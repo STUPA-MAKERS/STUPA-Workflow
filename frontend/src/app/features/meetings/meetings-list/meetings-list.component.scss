@@ -97,10 +97,15 @@
 .mtl__row:only-child {
   --li-radius: var(--radius-lg);
 }
-/* A past meeting steps back: muted text and a muted date block (`[muted]`), the status
-   stays readable. */
+/* A past meeting steps back: a muted title, a subtle sub line and a muted date block
+   (`[muted]`), the status stays readable. The subtle text passes 4.5:1 on surface 2 but
+   not on surface 3, so the hovered row takes the muted sub line again. */
 .mtl__row--past {
   --li-color: var(--color-text-muted);
+  --li-sub-color: var(--color-text-subtle);
+}
+.mtl__row--past:hover {
+  --li-sub-color: var(--color-text-muted);
 }
 
 .mtl__meta {

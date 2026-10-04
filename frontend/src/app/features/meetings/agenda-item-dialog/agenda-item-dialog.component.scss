@@ -5,6 +5,9 @@
 .aid {
   @include df.form;
 }
+.aid__switchLabel {
+  @include df.switch-label;
+}
 .aid__kind {
   align-self: flex-start;
   max-width: 100%;

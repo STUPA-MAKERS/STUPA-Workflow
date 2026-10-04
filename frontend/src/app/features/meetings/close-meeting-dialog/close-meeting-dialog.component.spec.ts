@@ -93,6 +93,23 @@ describe('CloseMeetingDialogComponent', () => {
     expect(screen.getByText('Keine offene Abstimmung')).toBeInTheDocument();
   });
 
+  it('clears the 409 refusal when a new meeting state shows no open vote', async () => {
+    const { http, cmp, fixture } = await setup();
+    cmp.confirm();
+    http.expectOne('/api/meetings/m-1').flush({ code: 'open_vote' }, { status: 409, statusText: 'x' });
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Sitzung schließen' })).toBeDisabled();
+    // The other tab opened the vote: the push shows it, the close stays blocked.
+    fixture.componentRef.setInput('meeting', { ...LIVE, votes: [vote('open')] });
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Sitzung schließen' })).toBeDisabled();
+    // The other tab closed the vote again: the close is possible without a new opening.
+    fixture.componentRef.setInput('meeting', { ...LIVE, votes: [vote('closed')] });
+    fixture.detectChanges();
+    expect(screen.getByText('Keine offene Abstimmung')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sitzung schließen' })).toBeEnabled();
+  });
+
   it('shows another refusal as a toast', async () => {
     const { http, cmp, toasts } = await setup();
     cmp.confirm();

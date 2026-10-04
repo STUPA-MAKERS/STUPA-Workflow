@@ -6,6 +6,9 @@
 .vod {
   @include df.form;
 }
+.vod__switchLabel {
+  @include df.switch-label;
+}
 
 /* The decision question: a filled field like the kit inputs, with its label inside. */
 .vod__field {

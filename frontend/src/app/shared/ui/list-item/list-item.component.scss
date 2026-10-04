@@ -107,7 +107,7 @@
   min-width: 0;
   font-size: 0.8125rem; /* 13px */
   line-height: 1.1875rem;
-  color: var(--color-text-muted);
+  color: var(--li-sub-color, var(--color-text-muted));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

@@ -35,7 +35,7 @@
       [hint]="'meetings.vote.secretHint' | t"
       [checked]="secret()"
       (checkedChange)="secret.set($event)"
-      >{{ 'meetings.vote.secret' | t }}</app-switch
+      ><span class="vod__switchLabel">{{ 'meetings.vote.secret' | t }}</span></app-switch
     >
   </form>
   <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>

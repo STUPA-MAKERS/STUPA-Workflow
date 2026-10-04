@@ -29,7 +29,8 @@ import { errorCode, errorDetail } from '../meetings-display.util';
  * needs and does (O12, O13):
  *
  * - No vote of the meeting may be open. The server refuses the close with 409
- *   `open_vote` otherwise, and the dialog then shows that reason in the list.
+ *   `open_vote` otherwise, and the dialog then shows that reason in the list. The
+ *   reason stays until a new state of the meeting shows no open vote.
  * - The close cancels the planned (draft) votes of the meeting.
  * - The close does NOT finalize the protocol. Finalizing is a step of its own, for a
  *   holder of the Gremium right `protocol.finalize`.
@@ -72,6 +73,13 @@ export class CloseMeetingDialogComponent {
           this.refused.set(false);
         });
       }
+    });
+    // A refusal is only true until the page learns more. When a new state of the
+    // meeting (for example a `meeting_state` push after the other tab closed the vote)
+    // shows no open vote, the close is possible again.
+    effect(() => {
+      const anyOpen = this.meeting().votes.some((v) => v.status === 'open');
+      if (!anyOpen) untracked(() => this.refused.set(false));
     });
   }
 

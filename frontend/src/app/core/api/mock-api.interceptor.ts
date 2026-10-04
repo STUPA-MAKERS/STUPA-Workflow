@@ -428,6 +428,10 @@ let MOCK_MEETING: MeetingOutWire = {
   gremiumId: null,
   gremiumName: 'Studierendenparlament',
   protocolId: MOCK_PROTOCOL_ID,
+  // The demo user keeps the minutes: an id of the roster below, so that the settings
+  // dialog preselects the same person that the list row shows.
+  protokollantId: MOCK_PRINCIPAL.sub,
+  protokollantName: MOCK_PRINCIPAL.display_name,
   isProtokollant: true,
   canControl: true,
   // The demo user leads the meeting: the dialogs of the meeting page show.
@@ -522,7 +526,8 @@ function mockTimelineMeeting(
     gremiumId: 'g0000000-0000-0000-0000-000000000001',
     gremiumName: 'Studierendenparlament',
     protocolId: status === 'planned' ? null : `e0000000-0000-0000-0000-0000000001${String(n).padStart(2, '0')}`,
-    protokollantName: status === 'planned' ? null : 'Demo Mitglied',
+    protokollantId: status === 'planned' ? null : MOCK_PRINCIPAL.sub,
+    protokollantName: status === 'planned' ? null : MOCK_PRINCIPAL.display_name,
     canManage: true,
     canControl: true,
     canWrite: true,
@@ -556,7 +561,8 @@ function mockTimeline(): { past: MeetingOutWire[]; upcoming: MeetingOutWire[] } 
     date: MOCK_MEETING.date ?? mockDay(0),
     startTime: MOCK_MEETING.startTime ?? '18:00:00',
     startedAt: MOCK_MEETING.status === 'live' ? `${mockDay(0)}T16:04:00Z` : null,
-    protokollantName: MOCK_MEETING.protokollantName ?? 'Demo Mitglied',
+    protokollantId: MOCK_MEETING.protokollantId ?? null,
+    protokollantName: MOCK_MEETING.protokollantName ?? null,
     canManage: true,
   };
   const upcoming = [
@@ -566,7 +572,8 @@ function mockTimeline(): { past: MeetingOutWire[]; upcoming: MeetingOutWire[] } 
       gremiumId: 'g0000000-0000-0000-0000-000000000002',
       startTime: '17:30:00',
       endTime: '19:00:00',
-      protokollantName: 'Demo Mitglied',
+      protokollantId: MOCK_PRINCIPAL.sub,
+      protokollantName: MOCK_PRINCIPAL.display_name,
       canManage: false,
       canControl: false,
       canWrite: false,
@@ -592,12 +599,15 @@ interface MockAttendance {
   source: 'self' | 'lead' | null;
   note: string | null;
   isSelf: boolean;
+  /** O20: the member holds `protocol.write` and can keep the minutes. */
+  canKeepProtocol: boolean;
 }
 
+/** The roster of the mock Gremium. The demo user is in it with the id of the principal. */
 let MOCK_ATTENDANCE: MockAttendance[] = [
-  { principalId: 'me', displayName: 'Demo-Nutzer:in', email: null, status: null, source: null, note: null, isSelf: true },
-  { principalId: 'p-2', displayName: 'Max Mustermann', email: 'max@example.com', status: 'present', source: 'lead', note: null, isSelf: false },
-  { principalId: 'p-3', displayName: 'Erika Beispiel', email: 'erika@example.com', status: 'excused', source: 'self', note: 'Prüfung', isSelf: false },
+  { principalId: MOCK_PRINCIPAL.sub, displayName: MOCK_PRINCIPAL.display_name ?? null, email: MOCK_PRINCIPAL.email ?? null, status: null, source: null, note: null, isSelf: true, canKeepProtocol: true },
+  { principalId: 'p-2', displayName: 'Max Mustermann', email: 'max@example.com', status: 'present', source: 'lead', note: null, isSelf: false, canKeepProtocol: true },
+  { principalId: 'p-3', displayName: 'Erika Beispiel', email: 'erika@example.com', status: 'excused', source: 'self', note: 'Prüfung', isSelf: false, canKeepProtocol: false },
 ];
 
 interface MockAgendaItem {
@@ -738,7 +748,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
           principalId: a.principalId,
           displayName: a.displayName,
           email: a.email,
-          canKeepProtocol: a.principalId !== 'p-3',
+          canKeepProtocol: a.canKeepProtocol,
         })),
       );
     }
@@ -962,6 +972,14 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       endTime: body.endTime !== undefined ? body.endTime : MOCK_MEETING.endTime,
       protokollantId:
         body.protokollantId !== undefined ? body.protokollantId : MOCK_MEETING.protokollantId,
+      protokollantName:
+        body.protokollantId !== undefined
+          ? (MOCK_ATTENDANCE.find((a) => a.principalId === body.protokollantId)?.displayName ?? null)
+          : MOCK_MEETING.protokollantName,
+      isProtokollant:
+        body.protokollantId !== undefined
+          ? body.protokollantId === MOCK_PRINCIPAL.sub
+          : MOCK_MEETING.isProtokollant,
       closedAt: body.status === 'closed' ? new Date().toISOString() : MOCK_MEETING.closedAt,
     };
     return ok(MOCK_MEETING);

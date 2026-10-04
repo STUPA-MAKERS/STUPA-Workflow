@@ -35,9 +35,9 @@ import { RouterLink } from '@angular/router';
  * Slots: `[lead]` (an avatar for a person, an icon or a date block; never initials for a
  * thing), `[status]` (a status right after the title, on the title line; the title gets
  * the ellipsis first), `[sub]` and `[trail]`. Set `--li-hover` on the host to change the
- * hover surface (for example in a row group on surface 2) , `--li-color` to change the
- * text colour (for example a muted row of the past) and `--li-radius` to match the corners
- * of a row group.
+ * hover surface (for example in a row group on surface 2), `--li-color` to change the
+ * text colour (for example a muted row of the past), `--li-sub-color` to change the colour
+ * of the sub line and `--li-radius` to match the corners of a row group.
  */
 @Component({
   selector: 'app-list-item',

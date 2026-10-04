@@ -101,8 +101,15 @@ export const MOCK_PRINCIPALS: AdminPrincipal[] = [
   },
 ];
 
+/**
+ * The id of the mock Studierendenparlament. It is the id of the core mock API
+ * (`mock-api.interceptor.ts`), where the mock principal manages this Gremium
+ * (`session_manage_gremien`). With the same id, "Neue Sitzung" offers it.
+ */
+export const MOCK_GREMIUM_STUPA_ID = 'g0000000-0000-0000-0000-000000000001';
+
 export const MOCK_GREMIEN: Gremium[] = [
-  { id: 'g-stupa', name: 'Studierendenparlament', slug: 'stupa', cdVariantId: 'cd-stupa', defaultLang: 'de', allowVoteDelegation: true },
+  { id: MOCK_GREMIUM_STUPA_ID, name: 'Studierendenparlament', slug: 'stupa', cdVariantId: 'cd-stupa', defaultLang: 'de', allowVoteDelegation: true },
   { id: 'g-asta', name: 'AStA', slug: 'asta', cdVariantId: 'cd-asta', defaultLang: 'de', allowVoteDelegation: false },
 ];
 
@@ -127,8 +134,8 @@ export const MOCK_GREMIUM_ROLES: GremiumRole[] = MOCK_GREMIEN.flatMap((g) => [
 
 /** Read-only memberships. In the real backend the OIDC group sync writes them. */
 export const MOCK_GREMIUM_MEMBERSHIPS: GremiumMembership[] = [
-  { id: 'gms-1', principalId: 'p-1', gremiumId: 'g-stupa', gremiumRoleId: 'gr-stupa-board' },
-  { id: 'gms-2', principalId: 'p-2', gremiumId: 'g-stupa', gremiumRoleId: 'gr-stupa-member' },
+  { id: 'gms-1', principalId: 'p-1', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-board' },
+  { id: 'gms-2', principalId: 'p-2', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-member' },
 ];
 
 /** OIDC group → global role. */
@@ -139,28 +146,28 @@ export const MOCK_GROUP_MAPPINGS: GroupMapping[] = [
 
 /** OIDC group → gremium membership. */
 export const MOCK_GREMIUM_MEMBERSHIP_MAPPINGS: GremiumMembershipMapping[] = [
-  { id: 'gmm-1', gremiumId: 'g-stupa', oidcGroup: 'stupa-mitglieder' },
+  { id: 'gmm-1', gremiumId: MOCK_GREMIUM_STUPA_ID, oidcGroup: 'stupa-mitglieder' },
   { id: 'gmm-2', gremiumId: 'g-asta', oidcGroup: 'asta-referate' },
 ];
 
 /** OIDC group → role of one gremium. */
 export const MOCK_GREMIUM_ROLE_MAPPINGS: GremiumRoleMapping[] = [
-  { id: 'grm-1', gremiumId: 'g-stupa', gremiumRoleId: 'gr-stupa-board', oidcGroup: 'stupa-praesidium' },
+  { id: 'grm-1', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-board', oidcGroup: 'stupa-praesidium' },
 ];
 
 /** Seed for the forms overview, until `/admin/application-types` is real. */
 export const MOCK_FORMS: FormOverviewItem[] = [
-  { id: 'f-foerderung', name: { de: 'Förderantrag', en: 'Funding application' }, gremiumId: 'g-stupa', status: 'active', version: 3 },
+  { id: 'f-foerderung', name: { de: 'Förderantrag', en: 'Funding application' }, gremiumId: MOCK_GREMIUM_STUPA_ID, status: 'active', version: 3 },
   { id: 'f-veranstaltung', name: { de: 'Veranstaltungsantrag', en: 'Event application' }, gremiumId: 'g-asta', status: 'active', version: 2 },
-  { id: 'f-anschaffung', name: { de: 'Anschaffungsantrag', en: 'Procurement application' }, gremiumId: 'g-stupa', status: 'draft', version: 1 },
+  { id: 'f-anschaffung', name: { de: 'Anschaffungsantrag', en: 'Procurement application' }, gremiumId: MOCK_GREMIUM_STUPA_ID, status: 'draft', version: 1 },
   { id: 'f-altfall', name: { de: 'Härtefallantrag', en: 'Hardship application' }, gremiumId: 'g-asta', status: 'inactive', version: 5 },
 ];
 
 /** Application types/forms for the forms builder — mock until the backend is real. */
 export const MOCK_APP_TYPES: ApplicationTypeFull[] = [
-  { id: 'f-foerderung', name: { de: 'Förderantrag', en: 'Funding application' }, gremiumId: 'g-stupa', hasBudget: true, activeFormVersionId: 'fv-foerderung-3' },
+  { id: 'f-foerderung', name: { de: 'Förderantrag', en: 'Funding application' }, gremiumId: MOCK_GREMIUM_STUPA_ID, hasBudget: true, activeFormVersionId: 'fv-foerderung-3' },
   { id: 'f-veranstaltung', name: { de: 'Veranstaltungsantrag', en: 'Event application' }, gremiumId: 'g-asta', hasBudget: false, activeFormVersionId: 'fv-veranstaltung-2' },
-  { id: 'f-anschaffung', name: { de: 'Anschaffungsantrag', en: 'Procurement application' }, gremiumId: 'g-stupa', hasBudget: true, activeFormVersionId: null },
+  { id: 'f-anschaffung', name: { de: 'Anschaffungsantrag', en: 'Procurement application' }, gremiumId: MOCK_GREMIUM_STUPA_ID, hasBudget: true, activeFormVersionId: null },
 ];
 
 /** Form drafts per type — raw fields + description of the forms editor. */

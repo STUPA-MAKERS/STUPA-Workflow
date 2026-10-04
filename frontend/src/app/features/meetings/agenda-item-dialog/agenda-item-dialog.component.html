@@ -69,7 +69,7 @@
       [hint]="'meetings.agenda.nonPublicHint' | t"
       [checked]="nonPublic()"
       (checkedChange)="nonPublic.set($event)"
-      >{{ 'meetings.agenda.nonPublicLabel' | t }}</app-switch
+      ><span class="aid__switchLabel">{{ 'meetings.agenda.nonPublicLabel' | t }}</span></app-switch
     >
     <button type="submit" hidden></button>
   </form>

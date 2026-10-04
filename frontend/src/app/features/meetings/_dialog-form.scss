@@ -22,6 +22,12 @@
   margin: 0;
 }
 
+// The label of a switch in a dialog: medium weight over the regular hint line, as on
+// the boards. The label text is projected, so the dialog styles it.
+@mixin switch-label {
+  font-weight: var(--fw-medium);
+}
+
 // Small text below a control or a group: a hint with a function.
 @mixin hint {
   margin: 0;

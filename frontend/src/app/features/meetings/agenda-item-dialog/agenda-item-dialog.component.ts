@@ -138,6 +138,12 @@ export class AgendaItemDialogComponent {
     if (value === 'application' || value === 'freetext') this.kind.set(value);
   }
 
+  /**
+   * The flow state of an assignable application, as neutral status text. The board
+   * shows it in the accent, but the accent means "done" or "live" (see
+   * `status-kind.util.ts`), and an application that waits for its agenda item is
+   * neither. The list also has no state colour to map with `flowColorKind`.
+   */
   stateOf(a: AssignableApplication): string {
     return resolveI18n(a.stateLabel, this.i18n.locale());
   }
