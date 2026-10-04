@@ -1035,6 +1035,7 @@ export const de = {
   'voting.beamer.waiting': 'Bereit – noch keine Abstimmung freigeschaltet.',
   'voting.beamer.votesOf': '{cast} von {eligible} Stimmen',
   'voting.beamer.closed': 'Endergebnis',
+  'voting.beamer.exit': 'Beamer-Ansicht verlassen',
 
   'admin.home.title': 'Verwaltung',
   'admin.home.formBuilder': 'Formular-Builder',
@@ -3307,6 +3308,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'voting.beamer.waiting': 'Ready – no vote opened yet.',
   'voting.beamer.votesOf': '{cast} of {eligible} votes',
   'voting.beamer.closed': 'Final result',
+  'voting.beamer.exit': 'Leave projector view',
 
   'admin.home.title': 'Administration',
   'admin.home.formBuilder': 'Form builder',

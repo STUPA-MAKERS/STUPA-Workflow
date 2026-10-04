@@ -55,6 +55,16 @@
   line-height: 14px;
   text-decoration: none;
 }
+/* The search is a button: reset the native button look to the link look. */
+.rail__search {
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
 .rail__label {
   max-width: 88px;
   overflow: hidden;

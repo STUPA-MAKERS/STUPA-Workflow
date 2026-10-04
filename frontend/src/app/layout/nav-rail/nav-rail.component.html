@@ -3,6 +3,17 @@
     <img [src]="markSrc" alt="" width="40" height="40" />
   </a>
 
+  <!-- The search stays in reach on every page, not only on the start page. -->
+  <button
+    type="button"
+    class="rail__item rail__search"
+    [attr.aria-keyshortcuts]="searchKeys"
+    (click)="palette.open()"
+  >
+    <span class="rail__ind"><app-icon name="search" [size]="22" /></span>
+    <span class="rail__label">{{ 'search.title' | t }}</span>
+  </button>
+
   <!-- Only the areas scroll when the viewport is too low. The administration and the
        account stay in view below them. -->
   <div class="rail__main">

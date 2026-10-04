@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { IconComponent } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
-import { isApplePlatform, searchShortcutLabel } from '../../../features/search/shortcut';
+import { searchShortcutKeys, searchShortcutLabel } from '../../../features/search/shortcut';
 
 /** `button` opens something (the command palette); `input` filters in place. */
 export type SearchPillMode = 'button' | 'input';
@@ -58,9 +58,7 @@ export class SearchPillComponent {
 
   protected readonly name = computed(() => this.label() ?? this.placeholder());
   protected readonly keyLabel = computed(() => searchShortcutLabel(this.i18n.locale()));
-  protected readonly keys = computed(() =>
-    this.shortcut() ? (isApplePlatform() ? 'Meta+K' : 'Control+K') : null,
-  );
+  protected readonly keys = computed(() => (this.shortcut() ? searchShortcutKeys() : null));
 
   protected onInput(event: Event): void {
     this.value.set((event.target as HTMLInputElement).value);

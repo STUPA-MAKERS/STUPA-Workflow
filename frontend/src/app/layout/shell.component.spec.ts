@@ -181,9 +181,9 @@ describe('ShellComponent', () => {
   });
 
   describe('rail entries', () => {
-    /** The visible labels of the rail entries, in rail order (without the brand mark). */
+    /** The visible labels of the rail links, in rail order (without the brand mark and the search). */
     const labels = () =>
-      Array.from((mainNav() as HTMLElement).querySelectorAll('.rail__label')).map((l) =>
+      Array.from((mainNav() as HTMLElement).querySelectorAll('a.rail__item .rail__label')).map((l) =>
         l.textContent?.trim(),
       );
 

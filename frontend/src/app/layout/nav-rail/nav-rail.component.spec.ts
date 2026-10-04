@@ -8,6 +8,7 @@ import type { Principal } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { createLocationMock, provideLocationMock } from '../../../testing/location-mock';
+import { CommandPaletteService } from '../../features/search/command-palette.service';
 import { RailStatusService } from '../rail-status.service';
 import { NavRailComponent } from './nav-rail.component';
 
@@ -62,6 +63,17 @@ describe('NavRailComponent', () => {
     expect(spacer).toBeGreaterThan(0);
     expect(children.slice(spacer + 1)).toEqual(['rail__item', 'rail__account']);
     expect(within(nav).getByRole('button', { name: 'Konto: Ada Admin' })).toBeInTheDocument();
+  });
+
+  it('opens the search palette from every page, with the shortcut named', async () => {
+    const view = await setup();
+    const palette = view.fixture.debugElement.injector.get(CommandPaletteService);
+    const button = screen.getByRole('button', { name: 'Suche' });
+    expect(button).toHaveAttribute('aria-keyshortcuts', expect.stringMatching(/^(Control|Meta)\+K$/));
+    expect(palette.isOpen()).toBe(false);
+    button.click();
+    expect(palette.isOpen()).toBe(true);
+    palette.close();
   });
 
   it('shows no badge before the first answer', async () => {
