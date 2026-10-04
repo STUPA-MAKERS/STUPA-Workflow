@@ -1,7 +1,7 @@
 import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { ApiClient } from '@core/api/api-client.service';
-import type { I18nMap, PublicFooterLink } from '@core/api/models';
+import type { I18nMap, PublicFooterColumn, PublicFooterLink } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 
 /**
@@ -34,6 +34,7 @@ export class BrandingService {
      from `/admin/site-config` would refuse that request and fall back to the defaults. */
   private readonly _copyright = signal<I18nMap | null>(null);
   private readonly _legalLinks = signal<PublicFooterLink[]>([]);
+  private readonly _footerColumns = signal<PublicFooterColumn[]>([]);
 
   /** Default confirmation window of a guest application, in hours. */
   static readonly DEFAULT_CONFIRM_TTL_HOURS = 12;
@@ -50,6 +51,8 @@ export class BrandingService {
   readonly copyright = this._copyright.asReadonly();
   /** Maintained footer links; empty means the built-in imprint/privacy pair. */
   readonly legalLinks = this._legalLinks.asReadonly();
+  /** Footer columns, each a heading and its links. */
+  readonly footerColumns = this._footerColumns.asReadonly();
 
   /**
    * Full app name: the config value, else i18n `app.title`. The value reacts to
@@ -78,6 +81,7 @@ export class BrandingService {
         this._configuredName.set(cfg.branding?.appName ?? '');
         this._copyright.set(cfg.branding?.copyright ?? null);
         this._legalLinks.set(cfg.branding?.legalLinks ?? []);
+        this._footerColumns.set(cfg.branding?.footerColumns ?? []);
         if (typeof cfg.confirmTtlHours === 'number' && cfg.confirmTtlHours > 0) {
           this._confirmTtlHours.set(cfg.confirmTtlHours);
         }

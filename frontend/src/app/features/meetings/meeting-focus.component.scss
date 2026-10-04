@@ -1,18 +1,18 @@
 @use 'vote-block';
 
-/* The page fills the viewport below the app header. The main region adds its block
-   padding around the router outlet, so the host pulls that back and the dock lands on
-   the bottom edge of the viewport. */
+/* The page fills the viewport. The main region adds its block padding around the router
+   outlet (`--main-pad-top` / `--main-pad-bottom` of the shell), so the host pulls exactly
+   that back and the dock lands on the bottom edge of the viewport. */
 :host {
   display: flex;
   flex-direction: column;
   min-height: calc(100dvh - var(--layout-header-height));
-  margin-block: calc(-1 * var(--space-8));
+  margin-block: calc(-1 * var(--main-pad-top, var(--space-8)))
+    calc(-1 * var(--main-pad-bottom, var(--space-8)));
   margin-inline: calc(-1 * var(--layout-gutter));
 }
 @media (max-width: 768px) {
   :host {
-    margin-block: calc(-1 * var(--space-5));
     margin-inline: calc(-1 * var(--space-4));
   }
 }
@@ -789,12 +789,13 @@ app-markdown-editor ::ng-deep .mde__host .ProseMirror {
   :host {
     padding-bottom: var(--fx-dock-h, 0px);
   }
+  /* Above the phone navigation bar of the shell, where there is one. */
   .fx__dock {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: 0;
-    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+    bottom: var(--app-bottom-inset, 0px);
+    padding-bottom: calc(var(--space-3) + var(--app-bottom-safe-area, env(safe-area-inset-bottom)));
   }
   .fx__bar {
     padding: var(--space-3) var(--space-4);

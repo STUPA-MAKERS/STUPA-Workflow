@@ -7,6 +7,7 @@ import { DelegationsApiService, type VoteDelegationStatus } from '@core/api/dele
 import type { Vote } from '@core/api/models';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { VoteCastComponent } from './vote-cast.component';
+import { RailStatusService } from '../../layout/rail-status.service';
 
 function vote(overrides: Partial<Vote> = {}): Vote {
   return {
@@ -67,6 +68,7 @@ async function setup(opts: {
       );
 
   const toast = { success: jest.fn(), error: jest.fn() };
+  const railStatus = { refresh: jest.fn() };
 
   const id = opts.routeId === undefined ? 'v1' : opts.routeId;
   const r = await render(VoteCastComponent, {
@@ -79,6 +81,7 @@ async function setup(opts: {
       { provide: ApiClient, useValue: api },
       { provide: DelegationsApiService, useValue: { voteStatus } },
       { provide: ToastService, useValue: toast },
+      { provide: RailStatusService, useValue: railStatus },
       {
         provide: ActivatedRoute,
         useValue: {
@@ -87,7 +90,7 @@ async function setup(opts: {
       },
     ],
   });
-  return { ...r, getVote, castBallot, deleteVote, voteStatus, toast };
+  return { ...r, getVote, castBallot, deleteVote, voteStatus, toast, railStatus };
 }
 
 /** A draft standalone vote: the only shape the delete route accepts. */
@@ -279,10 +282,12 @@ describe('VoteCastComponent', () => {
   });
 
   it('shows the cast toast after a ballot', async () => {
-    const { castBallot, toast } = await setup({});
+    const { castBallot, toast, railStatus } = await setup({});
     await userEvent.click(screen.getByRole('button', { name: 'Nein' }));
     expect(castBallot).toHaveBeenCalledWith('v1', 'no', false);
     expect(toast.success).toHaveBeenCalledWith('Stimme gezählt.');
+    // A ballot can close a task, so the count in the navigation asks again.
+    expect(railStatus.refresh).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/Deine Stimme: Nein/)).toBeInTheDocument();
   });
 

@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, Subject } from 'rxjs';
 import { LOCATION } from '../browser/location.token';
-import type { ClientMessage, ServerMessage } from './ws-messages';
+import type { ClientMessage, MeetingStateMsg, ServerMessage } from './ws-messages';
 
 /** An open live-vote connection. */
 export interface MeetingChannel {
@@ -20,6 +20,13 @@ export interface MeetingChannel {
 @Injectable({ providedIn: 'root' })
 export class WsService {
   private readonly location = inject(LOCATION);
+  private readonly meetingStates = new Subject<MeetingStateMsg>();
+
+  /**
+   * Every `meeting_state` frame of every open channel. The navigation rail follows it
+   * to update the live mark when a meeting starts or closes.
+   */
+  readonly meetingStates$: Observable<MeetingStateMsg> = this.meetingStates.asObservable();
 
   /** Open `/api/ws/meetings/{id}`, or `…/beamer` for read-only access. */
   connectMeeting(meetingId: string, beamer = false): MeetingChannel {
@@ -37,11 +44,15 @@ export class WsService {
 
     ws.addEventListener('open', flush);
     ws.addEventListener('message', (ev: MessageEvent<string>) => {
+      let msg: ServerMessage;
       try {
-        subject.next(JSON.parse(ev.data) as ServerMessage);
+        msg = JSON.parse(ev.data) as ServerMessage;
       } catch {
         subject.next({ type: 'error', code: 'malformed_message' });
+        return;
       }
+      subject.next(msg);
+      if (msg.type === 'meeting_state') this.meetingStates.next(msg);
     });
     ws.addEventListener('error', () => subject.next({ type: 'error', code: 'socket_error' }));
     ws.addEventListener('close', () => subject.complete());

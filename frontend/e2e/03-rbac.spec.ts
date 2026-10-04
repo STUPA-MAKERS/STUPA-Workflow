@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { expectPublicFrame } from './helpers';
 
 /**
  * Scenario 7 (testing.md §3.7): RBAC fails closed. An unauthenticated visitor must
@@ -17,3 +18,11 @@ for (const path of GUARDED) {
     expect(new URL(page.url()).pathname).not.toBe(path);
   });
 }
+
+test('@gating Unauth bekommt eine unbekannte Seite als 404 im öffentlichen Rahmen', async ({ page }) => {
+  await page.goto('/gibt-es-nicht');
+  await expect(page.getByRole('heading', { name: /Seite nicht gefunden|Page not found/ })).toBeVisible();
+  await expectPublicFrame(page);
+  // The way out goes to the public start page, not into the guarded app.
+  await expect(page.getByRole('link', { name: /Zur Startseite|Back to start/ })).toHaveAttribute('href', '/');
+});

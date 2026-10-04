@@ -14,6 +14,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { render, screen } from '@testing-library/angular';
 import { BehaviorSubject } from 'rxjs';
 import { ApplicationsDetailComponent } from './applications-detail.component';
+import { RailStatusService } from '../../layout/rail-status.service';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ToastService } from '@stupa-makers/ui-kit';
@@ -78,6 +79,8 @@ async function setup(
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
       { provide: AuthService, useValue: fakeAuth(permissions) },
+      // The real service polls; the page only asks it to refresh.
+      { provide: RailStatusService, useValue: { refresh: jest.fn() } },
       { provide: ActivatedRoute, useValue: { paramMap: paramMap$ } },
     ],
   });

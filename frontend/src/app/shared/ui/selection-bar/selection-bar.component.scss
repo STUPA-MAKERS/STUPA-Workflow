@@ -4,7 +4,8 @@
    The host lets clicks through, so it does not block the rows under the empty sides. */
 :host {
   position: sticky;
-  bottom: var(--space-6);
+  /* Above the phone navigation bar of the shell, where there is one. */
+  bottom: calc(var(--app-bottom-inset, 0px) + var(--space-6));
   z-index: var(--z-sticky);
   display: flex;
   justify-content: center;

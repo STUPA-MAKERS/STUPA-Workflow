@@ -2,18 +2,17 @@ import type { Routes } from '@angular/router';
 import { authGuard } from '@core/auth/auth.guard';
 import { homeRedirectGuard } from '@core/auth/home-redirect.guard';
 import { ShellComponent } from './layout/shell.component';
-
-/**
- * The gremium permissions that open the voting pages. Casting is `vote.cast`. Running a
- * vote is `vote.manage`, or the meeting lead `session.manage`. All three are gremium
- * permissions: no global permission grants a voting right.
- */
-const VOTING_GREMIUM_PERMISSIONS = ['vote.cast', 'vote.manage', 'session.manage'];
+import {
+  ADMIN_AREA_PERMISSIONS,
+  BUDGET_PERMISSIONS,
+  VOTING_GREMIUM_PERMISSIONS,
+} from './layout/nav.service';
 
 /**
  * Routing skeleton. `authGuard` protects the OIDC areas. Some areas also need an RBAC
  * permission: a global one (`data.permission`) or a gremium one in any gremium
- * (`data.gremiumPermission`).
+ * (`data.gremiumPermission`). `data.chrome: false` shows the page without the frame of the
+ * shell (no rail, no bars, no footer), for the beamer.
  */
 export const routes: Routes = [
   {
@@ -114,14 +113,15 @@ export const routes: Routes = [
         // Read-only beamer view for the projector. Declared before `vote/:id`.
         path: 'voting/beamer',
         // The beamer WebSocket needs `session.manage` in the gremium of the meeting.
-        data: { title: 'voting.beamer.heading', gremiumPermission: 'session.manage' },
+        // `chrome: false`: the projector shows the page without rail, bars or footer.
+        data: { title: 'voting.beamer.heading', gremiumPermission: 'session.manage', chrome: false },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./features/voting/beamer.component').then((m) => m.BeamerComponent),
       },
       {
         path: 'voting/beamer/:id',
-        data: { title: 'voting.beamer.heading', gremiumPermission: 'session.manage' },
+        data: { title: 'voting.beamer.heading', gremiumPermission: 'session.manage', chrome: false },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./features/voting/beamer.component').then((m) => m.BeamerComponent),
@@ -184,7 +184,7 @@ export const routes: Routes = [
       {
         path: 'budget',
         // A Gremium with an assigned cost center sees a scoped tab.
-        data: { title: 'nav.budget', permission: ['budget.view', 'budget.structure', 'budget.book'], allowScopedBudgetView: true, wide: true },
+        data: { title: 'nav.budget', permission: BUDGET_PERMISSIONS, allowScopedBudgetView: true, wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/budget/budget-dashboard.component').then(
@@ -193,7 +193,7 @@ export const routes: Routes = [
       },
       {
         path: 'expenses',
-        data: { title: 'nav.expenses', permission: ['budget.view', 'budget.structure', 'budget.book'], wide: true },
+        data: { title: 'nav.expenses', permission: BUDGET_PERMISSIONS, wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/expenses/expenses.component').then((m) => m.ExpensesComponent),
@@ -201,7 +201,7 @@ export const routes: Routes = [
       {
         path: 'invoices',
         // Narrow body like the tasks tab: no `wide` keeps the default container width.
-        data: { title: 'nav.invoices', permission: ['budget.view', 'budget.structure', 'budget.book'] },
+        data: { title: 'nav.invoices', permission: BUDGET_PERMISSIONS },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/invoices/invoices.component').then((m) => m.InvoicesComponent),
@@ -221,7 +221,7 @@ export const routes: Routes = [
         data: {
           title: 'nav.admin',
           // Every area-admin role can reach the admin overview.
-          permission: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.users', 'admin.group_mappings', 'admin.gremium_roles', 'admin.cd_variants', 'admin.delegations', 'admin.deadlines', 'admin.notifications', 'privacy.manage', 'webhook.manage', 'audit.read', 'backup.manage'],
+          permission: ADMIN_AREA_PERMISSIONS,
         },
         canActivate: [authGuard],
         loadComponent: () =>

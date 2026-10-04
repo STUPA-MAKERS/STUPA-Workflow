@@ -1,4 +1,3 @@
-import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -12,13 +11,16 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Subject, debounceTime, switchMap } from 'rxjs';
+import { Subject, catchError, debounceTime, of, switchMap } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ApiClient } from '@core/api/api-client.service';
-import type { SearchHit, SearchKind } from '@core/api/models';
+import type { SearchHit, SearchKind, SearchResults } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { StatusTextComponent } from '@shared/ui';
 import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
+import { CommandPaletteService } from './command-palette.service';
+import { highlight, type TextPart } from './highlight';
 import { PageIndexService, type PageEntry } from './page-index.service';
 import { isApplePlatform } from './shortcut';
 
@@ -30,7 +32,9 @@ interface PaletteRow {
   subtitle: string | null;
   icon: IconName;
   url: string;
-  /** Applications only. The row badges it, so an archived hit is not read as current. */
+  /** The subtitle is the state of an application: it shows as status text. */
+  status?: boolean;
+  /** Applications only. The row marks it, so an archived hit is not read as current. */
   archived?: boolean;
 }
 
@@ -40,41 +44,41 @@ const DEBOUNCE_MS = 180;
 /** The server ignores anything shorter, so the client does not ask. */
 const MIN_QUERY = 2;
 
-/** Picked from the icons the kit actually has, not from what each kind would ideally
-    want. A wrong-but-present glyph beats a name that fails to compile. */
+/** The icons of the records: the same icons the navigation uses for their areas. */
 const KIND_ICON: Record<SearchKind, IconName> = {
-  application: 'document',
-  meeting: 'clock',
-  invoice: 'euro',
-  expense: 'chart-pie',
-  budget: 'chart-pie',
+  application: 'file',
+  meeting: 'users',
+  invoice: 'receipt',
+  expense: 'swap',
+  budget: 'pie',
   gremium: 'parliament',
   principal: 'user',
 };
 
 /**
- * The icon for a page row, keyed on the leading path segment.
- *
- * A gear for every page said "setting" about pages that are not one — the dashboard, the
- * applications list. Admin pages keep it, because there it is true.
+ * The icon for a page row, keyed on the leading path segment: the icon of the area in
+ * the navigation. Admin pages keep the gear, because there it is true.
  */
 const SECTION_ICON: Record<string, IconName> = {
   dashboard: 'home',
-  applications: 'document',
-  apply: 'form',
-  tasks: 'check',
-  meetings: 'clock',
-  budget: 'chart-pie',
-  expenses: 'chart-pie',
-  invoices: 'euro',
+  applications: 'file',
+  apply: 'fileplus',
+  tasks: 'tasks',
+  meetings: 'users',
+  voting: 'vote',
+  budget: 'pie',
+  expenses: 'swap',
+  invoices: 'receipt',
   account: 'user',
   admin: 'gear',
 };
 
 /** The leading segment of a route path, which is the section it belongs to. */
 function sectionIcon(path: string): IconName {
-  return SECTION_ICON[path.replace(/^\//, '').split('/')[0] ?? ''] ?? 'gear';
+  return SECTION_ICON[path.replace(/^\//, '').split('/')[0]] ?? 'gear';
 }
+
+const EMPTY: SearchResults = { hits: [], truncated: false, failed: [] };
 
 /**
  * Global search, as a command palette.
@@ -85,15 +89,16 @@ function sectionIcon(path: string): IconName {
  * guard applies, so they appear instantly and never offer somewhere the user cannot go.
  * Records come from `GET /api/search`, which reuses each module's own read gate.
  *
- * The dialog is deliberately not `app-dialog`: that component centres a card in the
- * viewport and traps focus around a title and a footer. A palette sits high, owns the
- * keyboard, and has neither.
+ * The field is a combobox: the focus stays in it, the arrow keys move the active row
+ * (`aria-activedescendant`), Enter opens it and Escape closes the palette. Tab stays
+ * inside the dialog: it goes round between the field and the close button. The
+ * {@link CommandPaletteService} opens it from anywhere; Ctrl+K (⌘K) toggles it.
  */
 @Component({
   selector: 'app-command-palette',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, NgTemplateOutlet, TranslatePipe, IconComponent],
+  imports: [FormsModule, TranslatePipe, IconComponent, StatusTextComponent],
   templateUrl: './command-palette.component.html',
   styleUrl: './command-palette.component.scss',
 })
@@ -102,13 +107,15 @@ export class CommandPaletteComponent {
   private readonly router = inject(Router);
   private readonly i18n = inject(I18nService);
   private readonly pages = inject(PageIndexService);
+  private readonly palette = inject(CommandPaletteService);
 
   private readonly field = viewChild<ElementRef<HTMLInputElement>>('field');
+  private readonly closeButton = viewChild<ElementRef<HTMLButtonElement>>('closeButton');
 
   /** `⎋` is the key's own symbol on Apple keyboards; elsewhere the word is clearer. */
   protected readonly escLabel = isApplePlatform() ? '⎋' : 'Esc';
 
-  readonly open = signal(false);
+  readonly open = this.palette.isOpen;
   readonly query = signal('');
   readonly loading = signal(false);
   /** Index of the highlighted row, over the flattened list. */
@@ -117,6 +124,8 @@ export class CommandPaletteComponent {
   private readonly hits = signal<SearchHit[]>([]);
   private readonly truncated = signal(false);
   private readonly typed = new Subject<string>();
+  /** Where the focus was before the palette opened; it goes back there on close. */
+  private returnFocus: HTMLElement | null = null;
 
   /** Pages that match, filtered to what this user may actually open. */
   private readonly pageRows = computed<PaletteRow[]>(() => {
@@ -144,6 +153,8 @@ export class CommandPaletteComponent {
       subtitle: h.subtitle,
       icon: KIND_ICON[h.kind],
       url: h.url,
+      // The server sends the state label as the subtitle of an application.
+      status: h.kind === 'application',
       archived: h.archived,
     })),
   );
@@ -162,6 +173,12 @@ export class CommandPaletteComponent {
     return out;
   });
 
+  /** The id of the active row, for `aria-activedescendant`. */
+  readonly activeId = computed(() => {
+    const row = this.rows()[this.active()];
+    return row ? this.optionId(row) : null;
+  });
+
   readonly showEmpty = computed(
     () => !this.loading() && this.query().trim().length >= MIN_QUERY && !this.rows().length,
   );
@@ -172,22 +189,27 @@ export class CommandPaletteComponent {
       .pipe(
         debounceTime(DEBOUNCE_MS),
         // `switchMap` cancels the in-flight request: with a slow connection the answer
-        // to "ab" must never overwrite the answer to "abcd".
-        switchMap((q) => this.api.search(q)),
+        // to "ab" must never overwrite the answer to "abcd". The error is caught INSIDE,
+        // so one failed request does not end the search for the rest of the session.
+        switchMap((q) =>
+          this.api.search(q).pipe(
+            catchError(() => {
+              this.loading.set(false);
+              return of(EMPTY);
+            }),
+          ),
+        ),
         takeUntilDestroyed(),
       )
-      .subscribe({
-        next: (res) => {
-          this.hits.set(res.hits);
-          this.truncated.set(res.truncated);
-          this.loading.set(false);
-          this.active.set(0);
-        },
-        error: () => {
-          this.hits.set([]);
-          this.loading.set(false);
-        },
+      .subscribe((res) => {
+        this.hits.set(res.hits);
+        this.truncated.set(res.truncated);
+        this.loading.set(false);
+        this.active.set(0);
       });
+
+    // Every opening starts from a clean field, whoever opened it.
+    this.palette.opened$.pipe(takeUntilDestroyed()).subscribe(() => this.reset());
 
     // Focus the field once the overlay is in the DOM.
     effect(() => {
@@ -196,16 +218,16 @@ export class CommandPaletteComponent {
   }
 
   show(): void {
-    this.query.set('');
-    this.hits.set([]);
-    this.truncated.set(false);
-    this.active.set(0);
-    this.open.set(true);
+    this.palette.open();
   }
 
   close(): void {
-    this.open.set(false);
+    if (!this.open()) return;
+    this.palette.close();
     this.loading.set(false);
+    const target = this.returnFocus;
+    this.returnFocus = null;
+    if (target?.isConnected) target.focus();
   }
 
   onQuery(value: string): void {
@@ -238,22 +260,30 @@ export class CommandPaletteComponent {
       this.close();
       return;
     }
+    if (event.key === 'Tab') {
+      this.trapTab(event);
+      return;
+    }
+    // The row keys belong to the field. On the close button, Enter must press the button.
+    if (event.target !== this.field()?.nativeElement) return;
     const rows = this.rows();
     if (!rows.length) return;
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      this.active.set((this.active() + 1) % rows.length);
+      this.moveTo(rows, (this.active() + 1) % rows.length);
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
-      this.active.set((this.active() - 1 + rows.length) % rows.length);
+      this.moveTo(rows, (this.active() - 1 + rows.length) % rows.length);
     } else if (event.key === 'Enter') {
       event.preventDefault();
-      const row = rows[this.active()];
-      if (row) this.go(row);
+      // The rows can shrink under a kept index; the last row is then the nearest.
+      this.go(rows[Math.min(this.active(), rows.length - 1)]);
     }
   }
 
   go(row: PaletteRow): void {
+    // No focus return: the reader goes somewhere else.
+    this.returnFocus = null;
     this.close();
     // The url can carry a query string (`/budget?ks=…`), which `navigateByUrl` parses
     // and `navigate` would not.
@@ -265,5 +295,49 @@ export class CommandPaletteComponent {
     return this.rows().findIndex((r) => r.key === row.key);
   }
 
-  protected readonly rowKey = (_i: number, row: PaletteRow): string => row.key;
+  /** The parts of a text that match the query, for the highlight. */
+  parts(text: string): TextPart[] {
+    return highlight(text, this.query());
+  }
+
+  /** A stable DOM id for a row. */
+  optionId(row: PaletteRow): string {
+    return `palette-option-${row.key.replace(/[^A-Za-z0-9_-]/g, '-')}`;
+  }
+
+  private reset(): void {
+    this.returnFocus = document.activeElement as HTMLElement | null;
+    this.query.set('');
+    this.hits.set([]);
+    this.truncated.set(false);
+    this.loading.set(false);
+    this.active.set(0);
+  }
+
+  /**
+   * Keep the focus in the dialog (`aria-modal`). The rows are not tab stops (the arrow
+   * keys move between them), so Tab goes round between the field and the close button.
+   */
+  private trapTab(event: KeyboardEvent): void {
+    const first = this.field()?.nativeElement;
+    const last = this.closeButton()?.nativeElement;
+    if (!first || !last) return;
+    const current = document.activeElement;
+    let next: HTMLElement | null = null;
+    if (current !== first && current !== last) next = first;
+    else if (event.shiftKey && current === first) next = last;
+    else if (!event.shiftKey && current === last) next = first;
+    if (next) {
+      event.preventDefault();
+      next.focus();
+    }
+  }
+
+  /** Make a row the active one and scroll it into the visible part of the list. */
+  private moveTo(rows: PaletteRow[], index: number): void {
+    this.active.set(index);
+    const id = this.optionId(rows[index]);
+    // After the render that moves the highlight.
+    queueMicrotask(() => document.getElementById(id)?.scrollIntoView({ block: 'nearest' }));
+  }
 }

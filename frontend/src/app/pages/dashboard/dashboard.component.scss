@@ -16,9 +16,9 @@
    disappeared into them, which is the opposite of what a call to action has to do. */
 .dash__apply {
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: var(--space-2);
-  align-self: flex-start;
   padding: var(--space-4) var(--space-6);
   color: var(--color-on-accent);
   background: var(--color-accent);
@@ -41,8 +41,31 @@
   }
 }
 
+/* Search on the start side, the action at the end edge. */
+.dash__top {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+/* The pill shrinks before the row wraps: a 600px basis would wrap the row
+   below about 1000px, before the shrink starts. */
+.dash__search {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 600px;
+}
+
 /* Full-width tap target on a phone, where the inline size was hardest to hit. */
 @media (max-width: 768px) {
+  .dash__top {
+    flex-wrap: wrap;
+  }
+  .dash__search {
+    flex-basis: 100%;
+    max-width: none;
+  }
   .dash__apply {
     width: 100%;
     justify-content: center;

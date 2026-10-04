@@ -1,15 +1,18 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { ErrorPageComponent } from './error-page/error-page.component';
 
-/** 404 page. */
+/**
+ * 404 page. The shell frames it: the public bar while nobody is signed in, the rail
+ * while a principal is. The way out is the start page, which sends a signed-in
+ * principal on to the dashboard.
+ */
 @Component({
   selector: 'app-not-found',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslatePipe, EmptyStateComponent],
+  imports: [TranslatePipe, ErrorPageComponent],
   templateUrl: './not-found.component.html',
-  styleUrl: './not-found.component.scss',
+  styleUrl: './error-page/error-route.scss',
 })
 export class NotFoundComponent {}

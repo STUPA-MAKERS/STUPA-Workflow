@@ -8,6 +8,8 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { BehaviorSubject } from 'rxjs';
 import { ApplicationsDetailComponent } from './applications-detail.component';
+import { RailStatusService } from '../../layout/rail-status.service';
+import { TestBed } from '@angular/core/testing';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ToastService } from '@stupa-makers/ui-kit';
@@ -91,6 +93,8 @@ async function setup(
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
       { provide: AuthService, useValue: fakeAuth(permissions, roles) },
+      // The real service polls; the page only asks it to refresh.
+      { provide: RailStatusService, useValue: { refresh: jest.fn() } },
       { provide: ActivatedRoute, useValue: { paramMap: paramMap$ } },
     ],
   });
@@ -556,6 +560,7 @@ describe('ApplicationsDetailComponent', () => {
     flushForm(http);
     detectChanges();
     const success = jest.spyOn(toast, 'success');
+    const railRefresh = jest.spyOn(TestBed.inject(RailStatusService), 'refresh');
 
     await userEvent.click(screen.getByRole('button', { name: 'Annehmen' }));
     const post = http.expectOne((r) => r.url === '/api/applications/app-1/transition');
@@ -564,6 +569,8 @@ describe('ApplicationsDetailComponent', () => {
     post.flush({ newStateId: 's2', statusEventId: 'e1', dispatchedActions: [] });
     expect(cmp.firing()).toBeNull();
     expect(success).toHaveBeenCalled();
+    // The new state can add or remove a task: the count in the navigation asks again.
+    expect(railRefresh).toHaveBeenCalledTimes(1);
 
     // The refresh fetches the application and the aux data again, but not the form.
     http.expectOne(url('')).flush({ ...appWire(), version: 3 });
@@ -1358,6 +1365,8 @@ describe('ApplicationsDetailComponent', () => {
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
         { provide: AuthService, useValue: fakeAuth(['application.read']) },
+        // The real service polls; the page only asks it to refresh.
+        { provide: RailStatusService, useValue: { refresh: jest.fn() } },
         {
           provide: ActivatedRoute,
           useValue: { paramMap: new BehaviorSubject(convertToParamMap({ id: 'app-1' })) },

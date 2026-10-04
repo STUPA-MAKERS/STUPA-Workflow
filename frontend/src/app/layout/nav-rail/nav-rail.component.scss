@@ -1,0 +1,130 @@
+/* The rail sits on the page background, without an edge: the selected entry is the only
+   accent in it. On a low viewport the entries first get more compact; below that only
+   the areas scroll, so the administration and the account never leave the view. */
+:host {
+  display: block;
+  height: 100%;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 96px;
+  height: 100%;
+  padding: 20px 0 16px;
+  overflow: hidden;
+}
+
+/* The areas. A thin scroll bar is the sign that more entries sit below. */
+.rail__main {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.rail__brand {
+  display: flex;
+  flex: none;
+  margin-bottom: 24px;
+  border-radius: var(--radius-md);
+}
+.rail__brand img {
+  display: block;
+  width: 40px;
+  height: 40px;
+}
+
+.rail__item {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 60px;
+  color: var(--color-text-muted);
+  font-size: 11.5px;
+  font-weight: var(--fw-medium);
+  line-height: 14px;
+  text-decoration: none;
+}
+/* The search is a button: reset the native button look to the link look. */
+.rail__search {
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.rail__label {
+  max-width: 88px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The indicator: a pill behind the icon. Hover tints it, the active entry fills it. */
+.rail__ind {
+  position: relative;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 56px;
+  height: 32px;
+  border-radius: 16px;
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+.rail__item:hover .rail__ind {
+  background: var(--color-surface-2);
+}
+.rail__item:hover {
+  color: var(--color-text);
+}
+.rail__item.is-active {
+  color: var(--color-text);
+  font-weight: var(--fw-semibold);
+}
+.rail__item.is-active .rail__ind {
+  background: var(--color-selected);
+  color: var(--color-accent-text);
+}
+.rail__item:focus-visible,
+.rail__brand:focus-visible {
+  outline: none;
+}
+.rail__item:focus-visible .rail__ind,
+.rail__brand:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.rail__spacer {
+  flex: 1 0 var(--space-4);
+}
+
+.rail__account {
+  flex: none;
+  margin-top: 8px;
+}
+
+/* A low laptop screen (1366x657 and similar): smaller steps, so every entry fits. */
+@media (max-height: 760px) {
+  .rail {
+    padding-top: 14px;
+  }
+  .rail__brand {
+    margin-bottom: 12px;
+  }
+  .rail__item {
+    min-height: 52px;
+  }
+}

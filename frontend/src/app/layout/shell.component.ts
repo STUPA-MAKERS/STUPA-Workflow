@@ -1,128 +1,90 @@
-import { UpperCasePipe } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  HostListener,
-  computed,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import {
-  ActivatedRoute,
-  NavigationEnd,
-  Router,
-  RouterLink,
-  RouterLinkActive,
-  RouterOutlet,
-} from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { AuthService } from '@core/auth/auth.service';
-import { BrandingService } from '@core/branding/branding.service';
-import { LOCATION } from '@core/browser/location.token';
-import { I18nService } from '@core/i18n/i18n.service';
-import { CommandPaletteComponent } from '../features/search/command-palette.component';
-import { searchShortcutLabel } from '../features/search/shortcut';
 import { PrefetchService } from '@core/cache/prefetch.service';
-import { ThemeService } from '@core/theme/theme.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { Locale } from '@core/i18n/translations';
-import { resolveI18n } from '@shared/forms/i18n-text';
-import { IconComponent, LoadingOverlayComponent, ToastComponent } from '@stupa-makers/ui-kit';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
+import { LoadingOverlayComponent, MEDIA, ToastComponent } from '@stupa-makers/ui-kit';
+import { CommandPaletteComponent } from '../features/search/command-palette.component';
+import { BottomBarComponent } from './bottom-bar/bottom-bar.component';
+import { mediaQuerySignal } from './media-query';
+import { NavRailComponent } from './nav-rail/nav-rail.component';
+import { PublicHeaderComponent } from './public-header/public-header.component';
+import { SiteFooterComponent } from './site-footer/site-footer.component';
 
-interface NavItem {
-  path: string;
-  labelKey: Parameters<TranslatePipe['transform']>[0];
-  /** Visible when the principal has at least one of these permissions (empty = any session). */
-  permissions: string[];
-  /** Also visible to a member of any Gremium, for example the meetings entry. */
-  inAnyCommittee?: boolean;
-  /** Also visible with one of these gremium permissions in any Gremium. */
-  gremiumPermissions?: string[];
-  /** Also visible with a scoped budget view. */
-  scopedBudgetView?: boolean;
-  /**
-   * Match the active route exactly. This is needed when the path is a prefix of
-   * another nav entry, for example `/budget` before `/budget/pots`. Without it a
-   * child route marks the parent and the child active at the same time.
-   */
-  exact?: boolean;
-}
+/**
+ * The frame around a page.
+ *
+ * - `rail`: a signed-in principal. The navigation rail at the start edge, or the bottom
+ *   bar on a phone; the branded footer at the end of the content.
+ * - `public`: nobody signed in. The public top bar and the branded footer.
+ * - `bare`: route data `chrome: false` (the beamer). Only the page.
+ * - `pending`: the session is not known yet. Only the page, so no frame flashes up
+ *   and changes a moment later.
+ */
+export type ShellFrame = 'rail' | 'public' | 'bare' | 'pending';
 
-/** App frame: header (logo/nav/theme/language/account), content, footer, toasts. */
+/**
+ * App frame: the chrome around the router outlet, the toasts, the loading overlay and
+ * the search palette.
+ *
+ * There is ONE router outlet for every frame. The frame only adds or removes the chrome
+ * around it, so a change of frame (sign-in, the beamer) never destroys and recreates the
+ * page.
+ */
 @Component({
   selector: 'app-shell',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ScrollFadeDirective, 
+  imports: [
     RouterOutlet,
-    RouterLink,
-    RouterLinkActive,
     TranslatePipe,
-    UpperCasePipe,
-    IconComponent,
     ToastComponent,
     LoadingOverlayComponent,
     CommandPaletteComponent,
+    NavRailComponent,
+    BottomBarComponent,
+    PublicHeaderComponent,
+    SiteFooterComponent,
   ],
   templateUrl: './shell.component.html',
   styleUrl: './shell.component.scss',
 })
 export class ShellComponent {
-  /** `⌘K` only where that key exists. Computed, so a language switch re-spells it. */
-  readonly searchShortcut = computed(() => searchShortcutLabel(this.i18n.locale()));
-
   // Injected for its side effect: it warms the reference-data cache after sign-in.
   // Nothing reads it, and that is the point — the pages that need the data find it
   // in the cache rather than being coupled to a prefetch they did not ask for.
   private readonly prefetch = inject(PrefetchService);
 
-  readonly theme = inject(ThemeService);
-  readonly i18n = inject(I18nService);
   readonly auth = inject(AuthService);
-  readonly branding = inject(BrandingService);
   private readonly router = inject(Router);
-  private readonly location = inject(LOCATION);
   private readonly route = inject(ActivatedRoute);
+
+  /** The viewport is a phone (<= 768px): bottom bar instead of the rail. */
+  readonly phone = mediaQuerySignal(MEDIA.phone);
 
   /** Full-width content from route data `wide`, for example the budget tab with two sidebars. */
   readonly wide = signal(false);
+  /** Route data `chrome: false` turns the frame off, for example for the beamer. */
+  private readonly chrome = signal(true);
+  /** The first answer of `/auth/me` arrived (a principal or none). */
+  private readonly sessionKnown = signal(false);
 
-  /* Footer content comes from the BRANDING service, which loads the public site config.
-     It needs no session, so a logged-out visitor sees what the admin configured, and no
-     non-admin pays for an admin request on every page load. */
-
-  /** Legal links for the active locale. Empty means the default footer (imprint/privacy). */
-  readonly footerLinks = computed(() =>
-    this.branding
-      .legalLinks()
-      .map((l) => ({ url: l.url, label: resolveI18n(l.label, this.i18n.locale()) })),
-  );
-
-  /** Copyright line for the active locale. Empty means the default co-branding text. */
-  readonly footerCopyright = computed(() =>
-    resolveI18n(this.branding.copyright(), this.i18n.locale()),
-  );
-
-  /**
-   * Theme-dependent wordmark: black type on light, white type on dark. Both are
-   * official CD variants. The multicolor mark stays legible in both modes.
-   */
-  readonly logoSrc = computed(() => `assets/logos/stupa-wordmark-${this.theme.resolved()}.svg`);
-  /**
-   * The mark without the wordmark, for the narrow header.
-   *
-   * One file for both themes, unlike the wordmark: the mark is the coloured emblem and
-   * carries no text that would have to change colour with the background.
-   */
-  readonly markSrc = 'assets/logos/stupa-mark.svg';
-
-  /** Logo click: logged in → dashboard, otherwise the public landing page. */
-  readonly brandTarget = computed(() => (this.auth.isAuthenticated() ? '/dashboard' : '/'));
+  readonly frame = computed<ShellFrame>(() => {
+    if (!this.chrome()) return 'bare';
+    if (!this.sessionKnown()) return 'pending';
+    return this.auth.isAuthenticated() ? 'rail' : 'public';
+  });
 
   constructor() {
-    // Full width comes from the route data. The deepest active route wins.
+    // The app initializer starts the same request; `ensureLoaded` shares it.
+    this.auth
+      .ensureLoaded()
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => this.sessionKnown.set(true));
+
+    // `wide` and `chrome` come from the route data. The deepest active route wins.
     this.router.events
       .pipe(
         filter((e) => e instanceof NavigationEnd),
@@ -131,137 +93,14 @@ export class ShellComponent {
       .subscribe(() => {
         let r = this.route.firstChild;
         let wide = false;
+        let chrome = true;
         while (r) {
           wide = r.snapshot.data['wide'] === true || wide;
+          if (r.snapshot.data['chrome'] === false) chrome = false;
           r = r.firstChild;
         }
         this.wide.set(wide);
-        this.closeMobileNav();
+        this.chrome.set(chrome);
       });
-  }
-
-  private readonly nav: NavItem[] = [
-    { path: '/dashboard', labelKey: 'nav.dashboard', permissions: [] },
-    // Without application.read these pages show only the applications and tasks of the user.
-    { path: '/applications', labelKey: 'nav.applications', permissions: [] },
-    { path: '/tasks', labelKey: 'nav.tasks', permissions: [] },
-    {
-      path: '/meetings',
-      labelKey: 'nav.meetings',
-      // Meetings are gremium business. The admin passes through `canInAnyGremium`.
-      // The only global key is the read right `meeting.view_all`: the server shows
-      // its holder the meetings of every Gremium, also without a membership.
-      permissions: ['meeting.view_all'],
-      gremiumPermissions: ['session.manage', 'protocol.write'],
-      inAnyCommittee: true,
-    },
-    {
-      path: '/budget',
-      labelKey: 'nav.budget',
-      permissions: ['budget.view', 'budget.structure', 'budget.book'],
-      // A Gremium with an assigned cost center sees the tab in scoped form.
-      scopedBudgetView: true,
-    },
-    {
-      path: '/expenses',
-      labelKey: 'nav.expenses',
-      permissions: ['budget.view', 'budget.structure', 'budget.book'],
-    },
-    {
-      path: '/invoices',
-      labelKey: 'nav.invoices',
-      permissions: ['budget.view', 'budget.structure', 'budget.book'],
-    },
-    {
-      path: '/admin',
-      labelKey: 'nav.admin',
-      permissions: ['admin.site', 'admin.gremien', 'admin.types', 'admin.roles', 'admin.notifications', 'webhook.manage', 'audit.read'],
-    },
-  ];
-
-  /**
-   * RBAC-filtered navigation for the UX.
-   *
-   * It needs an active session and shows only the entries whose permission the
-   * principal holds. The server stays authoritative.
-   */
-  readonly visibleNav = computed(() => {
-    if (!this.auth.isAuthenticated()) return [];
-    const inAnyCommittee = this.auth.gremien().length > 0;
-    return this.nav.filter(
-      (item) =>
-        this.globalAllows(item) ||
-        (item.gremiumPermissions ?? []).some((p) => this.auth.canInAnyGremium(p)) ||
-        (!!item.inAnyCommittee && inAnyCommittee) ||
-        (!!item.scopedBudgetView && this.auth.hasScopedBudgetView()),
-    );
-  });
-
-  /** Global permission part of the nav gate. An empty list opens the entry for
-   *  every session, unless the entry is gated by gremium permissions instead. */
-  private globalAllows(item: NavItem): boolean {
-    if (item.permissions.length === 0) return !item.gremiumPermissions;
-    return this.auth.canAny(...item.permissions);
-  }
-
-  toggleTheme(): void {
-    this.theme.toggle();
-  }
-
-  setLocale(value: string): void {
-    const locale = value as Locale;
-    if (locale === this.i18n.locale()) return;
-    this.i18n.setLocale(locale);
-    // The server resolves its i18n values (state, type and transition labels, form
-    // fields) in the language of the load and never updates them later. Reload the
-    // current view to get a consistent language switch.
-    this.reloadForLocale();
-  }
-
-  /** Reload the page after a language change. Tests override or spy on this method. */
-  protected reloadForLocale(): void {
-    if (typeof window !== 'undefined') {
-      this.location.reload();
-    }
-  }
-
-  login(): void {
-    this.auth.login();
-  }
-
-  /**
-   * Mobile navigation drawer. It replaces the header nav below 720px. It closes on
-   * navigation, on a backdrop click and on ESC.
-   */
-  readonly mobileNavOpen = signal(false);
-
-  toggleMobileNav(): void {
-    this.mobileNavOpen.update((v) => !v);
-  }
-
-  @HostListener('document:keydown.escape')
-  onEscape(): void {
-    this.closeMobileNav();
-    this.closeAccountMenu();
-  }
-
-  closeMobileNav(): void {
-    this.mobileNavOpen.set(false);
-  }
-
-  /** Account popout. Actions such as logout live only here, not in the header. */
-  readonly accountMenuOpen = signal(false);
-
-  toggleAccountMenu(): void {
-    this.accountMenuOpen.update((v) => !v);
-  }
-
-  closeAccountMenu(): void {
-    this.accountMenuOpen.set(false);
-  }
-
-  logout(): void {
-    this.closeAccountMenu();
-    this.auth.logout();
   }
 }

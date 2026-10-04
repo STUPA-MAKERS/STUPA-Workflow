@@ -12,6 +12,8 @@ import type { TranslationKey } from '@core/i18n/translations';
 import type { ApplicationListItem, ApplicationType, Meeting, Uuid } from '@core/api/models';
 import { BadgeComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
+import { CommandPaletteService } from '../../features/search/command-palette.service';
 
 /** Max number of application rows shown per panel. */
 const PREVIEW_ROWS = 5;
@@ -37,12 +39,15 @@ const PREVIEW_ROWS = 5;
     TranslatePipe,
     BadgeComponent,
     PageHeaderComponent,
+    SearchPillComponent,
   ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })
 export class DashboardComponent {
   readonly auth = inject(AuthService);
+  /** The search pill at the top opens the global search. */
+  protected readonly palette = inject(CommandPaletteService);
   private readonly api = inject(ApiClient);
 
   /** "My applications": only the applications the user owns. `mine=true` forces the

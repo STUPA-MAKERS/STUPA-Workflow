@@ -1,3 +1,23 @@
+<!-- The top row of the start page (board Main): the global search and the one action
+     taken from here. The pill is the pointer and touch way into the search palette; the
+     rail has no search entry. The apply link is a primary button, not a banner and not
+     a muted text link: an outlined button on the surface of the panels reads as part of
+     the furniture. -->
+<div class="dash__top">
+  <app-search-pill
+    class="dash__search"
+    mode="button"
+    [shortcut]="true"
+    [placeholder]="'search.placeholder' | t"
+    [label]="'search.title' | t"
+    (activate)="palette.open()"
+  />
+  <a class="dash__apply" routerLink="/apply">
+    <app-icon name="form" [size]="20" />
+    {{ 'dashboard.apply.title' | t }}
+  </a>
+</div>
+
 <app-page-header
   [title]="'dashboard.greeting' | t: { name: auth.displayName() }"
 />
@@ -13,15 +33,6 @@
     }
   </div>
 }
-
-<!-- A primary button, not a banner and not a muted text link. A signed-in member came
-     for their tasks and meetings, so this does not lead the page — but it is the one
-     action they take from here, and an outlined button on the same surface as the panels
-     around it read as part of the furniture. -->
-<a class="dash__apply" routerLink="/apply">
-  <app-icon name="form" [size]="20" />
-  {{ 'dashboard.apply.title' | t }}
-</a>
 
 @if (sessionShortcuts().length) {
   <section class="flex flex-col gap-3" aria-labelledby="dash-sessions-h">

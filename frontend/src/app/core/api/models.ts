@@ -20,15 +20,21 @@ export type Lang = 'de' | 'en';
 /** Configurable multilingual text (`*_i18n` JSONB). */
 export type I18nMap = Record<string, string>;
 
-/** Public branding config of the active site version. It needs no authentication.
- *  The type stays loose on purpose. The frontend reads only the free texts, for
- *  example `applyInfo`, and the app name. */
 /** One maintained footer link: a label per locale plus its target. */
 export interface PublicFooterLink {
   label: I18nMap;
   url: string;
 }
 
+/** A footer column of the branding: a heading and its links. */
+export interface PublicFooterColumn {
+  label: I18nMap;
+  links: PublicFooterLink[];
+}
+
+/** Public branding config of the active site version. It needs no authentication.
+ *  The type stays loose on purpose. The frontend reads only what it shows: the free
+ *  texts (for example `applyInfo`), the app name and the footer. */
 export interface PublicSiteConfig {
   version: number;
   /**
@@ -43,8 +49,10 @@ export interface PublicSiteConfig {
     appShortName?: string;
     /** Footer copyright line per locale. Empty falls back to the co-branding text. */
     copyright?: I18nMap;
-    /** Footer legal links. Empty falls back to the built-in imprint/privacy pair. */
+    /** Footer legal links. Empty shows no legal link. */
     legalLinks?: PublicFooterLink[];
+    /** Footer columns: a heading and its links each. Empty shows no column. */
+    footerColumns?: PublicFooterColumn[];
     freetexts?: Partial<
       Record<'loginHint' | 'welcome' | 'support' | 'emailFooter' | 'applyInfo', I18nMap>
     >;

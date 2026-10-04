@@ -1,6 +1,8 @@
-<section class="text-center py-12">
-  <p class="text-3xl font-bold text-danger">403</p>
-  <h1>{{ 'forbidden.heading' | t }}</h1>
-  <p class="text-muted mt-3 mb-5">{{ 'forbidden.body' | t }}</p>
-  <a routerLink="/dashboard" class="fb403__back">{{ 'forbidden.back' | t }}</a>
-</section>
+<app-error-page
+  code="403"
+  icon="lock"
+  [heading]="'forbidden.heading' | t"
+  [body]="'forbidden.body' | t"
+  [actionLabel]="'forbidden.back' | t"
+  actionLink="/dashboard"
+/>

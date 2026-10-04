@@ -41,7 +41,8 @@ src/
     shared/
       ui/            App building blocks (empty state, page header, skeleton)
       formly/        Formly binding to the UI kit (field type `input`)
-    layout/          ShellComponent (Header/Nav/Theme/Language/Footer/Toasts)
+    layout/          ShellComponent (frame), nav rail, phone bottom bar, account menu,
+                     public top bar, branded footer, rail marks
     pages/           Home, Dashboard, Applications, Voting, Budget/Expenses/Invoices,
                      Tasks, Account, Admin (Forms/Flow/Gremien/Roles/…), 404
     features/        apply/ (Wizard, Confirmation, Timeline, Altcha), meetings/,
@@ -70,15 +71,17 @@ tokens, the breakpoints and the binding UI rules, see **[DESIGN_SYSTEM.md](./DES
 - **Icons:** `app-icon` draws line icons as inline SVG. The app loads no icon font.
 - **Logos:** The official STUPA CD assets come from Nextcloud and hold the mark and the word
   mark. Use STUPA logos only. Do not use the logo of the university. The word mark has a light
-  variant (black text) and a dark variant (white text). `ShellComponent` picks the variant from
-  the active theme. Neither variant follows `currentColor`, because the page embeds it through
+  variant (black text) and a dark variant (white text). The public top bar
+  (`PublicHeaderComponent`) picks the variant from the active theme; the navigation rail shows
+  the mark alone. Neither variant follows `currentColor`, because the page embeds it through
   `<img src>`. For details, see `assets/logos/README.md`.
 
 ## i18n
 
 The UI strings exist in German and English (`core/i18n`). The service takes the locale from the
 stored choice, then from the browser, then from the German default. A missing key falls back to
-German. The language switcher in the header changes the locale. Configurable database texts
+German. The account menu (and, while nobody is signed in, the public top bar) changes the
+locale. Configurable database texts
 (`*_i18n`) are **not** part of this service.
 
 ## API client and mock

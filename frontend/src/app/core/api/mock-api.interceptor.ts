@@ -23,6 +23,8 @@ import type {
   Page,
   Principal,
   ProtocolOutWire,
+  SearchHit,
+  SearchResults,
   SignedUrlOutWire,
   StateOutWire,
   TimelineEventOutWire,
@@ -495,6 +497,41 @@ function setVoteStatus(voteId: string, status: 'open' | 'closed'): void {
   };
 }
 
+/**
+ * GET /search: the mock applications, tasks and the meeting whose title holds the
+ * query, in the shape of the real search (one flat hit per record, grouped by kind).
+ */
+function mockSearch(q: string): SearchResults {
+  const needle = q.trim().toLowerCase();
+  const hits: SearchHit[] = [];
+  const apps = [
+    ...MOCK_APPLICATIONS.items.map((a) => ({
+      id: a.id,
+      title: String(a.data['title'] ?? ''),
+      state: a.state?.label['de'] ?? '',
+    })),
+    ...MOCK_TASKS.map((t) => ({ id: t.id, title: t.title ?? '', state: t.state?.label['de'] ?? '' })),
+  ];
+  for (const a of apps) {
+    if (a.title.toLowerCase().includes(needle)) {
+      hits.push({ kind: 'application', id: a.id, title: a.title, subtitle: a.state, url: `/applications/${a.id}` });
+    }
+  }
+  if (MOCK_MEETING.title.toLowerCase().includes(needle)) {
+    hits.push({
+      kind: 'meeting',
+      id: MOCK_MEETING.id,
+      title: MOCK_MEETING.title,
+      subtitle: MOCK_MEETING.gremiumName ?? null,
+      url: `/meetings/${MOCK_MEETING.id}`,
+    });
+  }
+  if ('demo mitglied'.includes(needle)) {
+    hits.push({ kind: 'principal', id: MOCK_PRINCIPAL.sub, title: 'Demo Mitglied', subtitle: MOCK_PRINCIPAL.email ?? null, url: '/admin/users' });
+  }
+  return { hits, truncated: false, failed: [] };
+}
+
 function path(url: string): string {
   return url.split('?')[0];
 }
@@ -545,6 +582,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     // Expenses and income: empty page. There is no tree mock, and this keeps a
     // 404 out of the console.
     if (p.endsWith('/expenses')) return ok({ items: [], total: 0, limit: 20, offset: 0 });
+    if (p.endsWith('/search')) return ok(mockSearch(req.params.get('q') ?? ''));
     if (p.endsWith('/applications/tasks')) return ok([...MOCK_TASKS]);
     if (p.endsWith('/applications')) return ok(MOCK_APPLICATIONS);
     if (/\/votes\/[^/]+$/.test(p)) return ok(MOCK_VOTE);

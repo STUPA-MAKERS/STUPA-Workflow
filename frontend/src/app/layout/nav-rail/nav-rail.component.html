@@ -1,0 +1,53 @@
+<nav class="rail" [attr.aria-label]="'nav.main' | t">
+  <a class="rail__brand" routerLink="/dashboard" [attr.aria-label]="'shell.nav.brand' | t: { name: branding.appName() }">
+    <img [src]="markSrc" alt="" width="40" height="40" />
+  </a>
+
+  <!-- The search stays in reach on every page, not only on the start page. -->
+  <button
+    type="button"
+    class="rail__item rail__search"
+    [attr.aria-keyshortcuts]="searchKeys"
+    (click)="palette.open()"
+  >
+    <span class="rail__ind"><app-icon name="search" [size]="22" /></span>
+    <span class="rail__label">{{ 'search.title' | t }}</span>
+  </button>
+
+  <!-- Only the areas scroll when the viewport is too low. The administration and the
+       account stay in view below them. -->
+  <div class="rail__main">
+    @for (item of mainItems(); track item.key) {
+      <a
+        class="rail__item"
+        [routerLink]="item.path"
+        routerLinkActive="is-active"
+        ariaCurrentWhenActive="page"
+        [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
+      >
+        <span class="rail__ind">
+          <app-icon [name]="item.icon" [size]="22" />
+          <app-nav-mark [key]="item.key" />
+        </span>
+        <span class="rail__label">{{ item.labelKey | t }}</span>
+        <app-nav-mark [key]="item.key" part="text" />
+      </a>
+    }
+  </div>
+
+  <div class="rail__spacer"></div>
+
+  @for (item of endItems(); track item.key) {
+    <a
+      class="rail__item"
+      [routerLink]="item.path"
+      routerLinkActive="is-active"
+      ariaCurrentWhenActive="page"
+    >
+      <span class="rail__ind"><app-icon [name]="item.icon" [size]="22" /></span>
+      <span class="rail__label">{{ item.labelKey | t }}</span>
+    </a>
+  }
+
+  <app-account-menu class="rail__account" variant="popover" />
+</nav>

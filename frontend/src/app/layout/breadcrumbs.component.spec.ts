@@ -57,12 +57,15 @@ async function setup() {
   return { ...view, router, i18n };
 }
 
+/** The accessible name of the crumb bar, in either language. */
+const BREADCRUMB = /^(Seitenpfad|Breadcrumb)$/;
+
 describe('BreadcrumbsComponent', () => {
   it('renders nothing when there is no titled route', async () => {
     const { router, fixture } = await setup();
     await router.navigateByUrl('/untitled');
     fixture.detectChanges();
-    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: BREADCRUMB })).not.toBeInTheDocument();
   });
 
   it('renders nothing when the current page has no parent (single crumb)', async () => {
@@ -70,7 +73,7 @@ describe('BreadcrumbsComponent', () => {
     await router.navigateByUrl('/solo');
     fixture.detectChanges();
     // With one crumb the H1 is enough, so the nav stays hidden.
-    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: BREADCRUMB })).not.toBeInTheDocument();
   });
 
   it('prepends a config-resolved parent crumb before the current page', async () => {
@@ -78,7 +81,7 @@ describe('BreadcrumbsComponent', () => {
     await router.navigateByUrl('/budget/pots');
     fixture.detectChanges();
 
-    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: BREADCRUMB })).toBeInTheDocument();
     const parent = screen.getByRole('link', { name: i18n.translate('nav.budget') });
     expect(parent).toHaveAttribute('href', '/budget');
     const current = screen.getByText(i18n.translate('nav.expenses'));
@@ -91,7 +94,7 @@ describe('BreadcrumbsComponent', () => {
     fixture.detectChanges();
     // The parent path "does/not/exist" has no title. No parent crumb appears, so one
     // crumb remains and the nav stays hidden.
-    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: BREADCRUMB })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: i18n.translate('nav.tasks') })).not.toBeInTheDocument();
   });
 
@@ -117,10 +120,20 @@ describe('BreadcrumbsComponent', () => {
 
     await router.navigateByUrl('/untitled');
     fixture.detectChanges();
-    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: BREADCRUMB })).not.toBeInTheDocument();
 
     await router.navigateByUrl('/admin/users');
     fixture.detectChanges();
     expect(screen.getByText(i18n.translate('nav.applications'))).toBeInTheDocument();
+  });
+
+  it('puts a chevron between the crumbs and none after the current page', async () => {
+    const { router, fixture, container } = await setup();
+    await router.navigateByUrl('/budget/pots');
+    fixture.detectChanges();
+    const entries = container.querySelectorAll('li.bc__entry');
+    expect(entries).toHaveLength(2);
+    expect(entries[0].querySelector('app-icon.bc__sep')).not.toBeNull();
+    expect(entries[1].querySelector('app-icon.bc__sep')).toBeNull();
   });
 });

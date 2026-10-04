@@ -1,0 +1,61 @@
+/* Quiet and centred: a line of small text, with the configured columns above it. */
+:host {
+  display: block;
+}
+
+.ft {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-4) 22px;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--color-text-muted);
+}
+
+.ft__cols {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-4) var(--space-8);
+}
+.ft__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 8rem;
+}
+.ft__colTitle {
+  margin: 0 0 2px;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text);
+}
+
+.ft__line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px var(--space-4);
+  margin: 0;
+  text-align: center;
+}
+.ft__dot {
+  color: var(--color-text-subtle);
+}
+
+.ft__link {
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+.ft__link:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+.ft__link:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}

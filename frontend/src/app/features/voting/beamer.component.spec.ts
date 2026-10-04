@@ -139,6 +139,19 @@ describe('BeamerComponent', () => {
     expect(screen.getByText(/Quorum:\s*nicht erreicht/)).toBeInTheDocument();
   });
 
+  it('has a way back to the live vote of the meeting, since the route has no chrome', async () => {
+    await setup();
+    expect(screen.getByRole('link', { name: 'Beamer-Ansicht verlassen' })).toHaveAttribute(
+      'href',
+      '/voting/meeting/m1',
+    );
+  });
+
+  it('leads back to the voting overview when the route has no meeting', async () => {
+    await setup(false);
+    expect(screen.getByRole('link', { name: 'Beamer-Ansicht verlassen' })).toHaveAttribute('href', '/voting');
+  });
+
   it('closes the live session on destroy (no reconnect)', async () => {
     const { fixture, channel } = await setup();
     const close = jest.spyOn(channel, 'close');

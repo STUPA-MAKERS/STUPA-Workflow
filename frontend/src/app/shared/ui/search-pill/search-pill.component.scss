@@ -77,6 +77,12 @@
 .sp__kbd {
   flex: none;
 }
+/* A touch screen without a hover pointer has, as a rule, no keyboard for the shortcut. */
+@media (hover: none) {
+  .sp__kbd {
+    display: none;
+  }
+}
 
 .sp__trail:empty {
   display: none;

@@ -1,0 +1,23 @@
+<footer class="ft" [attr.aria-label]="'nav.footer' | t">
+  @if (columns().length > 0) {
+    <div class="ft__cols">
+      @for (col of columns(); track $index) {
+        <div class="ft__col">
+          @if (col.label) {
+            <h2 class="ft__colTitle">{{ col.label }}</h2>
+          }
+          @for (link of col.links; track $index) {
+            <a class="ft__link" [href]="link.url">{{ link.label }}</a>
+          }
+        </div>
+      }
+    </div>
+  }
+  <p class="ft__line">
+    <span>{{ copyright() || ('footer.coBranding' | t) }}</span>
+    @for (link of legalLinks(); track link.url) {
+      <span class="ft__dot" aria-hidden="true">·</span>
+      <a class="ft__link" [href]="link.url">{{ link.label }}</a>
+    }
+  </p>
+</footer>

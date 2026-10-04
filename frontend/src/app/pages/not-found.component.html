@@ -1,7 +1,8 @@
-<app-empty-state
+<app-error-page
   code="404"
+  icon="search"
   [heading]="'notFound.heading' | t"
   [body]="'notFound.body' | t"
->
-  <a routerLink="/" class="nf__back">{{ 'notFound.back' | t }}</a>
-</app-empty-state>
+  [actionLabel]="'notFound.back' | t"
+  actionLink="/"
+/>
