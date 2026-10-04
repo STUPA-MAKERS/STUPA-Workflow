@@ -959,6 +959,18 @@ describe('BudgetDashboardComponent', () => {
       expect(c.overviewOpen()).toBe(false);
       expect(c.selectedKsId()).toBe('b-800');
     });
+
+    it('names the close button in the active locale', async () => {
+      localStorage.setItem('ap.locale', 'en');
+      const view = await setup();
+      const c = view.fixture.componentInstance as unknown as Inst;
+      c.overviewOpen.set(true);
+      view.fixture.detectChanges();
+      const dialog = screen.getByRole('dialog', { name: 'Budget overview' });
+      const close = within(dialog).getByRole('button', { name: 'Close' });
+      expect(close.getAttribute('title')).toBe('Close');
+      expect(within(dialog).queryByRole('button', { name: 'Schließen' })).toBeNull();
+    });
   });
 
   // ------------------------------------------------------------------ edge cases

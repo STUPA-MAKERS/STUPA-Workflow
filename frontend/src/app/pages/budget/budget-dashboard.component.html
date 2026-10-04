@@ -376,6 +376,7 @@
   <app-dialog
     [open]="overviewOpen()"
     [title]="'budget.overview.title' | t"
+    [closeLabel]="'action.close' | t"
     size="lg"
     (closed)="overviewOpen.set(false)"
   >
