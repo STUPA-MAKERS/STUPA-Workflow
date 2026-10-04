@@ -113,8 +113,8 @@ describe('HistoryComponent', () => {
     const { container } = await render(HistoryComponent, {
       inputs: { entries: ENTRIES, surface: 3 },
     });
-    expect(container.querySelector('ol')).toHaveClass('seg', 'seg--bg3');
-    expect(container.querySelector('ol')).not.toHaveClass('seg--bg1');
+    expect(container.querySelector('ol')).toHaveClass('rowgroup', 'rowgroup--bg3');
+    expect(container.querySelector('ol')).not.toHaveClass('rowgroup--bg1');
   });
 
   it('puts the entries with an invalid date into a last group and does not throw', async () => {

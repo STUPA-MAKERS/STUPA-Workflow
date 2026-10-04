@@ -73,7 +73,7 @@
 }
 /* On surface 3 the subtle text is below 4.5:1 (WCAG 1.4.3); the muted text passes.
    This also applies to a status title of the kind `muted`. */
-.seg--bg3 .hist__meta,
-.seg--bg3 .hist__title app-status-text.st--muted {
+.rowgroup--bg3 .hist__meta,
+.rowgroup--bg3 .hist__title app-status-text.st--muted {
   color: var(--color-text-muted);
 }

@@ -46,10 +46,10 @@ describe('FieldGroupComponent and FieldRowComponent', () => {
       { imports },
     );
     const [two, one, three] = Array.from(container.querySelectorAll('app-field-group'));
-    expect(two).toHaveClass('seg');
-    expect(two).not.toHaveClass('seg--bg1');
-    expect(two).not.toHaveClass('seg--bg3');
-    expect(one).toHaveClass('seg', 'seg--bg1');
-    expect(three).toHaveClass('seg', 'seg--bg3');
+    expect(two).toHaveClass('rowgroup');
+    expect(two).not.toHaveClass('rowgroup--bg1');
+    expect(two).not.toHaveClass('rowgroup--bg3');
+    expect(one).toHaveClass('rowgroup', 'rowgroup--bg1');
+    expect(three).toHaveClass('rowgroup', 'rowgroup--bg3');
   });
 });

@@ -24,6 +24,25 @@ class HostComponent {
   readonly open = signal(false);
 }
 
+@Component({
+  standalone: true,
+  imports: [ListDetailLayoutComponent],
+  template: `
+    <app-list-detail [detailOpen]="open() !== null" (back)="open.set(null)">
+      <ul list aria-label="Anträge">
+        @for (row of rows(); track row) {
+          <li><button type="button" (click)="open.set(row)">{{ row }}</button></li>
+        }
+      </ul>
+      <article detail aria-label="Detail">{{ open() }}</article>
+    </app-list-detail>
+  `,
+})
+class FocusHostComponent {
+  readonly rows = signal(['Druckkosten', 'Lastenrad']);
+  readonly open = signal<string | null>(null);
+}
+
 /** Drives the ResizeObserver of the layout: the last observer created gets the width. */
 let resize: ((width: number) => void) | null = null;
 let disconnects = 0;
@@ -158,6 +177,89 @@ describe('ListDetailLayoutComponent', () => {
       expect(list()).toBeVisible();
       expect(detail()).not.toBeVisible();
       expect(await runAxe(view.container)).toHaveNoViolations();
+    });
+  });
+
+  describe('focus in the one-view layout', () => {
+    it('moves the focus to "Zur Liste" when a row opens, and back to the row', async () => {
+      viewport(390);
+      const view = await render(FocusHostComponent);
+      const user = userEvent.setup();
+      const row = screen.getByRole('button', { name: 'Lastenrad' });
+      await user.click(row);
+      await view.fixture.whenStable();
+      const back = screen.getByRole('button', { name: 'Zur Liste' });
+      expect(back).toHaveFocus();
+
+      await user.click(back);
+      await view.fixture.whenStable();
+      expect(view.fixture.componentInstance.open()).toBeNull();
+      expect(row).toHaveFocus();
+    });
+
+    it('opens from the keyboard and returns to the same row', async () => {
+      viewport(960);
+      const view = await render(FocusHostComponent);
+      const user = userEvent.setup();
+      const row = screen.getByRole('button', { name: 'Druckkosten' });
+      row.focus();
+      await user.keyboard('{Enter}');
+      await view.fixture.whenStable();
+      expect(screen.getByRole('button', { name: 'Zur Liste' })).toHaveFocus();
+      await user.keyboard('{Enter}');
+      await view.fixture.whenStable();
+      expect(row).toHaveFocus();
+    });
+
+    it('focuses the list when the row that opened the detail is gone', async () => {
+      viewport(390);
+      const view = await render(FocusHostComponent);
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'Lastenrad' }));
+      await view.fixture.whenStable();
+      view.fixture.componentInstance.rows.set(['Druckkosten']);
+      await user.click(screen.getByRole('button', { name: 'Zur Liste' }));
+      await view.fixture.whenStable();
+      expect(screen.queryByRole('button', { name: 'Lastenrad' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Druckkosten' })).not.toHaveFocus();
+      expect(view.container.querySelector('.ld__list')).toHaveFocus();
+    });
+
+    it('focuses the list on "Zur Liste" after a deep link to a row', async () => {
+      viewport(390);
+      const view = await render(FocusHostComponent, {
+        detectChangesOnRender: false,
+        autoDetectChanges: false,
+      });
+      view.fixture.componentInstance.open.set('Druckkosten');
+      view.fixture.detectChanges();
+      view.fixture.autoDetectChanges();
+      await view.fixture.whenStable();
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Zur Liste' }));
+      await view.fixture.whenStable();
+      expect(view.container.querySelector('.ld__list')).toHaveFocus();
+    });
+
+    it('does not move the focus on the first render with an open row', async () => {
+      viewport(390);
+      const view = await render(FocusHostComponent, {
+        detectChangesOnRender: false,
+        autoDetectChanges: false,
+      });
+      view.fixture.componentInstance.open.set('Druckkosten');
+      view.fixture.detectChanges();
+      await view.fixture.whenStable();
+      expect(screen.getByRole('button', { name: 'Zur Liste' })).not.toHaveFocus();
+    });
+
+    it('does not move the focus in the split layout', async () => {
+      viewport(1440);
+      const view = await render(FocusHostComponent);
+      const row = screen.getByRole('button', { name: 'Lastenrad' });
+      await userEvent.setup().click(row);
+      await view.fixture.whenStable();
+      expect(screen.queryByRole('button', { name: 'Zur Liste' })).toBeNull();
+      expect(row).toHaveFocus();
     });
   });
 

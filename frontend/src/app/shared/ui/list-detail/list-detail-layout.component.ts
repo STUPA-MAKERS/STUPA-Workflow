@@ -3,12 +3,16 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  Injector,
   afterNextRender,
   computed,
+  effect,
   inject,
   input,
   output,
   signal,
+  untracked,
+  viewChild,
 } from '@angular/core';
 import { BREAKPOINTS, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -47,6 +51,11 @@ export const LIST_DETAIL_SPLIT_MIN = BREAKPOINTS.wideMin - NAV_RAIL_WIDTH - 2 * 
  * detail shows with a "Zur Liste" control above it that emits `back`. The list stays in the
  * DOM while hidden, so it keeps its scroll position.
  *
+ * Focus in the one-view layout: when a row opens, the list hides, so the layout moves the
+ * focus to "Zur Liste". When the detail closes, the focus goes back to the element in the
+ * list that had it (normally the row), if that element is still in the DOM, else to the
+ * list itself. A keyboard or screen-reader user so stays at the same place in the list.
+ *
  * Slots: `[list]` and `[detail]`. In the wide layout with no detail open the page puts its
  * own empty state into the detail slot.
  */
@@ -78,6 +87,12 @@ export class ListDetailLayoutComponent {
   /** The measured width of the host. 0 means "not laid out yet" (hidden, or a test). */
   private readonly width = signal(0);
 
+  private readonly listPane = viewChild.required<ElementRef<HTMLElement>>('listPane');
+  private readonly detailPane = viewChild.required<ElementRef<HTMLElement>>('detailPane');
+  private readonly backButton = viewChild<ElementRef<HTMLButtonElement>>('backButton');
+  /** The element in the list that had the focus when the detail opened. */
+  private returnFocus: HTMLElement | null = null;
+
   /** True while the viewport or the content is too narrow for two panes. */
   readonly collapsed = computed(() => {
     if (!this.viewportWide()) return true;
@@ -90,6 +105,8 @@ export class ListDetailLayoutComponent {
     this.viewportWide.set(media.matches);
     const onMedia = (event: MediaQueryListEvent): void => this.viewportWide.set(event.matches);
     media.addEventListener('change', onMedia);
+
+    this.manageFocus();
 
     let observer: ResizeObserver | null = null;
     afterNextRender(() => {
@@ -105,4 +122,61 @@ export class ListDetailLayoutComponent {
       media.removeEventListener('change', onMedia);
     });
   }
+
+  /**
+   * Moves the focus when the one-view layout changes between the list and the detail.
+   * Only a change of `detailOpen` moves it, not the first render (a deep link to a row)
+   * and not a change of the layout width.
+   */
+  private manageFocus(): void {
+    const injector = inject(Injector);
+    let wasOpen: boolean | null = null;
+    effect(() => {
+      const open = this.detailOpen();
+      const collapsed = this.collapsed();
+      untracked(() => {
+        const changed = wasOpen !== null && open !== wasOpen;
+        wasOpen = open;
+        if (!changed || !collapsed) return;
+        if (open) {
+          // Read before the list hides: then the focused row is still the active element.
+          const active = document.activeElement;
+          this.returnFocus =
+            active instanceof HTMLElement && this.listPane().nativeElement.contains(active)
+              ? active
+              : null;
+          afterNextRender(
+            () => {
+              if (this.returnFocus !== null || focusIsLost(null)) {
+                this.backButton()?.nativeElement.focus();
+              }
+            },
+            { injector },
+          );
+        } else {
+          afterNextRender(
+            () => {
+              const target = this.returnFocus;
+              this.returnFocus = null;
+              if (!focusIsLost(this.detailPane().nativeElement)) return;
+              // The row that opened the detail, else (a deep link, or the row is gone) the
+              // list itself, so that Tab goes on from the list.
+              if (target?.isConnected) target.focus();
+              else this.listPane().nativeElement.focus();
+            },
+            { injector },
+          );
+        }
+      });
+    });
+  }
+}
+
+/**
+ * True when no visible element has the focus: the focus is on the body, or on an element
+ * in `hiddenPane` (a pane that the layout just hid).
+ */
+function focusIsLost(hiddenPane: HTMLElement | null): boolean {
+  const active = document.activeElement;
+  return active === null || active === document.body || !!hiddenPane?.contains(active);
 }

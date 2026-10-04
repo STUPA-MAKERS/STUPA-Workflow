@@ -1,9 +1,9 @@
-<div class="ld__list" [hidden]="collapsed() && detailOpen()">
+<div #listPane class="ld__list" tabindex="-1" [hidden]="collapsed() && detailOpen()">
   <ng-content select="[list]" />
 </div>
-<div class="ld__detail" [hidden]="collapsed() && !detailOpen()">
+<div #detailPane class="ld__detail" [hidden]="collapsed() && !detailOpen()">
   @if (collapsed()) {
-    <button type="button" class="ld__back" (click)="back.emit()">
+    <button #backButton type="button" class="ld__back" (click)="back.emit()">
       <app-icon name="left" [size]="16" />
       {{ 'ui.listDetail.back' | t }}
     </button>

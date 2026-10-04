@@ -84,10 +84,10 @@
   outline-offset: -2px;
 }
 
+/* A block, not a flex row, so a long sub line gets an ellipsis also when it comes from the
+   [sub] slot with a status in it. The status is inline text for this. */
 .li__sub {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: block;
   min-width: 0;
   font-size: 0.8125rem; /* 13px */
   line-height: 1.1875rem;
@@ -96,7 +96,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.li__subText {
-  overflow: hidden;
-  text-overflow: ellipsis;
+.li__sub ::ng-deep app-status-text {
+  display: inline;
+}
+.li__subText + ::ng-deep * {
+  margin-inline-start: 6px;
 }

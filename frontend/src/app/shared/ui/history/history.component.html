@@ -3,9 +3,9 @@
     <div class="hist__day">
       <p class="cap hist__date" [id]="id + '-' + day.key">{{ day.label }}</p>
       <ol
-        class="seg hist__list"
-        [class.seg--bg1]="surface() === 1"
-        [class.seg--bg3]="surface() === 3"
+        class="rowgroup hist__list"
+        [class.rowgroup--bg1]="surface() === 1"
+        [class.rowgroup--bg3]="surface() === 3"
         [attr.aria-labelledby]="id + '-' + day.key"
       >
         @for (e of day.entries; track $index) {

@@ -20,7 +20,7 @@
   color: var(--color-text-subtle);
 }
 /* On surface 3 the subtle text is below 4.5:1 (WCAG 1.4.3); the muted text passes. */
-:host-context(.seg--bg3) .fld__label {
+:host-context(.rowgroup--bg3) .fld__label {
   color: var(--color-text-muted);
 }
 

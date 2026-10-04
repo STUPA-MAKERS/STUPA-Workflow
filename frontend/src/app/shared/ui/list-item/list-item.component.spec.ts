@@ -1,8 +1,9 @@
 import { Component, signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { render, screen } from '@testing-library/angular';
+import { fireEvent, render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { runAxe } from '../../../../testing/a11y';
+import { StatusTextComponent } from '../status-text/status-text.component';
 import { ListItemComponent } from './list-item.component';
 
 @Component({ standalone: true, template: '' })
@@ -26,6 +27,25 @@ class HostComponent {
   readonly selected = signal(false);
   opened = 0;
   trail = 0;
+}
+
+@Component({
+  standalone: true,
+  imports: [ListItemComponent, StatusTextComponent],
+  template: `
+    <app-list-item title="Druckkosten">
+      <span sub data-testid="sub"
+        ><app-status-text kind="warn">Auf Tagesordnung</app-status-text> · Förderantrag</span
+      >
+    </app-list-item>
+  `,
+})
+class StatusSubHostComponent {}
+
+/** jsdom has no layout: give the sub line a width and a content width. */
+function setWidths(el: Element, scroll: number, client: number): void {
+  Object.defineProperty(el, 'scrollWidth', { configurable: true, value: scroll });
+  Object.defineProperty(el, 'clientWidth', { configurable: true, value: client });
 }
 
 describe('ListItemComponent', () => {
@@ -90,6 +110,44 @@ describe('ListItemComponent', () => {
       inputs: { title: 'Lastenrad', sub: 'Fachschaftsmittel' },
     });
     expect(container.querySelector('.li__subText')).toHaveTextContent('Fachschaftsmittel');
+  });
+
+  it('puts the [sub] slot with a status into the one-line sub line', async () => {
+    const { container } = await render(StatusSubHostComponent);
+    const line = screen.getByTestId('sub').parentElement;
+    expect(line).toHaveClass('li__sub');
+    expect(line?.querySelector('app-status-text')).toHaveTextContent('Auf Tagesordnung');
+    expect(container.querySelector('.li__sub')).toBe(line);
+  });
+
+  it('adds a cut sub line to the title tooltip when the pointer enters the row', async () => {
+    const view = await render(StatusSubHostComponent);
+    const control = screen.getByRole('button', { name: 'Druckkosten' });
+    const line = view.container.querySelector('.li__sub') as HTMLElement;
+    const row = view.container.querySelector('.li') as HTMLElement;
+
+    setWidths(line, 180, 180);
+    fireEvent.pointerEnter(row);
+    view.fixture.detectChanges();
+    expect(control).toHaveAttribute('title', 'Druckkosten');
+
+    setWidths(line, 260, 180);
+    fireEvent.pointerEnter(row);
+    view.fixture.detectChanges();
+    expect(control).toHaveAttribute('title', 'Druckkosten\nAuf Tagesordnung · Förderantrag');
+  });
+
+  it('adds a cut plain sub line to the title tooltip', async () => {
+    const view = await render(ListItemComponent, {
+      inputs: { title: 'Lastenrad', sub: 'Fachschaftsmittel für das Sommersemester' },
+    });
+    setWidths(view.container.querySelector('.li__sub') as HTMLElement, 300, 120);
+    fireEvent.pointerEnter(view.container.querySelector('.li') as HTMLElement);
+    view.fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Lastenrad' })).toHaveAttribute(
+      'title',
+      'Lastenrad\nFachschaftsmittel für das Sommersemester',
+    );
   });
 
   it('has no a11y violations', async () => {

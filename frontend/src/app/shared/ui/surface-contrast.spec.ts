@@ -58,13 +58,13 @@ describe('text on surface 3', () => {
 
   it('the field label on surface 3 uses the muted text', () => {
     expect(scss('field-group/field-row.component.scss')).toMatch(
-      /:host-context\(\.seg--bg3\) \.fld__label \{\s*color: var\(--color-text-muted\);/,
+      /:host-context\(\.rowgroup--bg3\) \.fld__label \{\s*color: var\(--color-text-muted\);/,
     );
   });
 
   it('the history meta line and a muted status on surface 3 use the muted text', () => {
     expect(scss('history/history.component.scss')).toMatch(
-      /\.seg--bg3 \.hist__meta,\s*\.seg--bg3 \.hist__title app-status-text\.st--muted \{\s*color: var\(--color-text-muted\);/,
+      /\.rowgroup--bg3 \.hist__meta,\s*\.rowgroup--bg3 \.hist__title app-status-text\.st--muted \{\s*color: var\(--color-text-muted\);/,
     );
   });
 

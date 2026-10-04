@@ -27,30 +27,30 @@
 // A group of rows that reads as one block (`app-field-group`, the days of a history, a
 // short list on a sheet): the rows sit 2px apart on their own surface, and only the outer
 // corners are round. The rows sit on surface 2, which suits the page and a sheet on
-// surface 1. `.seg--bg1` and `.seg--bg3` pick another row surface, for example surface 3
+// surface 1. `.rowgroup--bg1` and `.rowgroup--bg3` pick another row surface, for example surface 3
 // in a side sheet on surface 2. Global, because the rows are projected content.
-.seg {
+.rowgroup {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
-.seg > * {
+.rowgroup > * {
   border-radius: 4px;
   background: var(--color-surface-2);
 }
-.seg > :first-child {
+.rowgroup > :first-child {
   border-top-left-radius: var(--radius-lg);
   border-top-right-radius: var(--radius-lg);
 }
-.seg > :last-child {
+.rowgroup > :last-child {
   border-bottom-left-radius: var(--radius-lg);
   border-bottom-right-radius: var(--radius-lg);
 }
-.seg.seg--bg1 > * {
+.rowgroup.rowgroup--bg1 > * {
   background: var(--color-surface-1);
 }
-.seg.seg--bg3 > * {
+.rowgroup.rowgroup--bg3 > * {
   background: var(--color-surface-3);
 }
 

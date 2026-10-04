@@ -5,8 +5,8 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
  * corners are round.
  *
  * It holds field rows (`app-field-row`) and also any other row, for example the rows of a
- * history day or a short list. The look is the global `.seg` class in `styles.scss`, so a
- * page can also put `class="seg"` on a plain element.
+ * history day or a short list. The look is the global `.rowgroup` class in `styles.scss`, so a
+ * page can also put `class="rowgroup"` on a plain element.
  *
  * `surface` picks the row colour: 2 (default) on the page or on a sheet of surface 1,
  * 3 in a side sheet of surface 2, 1 where the rows must stand out less.
@@ -16,9 +16,9 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    class: 'seg',
-    '[class.seg--bg1]': 'surface() === 1',
-    '[class.seg--bg3]': 'surface() === 3',
+    class: 'rowgroup',
+    '[class.rowgroup--bg1]': 'surface() === 1',
+    '[class.rowgroup--bg3]': 'surface() === 3',
   },
   templateUrl: './field-group.component.html',
   styleUrl: './field-group.component.scss',

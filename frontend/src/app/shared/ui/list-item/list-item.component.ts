@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  type ElementRef,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 /**
@@ -10,7 +19,11 @@ import { RouterLink } from '@angular/router';
  * keyboard. Controls in the trailing slot (a row menu, a delete button) sit above the
  * stretched area and keep their own click.
  *
- * The title is one line with an ellipsis and always carries the full text as `title`.
+ * The title is one line with an ellipsis and always carries the full text as `title`. The
+ * sub line is also one line with an ellipsis, from the `sub` input and from the `[sub]`
+ * slot (a status in the slot is inline text). The stretched title covers the sub line, so
+ * a tooltip on the sub line would never show. When the sub line is cut, the title tooltip
+ * shows the full sub line as a second line.
  *
  * ```html
  * <app-list-item [title]="a.title" [selected]="a.id === selectedId()" (activate)="open(a)">
@@ -42,4 +55,20 @@ export class ListItemComponent {
 
   /** The row was opened by a click, Enter or Space. Also emitted for a link. */
   readonly activate = output<void>();
+
+  private readonly subLine = viewChild.required<ElementRef<HTMLElement>>('subLine');
+  /** The full text of the sub line while it is cut, else null. */
+  protected readonly subTip = signal<string | null>(null);
+  /** The `title` of the control: the title, and the sub line when it is cut. */
+  protected readonly tooltip = computed(() => {
+    const sub = this.subTip();
+    return sub ? `${this.title()}\n${sub}` : this.title();
+  });
+
+  /** Measures the sub line when the pointer enters the row, before the tooltip shows. */
+  protected measureSub(): void {
+    const el = this.subLine().nativeElement;
+    const cut = el.scrollWidth > el.clientWidth;
+    this.subTip.set(cut ? (el.textContent ?? '').replace(/\s+/g, ' ').trim() || null : null);
+  }
 }
