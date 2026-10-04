@@ -247,17 +247,21 @@ describe('MeetingsListComponent', () => {
   it('offers the Gremium filter for more than one Gremium and reloads with it', async () => {
     const view = await setup();
     load(view, { gremien: [{ id: 'g-1', name: 'StuPa' }, { id: 'g-2', name: 'Finanzausschuss' }] });
-    const filter = screen.getByRole('combobox', { name: 'Gremium' });
-    expect(within(filter).getAllByRole('option').map((o) => o.textContent?.trim())).toEqual([
+    // The chip opens the menu of the app, not the list of the browser.
+    expect(view.container.querySelector('select')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Gremium: Alle Gremien' }));
+    view.fixture.detectChanges();
+    const list = screen.getByRole('listbox', { name: 'Gremium' });
+    expect(within(list).getAllByRole('option').map((o) => o.textContent?.trim())).toEqual([
       'Alle Gremien',
       'StuPa',
       'Finanzausschuss',
     ]);
-    // The chip shows the selected label; the select lies transparent over it.
-    const label = () => view.container.querySelector('.mtl__chipLabel');
-    expect(label()).toHaveTextContent('Alle Gremien');
-    await userEvent.selectOptions(filter, 'g-2');
-    expect(label()).toHaveTextContent('Finanzausschuss');
+    expect(within(list).getByRole('option', { name: 'Alle Gremien' })).toHaveAttribute('aria-selected', 'true');
+    await userEvent.click(within(list).getByRole('option', { name: 'Finanzausschuss' }));
+    view.fixture.detectChanges();
+    // The chip shows the selected label.
+    expect(screen.getByRole('button', { name: 'Gremium: Finanzausschuss' })).toHaveTextContent('Finanzausschuss');
     const up = timelineReq(view.http, 'upcoming');
     expect(up.request.params.get('gremiumId')).toBe('g-2');
     up.flush({ items: [FOREIGN], nextCursor: null });
@@ -268,7 +272,7 @@ describe('MeetingsListComponent', () => {
     const view = await setup();
     view.http.expectOne('/api/meetings/gremien').flush(null, { status: 500, statusText: 'e' });
     view.fixture.detectChanges();
-    expect(screen.queryByRole('combobox', { name: 'Gremium' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Gremium/ })).toBeNull();
     expect(view.timeline.filterGremien()).toEqual([]);
   });
 

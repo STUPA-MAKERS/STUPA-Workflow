@@ -538,10 +538,13 @@ describe('BudgetDashboardComponent', () => {
     it('switches the figure and drops empty slices', async () => {
       const view = await setup();
       const c = view.fixture.componentInstance as unknown as Inst;
-      const select = view.container.querySelector('.bd__secHead select') as HTMLSelectElement;
-      select.value = 'requested';
-      select.dispatchEvent(new Event('change'));
+      (view.container.querySelector('.bd__secHead app-filter-select button') as HTMLElement).click();
+      view.fixture.detectChanges();
+      const list = screen.getByRole('listbox', { name: 'Kennzahl' });
+      within(list).getByRole('option', { name: c.metricLabel('requested') }).click();
+      view.fixture.detectChanges();
       expect(c.metric()).toBe('requested');
+      expect(screen.queryByRole('listbox')).toBeNull();
       // 800 asked for 20, 900 for nothing, the root holds 50 more.
       expect(c.distribution().map((s: { value: number }) => s.value)).toEqual([20, 50]);
     });
@@ -640,15 +643,12 @@ describe('BudgetDashboardComponent', () => {
       expect(view.container.querySelector('.bd__legends, .bd__legend, .bd__swatch')).toBeNull();
     });
 
-    it('lets the select fill the metric chip and the chevron pass the click through', async () => {
+    it('opens no native select: the metric and the year chip open the menu of the app', async () => {
       const view = await setup();
-      const chip = view.container.querySelector('#bd-dist')?.parentElement?.querySelector(
-        'label.bd__selectChip',
-      ) as HTMLElement;
-      expect(chip).toBeTruthy();
-      // The chevron is a sibling on top of the select, not a second click target.
-      expect(chip.querySelector('select.bd__select')).toBeTruthy();
-      expect(chip.querySelector('app-icon.bd__selectChev')).toBeTruthy();
+      expect(view.container.querySelector('select')).toBeNull();
+      const chip = view.container.querySelector('.bd__secHead app-filter-select button') as HTMLElement;
+      expect(chip).toHaveAttribute('aria-haspopup', 'listbox');
+      expect(chip).toHaveClass('chip', 'on');
     });
 
     it('drills into a row by its name', async () => {
@@ -760,10 +760,15 @@ describe('BudgetDashboardComponent', () => {
       const view = await setup({ fys: [FY, FY2] });
       const c = view.fixture.componentInstance as unknown as Inst;
       const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-      const select = view.container.querySelector('.bd__pane select') as HTMLSelectElement;
-      expect([...select.options].map((o) => o.textContent?.trim())).toEqual(['HHJ 2026', 'HHJ 2027']);
-      select.value = 'fy-2';
-      select.dispatchEvent(new Event('change'));
+      (view.container.querySelector('.bd__pane app-filter-select button') as HTMLElement).click();
+      view.fixture.detectChanges();
+      const list = screen.getByRole('listbox', { name: 'Haushaltsjahr' });
+      expect(within(list).getAllByRole('option').map((o) => o.textContent?.trim())).toEqual([
+        'HHJ 2026',
+        'HHJ 2027',
+      ]);
+      within(list).getByRole('option', { name: 'HHJ 2027' }).click();
+      view.fixture.detectChanges();
       expect(c.selectedFyId()).toBe('fy-2');
       expect(nav).toHaveBeenCalled();
       const req = view.http.expectOne((r) => r.url.endsWith('/budgets/b-vs/applications'));
@@ -907,13 +912,28 @@ describe('BudgetDashboardComponent', () => {
       const c = view.fixture.componentInstance as unknown as Inst;
       const chips = view.container.querySelector('.bd__top .bd__chips') as HTMLElement;
       expect(chips.querySelector('.bd__pathChip')).toBeTruthy();
-      expect(chips.querySelector('label.bd__selectChip select')).toBeTruthy();
+      expect(chips.querySelector('app-filter-select')).toBeTruthy();
       const chip = within(chips).getByRole('button', { name: 'Übersicht' });
       expect(chip).not.toHaveClass('bd-chip--on');
       chip.click();
       view.fixture.detectChanges();
       expect(c.overviewOpen()).toBe(true);
       expect(chip).toHaveClass('bd-chip--on');
+    });
+
+    it('opens the year chip as a bottom sheet on a phone', async () => {
+      const view = await setup({ wide: false, phone: true, fys: [FY, FY2] });
+      const c = view.fixture.componentInstance as unknown as Inst;
+      jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+      const chips = view.container.querySelector('.bd__top .bd__chips') as HTMLElement;
+      within(chips).getByRole('button', { name: 'Haushaltsjahr: HHJ 2026' }).click();
+      view.fixture.detectChanges();
+      const sheet = screen.getByRole('dialog', { name: 'Haushaltsjahr' });
+      within(sheet).getByRole('option', { name: 'HHJ 2027' }).click();
+      view.fixture.detectChanges();
+      expect(c.selectedFyId()).toBe('fy-2');
+      expect(screen.queryByRole('dialog', { name: 'Haushaltsjahr' })).toBeNull();
+      view.http.match(() => true);
     });
 
     it('names the sheet after the path and puts the actions beside the title', async () => {

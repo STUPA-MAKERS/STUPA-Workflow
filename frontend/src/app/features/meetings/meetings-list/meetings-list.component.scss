@@ -27,53 +27,9 @@
   max-width: 100%;
 }
 
-/* The Gremium filter: a chip that shows the selected label, with a transparent native
-   select over it. The chip is as wide as the label, not as the longest option. */
+/* The Gremium filter: a chip that shows the selected label. */
 .mtl__chip {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   max-width: 17rem;
-  height: 2.75rem;
-  padding: 0 14px;
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-pill);
-  color: var(--color-text);
-  font-size: var(--fs-body);
-  font-weight: var(--fw-medium);
-  cursor: pointer;
-}
-.mtl__chip:focus-within {
-  box-shadow: 0 0 0 2px var(--color-focus-ring);
-}
-.mtl__chipIcon {
-  flex: none;
-  color: var(--color-text-muted);
-}
-.mtl__chipLabel {
-  min-width: 0;
-}
-.mtl__chipSelect {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: inherit;
-  outline: 0;
-  appearance: none;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  opacity: 0;
-  cursor: pointer;
-}
-.mtl__chipSelect option {
-  background: var(--color-bg-elevated);
-  color: var(--color-text);
 }
 
 /* Rows of one group, 2px apart, rounded as one block (see `.rowgroup`). */
@@ -177,9 +133,6 @@
     flex: 1 1 0;
     min-width: 0;
     max-width: none;
-  }
-  .mtl__chipLabel {
-    flex: 1 1 auto;
   }
   /* The row actions move into the meeting page; the chevron stays. */
   .mtl__trail app-button {

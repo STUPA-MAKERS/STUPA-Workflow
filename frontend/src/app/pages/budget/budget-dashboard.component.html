@@ -133,15 +133,13 @@
             <section class="bd__sec" aria-labelledby="bd-dist">
               <div class="bd__secHead">
                 <h3 id="bd-dist" class="bd__h">{{ 'budget.dash.distribution' | t }}</h3>
-                <label class="bd-chip bd-chip--on bd__selectChip">
-                  <span class="sr-only">{{ 'budget.dash.metric' | t }}</span>
-                  <select class="bd__select" [value]="metric()" (change)="onMetricChange($event)">
-                    @for (m of metrics; track m) {
-                      <option [value]="m" [selected]="m === metric()">{{ metricLabel(m) }}</option>
-                    }
-                  </select>
-                  <app-icon class="bd__selectChev" name="chevron-down" [size]="14" />
-                </label>
+<app-filter-select
+                  [label]="'budget.dash.metric' | t"
+                  [options]="metricOptions()"
+                  [value]="metric()"
+                  (valueChange)="onMetricChange($event)"
+                  [active]="true"
+                />
               </div>
               <app-budget-pie
                 [label]="metricLabel(metric())"
@@ -360,16 +358,14 @@
   </ng-template>
 
   <ng-template #yearChip>
-    <label class="bd-chip bd-chip--on bd__selectChip bd__selectChip--lead">
-      <app-icon class="bd__selectLead" name="cal" [size]="15" />
-      <span class="sr-only">{{ 'budget.dash.year' | t }}</span>
-      <select class="bd__select" [value]="selectedFyId()" (change)="onYearChange($event)">
-        @for (fy of years(); track fy.id) {
-          <option [value]="fy.id" [selected]="fy.id === selectedFyId()">{{ 'budget.dash.yearShort' | t: { year: fy.display } }}</option>
-        }
-      </select>
-      <app-icon class="bd__selectChev" name="chevron-down" [size]="15" />
-    </label>
+<app-filter-select
+      icon="cal"
+      [label]="'budget.dash.year' | t"
+      [options]="yearOptions()"
+      [value]="selectedFyId()"
+      (valueChange)="selectYear($event)"
+      [active]="true"
+    />
   </ng-template>
 
   <!-- The sunburst covers the whole subtree of the selected cost centre. -->

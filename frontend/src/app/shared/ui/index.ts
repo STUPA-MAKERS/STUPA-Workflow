@@ -18,6 +18,8 @@ export { DateBlockComponent } from './date-block/date-block.component';
 export { EmptyStateComponent } from './empty-state/empty-state.component';
 export { FieldGroupComponent, FieldRowComponent } from './field-group/field-group.component';
 export { FileDropZoneComponent, acceptsFile } from './file-drop-zone/file-drop-zone.component';
+export { FilterSelectComponent } from './filter-select/filter-select.component';
+export type { FilterSelectOption } from './filter-select/filter-select.component';
 export { HistoryComponent } from './history/history.component';
 export type { HistoryEntry } from './history/history.component';
 export {

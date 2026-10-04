@@ -66,57 +66,6 @@
 .apps__chip {
   max-width: 100%;
 }
-.apps__chip .ell {
-  max-width: 18rem;
-}
-
-/* A chip over a native select: the select fills the chip, so a click anywhere on it (the
-   text, the padding, the chevron) opens the list of the browser. The icons sit on top
-   and let the click through. */
-.apps__selectChip {
-  position: relative;
-  padding: 0;
-}
-.apps__chipText {
-  padding-inline: var(--space-3) 31px;
-  pointer-events: none;
-}
-.apps__chipLead + .apps__chipText {
-  padding-inline-start: 33px;
-}
-.apps__chipLead,
-.apps__chipChev {
-  position: absolute;
-  top: 50%;
-  display: flex;
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-.apps__chipLead {
-  inset-inline-start: var(--space-3);
-}
-.apps__chipChev {
-  inset-inline-end: 10px;
-}
-.apps__select {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  border-radius: inherit;
-  opacity: 0;
-  font: inherit;
-  cursor: pointer;
-  appearance: none;
-}
-.apps__selectChip:focus-within {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-
 /* "Weitere Filter" at the end of the search pill. The count says how many are set. */
 .apps__tune {
   position: relative;
@@ -355,17 +304,6 @@
 }
 
 /* ------------------------------------------------------------------ sheets */
-.apps__check {
-  display: flex;
-  align-items: center;
-  min-height: 52px;
-  padding: var(--space-2) var(--space-4);
-}
-.apps__sheetNone {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
 .apps__moreForm {
   /* The fields sit on the sheet (surface 2): one step up, so they stand out from it. */
   --color-surface-sunken: var(--color-surface-3);
