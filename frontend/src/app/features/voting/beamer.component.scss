@@ -3,7 +3,8 @@
 // screen readable at a distance.
 :host {
   display: block;
-  min-height: calc(100vh - var(--layout-header-height));
+  /* The route has no chrome (route data `chrome: false`): the page is the screen. */
+  min-height: 100dvh;
 }
 
 .beamer {

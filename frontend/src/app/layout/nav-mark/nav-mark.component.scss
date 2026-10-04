@@ -1,0 +1,34 @@
+/* The mark sits on the top end of the icon pill (56 × 32) of the rail and the phone bar. */
+:host {
+  display: contents;
+}
+
+.mark__count {
+  position: absolute;
+  top: 0;
+  left: 31px;
+  display: grid;
+  place-items: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 10.5px;
+  font-weight: var(--fw-bold);
+  line-height: 1;
+}
+
+/* The ring in the colour behind the bar separates the dot from the icon stroke. */
+.mark__live {
+  position: absolute;
+  top: 4px;
+  left: 35px;
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--nav-mark-ring, var(--color-bg));
+}
+

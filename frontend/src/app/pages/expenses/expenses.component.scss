@@ -343,7 +343,8 @@ input.exp__input {
    (--z-dialog) and above the sticky table cells. */
 .exp__bulkbar {
   position: fixed;
-  bottom: max(var(--space-4), env(safe-area-inset-bottom));
+  /* Above the phone navigation bar of the shell, where there is one. */
+  bottom: calc(var(--app-bottom-inset, 0px) + max(var(--space-4), env(safe-area-inset-bottom)));
   left: 50%;
   transform: translateX(-50%);
   z-index: var(--z-sticky);

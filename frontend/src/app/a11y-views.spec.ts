@@ -29,7 +29,6 @@ import { FlowEditorComponent } from './pages/admin/flow-editor/flow-editor.compo
 import { BrandingEditorComponent } from './pages/admin/branding/branding-editor.component';
 import { AdminApiService } from './pages/admin/admin-api.service';
 import { BudgetTreeApi } from './pages/budget/budget-tree.api';
-import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ApiClient } from '@core/api/api-client.service';
 import { provideFormly } from '@shared/formly/formly.providers';
@@ -58,31 +57,26 @@ describe('Kern-Views a11y (axe)', () => {
           { provide: USE_MOCK_API, useValue: false },
         ],
       });
-      const auth = view.fixture.debugElement.injector.get(AuthService);
       const http = view.fixture.debugElement.injector.get(HttpTestingController);
-      http
-        .match((r) => r.url.endsWith('/admin/site-config'))
-        .forEach((req) =>
-          req.flush({
-            version: 1,
-            active: { logos: {}, footerColumns: [], copyright: {}, legalLinks: [], freetexts: {} },
-            draft: { logos: {}, footerColumns: [], copyright: {}, legalLinks: [], freetexts: {} },
-            hasDraftChanges: false,
-          }),
-        );
-      return { view, auth, http };
+      return { view, http };
     }
 
-    it('anonymous shell has valid landmarks and no violations', async () => {
-      const { view } = await setupShell();
+    it('anonymous shell (public frame) has valid landmarks and no violations', async () => {
+      const { view, http } = await setupShell();
+      http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
+      view.fixture.detectChanges();
       expect(await runAxe(view.container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
     });
 
-    it('authenticated shell (full nav) has no violations', async () => {
-      const { view, auth, http } = await setupShell();
-      auth.ensureLoaded().subscribe();
+    it('authenticated shell (rail and account menu) has no violations', async () => {
+      const { view, http } = await setupShell();
       http.expectOne('/api/auth/me').flush(MEMBER);
       view.fixture.detectChanges();
+      expect(await runAxe(view.container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
+      // The open account popover too: it holds a select and a switch.
+      (view.container.querySelector('.am__trigger') as HTMLButtonElement).click();
+      view.fixture.detectChanges();
+      expect(view.container.querySelector('.am--popover')).not.toBeNull();
       expect(await runAxe(view.container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
     });
   });

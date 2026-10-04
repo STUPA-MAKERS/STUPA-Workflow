@@ -1,0 +1,142 @@
+@use 'breakpoints' as bp;
+
+:host {
+  display: block;
+}
+
+.pub {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 72px;
+  padding: 0 28px;
+}
+@include bp.phone {
+  .pub {
+    height: 64px;
+    padding: 0 var(--space-4);
+    gap: var(--space-2);
+  }
+}
+
+.pub__brand {
+  display: inline-flex;
+  flex: none;
+  border-radius: var(--radius-md);
+}
+.pub__brand:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 4px;
+}
+.pub__logo {
+  display: block;
+  height: 36px;
+  width: auto;
+}
+/* On a phone the wordmark is both unreadable and the widest thing in the bar. */
+.pub__mark {
+  display: none;
+  height: 32px;
+  width: auto;
+}
+@include bp.phone {
+  .pub__logo {
+    display: none;
+  }
+  .pub__mark {
+    display: block;
+  }
+}
+
+.pub__spacer {
+  flex: 1 1 auto;
+}
+
+/* A chip: globe, code, chevron. The native select keeps the keyboard and the
+   platform picker; the icons sit over it and let the clicks through. */
+.pub__lang {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+.pub__langSelect {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 32px;
+  padding: 0 32px 0 34px;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-1);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.pub__langSelect:hover {
+  border-color: var(--color-border-strong);
+}
+.pub__langSelect:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.pub__langIcon,
+.pub__langChevron {
+  position: absolute;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+.pub__langIcon {
+  left: 12px;
+}
+.pub__langChevron {
+  right: 10px;
+}
+
+.pub__icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.pub__icon:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.pub__icon:focus-visible,
+.pub__login:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* An outlined pill: signing in is offered, not pushed. */
+.pub__login {
+  flex: none;
+  height: 40px;
+  padding: 0 var(--space-5);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pub__login:hover {
+  background: var(--color-surface-2);
+}
+@include bp.phone {
+  .pub__login {
+    padding: 0 var(--space-4);
+  }
+}
