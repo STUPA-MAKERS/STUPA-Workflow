@@ -104,6 +104,11 @@ export class ApplicationsListComponent implements OnDestroy {
   private fetchSeq = 0;
   /** `gremium` has no visible control. It still mirrors the URL. */
   readonly gremium = signal('');
+  /**
+   * `mine=true`: only the own applications ("Alle ansehen" under "Meine Anträge" on the
+   * start page). No visible control; the reset clears it with the other filters.
+   */
+  readonly mine = signal('');
   readonly types = signal<ApplicationType[]>([]);
 
   /** Visible filter controls. They mirror the query params. */
@@ -286,6 +291,7 @@ export class ApplicationsListComponent implements OnDestroy {
     };
     str('q'); str('type'); str('state'); str('gremium'); str('budget');
     str('createdFrom'); str('createdTo');
+    if (pm.get('mine') === 'true') query.mine = true;
     const min = pm.get('amountMin'); if (min) query.amountMin = Number(min);
     const max = pm.get('amountMax'); if (max) query.amountMax = Number(max);
     const sort = pm.get('sort'); if (sort === 'amount' || sort === 'createdAt') query.sort = sort;
@@ -376,6 +382,7 @@ export class ApplicationsListComponent implements OnDestroy {
     { param: 'type', signal: this.typeId, empty: '' },
     { param: 'state', signal: this.state, empty: '' },
     { param: 'gremium', signal: this.gremium, empty: '' },
+    { param: 'mine', signal: this.mine, empty: '', parse: (raw) => (raw === 'true' ? raw : '') },
     { param: 'budget', signal: this.budgetId, empty: '' },
     { param: 'amountMin', signal: this.amountMin, empty: '', numeric: true, trim: true },
     { param: 'amountMax', signal: this.amountMax, empty: '', numeric: true, trim: true },
