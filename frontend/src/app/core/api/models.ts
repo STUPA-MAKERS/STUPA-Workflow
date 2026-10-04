@@ -118,7 +118,11 @@ export interface Page<T> {
 }
 
 export interface ApplicationListQuery {
-  state?: string;
+  /**
+   * Flow state UUIDs. The request repeats `state` once per value (A4), and the list keeps
+   * the applications in any of these states.
+   */
+  state?: readonly string[];
   gremium?: Uuid;
   type?: Uuid;
   /** Cost center in the budget tree. The filter includes the subtree. */
@@ -323,6 +327,10 @@ export interface TransitionOutWire {
   label: I18nMap;
   /** Optional color for the decision button. */
   color?: string | null;
+  /** The transition carries an `addToNextSession` action (A1). */
+  addsToAgenda?: boolean;
+  /** The gremium whose planned meetings the agenda dialog offers (A1). */
+  agendaGremiumId?: Uuid | null;
 }
 
 /** A field change in the version diff (`FieldChange`). */
@@ -572,6 +580,13 @@ export interface Transition {
   label: string;
   /** Optional color for the decision button. `null` selects the default. */
   color: string | null;
+  /**
+   * The transition puts the application on the agenda of a meeting (A1). The agenda
+   * dialog (meeting choice) needs the meeting list; the row menu opens the detail instead.
+   */
+  addsToAgenda: boolean;
+  /** The gremium whose planned meetings the agenda dialog offers, or null. */
+  agendaGremiumId: Uuid | null;
 }
 
 /** A changed field cell, frontend view. The `key` comes out of the diff map. */

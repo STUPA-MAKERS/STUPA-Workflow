@@ -226,9 +226,128 @@ describe('mockApiInterceptor', () => {
       expect(tasks[1].stateSince).toBeUndefined();
     });
 
-    it('GET /applications → page', async () => {
-      const page = await get<{ items: unknown[]; total: number }>('/api/applications');
-      expect(page.total).toBe(2);
+    describe('demo applications (mock-applications.ts)', () => {
+      type Row = { id: string; title: string; amount: string | null; archivedAt: string | null; state: { id: string; key: string } };
+      const first = 'a1000000-0000-0000-0000-000000000001';
+      const second = 'a1000000-0000-0000-0000-000000000002';
+
+      beforeEach(async () => (await import('./mock-applications')).resetMockApplications());
+
+      it('GET /applications → the demo page, newest first, without archived rows', async () => {
+        const page = await get<{ items: Row[]; total: number }>('/api/applications');
+        expect(page.total).toBe(15);
+        expect(page.items).toHaveLength(15);
+        expect(page.items[0].id).toBe(first);
+        expect(page.items.some((r) => r.archivedAt)).toBe(false);
+      });
+
+      it('filters by state (repeated), type, text, amount, date and archive', async () => {
+        const review = '66666666-6666-6666-6666-666666666662';
+        const agenda = '66666666-6666-6666-6666-666666666665';
+        let params = new HttpParams().append('state', review).append('state', agenda);
+        let page = await get<{ items: Row[] }>('/api/applications', params);
+        expect(page.items.every((r) => [review, agenda].includes(r.state.id))).toBe(true);
+        expect(page.items.length).toBe(7);
+
+        params = new HttpParams().set('type', '22222222-2222-2222-2222-222222222222').set('q', 'fahrt');
+        page = await get<{ items: Row[] }>('/api/applications', params);
+        expect(page.items.map((r) => r.title)).toEqual([
+          'Fahrt zur Landes-ASten-Konferenz',
+          'Fahrtkosten Fachschaftentagung',
+        ]);
+
+        params = new HttpParams().set('amountMin', '1000').set('amountMax', '2000');
+        page = await get<{ items: Row[] }>('/api/applications', params);
+        expect(page.items.every((r) => Number(r.amount) >= 1000 && Number(r.amount) <= 2000)).toBe(true);
+
+        params = new HttpParams().set('createdFrom', '2026-08-01').set('createdTo', '2026-08-31');
+        page = await get<{ items: Row[] }>('/api/applications', params);
+        expect(page.items).toHaveLength(3);
+
+        params = new HttpParams().set('archived', 'true');
+        page = await get<{ items: Row[] }>('/api/applications', params);
+        expect(page.items.map((r) => r.title)).toEqual(['Spieleabend in der Mensa']);
+        params = new HttpParams().set('archived', 'all');
+        expect((await get<{ total: number }>('/api/applications', params)).total).toBe(16);
+      });
+
+      it('sorts by amount and by date in both directions and pages', async () => {
+        let params = new HttpParams().set('sort', 'amount').set('order', 'desc');
+        let page = await get<{ items: Row[] }>('/api/applications', params);
+        expect(page.items[0].amount).toBe('2890.00');
+        params = new HttpParams().set('sort', 'amount').set('order', 'asc');
+        page = await get<{ items: Row[] }>('/api/applications', params);
+        expect(page.items[0].amount).toBeNull();
+        params = new HttpParams().set('order', 'asc').set('limit', '5').set('offset', '5');
+        const paged = await get<{ items: Row[]; offset: number; limit: number }>('/api/applications', params);
+        expect(paged.items).toHaveLength(5);
+        expect(paged.offset).toBe(5);
+      });
+
+      it('GET the detail, its transitions, attachments, shares and flow states', async () => {
+        const app = await get<{ id: string; data: Record<string, unknown>; applicant: { name: string } }>(
+          `/api/applications/${first}`,
+        );
+        expect(app.id).toBe(first);
+        expect(app.applicant.name).toBeTruthy();
+        expect(await get<unknown[]>(`/api/applications/${first}/transitions`)).toEqual([]);
+        const fromReview = await get<{ addsToAgenda: boolean }[]>(
+          '/api/applications/a1000000-0000-0000-0000-000000000004/transitions',
+        );
+        expect(fromReview.map((t) => t.addsToAgenda)).toEqual([true, false, false]);
+        expect(await get<unknown[]>(`/api/applications/${first}/attachments`)).toHaveLength(3);
+        expect(await get<unknown[]>(`/api/applications/${second}/attachments`)).toEqual([]);
+        expect(await get<unknown[]>(`/api/applications/${first}/shares`)).toEqual([]);
+        expect((await get<unknown[]>(`/api/applications/${first}/flow-states`)).length).toBe(5);
+      });
+
+      it('answers 404 for an unknown demo id', async () => {
+        await expect(get('/api/applications/a1000000-0000-0000-0000-000000009999')).rejects.toMatchObject({
+          status: 404,
+        });
+      });
+
+      it('fires a transition, archives, forces a state, edits and deletes a demo row', async () => {
+        const start = (await get<{ id: string }[]>(`/api/applications/${second}/transitions`))[0];
+        await firstValueFrom(http.post(`/api/applications/${second}/transition`, { transitionId: start.id }));
+        expect((await get<Row>(`/api/applications/${second}`)).state.key).toBe('review');
+        // An unknown transition keeps the state.
+        await firstValueFrom(http.post(`/api/applications/${second}/transition`, { transitionId: 'x' }));
+        expect((await get<Row>(`/api/applications/${second}`)).state.key).toBe('review');
+
+        const archived = await firstValueFrom(http.post<Row>(`/api/applications/${second}/archive`, {}));
+        expect(archived.archivedAt).toBeTruthy();
+        const back = await firstValueFrom(http.delete<Row>(`/api/applications/${second}/archive`));
+        expect(back.archivedAt).toBeNull();
+
+        await firstValueFrom(
+          http.post(`/api/applications/${second}/force-status`, { stateId: '66666666-6666-6666-6666-666666666666' }),
+        );
+        expect((await get<Row>(`/api/applications/${second}`)).state.key).toBe('approved');
+        await firstValueFrom(http.post(`/api/applications/${second}/force-status`, { stateId: 'nope' }));
+        expect((await get<Row>(`/api/applications/${second}`)).state.key).toBe('approved');
+
+        const edited = await firstValueFrom(
+          http.patch<{ title: string; data: { title: string } }>(`/api/applications/${second}`, {
+            data: { title: ' Neuer Titel ' },
+          }),
+        );
+        expect(edited.data.title).toBe('Neuer Titel');
+        await firstValueFrom(http.patch(`/api/applications/${second}`, { data: { title: '  ' } }));
+        expect((await get<Row & { data: { title: string } }>(`/api/applications/${second}`)).data.title).toBe('Neuer Titel');
+
+        await firstValueFrom(http.delete(`/api/applications/${second}`));
+        await expect(get(`/api/applications/${second}`)).rejects.toMatchObject({ status: 404 });
+      });
+
+      it('answers 404 for a write it does not know', async () => {
+        await expect(
+          firstValueFrom(http.put(`/api/applications/${first}`, {})),
+        ).rejects.toMatchObject({ status: 404 });
+        await expect(
+          firstValueFrom(http.post(`/api/applications/${first}`, {})),
+        ).rejects.toMatchObject({ status: 404 });
+      });
     });
 
     it('GET /votes/{id} → vote', async () => {

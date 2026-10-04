@@ -58,6 +58,14 @@ const MOCK_PRINCIPAL: Principal = {
   permissions: [
     'application.read',
     'application.manage',
+    // The row menu and the header of the applications page: transitions, export, share
+    // links, archive, delete and force status.
+    'application.transition',
+    'application.export',
+    'application.share',
+    'application.archive',
+    'application.delete',
+    'application.force_status',
     'admin.site',
     'admin.gremien',
     'admin.types',
@@ -247,6 +255,10 @@ function mockApplication(data: Record<string, unknown> = {}): ApplicationOutWire
   };
 }
 
+/**
+ * The applications of the global search (`GET /search`). The list page has its own demo
+ * rows in `mock-applications.ts`.
+ */
 const MOCK_APPLICATIONS: Page<ApplicationOutWire> = {
   items: [
     {
@@ -684,6 +696,10 @@ function mockSearch(q: string): SearchResults {
   return { hits, truncated: false, failed: [] };
 }
 
+/** The paths of the demo applications in `mock-applications.ts` (id prefix `a1000000-`). */
+const DEMO_APPLICATION_PATH =
+  /\/applications\/a1000000-[^/]+(\/(transitions|attachments|shares|flow-states|transition|archive|force-status))?$/;
+
 /** The budget routes the demo data in `mock-budget.ts` answers. */
 const BUDGET_MOCK_PATH = /\/budgets(\/[^/]+\/(fiscal-years|applications))?$/;
 
@@ -703,6 +719,26 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   const p = path(req.url);
   const ok = <T>(body: T, status = 200): Observable<HttpEvent<unknown>> =>
     of(new HttpResponse({ status, body })).pipe(delay(120));
+
+  // The demo applications of the list page and their detail paths. The demo data loads
+  // on first use, so it stays out of the initial bundle.
+  if (
+    (req.method === 'GET' && /(^|\/)api\/applications$/.test(p)) ||
+    DEMO_APPLICATION_PATH.test(p)
+  ) {
+    return from(import('./mock-applications')).pipe(
+      mergeMap((m) => {
+        const body =
+          req.method === 'GET'
+            ? m.mockApplicationsGet(p, req.params)
+            : m.mockApplicationsWrite(req.method, p, req.body);
+        if (body === undefined) {
+          return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
+        }
+        return ok(body, req.method === 'DELETE' ? 204 : 200);
+      }),
+    );
+  }
 
   if (req.method === 'GET') {
     if (p.endsWith('/auth/me')) return ok(MOCK_PRINCIPAL);
@@ -776,7 +812,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/expenses')) return ok({ items: [], total: 0, limit: 20, offset: 0 });
     if (p.endsWith('/search')) return ok(mockSearch(req.params.get('q') ?? ''));
     if (p.endsWith('/applications/tasks')) return ok([...MOCK_TASKS]);
-    if (p.endsWith('/applications')) return ok(MOCK_APPLICATIONS);
     if (/\/votes\/[^/]+$/.test(p)) return ok(MOCK_VOTE);
     if (p.endsWith('/meetings')) return ok([MOCK_MEETING, MOCK_PLANNED_MEETING]);
     if (p.endsWith('/delegations')) {

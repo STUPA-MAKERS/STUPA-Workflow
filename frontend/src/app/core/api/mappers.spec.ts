@@ -316,7 +316,23 @@ describe('mapTransition', () => {
       toStateId: 's2',
       label: 'Accept',
       color: null,
+      addsToAgenda: false,
+      agendaGremiumId: null,
     });
+  });
+
+  it('passes the agenda action through (A1)', () => {
+    const wire: TransitionOutWire = {
+      id: 'tr1',
+      fromStateId: 's1',
+      toStateId: 's2',
+      label: { de: 'Auf Tagesordnung' },
+      addsToAgenda: true,
+      agendaGremiumId: 'g1',
+    };
+    const view = mapTransition(wire, 'de');
+    expect(view.addsToAgenda).toBe(true);
+    expect(view.agendaGremiumId).toBe('g1');
   });
 
   it('passes the transition color through (and defaults to null)', () => {

@@ -179,10 +179,7 @@ export class ApiClient {
   }
 
   listApplications(query: ApplicationListQuery = {}): Observable<Page<ApplicationListItem>> {
-    let params = new HttpParams();
-    for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== null) params = params.set(key, String(value));
-    }
+    const params = listParams(query, false);
     const lang = this.i18n.locale();
     return this.http
       .get<Page<ApplicationListItemWire>>(`${this.base}/applications`, {
@@ -199,12 +196,7 @@ export class ApiClient {
 
   /** GET /applications/export.xlsx — filtered list as Excel (P(`application.export`)). */
   exportApplicationsXlsx(query: ApplicationListQuery = {}): Observable<Blob> {
-    let params = new HttpParams();
-    for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== null && key !== 'limit' && key !== 'offset') {
-        params = params.set(key, String(value));
-      }
-    }
+    const params = listParams(query, true);
     return this.http.get(`${this.base}/applications/export.xlsx`, {
       params,
       responseType: 'blob',
@@ -905,4 +897,25 @@ function attendanceBody(
   note: string | null | undefined,
 ): { status: AttendanceStatus; note?: string | null } {
   return note === undefined ? { status } : { status, note };
+}
+
+/**
+ * The query of the application list and of its XLSX export as HTTP params.
+ *
+ * An array value repeats its key once per entry (`?state=a&state=b`, A4). An empty
+ * array, `undefined` and `null` add nothing. The export (`forExport`) leaves out the
+ * paging keys, because the file holds every matching row.
+ */
+function listParams(query: ApplicationListQuery, forExport: boolean): HttpParams {
+  let params = new HttpParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null) continue;
+    if (forExport && (key === 'limit' || key === 'offset')) continue;
+    if (Array.isArray(value)) {
+      for (const entry of value) params = params.append(key, String(entry));
+    } else {
+      params = params.set(key, String(value));
+    }
+  }
+  return params;
 }
