@@ -7,8 +7,9 @@ requires-python = ">=3.11"
 dependencies = [
     # Cap below 2.0: that release moved `mcp.server.fastmcp` into the separate
     # `fastmcp` distribution, so an uncapped install resolves to a version this
-    # server cannot import.
-    "mcp>=1.2.0,<3",
+    # server cannot import. Dependabot must not raise this cap (see
+    # .github/dependabot.yml). Change it only together with the import migration.
+    "mcp>=1.2.0,<2",
     "httpx>=0.27",
     "pydantic>=2.7",
 ]
