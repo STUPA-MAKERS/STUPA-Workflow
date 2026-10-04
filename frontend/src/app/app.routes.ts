@@ -66,7 +66,8 @@ export const routes: Routes = [
       {
         path: 'dashboard',
         // Wide: the two columns of the start page fill the width (board Main).
-        data: { title: 'nav.dashboard', wide: true },
+        // Fab: on a phone the shell keeps the foot of the page free for the "Antrag" button.
+        data: { title: 'nav.dashboard', wide: true, fab: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/dashboard/dashboard.component').then((m) => m.DashboardComponent),

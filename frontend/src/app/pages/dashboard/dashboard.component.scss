@@ -263,7 +263,8 @@
 
 /* ------------------------------------------------------------------ phone */
 
-/* The floating apply button stands above the bottom bar. */
+/* The floating apply button stands above the bottom bar. The route data `fab` makes the
+   shell keep the foot of the page free for it, below the footer (shell.component.scss). */
 .dash__fab {
   position: fixed;
   right: var(--space-4);
@@ -285,8 +286,6 @@
 
 :host(.dash--phone) {
   gap: 22px;
-  /* The last rows stay clear of the floating button. */
-  padding-bottom: 72px;
 }
 :host(.dash--phone) .dash__col {
   gap: 22px;

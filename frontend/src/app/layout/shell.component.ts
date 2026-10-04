@@ -66,6 +66,12 @@ export class ShellComponent {
 
   /** Full-width content from route data `wide`, for example the budget tab with two sidebars. */
   readonly wide = signal(false);
+  /**
+   * Route data `fab: true`: on a phone the page shows a floating action button above the
+   * bottom bar (the start page). The frame then keeps the foot of the body free for it, so
+   * the button never covers the footer and its legal links.
+   */
+  readonly fab = signal(false);
   /** Route data `chrome: false` turns the frame off, for example for the beamer. */
   private readonly chrome = signal(true);
   /** The first answer of `/auth/me` arrived (a principal or none). */
@@ -84,7 +90,7 @@ export class ShellComponent {
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.sessionKnown.set(true));
 
-    // `wide` and `chrome` come from the route data. The deepest active route wins.
+    // `wide`, `fab` and `chrome` come from the route data. The deepest active route wins.
     this.router.events
       .pipe(
         filter((e) => e instanceof NavigationEnd),
@@ -93,13 +99,16 @@ export class ShellComponent {
       .subscribe(() => {
         let r = this.route.firstChild;
         let wide = false;
+        let fab = false;
         let chrome = true;
         while (r) {
           wide = r.snapshot.data['wide'] === true || wide;
+          fab = r.snapshot.data['fab'] === true || fab;
           if (r.snapshot.data['chrome'] === false) chrome = false;
           r = r.firstChild;
         }
         this.wide.set(wide);
+        this.fab.set(fab);
         this.chrome.set(chrome);
       });
   }

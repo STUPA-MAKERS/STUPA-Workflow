@@ -79,7 +79,13 @@
   --app-bottom-safe-area: 0px;
 }
 .frame--phone .frame__body {
-  padding-bottom: var(--app-bottom-inset);
+  padding-bottom: calc(var(--app-bottom-inset) + var(--app-fab-clearance, 0px));
+}
+/* Route data `fab`: a floating action button (56px high, 16px above the bottom bar) sits
+   over the foot of the page. The body ends 16px above the button, so at the end of the
+   page the footer with its legal links is never under it. */
+.frame--fab {
+  --app-fab-clearance: calc(56px + 2 * var(--space-4));
 }
 .frame--phone .main {
   --main-pad-top: var(--space-4);
