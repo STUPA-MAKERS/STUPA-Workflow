@@ -568,8 +568,8 @@ describe('mockApiInterceptor', () => {
 
     it('GET /gremien/{id}/meeting-members → members, one without protocol.write', async () => {
       const ms = await get<{ canKeepProtocol: boolean }[]>('/api/gremien/g1/meeting-members');
-      expect(ms.length).toBe(3);
-      expect(ms.filter((m) => !m.canKeepProtocol).length).toBe(1);
+      expect(ms.length).toBe(9);
+      expect(ms.filter((m) => !m.canKeepProtocol).length).toBe(4);
     });
 
     it('GET /meetings/{id}/protocol → protocol', async () => {
@@ -593,9 +593,8 @@ describe('mockApiInterceptor', () => {
     });
 
     it('GET /delegations → the own delegations, filtered by meetingId', async () => {
-      const all = await get<{ meetingId: string; direction: string }[]>('/api/delegations');
-      expect(all.length).toBe(1);
-      expect(all[0].direction).toBe('incoming');
+      const all = await get<{ meetingId: string; direction: string | null }[]>('/api/delegations');
+      expect(all.map((d) => d.direction)).toEqual(['incoming', null]);
       const none = await get<unknown[]>(
         '/api/delegations',
         new HttpParams().set('meetingId', 'other'),
@@ -605,7 +604,7 @@ describe('mockApiInterceptor', () => {
 
     it('GET …/attendance → roster', async () => {
       const roster = await get<unknown[]>('/api/meetings/m1/attendance');
-      expect(roster.length).toBe(3);
+      expect(roster.length).toBe(9);
     });
 
     it('GET …/agenda/assignable → filtered list (both seeded applications are taken)', async () => {
@@ -1106,6 +1105,123 @@ describe('mockApiInterceptor', () => {
         http.delete<{ id: string }[]>(`/api/meetings/m1/agenda/${id}`),
       );
       expect(after.some((a) => a.id === id)).toBe(false);
+    });
+
+    describe('FE7: keepers, attendance with delegations, closed meetings', () => {
+      const LIVE = 'd0000000-0000-0000-0000-000000000001';
+      const DEMO = '00000000-0000-0000-0000-000000000001';
+      type M = {
+        protokollantId: string | null;
+        plannedHandover: { principalId: string; fromPosition: number | null } | null;
+        keeperPeriods: { principalId: string; toAt: string | null; toPosition: number | null }[];
+      };
+      const handover = (principalId: string, mode: string) =>
+        firstValueFrom(http.post<M>(`/api/meetings/${LIVE}/protokollant-handover`, { principalId, mode }));
+
+      // Other tests change the shared mock meeting: start from the demo keeper on TOP 3.
+      beforeEach(async () => {
+        await firstValueFrom(
+          http.patch(`/api/meetings/${LIVE}`, { protokollantId: DEMO, currentAgendaItemId: 'ag-s3' }),
+        );
+      });
+
+      it('refuses a handover to a member without protocol.write and to the keeper (O20)', async () => {
+        await expect(handover('p-3', 'now')).rejects.toMatchObject({
+          status: 422,
+          error: { code: 'protokollant_needs_protocol_write' },
+        });
+        await expect(handover(DEMO, 'now')).rejects.toMatchObject({
+          status: 409,
+          error: { code: 'already_protokollant' },
+        });
+      });
+
+      it('plans a handover, discards it, and starts a planned one on a forward move (Z3)', async () => {
+        // Other tests change the agenda: take the items it has now.
+        const agenda = await get<{ id: string }[]>(`/api/meetings/${LIVE}/agenda`);
+        expect(agenda.length).toBeGreaterThan(1);
+        await firstValueFrom(http.patch(`/api/meetings/${LIVE}`, { currentAgendaItemId: agenda[0].id }));
+        const planned = await handover('p-4', 'next_item');
+        expect(planned.plannedHandover).toMatchObject({ principalId: 'p-4', fromPosition: 2 });
+        const discarded = await firstValueFrom(
+          http.delete<M>(`/api/meetings/${LIVE}/protokollant-handover`),
+        );
+        expect(discarded.plannedHandover).toBeNull();
+        await expect(
+          firstValueFrom(http.delete(`/api/meetings/${LIVE}/protokollant-handover`)),
+        ).rejects.toMatchObject({ status: 404 });
+        await handover('p-4', 'next_item');
+        const moved = await firstValueFrom(
+          http.patch<M>(`/api/meetings/${LIVE}`, { currentAgendaItemId: agenda[1].id }),
+        );
+        expect(moved.protokollantId).toBe('p-4');
+        expect(moved.plannedHandover).toBeNull();
+        expect(moved.keeperPeriods.at(-1)?.principalId).toBe('p-4');
+        // The last item has no next one.
+        await firstValueFrom(
+          http.patch(`/api/meetings/${LIVE}`, { currentAgendaItemId: agenda[agenda.length - 1].id }),
+        );
+        await expect(handover(DEMO, 'next_item')).rejects.toMatchObject({
+          status: 409,
+          error: { code: 'no_next_item' },
+        });
+        // Hand back now: one running period, the demo user's.
+        const back = await handover(DEMO, 'now');
+        expect(back.protokollantId).toBe(DEMO);
+        expect(back.keeperPeriods.filter((k) => k.toAt === null)).toEqual([
+          expect.objectContaining({ principalId: DEMO }),
+        ]);
+      });
+
+      it('refuses "present" while the member has a delegation of the meeting, until it is revoked (O23)', async () => {
+        await expect(
+          firstValueFrom(http.put(`/api/meetings/${LIVE}/attendance/p-6`, { status: 'present' })),
+        ).rejects.toMatchObject({ status: 409, error: { code: 'delegation_active' } });
+        const listed = await get<{ id: string; delegatorId: string }[]>(
+          '/api/delegations',
+          new HttpParams().set('meetingId', LIVE),
+        );
+        expect(listed.map((d) => d.delegatorId)).toEqual(['p-6']);
+        await firstValueFrom(http.delete(`/api/delegations/${listed[0].id}`));
+        const rows = await firstValueFrom(
+          http.put<{ principalId: string; status: string }[]>(`/api/meetings/${LIVE}/attendance/p-6`, { status: 'present' }),
+        );
+        expect(rows.find((r) => r.principalId === 'p-6')?.status).toBe('present');
+      });
+
+      it('serves the closed meetings: draft, edit of the text, finalize, and a final one', async () => {
+        const draft = 'd0000000-0000-0000-0000-000000000101';
+        const m = await get<{ status: string; keeperPeriods: unknown[]; votes: { status: string }[] }>(`/api/meetings/${draft}`);
+        expect(m.status).toBe('closed');
+        expect(m.keeperPeriods).toHaveLength(2);
+        expect(m.votes[0].status).toBe('closed');
+        const agenda = await get<{ id: string; body: string }[]>(`/api/meetings/${draft}/agenda`);
+        expect(agenda[2].body).toContain('> [!abstimmung]');
+        const edited = await firstValueFrom(
+          http.patch<{ id: string; body: string }[]>(`/api/meetings/${draft}/agenda/${agenda[0].id}`, { body: 'Neu.' }),
+        );
+        expect(edited[0].body).toBe('Neu.');
+        const protocol = await get<{ id: string; status: string }>(`/api/meetings/${draft}/protocol`);
+        expect(protocol.status).toBe('draft');
+        await firstValueFrom(http.patch(`/api/protocols/${protocol.id}`, { markdown: '# A' }));
+        const final = await firstValueFrom(
+          http.post<{ status: string; publicPdfUrl: string | null }>(`/api/protocols/${protocol.id}/finalize`, null),
+        );
+        expect(final.status).toBe('final');
+        expect(final.publicPdfUrl).toBeTruthy();
+        // Anything else on a closed meeting is refused.
+        await expect(
+          firstValueFrom(http.delete(`/api/meetings/${draft}/agenda/${agenda[0].id}`)),
+        ).rejects.toMatchObject({ status: 409 });
+        const other = await get<{ status: string; pdfUrl: string }>(
+          '/api/meetings/d0000000-0000-0000-0000-000000000102/protocol',
+        );
+        expect(other.status).toBe('final');
+        expect(other.pdfUrl).toBeTruthy();
+        // The roster of a closed meeting is the roster of the gremium.
+        const roster = await get<unknown[]>(`/api/meetings/${draft}/attendance`);
+        expect(roster.length).toBe(9);
+      });
     });
 
     it('DELETE on an unmatched /api path falls through to next()', () => {

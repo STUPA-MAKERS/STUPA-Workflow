@@ -62,9 +62,17 @@
     }
   }
 
-  @if (v.status === 'closed' && canInsert()) {
+  @if (v.status === 'closed' && inProtocol()) {
+    <p class="vc__inProtocol">
+      <app-icon name="check" [size]="16" />
+      {{ 'meetings.voteResult.inProtocol' | t }}
+    </p>
+  } @else if (v.status === 'closed' && canInsert()) {
     <div class="vc__actions">
-      <app-button variant="tonal" [block]="true" (click)="insertResult.emit(v)">{{ 'meetings.dock.insertResult' | t }}</app-button>
+      <app-button variant="tonal" [block]="true" (click)="insertResult.emit(v)">
+        <app-icon name="fileplus" [size]="16" />
+        {{ 'meetings.dock.insertResult' | t }}
+      </app-button>
     </div>
   }
 

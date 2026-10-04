@@ -12,10 +12,9 @@ import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
+import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import {
-  BadgeComponent,
   ButtonComponent,
-  CardComponent,
   CheckboxComponent,
   DialogComponent,
   SelectComponent,
@@ -24,10 +23,10 @@ import {
 import { ToastService } from '@stupa-makers/ui-kit';
 
 /**
- * Delegation card on the meeting page.
+ * The own delegations of a meeting, as a section of the attendance sheet ("Vertretung").
  *
- * The card shows the own outgoing delegation, which stays revocable until the
- * meeting starts, and the delegations directed at me. The setup dialog picks the
+ * The section shows the own outgoing delegation, which stays revocable until the
+ * meeting starts, and the delegations directed at me, as rows of one group. The setup dialog picks the
  * recipient from the Gremium members and the substitute pool. It also runs a
  * server-side name search when external recipients are enabled. The server enforces
  * all rules: deadline, recipient set and chains. The card only hides what is
@@ -41,9 +40,8 @@ import { ToastService } from '@stupa-makers/ui-kit';
     FormsModule,
     TranslatePipe,
     LocalizedDatePipe,
-    BadgeComponent,
+    AvatarComponent,
     ButtonComponent,
-    CardComponent,
     CheckboxComponent,
     DialogComponent,
     SelectComponent,
@@ -73,6 +71,14 @@ export class MeetingDelegationCardComponent {
     const c = this.ctx();
     if (!c || !c.allowVoteDelegation) return false;
     return c.canDelegate || c.myDelegation !== null || c.incoming.length > 0;
+  });
+
+  /** The section has a row to show: the own delegation, the setup, the deadline or an incoming one. */
+  protected readonly hasRows = computed(() => {
+    const c = this.ctx();
+    if (!c) return false;
+    const deadlineRow = c.canDelegate && c.deadlinePassed && !c.meetingStarted;
+    return c.myDelegation !== null || this.canCreate() || deadlineRow || c.incoming.length > 0;
   });
 
   /** True when the user may delegate, the meeting is still planned and a window is

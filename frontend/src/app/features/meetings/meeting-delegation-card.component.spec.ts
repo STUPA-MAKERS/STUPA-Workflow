@@ -73,6 +73,7 @@ interface CardInternals {
   query: { (): string; set(v: string): void };
   searched: { (): DelegationRecipient[] | null; set(v: DelegationRecipient[] | null): void };
   visible(): boolean;
+  hasRows(): boolean;
   canCreate(): boolean;
   recipientOptions(): { value: string; label: string }[];
   selectedRecipient(): DelegationRecipient | null;
@@ -148,6 +149,31 @@ describe('MeetingDelegationCardComponent', () => {
     expect(cmp.canCreate()).toBe(false);
     expect(cmp.recipientOptions()).toEqual([]);
     expect(cmp.selectedRecipient()).toBeNull();
+  });
+
+  it('shows a section only with a row: the own delegation, the setup, the deadline or an incoming one', async () => {
+    const { http, cmp, fixture, container } = await setup();
+    flushContext(http, ctx({ deadlinePassed: true, recipients: [] }));
+    fixture.detectChanges();
+    // The deadline passed and no pool recipient is left: the row says so.
+    expect(cmp.canCreate()).toBe(false);
+    expect(cmp.hasRows()).toBe(true);
+    expect(container.querySelector('.dc__muted')).toBeTruthy();
+    // Started, nothing set up and nothing incoming: no empty section.
+    cmp.ctx.set(ctx({ meetingStarted: true }));
+    fixture.detectChanges();
+    expect(cmp.visible()).toBe(true);
+    expect(cmp.hasRows()).toBe(false);
+    expect(container.querySelector('.dc')).toBeNull();
+    cmp.ctx.set(ctx({ meetingStarted: true, incoming: [delegation({ direction: 'incoming', delegateVoting: true })] }));
+    fixture.detectChanges();
+    expect(container.querySelector('.dc')).toHaveTextContent('Du vertrittst Delegator in dieser Sitzung.');
+    cmp.ctx.set(ctx({ myDelegation: delegation({ delegateVoting: true, viaPool: true }) }));
+    fixture.detectChanges();
+    const sub = container.querySelector('.dc__sub') as HTMLElement;
+    expect([...sub.querySelectorAll('span')].map((x) => x.textContent?.trim())).toEqual(['Stimmrecht', 'Pool']);
+    cmp.ctx.set(null);
+    expect(cmp.hasRows()).toBe(false);
   });
 
   it('blocks creation once the meeting has started', async () => {

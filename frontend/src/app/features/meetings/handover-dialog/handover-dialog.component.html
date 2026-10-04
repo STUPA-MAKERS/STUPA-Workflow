@@ -1,0 +1,66 @@
+<app-dialog
+  [open]="open()"
+  [title]="'meetings.handover.title' | t"
+  [subtitle]="meeting().title"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="cancel()"
+>
+  @if (target()) {
+    <div class="hd">
+      <div class="hd__pair">
+        <app-avatar [name]="currentName()" size="sm" [decorative]="true" />
+        <span class="hd__who">
+          <span class="hd__small">{{ 'meetings.handoverDialog.before' | t }}</span>
+          <span class="hd__name ell" [title]="currentName()">{{ currentName() }}</span>
+        </span>
+        <app-icon class="hd__arrow" name="arrow" [size]="18" />
+        <app-avatar [name]="targetName()" size="sm" [accent]="true" [decorative]="true" />
+        <span class="hd__who hd__who--grow">
+          <span class="hd__small">{{ 'meetings.handoverDialog.after' | t }}</span>
+          <span class="hd__name ell" [title]="targetName()">{{ targetName() }}</span>
+        </span>
+        <app-button variant="text" size="sm" (click)="change.emit()">{{ 'meetings.handoverDialog.change' | t }}</app-button>
+      </div>
+
+      <fieldset class="hd__modes">
+        <legend class="hd__cap cap">{{ 'meetings.handoverDialog.when' | t }}</legend>
+        <div class="rowgroup rowgroup--bg3">
+          @for (o of options(); track o.mode) {
+            <label class="hd__mode" [class.hd__mode--on]="mode() === o.mode" [class.hd__mode--off]="o.disabled">
+              <input
+                type="radio"
+                name="handoverMode"
+                class="hd__radio"
+                [value]="o.mode"
+                [checked]="mode() === o.mode"
+                [disabled]="o.disabled"
+                (change)="pickMode(o)"
+              />
+              <span class="hd__modeText">
+                <span class="hd__modeLabel">{{ o.label }}</span>
+                <span class="hd__small">{{ o.sub }}</span>
+              </span>
+            </label>
+          }
+        </div>
+      </fieldset>
+
+      <div class="hd__preview">
+        <span class="hd__small">{{ 'meetings.handoverDialog.head' | t }}</span>
+        <span class="hd__previewText">{{ 'meetings.handoverDialog.headLine' | t: { keepers: preview() } }}</span>
+      </div>
+
+      @if (refusalKey(); as key) {
+        <p class="hd__error" role="alert">
+          <app-icon name="alert" [size]="16" />
+          <span>{{ key | t }}</span>
+        </p>
+      }
+    </div>
+  }
+  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="fill" [loading]="saving()" (click)="submit()">
+    <app-icon name="repeat" [size]="16" />
+    {{ 'meetings.handoverDialog.confirm' | t }}
+  </app-button>
+</app-dialog>

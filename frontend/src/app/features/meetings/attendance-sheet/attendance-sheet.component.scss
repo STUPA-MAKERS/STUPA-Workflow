@@ -1,0 +1,270 @@
+@use 'breakpoints' as bp;
+
+:host {
+  display: contents;
+}
+
+/* The content of the sheet: the counts and the search stay, the rows scroll. */
+.as {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+.as__top {
+  flex: none;
+  padding: 0 var(--space-1) var(--space-4);
+}
+.as__counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: 0 0 var(--space-3);
+  padding: 0 var(--space-2);
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.as__counts strong {
+  color: var(--color-text);
+  font-weight: var(--fw-semibold);
+}
+.as__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 44px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+  cursor: text;
+}
+.as__search:focus-within {
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+}
+.as__search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-body);
+  outline: none;
+}
+
+.as__scroll {
+  --as-fade: var(--space-5);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--space-1) var(--space-2);
+}
+/* An end fades only while more content lies past it (`appScrollFade` sets the classes). */
+.as__scroll.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--as-fade));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--as-fade));
+}
+.as__scroll.is-fade-end {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--as-fade));
+  mask-image: linear-gradient(to top, transparent, #000 var(--as-fade));
+}
+.as__scroll.is-fade-start.is-fade-end {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--as-fade),
+    #000 calc(100% - var(--as-fade)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--as-fade),
+    #000 calc(100% - var(--as-fade)),
+    transparent
+  );
+}
+
+.as__rows,
+.as__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A member: avatar, name and sub line, then the control and the row menu. */
+.as__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-2) var(--space-2) 14px;
+}
+.as__who {
+  display: flex;
+  flex: 1 1 10rem;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.as__names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.as__name {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+}
+.as__sub {
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.as__muted {
+  color: var(--color-text-muted);
+  font-weight: var(--fw-regular);
+}
+.as__nowrap {
+  flex: none;
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+.as__note {
+  width: 100%;
+  min-width: 12rem;
+  height: 32px;
+  margin-top: 2px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-4);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-small);
+}
+.as__note:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+}
+
+.as__ctl {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-start: auto;
+}
+/* The control: one pill, the options side by side, the chosen one filled. */
+.as__seg {
+  display: flex;
+  height: 32px;
+  overflow: hidden;
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+}
+.as__opt {
+  flex: 1 1 auto;
+  padding: 0 9px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.as__opt + .as__opt {
+  border-inline-start: var(--border-width) solid var(--color-border-strong);
+}
+.as__opt:hover:not(.as__opt--on):not([aria-disabled='true']) {
+  background: var(--color-surface-4);
+  color: var(--color-text);
+}
+.as__opt:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.as__opt--on {
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+  font-weight: var(--fw-semibold);
+}
+.as__opt[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+.as__opt[aria-disabled='true']:not(.as__opt--on) {
+  opacity: 0.45;
+}
+.as__menuGap {
+  display: block;
+  width: var(--control-height);
+}
+
+/* O23: the server refused "present" while a delegation of the member is active. */
+.as__conflict {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding-inline-start: 42px;
+  font-size: var(--fs-small);
+  color: var(--color-danger);
+}
+.as__empty {
+  padding: var(--space-4);
+  font-size: var(--fs-body);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.as__sec {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 14px;
+}
+.as__cap {
+  margin: 0;
+  padding: 0 var(--space-2);
+}
+.as__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: var(--space-2) 14px;
+  font-size: var(--fs-body);
+}
+.as__itemText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.as__own {
+  display: block;
+  padding-top: 14px;
+}
+
+/* A phone: the control takes its own line below the name. */
+@include bp.phone {
+  .as__ctl {
+    flex: 1 1 100%;
+    margin-inline-start: 0;
+  }
+  .as__seg {
+    flex: 1 1 auto;
+    height: 40px;
+  }
+  .as__opt {
+    padding: 0 4px;
+  }
+  /* The control spans the row; the gap that aligns the controls beside a row menu goes. */
+  .as__menuGap {
+    display: none;
+  }
+}

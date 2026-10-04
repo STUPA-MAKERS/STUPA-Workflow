@@ -1,0 +1,34 @@
+@let s = state();
+@let p = protocol();
+
+<div class="pb" role="status">
+  <app-icon class="pb__icon" [class.pb__icon--accent]="s.tone === 'accent'" [name]="s.icon" [size]="18" />
+  <p class="pb__text">
+    <strong>{{ s.label | t }}</strong> · {{ s.text | t }}
+    @if (needsRight()) {
+      <span class="pb__hint">{{ 'meetings.protocolBar.needsRight' | t }}</span>
+    }
+  </p>
+  <div class="pb__actions">
+    @if (canFinalize()) {
+      <app-button variant="fill" size="sm" [loading]="finalizing()" (click)="finalize.emit()">
+        <app-icon name="send" [size]="15" />
+        {{ 'meetings.protocol.finalize' | t }}
+      </app-button>
+    }
+    @if (p.isFinal) {
+      @if (p.pdfUrl) {
+        <a class="pb__pdf" [href]="p.pdfUrl" target="_blank" rel="noopener">
+          <app-icon name="download" [size]="15" />
+          {{ (p.publicPdfUrl ? 'meetings.protocolBar.pdfInternal' : 'meetings.protocolBar.pdf') | t }}
+        </a>
+      }
+      @if (p.publicPdfUrl) {
+        <a class="pb__pdf" [href]="p.publicPdfUrl" target="_blank" rel="noopener">
+          <app-icon name="download" [size]="15" />
+          {{ 'meetings.protocolBar.pdfPublic' | t }}
+        </a>
+      }
+    }
+  </div>
+</div>

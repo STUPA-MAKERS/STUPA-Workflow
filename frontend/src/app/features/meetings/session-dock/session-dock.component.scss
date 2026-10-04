@@ -141,25 +141,7 @@
   white-space: nowrap;
 }
 
-/* The content of the bottom sheet on a phone. The sheet body scrolls, so the list of
-   members does not scroll by itself in there. */
-.sd__sheet {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.sd__sheet .sd__people {
-  max-height: none;
-  overflow: visible;
-}
-/* The bottom sheet has the surface-2 background of the field and of a row hover, so
-   both go one step up; else the search field shows only as its placeholder. */
-.sd__sheet .sd__input,
-.sd__sheet .sd__person:hover {
-  background: var(--color-surface-3);
-}
-
-/* Popovers above the dock */
+/* The minute-taker menu above the dock: the menu surface of the app (surface 3). */
 .sd__backdrop {
   position: fixed;
   inset: 0;
@@ -172,158 +154,22 @@
 .sd__pop {
   position: absolute;
   bottom: calc(100% + var(--space-2));
+  inset-inline-end: 0;
   z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  width: 460px;
+  width: 320px;
   max-width: calc(100vw - 2 * var(--space-4));
   max-height: calc(100dvh - 9rem);
-  padding: var(--space-4);
+  padding: 10px 0;
   overflow-y: auto;
-  border-radius: var(--radius-2xl);
-  background: var(--color-surface-1);
-  box-shadow: var(--shadow-lg);
-}
-.sd__pop--end {
-  inset-inline-end: 0;
-}
-.sd__pop--narrow {
-  width: 380px;
-}
-.sd__popHead {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-.sd__popTitle {
-  margin: 0;
-  font-size: var(--fs-h2);
-  font-weight: var(--fw-semibold);
-}
-.sd__close {
-  display: grid;
-  place-items: center;
-  width: var(--control-height);
-  height: var(--control-height);
-  margin-inline-start: auto;
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-}
-.sd__close:hover {
-  background: var(--color-surface-2);
-  color: var(--color-text);
-}
-.sd__close:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
-}
-.sd__stat {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding-bottom: var(--space-3);
-  border-bottom: var(--border-width) solid var(--color-border);
-  font-size: var(--fs-body);
-}
-.sd__plan {
-  justify-content: space-between;
-}
-.sd__modes {
-  display: flex;
-  gap: var(--space-2);
-}
-.sd__subHead {
-  margin: 0 0 var(--space-2);
-  font-size: var(--fs-small);
-  font-weight: var(--fw-semibold);
-  color: var(--color-text-muted);
-}
-.sd__viewers {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--fs-body);
-}
-.sd__viewers li {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.sd__input {
-  height: var(--control-height);
-  padding: 0 var(--space-3);
-  border: 0;
   border-radius: var(--radius-field);
-  background: var(--color-surface-2);
+  background: var(--color-surface-3);
   color: var(--color-text);
-  font: inherit;
+  box-shadow: var(--shadow-elevated);
 }
-.sd__input:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 1px;
-}
-.sd__people {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 18rem;
-  margin: 0;
-  padding: 0;
-  overflow-y: auto;
-  list-style: none;
-}
-.sd__person {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  padding: var(--space-2);
-  border: 0;
-  border-radius: var(--radius-lg);
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  font-size: var(--fs-body);
-  text-align: start;
-  cursor: pointer;
-}
-.sd__person:hover {
-  background: var(--color-surface-2);
-}
-.sd__person:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
-}
-.sd__person--sel {
-  background: var(--color-selected);
-  color: var(--color-on-selected);
-}
-.sd__personName {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sd__personState {
-  font-size: var(--fs-small);
-  color: var(--color-text-muted);
-}
-.sd__personState[data-status='present'] {
-  color: var(--color-accent-text);
-}
-.sd__empty {
-  padding: var(--space-3) var(--space-2);
-  color: var(--color-text-muted);
-  font-size: var(--fs-body);
+.sd__chev {
+  pointer-events: none;
 }
 
 /* Narrow and phone: the chips may wrap below the step. */

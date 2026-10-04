@@ -77,6 +77,18 @@ function fakeAuth(perms: string[]): Partial<AuthService> {
 
 type Cmp = InstanceType<typeof MeetingsComponent>;
 
+/** A member who can take the minutes over. */
+const MIKA = {
+  principalId: 'pr-2',
+  displayName: 'Mika Mitglied',
+  email: null,
+  status: 'present' as const,
+  source: 'self' as const,
+  note: null,
+  isSelf: false,
+  canKeepProtocol: true,
+};
+
 /**
  * Router double. `navigate` is the only method the component calls. The rest is
  * the read-only surface that the breadcrumbs of `app-page-header` read.
@@ -172,7 +184,9 @@ describe('MeetingsComponent — AUD-012 autosave flush on TOP switch', () => {
       const { cmp, http } = await loaded();
       cmp.agenda.set([AGENDA_ITEM()] as never);
       cmp.onTopBodyChange('t-1', 'Letzter Satz');
-      cmp.handOver(cmp.meeting()!, 'pr-2', 'now');
+      cmp.attendance.set([MIKA]);
+      cmp.askHandover('pr-2');
+      cmp.handOver(cmp.meeting()!, 'now');
       const save = http.expectOne('/api/meetings/m-1/agenda/t-1');
       expect(save.request.body).toEqual({ body: 'Letzter Satz' });
       // The write right can move with the handover, so the POST waits for the save.
@@ -188,11 +202,21 @@ describe('MeetingsComponent — AUD-012 autosave flush on TOP switch', () => {
     }
   });
 
+  it('sends no handover without a picked member', async () => {
+    const { cmp, http } = await loaded();
+    cmp.askHandover('nobody');
+    cmp.handOver(cmp.meeting()!, 'now');
+    http.expectNone('/api/meetings/m-1/protokollant-handover');
+    http.verify();
+  });
+
   it('sends the handover also when the TOP body save fails', async () => {
     const { cmp, http } = await loaded();
     cmp.agenda.set([AGENDA_ITEM()] as never);
     cmp.onTopBodyChange('t-1', 'Text');
-    cmp.handOver(cmp.meeting()!, 'pr-2', 'next_item');
+    cmp.attendance.set([MIKA]);
+    cmp.askHandover('pr-2');
+    cmp.handOver(cmp.meeting()!, 'next_item');
     http
       .expectOne('/api/meetings/m-1/agenda/t-1')
       .flush(null, { status: 403, statusText: 'Forbidden' });

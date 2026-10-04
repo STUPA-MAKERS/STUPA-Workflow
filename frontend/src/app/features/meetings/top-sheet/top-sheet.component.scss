@@ -152,6 +152,11 @@
   min-height: 16rem;
   line-height: 1.7;
 }
+/* A read-only text (a final protocol, a reader) is a text to read: full contrast, as on
+   the boards. The missing format bar already says that nobody types here. */
+.ts__editor ::ng-deep .mde__host--disabled {
+  opacity: 1;
+}
 
 .ts__empty {
   display: flex;
@@ -179,14 +184,20 @@
   font-size: var(--fs-small);
   color: var(--color-text-muted);
 }
-.ts__link {
-  color: var(--color-accent-text);
-  font-weight: var(--fw-semibold);
-  text-decoration: none;
+/* The keeper line of a closed meeting, below the title. */
+.ts__keepers {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0 28px 10px;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
 }
-.ts__link:hover,
-.ts__link:focus-visible {
-  text-decoration: underline;
+.ts__keepers app-icon {
+  flex: none;
 }
 
 /* Phone: the title may take two lines, and the gutters shrink. */
@@ -211,7 +222,8 @@
   .ts__editor {
     padding: var(--space-4);
   }
-  .ts__foot {
+  .ts__foot,
+  .ts__keepers {
     padding-inline: var(--space-4);
   }
 }
