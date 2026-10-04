@@ -55,11 +55,13 @@ export class TasksComponent {
   );
 
   protected readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'title', label: this.i18n.translate('tasks.col.title'), card: 'title' },
-    { key: 'type', label: this.i18n.translate('tasks.col.type'), width: '11rem' },
-    { key: 'state', label: this.i18n.translate('tasks.col.state'), width: '11rem' },
-    { key: 'amount', label: this.i18n.translate('tasks.col.amount'), align: 'end', width: '9rem' },
-    { key: 'waiting', label: this.i18n.translate('tasks.col.waiting'), align: 'end', width: '9rem' },
+    // The title takes the width that the other columns leave. They keep their content on
+    // one line, so they are as wide as their longest value.
+    { key: 'title', label: this.i18n.translate('tasks.col.title'), card: 'title', width: '100%' },
+    { key: 'type', label: this.i18n.translate('tasks.col.type') },
+    { key: 'state', label: this.i18n.translate('tasks.col.state') },
+    { key: 'amount', label: this.i18n.translate('tasks.col.amount'), align: 'end' },
+    { key: 'waiting', label: this.i18n.translate('tasks.col.waiting'), align: 'end' },
     { key: 'open', label: '', align: 'end', width: '3.25rem', card: 'hidden' },
   ]);
 

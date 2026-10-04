@@ -28,6 +28,12 @@
   color: var(--color-text-muted);
 }
 
+/* One line, so each of these columns is as wide as its longest value and the title
+   column takes the rest. */
+.tasks__nowrap {
+  white-space: nowrap;
+}
+
 .tasks__waiting {
   font-size: 0.8125rem; /* 13px */
   color: var(--color-text-muted);
@@ -41,6 +47,9 @@
 
 /* A card has the width for the full title, so it wraps there. */
 @include bp.phone {
+  .tasks__nowrap {
+    white-space: normal;
+  }
   .tasks__title {
     width: auto;
     white-space: normal;

@@ -17,17 +17,17 @@
     <span class="tasks__title ell" [title]="titleOf($any(r))">{{ titleOf($any(r)) }}</span>
   </ng-template>
   <ng-template appCell="type" let-r>
-    <span class="tasks__muted">{{ typeName($any(r).typeId) }}</span>
+    <span class="tasks__muted tasks__nowrap">{{ typeName($any(r).typeId) }}</span>
   </ng-template>
   <ng-template appCell="state" let-r>
     @if ($any(r).state; as s) {
-      <app-status-text [kind]="flowColorKind(s.color)">{{ s.label }}</app-status-text>
+      <app-status-text class="tasks__nowrap" [kind]="flowColorKind(s.color)">{{ s.label }}</app-status-text>
     } @else {
       <span class="tasks__muted">—</span>
     }
   </ng-template>
   <ng-template appCell="amount" let-r>
-    <span class="mono">{{ money($any(r)) }}</span>
+    <span class="mono tasks__nowrap">{{ money($any(r)) }}</span>
   </ng-template>
   <ng-template appCell="waiting" let-r>
     @let at = since($any(r));
