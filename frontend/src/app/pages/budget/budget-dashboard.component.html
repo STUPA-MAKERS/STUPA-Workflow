@@ -1,154 +1,328 @@
-<app-page-header [title]="'budget.title' | t" [subtitle]="'budget.subtitle' | t" [rail]="true" [flush]="true">
-  <div actions class="inline-flex items-center gap-2">
-    <app-button variant="secondary" size="sm" (click)="overviewOpen.set(true)">
-      <span class="inline-flex items-center gap-2">
-        <app-icon name="chart-pie" [size]="16" />
-        {{ 'budget.overview.button' | t }}
-      </span>
-    </app-button>
-    @if (canExport()) {
-      <app-button variant="secondary" size="sm" (click)="onExport()" [loading]="exporting()">
-        <span class="inline-flex items-center gap-2">
-          <app-icon name="export" [size]="16" />
-          {{ 'budget.export' | t }}
-        </span>
-      </app-button>
-    }
-  </div>
-</app-page-header>
-
 @if (error()) {
+  <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
   <p class="bd__status bd__status--error" role="alert">{{ 'budget.error' | t }}</p>
 } @else if (loading()) {
   <!-- Never the empty state while loading. "There are no cost centres" and "they have
        not arrived yet" are different claims, and the first one is false during every
-       load. The placeholder holds the shape of the layout so the page does not jump
-       when the real tree lands. -->
-  <div class="bd__layout" aria-busy="true">
-    <aside class="bd__nav" aria-hidden="true">
+       load. The placeholder holds the shape of the layout. -->
+  <div class="bd" aria-busy="true">
+    <section class="bd__pane" aria-hidden="true">
+      <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
       <span class="skel skel--line"></span>
       <span class="skel skel--line"></span>
       <span class="skel skel--line"></span>
-    </aside>
-    <div class="bd__main">
+    </section>
+    <div class="bd__sheet">
       <span class="skel skel--panel"></span>
       <span class="sr-only" role="status">{{ 'budget.loading' | t }}</span>
     </div>
   </div>
 } @else if (emptyReason() === 'noFiscalYear') {
-  <!-- Cost centres exist; the fiscal year does not. Saying "nothing is created yet"
-       here names the wrong cause, so this branch names the fiscal year and points at
-       the page that creates one. -->
-  <section class="bd__empty">
-    <h2 class="bd__emptyTitle">{{ 'budget.empty.noFiscalYear.title' | t }}</h2>
-    <p>{{ 'budget.empty.noFiscalYear.body' | t }}</p>
-    @if (canManageStructure()) {
-      <p>
+  <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
+  <!-- Cost centres exist; the fiscal year does not. "Nothing is created yet" names the
+       wrong cause here, so this branch names the fiscal year and links the page that
+       creates one. -->
+  <div class="bd__empty">
+    <app-empty-state
+      icon="cal"
+      [heading]="'budget.empty.noFiscalYear.title' | t"
+      [body]="'budget.empty.noFiscalYear.body' | t"
+    >
+      @if (canManageStructure()) {
         <a class="bd__emptyLink" [routerLink]="['/admin/cost-centres']">
           {{ 'budget.empty.noFiscalYear.action' | t }}
         </a>
-      </p>
-    }
-  </section>
+      }
+    </app-empty-state>
+  </div>
 } @else if (emptyReason()) {
-  <section class="bd__empty">
-    <h2 class="bd__emptyTitle">{{ 'budget.empty.title' | t }}</h2>
-    <p>{{ 'budget.empty.body' | t }}</p>
-  </section>
+  <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
+  <div class="bd__empty">
+    <app-empty-state icon="pie" [heading]="'budget.empty.title' | t" [body]="'budget.empty.body' | t" />
+  </div>
 } @else {
-  <div class="bd__layout">
-    <!-- The tree collapses on mobile (max 768px). CSS shows the toggle only there.
-         Desktop always shows the tree. -->
-    <aside class="bd__nav">
-      <button
-        type="button"
-        class="bd__nav-toggle"
-        [attr.aria-expanded]="navOpen()"
-        (click)="toggleNav()"
-      >
-        <span class="bd__nav-toggle-label">{{ navToggleLabel() }}</span>
-        <app-icon [name]="navOpen() ? 'chevron-up' : 'chevron-down'" [size]="14" />
-      </button>
-      <div class="bd__nav-body" [class.bd__nav-body--open]="navOpen()">
-        <app-budget-year-tree
-          [tops]="tops()"
-          [fiscalYears]="fiscalYearsByBudget()"
-          [selectedBudgetId]="selectedBudgetId()"
-          [selectedFyId]="selectedFyId()"
-          (budgetPicked)="selectBudget($event)"
-          (yearPicked)="onYearPicked($event)"
-        />
+  <div class="bd" [class.bd--wide]="wide()">
+    @if (wide()) {
+      <section class="bd__pane" [attr.aria-label]="'budget.dash.tree' | t">
+        <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
+        <ng-container *ngTemplateOutlet="treePane" />
+      </section>
+    } @else {
+      <div class="bd__top">
+        <div class="bd__topRow">
+          <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
+          <ng-container *ngTemplateOutlet="actions" />
+        </div>
+        <div class="bd__chips">
+          <button
+            type="button"
+            class="bd-chip bd-chip--on bd__pathChip"
+            aria-haspopup="dialog"
+            [attr.aria-expanded]="navOpen()"
+            [title]="pathLabel()"
+            (click)="navOpen.set(true)"
+          >
+            <app-icon name="pie" [size]="15" />
+            <span class="ell">{{ pathLabel() }}</span>
+            <app-icon name="chevron-down" [size]="15" />
+          </button>
+          <ng-container *ngTemplateOutlet="yearChip" />
+        </div>
       </div>
-    </aside>
+    }
 
-    <!-- Not a `<main>`: the shell already wraps the routed page in one, and a main
-         landmark inside a main landmark is invalid HTML that gives a screen reader two
-         "main" regions with no way to tell which is the page. -->
-    <div class="bd__main">
-      @if (breadcrumbs().length > 1) {
-        <nav class="flex flex-wrap items-center gap-2" [attr.aria-label]="'budget.breadcrumbs' | t">
-          @for (node of breadcrumbs(); track node.id; let last = $last) {
-            <button type="button" class="bd__crumb" [class.bd__crumb--current]="last" [disabled]="last" (click)="selectKs(node.id)">
-              {{ node.key }}
-            </button>
-            @if (!last) {
-              <span class="text-muted" aria-hidden="true">›</span>
-            }
-          }
-        </nav>
+    <!-- Not a `<main>`: the shell already wraps the routed page in one. -->
+    <article
+      class="bd__sheet bd__main"
+      [attr.aria-labelledby]="wide() ? 'bd-title' : null"
+      [attr.aria-label]="wide() ? null : pathLabel()"
+    >
+      <!-- Narrower layouts name the path in the chip above and put the actions beside the
+           page title, so the sheet starts with the figures. -->
+      @if (wide()) {
+        <header class="bd__head">
+          <div class="bd__headText">
+            <nav class="bd__crumbs" [attr.aria-label]="'budget.breadcrumbs' | t">
+              @for (node of breadcrumbs(); track node.id; let last = $last) {
+                @if (last) {
+                  <span class="bd__crumb bd__crumb--current ell" aria-current="page" [title]="node.name">{{ node.name }}</span>
+                  <span class="bd__key mono">{{ node.pathKey | simplifyPath }}</span>
+                } @else {
+                  <button type="button" class="bd__crumb ell" [title]="node.name" (click)="selectKs(node.id)">{{ node.name }}</button>
+                  <app-icon class="bd__crumbSep" name="chevron-right" [size]="13" />
+                }
+              }
+            </nav>
+            <h2 id="bd-title" class="bd__name ell" [title]="current()?.name ?? ''">
+              {{ current()?.name }}
+            </h2>
+          </div>
+          <ng-container *ngTemplateOutlet="actions" />
+        </header>
+      } @else {
+        <h2 class="sr-only">{{ current()?.name }}</h2>
       }
 
-      <section class="bd__usage" [attr.aria-label]="'budget.usage.heading' | t">
-        <!-- Cross-link for the selected cost center. -->
-        <div class="bd__sectionHead bd__sectionHead--end">
-          <a class="bd__sectionLink" [routerLink]="['/expenses']" [queryParams]="{ budget: selectedKsId() }">
-            <app-icon name="euro" [size]="14" />
-            {{ 'budget.usage.viewExpenses' | t }}
-          </a>
-          <a class="bd__sectionLink" [routerLink]="['/applications']" [queryParams]="{ budget: selectedKsId() }">
-            <app-icon name="form" [size]="14" />
-            {{ 'budget.apps.viewAll' | t }}
-          </a>
-        </div>
-        <app-data-table
-          [loading]="loading()"
-          [loadingText]="'budget.loading' | t"
-          [columns]="usageColumns()" [rows]="usageRows()" [rowKey]="usageRowId">
-          <ng-template appCell="node" let-row>
-            <button type="button" class="bd__ks" [style.paddingLeft.rem]="$any(row).depth * 1.25" (click)="drillInto($any(row).node)">
-              <span class="bd__path">{{ $any(row).node.pathKey | simplifyPath }}</span>
-              <span class="bd__name">{{ $any(row).node.name }}</span>
-            </button>
-          </ng-template>
-          <ng-template appCell="bar" let-row>
-            <span class="bd__bar-cell">
-              <span class="bd__track" role="img" [attr.aria-label]="($any(row).percent ?? 0) + '%'">
-                <span class="bd__seg bd__seg--bound" [class.bd__seg--over]="$any(row).available < 0" [style.width.%]="boundPct($any(row))"></span>
-                <span class="bd__seg bd__seg--expended" [class.bd__seg--over]="$any(row).available < 0" [style.width.%]="expendedPct($any(row))"></span>
-              </span>
-              <span class="bd__pct">{{ $any(row).percent === null ? '—' : $any(row).percent + '%' }}</span>
-            </span>
-          </ng-template>
-          <ng-template appCell="requested" let-row><span class="text-muted">{{ money($any(row).requested, $any(row).node.currency) }}</span></ng-template>
-          <ng-template appCell="bound" let-row>{{ money($any(row).committed, $any(row).node.currency) }}</ng-template>
-          <ng-template appCell="expended" let-row>
-            {{ money($any(row).expended, $any(row).node.currency) }}
-          </ng-template>
-          <ng-template appCell="available" let-row><span [class.bd__neg]="$any(row).available < 0">{{ money($any(row).available, $any(row).node.currency) }}</span></ng-template>
-        </app-data-table>
-      </section>
-    </div>
+      <dl class="bd__figs">
+        @for (f of figureList(); track f.key) {
+          <div class="bd__fig" [class.bd__fig--main]="f.key === 'available'">
+            <dt class="bd__figLabel">{{ f.label }}</dt>
+            <dd class="bd__figValue mono" [class.bd__neg]="f.value < 0">{{ money(f.value, current()?.currency) }}</dd>
+          </div>
+        }
+      </dl>
 
-    <!-- The pie charts cover the direct sub cost centers only. -->
-    <aside class="bd__charts">
-      <app-budget-pie [title]="'budget.pie.allocated' | t" [slices]="allocPie()" (sliceClick)="selectKs($event)" />
-      <app-budget-pie [title]="'budget.pie.committed' | t" [slices]="committedPie()" (sliceClick)="selectKs($event)" />
-      <app-budget-pie [title]="'budget.pie.available' | t" [slices]="availablePie()" (sliceClick)="selectKs($event)" />
-      <app-budget-pie [title]="'budget.pie.expended' | t" [slices]="expendedPie()" (sliceClick)="selectKs($event)" />
-    </aside>
+      <!-- A cost centre without sub cost centres has nothing to distribute: the chart
+           would be one ring of its own amount, so only the utilisation shows. -->
+      <div class="bd__cols" [class.bd__cols--single]="!hasChildren()">
+        @if (hasChildren()) {
+          <section class="bd__sec" aria-labelledby="bd-dist">
+            <div class="bd__secHead">
+              <h3 id="bd-dist" class="bd__h">{{ 'budget.dash.distribution' | t }}</h3>
+              <label class="bd-chip bd-chip--on bd__selectChip">
+                <span class="sr-only">{{ 'budget.dash.metric' | t }}</span>
+                <select class="bd__select" [value]="metric()" (change)="onMetricChange($event)">
+                  @for (m of metrics; track m) {
+                    <option [value]="m" [selected]="m === metric()">{{ metricLabel(m) }}</option>
+                  }
+                </select>
+                <app-icon name="chevron-down" [size]="14" />
+              </label>
+            </div>
+            <app-budget-pie
+              [label]="metricLabel(metric())"
+              [ariaLabel]="('budget.dash.distributionOf' | t: { metric: metricLabel(metric()) })"
+              [slices]="distribution()"
+              [currency]="current()?.currency ?? 'EUR'"
+              (sliceClick)="selectKs($event)"
+            />
+          </section>
+        }
+
+        <section class="bd__sec" aria-labelledby="bd-usage">
+          <div class="bd__secHead">
+            <h3 id="bd-usage" class="bd__h">{{ 'budget.usage.heading' | t }}</h3>
+            <span class="bd__legends" aria-hidden="true">
+              <span class="bd__legend">
+                <span class="bd__swatch bd__swatch--spent"></span>{{ 'budget.dash.fig.expended' | t }}
+              </span>
+              <span class="bd__legend">
+                <span class="bd__swatch bd__swatch--bound"></span>{{ 'budget.dash.fig.bound' | t }}
+              </span>
+            </span>
+          </div>
+          <div class="bd__usageCols" aria-hidden="true">
+            <span class="bd__grow"></span>
+            <span class="bd__c1">{{ 'budget.dash.fig.requested' | t }}</span>
+            <span class="bd__c2">{{ 'budget.usage.bar' | t }}</span>
+            <span class="bd__c3">{{ 'budget.dash.fig.available' | t }}</span>
+          </div>
+          <ul class="bd__usage">
+            @for (row of usageRows(); track row.node.id) {
+              <li class="bd__urow" [style.--color-accent]="row.color">
+                <div class="bd__uline">
+                  <button
+                    type="button"
+                    class="bd__uname ell"
+                    [title]="row.node.name"
+                    [disabled]="row.node.id === selectedKsId()"
+                    (click)="drillInto(row.node)"
+                  >{{ row.node.name }}</button>
+                  <span class="bd__c1 mono">
+                    <span class="sr-only">{{ 'budget.dash.fig.requested' | t }}:</span>
+                    {{ row.figures.requested ? moneyShort(row.figures.requested, row.node.currency) : '–' }}
+                  </span>
+                  <span class="bd__c2 mono">
+                    <span class="sr-only">{{ 'budget.usage.bar' | t }}:</span>
+                    {{ row.percent === null ? '–' : row.percent + ' %' }}
+                  </span>
+                  <span class="bd__c3 mono" [class.bd__neg]="row.figures.available < 0">
+                    <span class="sr-only">{{ 'budget.dash.fig.available' | t }}:</span>
+                    {{ moneyShort(row.figures.available, row.node.currency) }}
+                  </span>
+                </div>
+                <app-seg-bar [segments]="row.segments" [total]="row.total" [label]="usageLabel(row)" />
+              </li>
+            }
+          </ul>
+        </section>
+      </div>
+
+      <section class="bd__sec" aria-labelledby="bd-apps">
+        <div class="bd__secHead bd__secHead--apps">
+          <h3 id="bd-apps" class="bd__h">{{ 'budget.dash.apps' | t }}</h3>
+          @if (apps()?.length) {
+            <app-button variant="text" size="sm" (click)="openApplications()">{{ 'budget.dash.appsAll' | t }}</app-button>
+          }
+        </div>
+        @if (apps() === null) {
+          <app-skeleton variant="rows" [count]="3" [label]="'budget.dash.appsLoading' | t" />
+        } @else if (appsError()) {
+          <p class="bd__status bd__status--error" role="alert">{{ 'budget.dash.appsError' | t }}</p>
+        } @else if (!appRows().length) {
+          <p class="empty-state bd__none">{{ 'budget.dash.appsNone' | t }}</p>
+        } @else {
+          <div class="rowgroup">
+            @for (r of appRows(); track r.app.applicationId) {
+              <app-list-item [title]="r.title" [link]="['/applications', r.app.applicationId]">
+                <span sub>
+                  @if (r.statusLabel) {
+                    <app-status-text [kind]="r.statusKind">{{ r.statusLabel }}</app-status-text>
+                    <span class="bd__dot" aria-hidden="true">·</span>
+                  }
+                  @if (r.app.pathKey) {
+                    <span class="mono">{{ r.app.pathKey | simplifyPath }}</span>
+                  }
+                  @if (r.costCentre) {
+                    <span class="bd__appKs">{{ r.costCentre }}</span>
+                  }
+                </span>
+                <span trail class="mono bd__amount">{{ r.app.amount === null ? '–' : money(r.app.amount, r.app.currency ?? 'EUR') }}</span>
+              </app-list-item>
+            }
+          </div>
+        }
+      </section>
+    </article>
   </div>
 
-  <!-- The sunburst covers the whole subtree of the selected cost center. -->
+  @if (!wide()) {
+    <app-side-sheet side="start" [heading]="'budget.dash.tree' | t" [(open)]="navOpen">
+      <ng-container *ngTemplateOutlet="treePane" />
+    </app-side-sheet>
+  }
+
+  <!-- The pane: year, overview, search and the cost-centre tree. The wide layout shows it
+       beside the sheet; a narrower one shows it in the side sheet. -->
+  <ng-template #treePane>
+    <div class="bd__paneBody">
+      <div class="bd__chips">
+        @if (wide()) {
+          <ng-container *ngTemplateOutlet="yearChip" />
+        }
+        <button type="button" class="bd-chip" (click)="overviewOpen.set(true)">
+          <app-icon name="grid" [size]="15" />{{ 'budget.overview.button' | t }}
+        </button>
+      </div>
+      <app-search-pill size="md" [placeholder]="'budget.dash.search' | t" [(value)]="query" />
+      <nav class="bd__tree" [attr.aria-label]="'budget.dash.tree' | t">
+        @for (row of treeRows(); track row.node.id) {
+          <div
+            class="tn"
+            [class.tn--on]="row.node.id === selectedKsId()"
+            [style.--tn-depth]="row.depth"
+            [style.--color-accent]="row.color"
+          >
+            @if (row.hasChildren) {
+              <button
+                type="button"
+                class="tn__chev"
+                [attr.aria-expanded]="row.expanded"
+                [attr.aria-label]="(row.expanded ? 'budget.dash.collapse' : 'budget.dash.expand') | t: { name: row.node.name }"
+                [disabled]="!!query().trim()"
+                (click)="toggle(row.node.id)"
+              >
+                <app-icon [name]="row.expanded ? 'chevron-down' : 'chevron-right'" [size]="17" />
+              </button>
+            } @else {
+              <span class="tn__chev" aria-hidden="true"></span>
+            }
+            <button
+              type="button"
+              class="tn__main"
+              [attr.aria-current]="row.node.id === selectedKsId() ? 'true' : null"
+              [title]="row.node.name + ' · ' + (row.node.pathKey | simplifyPath)"
+              (click)="selectKs(row.node.id)"
+            >
+              <span class="tn__line">
+                @if (row.swatch) {
+                  <span class="tn__swatch" [style.background]="row.color" aria-hidden="true"></span>
+                }
+                <span class="tn__name ell" [class.tn__name--root]="row.depth === 0">{{ row.node.name }}</span>
+                <span class="tn__amt mono">{{ moneyShort(row.allocated, row.node.currency) }}</span>
+              </span>
+              <app-seg-bar
+                size="thin"
+                [segments]="row.segments"
+                [total]="row.total"
+                [label]="'budget.dash.treeBar' | t: { percent: row.percent ?? 0 }"
+              />
+            </button>
+          </div>
+        } @empty {
+          <p class="bd__none">{{ 'budget.dash.searchNone' | t }}</p>
+        }
+      </nav>
+    </div>
+  </ng-template>
+
+  <ng-template #actions>
+    <div class="bd__actions">
+      @if (canExport()) {
+        <app-button variant="outlined" [size]="wide() ? 'md' : 'sm'" (click)="onExport()" [loading]="exporting()">
+          <span class="bd__btn"><app-icon name="download" [size]="17" />{{ 'budget.dash.export' | t }}</span>
+        </app-button>
+      }
+      @if (canSeeBookings()) {
+        <app-button variant="tonal" [size]="wide() ? 'md' : 'sm'" (click)="openBookings()">{{ 'budget.usage.viewExpenses' | t }}</app-button>
+      }
+    </div>
+  </ng-template>
+
+  <ng-template #yearChip>
+    <label class="bd-chip bd-chip--on bd__selectChip">
+      <app-icon name="cal" [size]="15" />
+      <span class="sr-only">{{ 'budget.dash.year' | t }}</span>
+      <select class="bd__select" [value]="selectedFyId()" (change)="onYearChange($event)">
+        @for (fy of years(); track fy.id) {
+          <option [value]="fy.id" [selected]="fy.id === selectedFyId()">{{ 'budget.dash.yearShort' | t: { year: fy.display } }}</option>
+        }
+      </select>
+      <app-icon name="chevron-down" [size]="15" />
+    </label>
+  </ng-template>
+
+  <!-- The sunburst covers the whole subtree of the selected cost centre. -->
   <app-dialog
     [open]="overviewOpen()"
     [title]="'budget.overview.title' | t"
@@ -161,8 +335,8 @@
           <button
             type="button"
             role="tab"
-            class="bd__ovTab"
-            [class.bd__ovTab--active]="activeOverviewMetric() === m"
+            class="bd-chip"
+            [class.bd-chip--on]="activeOverviewMetric() === m"
             [attr.aria-selected]="activeOverviewMetric() === m"
             (click)="overviewMetric.set(m)"
           >
@@ -175,6 +349,7 @@
       [root]="overviewRoot()"
       [fyId]="selectedFyId()"
       [metric]="activeOverviewMetric()"
+      [colors]="colors()"
       (nodeClick)="onOverviewPick($event)"
     />
   </app-dialog>

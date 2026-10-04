@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Uuid } from '@core/api/models';
 import type { BudgetTreeNode, FiscalYear } from './budget-tree.api';
+import { nodeColors, paletteColor } from './budget-color.util';
 
 /** Selection in the left tree: a top budget and a fiscal year. */
 export interface BudgetYearSelection {
@@ -12,9 +13,9 @@ export interface BudgetYearSelection {
 /**
  * Left navigation tree from budget to fiscal year. It has two levels. Each top
  * budget shows its fiscal years below it. A click on a year selects the budget and
- * the year. The tree highlights the current selection and draws dotted, light-green,
- * compact lines. It shows "…" when a budget has more than 5 fiscal years. The
- * dashboard and the admin page both use it.
+ * the year. The tree highlights the current selection and draws dotted connector lines
+ * in the colour of the budget. It shows "…" when a budget has more than 5 fiscal years.
+ * The admin cost-centre page uses it.
  */
 @Component({
   selector: 'app-budget-year-tree',
@@ -36,7 +37,8 @@ export class BudgetYearTreeComponent {
 
   private readonly MAX = 5;
 
-  readonly palette = computed(() => this.tops().map((t) => t.id));
+  /** Display colour per budget, by the same rule as the budget page (`nodeColors`). */
+  private readonly colors = computed(() => nodeColors(this.tops()));
 
   years(budgetId: Uuid): FiscalYear[] {
     return this.fiscalYears()[budgetId] ?? [];
@@ -54,11 +56,10 @@ export class BudgetYearTreeComponent {
       .join(', ');
   }
 
-  /** Color of a node. It uses the set color, else a stable palette color by index. */
+  /** Colour of a budget: the set colour, else a stable palette colour by position. A
+   *  node that is not in `tops` gets its own colour, else the last palette colour. */
   dotColor(node: BudgetTreeNode): string {
-    if (node.color) return node.color;
-    const idx = this.palette().indexOf(node.id);
-    return PALETTE[((idx % PALETTE.length) + PALETTE.length) % PALETTE.length];
+    return this.colors().get(node.id) ?? (node.color?.trim() || paletteColor(-1));
   }
 
   pickBudget(b: BudgetTreeNode): void {
@@ -68,15 +69,3 @@ export class BudgetYearTreeComponent {
     this.yearPicked.emit({ budgetId, fiscalYearId });
   }
 }
-
-/** Fallback palette for nodes without a set color. The index keeps it stable. */
-export const PALETTE: readonly string[] = [
-  '#5fb37a',
-  '#4a90d9',
-  '#e0a458',
-  '#c45c8a',
-  '#8a6fc4',
-  '#52a8a8',
-  '#d97b5c',
-  '#7aa84a',
-];

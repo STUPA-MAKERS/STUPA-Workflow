@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/angular';
+import { render } from '@testing-library/angular';
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 
 /** Direct access to the `protected` members for targeted branch coverage. */
@@ -10,9 +10,11 @@ const SLICES: PieSlice[] = [
   { label: 'Beta', value: 40, color: '#222', id: 'b' },
 ];
 
-async function setup(inputs: Partial<{ title: string; slices: PieSlice[] }> = {}) {
+async function setup(
+  inputs: Partial<{ label: string; ariaLabel: string | null; slices: PieSlice[] }> = {},
+) {
   const view = await render(BudgetPieComponent, {
-    inputs: { title: 'Verteilung', slices: SLICES, ...inputs },
+    inputs: { label: 'Zuteilung', slices: SLICES, ...inputs },
   });
   return { ...view, c: view.fixture.componentInstance as unknown as PieInternals };
 }
@@ -20,14 +22,47 @@ async function setup(inputs: Partial<{ title: string; slices: PieSlice[] }> = {}
 describe('BudgetPieComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('renders the title and one path per non-zero slice', async () => {
+  it('renders one path per non-zero slice and the metric with the total in the hole', async () => {
     const view = await setup();
-    expect(screen.getByText('Verteilung')).toBeTruthy();
     const paths = view.container.querySelectorAll('path.pie__slice');
     expect(paths.length).toBe(2);
     expect(view.container.querySelector('svg.pie__svg')?.getAttribute('aria-label')).toBe(
-      'Verteilung',
+      'Zuteilung',
     );
+    expect(view.container.querySelector('.pie__cap')?.textContent).toContain('Zuteilung');
+    expect(view.container.querySelector('.pie__total')?.textContent).toContain('100');
+  });
+
+  it('takes the accessible name from ariaLabel when it is set', async () => {
+    const view = await setup({ ariaLabel: 'Zuteilung je Unter-Kostenstelle' });
+    expect(view.container.querySelector('svg.pie__svg')?.getAttribute('aria-label')).toBe(
+      'Zuteilung je Unter-Kostenstelle',
+    );
+  });
+
+  it('lists every slice in the legend with its name, amount and colour', async () => {
+    const view = await setup();
+    const items = view.container.querySelectorAll('button.pie__item');
+    expect(items).toHaveLength(2);
+    expect(items[0].textContent).toContain('Alpha');
+    expect(items[0].textContent).toContain('60');
+    expect(items[0].getAttribute('title')).toBe('Alpha');
+    expect((items[0].querySelector('.pie__swatch') as HTMLElement).style.background).toBeTruthy();
+  });
+
+  it('disables a legend entry without an id and emits the id of one with it', async () => {
+    const view = await setup({
+      slices: [
+        { label: 'Child', value: 60, color: '#111', id: 'child' },
+        { label: 'Own', value: 40, color: 'var(--color-text-subtle)' },
+      ],
+    });
+    const emit = jest.fn();
+    (view.fixture.componentInstance as unknown as PieInternals).sliceClick.subscribe(emit);
+    const items = view.container.querySelectorAll<HTMLButtonElement>('button.pie__item');
+    expect(items[1].disabled).toBe(true);
+    items[0].click();
+    expect(emit).toHaveBeenCalledWith('child');
   });
 
   it('shows the empty paragraph (not the svg) when total is 0', async () => {
@@ -104,8 +139,8 @@ describe('BudgetPieComponent', () => {
     });
     const arcs = c.arcs();
     // donutArc embeds the large-arc flag in the "A R R 0 <large> 1" command.
-    expect(arcs[0].d).toMatch(/A 70 70 0 1 1/);
-    expect(arcs[1].d).toMatch(/A 70 70 0 0 1/);
+    expect(arcs[0].d).toMatch(/A 87 87 0 1 1/);
+    expect(arcs[1].d).toMatch(/A 87 87 0 0 1/);
   });
 
   it('active() is null with no hover and the chosen arc when hovered', async () => {
@@ -118,14 +153,20 @@ describe('BudgetPieComponent', () => {
     expect(c.active()).toBeNull();
   });
 
-  it('legend shows the hovered slice and falls back to the hint otherwise', async () => {
+  it('shows the hovered slice in the hole and marks its legend entry', async () => {
     const view = await setup();
-    // No hover → hint span present.
-    expect(view.container.querySelector('.pie__legHint')).toBeTruthy();
-    (view.fixture.componentInstance as unknown as PieInternals).hovered.set(0);
+    const c = view.fixture.componentInstance as unknown as PieInternals;
+    c.hovered.set(0);
     view.fixture.detectChanges();
-    expect(view.container.querySelector('.pie__legLabel')?.textContent).toContain('Alpha');
-    expect(view.container.querySelector('.pie__legVal')).toBeTruthy();
+    expect(view.container.querySelector('.pie__cap')?.textContent).toContain('60 %');
+    expect(view.container.querySelector('.pie__item--on')?.textContent).toContain('Alpha');
+    // Focus on an entry does the same, so the keyboard sees what the pointer sees.
+    const beta = view.container.querySelectorAll<HTMLButtonElement>('button.pie__item')[1];
+    beta.dispatchEvent(new FocusEvent('focus'));
+    view.fixture.detectChanges();
+    expect(c.hovered()).toBe(1);
+    beta.dispatchEvent(new FocusEvent('blur'));
+    expect(c.hovered()).toBeNull();
   });
 
   it('emits sliceClick only for slices that carry an id', async () => {
@@ -144,7 +185,7 @@ describe('BudgetPieComponent', () => {
     const arc = { id: 'x', label: 'l', value: 1, color: '#0', d: '', midX: 1, midY: 0.5, percent: 1 };
     c.hovered.set(2);
     expect(c.sliceTransform(arc, 2)).toContain('translate(');
-    expect(c.sliceTransform(arc, 2)).toContain('scale(1.04)');
+    expect(c.sliceTransform(arc, 2)).toContain('scale(1.03)');
     expect(c.sliceTransform(arc, 3)).toBe('none');
   });
 

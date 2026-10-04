@@ -10,8 +10,8 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 
-/** A pie slice: label, value in currency units and color.
- *  An `id`, which is a cost center id, makes the slice clickable for a drilldown. */
+/** A pie slice: label, value in currency units and colour (any CSS colour).
+ *  An `id`, which is a cost centre id, makes the slice clickable for a drilldown. */
 export interface PieSlice {
   label: string;
   value: number;
@@ -26,117 +26,40 @@ interface Arc extends PieSlice {
   percent: number;
 }
 
-const SIZE = 160;
-const R = 70;
-const INNER = 38;
+const SIZE = 200;
+const R = 87;
+const INNER = 65;
 const CX = SIZE / 2;
 const CY = SIZE / 2;
-const GROW = 7; // radial growth on hover
+const GROW = 5; // radial growth on hover
 
 /**
- * Interactive donut chart of the distribution across the pie slices.
+ * Donut chart of a distribution with its legend ("Verteilung").
  *
- * The short title stands above the chart and there is no box. Hover highlights a
- * slice and grows it radially with an animation. A tooltip shows the label, the
- * amount and the percent. The chart is pure SVG and uses no third-party library.
+ * The ring shows the slices; the hole shows the metric and the total. The legend beside
+ * it lists every slice with its colour, name and amount. A legend entry and a slice with
+ * an `id` are clickable for the drilldown; the legend entries are the keyboard path.
+ * Hover on a slice or an entry highlights both. Pure SVG, no third-party library.
  */
 @Component({
   selector: 'app-budget-pie',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <figure class="pie">
-      <figcaption class="pie__title">{{ title() }}</figcaption>
-      @if (total() > 0) {
-        <svg [attr.viewBox]="'0 0 ' + SIZE + ' ' + SIZE" class="pie__svg" role="img" [attr.aria-label]="title()">
-          @for (a of arcs(); track a.label; let i = $index) {
-            <path
-              [attr.d]="a.d"
-              [attr.fill]="a.color"
-              class="pie__slice"
-              [class.pie__slice--dim]="hovered() !== null && hovered() !== i"
-              [style.transform]="sliceTransform(a, i)"
-              (pointerenter)="hovered.set(i)"
-              (pointerleave)="hovered.set(null)"
-              (click)="onSlice(a)"
-            />
-          }
-        </svg>
-        <div class="pie__legend" aria-hidden="true">
-          @if (active(); as a) {
-            <span class="pie__swatch" [style.background]="a.color"></span>
-            <span class="pie__legLabel">{{ a.label }}</span>
-            <span class="pie__legVal">{{ money(a.value) }} · {{ a.percent }}%</span>
-          } @else {
-            <span class="pie__legHint">{{ 'budget.pie.hint' | t }}</span>
-          }
-        </div>
-      } @else {
-        <p class="pie__empty">{{ 'budget.pie.empty' | t }}</p>
-      }
-    </figure>
-  `,
   imports: [TranslatePipe],
-  styles: [
-    `
-      .pie {
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: var(--space-1);
-      }
-      .pie__title {
-        align-self: flex-start;
-        font-size: var(--fs-sm);
-        font-weight: var(--fw-semibold);
-        color: var(--color-text-muted);
-      }
-      .pie__svg {
-        width: 160px;
-        height: 160px;
-        overflow: visible;
-      }
-      .pie__slice {
-        transform-origin: ${CX}px ${CY}px;
-        transition:
-          transform 160ms ease,
-          opacity 160ms ease;
-        cursor: pointer;
-      }
-      .pie__slice--dim {
-        opacity: 0.4;
-      }
-      .pie__legend {
-        display: flex;
-        align-items: center;
-        gap: var(--space-2);
-        min-height: 1.25rem;
-        font-size: var(--fs-xs);
-      }
-      .pie__swatch {
-        width: 10px;
-        height: 10px;
-        border-radius: 2px;
-      }
-      .pie__legVal {
-        color: var(--color-text-muted);
-        font-variant-numeric: tabular-nums;
-      }
-      .pie__legHint,
-      .pie__empty {
-        color: var(--color-text-muted);
-        font-size: var(--fs-xs);
-      }
-    `,
-  ],
+  templateUrl: './budget-pie.component.html',
+  styleUrl: './budget-pie.component.scss',
 })
 export class BudgetPieComponent {
   private readonly i18n = inject(I18nService);
 
-  readonly title = input<string>('');
+  /** The metric, shown in the hole above the total ("Zuteilung"). */
+  readonly label = input<string>('');
+  /** The accessible name of the chart. Defaults to the label. */
+  readonly ariaLabel = input<string | null>(null);
   readonly slices = input<PieSlice[]>([]);
-  /** Click on a slice with an `id`: emits the cost center id for the drilldown. */
+  /** The currency of the amounts. */
+  readonly currency = input<string>('EUR');
+  /** Click on a slice or an entry with an `id`: emits the cost centre id. */
   readonly sliceClick = output<string>();
 
   protected readonly SIZE = SIZE;
@@ -173,20 +96,22 @@ export class BudgetPieComponent {
     return h === null ? null : (this.arcs()[h] ?? null);
   });
 
+  protected readonly name = computed(() => this.ariaLabel() ?? this.label());
+
   protected onSlice(a: Arc): void {
     if (a.id) this.sliceClick.emit(a.id);
   }
 
   protected sliceTransform(a: Arc, i: number): string {
     return this.hovered() === i
-      ? `translate(${a.midX * GROW}px, ${a.midY * GROW}px) scale(1.04)`
+      ? `translate(${a.midX * GROW}px, ${a.midY * GROW}px) scale(1.03)`
       : 'none';
   }
 
   protected money(value: number): string {
     return new Intl.NumberFormat(this.i18n.formatLocale(), {
       style: 'currency',
-      currency: 'EUR',
+      currency: this.currency() || 'EUR',
       maximumFractionDigits: 0,
     }).format(value);
   }

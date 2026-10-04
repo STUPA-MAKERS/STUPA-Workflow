@@ -1,84 +1,143 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, type ParamMap, Router, RouterLink } from '@angular/router';
+import { NgTemplateOutlet } from '@angular/common';
+import { Subject, of } from 'rxjs';
+import { catchError, map, switchMap } from 'rxjs/operators';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
-import {
-  ButtonComponent,
-  CellDirective,
-  type ColumnDef,
-  DataTableComponent,
-  IconComponent,
-} from '@stupa-makers/ui-kit';
+import { ButtonComponent, DialogComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
 import { downloadBlob } from '@shared/download.util';
+import { SimplifyPathPipe } from '@shared/budget-path';
 import {
-} from '../applications/applications-table.component';
+  EmptyStateComponent,
+  ListItemComponent,
+  SearchPillComponent,
+  type Seg,
+  SegBarComponent,
+  SideSheetComponent,
+  SkeletonComponent,
+  StatusTextComponent,
+  type StatusKind,
+  flowColorKind,
+} from '@shared/ui';
+import { mediaQuerySignal } from '../../layout/media-query';
+import { BUDGET_PERMISSIONS } from '../../layout/nav.service';
 import {
   BudgetTreeApi,
+  type BudgetAllocationView,
   type BudgetApplication,
   type BudgetTreeNode,
   type FiscalYear,
 } from './budget-tree.api';
-import { SimplifyPathPipe } from '@shared/budget-path';
-import {
-  BudgetYearTreeComponent,
-  type BudgetYearSelection,
-} from './budget-year-tree.component';
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
-import { PALETTE } from './budget-year-tree.component';
-import { DialogComponent } from '@stupa-makers/ui-kit';
+import { nodeColors, resolveNodeColors } from './budget-color.util';
 
-/** A tree row in the usage section. */
-interface UsageRow {
-  node: BudgetTreeNode;
-  depth: number;
+/** The amounts of one cost centre in one fiscal year, as numbers. */
+export interface Figures {
   allocated: number;
-  committed: number;
-  /** Bound: the accepted applications minus the committed expenses. */
+  requested: number;
+  /** Accepted applications minus the bookings against them. */
   bound: number;
-  /** Expended: the actual expenses. */
   expended: number;
   income: number;
-  requested: number;
+  /** bound + expended. */
+  committed: number;
   available: number;
-  /** committed/(available+committed) as a percentage (null when denominator is 0). */
+}
+
+/** A figure the sheet names. `committed` is only a sum for the bars. */
+export type FigureKey = Exclude<keyof Figures, 'committed'>;
+
+/** A figure that the "Verteilung" chart can show. */
+export type DistributionMetric = 'allocated' | 'requested' | 'bound' | 'expended' | 'available';
+
+/** One row of the cost-centre tree in the pane. */
+interface TreeRow {
+  node: BudgetTreeNode;
+  depth: number;
+  hasChildren: boolean;
+  expanded: boolean;
+  /** Display colour of the node (see `nodeColors`). */
+  color: string;
+  /** The node has an own or inherited colour, so the row shows a swatch. */
+  swatch: boolean;
+  allocated: number;
+  segments: Seg[];
+  total: number | null;
   percent: number | null;
 }
 
-/**
- * Budget statistics as a drilldown over the cost center tree.
- *
- * Left: the budget to fiscal year navigation tree. Middle: the breadcrumbs
- * (depth > 0), the usage table of the selected cost center (allocated, committed,
- * requested, available) and the applications. Right: stacked pie charts over the
- * direct sub cost centers. The query params hold the selection, so the view is
- * shareable as a link.
- */
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+/** One row of "Auslastung je Budget". */
+interface UsageRow {
+  node: BudgetTreeNode;
+  color: string;
+  figures: Figures;
+  percent: number | null;
+  segments: Seg[];
+  total: number | null;
+}
 
+/** An application on the selected cost centre, ready to show. */
+interface AppRow {
+  app: BudgetApplication;
+  title: string;
+  statusLabel: string | null;
+  statusKind: StatusKind;
+  costCentre: string | null;
+}
+
+const ZERO: Figures = {
+  allocated: 0,
+  requested: 0,
+  bound: 0,
+  expended: 0,
+  income: 0,
+  committed: 0,
+  available: 0,
+};
+
+/** How many applications the sheet lists before "Alle ansehen". */
+export const APPS_SHOWN = 5;
+
+/**
+ * Budget: the cost-centre tree beside a sheet with the figures of the selected cost centre.
+ *
+ * The pane holds the fiscal year, the overview (sunburst), a search and the tree. Each
+ * tree node shows its allocation and a bar of its utilisation, in its own colour or the
+ * colour it inherits (O19). The sheet shows the path, the six figures (Zuteilung,
+ * Beantragt, Gebunden, Ausgegeben, Einnahmen, Verfügbar; N28), the distribution over the
+ * sub cost centres, the utilisation per sub cost centre and the applications on it.
+ *
+ * Below the wide breakpoint the pane moves into a side sheet that a path chip opens. The
+ * query params hold the selection, so the view is shareable as a link. A reader with a
+ * gremium scope (`viewGremiumId`) gets only the subtrees of the server response.
+ */
 @Component({
   selector: 'app-budget-dashboard',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    PageHeaderComponent,
-    FormsModule,
+    NgTemplateOutlet,
+    RouterLink,
     TranslatePipe,
     SimplifyPathPipe,
     ButtonComponent,
-    DataTableComponent,
-    CellDirective,
+    DialogComponent,
     IconComponent,
-    BudgetYearTreeComponent,
+    EmptyStateComponent,
+    ListItemComponent,
+    SearchPillComponent,
+    SegBarComponent,
+    SideSheetComponent,
+    SkeletonComponent,
+    StatusTextComponent,
     BudgetPieComponent,
     BudgetSunburstComponent,
-    DialogComponent,
-      RouterLink,
   ],
   templateUrl: './budget-dashboard.component.html',
   styleUrl: './budget-dashboard.component.scss',
@@ -90,40 +149,48 @@ export class BudgetDashboardComponent {
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
 
+  /** The pane sits beside the sheet only on a wide viewport. */
+  readonly wide = mediaQuerySignal(MEDIA.wide);
+
   readonly canExport = computed(() => this.auth.can('budget.export'));
+  /** The bookings page needs a global budget permission; a gremium scope alone has none. */
+  readonly canSeeBookings = computed(() => this.auth.canAny(...BUDGET_PERMISSIONS));
+  /** Only a reader with `budget.structure` can open /admin/cost-centres and add a year. */
+  readonly canManageStructure = computed(() => this.auth.can('budget.structure'));
   readonly exporting = signal(false);
 
   readonly loading = signal(true);
   readonly error = signal(false);
   readonly tree = signal<BudgetTreeNode[]>([]);
-  /** Fiscal years per top budget (for the left tree). */
+  /** Fiscal years per root of the tree. */
   readonly fiscalYearsByBudget = signal<Record<Uuid, FiscalYear[]>>({});
 
+  /** The root (top budget, or a scoped sub cost centre) the selection hangs under. */
   readonly selectedBudgetId = signal('');
   readonly selectedKsId = signal('');
   readonly selectedFyId = signal('');
 
-  /** Mobile (<=768px): the left tree picker collapses. Desktop ignores this flag,
-   *  because CSS hides the toggle there and always shows the tree. */
+  /** Narrow and phone: the side sheet with the tree. */
   readonly navOpen = signal(false);
+  /** The text of "Kostenstelle suchen". */
+  readonly query = signal('');
+  /** Tree nodes the reader opened. The path to the selection is always open. */
+  readonly expanded = signal<ReadonlySet<string>>(new Set());
+  /** The figure the "Verteilung" chart shows. */
+  readonly metric = signal<DistributionMetric>('allocated');
+  readonly metrics: readonly DistributionMetric[] = [
+    'allocated',
+    'requested',
+    'bound',
+    'expended',
+    'available',
+  ];
 
-  /** Mobile toggle label: selected budget + fiscal year, else a generic title. */
-  readonly navToggleLabel = computed(() => {
-    const budget = this.nodeById().get(this.selectedBudgetId());
-    if (!budget) return this.i18n.translate('budget.tree.navTitle');
-    const fy = (this.fiscalYearsByBudget()[this.selectedBudgetId()] ?? []).find(
-      (f) => f.id === this.selectedFyId(),
-    );
-    return fy ? `${budget.name} · ${fy.display}` : budget.name;
-  });
+  // ---------------------------------------------------------------- tree
 
-  toggleNav(): void {
-    this.navOpen.update((v) => !v);
-  }
-
-  /** Tree without the hidden cost centers. `hiddenInBudget` removes the node and
-   *  its subtree from ALL views of the budget tab. This changes the display only.
-   *  The values still count in the parent rollups. */
+  /** Tree without the hidden cost centres. `hiddenInBudget` removes the node and its
+   *  subtree from the budget tab. This changes the display only: the values still count
+   *  in the parent rollups. */
   private readonly visibleTree = computed<BudgetTreeNode[]>(() => {
     const prune = (nodes: BudgetTreeNode[]): BudgetTreeNode[] =>
       nodes
@@ -132,10 +199,9 @@ export class BudgetDashboardComponent {
     return prune(this.tree());
   });
 
-  /** Roots for the left tree: the forest roots of the server response. The full
-   *  view gives the top budgets. A gremium scope gives the assigned sub cost
-   *  centers. Only roots WITH a fiscal year appear. The fiscal-year endpoint
-   *  resolves a sub cost center to its top-level ancestor. */
+  /** Roots of the tree: the forest roots of the server response that HAVE a fiscal year.
+   *  The full view gives the top budgets; a gremium scope gives the assigned sub cost
+   *  centres. The fiscal-year endpoint resolves a sub cost centre to its top budget. */
   readonly tops = computed(() => {
     const fy = this.fiscalYearsByBudget();
     return this.visibleTree().filter((n) => (fy[n.id]?.length ?? 0) > 0);
@@ -147,11 +213,10 @@ export class BudgetDashboardComponent {
    * `'noBudgets'` — no cost centre is visible to this reader.
    * `'noFiscalYear'` — cost centres exist, but not one of them has a fiscal year. Every
    * figure on this page belongs to a fiscal year, so the tree stays empty until one
-   * exists. "No cost centres" names the wrong cause here and sends the reader to create
-   * what is already there, instead of to the fiscal year that is missing.
+   * exists.
    *
-   * The years arrive as one response per budget, after the tree. Until the last of them
-   * is in, "no budget has a year" is not yet a fact, so neither claim is made.
+   * The years arrive as one response per root, after the tree. Until the last of them is
+   * in, "no root has a year" is not yet a fact, so neither claim is made.
    */
   readonly emptyReason = computed<'noBudgets' | 'noFiscalYear' | null>(() => {
     if (!this.visibleTree().length) return 'noBudgets';
@@ -159,24 +224,37 @@ export class BudgetDashboardComponent {
     return this.pendingFiscalYears() > 0 ? null : 'noFiscalYear';
   });
 
-  /** Only a reader with `budget.structure` can open /admin/cost-centres and add a year. */
-  readonly canManageStructure = computed(() => this.auth.can('budget.structure'));
-
   private readonly nodeById = computed(() => {
-    const map = new Map<string, BudgetTreeNode>();
+    const out = new Map<string, BudgetTreeNode>();
     const walk = (nodes: BudgetTreeNode[]): void => {
       for (const n of nodes) {
-        map.set(n.id, n);
+        out.set(n.id, n);
         walk(n.children);
       }
     };
     walk(this.visibleTree());
-    return map;
+    return out;
   });
 
-  private readonly selectedKs = computed(() => this.nodeById().get(this.selectedKsId()) ?? null);
+  /** Own or inherited colour of every visible node, `null` when it has none (O19). */
+  private readonly setColors = computed(() => resolveNodeColors(this.visibleTree()));
+  /** Display colour of every visible node. The tree, the bars and the charts all use it,
+   *  so a cost centre has one colour on the page (gaps D6). */
+  readonly colors = computed(() => nodeColors(this.visibleTree()));
 
-  /** Breadcrumbs from the top budget to the current cost center. */
+  private readonly selectedKs = computed(() => this.nodeById().get(this.selectedKsId()) ?? null);
+  /** The selected cost centre, for the template. */
+  readonly current = this.selectedKs;
+
+  /** The fiscal years of the selected root, for the year chip. */
+  readonly years = computed<FiscalYear[]>(
+    () => this.fiscalYearsByBudget()[this.selectedBudgetId()] ?? [],
+  );
+  readonly selectedYear = computed<FiscalYear | null>(
+    () => this.years().find((f) => f.id === this.selectedFyId()) ?? null,
+  );
+
+  /** The path from the root to the selected cost centre. */
   readonly breadcrumbs = computed<BudgetTreeNode[]>(() => {
     const map = this.nodeById();
     let node = this.selectedKs();
@@ -188,70 +266,215 @@ export class BudgetDashboardComponent {
     return chain;
   });
 
-  private alloc(node: BudgetTreeNode): number {
-    const a = node.byFiscalYear.find((x) => x.fiscalYearId === this.selectedFyId());
-    return a ? Number(a.allocated) : 0;
-  }
-  private committedOf(node: BudgetTreeNode): number {
-    const a = node.byFiscalYear.find((x) => x.fiscalYearId === this.selectedFyId());
-    return a ? Number(a.committed) : 0;
-  }
-  private availableOf(node: BudgetTreeNode): number {
-    const a = node.byFiscalYear.find((x) => x.fiscalYearId === this.selectedFyId());
-    return a ? Number(a.available) : 0;
-  }
-  private expendedOf(node: BudgetTreeNode): number {
-    const a = node.byFiscalYear.find((x) => x.fiscalYearId === this.selectedFyId());
-    return a ? Number(a.expended) : 0;
+  /** The label of the path chip on a narrow viewport. */
+  readonly pathLabel = computed(() => this.breadcrumbs().map((n) => n.name).join(' › '));
+
+  /**
+   * The fiscal year whose figures a node in this root shows.
+   *
+   * Fiscal years belong to a top budget, so another root has its own ids. A node there
+   * shows the year with the same start year as the selected one.
+   */
+  private fyIdFor(rootId: string): string {
+    if (rootId === this.selectedBudgetId()) return this.selectedFyId();
+    const year = this.selectedYear()?.year;
+    return (this.fiscalYearsByBudget()[rootId] ?? []).find((f) => f.year === year)?.id ?? '';
   }
 
-  /** Usage rows: the selected cost center and its subtree, flattened. */
-  readonly usageRows = computed<UsageRow[]>(() => {
-    const ks = this.selectedKs();
-    if (!ks) return [];
-    const fy = this.selectedFyId();
-    const out: UsageRow[] = [];
-    const walk = (node: BudgetTreeNode, depth: number): void => {
-      const a = node.byFiscalYear.find((x) => x.fiscalYearId === fy);
-      const allocated = a ? Number(a.allocated) : 0;
-      const committed = a ? Number(a.committed) : 0;
-      const bound = a ? Number(a.bound) : 0;
-      const expended = a ? Number(a.expended) : 0;
-      const income = a ? Number(a.income) : 0;
-      const requested = a ? Number(a.requested) : 0;
-      const available = a ? Number(a.available) : 0;
-      out.push({
-        node,
-        depth,
-        allocated,
-        committed,
-        bound,
-        expended,
-        income,
-        requested,
-        available,
-        percent:
-          a && available + committed > 0
-            ? Math.round((committed / (available + committed)) * 100)
-            : null,
-      });
-      for (const c of node.children) walk(c, depth + 1);
+  /** The figures of a node in a fiscal year. A missing allocation counts as zero. */
+  figuresOf(node: BudgetTreeNode, fyId = this.selectedFyId()): Figures {
+    const a = node.byFiscalYear.find((x) => x.fiscalYearId === fyId);
+    return a ? toFigures(a) : ZERO;
+  }
+
+  /** The visible rows of the tree, flattened in display order. */
+  readonly treeRows = computed<TreeRow[]>(() => {
+    const q = this.query().trim().toLowerCase();
+    const open = this.expanded();
+    const colors = this.colors();
+    const set = this.setColors();
+    const out: TreeRow[] = [];
+    const matches = (n: BudgetTreeNode): boolean =>
+      n.name.toLowerCase().includes(q) ||
+      n.key.toLowerCase().includes(q) ||
+      n.pathKey.toLowerCase().includes(q);
+    // With a search: a node shows when it or a node below it matches, and every node on
+    // the way to a match is open.
+    const hits = new Set<string>();
+    const mark = (n: BudgetTreeNode): boolean => {
+      let any = matches(n);
+      for (const c of n.children) any = mark(c) || any;
+      if (any) hits.add(n.id);
+      return any;
     };
-    walk(ks, 0);
+    if (q) for (const t of this.tops()) mark(t);
+
+    const walk = (n: BudgetTreeNode, depth: number, fyId: string): void => {
+      if (q && !hits.has(n.id)) return;
+      const children = q ? n.children.filter((c) => hits.has(c.id)) : n.children;
+      const expanded = children.length > 0 && (q ? true : open.has(n.id));
+      const f = this.figuresOf(n, fyId);
+      const total = f.available + f.committed;
+      out.push({
+        node: n,
+        depth,
+        hasChildren: n.children.length > 0,
+        expanded,
+        color: colors.get(n.id) ?? '',
+        swatch: set.get(n.id) != null,
+        allocated: f.allocated,
+        segments: [{ value: f.committed, tone: f.available < 0 ? 'error' : 'filled' }],
+        total: total > 0 ? total : null,
+        percent: utilisation(f),
+      });
+      if (expanded) for (const c of children) walk(c, depth + 1, fyId);
+    };
+    for (const t of this.tops()) walk(t, 0, this.fyIdFor(t.id));
     return out;
   });
 
-  readonly usageColumns = computed<ColumnDef[]>(() => [
-    { key: 'node', label: this.i18n.translate('budget.tree.col.node') },
-    { key: 'bar', label: this.i18n.translate('budget.usage.bar'), width: '10rem' },
-    { key: 'requested', label: this.i18n.translate('budget.tree.col.requested'), align: 'end' },
-    { key: 'bound', label: this.i18n.translate('budget.tree.col.bound'), align: 'end' },
-    { key: 'expended', label: this.i18n.translate('budget.tree.col.expended'), align: 'end' },
-    { key: 'available', label: this.i18n.translate('budget.tree.col.available'), align: 'end' },
-  ]);
+  toggle(id: string): void {
+    this.expanded.update((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  /** Open the path to a node and the node itself, so its sub cost centres show. */
+  private expandPath(id: string): void {
+    const map = this.nodeById();
+    const add: string[] = [];
+    let node = map.get(id) ?? null;
+    while (node) {
+      add.push(node.id);
+      node = node.parentId ? (map.get(node.parentId) ?? null) : null;
+    }
+    if (add.every((x) => this.expanded().has(x))) return;
+    this.expanded.update((s) => new Set([...s, ...add]));
+  }
+
+  // ---------------------------------------------------------------- sheet
+
+  /** The six figures of the selected cost centre. */
+  readonly figures = computed<Figures>(() => {
+    const ks = this.selectedKs();
+    return ks ? this.figuresOf(ks) : ZERO;
+  });
+
+  readonly figureList = computed(() => {
+    const f = this.figures();
+    const keys: FigureKey[] = [
+      'allocated',
+      'requested',
+      'bound',
+      'expended',
+      'income',
+      'available',
+    ];
+    return keys.map((k) => ({ key: k, label: this.figureLabel(k), value: f[k] }));
+  });
+
+  figureLabel(key: FigureKey): string {
+    return this.i18n.translate(`budget.dash.fig.${key}` as TranslationKey);
+  }
+
+  /** The selected cost centre has sub cost centres to distribute over. */
+  readonly hasChildren = computed(() => (this.selectedKs()?.children.length ?? 0) > 0);
+
+  /** "Verteilung": the chosen figure over the direct sub cost centres. The part the
+   *  selected cost centre keeps for itself is its own grey slice. */
+  readonly distribution = computed<PieSlice[]>(() => {
+    const ks = this.selectedKs();
+    if (!ks?.children.length) return [];
+    const metric = this.metric();
+    const colors = this.colors();
+    const slices: PieSlice[] = ks.children.map((c) => ({
+      label: c.name,
+      value: this.figuresOf(c)[metric],
+      color: colors.get(c.id) ?? '',
+      id: c.id,
+    }));
+    const own = this.figuresOf(ks)[metric] - slices.reduce((s, x) => s + x.value, 0);
+    if (own > 0.005) {
+      slices.push({
+        label: this.i18n.translate('budget.dash.ownShare', { name: ks.name }),
+        value: own,
+        color: 'var(--color-text-subtle)',
+      });
+    }
+    return slices.filter((s) => s.value > 0);
+  });
+
+  metricLabel(m: DistributionMetric | SunburstMetric): string {
+    return this.figureLabel(m);
+  }
+
+  onMetricChange(event: Event): void {
+    this.metric.set((event.target as HTMLSelectElement).value as DistributionMetric);
+  }
+
+  /** "Auslastung je Budget": the direct sub cost centres, or the cost centre itself when
+   *  it has none. */
+  readonly usageRows = computed<UsageRow[]>(() => {
+    const ks = this.selectedKs();
+    if (!ks) return [];
+    const nodes = ks.children.length ? ks.children : [ks];
+    const colors = this.colors();
+    return nodes.map((node) => {
+      const f = this.figuresOf(node);
+      const total = f.available + f.committed;
+      return {
+        node,
+        color: colors.get(node.id) ?? '',
+        figures: f,
+        percent: utilisation(f),
+        segments: [
+          { value: f.expended, tone: f.available < 0 ? 'error' : 'filled' },
+          { value: f.bound, tone: f.available < 0 ? 'error' : 'second' },
+        ],
+        total: total > 0 ? total : null,
+      };
+    });
+  });
+
+  /** The screen-reader text of a utilisation bar. */
+  usageLabel(row: UsageRow): string {
+    const f = row.figures;
+    return this.i18n.translate('budget.dash.usageLabel', {
+      percent: row.percent ?? 0,
+      expended: this.money(f.expended, row.node.currency),
+      bound: this.money(f.bound, row.node.currency),
+      total: this.money(f.available + f.committed, row.node.currency),
+    });
+  }
+
+  // ---------------------------------------------------------------- applications
+
+  /** The applications of the selected cost centre and its subtree; `null` while loading. */
+  readonly apps = signal<BudgetApplication[] | null>(null);
+  readonly appsError = signal(false);
+  private readonly appsKey = new Subject<{ ks: string; fy: string }>();
+
+  /** The newest applications first, at most {@link APPS_SHOWN}. */
+  readonly appRows = computed<AppRow[]>(() => {
+    const list = this.apps() ?? [];
+    const byId = this.nodeById();
+    return [...list]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .slice(0, APPS_SHOWN)
+      .map((app) => ({
+        app,
+        title: this.titleOf(app),
+        statusLabel: app.stateLabel ? this.resolveLabel(app.stateLabel) || null : null,
+        statusKind: flowColorKind(app.stateColor),
+        costCentre: app.budgetId ? (byId.get(app.budgetId)?.name ?? null) : null,
+      }));
+  });
 
   /** Application title. It falls back to the short id when no title is set. */
-  titleOf(app: BudgetApplication): string {
+  titleOf(app: Pick<BudgetApplication, 'applicationId' | 'title'>): string {
     return app.title?.trim() || `${this.shortId(app.applicationId)}…`;
   }
 
@@ -260,49 +483,18 @@ export class BudgetDashboardComponent {
   private resolveLabel(map: Record<string, string>): string {
     return map[this.i18n.locale()] || map['de'] || map['en'] || Object.values(map)[0] || '';
   }
-  readonly usageRowId = (r: unknown): string => (r as UsageRow).node.id;
 
-  private color(node: BudgetTreeNode, idx: number): string {
-    return node.color ?? PALETTE[idx % PALETTE.length];
-  }
-  private pie(metric: (n: BudgetTreeNode) => number): PieSlice[] {
-    const ks = this.selectedKs();
-    if (!ks) return [];
-    const slices: PieSlice[] = ks.children.map((c, i) => ({
-      label: c.name,
-      value: metric(c),
-      color: this.color(c, i),
-      id: c.id,
-    }));
-    // Own share of the node, the part not distributed to the children. It becomes
-    // its own segment with the name and the color of the open cost center.
-    const own = metric(ks) - slices.reduce((s, x) => s + x.value, 0);
-    if (own > 0.005) {
-      slices.push({
-        label: ks.name,
-        value: own,
-        color: ks.color ?? PALETTE[0],
-      });
-    }
-    return slices.filter((s) => s.value > 0);
-  }
-  readonly allocPie = computed<PieSlice[]>(() => this.pie((n) => this.alloc(n)));
-  readonly committedPie = computed<PieSlice[]>(() => this.pie((n) => this.committedOf(n)));
-  readonly availablePie = computed<PieSlice[]>(() => this.pie((n) => this.availableOf(n)));
-  readonly expendedPie = computed<PieSlice[]>(() => this.pie((n) => this.expendedOf(n)));
+  // ---------------------------------------------------------------- overview (sunburst)
 
   readonly overviewOpen = signal(false);
   readonly overviewMetric = signal<SunburstMetric>('allocated');
   readonly overviewMetrics: SunburstMetric[] = ['allocated', 'available', 'expended'];
-  /** Root of the sunburst: the cost center that is selected now. */
+  /** Root of the sunburst: the cost centre that is selected now. */
   readonly overviewRoot = computed(() => this.selectedKs());
 
   /** Subtree sum of a metric. It uses the same calculation as the sunburst. */
   private metricTotal(node: BudgetTreeNode, metric: SunburstMetric): number {
-    const valueOf = (n: BudgetTreeNode): number => {
-      const a = n.byFiscalYear.find((x) => x.fiscalYearId === this.selectedFyId());
-      return a ? Number(a[metric]) : 0;
-    };
+    const valueOf = (n: BudgetTreeNode): number => this.figuresOf(n)[metric];
     const subtree = (n: BudgetTreeNode): number => {
       const children = n.children.reduce((s, c) => s + subtree(c), 0);
       const own = Math.max(0, valueOf(n) - n.children.reduce((s, c) => s + valueOf(c), 0));
@@ -330,9 +522,7 @@ export class BudgetDashboardComponent {
     this.selectKs(id);
   }
 
-  metricLabel(m: SunburstMetric): string {
-    return this.i18n.translate(`budget.overview.metric.${m}` as TranslationKey);
-  }
+  // ---------------------------------------------------------------- selection + URL
 
   /**
    * The query params to resolve the selection from.
@@ -348,6 +538,21 @@ export class BudgetDashboardComponent {
   private readonly pendingFiscalYears = signal(0);
 
   constructor() {
+    this.appsKey
+      .pipe(
+        switchMap(({ ks, fy }) =>
+          this.api.applications(ks as Uuid, fy || undefined).pipe(
+            map((list) => ({ list, failed: false })),
+            catchError(() => of({ list: [] as BudgetApplication[], failed: true })),
+          ),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe(({ list, failed }) => {
+        this.apps.set(list);
+        this.appsError.set(failed);
+      });
+
     this.load();
 
     // The palette can send us here while we are already here. The router keeps this
@@ -361,24 +566,21 @@ export class BudgetDashboardComponent {
 
   money(value: string | number | null | undefined, currency = 'EUR'): string {
     const n = value == null || value === '' ? 0 : Number(value);
-    return new Intl.NumberFormat(this.i18n.formatLocale(), { style: 'currency', currency }).format(n);
+    return new Intl.NumberFormat(this.i18n.formatLocale(), {
+      style: 'currency',
+      currency: currency || 'EUR',
+    }).format(n);
   }
-  /** Row total budget = available + bound + expended (= allocated + income).
-   *  This is the reference value for the usage bar. Income-funded cost centers
-   *  then stay at or below 100%. */
-  private usageTotal(row: UsageRow): number {
-    return row.available + row.committed;
+
+  /** Whole currency units, for the tree and the charts. */
+  moneyShort(value: number, currency = 'EUR'): string {
+    return new Intl.NumberFormat(this.i18n.formatLocale(), {
+      style: 'currency',
+      currency: currency || 'EUR',
+      maximumFractionDigits: 0,
+    }).format(value);
   }
-  /** Bound share of the total budget, drawn in light gray. */
-  boundPct(row: UsageRow): number {
-    const total = this.usageTotal(row);
-    return total > 0 ? Math.max(0, Math.min(100, (row.bound / total) * 100)) : 0;
-  }
-  /** Expended share of the total budget, drawn in the primary color. */
-  expendedPct(row: UsageRow): number {
-    const total = this.usageTotal(row);
-    return total > 0 ? Math.max(0, Math.min(100, (row.expended / total) * 100)) : 0;
-  }
+
   shortId(id: Uuid): string {
     return id.slice(0, 8);
   }
@@ -390,13 +592,11 @@ export class BudgetDashboardComponent {
       next: (tree) => {
         this.tree.set(tree);
         this.loading.set(false);
-        // Forest roots. They can be sub cost centers. A hidden root is not
-        // selectable in the tab.
+        // Forest roots. They can be sub cost centres. A hidden root is not selectable.
         const tops = tree.filter((n) => !n.hiddenInBudget);
-        // Load the fiscal years of all top budgets for the left tree. The requests
-        // run in parallel and a failure of one does not stop the others.
-        // How many fiscal-year responses are still out. `resolveSelection` uses it to
-        // tell "this budget has no years" from "its years have not arrived yet".
+        // The fiscal years of every root load in parallel; one failure does not stop the
+        // others. The counter tells "this root has no years" from "its years have not
+        // arrived yet".
         this.pendingFiscalYears.set(tops.length);
         for (const top of tops) {
           this.api.listFiscalYears(top.id as Uuid).subscribe({
@@ -411,9 +611,7 @@ export class BudgetDashboardComponent {
             },
           });
         }
-        if (tops.length) {
-          this.restoreOrDefault(tops);
-        }
+        if (tops.length) this.restoreOrDefault(tops);
       },
       error: () => {
         this.error.set(true);
@@ -422,17 +620,15 @@ export class BudgetDashboardComponent {
     });
   }
 
-  /** Restore the first selection from the query params. Else take the first budget
-   *  and its first fiscal year. */
+  /** Restore the first selection from the query params. Else take the first root and
+   *  its first fiscal year. */
   private restored = false;
   private restoreOrDefault(tops: BudgetTreeNode[]): void {
     if (this.restored || !tops.length) return;
     const next = this.resolveSelection(tops);
     if (next === null) return; // not loaded yet, try again later
     this.restored = true;
-    this.selectedBudgetId.set(next.budgetId);
-    this.selectedKsId.set(next.ksId);
-    this.selectedFyId.set(next.fyId);
+    this.setSelection(next.budgetId, next.ksId, next.fyId);
   }
 
   /**
@@ -440,10 +636,9 @@ export class BudgetDashboardComponent {
    * reader is already on it.
    *
    * The global search sends a cost centre here as `/budget?ks=…`, and the router keeps
-   * this component alive for a query-string-only change. Nothing re-read the URL, so the
-   * selection stayed where it was and the hit looked ignored. `restoreOrDefault` could
-   * not do this job: it is latched, because its OTHER job is to pick a default exactly
-   * once while the tree and the fiscal years trickle in.
+   * this component alive for a query-string-only change. `restoreOrDefault` cannot do
+   * this job: it is latched, because its OTHER job is to pick a default exactly once
+   * while the tree and the fiscal years trickle in.
    */
   private applyUrlSelection(): void {
     const tops = this.tree().filter((n) => !n.hiddenInBudget);
@@ -457,9 +652,7 @@ export class BudgetDashboardComponent {
       return;
     }
     this.restored = true;
-    this.selectedBudgetId.set(next.budgetId);
-    this.selectedKsId.set(next.ksId);
-    this.selectedFyId.set(next.fyId);
+    this.setSelection(next.budgetId, next.ksId, next.fyId);
   }
 
   /**
@@ -472,7 +665,6 @@ export class BudgetDashboardComponent {
     tops: BudgetTreeNode[],
   ): { budgetId: string; ksId: string; fyId: string } | null {
     if (!tops.length) return null;
-    // Only budgets with a fiscal year are selectable in the budget tab.
     const withFy = tops.filter((t) => (this.fiscalYearsByBudget()[t.id]?.length ?? 0) > 0);
     if (!withFy.length) return null; // no fiscal year loaded yet, try again later
     const qp = this.urlParams;
@@ -481,30 +673,26 @@ export class BudgetDashboardComponent {
 
     const ks = qp.get('ks');
     const qpBudget = qp.get('budget');
-    // A search hit is `?ks=…` alone. Taking the first budget then showed the right cost
-    // centre hanging under the wrong root, so the budget comes from the cost centre
-    // itself when the URL does not name one.
+    // A search hit is `?ks=…` alone, so the root comes from the cost centre itself when
+    // the URL does not name one.
     const derived = ks && this.nodeById().get(ks) ? this.rootOf(ks) : null;
     const wanted = selectable(qpBudget) ? qpBudget : selectable(derived) ? derived : null;
-    // The fiscal years of each top budget arrive as separate responses, and this runs
-    // after every one of them. A URL that names a budget whose years have not landed yet
-    // must WAIT rather than settle for the first budget that happens to be ready — the
-    // choice is latched, so settling early meant the link silently opened the wrong cost
-    // centre and never corrected itself.
+    // A URL that names a root whose years have not landed yet must WAIT rather than
+    // settle for the first root that happens to be ready: the choice is latched.
     if (wanted === null && (ks || qpBudget) && this.pendingFiscalYears() > 0) return null;
     const budgetId = wanted ?? withFy[0].id;
 
+    // Both ways to `budgetId` above require at least one year, so `fys[0]` exists.
     const fys = this.fiscalYearsByBudget()[budgetId];
-    if (fys === undefined) return null; // not loaded yet, try again later
     const fy = qp.get('fy');
     return {
       budgetId,
       ksId: ks && this.nodeById().get(ks) ? ks : budgetId,
-      fyId: fy && fys.some((f) => f.id === fy) ? fy : (fys[0]?.id ?? ''),
+      fyId: fy && fys.some((f) => f.id === fy) ? fy : fys[0].id,
     };
   }
 
-  /** The top budget a cost centre hangs under. */
+  /** The root a cost centre hangs under. */
   private rootOf(id: string): string | null {
     const map = this.nodeById();
     let node = map.get(id) ?? null;
@@ -514,6 +702,28 @@ export class BudgetDashboardComponent {
       node = parent;
     }
     return node?.id ?? null;
+  }
+
+  /** The one place that changes the selection: it opens the path in the tree and loads
+   *  the applications of the new cost centre and year. */
+  private setSelection(budgetId: string, ksId: string, fyId: string): void {
+    const changed = ksId !== this.selectedKsId() || fyId !== this.selectedFyId();
+    this.selectedBudgetId.set(budgetId);
+    this.selectedKsId.set(ksId);
+    this.selectedFyId.set(fyId);
+    if (ksId) this.expandPath(ksId);
+    if (changed || this.apps() === null) this.loadApps();
+  }
+
+  private loadApps(): void {
+    const ks = this.selectedKsId();
+    if (!ks) {
+      this.apps.set([]);
+      return;
+    }
+    this.apps.set(null);
+    this.appsError.set(false);
+    this.appsKey.next({ ks, fy: this.selectedFyId() });
   }
 
   private syncUrl(): void {
@@ -529,26 +739,18 @@ export class BudgetDashboardComponent {
     });
   }
 
-  selectBudget(id: string): void {
-    this.selectedBudgetId.set(id);
-    this.selectedKsId.set(id); // drilldown starts at the root
-    const fys = this.fiscalYearsByBudget()[id] ?? [];
-    this.selectedFyId.set(fys[0]?.id ?? '');
-    this.syncUrl();
-  }
-
-  onYearPicked(sel: BudgetYearSelection): void {
-    this.selectedBudgetId.set(sel.budgetId);
-    this.selectedKsId.set(sel.budgetId);
-    this.selectedFyId.set(sel.fiscalYearId);
-    // Mobile: collapse the picker again after the user picks a year. Desktop keeps
-    // the tree open.
-    this.navOpen.set(false);
-    this.syncUrl();
-  }
-
+  /** Select a cost centre. A node under another root switches the root and keeps the
+   *  start year where that root has it. */
   selectKs(id: string): void {
-    this.selectedKsId.set(id);
+    const root = this.rootOf(id) ?? id;
+    if (root !== this.selectedBudgetId()) {
+      const fys = this.fiscalYearsByBudget()[root] ?? [];
+      const fy = this.fyIdFor(root) || (fys[0]?.id ?? '');
+      this.setSelection(root, id, fy);
+    } else {
+      this.setSelection(root, id, this.selectedFyId());
+    }
+    this.navOpen.set(false);
     this.syncUrl();
   }
 
@@ -556,6 +758,24 @@ export class BudgetDashboardComponent {
     this.selectKs(node.id);
   }
 
+  /** Pick a fiscal year of the selected root. */
+  selectYear(fyId: string): void {
+    if (fyId === this.selectedFyId()) return;
+    this.setSelection(this.selectedBudgetId(), this.selectedKsId(), fyId);
+    this.syncUrl();
+  }
+
+  onYearChange(event: Event): void {
+    this.selectYear((event.target as HTMLSelectElement).value);
+  }
+
+  openApplications(): void {
+    void this.router.navigate(['/applications'], { queryParams: { budget: this.selectedKsId() } });
+  }
+
+  openBookings(): void {
+    void this.router.navigate(['/expenses'], { queryParams: { budget: this.selectedKsId() } });
+  }
 
   onExport(): void {
     if (this.exporting()) return;
@@ -573,4 +793,24 @@ export class BudgetDashboardComponent {
         error: () => this.exporting.set(false),
       });
   }
+}
+
+/** The allocation view as numbers. Money is a string on the wire. */
+function toFigures(a: BudgetAllocationView): Figures {
+  return {
+    allocated: Number(a.allocated),
+    requested: Number(a.requested),
+    bound: Number(a.bound),
+    expended: Number(a.expended),
+    income: Number(a.income),
+    committed: Number(a.committed),
+    available: Number(a.available),
+  };
+}
+
+/** Utilisation in percent: committed / (allocated + income), where allocated + income =
+ *  available + committed. `null` when there is nothing to use. */
+export function utilisation(f: Figures): number | null {
+  const total = f.available + f.committed;
+  return total > 0 ? Math.round((f.committed / total) * 100) : null;
 }

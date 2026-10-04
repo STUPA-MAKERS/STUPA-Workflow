@@ -180,6 +180,44 @@ describe('mockApiInterceptor', () => {
       expect(page.total).toBe(0);
     });
 
+    it('GET /budgets → the demo tree with consistent rollups', async () => {
+      type N = { id: string; pathKey: string; color: string | null; children: N[];
+        byFiscalYear: { allocated: string; committed: string; income: string; available: string }[] };
+      const tree = await get<N[]>('/api/budgets');
+      expect(tree).toHaveLength(1);
+      const root = tree[0];
+      // Path keys join with "-", like the server.
+      expect(root.children[1].children[0].pathKey).toBe('HH-200-210');
+      // available = allocated - committed + income.
+      const a = root.byFiscalYear[0];
+      expect(Number(a.available)).toBe(Number(a.allocated) - Number(a.committed) + Number(a.income));
+      // One node inherits its colour: it has none of its own under a coloured parent.
+      const gestaltung = root.children[1].children[2];
+      expect(gestaltung.color).toMatch(/^#/);
+      expect(gestaltung.children[0].color).toBeNull();
+    });
+
+    it('GET /budgets/{id}/fiscal-years → the years of the demo budget', async () => {
+      const fys = await get<{ year: number }[]>('/api/budgets/x/fiscal-years');
+      expect(fys.map((f) => f.year)).toEqual([2026, 2025]);
+    });
+
+    it('GET /budgets/{id}/applications → the subtree, filtered by year', async () => {
+      type A = { budgetId: string; pathKey: string };
+      const root = 'b1000000-0000-0000-0000-000000000001';
+      const all = await get<A[]>(`/api/budgets/${root}/applications`);
+      expect(all.length).toBe(5);
+      const fs = await get<A[]>('/api/budgets/b1000000-0000-0000-0000-000000000020/applications');
+      expect(fs.length).toBe(3);
+      expect(fs.every((x) => x.pathKey.startsWith('HH-200-'))).toBe(true);
+      const old = await get<A[]>(
+        `/api/budgets/${root}/applications`,
+        new HttpParams().set('fiscalYear', 'f1000000-0000-0000-0000-000000000002'),
+      );
+      expect(old).toEqual([]);
+      expect(await get<A[]>('/api/budgets/unknown/applications')).toEqual([]);
+    });
+
     it('GET /applications/tasks → task list', async () => {
       const tasks = await get<unknown[]>('/api/applications/tasks');
       expect(tasks.length).toBe(2);
