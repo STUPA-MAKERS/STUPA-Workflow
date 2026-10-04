@@ -13,6 +13,7 @@ import { CardComponent } from '@stupa-makers/ui-kit';
 import { DialogComponent } from '@stupa-makers/ui-kit';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { VoteBarsComponent } from './vote-bars.component';
+import { RailStatusService } from '../../layout/rail-status.service';
 
 type Phase = 'loading' | 'error' | 'ready';
 
@@ -58,6 +59,7 @@ export class VoteCastComponent {
   private readonly delegations = inject(DelegationsApiService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly railStatus = inject(RailStatusService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
@@ -214,6 +216,8 @@ export class VoteCastComponent {
         this.markCast(asDelegation, choice);
         this.submitting.set(false);
         this.toast.success(this.i18n.translate('voting.cast.toast.cast'));
+        // A ballot can close a task; the count in the navigation follows.
+        this.railStatus.refresh();
         // Reload the current tally from the server. Do not guess it optimistically.
         this.api.getVote(vote.id, { quiet: true }).subscribe((v) => this.vote.set(v));
       },

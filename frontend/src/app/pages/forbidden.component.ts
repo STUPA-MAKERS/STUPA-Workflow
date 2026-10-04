@@ -16,5 +16,6 @@ import { ErrorPageComponent } from './error-page/error-page.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, ErrorPageComponent],
   templateUrl: './forbidden.component.html',
+  styleUrl: './error-page/error-route.scss',
 })
 export class ForbiddenComponent {}

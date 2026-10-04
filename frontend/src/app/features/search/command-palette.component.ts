@@ -90,7 +90,8 @@ const EMPTY: SearchResults = { hits: [], truncated: false, failed: [] };
  * Records come from `GET /api/search`, which reuses each module's own read gate.
  *
  * The field is a combobox: the focus stays in it, the arrow keys move the active row
- * (`aria-activedescendant`), Enter opens it and Escape closes the palette. The
+ * (`aria-activedescendant`), Enter opens it and Escape closes the palette. Tab stays
+ * inside the dialog: it goes round between the field and the close button. The
  * {@link CommandPaletteService} opens it from anywhere; Ctrl+K (⌘K) toggles it.
  */
 @Component({
@@ -109,6 +110,7 @@ export class CommandPaletteComponent {
   private readonly palette = inject(CommandPaletteService);
 
   private readonly field = viewChild<ElementRef<HTMLInputElement>>('field');
+  private readonly closeButton = viewChild<ElementRef<HTMLButtonElement>>('closeButton');
 
   /** `⎋` is the key's own symbol on Apple keyboards; elsewhere the word is clearer. */
   protected readonly escLabel = isApplePlatform() ? '⎋' : 'Esc';
@@ -258,6 +260,12 @@ export class CommandPaletteComponent {
       this.close();
       return;
     }
+    if (event.key === 'Tab') {
+      this.trapTab(event);
+      return;
+    }
+    // The row keys belong to the field. On the close button, Enter must press the button.
+    if (event.target !== this.field()?.nativeElement) return;
     const rows = this.rows();
     if (!rows.length) return;
     if (event.key === 'ArrowDown') {
@@ -304,6 +312,25 @@ export class CommandPaletteComponent {
     this.truncated.set(false);
     this.loading.set(false);
     this.active.set(0);
+  }
+
+  /**
+   * Keep the focus in the dialog (`aria-modal`). The rows are not tab stops (the arrow
+   * keys move between them), so Tab goes round between the field and the close button.
+   */
+  private trapTab(event: KeyboardEvent): void {
+    const first = this.field()?.nativeElement;
+    const last = this.closeButton()?.nativeElement;
+    if (!first || !last) return;
+    const current = document.activeElement;
+    let next: HTMLElement | null = null;
+    if (current !== first && current !== last) next = first;
+    else if (event.shiftKey && current === first) next = last;
+    else if (!event.shiftKey && current === last) next = first;
+    if (next) {
+      event.preventDefault();
+      next.focus();
+    }
   }
 
   /** Make a row the active one and scroll it into the visible part of the list. */

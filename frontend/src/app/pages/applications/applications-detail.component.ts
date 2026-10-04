@@ -52,6 +52,7 @@ import {
   formatIsoDate,
 } from './applications.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { RailStatusService } from '../../layout/rail-status.service';
 
 /** Comparison offer / cost position for the structured detail view. */
 interface DetailOffer {
@@ -105,6 +106,7 @@ export class ApplicationsDetailComponent {
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly railStatus = inject(RailStatusService);
   private readonly route = inject(ActivatedRoute);
 
   readonly loading = signal(true);
@@ -959,8 +961,10 @@ export class ApplicationsDetailComponent {
     });
   }
 
-  /** Reload the application and the dependent sections after a transition. */
+  /** Reload the application and the dependent sections after a transition. The task
+   *  count of the navigation changes with the state, so it is asked again too. */
   private refresh(): void {
+    this.railStatus.refresh();
     const seq = this.loadSeq;
     this.api.getApplication(this.id, { quiet: true }).subscribe({
       next: (app) => {

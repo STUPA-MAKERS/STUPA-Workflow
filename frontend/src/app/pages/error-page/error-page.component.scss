@@ -1,10 +1,12 @@
-/* Centred in the free space of the page; the text inside stays left-aligned. The
-   height leaves out the frame around the page (bar or padding, footer). */
+/* Centred in the free space of the page; the text inside stays left-aligned. The shell
+   main is a flex column that fills the height between the bars and the footer, so
+   `flex: 1` takes exactly the free space of any frame and never pushes the footer past
+   the fold. */
 :host {
   display: flex;
+  flex: 1 0 auto;
   align-items: center;
   justify-content: center;
-  min-height: calc(100dvh - 12rem);
 }
 
 .err {

@@ -3,22 +3,26 @@
     <img [src]="markSrc" alt="" width="40" height="40" />
   </a>
 
-  @for (item of mainItems(); track item.key) {
-    <a
-      class="rail__item"
-      [routerLink]="item.path"
-      routerLinkActive="is-active"
-      ariaCurrentWhenActive="page"
-      [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
-    >
-      <span class="rail__ind">
-        <app-icon [name]="item.icon" [size]="22" />
-        <app-nav-mark [key]="item.key" />
-      </span>
-      <span class="rail__label">{{ item.labelKey | t }}</span>
-      <app-nav-mark [key]="item.key" part="text" />
-    </a>
-  }
+  <!-- Only the areas scroll when the viewport is too low. The administration and the
+       account stay in view below them. -->
+  <div class="rail__main">
+    @for (item of mainItems(); track item.key) {
+      <a
+        class="rail__item"
+        [routerLink]="item.path"
+        routerLinkActive="is-active"
+        ariaCurrentWhenActive="page"
+        [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
+      >
+        <span class="rail__ind">
+          <app-icon [name]="item.icon" [size]="22" />
+          <app-nav-mark [key]="item.key" />
+        </span>
+        <span class="rail__label">{{ item.labelKey | t }}</span>
+        <app-nav-mark [key]="item.key" part="text" />
+      </a>
+    }
+  </div>
 
   <div class="rail__spacer"></div>
 

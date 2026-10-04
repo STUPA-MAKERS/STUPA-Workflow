@@ -8,6 +8,7 @@ import { render, screen } from '@testing-library/angular';
 import { DashboardComponent } from './dashboard.component';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
+import { CommandPaletteService } from '../../features/search/command-palette.service';
 import type {
   ApplicationListItemWire,
   ApplicationTypeListItemWire,
@@ -219,6 +220,18 @@ describe('DashboardComponent', () => {
     const { http } = await setup(MEMBER);
     const cta = screen.getByRole('link', { name: /Antrag stellen/ });
     expect(cta).toHaveAttribute('href', '/apply');
+    http.verify();
+  });
+
+  it('opens the global search from the search pill at the top', async () => {
+    // Above the phone width the rail has no search entry: this pill is the way in for a
+    // mouse or a touch screen, besides the shortcut.
+    const { http, fixture } = await setup(MEMBER);
+    const palette = fixture.debugElement.injector.get(CommandPaletteService);
+    const pill = screen.getByRole('button', { name: 'Suche' });
+    expect(pill).toHaveAttribute('aria-keyshortcuts');
+    pill.click();
+    expect(palette.isOpen()).toBe(true);
     http.verify();
   });
 

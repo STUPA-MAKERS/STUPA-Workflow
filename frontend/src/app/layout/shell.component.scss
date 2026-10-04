@@ -1,5 +1,6 @@
 /* The frame has no top bar any more, except the public one, which scrolls away with the
-   page. Pages that offset sticky panels by the header height get 0 here. */
+   page. Pages that offset sticky panels by the header height get 0 here. The loading
+   overlay reads it too; the rules near the end keep it off the rail and the phone bar. */
 :host {
   --layout-header-height: 0px;
   --rail-width: 96px;
@@ -51,7 +52,11 @@
      meeting page) can pull exactly this much back. */
   --main-pad-top: var(--space-8);
   --main-pad-bottom: var(--space-8);
+  /* A column, so a page can fill the free height with `flex: 1` (the 403 and 404 pages
+     centre in it) without a guess at the height of the frame around it. */
+  display: flex;
   flex: 1 0 auto;
+  flex-direction: column;
   width: 100%;
   padding-block: var(--main-pad-top) var(--main-pad-bottom);
 }
@@ -90,6 +95,16 @@
 .frame--bare .main {
   --main-pad-top: 0px;
   --main-pad-bottom: 0px;
+}
+
+/* The global loading overlay (ui-kit `.lo`, fixed, z-index above the rail) dims the page
+   only. The rail and the phone bar stay clear and usable, so a slow request never keeps
+   the user from going somewhere else. */
+.frame--rail ~ app-loading-overlay ::ng-deep .lo {
+  inset-inline-start: var(--rail-width);
+}
+.frame--phone ~ app-loading-overlay ::ng-deep .lo {
+  bottom: calc(var(--bottom-bar-height) + env(safe-area-inset-bottom));
 }
 
 /* Toasts sit above the phone bar instead of on it. */

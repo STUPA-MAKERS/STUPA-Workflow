@@ -19,6 +19,7 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { BehaviorSubject } from 'rxjs';
 import { ApplicationsDetailComponent } from './applications-detail.component';
+import { RailStatusService } from '../../layout/rail-status.service';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type {
@@ -87,6 +88,8 @@ async function setup(permissions: string[] = ['application.read', 'application.s
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
       { provide: AuthService, useValue: fakeAuth(permissions) },
+      // The real service polls; the page only asks it to refresh.
+      { provide: RailStatusService, useValue: { refresh: jest.fn() } },
       {
         provide: ActivatedRoute,
         useValue: { paramMap: new BehaviorSubject(convertToParamMap({ id: 'app-1' })) },

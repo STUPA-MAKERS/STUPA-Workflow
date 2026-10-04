@@ -11,7 +11,12 @@ import { SKIP_LOADING } from '@core/loading/loading.interceptor';
 import type { MeetingStateMsg } from '@core/ws/ws-messages';
 import { WsService } from '@core/ws/ws.service';
 import { createLocationMock, provideLocationMock } from '../../testing/location-mock';
-import { RAIL_STATUS_DEBOUNCE_MS, RAIL_STATUS_POLL_MS, RailStatusService } from './rail-status.service';
+import {
+  LIVE_MAX_PAGES,
+  RAIL_STATUS_DEBOUNCE_MS,
+  RAIL_STATUS_POLL_MS,
+  RailStatusService,
+} from './rail-status.service';
 
 @Component({ standalone: true, template: '' })
 class StubPage {}
@@ -95,6 +100,36 @@ describe('RailStatusService', () => {
     timeline.flush({ items: [meeting('planned'), meeting('live')], nextCursor: null });
     expect(env.svc.taskCount()).toBe(3);
     expect(env.svc.live()).toBe(true);
+  });
+
+  it('reads the next page while no live meeting has shown up', () => {
+    // A meeting that started before its planned time sorts after earlier planned ones.
+    const env = setup();
+    signIn(env);
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectOne((r) => r.url === TASKS).flush([]);
+    const first = env.http.expectOne((r) => r.url === TIMELINE);
+    expect(first.request.params.get('cursor')).toBeNull();
+    first.flush({ items: [meeting('planned')], nextCursor: 'c1' });
+    const second = env.http.expectOne((r) => r.url === TIMELINE);
+    expect(second.request.params.get('cursor')).toBe('c1');
+    second.flush({ items: [meeting('live')], nextCursor: 'c2' });
+    // A live meeting ends the walk, even when more pages exist.
+    env.http.expectNone((r) => r.url === TIMELINE);
+    expect(env.svc.live()).toBe(true);
+  });
+
+  it('stops after a fixed number of pages', () => {
+    const env = setup();
+    signIn(env);
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectOne((r) => r.url === TASKS).flush([]);
+    for (let i = 0; i < LIVE_MAX_PAGES; i++) {
+      env.http.expectOne((r) => r.url === TIMELINE).flush({ items: [meeting('planned')], nextCursor: `c${i}` });
+    }
+    env.http.expectNone((r) => r.url === TIMELINE);
+    expect(env.svc.live()).toBe(false);
+    expect(env.svc.taskCount()).toBe(0);
   });
 
   it('does not ask for the live flag when the principal cannot see meetings', () => {

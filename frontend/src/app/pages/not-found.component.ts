@@ -13,5 +13,6 @@ import { ErrorPageComponent } from './error-page/error-page.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, ErrorPageComponent],
   templateUrl: './not-found.component.html',
+  styleUrl: './error-page/error-route.scss',
 })
 export class NotFoundComponent {}

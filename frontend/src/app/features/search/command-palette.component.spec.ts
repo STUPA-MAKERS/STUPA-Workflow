@@ -47,6 +47,18 @@ async function setup(pages = PAGES) {
   return { ...view, http, router, cmp };
 }
 
+/**
+ * A key in the search field. It bubbles to the document listener, the way a real
+ * keystroke does; the row keys only count when the field is the target.
+ */
+function pressInField(key: string, init: KeyboardEventInit = {}): KeyboardEvent {
+  const field = document.querySelector<HTMLInputElement>('.pal__input');
+  if (!field) throw new Error('palette field missing');
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init });
+  field.dispatchEvent(event);
+  return event;
+}
+
 /** Let the 180ms debounce elapse and answer the request it produced. */
 async function answer(http: HttpTestingController, body: SearchResults = HITS) {
   jest.advanceTimersByTime(200);
@@ -188,12 +200,12 @@ describe('CommandPaletteComponent', () => {
     fixture.detectChanges();
 
     expect(cmp.active()).toBe(0);
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    pressInField('ArrowDown');
     fixture.detectChanges();
     // One page matches "Re" (Rechnungen), so the list wraps back to itself.
     expect(cmp.active()).toBe(0);
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    pressInField('Enter');
     expect(nav).toHaveBeenCalledWith('/invoices');
     expect(cmp.open()).toBe(false);
   });
@@ -346,12 +358,12 @@ describe('CommandPaletteComponent', () => {
     expect(options[0]).toHaveAttribute('aria-selected', 'true');
     expect(options[0]).toHaveTextContent('Enter');
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    pressInField('ArrowDown');
     fixture.detectChanges();
     expect(field).toHaveAttribute('aria-activedescendant', options[1].id);
     expect(options[1]).toHaveAttribute('aria-selected', 'true');
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' }));
+    pressInField('ArrowUp');
     fixture.detectChanges();
     expect(field).toHaveAttribute('aria-activedescendant', options[0].id);
   });
@@ -449,12 +461,69 @@ describe('CommandPaletteComponent', () => {
       failed: [],
     });
     fixture.detectChanges();
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    pressInField('ArrowDown');
     jest.runAllTicks();
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
     expect(cmp.active()).toBe(1);
     expect(cmp.open()).toBe(true);
+  });
+
+  it('closes on Enter on the close button and does not open the active row', async () => {
+    const { cmp, fixture, http, router } = await setup();
+    const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    cmp.show();
+    cmp.onQuery('Re');
+    await answer(http, { hits: [], truncated: false, failed: [] });
+    fixture.detectChanges();
+    expect(cmp.rows().length).toBe(1);
+
+    const close = screen.getByRole('button', { name: 'Suche schließen' });
+    close.focus();
+    // The document listener must leave the key to the button.
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    close.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(nav).not.toHaveBeenCalled();
+    // The browser turns Enter on a button into a click.
+    close.click();
+    expect(cmp.open()).toBe(false);
+    expect(nav).not.toHaveBeenCalled();
+  });
+
+  it('keeps Tab inside the dialog', async () => {
+    const { cmp, fixture } = await setup([]);
+    cmp.show();
+    fixture.detectChanges();
+    const field = screen.getByRole('combobox', { name: 'Suche' });
+    const close = screen.getByRole('button', { name: 'Suche schließen' });
+
+    // From the last stop forward to the first.
+    close.focus();
+    let event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    close.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(field).toHaveFocus();
+
+    // From the first stop backward to the last.
+    event = pressInField('Tab', { shiftKey: true });
+    expect(event.defaultPrevented).toBe(true);
+    expect(close).toHaveFocus();
+
+    // Inside the dialog the browser moves the focus itself.
+    field.focus();
+    event = pressInField('Tab');
+    expect(event.defaultPrevented).toBe(false);
+
+    // Focus outside the dialog comes back to the field.
+    const outside = document.createElement('button');
+    document.body.appendChild(outside);
+    outside.focus();
+    event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    outside.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(field).toHaveFocus();
+    outside.remove();
   });
 });
