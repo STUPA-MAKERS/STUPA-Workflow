@@ -203,6 +203,29 @@ export interface Invoice {
   hasFile: boolean;
   actor: string | null;
   createdAt: string;
+  /**
+   * The bookings that reference this invoice (A6), in booking order. The server sends
+   * only the bookings on cost centres the reader may see. A backend before A6 sends no
+   * field at all: the list then hides its bookings column instead of asking for the
+   * bookings of each invoice one by one.
+   */
+  linkedBookings?: InvoiceBooking[];
+}
+
+/** One booking on an invoice, as the invoice list shows it. */
+export interface InvoiceBooking {
+  id: Uuid;
+  budgetId: Uuid;
+  pathKey: string;
+  budgetName: string;
+  fiscalYearId: Uuid;
+  kind: ExpenseKind;
+  amount: string;
+  description: string;
+  paymentDate: string | null;
+  /** Set when the booking is a sub-booking of another booking. */
+  parentExpenseId: Uuid | null;
+  createdAt: string;
 }
 
 /** Create an invoice. ``grossAmount`` is required and the rest is optional. On

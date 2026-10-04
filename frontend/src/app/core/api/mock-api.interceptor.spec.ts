@@ -174,10 +174,80 @@ describe('mockApiInterceptor', () => {
       expect(s.expiresIn).toBe(120);
     });
 
-    it('GET …/expenses → empty page', async () => {
-      const page = await get<{ items: unknown[]; total: number }>('/api/budgets/x/expenses');
-      expect(page.items).toEqual([]);
-      expect(page.total).toBe(0);
+    it('GET /expenses → the demo bookings, filtered and paged', async () => {
+      type E = { id: string; kind: string; budgetId: string; childCount: number };
+      const all = await get<{ items: E[]; total: number }>('/api/expenses');
+      expect(all.total).toBeGreaterThan(5);
+      expect(all.items.some((e) => e.kind === 'income')).toBe(true);
+      expect(all.items.some((e) => e.childCount > 0)).toBe(true);
+
+      const income = await get<{ items: E[] }>(
+        '/api/expenses',
+        new HttpParams().set('kind', 'income'),
+      );
+      expect(income.items.every((e) => e.kind === 'income')).toBe(true);
+
+      // A cost centre filters its whole subtree: "Fachschaften" holds 210, 220 and 231.
+      const sub = await get<{ items: E[] }>(
+        '/api/expenses',
+        new HttpParams().set('budget', 'b1000000-0000-0000-0000-000000000020'),
+      );
+      expect(sub.items.length).toBeGreaterThan(0);
+      expect(sub.items.every((e) => /0000000000(2\d)$/.test(e.budgetId))).toBe(true);
+
+      const searched = await get<{ items: E[] }>('/api/expenses', new HttpParams().set('q', 'turnier'));
+      expect(searched.items.length).toBe(2);
+
+      const paged = await get<{ items: E[]; offset: number }>(
+        '/api/expenses',
+        new HttpParams().set('limit', '2').set('offset', '2'),
+      );
+      expect(paged.items).toHaveLength(2);
+      expect(paged.offset).toBe(2);
+    });
+
+    it('GET sub-bookings, transfers and one invoice → the demo rows', async () => {
+      const subs = await get<{ parentExpenseId: string }[]>(
+        '/api/budget-expenses/e1000000-0000-0000-0000-000000000002/sub-bookings',
+      );
+      expect(subs).toHaveLength(2);
+      const transfers = await get<{ items: unknown[] }>('/api/budget-transfers');
+      expect(transfers.items).toHaveLength(1);
+      const inv = await get<{ number: string } | null>(
+        '/api/invoices/d1000000-0000-0000-0000-000000000003',
+      );
+      expect(inv?.number).toBe('SP-88213');
+      expect(await get('/api/invoices/unknown')).toBeNull();
+    });
+
+    it('GET /invoices → the demo invoices with their bookings', async () => {
+      type I = { id: string; status: string; linkedBookings: unknown[] };
+      const all = await get<{ items: I[] }>('/api/invoices');
+      expect(all.items.some((i) => i.linkedBookings.length > 1)).toBe(true);
+      expect(all.items.some((i) => i.linkedBookings.length === 0)).toBe(true);
+      const open = await get<{ items: I[] }>('/api/invoices', new HttpParams().set('status', 'open'));
+      expect(open.items.every((i) => i.status === 'open')).toBe(true);
+      const byId = await get<{ items: I[] }>(
+        '/api/invoices',
+        new HttpParams().set('id', 'd1000000-0000-0000-0000-000000000002'),
+      );
+      expect(byId.items).toHaveLength(1);
+      const q = await get<{ items: I[] }>('/api/invoices', new HttpParams().set('q', 'neckar'));
+      expect(q.items).toHaveLength(1);
+    });
+
+    it('POST /invoices/parse → a known invoice, flagged as a duplicate', async () => {
+      const form = new FormData();
+      form.append('file', new File(['%PDF'], 'beleg.pdf', { type: 'application/pdf' }));
+      const parsed = await firstValueFrom(
+        http.post<{ fileName: string; duplicate: boolean }>('/api/invoices/parse', form),
+      );
+      expect(parsed.fileName).toBe('beleg.pdf');
+      expect(parsed.duplicate).toBe(true);
+      const bare = await firstValueFrom(
+        http.post<{ fileName: string }>('/api/invoices/parse', new FormData()),
+      );
+      expect(bare.fileName).toBe('rechnung.pdf');
     });
 
     it('GET /budgets → the demo tree with consistent rollups', async () => {
