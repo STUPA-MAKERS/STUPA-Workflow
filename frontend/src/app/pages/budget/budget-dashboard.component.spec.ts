@@ -234,6 +234,8 @@ describe('BudgetDashboardComponent', () => {
       const tree = view.container.querySelector('.bd__pane .bd__tree') as HTMLElement;
       // The year, the overview and the search are outside the scrolling list.
       expect(tree.querySelector('app-search-pill, .bd-chip')).toBeNull();
+      // The pane sits on the page, so the search field keeps its own surface.
+      expect(view.container.querySelector('.bd__pane .bd__paneBody')).not.toHaveClass('bd__paneBody--side');
       const geometry = (scrollHeight: number, scrollTop: number) => {
         Object.defineProperty(tree, 'scrollHeight', { value: scrollHeight, configurable: true });
         Object.defineProperty(tree, 'clientHeight', { value: 300, configurable: true });
@@ -850,6 +852,9 @@ describe('BudgetDashboardComponent', () => {
       // The year and the overview sit on the page, so the sheet has only the search and
       // the tree.
       expect(dialog.querySelector('.bd-chip, select')).toBeNull();
+      // The sheet has the background of the search field, so the field takes the next
+      // surface there.
+      expect(dialog.querySelector('.bd__paneBody')).toHaveClass('bd__paneBody--side');
     });
 
     it('opens the tree in the dialog of the ui-kit on a phone, which is a bottom sheet there', async () => {
@@ -864,6 +869,7 @@ describe('BudgetDashboardComponent', () => {
       // The search stays above the tree, which scrolls by itself.
       const pane = dialog.querySelector('.bd__paneBody') as HTMLElement;
       expect(pane).toHaveClass('bd__paneBody--sheet');
+      expect(pane).not.toHaveClass('bd__paneBody--side');
       expect(pane.querySelector(':scope > app-search-pill + .bd__tree')).toBeTruthy();
       // The close button of the dialog closes it.
       (dialog.querySelector('.dialog__close') as HTMLButtonElement).click();

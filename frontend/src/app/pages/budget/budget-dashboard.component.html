@@ -266,7 +266,11 @@
        phone in the bottom sheet of the dialog. The chips and the search stay in place;
        only the tree scrolls, with a fade at an end where more rows are. -->
   <ng-template #treePane let-inSheet>
-    <div class="bd__paneBody" [class.bd__paneBody--sheet]="inSheet">
+    <div
+      class="bd__paneBody"
+      [class.bd__paneBody--sheet]="inSheet"
+      [class.bd__paneBody--side]="!wide() && !inSheet"
+    >
       <!-- Below the wide layout the year and the overview chips sit on the page, beside
            the path chip, so the sheet holds only the search and the tree. -->
       @if (wide()) {

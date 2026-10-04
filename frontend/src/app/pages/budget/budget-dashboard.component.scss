@@ -97,6 +97,11 @@
 .bd__paneBody--sheet {
   max-height: calc(85dvh - 7.5rem - env(safe-area-inset-bottom, 0px));
 }
+/* The side sheet has the surface-2 background of the search field. The field takes the
+   next surface, so that its edge shows. */
+.bd__paneBody--side app-search-pill {
+  --sp-bg: var(--color-surface-3);
+}
 
 .bd__top {
   display: flex;
