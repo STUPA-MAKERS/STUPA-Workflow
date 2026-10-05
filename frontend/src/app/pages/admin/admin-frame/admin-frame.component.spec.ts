@@ -107,6 +107,41 @@ describe('AdminFrameComponent', () => {
     expect(active[0]).toHaveClass('af__item--on');
   });
 
+  it('scrolls the column, not the window, so that the active entry shows', async () => {
+    // jsdom has no layout: every entry sits 40 px under the one before it, the column
+    // shows 200 px and starts at 0.
+    const rect = jest
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        const links = [...document.querySelectorAll('a.af__item')];
+        const i = links.indexOf(this);
+        const top = i < 0 ? 0 : i * 40;
+        const height = i < 0 ? 200 : 40;
+        return { top, bottom: top + height, height, left: 0, right: 0, width: 0, x: 0, y: top } as DOMRect;
+      });
+    const scrollWindow = jest.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    try {
+      const view = await setup(ALL, '/admin/users');
+      const body = view.container.querySelector<HTMLElement>('.af__navBody')!;
+      Object.defineProperty(body, 'clientHeight', { configurable: true, value: 200 });
+      // The first entry is in view: the column stays.
+      expect(body.scrollTop).toBe(0);
+      await view.fixture.ngZone!.run(() =>
+        view.fixture.debugElement.injector.get(Router).navigateByUrl('/admin/backups'),
+      );
+      view.fixture.detectChanges();
+      await view.fixture.whenStable();
+      const i = navLinks().findIndex((a) => a.getAttribute('href') === '/admin/backups');
+      expect(i).toBeGreaterThan(5);
+      // The entry is out of view: the column puts it in the middle.
+      expect(body.scrollTop).toBe(i * 40 - 80);
+      expect(scrollWindow).not.toHaveBeenCalled();
+    } finally {
+      rect.mockRestore();
+      scrollWindow.mockRestore();
+    }
+  });
+
   it('filters the entries by title and description, and says when nothing matches', async () => {
     await setup(ALL);
     const search = screen.getByRole('searchbox', { name: 'Einstellungen durchsuchen' });

@@ -2,10 +2,14 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  type ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   effect,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
@@ -85,6 +89,8 @@ const XL = '(min-width: 1440px)';
  *   `data: { adminNav: 'xl' }` (the cost centres) does so below 1440 px.
  * - The "Zustand" tiles stay while the search hides them, so a cleared search does not
  *   load them again.
+ * - The entries of the column scroll on their own. After each navigation the column
+ *   scrolls the active entry into view; the window does not move.
  */
 @Component({
   selector: 'app-admin-frame',
@@ -108,6 +114,10 @@ export class AdminFrameComponent {
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
   private readonly pageFrame = inject(PageFrameService);
+  private readonly injector = inject(Injector);
+
+  /** The scrolling part of the navigation column (absent while the navigation is hidden). */
+  private readonly navBody = viewChild<ElementRef<HTMLElement>>('navBody');
 
   /** The viewport is wide: the navigation is a column beside the page. */
   readonly wide = mediaQuerySignal(MEDIA.wide);
@@ -170,11 +180,39 @@ export class AdminFrameComponent {
       .subscribe((e) => {
         this.home.set(pathOf(e.urlAfterRedirects) === HOME);
         this.navMode.set(navMode(this.router.routerState.snapshot.root));
+        afterNextRender(() => this.revealActive(), { injector: this.injector });
       });
+    afterNextRender(() => this.revealActive());
 
     // The navigation shows "Verwaltung" beside the page, so the breadcrumbs leave it out.
     effect(() => this.pageFrame.crumbRoot.set(this.split() ? 'admin' : null));
     inject(DestroyRef).onDestroy(() => this.pageFrame.crumbRoot.set(null));
+  }
+
+  /**
+   * Scroll the column so that the active entry is fully visible. The column only moves
+   * when the entry is out of view, and then puts it in the middle, clear of the fades.
+   * The method sets `scrollTop` of the column, so the window never scrolls.
+   *
+   * The active entry comes from the URL, with the prefix match of `routerLinkActive`.
+   * `aria-current` is no help here: `RouterLinkActive` sets it in a microtask, after
+   * this hook.
+   */
+  private revealActive(): void {
+    if (!this.split()) return;
+    const body = this.navBody()?.nativeElement;
+    if (!body) return;
+    const url = pathOf(this.router.url);
+    const link = [...body.querySelectorAll<HTMLAnchorElement>('a.af__item')].find((a) => {
+      const href = a.getAttribute('href');
+      return !!href && (url === href || url.startsWith(`${href}/`));
+    });
+    if (!link) return;
+    const box = body.getBoundingClientRect();
+    const item = link.getBoundingClientRect();
+    if (item.top >= box.top && item.bottom <= box.bottom) return;
+    const top = item.top - box.top + body.scrollTop;
+    body.scrollTop = Math.max(0, top - (body.clientHeight - item.height) / 2);
   }
 
   /** The full path of an entry. */

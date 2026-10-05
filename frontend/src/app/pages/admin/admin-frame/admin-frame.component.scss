@@ -67,6 +67,15 @@
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
+/* One column: the title, the search, the tiles and the entries start on the content
+   edge, the same as the gremien under them. The inset only keeps the focus rings and
+   the fades clear of the edge of the scrolling column. */
+.af:not(.af--split) .af__navHead,
+.af:not(.af--split) .af__navBody,
+.af:not(.af--split) .af__title {
+  padding-inline: 0;
+}
+
 .af__navBody.is-fade-start {
   mask-image: linear-gradient(to bottom, transparent, #000 var(--space-6));
 }
