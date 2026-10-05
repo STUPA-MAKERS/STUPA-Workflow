@@ -358,6 +358,14 @@
 }
 
 @include bp.phone {
+  /* Four segments with counts in a phone column: less padding, and a segment never gets
+     narrower than its label and count, so no label gets an ellipsis. */
+  .inv__seg ::ng-deep .seg {
+    grid-auto-columns: minmax(max-content, 1fr);
+  }
+  .inv__seg ::ng-deep .seg__opt {
+    padding-inline: var(--space-2);
+  }
   /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
   .inv__chips {
     --inv-chip-fade: var(--space-6);
