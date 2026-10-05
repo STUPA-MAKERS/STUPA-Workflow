@@ -45,6 +45,11 @@ const routes = [
         component: StubPage,
         data: { title: 'nav.applications' as const, parent: ['admin'] },
       },
+      {
+        path: 'users/roles',
+        component: StubPage,
+        data: { title: 'nav.tasks' as const, parent: ['admin', 'admin/users'] },
+      },
     ],
   },
 ];
@@ -120,6 +125,10 @@ describe('BreadcrumbsComponent', () => {
     await router.navigateByUrl('/admin/users');
     fixture.detectChanges();
     // Only the current page is left, so the bar hides.
+    expect(screen.queryByRole('navigation', { name: BREADCRUMB })).not.toBeInTheDocument();
+    // A sub-page of the frame loses its frame parents too: the navigation marks them.
+    await router.navigateByUrl('/admin/users/roles');
+    fixture.detectChanges();
     expect(screen.queryByRole('navigation', { name: BREADCRUMB })).not.toBeInTheDocument();
     // Another root keeps every crumb.
     frame.crumbRoot.set('budget');

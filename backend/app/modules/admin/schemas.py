@@ -335,6 +335,10 @@ class ApplicationTypeOut(_CamelModel):
     active_form_version_id: UUID | None = Field(
         serialization_alias="activeFormVersionId"
     )
+    # The number of the active form version. ``None`` while no version is active.
+    active_form_version: int | None = Field(
+        default=None, serialization_alias="activeFormVersion"
+    )
 
 
 class ApplicationTypeCreate(_CamelModel):

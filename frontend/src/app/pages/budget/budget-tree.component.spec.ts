@@ -3,9 +3,11 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
-import { ToastService } from '@stupa-makers/ui-kit';
+import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
+import { matchMediaQueries } from '../../../testing/meeting-fixtures';
 import { AdminApiService } from '../admin/admin-api.service';
 import { BudgetTreeComponent } from './budget-tree.component';
 import type { BudgetTreeNode, FiscalYear } from './budget-tree.api';
@@ -186,7 +188,9 @@ describe('BudgetTreeComponent', () => {
     expect(c.columns().map((col: { key: string }) => col.key)).toEqual([
       'node',
       'allocated',
-      'committed',
+      'bound',
+      'expended',
+      'income',
       'available',
       'color',
       'actions',
@@ -194,8 +198,174 @@ describe('BudgetTreeComponent', () => {
     const row = { node: TREE[0], depth: 0 };
     expect(c.rowId(row)).toBe('b-vs');
     expect(c.childExpanded(row)).toBe(false);
+    // The inline create row stands after the last row of the parent's subtree.
     c.addingChildOf.set('b-vs');
-    expect(c.childExpanded(row)).toBe(true);
+    expect(c.childExpanded(row)).toBe(false);
+    expect(c.childExpanded({ node: TREE[0].children[0], depth: 1 })).toBe(true);
+    c.addingChildOf.set('b-800');
+    expect(c.childExpanded({ node: TREE[0].children[0], depth: 1 })).toBe(true);
+    // The label of the inline row names the nested parent.
+    expect(c.childParent()?.id).toBe('b-800');
+    // A parent that is not in the visible rows places no create row.
+    c.addingChildOf.set('ghost');
+    expect(c.childExpanded(row)).toBe(false);
+    expect(c.childParent()).toBeNull();
+  });
+
+  it('leaves out the amounts a narrow page has no room for and shows them under "Verfügbar"', async () => {
+    const { c, fixture } = await setup();
+    const keys = (): string[] => c.columns().map((col: { key: string }) => col.key);
+    // The sheet beside the admin navigation at 1440 px shows every amount.
+    c.width.set(904);
+    expect(keys()).toEqual(expect.arrayContaining(['expended', 'income']));
+    expect(c.hiddenAmounts(TREE[0])).toEqual([]);
+    c.width.set(820);
+    expect(keys()).not.toContain('income');
+    expect(keys()).toContain('expended');
+    // Intl puts a no-break space before the currency sign.
+    const plain = (t: string): string => t.replace(/\u00a0/g, ' ');
+    expect(c.hiddenAmounts(TREE[0]).map(plain)).toEqual(['Einnahmen 0 €']);
+    c.width.set(700);
+    expect(keys()).not.toContain('expended');
+    expect(c.hiddenAmounts(TREE[0]).map(plain)).toEqual(['Ausgegeben 50 €', 'Einnahmen 0 €']);
+    // The lines are text in the cell, so a keyboard or touch user reads them too.
+    fixture.detectChanges();
+    const more = [...(fixture.nativeElement as HTMLElement).querySelectorAll('.bt__more')].map((el) => plain(el.textContent ?? '').trim());
+    expect(more).toContain('Ausgegeben 50 €');
+    c.width.set(1200);
+    expect(keys()).toContain('income');
+    // Without an allocation view there are no lines.
+    c.width.set(700);
+    c.selectedFyId.set('other');
+    expect(c.hiddenAmounts(TREE[0])).toEqual([]);
+  });
+
+  it('folds and unfolds a subtree', async () => {
+    const { c, fixture } = await setup();
+    const fold = screen.getByRole('button', { name: /^Unter-Kostenstellen ein- oder ausklappen: VS-Mittel/ });
+    expect(fold).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(fold);
+    fixture.detectChanges();
+    expect(c.rows().map((r: { node: { id: string } }) => r.node.id)).toEqual(['b-vs']);
+    expect(c.isCollapsed('b-vs')).toBe(true);
+    expect(fold).toHaveAttribute('aria-expanded', 'false');
+    // A sub cost centre opens its folded parent, so the inline row can show.
+    c.startAddChild(TREE[0]);
+    expect(c.isCollapsed('b-vs')).toBe(false);
+    c.toggleCollapse('b-vs');
+    c.toggleCollapse('b-vs');
+    expect(c.isCollapsed('b-vs')).toBe(false);
+  });
+
+  it('shows the colour of a node: own, from a parent, or none', async () => {
+    const tree = [
+      fullNode({
+        id: 'r',
+        key: 'R',
+        pathKey: 'R',
+        name: 'Root',
+        children: [
+          fullNode({
+            id: 'a',
+            parentId: 'r',
+            key: 'A',
+            pathKey: 'R-A',
+            name: 'A',
+            color: '#ff0000',
+            children: [fullNode({ id: 'a1', parentId: 'a', key: '1', pathKey: 'R-A-1', name: 'A1' })],
+          }),
+        ],
+      }),
+    ];
+    const { c, http } = await setup();
+    c['reload']();
+    http.expectOne((r) => r.url.endsWith('/budgets') && r.method === 'GET').flush(tree);
+    http.expectOne((r) => r.url.endsWith('/budgets/r/fiscal-years')).flush([FY]);
+    const [root, a] = [tree[0], tree[0].children[0]];
+    const a1 = a.children[0];
+    expect(c.swatch(a)).toEqual({ kind: 'own', color: '#ff0000' });
+    expect(c.swatch(a1)).toEqual({ kind: 'inherited', color: '#ff0000' });
+    expect(c.swatch(root)).toEqual({ kind: 'none', color: null });
+    expect(c.swatchLabel(c.swatch(a))).toBe('Eigene Farbe #ff0000');
+    expect(c.swatchLabel(c.swatch(a1))).toBe('Farbe vom Elternknoten (#ff0000)');
+    expect(c.swatchLabel(c.swatch(root))).toBe('Keine Farbe');
+  });
+
+  it('marks an inactive cost centre and a negative balance', async () => {
+    const neg = fullNode({
+      id: 'n',
+      key: 'N',
+      pathKey: 'N',
+      name: 'Negativ',
+      active: false,
+      byFiscalYear: [
+        { fiscalYearId: 'fy-1', allocated: '10', bound: '20', expended: '0', income: '0', committed: '20', requested: '0', available: '-10' },
+      ],
+    });
+    const { c, http, fixture } = await setup();
+    c['reload']();
+    http.expectOne((r) => r.url.endsWith('/budgets') && r.method === 'GET').flush([neg]);
+    http.expectOne((r) => r.url.endsWith('/budgets/n/fiscal-years')).flush([FY]);
+    fixture.detectChanges();
+    expect(c.isNegative(neg)).toBe(true);
+    expect(c.amount(neg, 'available')).toContain('10');
+    expect(screen.getByText(/N · inaktiv/)).toBeInTheDocument();
+    c.selectedFyId.set('other');
+    expect(c.isNegative(neg)).toBe(false);
+    expect(c.amount(neg, 'allocated')).toBe('—');
+  });
+
+  it('offers the row actions in a menu on a phone', async () => {
+    const { c } = await setup();
+    const sections = c.rowMenu();
+    expect(sections[0].items.map((i: { id: string }) => i.id)).toEqual(['edit', 'limit', 'child']);
+    expect(sections[0].items[1].disabledReason).toBeNull();
+    c.selectedFyId.set('');
+    expect(c.rowMenu()[0].items[1].disabledReason).toBe('Noch kein Haushaltsjahr');
+    c.onRowMenu(TREE[0], { id: 'edit', label: '' });
+    expect(c.editNode()).toBe(TREE[0]);
+    c.onRowMenu(TREE[0], { id: 'limit', label: '' });
+    expect(c.limitNode()).toBe(TREE[0]);
+    c.onRowMenu(TREE[0], { id: 'child', label: '' });
+    expect(c.addingChildOf()).toBe('b-vs');
+    c.onRowMenu(TREE[0], { id: 'delete', label: '' });
+    expect(c.nodeDelete()).toBe(TREE[0]);
+  });
+
+  it('opens the toolbar dialogs from the header menu on a phone', async () => {
+    const { c } = await setup();
+    expect(c.headerMenu()[0].items.every((i: { disabledReason: string | null }) => i.disabledReason === null)).toBe(true);
+    c.onHeaderMenu({ id: 'states', label: '' });
+    expect(c.stateConfigOpen()).toBe(true);
+    c.onHeaderMenu({ id: 'cutoff', label: '' });
+    expect(c.stichtagOpen()).toBe(true);
+    c.onHeaderMenu({ id: 'fy', label: '' });
+    expect(c.fyOpen()).toBe(true);
+    c.selectedTopId.set('');
+    expect(c.headerMenu()[0].items[0].disabledReason).toBeTruthy();
+  });
+
+  it('names the picked budget, its cutoff and the fiscal years in the pickers', async () => {
+    const { c } = await setup();
+    expect(c.topOptions()).toEqual([{ value: 'b-vs', label: 'VS-Mittel (VS)' }]);
+    expect(c.topChipText()).toBe('VS-Mittel VS · Stichtag 01.01.');
+    expect(c.cutoffLabel()).toBe('01.01.');
+    c.fiscalYears.set([FY, { ...FY, id: 'fy-0', year: 2025, display: '2025', active: false }]);
+    expect(c.fyOptions()).toEqual([
+      { value: 'fy-1', label: 'HHJ 2026' },
+      { value: 'fy-0', label: 'HHJ 2025 · inaktiv' },
+    ]);
+    expect(c.selectedFyLabel()).toBe('2026');
+    c.selectedFyId.set('gone');
+    expect(c.selectedFyLabel()).toBe('');
+    c.selectedFyId.set('fy-1');
+    c.selectFy('fy-0');
+    expect(c.selectedFyId()).toBe('fy-0');
+    c.selectFy(null);
+    expect(c.selectedFyId()).toBe('fy-0');
+    c.selectedTopId.set('');
+    expect(c.topChipText()).toBeNull();
+    expect(c.cutoffLabel()).toBe('');
   });
 
   it('maps gremien into options on construction', async () => {
@@ -240,10 +410,20 @@ describe('BudgetTreeComponent', () => {
     expect(c.loading()).toBe(false);
   });
 
-  it('records fiscal years per budget for the left tree and keeps a valid selected fy', async () => {
-    const { c } = await setup();
-    expect(c.fiscalYearsByBudget()).toEqual({ 'b-vs': [FY] });
+  it('picks the newest active fiscal year, else the newest one', async () => {
+    const { c, http } = await setup();
     expect(c.selectedFyId()).toBe('fy-1');
+    const old = { ...FY, id: 'fy-old', year: 2024, display: '2024', active: true };
+    const closed = { ...FY, id: 'fy-new', year: 2027, display: '2027', active: false };
+    c.selectTop('b-vs');
+    http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([old, closed]);
+    expect(c.selectedFyId()).toBe('fy-old');
+    c.selectTop('b-vs');
+    http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([closed]);
+    expect(c.selectedFyId()).toBe('fy-new');
+    // An empty pick does nothing.
+    c.selectTop('');
+    http.verify();
   });
 
   it('clears an invalid selected fy on reload (defaults to first)', async () => {
@@ -292,18 +472,20 @@ describe('BudgetTreeComponent', () => {
     expect(c.alloc(TREE[0])).toBeNull();
   });
 
-  it('money formats numbers, empty strings and null as currency', async () => {
+  it('money formats numbers, empty strings and null as currency, with cents only when needed', async () => {
     const { c } = await setup();
-    const eur = (n: number) =>
+    const eur = (n: number, digits: number) =>
       new Intl.NumberFormat(TestBed.inject(I18nService).formatLocale(), {
         style: 'currency',
         currency: 'EUR',
+        minimumFractionDigits: digits,
+        maximumFractionDigits: 2,
       }).format(n);
-    expect(c.money('1234.5', 'EUR')).toBe(eur(1234.5));
-    expect(c.money('', 'EUR')).toBe(eur(0));
-    expect(c.money(null, 'EUR')).toBe(eur(0));
-    expect(c.money(undefined, 'EUR')).toBe(eur(0));
-    expect(c.money(42, 'EUR')).toBe(eur(42));
+    expect(c.money('1234.5', 'EUR')).toBe(eur(1234.5, 2));
+    expect(c.money('', 'EUR')).toBe(eur(0, 0));
+    expect(c.money(null, 'EUR')).toBe(eur(0, 0));
+    expect(c.money(undefined, 'EUR')).toBe(eur(0, 0));
+    expect(c.money(42, 'EUR')).toBe(eur(42, 0));
   });
 
   it('reports accepted/denied membership for the selected top', async () => {
@@ -358,48 +540,22 @@ describe('BudgetTreeComponent', () => {
     expect(c.fiscalYears()).toEqual([]);
   });
 
-  it('onYearPicked sets budget + cached fiscal years + fy from the left tree', async () => {
-    const { c } = await setup();
-    c.onYearPicked({ budgetId: 'b-vs', fiscalYearId: 'fy-1' });
-    expect(c.selectedTopId()).toBe('b-vs');
-    expect(c.fiscalYears()).toEqual([FY]);
-    expect(c.selectedFyId()).toBe('fy-1');
-  });
-
-  it('onYearPicked falls back to an empty fiscal-year list for an uncached budget', async () => {
-    const { c } = await setup();
-    c.onYearPicked({ budgetId: 'unknown', fiscalYearId: 'fy-x' });
-    expect(c.fiscalYears()).toEqual([]);
-    expect(c.selectedFyId()).toBe('fy-x');
-  });
-
-  it('saveColor PATCHes the color, toasts success and reloads', async () => {
-    const { c, http, toast } = await setup();
-    c.saveColor(TREE[0], '#ff0000');
-    const patch = http.expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH');
-    expect(patch.request.body).toEqual({ color: '#ff0000' });
-    patch.flush({});
-    expect(toast.success).toHaveBeenCalled();
-    flushReload(http);
-  });
-
-  it('saveColor sends an empty string when clearing the color', async () => {
+  it('picks a colour, takes a typed hex value and clears it again', async () => {
     const { c, http } = await setup();
-    c.saveColor(TREE[0], '');
-    const patch = http.expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH');
-    expect(patch.request.body).toEqual({ color: '' });
-    patch.flush({});
-    flushReload(http);
-  });
-
-  it('saveColor toasts an error and does not reload on failure', async () => {
-    const { c, http, toast } = await setup();
-    c.saveColor(TREE[0], '#abc');
-    http
-      .expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH')
-      .flush(null, { status: 500, statusText: 'err' });
-    expect(toast.error).toHaveBeenCalled();
+    c.openEditNode(fullNode({ id: 'b-x', color: '  #00AA00 ' }));
+    expect(c.editColor()).toBe('#00AA00');
+    c.pickColor('#ABCDEF');
+    expect(c.editColor()).toBe('#abcdef');
+    c.editColor.set('#12');
+    expect(c.editColorInvalid()).toBe(true);
+    // An invalid colour blocks the save.
+    c.saveEditNode();
     http.verify();
+    c.clearColor();
+    expect(c.editColor()).toBe('');
+    expect(c.editColorInvalid()).toBe(false);
+    c.openEditNode(fullNode({ id: 'b-y', color: null }));
+    expect(c.editColor()).toBe('');
   });
 
   it('toggleState does nothing when no top is selected', async () => {
@@ -469,14 +625,15 @@ describe('BudgetTreeComponent', () => {
     expect(c.newTop().name).toBe('AStA-Mittel');
   });
 
-  it('patchTopStichtag clamps month to 1..12 and day to 1..31, defaulting non-numbers to 1', async () => {
+  it('patchTopStichtag clamps month to 1..12 and day to 1..28, defaulting non-numbers to 1', async () => {
     const { c } = await setup();
     c.patchTopStichtag('fiscalStartMonth', '99');
     expect(c.newTop().fiscalStartMonth).toBe(12);
     c.patchTopStichtag('fiscalStartMonth', '0');
     expect(c.newTop().fiscalStartMonth).toBe(1);
+    // The cutoff day must exist in every month: 1..28.
     c.patchTopStichtag('fiscalStartDay', '99');
-    expect(c.newTop().fiscalStartDay).toBe(31);
+    expect(c.newTop().fiscalStartDay).toBe(28);
     c.patchTopStichtag('fiscalStartDay', 'abc');
     expect(c.newTop().fiscalStartDay).toBe(1);
     c.patchTopStichtag('fiscalStartMonth', '7.9');
@@ -578,6 +735,19 @@ describe('BudgetTreeComponent', () => {
     expect(c.addingChildOf()).toBeNull();
   });
 
+  it('moves the focus to the key field of the inline sub cost centre row', async () => {
+    const { fixture } = await setup();
+    const plus = screen.getByRole('button', { name: 'Unter-Kostenstelle anlegen: VS-Mittel' });
+    await userEvent.click(plus);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const form = document.querySelector('.bt__child');
+    expect(form).not.toBeNull();
+    const key = form!.querySelector('.bt__childKey input');
+    expect(key).not.toBeNull();
+    expect(document.activeElement).toBe(key);
+  });
+
   it('patchChild updates a single child-draft field', async () => {
     const { c } = await setup();
     c.patchChild('key', '40');
@@ -625,17 +795,50 @@ describe('BudgetTreeComponent', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  it('deleteNode DELETEs, toasts success and reloads', async () => {
-    const { c, http, toast } = await setup();
-    c.deleteNode(TREE[0].children[0]);
+  it('deletes a cost centre only after the confirmation, then reloads', async () => {
+    const { c, http, toast, fixture } = await setup();
+    c.deleteNode(); // nothing to confirm yet
+    http.verify();
+    await userEvent.click(screen.getByRole('button', { name: 'Löschen: Dezentrale Einrichtungen' }));
+    fixture.detectChanges();
+    expect(c.nodeDelete()).toBe(TREE[0].children[0]);
+    expect(screen.getByText('„Dezentrale Einrichtungen“ (VS-800) löschen?')).toBeInTheDocument();
+    c.deleteNode();
     http.expectOne((r) => r.url.endsWith('/budgets/b-800') && r.method === 'DELETE').flush(null);
     expect(toast.success).toHaveBeenCalled();
+    expect(c.nodeDelete()).toBeNull();
     flushReload(http);
   });
 
-  it('deleteNode toasts a delete error on failure', async () => {
+  it('a deleted top budget clears the selection', async () => {
+    const { c, http } = await setup();
+    c.askDeleteNode(TREE[0]);
+    c.deleteNode();
+    http.expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'DELETE').flush(null);
+    expect(c.selectedTopId()).toBe('');
+    http.expectOne((r) => r.url.endsWith('/budgets') && r.method === 'GET').flush([]);
+    expect(c.fiscalYears()).toEqual([]);
+  });
+
+  it('a 409 keeps the dialog open and names the reason', async () => {
+    const { c, http, toast, fixture } = await setup();
+    c.askDeleteNode(TREE[0]);
+    c.deleteNode();
+    http.expectOne((r) => r.method === 'DELETE').flush(null, { status: 409, statusText: 'conflict' });
+    fixture.detectChanges();
+    expect(c.nodeDeleteBlocked()).toBe(true);
+    expect(c.nodeDelete()).toBe(TREE[0]);
+    expect(screen.getByRole('alert')).toHaveTextContent('Unter-Kostenstellen oder Zuteilungen');
+    expect(toast.error).not.toHaveBeenCalled();
+    c.closeDeleteNode();
+    expect(c.nodeDelete()).toBeNull();
+    expect(c.nodeDeleteBlocked()).toBe(false);
+  });
+
+  it('toasts any other delete failure', async () => {
     const { c, http, toast } = await setup();
-    c.deleteNode(TREE[0].children[0]);
+    c.askDeleteNode(TREE[0].children[0]);
+    c.deleteNode();
     http
       .expectOne((r) => r.url.endsWith('/budgets/b-800') && r.method === 'DELETE')
       .flush(null, { status: 500, statusText: 'err' });
@@ -657,6 +860,21 @@ describe('BudgetTreeComponent', () => {
     expect(c.editName()).toBe('Name');
     expect(c.editHidden()).toBe(true);
     expect(c.editViewGremium()).toBe('g-9');
+    expect(c.editActive()).toBe(true);
+  });
+
+  it('shows every setting of a node in the edit dialog', async () => {
+    const { c, fixture } = await setup();
+    c.openEditNode(TREE[0].children[0]);
+    fixture.detectChanges();
+    expect(screen.getByRole('dialog')).toHaveTextContent('VS-800');
+    expect(screen.getByLabelText('Schlüssel')).toBeInTheDocument();
+    expect(screen.getByLabelText('Name')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Aktiv' })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /Im Budget-Tab ausblenden/ })).toBeInTheDocument();
+    expect(screen.getByLabelText('Sichtbar für Gremium')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Farbe #5fb37a' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Eigene Farbe wählen')).toBeInTheDocument();
   });
 
   it('openEditNode defaults the view gremium to "" when null', async () => {
@@ -698,11 +916,15 @@ describe('BudgetTreeComponent', () => {
     c.editName.set(' VS-Mittel ');
     c.editHidden.set(true);
     c.editViewGremium.set('');
+    c.editActive.set(false);
+    c.pickColor('#ff0000');
     c.saveEditNode();
     const patch = http.expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH');
     expect(patch.request.body).toEqual({
       key: 'VS',
       name: 'VS-Mittel',
+      color: '#ff0000',
+      active: false,
       hiddenInBudget: true,
       viewGremiumId: null,
     });
@@ -885,8 +1107,8 @@ describe('BudgetTreeComponent', () => {
     http
       .expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years'))
       .flush([{ ...FY, year: 2027, display: '2027' }]);
-    // The left navigation follows the correction.
-    expect(c.fiscalYearsByBudget()['b-vs'][0].display).toBe('2027');
+    // The fiscal-year segments follow the correction.
+    expect(c.fyOptions()[0].label).toBe('HHJ 2027');
   });
 
   it('saveFyEdit names the duplicate year on 422', async () => {
@@ -1020,8 +1242,8 @@ describe('BudgetTreeComponent', () => {
     const { c, fixture } = await setup();
     c.openFy();
     fixture.detectChanges();
-    expect(screen.getByRole('button', { name: 'Haushaltsjahr bearbeiten' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Haushaltsjahr löschen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Haushaltsjahr bearbeiten: 2026' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Haushaltsjahr löschen: 2026' })).toBeInTheDocument();
   });
 
   it('nests no second main landmark inside the shell main', async () => {
@@ -1029,8 +1251,54 @@ describe('BudgetTreeComponent', () => {
     // shell. HTML forbids that, and it gives a screen reader two "main" landmarks.
     const view = await setup();
     expect(view.container.querySelectorAll('main')).toHaveLength(0);
-    const region = view.container.querySelector('.bt__main');
+    const region = view.container.querySelector('.bt');
     expect(region).toBeTruthy();
     expect(region!.getAttribute('role')).toBeNull();
+  });
+
+  describe('on a phone', () => {
+    let restore: () => void;
+    beforeEach(() => (restore = matchMediaQueries(MEDIA.phone)));
+    afterEach(() => restore());
+
+    it('keeps one primary action in the header and puts the row actions in a menu', async () => {
+      const { fixture } = await setup();
+      expect(screen.queryByRole('toolbar')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Budget$/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Weitere Aktionen' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Aktionen: VS-Mittel' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Kostenstelle bearbeiten: VS-Mittel' })).not.toBeInTheDocument();
+      // The cards have room for all five amounts, whatever the width.
+      const c = fixture.componentInstance as unknown as { width: { set(v: number): void }; columns(): { key: string }[] };
+      c.width.set(300);
+      expect(c.columns().map((col) => col.key)).toContain('income');
+    });
+  });
+
+  it('measures its width with a ResizeObserver and stops on destroy', async () => {
+    // The data tables observe their own boxes too, so the stub keeps each callback by element.
+    const watchers = new Map<Element, ResizeObserverCallback>();
+    const disconnect = jest.fn();
+    const original = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
+      constructor(private readonly cb: ResizeObserverCallback) {}
+      observe(el: Element): void {
+        watchers.set(el, this.cb);
+      }
+      unobserve(): void {}
+      disconnect = disconnect;
+    };
+    try {
+      const { c, fixture } = await setup();
+      const host = fixture.nativeElement as Element;
+      expect(watchers.has(host)).toBe(true);
+      watchers.get(host)!([{ contentRect: { width: 720 } } as ResizeObserverEntry], {} as ResizeObserver);
+      expect(c.width()).toBe(720);
+      expect(c.hidden().has('expended')).toBe(true);
+      fixture.destroy();
+      expect(disconnect).toHaveBeenCalled();
+    } finally {
+      (globalThis as { ResizeObserver?: unknown }).ResizeObserver = original;
+    }
   });
 });

@@ -7,34 +7,64 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { switchMap } from 'rxjs';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { resolveI18n } from '@shared/forms/i18n-text';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { ButtonComponent, SwitchComponent } from '@stupa-makers/ui-kit';
-import { ToastService } from '@stupa-makers/ui-kit';
-import { AdminApiService } from '../admin-api.service';
-import { VersionHistoryComponent } from '../version-history/version-history.component';
 import type { I18nMap } from '@core/api/models';
+import { resolveI18n } from '@shared/forms/i18n-text';
+import { NoteComponent } from '@shared/ui/note/note.component';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { RowMenuComponent, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
+import {
+  ButtonComponent,
+  IconComponent,
+  InputComponent,
+  MEDIA,
+  SegmentedComponent,
+  type SegmentedOption,
+  SwitchComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
+import { mediaQuerySignal } from '../../../layout/media-query';
+import { AdminApiService } from '../admin-api.service';
+import { formatBytes } from '../admin-health/admin-health.util';
+import { VersionHistoryComponent } from '../version-history/version-history.component';
 import {
   type Branding,
   type FooterColumn,
+  type FooterLink,
   LOGO_ACCEPT_MIME,
   LOGO_MAX_SIZE_MB,
   type LogoSlot,
 } from '../admin.models';
 import { brandingLinkErrors } from '../branding.util';
 
+/** The language of the texts in the editor. */
+type TextLang = 'de' | 'en';
+
+/** The free texts in the order of the board. `applyInfo` takes Markdown. */
+const FREETEXTS = ['welcome', 'loginHint', 'support', 'emailFooter', 'applyInfo'] as const;
+type FreetextKey = (typeof FREETEXTS)[number];
+
 /**
- * Branding and site-config editor. It makes the logos, the footer and the free texts
- * editable in the UI instead of in code. It holds a logo upload with a preview. The upload
- * has a MIME guard and a size guard. It also holds footer link columns, i18n free texts and
- * a live preview. It versions the active config against the draft and adds an activate
- * button.
+ * Branding and site-config editor (board Admin-Branding).
  *
- * It works against `/api/admin/site-config`. That route is not part of the API spec. The mock
- * serves it. The editor writes valid `branding` JSON.
+ * The header saves the draft ("Entwurf speichern") and activates it ("Entwurf
+ * aktivieren"); the line under it names the active version and whether the draft holds
+ * changes that are not active yet. The left column holds the app name, the three logo
+ * slots (Wortmarke, Bildmarke, Favicon; a file with a MIME and a size guard, by drop or
+ * by the file dialog) and the free texts, including the e-mail footer (gaps N43). The
+ * right column holds the footer columns with their links (gaps N43), the copyright line
+ * and the legal links. A text field shows the language that "Texte in" picks.
+ *
+ * A link may carry `http:`, `https:` or `mailto:` only; another scheme blocks the save.
+ * The version list below restores an older version. It works against
+ * `/api/admin/site-config`.
+ *
+ * The page counts the local edits. When the screen holds edits that the server does not
+ * have yet, "Entwurf aktivieren" saves the draft first and activates it after that. Thus
+ * the activation publishes the draft that the preview shows.
  */
 @Component({
   selector: 'app-branding-editor',
@@ -44,6 +74,11 @@ import { brandingLinkErrors } from '../branding.util';
     FormsModule,
     TranslatePipe,
     ButtonComponent,
+    IconComponent,
+    InputComponent,
+    NoteComponent,
+    RowMenuComponent,
+    SegmentedComponent,
     SwitchComponent,
     VersionHistoryComponent,
     PageHeaderComponent,
@@ -59,15 +94,52 @@ export class BrandingEditorComponent {
   protected readonly maxMb = LOGO_MAX_SIZE_MB;
   protected readonly accept = LOGO_ACCEPT_MIME.join(',');
   protected readonly logoSlots: readonly LogoSlot[] = ['wordmark', 'imagemark', 'favicon'];
+  protected readonly freetexts = FREETEXTS;
 
   protected readonly version = signal(0);
   protected readonly hasDraftChanges = signal(false);
   protected readonly draft = signal<Branding | null>(null);
+  /** The count of local edits. `patch()` increments it. */
+  private readonly editRev = signal(0);
+  /** The edit count that the server has. A save, a load or an activate sets it. */
+  private readonly savedRev = signal(0);
+  /** The screen holds edits that are not saved yet. */
+  protected readonly dirty = computed(() => this.editRev() !== this.savedRev());
+  /** The slot a file is dragged over, for the drop look. */
+  protected readonly dropSlot = signal<LogoSlot | null>(null);
 
-  protected readonly lang = computed(() => this.i18n.locale());
+  /** The language of the text fields. It starts with the language of the page. */
+  protected readonly lang = signal<TextLang>(this.i18n.locale() === 'en' ? 'en' : 'de');
+  protected readonly langOptions: SegmentedOption[] = [
+    { value: 'de', label: 'DE' },
+    { value: 'en', label: 'EN' },
+  ];
 
   /** Disallowed link URLs. Their scheme is not http, https or mailto. They block a save. */
   protected readonly linkErrors = computed(() => brandingLinkErrors(this.draft()));
+
+  /**
+   * Activate needs valid links and a draft with changes, saved or local. With local
+   * edits, the activate saves the draft first.
+   */
+  protected readonly canActivate = computed(
+    () => (this.hasDraftChanges() || this.dirty()) && this.linkErrors().length === 0,
+  );
+
+  /** Phone: the header keeps "Entwurf speichern"; the activate is in a menu. */
+  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly phoneMenu = computed<RowMenuSection[]>(() => [
+    {
+      items: [
+        {
+          id: 'activate',
+          label: this.i18n.translate('admin.brand.activate'),
+          icon: 'check',
+          disabledReason: this.canActivate() ? null : this.i18n.translate('admin.brand.nothingToActivate'),
+        },
+      ],
+    },
+  ]);
 
   /** Version sidebar. Reload it after an activate or a restore. */
   protected readonly history = viewChild(VersionHistoryComponent);
@@ -82,28 +154,110 @@ export class BrandingEditorComponent {
       this.version.set(cfg.version);
       this.hasDraftChanges.set(cfg.hasDraftChanges);
       this.draft.set(cfg.draft);
+      this.markSaved(this.editRev());
     });
   }
 
-  protected text(map: Record<string, string> | null | undefined): string {
-    return resolveI18n(map, this.lang());
+  /** Record that the server has the draft up to the edit count `rev`. */
+  private markSaved(rev: number): void {
+    this.savedRev.set(rev);
+  }
+
+  protected setLang(value: string | null): void {
+    this.lang.set(value === 'en' ? 'en' : 'de');
   }
 
   protected slotLabel(slot: LogoSlot): string {
     return this.i18n.translate(`admin.brand.logo.${slot}` as TranslationKey);
   }
 
+  protected freetextLabel(key: FreetextKey): string {
+    return this.i18n.translate(`admin.brand.text.${key}` as TranslationKey);
+  }
+
+  /** The field label with the language of the text: "Willkommenstext (DE)". */
+  protected withLang(label: string): string {
+    return `${label} (${this.lang().toUpperCase()})`;
+  }
+
+  protected size(bytes: number): string {
+    return formatBytes(bytes, this.i18n);
+  }
+
+  /** One text of the draft in the language that is edited now, for the preview. */
+  protected text(map: I18nMap | null | undefined): string {
+    return resolveI18n(map, this.lang());
+  }
+
+  /** The text map of a free text. `applyInfo` is missing in an older config. */
+  protected freetext(d: Branding, key: FreetextKey): I18nMap {
+    if (key === 'applyInfo') {
+      d.freetexts.applyInfo ??= {};
+      return d.freetexts.applyInfo;
+    }
+    return d.freetexts[key];
+  }
+
+  /** Write the text of the picked language into a map and refresh the draft. */
+  protected setText(map: I18nMap, value: string): void {
+    this.patch(() => {
+      map[this.lang()] = value;
+    });
+  }
+
+  protected setUrl(link: FooterLink, value: string): void {
+    this.patch(() => {
+      link.url = value;
+    });
+  }
+
+  /** The column heading in one language; both stand side by side. */
+  protected setColumnLabel(col: FooterColumn, lang: TextLang, value: string): void {
+    this.patch(() => {
+      col.label[lang] = value;
+    });
+  }
+
+  protected setAppName(key: 'appName' | 'appShortName', value: string): void {
+    this.patch((d) => {
+      d[key] = value;
+    });
+  }
+
+  protected isBadUrl(url: string): boolean {
+    return this.linkErrors().includes(url);
+  }
+
   protected onLogoSelected(slot: LogoSlot, input: HTMLInputElement): void {
     const file = input.files?.[0];
-    if (!file) return;
+    input.value = '';
+    if (file) this.readLogo(slot, file);
+  }
+
+  protected onDragOver(slot: LogoSlot, event: DragEvent): void {
+    event.preventDefault();
+    this.dropSlot.set(slot);
+  }
+
+  protected onDragLeave(): void {
+    this.dropSlot.set(null);
+  }
+
+  protected onDrop(slot: LogoSlot, event: DragEvent): void {
+    event.preventDefault();
+    this.dropSlot.set(null);
+    const file = event.dataTransfer?.files?.[0];
+    if (file) this.readLogo(slot, file);
+  }
+
+  /** Check the type and the size, then keep the file as a data URL in the draft. */
+  private readLogo(slot: LogoSlot, file: File): void {
     if (!LOGO_ACCEPT_MIME.includes(file.type)) {
       this.toast.error(this.i18n.translate('admin.brand.badType'));
-      input.value = '';
       return;
     }
     if (file.size > LOGO_MAX_SIZE_MB * 1024 * 1024) {
       this.toast.error(this.i18n.translate('admin.brand.tooLarge', { mb: LOGO_MAX_SIZE_MB }));
-      input.value = '';
       return;
     }
     const reader = new FileReader();
@@ -116,7 +270,6 @@ export class BrandingEditorComponent {
       });
     };
     reader.readAsDataURL(file);
-    input.value = '';
   }
 
   protected removeLogo(slot: LogoSlot): void {
@@ -173,12 +326,6 @@ export class BrandingEditorComponent {
     });
   }
 
-  /** Create the apply info on first use. An older config does not have this field. */
-  protected applyInfo(d: Branding): I18nMap {
-    d.freetexts.applyInfo ??= {};
-    return d.freetexts.applyInfo;
-  }
-
   /** Turn the Gravatar images of the avatars on or off (saved with the draft). */
   protected setGravatar(on: boolean): void {
     this.patch((d) => {
@@ -186,19 +333,13 @@ export class BrandingEditorComponent {
     });
   }
 
-  /** Emit the signal again after an in-place `[(ngModel)]` change, to refresh the preview. */
-  protected reemit(): void {
-    this.patch(() => {
-      /* re-emit only */
-    });
-  }
-
-  /** Change the draft and emit the signal again, for the preview and the validation. */
+  /** Change the draft and emit the signal again, for the validation and the dirty mark. */
   protected patch(fn: (d: Branding) => void): void {
     const d = this.draft();
     if (!d) return;
     fn(d);
     this.draft.set({ ...d });
+    this.editRev.update((n) => n + 1);
   }
 
   protected saveDraft(): void {
@@ -208,21 +349,37 @@ export class BrandingEditorComponent {
       this.toast.error(this.i18n.translate('admin.brand.badUrl'));
       return;
     }
+    const rev = this.editRev();
     this.api.saveBrandingDraft(d).subscribe({
       next: (cfg) => {
         this.hasDraftChanges.set(cfg.hasDraftChanges);
+        this.markSaved(rev);
         this.toast.success(this.i18n.translate('admin.common.saved'));
       },
       error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
     });
   }
 
+  /**
+   * Activate the draft. When the screen holds unsaved edits, save the draft first, so
+   * that the activation publishes what the page shows.
+   */
   protected activate(): void {
-    this.api.activateBranding().subscribe({
+    const d = this.draft();
+    if (this.linkErrors().length > 0) {
+      this.toast.error(this.i18n.translate('admin.brand.badUrl'));
+      return;
+    }
+    const activate$ =
+      this.dirty() && d
+        ? this.api.saveBrandingDraft(d).pipe(switchMap(() => this.api.activateBranding()))
+        : this.api.activateBranding();
+    activate$.subscribe({
       next: (cfg) => {
         this.version.set(cfg.version);
         this.hasDraftChanges.set(cfg.hasDraftChanges);
         this.draft.set(cfg.draft);
+        this.markSaved(this.editRev());
         this.toast.success(this.i18n.translate('admin.brand.activated', { n: cfg.version }));
         this.history()?.reload();
       },

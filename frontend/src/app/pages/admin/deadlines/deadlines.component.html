@@ -1,43 +1,73 @@
 <section class="dl">
-  <app-page-header [title]="'admin.deadlines.title' | t" [subtitle]="'admin.deadlines.subtitle' | t">
-    <app-button actions size="sm" (click)="openAdd()">{{ 'admin.deadlines.add' | t }}</app-button>
+  <app-page-header [flush]="true" [title]="'admin.deadlines.title' | t" [subtitle]="'admin.deadlines.subtitle' | t">
+    <app-button actions variant="fill" (click)="openAdd()">
+      <app-icon name="plus" [size]="18" /> {{ 'admin.deadlines.add' | t }}
+    </app-button>
   </app-page-header>
 
   <app-data-table
+    surface="rowgroup"
     [loading]="loading()"
-    [loadingText]="'common.loading' | t" [columns]="columns()" [rows]="policies()" [emptyText]="'admin.deadlines.empty' | t">
-    <ng-template appCell="label" let-r>{{ label($any(r)) }}</ng-template>
-    <ng-template appCell="key" let-r><span class="dl__mono">{{ $any(r).key }}</span></ng-template>
-    <ng-template appCell="kind" let-r>{{ kindLabel($any(r).kind) }}</ng-template>
-    <ng-template appCell="value" let-r>{{ valueOf($any(r)) }}</ng-template>
+    [loadingText]="'common.loading' | t"
+    [columns]="columns()"
+    [rows]="policies()"
+    [rowKey]="rowId"
+    [emptyText]="'admin.deadlines.empty' | t"
+  >
+    <ng-template appCell="label" let-r>
+      <span class="dl__name">{{ label($any(r)) }}</span>
+    </ng-template>
+    <ng-template appCell="key" let-r><span class="dl__key mono">{{ $any(r).key }}</span></ng-template>
+    <ng-template appCell="kind" let-r><span class="dl__muted">{{ kindLabel($any(r).kind) }}</span></ng-template>
+    <ng-template appCell="value" let-r>
+      @let v = valueOf($any(r));
+      <span class="dl__value" [class.dl__muted]="v.muted" [title]="v.title">{{ v.text }}</span>
+    </ng-template>
     <ng-template appCell="actions" let-r let-i="index">
-      <span class="inline-flex items-center gap-1 justify-end">
-        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.edit' | t" (click)="openEdit(i)">
+      <span class="dl__actions">
+        <app-button
+          variant="text"
+          size="sm"
+          [iconOnly]="true"
+          [ariaLabel]="('admin.common.edit' | t) + ': ' + label($any(r))"
+          [title]="'admin.common.edit' | t"
+          (click)="openEdit(i)"
+        >
           <app-icon name="edit" />
         </app-button>
-        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="askDelete($any(r))">
-          <app-icon name="delete" />
+        <app-button
+          variant="text"
+          size="sm"
+          [iconOnly]="true"
+          [ariaLabel]="('admin.common.remove' | t) + ': ' + label($any(r))"
+          [title]="'admin.common.remove' | t"
+          (click)="askDelete($any(r))"
+        >
+          <app-icon name="trash" />
         </app-button>
       </span>
     </ng-template>
   </app-data-table>
+
+  <app-guest-settings />
 </section>
 
 <app-dialog
   [open]="draft() !== null"
-  [title]="(editingId() === null ? 'admin.deadlines.add' : 'admin.common.edit') | t"
+  [title]="(editingId() === null ? 'admin.deadlines.add' : 'admin.deadlines.edit') | t"
   [closeLabel]="'action.cancel' | t"
   (closed)="close()"
 >
   @if (draft(); as d) {
-    <form class="flex flex-col gap-4" (submit)="$event.preventDefault(); save()">
+    <form class="dl__form" (submit)="$event.preventDefault(); save()">
       <app-input
+        class="dl__keyField"
         [label]="'admin.common.key' | t"
         [ngModel]="d.key"
         (ngModelChange)="patch('key', $event)"
         name="key"
         [disabled]="editingId() !== null"
-        placeholder="z. B. semester_frist"
+        [hint]="(editingId() === null ? 'admin.deadlines.keyHint' : 'admin.deadlines.keyLocked') | t"
       />
       <app-input
         [label]="'admin.common.labelDe' | t"
@@ -58,67 +88,76 @@
         (ngModelChange)="patch('kind', $event)"
         name="kind"
       />
+
       @if (d.kind === 'absolute') {
-        <label class="flex flex-col gap-2">
-          <span class="text-sm font-medium">{{ 'admin.deadlines.date' | t }}</span>
-          <app-datepicker [ngModel]="d.absoluteAt" (ngModelChange)="patch('absoluteAt', $event)" name="absoluteAt" />
-        </label>
+        <app-datepicker
+          [label]="'admin.deadlines.date' | t"
+          [ngModel]="d.absoluteAt"
+          (ngModelChange)="patch('absoluteAt', $event)"
+          name="absoluteAt"
+        />
       } @else if (d.kind === 'recurring') {
-        <div class="flex flex-col gap-2">
-          <span class="text-sm font-medium">{{ 'admin.deadlines.dates' | t }}</span>
-          <p class="text-muted text-xs m-0">{{ 'admin.deadlines.datesHint' | t }}</p>
+        <fieldset class="dl__dates">
+          <legend class="dl__legend">{{ 'admin.deadlines.dates' | t }}</legend>
+          <p class="dl__hint">{{ 'admin.deadlines.datesHint' | t }}</p>
           @for (dt of d.dates; track $index) {
-            <div class="flex items-end gap-2">
+            <div class="dl__date">
               <app-datepicker
-                class="flex-1"
+                class="dl__dateField"
+                [label]="'admin.deadlines.date' | t"
                 [ngModel]="dt"
                 (ngModelChange)="setDate($index, $event)"
                 [name]="'date-' + $index"
-                [ariaLabel]="'admin.deadlines.date' | t"
               />
               <app-button
-                variant="ghost"
+                variant="text"
                 size="sm"
                 [iconOnly]="true"
-                [ariaLabel]="'admin.deadlines.removeDate' | t"
+                [ariaLabel]="('admin.deadlines.removeDate' | t) + ' ' + ($index + 1)"
+                [title]="'admin.deadlines.removeDate' | t"
                 (click)="removeDate($index)"
               >
-                <app-icon name="delete" />
+                <app-icon name="trash" />
               </app-button>
             </div>
           }
-          <app-button variant="ghost" size="sm" (click)="addDate()">
-            <app-icon name="add" />
-            {{ 'admin.deadlines.addDate' | t }}
+          <app-button class="dl__addDate" variant="text" size="sm" (click)="addDate()">
+            <app-icon name="plus" [size]="16" /> {{ 'admin.deadlines.addDate' | t }}
           </app-button>
-        </div>
+        </fieldset>
       } @else {
-        <label class="flex flex-col gap-2">
-          <span class="text-sm font-medium">{{ 'admin.deadlines.offsetDays' | t }}</span>
-          <input class="field__control" type="number" min="0" [ngModel]="d.offsetDays" (ngModelChange)="patch('offsetDays', $event)" name="offsetDays" />
-        </label>
+        <app-input
+          type="number"
+          [label]="'admin.deadlines.offsetDays' | t"
+          [ngModel]="d.offsetDays"
+          (ngModelChange)="patchOffset($event)"
+          name="offsetDays"
+        />
       }
 
-      <label class="flex flex-col gap-2">
-        <span class="text-sm font-medium">{{ 'admin.deadlines.atTime' | t }}</span>
-        <input class="field__control" type="time" [ngModel]="d.atTime" (ngModelChange)="patch('atTime', $event)" name="atTime" />
-        <span class="text-muted text-xs">{{ 'admin.deadlines.atTimeHint' | t }}</span>
-      </label>
-
-      @if (d.atTime || d.kind === 'recurring') {
+      <div class="dl__time">
+        <app-time-input
+          class="dl__timeField"
+          [label]="'admin.deadlines.atTime' | t"
+          [ngModel]="d.atTime"
+          (ngModelChange)="patch('atTime', $event)"
+          name="atTime"
+        />
         <app-select
+          class="dl__tz"
           [label]="'admin.deadlines.timezone' | t"
           [options]="timezoneOptions"
           [ngModel]="d.timezone"
           (ngModelChange)="patch('timezone', $event)"
           name="timezone"
         />
-      }
+      </div>
+      <p class="dl__hint">{{ 'admin.deadlines.atTimeHint' | t }}</p>
     </form>
   }
-  <div dialog-footer class="flex justify-end gap-3">
-    <app-button size="sm" variant="ghost" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-    <app-button size="sm" [disabled]="!canSave()" (click)="save()">{{ 'action.save' | t }}</app-button>
+  <div dialog-footer class="dl__foot">
+    <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="fill" [disabled]="!canSave()" (click)="save()">{{ 'action.save' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -128,9 +167,9 @@
   [closeLabel]="'action.cancel' | t"
   (closed)="confirmDelete.set(null)"
 >
-  <p>{{ 'admin.deadlines.deleteConfirm' | t: { name: label(confirmDelete()) } }}</p>
-  <div dialog-footer class="flex justify-end gap-3">
-    <app-button size="sm" variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button size="sm" variant="danger" (click)="doDelete()">{{ 'admin.common.remove' | t }}</app-button>
+  <p class="dl__confirm">{{ 'admin.deadlines.deleteConfirm' | t: { name: label(confirmDelete()) } }}</p>
+  <div dialog-footer class="dl__foot">
+    <app-button variant="text" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="danger" (click)="doDelete()">{{ 'admin.common.remove' | t }}</app-button>
   </div>
 </app-dialog>

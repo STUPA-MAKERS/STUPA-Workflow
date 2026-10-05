@@ -12,7 +12,12 @@ import type {
   ErasureRequest,
   ApplicationTypeFull,
   Branding,
+  CdVariant,
+  ConfigRevision,
+  DeadlinePolicy,
   FormDraft,
+  GuestSettings,
+  MailTemplate,
   FormOverviewItem,
   Gremium,
   GremiumMembership,
@@ -22,6 +27,7 @@ import type {
   GroupMapping,
   Role,
   WebhookConfig,
+  WebhookDeliveryStatus,
 } from './admin.models';
 
 /** Permission catalog (mirror of `app.shared.permissions.PERMISSION_CATALOGUE`). */
@@ -243,9 +249,9 @@ export const MOCK_FORMS: FormOverviewItem[] = [
 
 /** Application types/forms for the forms builder — mock until the backend is real. */
 export const MOCK_APP_TYPES: ApplicationTypeFull[] = [
-  { id: 'f-foerderung', name: { de: 'Förderantrag', en: 'Funding application' }, gremiumId: MOCK_GREMIUM_STUPA_ID, hasBudget: true, activeFormVersionId: 'fv-foerderung-3' },
-  { id: 'f-veranstaltung', name: { de: 'Veranstaltungsantrag', en: 'Event application' }, gremiumId: 'g-asta', hasBudget: false, activeFormVersionId: 'fv-veranstaltung-2' },
-  { id: 'f-anschaffung', name: { de: 'Anschaffungsantrag', en: 'Procurement application' }, gremiumId: MOCK_GREMIUM_STUPA_ID, hasBudget: true, activeFormVersionId: null },
+  { id: 'f-foerderung', name: { de: 'Förderantrag', en: 'Funding application' }, gremiumId: MOCK_GREMIUM_STUPA_ID, hasBudget: true, activeFormVersionId: 'fv-foerderung-3', activeFormVersion: 3 },
+  { id: 'f-veranstaltung', name: { de: 'Veranstaltungsantrag', en: 'Event application' }, gremiumId: 'g-asta', hasBudget: false, activeFormVersionId: 'fv-veranstaltung-2', activeFormVersion: 2 },
+  { id: 'f-anschaffung', name: { de: 'Anschaffungsantrag', en: 'Procurement application' }, gremiumId: MOCK_GREMIUM_STUPA_ID, hasBudget: true, activeFormVersionId: null, activeFormVersion: null },
 ];
 
 /** Form drafts per type — raw fields + description of the forms editor. */
@@ -286,6 +292,101 @@ export const MOCK_WEBHOOKS: WebhookConfig[] = [
     events: ['application_created', 'status_changed'],
     active: true,
   },
+  {
+    id: 'wh-2',
+    name: 'Archiv-Export',
+    url: 'https://archive.example.org/api/hooks/protocols/receive-and-store-every-final-protocol',
+    events: ['protocol_finalized', 'vote_closed', 'budget_booked'],
+    active: true,
+  },
+  { id: 'wh-3', name: 'Kalender', url: 'https://calendar.example.org/hook', events: ['deadline_approaching'], active: true },
+  { id: 'wh-4', name: 'Test-Endpunkt', url: 'https://test.example.org/hook', events: [], active: false },
+];
+
+/** The delivery state of the mock webhooks: one of each state. */
+export const MOCK_WEBHOOK_STATUS: WebhookDeliveryStatus[] = [
+  { webhookId: 'wh-1', lastState: 'sent', reasonClass: 'delivered', responseCode: 200, attempts: 1, lastAt: '2026-10-04T16:20:00Z' },
+  { webhookId: 'wh-2', lastState: 'dead', reasonClass: 'target_server_error', responseCode: 502, attempts: 5, lastAt: '2026-10-04T18:12:00Z' },
+  { webhookId: 'wh-3', lastState: 'pending', reasonClass: 'in_progress', responseCode: null, attempts: 2, lastAt: '2026-10-05T07:45:00Z' },
+  { webhookId: 'wh-4', lastState: 'never', reasonClass: 'no_deliveries', responseCode: null, attempts: 0, lastAt: null },
+];
+
+/** Deadline policies of the mock flow: one of each kind. */
+export const MOCK_DEADLINE_POLICIES: DeadlinePolicy[] = [
+  { id: 'dp-1', key: 'nachforderung_14d', label: { de: 'Nachforderung beantworten', en: 'Answer the request' }, kind: 'relative_changed', offsetDays: 14, atTime: '23:59', timezone: 'Europe/Berlin' },
+  { id: 'dp-2', key: 'pruefung_21d', label: { de: 'Prüfung durch den Finanzausschuss', en: 'Review by the finance committee' }, kind: 'relative_submitted', offsetDays: 21 },
+  { id: 'dp-3', key: 'einreichschluss_ws', label: { de: 'Einreichschluss Wintersemester', en: 'Winter term deadline' }, kind: 'absolute', absoluteAt: '2026-10-15T10:00:00Z', atTime: '12:00', timezone: 'Europe/Berlin' },
+  { id: 'dp-4', key: 'stupa_sitzungen', label: { de: 'Sitzungstermine Studierendenparlament', en: 'Student parliament meetings' }, kind: 'recurring', dates: ['2026-09-29', '2026-10-13', '2026-10-27', '2026-11-10'], atTime: '18:00', timezone: 'Europe/Berlin' },
+];
+
+/** The guest settings of the mock backend (the server defaults). */
+export const MOCK_GUEST_SETTINGS: GuestSettings = { confirmTtlHours: 12, linkTtlDays: null };
+
+/** CD variants of the mock gremien. */
+export const MOCK_CD_VARIANTS: CdVariant[] = [
+  {
+    id: 'cd-stupa',
+    key: 'stupa',
+    name: 'StuPa',
+    baseVariant: 'protocol',
+    logos: [
+      { id: 'cdl-1', slot: 'title', position: 0, vendoredName: 'HSRT' },
+      { id: 'cdl-2', slot: 'title', position: 1, fileName: 'stupa-mark.svg', mime: 'image/svg+xml', size: 3_172 },
+      { id: 'cdl-3', slot: 'footer', position: 0, fileName: 'stupa-wordmark.pdf', mime: 'application/pdf', size: 45_311 },
+    ],
+  },
+  { id: 'cd-asta', key: 'asta', name: 'AStA', baseVariant: 'protocol', logos: [{ id: 'cdl-4', slot: 'title', position: 0, vendoredName: 'ASTA' }] },
+  { id: 'cd-bericht', key: 'bericht', name: 'Bericht', baseVariant: 'report', logos: [] },
+];
+
+/** A part of the builtin mail catalogue, one template with an override. */
+export const MOCK_MAIL_TEMPLATES: MailTemplate[] = [
+  {
+    id: null,
+    key: 'magic_link',
+    subjectI18n: { de: 'Dein Link zur Antragsplattform', en: 'Your link to the application platform' },
+    bodyI18n: { de: 'Hallo,\n\nmit diesem Link öffnest du deinen Antrag:\n{{ link }}', en: 'Hello,\n\nopen your application with this link:\n{{ link }}' },
+    bodyHtmlI18n: {},
+    placeholders: { link: 'https://antraege.example.org/status#t=…' },
+    source: 'builtin',
+  },
+  {
+    id: 'mt-1',
+    key: 'status_update',
+    subjectI18n: { de: 'Dein Antrag „{{ applicationTitle }}“: {{ status }}', en: 'Your application "{{ applicationTitle }}": {{ status }}' },
+    bodyI18n: {
+      de: 'Hallo,\n\nder Status deines Antrags „{{ applicationTitle }}“ hat sich geändert:\n{{ status }}\n\nDen aktuellen Stand siehst du über deinen Link.',
+      en: 'Hello,\n\nthe status of your application "{{ applicationTitle }}" changed:\n{{ status }}',
+    },
+    bodyHtmlI18n: {},
+    placeholders: { applicationTitle: 'Erstsemester-Party', status: 'Auf Tagesordnung', applicationId: 'a1b2c3d4' },
+    source: 'override',
+  },
+  {
+    id: null,
+    key: 'task_reminder',
+    subjectI18n: { de: 'Erinnerung: offene Aufgabe', en: 'Reminder: open task' },
+    bodyI18n: { de: 'Hallo,\n\nder Antrag „{{ applicationTitle }}“ wartet auf dich.', en: 'Hello,\n\nthe application "{{ applicationTitle }}" waits for you.' },
+    bodyHtmlI18n: {},
+    placeholders: { applicationTitle: 'Erstsemester-Party' },
+    source: 'builtin',
+  },
+  {
+    id: null,
+    key: 'erasure_requested',
+    subjectI18n: { de: 'Neuer Löschantrag', en: 'New erasure request' },
+    bodyI18n: { de: 'Hallo,\n\nein neuer Löschantrag wartet auf eine Entscheidung.', en: 'Hello,\n\na new erasure request waits for a decision.' },
+    bodyHtmlI18n: {},
+    placeholders: {},
+    source: 'builtin',
+  },
+];
+
+/** The versions of the site config in the mock backend, newest first. */
+export const MOCK_SITE_REVISIONS: ConfigRevision[] = [
+  { id: 'rev-site-3', entityType: 'site_config', entityId: 'global', version: 3, at: '2026-10-02T09:12:00Z', createdBy: 'p-1', createdByName: 'Mara Keller', isCurrent: true },
+  { id: 'rev-site-2', entityType: 'site_config', entityId: 'global', version: 2, at: '2026-09-14T15:40:00Z', createdBy: 'p-1', createdByName: 'Mara Keller', isCurrent: false },
+  { id: 'rev-site-1', entityType: 'site_config', entityId: 'global', version: 1, at: '2026-08-30T08:00:00Z', createdBy: null, createdByName: null, isCurrent: false },
 ];
 
 export const MOCK_BRANDING: Branding = {

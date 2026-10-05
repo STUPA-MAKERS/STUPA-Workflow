@@ -76,10 +76,20 @@ class FakeApi {
   updateNode = () => throwError(() => new Error('unused'));
 }
 
-async function setup() {
+/** A FakeApi whose tree reads also stay open until the test resolves them. */
+class DeferredTreeApi extends FakeApi {
+  readonly treeCalls: Subject<BudgetTreeNode[]>[] = [];
+
+  override tree(): Observable<BudgetTreeNode[]> {
+    const s = new Subject<BudgetTreeNode[]>();
+    this.treeCalls.push(s);
+    return s;
+  }
+}
+
+async function setup<A extends FakeApi = FakeApi>(api: A = new FakeApi() as A) {
   toastSpy.success.mockClear();
   toastSpy.error.mockClear();
-  const api = new FakeApi();
   const view = await render(BudgetTreeComponent, {
     providers: [
       { provide: BudgetTreeApi, useValue: api },
@@ -115,7 +125,6 @@ describe('BudgetTreeComponent reload race guard (AUD-039)', () => {
     stale.next([fy('fy-stale')]);
     expect(c.selectedFyId()).toBe('fy-fresh');
     expect(c.fiscalYears().map((f: FiscalYear) => f.id)).toEqual(['fy-fresh']);
-    expect(c.fiscalYearsByBudget()['b-vs']?.map((f: FiscalYear) => f.id)).toEqual(['fy-fresh']);
   });
 
   it('lets loadFiscalYears (selectTop) win over an in-flight reload fan-out', async () => {
@@ -135,25 +144,40 @@ describe('BudgetTreeComponent reload race guard (AUD-039)', () => {
     expect(c.fiscalYears().map((f: FiscalYear) => f.id)).toEqual(['fy-selected']);
   });
 
-  it('lets onYearPicked (left-tree year click) win over an in-flight reload fan-out', async () => {
+  it('keeps a fiscal year that the user picked while the year list loads', async () => {
     const { c, api } = await setup();
-    // Constructor reload() left one pending fan-out request for b-vs.
+    // Constructor reload() left one pending request for the years of b-vs.
     expect(api.fyCalls).toHaveLength(1);
-    const reloadFy = api.fyCalls[0];
+    const pending = api.fyCalls[0];
 
-    // The left tree already knows the fiscal years of the budget. The user clicks a
-    // year there. The handler sets the selection at once AND raises reloadSeq. The
-    // reload fan-out that still runs below can then no longer clobber the selection.
-    c.fiscalYearsByBudget.set({ 'b-vs': [fy('fy-picked')] });
-    c.onYearPicked({ budgetId: 'b-vs', fiscalYearId: 'fy-picked' });
+    // The user picks a year of the segmented control before the list arrives.
+    c.selectFy('fy-picked');
+    expect(c.selectedFyId()).toBe('fy-picked');
+
+    // The list holds the picked year, so the pick stays.
+    pending.next([fy('fy-other'), fy('fy-picked')]);
+    expect(c.selectedFyId()).toBe('fy-picked');
+    expect(c.fiscalYears().map((f: FiscalYear) => f.id)).toEqual(['fy-other', 'fy-picked']);
+  });
+
+  it('drops a stale tree answer and a stale tree error after a newer reload', async () => {
+    const { c, api } = await setup(new DeferredTreeApi());
+    const stale = api.treeCalls[0];
+    c.reload();
+    api.treeCalls[1].next(TREE);
     expect(c.selectedTopId()).toBe('b-vs');
-    expect(c.selectedFyId()).toBe('fy-picked');
-    expect(c.fiscalYears().map((f: FiscalYear) => f.id)).toEqual(['fy-picked']);
+    stale.error(new Error('late'));
+    expect(c.loadError()).toBe(false);
+    stale.next([]);
+    expect(c.tree()).toEqual(TREE);
+  });
 
-    // The stale reload fan-out resolves afterward with top.id === sel.budgetId. It
-    // must NOT overwrite the pick of the user.
-    reloadFy.next([fy('fy-stale')]);
-    expect(c.selectedFyId()).toBe('fy-picked');
-    expect(c.fiscalYears().map((f: FiscalYear) => f.id)).toEqual(['fy-picked']);
+  it('drops a stale fiscal-year error after a newer year list', async () => {
+    const { c, api } = await setup();
+    const stale = api.fyCalls[0];
+    c.selectTop('b-vs');
+    api.fyCalls[1].next([fy('fy-new')]);
+    stale.error(new Error('late'));
+    expect(c.fiscalYears().map((f: FiscalYear) => f.id)).toEqual(['fy-new']);
   });
 });

@@ -37,14 +37,14 @@ describe('AdminApiService — mock mode', () => {
     });
   });
 
-  it('deletes a webhook and reports no delivery status in mock mode', async () => {
+  it('deletes a webhook and reports one delivery status per state in mock mode', async () => {
     const s = svc();
     const before = await firstValueFrom(s.listWebhooks());
     await firstValueFrom(s.deleteWebhook(before[0].id));
     const after = await firstValueFrom(s.listWebhooks());
     expect(after.some((h) => h.id === before[0].id)).toBe(false);
-    // The mock backend records no deliveries.
-    expect(await firstValueFrom(s.listWebhookDeliveryStatus())).toEqual([]);
+    const status = await firstValueFrom(s.listWebhookDeliveryStatus());
+    expect(status.map((x) => x.lastState)).toEqual(['sent', 'dead', 'pending', 'never']);
   });
 
   it('covers schemas, versions, gremien, roles and rule upsert in mock mode', async () => {
@@ -340,8 +340,40 @@ describe('AdminApiService — real mode (contract)', () => {
       { id: 't1', nameI18n: { de: 'X' }, gremiumId: 'g1', hasBudget: true, retentionMonths: 12, activeFormVersionId: 'fv' },
       { id: 't2' },
     ]);
-    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, retentionMonths: 12, activeFormVersionId: 'fv' });
-    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, retentionMonths: null, activeFormVersionId: null });
+    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, retentionMonths: 12, activeFormVersionId: 'fv', activeFormVersion: null });
+    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, retentionMonths: null, activeFormVersionId: null, activeFormVersion: null });
+  });
+
+  it('maps the number of the active form version', () => {
+    let out: { activeFormVersion?: number | null }[] | undefined;
+    s.listApplicationTypesFull().subscribe((o) => (out = o));
+    http.expectOne('/api/admin/application-types').flush([{ id: 't1', activeFormVersionId: 'fv', activeFormVersion: 7 }]);
+    expect(out![0].activeFormVersion).toBe(7);
+  });
+
+  it('lists, diffs and restores the config revisions of an entity', () => {
+    let list: unknown;
+    s.listConfigRevisions('site_config', 'global').subscribe((v) => (list = v));
+    const req = http.expectOne((r) => r.url === '/api/admin/config-revisions');
+    expect(req.request.params.get('entityType')).toBe('site_config');
+    expect(req.request.params.get('entityId')).toBe('global');
+    req.flush([{ id: 'r1' }]);
+    expect(list).toEqual([{ id: 'r1' }]);
+    s.restoreConfigRevision('r1').subscribe();
+    http.expectOne({ method: 'POST', url: '/api/admin/config-revisions/r1/restore' }).flush(null);
+  });
+
+  it('reads and replaces the guest settings', () => {
+    let read: unknown;
+    s.getGuestSettings().subscribe((v) => (read = v));
+    http.expectOne({ method: 'GET', url: '/api/admin/guest-settings' }).flush({ confirmTtlHours: 12, linkTtlDays: null });
+    expect(read).toEqual({ confirmTtlHours: 12, linkTtlDays: null });
+    let saved: unknown;
+    s.putGuestSettings({ confirmTtlHours: 24, linkTtlDays: 30 }).subscribe((v) => (saved = v));
+    const req = http.expectOne({ method: 'PUT', url: '/api/admin/guest-settings' });
+    expect(req.request.body).toEqual({ confirmTtlHours: 24, linkTtlDays: 30 });
+    req.flush({ confirmTtlHours: 24, linkTtlDays: 30 });
+    expect(saved).toEqual({ confirmTtlHours: 24, linkTtlDays: 30 });
   });
 
   it('POSTs a new application type and maps the wire response', () => {
@@ -920,16 +952,37 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
 
   it('CRUDs deadline policies in the mock store', async () => {
     const s = svc();
-    expect(await firstValueFrom(s.listDeadlinePolicies())).toEqual([]);
+    const seeded = await firstValueFrom(s.listDeadlinePolicies());
+    expect(seeded.map((p) => p.kind)).toEqual(['relative_changed', 'relative_submitted', 'absolute', 'recurring']);
     const created = await firstValueFrom(s.createDeadlinePolicy({ key: 'sem', label: { de: 'Semester' }, kind: 'absolute' }));
-    expect(created.id).toBe('dp-1');
+    expect(created.id).toBe('dp-5');
     const updated = await firstValueFrom(s.updateDeadlinePolicy(created.id, { offsetDays: 5 }));
     expect(updated.offsetDays).toBe(5);
     // An unknown id gives a synthesized fallback.
     const fallback = await firstValueFrom(s.updateDeadlinePolicy('ghost', { offsetDays: 1 }));
     expect(fallback.id).toBe('ghost');
     await firstValueFrom(s.deleteDeadlinePolicy(created.id));
-    expect(await firstValueFrom(s.listDeadlinePolicies())).toEqual([]);
+    expect(await firstValueFrom(s.listDeadlinePolicies())).toEqual(seeded);
+  });
+
+  it('keeps the guest settings in the mock store', async () => {
+    const s = svc();
+    expect(await firstValueFrom(s.getGuestSettings())).toEqual({ confirmTtlHours: 12, linkTtlDays: null });
+    await firstValueFrom(s.putGuestSettings({ confirmTtlHours: 48, linkTtlDays: 14 }));
+    expect(await firstValueFrom(s.getGuestSettings())).toEqual({ confirmTtlHours: 48, linkTtlDays: 14 });
+  });
+
+  it('serves the CD variants, the site versions and the notification save in mock mode', async () => {
+    const s = svc();
+    const variants = await firstValueFrom(s.listCdVariants());
+    expect(variants.map((v) => v.key)).toEqual(['stupa', 'asta', 'bericht']);
+    expect((await firstValueFrom(s.listConfigRevisions('site_config', 'global'))).map((r) => r.version)).toEqual([3, 2, 1]);
+    expect(await firstValueFrom(s.listConfigRevisions('flow', 'global'))).toEqual([]);
+    expect(await firstValueFrom(s.putNotificationSettings({ taskReminderAfterDays: 9 }))).toEqual({
+      taskReminderEnabled: true,
+      taskReminderAfterDays: 9,
+      taskReminderRepeatDays: 7,
+    });
   });
 
   it('returns the seeded memberships of one gremium in mock mode', async () => {
@@ -1153,12 +1206,44 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(after.items.some((b) => b.id === created.id)).toBe(false);
   });
 
-  it('mail-templates always hit HTTP even in mock mode', () => {
-    // These methods have no mock branch. They always call HttpClient.
+  it('edits, resets and previews the mail templates in the mock store', async () => {
     const s = svc();
     const http = TestBed.inject(HttpTestingController);
-    s.listMailTemplates().subscribe();
-    http.expectOne('/api/admin/mail-templates').flush([]);
+    const list = await firstValueFrom(s.listMailTemplates());
+    expect(list.find((t) => t.key === 'status_update')?.source).toBe('override');
+    const saved = await firstValueFrom(
+      s.upsertMailTemplate({ key: 'magic_link', subjectI18n: { de: 'Neu' }, bodyI18n: { de: 'Text' }, bodyHtmlI18n: {} }),
+    );
+    expect(saved).toMatchObject({ key: 'magic_link', source: 'override', id: 'mt-magic_link', subjectI18n: { de: 'Neu' } });
+    expect(saved.placeholders).toEqual({ link: expect.any(String) });
+    // An override keeps its id.
+    const again = await firstValueFrom(
+      s.upsertMailTemplate({ key: 'status_update', subjectI18n: { de: 'S' }, bodyI18n: {}, bodyHtmlI18n: {} }),
+    );
+    expect(again.id).toBe('mt-1');
+    // A key that is not in the store gets no placeholders.
+    const unknown = await firstValueFrom(
+      s.upsertMailTemplate({ key: 'ghost', subjectI18n: {}, bodyI18n: {}, bodyHtmlI18n: {} }),
+    );
+    expect(unknown.placeholders).toEqual({});
+    const reset = await firstValueFrom(s.resetMailTemplate('magic_link'));
+    expect(reset).toMatchObject({ key: 'magic_link', source: 'builtin', id: null, subjectI18n: { de: 'Dein Link zur Antragsplattform' } });
+    // An unknown key falls back to the first seed template.
+    expect((await firstValueFrom(s.resetMailTemplate('ghost'))).source).toBe('builtin');
+    const pv = await firstValueFrom(
+      s.previewMailPayload({
+        subjectI18n: { de: 'Hallo {{ name }}' },
+        bodyI18n: { de: 'Status: {{status}} {{ missing }}' },
+        bodyHtmlI18n: { de: '<p>{{ name }}</p>' },
+        lang: 'de',
+        context: { name: 'Mara', status: 'offen' },
+      }),
+    );
+    expect(pv).toEqual({ subject: 'Hallo Mara', text: 'Status: offen ', html: '<p>Mara</p>', lang: 'de' });
+    const plain = await firstValueFrom(
+      s.previewMailPayload({ subjectI18n: {}, bodyI18n: {}, bodyHtmlI18n: {}, lang: 'en', context: {} }),
+    );
+    expect(plain).toEqual({ subject: '', text: '', html: null, lang: 'en' });
     http.verify();
   });
 });

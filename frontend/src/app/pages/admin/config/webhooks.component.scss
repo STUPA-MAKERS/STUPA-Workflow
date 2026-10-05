@@ -1,0 +1,189 @@
+:host {
+  display: block;
+}
+
+.wh {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  container-type: inline-size;
+}
+
+.wh__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wh__hook {
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+}
+.wh__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.wh__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.wh__titleLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-3);
+  margin: 0;
+}
+.wh__name {
+  font-weight: var(--fw-semibold);
+}
+/* The target URL is shown whole: it wraps and stays selectable. */
+.wh__url {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.wh__events {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.wh__event {
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-xs);
+}
+.wh__noEvents,
+.wh__muted {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.wh__side {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+.wh__toggle {
+  min-height: 2.25rem;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.wh__toggle:hover {
+  background: var(--color-surface-3);
+}
+.wh__toggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 0;
+}
+
+/* The delivery diagnosis inside the card, one surface up. */
+.wh__status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-3);
+}
+.wh__statusTitle {
+  margin: 0;
+}
+.wh__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+}
+.wh__grid dt {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.wh__grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.wh__reason {
+  grid-column: 1 / -1;
+}
+.wh__dead {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-danger);
+}
+.wh__empty {
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+}
+
+.wh__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.wh__urlField ::ng-deep input {
+  font-family: var(--font-mono);
+}
+.wh__eventsField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.wh__legend {
+  padding: 0;
+  font-weight: var(--fw-semibold);
+}
+.wh__hint {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.wh__eventGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: var(--space-2) var(--space-4);
+}
+.wh__confirm {
+  margin: 0;
+}
+.wh__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* A narrow sheet: the controls go below the hook, the facts in two columns. */
+@container (max-width: 40rem) {
+  .wh__row {
+    flex-direction: column;
+  }
+  .wh__side {
+    flex-wrap: wrap;
+  }
+  .wh__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

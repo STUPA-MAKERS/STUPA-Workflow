@@ -33,7 +33,7 @@ describe('NotificationSettingsComponent', () => {
     expect(screen.getByText('Aufgaben-Erinnerungen')).toBeInTheDocument();
     expect(screen.getByLabelText(/Erinnern nach/)).toHaveValue(5);
     expect(screen.getByLabelText(/Wiederholen alle/)).toHaveValue(7);
-    expect(screen.getByRole('checkbox')).toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Aktiviert' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('saves changed values via PUT', async () => {
@@ -142,5 +142,21 @@ describe('NotificationSettingsComponent', () => {
     expect(toast.success).toHaveBeenCalled();
     expect(c.dirty()).toBe(false);
     expect(c.saving()).toBe(false);
+  });
+
+  it('names a day count that is not a whole number in range and blocks the save', async () => {
+    const { fixture, putNotificationSettings } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.patch({ taskReminderAfterDays: c.toNumber('0') });
+    c.patch({ taskReminderRepeatDays: c.toNumber('') });
+    fixture.detectChanges();
+    expect(screen.getByText('Eine ganze Zahl ab 1.')).toBeInTheDocument();
+    expect(screen.getByText('Eine ganze Zahl ab 0.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+    c.save();
+    expect(putNotificationSettings).not.toHaveBeenCalled();
+    c.patch({ taskReminderAfterDays: c.toNumber(' 2 '), taskReminderRepeatDays: 0 });
+    expect(c.valid()).toBe(true);
   });
 });

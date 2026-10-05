@@ -1,57 +1,54 @@
-<app-page-header [title]="'admin.notifications.title' | t" [subtitle]="'admin.notifications.intro' | t" />
-
 <section class="ns">
+  <app-page-header [flush]="true" [title]="'admin.notifications.title' | t" [subtitle]="'admin.notifications.intro' | t">
+    @if (settings()) {
+      <app-button actions variant="fill" [disabled]="!dirty() || !valid()" [loading]="saving()" (click)="save()">
+        <app-icon name="check" [size]="18" /> {{ 'action.save' | t }}
+      </app-button>
+    }
+  </app-page-header>
+
   @if (error()) {
-    <p class="ns__error" role="alert">{{ $any(error()) | t }}</p>
+    <app-note kind="error" icon="alert" role="alert">{{ $any(error()) | t }}</app-note>
   }
 
-  <section class="card">
-    <h2>{{ 'admin.notifications.taskReminder' | t }}</h2>
-    <p class="ns__muted">{{ 'admin.notifications.taskReminderDesc' | t }}</p>
-
-    @if (loading()) {
-      <app-skeleton variant="lines" [count]="4" [label]="'common.loading' | t" />
-    } @else if (settings(); as s) {
-      <div class="flex flex-col gap-4">
-        <app-checkbox
-          [ngModel]="s.taskReminderEnabled"
-          (ngModelChange)="patch({ taskReminderEnabled: $event })"
-        >
-          {{ 'admin.notifications.enabled' | t }}
-        </app-checkbox>
-
-        <label class="flex flex-col gap-2">
-          <span class="text-sm font-medium text-text">{{ 'admin.notifications.afterDays' | t }}</span>
-          <input
-            class="field__control"
+  @if (loading()) {
+    <app-skeleton variant="lines" [count]="4" [label]="'common.loading' | t" />
+  } @else if (settings(); as s) {
+    <section class="ns__card" aria-labelledby="ns-reminder">
+      <app-icon class="ns__icon" name="bell" [size]="20" />
+      <div class="ns__body">
+        <div class="ns__head">
+          <div class="ns__text">
+            <h2 class="ns__title" id="ns-reminder">{{ 'admin.notifications.taskReminder' | t }}</h2>
+            <p class="ns__desc">{{ 'admin.notifications.taskReminderDesc' | t }}</p>
+          </div>
+          <app-switch [checked]="s.taskReminderEnabled" (checkedChange)="patch({ taskReminderEnabled: $event })">
+            {{ 'admin.notifications.enabled' | t }}
+          </app-switch>
+        </div>
+        <div class="ns__fields">
+          <app-input
             type="number"
-            min="1"
-            [disabled]="!s.taskReminderEnabled"
+            [label]="'admin.notifications.afterDays' | t"
+            [hint]="'admin.notifications.afterDaysHint' | t"
+            [error]="afterDaysError()"
             [ngModel]="s.taskReminderAfterDays"
-            (ngModelChange)="patch({ taskReminderAfterDays: $event })"
-          />
-          <span class="text-xs text-muted">{{ 'admin.notifications.afterDaysHint' | t }}</span>
-        </label>
-
-        <label class="flex flex-col gap-2">
-          <span class="text-sm font-medium text-text">{{ 'admin.notifications.repeatDays' | t }}</span>
-          <input
-            class="field__control"
-            type="number"
-            min="0"
+            (ngModelChange)="patch({ taskReminderAfterDays: toNumber($event) })"
             [disabled]="!s.taskReminderEnabled"
-            [ngModel]="s.taskReminderRepeatDays"
-            (ngModelChange)="patch({ taskReminderRepeatDays: $event })"
+            name="afterDays"
           />
-          <span class="text-xs text-muted">{{ 'admin.notifications.repeatDaysHint' | t }}</span>
-        </label>
-
-        <div class="flex justify-end">
-          <app-button size="sm" [disabled]="!dirty() || saving()" (click)="save()">
-            {{ 'action.save' | t }}
-          </app-button>
+          <app-input
+            type="number"
+            [label]="'admin.notifications.repeatDays' | t"
+            [hint]="'admin.notifications.repeatDaysHint' | t"
+            [error]="repeatDaysError()"
+            [ngModel]="s.taskReminderRepeatDays"
+            (ngModelChange)="patch({ taskReminderRepeatDays: toNumber($event) })"
+            [disabled]="!s.taskReminderEnabled"
+            name="repeatDays"
+          />
         </div>
       </div>
-    }
-  </section>
+    </section>
+  }
 </section>

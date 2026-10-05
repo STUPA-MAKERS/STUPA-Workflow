@@ -147,8 +147,28 @@ describe('FormsListComponent — display helpers', () => {
       'gremium',
       'budget',
       'status',
+      'version',
       'actions',
     ]);
+  });
+
+  it('shows the budget, the status as text and the version of each type', async () => {
+    const rows: ApplicationTypeFull[] = [
+      { ...type('f1', 'Förderantrag'), hasBudget: true, activeFormVersionId: 'fv-1', activeFormVersion: 7 },
+      type('f2', 'Raumantrag'),
+    ];
+    const { c } = await setup({ api: { listApplicationTypesFull: jest.fn(() => of(rows)) } });
+    expect(screen.getByText('Mit Budget')).toBeInTheDocument();
+    expect(screen.getByText('Ohne Budget')).toBeInTheDocument();
+    expect(screen.getByText('Aktiv')).toBeInTheDocument();
+    expect(screen.getByText('Entwurf')).toBeInTheDocument();
+    expect(screen.getByText('v7')).toBeInTheDocument();
+    expect(c.versionLabel(rows[1])).toBe('–');
+    // The draft note explains why a draft type is missing in the public form.
+    expect(screen.getByText(/Ohne aktive Formularversion/)).toBeInTheDocument();
+    // Each row action names its type.
+    expect(screen.getByRole('link', { name: 'Bearbeiten: Förderantrag' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Antragsart löschen: Raumantrag' })).toBeInTheDocument();
   });
 });
 

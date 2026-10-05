@@ -102,8 +102,12 @@ lives in budget/tree_service.py and tree_rules.py. Budget is a critical module, 
 `accepted_state_keys` and `denied_state_keys` (migration 0041), and the state-based committed and
 requested roll-up. `tree_rules.build_forest` takes requested_rows. `tree_service.get_tree` joins
 Application to State and classifies per top config. Frontend: the shared
-`budget-year-tree.component.ts` (left nav) and `budget-pie.component.ts` (interactive donut, with
-PALETTE fallback colors). The dashboard is rebuilt with a 3-zone layout, the Requested column, the
+`budget-year-tree.component.ts` (left nav, removed in FE12a, see below) and
+`budget-pie.component.ts` (interactive donut, with PALETTE fallback colors).
+
+**Update (FE12a):** `budget-year-tree.component` no longer exists. The cost-centre page now picks
+the budget with an `app-filter-select` chip and the fiscal year with segmented chips
+(`app-segmented`) above the table. The dashboard is rebuilt with a 3-zone layout, the Requested column, the
 breadcrumb omission at the top level, and URL sync through the query params budget, ks and fy. The
 admin page /admin/budget-pots is rebuilt with the left tree, the color picker and the accepted and
 denied state matrix. It loads the global flow states through AdminApiService.getGlobalFlow.
