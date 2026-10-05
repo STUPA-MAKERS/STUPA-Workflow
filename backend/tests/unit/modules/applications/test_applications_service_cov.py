@@ -943,6 +943,20 @@ async def test_list_applications_all_filters_postgres_search(
     assert page.items[0].state_since == since
 
 
+async def test_list_applications_sort_state_since() -> None:
+    """`sort=stateSince` orders by the last status change (the order itself: integration)."""
+    app = _app()
+    since = datetime(2026, 7, 1, tzinfo=UTC)
+    session = _Session(
+        get_results=[_state()],
+        execute_results=[[(app, since)], [("draft", "#z")]],
+        scalar_results=[1],
+    )
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    page = await svc.list_applications(sort="stateSince", order="desc", limit=10, offset=0)
+    assert page.items[0].state_since == since
+
+
 async def test_list_applications_unknown_budget_yields_empty() -> None:
     session = _Session(
         scalar_results=[None, 0],  # budget path_key None → false() filter, total 0

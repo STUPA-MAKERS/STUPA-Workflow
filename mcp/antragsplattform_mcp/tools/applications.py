@@ -17,7 +17,7 @@ async def list_applications(
     gremium: str | None = None,
     type: str | None = None,
     q: str | None = None,
-    sort: Literal["createdAt", "amount"] | None = None,
+    sort: Literal["createdAt", "amount", "stateSince"] | None = None,
     order: Literal["asc", "desc"] | None = None,
     limit: int | None = None,
     offset: int | None = None,

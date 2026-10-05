@@ -1,17 +1,43 @@
 @use 'breakpoints' as bp;
+@use 'surface';
 
+/* One column that scrolls with the page (narrow, phone): the head, "Heute", the work
+   list. Wide, the host is a pane page (`.pane-page` in styles.scss) and a grid: the list
+   column on the start side, the sheet "Heute" on the end side over the full height. */
 :host {
+  --dash-fade: var(--space-6);
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: var(--space-6);
 }
 
 /* Flex and grid items default to min-width: auto, so a long title without a break would
    push a column past the viewport. Clamp the chain to 0 and let the rows cut it. */
-:host > *,
-.dash__grid > *,
-.dash__col > * {
+:host > * {
   min-width: 0;
+}
+
+:host(.dash--wide) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(420px, 26vw, 500px);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  column-gap: var(--space-6);
+  row-gap: 0;
+}
+:host(.dash--wide) > .dash__top {
+  grid-area: 1 / 1;
+}
+:host(.dash--wide) > .dash__head {
+  grid-area: 2 / 1;
+  margin-block: var(--space-5) var(--space-6);
+}
+:host(.dash--wide) > .dash__work {
+  grid-area: 3 / 1;
+  min-height: 0;
+}
+:host(.dash--wide) > .dash__today {
+  grid-area: 1 / 2 / -1 / 3;
+  min-height: 0;
 }
 
 /* ------------------------------------------------------------------ head */
@@ -51,7 +77,9 @@
 .dash__btn:focus-visible,
 .dash__more:focus-visible,
 .dash__fab:focus-visible,
-.dash__me:focus-visible {
+.dash__me:focus-visible,
+.dash__iconBtn:focus-visible,
+.dash__budget:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
@@ -61,13 +89,6 @@
 }
 .dash__btn--fill:hover {
   filter: brightness(1.08);
-}
-.dash__btn--tonal {
-  background: var(--color-surface-3);
-  color: var(--color-text);
-}
-.dash__btn--tonal:hover {
-  background: var(--color-surface-4);
 }
 .dash__btn--block {
   width: 100%;
@@ -84,181 +105,444 @@
   cursor: pointer;
 }
 
-/* ------------------------------------------------------------------ grid */
-
-/* Two columns that fill the width on a wide screen; one column below 1200px. */
-.dash__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--space-6);
-  align-items: start;
-}
-.dash__grid--one {
-  grid-template-columns: minmax(0, 1fr);
-}
-@include bp.below-wide {
-  .dash__grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 28px;
-  }
-}
-
-.dash__col {
-  display: flex;
-  flex-direction: column;
-  gap: 28px;
-}
-
-.dash__sec {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-/* Section head: title, count, and "Alle ansehen" at the end. */
-.dash__h {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 2rem;
-  padding: 0 var(--space-1);
-}
-.dash__title {
-  margin: 0;
-  font-size: var(--fs-h2);
-  line-height: var(--lh-h2);
-  font-weight: var(--fw-semibold);
-}
-.dash__count {
-  font-size: var(--fs-small);
-  line-height: var(--lh-small);
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
-}
-.dash__count:empty {
-  display: none;
-}
-.dash__grow {
-  flex: 1 1 auto;
-}
 .dash__more {
   flex: none;
-  margin-inline-start: auto;
   padding: 6px 10px;
   border-radius: var(--radius-pill);
   color: var(--color-accent-text);
   font-size: 0.8125rem; /* 13px */
   font-weight: var(--fw-semibold);
   text-decoration: none;
+  white-space: nowrap;
 }
 .dash__more:hover {
   background: var(--color-surface-2);
 }
 
-/* ------------------------------------------------------------------ meetings */
+.dash__dot {
+  margin-inline: 6px;
+  color: var(--color-text-subtle);
+}
+.dash__chev {
+  display: inline-flex;
+  color: var(--color-text-muted);
+}
+.dash__muted {
+  color: var(--color-text-muted);
+}
+.dash__date {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
 
+/* ------------------------------------------------------------------ work list */
+
+.dash__work {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* The tabs and "Alle … öffnen" share one rule under them. */
+.dash__tabbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.dash__tabs {
+  flex: 1 1 auto;
+}
+.dash__tabs ::ng-deep .tabs {
+  gap: var(--space-1);
+  border-bottom: 0;
+}
+.dash__tabs ::ng-deep .tabs__tab {
+  gap: var(--space-2);
+  padding-inline: 14px;
+}
+/* The count as a small plate, so it reads as a number of rows and not as a label. */
+.dash__tabs ::ng-deep .tabs__count {
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+  line-height: 18px;
+}
+
+/* Wide: the panel scrolls inside the list column; the tabs stay.
+
+   The rows of the work list sit on surface 2, as the row groups of the other lists on
+   the page background, with the page background between them (board B). */
+.dash__panel {
+  min-width: 0;
+  @include surface.context(1);
+  --dt-gap: var(--color-bg);
+}
+:host(.dash--wide) .dash__panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--dash-fade);
+}
+.dash__panel.is-fade-start,
+.dash__todayBody.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--dash-fade));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--dash-fade));
+}
+.dash__panel.is-fade-end,
+.dash__todayBody.is-fade-end {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--dash-fade));
+  mask-image: linear-gradient(to top, transparent, #000 var(--dash-fade));
+}
+.dash__panel.is-fade-start.is-fade-end,
+.dash__todayBody.is-fade-start.is-fade-end {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--dash-fade),
+    #000 calc(100% - var(--dash-fade)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--dash-fade),
+    #000 calc(100% - var(--dash-fade)),
+    transparent
+  );
+}
+
+/* A title takes up to two lines in the table, then the ellipsis. */
+.dash__cellTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  /* A margin, not a padding: the clamp cuts at the content box, and a padding would show
+     the top of the third line. */
+  margin-block: 6px;
+  font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
+}
+.dash__amount {
+  white-space: nowrap;
+}
+.dash__ballot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-accent-text);
+  white-space: nowrap;
+}
+.dash__ballot--pending {
+  color: var(--color-warning);
+}
+
+.dash__state {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+}
+.dash__state--error {
+  color: var(--color-danger);
+}
+
+/* Empty tab: the empty state, and for a new user the card "Antrag stellen" beside it. */
+.dash__emptyGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: stretch;
+  padding-top: var(--space-2);
+}
+.dash__emptyGrid--two {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+}
+.dash__emptyBox {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+}
+/* The empty state of a block, not of a page: a smaller heading and less air. */
+.dash__emptyBox ::ng-deep .es {
+  padding: var(--space-6) var(--space-5);
+}
+.dash__emptyBox ::ng-deep .es__icon {
+  box-sizing: content-box;
+  width: 22px;
+  height: 22px;
+  padding: 13px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+}
+.dash__emptyBox ::ng-deep .es__heading {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.dash__emptyBox ::ng-deep .es__body {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+
+.dash__apply {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.dash__applyH {
+  margin: 0;
+  padding-inline: var(--space-1);
+  font-size: var(--fs-h3);
+  line-height: var(--lh-h3);
+  font-weight: var(--fw-semibold);
+}
+.dash__typeIcon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-container);
+  color: var(--color-on-accent-container);
+}
+
+/* ------------------------------------------------------------------ "Heute" */
+
+/* The sheet: surface 1, round, the body scrolls inside it (wide). Narrow, the same block
+   is a card at the top of the page. */
+.dash__today {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+  @include surface.context(1);
+}
+:host(.dash--wide) .dash__today {
+  overflow: hidden;
+}
+
+.dash__todayHead {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 18px var(--space-3) 10px var(--space-5);
+}
+.dash__todayTitle {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.dash__todayDate {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+.dash__todayH {
+  margin: 0;
+  font-size: var(--fs-h1);
+  line-height: var(--lh-h1);
+  font-weight: var(--fw-semibold);
+}
+.dash__iconBtn {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-muted);
+}
+.dash__iconBtn:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+.dash__todayBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  padding: 0 14px 14px;
+}
+.dash__todayBody > * {
+  flex: none;
+}
+:host(.dash--wide) .dash__todayBody {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.dash__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.dash__blockHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 2rem;
+  padding: 10px 6px 0;
+}
+.dash__blockHead .dash__more {
+  margin-inline-end: -4px;
+}
+
+/* The live meeting: a block on surface 2 with its progress on surface 3. */
 .dash__live {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: var(--space-4);
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
 }
 .dash__liveHead {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
+  min-width: 0;
 }
 .dash__liveText {
   display: flex;
   flex: 1 1 0;
   flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
 .dash__liveTitle {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   gap: var(--space-2);
   min-width: 0;
 }
 .dash__name {
+  display: -webkit-box;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-size: var(--fs-h3);
-  line-height: var(--lh-h3);
+  line-height: 1.25rem;
   font-weight: var(--fw-semibold);
 }
 .dash__liveTitle app-status-text {
   flex: none;
 }
 .dash__sub {
+  color: var(--color-text-muted);
   font-size: 0.8125rem;
   line-height: 1.1875rem;
-  color: var(--color-text-muted);
 }
 
-/* "Jetzt: TOP 3 · …" and the bar, indented to the text column (date block + gap). */
-.dash__now {
+.dash__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-3);
+}
+/* On surface 3 the muted text keeps 4.5:1; the subtle text does not. */
+.dash__progress .dash__sub {
+  color: var(--color-text-muted);
+}
+.dash__progressLine {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.dash__progressLabel {
+  flex: 1 1 auto;
+  font-weight: var(--fw-medium);
+}
+.dash__progressCount {
+  flex: none;
+  font-size: 0.8125rem;
+  word-spacing: -0.15em;
+}
+.dash__voteLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin: 0;
+  padding-inline: 2px;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.1875rem;
+}
+
+.dash__note {
+  color: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
+}
+
+/* The budget summary: a link card on surface 2. */
+.dash__budget {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding-inline-start: calc(3rem + var(--space-4));
-}
-.dash__nowLine {
-  display: flex;
-  gap: var(--space-2);
-  font-size: 0.8125rem;
-  line-height: 1.1875rem;
-  color: var(--color-text);
-}
-.dash__nowLine > .ell {
-  flex: 1 1 0;
-}
-.dash__nowCount {
-  flex: none;
-  word-spacing: -0.15em;
-}
-
-.dash__link {
-  padding: 0 var(--space-3);
-  color: var(--color-accent-text);
-  font-size: 0.8125rem;
-  font-weight: var(--fw-semibold);
-  white-space: nowrap;
-}
-.dash__chev {
-  display: inline-flex;
-  color: var(--color-text-subtle);
-}
-
-/* ------------------------------------------------------------------ rows */
-
-.dash__dot {
-  margin: 0 6px;
-  color: var(--color-text-subtle);
-}
-.dash__date {
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
-}
-
-.dash__state {
-  margin: 0;
-  padding: 0 var(--space-1);
-  color: var(--color-text-muted);
-}
-.dash__state--error {
-  color: var(--color-danger);
-}
-.dash__empty {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  padding: 12px 14px;
   border-radius: var(--radius-lg);
   background: var(--color-surface-2);
+  color: inherit;
+  text-decoration: none;
 }
-.dash__empty .dash__state {
-  padding: 0;
+.dash__budget:hover {
+  background: var(--color-surface-3);
+}
+.dash__budgetHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+.dash__budgetTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: var(--fw-semibold);
+}
+.dash__budgetSum {
+  flex: none;
+  font-size: 0.9375rem;
+}
+
+
+/* Row feedback. In a row group the rows already sit on surface 2, the hover colour of
+   the list item, so hover and press take surface 3. The row keeps the corners the group
+   gives it. */
+.rowgroup > app-list-item ::ng-deep .li {
+  border-radius: inherit;
+}
+.rowgroup > app-list-item:hover ::ng-deep .li,
+.rowgroup > app-list-item:active ::ng-deep .li {
+  background: var(--color-surface-3);
+}
+
+/* ------------------------------------------------------------------ narrow */
+
+/* Narrow (not a phone): the blocks of "Heute" sit side by side in the card. */
+@include bp.narrow {
+  .dash__todayBody {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    align-items: start;
+    column-gap: var(--space-4);
+  }
 }
 
 /* ------------------------------------------------------------------ phone */
@@ -285,33 +569,32 @@
 }
 
 :host(.dash--phone) {
-  gap: 22px;
+  gap: var(--space-5);
 }
-:host(.dash--phone) .dash__col {
-  gap: 22px;
+/* Phone: "Heute" is a band on the page, not a card; its blocks keep their surfaces. */
+:host(.dash--phone) .dash__today {
+  border-radius: 0;
+  background: none;
 }
-:host(.dash--phone) .dash__live {
-  gap: var(--space-3);
-  /* The inline padding is the one of the list-item rows below, so the date blocks of the
-     live and the planned meetings line up (board Telefon-Start). */
-  padding: 14px var(--space-4);
+:host(.dash--phone) .dash__todayHead {
+  padding: 0 var(--space-1) var(--space-1);
 }
-/* Phone: "Live" sits at the end of the title row (board Telefon-Start). */
-:host(.dash--phone) .dash__liveTitle .dash__name {
-  flex: 1 1 0;
-  min-width: 0;
+:host(.dash--phone) .dash__todayH {
+  font-size: var(--fs-h2);
+  line-height: var(--lh-h2);
 }
-:host(.dash--phone) .dash__now {
-  padding-inline-start: 0;
+:host(.dash--phone) .dash__todayBody {
+  padding: 0;
 }
-
-/* Row feedback. In a row group the rows already sit on surface 2, the hover colour of
-   the list item, so hover and press take surface 3. The row keeps the corners the group
-   gives it. */
-.rowgroup > app-list-item ::ng-deep .li {
-  border-radius: inherit;
+:host(.dash--phone) .dash__tabs ::ng-deep .tabs__tab {
+  padding-inline: var(--space-2);
 }
-.rowgroup > app-list-item:hover ::ng-deep .li,
-.rowgroup > app-list-item:active ::ng-deep .li {
-  background: var(--color-surface-3);
+/* Phone: "Alle … öffnen" under the rows, at the end edge. */
+:host(.dash--phone) .dash__all {
+  align-self: flex-end;
+  margin-inline-end: -4px;
+}
+/* Phone: the empty states are compact, so the next block stays in view. */
+:host(.dash--phone) .dash__emptyBox ::ng-deep .es {
+  padding: var(--space-5) var(--space-4);
 }

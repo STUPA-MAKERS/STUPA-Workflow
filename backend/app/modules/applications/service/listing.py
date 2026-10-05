@@ -10,6 +10,7 @@ from uuid import UUID
 
 from sqlalchemy import ARRAY, ColumnElement, Text, case, cast, false, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB, array
+from sqlalchemy.orm import InstrumentedAttribute
 
 from app.modules.admin.models import ApplicationType, Gremium, GremiumMembership
 from app.modules.applications.models import Application
@@ -72,6 +73,10 @@ class ListingOps(ApplicationsServiceBase):
         `q` then skips the `isPII` field values, except in the own applications
         (`created_by == owner_sub`). Without this rule the search is an oracle: a
         guessed name or IBAN would tell which readable application holds it.
+
+        `sort` is `createdAt`, `amount` or `stateSince`. `stateSince` sorts by the time
+        of the last status change, with the creation time for an application without an
+        event, the same value as the item carries.
 
         `archived` defaults to False, so the working list hides archived applications
         without every caller remembering to ask. `True` lists only the archived ones and
@@ -140,7 +145,15 @@ class ListingOps(ApplicationsServiceBase):
             end = datetime.combine(created_to + timedelta(days=1), time.min, UTC)
             filters.append(Application.created_at < end)
 
-        sort_col = Application.amount if sort == "amount" else Application.created_at
+        since_sq = state_since_subquery()
+        # `stateSince` falls back to the creation time, as the items do below.
+        sort_col: ColumnElement[Any] | InstrumentedAttribute[Any]
+        if sort == "amount":
+            sort_col = Application.amount
+        elif sort == "stateSince":
+            sort_col = func.coalesce(since_sq.c.since, Application.created_at)
+        else:
+            sort_col = Application.created_at
         ordering = (sort_col.asc() if order == "asc" else sort_col.desc()).nulls_last()
         # An active search puts the most relevant row first. The chosen sort then acts
         # as a deterministic tiebreak. Without a search the order does not change.
@@ -149,7 +162,6 @@ class ListingOps(ApplicationsServiceBase):
         total = await self.session.scalar(
             select(func.count()).select_from(Application).where(*filters)
         )
-        since_sq = state_since_subquery()
         rows = (
             await self.session.execute(
                 select(Application, since_sq.c.since)

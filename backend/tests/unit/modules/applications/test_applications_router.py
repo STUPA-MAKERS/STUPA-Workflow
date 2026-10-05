@@ -700,6 +700,15 @@ def test_list_applications_amount_date_sort_passed(
     assert kw["sort"] == "amount" and kw["order"] == "asc"
 
 
+def test_list_applications_state_since_sort_passed(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _as_principal(app, "application.read")
+    r = client.get("/api/applications?mine=true&sort=stateSince&order=desc")
+    assert r.status_code == 200
+    assert fake_service.list_kwargs["sort"] == "stateSince"
+
+
 def test_list_applications_rejects_bad_sort_422(app: FastAPI, client: TestClient) -> None:
     _as_principal(app, "application.read")
     assert client.get("/api/applications?sort=bogus").status_code == 422
