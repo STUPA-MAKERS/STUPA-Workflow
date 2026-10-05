@@ -265,6 +265,11 @@ export interface Attendance {
   isSelf: boolean;
   /** O20: the member holds `protocol.write` in the gremium and can keep the minutes. */
   canKeepProtocol?: boolean;
+  /**
+   * The member has an own vote now (gremium permission `vote.cast`). Only such a member
+   * can be substituted (O6). An older server leaves the flag out.
+   */
+  canVote?: boolean;
 }
 
 /** `AgendaItemOut`. An agenda item holds a linked application or free text. */

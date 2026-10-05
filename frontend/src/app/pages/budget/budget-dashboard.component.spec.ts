@@ -257,8 +257,9 @@ describe('BudgetDashboardComponent', () => {
       const view = await setup();
       const sheet = view.container.querySelector('article.bd__sheet') as HTMLElement;
       const body = sheet.querySelector(':scope > .bd__sheetBody') as HTMLElement;
-      // The body holds all of the content, so the card keeps its background unmasked.
-      expect(sheet.children).toHaveLength(1);
+      // The bar stays on top; the body holds the rest of the content, so the card keeps
+      // its background unmasked.
+      expect(Array.from(sheet.children).map((el) => el.tagName.toLowerCase())).toEqual(['app-sheet-bar', 'div']);
       expect(body.querySelector('.bd__figs')).toBeTruthy();
       Object.defineProperty(body, 'scrollHeight', { value: 1200, configurable: true });
       Object.defineProperty(body, 'clientHeight', { value: 800, configurable: true });
@@ -428,6 +429,25 @@ describe('BudgetDashboardComponent', () => {
   // ------------------------------------------------------------------ path + actions
 
   describe('header', () => {
+    it('puts the path in the kicker of the shared sheet bar, the actions at its end', async () => {
+      const view = await setup({ queryParams: { ks: 'b-810' } });
+      const bar = view.container.querySelector('article.bd__sheet > app-sheet-bar') as HTMLElement;
+      expect(bar).toBeTruthy();
+      // The bar sits above the scrolling body, so it stays in place.
+      expect(bar.nextElementSibling).toHaveClass('bd__sheetBody');
+      const kicker = bar.querySelector('.sheet-bar__kicker') as HTMLElement;
+      expect(kicker.querySelector('nav.bd__crumbs')).toBeTruthy();
+      expect(kicker.querySelector('nav')?.getAttribute('aria-label')).toBe(
+        view.container.querySelector('nav.bd__crumbs')?.getAttribute('aria-label'),
+      );
+      const actions = bar.querySelector(':scope > .bd__actions') as HTMLElement;
+      expect(within(actions).getByRole('button', { name: /Exportieren/ })).toBeTruthy();
+      expect(within(actions).getByRole('button', { name: 'Buchungen ansehen' })).toBeTruthy();
+      expect(bar.firstElementChild).toBe(kicker);
+      // The title is the first line of the body, below the bar.
+      expect(view.container.querySelector('.bd__sheetBody')?.firstElementChild?.id).toBe('bd-title');
+    });
+
     it('shows the path with the key and goes up on a click', async () => {
       const view = await setup({ queryParams: { ks: 'b-810' } });
       const crumbs = within(view.container.querySelector('.bd__crumbs') as HTMLElement);
@@ -941,7 +961,8 @@ describe('BudgetDashboardComponent', () => {
       const article = view.container.querySelector('article.bd__sheet');
       expect(article?.getAttribute('aria-label')).toBe('VS-Mittel');
       expect(view.container.querySelector('.bd__topRow .bd__actions')).toBeTruthy();
-      expect(view.container.querySelector('.bd__head')).toBeNull();
+      expect(view.container.querySelector('app-sheet-bar')).toBeNull();
+      expect(view.container.querySelector('.bd__crumbs')).toBeNull();
     });
   });
 

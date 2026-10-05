@@ -288,3 +288,26 @@ async def test_roster_note_only_for_self_and_lead() -> None:
 
     assert await roster(can_write=False) == {"me": "mine", "other": None}
     assert await roster(can_write=True) == {"me": "mine", "other": "theirs"}
+
+
+async def test_roster_marks_the_vote_and_the_keeper_right() -> None:
+    """O6 and O20: the flags come from the union of the active gremium roles."""
+    meeting = _meeting("live")
+    voter, keeper, both, former = _member("v"), _member("k"), _member("b"), _member("f")
+    perms = result(
+        (voter.id, ["vote.cast"]),
+        (keeper.id, ["protocol.write"]),
+        # Two memberships: one role gives the vote, the other the minutes.
+        (both.id, ["vote.cast"]),
+        (both.id, None),
+        (both.id, ["protocol.write"]),
+    )
+    db = fake_session(result(meeting), result(voter, keeper, both, former), result(), perms)
+    out = await AttendanceService(db).roster(meeting.id, "nobody")
+    flags = {o.display_name: (o.can_vote, o.can_keep_protocol) for o in out}
+    assert flags == {
+        "v": (True, False),
+        "k": (False, True),
+        "b": (True, True),
+        "f": (False, False),
+    }

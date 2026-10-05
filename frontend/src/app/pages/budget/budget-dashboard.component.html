@@ -89,31 +89,33 @@
       [attr.aria-labelledby]="wide() ? 'bd-title' : null"
       [attr.aria-label]="wide() ? null : pathLabel()"
     >
+      <!-- Wide: the shared bar of every detail sheet stays on top. The breadcrumb of the
+           cost centre is its kicker, the actions sit at its end on the same axis. -->
+      @if (wide()) {
+        <app-sheet-bar class="bd__bar">
+          <nav appSheetBarKicker class="bd__crumbs" [attr.aria-label]="'budget.breadcrumbs' | t">
+            @for (node of breadcrumbs(); track node.id; let last = $last) {
+              @if (last) {
+                <span class="bd__crumb bd__crumb--current ell" aria-current="page" [title]="node.name">{{ node.name }}</span>
+                <span class="bd__key mono">{{ node.pathKey | simplifyPath }}</span>
+              } @else {
+                <button type="button" class="bd__crumb ell" [title]="node.name" (click)="selectKs(node.id)">{{ node.name }}</button>
+                <app-icon class="bd__crumbSep" name="chevron-right" [size]="13" />
+              }
+            }
+          </nav>
+          <ng-container *ngTemplateOutlet="actions" />
+        </app-sheet-bar>
+      }
       <!-- The wide layout scrolls the sheet inside itself, with a fade at an end only where
            more content is. The card keeps its background; only the content fades. -->
       <div class="bd__sheetBody" appScrollFade="y">
         <!-- Narrower layouts name the path in the chip above and put the actions beside the
              page title, so the sheet starts with the figures. -->
         @if (wide()) {
-          <header class="bd__head">
-            <div class="bd__headText">
-              <nav class="bd__crumbs" [attr.aria-label]="'budget.breadcrumbs' | t">
-                @for (node of breadcrumbs(); track node.id; let last = $last) {
-                  @if (last) {
-                    <span class="bd__crumb bd__crumb--current ell" aria-current="page" [title]="node.name">{{ node.name }}</span>
-                    <span class="bd__key mono">{{ node.pathKey | simplifyPath }}</span>
-                  } @else {
-                    <button type="button" class="bd__crumb ell" [title]="node.name" (click)="selectKs(node.id)">{{ node.name }}</button>
-                    <app-icon class="bd__crumbSep" name="chevron-right" [size]="13" />
-                  }
-                }
-              </nav>
-              <h2 id="bd-title" class="bd__name ell" [title]="current()?.name ?? ''">
-                {{ current()?.name }}
-              </h2>
-            </div>
-            <ng-container *ngTemplateOutlet="actions" />
-          </header>
+          <h2 id="bd-title" class="bd__name ell" [title]="current()?.name ?? ''">
+            {{ current()?.name }}
+          </h2>
         } @else {
           <h2 class="sr-only">{{ current()?.name }}</h2>
         }

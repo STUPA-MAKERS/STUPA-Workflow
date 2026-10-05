@@ -1,11 +1,23 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Directive, contentChild, input } from '@angular/core';
+
+/**
+ * Marks the element that a page projects as the kicker of `app-sheet-bar`, for a kicker
+ * that is more than text (the cost-centre breadcrumb of the budget page). The bar gives
+ * it the place, the size, the weight and the colour of the text kicker.
+ */
+@Directive({
+  selector: '[appSheetBarKicker]',
+  standalone: true,
+})
+export class SheetBarKickerDirective {}
+
 
 /**
  * The top bar of a detail sheet: the kicker (the context line above the title) and the
  * header actions of the sheet.
  *
  * Every right pane of a list/detail page starts with this bar (applications, tasks,
- * votes, the meeting detail, the calendar panel, bookings, invoices). One component owns
+ * votes, the meeting detail, the calendar panel, bookings, invoices, the budget). One component owns
  * the size, weight, colour and placement of the kicker, so it looks the same on every
  * page: one line with an ellipsis, centred on the axis of the icon buttons, in a bar of
  * the height of the header controls. The Verwaltung pages use `app-page-header` instead.
@@ -20,6 +32,16 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
  * Give `kickerId` when the kicker is the heading of a section (the calendar panel names
  * the selected day); the kicker is then an `h2` with that id, so a section can point at
  * it with `aria-labelledby`.
+ *
+ * A kicker with controls in it (the budget breadcrumb) is projected with
+ * `appSheetBarKicker` instead of `[kicker]`. It takes the same place and font:
+ *
+ * ```html
+ * <app-sheet-bar>
+ *   <nav appSheetBarKicker aria-label="…">…</nav>
+ *   <app-button …>…</app-button>
+ * </app-sheet-bar>
+ * ```
  */
 @Component({
   selector: 'app-sheet-bar',
@@ -45,4 +67,7 @@ export class SheetBarComponent {
    * padding: without one the bar would make the pane scroll sideways.
    */
   readonly bleed = input(false);
+
+  /** The projected kicker (`appSheetBarKicker`), which replaces the text kicker. */
+  protected readonly slotKicker = contentChild(SheetBarKickerDirective);
 }

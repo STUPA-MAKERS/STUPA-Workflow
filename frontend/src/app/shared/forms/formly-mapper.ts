@@ -135,7 +135,7 @@ function sectionHeading(f: FormFieldDef, lang: Lang | string): FormlyFieldConfig
 
 /**
  * The help text of a field, or undefined when it has none or when it only repeats the
- * label (the form builder copies the label into an empty help text in some old forms).
+ * label. A form can hold the same words in both, and the field would then show them twice.
  */
 function ownHelp(f: FormFieldDef, label: string, lang: Lang | string): string | undefined {
   const help = f.help ? resolveI18n(f.help, lang) : '';

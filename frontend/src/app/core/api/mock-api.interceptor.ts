@@ -1087,20 +1087,23 @@ interface MockAttendance {
   isSelf: boolean;
   /** O20: the member holds `protocol.write` and can keep the minutes. */
   canKeepProtocol: boolean;
+  /** O6: the member has an own vote (`vote.cast`) and can be substituted. */
+  canVote: boolean;
 }
 
 /** The roster of the mock Gremium. The demo user is in it with the id of the principal. */
 let MOCK_ATTENDANCE: MockAttendance[] = [
-  { principalId: MOCK_PRINCIPAL.sub, displayName: MOCK_PRINCIPAL.display_name ?? null, email: MOCK_PRINCIPAL.email ?? null, status: null, source: null, note: null, isSelf: true, canKeepProtocol: true },
-  { principalId: 'p-2', displayName: 'Max Mustermann', email: 'max@example.com', status: 'present', source: 'lead', note: null, isSelf: false, canKeepProtocol: true },
-  { principalId: 'p-3', displayName: 'Erika Beispiel', email: 'erika@example.com', status: 'excused', source: 'self', note: 'Prüfung', isSelf: false, canKeepProtocol: false },
-  { principalId: 'p-4', displayName: 'Uli Übernahme', email: 'uli@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: true },
-  { principalId: 'p-5', displayName: 'Rolf Redner', email: 'rolf@example.com', status: 'present', source: 'lead', note: null, isSelf: false, canKeepProtocol: true },
+  { principalId: MOCK_PRINCIPAL.sub, displayName: MOCK_PRINCIPAL.display_name ?? null, email: MOCK_PRINCIPAL.email ?? null, status: null, source: null, note: null, isSelf: true, canKeepProtocol: true, canVote: true },
+  { principalId: 'p-2', displayName: 'Max Mustermann', email: 'max@example.com', status: 'present', source: 'lead', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
+  { principalId: 'p-3', displayName: 'Erika Beispiel', email: 'erika@example.com', status: 'excused', source: 'self', note: 'Prüfung', isSelf: false, canKeepProtocol: false, canVote: true },
+  { principalId: 'p-4', displayName: 'Uli Übernahme', email: 'uli@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
+  { principalId: 'p-5', displayName: 'Rolf Redner', email: 'rolf@example.com', status: 'present', source: 'lead', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
   // O23: Vera Vertretung has a delegation for the live meeting, so "present" gives 409.
-  { principalId: 'p-6', displayName: 'Vera Vertretung', email: 'vera@example.com', status: 'excused', source: 'self', note: null, isSelf: false, canKeepProtocol: true },
-  { principalId: 'p-7', displayName: 'Sven Stellvertreter', email: 'sven@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: false },
-  { principalId: 'p-8', displayName: 'Fritz Fehlend', email: 'fritz@example.com', status: 'absent', source: 'lead', note: null, isSelf: false, canKeepProtocol: false },
-  { principalId: 'p-9', displayName: 'Olga Offen', email: 'olga@example.com', status: null, source: null, note: null, isSelf: false, canKeepProtocol: false },
+  { principalId: 'p-6', displayName: 'Vera Vertretung', email: 'vera@example.com', status: 'excused', source: 'self', note: null, isSelf: false, canKeepProtocol: true, canVote: true },
+  { principalId: 'p-7', displayName: 'Sven Stellvertreter', email: 'sven@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: false, canVote: true },
+  { principalId: 'p-8', displayName: 'Fritz Fehlend', email: 'fritz@example.com', status: 'absent', source: 'lead', note: null, isSelf: false, canKeepProtocol: false, canVote: true },
+  // Olga Offen is a member without a vote: the lead cannot enter a substitute for her.
+  { principalId: 'p-9', displayName: 'Olga Offen', email: 'olga@example.com', status: null, source: null, note: null, isSelf: false, canKeepProtocol: false, canVote: false },
 ];
 
 interface MockAgendaItem {

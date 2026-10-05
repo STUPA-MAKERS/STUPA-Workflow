@@ -196,7 +196,11 @@ describe('TasksComponent', () => {
     await settle();
     expect(listTasks).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('link', { name: 'Erster', hidden: true })).not.toBeInTheDocument();
-    expect(screen.getAllByRole('link', { hidden: true })).toHaveLength(2);
+    // Only the rows of the list pane count, not a link of the detail or the frame.
+    const list = document.querySelector<HTMLElement>('.tasks__scroll')!;
+    expect(
+      within(list).getAllByRole('link', { hidden: true }).map((a) => a.textContent?.trim()),
+    ).toEqual(['Zweiter', 'Dritter']);
   });
 
   it('ignores the notices of the list pane', async () => {

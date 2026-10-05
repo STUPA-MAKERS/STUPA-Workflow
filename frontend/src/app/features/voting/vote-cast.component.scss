@@ -61,6 +61,11 @@
   padding: 0;
   overflow: hidden;
 }
+/* The bar of the sheet (`app-sheet-bar`) keeps 4px between the outlined beamer button
+   and the menu, as before the shared bar. */
+.vc__bar {
+  gap: var(--space-1);
+}
 /* The bar on top of the sheet (`app-sheet-bar`): the sheet padding moves into it. */
 .vc--ready.vc--sheet .vc__bar {
   padding-inline: var(--space-6) calc(var(--space-6) - var(--space-3));
