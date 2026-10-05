@@ -86,4 +86,34 @@ describe('TransitionDetailComponent', () => {
       ['guard', null],
     ]);
   });
+
+  it('adds the chosen action kind only on "Hinzufügen" and clears the choice', async () => {
+    const { c, fixture } = await setup({ from: 'a', to: 'b', actions: [] });
+    const added: string[] = [];
+    c.actionAdd.subscribe((e: string) => added.push(e));
+    expect(screen.getByText('Noch keine Aktionen für diesen Übergang. Oben eine hinzufügen.')).toBeInTheDocument();
+    const add = screen.getByRole('button', { name: 'Hinzufügen' });
+    expect(add).toBeDisabled();
+    c.addPending();
+    expect(added).toEqual([]);
+    c.pendingAction.set('webhook');
+    fixture.detectChanges();
+    expect(add).toBeEnabled();
+    add.click();
+    expect(added).toEqual(['webhook']);
+    expect(c.pendingAction()).toBe('');
+  });
+
+  it('puts the value of a recipient under its kind and names the remove button of an action', async () => {
+    const { container } = await setup({
+      from: 'a',
+      to: 'b',
+      actions: [{ type: 'notify', recipients: [{ kind: 'applicant' }, { kind: 'gremium', ref: 'g1' }] }],
+    });
+    const rows = container.querySelectorAll('.td__recipient');
+    expect(rows).toHaveLength(2);
+    expect(rows[0].classList).not.toContain('td__recipient--ref');
+    expect(rows[1].classList).toContain('td__recipient--ref');
+    expect(screen.getByRole('button', { name: 'Entfernen: Benachrichtigen' })).toBeInTheDocument();
+  });
 });

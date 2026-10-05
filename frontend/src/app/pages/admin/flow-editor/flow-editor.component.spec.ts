@@ -2949,4 +2949,131 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     screen.getAllByRole('button', { name: 'Nach unten' })[0].click();
     expect(c.guardGroupsFor('a').map((gp: { value: string }) => gp.value)).toEqual(['x', 'y']);
   });
+
+  describe('redesign (FE12b): tags, status, zoom, versions', () => {
+    const TAGGED: FlowGraph = {
+      states: [
+        { key: 'a', label: { de: 'Entwurf' }, isInitial: true },
+        { key: 'v', label: { de: 'Abstimmung' }, kind: 'vote', config: { gremiumId: 'g1' } },
+        { key: 'ok', label: { de: 'Bewilligt' }, isTerminal: true },
+        { key: 'no', label: { de: 'Abgelehnt' }, isTerminal: true },
+      ],
+      transitions: [
+        { from: 'a', to: 'v', automatic: true, actions: [] },
+        { from: 'v', to: 'ok', branch: 'pass', actions: [] },
+        { from: 'v', to: 'no', branch: 'fail', actions: [] },
+      ],
+    };
+
+    it('tags terminal states, names the kind above a state and marks an automatic edge', async () => {
+      const { container } = await setup({ getGlobalFlow: jest.fn(() => of(TAGGED)) });
+      const tags = [...container.querySelectorAll('.fe__node-tag')].map((t) => t.textContent?.trim());
+      expect(tags).toEqual(['Endzustand', 'Endzustand']);
+      expect(container.querySelector('.fe__node-kind')?.textContent?.trim()).toBe('Abstimmung (Gremium)');
+      expect(container.querySelectorAll('.fe__node-initial-dot')).toHaveLength(1);
+      expect(container.querySelectorAll('.fe__edge--auto')).toHaveLength(1);
+      expect(container.querySelectorAll('.fe__bolt')).toHaveLength(1);
+      // The legend explains the dot and the dashed line.
+      expect(screen.getByText('Initial', { selector: '.fe__legendItem' })).toBeInTheDocument();
+      expect(screen.getByText('Automatisch', { selector: '.fe__legendItem' })).toBeInTheDocument();
+    });
+
+    it('says "Gültig" for a valid flow and counts the errors of an invalid one', async () => {
+      const { fixture } = await setup({ getGlobalFlow: jest.fn(() => of(TAGGED)) });
+      expect(screen.getByText('Gültig')).toBeInTheDocument();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = fixture.componentInstance as any;
+      // A second start state and a vote without its gremium: two findings.
+      c.graph.update((g: FlowGraph) => ({
+        ...g,
+        states: g.states.map((st) =>
+          st.key === 'ok' ? { ...st, isInitial: true } : st.key === 'v' ? { ...st, config: {} } : st,
+        ),
+      }));
+      fixture.detectChanges();
+      const n = c.validationMessages().length;
+      expect(n).toBeGreaterThanOrEqual(2);
+      expect(screen.getByText(`${n} Fehler`)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+    });
+
+    it('shows no status before the flow has loaded', async () => {
+      await setup({ getGlobalFlow: jest.fn(() => NEVER) });
+      expect(screen.queryByText('Gültig')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Fehler$/)).not.toBeInTheDocument();
+    });
+
+    it('reports the zoom relative to the fitted view', async () => {
+      const { fixture } = await setup({ getGlobalFlow: jest.fn(() => of(TAGGED)) });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = fixture.componentInstance as any;
+      expect(c.zoomPercent()).toBe(100);
+      c.zoomIn();
+      expect(c.zoomPercent()).toBe(120);
+      c.resetView();
+      expect(c.zoomPercent()).toBe(100);
+      fixture.detectChanges();
+      expect(screen.getByText('100 %')).toBeInTheDocument();
+    });
+
+    it('keeps a small flow at its real size in a large canvas box and centres it', async () => {
+      const { fixture } = await setup({ getGlobalFlow: jest.fn(() => of(TAGGED)) });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = fixture.componentInstance as any;
+      const b = c.contentBounds();
+      // Unmeasured (as in a test without a layout), the fit is the content itself.
+      expect(c.fitBounds()).toEqual(b);
+      c.canvasSize.set({ w: b.w + 400, h: b.h + 200 });
+      const fit = c.fitBounds();
+      expect(fit.w).toBe(b.w + 400);
+      expect(fit.h).toBe(b.h + 200);
+      expect(fit.x).toBe(b.x - 200);
+      expect(fit.y).toBe(b.y - 100);
+      expect(c.viewBox()).toBe(`${fit.x} ${fit.y} ${fit.w} ${fit.h}`);
+      // A box smaller than the flow fits the flow (it scales down).
+      c.canvasSize.set({ w: 10, h: 10 });
+      expect(c.fitBounds()).toEqual(b);
+    });
+
+    it('shows the versions in the inspector and names the active version in the lead line', async () => {
+      const { fixture } = await setup({ getGlobalFlow: jest.fn(() => of(TAGGED)) });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = fixture.componentInstance as any;
+      expect(screen.getByText('Globales Flow-Chart für alle Anträge')).toBeInTheDocument();
+      c.currentVersion.set(12);
+      fixture.detectChanges();
+      expect(screen.getByText('Globales Flow-Chart für alle Anträge · Version 12 aktiv')).toBeInTheDocument();
+
+      c.selectEdge(0);
+      fixture.detectChanges();
+      expect(screen.getByRole('heading', { name: 'Bedingung (Guard)' })).toBeInTheDocument();
+      screen.getByRole('button', { name: 'Versionen' }).click();
+      fixture.detectChanges();
+      expect(c.showVersions()).toBe(true);
+      // The selection gives way to the version history.
+      expect(screen.queryByRole('heading', { name: 'Bedingung (Guard)' })).not.toBeInTheDocument();
+      // A new selection on the canvas brings the inspector back.
+      c.selectEdge(1);
+      fixture.detectChanges();
+      expect(c.showVersions()).toBe(false);
+      // The ⋮ menu of a phone header toggles the same view.
+      c.onHeaderMenu({ id: 'versions', label: 'Versionen' });
+      expect(c.showVersions()).toBe(true);
+      expect(c.headerMenu()[0].items[0].checked).toBe(true);
+      c.onHeaderMenu({ id: 'other', label: 'x' });
+      expect(c.showVersions()).toBe(true);
+    });
+
+    it('lists the incoming and outgoing transitions of a selected state in the inspector', async () => {
+      const { fixture } = await setup({ getGlobalFlow: jest.fn(() => of(TAGGED)) });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = fixture.componentInstance as any;
+      c.selection.set({ kind: 'state', key: 'v' });
+      fixture.detectChanges();
+      expect(screen.getByRole('heading', { name: 'Eingehend (1)' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Ausgehend (2)' })).toBeInTheDocument();
+      screen.getByRole('button', { name: /^Automatisch:/ }).click();
+      expect(c.selection()).toEqual({ kind: 'transition', index: 0 });
+    });
+  });
 });

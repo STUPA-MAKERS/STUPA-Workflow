@@ -1,26 +1,73 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+/* A combinator: a box one surface up, its fields one more. */
+.ge__box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-3);
+  --color-surface-sunken: var(--color-surface-4);
+}
+/* A combinator inside a combinator: no second box, the indent shows the nesting. */
+.ge__children .ge__box {
+  padding: 0;
+  background: none;
+}
+
+.ge__comb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.ge__combOp {
+  flex: 0 1 10rem;
+}
+.ge__combText {
+  flex: 1 1 6rem;
+  min-width: 0;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+
+.ge__children {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--color-border);
+}
+
 .ge__child {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 .ge__child > app-guard-editor {
   flex: 1;
   min-width: 0;
 }
-.ge__compare {
+
+.ge__leaf {
   display: flex;
+  flex-direction: column;
   gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.ge__input {
-  padding: var(--space-2) var(--space-3);
-  font: inherit;
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-sm);
   min-width: 0;
 }
-.ge__compare .ge__input {
-  flex: 1 1 6rem;
+
+/* A comparison: field, operator and value on one line. */
+.ge__compare {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7.5rem minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+/* Keys and values in the mono face (the value only, not the label). */
+.ge__mono ::ng-deep input {
+  font-family: var(--font-mono);
 }

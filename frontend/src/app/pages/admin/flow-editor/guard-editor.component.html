@@ -1,15 +1,25 @@
-<div class="flex flex-col gap-2">
-  <app-select
-    class="ge__op"
-    [options]="opOptions()"
-    [placeholder]="'admin.flow.guardNone' | t"
-    [ngModel]="op()"
-    (ngModelChange)="onOpChange($event)"
-  />
-
-  @switch (kind()) {
-    @case ('combinator') {
-      <div class="flex flex-col gap-2 pl-3 border-0 border-l-2 border-solid border-line">
+@switch (kind()) {
+  @case ('combinator') {
+    <!-- AND / OR / NOT: the combinator, what it means, "+ Bedingung", then the
+         conditions inside it, indented. -->
+    <div class="ge__box">
+      <div class="ge__comb">
+        <app-select
+          class="ge__combOp"
+          [ariaLabel]="'admin.flow.guardOp' | t"
+          [options]="opOptions()"
+          [placeholder]="'admin.flow.guardNone' | t"
+          [ngModel]="op()"
+          (ngModelChange)="onOpChange($event)"
+        />
+        <span class="ge__combText">{{ combinatorText() }}</span>
+        @if (op() !== 'not') {
+          <app-button variant="text" size="sm" (click)="addChild()">
+            <app-icon name="plus" [size]="14" /> {{ 'admin.flow.guardAddChild' | t }}
+          </app-button>
+        }
+      </div>
+      <div class="ge__children">
         @for (child of children(); track $index) {
           <div class="ge__child">
             <app-guard-editor
@@ -20,39 +30,44 @@
               (guardChange)="setChild($index, $event)"
             />
             @if (op() !== 'not') {
-              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeChild($index)">✕</app-button>
+              <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.flow.guardRemove' | t" [title]="'admin.flow.guardRemove' | t" (click)="removeChild($index)">
+                <app-icon name="x" />
+              </app-button>
             }
           </div>
         }
-        @if (op() !== 'not') {
-          <app-button variant="ghost" size="sm" (click)="addChild()">+ {{ 'admin.flow.guardAddChild' | t }}</app-button>
-        }
       </div>
-    }
-    @case ('leaf') {
+    </div>
+  }
+  @default {
+    <!-- A single condition (or none): the operator, then the value it needs. -->
+    <div class="ge__leaf">
+      <app-select
+        class="ge__op"
+        [label]="'admin.flow.guardOp' | t"
+        [options]="opOptions()"
+        [placeholder]="'admin.flow.guardNone' | t"
+        [ngModel]="op()"
+        (ngModelChange)="onOpChange($event)"
+      />
       @switch (valueKind()) {
         @case ('role') {
-          <app-select [options]="roleOptions()" [placeholder]="'admin.flow.cfgRolePh' | t" [ngModel]="strValue()" (ngModelChange)="setValue($event)" />
+          <app-select [label]="'admin.flow.recipientKind.role' | t" [options]="roleOptions()" [placeholder]="'admin.flow.cfgRolePh' | t" [ngModel]="strValue()" (ngModelChange)="setValue($event)" />
         }
         @case ('committee') {
-          <app-select [options]="gremiumOptions()" [placeholder]="'admin.flow.cfgGremiumPh' | t" [ngModel]="strValue()" (ngModelChange)="setValue($event)" />
+          <app-select [label]="'admin.flow.cfgGremium' | t" [options]="gremiumOptions()" [placeholder]="'admin.flow.cfgGremiumPh' | t" [ngModel]="strValue()" (ngModelChange)="setValue($event)" />
         }
         @case ('text') {
-          <input class="ge__input" [ngModel]="strValue()" (ngModelChange)="setValue($event)" [attr.aria-label]="'admin.flow.guardValue' | t" />
+          <app-input class="ge__mono" [label]="'admin.flow.guardValue' | t" [ngModel]="strValue()" (ngModelChange)="setValue($event)" />
         }
         @case ('compare') {
           <div class="ge__compare">
-            <input class="ge__input" [ngModel]="cmp().field" (ngModelChange)="setCompare({ field: $event })" [attr.placeholder]="'admin.flow.compareFieldPh' | t" [attr.aria-label]="'admin.flow.compareField' | t" />
-            <select class="ge__input" [ngModel]="cmp().op" (ngModelChange)="setCompare({ op: $event })" [attr.aria-label]="'admin.flow.compareOp' | t">
-              @for (o of compareOps; track o) { <option [value]="o">{{ o }}</option> }
-            </select>
-            <input class="ge__input" [ngModel]="cmp().value" (ngModelChange)="setCompare({ value: $event })" [attr.placeholder]="'admin.flow.compareValue' | t" [attr.aria-label]="'admin.flow.compareValue' | t" />
+            <app-input class="ge__mono" [label]="'admin.flow.compareField' | t" [placeholder]="'admin.flow.compareFieldPh' | t" [ngModel]="cmp().field" (ngModelChange)="setCompare({ field: $event })" />
+            <app-select class="ge__cmpOp" [label]="'admin.flow.compareOp' | t" [options]="compareOpOptions" [ngModel]="cmp().op" (ngModelChange)="setCompare({ op: $event })" />
+            <app-input class="ge__mono" [label]="'admin.flow.compareValue' | t" [ngModel]="cmp().value" (ngModelChange)="setCompare({ value: $event })" />
           </div>
         }
-        @case ('none') {
-          <span class="text-sm text-muted">{{ 'admin.flow.guardBoolTrue' | t }}</span>
-        }
       }
-    }
+    </div>
   }
-</div>
+}

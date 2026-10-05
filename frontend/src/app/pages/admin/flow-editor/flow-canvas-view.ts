@@ -52,6 +52,8 @@ export interface CanvasNode {
   kind: string;
   color: string | null;
   isInitial: boolean;
+  /** A terminal state: the node carries the tag "Endzustand" under its label. */
+  isTerminal: boolean;
   selected: boolean;
   multi: boolean;
   x: number;
@@ -253,6 +255,7 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
         kind: s.kind ?? 'normal',
         color: s.color ?? null,
         isInitial: !!s.isInitial,
+        isTerminal: !!s.isTerminal,
         selected: sel?.kind === 'state' && sel.key === s.key,
         multi: multi.has(s.key),
         x: pos[s.key]?.x ?? 0,

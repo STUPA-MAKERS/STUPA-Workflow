@@ -1,9 +1,15 @@
-import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent, SelectComponent, type SelectOption } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  IconComponent,
+  InputComponent,
+  SelectComponent,
+  type SelectOption,
+} from '@stupa-makers/ui-kit';
 import {
   ACTION_TYPES,
   NOTIFY_RECIPIENT_KINDS,
@@ -15,12 +21,24 @@ import {
 import { GuardEditorComponent } from './guard-editor.component';
 import { actionParamOf, recipientNeedsRef, recipientsOf } from './flow-guard.util';
 
-/** Guard and actions pane of the selected transition. It sits below the graph. */
+/**
+ * Guard and actions of the selected transition. They follow the transition settings in
+ * the inspector: the guard builder, one card per action with its parameters, and
+ * "Aktion hinzufügen" (choose the kind, then "Hinzufügen").
+ */
 @Component({
   selector: 'app-transition-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, SelectComponent, GuardEditorComponent],
+  imports: [
+    FormsModule,
+    TranslatePipe,
+    ButtonComponent,
+    IconComponent,
+    InputComponent,
+    SelectComponent,
+    GuardEditorComponent,
+  ],
   templateUrl: './transition-detail.component.html',
   styleUrl: './transition-detail.component.scss',
 })
@@ -40,6 +58,17 @@ export class TransitionDetailComponent {
   readonly recipientRemove = output<{ ai: number; ri: number }>();
   readonly recipientKindChange = output<{ ai: number; ri: number; kind: string }>();
   readonly recipientRefChange = output<{ ai: number; ri: number; ref: string }>();
+
+  /** The action kind chosen in "Aktion hinzufügen", until "Hinzufügen" adds it. */
+  protected readonly pendingAction = signal('');
+
+  /** Add the chosen action kind and clear the choice. */
+  protected addPending(): void {
+    const type = this.pendingAction();
+    if (!type) return;
+    this.actionAdd.emit(type);
+    this.pendingAction.set('');
+  }
 
   protected actionOptions(): SelectOption[] {
     return ACTION_TYPES.map((a) => ({

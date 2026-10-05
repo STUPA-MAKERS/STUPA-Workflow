@@ -299,4 +299,26 @@ describe('GuardEditorComponent', () => {
       expect(last()).toEqual({ compare: { field: 'total', op: '==', value: '5' } });
     });
   });
+
+  describe('layout (FE12b)', () => {
+    it('describes a combinator beside its operator and offers "+ Bedingung" except for NOT', async () => {
+      const { c, setGuard, container } = await setup({ guard: { and: [{ deadlinePassed: true }] } });
+      expect(c.combinatorText()).toBe('alle Bedingungen erfüllt');
+      expect(container.querySelector('.ge__box')).not.toBeNull();
+      expect(container.querySelector('.ge__add, app-button')).not.toBeNull();
+      setGuard({ or: [{ deadlinePassed: true }] });
+      expect(c.combinatorText()).toBe('mindestens eine Bedingung erfüllt');
+      setGuard({ not: [{ deadlinePassed: true }] });
+      expect(c.combinatorText()).toBe('die Bedingung ist nicht erfüllt');
+      expect(container.textContent).not.toContain('Bedingung entfernen');
+      setGuard({ roleIs: 'stupa' });
+      expect(c.combinatorText()).toBe('');
+    });
+
+    it('renders a comparison as field, operator and value with every compare operator', async () => {
+      const { c, container } = await setup({ guard: { compare: { field: 'amount', op: '>', value: '1000' } } });
+      expect(container.querySelectorAll('.ge__compare app-input')).toHaveLength(2);
+      expect(c.compareOpOptions.map((o: { value: string }) => o.value)).toEqual(['==', '!=', '<', '<=', '>', '>=', 'in']);
+    });
+  });
 });
