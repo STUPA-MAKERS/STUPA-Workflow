@@ -161,6 +161,41 @@ class VoteOut(_CamelModel):
     can_cast: bool = Field(default=False, alias="canCast")
 
 
+VoteStatus = Literal["draft", "open", "closed", "cancelled"]
+
+
+class VoteListItem(_CamelModel):
+    """One row of the vote list (``GET /votes``).
+
+    The row carries no tally. The client reads the tally from ``GET /votes/{id}``.
+    ``myBallot`` and ``canCast`` give the own ballot state of the caller: a secret vote
+    gives only ``cast``, never the choice. ``meetingTitle`` and ``agendaPosition``
+    (the 1-based number of the agenda item, "TOP 3") are None for a vote without a
+    meeting. ``gremiumName`` is None when the vote names no gremium (an old row with a
+    free group key).
+    """
+
+    id: UUID
+    question: str | None = None
+    status: VoteStatus
+    result: Literal["passed", "rejected", "tie"] | None = None
+    secret: bool
+    application_id: UUID | None = Field(default=None, alias="applicationId")
+    meeting_id: UUID | None = Field(default=None, alias="meetingId")
+    meeting_title: str | None = Field(default=None, alias="meetingTitle")
+    agenda_item_id: UUID | None = Field(default=None, alias="agendaItemId")
+    agenda_position: int | None = Field(default=None, alias="agendaPosition")
+    gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+    gremium_name: str | None = Field(default=None, alias="gremiumName")
+    created_at: datetime = Field(alias="createdAt")
+    opened_at: datetime | None = Field(default=None, alias="openedAt")
+    closed_at: datetime | None = Field(default=None, alias="closedAt")
+    # The planned end of the cast window, not the real end.
+    closes_at: datetime | None = Field(default=None, alias="closesAt")
+    can_cast: bool = Field(default=False, alias="canCast")
+    my_ballot: MyBallot = Field(default_factory=MyBallot, alias="myBallot")
+
+
 class BallotAccepted(_CamelModel):
     """Response for an accepted ballot.
 

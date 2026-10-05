@@ -51,10 +51,13 @@ from app.modules.voting.schemas import (
     VoteClosed,
     VoteCreate,
     VoteCreateInternal,
+    VoteListItem,
     VoteOut,
+    VoteStatus,
 )
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
+from app.shared.paging import DEFAULT_LIMIT, Page
 
 # The problem code of a second cast (REST 409 and the live-vote error frame).
 ALREADY_VOTED = "already_voted"
@@ -1027,6 +1030,33 @@ class VotingService:
         """
         vote = await self._get_vote(vote_id)
         await self.assert_can_manage(vote, principal)
+
+    async def list_visible(
+        self,
+        principal: Principal,
+        *,
+        statuses: Sequence[VoteStatus] | None = None,
+        gremium_id: UUID | None = None,
+        q: str | None = None,
+        limit: int = DEFAULT_LIMIT,
+        offset: int = 0,
+    ) -> Page[VoteListItem]:
+        """Return one page of the votes that the principal can read (``GET /votes``).
+
+        The read rule is the rule of ``assert_can_read``, applied in SQL. See
+        ``app.modules.voting.listing``.
+        """
+        from app.modules.voting.listing import list_votes
+
+        return await list_votes(
+            self.session,
+            principal,
+            statuses=statuses,
+            gremium_id=gremium_id,
+            q=q,
+            limit=limit,
+            offset=offset,
+        )
 
     async def get(self, vote_id: UUID) -> VoteOut:
         """Return the vote state and the aggregated tally.

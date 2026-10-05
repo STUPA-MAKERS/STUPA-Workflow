@@ -7,6 +7,8 @@
 * ``DELETE /api/votes/{id}``            - delete a draft vote. Manage right.
 * ``POST /api/votes/{id}/ballot``       - cast a vote. Roster of the vote, human only.
 * ``GET  /api/votes/{id}``              - vote state + tally (secret: only counts).
+* ``GET  /api/votes``                   - the votes the caller can read, with the own
+  ballot state (no tally).
 
 The manage right is the admin role or the gremium permission ``vote.manage`` or
 ``session.manage`` in the gremium of the vote (``VotingService.can_manage_group``). The
@@ -24,7 +26,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.deps import DbSession, require_principal
 from app.modules.auth.principal import Principal
@@ -36,10 +38,13 @@ from app.modules.voting.schemas import (
     BallotIn,
     VoteClosed,
     VoteCreate,
+    VoteListItem,
     VoteOut,
+    VoteStatus,
 )
 from app.modules.voting.service import VotingService
 from app.shared.errors import ProblemDetail
+from app.shared.paging import DEFAULT_LIMIT, MAX_LIMIT, Page
 
 router = APIRouter(tags=["voting"])
 
@@ -228,6 +233,40 @@ async def cast_ballot(
     )
     await publisher.vote_tally(await service.get(vote_id))
     return accepted
+
+
+@router.get(
+    "/votes",
+    response_model=Page[VoteListItem],
+    responses=_errors(401, 422),
+)
+async def list_votes(
+    service: ServiceDep,
+    principal: ReaderDep,
+    status: Annotated[list[VoteStatus] | None, Query()] = None,
+    gremium_id: Annotated[UUID | None, Query(alias="gremiumId")] = None,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+    limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> Page[VoteListItem]:
+    """List the votes that the caller can read, the open votes first.
+
+    The read rule is the rule of ``GET /votes/{id}``: the meeting votes of the meetings
+    the caller can read, and the votes without a meeting for a holder of
+    ``application.read``, an eligible voter or a manager of the vote. ``status`` repeats
+    (``?status=open&status=closed``). Without it the list leaves out the drafts.
+    ``gremiumId`` keeps the votes of one gremium, and ``q`` searches the question and
+    the meeting title. Each row carries ``canCast`` and the own ballot (``myBallot``; a
+    secret vote gives only ``cast``) and no tally.
+    """
+    return await service.list_visible(
+        principal,
+        statuses=status,
+        gremium_id=gremium_id,
+        q=q,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get(

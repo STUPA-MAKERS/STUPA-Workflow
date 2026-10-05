@@ -212,6 +212,22 @@ class PermissionOps(MeetingServiceBase):
             return
         raise ForbiddenError("not allowed to view this meeting")
 
+    async def meeting_read_scope(
+        self, principal: Principal
+    ) -> tuple[set[UUID] | None, set[UUID]]:
+        """Return the read scope of `assert_can_read` as two id sets.
+
+        The first set holds the gremien whose meetings the principal can read. `None`
+        means all gremien. The second set holds the meetings in which the principal
+        receives a delegation. It is empty when the first set is `None`, because the
+        principal then reads every meeting. The vote list (`GET /votes`) filters the
+        meeting votes with this scope, so the list and the single read agree.
+        """
+        visible = await self._visible_gremium_ids(principal)
+        if visible is None:
+            return None, set()
+        return visible, await self._delegated_meeting_ids(principal.sub)
+
     async def _visible_gremium_ids(self, principal: Principal) -> set[UUID] | None:
         """Return the gremien whose meetings the principal can see.
 
