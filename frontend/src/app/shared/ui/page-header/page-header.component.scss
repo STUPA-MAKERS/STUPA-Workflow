@@ -45,6 +45,26 @@
   letter-spacing: var(--tracking-tight);
 }
 
+/* The title and its meta text share one baseline. The meta text wraps under the title
+   only when the line has no space for both. */
+.ph__heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+  min-width: 0;
+}
+
+/* A short fact about the page, such as "8 offen". It is part of the title block, not a
+   control, so it does not go into the actions slot. */
+.ph__meta {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* The lead line. Give it only when it says something the title does not. */
 .ph__subtitle {
   margin: var(--space-1) 0 0;
