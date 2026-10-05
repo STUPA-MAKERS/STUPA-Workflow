@@ -13,7 +13,7 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { map } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
 import type { Meeting, Uuid } from '@core/api/models';
@@ -34,6 +34,7 @@ import { StatusTextComponent } from '@shared/ui/status-text/status-text.componen
 import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
 import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
+import { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
 import { MeetingDetailSheetComponent } from '../meeting-detail-sheet/meeting-detail-sheet.component';
 import { MeetingDialogsService } from '../meeting-dialogs.service';
 import { meetingDay, meetingTimeText } from '../meetings-display.util';
@@ -69,7 +70,6 @@ import { beamerUrl } from '../../voting/beamer-link.util';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NgTemplateOutlet,
-    RouterLink,
     TranslatePipe,
     ButtonComponent,
     IconComponent,
@@ -86,6 +86,7 @@ import { beamerUrl } from '../../voting/beamer-link.util';
     ScrollFadeDirective,
     MeetingDetailSheetComponent,
     MeetingsViewSwitchComponent,
+    CalendarSubscribeComponent,
   ],
   templateUrl: './meetings-list.component.html',
   styleUrl: './meetings-list.component.scss',
@@ -272,8 +273,9 @@ export class MeetingsListComponent {
     window.open(url, '_blank', 'noopener');
   }
 
-  onPhoneMenu(item: RowMenuItem): void {
-    if (item.id === 'calendar') void this.router.navigate(['/account/calendar']);
+  /** The ⋮ menu of the phone header: "Kalender-Abo" opens the bottom sheet. */
+  onPhoneMenu(item: RowMenuItem, abo: CalendarSubscribeComponent): void {
+    if (item.id === 'calendar') abo.open();
   }
 
   status(m: Meeting): StatusView {

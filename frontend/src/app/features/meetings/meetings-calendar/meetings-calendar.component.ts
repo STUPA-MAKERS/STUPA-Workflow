@@ -14,7 +14,7 @@ import {
   Injector,
   NgZone,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import type { Meeting } from '@core/api/models';
 import { I18nService, toFormatLocale } from '@core/i18n/i18n.service';
@@ -33,6 +33,7 @@ import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
+import { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
 import { MeetingDialogsService } from '../meeting-dialogs.service';
 import { meetingDay, meetingTimeText, shortTime, weekdayDate } from '../meetings-display.util';
 import {
@@ -99,7 +100,6 @@ interface DayCard {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink,
     TranslatePipe,
     ButtonComponent,
     IconComponent,
@@ -112,6 +112,7 @@ interface DayCard {
     StatusTextComponent,
     ScrollFadeDirective,
     MeetingsViewSwitchComponent,
+    CalendarSubscribeComponent,
   ],
   host: { '[class.cal--wide]': 'wide()' },
   templateUrl: './meetings-calendar.component.html',

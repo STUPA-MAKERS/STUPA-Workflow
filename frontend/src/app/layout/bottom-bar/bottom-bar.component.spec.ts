@@ -33,7 +33,6 @@ async function setup(principal: Principal = ADMIN) {
       provideRouter([
         { path: 'dashboard', component: StubPage },
         { path: 'budget', component: StubPage },
-        { path: 'account/calendar', component: StubPage },
         { path: 'account/notifications', component: StubPage },
         { path: 'expenses', component: StubPage },
       ]),
@@ -115,7 +114,7 @@ describe('BottomBarComponent', () => {
     fixture.detectChanges();
     expect(more()).toHaveClass('is-active');
 
-    await router.navigateByUrl('/account/calendar');
+    await router.navigateByUrl('/account/notifications');
     fixture.detectChanges();
     expect(more()).toHaveClass('is-active');
 

@@ -7,9 +7,6 @@
   <a class="am__item" routerLink="/account/notifications" (click)="onNavigate()">
     <app-icon name="bell" [size]="19" />{{ 'account.menu.notifications' | t }}
   </a>
-  <a class="am__item" routerLink="/account/calendar" (click)="onNavigate()">
-    <app-icon name="cal" [size]="19" />{{ 'account.menu.calendar' | t }}
-  </a>
   @if (auth.canAny('mcp.use')) {
     <a class="am__item" routerLink="/account/grants" (click)="onNavigate()">
       <app-icon name="webhook" [size]="19" />{{ 'account.menu.apiAccess' | t }}

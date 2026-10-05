@@ -100,23 +100,6 @@
   flex: none;
   max-width: 100%;
 }
-.cal__iconLink {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: var(--control-height);
-  height: var(--control-height);
-  border-radius: 50%;
-  color: var(--color-text-muted);
-}
-.cal__iconLink:hover {
-  background: var(--color-surface-2);
-  color: var(--color-text);
-}
-.cal__iconLink:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
-}
 
 /* ------------------------------------------------------------------ month grid */
 /* The cells sit on the border colour with a 1px gap: the gap draws the lines. The grid

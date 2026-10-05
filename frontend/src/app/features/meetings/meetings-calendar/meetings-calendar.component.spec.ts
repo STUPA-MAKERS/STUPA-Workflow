@@ -405,7 +405,7 @@ describe('MeetingsCalendarComponent', () => {
     expect(screen.getByText('Keine Sitzung an diesem Tag.')).toBeInTheDocument();
   });
 
-  it('switches the view, creates a meeting and links the calendar subscription', async () => {
+  it('switches the view, creates a meeting and opens the calendar subscription', async () => {
     const view = await setup({ wide: true });
     load(view);
     expect(view.fixture.nativeElement).toHaveClass('cal--wide');
@@ -413,7 +413,11 @@ describe('MeetingsCalendarComponent', () => {
     expect(view.on.viewChange).toHaveBeenCalledWith('list');
     await userEvent.click(screen.getByRole('button', { name: 'Neue Sitzung' }));
     expect(view.on.create).toHaveBeenCalled();
-    expect(screen.getByRole('link', { name: 'Kalender-Abo' })).toHaveAttribute('href', '/account/calendar');
+    await userEvent.click(screen.getByRole('button', { name: 'Kalender-Abo' }));
+    view.http.expectOne('/api/calendar/me').flush({ url: null });
+    view.fixture.detectChanges();
+    expect(screen.getByRole('dialog', { name: 'Kalender-Abo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Kalender-Abo' })).toHaveAttribute('aria-pressed', 'true');
     view.fixture.componentRef.setInput('canCreate', false);
     view.fixture.detectChanges();
     expect(screen.queryByRole('button', { name: 'Neue Sitzung' })).toBeNull();

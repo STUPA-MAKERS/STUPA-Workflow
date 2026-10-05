@@ -77,7 +77,6 @@ export const de = {
   'ui.history.after': 'Nachher',
   'account.menu.apiAccess': 'API-Zugang',
   'account.menu.notifications': 'Benachrichtigungen',
-  'account.menu.calendar': 'Kalender-Abo',
   'account.calendar.title': 'Kalender-Abo',
   'account.calendar.intro':
     'Abonniere deine Sitzungstermine im Kalender (Google, Apple, Outlook …). Die URL ist persönlich — teile sie nicht.',
@@ -2992,7 +2991,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'ui.history.after': 'After',
   'account.menu.apiAccess': 'API access',
   'account.menu.notifications': 'Notifications',
-  'account.menu.calendar': 'Calendar feed',
   'account.calendar.title': 'Calendar subscription',
   'account.calendar.intro':
     'Subscribe to your meeting dates in your calendar (Google, Apple, Outlook …). The URL is personal — do not share it.',

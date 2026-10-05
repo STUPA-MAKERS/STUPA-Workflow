@@ -270,10 +270,16 @@
   <span class="fv__cap cap">{{ 'participant.start.cap' | t }}</span>
   <h2 class="fv__startTitle">{{ startText() }}</h2>
   <p class="fv__muted">{{ 'participant.start.lead' | t }}</p>
-  <a class="fv__calendar" routerLink="/account/calendar">
+  <button
+    type="button"
+    class="fv__calendar"
+    [attr.aria-expanded]="abo.isOpen()"
+    (click)="abo.toggle($event.currentTarget)"
+  >
     <app-icon name="cal" [size]="17" />
     {{ 'participant.start.calendar' | t }}
-  </a>
+  </button>
+  <app-calendar-subscribe #abo />
 </ng-template>
 
 <!-- A running meeting before the lead calls an item, or a closed meeting without items. -->

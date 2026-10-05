@@ -216,6 +216,10 @@ app-button ::ng-deep .btn__label > app-icon:first-child {
 }
 .fv__calendar {
   display: inline-flex;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
   align-items: center;
   gap: var(--space-2);
   min-height: var(--control-height);

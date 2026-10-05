@@ -92,7 +92,6 @@ async function setup(
       provideHttpClientTesting(),
       provideRouter([
         { path: 'meetings/:id', children: [] },
-        { path: 'account/calendar', children: [] },
         { path: '**', children: [] },
       ]),
       MeetingsTimelineService,
@@ -446,7 +445,10 @@ describe('MeetingsListComponent', () => {
       load(view);
       await userEvent.click(screen.getByRole('radio', { name: 'Kalender' }));
       expect(view.on.viewChange).toHaveBeenCalledWith('calendar');
-      expect(screen.getByRole('link', { name: 'Kalender-Abo' })).toHaveAttribute('href', '/account/calendar');
+      await userEvent.click(screen.getByRole('button', { name: 'Kalender-Abo' }));
+      view.http.expectOne('/api/calendar/me').flush({ url: 'https://x/api/calendar/T.ics' });
+      view.fixture.detectChanges();
+      expect(screen.getByRole('dialog', { name: 'Kalender-Abo' })).toHaveTextContent('https://x/api/calendar/T.ics');
       await userEvent.click(screen.getByRole('button', { name: 'Neue Sitzung' }));
       expect(view.on.create).toHaveBeenCalled();
       view.fixture.componentRef.setInput('showSwitch', false);
@@ -498,8 +500,12 @@ describe('MeetingsListComponent', () => {
       expect(view.on.create).toHaveBeenCalled();
       await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
       await userEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Kalender-Abo' }));
+      view.http.expectOne('/api/calendar/me').flush({ url: null });
       await view.fixture.whenStable();
-      expect(view.router.url).toBe('/account/calendar');
+      view.fixture.detectChanges();
+      // A phone shows the subscription as a bottom sheet.
+      expect(screen.getByRole('dialog', { name: 'Kalender-Abo' })).toHaveTextContent('Abo-Link erzeugen');
+      expect(view.router.url).toBe('/');
     });
 
     it('puts the time and the agenda count into the sub line and wraps the title', async () => {
