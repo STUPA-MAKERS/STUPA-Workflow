@@ -15,7 +15,7 @@ class Host {
 @Component({
   standalone: true,
   imports: [StickyBarComponent],
-  template: `<div class="pane" style="overflow-y: auto">
+  template: `<div class="pane" style="overflow-y: auto; padding-top: 32px">
     <app-sticky-bar><input aria-label="Suche" /></app-sticky-bar>
   </div>`,
 })
@@ -140,7 +140,8 @@ describe('StickyBarComponent', () => {
 
     it('is stuck when the box scrolled and the bar sits at the top of the box, also with the window at the top', async () => {
       const { view, pane, bar } = await setupPane();
-      place(bar, 24);
+      // The box starts at 24 and has a top padding of 32: the bar sticks at 56.
+      place(bar, 56);
       Object.defineProperty(pane, 'scrollTop', { value: 200, writable: true, configurable: true });
       pane.dispatchEvent(new Event('scroll'));
       await flushFrame();
@@ -153,7 +154,8 @@ describe('StickyBarComponent', () => {
       place(bar, 24, 56);
       pane.dispatchEvent(new Event('scroll'));
       await flushFrame();
-      expect(pane.style.getPropertyValue('scroll-padding-top')).toBe('56px');
+      // 32 (the top padding of the box) + 56 (the bar).
+      expect(pane.style.getPropertyValue('scroll-padding-top')).toBe('88px');
       expect(document.documentElement.style.getPropertyValue('scroll-padding-top')).toBe('');
       view.fixture.destroy();
       expect(pane.style.getPropertyValue('scroll-padding-top')).toBe('');
