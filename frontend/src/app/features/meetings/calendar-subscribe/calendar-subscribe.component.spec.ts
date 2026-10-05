@@ -349,4 +349,92 @@ describe('CalendarSubscribeComponent', () => {
       delete (HTMLElement.prototype as { showPopover?: unknown }).showPopover;
     }
   });
+
+  it('is placed under its anchor on the first rendered frame, with no timer', async () => {
+    const rect = (x: number, y: number, w: number, h: number) =>
+      ({ top: y, bottom: y + h, left: x, right: x + w, width: w, height: h, x, y }) as DOMRect;
+    const atShow: { placed: boolean; top: string }[] = [];
+    Object.defineProperty(HTMLElement.prototype, 'showPopover', {
+      configurable: true,
+      value(this: HTMLElement) {
+        atShow.push({ placed: this.classList.contains('cs--placed'), top: this.style.top });
+      },
+    });
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    const spy = jest
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.classList.contains('cs--pop')) return rect(0, 0, 400, 300);
+        if (this.classList.contains('anchor')) return rect(900, 100, 40, 40);
+        return original.call(this);
+      });
+    try {
+      const { fixture, anchor } = await setup();
+      fireEvent.click(anchor);
+      // One change detection, no timer and no further tick: the popover is in the top
+      // layer, hidden until placed, and placed under the end of its anchor.
+      fixture.detectChanges();
+      const pop = document.querySelector<HTMLElement>('.cs--pop')!;
+      expect(atShow).toEqual([{ placed: false, top: '' }]);
+      expect(pop).toHaveClass('cs--placed');
+      expect(pop.style.top).toBe(`${100 + 40 + 6}px`);
+      expect(pop.style.left).toBe(`${940 - 400}px`);
+      expect(pop).toHaveFocus();
+      fixture.destroy();
+    } finally {
+      spy.mockRestore();
+      delete (HTMLElement.prototype as { showPopover?: unknown }).showPopover;
+    }
+  });
+
+  it('places the popover again when the layout changes, and stops on close', async () => {
+    const observers: { cb: () => void; targets: Element[]; disconnect: jest.Mock }[] = [];
+    const originalRO = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
+      readonly entry: { cb: () => void; targets: Element[]; disconnect: jest.Mock };
+      constructor(cb: () => void) {
+        this.entry = { cb, targets: [], disconnect: jest.fn() };
+        observers.push(this.entry);
+      }
+      observe(el: Element): void {
+        this.entry.targets.push(el);
+      }
+      disconnect(): void {
+        this.entry.disconnect();
+      }
+    };
+    let anchorTop = 100;
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    const spy = jest
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.classList.contains('anchor'))
+          return { top: anchorTop, bottom: anchorTop + 40, left: 900, right: 940, width: 40, height: 40, x: 900, y: anchorTop } as DOMRect;
+        return original.call(this);
+      });
+    try {
+      const { openIt, fixture, cmp, anchor } = await setup();
+      await openIt();
+      expect(observers).toHaveLength(1);
+      const [ro] = observers;
+      expect(ro.targets).toEqual([document.querySelector('.cs--pop'), anchor, document.body]);
+      expect(cmp.position().top).toBe(146);
+      // The calendar grid renders below the toolbar and moves the anchor.
+      anchorTop = 160;
+      ro.cb();
+      expect(cmp.position().top).toBe(206);
+      expect(document.querySelector<HTMLElement>('.cs--pop')!.style.top).toBe('206px');
+      cmp.close();
+      fixture.detectChanges();
+      expect(ro.disconnect).toHaveBeenCalled();
+      // A late callback after the close places nothing.
+      anchorTop = 300;
+      ro.cb();
+      expect(cmp.position().top).toBe(206);
+      fixture.destroy();
+    } finally {
+      spy.mockRestore();
+      (globalThis as { ResizeObserver?: unknown }).ResizeObserver = originalRO;
+    }
+  });
 });
