@@ -158,10 +158,12 @@ describe('AdminFrameComponent', () => {
   });
 
   it('is the overview on the home page: h1, Zustand and a line per entry', async () => {
-    const view = await setup(ALL, '/admin');
+    // One column: the navigation is the page, with a description per entry.
+    const view = await setup(ALL, '/admin', false);
     expect(screen.getByRole('heading', { name: 'Verwaltung', level: 1 })).toBeInTheDocument();
     expect(view.container.querySelector('app-admin-health')).not.toBeNull();
     expect(screen.getByText('Benutzer und Rollenzuweisungen')).toBeInTheDocument();
+    expect(view.container.querySelector('.af__page')).toHaveClass('af__hidden');
     expect(view.container.querySelector('.af')).toHaveClass('af--home');
     // The search hides the tiles: they are no entries. They stay in the DOM, so a
     // cleared search does not load them again.
@@ -294,9 +296,13 @@ describe('AdminFrameComponent', () => {
     expect(home.container.querySelector('.af')).not.toHaveClass('af--split');
   });
 
-  it('keeps the home page in one column without a gremium page beside the navigation', async () => {
+  it('keeps the column and the sheet of every admin page on the wide home page', async () => {
+    // Any admin right gives the same split: the empty sheet stands beside the column,
+    // which shows the titles only, as beside an admin page.
     const view = await setup(['backup.manage'], '/admin');
-    expect(view.container.querySelector('.af')).not.toHaveClass('af--split');
+    expect(view.container.querySelector('.af')).toHaveClass('af--split');
+    expect(view.container.querySelector('.af__page')).not.toHaveClass('af__hidden');
+    expect(view.container.querySelector('.af__itemDesc')).toBeNull();
   });
 
   it('tells the breadcrumbs to leave out "Verwaltung" while the column shows, and clears it', async () => {

@@ -44,7 +44,7 @@
                     <app-icon class="af__icon" [name]="p.icon" [size]="20" />
                     <span class="af__itemText">
                       <span class="af__itemTitle ell" [title]="p.title | t">{{ p.title | t }}</span>
-                      @if (home()) {
+                      @if (home() && !split()) {
                         <span class="af__itemDesc">{{ p.desc | t }}</span>
                       }
                     </span>
@@ -62,7 +62,9 @@
 
   <!-- Beside the navigation the page sheet is a window with round corners: the sheet
        clips, the body in it scrolls, so the corners clip what scrolls. -->
-  <div class="af__page">
+  <!-- One column on the home page: the navigation is the page, the empty sheet does not
+       show. -->
+  <div class="af__page" [class.af__hidden]="home() && !split()">
     <div #page class="af__pageBody" appScrollFade="y">
       <router-outlet />
     </div>

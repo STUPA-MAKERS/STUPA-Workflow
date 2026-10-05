@@ -24,6 +24,8 @@
 /* Wide: a pane page (`.pane-page` on the host, see styles.scss). The frame takes the
    free height of the shell main and does not scroll as a page. The navigation and the
    page sheet each scroll inside themselves. */
+/* The column has ONE width on the home page and on every admin page, so the column and
+   the sheet never move when an entry opens. */
 /* The gap to the sheet is the page gutter, the same as the margin of the sheet at the
    top, at the end edge and at the bottom. */
 .af--split {
@@ -33,9 +35,6 @@
   grid-template-rows: minmax(0, 1fr);
   gap: var(--layout-gutter);
   min-height: 0;
-}
-.af--split.af--home {
-  grid-template-columns: 24rem minmax(0, 1fr);
 }
 
 .af__nav {
