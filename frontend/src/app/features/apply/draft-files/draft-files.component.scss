@@ -47,10 +47,13 @@
   flex-direction: column;
   min-width: 0;
 }
-/* A file name is a value a person may copy: it wraps and never gets cut. */
+/* A long file name stays on one line with an ellipsis; the title shows all of it. */
 .df__name {
+  min-width: 0;
+  overflow: hidden;
   font-weight: var(--fw-medium);
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .df__sub {
   display: flex;

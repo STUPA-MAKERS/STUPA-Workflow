@@ -17,7 +17,7 @@
         <li class="df__row" [class.df__row--failed]="file.failed">
           <app-icon class="df__icon" name="clip" [size]="18" />
           <div class="df__text">
-            <span class="df__name">{{ file.filename }}</span>
+            <span class="df__name" [title]="file.filename">{{ file.filename }}</span>
             <span class="df__sub">
               <span>{{ size(file.size) }}</span>
               <span class="df__sep" aria-hidden="true">·</span>
@@ -45,7 +45,7 @@
         <li class="df__row df__row--pending">
           <span class="df__spinner" aria-hidden="true"></span>
           <div class="df__text">
-            <span class="df__name">{{ p.filename }}</span>
+            <span class="df__name" [title]="p.filename">{{ p.filename }}</span>
             <span class="df__sub" role="status">{{ size(p.size) }} · {{ 'apply.files.uploading' | t }}</span>
           </div>
         </li>

@@ -183,7 +183,9 @@
 .wz__fileName {
   flex: 1 1 auto;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* The actions stay at the foot of the window while the sheet scrolls. Fixed chrome:

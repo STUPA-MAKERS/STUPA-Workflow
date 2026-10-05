@@ -138,7 +138,7 @@
                   @for (f of drafts.usable(); track f.id) {
                     <li class="wz__file">
                       <app-icon class="wz__fileIcon" name="clip" [size]="17" />
-                      <span class="wz__fileName">{{ f.filename }}</span>
+                      <span class="wz__fileName" [title]="f.filename">{{ f.filename }}</span>
                       @if (f.isComparisonOffer) {
                         <app-badge variant="neutral">{{ 'apply.files.offerTag' | t }}</app-badge>
                       }

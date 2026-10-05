@@ -313,8 +313,6 @@ export class ApplyWizardComponent {
   });
 
   private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
-  /** No autosave while a restore or a discard writes the model. */
-  private restoring = false;
 
   constructor() {
     // Load the (cached) session, so a signed-in user gets the account as contact. /apply
@@ -355,13 +353,11 @@ export class ApplyWizardComponent {
     this.loadingForm.set(true);
     this.api.effectiveForm(id).subscribe({
       next: (eff) => {
-        this.restoring = true;
         this.model = {};
         this.effForm.set(eff);
         this.buildFields(eff);
         this.restoreDraft(id);
         this.syncFileFields();
-        this.restoring = false;
         this.loadingForm.set(false);
       },
       error: () => {
@@ -598,7 +594,6 @@ export class ApplyWizardComponent {
   /** "Entwurf verwerfen": answers, contact, files and autosave; back to step 1. */
   async discardDraft(): Promise<void> {
     this.confirmDiscard.set(false);
-    this.restoring = true;
     this.clearAutosave();
     this.model = {};
     this.contactForm.reset();
@@ -607,7 +602,6 @@ export class ApplyWizardComponent {
     if (eff) this.buildFields(eff);
     this.activeIndex.set(0);
     this.saved.set(false);
-    this.restoring = false;
     await this.drafts.discard();
   }
 
@@ -619,7 +613,7 @@ export class ApplyWizardComponent {
   }
 
   private scheduleAutosave(): void {
-    if (this.restoring || !this.draftKey()) return;
+    if (!this.draftKey()) return;
     if (this.autosaveTimer) clearTimeout(this.autosaveTimer);
     this.autosaveTimer = setTimeout(() => {
       this.autosaveTimer = null;
@@ -630,6 +624,10 @@ export class ApplyWizardComponent {
   /**
    * Write the autosave: the answers without the PII and file fields, and the step. The
    * contact step is never stored. A storage that throws ends the autosave quietly.
+   *
+   * Without an answer, there is no draft: the autosave of the type goes and the note
+   * "saved" goes. Thus a type pick alone and an "Entwurf verwerfen" store nothing (the
+   * autosave effect runs after the discard and sees the empty model).
    */
   persistDraft(): void {
     const key = this.draftKey();
@@ -640,6 +638,10 @@ export class ApplyWizardComponent {
     for (const [k, v] of Object.entries(this.model)) {
       if (!skip.has(k)) model[k] = v;
     }
+    if (!Object.values(model).some(hasAnswer)) {
+      this.dropDraft(key, typeId);
+      return;
+    }
     const draft: StoredAnswers = { v: 1, model, step: this.currentStep() };
     try {
       sessionStorage.setItem(key, JSON.stringify(draft));
@@ -647,6 +649,19 @@ export class ApplyWizardComponent {
       this.saved.set(true);
     } catch {
       /* storage blocked: the autosave is best effort */
+    }
+  }
+
+  /** Remove the autosave of one type, and the last type when it points to this type. */
+  private dropDraft(key: string, typeId: Uuid): void {
+    this.saved.set(false);
+    try {
+      sessionStorage.removeItem(key);
+      if (sessionStorage.getItem(DRAFT_LAST_TYPE) === typeId) {
+        sessionStorage.removeItem(DRAFT_LAST_TYPE);
+      }
+    } catch {
+      /* storage blocked: nothing to remove */
     }
   }
 
@@ -746,4 +761,16 @@ function readStorage(key: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * The value holds an answer. Empty text, an empty list, an object without an answer,
+ * null and false (an unset checkbox) are the state of a new form, so they hold none.
+ */
+function hasAnswer(value: unknown): boolean {
+  if (value === null || value === undefined || value === false) return false;
+  if (typeof value === 'string') return value.trim() !== '';
+  if (Array.isArray(value)) return value.some(hasAnswer);
+  if (typeof value === 'object') return Object.values(value).some(hasAnswer);
+  return true;
 }

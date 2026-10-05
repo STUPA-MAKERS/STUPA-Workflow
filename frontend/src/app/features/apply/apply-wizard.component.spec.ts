@@ -539,6 +539,7 @@ describe('ApplyWizardComponent', () => {
     expect(JSON.stringify(stored)).not.toContain('Erika');
     expect(JSON.stringify(stored)).not.toContain('DE89');
     expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBe('t1');
+    s.fixture.detectChanges();
     expect(screen.getByText('Entwurf in diesem Tab gespeichert')).toBeInTheDocument();
     // Nothing of the draft goes into localStorage (only the language is there).
     expect(Object.keys(localStorage)).toEqual(['ap.locale']);
@@ -644,8 +645,50 @@ describe('ApplyWizardComponent', () => {
     await waitFor(() => expect(drafts.discard).toHaveBeenCalled());
     expect(s.comp.model).toEqual({});
     expect(s.comp.activeIndex()).toBe(0);
+    // The autosave effect runs after the discard: past its pause, it stores nothing.
+    s.fixture.detectChanges();
+    await new Promise((r) => setTimeout(r, 600));
     expect(sessionStorage.getItem(`${DRAFT_PREFIX}t1`)).toBeNull();
     expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBeNull();
+    expect(s.comp.saved()).toBe(false);
+    expect(screen.queryByText('Entwurf in diesem Tab gespeichert')).toBeNull();
+  });
+
+  it('stores no autosave for a type pick without an answer', async () => {
+    jest.useFakeTimers();
+    try {
+      const s = await setup({ form: PLAIN });
+      s.comp.selectType('t1');
+      s.fixture.detectChanges();
+      s.comp.model['title'] = '  ';
+      s.comp.model['list'] = [null, { a: '', b: false }];
+      s.comp.activeIndex.set(1);
+      s.fixture.detectChanges();
+      jest.advanceTimersByTime(500);
+      expect(sessionStorage.getItem(`${DRAFT_PREFIX}t1`)).toBeNull();
+      expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBeNull();
+      expect(s.comp.saved()).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('removes the autosave when the last answer goes, but keeps the last type of another', async () => {
+    const s = await setup({ form: PLAIN });
+    s.comp.selectType('t1');
+    s.comp.model['title'] = 'X';
+    s.comp.model['amount'] = 0;
+    s.comp.persistDraft();
+    expect(s.comp.saved()).toBe(true);
+    delete s.comp.model['amount'];
+    s.comp.model['title'] = '';
+    s.comp.persistDraft();
+    expect(sessionStorage.getItem(`${DRAFT_PREFIX}t1`)).toBeNull();
+    expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBeNull();
+    expect(s.comp.saved()).toBe(false);
+    sessionStorage.setItem(DRAFT_LAST_TYPE, 't9');
+    s.comp.persistDraft();
+    expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBe('t9');
   });
 
   it('keeps the draft when the confirmation is cancelled', async () => {
