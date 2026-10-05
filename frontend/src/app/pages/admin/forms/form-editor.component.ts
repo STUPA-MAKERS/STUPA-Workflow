@@ -150,7 +150,10 @@ export class FormEditorComponent {
   protected readonly hasVersion = signal(false);
   protected readonly togglingActive = signal(false);
   protected readonly preview = signal(false);
-  /** Which cards show their advanced options (⋯). The key is "gi:qi". */
+  /**
+   * Which cards show their advanced options (⋯). The key is "gi:qi". A change of the
+   * structure (move, drop, delete, duplicate) re-keys it, see `restructure`.
+   */
   protected readonly expanded = signal<Record<string, boolean>>({});
   /** Open "add question" type menu per group: the group index, or null for none. */
   protected readonly typeMenuGroup = signal<number | null>(null);
@@ -158,8 +161,15 @@ export class FormEditorComponent {
   protected readonly menuPos = signal<{ left: number; top: number | null; bottom: number | null }>(
     { left: 0, top: 0, bottom: null },
   );
-  /** Raw edit strings of the JsonLogic fields: "gi:qi" maps to {visibleIf, compute}. */
+  /**
+   * Raw edit strings of the JsonLogic fields: "gi:qi" maps to {visibleIf, compute}. A
+   * change of the structure re-keys it, the same as `expanded`.
+   */
   private readonly rawLogic = signal<Record<string, { visibleIf?: string; compute?: string }>>({});
+  /** The "Frage hinzufügen" button that opened the type menu. Escape gives it the focus. */
+  private menuOpener: HTMLElement | null = null;
+  /** Closes the type menu on a scroll. Only one is registered at a time. */
+  private readonly closeOnScroll = (): void => this.closeTypeMenu(false);
   /** Index of the dragged group during a drag-reorder of whole groups. */
   private dragGroup: number | null = null;
   /** The dragged question during a drag in the outline. */
@@ -354,7 +364,7 @@ export class FormEditorComponent {
   }
 
   protected removeGroup(gi: number): void {
-    this.groups.update((list) => list.filter((_, i) => i !== gi));
+    this.restructure(() => this.groups.update((list) => list.filter((_, i) => i !== gi)));
     const sel = this.selected();
     if (sel?.gi === gi) this.selected.set(null);
     else if (sel && sel.gi > gi) this.selected.set({ gi: sel.gi - 1, qi: sel.qi });
@@ -369,12 +379,14 @@ export class FormEditorComponent {
   private reorderGroup(from: number, to: number): void {
     const len = this.groups().length;
     if (to < 0 || to >= len || from === to) return;
-    this.groups.update((list) => {
-      const next = [...list];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
+    this.restructure(() =>
+      this.groups.update((list) => {
+        const next = [...list];
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        return next;
+      }),
+    );
     // The shown group and the selection follow the groups to their new places.
     const place = (i: number): number => {
       if (i === from) return to;
@@ -409,10 +421,11 @@ export class FormEditorComponent {
    */
   protected toggleTypeMenu(gi: number, event: Event): void {
     if (this.typeMenuGroup() === gi) {
-      this.typeMenuGroup.set(null);
+      this.closeTypeMenu(false);
       return;
     }
     const button = (event.currentTarget as HTMLElement | null) ?? null;
+    this.menuOpener = button;
     const rect = button?.getBoundingClientRect();
     if (rect) {
       const below = window.innerHeight - rect.bottom;
@@ -423,12 +436,73 @@ export class FormEditorComponent {
       );
     }
     this.typeMenuGroup.set(gi);
+    // On a phone the menu is a bottom sheet. A scroll inside the sheet must not close it.
+    if (this.phone()) return;
     // The menu stays at its place on the screen, so a scroll of the page or of a column
     // closes it before it can drift away from its button.
-    window.addEventListener('scroll', () => this.typeMenuGroup.set(null), {
-      capture: true,
-      once: true,
-    });
+    window.removeEventListener('scroll', this.closeOnScroll, { capture: true });
+    window.addEventListener('scroll', this.closeOnScroll, { capture: true, once: true });
+    // The keyboard continues in the menu: the focus goes to its first type.
+    setTimeout(() => this.menuItems()[0]?.focus({ preventScroll: true }));
+  }
+
+  /** Close the type menu. With `refocus`, the button that opened it gets the focus again. */
+  protected closeTypeMenu(refocus: boolean): void {
+    if (this.typeMenuGroup() === null) return;
+    this.typeMenuGroup.set(null);
+    window.removeEventListener('scroll', this.closeOnScroll, { capture: true });
+    if (refocus) {
+      const opener = this.menuOpener;
+      (opener?.querySelector<HTMLElement>('button') ?? opener)?.focus({ preventScroll: true });
+    }
+  }
+
+  /** The type buttons of the open menu (wide and tablet only). */
+  private menuItems(): HTMLElement[] {
+    return Array.from(
+      this.host.nativeElement.querySelectorAll<HTMLElement>('.fe__menu .fe__menu-item'),
+    );
+  }
+
+  /**
+   * Keyboard in the type menu: the arrow keys, Home and End move between the types. Tab
+   * closes the menu and gives the focus back to its button.
+   */
+  protected onMenuKeydown(event: KeyboardEvent): void {
+    const items = this.menuItems();
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    let next: number | null = null;
+    switch (event.key) {
+      case 'ArrowDown':
+      case 'ArrowRight':
+        next = at < 0 ? 0 : (at + 1) % items.length;
+        break;
+      case 'ArrowUp':
+      case 'ArrowLeft':
+        next = at <= 0 ? items.length - 1 : at - 1;
+        break;
+      case 'Home':
+        next = 0;
+        break;
+      case 'End':
+        next = items.length - 1;
+        break;
+      case 'Tab':
+        event.preventDefault();
+        this.closeTypeMenu(true);
+        return;
+      default:
+        return;
+    }
+    event.preventDefault();
+    items[next]?.focus({ preventScroll: true });
+  }
+
+  /** Escape closes the open type menu, wherever the focus is, and focuses its button. */
+  @HostListener('document:keydown.escape')
+  protected onDocumentEscape(): void {
+    if (this.typeMenuGroup() === null || this.phone()) return;
+    this.closeTypeMenu(true);
   }
 
   /** A press outside the type menu and its buttons closes the menu. */
@@ -437,7 +511,7 @@ export class FormEditorComponent {
     if (this.typeMenuGroup() === null || this.phone()) return;
     const target = event.target as Element | null;
     if (target?.closest('.fe__menu, .fe__addBtn')) return;
-    this.typeMenuGroup.set(null);
+    this.closeTypeMenu(false);
   }
 
   /** A click or the focus in a card selects its question, without a scroll. */
@@ -502,16 +576,18 @@ export class FormEditorComponent {
 
   protected addQuestion(gi: number, type: FieldType): void {
     this.patchGroup(gi, (g) => ({ ...g, fields: [...g.fields, blankField(type, '')] }));
-    this.typeMenuGroup.set(null);
+    this.closeTypeMenu(false);
     const qi = (this.groups()[gi]?.fields.length ?? 1) - 1;
     this.selectQuestion({ gi, qi });
   }
 
   protected removeQuestion(pos: QPos): void {
-    this.patchGroup(pos.gi, (g) => ({
-      ...g,
-      fields: g.fields.filter((_, i) => i !== pos.qi),
-    }));
+    this.restructure(() =>
+      this.patchGroup(pos.gi, (g) => ({
+        ...g,
+        fields: g.fields.filter((_, i) => i !== pos.qi),
+      })),
+    );
     const sel = this.selected();
     if (sel?.gi !== pos.gi) return;
     if (sel.qi === pos.qi) this.selected.set(null);
@@ -519,14 +595,16 @@ export class FormEditorComponent {
   }
 
   protected duplicateQuestion(pos: QPos): void {
-    this.patchGroup(pos.gi, (g) => {
-      const copy: FormFieldDef = structuredClone(g.fields[pos.qi]);
-      copy.key = copy.key ? `${copy.key}_copy` : '';
-      return {
-        ...g,
-        fields: [...g.fields.slice(0, pos.qi + 1), copy, ...g.fields.slice(pos.qi + 1)],
-      };
-    });
+    this.restructure(() =>
+      this.patchGroup(pos.gi, (g) => {
+        const copy: FormFieldDef = structuredClone(g.fields[pos.qi]);
+        copy.key = copy.key ? `${copy.key}_copy` : '';
+        return {
+          ...g,
+          fields: [...g.fields.slice(0, pos.qi + 1), copy, ...g.fields.slice(pos.qi + 1)],
+        };
+      }),
+    );
     this.selectQuestion({ gi: pos.gi, qi: pos.qi + 1 });
   }
 
@@ -537,26 +615,56 @@ export class FormEditorComponent {
     if (!group) return;
     const target = pos.qi + dir;
     if (target >= 0 && target < group.fields.length) {
-      this.patchGroup(pos.gi, (g) => {
-        const next = [...g.fields];
-        const [moved] = next.splice(pos.qi, 1);
-        next.splice(target, 0, moved);
-        return { ...g, fields: next };
-      });
+      this.restructure(() =>
+        this.patchGroup(pos.gi, (g) => {
+          const next = [...g.fields];
+          const [moved] = next.splice(pos.qi, 1);
+          next.splice(target, 0, moved);
+          return { ...g, fields: next };
+        }),
+      );
       this.follow(pos, { gi: pos.gi, qi: target });
       return;
     }
     // At the edge, hand the question to the neighboring group when one exists.
     const ngi = pos.gi + dir;
     if (ngi < 0 || ngi >= groups.length) return;
-    this.groups.update((list) => {
-      const next = list.map((g) => ({ ...g, fields: [...g.fields] }));
-      const [moved] = next[pos.gi].fields.splice(pos.qi, 1);
-      if (dir === -1) next[ngi].fields.push(moved);
-      else next[ngi].fields.unshift(moved);
-      return next;
-    });
+    this.restructure(() =>
+      this.groups.update((list) => {
+        const next = list.map((g) => ({ ...g, fields: [...g.fields] }));
+        const [moved] = next[pos.gi].fields.splice(pos.qi, 1);
+        if (dir === -1) next[ngi].fields.push(moved);
+        else next[ngi].fields.unshift(moved);
+        return next;
+      }),
+    );
     this.follow(pos, { gi: ngi, qi: dir === -1 ? groups[ngi].fields.length : 0 });
+  }
+
+  /**
+   * Run a change of the structure (a move, drop, delete or duplicate of questions or
+   * groups) and re-key the per-question editor state ("gi:qi") to the new places.
+   *
+   * The change keeps the question objects, so each old key goes to the place where its
+   * object is now. The state of a deleted question goes away. A copy starts without state.
+   */
+  private restructure(change: () => void): void {
+    const before = this.groups();
+    change();
+    const now = new Map<FormFieldDef, string>();
+    this.groups().forEach((g, gi) => g.fields.forEach((f, qi) => now.set(f, `${gi}:${qi}`)));
+    const rekey = <T>(map: Record<string, T>): Record<string, T> => {
+      const next: Record<string, T> = {};
+      for (const [key, value] of Object.entries(map)) {
+        const [gi, qi] = key.split(':').map(Number);
+        const field = before[gi]?.fields[qi];
+        const to = field ? now.get(field) : undefined;
+        if (to !== undefined) next[to] = value;
+      }
+      return next;
+    };
+    this.expanded.update(rekey);
+    this.rawLogic.update(rekey);
   }
 
   /** The selection follows a moved question to its new place. */
@@ -688,7 +796,7 @@ export class FormEditorComponent {
     const selField = sel ? this.groups()[sel.gi]?.fields[sel.qi] : undefined;
     const moved = moveQuestionTo(this.groups(), from, to);
     if (!moved) return;
-    this.groups.set(moved.groups);
+    this.restructure(() => this.groups.set(moved.groups));
     // The selected question keeps its selection at its new place.
     if (!selField) return;
     moved.groups.forEach((g, gi) => {

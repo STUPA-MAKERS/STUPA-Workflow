@@ -208,12 +208,14 @@
                 (focusin)="focusCard(pos)"
                 (click)="focusCard(pos)"
               >
+                <!-- The actions of the head stop their click here: a click that reaches the
+                     card would select the old place again after a move. -->
                 <div class="fe__cardHead">
                   <h3 class="cap fe__cardTitle ell">{{ resolved(field.label) || ('admin.forms.untitledQuestion' | t) }}</h3>
-                  <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.moveUp' | t" [title]="'admin.common.moveUp' | t" (click)="moveQuestion(pos, -1)"><app-icon name="up" /></app-button>
-                  <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.moveDown' | t" [title]="'admin.common.moveDown' | t" (click)="moveQuestion(pos, 1)"><app-icon name="down" /></app-button>
-                  <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.forms.duplicate' | t" [title]="'admin.forms.duplicate' | t" (click)="duplicateQuestion(pos)"><app-icon name="copy" /></app-button>
-                  <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.delete' | t" [title]="'admin.common.delete' | t" (click)="removeQuestion(pos)"><app-icon name="trash" /></app-button>
+                  <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.moveUp' | t" [title]="'admin.common.moveUp' | t" (click)="$event.stopPropagation(); moveQuestion(pos, -1)"><app-icon name="up" /></app-button>
+                  <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.moveDown' | t" [title]="'admin.common.moveDown' | t" (click)="$event.stopPropagation(); moveQuestion(pos, 1)"><app-icon name="down" /></app-button>
+                  <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.forms.duplicate' | t" [title]="'admin.forms.duplicate' | t" (click)="$event.stopPropagation(); duplicateQuestion(pos)"><app-icon name="copy" /></app-button>
+                  <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.delete' | t" [title]="'admin.common.delete' | t" (click)="$event.stopPropagation(); removeQuestion(pos)"><app-icon name="trash" /></app-button>
                 </div>
 
                 <div class="fe__base">
@@ -432,7 +434,7 @@
     [style.left.px]="menuPos().left"
     [style.top.px]="menuPos().top"
     [style.bottom.px]="menuPos().bottom"
-    (keydown.escape)="typeMenuGroup.set(null)"
+    (keydown)="onMenuKeydown($event)"
   >
     @for (type of typeMenu; track type) {
       <button type="button" class="fe__menu-item" role="menuitem" (click)="addQuestion(gi, type)">
@@ -448,7 +450,7 @@
     side="bottom"
     [heading]="'admin.form.typeMenu' | t"
     [open]="typeMenuGroup() !== null"
-    (closed)="typeMenuGroup.set(null)"
+    (closed)="closeTypeMenu(false)"
   >
     <div class="fe__sheetMenu" role="menu" [attr.aria-label]="'admin.form.typeMenu' | t">
       @for (type of typeMenu; track type) {

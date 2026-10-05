@@ -3,7 +3,7 @@
     @if (loaded()) {
       <app-status-text heading class="fe__validity" [kind]="validation().valid ? 'accent' : 'error'">
         <app-icon [name]="validation().valid ? 'check' : 'alert'" [size]="16" />
-        {{ validation().valid ? ('admin.common.valid' | t) : ('admin.flow.errorCount' | t: { n: validationMessages().length }) }}
+        {{ validation().valid ? ('admin.common.valid' | t) : (validationMessages().length === 1 ? ('admin.flow.errorCountOne' | t) : ('admin.flow.errorCount' | t: { n: validationMessages().length })) }}
       </app-status-text>
     }
     <div actions class="fe__headTools">

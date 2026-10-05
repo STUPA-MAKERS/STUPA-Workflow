@@ -1011,6 +1011,105 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
     window.dispatchEvent(new Event('scroll'));
     expect(c.typeMenuGroup()).toBeNull();
   });
+
+  it('a scroll does not close the type menu on a phone, where it is a bottom sheet', async () => {
+    const { c } = await setup(draft(TWO_GROUPS));
+    c.phone = () => true;
+    const button = { currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 100, bottom: 132 }) } } as unknown as Event;
+    c.toggleTypeMenu(0, button);
+    window.dispatchEvent(new Event('scroll'));
+    expect(c.typeMenuGroup()).toBe(0);
+  });
+
+  it('the type menu works with the keyboard: the focus goes in, arrows move, Escape closes and refocuses', async () => {
+    const { fixture } = await setup(draft(TWO_GROUPS));
+    const add = screen.getAllByRole('button', { name: 'Frage hinzufügen' })[0];
+    add.focus();
+    await userEvent.keyboard('{Enter}');
+    fixture.detectChanges();
+    const menu = await screen.findByRole('menu');
+    const items = within(menu).getAllByRole('menuitem');
+    await waitFor(() => expect(document.activeElement).toBe(items[0]));
+    await userEvent.keyboard('{ArrowDown}');
+    expect(document.activeElement).toBe(items[1]);
+    await userEvent.keyboard('{ArrowUp}{ArrowUp}');
+    expect(document.activeElement).toBe(items.at(-1));
+    await userEvent.keyboard('{Home}');
+    expect(document.activeElement).toBe(items[0]);
+    await userEvent.keyboard('{End}');
+    expect(document.activeElement).toBe(items.at(-1));
+    await userEvent.keyboard('{Escape}');
+    fixture.detectChanges();
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(document.activeElement).toBe(add);
+    // Tab leaves the menu the same way: it closes, and the button has the focus.
+    await userEvent.keyboard('{Enter}');
+    fixture.detectChanges();
+    await waitFor(() => expect(screen.getByRole('menu').contains(document.activeElement)).toBe(true));
+    await userEvent.keyboard('{Tab}');
+    fixture.detectChanges();
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(document.activeElement).toBe(add);
+  });
+
+  it('the move buttons of a card: the moved question keeps the selection, also into the next group', async () => {
+    const { c, fixture } = await setup(draft(TWO_GROUPS));
+    c.selectQuestion({ gi: 0, qi: 1 }, false);
+    fixture.detectChanges();
+    // "Kategorie" is the last question of group 1; "Nach unten" hands it to group 2.
+    const card = document.querySelector<HTMLElement>('[data-q="0:1"]')!;
+    await userEvent.click(within(card).getByRole('button', { name: 'Nach unten' }));
+    expect(c.groupIndex()).toBe(1);
+    expect(c.selected()).toEqual({ gi: 1, qi: 0 });
+    expect(c.groups()[1].fields[0].key).toBe('cat');
+    // Within a group: the selection goes with the question, not to the neighbour.
+    fixture.detectChanges();
+    const first = document.querySelector<HTMLElement>('[data-q="1:0"]')!;
+    await userEvent.click(within(first).getByRole('button', { name: 'Nach unten' }));
+    expect(c.selected()).toEqual({ gi: 1, qi: 1 });
+    expect(c.groups()[1].fields[1].key).toBe('cat');
+    // Duplicate selects the copy; delete clears the selection.
+    fixture.detectChanges();
+    const moved = document.querySelector<HTMLElement>('[data-q="1:1"]')!;
+    await userEvent.click(within(moved).getByRole('button', { name: 'Duplizieren' }));
+    expect(c.selected()).toEqual({ gi: 1, qi: 2 });
+    fixture.detectChanges();
+    const copy = document.querySelector<HTMLElement>('[data-q="1:2"]')!;
+    await userEvent.click(within(copy).getByRole('button', { name: 'Löschen' }));
+    expect(c.selected()).toBeNull();
+  });
+
+  it('the raw JsonLogic text and the open advanced options move with their question', async () => {
+    const { c } = await setup(draft(TWO_GROUPS));
+    const ev = () =>
+      ({ preventDefault: jest.fn(), stopPropagation: jest.fn(), dataTransfer: { setData: jest.fn() } }) as unknown as DragEvent;
+    c.toggleExpanded({ gi: 0, qi: 0 });
+    c.onLogicInput({ gi: 0, qi: 0 }, 'visibleIf', '{"==": [');
+    // Drag "Titel" into group 2, before "Eintritt".
+    c.onQuestionDragStart(ev(), { gi: 0, qi: 0 });
+    c.onQuestionDrop(ev(), { gi: 1, qi: 1 });
+    expect(c.logicRaw(1, 1, 'visibleIf')).toBe('{"==": [');
+    expect(c.isExpanded({ gi: 1, qi: 1 })).toBe(true);
+    // "Kategorie" now holds the old place and shows its own state.
+    expect(c.logicRaw(0, 0, 'visibleIf')).toBe('');
+    expect(c.isExpanded({ gi: 0, qi: 0 })).toBe(false);
+    // An arrow move, a duplicate, a delete and a group move re-key the state the same way.
+    c.moveQuestion({ gi: 1, qi: 1 }, -1);
+    expect(c.logicRaw(1, 0, 'visibleIf')).toBe('{"==": [');
+    c.duplicateQuestion({ gi: 1, qi: 0 });
+    expect(c.logicRaw(1, 1, 'visibleIf')).toBe('');
+    expect(c.logicRaw(1, 0, 'visibleIf')).toBe('{"==": [');
+    c.removeQuestion({ gi: 1, qi: 1 });
+    c.moveGroup(1, -1);
+    expect(c.logicRaw(0, 0, 'visibleIf')).toBe('{"==": [');
+    expect(c.isExpanded({ gi: 0, qi: 0 })).toBe(true);
+    c.removeQuestion({ gi: 0, qi: 0 });
+    expect(c.logicRaw(0, 0, 'visibleIf')).toBe('');
+    expect(c.isExpanded({ gi: 0, qi: 0 })).toBe(false);
+    c.toggleExpanded({ gi: 1, qi: 0 });
+    c.removeGroup(0);
+    expect(c.isExpanded({ gi: 0, qi: 0 })).toBe(true);
+  });
 });
 
 describe('group serialize/deserialize round-trip', () => {

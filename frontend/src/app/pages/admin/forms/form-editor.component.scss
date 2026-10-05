@@ -435,14 +435,18 @@
 .fe__area:focus-within .fe__areaLabel {
   @include f.label-focus;
 }
+/* The description grows with its text (three lines at least), so no line shows cut. A
+   browser without field-sizing keeps the three rows and scrolls. */
 .fe__area textarea {
   @include f.control;
   & {
     height: auto;
-    min-height: var(--field-height);
+    min-height: calc(3lh + 32px);
+    max-height: calc(16lh + 32px);
     padding-top: 24px;
     padding-bottom: 8px;
     resize: vertical;
+    field-sizing: content;
   }
 }
 

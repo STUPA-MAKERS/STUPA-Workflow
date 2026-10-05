@@ -58,13 +58,30 @@
   flex-direction: column;
   gap: var(--space-2);
   min-width: 0;
+  container-type: inline-size;
 }
 
-/* A comparison: field, operator and value on one line. */
+/*
+ * A comparison. In a narrow leaf (the inspector panel, a phone) the field has its own
+ * line, then the operator and the value. A wide leaf has all three on one line. The
+ * operator column is as wide as its label "Operator" and the chevron need; the value
+ * itself is short (= != < <= > >=).
+ */
 .ge__compare {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 7.5rem minmax(0, 1fr);
+  grid-template-columns: 7.5rem minmax(0, 1fr);
   gap: var(--space-2);
+}
+.ge__compare > :first-child {
+  grid-column: 1 / -1;
+}
+@container (min-width: 30rem) {
+  .ge__compare {
+    grid-template-columns: minmax(0, 1fr) 7.5rem minmax(0, 1fr);
+  }
+  .ge__compare > :first-child {
+    grid-column: auto;
+  }
 }
 
 /* Keys and values in the mono face (the value only, not the label). */
