@@ -58,9 +58,6 @@
 .vh__actor {
   min-width: 0;
 }
-.vh__meta time {
-  white-space: nowrap;
-}
 .vh__actions {
   display: inline-flex;
   align-items: center;
@@ -107,8 +104,10 @@
   gap: var(--space-2);
 }
 
-/* A narrow sheet (a phone): one column. Version and state, then time and person, then
-   the actions; "Version 2" and the time never break inside. */
+/* A narrow sheet (a phone) or a narrow column (the side column of the form editor, the
+   inspector of the flow editor): one column. Version and state, then time and person,
+   then the actions, each on a line of its own; "Version 2" and the time never break
+   inside. */
 @container (max-width: 34rem) {
   .vh__row {
     grid-template-columns: minmax(0, 1fr);
@@ -119,27 +118,7 @@
   }
   .vh__actions {
     grid-row: 3;
-    justify-content: space-between;
-    margin-inline-start: calc(-1 * var(--space-2));
-  }
-}
-
-/* A narrow column (the side column of the form editor, the inspector of the flow
-   editor): the version, then the time and the person, then the actions, each on a line
-   of its own. */
-@container (max-width: 24rem) {
-  .vh__row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-1);
-  }
-  .vh__meta {
-    grid-column: 1;
-    grid-row: 2;
-  }
-  .vh__actions {
-    grid-column: 1;
-    grid-row: 3;
     justify-content: flex-start;
-    margin-left: calc(-1 * var(--space-2));
+    margin-inline-start: calc(-1 * var(--space-2));
   }
 }
