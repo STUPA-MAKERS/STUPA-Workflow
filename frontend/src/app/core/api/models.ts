@@ -804,6 +804,19 @@ export interface Tally {
   quorumMet: boolean;
   leading: string | null;
   result?: VoteResult | null;
+  /** Turnout: the ballots cast so far. The server always sends it, also while the
+   *  counts stay hidden. */
+  voted?: number;
+  /** The present members of the meeting (the reveal denominator). It is 0 for a vote
+   *  without a meeting and for a closed vote. */
+  present?: number;
+  /** `counts` and `leading` are visible: the vote is closed, or it is open, not secret
+   *  and every present member voted (a vote without a meeting is always visible).
+   *  Otherwise `counts` is empty. */
+  revealed?: boolean;
+  /** Why a closed vote failed: `quorum` or `majority`. `null` while open, on a pass and
+   *  on a tie. */
+  failedReason?: 'quorum' | 'majority' | null;
 }
 
 /**
@@ -814,11 +827,17 @@ export interface Tally {
  */
 export interface Vote {
   id: Uuid;
-  applicationId: Uuid;
+  /** `null` marks a motion on a free-text agenda item, with no application. */
+  applicationId: Uuid | null;
   /** The meeting that holds the vote. `null` marks a standalone (async) vote.
    *  A meeting-bound vote is deleted through its meeting, never through
    *  `DELETE /votes/{id}` (that route answers 409). */
   meetingId?: Uuid | null;
+  /** The agenda item of a meeting vote. The page reads its number ("TOP 3") from the
+   *  agenda. */
+  agendaItemId?: Uuid | null;
+  /** The motion of a meeting vote. A standalone vote often has none. */
+  question?: string | null;
   eligibleGroup: string;
   config: VoteConfig;
   status: VoteStatus;

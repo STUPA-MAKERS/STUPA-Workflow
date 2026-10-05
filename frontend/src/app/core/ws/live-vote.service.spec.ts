@@ -173,6 +173,20 @@ describe('LiveVoteService', () => {
     expect(ch.sent).toContainEqual({ type: 'cast', voteId: 'v9', choice: 'no' });
   });
 
+  it('marks a represented ballot with asDelegation', () => {
+    const s = svc.open('m-1');
+    const ch = source.channels[0];
+    ch.subject.next({
+      type: 'vote_opened',
+      voteId: 'v9',
+      applicationId: 'a1',
+      options: ['yes', 'no'],
+      closesAt: null,
+    });
+    s.cast('yes', true);
+    expect(ch.sent).toContainEqual({ type: 'cast', voteId: 'v9', choice: 'yes', asDelegation: true });
+  });
+
   it('ignores casts when no vote is open', () => {
     const s = svc.open('m-1');
     s.cast('yes');

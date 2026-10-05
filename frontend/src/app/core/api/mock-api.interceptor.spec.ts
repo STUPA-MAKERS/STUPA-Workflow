@@ -502,6 +502,48 @@ describe('mockApiInterceptor', () => {
       expect(v.status).toBe('open');
     });
 
+    it('GET /votes/{id} of a closed demo meeting → its closed result', async () => {
+      const v = await get<{ status: string; result: string; meetingId: string; agendaItemId: string }>(
+        '/api/votes/a0000000-0000-0000-0000-000000000101',
+      );
+      expect(v).toMatchObject({
+        status: 'closed',
+        result: 'passed',
+        meetingId: 'd0000000-0000-0000-0000-000000000101',
+        agendaItemId: 'ag-c01-3',
+      });
+    });
+
+    it('GET /delegations/votes/{id}/status → the demo user represents a member', async () => {
+      const s = await get<{ exercising: boolean; delegatedByName: string }>(
+        '/api/delegations/votes/vote-x/status',
+      );
+      expect(s.exercising).toBe(true);
+      expect(s.delegatedByName).toBeTruthy();
+    });
+
+    it('POST /votes/{id}/ballot keeps the ballots and refuses a second one', async () => {
+      const cast = (body: unknown) =>
+        firstValueFrom(http.post<{ status: string }>('/api/votes/vote-ballots/ballot', body));
+      expect((await cast({ choice: 'no' })).status).toBe('cast');
+      await expect(cast({ choice: 'yes' })).rejects.toMatchObject({
+        status: 409,
+        error: { code: 'already_voted' },
+      });
+      expect((await cast({ asDelegation: true })).status).toBe('cast');
+      const v = await get<{ myBallot: { cast: boolean; choice: string }; representedCast: boolean; tally: { voted: number } }>(
+        '/api/votes/vote-ballots',
+      );
+      expect(v.myBallot).toEqual({ cast: true, choice: 'no' });
+      expect(v.representedCast).toBe(true);
+      expect(v.tally.voted).toBe(10);
+    });
+
+    it('POST /votes/{id}/ballot without a body still counts', async () => {
+      const res = await firstValueFrom(http.post<{ status: string }>('/api/votes/vote-empty/ballot', null));
+      expect(res.status).toBe('cast');
+    });
+
     it('GET /meetings/timeline?direction=upcoming → the live meeting first, then the planned ones', async () => {
       const page = await get<{ items: { status: string }[]; nextCursor: string | null }>(
         '/api/meetings/timeline',
