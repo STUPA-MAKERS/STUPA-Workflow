@@ -13,6 +13,7 @@ a gremium. The tests run against the migrated schema. They prove these facts:
 - the EXCLUDE constraint still allows one row per (principal, gremium) only.
 - a gremium role that a mapping uses cannot be deleted. A duplicate mapping gives 409.
 - the global group mapping has no gremium scope any more.
+- the membership list carries the name and the e-mail of each member.
 """
 
 from __future__ import annotations
@@ -244,3 +245,23 @@ async def test_global_group_mapping_has_no_gremium_column(session: AsyncSession)
         lambda s: {c["name"] for c in inspect(s.connection()).get_columns("group_mapping")}
     )
     assert "gremium_id" not in columns
+
+
+async def test_membership_list_carries_name_and_email(session: AsyncSession) -> None:
+    gremium, member, _board = await _gremium(session)
+    group = f"{gremium.slug}-m"
+    named = await _principal(session, [group])
+    named.email = "mara@example.org"
+    plain = PrincipalRow(sub=f"s-{uuid.uuid4()}", display_name=None, oidc_groups=[group])
+    session.add(plain)
+    await session.commit()
+    await OidcMappingService(session).create_membership_mapping(_member_of(group, gremium), _ACTOR)
+
+    rows = await GremiumRoleService(session).list_memberships(gremium.id)
+    by_principal = {r.principal_id: r for r in rows}
+    assert set(by_principal) == {named.id, plain.id}
+    assert by_principal[named.id].display_name == "Mara"
+    assert by_principal[named.id].email == "mara@example.org"
+    assert by_principal[named.id].gremium_role_id == member.id
+    assert by_principal[plain.id].display_name is None
+    assert by_principal[plain.id].email is None

@@ -197,7 +197,14 @@ _ANY_ADMIN_AREA = Depends(require_any_permission(*_ALL_ADMIN_AREAS))
 _GREMIEN_OR_GREMIUM_ROLES = Depends(
     require_any_permission("admin.gremien", "admin.gremium_roles", "admin.group_mappings")
 )
-_GREMIEN_OR_USERS = Depends(require_any_permission("admin.gremien", "admin.users"))
+# The principal search serves the user page, the gremium members and the person picker
+# of the substitute pool on the delegations page (admin.delegations).
+_PRINCIPAL_READERS = Depends(
+    require_any_permission("admin.gremien", "admin.users", "admin.delegations")
+)
+# The members of a gremium: the members page (admin.gremien) and the "represents" choice
+# of the substitute pool on the delegations page (admin.delegations).
+_MEMBERSHIP_READERS = Depends(require_any_permission("admin.gremien", "admin.delegations"))
 # Read gates for pages that need the data of another area only as a selection
 # source or a display source. The writes stay on the strict permission. The flow
 # editor reads the global flow, the roles, the webhooks and the deadlines. The
@@ -361,7 +368,7 @@ async def delete_gremium_role(
 @router.get(
     "/gremien/{gremium_id}/memberships",
     response_model=list[GremiumMembershipOut],
-    dependencies=[_GREMIEN],
+    dependencies=[_MEMBERSHIP_READERS],
     responses=_errors(401, 403),
 )
 async def list_gremium_memberships(
@@ -637,7 +644,7 @@ async def create_global_flow(
 @router.get(
     "/principals",
     response_model=list[PrincipalOut],
-    dependencies=[_GREMIEN_OR_USERS],
+    dependencies=[_PRINCIPAL_READERS],
     responses=_errors(401, 403),
 )
 async def list_principals(

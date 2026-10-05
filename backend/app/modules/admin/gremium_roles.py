@@ -159,12 +159,16 @@ def _role_out(row: GremiumRole) -> GremiumRoleOut:
     )
 
 
-def _membership_out(row: GremiumMembership) -> GremiumMembershipOut:
+def _membership_out(
+    row: GremiumMembership, display_name: str | None = None, email: str | None = None
+) -> GremiumMembershipOut:
     return GremiumMembershipOut(
         id=row.id,
         principal_id=row.principal_id,
         gremium_id=row.gremium_id,
         gremium_role_id=row.gremium_role_id,
+        display_name=display_name,
+        email=email,
     )
 
 
@@ -300,11 +304,13 @@ class GremiumRoleService:
         await self.session.commit()
 
     async def list_memberships(self, gremium_id: UUID) -> list[GremiumMembershipOut]:
+        """List the memberships of a gremium with the name and e-mail of each member."""
         rows = (
-            await self.session.scalars(
-                select(GremiumMembership)
+            await self.session.execute(
+                select(GremiumMembership, PrincipalRow.display_name, PrincipalRow.email)
+                .outerjoin(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
                 .where(GremiumMembership.gremium_id == gremium_id)
                 .order_by(GremiumMembership.valid_from)
             )
         ).all()
-        return [_membership_out(r) for r in rows]
+        return [_membership_out(m, name, email) for m, name, email in rows]

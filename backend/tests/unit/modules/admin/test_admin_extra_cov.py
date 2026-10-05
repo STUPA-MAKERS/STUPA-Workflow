@@ -281,13 +281,19 @@ async def test_delete_role_success() -> None:
 
 
 async def test_list_memberships() -> None:
-    gid, pid = uuid4(), uuid4()
+    gid, pid, other = uuid4(), uuid4(), uuid4()
     m = _membership(pid, gid, _dt("2026-01-01"), _dt("2026-12-31"))
-    db = fake_session(result(m))
+    # A row without a principal row (outer join) gives no name and no e-mail.
+    n = _membership(other, gid, _dt("2026-01-01"), _dt("2026-12-31"))
+    db = fake_session(result((m, "Max", "max@example.org"), (n, None, None)))
     svc = GremiumRoleService(db)
     out = await svc.list_memberships(gid)
-    assert len(out) == 1
+    assert len(out) == 2
     assert out[0].principal_id == pid and out[0].gremium_id == gid
+    assert out[0].display_name == "Max" and out[0].email == "max@example.org"
+    assert out[1].display_name is None and out[1].email is None
+    dumped = out[0].model_dump(by_alias=True)
+    assert dumped["displayName"] == "Max" and dumped["email"] == "max@example.org"
 
 
 def _scv(version: int, *, active: bool, branding=None) -> SiteConfigVersion:
