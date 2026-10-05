@@ -357,13 +357,8 @@ const DEMO_FORM: EffectiveForm = {
         { key: 'description', type: 'textarea', label: { de: 'Beschreibung', en: 'Description' }, required: true },
         { key: 'event_date', type: 'date', label: { de: 'Veranstaltungsdatum', en: 'Event date' } },
         { key: 'participants', type: 'number', label: { de: 'Erwartete Teilnehmende', en: 'Expected participants' } },
-        {
-          key: 'gremium',
-          type: 'gremium_select',
-          label: { de: 'Zuständiges Gremium', en: 'Responsible committee' },
-          options: [{ value: GREMIUM, label: { de: 'Studierendenparlament', en: 'Studierendenparlament' } }],
-        },
-        { key: 'category', type: 'multiselect', label: { de: 'Kategorie', en: 'Category' }, options: OPTIONS_CATEGORY },
+        // The room question sits mid-section, so a hidden room shows whether the next
+        // field moves up into its cell.
         { key: 'needs_room', type: 'checkbox', label: { de: 'Raum der Hochschule nötig', en: 'Needs a university room' } },
         {
           key: 'room',
@@ -371,6 +366,13 @@ const DEMO_FORM: EffectiveForm = {
           label: { de: 'Raum', en: 'Room' },
           visibleIf: { '==': [{ var: 'needs_room' }, true] },
         },
+        {
+          key: 'gremium',
+          type: 'gremium_select',
+          label: { de: 'Zuständiges Gremium', en: 'Responsible committee' },
+          options: [{ value: GREMIUM, label: { de: 'Studierendenparlament', en: 'Studierendenparlament' } }],
+        },
+        { key: 'category', type: 'multiselect', label: { de: 'Kategorie', en: 'Category' }, options: OPTIONS_CATEGORY },
       ],
     },
     {

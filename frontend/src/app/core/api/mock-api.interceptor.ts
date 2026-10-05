@@ -223,8 +223,15 @@ const MOCK_TYPES: Page<ApplicationTypeListItemWire> = {
       active: true,
       activeFormVersionId: '44444444-4444-4444-4444-444444444445',
     },
+    {
+      id: '22222222-2222-2222-2222-222222222223',
+      name: 'Projektantrag: QSM',
+      hasBudget: false,
+      active: true,
+      activeFormVersionId: '44444444-4444-4444-4444-444444444446',
+    },
   ],
-  total: 2,
+  total: 3,
   limit: 20,
   offset: 0,
 };
@@ -343,6 +350,103 @@ const MOCK_EFFECTIVE_FORM: EffectiveForm = {
           key: 'more_confirm',
           type: 'checkbox',
           label: { de: 'Die Angaben sind vollständig.', en: 'The details are complete.' },
+          required: true,
+        },
+      ],
+    },
+  ],
+};
+
+/** A select option with the same German and English text. */
+function opt(value: string, de: string, en = de): { value: string; label: { de: string; en: string } } {
+  return { value, label: { de, en } };
+}
+
+/**
+ * The form of "Projektantrag: QSM", cut down to the questions that depend on other
+ * answers. With "Person", the two institution questions are hidden, so the wizard shows
+ * whether the next questions move up into their cells.
+ */
+const MOCK_QSM_FORM: EffectiveForm = {
+  applicationTypeId: MOCK_TYPES.items[2].id,
+  formVersionId: '44444444-4444-4444-4444-444444444446',
+  hasBudget: false,
+  sections: [
+    {
+      key: 'section_1',
+      label: { de: 'Projekttitel', en: 'Project title' },
+      fields: [
+        { key: 'title', type: 'text', label: { de: 'Titel', en: 'Title' }, required: true },
+        {
+          key: 'info_text',
+          type: 'markdown',
+          label: {
+            de: 'Bspw. Erstsemesterwochenende der Fakultät XYZ im WiSe XX/XX',
+            en: 'e.g. Freshman Weekend of the faculty XYZ in the Winter Term XX/XX',
+          },
+        },
+      ],
+    },
+    {
+      key: 'section_2',
+      label: { de: 'Antragsteller', en: 'Applicant' },
+      fields: [
+        {
+          key: 'antragsteller_art',
+          type: 'select',
+          label: { de: 'Art des Antragstellers', en: 'Type of applicant' },
+          required: true,
+          options: [opt('person', 'Person'), opt('institution', 'Institution')],
+        },
+        {
+          key: 'institution_art',
+          type: 'select',
+          label: { de: 'Art der Institution', en: 'Type of institution' },
+          options: [opt('fachschaft', 'Fachschaft', 'Student council'), opt('verein', 'Verein', 'Association')],
+          visibleIf: { '==': [{ var: 'antragsteller_art' }, 'institution'] },
+        },
+        {
+          key: 'institution_name',
+          type: 'text',
+          label: { de: 'Name der Institution', en: 'Name of institution' },
+          visibleIf: { '==': [{ var: 'antragsteller_art' }, 'institution'] },
+        },
+        {
+          key: 'fakultaet',
+          type: 'select',
+          label: { de: 'Fakultät', en: 'Faculty' },
+          required: true,
+          options: [opt('inf', 'Informatik (INF)', 'Informatics (INF)'), opt('esb', 'ESB Business School (ESB)')],
+        },
+        {
+          key: 'rolle',
+          type: 'select',
+          label: { de: 'Rolle', en: 'Role' },
+          options: [opt('studierende_r', 'Studierende:r', 'Student'), opt('sonstige', 'Sonstige', 'Other')],
+        },
+        { key: 'telefon', type: 'text', label: { de: 'Telefonnummer', en: 'Phone number' } },
+      ],
+    },
+    {
+      key: 'section_7',
+      label: { de: 'Checkliste: QS-Mittel', en: 'Checklist: QS funds' },
+      fields: [
+        {
+          key: 'ist_exkursion',
+          type: 'checkbox',
+          label: { de: 'Das Projekt ist eine Exkursion', en: 'The project is a field trip' },
+        },
+        {
+          key: 'cl_exkursion_genehmigt',
+          type: 'checkbox',
+          label: { de: 'Die Exkursion wurde von der Fakultät genehmigt', en: 'The faculty approved the field trip' },
+          required: true,
+          visibleIf: { '==': [{ var: 'ist_exkursion' }, true] },
+        },
+        {
+          key: 'cl_zugute',
+          type: 'checkbox',
+          label: { de: 'Die Maßnahme kommt den Studierenden zugute', en: 'The measure benefits the students' },
           required: true,
         },
       ],
@@ -1425,6 +1529,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/altcha/challenge')) {
       return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
     }
+    if (p.endsWith(`/application-types/${MOCK_TYPES.items[2].id}/form`)) return ok(MOCK_QSM_FORM);
     if (/\/application-types\/[^/]+\/form$/.test(p)) return ok(MOCK_EFFECTIVE_FORM);
     if (p.endsWith('/application-types')) return ok(MOCK_TYPES);
     // Match the meeting timeline BEFORE the generic `/timeline` rule. The
