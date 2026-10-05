@@ -394,7 +394,7 @@ async def test_quorate_with_explicit_percent_threshold() -> None:
     session.scalar_results = [10]  # 10 members
     gremium = _gremium(quorum_percent=50)
     # 5 present, 50% of 10 is 5, so 500 >= 500 is true.
-    assert await svc._quorate(gremium, present_count=5) is True
+    assert await svc._quorate(gremium, None, present_count=5) is True
 
 
 async def test_quorate_percent_not_met() -> None:
@@ -403,7 +403,7 @@ async def test_quorate_percent_not_met() -> None:
     session.scalar_results = [10]
     gremium = _gremium(quorum_percent=60)
     # 5 present, 60% of 10 is 6, so 500 >= 600 is false.
-    assert await svc._quorate(gremium, present_count=5) is False
+    assert await svc._quorate(gremium, None, present_count=5) is False
 
 
 async def test_quorate_default_majority_rule() -> None:
@@ -412,28 +412,28 @@ async def test_quorate_default_majority_rule() -> None:
     svc = _service(session)
     session.scalar_results = [10]
     gremium = _gremium(quorum_percent=None)
-    assert await svc._quorate(gremium, present_count=6) is True
+    assert await svc._quorate(gremium, None, present_count=6) is True
     session.scalar_results = [10]
-    assert await svc._quorate(gremium, present_count=5) is False
+    assert await svc._quorate(gremium, None, present_count=5) is False
 
 
 async def test_quorate_none_without_gremium() -> None:
     svc = _service(FakeSession())
-    assert await svc._quorate(None, present_count=3) is None
+    assert await svc._quorate(None, None, present_count=3) is None
 
 
 async def test_quorate_none_without_members() -> None:
     session = FakeSession()
     svc = _service(session)
     session.scalar_results = [0]  # no members
-    assert await svc._quorate(_gremium(), present_count=3) is None
+    assert await svc._quorate(_gremium(), None, present_count=3) is None
 
 
 async def test_quorate_none_when_member_count_query_returns_none() -> None:
     """`session.scalar` returns None, so `or 0` makes members 0 and the result None."""
     svc = _service(FakeSession())
     # An empty scalar_results makes scalar() return None, so the `or 0` applies.
-    assert await svc._quorate(_gremium(), present_count=3) is None
+    assert await svc._quorate(_gremium(), None, present_count=3) is None
 
 
 async def test_header_meta_returns_empty_without_meeting() -> None:

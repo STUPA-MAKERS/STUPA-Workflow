@@ -36,9 +36,7 @@ The server enforces these invariants:
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from datetime import time as _time
 from uuid import UUID
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import or_, select, text
 from sqlalchemy.exc import IntegrityError
@@ -79,6 +77,7 @@ from app.modules.delegations.schemas import (
     VoteDelegationStatus,
 )
 from app.modules.livevote.models import Meeting, MeetingAttendance
+from app.modules.livevote.roster import planned_start_utc
 from app.modules.voting.models import Vote
 from app.settings import Settings
 from app.shared.errors import (
@@ -123,10 +122,7 @@ def meeting_start_utc(meeting: Meeting, tz_name: str) -> datetime | None:
     Returns:
         The start in UTC, or None when the meeting has no date.
     """
-    if meeting.date is None:
-        return None
-    local = datetime.combine(meeting.date, meeting.start_time or _time(0, 0))
-    return local.replace(tzinfo=ZoneInfo(tz_name)).astimezone(UTC)
+    return planned_start_utc(meeting, tz_name)
 
 
 async def _membership_with_vote_cast(
