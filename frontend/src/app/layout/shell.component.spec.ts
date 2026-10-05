@@ -54,6 +54,9 @@ function brandingStub(
     copyright: signal(over.copyright ?? null),
     legalLinks: signal(over.legalLinks ?? []),
     footerColumns: signal(over.footerColumns ?? []),
+    // The avatars read these; the config is not loaded, so they show the initials.
+    loaded: signal(false),
+    gravatarEnabled: signal(true),
     init: () => undefined,
   };
 }

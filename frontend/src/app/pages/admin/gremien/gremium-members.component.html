@@ -36,7 +36,7 @@
       <ul class="rowgroup gmm__list" [attr.aria-label]="'admin.gremien.members' | t">
         @for (m of visible(); track m.id) {
           <li class="gmm__row">
-            <app-avatar size="sm" [name]="m.name" [decorative]="true" />
+            <app-avatar size="sm" [name]="m.name" [principalId]="m.id" [decorative]="true" />
             <span class="gmm__name ell" [title]="m.name">{{ m.name }}</span>
             <span class="gmm__mail mono">{{ m.email ?? '—' }}</span>
             <span class="gmm__role">{{ m.role | capitalize }}</span>

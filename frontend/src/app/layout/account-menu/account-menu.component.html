@@ -57,7 +57,7 @@
     [title]="'shell.account.open' | t: { name: auth.displayName() }"
     (click)="toggle()"
   >
-    <app-avatar [name]="auth.displayName()" [decorative]="true" />
+    <app-avatar [name]="auth.displayName()" principalId="me" [decorative]="true" />
   </button>
   @if (open()) {
     <div

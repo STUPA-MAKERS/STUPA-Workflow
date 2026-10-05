@@ -63,6 +63,8 @@ export interface PublicSiteConfig {
     freetexts?: Partial<
       Record<'loginHint' | 'welcome' | 'support' | 'emailFooter' | 'applyInfo', I18nMap>
     >;
+    /** Show the Gravatar images of the avatars (through the API proxy). Missing = on. */
+    gravatarEnabled?: boolean;
   } | null;
 }
 
@@ -307,6 +309,8 @@ export interface ActorInfo {
   kind: ActorKind;
   key?: string | null;
   displayName?: string | null;
+  /** Only for `principal`: the account id, for the avatar. Never in the applicant view. */
+  principalId?: Uuid | null;
 }
 
 /** `TimelineEventOut`. A status transition in the timeline. */

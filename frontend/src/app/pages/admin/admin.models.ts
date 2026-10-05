@@ -949,6 +949,8 @@ export interface Branding {
   copyright: I18nMap;
   legalLinks: FooterLink[];
   freetexts: SiteFreetexts;
+  /** Show the Gravatar images of the avatars. Missing (an older config) = on. */
+  gravatarEnabled?: boolean;
 }
 
 /** Versioned site config: active version + editable draft. */

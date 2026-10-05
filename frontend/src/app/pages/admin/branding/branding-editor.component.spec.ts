@@ -261,6 +261,19 @@ describe('BrandingEditorComponent', () => {
     expect(api.saveBrandingDraft).not.toHaveBeenCalled();
   });
 
+  it('switches the Gravatar images off and saves the switch with the draft', async () => {
+    const { api } = await setupWithStub({});
+    // A config without the field counts as on.
+    const sw = screen.getByRole('switch', { name: /Gravatar-Bilder zeigen/ });
+    await waitFor(() => expect(sw).toHaveAttribute('aria-checked', 'true'));
+    await userEvent.click(sw);
+    await waitFor(() => expect(sw).toHaveAttribute('aria-checked', 'false'));
+    await userEvent.click(screen.getByRole('button', { name: /Entwurf speichern/ }));
+    expect(api.saveBrandingDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ gravatarEnabled: false }),
+    );
+  });
+
   it('saveDraft toasts and persists on success', async () => {
     const { fixture, api, toast } = await setupWithStub({});
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

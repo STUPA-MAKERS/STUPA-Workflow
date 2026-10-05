@@ -1,4 +1,6 @@
+import { signal } from '@angular/core';
 import { render, screen } from '@testing-library/angular';
+import { BrandingService } from '@core/branding/branding.service';
 import { runAxe } from '../../../../testing/a11y';
 import { AvatarComponent, AvatarStackComponent, initials } from './avatar.component';
 
@@ -42,6 +44,71 @@ describe('AvatarComponent', () => {
     const host = view.fixture.nativeElement as HTMLElement;
     expect(host).toHaveClass('av--sm');
     expect(host).toHaveClass('av--accent');
+  });
+});
+
+describe('AvatarComponent with an image', () => {
+  const branding = () => ({ loaded: signal(true), gravatarEnabled: signal(true) });
+
+  async function renderWithImage(inputs: Record<string, unknown>) {
+    const view = await render(AvatarComponent, {
+      inputs: { name: 'Mara Keller', ...inputs },
+      providers: [{ provide: BrandingService, useValue: branding() }],
+    });
+    const host = view.fixture.nativeElement as HTMLElement;
+    const img = () => host.querySelector('img');
+    return { view, host, img };
+  }
+
+  it('loads the proxy image over the initials, hidden until it has loaded', async () => {
+    const { view, host, img } = await renderWithImage({ principalId: 'p-1', size: 'sm' });
+    expect(img()).toHaveAttribute('src', '/api/principals/p-1/avatar?s=64');
+    expect(img()).toHaveAttribute('alt', '');
+    expect(img()).not.toHaveClass('av__img--on');
+    expect(host).not.toHaveClass('av--img');
+    // The initials stay in the DOM: they are the fallback and keep the size.
+    expect(host.querySelector('.av__letters')).toHaveTextContent('MK');
+
+    img()!.dispatchEvent(new Event('load'));
+    view.fixture.detectChanges();
+    expect(img()).toHaveClass('av__img--on');
+    expect(host).toHaveClass('av--img');
+    // The accessible name stays the name of the person.
+    expect(screen.getByRole('img', { name: 'Mara Keller' })).toBe(host);
+    expect(await runAxe(view.container)).toHaveNoViolations();
+  });
+
+  it('falls back to the initials when the image fails', async () => {
+    const { view, host, img } = await renderWithImage({ principalId: 'p-2' });
+    expect(img()).toHaveAttribute('src', '/api/principals/p-2/avatar?s=80');
+    img()!.dispatchEvent(new Event('error'));
+    view.fixture.detectChanges();
+    expect(img()).toBeNull();
+    expect(host).not.toHaveClass('av--img');
+    expect(host).toHaveTextContent('MK');
+  });
+
+  it('starts hidden again for a new person', async () => {
+    const { view, host, img } = await renderWithImage({ principalId: 'p-3' });
+    img()!.dispatchEvent(new Event('load'));
+    view.fixture.detectChanges();
+    expect(host).toHaveClass('av--img');
+    view.fixture.componentRef.setInput('principalId', 'p-4');
+    view.fixture.detectChanges();
+    expect(img()).toHaveAttribute('src', '/api/principals/p-4/avatar?s=80');
+    expect(host).not.toHaveClass('av--img');
+  });
+
+  it('shows only the initials without a principal', async () => {
+    const { img } = await renderWithImage({});
+    expect(img()).toBeNull();
+  });
+
+  it('ignores an error without a principal id', async () => {
+    const { view } = await renderWithImage({ principalId: 'p-5' });
+    const cmp = view.fixture.componentInstance as unknown as { onError(): void };
+    view.fixture.componentRef.setInput('principalId', null);
+    expect(() => cmp.onError()).not.toThrow();
   });
 });
 

@@ -84,7 +84,7 @@
       [disabled]="off"
       (change)="pick(r)"
     />
-    <app-avatar [name]="name(r)" size="sm" [decorative]="true" />
+    <app-avatar [name]="name(r)" [principalId]="r.principalId" size="sm" [decorative]="true" />
     <span class="dd__text">
       <span class="dd__name ell" [title]="name(r)">{{ name(r) }}</span>
       <span class="dd__sub">{{ roleKey(r) | t }}</span>

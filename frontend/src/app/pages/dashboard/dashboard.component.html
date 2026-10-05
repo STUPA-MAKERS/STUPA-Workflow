@@ -19,7 +19,7 @@
         [attr.aria-label]="'shell.account.open' | t: { name: auth.displayName() }"
         (click)="openAccount()"
       >
-        <app-avatar [name]="auth.displayName()" size="sm" [decorative]="true" />
+        <app-avatar [name]="auth.displayName()" principalId="me" size="sm" [decorative]="true" />
       </button>
     </app-search-pill>
   } @else {
@@ -145,7 +145,7 @@
                 [sub]="delegationSub(d)"
                 [link]="['/meetings', d.meetingId]"
               >
-                <app-avatar lead [name]="otherName(d)" [decorative]="true" />
+                <app-avatar lead [name]="otherName(d)" [principalId]="otherId(d)" [decorative]="true" />
                 @if (d.delegateVoting) {
                   <app-badge trail variant="neutral">{{ 'delegation.card.votingBadge' | t }}</app-badge>
                 }

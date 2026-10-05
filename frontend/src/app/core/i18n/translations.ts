@@ -1847,6 +1847,10 @@ export const de = {
   'admin.brand.appName.short': 'Kurzname (PWA-Symbol/Startbildschirm)',
   'admin.brand.appName.hint':
     'Leer lassen, um die Standardnamen (STUPA Antragsplattform / StuPa) zu verwenden.',
+  'admin.brand.avatars.group': 'Profilbilder',
+  'admin.brand.avatars.gravatar': 'Gravatar-Bilder zeigen',
+  'admin.brand.avatars.hint':
+    'Personen mit einem Gravatar-Konto zeigen ihr Bild statt der Initialen. Die Plattform holt das Bild selbst; der Browser verbindet sich nicht mit Gravatar. Aus: überall Initialen.',
   'admin.brand.logos': 'Logos',
   'admin.brand.logo.wordmark': 'Wortmarke',
   'admin.brand.logo.imagemark': 'Bildmarke',
@@ -4501,6 +4505,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.brand.appName.short': 'Short name (PWA icon/home screen)',
   'admin.brand.appName.hint':
     'Leave empty to use the default names (STUPA Antragsplattform / StuPa).',
+  'admin.brand.avatars.group': 'Profile pictures',
+  'admin.brand.avatars.gravatar': 'Show Gravatar pictures',
+  'admin.brand.avatars.hint':
+    'Persons with a Gravatar account show their picture instead of the initials. The platform fetches the picture itself; the browser does not connect to Gravatar. Off: initials everywhere.',
   'admin.brand.logos': 'Logos',
   'admin.brand.logo.wordmark': 'Wordmark',
   'admin.brand.logo.imagemark': 'Image mark',

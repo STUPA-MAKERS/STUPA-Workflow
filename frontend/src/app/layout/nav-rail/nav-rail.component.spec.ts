@@ -30,7 +30,14 @@ async function setup(tasks: number | null = 120) {
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
       provideLocationMock(createLocationMock()),
-      { provide: BrandingService, useValue: { appName: signal('Antragsplattform') } },
+      {
+        provide: BrandingService,
+        useValue: {
+          appName: signal('Antragsplattform'),
+          loaded: signal(false),
+          gravatarEnabled: signal(true),
+        },
+      },
       { provide: RailStatusService, useValue: { taskCount: signal(tasks), live: signal(false) } },
     ],
   });

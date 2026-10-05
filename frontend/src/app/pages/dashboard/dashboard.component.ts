@@ -280,6 +280,11 @@ export class DashboardComponent {
     return (this.isOutgoing(d) ? d.delegateName : d.delegatorName) || '?';
   }
 
+  /** The principal id of the other person, for the avatar. */
+  otherId(d: Delegation): string {
+    return this.isOutgoing(d) ? d.delegateId : d.delegatorId;
+  }
+
   /** "12. Sitzung des Finanzausschusses, 02.10.2026". */
   delegationSub(d: Delegation): string {
     const date = d.meetingDate ? this.longDay(d.meetingDate) : '';
