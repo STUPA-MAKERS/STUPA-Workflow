@@ -1506,6 +1506,28 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
+  // The tasks page shows the same detail under `/tasks` and sets the list path.
+  it('goes back to the list path of the page after a delete', async () => {
+    const { http, detectChanges, cmp, router, fixture } = await setup(
+      ['application.read', 'application.manage'],
+      new BehaviorSubject(convertToParamMap({ id: 'app-1' })),
+      ['admin'],
+    );
+    fixture.debugElement.injector.get(ApplicationsPageService).listPath.set(['/tasks']);
+    flushAll(http);
+    http.expectOne(url('/transitions')).flush([]);
+    detectChanges();
+    flushAttachments(http);
+    const nav = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+
+    cmp.doDelete();
+    http
+      .expectOne((r) => r.method === 'DELETE' && r.url === '/api/applications/app-1')
+      .flush(null, { status: 204, statusText: 'No Content' });
+    expect(nav).toHaveBeenCalledWith(['/tasks'], { queryParamsHandling: 'preserve' });
+    http.verify();
+  });
+
   it('toasts and keeps the dialog on a failed delete, and guards double-delete', async () => {
     const { http, detectChanges, cmp, toast } = await setup();
     flushAll(http);

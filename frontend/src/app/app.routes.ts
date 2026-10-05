@@ -111,9 +111,28 @@ export const routes: Routes = [
         path: 'tasks',
         // No permission gate: the tab shows at least your own applications in an editable
         // state.
+        //
+        // The same two panes as `applications`: the task list stays while the detail of
+        // `:id` loads in its outlet. A deep link to `/tasks/:id` opens that task.
         data: { title: 'nav.tasks', wide: true },
         canActivate: [authGuard],
         loadComponent: () => import('./pages/tasks/tasks.component').then((m) => m.TasksComponent),
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./pages/tasks/tasks-none.component').then((m) => m.TasksNoneComponent),
+          },
+          {
+            path: ':id',
+            // The detail of the applications page. The server authorizes the read.
+            data: { title: 'applications.detail.crumb', parent: ['tasks'] },
+            loadComponent: () =>
+              import('./pages/applications/applications-detail.component').then(
+                (m) => m.ApplicationsDetailComponent,
+              ),
+          },
+        ],
       },
       {
         path: 'voting',

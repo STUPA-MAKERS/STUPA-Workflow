@@ -1,43 +1,80 @@
-<app-page-header
-  [title]="'tasks.title' | t"
-  [subtitle]="'tasks.subtitle' | t"
-  [meta]="loading() || error() ? null : ('tasks.count' | t: { n: tasks().length })"
-/>
+<div class="tasks" [class.tasks--split]="split()">
+  <app-list-detail [detailOpen]="selectedId() !== null" (back)="closeDetail()">
+    <section list class="tasks__pane" aria-labelledby="tasks-title">
+      <header class="tasks__head">
+        <h1 id="tasks-title" class="tasks__title">{{ 'tasks.title' | t }}</h1>
+        @if (!loading() && !error()) {
+          <span class="tasks__meta">{{ 'tasks.count' | t: { n: tasks().length } }}</span>
+        }
+      </header>
 
-@if (error()) {
-  <p class="tasks__error" role="alert">{{ 'tasks.error' | t }}</p>
-} @else {
-  <app-data-table
-    [loading]="loading()"
-    [loadingText]="'tasks.loading' | t"
-    [columns]="columns()"
-    [rows]="tasks()"
-    [emptyText]="'tasks.empty' | t"
-    [clickable]="true"
-    (rowClick)="open($any($event).id)"
-  >
-    <ng-template appCell="title" let-r>
-      <span class="tasks__title ell" [title]="titleOf($any(r))">{{ titleOf($any(r)) }}</span>
-    </ng-template>
-    <ng-template appCell="type" let-r>
-      <span class="tasks__muted tasks__nowrap">{{ typeName($any(r).typeId) }}</span>
-    </ng-template>
-    <ng-template appCell="state" let-r>
-      @if ($any(r).state; as s) {
-        <app-status-text class="tasks__nowrap" [kind]="flowColorKind(s.color)">{{ s.label }}</app-status-text>
-      } @else {
-        <span class="tasks__muted">—</span>
-      }
-    </ng-template>
-    <ng-template appCell="amount" let-r>
-      <span class="mono tasks__nowrap">{{ money($any(r)) }}</span>
-    </ng-template>
-    <ng-template appCell="waiting" let-r>
-      @let at = since($any(r));
-      <span class="tasks__waiting" [attr.title]="sinceTitle(at)">{{ waitingSince(at) }}</span>
-    </ng-template>
-    <ng-template appCell="open" let-r>
-      <app-icon class="tasks__chev" name="right" [size]="17" />
-    </ng-template>
-  </app-data-table>
-}
+      <div class="tasks__scroll" appScrollFade="y">
+        @if (error()) {
+          <p class="tasks__status tasks__status--error" role="alert">{{ 'tasks.error' | t }}</p>
+        } @else if (loading()) {
+          <app-skeleton variant="rows" [count]="6" [label]="'tasks.loading' | t" />
+        } @else if (!rows().length) {
+          @if (split()) {
+            <!-- Side by side the detail pane shows the empty state; one is enough. -->
+            <p class="tasks__status">{{ 'tasks.empty' | t }}</p>
+          } @else {
+            <app-empty-state
+              class="tasks__empty"
+              icon="check"
+              [heading]="'tasks.empty' | t"
+              [body]="'tasks.emptyBody' | t"
+            />
+          }
+        } @else {
+          @for (group of groups(); track group.key + $index) {
+            <section class="tasks__group" [attr.aria-label]="group.label || null">
+              @if (group.label) {
+                <h2 class="sec tasks__month">{{ group.label }}</h2>
+              }
+              <div class="tasks__rows" [class.rowgroup]="!split()" role="list">
+                @for (row of group.items; track row.item.id) {
+                  <app-list-item
+                    role="listitem"
+                    class="tasks__row"
+                    [title]="row.title"
+                    [link]="['/tasks', row.item.id]"
+                    [selected]="row.item.id === selectedId()"
+                  >
+                    <span sub>
+                      @if (row.stateLabel) {
+                        <app-status-text [kind]="row.stateKind">{{ row.stateLabel }}</app-status-text>
+                      }
+                      @if (row.stateLabel && row.typeLabel) {
+                        <span class="tasks__dot" aria-hidden="true">·</span>
+                      }
+                      @if (row.typeLabel) {
+                        <span>{{ row.typeLabel }}</span>
+                      }
+                    </span>
+                    <span trail class="tasks__trail">
+                      <span class="tasks__facts">
+                        @if (row.amount) {
+                          <span class="mono tasks__amount">{{ row.amount }}</span>
+                        }
+                        <span class="tasks__waiting" [attr.title]="sinceTitle(row.since)">{{
+                          waitingSince(row.since)
+                        }}</span>
+                      </span>
+                      @if (!split()) {
+                        <app-icon class="tasks__chev" name="chevron-right" [size]="17" />
+                      }
+                    </span>
+                  </app-list-item>
+                }
+              </div>
+            </section>
+          }
+        }
+      </div>
+    </section>
+
+    <div detail class="tasks__detail">
+      <router-outlet />
+    </div>
+  </app-list-detail>
+</div>

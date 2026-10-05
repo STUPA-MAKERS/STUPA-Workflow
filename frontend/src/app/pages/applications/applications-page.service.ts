@@ -20,12 +20,15 @@ export interface ApplicationChange {
  *
  * - `split`: the list and the detail sit side by side. The detail then shows its sections
  *   in two columns; otherwise in tabs.
+ * - `listPath`: the route of the list pane. The detail goes back to it after a delete and
+ *   from its "not found" state. The tasks page shows the same detail under `/tasks`.
  * - `changes$`: a pane changed an application (a transition, an archive, a delete, an
  *   edit). The other pane loads it again, so both show the same state.
  */
 @Injectable()
 export class ApplicationsPageService {
   readonly split = signal(false);
+  readonly listPath = signal<readonly string[]>(['/applications']);
 
   private readonly changes = new Subject<ApplicationChange>();
   readonly changes$ = this.changes.asObservable();
