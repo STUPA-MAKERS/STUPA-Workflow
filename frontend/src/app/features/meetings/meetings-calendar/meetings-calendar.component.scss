@@ -36,7 +36,7 @@
 }
 
 /* ------------------------------------------------------------------ header + toolbar */
-app-page-header app-icon,
+.cal__new app-icon,
 .cal__actions app-icon {
   margin-inline-end: 6px;
 }
@@ -265,7 +265,8 @@ app-page-header app-icon,
   flex-direction: column;
   gap: var(--space-5);
   min-height: 0;
-  padding: var(--space-5);
+  /* 10px below the bar, as between the bar and the title of the other sheets. */
+  padding: 10px var(--space-6) var(--space-6);
   overflow-y: auto;
   overscroll-behavior: contain;
   @include fade.fade-y(var(--cal-fade));
@@ -277,11 +278,9 @@ app-page-header app-icon,
   padding-bottom: var(--space-5);
   border-bottom: var(--border-width) solid var(--color-border);
 }
+/* The bar of the panel (`app-sheet-bar`) takes the side padding of the sheet. */
 .cal__dayHead {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-  font-weight: var(--fw-regular);
+  padding-inline: var(--space-6);
 }
 .cal__note {
   margin: 0;

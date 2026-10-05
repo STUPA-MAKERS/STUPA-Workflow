@@ -19,8 +19,12 @@ const APP = join(SRC, 'app');
 const GLOBAL_STYLES = join(SRC, 'styles.scss');
 const PAGE_HEADER_DIR = join(APP, 'shared/ui/page-header');
 
-/** The pages with a list column. Each one names the file base of its component. */
-const LIST_PAGES = [
+/**
+ * The list pages known when the geometry was unified. The spec finds the list pages by
+ * itself (every template with `app-list-detail`); this list only proves that the search
+ * still finds them, so a broken search cannot pass with no pages at all.
+ */
+const KNOWN_LIST_PAGES = [
   'pages/applications/applications-list.component',
   'pages/tasks/tasks.component',
   'features/voting/voting-page/voting.component',
@@ -53,7 +57,27 @@ function code(path: string): string {
 const read = (base: string, ext: 'html' | 'scss') => code(join(APP, `${base}.${ext}`));
 const appStyles = () => files(APP).filter((f) => f.endsWith('.scss'));
 
+/** Every page with a list column: the templates that use `app-list-detail`. */
+const LIST_PAGES = files(APP)
+  .filter((f) => f.endsWith('.component.html') && /<app-list-detail[\s>]/.test(code(f)))
+  .map((f) => relative(APP, f).replace(/\.html$/, ''))
+  .sort();
+
 describe('the one list/detail geometry', () => {
+  it('finds every list page by itself', () => {
+    expect(LIST_PAGES).toEqual(expect.arrayContaining(KNOWN_LIST_PAGES));
+  });
+
+  it('the list column does not read the state class of the layout', () => {
+    // `.ld--split` belongs to app-list-detail. The column gets its height through
+    // `--ld-pane-height`, which the layout sets on its list slot while it splits.
+    const global = code(GLOBAL_STYLES);
+    expect(global).not.toMatch(/\.ld--split[^{]*\.ld-pane/);
+    expect(global).toMatch(/\.ld-pane\s*\{[^}]*height:\s*var\(--ld-pane-height,\s*auto\)/);
+    const layout = code(join(APP, 'shared/ui/list-detail/list-detail-layout.component.scss'));
+    expect(layout).toMatch(/:host\(\.ld--split\) \.ld__list \{[^}]*--ld-pane-height:\s*100%/);
+  });
+
   it('defines the column width and the gap once, in styles.scss', () => {
     const global = code(GLOBAL_STYLES);
     expect(global).toMatch(/--ld-list-width:\s*clamp\(/);

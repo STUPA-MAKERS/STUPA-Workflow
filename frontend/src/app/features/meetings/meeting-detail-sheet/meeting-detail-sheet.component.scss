@@ -32,22 +32,6 @@
   padding-bottom: 22px;
   border-bottom: var(--border-width) solid var(--color-border);
 }
-.ms__bar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  min-height: 60px;
-}
-/* On the sheet the icon buttons sit in its padding. Without the sheet a negative margin
-   would make the pane scroll sideways. */
-.ms--split .ms__bar {
-  margin-inline-end: calc(-1 * var(--space-3));
-}
-.ms__meta {
-  flex: 1 1 auto;
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-}
 .ms__title {
   margin: 0;
   font-size: var(--fs-d2);

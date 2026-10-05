@@ -187,6 +187,27 @@ describe('toFormlyFields', () => {
     expect(cfg.props?.['description']).toBe('Erläuterung');
   });
 
+  it('hides a section help that only repeats the heading', () => {
+    const fields: FormFieldDef[] = [
+      { key: 's', type: 'section', label: { de: 'Block' }, help: { de: ' Block ' } },
+      { key: 't', type: 'section', label: { de: 'Leer' }, help: { de: '  ' } },
+    ];
+    const [a, b] = toFormlyFields(fields, 'de');
+    expect(a.props?.['label']).toBe('Block');
+    expect(a.props?.['description']).toBeUndefined();
+    expect(b.props?.['description']).toBeUndefined();
+  });
+
+  it('shows an info text once when its help repeats its label', () => {
+    const fields: FormFieldDef[] = [
+      { key: 'note', type: 'markdown', label: { de: 'Gleich' }, help: { de: 'Gleich' } },
+    ];
+    const [cfg] = toFormlyFields(fields, 'de');
+    expect(cfg.props?.['text']).toBe('Gleich');
+    expect(cfg.props?.['label']).toBeUndefined();
+    expect(cfg.props?.['description']).toBeUndefined();
+  });
+
   it('maps a markdown field without help, falling back to label as text', () => {
     const fields: FormFieldDef[] = [{ key: 'note', type: 'markdown', label: { de: 'Nur Label' } }];
     const [cfg] = toFormlyFields(fields, 'de');

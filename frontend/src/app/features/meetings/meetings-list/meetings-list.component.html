@@ -2,9 +2,6 @@
   <app-list-detail [detailOpen]="selParam() !== null" (back)="clearSelection()">
     <section list class="ld-pane" aria-labelledby="mtl-title">
       <app-page-header [pane]="true" titleId="mtl-title" [title]="'meetings.title' | t">
-        @if (!phone() && showSwitch()) {
-          <app-meetings-view-switch heading value="list" (valueChange)="viewChange.emit($event)" />
-        }
         <ng-container ngProjectAs="[actions]">
           @if (phone()) {
             <!-- Phone: the title, one main action and one menu (DECISIONS: phone headers). -->
@@ -20,6 +17,11 @@
               (selected)="onPhoneMenu($event, abo)"
             />
           } @else {
+            <!-- The switch sits at the end of the header, beside the Abo button, in both
+                 views: the calendar view has the same order. -->
+            @if (showSwitch()) {
+              <app-meetings-view-switch value="list" (valueChange)="viewChange.emit($event)" />
+            }
             <app-button
               variant="text"
               [iconOnly]="true"

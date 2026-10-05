@@ -105,7 +105,21 @@ describe('MeetingDetailSheetComponent', () => {
     expect(rows[2].querySelector('.ms__topSub')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
       'Antrag · nicht öffentlich',
     );
+    // A free-text item has no sub line: the number names the TOP, "Freitext" says nothing.
+    expect(rows[0].querySelector('.ms__topSub')).toBeNull();
+    expect(rows[1].querySelector('.ms__topSub')).toBeNull();
+    expect(screen.queryByText(/Freitext/)).toBeNull();
     expect(screen.getByText('3 TOPs')).toBeInTheDocument();
+  });
+
+  it('gives a non-public free-text item only its marker as the sub line', async () => {
+    const { http, fixture } = await setup();
+    flush(http, 'm-1', { agenda: [{ ...AGENDA[0], nonPublic: true }] });
+    fixture.detectChanges();
+    const rows = within(screen.getAllByRole('list')[0]).getAllByRole('listitem');
+    expect(rows[0].querySelector('.ms__topSub')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+      'nicht öffentlich',
+    );
   });
 
   it('shows the progress, the turnout of the open vote, the counts, the delegations and the protocol', async () => {
@@ -294,7 +308,7 @@ describe('MeetingDetailSheetComponent', () => {
     const { http, fixture } = await setup({ meeting: bare });
     flush(http, 'm-1', { protocol: false });
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.ms__meta').textContent.trim()).toBe('');
+    expect(fixture.nativeElement.querySelector('.sheet-bar__kicker').textContent.trim()).toBe('');
     expect(fixture.nativeElement.querySelectorAll('.ms__part')).toHaveLength(2);
   });
 });

@@ -5,7 +5,6 @@
         [pane]="true"
         titleId="tasks-title"
         [title]="'tasks.title' | t"
-        [meta]="!loading() && !error() ? ('tasks.count' | t: { n: tasks().length }) : null"
       />
 
       <div class="tasks__scroll" appScrollFade="y">

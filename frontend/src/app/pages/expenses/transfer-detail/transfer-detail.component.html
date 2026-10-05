@@ -1,8 +1,7 @@
 @let t = transfer();
 <article class="fd" [class.fd--split]="split()" aria-labelledby="tdt-title">
   <header class="fd__head">
-    <div class="fd__bar">
-      <span class="fd__meta ell" [title]="metaLine()">{{ metaLine() }}</span>
+    <app-sheet-bar [bleed]="split()" [kicker]="metaLine()">
       @if (canManage()) {
         @if (phone()) {
           <app-button variant="tonal" size="sm" (click)="edit.emit()">
@@ -21,7 +20,7 @@
       @if (menu().length) {
         <app-row-menu [label]="'expenses.detail.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />
       }
-    </div>
+    </app-sheet-bar>
     <h2 id="tdt-title" class="fd__title">{{ t.description }}</h2>
     <p class="fd__line fd__seps">
       <span class="fd__parts">

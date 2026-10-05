@@ -45,7 +45,7 @@
       } @else {
         <app-list-item
           [title]="title(item)"
-          [sub]="sub(item, i)"
+          [sub]="sub(item)"
           [selected]="item.id === selectedId()"
           (activate)="pick.emit(item.id)"
         >

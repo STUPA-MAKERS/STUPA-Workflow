@@ -120,9 +120,10 @@ describe('TasksComponent', () => {
     ]);
   });
 
-  it('counts the open tasks in the header', async () => {
+  it('shows no count next to the title (the navigation badge counts the tasks)', async () => {
     await start('/tasks', [[task('a1'), task('a2')]]);
-    expect(screen.getByText('2 offen')).toBeInTheDocument();
+    expect(screen.queryByText('2 offen')).not.toBeInTheDocument();
+    expect(document.querySelector('.ph__meta')).toBeNull();
   });
 
   it('sets the list path of the shared detail to /tasks', async () => {
@@ -173,7 +174,6 @@ describe('TasksComponent', () => {
     await settle();
     expect(router.url).toBe('/tasks');
     expect(screen.getAllByText('Keine offenen Aufgaben.').length).toBeGreaterThan(0);
-    expect(screen.getByText('0 offen')).toBeInTheDocument();
   });
 
   it('keeps the open task when it stays in the list after a change', async () => {
@@ -196,7 +196,7 @@ describe('TasksComponent', () => {
     await settle();
     expect(listTasks).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('link', { name: 'Erster', hidden: true })).not.toBeInTheDocument();
-    expect(screen.getByText('2 offen')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { hidden: true })).toHaveLength(2);
   });
 
   it('ignores the notices of the list pane', async () => {
@@ -213,12 +213,11 @@ describe('TasksComponent', () => {
     expect(router.url).toBe('/tasks');
   });
 
-  it('shows the empty state and the count 0 when there are no tasks', async () => {
+  it('shows the empty state when there are no tasks', async () => {
     await start('/tasks', [[]]);
     // The list pane (one pane at a time in the test) and the none pane both say it.
     expect(screen.getAllByText('Keine offenen Aufgaben.').length).toBeGreaterThan(0);
     expect(document.querySelector('app-empty-state')).not.toBeNull();
-    expect(screen.getByText('0 offen')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
@@ -227,14 +226,13 @@ describe('TasksComponent', () => {
     expect(screen.getByText('Keine Aufgabe geöffnet')).toBeInTheDocument();
   });
 
-  it('shows an error and no count, not an empty list, when the request fails', async () => {
+  it('shows an error, not an empty list, when the request fails', async () => {
     const { cmp } = await start('/tasks', [[]], { tasksError: true });
     expect(cmp.tasks()).toEqual([]);
     expect(cmp.loading()).toBe(false);
     expect(cmp.error()).toBe(true);
     expect(screen.getByRole('alert')).toHaveTextContent('Aufgaben konnten nicht geladen werden.');
     expect(screen.queryByText('Keine offenen Aufgaben.')).not.toBeInTheDocument();
-    expect(screen.queryByText('0 offen')).not.toBeInTheDocument();
   });
 
   it('tolerates a failing type load and an untitled task without a state', async () => {

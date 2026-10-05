@@ -1,40 +1,36 @@
+<!-- One section, one heading: the pool of the chosen Gremium. Each row reads
+     "Mitglied → Stellvertretung"; an entry for the whole Gremium reads "Für alle
+     Mitglieder → Stellvertretung". -->
 <section class="sp" aria-labelledby="sp-title">
   <header class="sp__head">
     <h2 class="sec" id="sp-title">{{ 'admin.substitutes.title' | t }}</h2>
-    <span class="sp__actions"><ng-content select="[poolActions]" /></span>
+    <span class="sp__actions">
+      <ng-content select="[poolActions]" />
+      <app-button variant="text" size="sm" (click)="openAdd()">
+        <app-icon name="plus" [size]="16" /> {{ 'admin.substitutes.add' | t }}
+      </app-button>
+    </span>
   </header>
   <p class="sp__hint">{{ 'admin.substitutes.hint' | t }}</p>
-
-  <div class="sp__sub">
-    <h3 class="cap sp__cap">{{ 'admin.substitutes.single' | t }}</h3>
-    <app-button variant="text" size="sm" (click)="openAdd()">
-      <app-icon name="plus" [size]="16" /> {{ 'admin.substitutes.add' | t }}
-    </app-button>
-  </div>
 
   @if (loading()) {
     <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
   } @else if (failed()) {
     <p class="sp__error" role="alert">{{ 'admin.substitutes.loadFailed' | t }}</p>
   } @else {
-    @if (entries().length) {
-      <div class="sp__cols" aria-hidden="true">
-        <span class="cap">{{ 'admin.substitutes.col.substitute' | t }}</span>
-        <span class="cap">{{ 'admin.substitutes.col.member' | t }}</span>
-      </div>
-    }
-    <ul class="rowgroup sp__list" [attr.aria-label]="'admin.substitutes.single' | t">
+    <ul class="rowgroup sp__list" aria-labelledby="sp-title">
       @for (s of entries(); track s.id) {
         <li class="sp__row">
-          <app-avatar size="sm" [name]="entryName(s)" [principalId]="s.substituteId" [decorative]="true" />
-          <span class="sp__name ell" [title]="entryName(s)">{{ entryName(s) }}</span>
-          <span class="sp__member">
-            <span class="sr-only">{{ 'admin.substitutes.col.member' | t }}: </span>
-            @if (memberName(s); as name) {
-              {{ name }}
-            } @else {
-              <span class="sp__all">{{ 'admin.substitutes.allMembers' | t }}</span>
-            }
+          <span class="sp__pair">
+            <span class="sp__member" [class.sp__all]="!memberName(s)">{{
+              memberName(s) || ('admin.substitutes.allMembers' | t)
+            }}</span>
+            <app-icon class="sp__arrow" name="arrow" [size]="16" />
+            <span class="sr-only">{{ 'admin.substitutes.by' | t }}</span>
+            <span class="sp__who">
+              <app-avatar size="sm" [name]="entryName(s)" [principalId]="s.substituteId" [decorative]="true" />
+              <span class="sp__name">{{ entryName(s) }}</span>
+            </span>
           </span>
           <app-button
             variant="text"

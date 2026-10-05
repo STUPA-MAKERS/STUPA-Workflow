@@ -48,11 +48,14 @@ async function openMenu(index: number): Promise<HTMLElement> {
 }
 
 describe('AgendaPaneComponent', () => {
-  it('counts the items and shows kind, open vote and the NÖ tag', async () => {
+  it('counts the items and shows the kind of an application, an open vote and the NÖ tag', async () => {
     await setup({ meeting: meeting({ votes: [vote({ agendaItemId: 't-3' })] }) });
     expect(screen.getByRole('heading', { name: 'Tagesordnung · 3 TOPs' })).toBeInTheDocument();
-    expect(screen.getByText('TOP 1 · Freitext')).toBeInTheDocument();
-    expect(screen.getByText('TOP 3 · Antrag · Abstimmung offen')).toBeInTheDocument();
+    // The number badge names the TOP; a free-text item has no sub line at all.
+    const rows = screen.getAllByRole('listitem');
+    expect(rows[0].querySelector('.li__subText')).toBeNull();
+    expect(screen.queryByText(/Freitext|TOP 1/)).toBeNull();
+    expect(screen.getByText('Antrag · Abstimmung offen')).toBeInTheDocument();
     const noe = screen.getByText('NÖ');
     expect(noe.closest('li')).toHaveTextContent('Antrag Kulturfestival');
   });

@@ -138,17 +138,21 @@
 // `app-sticky-bar`), then the rows. The search is the large search pill on every list.
 // Side by side the column takes the full height and only its rows scroll; one pane at a
 // time the page scrolls.
+//
+// The column does not read the state of `app-list-detail` (its host class). The layout
+// sets `--ld-pane-height` on its list slot while it splits; a column of its own beside a
+// sheet (the budget tree) sets it with `.ld-pane--fill`.
 .ld-pane {
   position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   min-width: 0;
-}
-.ld--split .ld-pane,
-.ld-pane--fill {
-  height: 100%;
   min-height: 0;
+  height: var(--ld-pane-height, auto);
+}
+.ld-pane--fill {
+  --ld-pane-height: 100%;
 }
 // Two classes: the bar is mostly an `app-sticky-bar`, whose own host style
 // (`display: block`) would win over one global class.

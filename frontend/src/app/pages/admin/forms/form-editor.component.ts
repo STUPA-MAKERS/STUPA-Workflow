@@ -334,6 +334,16 @@ export class FormEditorComponent {
     return map ? resolveI18n(map, this.i18n.locale()) : '';
   }
 
+  /**
+   * The help text of an info field in the preview, or '' when it has none or when it only
+   * repeats the label. The wizard shows such an info text once: no bold label over the
+   * same text (the preview follows the same rule).
+   */
+  protected infoHelp(field: FormFieldDef): string {
+    const help = this.resolved(field.help).trim();
+    return help && help !== this.resolved(field.label).trim() ? help : '';
+  }
+
   protected setTitle(lang: 'de' | 'en', value: string): void {
     this.title.update((t) => ({ ...t, [lang]: value }));
   }

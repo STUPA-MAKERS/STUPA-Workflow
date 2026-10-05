@@ -59,11 +59,15 @@
               @for (field of group.fields; track $index; let qi = $index) {
                 @if (qi > 0) { <hr class="fe__divider" aria-hidden="true" /> }
                 <div class="fe__pv-field">
-                  <label class="fe__pv-label">
-                    {{ resolved(field.label) || ('admin.forms.untitledQuestion' | t) }}
-                    @if (field.required) { <span class="fe__req" aria-hidden="true">*</span> }
-                  </label>
-                  @if (resolved(field.help)) { <p class="fe__pv-help">{{ resolved(field.help) }}</p> }
+                  <!-- An info text shows its text once: a bold label only over a help
+                       text of its own (the rule of the wizard). -->
+                  @if (field.type !== 'markdown' || infoHelp(field)) {
+                    <label class="fe__pv-label">
+                      {{ resolved(field.label) || ('admin.forms.untitledQuestion' | t) }}
+                      @if (field.required) { <span class="fe__req" aria-hidden="true">*</span> }
+                    </label>
+                  }
+                  @if (field.type !== 'markdown' && resolved(field.help)) { <p class="fe__pv-help">{{ resolved(field.help) }}</p> }
                   @switch (field.type) {
                     @case ('textarea') { <textarea class="fe__pv-control" rows="3" disabled></textarea> }
                     @case ('checkbox') { <input type="checkbox" disabled /> }
@@ -81,7 +85,7 @@
                     @case ('number') { <input class="fe__pv-control" type="number" disabled /> }
                     @case ('currency') { <input class="fe__pv-control" type="number" inputmode="decimal" disabled /> }
                     @case ('file') { <input class="fe__pv-control" type="file" disabled /> }
-                    @case ('markdown') { <p class="fe__pv-md">{{ resolved(field.label) }}</p> }
+                    @case ('markdown') { <p class="fe__pv-md">{{ infoHelp(field) || resolved(field.label) }}</p> }
                     @default { <input class="fe__pv-control" type="text" disabled /> }
                   }
                 </div>

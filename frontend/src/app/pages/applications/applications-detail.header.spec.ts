@@ -224,7 +224,7 @@ describe('ApplicationsDetailComponent — header', () => {
 
   it('leaves out an unknown type, a missing gremium and a missing amount', async () => {
     const { cmp, http } = await setup({ app: { gremiumId: null, amount: null, typeId: 'other' } });
-    expect(document.querySelector('.ad__meta')?.textContent?.trim()).toBe('Version 2');
+    expect(document.querySelector('.sheet-bar__kicker')?.textContent?.trim()).toBe('Version 2');
     expect(document.querySelector('.ad__line')!.textContent?.trim()).toBe('Eingereicht');
     expect(cmp.gremiumName()).toBeNull();
     http.verify();

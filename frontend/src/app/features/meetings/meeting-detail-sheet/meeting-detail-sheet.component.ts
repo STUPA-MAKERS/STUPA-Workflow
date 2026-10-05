@@ -35,6 +35,7 @@ import {
   openVoteOf,
   topsLabel,
 } from '../meetings-overview.util';
+import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
 
 /** What the sheet loaded for the meeting. `null` = the request failed. */
 interface SheetData {
@@ -74,6 +75,7 @@ interface AgendaRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBarComponent,
     TranslatePipe,
     ButtonComponent,
     IconComponent,

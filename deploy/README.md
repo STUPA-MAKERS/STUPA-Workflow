@@ -1,6 +1,6 @@
 # deploy
 
-Compose stack for one VM. Internal traffic is plain HTTP. The external Nginx Proxy Manager
+Compose stack for one VM. Internal traffic is plain HTTP. The external Caddy reverse proxy
 terminates TLS. `web` publishes `127.0.0.1:8080` by default (`WEB_PORT` moves the port,
 `WEB_HOST` the bind address; see `.env.example` before opening it beyond loopback). `postgres` also publishes a loopback-only
 port for the admin CLI (see the service table). Every other service stays on the internal
@@ -39,7 +39,7 @@ docker compose up -d --build
 Docker builds `web` from the repository root `..` in two stages (`web/Dockerfile`). Stage 1
 builds the Angular frontend with Node. Stage 2 serves it with nginx. The image contains
 `web/nginx.conf`, but compose also mounts it. You can therefore edit the file in production
-without a rebuild, for example the `real_ip` CIDR of the Proxy Manager.
+without a rebuild, for example the `real_ip` CIDR of Caddy.
 
 ## Migrations
 
@@ -118,8 +118,8 @@ Then point `DATABASE_URL` to user `app` and `DB_MIGRATION_URL` to user `migrator
   proxy answers 404 after its timeout and the app shows the initials.
 - `typst_net` — `internal: true`, so there is no egress. api and worker reach the typst
   render service over it, and the typst container sits on this network only.
-- `proxy` — in production this is the network of the Nginx Proxy Manager. Set `external: true`
-  there and reference the NPM network.
+- `proxy` — in production this is the network of the Caddy container. Set `external: true`
+  there and reference the Caddy network.
 
 ## Configuration
 
@@ -160,11 +160,11 @@ BOOTSTRAP_ADMIN_EMAILS=admin@hochschule.example,vorstand@stupa.example
 
 ## Profiles
 
-- **prod** — behind NPM, with an external OIDC IdP, SMTP and Nextcloud, ClamAV on:
+- **prod** — behind Caddy, with an external OIDC IdP, SMTP and Nextcloud, ClamAV on:
   ```bash
   docker compose --profile prod up -d --build
   ```
-  For the real NPM network, switch `proxy:` in the compose file to `external: true`.
+  For the real Caddy network, switch `proxy:` in the compose file to `external: true`.
 - Default (no profile) = smoke and dev stack.
 
 ## Backup and restore
