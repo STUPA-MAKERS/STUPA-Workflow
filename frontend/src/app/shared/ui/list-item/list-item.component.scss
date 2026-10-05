@@ -11,6 +11,7 @@
   min-height: 4rem;
   padding: 10px var(--space-4);
   border-radius: var(--li-radius, var(--radius-lg));
+  background: var(--li-bg, transparent);
   color: var(--li-color, var(--color-text));
   transition: background-color var(--motion-fast) var(--ease-standard);
 }

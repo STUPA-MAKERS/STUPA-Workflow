@@ -146,6 +146,24 @@ describe('ListItemComponent', () => {
     expect(screen.getByRole('link', { name: 'Druckkosten' })).toHaveAttribute('href', '/applications/a1?type=t1');
   });
 
+  it('merges its own query params into the link', async () => {
+    const { fixture } = await render(ListItemComponent, {
+      inputs: {
+        title: 'Lastenrad',
+        link: ['/expenses'],
+        linkQueryParams: { id: 'e1' },
+        linkQueryParamsHandling: 'merge',
+      },
+      providers: [provideRouter([{ path: '**', component: BlankComponent }])],
+    });
+    await TestBed.inject(Router).navigateByUrl('/expenses?kind=expense');
+    fixture.detectChanges();
+    expect(screen.getByRole('link', { name: 'Lastenrad' })).toHaveAttribute(
+      'href',
+      '/expenses?kind=expense&id=e1',
+    );
+  });
+
   it('shows a plain sub line from the input', async () => {
     const { container } = await render(ListItemComponent, {
       inputs: { title: 'Lastenrad', sub: 'Fachschaftsmittel' },

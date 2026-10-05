@@ -1,0 +1,39 @@
+:host {
+  display: contents;
+}
+
+.rc__chip {
+  max-width: 100%;
+}
+/* The closed sheet takes no place (and no gap) in the row of chips. */
+.rc__sheet {
+  display: contents;
+}
+/* The icon never takes the click: the whole chip is the button. */
+.rc__chip app-icon {
+  pointer-events: none;
+}
+
+.rc__form {
+  /* The fields sit on the sheet (surface 2): one step up, so they stand out from it. */
+  --color-surface-sunken: var(--color-surface-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.rc__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  min-width: 0;
+}
+.rc__error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--fs-small);
+}
+.rc__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
