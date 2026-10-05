@@ -1,0 +1,307 @@
+@use 'breakpoints' as bp;
+
+:host {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The sheet of the meeting (surface 1, large radius) beside the list. One pane at a time
+   it loses the sheet and sits on the page, like the applications detail. The body splits
+   into two columns from the container width of the sheet, not of the viewport. */
+.ms {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+  container-type: inline-size;
+}
+.ms--split {
+  padding: 0 var(--space-6) var(--space-6);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+
+/* ------------------------------------------------------------------ header */
+.ms__head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 22px;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.ms__bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 60px;
+}
+/* On the sheet the icon buttons sit in its padding. Without the sheet a negative margin
+   would make the pane scroll sideways. */
+.ms--split .ms__bar {
+  margin-inline-end: calc(-1 * var(--space-3));
+}
+.ms__meta {
+  flex: 1 1 auto;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.ms__title {
+  margin: 0;
+  font-size: var(--fs-d2);
+  line-height: var(--lh-d2);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-tight);
+  overflow-wrap: anywhere;
+}
+
+/* Items with a dot between two of them, also after a wrap (never a dot at a line start). */
+.ms__line {
+  --ms-sep: 24px;
+  margin: 0;
+  overflow-x: clip;
+  color: var(--color-text-muted);
+  font-size: var(--fs-md);
+  min-width: 0;
+}
+.ms__parts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin-inline-start: calc(-1 * var(--ms-sep));
+  min-width: 0;
+}
+.ms__part {
+  min-width: 0;
+  white-space: nowrap;
+}
+.ms__part::before {
+  display: inline-block;
+  width: var(--ms-sep);
+  color: var(--color-text-subtle);
+  font-family: var(--font-sans);
+  text-align: center;
+  content: '·';
+  content: '·' / '';
+}
+.ms__warn {
+  color: var(--color-warning);
+}
+
+.ms__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.ms__actions app-icon {
+  margin-inline-end: 6px;
+}
+.ms__grow {
+  flex: 1 1 auto;
+}
+
+.ms__busy {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ------------------------------------------------------------------ body */
+/* One column: the facts first (what runs now), then the agenda. From 44rem of sheet
+   width: the agenda on the left, the facts on the right (board Sitzungen, variant A). */
+.ms__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+  min-width: 0;
+}
+.ms__agenda {
+  order: 2;
+}
+@container (min-width: 44rem) {
+  .ms__body {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    align-items: start;
+  }
+  .ms__agenda {
+    order: 0;
+  }
+}
+.ms__facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+  /* The counts follow the width of this column, not of the sheet. */
+  container-type: inline-size;
+}
+
+.ms__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.ms__secHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.ms__sec .sec {
+  padding-inline: var(--space-1);
+}
+.ms__count {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+.ms__note {
+  margin: 0;
+  padding-inline: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.ms__note--error {
+  color: var(--color-danger);
+}
+
+/* The agenda: one row group (surface 2 on the sheet), the current item marked. */
+.ms__tops,
+.ms__dels {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ms__top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 54px;
+  padding: var(--space-2) var(--space-4);
+}
+.rowgroup > .ms__top--now {
+  background: var(--color-selected);
+}
+.ms__topNo {
+  flex: none;
+  width: 1.25rem;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  text-align: center;
+}
+.ms__topBody {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ms__topTitle {
+  font-weight: var(--fw-medium);
+}
+.ms__topSub,
+.ms__cardSub {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.ms__topMark {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.ms__topMark--now {
+  color: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
+}
+
+/* A fact card: surface 2 on the sheet (one step above it). */
+.ms__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  min-width: 0;
+}
+.ms__cardHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.ms__voteHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.ms__voteMeta {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+/* Counts side by side: four (attendance) or up to three (protocol) cells. */
+.ms__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.ms__stats--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.ms__stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ms__stats dt {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.ms__stats dd {
+  margin: 0;
+  font-size: var(--fs-md);
+}
+.ms__wrap {
+  overflow-wrap: anywhere;
+}
+.ms__link {
+  color: var(--color-accent-text);
+}
+
+.ms__del {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+}
+.ms__delNames {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+
+@container (max-width: 28rem) {
+  .ms__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ms__stats--3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@include bp.phone {
+  .ms__top {
+    padding-inline: var(--space-3);
+  }
+}

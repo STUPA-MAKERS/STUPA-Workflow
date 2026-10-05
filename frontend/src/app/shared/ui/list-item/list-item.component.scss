@@ -85,6 +85,22 @@
   text-overflow: ellipsis;
   cursor: pointer;
 }
+.li__titleText {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* `wrap`: up to two lines, then the ellipsis. */
+.li--wrap .li__title {
+  white-space: normal;
+}
+.li--wrap .li__titleText {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+}
 .li__title::after {
   content: '';
   position: absolute;

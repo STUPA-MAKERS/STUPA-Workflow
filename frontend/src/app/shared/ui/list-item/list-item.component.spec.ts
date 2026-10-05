@@ -115,6 +115,13 @@ describe('ListItemComponent', () => {
     expect(view.container.querySelector('.li')).toHaveClass('li--on');
   });
 
+  it('lets the title take two lines with `wrap`', async () => {
+    await render(ListItemComponent, { inputs: { title: LONG, wrap: true } });
+    const title = screen.getByRole('button', { name: LONG });
+    expect(title.closest('.li')).toHaveClass('li--wrap');
+    expect(title.querySelector('.li__titleText')).toHaveTextContent(LONG);
+  });
+
   it('renders a link when it has a target and still emits activate', async () => {
     const activate = jest.fn();
     await render(ListItemComponent, {

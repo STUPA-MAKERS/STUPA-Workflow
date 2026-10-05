@@ -1,4 +1,4 @@
-<div class="li" [class.li--on]="selected()" (pointerenter)="measureSub()">
+<div class="li" [class.li--on]="selected()" [class.li--wrap]="wrap()" (pointerenter)="measureSub()">
   <span class="li__lead"><ng-content select="[lead]" /></span>
   <span class="li__body">
     <span class="li__head">
@@ -10,7 +10,7 @@
           [title]="tooltip()"
           [attr.aria-current]="selected() ? 'true' : null"
           (click)="activate.emit()"
-          >{{ title() }}</a
+          ><span class="li__titleText">{{ title() }}</span></a
         >
       } @else {
         <button
@@ -20,7 +20,7 @@
           [attr.aria-current]="selected() ? 'true' : null"
           (click)="activate.emit()"
         >
-          {{ title() }}
+          <span class="li__titleText">{{ title() }}</span>
         </button>
       }
       <ng-content select="[status]" />

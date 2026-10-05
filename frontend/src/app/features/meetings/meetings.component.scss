@@ -26,6 +26,19 @@
   ) {
   display: contents;
 }
+/* The overview: one pane at a time it takes at least the free height and the page
+   scrolls; in a pane layout (`.pane-page`, see the host binding) it takes the free
+   height and only its panes scroll. */
+:host(:not(.pane-page)):has(> app-meetings-overview) {
+  flex: 1 0 auto;
+}
+:host > app-meetings-overview {
+  flex: 1 0 auto;
+}
+:host(.pane-page) > app-meetings-overview {
+  flex: 1 1 0;
+  min-height: 0;
+}
 /* Legacy: meeting votes without an item show in a card below the session page. Then the
    page scrolls as a page again, and the session page keeps the height of the window. */
 :host:has(> app-card) {

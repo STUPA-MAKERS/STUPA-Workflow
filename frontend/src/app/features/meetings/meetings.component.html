@@ -178,8 +178,9 @@
   />
   } <!-- /@if (isFollower()) -->
 } @else if (!detailMode()) {
-  <!-- The list. Plain Gremium members also see their meetings, filtered on the server. -->
-  <app-meetings-list />
+  <!-- The overview (list or calendar). Plain Gremium members also see their meetings,
+       filtered on the server. -->
+  <app-meetings-overview />
 }
 
 <!-- Settings and delete open from a list row and from the meeting page. -->

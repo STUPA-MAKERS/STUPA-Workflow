@@ -197,6 +197,8 @@ export const routes: Routes = [
           permission: ['meeting.view_all'],
           gremiumPermission: ['session.manage'],
           allowCommitteeMember: true,
+          // The overview is a list/detail or a calendar page over the full width.
+          wide: true,
         },
         canActivate: [authGuard],
         loadComponent: () =>

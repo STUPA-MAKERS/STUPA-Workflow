@@ -558,10 +558,17 @@ export class ApiClient {
     });
   }
 
-  /** GET /meetings — list meetings (newest first), optionally gremium-filtered. */
-  listMeetings(gremiumId?: Uuid): Observable<Meeting[]> {
+  /**
+   * GET /meetings — list meetings (newest first), optionally gremium-filtered.
+   *
+   * `range` limits the list to the meetings with a planned date from `from` to `to`
+   * (`YYYY-MM-DD`, both included). The calendar view reads one month this way; a
+   * meeting without a date is then not in the list.
+   */
+  listMeetings(gremiumId?: Uuid, range?: { from: string; to: string }): Observable<Meeting[]> {
     let params = new HttpParams();
     if (gremiumId) params = params.set('gremiumId', gremiumId);
+    if (range) params = params.set('dateFrom', range.from).set('dateTo', range.to);
     return this.http
       .get<MeetingOutWire[]>(`${this.base}/meetings`, { params, context: skipLoading() })
       .pipe(map((items) => items.map(mapMeeting)));

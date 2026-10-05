@@ -38,7 +38,7 @@ import { MeetingFollowViewComponent } from './meeting-follow-view.component';
 import { MeetingPageComponent } from './meeting-page/meeting-page.component';
 import { MeetingSessionService } from './meeting-session.service';
 import { MeetingSettingsDialogComponent } from './meeting-settings-dialog/meeting-settings-dialog.component';
-import { MeetingsListComponent } from './meetings-list/meetings-list.component';
+import { MeetingsOverviewComponent } from './meetings-overview/meetings-overview.component';
 import { MeetingsTimelineService } from './meetings-timeline.service';
 import { VoteOpenDialogComponent } from './vote-open-dialog/vote-open-dialog.component';
 import {
@@ -52,7 +52,8 @@ import {
 } from './meetings-display.util';
 
 /**
- * Meetings page: the list (`/meetings`, `MeetingsListComponent`) and the meeting
+ * Meetings page: the overview (`/meetings`, `MeetingsOverviewComponent`: list or
+ * calendar) and the meeting
  * page (`/meetings/:id`). The meeting page is the session page for the minute-taker
  * and the lead, and the participant view for a member. This component wires
  * the component-scoped services and the meeting dialogs; its public surface also
@@ -77,7 +78,7 @@ import {
     PageHeaderComponent,
     MeetingPageComponent,
     MeetingFollowViewComponent,
-    MeetingsListComponent,
+    MeetingsOverviewComponent,
     MeetingSettingsDialogComponent,
     DeleteMeetingDialogComponent,
     CloseMeetingDialogComponent,
@@ -85,6 +86,9 @@ import {
     AgendaItemDialogComponent,
     HandoverDialogComponent,
   ],
+  // The overview in a pane layout (the list beside the detail, the wide calendar) fills
+  // the free height and scrolls only inside its panes.
+  host: { '[class.pane-page]': 'overviewPane()' },
   templateUrl: './meetings.component.html',
   styleUrl: './meetings.component.scss',
 })
@@ -98,6 +102,9 @@ export class MeetingsComponent {
   protected readonly dialogs = inject(MeetingDialogsService);
   /** The session page, for "Ändern" in the handover dialog (back to the dock picker). */
   private readonly page = viewChild(MeetingPageComponent);
+  /** The overview (`/meetings`), for its pane layout. */
+  private readonly overview = viewChild(MeetingsOverviewComponent);
+  readonly overviewPane = computed(() => this.overview()?.pane() === true);
 
   /** Detail route (`/meetings/:id`) vs. list (`/meetings`). */
   readonly detailMode = signal(false);

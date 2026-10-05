@@ -48,7 +48,10 @@ import { RouterLink, type QueryParamsHandling } from '@angular/router';
   styleUrl: './list-item.component.scss',
 })
 export class ListItemComponent {
-  /** The name of the thing. Shown on one line; the full text is in the `title` attribute. */
+  /**
+   * The name of the thing. Shown on one line (two with `wrap`); the full text is in the
+   * `title` attribute.
+   */
   readonly title = input.required<string>();
   /** A plain sub line. Use the `[sub]` slot for a sub line with a status or markup. */
   readonly sub = input<string | null>(null);
@@ -61,6 +64,11 @@ export class ListItemComponent {
   readonly linkQueryParamsHandling = input<QueryParamsHandling>('');
   /** The row is the one open in the detail pane. */
   readonly selected = input(false);
+  /**
+   * The title may take two lines before it gets the ellipsis. For a narrow list where
+   * the end of a long title tells the rows apart (meetings on a phone).
+   */
+  readonly wrap = input(false);
 
   /** The row was opened by a click, Enter or Space. Also emitted for a link. */
   readonly activate = output<void>();
