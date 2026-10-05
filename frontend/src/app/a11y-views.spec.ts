@@ -27,11 +27,16 @@ import { AdminHomeComponent } from './pages/admin/admin-home.component';
 import { UsersComponent } from './pages/admin/users/users.component';
 import { FlowEditorComponent } from './pages/admin/flow-editor/flow-editor.component';
 import { BrandingEditorComponent } from './pages/admin/branding/branding-editor.component';
+import { AdminGremienComponent } from './pages/admin/gremien/gremien.component';
+import { GremiumMembersComponent } from './pages/admin/gremien/gremium-members.component';
+import { DelegationsComponent } from './pages/admin/delegations/delegations.component';
+import { MOCK_GREMIUM_STUPA_ID } from './pages/admin/admin.mock';
 import { AdminApiService } from './pages/admin/admin-api.service';
 import { BudgetTreeApi } from './pages/budget/budget-tree.api';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ApiClient } from '@core/api/api-client.service';
 import { DelegationsApiService } from '@core/api/delegations.service';
+import { AuthService } from '@core/auth/auth.service';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { LIVE_VOTE_SOURCE, type LiveVoteSource } from '@core/ws/live-vote.source';
 import type { MeetingChannel } from '@core/ws/ws.service';
@@ -321,6 +326,67 @@ describe('Kern-Views a11y (axe)', () => {
     })
     class BrandingHost {}
 
+    @Component({
+      standalone: true,
+      imports: [AdminGremienComponent],
+      template: `<main><app-admin-gremien /></main>`,
+    })
+    class GremienHost {}
+
+    @Component({
+      standalone: true,
+      imports: [GremiumMembersComponent],
+      template: `<main><app-gremium-members /></main>`,
+    })
+    class MembersHost {}
+
+    @Component({
+      standalone: true,
+      imports: [DelegationsComponent],
+      template: `<main><app-delegations /></main>`,
+    })
+    class DelegationsHost {}
+
+    /** An admin: every page shows all its parts. */
+    const adminAuth = { provide: AuthService, useValue: { can: () => true, canInGremium: () => true } };
+    /** The delegations and the pool of the gremien pages, without HTTP. */
+    const fakeDelegations = {
+      provide: DelegationsApiService,
+      useValue: {
+        list: () =>
+          of([
+            {
+              id: 'd-1',
+              meetingId: 'm-1',
+              meetingTitle: '35. Sitzung',
+              meetingDate: '2999-01-01',
+              gremiumId: MOCK_GREMIUM_STUPA_ID,
+              gremiumName: 'Studierendenparlament',
+              delegatorId: 'p-1',
+              delegatorName: 'Alex',
+              delegateId: 'p-2',
+              delegateName: 'Robin',
+              delegateVoting: true,
+              viaPool: true,
+              createdAt: '2026-01-01T00:00:00Z',
+              revocable: true,
+              direction: null,
+            },
+          ]),
+        substitutes: () =>
+          of([
+            {
+              id: 's-1',
+              gremiumId: MOCK_GREMIUM_STUPA_ID,
+              memberId: null,
+              memberName: null,
+              substituteId: 'p-3',
+              substituteName: 'Sam',
+            },
+          ]),
+      },
+    };
+
     function fakeAdminApi(): Partial<AdminApiService> {
       const role = {
         id: 'r-admin',
@@ -377,6 +443,50 @@ describe('Kern-Views a11y (axe)', () => {
           { provide: BudgetTreeApi, useValue: { tree: () => of([]) } },
         ],
       });
+      expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
+    });
+
+    it('/admin/gremien (open row with settings and role matrix) has no violations', async () => {
+      const { container, fixture } = await render(GremienHost, {
+        providers: [provideRouter([]), ...adminHttp, { provide: USE_MOCK_API, useValue: true }, adminAuth],
+      });
+      await fixture.whenStable();
+      expect(container.querySelector('[role=table]')).not.toBeNull();
+      expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
+    });
+
+    it('/admin/gremien/:id/members (with the substitute pool) has no violations', async () => {
+      const { container, fixture } = await render(MembersHost, {
+        providers: [
+          provideRouter([]),
+          ...adminHttp,
+          { provide: USE_MOCK_API, useValue: true },
+          adminAuth,
+          fakeDelegations,
+          {
+            provide: ActivatedRoute,
+            useValue: {
+              snapshot: {
+                paramMap: convertToParamMap({ id: MOCK_GREMIUM_STUPA_ID }),
+                pathFromRoot: [
+                  { url: [] },
+                  { url: [{ path: 'admin' }] },
+                  { url: [{ path: 'gremien' }, { path: MOCK_GREMIUM_STUPA_ID }, { path: 'members' }] },
+                ],
+              },
+            },
+          },
+        ],
+      });
+      await fixture.whenStable();
+      expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
+    });
+
+    it('/admin/delegations has no violations', async () => {
+      const { container, fixture } = await render(DelegationsHost, {
+        providers: [provideRouter([]), ...adminHttp, { provide: USE_MOCK_API, useValue: true }, adminAuth, fakeDelegations],
+      });
+      await fixture.whenStable();
       expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
     });
 

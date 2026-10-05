@@ -584,6 +584,20 @@ def test_gremien_admin_can_manage_members_without_admin_roles(
     assert client.get("/api/admin/principals").status_code == 200
 
 
+def test_delegations_admin_reads_members_and_principals(app: FastAPI, client: TestClient) -> None:
+    """The substitute pool on the delegations page runs under admin.delegations.
+
+    It needs the members of a gremium for the "represents" choice and the principal
+    search for the person picker. The gremium roles stay closed to it.
+    """
+    app.dependency_overrides[get_gremium_role_service] = lambda: _FakeGremiumRoles()
+    _as(app, {"admin.delegations"})
+    gid = uuid4()
+    assert client.get(f"/api/admin/gremien/{gid}/memberships").status_code == 200
+    assert client.get("/api/admin/principals?q=max").status_code == 200
+    assert client.get(f"/api/admin/gremien/{gid}/roles").status_code == 403
+
+
 def test_members_endpoints_forbidden_for_unrelated_area(app: FastAPI, client: TestClient) -> None:
     """admin.types is neither gremien nor roles, so the member reads stay forbidden."""
     app.dependency_overrides[get_gremium_role_service] = lambda: _FakeGremiumRoles()

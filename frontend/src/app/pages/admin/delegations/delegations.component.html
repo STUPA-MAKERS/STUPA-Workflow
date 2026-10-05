@@ -1,64 +1,125 @@
-<section class="cfg">
-  <app-page-header [title]="'admin.deleg.title' | t" [subtitle]="'admin.deleg.subtitle' | t" />
+<section class="dl">
+  <app-page-header
+    [flush]="true"
+    [title]="'admin.deleg.title' | t"
+    [subtitle]="'admin.deleg.subtitle' | t"
+  />
 
-  @if (loadError()) {
-    <p class="cfg__empty" role="alert">{{ 'admin.deleg.error' | t }}</p>
-  } @else {
-    <app-data-table
-      [loading]="loading()"
-      [loadingText]="'admin.deleg.loading' | t"
-      [columns]="columns()"
-      [rows]="delegations()"
-      [rowKey]="rowId"
-      [emptyText]="'admin.deleg.none' | t"
-    >
-      <ng-template appCell="meeting" let-d>
-        <a [routerLink]="['/meetings', $any(d).meetingId]">
-          {{ $any(d).meetingTitle || $any(d).meetingId }}
-        </a>
-        @if ($any(d).meetingDate) {
-          <span class="cfg__muted"> · {{ $any(d).meetingDate | ldate: 'mediumDate' }}</span>
-        }
+  <section class="dl__section" aria-labelledby="dl-active-title">
+    <header class="dl__head">
+      <h2 class="sec" id="dl-active-title">{{ 'admin.deleg.active' | t }}</h2>
+      @if (!loading() && !loadError()) {
+        <span class="dl__count">{{ active().length }}</span>
+      }
+    </header>
+
+    @if (loading()) {
+      <app-skeleton variant="rows" [count]="3" [label]="'admin.deleg.loading' | t" />
+    } @else if (loadError()) {
+      <p class="dl__error" role="alert">{{ 'admin.deleg.error' | t }}</p>
+    } @else {
+      <ng-template #rows let-list>
+        <ul class="rowgroup dl__list">
+          @for (d of list; track d.id) {
+            <li class="dl__row">
+              <span class="dl__meeting">
+                <a class="dl__title" [routerLink]="['/meetings', d.meetingId]">{{
+                  d.meetingTitle || ('admin.deleg.meeting' | t)
+                }}</a>
+                @if (d.meetingDate) {
+                  <span class="dl__date">{{ d.meetingDate | ldate: 'mediumDate' }}</span>
+                }
+              </span>
+              <span class="dl__who">
+                <span class="dl__person">{{ who(d, 'from') }}</span>
+                <app-icon class="dl__arrow" name="arrow" [size]="16" />
+                <span class="sr-only">{{ 'admin.deleg.to' | t }}</span>
+                <span class="dl__person">{{ who(d, 'to') }}</span>
+              </span>
+              <span class="dl__tags">
+                @if (d.delegateVoting) {
+                  <span class="dl__tag dl__tag--vote">{{ 'admin.deleg.votingTag' | t }}</span>
+                }
+                @if (d.viaPool) {
+                  <span class="dl__tag">{{ 'admin.deleg.poolTag' | t }}</span>
+                }
+              </span>
+              <span class="dl__act">
+                <app-button
+                  variant="danger"
+                  size="sm"
+                  [ariaLabel]="
+                    ('admin.deleg.revoke' | t) + ': ' + who(d, 'from') + ' → ' + who(d, 'to')
+                  "
+                  (click)="askRevoke(d)"
+                  >{{ 'admin.deleg.revoke' | t }}</app-button
+                >
+              </span>
+            </li>
+          } @empty {
+            <li class="dl__empty">{{ 'admin.deleg.none' | t }}</li>
+          }
+        </ul>
       </ng-template>
-      <ng-template appCell="who" let-d>
-        {{ $any(d).delegatorName || $any(d).delegatorId }} →
-        {{ $any(d).delegateName || $any(d).delegateId }}
-      </ng-template>
-      <ng-template appCell="flags" let-d>
-        @if ($any(d).delegateVoting) {
-          <app-badge variant="neutral">{{ 'delegation.card.votingBadge' | t }}</app-badge>
-        }
-        @if ($any(d).viaPool) {
-          <app-badge variant="neutral">{{ 'delegation.card.poolBadge' | t }}</app-badge>
-        }
-      </ng-template>
-      <ng-template appCell="actions" let-d>
-        <app-button
-          variant="ghost"
-          size="sm"
-          [ariaLabel]="'admin.deleg.revoke' | t"
-          (click)="askRevoke($any(d))"
+
+      <ng-container *ngTemplateOutlet="rows; context: { $implicit: active() }" />
+
+      @if (past().length) {
+        <!-- A native button: the disclosure needs aria-expanded on the button itself. -->
+        <button
+          type="button"
+          class="dl__more"
+          [attr.aria-expanded]="showPast()"
+          aria-controls="dl-past"
+          (click)="showPast.set(!showPast())"
         >
-          {{ 'admin.deleg.revoke' | t }}
-        </app-button>
-      </ng-template>
-    </app-data-table>
+          <app-icon [name]="showPast() ? 'chevron-up' : 'chevron-down'" [size]="16" />
+          {{ 'admin.deleg.past' | t: { count: past().length } }}
+        </button>
+        @if (showPast()) {
+          <div id="dl-past">
+            <ng-container *ngTemplateOutlet="rows; context: { $implicit: past() }" />
+          </div>
+        }
+      }
+    }
+  </section>
+
+  @if (poolGremiumId()) {
+    <app-substitute-pool [gremiumId]="poolGremiumId()">
+      @if (gremiumOptions().length > 1) {
+        <app-filter-select
+          poolActions
+          [label]="'admin.deleg.gremium' | t"
+          [options]="gremiumOptions()"
+          [value]="gremiumId()"
+          (valueChange)="gremiumId.set($event)"
+        />
+      }
+    </app-substitute-pool>
   }
 </section>
 
 <app-dialog
   [open]="confirmRevoke() !== null"
   [title]="'admin.deleg.revokeTitle' | t"
-  [closeLabel]="'admin.deleg.cancel' | t"
+  [closeLabel]="'action.cancel' | t"
   (closed)="confirmRevoke.set(null)"
 >
-  <p>{{ 'admin.deleg.revokeConfirm' | t: { name: confirmRevoke()?.delegateName ?? '' } }}</p>
-  <div dialog-footer class="cfg__row-foot">
-    <app-button size="sm" variant="ghost" (click)="confirmRevoke.set(null)">
-      {{ 'admin.deleg.cancel' | t }}
-    </app-button>
-    <app-button size="sm" variant="danger" [loading]="busy()" (click)="revoke()">
-      {{ 'admin.deleg.revoke' | t }}
-    </app-button>
+  @if (confirmRevoke(); as d) {
+    <p class="dl__dialogText">
+      {{
+        'admin.deleg.revokeConfirm'
+          | t: { from: who(d, 'from'), to: who(d, 'to'), meeting: d.meetingTitle ?? '' }
+      }}
+    </p>
+  }
+  <div dialog-footer class="dl__dialogFoot">
+    <app-button variant="text" (click)="confirmRevoke.set(null)">{{
+      'action.cancel' | t
+    }}</app-button>
+    <app-button variant="danger" [loading]="busy()" (click)="revoke()">{{
+      'admin.deleg.revoke' | t
+    }}</app-button>
   </div>
 </app-dialog>

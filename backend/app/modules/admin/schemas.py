@@ -235,12 +235,24 @@ class GremiumRoleUpdate(_CamelModel):
 
 
 class GremiumMembershipOut(_CamelModel):
-    """A membership that the sync derived from the OIDC groups (read-only)."""
+    """A membership that the sync derived from the OIDC groups (read-only).
+
+    The display name and the e-mail address of the member come with the row, so the
+    members page needs no principal list. Without them a page must load every principal,
+    and the principal list stops after 50 rows.
+
+    ``active`` uses the same rule as the member count of the gremien list: the
+    principal is active and the membership is valid now. The members page shows only
+    the active rows, so its count agrees with the gremien list.
+    """
 
     id: UUID
     principal_id: UUID = Field(serialization_alias="principalId")
     gremium_id: UUID = Field(serialization_alias="gremiumId")
     gremium_role_id: UUID = Field(serialization_alias="gremiumRoleId")
+    display_name: str | None = Field(default=None, serialization_alias="displayName")
+    email: str | None = None
+    active: bool = True
 
 
 def _check_oidc_group(value: str) -> str:

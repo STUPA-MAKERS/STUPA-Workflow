@@ -1,0 +1,164 @@
+:host {
+  display: block;
+}
+
+.dl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  container-type: inline-size;
+}
+
+.dl__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.dl__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-inline: var(--space-1);
+}
+.dl__count {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.dl__error {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+.dl__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* One row: the meeting, from → to, the tags, the action. */
+.dl__row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1.4fr) minmax(10rem, 1.1fr) minmax(7rem, 0.7fr) auto;
+  grid-template-areas: 'meeting who tags act';
+  align-items: center;
+  gap: var(--space-2) var(--space-5);
+  min-height: 4rem;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+}
+
+.dl__meeting {
+  grid-area: meeting;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dl__title {
+  font-weight: var(--fw-semibold);
+  color: var(--color-accent-text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.dl__title:hover {
+  text-decoration: underline;
+}
+.dl__date {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.dl__who {
+  grid-area: who;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  min-width: 0;
+}
+.dl__person {
+  overflow-wrap: anywhere;
+}
+.dl__arrow {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+.dl__tags {
+  grid-area: tags;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.dl__tag {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+}
+.dl__tag--vote {
+  background: var(--color-accent-container);
+  color: var(--color-on-accent-container);
+}
+
+.dl__act {
+  grid-area: act;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.dl__empty {
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+}
+
+.dl__more {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 2rem;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.dl__more:hover {
+  background: var(--color-surface-2);
+}
+.dl__more:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.dl__dialogText {
+  margin: 0;
+}
+.dl__dialogFoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+@container (max-width: 48rem) {
+  .dl__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'meeting act'
+      'who who'
+      'tags tags';
+  }
+  .dl__tags:empty {
+    display: none;
+  }
+}

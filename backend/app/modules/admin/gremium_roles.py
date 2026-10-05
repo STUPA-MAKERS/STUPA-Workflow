@@ -159,12 +159,27 @@ def _role_out(row: GremiumRole) -> GremiumRoleOut:
     )
 
 
-def _membership_out(row: GremiumMembership) -> GremiumMembershipOut:
+def _membership_out(
+    row: GremiumMembership,
+    display_name: str | None = None,
+    email: str | None = None,
+    active: bool = True,
+) -> GremiumMembershipOut:
     return GremiumMembershipOut(
         id=row.id,
         principal_id=row.principal_id,
         gremium_id=row.gremium_id,
         gremium_role_id=row.gremium_role_id,
+        display_name=display_name,
+        email=email,
+        active=active,
+    )
+
+
+def _valid_at(row: GremiumMembership, now: datetime) -> bool:
+    """Return True if the membership is valid at ``now`` (see ``_time_valid_clause``)."""
+    return (row.valid_from is None or row.valid_from <= now) and (
+        row.valid_until is None or row.valid_until > now
     )
 
 
@@ -300,11 +315,27 @@ class GremiumRoleService:
         await self.session.commit()
 
     async def list_memberships(self, gremium_id: UUID) -> list[GremiumMembershipOut]:
+        """List the memberships of a gremium with the name and e-mail of each member.
+
+        Each row tells if it is active: the principal is active and the membership is
+        valid now. This is the rule of the member count in the gremien list. A row
+        without a principal row is not active.
+        """
+        now = datetime.now(UTC)
         rows = (
-            await self.session.scalars(
-                select(GremiumMembership)
+            await self.session.execute(
+                select(
+                    GremiumMembership,
+                    PrincipalRow.display_name,
+                    PrincipalRow.email,
+                    PrincipalRow.active,
+                )
+                .outerjoin(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
                 .where(GremiumMembership.gremium_id == gremium_id)
                 .order_by(GremiumMembership.valid_from)
             )
         ).all()
-        return [_membership_out(r) for r in rows]
+        return [
+            _membership_out(m, name, email, active=bool(active) and _valid_at(m, now))
+            for m, name, email, active in rows
+        ]

@@ -706,12 +706,34 @@ describe('mockApiInterceptor', () => {
 
     it('GET /delegations → the own delegations, filtered by meetingId', async () => {
       const all = await get<{ meetingId: string; direction: string | null }[]>('/api/delegations');
-      expect(all.map((d) => d.direction)).toEqual(['incoming', null]);
+      // The own one and three rows that the admin overview shows.
+      expect(all.map((d) => d.direction)).toEqual(['incoming', null, null, null]);
       const none = await get<unknown[]>(
         '/api/delegations',
         new HttpParams().set('meetingId', 'other'),
       );
       expect(none).toEqual([]);
+    });
+
+    it('/delegations/substitutes → the pool of a gremium: list, add, duplicate, remove', async () => {
+      type Row = { id: string; memberId: string | null; substituteId: string };
+      const stupa = new HttpParams().set('gremiumId', 'g0000000-0000-0000-0000-000000000001');
+      const before = await get<Row[]>('/api/delegations/substitutes', stupa);
+      expect(before.map((r) => r.substituteId)).toEqual(['p-12', 'p-3']);
+      expect(await get<Row[]>('/api/delegations/substitutes', new HttpParams().set('gremiumId', 'g-x'))).toEqual([]);
+      const body = { gremiumId: 'g0000000-0000-0000-0000-000000000001', substituteId: 'p-5' };
+      const added = await firstValueFrom(http.post<Row>('/api/delegations/substitutes', body));
+      expect(added).toMatchObject({ memberId: null, substituteId: 'p-5' });
+      await expect(firstValueFrom(http.post('/api/delegations/substitutes', body))).rejects.toMatchObject({
+        status: 409,
+      });
+      const forOne = await firstValueFrom(
+        http.post<Row>('/api/delegations/substitutes', { ...body, memberId: 'p-8' }),
+      );
+      expect(forOne.memberId).toBe('p-8');
+      await firstValueFrom(http.delete(`/api/delegations/substitutes/${added.id}`));
+      await firstValueFrom(http.delete(`/api/delegations/substitutes/${forOne.id}`));
+      expect((await get<Row[]>('/api/delegations/substitutes', stupa)).length).toBe(before.length);
     });
 
     it('GET …/attendance → roster', async () => {

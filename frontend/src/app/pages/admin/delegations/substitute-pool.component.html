@@ -1,0 +1,124 @@
+<section class="sp" aria-labelledby="sp-title">
+  <header class="sp__head">
+    <h2 class="sec" id="sp-title">{{ 'admin.substitutes.title' | t }}</h2>
+    <span class="sp__actions"><ng-content select="[poolActions]" /></span>
+  </header>
+  <p class="sp__hint">{{ 'admin.substitutes.hint' | t }}</p>
+
+  <div class="sp__sub">
+    <h3 class="cap sp__cap">{{ 'admin.substitutes.single' | t }}</h3>
+    <app-button variant="text" size="sm" (click)="openAdd()">
+      <app-icon name="plus" [size]="16" /> {{ 'admin.substitutes.add' | t }}
+    </app-button>
+  </div>
+
+  @if (loading()) {
+    <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
+  } @else if (failed()) {
+    <p class="sp__error" role="alert">{{ 'admin.substitutes.loadFailed' | t }}</p>
+  } @else {
+    @if (entries().length) {
+      <div class="sp__cols" aria-hidden="true">
+        <span class="cap">{{ 'admin.substitutes.col.substitute' | t }}</span>
+        <span class="cap">{{ 'admin.substitutes.col.member' | t }}</span>
+      </div>
+    }
+    <ul class="rowgroup sp__list" [attr.aria-label]="'admin.substitutes.single' | t">
+      @for (s of entries(); track s.id) {
+        <li class="sp__row">
+          <app-avatar size="sm" [name]="entryName(s)" [decorative]="true" />
+          <span class="sp__name ell" [title]="entryName(s)">{{ entryName(s) }}</span>
+          <span class="sp__member">
+            <span class="sr-only">{{ 'admin.substitutes.col.member' | t }}: </span>
+            @if (memberName(s); as name) {
+              {{ name }}
+            } @else {
+              <span class="sp__all">{{ 'admin.substitutes.allMembers' | t }}</span>
+            }
+          </span>
+          <app-button
+            variant="text"
+            size="sm"
+            [iconOnly]="true"
+            [disabled]="removing().has(s.id)"
+            [ariaLabel]="('admin.substitutes.remove' | t) + ': ' + entryName(s)"
+            [title]="'admin.substitutes.remove' | t"
+            (click)="remove(s)"
+          >
+            <app-icon name="trash" />
+          </app-button>
+        </li>
+      } @empty {
+        <li class="sp__empty">{{ 'admin.substitutes.empty' | t }}</li>
+      }
+    </ul>
+  }
+</section>
+
+<!-- The search finds every user, not only members of the gremium. -->
+<app-dialog
+  [open]="addOpen()"
+  [title]="'admin.substitutes.add' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="addOpen.set(false)"
+>
+  <form class="sp__form" (submit)="$event.preventDefault(); add()">
+    <div class="sp__search">
+      <label class="sp__searchBox">
+        <span class="sp__searchLabel">{{ 'admin.substitutes.search' | t }}</span>
+        <input
+          class="sp__searchInput"
+          type="search"
+          autocomplete="off"
+          name="person"
+          [placeholder]="'admin.gremien.memberSearchPlaceholder' | t"
+          [ngModel]="query()"
+          (ngModelChange)="onSearch($event)"
+        />
+      </label>
+      @if (candidates().length) {
+        <ul class="sp__hits" [attr.aria-label]="'admin.substitutes.hits' | t">
+          @for (c of candidates(); track c.id) {
+            <li>
+              <button
+                type="button"
+                class="sp__hit"
+                [class.sp__hit--on]="selected()?.id === c.id"
+                (click)="pick(c)"
+              >
+                <span class="sp__hitName">{{ label(c) }}</span>
+                @if (c.email) {
+                  <span class="sp__hitMail mono">{{ c.email }}</span>
+                }
+              </button>
+            </li>
+          }
+        </ul>
+      } @else if (query().trim() && !searching() && !selected()) {
+        <p class="sp__none">{{ 'admin.substitutes.noHits' | t }}</p>
+      }
+    </div>
+    @if (selected(); as s) {
+      <p class="sp__picked" role="status">
+        {{ 'admin.gremien.memberPicked' | t }}: <strong>{{ label(s) }}</strong>
+      </p>
+    }
+    <app-select
+      [label]="'admin.substitutes.forMember' | t"
+      [options]="memberOptions()"
+      [ngModel]="memberId()"
+      (ngModelChange)="memberId.set($event)"
+      name="member"
+    />
+    @if (addError()) {
+      <p class="sp__error" role="alert">{{ addError() }}</p>
+    }
+    <button type="submit" hidden></button>
+  </form>
+  <div dialog-footer class="sp__foot">
+    <app-button variant="text" (click)="addOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="fill" [disabled]="!selected()" [loading]="adding()" (click)="add()">{{
+      'admin.substitutes.addAction' | t
+    }}</app-button>
+  </div>
+</app-dialog>

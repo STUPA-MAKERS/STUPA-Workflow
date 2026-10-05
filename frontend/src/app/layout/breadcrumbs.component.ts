@@ -41,11 +41,17 @@ export class BreadcrumbsComponent {
 
   /**
    * The crumbs to show. A parent that the frame around the page shows already (the
-   * admin navigation shows "Verwaltung") is left out.
+   * admin navigation shows "Verwaltung") is left out. A label that the page gives for
+   * its own URL replaces the label of the current crumb.
    */
   readonly crumbs = computed<Crumb[]>(() => {
     const root = this.frame.crumbRoot();
-    const list = this.all();
+    const own = this.frame.crumbLabel();
+    let list = this.all();
+    const last = list.at(-1);
+    if (own && last && own.url === last.url) {
+      list = [...list.slice(0, -1), { ...last, label: own.label }];
+    }
     return root ? list.filter((c, i) => i === list.length - 1 || c.url !== `/${root}`) : list;
   });
 

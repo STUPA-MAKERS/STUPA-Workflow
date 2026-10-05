@@ -128,6 +128,22 @@ describe('BreadcrumbsComponent', () => {
     frame.crumbRoot.set(null);
   });
 
+  it('shows the label that the page gives for its own crumb', async () => {
+    const { router, fixture, i18n } = await setup();
+    const frame = fixture.debugElement.injector.get(PageFrameService);
+    await router.navigateByUrl('/budget/pots');
+    frame.crumbLabel.set({ url: '/budget/pots', label: 'Topf A' });
+    fixture.detectChanges();
+    expect(screen.getByText('Topf A')).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByText(i18n.translate('nav.expenses'))).not.toBeInTheDocument();
+    // A label for another URL does not apply.
+    frame.crumbLabel.set({ url: '/elsewhere', label: 'Stale' });
+    fixture.detectChanges();
+    expect(screen.queryByText('Stale')).not.toBeInTheDocument();
+    expect(screen.getByText(i18n.translate('nav.expenses'))).toBeInTheDocument();
+    frame.crumbLabel.set(null);
+  });
+
   it('refreshes the crumbs on every navigation', async () => {
     const { router, fixture, i18n } = await setup();
     await router.navigateByUrl('/budget/pots');
