@@ -1,0 +1,43 @@
+@use '../../budget/finance-sheet';
+@use '../../budget/finance-form';
+
+.bp--sheet {
+  --color-surface-sunken: var(--color-surface-3);
+}
+.bp__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.bp--sheet .bp__card {
+  padding: 0;
+  background: transparent;
+}
+.bp__hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.bp__end {
+  display: flex;
+  justify-content: flex-end;
+}
+.bp__sum {
+  color: var(--color-text);
+  font-weight: var(--fw-semibold);
+}
+.bp__action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}

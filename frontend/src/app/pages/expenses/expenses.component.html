@@ -1,427 +1,575 @@
-<!-- Board Arbeit-Buchungen. Wide (>= 1200px): the title row, then the cost-centre pane
-     beside the list; the page does not scroll, the pane and the list scroll inside
-     themselves. Narrower: the cost centre is a chip that opens the tree. -->
-<div class="exp" [class.exp--wide]="wide()">
-  <header class="exp__head">
-    <h1 class="exp__title">{{ 'expenses.title' | t }}</h1>
-
-    @if (wide()) {
-      <ng-container *ngTemplateOutlet="tools" />
-    }
-
-    <div class="exp__actions">
-      @if (canManage()) {
-        @if (!phone()) {
-          <app-button variant="tonal" size="sm" (click)="openTransfer()">
-            <span class="exp__btn"
-              ><app-icon name="repeat" [size]="16" />{{ 'expenses.transfer' | t }}</span
-            >
-          </app-button>
-        }
-        <app-button size="sm" data-testid="exp-add" (click)="openCreate()">
-          <span class="exp__btn"
-            ><app-icon name="add" [size]="16" />{{
-              (phone() ? 'expenses.addShort' : 'expenses.add') | t
-            }}</span
-          >
-        </app-button>
+<!-- Boards Fin-Buchungen and the other Fin-Buchung* boards: the list beside a detail
+     sheet, like the applications page. Side by side the page does not scroll: the list
+     scrolls below its search and chips, the sheet scrolls inside itself. -->
+<div class="exp" [class.exp--split]="split()">
+  <app-list-detail [detailOpen]="detailOpen()" (back)="closeDetail()">
+    <section list class="exp__pane" aria-labelledby="exp-title">
+      @if (phone() && selecting()) {
+        <!-- Phone: while rows are selected the title row is the bar of the bulk actions
+             (board Fin-Tel-Auswahl). -->
+        <header class="exp__head exp__head--select" role="toolbar" [attr.aria-label]="'ui.selection.toolbar' | t">
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'expenses.bulk.stop' | t"
+            (click)="stopSelecting()"
+          ><app-icon name="x" [size]="20" /></app-button>
+          <h1 id="exp-title" class="exp__selTitle" aria-live="polite">{{ selectionLabel() }}</h1>
+          <ng-container *ngTemplateOutlet="bulkIcons" />
+        </header>
+      } @else {
+        <header class="exp__head">
+          <h1 id="exp-title" class="exp__title">{{ 'expenses.title' | t }}</h1>
+          @if (phone()) {
+            @if (canManage()) {
+              <app-button size="sm" data-testid="exp-add" (click)="tab() === 'transfers' ? openTransfer() : openCreate()">
+                <span class="exp__btn"
+                  ><app-icon name="add" [size]="16" />{{
+                    (tab() === 'transfers' ? 'expenses.transferShort' : 'expenses.addShort') | t
+                  }}</span
+                >
+              </app-button>
+            }
+          } @else {
+            @if (canExport() && tab() === 'bookings') {
+              <app-button
+                variant="text"
+                [iconOnly]="true"
+                [loading]="exporting()"
+                [ariaLabel]="'expenses.export' | t"
+                [title]="'expenses.export' | t"
+                (click)="onExport()"
+              ><app-icon name="download" [size]="21" /></app-button>
+            }
+            @if (tab() === 'bookings') {
+              <app-row-menu
+                icon="sort"
+                [label]="'expenses.sort.title' | t"
+                [sections]="sortSections()"
+                (selected)="onHeaderMenu($event)"
+              />
+            }
+          }
+          @if (headerMenu().length) {
+            <app-row-menu
+              [label]="'expenses.moreActions' | t"
+              [sections]="headerMenu()"
+              (selected)="onHeaderMenu($event)"
+            />
+          }
+        </header>
       }
-      @if (phone() && phoneMenu()[0].items.length) {
-        <app-row-menu
-          [label]="'expenses.moreActions' | t"
-          [sections]="phoneMenu()"
-          (selected)="onPhoneMenu($event)"
+
+      <!-- The search and the chips never scroll away: one pane at a time they stick to
+           the top of the viewport; side by side only the rows below them scroll. -->
+      <app-sticky-bar class="exp__filters">
+        <app-search-pill
+          [placeholder]="'expenses.search' | t"
+          [label]="'expenses.searchLabel' | t"
+          [value]="q()"
+          (valueChange)="onSearch($event)"
         />
-      }
-    </div>
-  </header>
-
-  <!-- Below the wide layout the page scrolls: the search, the filter, the cost-centre
-       chip and the views stick to the top, the title row scrolls away. Wide, the page
-       does not scroll and only the list below them scrolls. -->
-  @if (!wide()) {
-    <app-sticky-bar class="exp__sticky">
-      <ng-container *ngTemplateOutlet="tools" />
-      <ng-container *ngTemplateOutlet="bar" />
-    </app-sticky-bar>
-  }
-
-  <div class="exp__body">
-    @if (wide()) {
-      <aside class="exp__pane" [attr.aria-label]="'expenses.filter.costCentre' | t">
-        <h2 class="exp__paneTitle cap">{{ 'expenses.filter.costCentre' | t }}</h2>
-        <div class="exp__tree" appScrollFade="y">
-          <ng-container *ngTemplateOutlet="tree" />
+        <div class="exp__chips" role="group" appScrollFade="x" [attr.aria-label]="'expenses.filter.group' | t">
+          @if (budgetTree().length) {
+            <button
+              type="button"
+              class="chip exp__chip"
+              [class.on]="budgetId() !== ''"
+              aria-haspopup="dialog"
+              [attr.aria-expanded]="pickerOpen()"
+              [attr.aria-label]="('expenses.filter.costCentre' | t) + ': ' + costCentreName()"
+              [title]="costCentreName()"
+              (click)="pickerOpen.set(true)"
+            >
+              @if (costCentreColor(); as c) {
+                <span class="exp__swatch" aria-hidden="true" [style.background]="c"></span>
+              } @else {
+                <app-icon name="pie" [size]="15" />
+              }
+              <span class="ell">{{ costCentreName() }}</span>
+              @if (!budgetId()) {
+                <app-icon name="down" [size]="15" />
+              }
+            </button>
+          }
+          @if (tab() === 'bookings') {
+            <app-filter-select
+              class="exp__chip"
+              [label]="'expenses.filter.kind' | t"
+              [options]="kindOptions()"
+              [value]="kind()"
+              (valueChange)="setKind($event)"
+              [text]="kindChipLabel()"
+              [active]="kind() !== ''"
+              [icon]="kind() ? 'check' : null"
+              [chevron]="!kind()"
+            />
+          }
+          <app-range-chip
+            kind="date"
+            [label]="'expenses.filter.period' | t"
+            [from]="createdFrom()"
+            [to]="createdTo()"
+            (applied)="onDateRange($event)"
+          />
+          <app-range-chip
+            kind="amount"
+            [label]="'expenses.filter.amountRange' | t"
+            [from]="amountMin()"
+            [to]="amountMax()"
+            (applied)="onAmountRange($event)"
+          />
         </div>
-      </aside>
-    }
 
-    <section class="exp__main" [attr.aria-label]="'expenses.title' | t">
-      @if (wide()) {
-        <ng-container *ngTemplateOutlet="bar" />
-      }
+        @if (selecting() && tab() === 'bookings' && !phone()) {
+          <!-- Board Fin-Buchungen-Auswahl: the selection bar in the column. One pane at a
+               time it also holds the bulk actions; side by side they are in the sheet. -->
+          <div class="exp__selbar" role="toolbar" [attr.aria-label]="'ui.selection.toolbar' | t">
+            <input
+              type="checkbox"
+              class="exp__check"
+              [attr.aria-label]="'expenses.bulk.selectAll' | t"
+              [checked]="allSelected()"
+              [indeterminate]="selectedCount() > 0 && !allSelected()"
+              (change)="toggleSelectAll(!allSelected())"
+            />
+            <span class="exp__selText" aria-live="polite">{{ selectionLabel() }}</span>
+            @if (split()) {
+              <app-button variant="text" size="sm" (click)="toggleSelectAll(true)">{{
+                'expenses.bulk.selectAll' | t
+              }}</app-button>
+            } @else {
+              <ng-container *ngTemplateOutlet="bulkIcons" />
+            }
+            <app-button
+              variant="text"
+              [iconOnly]="true"
+              [ariaLabel]="'expenses.bulk.stop' | t"
+              (click)="stopSelecting()"
+            ><app-icon name="x" [size]="18" /></app-button>
+          </div>
+        } @else {
+          <div class="exp__bar">
+            <!-- The transfer list needs `budget.book`: a reader gets no views. -->
+            @if (canManage()) {
+              <app-segmented
+                class="exp__tabs"
+                width="equal"
+                [ariaLabel]="'expenses.views' | t"
+                [options]="tabOptions()"
+                [value]="tab()"
+                (valueChange)="setTab($any($event))"
+              />
+            }
+            <span class="exp__count" role="status">{{
+              tab() === 'transfers'
+                ? ('expenses.count' | t: { count: transferItems().length, total: transferTotal() })
+                : ('expenses.count' | t: { count: items().length, total: total() })
+            }}</span>
+          </div>
+        }
+      </app-sticky-bar>
 
       <div
         #scroller
         class="exp__scroll"
-        [class.exp__scroll--selbar]="canManage() && selectedCount() > 0"
         appScrollFade="y"
         [attr.aria-busy]="refreshing() ? 'true' : null"
       >
         @if (tab() === 'transfers') {
-          <app-transfers-table
-            [rows]="transferItems()"
-            [loading]="transferLoading()"
-            [columnSet]="columnSet()"
-            [canManage]="canManage()"
-            [costCentres]="costCentres()"
-            (edit)="openTransferEdit($event)"
-            (remove)="askDeleteTransfer($event)"
-          />
-          @if (transferHasMore()) {
-            <div class="exp__more">
-              <app-button variant="tonal" size="sm" [loading]="transferLoadingMore()" (click)="loadMoreTransfers()">{{
-                'expenses.loadMore' | t
-              }}</app-button>
-            </div>
+          @if (transferLoading()) {
+            <app-skeleton variant="rows" [count]="5" [label]="'expenses.loading' | t" />
+          } @else if (!transferItems().length) {
+            <ng-container *ngTemplateOutlet="emptyList; context: { $implicit: 'expenses.transfers.empty' }" />
+          } @else {
+            @for (group of transferGroups(); track group.key + $index) {
+              <section class="exp__group" [attr.aria-label]="group.label || null">
+                @if (group.label) {
+                  <h2 class="sec exp__month">{{ group.label }}</h2>
+                }
+                <div class="exp__rows" [class.rowgroup]="!split()" role="list">
+                  @for (t of group.items; track t.transferId) {
+                    @let from = costCentre(t.fromBudgetId, t.fromPathKey);
+                    @let to = costCentre(t.toBudgetId, t.toPathKey);
+                    <app-list-item
+                      role="listitem"
+                      class="exp__row"
+                      [title]="t.description"
+                      [link]="[]"
+                      [linkQueryParams]="{ transfer: t.transferId, id: null }"
+                      linkQueryParamsHandling="merge"
+                      [selected]="t.transferId === selectedTransferId()"
+                    >
+                      <span sub>
+                        <span class="mono">{{ day(t.paymentDate ?? t.createdAt) }}</span>
+                        <span class="exp__dot" aria-hidden="true">·</span>
+                        <span class="exp__cc">@if (from.color) {<span class="exp__swatch" aria-hidden="true" [style.background]="from.color"></span>}{{ from.name }}</span>
+                        <app-icon class="exp__arrow" name="arrow" [size]="13" />
+                        <span class="sr-only">{{ 'expenses.transfers.to' | t }}</span>
+                        <span class="exp__cc">@if (to.color) {<span class="exp__swatch" aria-hidden="true" [style.background]="to.color"></span>}{{ to.name }}</span>
+                      </span>
+                      <span trail class="exp__trail">
+                        <span class="mono exp__amount">{{ money(t.amount) }}</span>
+                        <span class="exp__menuSlot">
+                          @if (!split()) {
+                            <span class="exp__chev" aria-hidden="true">
+                              <app-icon name="chevron-right" [size]="17" />
+                            </span>
+                          }
+                          <app-row-menu
+                            class="exp__menu"
+                            [label]="'expenses.rowMenu' | t: { description: t.description }"
+                            [sections]="transferMenu()"
+                            (selected)="onTransferMenu($event, t)"
+                          />
+                        </span>
+                      </span>
+                    </app-list-item>
+                  }
+                </div>
+              </section>
+            }
+            @if (transferHasMore()) {
+              <div #sentinel class="exp__sentinel" aria-hidden="true"></div>
+              <div class="exp__more">
+                <app-button variant="text" size="sm" [loading]="transferLoadingMore()" (click)="loadMoreTransfers()">{{
+                  'expenses.loadMore' | t
+                }}</app-button>
+              </div>
+            }
           }
         } @else {
-          <app-expenses-table
-            [rows]="items()"
-            [loading]="loading()"
-            [columnSet]="columnSet()"
-            [canManage]="canManage()"
-            [selected]="selected()"
-            (selectedChange)="onSelectionChange($event)"
-            [sort]="sortState()"
-            (sortChange)="onSortChange($event)"
-            [sub]="sub"
-            [costCentres]="costCentres()"
-            [budgetLink]="budgetLink"
-            (edit)="openEdit($event)"
-            (remove)="askDelete($event)"
-            (addSub)="openCreateSub($event)"
-            (viewInvoice)="openInvoiceDialog($event)"
-          />
-          @if (hasMore()) {
-            <div #sentinel class="exp__sentinel" aria-hidden="true"></div>
-            <div class="exp__more">
-              <app-button variant="tonal" size="sm" [loading]="loadingMore()" (click)="loadMore()">{{
-                'expenses.loadMore' | t
-              }}</app-button>
-            </div>
+          @if (loading()) {
+            <app-skeleton variant="rows" [count]="6" [label]="'expenses.loading' | t" />
+          } @else if (!items().length) {
+            <ng-container *ngTemplateOutlet="emptyList; context: { $implicit: 'expenses.empty' }" />
+          } @else {
+            @for (group of groups(); track group.key + $index) {
+              <section class="exp__group" [attr.aria-label]="group.label || null">
+                @if (group.label) {
+                  <h2 class="sec exp__month">{{ group.label }}</h2>
+                }
+                <div class="exp__rows" [class.rowgroup]="!split()" role="list">
+                  @for (e of group.items; track e.id) {
+                    @let cc = costCentre(e.budgetId, e.pathKey);
+                    <app-list-item
+                      role="listitem"
+                      class="exp__row"
+                      [class.exp__row--checked]="selecting() && isSelected(e.id)"
+                      [title]="e.description"
+                      [link]="selecting() ? null : []"
+                      [linkQueryParams]="{ id: e.id, transfer: null }"
+                      linkQueryParamsHandling="merge"
+                      [selected]="!selecting() && e.id === selectedId()"
+                      (activate)="onRowActivate(e)"
+                    >
+                      @if (selecting()) {
+                        <input
+                          lead
+                          type="checkbox"
+                          class="exp__check exp__check--row"
+                          [attr.aria-label]="'expenses.bulk.selectRow' | t: { description: e.description }"
+                          [checked]="isSelected(e.id)"
+                          (change)="toggleSelect(e.id, !isSelected(e.id))"
+                        />
+                      }
+                      <span sub>
+                        <app-status-text [kind]="e.kind === 'income' ? 'accent' : 'muted'">{{
+                          (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t
+                        }}</app-status-text>
+                        <span class="exp__dot" aria-hidden="true">·</span>
+                        <span class="exp__cc">@if (cc.color) {<span class="exp__swatch" aria-hidden="true" [style.background]="cc.color"></span>}{{ cc.name }}</span>
+                        @if (day(e.paymentDate ?? e.createdAt); as d) {
+                          <span class="exp__dot" aria-hidden="true">·</span>
+                          <span class="mono">{{ d }}</span>
+                        }
+                        @if (e.invoiceId) {
+                          <app-icon class="exp__receipt" name="receipt" [size]="13" />
+                          <span class="sr-only">{{ 'expenses.withInvoice' | t }}</span>
+                        }
+                      </span>
+                      <span trail class="exp__trail">
+                        <span class="mono exp__amount" [class.exp__amount--in]="e.kind === 'income'">{{
+                          signed(e)
+                        }}</span>
+                        @if (!selecting()) {
+                          @let menu = rowMenu(e);
+                          @if (menu.length || !split()) {
+                            <span class="exp__menuSlot">
+                              @if (!split()) {
+                                <span class="exp__chev" aria-hidden="true">
+                                  <app-icon name="chevron-right" [size]="17" />
+                                </span>
+                              }
+                              @if (menu.length) {
+                                <app-row-menu
+                                  class="exp__menu"
+                                  [label]="rowMenuLabel(e)"
+                                  [sections]="menu"
+                                  (selected)="onRowMenu($event, e)"
+                                />
+                              }
+                            </span>
+                          }
+                        }
+                      </span>
+                    </app-list-item>
+                  }
+                </div>
+              </section>
+            }
+            @if (hasMore()) {
+              <div #sentinel class="exp__sentinel" aria-hidden="true"></div>
+              <div class="exp__more">
+                <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">{{
+                  'expenses.loadMore' | t
+                }}</app-button>
+              </div>
+            }
           }
         }
       </div>
+
+      @if (canManage() && !phone() && !selecting()) {
+        <button type="button" class="exp__fab" (click)="tab() === 'transfers' ? openTransfer() : openCreate()">
+          <app-icon [name]="tab() === 'transfers' ? 'repeat' : 'plus'" [size]="22" />
+          {{ (tab() === 'transfers' ? 'expenses.transferNew' : 'expenses.add') | t }}
+        </button>
+      }
     </section>
-  </div>
+
+    <div detail class="exp__detail">
+      @switch (detailView()) {
+        @case ('form') {
+          <ng-container *ngTemplateOutlet="form; context: { $implicit: false }" />
+        }
+        @case ('bulk') {
+          <app-bulk-panel
+            [rows]="selectedRows()"
+            [costCentres]="costCentres()"
+            [tree]="budgetTree()"
+            [canExport]="canExport()"
+            [busy]="bulkBusy()"
+            [deleteReason]="bulkDeleteReason()"
+            [deleteMax]="bulkDeleteMax"
+            [(budgetId)]="bulkBudgetId"
+            [(category)]="bulkCategory"
+            (reassign)="runBulkReassign()"
+            (exported)="runBulkExport()"
+            (remove)="askBulkDelete()"
+            (closed)="stopSelecting()"
+          />
+        }
+        @case ('transfer') {
+          @let t = selectedTransfer()!;
+          <app-transfer-detail
+            [transfer]="t"
+            [costCentres]="costCentres()"
+            [fyLabel]="fyLabel(t.fiscalYearId)"
+            [canManage]="canManage()"
+            [split]="split()"
+            [phone]="phone()"
+            (edit)="openTransferEdit(t)"
+            (remove)="askDeleteTransfer(t)"
+          />
+        }
+        @case ('booking') {
+          @let e = selectedExpense()!;
+          <app-booking-detail
+            [expense]="e"
+            [costCentres]="costCentres()"
+            [tree]="budgetTree()"
+            [fyLabel]="fyLabel(e.fiscalYearId)"
+            [invoice]="linkedInvoice()"
+            [application]="linkedApplication()"
+            [subRows]="sub.subOf(e.id)"
+            [subLoading]="sub.isLoadingSub(e.id)"
+            [canManage]="canManage()"
+            [split]="split()"
+            [phone]="phone()"
+            (edit)="openEdit($event)"
+            (remove)="askDelete($event)"
+            (addSub)="openCreateSub(e)"
+            (openFile)="openInvoiceFile($event)"
+          />
+        }
+        @case ('missing') {
+          <div class="exp__none">
+            <app-empty-state
+              [fill]="true"
+              icon="search"
+              [heading]="'expenses.notFound' | t"
+              [body]="'expenses.notFoundBody' | t"
+            />
+          </div>
+        }
+        @default {
+          @if (split()) {
+            @if (!loading() && !(tab() === 'transfers' ? transferItems().length : items().length)) {
+              <!-- Board Fin-Buchungen-Leer: an empty list leaves a neutral sheet. -->
+              <div class="exp__none exp__none--skeleton" aria-hidden="true">
+                <span class="exp__ghost exp__ghost--title"></span>
+                <span class="exp__ghost exp__ghost--meta"></span>
+                <span class="exp__ghost exp__ghost--rule"></span>
+                <div class="exp__ghostCols">
+                  <span class="exp__ghost exp__ghost--card"></span>
+                  <span class="exp__ghost exp__ghost--card"></span>
+                </div>
+              </div>
+            } @else {
+              <div class="exp__none">
+                <app-empty-state
+                  [fill]="true"
+                  [icon]="tab() === 'transfers' ? 'repeat' : 'swap'"
+                  [heading]="(tab() === 'transfers' ? 'expenses.transfers.none' : 'expenses.none') | t"
+                />
+              </div>
+            }
+          }
+        }
+      }
+    </div>
+  </app-list-detail>
 </div>
 
-<ng-template #tools>
-  <div class="exp__tools">
-    <app-search-pill
-      class="exp__search"
-      size="md"
-      [placeholder]="'expenses.search' | t"
-      [value]="q()"
-      (valueChange)="onSearch($event)"
-    />
-    <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
-      <!-- `group`: three controls, not one. A plain field wraps its content in a label,
-           which would bind to the first button and take its name away. -->
-      <app-filter-field [label]="'expenses.filter.kind' | t" [group]="true">
-        <div class="exp__kinds">
-          <app-button
-            [variant]="kind() === '' ? 'primary' : 'ghost'"
-            size="sm"
-            [ariaPressed]="kind() === ''"
-            (click)="setKind('')"
-            >{{ 'expenses.filter.all' | t }}</app-button
-          >
-          <app-button
-            [variant]="kind() === 'expense' ? 'primary' : 'ghost'"
-            size="sm"
-            [ariaPressed]="kind() === 'expense'"
-            (click)="setKind('expense')"
-            >{{ 'expenses.kind.expense' | t }}</app-button
-          >
-          <app-button
-            [variant]="kind() === 'income' ? 'primary' : 'ghost'"
-            size="sm"
-            [ariaPressed]="kind() === 'income'"
-            (click)="setKind('income')"
-            >{{ 'expenses.kind.income' | t }}</app-button
-          >
-        </div>
-      </app-filter-field>
-      <app-filter-field [label]="'expenses.filter.amountRange' | t">
-        <app-filter-range>
-          <app-currency-input
-            start
-            [placeholder]="'expenses.filter.amountMin' | t"
-            [ariaLabel]="'expenses.filter.amountMin' | t"
-            [ngModel]="amountMin()"
-            (ngModelChange)="onAmountFilter('min', $event)"
-          />
-          <app-currency-input
-            end
-            [placeholder]="'expenses.filter.amountMax' | t"
-            [ariaLabel]="'expenses.filter.amountMax' | t"
-            [ngModel]="amountMax()"
-            (ngModelChange)="onAmountFilter('max', $event)"
-          />
-        </app-filter-range>
-      </app-filter-field>
-      <app-filter-field [label]="'expenses.filter.dateRange' | t">
-        <app-filter-range>
-          <app-datepicker
-            start
-            [ariaLabel]="'expenses.filter.dateFrom' | t"
-            [ngModel]="createdFrom()"
-            (ngModelChange)="onDateFilter('from', $event)"
-          />
-          <app-datepicker
-            end
-            [ariaLabel]="'expenses.filter.dateTo' | t"
-            [ngModel]="createdTo()"
-            (ngModelChange)="onDateFilter('to', $event)"
-          />
-        </app-filter-range>
-      </app-filter-field>
-    </app-filter-bar>
-    @if (canExport() && !phone()) {
-      <app-button
-        class="exp__export"
-        variant="outlined"
-        size="sm"
-        [ariaLabel]="'expenses.export' | t"
-        [title]="'expenses.export' | t"
-        [loading]="exporting()"
-        (click)="onExport()"
-      >
-        <span class="exp__btn"
-          ><app-icon name="download" [size]="16" /><span class="exp__btnText">{{
-            'expenses.export' | t
-          }}</span></span
-        >
-      </app-button>
+<ng-template #emptyList let-key>
+  <app-empty-state icon="search" [heading]="key | t">
+    @if (activeFilterCount() > 0) {
+      <app-button variant="tonal" size="sm" (click)="resetFilters()">{{ 'expenses.filter.reset' | t }}</app-button>
     }
-  </div>
+  </app-empty-state>
 </ng-template>
 
-<ng-template #bar>
-  <div class="exp__bar">
-    @if (!wide()) {
-      <button
-        type="button"
-        class="exp__ccChip"
-        [class.exp__ccChip--on]="!!budgetId()"
-        aria-haspopup="dialog"
-        [attr.aria-expanded]="pickerOpen()"
-        [attr.aria-label]="('expenses.filter.costCentre' | t) + ': ' + costCentreName()"
-        [title]="costCentreName()"
-        (click)="pickerOpen.set(true)"
-      >
-        @if (costCentreColor(); as c) {
-          <span class="exp__swatch" aria-hidden="true" [style.background]="c"></span>
-        } @else {
-          <app-icon name="pie" [size]="15" />
-        }
-        <span class="ell">{{ costCentreName() }}</span>
-        <app-icon name="chevron-down" [size]="15" />
-      </button>
-    }
-    <!-- The transfer list needs `budget.book`: a reader without it gets no tabs. -->
-    @if (canManage()) {
-      <app-segmented
-        class="exp__tabs"
-        [ariaLabel]="'expenses.views' | t"
-        [options]="tabOptions()"
-        [value]="tab()"
-        (valueChange)="setTab($any($event))"
-      />
-    }
-    @if (tab() === 'transfers' ? transferTotal() > 0 : total() > 0) {
-      <span class="exp__count" role="status">{{
-        tab() === 'transfers'
-          ? ('expenses.count' | t: { count: transferItems().length, total: transferTotal() })
-          : ('expenses.count' | t: { count: items().length, total: total() })
-      }}</span>
-    }
-  </div>
-</ng-template>
-
-<ng-template #tree>
-  <app-cost-centre-tree
-    [nodes]="budgetTree()"
-    [selectedId]="budgetId()"
-    [allLabel]="'expenses.filter.allCostCentres' | t"
-    [ariaLabel]="'expenses.filter.costCentre' | t"
-    (picked)="selectBudget($event)"
-  />
-</ng-template>
-
-<!-- The cost-centre picker below the wide layout: the shared side sheet, from the start
-     beside the list or from the bottom on a phone (the same sheet as on "Anträge"). -->
-@if (!wide()) {
-  <app-side-sheet
-    [side]="phone() ? 'bottom' : 'start'"
-    [heading]="'expenses.filter.costCentre' | t"
-    [(open)]="pickerOpen"
-  >
-    <ng-container *ngTemplateOutlet="tree" />
-  </app-side-sheet>
-}
-
-<!-- On a phone the three actions are icon buttons: with their labels they do not fit the
-     bar. The accessible name stays. -->
-<app-selection-bar
-  [count]="canManage() && tab() === 'bookings' ? selectedCount() : 0"
-  [countLabel]="selectionLabel()"
-  (cleared)="toggleSelectAll(false)"
->
+<!-- The bulk actions as icons: the phone title row and the selection bar of the narrow
+     layout. -->
+<ng-template #bulkIcons>
   <app-button
     variant="text"
-    size="sm"
-    [iconOnly]="phone()"
+    [iconOnly]="true"
     [ariaLabel]="'expenses.bulk.reassign' | t"
-    [disabled]="bulkBusy()"
+    [title]="'expenses.bulk.reassign' | t"
+    [disabled]="bulkBusy() || !selectedCount()"
     (click)="openBulkReassign()"
-  >
-    <span class="exp__btn"
-      ><app-icon name="repeat" [size]="16" /><span class="exp__selText">{{
-        'expenses.bulk.reassign' | t
-      }}</span></span
-    >
-  </app-button>
+  ><app-icon name="repeat" [size]="19" /></app-button>
   @if (canExport()) {
     <app-button
       variant="text"
-      size="sm"
-      [iconOnly]="phone()"
+      [iconOnly]="true"
       [ariaLabel]="'expenses.bulk.export' | t"
-      [disabled]="bulkBusy()"
-      (click)="askBulk('export')"
-    >
-      <span class="exp__btn"
-        ><app-icon name="download" [size]="16" /><span class="exp__selText">{{
-          'expenses.bulk.export' | t
-        }}</span></span
-      >
-    </app-button>
+      [title]="'expenses.bulk.export' | t"
+      [disabled]="bulkBusy() || !selectedCount()"
+      (click)="runBulkExport()"
+    ><app-icon name="download" [size]="19" /></app-button>
   }
   <app-button
-    variant="danger"
-    size="sm"
-    [iconOnly]="phone()"
+    variant="text"
+    class="exp__danger"
+    [iconOnly]="true"
     [ariaLabel]="'expenses.bulk.deleteSelected' | t"
-    [loading]="bulkBusy()"
-    [disabled]="bulkBusy() || bulkDeleteBlocked()"
     [title]="bulkDeleteReason() ?? ('expenses.bulk.deleteSelected' | t)"
-    (click)="askBulk('delete')"
-  >
-    <span class="exp__btn"
-      ><app-icon name="delete" [size]="16" /><span class="exp__selText">{{
-        'expenses.bulk.deleteSelected' | t
-      }}</span></span
-    >
-  </app-button>
-</app-selection-bar>
+    [disabled]="bulkBusy() || !selectedCount() || bulkDeleteBlocked()"
+    (click)="askBulkDelete()"
+  ><app-icon name="delete" [size]="19" /></app-button>
+</ng-template>
 
-@if (canManage()) {
-  <app-booking-dialog
-    mode="create"
-    [state]="dialogs"
-    [costCentreOptions]="costCentreOptions()"
-    [saving]="saving()"
-  />
-  <app-booking-dialog
-    mode="edit"
-    [state]="dialogs"
-    [costCentreOptions]="costCentreOptions()"
-    [saving]="saving()"
-  />
-  <app-sub-booking-dialog [sub]="sub" [saving]="saving()" />
-  <app-transfer-dialog
-    mode="create"
-    [dialogs]="dialogs"
-    [transfers]="transfers"
-    [costCentreOptions]="costCentreOptions()"
-    [costCentres]="costCentres()"
-    [saving]="saving()"
-  />
-  <app-transfer-dialog
-    mode="edit"
-    [dialogs]="dialogs"
-    [transfers]="transfers"
-    [costCentreOptions]="costCentreOptions()"
-    [costCentres]="costCentres()"
-    [saving]="transferSaving()"
-  />
-}
-
-<!-- The invoice a booking links to. -->
-<app-dialog
-  [open]="!!viewingInvoice()"
-  [title]="'expenses.invoice.title' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="viewingInvoice.set(null)"
->
-  @if (viewingInvoice(); as inv) {
-    <dl class="exp__inv">
-      <div>
-        <dt>{{ 'invoices.field.number' | t }}</dt>
-        <dd class="mono">{{ inv.number || '—' }}</dd>
-      </div>
-      <div>
-        <dt>{{ 'invoices.field.supplier' | t }}</dt>
-        <dd>{{ inv.supplier || '—' }}</dd>
-      </div>
-      <div>
-        <dt>{{ 'invoices.field.issueDate' | t }}</dt>
-        <dd class="mono">{{ inv.issueDate ? (inv.issueDate | ldate: 'mediumDate') : '—' }}</dd>
-      </div>
-      <div>
-        <dt>{{ 'invoices.field.dueDate' | t }}</dt>
-        <dd class="mono">{{ inv.dueDate ? (inv.dueDate | ldate: 'mediumDate') : '—' }}</dd>
-      </div>
-      <div>
-        <dt>{{ 'invoices.field.net' | t }}</dt>
-        <dd class="mono">{{ inv.netAmount ? money(inv.netAmount) : '—' }}</dd>
-      </div>
-      <div>
-        <dt>{{ 'invoices.field.tax' | t }}</dt>
-        <dd class="mono">{{ inv.taxAmount ? money(inv.taxAmount) : '—' }}</dd>
-      </div>
-      <div>
-        <dt>{{ 'invoices.field.gross' | t }}</dt>
-        <dd class="mono exp__invGross">{{ money(inv.grossAmount) }}</dd>
-      </div>
-      <div>
-        <dt>{{ 'invoices.field.status' | t }}</dt>
-        <dd>
-          @let st = invoiceStatus(inv.status);
-          <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
-        </dd>
-      </div>
-      @if (inv.note) {
-        <div>
-          <dt>{{ 'invoices.field.note' | t }}</dt>
-          <dd>{{ inv.note }}</dd>
-        </div>
-      }
-    </dl>
-    @if (inv.hasFile) {
-      <app-button variant="tonal" size="sm" (click)="openInvoiceFile(inv)">
-        <span class="exp__btn"
-          ><app-icon name="download" [size]="16" />{{ inv.fileName || ('invoices.openFile' | t) }}</span
-        >
-      </app-button>
-    } @else {
-      <app-note icon="file">{{ 'expenses.invoice.noFile' | t }}</app-note>
+<!-- The form of a booking or a transfer: in the detail pane, or in a bottom sheet on a
+     phone. -->
+<ng-template #form let-inSheet>
+  @switch (formMode()) {
+    @case ('create') {
+      <app-booking-form
+        mode="create"
+        [state]="dialogs"
+        [tree]="budgetTree()"
+        [costCentres]="costCentres()"
+        [saving]="saving()"
+        [layout]="inSheet ? 'sheet' : split() ? 'pane' : 'page'"
+      />
+    }
+    @case ('edit') {
+      @let e = editing()!;
+      <app-booking-form
+        mode="edit"
+        [state]="dialogs"
+        [tree]="budgetTree()"
+        [costCentres]="costCentres()"
+        [saving]="saving()"
+        [layout]="inSheet ? 'sheet' : split() ? 'pane' : 'page'"
+        [fyLabel]="fyLabel(e.fiscalYearId)"
+        [subRows]="sub.subOf(e.id)"
+        (remove)="askDelete(e)"
+        (addSub)="openCreateSub(e)"
+        (editSub)="openEdit($event)"
+        (removeSub)="askDelete($event)"
+      />
+    }
+    @case ('transfer-create') {
+      <app-transfer-form
+        mode="create"
+        [dialogs]="dialogs"
+        [transfers]="transfers"
+        [tree]="budgetTree()"
+        [costCentres]="costCentres()"
+        [saving]="saving()"
+        [layout]="inSheet ? 'sheet' : split() ? 'pane' : 'page'"
+      />
+    }
+    @case ('transfer-edit') {
+      <app-transfer-form
+        mode="edit"
+        [dialogs]="dialogs"
+        [transfers]="transfers"
+        [tree]="budgetTree()"
+        [costCentres]="costCentres()"
+        [saving]="transferSaving()"
+        [layout]="inSheet ? 'sheet' : split() ? 'pane' : 'page'"
+        [fyLabel]="fyLabel(editingTransfer()!.fiscalYearId)"
+        (remove)="askDeleteTransfer(editingTransfer()!)"
+      />
     }
   }
-</app-dialog>
+</ng-template>
+
+@if (phone()) {
+  <app-side-sheet
+    side="bottom"
+    [contentScrolls]="true"
+    [heading]="formTitle()"
+    [open]="formMode() !== null"
+    (openChange)="$event ? null : dialogs.closeForms()"
+  >
+    <ng-container *ngTemplateOutlet="form; context: { $implicit: true }" />
+  </app-side-sheet>
+}
+
+<!-- Cost centre: the tree of the applications page, with "Alle" on top. -->
+<app-side-sheet [side]="sheetSide()" [heading]="'expenses.filter.costCentre' | t" [(open)]="pickerOpen">
+  <app-cost-centre-tree
+    [nodes]="budgetTree()"
+    [selectedId]="budgetId()"
+    [allLabel]="'expenses.filter.all' | t"
+    [ariaLabel]="'expenses.filter.costCentre' | t"
+    (picked)="selectBudget($event)"
+  />
+</app-side-sheet>
+
+<!-- "Umbuchen" one pane at a time; side by side it is a section of the bulk panel. -->
+<app-side-sheet [side]="sheetSide()" [heading]="'expenses.bulk.reassignTitle' | t" [(open)]="bulkReassignOpen">
+  <app-bulk-panel
+    variant="reassign"
+    [rows]="selectedRows()"
+    [costCentres]="costCentres()"
+    [tree]="budgetTree()"
+    [busy]="bulkBusy()"
+    [(budgetId)]="bulkBudgetId"
+    [(category)]="bulkCategory"
+    (reassign)="runBulkReassign()"
+  />
+</app-side-sheet>
+
+@if (canManage()) {
+  <app-sub-booking-dialog [sub]="sub" [saving]="saving()" />
+}
 
 <app-dialog
   [open]="!!confirmDelete()"
@@ -464,58 +612,8 @@
   <p class="exp__confirm">{{ 'expenses.bulk.deleteBody' | t: { count: selectedCount() } }}</p>
   <div dialog-footer class="exp__footer">
     <app-button variant="text" (click)="bulkConfirm.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="bulkBusy()" (click)="runBulk()">{{
+    <app-button variant="danger" [loading]="bulkBusy()" (click)="runBulkDelete()">{{
       'expenses.bulk.deleteConfirm' | t
-    }}</app-button>
-  </div>
-</app-dialog>
-
-<app-dialog
-  [open]="bulkConfirm() === 'export'"
-  [title]="'expenses.bulk.exportTitle' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="bulkConfirm.set(null)"
->
-  <p class="exp__confirm">{{ 'expenses.bulk.exportBody' | t: { count: selectedCount() } }}</p>
-  <div dialog-footer class="exp__footer">
-    <app-button variant="text" (click)="bulkConfirm.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button [loading]="bulkBusy()" (click)="runBulk()">{{
-      'expenses.bulk.exportConfirm' | t
-    }}</app-button>
-  </div>
-</app-dialog>
-
-<!-- "Umbuchen": a new cost centre and/or a category for the selection. -->
-<app-dialog
-  [open]="bulkReassignOpen()"
-  [title]="'expenses.bulk.reassignTitle' | t"
-  [subtitle]="'expenses.bulk.reassignHint' | t: { count: selectedCount() }"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="bulkReassignOpen.set(false)"
->
-  <form class="exp__form" (submit)="$event.preventDefault(); runBulkReassign()">
-    <app-select
-      name="bcc"
-      [label]="'expenses.field.costCentre' | t"
-      [placeholder]="'expenses.bulk.keepValue' | t"
-      [options]="costCentreOptions()"
-      [ngModel]="bulkBudgetId()"
-      (ngModelChange)="bulkBudgetId.set($event)"
-    />
-    <app-input
-      name="bcat"
-      [label]="'expenses.field.category' | t"
-      [placeholder]="'expenses.bulk.keepValue' | t"
-      [ngModel]="bulkCategory()"
-      (ngModelChange)="bulkCategory.set($event)"
-    />
-  </form>
-  <div dialog-footer class="exp__footer">
-    <app-button variant="text" (click)="bulkReassignOpen.set(false)">{{
-      'action.cancel' | t
-    }}</app-button>
-    <app-button [disabled]="!canSubmitReassign()" [loading]="bulkBusy()" (click)="runBulkReassign()">{{
-      'expenses.bulk.reassignConfirm' | t
     }}</app-button>
   </div>
 </app-dialog>

@@ -1,0 +1,201 @@
+@let i = invoice();
+<article class="fd" [class.fd--split]="split()" aria-labelledby="id-title">
+  <header class="fd__head">
+    <div class="fd__bar">
+      <span class="fd__meta ell" [title]="metaLine()">{{ metaLine() }}</span>
+      @if (phone()) {
+        @if (canManage()) {
+          <app-button variant="tonal" size="sm" (click)="edit.emit()">
+            <span class="fd__btn"><app-icon name="edit" [size]="16" />{{ 'action.edit' | t }}</span>
+          </app-button>
+        }
+      } @else {
+        @if (i.hasFile) {
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'invoices.openFile' | t"
+            [title]="'invoices.openFile' | t"
+            (click)="openFile.emit()"
+          ><app-icon name="download" [size]="19" /></app-button>
+        }
+        @if (canManage()) {
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'invoices.edit' | t"
+            [title]="'invoices.edit' | t"
+            (click)="edit.emit()"
+          ><app-icon name="edit" [size]="19" /></app-button>
+        }
+      }
+      @if (menu().length) {
+        <app-row-menu [label]="'invoices.detail.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />
+      }
+    </div>
+    <h2 id="id-title" class="fd__title">{{ title() }}</h2>
+    <p class="fd__line fd__seps">
+      <span class="fd__parts">
+        <span class="fd__part">
+          <app-status-text [kind]="status().kind">{{ status().key | t }}</app-status-text>
+        </span>
+        @if (i.dueDate) {
+          <span class="fd__part mono">{{ 'invoices.dueLine' | t: { date: (i.dueDate | ldate: 'mediumDate') } }}</span>
+        }
+        @if (due(); as d) {
+          <span class="fd__part" [class.fd__neg]="d.late">{{ d.text }}</span>
+        }
+        <span class="fd__part"><span class="mono fd__amount">{{ money(i.grossAmount) }}</span></span>
+      </span>
+    </p>
+    @if (canManage()) {
+      <div class="fd__actions">
+        @if (i.status === 'open') {
+          <app-button variant="fill" [loading]="markingPaid()" (click)="markPaid.emit()">
+            <span class="fd__btn"><app-icon name="check" [size]="17" />{{ 'invoices.markPaid' | t }}</span>
+          </app-button>
+        }
+        <app-button variant="tonal" (click)="createBooking.emit()">
+          <span class="fd__btn"><app-icon name="add" [size]="17" />{{ 'invoices.createBooking' | t }}</span>
+        </app-button>
+      </div>
+    }
+  </header>
+
+  <div class="fd__cols">
+    <div class="fd__col">
+      <section class="fd__sec" aria-labelledby="id-file">
+        <h3 id="id-file" class="sec fd__secTitle">{{ 'invoices.detail.receipt' | t }}</h3>
+        @if (i.hasFile) {
+          <button type="button" class="fd__card id__file" (click)="openFile.emit()">
+            <app-icon class="id__fileIcon" name="file" [size]="22" />
+            <span class="id__fileBody">
+              <span class="id__fileName">{{ i.fileName || ('invoices.openFile' | t) }}</span>
+              <span class="id__fileMeta">PDF</span>
+            </span>
+            <span class="id__fileOpen">
+              <app-icon name="download" [size]="18" />
+              <span class="sr-only">{{ 'invoices.openFile' | t }}</span>
+            </span>
+          </button>
+        } @else {
+          <p class="fd__hint">
+            <app-icon name="file" [size]="16" />
+            <span>{{ 'invoices.detail.noFile' | t }}</span>
+          </p>
+        }
+      </section>
+
+      <section class="fd__sec" aria-labelledby="id-data">
+        <h3 id="id-data" class="sec fd__secTitle">{{ 'invoices.detail.data' | t }}</h3>
+        <dl class="fd__card fd__grid">
+          <div>
+            <dt>{{ 'invoices.field.number' | t }}</dt>
+            <dd class="mono fd__wrap">{{ i.number || '—' }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'invoices.field.issueDate' | t }}</dt>
+            <dd class="mono">{{ i.issueDate ? (i.issueDate | ldate: 'mediumDate') : '—' }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'invoices.field.dueDate' | t }}</dt>
+            <dd class="mono">{{ i.dueDate ? (i.dueDate | ldate: 'mediumDate') : '—' }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'invoices.detail.createdAt' | t }}</dt>
+            <dd class="mono">{{ createdAt() }}</dd>
+          </div>
+          <div class="id__full">
+            <dt>{{ 'invoices.field.supplier' | t }}</dt>
+            <dd class="fd__wrap">{{ i.supplier || '—' }}</dd>
+          </div>
+          @if (i.note) {
+            <div class="id__full">
+              <dt>{{ 'invoices.field.note' | t }}</dt>
+              <dd class="fd__note">{{ i.note }}</dd>
+            </div>
+          }
+        </dl>
+      </section>
+    </div>
+
+    <div class="fd__col">
+      <section class="fd__sec" aria-labelledby="id-amounts">
+        <h3 id="id-amounts" class="sec fd__secTitle">{{ 'invoices.detail.amounts' | t }}</h3>
+        <dl class="fd__card id__amounts">
+          <div>
+            <dt>{{ 'invoices.field.net' | t }}</dt>
+            <dd class="mono">{{ i.netAmount ? money(i.netAmount) : '—' }}</dd>
+          </div>
+          <div>
+            <dt>{{ taxLabel() }}</dt>
+            <dd class="mono">{{ i.taxAmount ? money(i.taxAmount) : '—' }}</dd>
+          </div>
+          <div class="id__gross">
+            <dt>{{ 'invoices.field.gross' | t }}</dt>
+            <dd class="mono">{{ money(i.grossAmount) }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      @if (i.linkedBookings !== undefined) {
+        <section class="fd__sec" aria-labelledby="id-bookings">
+          <div class="fd__secHead">
+            <h3 id="id-bookings" class="sec fd__secTitle">
+              {{ 'invoices.col.bookings' | t }}
+              <span class="fd__count">{{ bookings().length }}</span>
+            </h3>
+            @if (canManage()) {
+              <app-button variant="text" size="sm" (click)="createBooking.emit()">
+                <span class="fd__btn"><app-icon name="add" [size]="16" />{{ 'invoices.createBooking' | t }}</span>
+              </app-button>
+            }
+          </div>
+          @if (!bookings().length) {
+            <p class="fd__none">{{ 'invoices.detail.noBookings' | t }}</p>
+          }
+          <div class="rowgroup">
+            @for (b of bookings(); track b.id) {
+              @let c = cc(b);
+              <a class="fd__link" routerLink="/expenses" [queryParams]="{ id: bookingTarget(b) }">
+                <span class="fd__linkBody">
+                  <span class="fd__linkTitle">{{ b.description }}</span>
+                  <span class="fd__linkMeta">
+                    {{ (b.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}
+                    <span class="fd__dot" aria-hidden="true">·</span>
+                    @if (c.color) {
+                      <span class="fd__swatch" aria-hidden="true" [style.background]="c.color"></span>
+                    }
+                    {{ c.name }}
+                    @if (day(b.paymentDate); as d) {
+                      <span class="fd__dot" aria-hidden="true">·</span><span class="mono">{{ d }}</span>
+                    }
+                  </span>
+                </span>
+                <span class="mono fd__linkAmount">{{ signed(b) }}</span>
+                <app-icon class="fd__chev" name="chevron-right" [size]="17" />
+              </a>
+            }
+            @if (bookings().length && booked(); as bk) {
+              <div class="fd__booked">
+                <div class="fd__bookedLine">
+                  <span>{{ 'invoices.booked' | t }}</span>
+                  <span class="mono">{{ 'invoices.bookedOf' | t: { booked: money(bk.booked), gross: money(bk.gross) } }}</span>
+                </div>
+                <app-seg-bar
+                  size="thin"
+                  [segments]="[{ value: bk.booked, tone: 'filled' }]"
+                  [total]="bk.gross"
+                  [label]="bookedLabel(bk.booked, bk.gross)"
+                />
+                @if (bk.open > 0) {
+                  <p class="fd__bookedRest">{{ 'invoices.notBooked' | t: { amount: money(bk.open) } }}</p>
+                }
+              </div>
+            }
+          </div>
+        </section>
+      }
+    </div>
+  </div>
+</article>

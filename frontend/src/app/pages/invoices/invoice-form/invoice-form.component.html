@@ -1,0 +1,278 @@
+@let h = host();
+@let edited = h.editing();
+<form
+  class="ff"
+  [class.ff--pane]="layout() === 'pane'"
+  [class.ff--page]="layout() === 'page'"
+  [class.ff--sheet]="layout() === 'sheet'"
+  [attr.aria-labelledby]="layout() === 'sheet' ? null : 'if-title-' + mode()"
+  (submit)="submit($event)"
+>
+  @if (layout() !== 'sheet') {
+    <header class="ff__head">
+      <div class="ff__titles">
+        <h2 class="ff__title" [id]="'if-title-' + mode()">{{ title() | t }}</h2>
+        @if (subtitle()) {
+          <p class="ff__subtitle">{{ subtitle() }}</p>
+        }
+      </div>
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="close()">
+        <app-icon name="x" [size]="20" />
+      </app-button>
+    </header>
+  }
+
+  <div class="ff__body" appScrollFade="y">
+    <div class="ff__cols if__cols">
+      <!-- The receipt. The server sends a PDF as a download only, so the form shows the file,
+           not its pages. -->
+      <div class="ff__col if__fileCol">
+        <section class="ff__sec" aria-labelledby="if-file">
+          <h3 id="if-file" class="sec ff__secTitle">{{ 'invoices.detail.receipt' | t }}</h3>
+          @if (mode() === 'create') {
+            @if (h.importToken()) {
+              <div class="if__file">
+                <app-icon class="if__fileIcon" name="file" [size]="20" />
+                <span class="if__fileName" [title]="h.importFileName()">{{ h.importFileName() }}</span>
+                @if (fileSize()) {
+                  <span class="if__fileSize">{{ fileSize() }}</span>
+                }
+                <button
+                  type="button"
+                  class="ff__iconBtn"
+                  [attr.aria-label]="'invoices.removeBeleg' | t"
+                  [title]="'invoices.removeBeleg' | t"
+                  (click)="h.clearAttachment()"
+                >
+                  <app-icon name="x" [size]="16" />
+                </button>
+              </div>
+            } @else {
+              <input
+                #createFile
+                type="file"
+                accept="application/pdf,.pdf"
+                hidden
+                (change)="h.onCreateFilePicked($event)"
+              />
+              <div class="if__empty">
+                <app-icon name="upload" [size]="22" />
+                <app-button variant="tonal" size="sm" [loading]="h.attaching()" (click)="createFile.click()">
+                  {{ 'invoices.attachBeleg' | t }}
+                </app-button>
+              </div>
+            }
+          } @else if (edited) {
+            @if (edited.hasFile) {
+              <button type="button" class="if__file if__file--open" (click)="h.openFile(edited)">
+                <app-icon class="if__fileIcon" name="file" [size]="20" />
+                <span class="if__fileName">{{ edited.fileName || ('invoices.openFile' | t) }}</span>
+                <span class="if__fileSize">{{ 'invoices.openFile' | t }}</span>
+              </button>
+            } @else {
+              <p class="ff__info">
+                <app-icon name="file" [size]="16" />
+                <span>{{ 'invoices.detail.noFile' | t }}</span>
+              </p>
+            }
+          }
+        </section>
+      </div>
+
+      <div class="ff__col if__fields">
+        @if (mode() === 'create') {
+          @if (h.importNotice() === 'parsed') {
+            <p class="ff__info if__ok">
+              <app-icon name="check" [size]="16" />
+              <span>{{ 'invoices.import.parsed' | t }}</span>
+            </p>
+          } @else if (h.importNotice() === 'manual') {
+            <p class="ff__info">
+              <app-icon name="info" [size]="16" />
+              <span>{{ 'invoices.import.manual' | t }}</span>
+            </p>
+          }
+          @if (h.importDuplicate() !== null) {
+            <div class="if__dup" role="alert">
+              <app-icon name="alert" [size]="18" />
+              <span class="if__dupText">{{ 'invoices.import.duplicate' | t: { number: h.importDuplicate() ?? '' } }}</span>
+              <app-button variant="text" size="sm" (click)="openDuplicate.emit()">{{ 'invoices.import.openExisting' | t }}</app-button>
+            </div>
+          }
+          <div class="ff__grid">
+            <app-input
+              name="number"
+              [required]="true"
+              [label]="'invoices.field.number' | t"
+              [ngModel]="h.newNumber()"
+              (ngModelChange)="h.newNumber.set($event)"
+            />
+            <app-input
+              name="supplier"
+              [required]="true"
+              [label]="'invoices.field.supplier' | t"
+              [ngModel]="h.newSupplier()"
+              (ngModelChange)="h.newSupplier.set($event)"
+            />
+            <app-datepicker
+              name="issue"
+              [label]="'invoices.field.issueDate' | t"
+              [ngModel]="h.newIssueDate()"
+              (ngModelChange)="h.newIssueDate.set($event)"
+            />
+            <app-datepicker
+              name="due"
+              [label]="'invoices.field.dueDate' | t"
+              [ngModel]="h.newDueDate()"
+              (ngModelChange)="h.newDueDate.set($event)"
+            />
+          </div>
+          <div class="ff__grid ff__grid--3">
+            <app-currency-input
+              name="net"
+              [label]="'invoices.field.net' | t"
+              [ngModel]="h.newNet()"
+              (ngModelChange)="h.newNet.set($event)"
+            />
+            <app-currency-input
+              name="tax"
+              [label]="'invoices.field.tax' | t"
+              [ngModel]="h.newTax()"
+              (ngModelChange)="h.newTax.set($event)"
+            />
+            <app-currency-input
+              name="gross"
+              [label]="'invoices.field.gross' | t"
+              [required]="true"
+              [ngModel]="h.newGross()"
+              (ngModelChange)="h.newGross.set($event)"
+            />
+          </div>
+          <div class="ff__sec">
+            <span class="if__legend" id="if-status-create">{{ 'invoices.field.status' | t }}</span>
+            <app-segmented
+              width="fill"
+              [ariaLabel]="'invoices.field.status' | t"
+              [options]="statusOptions()"
+              [value]="h.newStatus()"
+              (valueChange)="setStatus($event)"
+            />
+          </div>
+          <!-- A note can have more than one line: a textarea keeps the line breaks. -->
+          <label class="ff__box ff__box--area" for="invoice-note">
+            <span class="ff__label">{{ 'invoices.field.note' | t }}</span>
+            <textarea
+              id="invoice-note"
+              class="ff__area"
+              name="note"
+              rows="2"
+              [ngModel]="h.newNote()"
+              (ngModelChange)="h.newNote.set($event)"
+            ></textarea>
+          </label>
+        } @else {
+          <div class="ff__grid">
+            <app-input
+              name="enumber"
+              [required]="h.editNumberRequired()"
+              [label]="'invoices.field.number' | t"
+              [ngModel]="h.editNumber()"
+              (ngModelChange)="h.editNumber.set($event)"
+            />
+            <app-input
+              name="esupplier"
+              [required]="h.editSupplierRequired()"
+              [label]="'invoices.field.supplier' | t"
+              [ngModel]="h.editSupplier()"
+              (ngModelChange)="h.editSupplier.set($event)"
+            />
+            <app-datepicker
+              name="eissue"
+              [label]="'invoices.field.issueDate' | t"
+              [ngModel]="h.editIssueDate()"
+              (ngModelChange)="h.editIssueDate.set($event)"
+            />
+            <app-datepicker
+              name="edue"
+              [label]="'invoices.field.dueDate' | t"
+              [ngModel]="h.editDueDate()"
+              (ngModelChange)="h.editDueDate.set($event)"
+            />
+          </div>
+          <div class="ff__grid ff__grid--3">
+            <app-currency-input
+              name="enet"
+              [label]="'invoices.field.net' | t"
+              [ngModel]="h.editNet()"
+              (ngModelChange)="h.editNet.set($event)"
+            />
+            <app-currency-input
+              name="etax"
+              [label]="'invoices.field.tax' | t"
+              [ngModel]="h.editTax()"
+              (ngModelChange)="h.editTax.set($event)"
+            />
+            <app-currency-input
+              name="egross"
+              [label]="'invoices.field.gross' | t"
+              [required]="true"
+              [ngModel]="h.editGross()"
+              (ngModelChange)="h.editGross.set($event)"
+            />
+          </div>
+          <div class="ff__sec">
+            <span class="if__legend">{{ 'invoices.field.status' | t }}</span>
+            <app-segmented
+              width="fill"
+              [ariaLabel]="'invoices.field.status' | t"
+              [options]="statusOptions()"
+              [value]="h.editStatus()"
+              (valueChange)="setStatus($event)"
+            />
+          </div>
+          <label class="ff__box ff__box--area" for="invoice-enote">
+            <span class="ff__label">{{ 'invoices.field.note' | t }}</span>
+            <textarea
+              id="invoice-enote"
+              class="ff__area"
+              name="enote"
+              rows="2"
+              [ngModel]="h.editNote()"
+              (ngModelChange)="h.editNote.set($event)"
+            ></textarea>
+          </label>
+        }
+      </div>
+    </div>
+  </div>
+
+  <footer class="ff__foot">
+    @if (mode() === 'edit') {
+      <!-- A phone sheet has no room for three labelled buttons: delete is an icon. -->
+      <app-button
+        variant="danger"
+        [iconOnly]="layout() === 'sheet'"
+        [ariaLabel]="'action.delete' | t"
+        (click)="remove.emit()"
+      >
+        <span class="ff__btn"
+          ><app-icon name="delete" [size]="16" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
+        >
+      </app-button>
+    }
+    <div class="ff__footEnd">
+      <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+      @if (mode() === 'create') {
+        <app-button [disabled]="!h.canSubmitCreate()" [loading]="h.saving()" (click)="submit($event)">
+          <span class="ff__btn"><app-icon name="add" [size]="16" />{{
+            (layout() === 'sheet' ? 'expenses.form.addShort' : 'invoices.add') | t
+          }}</span>
+        </app-button>
+      } @else {
+        <app-button [disabled]="!h.canSubmitEdit()" [loading]="h.saving()" (click)="submit($event)">{{
+          'action.save' | t
+        }}</app-button>
+      }
+    </div>
+  </footer>
+</form>

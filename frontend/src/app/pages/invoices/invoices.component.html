@@ -1,219 +1,268 @@
-<!-- Board Arbeit-Rechnungen. A PDF dropped anywhere on the page imports too; the drop
-     zone below the title row is the visible place for it and the keyboard path. -->
+<!-- Boards Fin-Rechnungen and the other Fin-Rechnung* boards. A PDF dropped anywhere on
+     the page imports too; the drop zone in the list is the visible place for it and the
+     keyboard path. -->
 <div
   class="inv"
+  [class.inv--split]="split()"
   (dragenter)="onDragEnter($event)"
   (dragover)="onDragOver($event)"
   (dragleave)="onDragLeave($event)"
   (drop)="onDrop($event)"
 >
-  <!-- The search and the filter never scroll away. Wide: they sit in the title row, so
-       the whole row sticks. Narrower: the title row scrolls, the search row below it
-       sticks. -->
-  <app-sticky-bar [sticky]="wide()">
-    <header class="inv__head">
-      <div class="inv__titles">
-        <h1 class="inv__title">{{ 'invoices.title' | t }}</h1>
-        <p class="inv__subtitle">{{ 'invoices.subtitle' | t }}</p>
-      </div>
-      @if (wide()) {
-        <ng-container *ngTemplateOutlet="tools" />
-      }
-      @if (canManage()) {
-        <div class="inv__actions">
-          <input
-            #fileInput
-            type="file"
-            accept="application/pdf,.pdf"
-            hidden
-            (change)="onFilePicked($event)"
-          />
-          @if (!phone()) {
-            <app-button variant="tonal" size="sm" [loading]="importing()" (click)="fileInput.click()">
-              <span class="inv__btn"><app-icon name="upload" [size]="16" />{{ 'invoices.import' | t }}</span>
-            </app-button>
-          }
-          <app-button size="sm" data-testid="inv-add" (click)="openCreate()">
-            <span class="inv__btn"
-              ><app-icon name="add" [size]="16" />{{
-                (phone() ? 'invoices.addShort' : 'invoices.add') | t
-              }}</span
-            >
-          </app-button>
+  <input #fileInput type="file" accept="application/pdf,.pdf" hidden (change)="onFilePicked($event)" />
+  <app-list-detail [detailOpen]="detailOpen()" (back)="closeDetail()">
+    <section list class="inv__pane" aria-labelledby="inv-title">
+      <header class="inv__head">
+        <h1 id="inv-title" class="inv__title">{{ 'invoices.title' | t }}</h1>
+        @if (canManage()) {
           @if (phone()) {
-            <app-row-menu
-              [label]="'expenses.moreActions' | t"
-              [sections]="phoneMenu()"
-              (selected)="fileInput.click()"
-            />
+            <app-button size="sm" data-testid="inv-add" (click)="openCreate()">
+              <span class="inv__btn"><app-icon name="add" [size]="16" />{{ 'invoices.addShort' | t }}</span>
+            </app-button>
+            <app-row-menu [label]="'invoices.moreActions' | t" [sections]="phoneMenu()" (selected)="onHeaderMenu($event)" />
+          } @else {
+            <app-button
+              variant="text"
+              [iconOnly]="true"
+              [loading]="importing()"
+              [ariaLabel]="'invoices.import' | t"
+              [title]="'invoices.import' | t"
+              (click)="fileInput.click()"
+            ><app-icon name="upload" [size]="21" /></app-button>
           }
+        }
+      </header>
+
+      <app-sticky-bar class="inv__filters">
+        <app-search-pill
+          [placeholder]="'invoices.search' | t"
+          [label]="'invoices.searchLabel' | t"
+          [value]="q()"
+          (valueChange)="onSearch($event)"
+        />
+        <div class="inv__chips" role="group" appScrollFade="x" [attr.aria-label]="'invoices.filter.group' | t">
+          <app-range-chip
+            kind="date"
+            [label]="'invoices.filter.issueRange' | t"
+            [from]="issueFrom()"
+            [to]="issueTo()"
+            (applied)="onIssueRange($event)"
+          />
+          <app-range-chip
+            kind="date"
+            [label]="'invoices.filter.due' | t"
+            [from]="dueFrom()"
+            [to]="dueTo()"
+            (applied)="onDueRange($event)"
+          />
+          <app-range-chip
+            kind="amount"
+            [label]="'invoices.filter.amount' | t"
+            [from]="grossMin()"
+            [to]="grossMax()"
+            (applied)="onGrossRange($event)"
+          />
+          <span class="inv__count" role="status">{{ 'invoices.count' | t: { count: items().length, total: total() } }}</span>
         </div>
-      }
-    </header>
-  </app-sticky-bar>
-  @if (!wide()) {
-    <app-sticky-bar>
-      <ng-container *ngTemplateOutlet="tools" />
-    </app-sticky-bar>
-  }
+        <app-segmented
+          class="inv__seg"
+          width="fill"
+          [check]="false"
+          [ariaLabel]="'invoices.segment.label' | t"
+          [options]="segmentOptions()"
+          [value]="segment()"
+          (valueChange)="setSegment($event ?? 'all')"
+        />
+      </app-sticky-bar>
 
-  <!-- A phone has no drag and drop: the import sits in the menu of the title row. -->
-  @if (canManage() && !phone()) {
-    <app-file-drop-zone
-      class="inv__zone"
-      accept="application/pdf,.pdf"
-      [multiple]="false"
-      [disabled]="importing()"
-      [label]="'invoices.drop' | t"
-      [hint]="'invoices.dropHint' | t"
-      [buttonLabel]="'invoices.dropButton' | t"
-      (files)="onZoneFiles($event)"
-      (rejected)="onZoneRejected()"
-    />
-  }
+      <!-- A phone has no drag and drop: the import sits in the menu of the title row. -->
+      @if (canManage() && !phone()) {
+        <app-file-drop-zone
+          class="inv__zone"
+          accept="application/pdf,.pdf"
+          [multiple]="false"
+          [disabled]="importing()"
+          [label]="'invoices.drop' | t"
+          [buttonLabel]="'invoices.dropButton' | t"
+          (files)="onZoneFiles($event)"
+          (rejected)="onZoneRejected()"
+        />
+      }
 
-  <!-- The table stays on screen while a filter, a search or a page load runs: it keeps
-       its header and column widths and draws skeleton rows. The actions column is
-       pinned, so the menu stays reachable while the wide table scrolls sideways. -->
-  <app-data-table
-    class="inv__table"
-    [columns]="columns()"
-    [rows]="items()"
-    [rowKey]="rowId"
-    [loading]="loading()"
-    [loadingText]="'invoices.loading' | t"
-    [skeletonRowCount]="8"
-    [emptyText]="'invoices.empty' | t"
-  >
-    <ng-template appCell="issueDate" let-i>
-      <span class="inv__date mono">{{
-        $any(i).issueDate ? ($any(i).issueDate | ldate: 'mediumDate') : '—'
-      }}</span>
-      <!-- The tight set has no due-date column: the date moves under the issue date. -->
-      @if (showDueLine() && $any(i).dueDate) {
-        <span class="inv__sub ell" data-testid="inv-due-line">{{
-          'invoices.dueLine' | t: { date: ($any(i).dueDate | ldate: 'mediumDate') }
-        }}</span>
-      }
-    </ng-template>
-    <ng-template appCell="dueDate" let-i>
-      <span class="inv__date inv__muted mono">{{
-        $any(i).dueDate ? ($any(i).dueDate | ldate: 'mediumDate') : '—'
-      }}</span>
-    </ng-template>
-    <ng-template appCell="number" let-i>
-      <span class="inv__number mono">{{ $any(i).number || '—' }}</span>
-    </ng-template>
-    <ng-template appCell="supplier" let-i>
-      <span class="inv__supplier ell" [title]="$any(i).supplier || ''">{{ $any(i).supplier || '—' }}</span>
-    </ng-template>
-    <ng-template appCell="net" let-i>
-      <span class="inv__money inv__muted mono">{{
-        $any(i).netAmount ? money($any(i).netAmount) : '—'
-      }}</span>
-    </ng-template>
-    <ng-template appCell="tax" let-i>
-      <span class="inv__money inv__muted mono">{{
-        $any(i).taxAmount ? money($any(i).taxAmount) : '—'
-      }}</span>
-    </ng-template>
-    <ng-template appCell="gross" let-i>
-      @if (columnSet() === 'full') {
-        <span class="inv__money mono">{{ money($any(i).grossAmount) }}</span>
-      } @else {
-        <!-- No net and tax columns: the split moves under gross and into its tooltip. -->
-        @let split = splitLine($any(i));
-        <span class="inv__grossCell" [title]="netTaxTitle($any(i))">
-          <span class="inv__money mono">{{ money($any(i).grossAmount) }}</span>
-          @if (split) {
-            <span class="inv__sub" data-testid="inv-split">{{ split }}</span>
+      <div #scroller class="inv__scroll" appScrollFade="y">
+        @if (loading()) {
+          <app-skeleton variant="rows" [count]="6" [label]="'invoices.loading' | t" />
+        } @else if (!items().length) {
+          <app-empty-state icon="search" [heading]="'invoices.empty' | t">
+            @if (activeFilterCount() > 0) {
+              <app-button variant="tonal" size="sm" (click)="resetFilters()">{{ 'invoices.filter.reset' | t }}</app-button>
+            }
+          </app-empty-state>
+        } @else {
+          @for (group of groups(); track group.key + $index) {
+            <section class="inv__group" [attr.aria-label]="group.label || null">
+              @if (group.label) {
+                <h2 class="sec inv__month">{{ group.label }}</h2>
+              }
+              <div class="inv__rows" [class.rowgroup]="!split()" role="list">
+                @for (i of group.items; track i.id) {
+                  @let st = invoiceStatus(i.status);
+                  @let menu = rowMenu(i);
+                  <app-list-item
+                    role="listitem"
+                    class="inv__row"
+                    [title]="titleOf(i)"
+                    [link]="[]"
+                    [linkQueryParams]="{ id: i.id }"
+                    linkQueryParamsHandling="merge"
+                    [selected]="i.id === selectedId()"
+                  >
+                    <span sub>
+                      <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+                      @if (i.number) {
+                        <span class="inv__dot" aria-hidden="true">·</span>
+                        <span class="mono">{{ i.number }}</span>
+                      }
+                      @if (i.status === 'open' && i.dueDate) {
+                        <span class="inv__dot" aria-hidden="true">·</span>
+                        <span class="mono">{{ 'invoices.dueShort' | t: { date: day(i.dueDate) } }}</span>
+                      } @else if (i.issueDate) {
+                        <span class="inv__dot" aria-hidden="true">·</span>
+                        <span class="mono">{{ day(i.issueDate) }}</span>
+                      }
+                    </span>
+                    <span trail class="inv__trail">
+                      <span class="mono inv__amount">{{ money(i.grossAmount) }}</span>
+                      @if (menu.length || !split()) {
+                        <span class="inv__menuSlot">
+                          @if (!split()) {
+                            <span class="inv__chev" aria-hidden="true">
+                              <app-icon name="chevron-right" [size]="17" />
+                            </span>
+                          }
+                          @if (menu.length) {
+                            <app-row-menu
+                              class="inv__menu"
+                              [label]="rowMenuLabel(i)"
+                              [sections]="menu"
+                              (selected)="onRowMenu($event, i)"
+                            />
+                          }
+                        </span>
+                      }
+                    </span>
+                  </app-list-item>
+                }
+              </div>
+            </section>
           }
-        </span>
-      }
-    </ng-template>
-    <ng-template appCell="status" let-i>
-      @let st = invoiceStatus($any(i).status);
-      <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
-    </ng-template>
-    <ng-template appCell="bookings" let-i>
-      @let bookings = $any(i).linkedBookings ?? [];
-      @if (bookings.length) {
-        @let first = bookings[0];
-        @let cc = bookingLabel(first);
-        <!-- Below the full set the column is narrow: the amount goes to a second line, so
-             the cost centre keeps its name. -->
-        <span
-          class="inv__booking"
-          [class.inv__booking--stacked]="columnSet() !== 'full'"
-          [title]="bookingsTitle($any(i))"
-        >
-          @if (cc.color) {
-            <span class="inv__swatch" aria-hidden="true" [style.background]="cc.color"></span>
+          @if (hasMore()) {
+            <div #sentinel class="inv__sentinel" aria-hidden="true"></div>
+            <div class="inv__more">
+              <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">{{
+                'invoices.loadMore' | t
+              }}</app-button>
+            </div>
           }
-          <span class="inv__bookingName ell">{{ first.budgetName || cc.name }}</span>
-          <span class="inv__bookingAmount mono">{{ bookingAmount(first) }}</span>
-          @if (bookings.length > 1) {
-            <span class="inv__bookingMore mono">{{
-              'invoices.bookingsMore' | t: { count: bookings.length - 1 }
-            }}</span>
-          }
-        </span>
-      } @else {
-        <span class="inv__muted">—</span>
-      }
-    </ng-template>
-    <ng-template appCell="file" let-i>
-      @if ($any(i).hasFile) {
-        <app-button
-          variant="text"
-          size="sm"
-          [iconOnly]="true"
-          [ariaLabel]="('invoices.openFile' | t) + ': ' + ($any(i).fileName || $any(i).number || '')"
-          [title]="$any(i).fileName || ('invoices.openFile' | t)"
-          (click)="openFile($any(i))"
-          ><app-icon name="file" [size]="17"
-        /></app-button>
-      } @else {
-        <span class="inv__muted">—</span>
-      }
-    </ng-template>
-    <ng-template appCell="actions" let-i>
-      <app-row-menu
-        [label]="rowMenuLabel($any(i))"
-        [sections]="rowMenu()"
-        (selected)="onRowMenu($event, $any(i))"
-      />
-    </ng-template>
-  </app-data-table>
+        }
+      </div>
 
-  @if (hasMore() || total() > 0) {
-    <div class="inv__foot">
-      @if (total() > 0) {
-        <span class="inv__count" role="status">{{
-          'invoices.count' | t: { count: items().length, total: total() }
-        }}</span>
+      @if (canManage() && !phone()) {
+        <button type="button" class="inv__fab" (click)="openCreate()">
+          <app-icon name="plus" [size]="22" />
+          {{ 'invoices.add' | t }}
+        </button>
       }
-      @if (hasMore()) {
-        <div #sentinel class="inv__sentinel" aria-hidden="true"></div>
-        <app-button variant="tonal" size="sm" [loading]="loadingMore()" (click)="loadMore()">{{
-          'invoices.loadMore' | t
-        }}</app-button>
+    </section>
+
+    <div detail class="inv__detail">
+      @switch (detailView()) {
+        @case ('form') {
+          <ng-container *ngTemplateOutlet="form; context: { $implicit: split() ? 'pane' : 'page' }" />
+        }
+        @case ('invoice') {
+          @let inv = selectedInvoice()!;
+          <app-invoice-detail
+            [invoice]="inv"
+            [costCentres]="costCentres()"
+            [canManage]="canManage()"
+            [split]="split()"
+            [phone]="phone()"
+            [markingPaid]="markingPaid() === inv.id"
+            (edit)="openEdit(inv)"
+            (remove)="askDelete(inv)"
+            (markPaid)="markPaid(inv)"
+            (createBooking)="createBooking(inv)"
+            (openFile)="openFile(inv)"
+          />
+        }
+        @case ('missing') {
+          <div class="inv__none">
+            <app-empty-state
+              [fill]="true"
+              icon="search"
+              [heading]="'invoices.notFound' | t"
+              [body]="'invoices.notFoundBody' | t"
+            />
+          </div>
+        }
+        @default {
+          @if (split()) {
+            @if (!loading() && !items().length) {
+              <!-- Board Fin-Rechnungen-Leer: an empty list leaves a neutral sheet. -->
+              <div class="inv__none inv__none--skeleton" aria-hidden="true">
+                <span class="inv__ghost inv__ghost--title"></span>
+                <span class="inv__ghost inv__ghost--meta"></span>
+                <span class="inv__ghost inv__ghost--rule"></span>
+                <div class="inv__ghostCols">
+                  <span class="inv__ghost inv__ghost--card"></span>
+                  <span class="inv__ghost inv__ghost--card"></span>
+                </div>
+              </div>
+            } @else {
+              <div class="inv__none">
+                <app-empty-state [fill]="true" icon="receipt" [heading]="'invoices.none' | t" />
+              </div>
+            }
+          }
+        }
       }
     </div>
-  }
+  </app-list-detail>
 
   @if (dragActive()) {
+    <!-- Board Fin-Rechnung-Ablegen: the whole page is the drop target. -->
     <div class="inv__dropOverlay" aria-hidden="true">
       <div class="inv__dropInner">
-        <app-icon name="upload" [size]="32" />
-        <span>{{ 'invoices.drop' | t }}</span>
+        <span class="inv__dropIcon"><app-icon name="upload" [size]="24" /></span>
+        <span class="inv__dropTitle">{{ 'invoices.drop' | t }}</span>
+        <span class="inv__dropHint">{{ 'invoices.dropHint' | t }}</span>
       </div>
     </div>
   }
 </div>
 
-<app-invoice-import-dialog mode="create" [host]="this" />
-<app-invoice-import-dialog mode="edit" [host]="this" />
+<ng-template #form let-layout>
+  <app-invoice-form
+    [mode]="formMode() === 'edit' ? 'edit' : 'create'"
+    [host]="this"
+    [layout]="layout"
+    (remove)="askDelete(editing()!)"
+    (openDuplicate)="openDuplicate()"
+  />
+</ng-template>
+
+@if (phone()) {
+  <app-side-sheet
+    side="bottom"
+    [contentScrolls]="true"
+    [heading]="formTitle()"
+    [open]="formMode() !== null"
+    (openChange)="$event ? null : closeForms()"
+  >
+    <ng-container *ngTemplateOutlet="form; context: { $implicit: 'sheet' }" />
+  </app-side-sheet>
+}
 
 <app-dialog
   [open]="!!confirmDelete()"
@@ -221,103 +270,11 @@
   [closeLabel]="'action.cancel' | t"
   (closed)="confirmDelete.set(null)"
 >
-  <p class="inv__confirm">{{ 'invoices.delete.body' | t: { number: confirmDelete()?.number ?? '' } }}</p>
+  <p class="inv__confirm">
+    {{ 'invoices.delete.body' | t: { number: confirmDelete()?.number || confirmDelete()?.supplier || '' } }}
+  </p>
   <div dialog-footer class="inv__footer">
     <app-button variant="text" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="saving()" (click)="doDelete()">{{
-      'invoices.delete.confirm' | t
-    }}</app-button>
+    <app-button variant="danger" [loading]="saving()" (click)="doDelete()">{{ 'invoices.delete.confirm' | t }}</app-button>
   </div>
 </app-dialog>
-
-<ng-template #tools>
-    <div class="inv__tools">
-      <app-search-pill
-        class="inv__search"
-        size="md"
-        [placeholder]="'invoices.search' | t"
-        [value]="q()"
-        (valueChange)="onSearch($event)"
-      />
-      <!-- These filters drive the server query. -->
-      <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
-        <!-- `group`: three controls, not one. A plain field wraps its content in a
-             label, which would bind to the first button and take its name away. -->
-        <app-filter-field [label]="'invoices.filter.status' | t" [group]="true">
-          <div class="inv__statuses">
-            <app-button
-              [variant]="statusFilter() === '' ? 'primary' : 'ghost'"
-              size="sm"
-              [ariaPressed]="statusFilter() === ''"
-              (click)="setStatus('')"
-              >{{ 'invoices.filter.all' | t }}</app-button
-            >
-            <app-button
-              [variant]="statusFilter() === 'open' ? 'primary' : 'ghost'"
-              size="sm"
-              [ariaPressed]="statusFilter() === 'open'"
-              (click)="setStatus('open')"
-              >{{ 'invoices.status.open' | t }}</app-button
-            >
-            <app-button
-              [variant]="statusFilter() === 'paid' ? 'primary' : 'ghost'"
-              size="sm"
-              [ariaPressed]="statusFilter() === 'paid'"
-              (click)="setStatus('paid')"
-              >{{ 'invoices.status.paid' | t }}</app-button
-            >
-          </div>
-        </app-filter-field>
-        <app-filter-field [label]="'invoices.filter.grossRange' | t">
-          <app-filter-range>
-            <app-currency-input
-              start
-              [placeholder]="'invoices.filter.amountMin' | t"
-              [ariaLabel]="'invoices.filter.amountMin' | t"
-              [ngModel]="grossMin()"
-              (ngModelChange)="onGrossFilter('min', $event)"
-            />
-            <app-currency-input
-              end
-              [placeholder]="'invoices.filter.amountMax' | t"
-              [ariaLabel]="'invoices.filter.amountMax' | t"
-              [ngModel]="grossMax()"
-              (ngModelChange)="onGrossFilter('max', $event)"
-            />
-          </app-filter-range>
-        </app-filter-field>
-        <app-filter-field [label]="'invoices.filter.issueRange' | t">
-          <app-filter-range>
-            <app-datepicker
-              start
-              [ariaLabel]="'invoices.filter.issueFrom' | t"
-              [ngModel]="issueFrom()"
-              (ngModelChange)="onDateFilter('issueFrom', $event)"
-            />
-            <app-datepicker
-              end
-              [ariaLabel]="'invoices.filter.issueTo' | t"
-              [ngModel]="issueTo()"
-              (ngModelChange)="onDateFilter('issueTo', $event)"
-            />
-          </app-filter-range>
-        </app-filter-field>
-        <app-filter-field [label]="'invoices.filter.dueRange' | t">
-          <app-filter-range>
-            <app-datepicker
-              start
-              [ariaLabel]="'invoices.filter.dueFrom' | t"
-              [ngModel]="dueFrom()"
-              (ngModelChange)="onDateFilter('dueFrom', $event)"
-            />
-            <app-datepicker
-              end
-              [ariaLabel]="'invoices.filter.dueTo' | t"
-              [ngModel]="dueTo()"
-              (ngModelChange)="onDateFilter('dueTo', $event)"
-            />
-          </app-filter-range>
-        </app-filter-field>
-      </app-filter-bar>
-    </div>
-</ng-template>

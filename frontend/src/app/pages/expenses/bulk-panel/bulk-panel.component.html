@@ -1,0 +1,141 @@
+<ng-template #reassignForm>
+  <div class="bp__card">
+    <div class="ff__grid bp__fields">
+      <div class="ff__box">
+        <span class="ff__label" id="bp-cc">{{ 'expenses.field.costCentre' | t }}</span>
+        <button
+          type="button"
+          class="ff__pick"
+          aria-labelledby="bp-cc bp-ccv"
+          [attr.aria-expanded]="treeOpen()"
+          (click)="treeOpen.set(!treeOpen())"
+        >
+          @if (pickedCostCentre(); as v) {
+            @if (v.color) {
+              <span class="ff__swatch" aria-hidden="true" [style.background]="v.color"></span>
+            }
+            <span class="ell" id="bp-ccv" [title]="v.name">{{ v.name }}</span>
+          } @else {
+            <span class="ell ff__placeholder" id="bp-ccv">{{ 'expenses.bulk.keepValue' | t }}</span>
+          }
+          <app-icon [name]="treeOpen() ? 'chevron-up' : 'chevron-down'" [size]="18" />
+        </button>
+      </div>
+      <app-input
+        name="bcat"
+        [label]="'expenses.field.category' | t"
+        [placeholder]="'expenses.bulk.keepValue' | t"
+        [ngModel]="category()"
+        (ngModelChange)="category.set($event)"
+      />
+    </div>
+    @if (treeOpen()) {
+      <div class="ff__tree">
+        <app-cost-centre-tree
+          [nodes]="tree()"
+          [selectedId]="budgetId()"
+          [allLabel]="'expenses.bulk.keepValue' | t"
+          [ariaLabel]="'expenses.field.costCentre' | t"
+          (picked)="pick($event)"
+        />
+      </div>
+    }
+    <p class="bp__hint">
+      {{ 'expenses.bulk.reassignHint' | t }}
+      @if (fixedRows().length) {
+        {{ 'expenses.bulk.reassignFixed' | t: { names: fixedNames() } }}
+      }
+    </p>
+    <div class="bp__end">
+      <app-button variant="tonal" size="sm" [disabled]="!canReassign() || busy()" [loading]="busy()" (click)="reassign.emit()">
+        <span class="ff__btn"><app-icon name="repeat" [size]="16" />{{ 'expenses.bulk.reassignConfirm' | t }}</span>
+      </app-button>
+    </div>
+  </div>
+</ng-template>
+
+@if (variant() === 'reassign') {
+  <div class="bp bp--sheet">
+    <ng-container *ngTemplateOutlet="reassignForm" />
+  </div>
+} @else {
+  <article class="fd fd--split bp" aria-labelledby="bp-title">
+    <header class="fd__head">
+      <div class="fd__bar">
+        <span class="fd__meta">{{ 'ui.selection.toolbar' | t }}</span>
+        <app-button variant="text" [iconOnly]="true" [ariaLabel]="'expenses.bulk.stop' | t" (click)="closed.emit()">
+          <app-icon name="x" [size]="20" />
+        </app-button>
+      </div>
+      <h2 id="bp-title" class="fd__title">{{ 'expenses.bulk.title' | t: { count: rows().length } }}</h2>
+      <p class="fd__line fd__seps">
+        <span class="fd__parts">
+          @if (commonCostCentre(); as cc) {
+            <span class="fd__part">{{ cc }}</span>
+          }
+          <span class="fd__part"><span class="mono fd__amount">{{ sum() }}</span></span>
+        </span>
+      </p>
+    </header>
+
+    <div class="fd__cols">
+      <div class="fd__col">
+        <section class="fd__sec" aria-labelledby="bp-reassign">
+          <h3 id="bp-reassign" class="sec fd__secTitle">{{ 'expenses.bulk.reassign' | t }}</h3>
+          <ng-container *ngTemplateOutlet="reassignForm" />
+        </section>
+      </div>
+      <div class="fd__col">
+        <section class="fd__sec" aria-labelledby="bp-rows">
+          <h3 id="bp-rows" class="sec fd__secTitle">{{ 'ui.selection.toolbar' | t }}</h3>
+          <div class="rowgroup" role="list">
+            @for (e of rows(); track e.id) {
+              @let cc = costCentre(e);
+              <div class="fd__subRow" role="listitem">
+                <span class="fd__subBody">
+                  <span class="fd__subTitle ell" [title]="e.description">{{ e.description }}</span>
+                  <span class="fd__subMeta ell">
+                    {{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}
+                    <span class="fd__dot" aria-hidden="true">·</span>{{ cc.name }}
+                    @if (day(e.paymentDate ?? e.createdAt); as d) {
+                      <span class="fd__dot" aria-hidden="true">·</span><span class="mono">{{ d }}</span>
+                    }
+                  </span>
+                </span>
+                <span class="mono fd__subAmount">{{ signed(e) }}</span>
+              </div>
+            }
+            <div class="fd__subSum bp__sum">
+              <span>{{ 'expenses.bulk.sum' | t }}</span>
+              <span class="mono">{{ sum() }}</span>
+            </div>
+          </div>
+        </section>
+
+        @if (canExport()) {
+          <section class="fd__sec" aria-labelledby="bp-export">
+            <h3 id="bp-export" class="sec fd__secTitle">{{ 'expenses.export' | t }}</h3>
+            <div class="bp__action">
+              <span>{{ 'expenses.bulk.exportLine' | t: { count: rows().length } }}</span>
+              <app-button variant="tonal" size="sm" [disabled]="busy()" (click)="exported.emit()">
+                <span class="ff__btn"><app-icon name="download" [size]="16" />{{ 'expenses.bulk.exportConfirm' | t }}</span>
+              </app-button>
+            </div>
+          </section>
+        }
+
+        <section class="fd__sec" aria-labelledby="bp-delete">
+          <h3 id="bp-delete" class="sec fd__secTitle">{{ 'action.delete' | t }}</h3>
+          <div class="bp__action">
+            <span>{{ deleteReason() ?? ('expenses.bulk.deleteLimit' | t: { max: deleteMax() }) }}</span>
+            <app-button variant="danger" size="sm" [disabled]="busy() || deleteReason() !== null" (click)="remove.emit()">
+              <span class="ff__btn"><app-icon name="delete" [size]="16" />{{
+                'expenses.bulk.deleteCount' | t: { count: rows().length }
+              }}</span>
+            </app-button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </article>
+}

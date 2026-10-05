@@ -1,0 +1,63 @@
+@use '../../budget/finance-sheet';
+
+/* The two legs of the transfer, with an arrow between them. */
+.td__legs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: var(--space-3);
+}
+.td__leg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.td__legKind {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.td__legName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+.td__legPath {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.td__legAmount {
+  margin-top: var(--space-2);
+  font-size: var(--fs-xl);
+}
+.td__legAmount--in {
+  color: var(--color-accent-text);
+}
+.td__arrow {
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+@container (max-width: 26rem) {
+  .td__legs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .td__arrow {
+    justify-self: center;
+    transform: rotate(90deg);
+  }
+}
+.fd__col {
+  container-type: inline-size;
+}

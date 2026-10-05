@@ -1,0 +1,37 @@
+@use '../../budget/finance-form';
+
+/* "So wird gebucht": one card per booking of the transfer. */
+.tf__leg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.ff--sheet .tf__leg {
+  background: var(--color-surface-3);
+}
+.tf__kind {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.tf__name {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+.tf__amount {
+  margin-top: var(--space-2);
+  font-size: var(--fs-xl);
+}
+.tf__amount--in {
+  color: var(--color-accent-text);
+}
+.tf__later {
+  margin: 0;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}

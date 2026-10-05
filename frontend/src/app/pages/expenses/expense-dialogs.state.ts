@@ -17,8 +17,9 @@ import type { ExpenseSubBookingsState } from './expense-sub-bookings.state';
 import type { ExpenseTransfersState } from './expense-transfers.state';
 
 /**
- * Booking dialogs: create (standalone or application-bound), edit, delete, transfer
- * between cost centers, and the linked-invoice cache with its detail dialog.
+ * Booking forms: create (standalone or application-bound), edit, delete, transfer
+ * between cost centres, and the invoice cache behind the invoice field and the
+ * "Verknüpft" card of the detail. One form shows at a time.
  */
 export class ExpenseDialogsState {
   private readonly api = inject(BudgetTreeApi);
@@ -68,7 +69,6 @@ export class ExpenseDialogsState {
   readonly invoices = signal<Invoice[]>([]);
   readonly newInvoiceId = signal('');
   readonly editInvoiceId = signal('');
-  readonly viewingInvoice = signal<Invoice | null>(null);
   /** Open invoices, newest issue date first. A booking marks its linked invoice paid
    *  on the server, so paid invoices drop out of the create dropdown. */
   private readonly openInvoices = computed<Invoice[]>(() =>
@@ -76,9 +76,17 @@ export class ExpenseDialogsState {
       .filter((i) => i.status === 'open')
       .sort((a, b) => (b.issueDate ?? '').localeCompare(a.issueDate ?? '')),
   );
-  readonly invoiceOptions = computed<SelectOption[]>(() =>
-    this.openInvoices().map((i) => ({ value: i.id, label: this.invoiceLabel(i) })),
-  );
+  /** Open invoices. A preselected paid one ("Buchung anlegen" on a paid invoice) stays
+   *  selectable, like the linked invoice of an edit. */
+  readonly invoiceOptions = computed<SelectOption[]>(() => {
+    const opts = this.openInvoices().map((i) => ({ value: i.id, label: this.invoiceLabel(i) }));
+    const picked = this.newInvoiceId();
+    if (picked && !opts.some((o) => o.value === picked)) {
+      const inv = this.invoices().find((i) => i.id === picked);
+      if (inv) opts.unshift({ value: inv.id, label: this.invoiceLabel(inv) });
+    }
+    return opts;
+  });
   /** Edit keeps the currently linked (possibly paid) invoice selectable. */
   readonly editInvoiceOptions = computed<SelectOption[]>(() => {
     const opts = this.openInvoices().map((i) => ({ value: i.id, label: this.invoiceLabel(i) }));
@@ -115,6 +123,11 @@ export class ExpenseDialogsState {
     return !!this.newBudgetId() && !!this.newFiscalYearId();
   });
 
+  /** Called with the new booking after a create, so the page can open it. */
+  onCreated: ((created: Expense) => void) | null = null;
+  /** Called with the booking after a delete, so the page can close its detail. */
+  onDeleted: ((gone: Expense) => void) | null = null;
+
   constructor(
     private readonly list: ExpensesListState,
     private readonly sub: ExpenseSubBookingsState,
@@ -141,7 +154,20 @@ export class ExpenseDialogsState {
     });
   }
 
-  openCreate(): void {
+  /** Close every booking and transfer form. Only one form shows at a time. */
+  closeForms(): void {
+    this.createOpen.set(false);
+    this.editing.set(null);
+    this.transferOpen.set(false);
+    this.transfers.closeEdit();
+  }
+
+  /**
+   * Open the form for a new booking. `invoiceId` preselects an invoice and takes its data
+   * ("Buchung anlegen" on the invoices page).
+   */
+  openCreate(opts: { invoiceId?: string } = {}): void {
+    this.closeForms();
     this.newKind.set('expense');
     this.newAmount.set('');
     this.newDescription.set('');
@@ -161,6 +187,22 @@ export class ExpenseDialogsState {
     this.fiscalYearOptions.set([]);
     if (this.list.budgetId()) this.loadFiscalYears(this.list.budgetId());
     this.createOpen.set(true);
+    if (opts.invoiceId) this.preselectInvoice(opts.invoiceId);
+  }
+
+  /** Pick an invoice for the new booking; load it first when the cache does not hold it. */
+  private preselectInvoice(id: string): void {
+    if (this.invoices().some((i) => i.id === id)) {
+      this.onPickInvoice(id);
+      return;
+    }
+    this.api.getInvoice(id).subscribe({
+      next: (inv) => {
+        this.invoices.update((rows) => [...rows.filter((r) => r.id !== inv.id), inv]);
+        this.onPickInvoice(inv.id);
+      },
+      error: (err) => this.toast.error(this.failureText(err)),
+    });
   }
 
   setNewKindIncome(): void {
@@ -259,32 +301,19 @@ export class ExpenseDialogsState {
         note: this.newNote().trim() || null,
       })
       .subscribe({
-        next: () => {
+        next: (created) => {
           this.list.saving.set(false);
           this.createOpen.set(false);
           this.toast.success(this.i18n.translate('expenses.toast.created'));
           this.loadInvoices();
           this.list.refresh();
+          if (created) this.onCreated?.(created);
         },
         error: (err) => {
           this.list.saving.set(false);
           this.toast.error(this.failureText(err));
         },
       });
-  }
-
-  openInvoiceDialog(e: Expense): void {
-    if (!e.invoiceId) return;
-    const cached = this.invoices().find((i) => i.id === e.invoiceId);
-    if (cached) {
-      this.viewingInvoice.set(cached);
-      return;
-    }
-    // A linked invoice is often paid or old and can sit outside the capped list cache.
-    this.api.getInvoice(e.invoiceId).subscribe({
-      next: (inv) => this.viewingInvoice.set(inv),
-      error: (err) => this.toast.error(this.failureText(err)),
-    });
   }
 
   /** MinIO is internal only, so the API streams the PDF as a blob. */
@@ -296,6 +325,7 @@ export class ExpenseDialogsState {
   }
 
   openEdit(e: Expense): void {
+    this.closeForms();
     this.editing.set(e);
     this.editAmount.set(e.amount);
     this.editDescription.set(e.description);
@@ -385,6 +415,7 @@ export class ExpenseDialogsState {
           this.list.total.update((t) => Math.max(0, t - 1));
         }
         this.toast.success(this.i18n.translate('expenses.toast.deleted'));
+        this.onDeleted?.(e);
       },
       error: () => {
         this.list.saving.set(false);
@@ -394,6 +425,7 @@ export class ExpenseDialogsState {
   }
 
   openTransfer(): void {
+    this.closeForms();
     this.tFromId.set(this.list.budgetId() || '');
     this.tToId.set('');
     this.tFiscalYearId.set('');

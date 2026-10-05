@@ -306,6 +306,30 @@ describe('mockApiInterceptor', () => {
       expect(q.items).toHaveLength(1);
     });
 
+    it('GET /invoices → the segments and their counts (FE10c)', async () => {
+      type I = { status: string; linkedBookings: unknown[] };
+      type P = { items: I[]; counts: { all: number; inbox: number; booked: number; paid: number } };
+      const all = await get<P>('/api/invoices');
+      const c = all.counts;
+      expect(c.all).toBe(all.items.length);
+      expect(c.inbox + c.booked + c.paid).toBe(c.all);
+      expect(c.inbox).toBeGreaterThan(0);
+      expect(c.booked).toBeGreaterThan(0);
+      const inbox = await get<P>(
+        '/api/invoices',
+        new HttpParams().set('status', 'open').set('booked', 'false'),
+      );
+      expect(inbox.items).toHaveLength(c.inbox);
+      expect(inbox.items.every((i) => i.status === 'open' && i.linkedBookings.length === 0)).toBe(true);
+      const booked = await get<P>(
+        '/api/invoices',
+        new HttpParams().set('status', 'open').set('booked', 'true'),
+      );
+      expect(booked.items.every((i) => i.linkedBookings.length > 0)).toBe(true);
+      // The counts ignore the segment itself.
+      expect(booked.counts).toEqual(c);
+    });
+
     it('POST /invoices/parse → a known invoice, flagged as a duplicate', async () => {
       const form = new FormData();
       form.append('file', new File(['%PDF'], 'beleg.pdf', { type: 'application/pdf' }));
