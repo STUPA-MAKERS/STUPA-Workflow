@@ -237,7 +237,12 @@ export class ExpenseDialogsState {
     }
     this.apps.listApplications({ q, limit: 8 }).subscribe({
       next: (page) =>
-        this.appCandidates.set(page.items.map((a) => ({ id: a.id, title: a.title || a.id }))),
+        this.appCandidates.set(
+          page.items.map((a) => ({
+            id: a.id,
+            title: a.title || this.i18n.translate('applications.list.untitled'),
+          })),
+        ),
       error: () => this.appCandidates.set([]),
     });
   }

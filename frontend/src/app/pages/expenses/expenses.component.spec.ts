@@ -703,7 +703,7 @@ describe('ExpensesComponent (unit)', () => {
     expect(dlg(cmp).appCandidates()).toEqual([]);
   });
 
-  it('onAppSearch queries applications and maps candidates (title fallback to id)', () => {
+  it('onAppSearch queries applications and maps candidates (a nameless one reads "Ohne Titel", never its id)', () => {
     const { cmp, http } = build();
     dlg(cmp).onAppSearch('  flyer ');
     // appQuery holds the raw value. Only the request param is trimmed.
@@ -722,7 +722,7 @@ describe('ExpensesComponent (unit)', () => {
     });
     expect(dlg(cmp).appCandidates()).toEqual([
       { id: 'app-1', title: 'Flyer-Antrag' },
-      { id: 'app-2', title: 'app-2' },
+      { id: 'app-2', title: 'Ohne Titel' },
     ]);
   });
 
