@@ -1219,6 +1219,72 @@ describe('mockApiInterceptor', () => {
       expect(after.some((a) => a.id === id)).toBe(false);
     });
 
+    describe('FE9: the participant view and the delegation setup', () => {
+      const MEMBER_LIVE = 'd0000000-0000-0000-0000-000000000003';
+      const MEMBER_PLANNED = 'd0000000-0000-0000-0000-000000000105';
+      type Ctx = {
+        meetingStarted: boolean;
+        deadline: string | null;
+        myDelegation: { delegateId: string; viaPool: boolean } | null;
+        incoming: { delegatorName: string }[];
+        recipients: { principalId: string; viaPool: boolean }[];
+      };
+
+      it('serves the live meeting as a plain member sees it', async () => {
+        // The status follows the live demo meeting, which other tests may have closed.
+        const m = await get<{ id: string; canWrite: boolean; canVote: boolean; protokollantName: string }>(
+          `/api/meetings/${MEMBER_LIVE}`,
+        );
+        expect(m).toMatchObject({ id: MEMBER_LIVE, canWrite: false, canVote: true, protokollantName: 'Max Mustermann' });
+        const ctx = await get<Ctx>(`/api/delegations/meetings/${MEMBER_LIVE}/context`);
+        expect(ctx.meetingStarted).toBe(true);
+        expect(ctx.incoming.map((d) => d.delegatorName)).toEqual(['Erika Beispiel']);
+      });
+
+      it('serves a planned meeting with its agenda and the delegation setup', async () => {
+        const m = await get<{ status: string; canManage: boolean }>(`/api/meetings/${MEMBER_PLANNED}`);
+        expect(m).toMatchObject({ status: 'planned', canManage: false });
+        const agenda = await get<unknown[]>(`/api/meetings/${MEMBER_PLANNED}/agenda`);
+        expect(agenda).toHaveLength(5);
+        const ctx = await get<Ctx>(`/api/delegations/meetings/${MEMBER_PLANNED}/context`);
+        expect(ctx.meetingStarted).toBe(false);
+        expect(ctx.deadline).toBeTruthy();
+        expect(ctx.recipients.filter((r) => r.viaPool)).toHaveLength(2);
+        const hits = await get<{ displayName: string }[]>(
+          `/api/delegations/meetings/${MEMBER_PLANNED}/recipients`,
+          new HttpParams().set('q', 'emma'),
+        );
+        expect(hits.map((r) => r.displayName)).toEqual(['Emma Vogel']);
+        const all = await get<unknown[]>(`/api/delegations/meetings/${MEMBER_PLANNED}/recipients`);
+        expect(all.length).toBeGreaterThan(2);
+      });
+
+      it('creates an own delegation, which the context then names', async () => {
+        const made = await firstValueFrom(
+          http.post<{ delegateName: string; viaPool: boolean; direction: string }>('/api/delegations', {
+            meetingId: MEMBER_PLANNED,
+            delegateId: 'p-10',
+            delegateVoting: true,
+          }),
+        );
+        expect(made).toMatchObject({ delegateName: 'Emma Vogel', viaPool: true, direction: 'outgoing' });
+        const member = await firstValueFrom(
+          http.post<{ delegateName: string; viaPool: boolean }>('/api/delegations', {
+            meetingId: 'd0000000-0000-0000-0000-000000000002',
+            delegateId: 'p-2',
+          }),
+        );
+        expect(member).toMatchObject({ delegateName: 'Max Mustermann', viaPool: false });
+        const nobody = await firstValueFrom(http.post<{ delegateName: string | null }>('/api/delegations', null));
+        expect(nobody.delegateName).toBeNull();
+        const ctx = await get<Ctx>(`/api/delegations/meetings/${MEMBER_PLANNED}/context`);
+        expect(ctx.myDelegation).toMatchObject({ delegateId: 'p-10' });
+        // The planned demo meeting of the lead has not started either.
+        const lead = await get<Ctx>('/api/delegations/meetings/d0000000-0000-0000-0000-000000000002/context');
+        expect(lead.meetingStarted).toBe(false);
+      });
+    });
+
     describe('FE7: keepers, attendance with delegations, closed meetings', () => {
       const LIVE = 'd0000000-0000-0000-0000-000000000001';
       const DEMO = '00000000-0000-0000-0000-000000000001';

@@ -321,6 +321,7 @@ describe('AttendanceSheetComponent', () => {
       meetingStarted: false,
       canDelegate: true,
       myDelegation: own,
+      recipients: [{ principalId: 'pr-2', displayName: 'Max Mitglied', viaPool: false, isMember: true }],
     };
     const { fixture, http, conflictResolved } = await setup({ conflictId: 'pr-1' }, [own], [], context);
     const pia = () => row('Pia Protokoll');
@@ -337,10 +338,9 @@ describe('AttendanceSheetComponent', () => {
     expect(conflictResolved).toHaveBeenCalledWith('pr-1');
     // A new delegation in the section blocks "Anwesend" again.
     await userEvent.click(within(section).getByRole('button', { name: 'Vertretung einrichten' }));
-    const card = fixture.debugElement.query((el) => el.name === 'app-meeting-delegation-card');
-    (card.componentInstance as { delegateId: { set(v: string): void } }).delegateId.set('pr-2');
-    fixture.detectChanges();
-    await userEvent.click(within(screen.getByRole('dialog', { name: 'Vertretung einrichten' })).getByRole('button', { name: 'Vertretung einrichten' }));
+    const dialog = screen.getByRole('dialog', { name: 'Vertretung einrichten' });
+    await userEvent.click(within(dialog).getByRole('radio', { name: /Max Mitglied/ }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Vertretung einrichten' }));
     http.expectOne((r) => r.method === 'POST' && r.url.endsWith('/delegations')).flush(own);
     http.expectOne((r) => r.url.includes('/delegations/meetings/')).flush(context);
     http.expectOne((r) => r.method === 'GET' && r.url.endsWith('/delegations')).flush([own]);

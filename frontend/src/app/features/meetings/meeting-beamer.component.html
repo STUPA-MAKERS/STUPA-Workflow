@@ -1,31 +1,61 @@
-<section class="mtg__beamer" [attr.aria-label]="'meetings.beamer.heading' | t">
-  @if (top(); as t) {
-    <p class="mtg__beamerTop">{{ 'meetings.agenda.top' | t: { n: topIndex() + 1 } }} · {{ t.title || ('meetings.agenda.untitled' | t) }}</p>
-  }
-  @if (vote(); as bv) {
-    <app-badge [variant]="voteVariant(bv.status)">{{ voteStatusKey(bv.status) | t }}</app-badge>
-    <h2 class="mtg__beamerQ">{{ bv.question || bv.title || ('meetings.vote.untitled' | t) }}</h2>
-    @if (bv.status === 'open') {
-      <p class="mtg__beamerProgress">{{ 'meetings.vote.progress' | t: { voted: bv.voted, present: bv.present } }}</p>
-    }
-    @if (bv.revealed && bv.counts) {
-      <dl class="mtg__beamerTally">
-        @for (entry of countEntries(bv); track entry.key) {
-          <div class="mtg__beamerOpt" [class.mtg__beamerOpt--lead]="entry.key === bv.leading">
-            <dd>{{ entry.value }}</dd>
-            <dt>{{ optionLabel(entry.key) }}</dt>
-          </div>
+<section class="bm" [attr.aria-label]="'beamer.title' | t">
+  <header class="bm__head">
+    <img class="bm__logo" [src]="logoSrc()" alt="" />
+    @if (meetingTitle(); as title) {
+      <div class="bm__where">
+        <p class="bm__meeting">{{ title }}</p>
+        @if (vote() && topLine(); as top) {
+          <p class="bm__top">{{ top }}</p>
         }
-      </dl>
-    } @else if (bv.status === 'open') {
-      <p class="mtg__beamerHidden">{{ 'meetings.vote.progressHidden' | t }}</p>
+      </div>
     }
-    @if (bv.result) {
-      <span class="mtg__beamerResult">
-        <app-badge [variant]="voteResultVariant(bv.result)">{{ voteResultKey(bv.result) | t }}</app-badge>
-      </span>
+  </header>
+
+  @if (vote(); as v) {
+    @let tx = text()!;
+    <h1 class="bm__q">{{ v.question }}</h1>
+
+    @if (tx.bars && v.counts) {
+      <app-vote-bars variant="beamer" [options]="v.options" [counts]="v.counts" />
+    } @else {
+      <div class="bm__turnout" role="status">
+        <p class="bm__count">
+          <span class="bm__big mono">{{ v.voted }}</span>
+          <span class="bm__of">{{ 'beamer.ofPresent' | t: { n: v.present } }}</span>
+        </p>
+        <app-seg-bar size="xl" [segments]="[{ value: v.voted, tone: 'filled' }]" [total]="v.present" [label]="tx.turnout" />
+        <p class="bm__hint">{{ tx.hiddenKey | t }}</p>
+      </div>
+    }
+
+    <span class="bm__fill" aria-hidden="true"></span>
+
+    @if (v.status === 'open') {
+      <p class="bm__foot">
+        <app-status-text kind="accent">{{ 'meetings.voteStatus.open' | t }}</app-status-text>
+        <span class="bm__sep" aria-hidden="true">·</span>
+        <span>{{ tx.rules }}</span>
+        @if (tx.quorumWarning; as warn) {
+          <span class="bm__sep" aria-hidden="true">·</span>
+          <span class="bm__warn">{{ warn }}</span>
+        }
+      </p>
+    } @else {
+      <p class="bm__outcome" role="status">
+        <span class="bm__result" [class.bm__result--passed]="tx.passed">
+          <app-icon [name]="tx.passed ? 'check' : 'x'" [size]="30" />
+          {{ (tx.passed ? 'vote.result.passed' : 'vote.result.rejected') | t }}
+        </span>
+        <span class="bm__note">{{ tx.outcome }}</span>
+      </p>
     }
   } @else {
-    <p class="mtg__beamerIdle">{{ 'meetings.beamer.idle' | t }}</p>
+    <div class="bm__idle" role="status">
+      @if (topLine(); as top) {
+        <p class="bm__cap">{{ 'beamer.now' | t }}</p>
+        <h1 class="bm__nowTop">{{ top }}</h1>
+      }
+      <p class="bm__idleText">{{ 'beamer.idle' | t }}</p>
+    </div>
   }
 </section>

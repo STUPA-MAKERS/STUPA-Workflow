@@ -15,6 +15,7 @@ interface Inputs {
   canEdit: boolean;
   saveState: SaveState;
   revision: number;
+  follow: boolean;
 }
 
 async function setup(over: Partial<Inputs> = {}) {
@@ -182,5 +183,42 @@ describe('TopSheetComponent', () => {
   it('names an untitled item', async () => {
     await setup({ top: { ...AGENDA[0], title: null } });
     expect(screen.getByRole('heading', { level: 1, name: 'Unbenannter TOP' })).toBeInTheDocument();
+  });
+
+  describe('participant view (follow)', () => {
+    const member = (over: Partial<Meeting> = {}) =>
+      meeting({ canWrite: false, isProtokollant: false, protokollantName: 'Mara Keller', currentAgendaItemId: 't-1', ...over });
+
+    it('reads the text without a protocol, marks the item of the room and names the keeper', async () => {
+      const view = await setup({ follow: true, protocol: null, editable: false, canEdit: false, meeting: member() });
+      expect(screen.getByText('Jetzt')).toBeInTheDocument();
+      expect(screen.getByText('Mara Keller führt das Protokoll')).toBeInTheDocument();
+      const editor = editorOf(view);
+      expect(editor.disabled()).toBe(true);
+      expect(editor.value()).toBe('Eröffnet.');
+      expect(editor.placeholder()).toBe('Noch kein Text zu diesem TOP.');
+      // No format bar, no save state, no foot, no note about a missing protocol.
+      expect(screen.queryByRole('toolbar')).toBeNull();
+      expect(screen.queryByText('Entwurf')).toBeNull();
+      expect(screen.queryByText(/Das Protokoll entsteht/)).toBeNull();
+    });
+
+    it('marks no item of the room in another item, a planned or a closed meeting', async () => {
+      const { fixture } = await setup({ follow: true, protocol: null, meeting: member(), top: AGENDA[1], topIndex: 1 });
+      expect(screen.queryByText('Jetzt')).toBeNull();
+      fixture.componentRef.setInput('meeting', member({ status: 'closed' }));
+      fixture.componentRef.setInput('top', AGENDA[0]);
+      fixture.detectChanges();
+      expect(screen.queryByText('Jetzt')).toBeNull();
+      expect(screen.queryByText('Mara Keller führt das Protokoll')).toBeNull();
+      fixture.componentRef.setInput('meeting', member({ currentAgendaItemId: null }));
+      fixture.detectChanges();
+      expect(screen.queryByText('Jetzt')).toBeNull();
+    });
+
+    it('names no keeper when nobody keeps the minutes', async () => {
+      await setup({ follow: true, protocol: null, meeting: member({ protokollantName: null }) });
+      expect(screen.queryByText(/führt das Protokoll/)).toBeNull();
+    });
   });
 });

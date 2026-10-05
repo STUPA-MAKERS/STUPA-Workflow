@@ -38,6 +38,10 @@
   line-height: 1.125rem;
   color: var(--color-text-muted);
 }
+.ts__now {
+  color: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
+}
 .ts__kind app-status-text {
   font-weight: inherit;
 }

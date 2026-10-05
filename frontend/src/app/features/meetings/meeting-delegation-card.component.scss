@@ -1,18 +1,3 @@
-.field__control {
-  height: var(--control-height);
-  padding: 0 var(--space-4);
-  background: var(--color-surface-sunken);
-  color: var(--color-text);
-  border: 0;
-  border-radius: var(--radius-field);
-  font-size: var(--fs-md);
-}
-/* The filled field of the ui-kit: no edge; focus draws a 2px accent line inside. */
-.field__control:focus-visible {
-  outline: none;
-  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
-}
-
 .dc {
   display: flex;
   flex-direction: column;
@@ -35,6 +20,15 @@
   padding: var(--space-2) var(--space-2) var(--space-2) 14px;
   font-size: var(--fs-body);
 }
+.dc__row > .dc__person {
+  flex: 1 1 auto;
+}
+.dc__person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
 .dc__text {
   display: flex;
   flex: 1 1 auto;
@@ -54,4 +48,34 @@
 }
 .dc__muted {
   color: var(--color-text-muted);
+}
+
+/* The box of the participant view (boards Teilnahme-Vorher, Teilnahme-Live). */
+.dc--box {
+  gap: 10px;
+  padding: var(--space-4) 18px;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-1);
+}
+.dc--box .dc__cap {
+  padding: 0;
+}
+.dc__lead {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.dc__small {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+}
+.dc__setup {
+  align-self: flex-start;
+}
+.dc__strong {
+  font-weight: var(--fw-medium);
+}
+.dc--box .dc__person + .dc__person {
+  margin-top: var(--space-1);
 }

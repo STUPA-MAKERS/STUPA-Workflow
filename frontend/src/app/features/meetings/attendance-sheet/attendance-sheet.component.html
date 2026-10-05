@@ -137,7 +137,7 @@
           </section>
         }
 
-        <app-meeting-delegation-card class="as__own" [meetingId]="m.id" (changed)="onOwnChange($event)" />
+        <app-meeting-delegation-card class="as__own" [meetingId]="m.id" [subtitle]="meetingLine()" (changed)="onOwnChange($event)" />
 
         @if (m.canWrite && m.status === 'live') {
           <section class="as__sec" [attr.aria-label]="'meetings.viewers.title' | t">

@@ -129,14 +129,14 @@ export const routes: Routes = [
         path: 'voting/beamer',
         // The beamer WebSocket needs `session.manage` in the gremium of the meeting.
         // `chrome: false`: the projector shows the page without rail, bars or footer.
-        data: { title: 'voting.beamer.heading', gremiumPermission: 'session.manage', chrome: false },
+        data: { title: 'beamer.title', gremiumPermission: 'session.manage', chrome: false },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./features/voting/beamer.component').then((m) => m.BeamerComponent),
       },
       {
         path: 'voting/beamer/:id',
-        data: { title: 'voting.beamer.heading', gremiumPermission: 'session.manage', chrome: false },
+        data: { title: 'beamer.title', gremiumPermission: 'session.manage', chrome: false },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./features/voting/beamer.component').then((m) => m.BeamerComponent),

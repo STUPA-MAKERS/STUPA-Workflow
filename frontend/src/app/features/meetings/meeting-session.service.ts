@@ -32,7 +32,6 @@ import {
   errorCode,
   errorDetail,
   liveOpenedVote,
-  pickBeamerVote,
 } from './meetings-display.util';
 
 /**
@@ -138,10 +137,6 @@ export class MeetingSessionService implements OnDestroy {
   readonly looseVotes = computed<MeetingVote[]>(() =>
     (this.meeting()?.votes ?? []).filter((v) => !v.agendaItemId),
   );
-  /** Beamer: currently open vote, else the last closed one. */
-  readonly beamerVote = computed<MeetingVote | null>(() =>
-    pickBeamerVote(this.meeting()?.votes ?? []),
-  );
 
   ngOnDestroy(): void {
     this.channel?.close();
@@ -192,15 +187,6 @@ export class MeetingSessionService implements OnDestroy {
       error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
     });
   }
-
-  /** The agenda item the room handles now, when it is on the agenda. */
-  readonly currentTop = computed<AgendaItem | null>(() => {
-    const id = this.meeting()?.currentAgendaItemId;
-    return id ? (this.agendaSvc.agenda().find((a) => a.id === id) ?? null) : null;
-  });
-  readonly currentTopIndex = computed(() =>
-    this.agendaSvc.agenda().findIndex((a) => a.id === this.meeting()?.currentAgendaItemId),
-  );
 
   /**
    * Start a planned meeting (planned → live). The server creates the protocol on

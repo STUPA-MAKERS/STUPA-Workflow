@@ -152,6 +152,8 @@ function routerStub(navigate: jest.Mock = jest.fn(() => Promise.resolve(true))) 
     navigate,
     events: EMPTY,
     config: [],
+    createUrlTree: jest.fn((commands: unknown[]) => commands),
+    serializeUrl: jest.fn((tree: unknown[]) => tree.join('/')),
     routerState: { snapshot: { root: { url: [], data: {}, firstChild: null } } },
   };
 }
@@ -595,7 +597,7 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
     http.expectOne('/api/meetings/m-1/agenda').flush([]);
     flushDelegationContext(http);
-    expect(await screen.findByText('Live-Sitzung')).toBeInTheDocument();
+    expect(await screen.findByRole('complementary', { name: 'Teilnahme' })).toBeInTheDocument();
     expect(screen.queryByText('Sitzungssteuerung')).not.toBeInTheDocument();
   });
 
@@ -617,7 +619,7 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/attendance').flush([]);
     http.expectOne('/api/meetings/m-1/agenda').flush([]);
     flushDelegationContext(http);
-    expect(await screen.findByText('Live-Sitzung')).toBeInTheDocument();
+    expect(await screen.findByRole('complementary', { name: 'Teilnahme' })).toBeInTheDocument();
     expect(screen.queryByRole('toolbar', { name: 'Sitzungssteuerung' })).not.toBeInTheDocument();
   });
 
@@ -659,8 +661,8 @@ describe('MeetingsComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Sitzungsmenü' }));
       expect(await screen.findByRole('menuitem', { name: 'Sitzung bearbeiten' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Sitzung löschen' })).toBeInTheDocument();
-      // The follow view must not take the page over.
-      expect(screen.queryByText('Live-Sitzung')).not.toBeInTheDocument();
+      // The participant view must not take the page over.
+      expect(screen.queryByRole('complementary', { name: 'Teilnahme' })).not.toBeInTheDocument();
     });
 
     it('keeps the agenda editor and vote creation for a manager who is not the minute-taker', async () => {
@@ -802,14 +804,6 @@ describe('MeetingsComponent — methods', () => {
   });
 
   describe('display helpers', () => {
-    it('maps status to badge variants and i18n keys', async () => {
-      const { cmp } = await loaded();
-      expect(cmp.statusVariant('live')).toBe('success');
-      expect(cmp.statusVariant('closed')).toBe('info');
-      expect(cmp.statusVariant('planned')).toBe('info');
-      expect(cmp.statusKey('live')).toBe('meetings.status.live');
-    });
-
     it('maps vote status to badge variants and keys', async () => {
       const { cmp } = await loaded();
       expect(cmp.voteVariant('open')).toBe('success');
@@ -874,6 +868,17 @@ describe('MeetingsComponent — methods', () => {
       expect(empty).toEqual([]);
     });
 
+    it('opens the beamer of the meeting in a new tab', async () => {
+      const { cmp } = await loaded();
+      const open = jest.spyOn(window, 'open').mockReturnValue(null);
+      try {
+        cmp.openBeamer(cmp.meeting()!);
+        expect(open).toHaveBeenCalledWith('/voting/beamer/m-1', '_blank', 'noopener');
+      } finally {
+        open.mockRestore();
+      }
+    });
+
     it('groups votes by TOP and collects loose votes', async () => {
       const { cmp, fixture } = await loaded();
       const { session } = services(fixture);
@@ -891,28 +896,6 @@ describe('MeetingsComponent — methods', () => {
       expect(session.votesForTop('t-7').map((v) => v.id)).toEqual(['bound']);
       expect(cmp.looseVotes().map((v) => v.id)).toEqual(['loose']);
     });
-
-    it('selects the beamer vote: open first, else last closed, else null', async () => {
-      const { cmp } = await loaded();
-      // The MEETING fixture has one open vote (v-1).
-      expect(cmp.beamerVote()?.id).toBe('v-1');
-      // No open votes → last closed one.
-      cmp.meeting.set({
-        ...cmp.meeting()!,
-        votes: [
-          { ...cmp.meeting()!.votes[0], id: 'c1', status: 'closed' },
-          { ...cmp.meeting()!.votes[0], id: 'c2', status: 'closed' },
-        ],
-      });
-      expect(cmp.beamerVote()?.id).toBe('c2');
-      // Neither open nor closed → null.
-      cmp.meeting.set({
-        ...cmp.meeting()!,
-        votes: [{ ...cmp.meeting()!.votes[0], id: 'p', status: 'draft' }],
-      });
-      expect(cmp.beamerVote()).toBeNull();
-    });
-
   });
 
   describe('agenda + TOP editing', () => {
@@ -2011,8 +1994,6 @@ describe('MeetingsComponent — methods', () => {
       http.expectOne('/api/meetings/m-1/agenda').flush([AGENDA_ITEM(), AGENDA_ITEM({ id: 't-2', position: 1 })]);
       http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
       expect(cmp.meeting()?.currentAgendaItemId).toBe('t-2');
-      expect(cmp.currentTop()?.id).toBe('t-2');
-      expect(cmp.currentTopIndex()).toBe(1);
       expect(cmp.selectedTopId()).toBe('t-2');
     });
 
@@ -2083,7 +2064,6 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.meeting()).toBeNull();
       expect(services(fixture).session.votesForTop('t-1')).toEqual([]); // meeting()?.votes ?? []
       expect(cmp.looseVotes()).toEqual([]); // meeting()?.votes ?? []
-      expect(cmp.beamerVote()).toBeNull(); // meeting()?.votes ?? []
     });
 
     it('clears all pending timers (body autosave, render poll) on destroy', async () => {

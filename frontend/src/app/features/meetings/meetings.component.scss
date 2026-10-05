@@ -5,17 +5,6 @@
   flex-direction: column;
   gap: var(--space-5);
 }
-/* Meeting meta line, beamer and follow view only. It sits below the page header and
-   keeps the body width of the toolbar and of the center column of the shell. */
-.mtg__meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  width: 100%;
-  max-width: var(--layout-max-width);
-  margin-inline: auto;
-}
 .mtg__status {
   color: var(--color-text-muted);
   padding: var(--space-5) 0;
@@ -30,9 +19,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-}
-.mtg__beamerToggle {
-  margin-left: auto;
 }
 /* The loading placeholder of the session page: a bar, a body and a dock. */
 .mtg__loadShell {

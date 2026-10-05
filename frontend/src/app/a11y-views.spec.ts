@@ -254,6 +254,29 @@ describe('Kern-Views a11y (axe)', () => {
           provideRouter([]),
           { provide: LIVE_VOTE_SOURCE, useValue: source },
           {
+            provide: ApiClient,
+            useValue: {
+              getMeeting: () => of({ id: 'm1', title: 'Sitzung', votes: [], currentAgendaItemId: 'ag1' }),
+              listAgenda: () => of([{ id: 'ag1', title: 'Haushalt', position: 0 }]),
+              getVote: () =>
+                of({
+                  id: 'v1',
+                  applicationId: 'a1',
+                  meetingId: 'm1',
+                  agendaItemId: 'ag1',
+                  question: 'Beschlussfrage?',
+                  eligibleGroup: 'g1',
+                  config: { options: ['yes', 'no', 'abstain'], majorityRule: 'simple' },
+                  status: 'open',
+                  opensAt: null,
+                  closesAt: null,
+                  result: null,
+                  secret: false,
+                  tally: { counts: {}, eligible: 9, voted: 3, present: 9, revealed: false, quorumMet: true, leading: null },
+                }),
+            },
+          },
+          {
             provide: ActivatedRoute,
             useValue: { snapshot: { paramMap: convertToParamMap({ id: 'm1' }) } },
           },

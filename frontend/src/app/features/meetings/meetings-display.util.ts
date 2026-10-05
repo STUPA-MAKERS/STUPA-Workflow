@@ -149,13 +149,23 @@ export function assembleProtocolMarkdown(agenda: AgendaItem[]): string {
     .join('\n\n');
 }
 
-/** Beamer pick: the currently open vote, else the last closed one. */
-export function pickBeamerVote(votes: MeetingVote[]): MeetingVote | null {
-  return (
-    votes.find((v) => v.status === 'open') ??
-    [...votes].reverse().find((v) => v.status === 'closed') ??
-    null
-  );
+/** A meeting date with a short weekday ("Di., 13.10.2026"). `formatLocale` is the
+ *  `Intl` locale of the page (`I18nService.formatLocale()`). */
+export function weekdayDate(isoDate: string, formatLocale: string): string {
+  const date = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return isoDate;
+  return new Intl.DateTimeFormat(formatLocale, {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+}
+
+/** "35. Sitzung des Studierendenparlaments · Di., 13.10.2026": the meeting below the
+ *  title of a dialog. */
+export function meetingLine(m: Meeting, formatLocale: string): string {
+  return m.date ? `${m.title} · ${weekdayDate(m.date, formatLocale)}` : m.title;
 }
 
 /** Long localized date ("14. Juni 2026"). It mirrors the `ldate` pipe. */

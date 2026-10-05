@@ -8,6 +8,7 @@ import { inject, isDevMode } from '@angular/core';
 import { type Observable, from, of, throwError } from 'rxjs';
 import { delay, mergeMap } from 'rxjs/operators';
 import { USE_MOCK_API } from './api.config';
+import type { Delegation } from './delegations.service';
 import type {
   ApplicationCreatedWire,
   ApplicationListItemWire,
@@ -663,12 +664,12 @@ const MOCK_PLANNED_AGENDA = [
  * GET /delegations: the user represents a member in the planned meeting, and in the live
  * meeting Vera Vertretung is represented by Sven Stellvertreter (the lead sees it and can revoke it).
  */
-let MOCK_DELEGATIONS = [
+let MOCK_DELEGATIONS: Delegation[] = [
   {
     id: 'f0000000-0000-0000-0000-000000000001',
     meetingId: MOCK_PLANNED_MEETING.id,
     meetingTitle: MOCK_PLANNED_MEETING.title,
-    meetingDate: MOCK_PLANNED_MEETING.date,
+    meetingDate: MOCK_PLANNED_MEETING.date ?? null,
     gremiumId: 'g0000000-0000-0000-0000-000000000002',
     gremiumName: 'Haushaltsausschuss',
     delegatorId: 'p-3',
@@ -931,6 +932,10 @@ function mockSearch(q: string): SearchResults {
  * The closed demo meetings of `mock-meetings-closed.ts` (draft and final protocol), by
  * meeting id and by protocol id. The data itself loads on first use.
  */
+/** The paths of `mock-meetings-member.ts`: the two meetings of the participant view, the
+ *  agenda of the planned one, and the delegation context and recipients of any meeting. */
+const MEMBER_MOCK_PATH =
+  /\/meetings\/d0000000-0000-0000-0000-000000000(003|105)$|\/meetings\/d0000000-0000-0000-0000-000000000105\/agenda$|\/delegations\/meetings\/[^/]+\/(context|recipients)$/;
 const CLOSED_MOCK_MEETING = /\/meetings\/(d0000000-0000-0000-0000-00000000010[12])(\/|$)/;
 const CLOSED_MOCK_PROTOCOL = /\/protocols\/e0000000-0000-0000-0000-0000000001(0[12])(\/|$)/;
 
@@ -1131,6 +1136,16 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     return from(import('./mock-applications')).pipe(mergeMap((m) => ok(m.agendaMeetings())));
   }
 
+  // The participant view: two meetings where the demo user is a plain member, and the
+  // delegation context of every meeting. The data loads on first use.
+  if (req.method === 'GET' && MEMBER_MOCK_PATH.test(p)) {
+    return from(import('./mock-meetings-member')).pipe(
+      mergeMap((m) =>
+        ok(m.memberMeetingGet(p, req.params.get('q') ?? '', MOCK_MEETING, MOCK_DELEGATIONS)),
+      ),
+    );
+  }
+
   // The closed demo meetings (draft and final protocol). The data loads on first use.
   const closedId = closedMockId(p);
   if (closedId && !/\/(attendance|delegations)/.test(p)) {
@@ -1301,6 +1316,15 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'POST') {
+    if (p.endsWith('/delegations')) {
+      return from(import('./mock-meetings-member')).pipe(
+        mergeMap((m) => {
+          const made = m.memberDelegationCreate(req.body, MOCK_DELEGATIONS.length, MOCK_ATTENDANCE);
+          MOCK_DELEGATIONS = [...MOCK_DELEGATIONS, made];
+          return ok(made, 201);
+        }),
+      );
+    }
     if (p.endsWith('/auth/logout')) return ok(LOGOUT_OUT);
     // A draft upload of the wizard (Z4): the file stays in the scan, the token stays.
     if (p.endsWith('/apply/attachments')) return ok(mockDraftUpload(req.body), 201);

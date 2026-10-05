@@ -1,6 +1,9 @@
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
-import { Subject } from 'rxjs';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { Subject, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
+import { ApiClient } from '@core/api/api-client.service';
+import type { AgendaItem, Meeting, MeetingVote, Vote } from '@core/api/models';
+import { ThemeService } from '@core/theme/theme.service';
 import { LIVE_VOTE_SOURCE, type LiveVoteSource } from '@core/ws/live-vote.source';
 import type { MeetingChannel } from '@core/ws/ws.service';
 import type { ClientMessage, ServerMessage } from '@core/ws/ws-messages';
@@ -30,133 +33,236 @@ class FakeSource implements LiveVoteSource {
   }
 }
 
-async function setup(withId = true) {
-  const source = new FakeSource();
-  const r = await render(BeamerComponent, {
-    providers: [
-      { provide: LIVE_VOTE_SOURCE, useValue: source },
-      {
-        provide: ActivatedRoute,
-        useValue: {
-          snapshot: { paramMap: convertToParamMap(withId ? { id: 'm1' } : {}) },
-        },
-      },
-    ],
-  });
-  return { ...r, source, channel: source.channels[0] };
+const AGENDA: AgendaItem[] = [
+  { id: 'ag-2', applicationId: null, title: 'Haushalt', position: 1 },
+  { id: 'ag-1', applicationId: null, title: 'Begrüßung', position: 0 },
+  { id: 'ag-3', applicationId: null, title: null, position: 2 },
+];
+
+function meeting(over: Partial<Meeting> = {}): Meeting {
+  return {
+    id: 'm1',
+    title: '34. Sitzung',
+    currentAgendaItemId: 'ag-2',
+    votes: [] as MeetingVote[],
+    ...over,
+  } as Meeting;
+}
+
+function vote(over: Partial<Vote> = {}): Vote {
+  return {
+    id: 'v1',
+    applicationId: null,
+    meetingId: 'm1',
+    agendaItemId: 'ag-2',
+    question: 'Wird der Haushalt beschlossen?',
+    eligibleGroup: 'g1',
+    config: { options: ['yes', 'no', 'abstain'], majorityRule: 'simple', quorum: { type: 'count', value: 12 } },
+    status: 'open',
+    opensAt: null,
+    closesAt: null,
+    result: null,
+    secret: false,
+    tally: { counts: {}, eligible: 19, voted: 4, present: 19, revealed: false, quorumMet: false, leading: null },
+    ...over,
+  };
 }
 
 const OPEN: ServerMessage = {
   type: 'vote_opened',
   voteId: 'v1',
-  applicationId: 'a1',
+  applicationId: null,
   options: ['yes', 'no', 'abstain'],
   closesAt: null,
 };
 
+async function setup(opts: { id?: string | null; meeting?: Meeting; votes?: Vote[] } = {}) {
+  const source = new FakeSource();
+  const votes = [...(opts.votes ?? [vote()])];
+  const api = {
+    getMeeting: jest.fn(() => of(opts.meeting ?? meeting())),
+    listAgenda: jest.fn(() => of(AGENDA)),
+    getVote: jest.fn((id: string) => {
+      const next = votes.length > 1 ? votes.shift()! : votes[0];
+      return next ? of({ ...next, id }) : throwError(() => new Error('gone'));
+    }),
+  };
+  const id = opts.id === undefined ? 'm1' : opts.id;
+  const view = await render(BeamerComponent, {
+    providers: [
+      provideRouter([]),
+      { provide: LIVE_VOTE_SOURCE, useValue: source },
+      { provide: ApiClient, useValue: api },
+      {
+        provide: ActivatedRoute,
+        useValue: { snapshot: { paramMap: convertToParamMap(id ? { id } : {}) } },
+      },
+    ],
+  });
+  const channel = source.channels[0];
+  const push = (msg: ServerMessage) => {
+    channel.subject.next(msg);
+    view.fixture.detectChanges();
+  };
+  return { ...view, source, channel, api, push };
+}
+
 describe('BeamerComponent', () => {
-  it('opens the read-only beamer stream', async () => {
-    const { source } = await setup();
+  afterEach(() => localStorage.clear());
+
+  it('follows the read-only beamer stream and turns the page dark while it shows', async () => {
+    const { source, fixture } = await setup();
+    const theme = fixture.debugElement.injector.get(ThemeService);
     expect(source.lastBeamer).toBe(true);
-  });
-
-  it('shows a waiting state before a vote is opened', async () => {
-    await setup();
-    expect(screen.getByText(/noch keine Abstimmung/i)).toBeInTheDocument();
-  });
-
-  it('renders big live bars, vote count and quorum indicator', async () => {
-    const { channel, detectChanges } = await setup();
-    channel.subject.next(OPEN);
-    channel.subject.next({
-      type: 'vote_tally',
-      voteId: 'v1',
-      counts: { yes: 5, no: 2, abstain: 1 },
-      eligible: 12,
-      quorumMet: true,
-      leading: 'yes',
-    });
-    detectChanges();
-    expect(screen.getByRole('img', { name: 'Ja: 5 Stimmen, 63 %' })).toBeInTheDocument();
-    expect(screen.getAllByRole('img').length).toBe(3);
-    expect(screen.getByText('8 von 12 Stimmen')).toBeInTheDocument();
-    expect(screen.getByText(/Quorum:\s*erreicht/)).toBeInTheDocument();
-  });
-
-  it('shows the final result when the vote closes', async () => {
-    const { channel, detectChanges } = await setup();
-    channel.subject.next(OPEN);
-    channel.subject.next({
-      type: 'vote_tally',
-      voteId: 'v1',
-      counts: { yes: 8, no: 2, abstain: 0 },
-      eligible: 12,
-      quorumMet: true,
-      leading: 'yes',
-    });
-    channel.subject.next({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: { yes: 9, no: 2, abstain: 1 } });
-    detectChanges();
-    expect(screen.getByText('Endergebnis')).toBeInTheDocument();
-    expect(screen.getByText('Angenommen')).toBeInTheDocument();
-    expect(screen.getByText('12 von 12 Stimmen')).toBeInTheDocument();
-  });
-
-  it('never sends cast frames (read-only)', async () => {
-    const { channel } = await setup();
-    expect(channel.sent.every((m) => m.type !== 'cast')).toBe(true);
-  });
-
-  it('subscribes for resync on open', async () => {
-    const { channel } = await setup();
-    expect(channel.sent).toContainEqual({ type: 'subscribe' });
-  });
-
-  it('falls back to the demo meeting id when the route has none', async () => {
-    const { source } = await setup(false);
-    expect(source.lastMeetingId).toBe('demo');
-  });
-
-  it('reports zero cast count and a tie result key before any tally arrives', async () => {
-    const { fixture } = await setup();
-    // No tally → castCount() is 0. No result → resultKey() falls back to tie.
-    expect(fixture.componentInstance.castCount()).toBe(0);
-    expect(fixture.componentInstance.resultKey()).toBe('vote.result.tie');
-  });
-
-  it('shows a rejected result when the vote fails', async () => {
-    const { channel, detectChanges } = await setup();
-    channel.subject.next(OPEN);
-    channel.subject.next({
-      type: 'vote_tally',
-      voteId: 'v1',
-      counts: { yes: 1, no: 5, abstain: 0 },
-      eligible: 12,
-      quorumMet: false,
-      leading: 'no',
-    });
-    channel.subject.next({ type: 'vote_closed', voteId: 'v1', result: 'rejected', counts: { yes: 1, no: 5, abstain: 0 } });
-    detectChanges();
-    expect(screen.getByText('Abgelehnt')).toBeInTheDocument();
-    expect(screen.getByText(/Quorum:\s*nicht erreicht/)).toBeInTheDocument();
-  });
-
-  it('has a way back to the live vote of the meeting, since the route has no chrome', async () => {
-    await setup();
-    expect(screen.getByRole('link', { name: 'Beamer-Ansicht verlassen' })).toHaveAttribute(
-      'href',
-      '/voting/meeting/m1',
-    );
-  });
-
-  it('leads back to the voting overview when the route has no meeting', async () => {
-    await setup(false);
-    expect(screen.getByRole('link', { name: 'Beamer-Ansicht verlassen' })).toHaveAttribute('href', '/voting');
-  });
-
-  it('closes the live session on destroy (no reconnect)', async () => {
-    const { fixture, channel } = await setup();
-    const close = jest.spyOn(channel, 'close');
+    expect(source.lastMeetingId).toBe('m1');
+    expect(theme.resolved()).toBe('dark');
     fixture.destroy();
-    expect(close).toHaveBeenCalled();
+    expect(theme.resolved()).toBe('light');
+  });
+
+  it('keeps a theme that the person chose', async () => {
+    localStorage.setItem('ap.theme', 'light');
+    const { fixture } = await setup();
+    expect(fixture.debugElement.injector.get(ThemeService).resolved()).toBe('light');
+  });
+
+  it('shows the item of the room while no vote runs', async () => {
+    const { api } = await setup();
+    expect(api.getMeeting).toHaveBeenCalledWith('m1', { quiet: true });
+    expect(screen.getByRole('heading', { name: 'TOP 2 · Haushalt' })).toBeInTheDocument();
+    expect(screen.getByText('Zurzeit keine aktive Abstimmung.')).toBeInTheDocument();
+    expect(screen.getByText('34. Sitzung')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Beamer-Ansicht verlassen' })).toHaveAttribute('href', '/meetings/m1');
+  });
+
+  it('names an item without a title, and shows no item that is not on the agenda', async () => {
+    const { push } = await setup();
+    push({ type: 'meeting_state', activeApplicationId: null, currentAgendaItemId: 'ag-3', status: 'live' });
+    expect(screen.getByRole('heading', { name: 'TOP 3 · Unbenannter TOP' })).toBeInTheDocument();
+    push({ type: 'meeting_state', activeApplicationId: null, currentAgendaItemId: 'ag-x', status: 'live' });
+    expect(screen.queryByText('Jetzt')).toBeNull();
+  });
+
+  it('goes back to the voting overview without a meeting', async () => {
+    const { source } = await setup({ id: null });
+    expect(source.lastMeetingId).toBe('demo');
+    expect(screen.getByRole('link', { name: 'Beamer-Ansicht verlassen' })).toHaveAttribute('href', '/voting');
+    expect(screen.getByText('Zurzeit keine aktive Abstimmung.')).toBeInTheDocument();
+  });
+
+  it('reads the meeting again on a new state of the room, but not on the first one', async () => {
+    const { push, api } = await setup();
+    push({ type: 'meeting_state', activeApplicationId: null, status: 'live' });
+    expect(api.getMeeting).toHaveBeenCalledTimes(1);
+    push({ type: 'meeting_state', activeApplicationId: null, currentAgendaItemId: 'ag-1', status: 'live' });
+    expect(api.getMeeting).toHaveBeenCalledTimes(2);
+    expect(api.listAgenda).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('heading', { name: 'TOP 1 · Begrüßung' })).toBeInTheDocument();
+  });
+
+  it('shows the turnout of an open vote and no tally while the counts are hidden', async () => {
+    const { push, api, container } = await setup();
+    push(OPEN);
+    expect(api.getVote).toHaveBeenCalledWith('v1', { quiet: true });
+    expect(screen.getByRole('heading', { name: 'Wird der Haushalt beschlossen?' })).toBeInTheDocument();
+    expect(container.querySelector('.bm__big')?.textContent?.trim()).toBe('4');
+    expect(container.querySelector('.bm__warn')?.textContent?.trim()).toBe('Quorum 12 · noch nicht erreicht');
+    // The turnout grows with each ballot; the counts stay hidden.
+    push({ type: 'vote_tally', voteId: 'v1', counts: {}, eligible: 19, cast: 14, present: 19, revealed: false, quorumMet: true, leading: null });
+    expect(container.querySelector('.bm__big')?.textContent?.trim()).toBe('14');
+    expect(container.querySelector('.bm__warn')).toBeNull();
+    expect(container.querySelector('app-vote-bars')).toBeNull();
+    // A frame of another vote changes nothing.
+    push({ type: 'vote_tally', voteId: 'other', counts: {}, eligible: 19, cast: 1, present: 19, revealed: false, quorumMet: true, leading: null });
+    expect(container.querySelector('.bm__big')?.textContent?.trim()).toBe('4');
+  });
+
+  it('shows the counts once every present member voted', async () => {
+    const { push } = await setup();
+    push(OPEN);
+    push({ type: 'vote_tally', voteId: 'v1', counts: { yes: 15, no: 2, abstain: 2 }, eligible: 19, cast: 19, present: 19, revealed: true, quorumMet: true, leading: 'yes' });
+    expect(screen.getByRole('img', { name: 'Ja: 15 Stimmen, 79 %' })).toBeInTheDocument();
+  });
+
+  it('shows the counts of a read that revealed them', async () => {
+    const { push } = await setup({
+      votes: [vote({ tally: { counts: { yes: 2, no: 1, abstain: 0 }, eligible: 3, voted: 3, present: 3, revealed: true, quorumMet: true, leading: 'yes' } })],
+    });
+    push(OPEN);
+    expect(screen.getByRole('img', { name: 'Ja: 2 Stimmen, 67 %' })).toBeInTheDocument();
+  });
+
+  it('shows the result of the close frame, then the result of the read', async () => {
+    const closed = vote({
+      status: 'closed',
+      result: 'passed',
+      tally: { counts: { yes: 15, no: 3, abstain: 2 }, eligible: 20, voted: 21, present: 0, revealed: true, quorumMet: true, leading: 'yes' },
+    });
+    const { push, api, container } = await setup({ votes: [vote(), vote(), closed] });
+    push(OPEN);
+    push({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: { yes: 15, no: 3, abstain: 2 } });
+    expect(api.getVote).toHaveBeenCalledTimes(2);
+    // The second read still says open (the server was slow): the frame stands in.
+    expect(container.querySelector('.bm__result')?.textContent).toContain('Angenommen');
+    expect(screen.getByText('Einfache Mehrheit · Quorum erreicht · 20 Stimmen')).toBeInTheDocument();
+  });
+
+  it('shows the read result after the close', async () => {
+    const closed = vote({
+      status: 'closed',
+      result: 'tie',
+      tally: { counts: { yes: 9, no: 9, abstain: 2 }, eligible: 20, voted: 20, present: 0, revealed: true, quorumMet: true, leading: null },
+    });
+    const { push, container } = await setup({ votes: [vote(), closed] });
+    push(OPEN);
+    push({ type: 'vote_closed', voteId: 'v1', result: 'tie', counts: { yes: 9, no: 9, abstain: 2 }, failedReason: null });
+    expect(container.querySelector('.bm__result')?.textContent).toContain('Abgelehnt');
+    expect(screen.getByText('Einfache Mehrheit nicht erreicht · Quorum erreicht · 20 Stimmen')).toBeInTheDocument();
+  });
+
+  it('takes the reason of the close frame', async () => {
+    const { push } = await setup();
+    push(OPEN);
+    push({ type: 'vote_closed', voteId: 'v1', result: 'rejected', counts: { yes: 1 }, failedReason: 'quorum' });
+    expect(screen.getByText('Einfache Mehrheit · Quorum nicht erreicht · 1 Stimme')).toBeInTheDocument();
+  });
+
+  it('goes idle when the vote is cancelled', async () => {
+    const { push } = await setup();
+    push(OPEN);
+    expect(screen.getByRole('heading', { name: 'Wird der Haushalt beschlossen?' })).toBeInTheDocument();
+    push({ type: 'vote_cancelled', voteId: 'v1' });
+    expect(screen.getByText('Zurzeit keine aktive Abstimmung.')).toBeInTheDocument();
+  });
+
+  it('shows the last result of the current item from the meeting read', async () => {
+    const row = { id: 'c1', agendaItemId: 'ag-2', status: 'closed' } as MeetingVote;
+    const closed = vote({
+      status: 'closed',
+      result: 'rejected',
+      question: '',
+      tally: { counts: { yes: 1, no: 4, abstain: 0 }, eligible: 5, quorumMet: true, leading: 'no', failedReason: 'majority' },
+    });
+    const { container, push } = await setup({ meeting: meeting({ votes: [row] }), votes: [closed] });
+    expect(container.querySelector('.bm__result')?.textContent).toContain('Abgelehnt');
+    // The question falls back to the placeholder; the turnout to the sum of the counts.
+    expect(screen.getByRole('heading', { level: 1, name: 'Beschlussfrage' })).toBeInTheDocument();
+    expect(screen.getByText('Einfache Mehrheit nicht erreicht · Quorum erreicht · 5 Stimmen')).toBeInTheDocument();
+    // The room moves on: the result goes.
+    push({ type: 'meeting_state', activeApplicationId: null, currentAgendaItemId: 'ag-1', status: 'live' });
+    expect(screen.getByText('Zurzeit keine aktive Abstimmung.')).toBeInTheDocument();
+  });
+
+  it('shows no cancelled vote', async () => {
+    const { push } = await setup({ votes: [vote({ status: 'cancelled' })] });
+    push(OPEN);
+    expect(screen.getByText('Zurzeit keine aktive Abstimmung.')).toBeInTheDocument();
+  });
+
+  it('survives a failed read', async () => {
+    const { push, api } = await setup({ votes: [] });
+    push(OPEN);
+    expect(api.getVote).toHaveBeenCalled();
+    expect(screen.getByText('Zurzeit keine aktive Abstimmung.')).toBeInTheDocument();
   });
 });

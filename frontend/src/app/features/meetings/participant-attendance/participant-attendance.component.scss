@@ -1,0 +1,34 @@
+/* A box of the side column (board Teilnahme-Vorher): caption, control, reason. */
+:host {
+  display: block;
+}
+
+.pa {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--space-4) 18px;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-1);
+}
+.pa__cap {
+  margin: 0;
+}
+.pa__seg {
+  align-self: flex-start;
+}
+.pa__state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+  font-weight: var(--fw-semibold);
+}
+.pa__muted {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
