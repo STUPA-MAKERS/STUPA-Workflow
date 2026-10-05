@@ -13,7 +13,7 @@ from app.deps import Principal, get_current_applicant, get_current_principal, ge
 from app.main import create_app
 from app.modules.auth.principal import Applicant
 from app.modules.files.models import Attachment
-from app.modules.files.router import get_files_service
+from app.modules.files.router import PREVIEW_CSP, get_files_service
 from app.modules.files.schemas import AttachmentOut, SignedUrlOut
 from app.modules.files.service import FilesService
 from app.settings import load_settings
@@ -25,6 +25,8 @@ ATT_ID = uuid4()
 
 class _FakeService:
     max_bytes = 10 * 1024 * 1024
+    # The sniffed type that `download_stream` reports for the stored file.
+    mime = "application/pdf"
 
     def __init__(self) -> None:
         self.uploaded: list[tuple[UUID, str | None, int]] = []
@@ -81,7 +83,7 @@ class _FakeService:
             yield b"PDF-"
             yield b"BYTES"
 
-        return _iter(), "doc.pdf", "application/pdf", len(b"PDF-BYTES")
+        return _iter(), "doc.pdf", self.mime, len(b"PDF-BYTES")
 
     async def assert_editable(self, application_id: UUID) -> None:
         self.lock_checked.append(application_id)
@@ -280,6 +282,57 @@ def test_download_inline_renders_in_browser(app: FastAPI, client: TestClient) ->
     assert r.status_code == 200
     assert 'inline; filename="doc.pdf"' in r.headers["content-disposition"]
     assert r.headers["x-content-type-options"] == "nosniff"
+
+
+@pytest.mark.parametrize(
+    "mime", ["application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"]
+)
+def test_download_inline_preview_may_be_framed_by_same_origin(
+    app: FastAPI, client: TestClient, fake_service: _FakeService, mime: str
+) -> None:
+    # The preview dialog frames the file. Only 'self' may frame it, in a sandbox.
+    fake_service.mime = mime
+    _as(app, "application.read")
+    r = client.get(f"/api/attachments/{ATT_ID}/download?inline=1")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == mime
+    assert r.headers["content-disposition"].startswith("inline;")
+    assert r.headers.get_list("x-frame-options") == ["SAMEORIGIN"]
+    assert r.headers.get_list("content-security-policy") == [PREVIEW_CSP]
+    assert r.headers["x-content-type-options"] == "nosniff"
+
+
+def test_download_without_inline_keeps_frame_deny(app: FastAPI, client: TestClient) -> None:
+    _as(app, "application.read")
+    r = client.get(f"/api/attachments/{ATT_ID}/download")
+    assert r.headers.get_list("x-frame-options") == ["DENY"]
+    assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
+
+
+@pytest.mark.parametrize(
+    "mime",
+    [
+        "text/html",
+        "image/svg+xml",
+        "application/xml",
+        "text/xml",
+        "application/zip",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ],
+)
+def test_download_inline_refused_for_unsafe_types(
+    app: FastAPI, client: TestClient, fake_service: _FakeService, mime: str
+) -> None:
+    # Anything outside the PDF and raster-image allowlist stays a forced download that
+    # no page may frame, even with ?inline=1.
+    fake_service.mime = mime
+    _as(app, "application.read")
+    r = client.get(f"/api/attachments/{ATT_ID}/download?inline=1")
+    assert r.status_code == 200
+    assert r.headers["content-disposition"].startswith("attachment;")
+    assert r.headers.get_list("x-frame-options") == ["DENY"]
+    assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
+    assert "sandbox" not in r.headers["content-security-policy"]
 
 
 def test_download_cross_tenant_is_404(app: FastAPI, client: TestClient) -> None:

@@ -57,6 +57,12 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add the default API headers that the route did not set itself.
+
+    A route can replace a default on purpose: the inline attachment preview sets its
+    own CSP and ``X-Frame-Options: SAMEORIGIN`` (see `app.modules.files.router`).
+    """
+
     async def dispatch(self, request: Request, call_next: Dispatch) -> Response:
         response = await call_next(request)
         for key, value in _SECURITY_HEADERS.items():

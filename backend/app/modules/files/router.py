@@ -64,10 +64,27 @@ router = APIRouter(tags=["files"])
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 _CHUNK = 64 * 1024
 
-# Types the browser may render inline in the attachment preview. This is the upload
-# allowlist without anything scriptable. HTML and SVG never appear here, so there is no
-# stored-XSS vector.
-_INLINE_MIMES = frozenset({"application/pdf", "image/png", "image/jpeg"})
+# Types the browser may render inline in the attachment preview: PDF and raster images
+# from the upload allowlist. HTML, SVG and XML never appear here, so there is no
+# stored-XSS vector. Every other type stays a forced download.
+_INLINE_MIMES = frozenset(
+    {"application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"}
+)
+
+# Headers of an inline preview response. The preview dialog of the SPA shows the file in
+# an iframe of the same origin, so this one response may be framed by 'self' only. The
+# default API set (`X-Frame-Options: DENY`, `frame-ancestors 'none'`) would block the
+# frame. `sandbox` puts the document in a unique origin without scripts. The built-in PDF
+# viewers of Firefox (pdf.js) and Chromium still render with this policy. Every other
+# response keeps the default API set from `SecurityHeadersMiddleware`.
+PREVIEW_CSP = (
+    "default-src 'none'; frame-ancestors 'self'; base-uri 'none'; "
+    "form-action 'none'; sandbox"
+)
+_PREVIEW_HEADERS = {
+    "Content-Security-Policy": PREVIEW_CSP,
+    "X-Frame-Options": "SAMEORIGIN",
+}
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
@@ -312,6 +329,10 @@ async def download_attachment(
     Access works like in ``get_attachment_url``: A/P, and a cross-tenant caller gets 404,
     so the API is no existence oracle. ``Content-Disposition: attachment`` forces a
     download instead of an inline render.
+
+    With ``?inline=1`` and a PDF or raster image, the response is an inline preview. Only
+    that response may be framed, and only by the same origin (``PREVIEW_CSP``,
+    ``X-Frame-Options: SAMEORIGIN``).
     """
     if principal is None and applicant is None:
         raise UnauthorizedError("Authentication required.")
@@ -331,18 +352,20 @@ async def download_attachment(
         attachment_id, allow_unconfirmed=access.is_owning_applicant
     )
     # ``?inline=1`` renders the file in the browser preview dialog. This works only for
-    # the non-scriptable allowlist. Anything else stays a forced download.
-    kind = "inline" if inline and mime in _INLINE_MIMES else "attachment"
-    disposition = f'{kind}; filename="{_safe_disposition(filename)}"'
-    return StreamingResponse(
-        stream,
-        media_type=mime,
-        headers={
-            "Content-Disposition": disposition,
-            "Content-Length": str(size),
-            "X-Content-Type-Options": "nosniff",
-        },
-    )
+    # the non-scriptable allowlist. Anything else stays a forced download with the
+    # default API headers, which forbid framing.
+    preview = inline and mime in _INLINE_MIMES
+    kind = "inline" if preview else "attachment"
+    headers = {
+        "Content-Disposition": f'{kind}; filename="{_safe_disposition(filename)}"',
+        "Content-Length": str(size),
+        "X-Content-Type-Options": "nosniff",
+    }
+    if preview:
+        # The security middleware sets its defaults with `setdefault`, so these win.
+        headers.update(_PREVIEW_HEADERS)
+    # ``mime`` is the type that libmagic sniffed at upload, not the claim of the client.
+    return StreamingResponse(stream, media_type=mime, headers=headers)
 
 
 @router.delete(
