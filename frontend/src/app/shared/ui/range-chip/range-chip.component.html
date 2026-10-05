@@ -1,11 +1,12 @@
 <button
+  #trigger
   type="button"
   class="chip rc__chip"
   [class.on]="active()"
   aria-haspopup="dialog"
   [attr.aria-expanded]="open()"
   [title]="chipText()"
-  (click)="openSheet()"
+  (click)="toggle()"
 >
   @if (active()) {
     <app-icon name="check" [size]="15" />
@@ -16,7 +17,7 @@
   }
 </button>
 
-<app-side-sheet class="rc__sheet" [side]="side()" [heading]="label()" [(open)]="open">
+<ng-template #rangeForm>
   <div class="rc__form">
     <div class="rc__fields" role="group" [attr.aria-label]="label()">
       @if (kind() === 'amount') {
@@ -57,4 +58,27 @@
       }}</app-button>
     </div>
   </div>
+</ng-template>
+
+<!-- Desktop: a popover under the chip, with the look of the list of app-filter-select. It
+     sits in the top layer, so a chip row that scrolls or fades does not clip it. -->
+@if (popoverOpen()) {
+  <div
+    #pop
+    class="rc__pop"
+    popover="manual"
+    role="dialog"
+    tabindex="-1"
+    [attr.aria-label]="label()"
+    [style.top.px]="position().top"
+    [style.left.px]="position().left"
+    (keydown)="onPopKey($event)"
+  >
+    <ng-container [ngTemplateOutlet]="rangeForm" />
+  </div>
+}
+
+<!-- Phone: the shared bottom sheet, like the other filter sheets. -->
+<app-side-sheet class="rc__sheet" side="bottom" [heading]="label()" [open]="sheetOpen()" (openChange)="onSheetOpen($event)">
+  <ng-container [ngTemplateOutlet]="rangeForm" />
 </app-side-sheet>

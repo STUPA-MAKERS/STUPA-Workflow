@@ -125,6 +125,8 @@ export class ExpenseDialogsState {
 
   /** Called with the new booking after a create, so the page can open it. */
   onCreated: ((created: Expense) => void) | null = null;
+  /** Called with the saved booking after an edit, so the page can update its detail. */
+  onSaved: ((saved: Expense) => void) | null = null;
   /** Called with the booking after a delete, so the page can close its detail. */
   onDeleted: ((gone: Expense) => void) | null = null;
 
@@ -146,12 +148,25 @@ export class ExpenseDialogsState {
     return problemDetail(err) ?? this.i18n.translate('expenses.toast.failed');
   }
 
-  /** A booking marks its linked invoice paid, so refresh the open-invoice dropdown. */
+  /**
+   * A booking marks its linked invoice paid, so refresh the open-invoice dropdown.
+   *
+   * The list has a cap and can arrive after `preselectInvoice` loaded a single invoice.
+   * A picked invoice that the new rows do not contain stays in the cache, so the select
+   * keeps showing it.
+   */
   private loadInvoices(): void {
     this.api.listInvoices().subscribe({
-      next: (rows) => this.invoices.set(rows),
-      error: () => this.invoices.set([]),
+      next: (rows) => this.invoices.set(this.keepPicked(rows)),
+      error: () => this.invoices.set(this.keepPicked([])),
     });
+  }
+
+  /** `rows` plus the cached invoices of the two invoice fields that `rows` does not hold. */
+  private keepPicked(rows: Invoice[]): Invoice[] {
+    const picked = new Set([this.newInvoiceId(), this.editInvoiceId()].filter((id) => !!id));
+    const kept = this.invoices().filter((i) => picked.has(i.id) && !rows.some((r) => r.id === i.id));
+    return kept.length ? [...rows, ...kept] : rows;
   }
 
   /** Close every booking and transfer form. Only one form shows at a time. */
@@ -383,6 +398,7 @@ export class ExpenseDialogsState {
               parentExpenseId: e.parentExpenseId,
             };
             this.list.items.update((rows) => rows.map((x) => (x.id === merged.id ? merged : x)));
+            this.onSaved?.(merged);
           }
           this.toast.success(this.i18n.translate('expenses.toast.saved'));
           this.loadInvoices();

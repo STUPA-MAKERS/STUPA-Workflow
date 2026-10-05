@@ -128,6 +128,21 @@
   flex: 1 1 0;
   min-width: min(100%, 18rem);
 }
+/* On a phone the two columns become one. The sections then take the order of the Tel
+   boards: a section sets its place with --fd-phone-order (default 0 = the DOM order). */
+@include bp.phone {
+  .fd__cols {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+  }
+  .fd__col {
+    display: contents;
+  }
+  .fd__sec {
+    order: var(--fd-phone-order, 0);
+  }
+}
 .fd__sec {
   display: flex;
   flex-direction: column;
@@ -258,9 +273,27 @@
   font-weight: var(--fw-semibold);
   overflow-wrap: anywhere;
 }
+/* One line: only the cost-centre name shortens, with an ellipsis. The kind, the dots,
+   the swatch and the date keep their width. */
 .fd__linkMeta {
+  display: flex;
+  align-items: center;
+  min-width: 0;
   font-size: 0.8125rem;
   color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.fd__linkMeta > * {
+  flex: none;
+}
+.fd__linkMeta > .fd__linkCc {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fd__linkMeta .fd__swatch {
+  margin-inline-end: 6px;
 }
 .fd__linkAmount {
   flex: none;

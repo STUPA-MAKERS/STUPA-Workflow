@@ -1393,6 +1393,48 @@ describe('InvoicesComponent (list/detail)', () => {
     expect(c.selectedInvoice().status).toBe('paid');
   });
 
+  it('keeps the open invoice in the detail when "mark paid" drops it from "Eingang"', async () => {
+    const { c, http, fixture } = await setup({ queryParams: { id: 'i-1', seg: 'inbox' } });
+    expect(c.segment()).toBe('inbox');
+    expect(c.detailView()).toBe('invoice');
+    c.markPaid(c.selectedInvoice());
+    http
+      .expectOne((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'PATCH')
+      .flush(inv({ status: 'paid' }));
+    // The reload of the segment no longer holds the paid invoice.
+    lastInvoicesReq(http).flush(page([inv({ id: 'i-9' })]));
+    fixture.detectChanges();
+    expect(c.items().map((i: Invoice) => i.id)).toEqual(['i-9']);
+    expect(c.detailView()).toBe('invoice');
+    expect(c.selectedInvoice().status).toBe('paid');
+    // The kept copy is current: no request by id.
+    http.expectNone((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'GET');
+  });
+
+  it('loads the open invoice by its id when a filter change drops it from the list', async () => {
+    const { c, http, fixture } = await setup({ queryParams: { id: 'i-1' } });
+    c.setSegment('paid');
+    lastInvoicesReq(http).flush(page([inv({ id: 'i-9', status: 'paid' })]));
+    fixture.detectChanges();
+    http.expectOne((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'GET').flush(inv());
+    expect(c.detailView()).toBe('invoice');
+    expect(c.selectedInvoice().id).toBe('i-1');
+  });
+
+  it('closes an open form when the URL opens another row', async () => {
+    const { c } = await setup({ initial: [inv(), inv({ id: 'i-2' })] });
+    c.openEdit(c.items()[0]);
+    expect(c.detailView()).toBe('form');
+    c.adoptUrl(convertToParamMap({ id: 'i-2' }));
+    expect(c.formMode()).toBeNull();
+    expect(c.detailView()).toBe('invoice');
+    expect(c.selectedInvoice().id).toBe('i-2');
+    // A form opened on the open row stays while the URL keeps that row.
+    c.openEdit(c.items()[1]);
+    c.adoptUrl(convertToParamMap({ id: 'i-2' }));
+    expect(c.formMode()).toBe('edit');
+  });
+
   it('builds the row menu from the rights and runs every item', async () => {
     const { c, http } = await setup();
     const row = c.items()[0];

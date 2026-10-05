@@ -228,7 +228,24 @@
   margin-inline: 6px;
   color: var(--color-text-subtle);
 }
-/* Inline, so that a long name gets the ellipsis of the sub line. */
+/* The sub line is a flex row: only the cost-centre name shortens, with an ellipsis. The
+   kind, the dots, the date, the arrow and the receipt icon keep their width, so a long
+   name never pushes them out of the row. */
+.exp__sub {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.exp__sub > * {
+  flex: none;
+}
+.exp__sub > .exp__cc {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .exp__cc .exp__swatch {
   margin-inline-end: 6px;
   vertical-align: 0;

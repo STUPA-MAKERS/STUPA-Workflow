@@ -72,3 +72,18 @@
   font-size: var(--fs-lg);
   font-weight: var(--fw-bold, 700);
 }
+
+/* The order on a phone (board Fin-Tel-Rechnung): Beleg, Buchungen, Beträge, Angaben.
+   Side by side the two columns keep the desktop order. */
+.id__secFile {
+  --fd-phone-order: 1;
+}
+.id__secBookings {
+  --fd-phone-order: 2;
+}
+.id__secAmounts {
+  --fd-phone-order: 3;
+}
+.id__secData {
+  --fd-phone-order: 4;
+}

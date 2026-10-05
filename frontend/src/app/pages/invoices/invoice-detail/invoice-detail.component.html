@@ -64,7 +64,7 @@
 
   <div class="fd__cols">
     <div class="fd__col">
-      <section class="fd__sec" aria-labelledby="id-file">
+      <section class="fd__sec id__secFile" aria-labelledby="id-file">
         <h3 id="id-file" class="sec fd__secTitle">{{ 'invoices.detail.receipt' | t }}</h3>
         @if (i.hasFile) {
           <button type="button" class="fd__card id__file" (click)="openFile.emit()">
@@ -86,7 +86,7 @@
         }
       </section>
 
-      <section class="fd__sec" aria-labelledby="id-data">
+      <section class="fd__sec id__secData" aria-labelledby="id-data">
         <h3 id="id-data" class="sec fd__secTitle">{{ 'invoices.detail.data' | t }}</h3>
         <dl class="fd__card fd__grid">
           <div>
@@ -103,7 +103,7 @@
           </div>
           <div>
             <dt>{{ 'invoices.detail.createdAt' | t }}</dt>
-            <dd class="mono">{{ createdAt() }}</dd>
+            <dd class="mono">{{ i.createdAt | ldate: 'mediumDate' }}</dd>
           </div>
           <div class="id__full">
             <dt>{{ 'invoices.field.supplier' | t }}</dt>
@@ -120,7 +120,7 @@
     </div>
 
     <div class="fd__col">
-      <section class="fd__sec" aria-labelledby="id-amounts">
+      <section class="fd__sec id__secAmounts" aria-labelledby="id-amounts">
         <h3 id="id-amounts" class="sec fd__secTitle">{{ 'invoices.detail.amounts' | t }}</h3>
         <dl class="fd__card id__amounts">
           <div>
@@ -139,7 +139,7 @@
       </section>
 
       @if (i.linkedBookings !== undefined) {
-        <section class="fd__sec" aria-labelledby="id-bookings">
+        <section class="fd__sec id__secBookings" aria-labelledby="id-bookings">
           <div class="fd__secHead">
             <h3 id="id-bookings" class="sec fd__secTitle">
               {{ 'invoices.col.bookings' | t }}
@@ -161,12 +161,12 @@
                 <span class="fd__linkBody">
                   <span class="fd__linkTitle">{{ b.description }}</span>
                   <span class="fd__linkMeta">
-                    {{ (b.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}
+                    <span>{{ (b.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</span>
                     <span class="fd__dot" aria-hidden="true">·</span>
                     @if (c.color) {
                       <span class="fd__swatch" aria-hidden="true" [style.background]="c.color"></span>
                     }
-                    {{ c.name }}
+                    <span class="fd__linkCc" [title]="c.name">{{ c.name }}</span>
                     @if (day(b.paymentDate); as d) {
                       <span class="fd__dot" aria-hidden="true">·</span><span class="mono">{{ d }}</span>
                     }

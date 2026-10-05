@@ -14,6 +14,28 @@
   pointer-events: none;
 }
 
+/* The popover of a wide screen: the look of the app-filter-select list (surface 3,
+   field radius, elevated shadow). Fixed to the viewport, under the chip and aligned to
+   its start. In the top layer the UA styles would centre it, so the reset comes first. */
+.rc__pop {
+  position: fixed;
+  inset: auto;
+  z-index: var(--z-dropdown);
+  width: min(26rem, calc(100vw - 16px));
+  max-height: min(24rem, calc(100vh - 16px));
+  margin: 0;
+  overflow-y: auto;
+  padding: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  box-shadow: var(--shadow-elevated);
+}
+.rc__pop:focus {
+  outline: none;
+}
+
 .rc__form {
   /* The fields sit on the sheet (surface 2): one step up, so they stand out from it. */
   --color-surface-sunken: var(--color-surface-3);
@@ -36,4 +58,8 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
+}
+/* In the popover (surface 3) the fields step up to surface 4. */
+.rc__pop .rc__form {
+  --color-surface-sunken: var(--color-surface-4);
 }

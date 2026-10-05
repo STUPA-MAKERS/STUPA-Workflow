@@ -68,8 +68,10 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+/* In the bottom sheet, the sheet body gives the side gutter. The form adds no second
+   gutter, so the fields go from 16px to 16px of a phone screen. */
 .ff--sheet .ff__body {
-  padding: var(--space-2) var(--space-5) var(--space-5);
+  padding: var(--space-2) 0 var(--space-5);
 }
 .ff__body.is-fade-start {
   -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--ff-fade));
@@ -430,7 +432,7 @@
   background: var(--color-surface-2);
 }
 .ff--sheet .ff__foot {
-  padding: var(--space-3) var(--space-5);
+  padding: var(--space-3) 0;
   border-radius: 0;
 }
 .ff__footEnd {

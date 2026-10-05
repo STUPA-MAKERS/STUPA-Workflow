@@ -94,9 +94,10 @@
               <div class="fd__subRow" role="listitem">
                 <span class="fd__subBody">
                   <span class="fd__subTitle ell" [title]="e.description">{{ e.description }}</span>
-                  <span class="fd__subMeta ell">
-                    {{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}
-                    <span class="fd__dot" aria-hidden="true">·</span>{{ cc.name }}
+                  <span class="fd__subMeta fd__linkMeta">
+                    <span>{{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</span>
+                    <span class="fd__dot" aria-hidden="true">·</span>
+                    <span class="fd__linkCc" [title]="cc.name">{{ cc.name }}</span>
                     @if (day(e.paymentDate ?? e.createdAt); as d) {
                       <span class="fd__dot" aria-hidden="true">·</span><span class="mono">{{ d }}</span>
                     }

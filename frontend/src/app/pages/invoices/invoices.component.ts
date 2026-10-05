@@ -427,10 +427,13 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
       );
     });
 
+    // The rows are tracked too: a reload can drop the open invoice from the list (for
+    // example after "Als bezahlt markieren" in "Eingang"). It then loads by its id.
     effect(() => {
       const id = this.selectedId();
       const loading = this.loading();
-      untracked(() => this.ensureSelected(id, loading));
+      const rows = this.items();
+      untracked(() => this.ensureSelected(id, loading, rows));
     });
     effect(() => {
       const inv = this.selectedInvoice();
@@ -477,6 +480,9 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     }
     const id = qp.get('id') ?? '';
     if (id !== this.selectedId()) {
+      // A click on another row while a form is open: the row replaces the form, so the
+      // highlighted row and the detail always agree.
+      if (id) this.closeForms();
       this.selectedId.set(id);
       this.selectedMissing.set(false);
     }
@@ -552,9 +558,10 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
       });
   }
 
-  /** Load the open invoice when it is not among the loaded rows (a deep link). */
-  private ensureSelected(id: string, loading: boolean): void {
-    if (!id || loading || this.items().some((i) => i.id === id)) return;
+  /** Load the open invoice when it is not among the loaded rows (a deep link, or a row
+   *  that a reload dropped). */
+  private ensureSelected(id: string, loading: boolean, rows: readonly Invoice[]): void {
+    if (!id || loading || rows.some((i) => i.id === id)) return;
     if (this.fetchedInvoice()?.id === id) return;
     this.api.getInvoice(id).subscribe({
       next: (inv) => {
@@ -892,9 +899,16 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     void this.router.navigate(['/expenses'], { queryParams: { new: 'booking', invoice: i.id } });
   }
 
+  /**
+   * Put a saved invoice into the list. The open invoice is also kept apart: a reload
+   * after a status change can drop its row from the segment, and the detail must still
+   * show it.
+   */
   private replaceRow(updated: Invoice): void {
     this.items.update((list) => list.map((x) => (x.id === updated.id ? { ...x, ...updated } : x)));
-    if (this.fetchedInvoice()?.id === updated.id) this.fetchedInvoice.set(updated);
+    if (updated.id === this.selectedId() || this.fetchedInvoice()?.id === updated.id) {
+      this.fetchedInvoice.set(updated);
+    }
   }
 
   askDelete(i: Invoice): void {

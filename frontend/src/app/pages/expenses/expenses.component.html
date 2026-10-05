@@ -200,13 +200,13 @@
                       linkQueryParamsHandling="merge"
                       [selected]="t.transferId === selectedTransferId()"
                     >
-                      <span sub>
+                      <span sub class="exp__sub">
                         <span class="mono">{{ day(t.paymentDate ?? t.createdAt) }}</span>
                         <span class="exp__dot" aria-hidden="true">·</span>
-                        <span class="exp__cc">@if (from.color) {<span class="exp__swatch" aria-hidden="true" [style.background]="from.color"></span>}{{ from.name }}</span>
+                        <span class="exp__cc" [title]="from.name">@if (from.color) {<span class="exp__swatch" aria-hidden="true" [style.background]="from.color"></span>}{{ from.name }}</span>
                         <app-icon class="exp__arrow" name="arrow" [size]="13" />
                         <span class="sr-only">{{ 'expenses.transfers.to' | t }}</span>
-                        <span class="exp__cc">@if (to.color) {<span class="exp__swatch" aria-hidden="true" [style.background]="to.color"></span>}{{ to.name }}</span>
+                        <span class="exp__cc" [title]="to.name">@if (to.color) {<span class="exp__swatch" aria-hidden="true" [style.background]="to.color"></span>}{{ to.name }}</span>
                       </span>
                       <span trail class="exp__trail">
                         <span class="mono exp__amount">{{ money(t.amount) }}</span>
@@ -273,12 +273,12 @@
                           (change)="toggleSelect(e.id, !isSelected(e.id))"
                         />
                       }
-                      <span sub>
+                      <span sub class="exp__sub">
                         <app-status-text [kind]="e.kind === 'income' ? 'accent' : 'muted'">{{
                           (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t
                         }}</app-status-text>
                         <span class="exp__dot" aria-hidden="true">·</span>
-                        <span class="exp__cc">@if (cc.color) {<span class="exp__swatch" aria-hidden="true" [style.background]="cc.color"></span>}{{ cc.name }}</span>
+                        <span class="exp__cc" [title]="cc.name">@if (cc.color) {<span class="exp__swatch" aria-hidden="true" [style.background]="cc.color"></span>}{{ cc.name }}</span>
                         @if (day(e.paymentDate ?? e.createdAt); as d) {
                           <span class="exp__dot" aria-hidden="true">·</span>
                           <span class="mono">{{ d }}</span>
@@ -330,7 +330,7 @@
         }
       </div>
 
-      @if (canManage() && !phone() && !selecting()) {
+      @if (canManage() && !phone() && !selecting() && formMode() === null) {
         <button type="button" class="exp__fab" (click)="tab() === 'transfers' ? openTransfer() : openCreate()">
           <app-icon [name]="tab() === 'transfers' ? 'repeat' : 'plus'" [size]="22" />
           {{ (tab() === 'transfers' ? 'expenses.transferNew' : 'expenses.add') | t }}

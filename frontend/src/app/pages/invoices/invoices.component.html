@@ -167,7 +167,8 @@
         }
       </div>
 
-      @if (canManage() && !phone()) {
+      <!-- The form in the detail has its own primary action, so the FAB hides while it is open. -->
+      @if (canManage() && !phone() && formMode() === null) {
         <button type="button" class="inv__fab" (click)="openCreate()">
           <app-icon name="plus" [size]="22" />
           {{ 'invoices.add' | t }}

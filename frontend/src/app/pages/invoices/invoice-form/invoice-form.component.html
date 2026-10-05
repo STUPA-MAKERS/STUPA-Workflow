@@ -66,7 +66,7 @@
             @if (edited.hasFile) {
               <button type="button" class="if__file if__file--open" (click)="h.openFile(edited)">
                 <app-icon class="if__fileIcon" name="file" [size]="20" />
-                <span class="if__fileName">{{ edited.fileName || ('invoices.openFile' | t) }}</span>
+                <span class="if__fileName" [title]="edited.fileName || ''">{{ edited.fileName || ('invoices.openFile' | t) }}</span>
                 <span class="if__fileSize">{{ 'invoices.openFile' | t }}</span>
               </button>
             } @else {

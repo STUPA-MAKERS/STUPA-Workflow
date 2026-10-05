@@ -207,8 +207,12 @@ export class ExpensesComponent implements OnDestroy {
   readonly selectedId = signal('');
   /** The transfer open in the detail (`?transfer=`). */
   readonly selectedTransferId = signal('');
-  /** The open booking when it is not among the loaded rows (a deep link). */
+  /** The open booking when it is not among the loaded rows (a deep link, or a row that
+   *  a refresh dropped from the filtered list). */
   private readonly fetchedExpense = signal<Expense | null>(null);
+  /** The open booking as the list showed it last. When a refresh drops the row, the
+   *  detail keeps this copy until the booking loads by its id. */
+  private seenRow: Expense | null = null;
   /** The open booking was asked for and does not exist (or is out of reach). */
   readonly selectedMissing = signal(false);
 
@@ -501,6 +505,12 @@ export class ExpensesComponent implements OnDestroy {
 
     // A new booking opens in the detail; a deleted one leaves it, with its form.
     this.dialogs.onCreated = (created) => this.openBooking(created.id);
+    // A saved booking that is open but not among the rows: keep its detail current.
+    this.dialogs.onSaved = (saved) => {
+      if (saved.id === this.selectedId() && !this.items().some((e) => e.id === saved.id)) {
+        this.fetchedExpense.set(saved);
+      }
+    };
     this.dialogs.onDeleted = (gone) => {
       this.dialogs.closeForms();
       if (!gone.parentExpenseId && gone.id === this.selectedId()) this.closeDetail();
@@ -521,10 +531,13 @@ export class ExpensesComponent implements OnDestroy {
 
     // The open booking: load what is not among the rows, its invoice, its application,
     // its sub-bookings and the label of its fiscal year.
+    // The rows are tracked too: a refresh after an edit or a bulk "Umbuchen" can move the
+    // open booking out of the filter. It then loads by its id.
     effect(() => {
       const id = this.selectedId();
       const loading = this.loading();
-      untracked(() => this.ensureSelected(id, loading));
+      const rows = this.items();
+      untracked(() => this.ensureSelected(id, loading, rows));
     });
     effect(() => {
       const e = this.selectedExpense();
@@ -593,12 +606,17 @@ export class ExpensesComponent implements OnDestroy {
     } else if (changed && view === 'transfers') {
       this.transfers.reload();
     }
+    // A click on another row while a form is open: the row replaces the form, so the
+    // highlighted row and the detail always agree.
     const id = qp.get('id') ?? '';
     if (id !== this.selectedId()) {
+      if (id) this.dialogs.closeForms();
       this.selectedId.set(id);
       this.selectedMissing.set(false);
     }
-    this.selectedTransferId.set(qp.get('transfer') ?? '');
+    const transferId = qp.get('transfer') ?? '';
+    if (transferId && transferId !== this.selectedTransferId()) this.dialogs.closeForms();
+    this.selectedTransferId.set(transferId);
     return changed;
   }
 
@@ -621,10 +639,22 @@ export class ExpensesComponent implements OnDestroy {
     });
   }
 
-  /** Load the open booking when it is not among the loaded rows (a deep link). */
-  private ensureSelected(id: string, loading: boolean): void {
-    if (!id || loading || this.items().some((e) => e.id === id)) return;
-    if (this.fetchedExpense()?.id === id) return;
+  /**
+   * Load the open booking when it is not among the loaded rows: a deep link, or a row
+   * that a refresh dropped (an edit or a bulk "Umbuchen" moved it out of the filter).
+   * A dropped row stays in the detail as the list showed it until the server answers.
+   */
+  private ensureSelected(id: string, loading: boolean, rows: readonly Expense[]): void {
+    if (!id || loading) return;
+    const row = rows.find((e) => e.id === id);
+    if (row) {
+      this.seenRow = row;
+      return;
+    }
+    const dropped = this.seenRow?.id === id ? this.seenRow : null;
+    this.seenRow = null;
+    if (dropped) this.fetchedExpense.set(dropped);
+    else if (this.fetchedExpense()?.id === id) return;
     this.api.listExpenses({ id: id as Uuid, limit: 1 }).subscribe({
       next: (page) => {
         if (this.selectedId() !== id) return;

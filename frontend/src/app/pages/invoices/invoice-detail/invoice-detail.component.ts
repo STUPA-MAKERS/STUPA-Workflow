@@ -114,14 +114,6 @@ export class InvoiceDetailComponent {
 
   protected readonly bookings = computed(() => this.invoice().linkedBookings ?? []);
 
-  protected readonly createdAt = computed(() =>
-    new Date(this.invoice().createdAt).toLocaleDateString(this.i18n.formatLocale(), {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }),
-  );
-
   protected readonly menu = computed<RowMenuSection[]>(() => {
     const i = this.invoice();
     const items: RowMenuItem[] = [];

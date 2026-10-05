@@ -1914,6 +1914,73 @@ describe('ExpensesComponent (query-param adoption)', () => {
     expect(cmp.selectedMissing()).toBe(true);
   });
 
+  it('keeps the open booking when a refresh drops it from the filtered list', () => {
+    const { cmp, http } = buildWithQuery([['id', 'e-1']]);
+    lst(cmp).items.set([EXPENSE]);
+    TestBed.tick();
+    // The row is among the loaded rows: no request by id.
+    http.expectNone((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-1');
+    // A bulk "Umbuchen" moved the booking out of the cost-centre filter.
+    lst(cmp).refresh();
+    flushList(http, page([]));
+    TestBed.tick();
+    // The detail keeps the row as the list showed it until the booking loads by its id.
+    expect(cmp.detailView()).toBe('booking');
+    expect(cmp.selectedExpense()?.budgetId).toBe('b-1');
+    http
+      .expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-1')
+      .flush(page([{ ...EXPENSE, budgetId: 'b-9' }]));
+    expect(cmp.detailView()).toBe('booking');
+    expect(cmp.selectedExpense()?.budgetId).toBe('b-9');
+  });
+
+  it('keeps a loaded booking of a deep link up to date after an edit', () => {
+    const { cmp, http } = buildWithQuery([['id', 'e-42']]);
+    TestBed.tick();
+    http
+      .expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-42')
+      .flush(page([{ ...EXPENSE, id: 'e-42' }]));
+    cmp.openEdit(cmp.selectedExpense()!);
+    dlg(cmp).editDescription.set('Neu');
+    cmp.saveEdit(new Event('submit'));
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/e-42') && r.method === 'PATCH')
+      .flush({ ...EXPENSE, id: 'e-42', description: 'Neu' });
+    expect(cmp.selectedExpense()?.description).toBe('Neu');
+  });
+
+  it('closes an open form when the URL opens another booking or transfer', () => {
+    const { cmp } = buildWithQuery([]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const adopt = (q: Record<string, string>) => (cmp as any).applyQueryParams(convertToParamMap(q));
+    cmp.openEdit(EXPENSE);
+    expect(cmp.formMode()).toBe('edit');
+    adopt({ id: 'e-2' });
+    expect(cmp.formMode()).toBeNull();
+    // A form on the open row stays while the URL keeps that row.
+    cmp.openEdit(EXPENSE);
+    adopt({ id: 'e-2' });
+    expect(cmp.formMode()).toBe('edit');
+    adopt({ transfer: 't-1' });
+    expect(cmp.formMode()).toBeNull();
+  });
+
+  it('keeps a preselected invoice when the invoice list arrives after it', () => {
+    const { cmp, http } = buildWithQuery([]);
+    dlg(cmp).openCreate({ invoiceId: 'inv-paid' });
+    http
+      .expectOne((r) => r.url.endsWith('/invoices/inv-paid'))
+      .flush({ ...INVOICE, id: 'inv-paid', number: 'RE-OLD', status: 'paid' });
+    // A later refresh of the capped list does not hold the paid invoice.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dlg(cmp) as any).loadInvoices();
+    http
+      .expectOne((r) => r.url.endsWith('/invoices') && r.method === 'GET')
+      .flush({ items: [INVOICE], total: 1, limit: 200, offset: 0 });
+    expect(dlg(cmp).newInvoiceId()).toBe('inv-paid');
+    expect(dlg(cmp).invoiceOptions().map((o) => o.value)).toEqual(['inv-paid', 'inv-1']);
+  });
+
   it('re-filters when the palette sends it here while it is already here', () => {
     // Same route, new query string: the router keeps this component. Reading the
     // snapshot once would leave the list showing the booking the reader came from, and

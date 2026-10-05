@@ -43,7 +43,7 @@
 
   <div class="fd__cols">
     <div class="fd__col">
-      <section class="fd__sec" aria-labelledby="bd-pay">
+      <section class="fd__sec bd__pay" aria-labelledby="bd-pay">
         <h3 id="bd-pay" class="sec fd__secTitle">{{ 'expenses.detail.payment' | t }}</h3>
         <dl class="fd__card fd__grid">
           <div>
@@ -74,7 +74,7 @@
       </section>
 
       @if (showSubs()) {
-        <section class="fd__sec" aria-labelledby="bd-subs">
+        <section class="fd__sec bd__subs" aria-labelledby="bd-subs">
           <div class="fd__secHead">
             <h3 id="bd-subs" class="sec fd__secTitle">
               {{ 'expenses.sub.title' | t }}
@@ -129,7 +129,7 @@
     </div>
 
     <div class="fd__col">
-      <section class="fd__sec" aria-labelledby="bd-details">
+      <section class="fd__sec bd__details" aria-labelledby="bd-details">
         <h3 id="bd-details" class="sec fd__secTitle">{{ 'expenses.detail.details' | t }}</h3>
         <dl class="fd__card fd__stack">
           <div>
@@ -164,7 +164,7 @@
       </section>
 
       @if (app() || inv()) {
-        <section class="fd__sec" aria-labelledby="bd-linked">
+        <section class="fd__sec bd__linked" aria-labelledby="bd-linked">
           <h3 id="bd-linked" class="sec fd__secTitle">{{ 'expenses.detail.linked' | t }}</h3>
           <div class="rowgroup">
             @if (app(); as a) {
@@ -224,7 +224,7 @@
         </section>
       }
 
-      <section class="fd__sec" aria-labelledby="bd-cc">
+      <section class="fd__sec bd__cc" aria-labelledby="bd-cc">
         <div class="fd__secHead">
           <h3 id="bd-cc" class="sec fd__secTitle">{{ 'expenses.field.costCentre' | t }}</h3>
           <a class="fd__secLink" routerLink="/budget" [queryParams]="budgetLink()">{{ 'expenses.detail.toBudget' | t }}</a>

@@ -151,9 +151,44 @@ describe('RangeChipComponent', () => {
     expect(host.applied.length).toBe(2);
   });
 
+  it('opens a popover under the chip on a wide screen, not a sheet', async () => {
+    const { chip, user } = await setup();
+    await user.click(chip());
+    expect(document.querySelector('.rc__pop')).not.toBeNull();
+    expect(document.querySelector('.ss--start')).toBeNull();
+    expect(screen.getByRole('dialog', { name: 'Betrag' }).classList.contains('rc__pop')).toBe(true);
+    // A second click on the chip closes it again.
+    await user.click(chip());
+    expect(document.querySelector('.rc__pop')).toBeNull();
+  });
+
+  it('closes the popover on Escape and on a click outside, and keeps the range', async () => {
+    const { chip, host, user, view } = await setup({ from: '10' });
+    await user.click(chip());
+    await user.keyboard('{Escape}');
+    expect(document.querySelector('.rc__pop')).toBeNull();
+    expect(document.activeElement).toBe(chip());
+
+    await user.click(chip());
+    document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    view.fixture.detectChanges();
+    expect(document.querySelector('.rc__pop')).toBeNull();
+    expect(host.applied).toEqual([]);
+  });
+
+  it('keeps the popover open on a click inside it', async () => {
+    const { chip, user, view } = await setup();
+    await user.click(chip());
+    const pop = document.querySelector('.rc__pop') as HTMLElement;
+    pop.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    view.fixture.detectChanges();
+    expect(document.querySelector('.rc__pop')).not.toBeNull();
+  });
+
   it('comes from the bottom on a phone', async () => {
     const { chip, user } = await setup({ phone: true });
     await user.click(chip());
     expect(document.querySelector('.ss--bottom')).not.toBeNull();
+    expect(document.querySelector('.rc__pop')).toBeNull();
   });
 });

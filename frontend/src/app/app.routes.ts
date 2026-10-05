@@ -259,7 +259,7 @@ export const routes: Routes = [
       },
       {
         path: 'invoices',
-        // Full width, as on the board: up to eleven columns.
+        // A list/detail page: the invoice list beside the detail of the open invoice.
         data: { title: 'nav.invoices', permission: BUDGET_PERMISSIONS, wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
