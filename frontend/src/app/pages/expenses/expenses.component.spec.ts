@@ -815,6 +815,24 @@ describe('ExpensesComponent (unit)', () => {
     expect(dlg(cmp).editAmount()).toBe('');
   });
 
+  it('onPickEditInvoice keeps the fields an invoice without data cannot fill', () => {
+    const bare = { ...INVOICE, id: 'inv-5', supplier: null, number: null, issueDate: null } as unknown as Invoice;
+    const undated = { ...INVOICE, id: 'inv-6', issueDate: null } as unknown as Invoice;
+    const { cmp } = build({ invoices: [bare, undated, INVOICE] });
+    // Invoices without a date sort after the dated one.
+    expect(dlg(cmp).invoiceOptions()[0].value).toBe('inv-1');
+    dlg(cmp).editCorrespondent.set('Alt');
+    dlg(cmp).editReferenceNumber.set('R-1');
+    dlg(cmp).editInvoiceDate.set('2026-01-01');
+    dlg(cmp).onPickEditInvoice('inv-5');
+    expect(dlg(cmp).editCorrespondent()).toBe('Alt');
+    expect(dlg(cmp).editReferenceNumber()).toBe('R-1');
+    expect(dlg(cmp).editInvoiceDate()).toBe('2026-01-01');
+    // A linked invoice that the list does not hold adds no option.
+    dlg(cmp).editInvoiceId.set('inv-gone');
+    expect(dlg(cmp).editInvoiceOptions().map((o) => o.value)).not.toContain('inv-gone');
+  });
+
   it('openEdit fills the edit form, coalescing null metadata to empty strings', () => {
     const { cmp } = build();
     const e: Expense = {

@@ -209,6 +209,19 @@ describe('ListItemComponent', () => {
     );
   });
 
+  it('adds no tooltip line for a cut sub line without text', async () => {
+    const view = await render(ListItemComponent, { inputs: { title: 'Lastenrad', sub: ' ' } });
+    const line = view.container.querySelector('.li__sub') as HTMLElement;
+    setWidths(line, 300, 120);
+    fireEvent.pointerEnter(view.container.querySelector('.li') as HTMLElement);
+    view.fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Lastenrad' })).toHaveAttribute('title', 'Lastenrad');
+    Object.defineProperty(line, 'textContent', { configurable: true, get: () => null });
+    fireEvent.pointerEnter(view.container.querySelector('.li') as HTMLElement);
+    view.fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Lastenrad' })).toHaveAttribute('title', 'Lastenrad');
+  });
+
   it('has no a11y violations', async () => {
     const { container } = await render(HostComponent);
     expect(await runAxe(container)).toHaveNoViolations();
