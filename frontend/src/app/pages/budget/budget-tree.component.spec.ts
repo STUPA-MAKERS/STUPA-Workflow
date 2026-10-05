@@ -735,6 +735,19 @@ describe('BudgetTreeComponent', () => {
     expect(c.addingChildOf()).toBeNull();
   });
 
+  it('moves the focus to the key field of the inline sub cost centre row', async () => {
+    const { fixture } = await setup();
+    const plus = screen.getByRole('button', { name: 'Unter-Kostenstelle anlegen: VS-Mittel' });
+    await userEvent.click(plus);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const form = document.querySelector('.bt__child');
+    expect(form).not.toBeNull();
+    const key = form!.querySelector('.bt__childKey input');
+    expect(key).not.toBeNull();
+    expect(document.activeElement).toBe(key);
+  });
+
   it('patchChild updates a single child-draft field', async () => {
     const { c } = await setup();
     c.patchChild('key', '40');

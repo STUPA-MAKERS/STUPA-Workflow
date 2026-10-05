@@ -3,6 +3,7 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  Injector,
   afterNextRender,
   computed,
   inject,
@@ -128,6 +129,7 @@ export class BudgetTreeComponent {
   private readonly auth = inject(AuthService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
 
   /** Phone: the toolbar actions go into the header menu, the rows into cards. */
   readonly phone = mediaQuerySignal(MEDIA.phone);
@@ -638,6 +640,17 @@ export class BudgetTreeComponent {
     });
     this.addingChildOf.set(node.id);
     this.childDraft.set({ key: '', name: '' });
+    // The row can stand far below the button, after a large subtree. Move the focus to
+    // its key field: the focus also scrolls the row into view inside the pane.
+    afterNextRender(() => this.focusChildKey(), { injector: this.injector });
+  }
+
+  /** Focus the key field of the inline row for a sub cost centre, when it shows. */
+  private focusChildKey(): void {
+    const input = this.host.nativeElement.querySelector<HTMLInputElement>('.bt__child .bt__childKey input');
+    if (!input) return;
+    input.focus();
+    input.scrollIntoView?.({ block: 'nearest' });
   }
 
   cancelAddChild(): void {

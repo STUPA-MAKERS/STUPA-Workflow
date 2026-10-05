@@ -56,7 +56,8 @@ const STUB_CFG: SiteConfig = {
 async function setupWithStub(api: Partial<Record<keyof AdminApiService, unknown>>) {
   const toast = { success: jest.fn(), error: jest.fn() };
   const fullApi = {
-    getSiteConfig: jest.fn(() => of(STUB_CFG)),
+    // A fresh draft per test: the editor changes the draft object in place.
+    getSiteConfig: jest.fn(() => of({ ...STUB_CFG, draft: emptyBranding() })),
     saveBrandingDraft: jest.fn(() => of({ ...STUB_CFG, hasDraftChanges: true })),
     activateBranding: jest.fn(() => of({ ...STUB_CFG, version: 4, hasDraftChanges: false })),
     listConfigRevisions: jest.fn(() => of([])),
@@ -397,6 +398,72 @@ describe('BrandingEditorComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     c.activate();
+    expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
+  });
+
+  it('saves unsaved edits before it activates, so the activation publishes the screen', async () => {
+    const calls: string[] = [];
+    const { api } = await setupWithStub({
+      saveBrandingDraft: jest.fn((d: Branding) => {
+        calls.push(`save:${d.freetexts.emailFooter.de}`);
+        return of({ ...STUB_CFG, hasDraftChanges: true });
+      }),
+      activateBranding: jest.fn(() => {
+        calls.push('activate');
+        return of({ ...STUB_CFG, version: 4, hasDraftChanges: false });
+      }),
+    });
+    const activate = screen.getByRole('button', { name: 'Entwurf aktivieren' });
+    expect(activate).toBeDisabled();
+
+    // Save once, then edit again: the server holds the older draft.
+    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'E-Mail-Fußzeile (DE)' }), 'Gruß');
+    expect(activate).toBeEnabled();
+
+    await userEvent.click(activate);
+    expect(calls).toEqual(['save:', 'save:Gruß', 'activate']);
+    expect(api.activateBranding).toHaveBeenCalledTimes(1);
+  });
+
+  it('activates without a second save when the screen holds no unsaved edits', async () => {
+    const { fixture, api } = await setupWithStub({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.saveDraft();
+    expect(c.dirty()).toBe(false);
+    c.activate();
+    expect(api.saveBrandingDraft).toHaveBeenCalledTimes(1);
+    expect(api.activateBranding).toHaveBeenCalledTimes(1);
+  });
+
+  it('enables the activate for local edits alone and blocks it for a bad link', async () => {
+    const { fixture, api, toast } = await setupWithStub({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    expect(c.canActivate()).toBe(false);
+    c.setAppName('appName', 'AStA');
+    expect(c.dirty()).toBe(true);
+    expect(c.canActivate()).toBe(true);
+    c.addLegalLink();
+    c.setUrl(c.draft().legalLinks[0], 'javascript:alert(1)');
+    expect(c.canActivate()).toBe(false);
+    c.activate();
+    expect(toast.error).toHaveBeenCalled();
+    expect(api.saveBrandingDraft).not.toHaveBeenCalled();
+    expect(api.activateBranding).not.toHaveBeenCalled();
+  });
+
+  it('keeps the edits unsaved when the save before the activate fails', async () => {
+    const { fixture, api, toast } = await setupWithStub({
+      saveBrandingDraft: jest.fn(() => throwError(() => new Error('boom'))),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.setAppName('appName', 'AStA');
+    c.activate();
+    expect(api.activateBranding).not.toHaveBeenCalled();
+    expect(c.dirty()).toBe(true);
     expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
   });
 

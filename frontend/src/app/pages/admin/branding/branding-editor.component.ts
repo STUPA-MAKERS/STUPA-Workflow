@@ -7,6 +7,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { switchMap } from 'rxjs';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -60,6 +61,10 @@ type FreetextKey = (typeof FREETEXTS)[number];
  * A link may carry `http:`, `https:` or `mailto:` only; another scheme blocks the save.
  * The version list below restores an older version. It works against
  * `/api/admin/site-config`.
+ *
+ * The page counts the local edits. When the screen holds edits that the server does not
+ * have yet, "Entwurf aktivieren" saves the draft first and activates it after that. Thus
+ * the activation publishes the draft that the preview shows.
  */
 @Component({
   selector: 'app-branding-editor',
@@ -94,6 +99,12 @@ export class BrandingEditorComponent {
   protected readonly version = signal(0);
   protected readonly hasDraftChanges = signal(false);
   protected readonly draft = signal<Branding | null>(null);
+  /** The count of local edits. `patch()` increments it. */
+  private readonly editRev = signal(0);
+  /** The edit count that the server has. A save, a load or an activate sets it. */
+  private readonly savedRev = signal(0);
+  /** The screen holds edits that are not saved yet. */
+  protected readonly dirty = computed(() => this.editRev() !== this.savedRev());
   /** The slot a file is dragged over, for the drop look. */
   protected readonly dropSlot = signal<LogoSlot | null>(null);
 
@@ -107,8 +118,13 @@ export class BrandingEditorComponent {
   /** Disallowed link URLs. Their scheme is not http, https or mailto. They block a save. */
   protected readonly linkErrors = computed(() => brandingLinkErrors(this.draft()));
 
-  /** Activate needs a saved draft with changes and valid links. */
-  protected readonly canActivate = computed(() => this.hasDraftChanges() && this.linkErrors().length === 0);
+  /**
+   * Activate needs valid links and a draft with changes, saved or local. With local
+   * edits, the activate saves the draft first.
+   */
+  protected readonly canActivate = computed(
+    () => (this.hasDraftChanges() || this.dirty()) && this.linkErrors().length === 0,
+  );
 
   /** Phone: the header keeps "Entwurf speichern"; the activate is in a menu. */
   protected readonly phone = mediaQuerySignal(MEDIA.phone);
@@ -138,7 +154,13 @@ export class BrandingEditorComponent {
       this.version.set(cfg.version);
       this.hasDraftChanges.set(cfg.hasDraftChanges);
       this.draft.set(cfg.draft);
+      this.markSaved(this.editRev());
     });
+  }
+
+  /** Record that the server has the draft up to the edit count `rev`. */
+  private markSaved(rev: number): void {
+    this.savedRev.set(rev);
   }
 
   protected setLang(value: string | null): void {
@@ -317,6 +339,7 @@ export class BrandingEditorComponent {
     if (!d) return;
     fn(d);
     this.draft.set({ ...d });
+    this.editRev.update((n) => n + 1);
   }
 
   protected saveDraft(): void {
@@ -326,21 +349,37 @@ export class BrandingEditorComponent {
       this.toast.error(this.i18n.translate('admin.brand.badUrl'));
       return;
     }
+    const rev = this.editRev();
     this.api.saveBrandingDraft(d).subscribe({
       next: (cfg) => {
         this.hasDraftChanges.set(cfg.hasDraftChanges);
+        this.markSaved(rev);
         this.toast.success(this.i18n.translate('admin.common.saved'));
       },
       error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
     });
   }
 
+  /**
+   * Activate the draft. When the screen holds unsaved edits, save the draft first, so
+   * that the activation publishes what the page shows.
+   */
   protected activate(): void {
-    this.api.activateBranding().subscribe({
+    const d = this.draft();
+    if (this.linkErrors().length > 0) {
+      this.toast.error(this.i18n.translate('admin.brand.badUrl'));
+      return;
+    }
+    const activate$ =
+      this.dirty() && d
+        ? this.api.saveBrandingDraft(d).pipe(switchMap(() => this.api.activateBranding()))
+        : this.api.activateBranding();
+    activate$.subscribe({
       next: (cfg) => {
         this.version.set(cfg.version);
         this.hasDraftChanges.set(cfg.hasDraftChanges);
         this.draft.set(cfg.draft);
+        this.markSaved(this.editRev());
         this.toast.success(this.i18n.translate('admin.brand.activated', { n: cfg.version }));
         this.history()?.reload();
       },

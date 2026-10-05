@@ -19,7 +19,7 @@
     <div class="br__meta">
       <p class="br__state">
         <span class="mono">{{ 'admin.brand.version' | t: { n: version() } }}</span>
-        @if (hasDraftChanges()) {
+        @if (hasDraftChanges() || dirty()) {
           <span class="br__dot" aria-hidden="true">·</span>
           <span class="br__dirty">{{ 'admin.brand.draftDirty' | t }}</span>
         }
