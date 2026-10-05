@@ -43,9 +43,9 @@ test('@gating Magic-Link bearbeiten → Flow-Transition → read-only', async ({
   const applicant = await browser.newContext();
   const ap = await applicant.newPage();
   await ap.goto(`/status?t=${token}&app=${appId}`);
-  await expect(ap.getByRole('heading', { name: 'Antragsstatus' })).toBeVisible();
-  await expect(ap.locator('ol.timeline')).toBeVisible();
-  await expect(ap.getByRole('button', { name: 'Änderungen speichern' })).toBeVisible();
+  await expect(ap.getByRole('heading', { level: 1, name: 'Magic-Link Antrag' })).toBeVisible();
+  await expect(ap.getByRole('heading', { name: 'Verlauf' })).toBeVisible();
+  await expect(ap.getByRole('button', { name: /Angaben bearbeiten/ })).toBeEnabled();
 
   // 3) Admin context: move the application to review with a flow transition.
   const admin = await browser.newContext({ storageState: ADMIN_STATE });
@@ -64,8 +64,8 @@ test('@gating Magic-Link bearbeiten → Flow-Transition → read-only', async ({
 
   // 4) The applicant loads again with the cookie session. The view is now read-only.
   await ap.goto(`/status?app=${appId}`);
-  await expect(ap.getByText('Gesperrt')).toBeVisible();
-  await expect(ap.getByRole('button', { name: 'Änderungen speichern' })).toHaveCount(0);
+  await expect(ap.getByText('Im aktuellen Status gesperrt')).toBeVisible();
+  await expect(ap.getByRole('button', { name: /Angaben bearbeiten/ })).toBeDisabled();
 
   await applicant.close();
   await admin.close();

@@ -1,941 +1,745 @@
-import { TestBed } from '@angular/core/testing';
+import { computed, signal } from '@angular/core';
 import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
-import { I18nService } from '@core/i18n/i18n.service';
-import { ToastService } from '@stupa-makers/ui-kit';
-import type { ApplicationType, EffectiveForm, FormFieldDef } from '@core/api/models';
+import type { ApplicationType, EffectiveForm, ProblemDetail } from '@core/api/models';
+import { BrandingService } from '@core/branding/branding.service';
 import { provideFormly } from '@shared/formly/formly.providers';
-import { ApplyWizardComponent } from './apply-wizard.component';
+import { ToastService } from '@stupa-makers/ui-kit';
+import { DRAFT_LAST_TYPE, DRAFT_PREFIX, ApplyWizardComponent } from './apply-wizard.component';
+import { DraftAttachmentsService, type DraftFile } from './draft-attachments.service';
+import { FormlyDraftFilesType } from './draft-files/formly-draft-files.type';
 
 const TYPES: ApplicationType[] = [
-  {
-    id: 't1',
-    name: 'Finanzantrag',
-    active: true,
-    hasBudget: true,
-    activeFormVersionId: 'v1',
-    key: null,
-    gremiumId: null,
-  },
+  { id: 't1', name: 'Förderantrag', active: true, hasBudget: true, activeFormVersionId: 'v1', key: null, gremiumId: null },
+  { id: 't2', name: 'Alt', active: false, hasBudget: false, activeFormVersionId: 'v2', key: null, gremiumId: null },
 ];
 
+/** A form with a PII section (IBAN plus its display text) and a file field. */
 const EFF: EffectiveForm = {
   applicationTypeId: 't1',
   formVersionId: 'v1',
+  hasBudget: true,
   sections: [
     {
-      key: 'main',
-      label: { de: 'Antrag' },
+      key: 'plan',
+      label: { de: 'Vorhaben' },
       fields: [
         { key: 'title', type: 'text', label: { de: 'Titel' }, required: true },
-        { key: 'needs_detail', type: 'checkbox', label: { de: 'Details nötig' } },
+        { key: 'needs', type: 'checkbox', label: { de: 'Details nötig' } },
         {
           key: 'detail',
           type: 'textarea',
-          label: { de: 'Detailangaben' },
+          label: { de: 'Details' },
           required: true,
-          visibleIf: { '==': [{ var: 'needs_detail' }, true] },
+          visibleIf: { '==': [{ var: 'needs' }, true] },
         },
-        { key: 'amount', type: 'currency', label: { de: 'Betrag' }, required: true, validation: { min: 0 } },
-        {
-          key: 'category',
-          type: 'select',
-          label: { de: 'Kategorie' },
-          options: [{ value: 'event', label: { de: 'Veranstaltung' } }],
-        },
-        {
-          key: 'tags',
-          type: 'multiselect',
-          label: { de: 'Tags' },
-          options: [{ value: 'a', label: { de: 'Alpha' } }],
-        },
-        { key: 'info', type: 'markdown', label: { de: 'Info' }, help: { de: 'Hinweis' } },
+        { key: 'receipt', type: 'file', label: { de: 'Beleg' } },
       ],
     },
     {
-      key: 'budget',
-      label: { de: 'Budget' },
-      fields: [{ key: 'cofunding', type: 'currency', label: { de: 'Eigenanteil' } }],
+      key: 'costs',
+      label: { de: 'Kosten' },
+      fields: [{ key: 'amount', type: 'currency', label: { de: 'Betrag' } }],
+    },
+    {
+      key: 'contact',
+      label: { de: 'Kontakt' },
+      fields: [
+        { key: 'note', type: 'markdown', label: { de: 'Hinweis' }, help: { de: 'Auszahlung' } },
+        { key: 'iban', type: 'iban', label: { de: 'IBAN' }, isPII: true, required: true },
+      ],
     },
   ],
 };
 
-function fakeApi(create = jest.fn(() => of({ applicationId: 'app-1' }))): Partial<ApiClient> {
+/** A form without PII and without files. */
+const PLAIN: EffectiveForm = {
+  applicationTypeId: 't1',
+  formVersionId: 'v1',
+  hasBudget: false,
+  sections: [
+    { key: 'main', label: { de: 'Antrag' }, fields: [{ key: 'title', type: 'text', label: { de: 'Titel' }, required: true }] },
+  ],
+};
+
+const PRINCIPAL = {
+  sub: 'u-7',
+  email: 'user@example.org',
+  display_name: 'Userin',
+  roles: [],
+  permissions: [],
+  groups: [],
+};
+
+function fakeDrafts(files: DraftFile[] = []) {
+  const list = signal<DraftFile[]>(files);
+  const usable = computed(() => list().filter((f) => !f.failed));
   return {
-    applicationTypes: () => of(TYPES),
-    effectiveForm: () => of(EFF),
+    files: list,
+    pending: signal([]),
+    busy: signal(false),
+    hasFailed: computed(() => list().some((f) => f.failed)),
+    usable,
+    limits: signal({ maxFileBytes: 10, maxDraftFiles: 20, maxDraftBytes: 50 }),
+    count: computed(() => usable().length),
+    bytes: computed(() => 0),
+    filesOf: (k: string | null) => list().filter((f) => f.fieldKey === k),
+    token: jest.fn(() => (list().length ? 'tok' : null)),
+    attachmentIds: jest.fn(() => usable().map((f) => f.id)),
+    markFailed: jest.fn((p: ProblemDetail | null) => {
+      const ids = (p?.errors ?? [])
+        .map((e) => /^attachmentIds\.(.+)$/.exec(e.field)?.[1])
+        .filter((x): x is string => !!x);
+      list.update((l) => l.map((f) => (ids.includes(f.id) ? { ...f, failed: true } : f)));
+      return ids;
+    }),
+    clear: jest.fn(),
+    discard: jest.fn(async () => undefined),
+    scopeToFields: jest.fn(async () => undefined),
+    upload: jest.fn(),
+    remove: jest.fn(),
+  };
+}
+
+function draft(id: string, fieldKey: string | null = null): DraftFile {
+  return {
+    id,
+    filename: `${id}.pdf`,
+    mime: 'application/pdf',
+    size: 1,
+    scanned: false,
+    isComparisonOffer: false,
+    scanState: 'scanning',
+    fieldKey,
+  };
+}
+
+interface SetupOpts {
+  form?: EffectiveForm;
+  loggedIn?: boolean;
+  create?: jest.Mock;
+  drafts?: ReturnType<typeof fakeDrafts>;
+  types?: () => ReturnType<ApiClient['applicationTypes']>;
+  effectiveForm?: () => ReturnType<ApiClient['effectiveForm']>;
+  freetexts?: Record<string, Record<string, string>>;
+}
+
+async function setup(opts: SetupOpts = {}) {
+  const create = opts.create ?? jest.fn(() => of({ applicationId: 'app-1' }));
+  const drafts = opts.drafts ?? fakeDrafts();
+  const toast = { error: jest.fn(), success: jest.fn(), show: jest.fn() };
+  const api: Partial<ApiClient> = {
+    applicationTypes: opts.types ?? (() => of(TYPES)),
+    effectiveForm: opts.effectiveForm ?? (() => of(opts.form ?? EFF)),
     createApplication: create as unknown as ApiClient['createApplication'],
-    // Anonymous session (no principal) — default path with contact step + Altcha.
-    me: (() => of(null)) as unknown as ApiClient['me'],
-    // Branding info below the type selection — empty in the test default.
-    publicSiteConfig: () => of({ version: 1, branding: null }),
+    me: (() => (opts.loggedIn ? of(PRINCIPAL) : throwError(() => ({ status: 401 })))) as unknown as ApiClient['me'],
+    altchaChallenge: () => of(null),
   };
-}
-
-async function setup(create?: jest.Mock) {
-  const view = await render(ApplyWizardComponent, {
-    providers: [
-      provideRouter([]),
-      provideFormly(),
-      { provide: ApiClient, useValue: fakeApi(create) },
-    ],
-  });
-  return view;
-}
-
-/** Render the wizard against a form of one section that holds `fields`. */
-async function setupFields(fields: FormFieldDef[]) {
-  const eff: EffectiveForm = {
-    ...EFF,
-    sections: [{ key: 'main', label: { de: 'Antrag' }, fields }],
+  const branding = {
+    freetexts: signal(opts.freetexts ?? {}),
+    attachmentLimits: signal({ maxFileBytes: 10, maxDraftFiles: 20, maxDraftBytes: 50 }),
   };
   const view = await render(ApplyWizardComponent, {
     providers: [
       provideRouter([]),
       provideFormly(),
-      { provide: ApiClient, useValue: { ...fakeApi(), effectiveForm: () => of(eff) } },
+      { provide: ApiClient, useValue: api },
+      { provide: BrandingService, useValue: branding },
+      { provide: ToastService, useValue: toast },
     ],
+    componentProviders: [{ provide: DraftAttachmentsService, useValue: drafts }],
   });
-  view.fixture.componentInstance.selectType('t1');
-  return view;
+  const router = view.fixture.debugElement.injector.get(Router);
+  const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+  const comp = view.fixture.componentInstance;
+  return { ...view, comp, create, drafts, toast, navigate };
 }
 
-/** Expected review output of a currency amount in the pinned DE locale. */
-const euro = (amount: number) =>
-  new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(amount);
+type Setup = Awaited<ReturnType<typeof setup>>;
 
-/** Expected review output of an ISO day in the pinned DE locale. */
-const day = (iso: string) =>
-  new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeZone: 'UTC' }).format(
-    new Date(`${iso}T00:00:00Z`),
-  );
+async function pickType(s: Setup) {
+  await userEvent.click(screen.getByRole('radio', { name: 'Förderantrag' }));
+  s.fixture.detectChanges();
+  await s.fixture.whenStable();
+}
 
-/** Like {@link setup}, but with a logged-in session (principal). */
-async function setupLoggedIn(create = jest.fn(() => of({ applicationId: 'app-1' }))) {
-  const api = {
-    ...fakeApi(create),
-    me: (() =>
-      of({
-        sub: 'u-7',
-        email: 'user@example.org',
-        display_name: 'Userin',
-        roles: [],
-        permissions: [],
-        groups: [],
-      })) as unknown as ApiClient['me'],
-  };
-  const view = await render(ApplyWizardComponent, {
-    providers: [provideRouter([]), provideFormly(), { provide: ApiClient, useValue: api }],
-  });
-  return { ...view, create };
+/** The Formly input of a label in the visible step. */
+function field(label: RegExp | string): HTMLInputElement {
+  return screen.getByLabelText(label) as HTMLInputElement;
+}
+
+async function toReview(s: Setup) {
+  await pickType(s);
+  s.comp.next();
+  s.fixture.detectChanges();
+  await userEvent.type(field(/Titel/), 'Party');
+  s.comp.next();
+  s.fixture.detectChanges();
+  await userEvent.type(screen.getByLabelText(/^E-Mail/), 'a@b.de');
+  await userEvent.type(screen.getByLabelText(/Name \(optional\)/), 'Erika');
+  await userEvent.type(field(/IBAN/), 'DE89370400440532013000');
+  s.comp.next();
+  s.fixture.detectChanges();
 }
 
 describe('ApplyWizardComponent', () => {
   beforeEach(() => {
+    localStorage.clear();
     sessionStorage.clear();
-    // Pin locale to DE — the German assertions below must hold regardless
-    // of the jsdom navigator language (en-US).
     localStorage.setItem('ap.locale', 'de');
+    window.scrollTo = jest.fn();
   });
-  afterEach(() => localStorage.clear());
-
-  it('renders the title and a single step before a type is chosen', async () => {
-    await setup();
-    expect(screen.getByRole('heading', { level: 1, name: /Antrag stellen/ })).toBeInTheDocument();
-    expect(screen.getByText('Finanzantrag')).toBeInTheDocument();
+  afterEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    jest.restoreAllMocks();
   });
 
-  it('builds the full step path once a type with its effective form is selected', async () => {
-    const { fixture } = await setup();
-    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    const comp = fixture.componentInstance;
-    expect(comp.effForm()).not.toBeNull();
-    // type + contact + 2 sections + review
-    expect(comp.steps().length).toBe(5);
+  it('shows the title, the guest lead and four steps before a type is chosen', async () => {
+    const s = await setup();
+    expect(screen.getByRole('heading', { level: 1, name: 'Antrag stellen' })).toBeInTheDocument();
+    expect(screen.getByText(/Ohne Konto/)).toBeInTheDocument();
+    const steps = screen.getByRole('list', { name: 'Antrags-Fortschritt' });
+    expect(steps.querySelectorAll('li')).toHaveLength(4);
+    expect(screen.getByText('Schritt 1 von 4')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Antragsart wählen' })).toBeInTheDocument();
+    // Only active types.
+    expect(screen.getAllByRole('radio')).toHaveLength(1);
+    // Next does nothing without a type.
+    s.comp.next();
+    expect(s.comp.activeIndex()).toBe(0);
+  });
+
+  it('names the type and the parts of each step once the form is in', async () => {
+    const s = await setup();
+    await pickType(s);
+    expect(s.comp.steps().map((x) => x.hint)).toEqual([
+      'Förderantrag',
+      'Vorhaben und Kosten',
+      'Name, E-Mail und IBAN',
+      'Zusammenfassung',
+    ]);
+    s.comp.next();
+    s.fixture.detectChanges();
+    expect(screen.getByText('Schritt 2 von 4 · Förderantrag')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Angaben zum Vorhaben' })).toBeInTheDocument();
+    // The PII field and its display text belong to "Kontakt", not to "Angaben".
+    const details = s.comp.detailsFields()[0].fieldGroup ?? [];
+    expect(details.map((f) => f.key).filter(Boolean)).toEqual(['title', 'needs', 'detail', 'receipt', 'amount']);
+    expect(details.find((f) => f.key === 'receipt')?.type).toBe(FormlyDraftFilesType);
+    expect(s.comp.piiFields()[0].fieldGroup?.map((f) => [f.key, f.className])).toEqual([
+      ['note', 'fe-full'],
+      ['iban', 'fe-half'],
+    ]);
   });
 
   it('reveals a conditional field when its visibleIf becomes true', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    comp.contactForm.setValue({ email: 'a@b.de', name: '' });
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → contact
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → main section
-
-    expect(screen.queryByLabelText(/Detailangaben/)).not.toBeInTheDocument();
-    await userEvent.click(screen.getByLabelText(/Details nötig/));
-    expect(screen.getByLabelText(/Detailangaben/)).toBeInTheDocument();
+    const s = await setup();
+    await pickType(s);
+    s.comp.next();
+    s.fixture.detectChanges();
+    expect(screen.queryByRole('textbox', { name: /^Details/ })).toBeNull();
+    await userEvent.click(screen.getByLabelText('Details nötig'));
+    s.fixture.detectChanges();
+    expect(await screen.findByRole('textbox', { name: /^Details/ })).toBeInTheDocument();
   });
 
-  it('walks through the wizard and submits with the collected data + altcha', async () => {
-    const create = jest.fn(() => of({ applicationId: 'app-1' }));
-    const { fixture } = await setup(create);
-    const comp = fixture.componentInstance;
-    const router = TestBed.inject(Router);
-    const navSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-
-    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    comp.contactForm.setValue({ email: 'antrag@stupa.de', name: 'Max' });
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → contact
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → main
-
-    await userEvent.type(screen.getByLabelText(/Titel/), 'Sommerfest');
-    await userEvent.type(screen.getByLabelText(/Betrag/), '500');
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → budget
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → review
-
-    expect(screen.getByText('Sommerfest')).toBeInTheDocument();
-
-    // A separate spec covers the Altcha widget, so feed the solution in directly.
-    comp.onAltchaSolved('sol');
-    fixture.detectChanges();
-    expect(comp.canSubmit()).toBe(true);
-
-    await userEvent.click(screen.getByRole('button', { name: /Antrag absenden/ }));
-
-    expect(create).toHaveBeenCalledTimes(1);
-    const payload = create.mock.calls[0][0] as {
-      typeId: string;
-      data: Record<string, unknown>;
-      applicantEmail: string;
-      altcha: string;
-    };
-    expect(payload.typeId).toBe('t1');
-    expect(payload.applicantEmail).toBe('antrag@stupa.de');
-    expect(payload.data['title']).toBe('Sommerfest');
-    expect(payload.altcha).toBe('sol');
-    expect(navSpy).toHaveBeenCalledWith(['/apply/confirmation'], { queryParams: { id: 'app-1' } });
+  it('blocks an invalid step with the errors and a toast', async () => {
+    const s = await setup();
+    await pickType(s);
+    s.comp.next();
+    s.comp.next();
+    expect(s.comp.currentStep()).toBe('details');
+    expect(s.toast.error).toHaveBeenCalledWith('Bitte prüfe die markierten Felder.');
+    await userEvent.type(field(/Titel/), 'Party');
+    s.comp.next();
+    expect(s.comp.currentStep()).toBe('contact');
+    // The contact step needs a valid e-mail.
+    s.comp.next();
+    expect(s.comp.currentStep()).toBe('contact');
+    await userEvent.type(screen.getByLabelText(/^E-Mail/), 'a@b.de');
+    // ... and the required IBAN.
+    s.comp.next();
+    expect(s.comp.currentStep()).toBe('contact');
   });
 
-  it('formats the review summary (boolean, option label, multiselect) and discards the draft', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    comp.model = { title: 'Fest', needs_detail: true, category: 'event', tags: ['a'] };
-    const rows = comp.summary();
-    const byLabel = (label: string) => rows.find((r) => r.label === label)?.value;
-    expect(byLabel('Titel')).toBe('Fest');
-    expect(byLabel('Details nötig')).toBe('Ja');
-    expect(byLabel('Kategorie')).toBe('Veranstaltung');
-    expect(byLabel('Tags')).toBe('Alpha');
-
-    comp.discardDraft();
-    expect(comp.model).toEqual({});
-    expect(comp.activeIndex()).toBe(0);
+  it('waits for running uploads before it leaves the details', async () => {
+    const drafts = fakeDrafts();
+    drafts.busy.set(true);
+    const s = await setup({ drafts });
+    await pickType(s);
+    s.comp.next();
+    s.comp.next();
+    expect(s.comp.currentStep()).toBe('details');
+    expect(s.toast.show).toHaveBeenCalledWith('Bitte warte, bis alle Dateien hochgeladen sind.');
   });
 
-  it('skips the contact step and Altcha for a logged-in user', async () => {
-    const { fixture, create } = await setupLoggedIn();
-    const comp = fixture.componentInstance;
-    const router = TestBed.inject(Router);
-    jest.spyOn(router, 'navigate').mockResolvedValue(true);
-
-    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    expect(comp.loggedIn()).toBe(true);
-    // type + 2 sections + review — NO contact step.
-    expect(comp.steps().length).toBe(4);
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → main directly
-
-    await userEvent.type(screen.getByLabelText(/Titel/), 'Sommerfest');
-    await userEvent.type(screen.getByLabelText(/Betrag/), '500');
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → budget
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → review
-
-    expect(comp.canSubmit()).toBe(true);
-    await userEvent.click(screen.getByRole('button', { name: /Antrag absenden/ }));
-
-    expect(create).toHaveBeenCalledTimes(1);
-    const payload = create.mock.calls[0][0] as { applicantEmail: string | null; altcha: string | null };
-    // The backend derives identity/Altcha → FE sends null.
-    expect(payload.applicantEmail).toBeNull();
-    expect(payload.altcha).toBeNull();
+  it('goes back by the button and by a done step, never forward by the stepper', async () => {
+    const s = await setup();
+    await pickType(s);
+    s.comp.next();
+    s.fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: /Antragsart/ }));
+    expect(s.comp.activeIndex()).toBe(0);
+    s.comp.goToStep(2);
+    expect(s.comp.activeIndex()).toBe(0);
+    s.comp.next();
+    s.comp.prev();
+    s.comp.prev();
+    expect(s.comp.activeIndex()).toBe(0);
   });
 
-  it('blocks advancing past an invalid contact step', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → contact
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // invalid email → stays
-    expect(comp.currentStep()).toBe('contact');
-  });
-
-  it('toasts when the application types fail to load', async () => {
-    const errSpy = jest.fn();
-    await render(ApplyWizardComponent, {
-      providers: [
-        provideRouter([]),
-        provideFormly(),
-        { provide: ToastService, useValue: { error: errSpy, success: jest.fn() } },
-        {
-          provide: ApiClient,
-          useValue: {
-            ...fakeApi(),
-            applicationTypes: () => throwError(() => new Error('boom')),
-          },
-        },
-      ],
+  it('reviews the answers, the applicant and the files, and submits with drafts and altcha', async () => {
+    const drafts = fakeDrafts([draft('d1'), draft('d2', 'receipt')]);
+    const s = await setup({ drafts });
+    await toReview(s);
+    expect(screen.getByRole('heading', { level: 2, name: 'Prüfen & absenden' })).toBeInTheDocument();
+    expect(screen.getByText('Party')).toBeInTheDocument();
+    expect(screen.getByText('Antragsteller:in')).toBeInTheDocument();
+    expect(screen.getByText('a@b.de')).toBeInTheDocument();
+    expect(screen.getByText('Erika')).toBeInTheDocument();
+    const review = document.querySelector('.wz__review') as HTMLElement;
+    expect(within(review).getByText('d1.pdf')).toBeInTheDocument();
+    // The model holds the file ids of the field; one of them is lost before the submit.
+    s.comp.model['receipt'] = ['d2', 'gone'];
+    // "Weiter" has no step after the review.
+    s.comp.next();
+    expect(s.comp.currentStep()).toBe('review');
+    const submit = screen.getByRole('button', { name: 'Antrag absenden' });
+    expect(submit.closest('app-button')?.querySelector('button')).toBeDisabled();
+    s.comp.onAltchaSolved('sol');
+    s.fixture.detectChanges();
+    s.comp.submit();
+    expect(s.create).toHaveBeenCalledTimes(1);
+    const payload = s.create.mock.calls[0][0];
+    expect(payload).toMatchObject({
+      typeId: 't1',
+      applicantEmail: 'a@b.de',
+      applicantName: 'Erika',
+      lang: 'de',
+      altcha: 'sol',
+      attachmentIds: ['d1', 'd2'],
+      draftToken: 'tok',
     });
-    expect(errSpy).toHaveBeenCalledWith('Antragsarten konnten nicht geladen werden.');
+    expect(payload.data).toMatchObject({ title: 'Party', iban: 'DE89370400440532013000', receipt: ['d2'] });
+    expect(drafts.clear).toHaveBeenCalled();
+    expect(s.navigate).toHaveBeenCalledWith(['/apply/confirmation'], { queryParams: { id: 'app-1' } });
+    expect(sessionStorage.getItem(`${DRAFT_PREFIX}t1`)).toBeNull();
+    expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBeNull();
   });
 
-  it('renders the configured apply info as markdown HTML', async () => {
-    const { fixture } = await render(ApplyWizardComponent, {
-      providers: [
-        provideRouter([]),
-        provideFormly(),
-        {
-          provide: ApiClient,
-          useValue: {
-            ...fakeApi(),
-            publicSiteConfig: () =>
-              of({
-                version: 1,
-                branding: { freetexts: { applyInfo: { de: '**Hallo** Welt' } } },
-              }),
-          },
-        },
-      ],
-    });
-    const html = fixture.componentInstance.applyInfoHtml();
-    expect(html).toContain('<strong>Hallo</strong>');
+  it('clears the autosave of every type on the submit', async () => {
+    sessionStorage.setItem(`${DRAFT_PREFIX}t9`, JSON.stringify({ v: 1, model: { title: 'Alt' } }));
+    sessionStorage.setItem('ap.other', 'keep');
+    const s = await setup({ form: PLAIN, loggedIn: true });
+    await waitFor(() => expect(s.comp.loggedIn()).toBe(true));
+    await pickType(s);
+    s.comp.next();
+    s.fixture.detectChanges();
+    await userEvent.type(field(/Titel/), 'X');
+    s.comp.persistDraft();
+    s.comp.next();
+    s.comp.submit();
+    expect(s.create).toHaveBeenCalled();
+    expect(sessionStorage.getItem(`${DRAFT_PREFIX}t9`)).toBeNull();
+    expect(sessionStorage.getItem(`${DRAFT_PREFIX}t1`)).toBeNull();
+    expect(sessionStorage.getItem('ap.other')).toBe('keep');
   });
 
-  it('yields empty apply-info HTML when no branding text is configured', async () => {
-    const { fixture } = await setup();
-    // Default fakeApi → branding: null → applyInfo signal stays null → empty html.
-    expect(fixture.componentInstance.applyInfoHtml()).toBe('');
-  });
-
-  it('toasts when the effective form fails to load and clears the loading flag', async () => {
-    const errSpy = jest.fn();
-    const { fixture } = await render(ApplyWizardComponent, {
-      providers: [
-        provideRouter([]),
-        provideFormly(),
-        { provide: ToastService, useValue: { error: errSpy, success: jest.fn() } },
-        {
-          provide: ApiClient,
-          useValue: {
-            ...fakeApi(),
-            effectiveForm: () => throwError(() => new Error('nope')),
-          },
-        },
-      ],
-    });
-    const comp = fixture.componentInstance;
-    comp.selectType('t1');
-    expect(errSpy).toHaveBeenCalledWith('Formular konnte nicht geladen werden.');
-    expect(comp.loadingForm()).toBe(false);
-    expect(comp.effForm()).toBeNull();
-  });
-
-  it('ignores selecting the already-active type (no reload)', async () => {
-    const eff = jest.fn(() => of(EFF));
-    const { fixture } = await render(ApplyWizardComponent, {
-      providers: [
-        provideRouter([]),
-        provideFormly(),
-        {
-          provide: ApiClient,
-          useValue: { ...fakeApi(), effectiveForm: eff as unknown as ApiClient['effectiveForm'] },
-        },
-      ],
-    });
-    const comp = fixture.componentInstance;
-    comp.selectType('t1');
-    expect(eff).toHaveBeenCalledTimes(1);
-    comp.selectType('t1'); // same id → guarded
-    expect(eff).toHaveBeenCalledTimes(1);
-  });
-
-  it('blocks advancing past an invalid form section', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    comp.contactForm.setValue({ email: 'a@b.de', name: '' });
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → contact
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → main section
-    expect(comp.currentStep()).toBe('section');
-    // Required title/amount empty → section invalid → stays.
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ }));
-    expect(comp.currentStep()).toBe('section');
-    expect(comp.activeIndex()).toBe(2);
-  });
-
-  it('navigates back with prev() and clamps at zero', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    comp.contactForm.setValue({ email: 'a@b.de', name: '' });
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → contact (idx 1)
-    expect(comp.activeIndex()).toBe(1);
-    comp.prev();
-    expect(comp.activeIndex()).toBe(0);
-    comp.prev(); // clamps
-    expect(comp.activeIndex()).toBe(0);
-  });
-
-  it('prev() persists nothing when no type (draftKey null) is selected', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    // No type chosen → draftKey() null → persistDraft early-returns.
-    expect(() => comp.prev()).not.toThrow();
-    expect(sessionStorage.length).toBe(0);
-  });
-
-  it('does not advance from the type step without a chosen type', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    comp.next(); // no type selected → guarded
-    expect(comp.activeIndex()).toBe(0);
-  });
-
-  it('marks altcha as not required when the widget reports it unavailable', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    expect(comp.altchaRequired()).toBe(true);
-    comp.onAltchaUnavailable();
-    expect(comp.altchaRequired()).toBe(false);
-  });
-
-  it('toasts the backend problem detail when the submit fails', async () => {
-    const errSpy = jest.fn();
-    const create = jest.fn(() =>
-      throwError(() => ({ error: { detail: 'Topf erschöpft' } })),
-    );
-    const { fixture } = await render(ApplyWizardComponent, {
-      providers: [
-        provideRouter([]),
-        provideFormly(),
-        { provide: ToastService, useValue: { error: errSpy, success: jest.fn() } },
-        {
-          provide: ApiClient,
-          useValue: {
-            ...fakeApi(create),
-            createApplication: create as unknown as ApiClient['createApplication'],
-          },
-        },
-      ],
-    });
-    const comp = fixture.componentInstance;
-    comp.selectType('t1');
-    comp.contactForm.setValue({ email: 'a@b.de', name: '' });
-    comp.model = { title: 'X', amount: 5 };
-    comp.onAltchaSolved('sol');
-    comp.submit();
-    expect(create).toHaveBeenCalledTimes(1);
-    expect(errSpy).toHaveBeenCalledWith('Topf erschöpft');
-    expect(comp.submitting()).toBe(false);
-  });
-
-  it('falls back to a generic submit-error toast without a problem detail', async () => {
-    const errSpy = jest.fn();
-    const create = jest.fn(() => throwError(() => ({})));
-    const { fixture } = await render(ApplyWizardComponent, {
-      providers: [
-        provideRouter([]),
-        provideFormly(),
-        { provide: ToastService, useValue: { error: errSpy, success: jest.fn() } },
-        {
-          provide: ApiClient,
-          useValue: {
-            ...fakeApi(create),
-            createApplication: create as unknown as ApiClient['createApplication'],
-          },
-        },
-      ],
-    });
-    const comp = fixture.componentInstance;
-    comp.selectType('t1');
-    comp.contactForm.setValue({ email: 'a@b.de', name: '' });
-    comp.onAltchaSolved('sol');
-    comp.submit();
-    expect(errSpy).toHaveBeenCalledWith('Antrag konnte nicht gesendet werden.');
-  });
-
-  it('does not submit when canSubmit is false or already submitting', async () => {
-    const create = jest.fn(() => of({ applicationId: 'app-1' }));
-    const { fixture } = await setup(create);
-    const comp = fixture.componentInstance;
-    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    // canSubmit false: contact invalid + no altcha.
-    expect(comp.canSubmit()).toBe(false);
-    comp.submit();
-    expect(create).not.toHaveBeenCalled();
-
-    // Check the submitting guard: set the flag, then submit must bail.
-    comp.contactForm.setValue({ email: 'a@b.de', name: '' });
-    comp.model = { title: 'X' };
-    comp.onAltchaSolved('sol');
-    comp.submitting.set(true);
-    comp.submit();
-    expect(create).not.toHaveBeenCalled();
-  });
-
-  it('persists a draft to sessionStorage on navigation', async () => {
-    const create = jest.fn(() => of({ applicationId: 'app-1' }));
-    const { fixture } = await setup(create);
-    const comp = fixture.componentInstance;
-    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    comp.contactForm.setValue({ email: 'draft@b.de', name: 'Erika' });
-    comp.model = { title: 'Entwurf' };
-    comp.next(); // persistDraft → writes to sessionStorage
-
-    const raw = sessionStorage.getItem('ap.draft.t1');
-    expect(raw).toBeTruthy();
-    const parsed = JSON.parse(raw as string);
-    expect(parsed.model.title).toBe('Entwurf');
-    expect(parsed.contact.email).toBe('draft@b.de');
-  });
-
-  it('restores a previously persisted draft when its type loads', async () => {
-    sessionStorage.setItem(
-      'ap.draft.t1',
-      JSON.stringify({
-        model: { title: 'Entwurf' },
-        contact: { email: 'draft@b.de', name: 'Erika' },
-        activeIndex: 1,
-      }),
-    );
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    comp.selectType('t1'); // loadForm → restoreDraft
-    expect(comp.model['title']).toBe('Entwurf');
-    expect(comp.contactForm.controls.email.value).toBe('draft@b.de');
-    expect(comp.contactForm.controls.name.value).toBe('Erika');
-    // The saved step is restored, not reset to 0.
-    expect(comp.activeIndex()).toBe(1);
-  });
-
-  it('clamps a restored activeIndex into the valid step range (AUD-038)', async () => {
-    sessionStorage.setItem(
-      'ap.draft.t1',
-      JSON.stringify({ model: { title: 'X' }, activeIndex: 999 }),
-    );
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    comp.selectType('t1');
-    // type + contact + 2 sections + review = 5 steps → max index 4.
-    expect(comp.steps().length).toBe(5);
-    expect(comp.activeIndex()).toBe(4);
-  });
-
-  it('ignores a non-numeric restored activeIndex (AUD-038)', async () => {
-    sessionStorage.setItem(
-      'ap.draft.t1',
-      JSON.stringify({ model: { title: 'X' }, activeIndex: 'nope' }),
-    );
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    comp.selectType('t1');
-    expect(comp.activeIndex()).toBe(0);
-  });
-
-  it('ignores a corrupt draft payload without throwing', async () => {
-    sessionStorage.setItem('ap.draft.t1', '{not valid json');
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    expect(() => comp.selectType('t1')).not.toThrow();
-    expect(comp.model).toEqual({});
-  });
-
-  it('restores a draft that contains no model or contact (partial payload)', async () => {
-    sessionStorage.setItem('ap.draft.t1', JSON.stringify({ activeIndex: 1 }));
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    comp.selectType('t1');
-    expect(comp.model).toEqual({});
-    expect(comp.contactForm.controls.email.value).toBe('');
-    // The step is restored even with missing model/contact.
-    expect(comp.activeIndex()).toBe(1);
-  });
-
-  it('restores a contact-only draft and defaults the missing name to empty', async () => {
-    sessionStorage.setItem(
-      'ap.draft.t1',
-      JSON.stringify({ contact: { email: 'only@mail.de' } }), // no name field
-    );
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    comp.selectType('t1');
-    expect(comp.contactForm.controls.email.value).toBe('only@mail.de');
-    expect(comp.contactForm.controls.name.value).toBe('');
-  });
-
-  it('survives a sessionStorage.getItem that throws while restoring', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    const spy = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-      throw new Error('blocked');
-    });
-    expect(() => comp.selectType('t1')).not.toThrow();
-    expect(comp.model).toEqual({});
-    spy.mockRestore();
-  });
-
-  it('survives a sessionStorage.setItem that throws while persisting', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    const spy = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('quota');
-    });
-    expect(() => comp.next()).not.toThrow();
-    spy.mockRestore();
-  });
-
-  it('tolerates a failing public site-config request (#18 best-effort)', async () => {
-    const { fixture } = await render(ApplyWizardComponent, {
-      providers: [
-        provideRouter([]),
-        provideFormly(),
-        {
-          provide: ApiClient,
-          useValue: {
-            ...fakeApi(),
-            publicSiteConfig: () => throwError(() => new Error('offline')),
-          },
-        },
-      ],
-    });
-    // applyInfo never set → empty html, no crash.
-    expect(fixture.componentInstance.applyInfoHtml()).toBe('');
-  });
-
-  it('summarises cost positions as count + preferred-offer sum', async () => {
-    const eff: EffectiveForm = {
-      ...EFF,
+  it('gives a file field its draft files back after a reload, so a required field passes', async () => {
+    const required: EffectiveForm = {
+      ...PLAIN,
       sections: [
         {
           key: 'main',
           label: { de: 'Antrag' },
-          fields: [{ key: 'kosten', type: 'positions', label: { de: 'Kosten' } }],
+          fields: [
+            { key: 'title', type: 'text', label: { de: 'Titel' }, required: true },
+            { key: 'receipt', type: 'file', label: { de: 'Beleg' }, required: true },
+          ],
         },
       ],
     };
-    const { fixture } = await render(ApplyWizardComponent, {
-      providers: [
-        provideRouter([]),
-        provideFormly(),
-        { provide: ApiClient, useValue: { ...fakeApi(), effectiveForm: () => of(eff) } },
-      ],
+    // The tab reloaded: the autosave (without the file field) and the draft files are back.
+    sessionStorage.setItem(DRAFT_LAST_TYPE, 't1');
+    sessionStorage.setItem(`${DRAFT_PREFIX}t1`, JSON.stringify({ v: 1, model: { title: 'X' }, step: 'details' }));
+    const lost = { ...draft('d3', 'receipt'), failed: true };
+    const drafts = fakeDrafts([draft('d1'), draft('d2', 'receipt'), lost]);
+    const s = await setup({ form: required, loggedIn: true, drafts });
+    await waitFor(() => expect(s.comp.currentStep()).toBe('details'));
+    s.fixture.detectChanges();
+    expect(drafts.scopeToFields).toHaveBeenCalledWith(new Set(['receipt']));
+    expect(s.comp.model['receipt']).toEqual(['d2']);
+    expect(s.comp.detailsForm.get('receipt')?.value).toEqual(['d2']);
+    s.comp.next();
+    expect(s.comp.currentStep()).toBe('review');
+  });
+
+  it('submits without a solution when ALTCHA is off, and without drafts no token', async () => {
+    const s = await setup({ form: PLAIN });
+    await pickType(s);
+    s.comp.next();
+    s.fixture.detectChanges();
+    await userEvent.type(field(/Titel/), 'X');
+    s.comp.next();
+    s.fixture.detectChanges();
+    await userEvent.type(screen.getByLabelText(/^E-Mail/), 'a@b.de');
+    s.comp.next();
+    s.fixture.detectChanges();
+    expect(s.comp.canSubmit()).toBe(false);
+    s.comp.onAltchaUnavailable();
+    s.comp.submit();
+    expect(s.create.mock.calls[0][0]).toMatchObject({
+      altcha: null,
+      applicantName: null,
+      attachmentIds: [],
+      draftToken: null,
     });
-    const comp = fixture.componentInstance;
-    comp.selectType('t1');
-    comp.model = {
-      kosten: [
-        { label: 'Zelt', offers: [{ value: 120, preferred: true }, { value: 150 }] },
-        { label: 'Musik', offers: [{ value: 80, preferred: true }] },
-        { label: 'Ohne', offers: [] },
-        { label: 'KeineOffers' }, // offers undefined → `?? []` branch + preferred value `?? 0`
-      ],
-    };
-    const rows = comp.summary();
-    const kosten = rows.find((r) => r.label === 'Kosten')?.value ?? '';
-    expect(kosten).toMatch(/4 Kostenpositionen/);
-    expect(kosten).toMatch(/200/);
   });
 
-  it('treats a non-array positions value as empty in the summary', async () => {
-    const eff: EffectiveForm = {
-      ...EFF,
-      sections: [
-        {
-          key: 'main',
-          label: { de: 'Antrag' },
-          fields: [{ key: 'kosten', type: 'positions', label: { de: 'Kosten' } }],
-        },
-      ],
-    };
-    const { fixture } = await render(ApplyWizardComponent, {
-      providers: [
-        provideRouter([]),
-        provideFormly(),
-        { provide: ApiClient, useValue: { ...fakeApi(), effectiveForm: () => of(eff) } },
-      ],
-    });
-    const comp = fixture.componentInstance;
-    comp.selectType('t1');
-    comp.model = { kosten: 'not-an-array' };
-    // A non-array value yields '' from formatPositions, so the summary drops the row.
-    expect(comp.summary().some((r) => r.label === 'Kosten')).toBe(false);
+  it('skips the contact step for a signed-in user without PII fields', async () => {
+    const s = await setup({ form: PLAIN, loggedIn: true });
+    await waitFor(() => expect(s.comp.stepKeys()).toEqual(['type', 'details', 'review']));
+    expect(screen.getByText(/mit deinem Konto/)).toBeInTheDocument();
+    await pickType(s);
+    s.comp.next();
+    s.fixture.detectChanges();
+    await userEvent.type(field(/Titel/), 'X');
+    s.comp.next();
+    s.fixture.detectChanges();
+    expect(s.comp.currentStep()).toBe('review');
+    expect(screen.queryByRole('button', { name: /kein Roboter/ })).toBeNull();
+    expect(screen.getByText('user@example.org')).toBeInTheDocument();
+    s.comp.submit();
+    expect(s.create.mock.calls[0][0]).toMatchObject({ applicantEmail: null, applicantName: null, altcha: null });
   });
 
-  it('renders unknown option values via their raw string in the summary', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    // The category field has only the option event. An unknown value falls back to the raw string.
-    comp.model = { category: 'unknown-value', tags: ['x', 'a'] };
-    const rows = comp.summary();
-    expect(rows.find((r) => r.label === 'Kategorie')?.value).toBe('unknown-value');
-    // multiselect: 'x' unknown → raw, 'a' → 'Alpha'.
-    expect(rows.find((r) => r.label === 'Tags')?.value).toBe('x, Alpha');
+  it('shows the account and the PII fields in the contact step of a signed-in user', async () => {
+    const s = await setup({ loggedIn: true });
+    await waitFor(() => expect(s.comp.loggedIn()).toBe(true));
+    await pickType(s);
+    expect(s.comp.stepKeys()).toHaveLength(4);
+    expect(s.comp.steps()[2].hint).toBe('IBAN');
+    s.comp.next();
+    s.fixture.detectChanges();
+    await userEvent.type(field(/Titel/), 'X');
+    s.comp.next();
+    s.fixture.detectChanges();
+    expect(screen.getByText('Dein Konto')).toBeInTheDocument();
+    expect(screen.getAllByText('Userin').length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText(/^E-Mail/)).toBeNull();
   });
 
-  it('renders a false boolean as "Nein" in the summary', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    comp.model = { needs_detail: false };
-    expect(comp.summary().find((r) => r.label === 'Details nötig')?.value).toBe('Nein');
-  });
-
-  it('returns an empty summary before any form is loaded', async () => {
-    const { fixture } = await setup();
-    // No type selected → effForm null → buildSummary short-circuits.
-    expect(fixture.componentInstance.summary()).toEqual([]);
-  });
-
-  it('currentSection is null when the active index points past the sections', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    comp.activeIndex.set(99); // beyond the section range
-    expect(comp.currentSection()).toBeNull();
-  });
-
-  it('exposes the contact email as the review email for anonymous users', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    comp.contactForm.controls.email.setValue('anon@mail.de');
-    expect(comp.reviewEmail()).toBe('anon@mail.de');
-  });
-
-  it('exposes the account email as the review email when logged in', async () => {
-    const { fixture } = await setupLoggedIn();
-    expect(fixture.componentInstance.reviewEmail()).toBe('user@example.org');
-  });
-
-  it('falls back to the display name when the logged-in principal has no email', async () => {
-    const api = {
-      ...fakeApi(),
-      me: (() =>
-        of({
-          sub: 'u-9',
-          email: undefined, // nullish → ?? falls back to display name
-          display_name: 'Namensträgerin',
-          roles: [],
-          permissions: [],
-          groups: [],
-        })) as unknown as ApiClient['me'],
-    };
-    const { fixture } = await render(ApplyWizardComponent, {
-      providers: [provideRouter([]), provideFormly(), { provide: ApiClient, useValue: api }],
-    });
-    expect(fixture.componentInstance.reviewEmail()).toBe('Namensträgerin');
-  });
-
-  it('does not submit a logged-in user when no type is chosen (typeId guard)', async () => {
-    const create = jest.fn(() => of({ applicationId: 'app-1' }));
-    const { fixture } = await setupLoggedIn(create);
-    const comp = fixture.componentInstance;
-    // Logged in + no sections + no contact/altcha → canSubmit true, but no typeId.
-    expect(comp.canSubmit()).toBe(true);
-    comp.submit();
-    expect(create).not.toHaveBeenCalled();
-  });
-
-
-  it('discardDraft is a no-op for clearing when no type is selected', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    // No type → draftKey() null → clearDraft returns early. The state still resets.
-    expect(() => comp.discardDraft()).not.toThrow();
-    expect(comp.model).toEqual({});
-    expect(comp.activeIndex()).toBe(0);
-  });
-
-  it('restores a draft whose contact entry omits the email field', async () => {
-    sessionStorage.setItem(
-      'ap.draft.t1',
-      JSON.stringify({ contact: { name: 'Nur Name' } }), // no email field
+  it('falls back to the display name when the account has no e-mail', async () => {
+    const s = await setup({ loggedIn: true });
+    await waitFor(() => expect(s.comp.loggedIn()).toBe(true));
+    const auth = s.fixture.debugElement.injector.get(
+      (await import('@core/auth/auth.service')).AuthService,
     );
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    comp.selectType('t1');
-    expect(comp.contactForm.controls.email.value).toBe('');
-    expect(comp.contactForm.controls.name.value).toBe('Nur Name');
-  });
-
-  it('survives a sessionStorage.removeItem that throws while clearing', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    comp.selectType('t1'); // sets typeId → clearDraft has a key
-    const spy = jest.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
-      throw new Error('locked');
+    (auth as unknown as { _principal: { set(v: unknown): void } })._principal.set({
+      ...PRINCIPAL,
+      email: null,
     });
-    expect(() => comp.discardDraft()).not.toThrow();
-    spy.mockRestore();
+    expect(s.comp.reviewEmail()).toBe('Userin');
   });
 
-  it('updates the review summary after an edit that follows the first review', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    comp.contactForm.setValue({ email: 'a@b.de', name: '' });
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → contact
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → main
-    await userEvent.type(screen.getByLabelText(/Titel/), 'Sommerfest');
-    await userEvent.type(screen.getByLabelText(/Betrag/), '500');
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → budget
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → review
-    expect(comp.summary().find((r) => r.label === 'Titel')?.value).toBe('Sommerfest');
-
-    // Back to the first section, change the title, forward to the review again.
-    await userEvent.click(screen.getByRole('button', { name: /Zurück/ })); // → budget
-    await userEvent.click(screen.getByRole('button', { name: /Zurück/ })); // → main
-    await userEvent.clear(screen.getByLabelText(/Titel/));
-    await userEvent.type(screen.getByLabelText(/Titel/), 'Winterfest');
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → budget
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → review
-
-    // The summary must show what the payload sends, not the first-visit snapshot.
-    expect(comp.model['title']).toBe('Winterfest');
-    expect(comp.summary().find((r) => r.label === 'Titel')?.value).toBe('Winterfest');
-    expect(screen.getByText('Winterfest')).toBeInTheDocument();
-  });
-
-  it('shows a field first filled after the review was open', async () => {
-    const { fixture } = await setup();
-    const comp = fixture.componentInstance;
-    await userEvent.click(screen.getByRole('radio', { name: /Finanzantrag/ }));
-    comp.contactForm.setValue({ email: 'a@b.de', name: '' });
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → contact
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → main
-    await userEvent.type(screen.getByLabelText(/Titel/), 'Fest');
-    await userEvent.type(screen.getByLabelText(/Betrag/), '500');
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → budget
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → review
-    expect(comp.summary().some((r) => r.label === 'Kategorie')).toBe(false);
-
-    await userEvent.click(screen.getByRole('button', { name: /Zurück/ })); // → budget
-    await userEvent.click(screen.getByRole('button', { name: /Zurück/ })); // → main
-    await userEvent.selectOptions(screen.getByLabelText(/Kategorie/), 'event');
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → budget
-    await userEvent.click(screen.getByRole('button', { name: /Weiter/ })); // → review
-
-    expect(comp.summary().find((r) => r.label === 'Kategorie')?.value).toBe('Veranstaltung');
-  });
-
-  it('formats currency, date and date-range values in the review summary', async () => {
-    const { fixture } = await setupFields([
-      { key: 'amount', type: 'currency', label: { de: 'Betrag' } },
-      { key: 'day', type: 'date', label: { de: 'Termin' } },
-      { key: 'span', type: 'daterange', label: { de: 'Zeitraum' } },
-    ]);
-    const comp = fixture.componentInstance;
-    // The currency control stores a canonical decimal string, not a number.
-    comp.model = {
-      amount: '4200',
-      day: '2026-07-01',
-      span: { from: '2026-07-01', to: '2026-07-05' },
+  it('sends lost files back to the details step', async () => {
+    const drafts = fakeDrafts([draft('d1', 'receipt'), draft('d2')]);
+    const problem = {
+      code: 'draft_attachments_missing',
+      errors: [{ field: 'attachmentIds.d1', msg: 'missing' }],
     };
-    const rows = comp.summary();
-    const byLabel = (label: string) => rows.find((r) => r.label === label)?.value;
-    expect(byLabel('Betrag')).toBe(euro(4200));
-    expect(byLabel('Termin')).toBe(day('2026-07-01'));
-    expect(byLabel('Zeitraum')).toBe(`${day('2026-07-01')} – ${day('2026-07-05')}`);
+    const create = jest.fn(() => throwError(() => ({ status: 422, error: problem })));
+    const s = await setup({ drafts, create });
+    await toReview(s);
+    s.comp.model['receipt'] = ['d1'];
+    s.comp.model['other'] = 'x';
+    s.comp.onAltchaSolved('sol');
+    s.comp.submit();
+    expect(drafts.markFailed).toHaveBeenCalledWith(problem);
+    expect(s.comp.currentStep()).toBe('details');
+    expect(s.comp.model['receipt']).toBeNull();
+    expect(s.toast.error).toHaveBeenCalledWith(
+      'Einige Dateien sind nicht mehr vorhanden. Bitte lade sie neu hoch.',
+    );
+    // A new solution is needed for the next submit.
+    expect(s.comp.altchaSolution()).toBeNull();
+    expect(s.comp.altchaRound()).toBe(1);
   });
 
-  it('reads a date day-first in the review summary when the UI is English', async () => {
-    const { fixture } = await setupFields([
-      { key: 'amount', type: 'currency', label: { de: 'Betrag' } },
-      { key: 'day', type: 'date', label: { de: 'Termin' } },
-      { key: 'span', type: 'daterange', label: { de: 'Zeitraum' } },
+  it('puts a 422 on the PII field and opens the contact step', async () => {
+    const problem = { code: 'validation_error', errors: [{ field: 'iban', msg: 'invalid IBAN' }] };
+    const create = jest.fn(() => throwError(() => ({ status: 422, error: problem })));
+    const s = await setup({ create });
+    await toReview(s);
+    s.comp.onAltchaSolved('sol');
+    s.comp.submit();
+    expect(s.comp.currentStep()).toBe('contact');
+    expect(s.toast.error).toHaveBeenCalledWith('Bitte prüfe die markierten Felder.');
+  });
+
+  it('puts a 422 on a details field and opens the details step', async () => {
+    const problem = { code: 'x', errors: [{ field: 'title', msg: 'too long' }] };
+    const create = jest.fn(() => throwError(() => ({ status: 422, error: problem })));
+    const s = await setup({ create });
+    await toReview(s);
+    s.comp.onAltchaSolved('sol');
+    s.comp.submit();
+    expect(s.comp.currentStep()).toBe('details');
+  });
+
+  it('toasts the problem of a 422 it cannot place, and other errors', async () => {
+    const create = jest
+      .fn()
+      .mockReturnValueOnce(throwError(() => ({ status: 422, error: { code: 'x', detail: 'Nope.' } })))
+      .mockReturnValueOnce(throwError(() => ({ status: 422, error: null })))
+      .mockReturnValueOnce(throwError(() => ({ status: 500, error: { detail: 'Server kaputt.' } })))
+      .mockReturnValueOnce(throwError(() => ({ status: 0 })));
+    const s = await setup({ create });
+    await toReview(s);
+    for (let i = 0; i < 4; i++) {
+      s.comp.onAltchaSolved(`sol${i}`);
+      s.comp.submit();
+    }
+    expect(s.toast.error.mock.calls.map((c) => c[0])).toEqual([
+      'Nope.',
+      'Antrag konnte nicht gesendet werden.',
+      'Server kaputt.',
+      'Antrag konnte nicht gesendet werden.',
     ]);
-    const comp = fixture.componentInstance;
-    const i18n = fixture.debugElement.injector.get(I18nService);
-    i18n.setLocale('en');
+    expect(s.comp.submitting()).toBe(false);
+  });
+
+  it('does not submit when it cannot or while it submits', async () => {
+    const s = await setup();
+    s.comp.submit();
+    expect(s.create).not.toHaveBeenCalled();
+    await toReview(s);
+    s.comp.onAltchaSolved('sol');
+    s.comp.submitting.set(true);
+    s.comp.submit();
+    expect(s.create).not.toHaveBeenCalled();
+    s.comp.submitting.set(false);
+    s.comp.typeId.set(null);
+    s.comp.submit();
+    expect(s.create).not.toHaveBeenCalled();
+  });
+
+  it('autosaves the answers without contact, PII and file fields', async () => {
+    const s = await setup();
+    await toReview(s);
+    s.comp.model['receipt'] = ['d1'];
+    s.comp.persistDraft();
+    const stored = JSON.parse(sessionStorage.getItem(`${DRAFT_PREFIX}t1`) as string);
+    expect(stored).toEqual({ v: 1, model: { title: 'Party' }, step: 'review' });
+    expect(JSON.stringify(stored)).not.toContain('a@b.de');
+    expect(JSON.stringify(stored)).not.toContain('Erika');
+    expect(JSON.stringify(stored)).not.toContain('DE89');
+    expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBe('t1');
+    s.fixture.detectChanges();
+    expect(screen.getByText('Entwurf in diesem Tab gespeichert')).toBeInTheDocument();
+    // Nothing of the draft goes into localStorage (only the language is there).
+    expect(Object.keys(localStorage)).toEqual(['ap.locale']);
+  });
+
+  it('writes the autosave a short time after a change', async () => {
+    jest.useFakeTimers();
     try {
-      comp.model = {
-        amount: '1500',
-        day: '2026-07-01',
-        span: { from: '2026-07-01', to: '2026-07-02' },
-      };
-      const rows = comp.summary();
-      const byLabel = (label: string) => rows.find((r) => r.label === label)?.value;
-      // 1 July, not 7 January.
-      expect(byLabel('Termin')).toBe('1 Jul 2026');
-      expect(byLabel('Zeitraum')).toBe('1 Jul 2026 \u2013 2 Jul 2026');
-      // EUR under en-GB keeps the English amount format. Only the date order moves.
-      expect(byLabel('Betrag')).toBe('\u20ac1,500.00');
+      const s = await setup({ form: PLAIN });
+      s.comp.selectType('t1');
+      s.fixture.detectChanges();
+      s.comp.model['title'] = 'Neu';
+      s.comp.activeIndex.set(1);
+      s.fixture.detectChanges();
+      jest.advanceTimersByTime(500);
+      expect(JSON.parse(sessionStorage.getItem(`${DRAFT_PREFIX}t1`) as string).model).toEqual({ title: 'Neu' });
     } finally {
-      i18n.setLocale('de');
+      jest.useRealTimers();
     }
   });
 
-  it('formats a numeric currency value and a half-filled date range', async () => {
-    const { fixture } = await setupFields([
-      { key: 'amount', type: 'currency', label: { de: 'Betrag' } },
-      { key: 'from_only', type: 'daterange', label: { de: 'Ab' } },
-      { key: 'to_only', type: 'daterange', label: { de: 'Bis' } },
-      { key: 'empty_span', type: 'daterange', label: { de: 'Leer' } },
-    ]);
-    const comp = fixture.componentInstance;
-    comp.model = {
-      amount: 1234.5,
-      from_only: { from: '2026-07-01' },
-      to_only: { to: '2026-07-05' },
-      empty_span: {},
-    };
-    const rows = comp.summary();
-    const byLabel = (label: string) => rows.find((r) => r.label === label)?.value;
-    expect(byLabel('Betrag')).toBe(euro(1234.5));
-    expect(byLabel('Ab')).toBe(day('2026-07-01'));
-    expect(byLabel('Bis')).toBe(day('2026-07-05'));
-    // An empty range formats to '' → the summary drops the row.
-    expect(rows.some((r) => r.label === 'Leer')).toBe(false);
-  });
-
-  it('keeps unparsable currency, date and range values raw', async () => {
-    const { fixture } = await setupFields([
-      { key: 'amount', type: 'currency', label: { de: 'Betrag' } },
-      { key: 'day', type: 'date', label: { de: 'Termin' } },
-      { key: 'span', type: 'daterange', label: { de: 'Zeitraum' } },
-    ]);
-    const comp = fixture.componentInstance;
-    comp.model = { amount: 'k. A.', day: 'irgendwann', span: 'kein Objekt' };
-    const rows = comp.summary();
-    const byLabel = (label: string) => rows.find((r) => r.label === label)?.value;
-    expect(byLabel('Betrag')).toBe('k. A.');
-    expect(byLabel('Termin')).toBe('irgendwann');
-    expect(byLabel('Zeitraum')).toBe('kein Objekt');
-  });
-
-  it('formats a full timestamp in a date field', async () => {
-    const { fixture } = await setupFields([
-      { key: 'day', type: 'date', label: { de: 'Termin' } },
-    ]);
-    const comp = fixture.componentInstance;
-    comp.model = { day: '2026-07-01T10:30:00Z' };
-    expect(comp.summary().find((r) => r.label === 'Termin')?.value).toBe(day('2026-07-01'));
-  });
-
-  it('names the counted cost positions instead of the field caption', async () => {
-    const { fixture } = await setupFields([
-      { key: 'kosten', type: 'positions', label: { de: 'Kosten' } },
-    ]);
-    const comp = fixture.componentInstance;
-    comp.model = { kosten: [{ label: 'Zelt', offers: [{ value: 120, preferred: true }] }] };
-    const one = comp.summary().find((r) => r.label === 'Kosten')?.value ?? '';
-    expect(one).toContain('1 Kostenposition');
-    expect(one).not.toContain('Positionswert');
-    expect(one).toContain(euro(120));
-
-    comp.model = {
-      kosten: [
-        { label: 'Zelt', offers: [{ value: 120, preferred: true }] },
-        { label: 'Musik', offers: [{ value: 80, preferred: true }] },
-      ],
-    };
-    expect(comp.summary().find((r) => r.label === 'Kosten')?.value ?? '').toContain(
-      '2 Kostenpositionen',
+  it('restores the autosave of the last type, but not past an empty contact step', async () => {
+    sessionStorage.setItem(DRAFT_LAST_TYPE, 't1');
+    sessionStorage.setItem(
+      `${DRAFT_PREFIX}t1`,
+      JSON.stringify({ v: 1, model: { title: 'Gespeichert', iban: 'leak', receipt: ['x'] }, step: 'review' }),
     );
+    const s = await setup();
+    await waitFor(() => expect(s.comp.typeId()).toBe('t1'));
+    expect(s.comp.model['title']).toBe('Gespeichert');
+    expect(s.comp.model['iban']).toBeUndefined();
+    expect(s.comp.model['receipt']).toBeUndefined();
+    expect(s.comp.currentStep()).toBe('contact');
+    expect(s.comp.saved()).toBe(true);
+  });
+
+  it('restores the stored step of a signed-in user', async () => {
+    sessionStorage.setItem(DRAFT_LAST_TYPE, 't1');
+    sessionStorage.setItem(`${DRAFT_PREFIX}t1`, JSON.stringify({ v: 1, model: { title: 'X' }, step: 'review' }));
+    const s = await setup({ form: PLAIN, loggedIn: true });
+    await waitFor(() => expect(s.comp.currentStep()).toBe('review'));
+  });
+
+  it('ignores a broken autosave and an unknown last type', async () => {
+    sessionStorage.setItem(DRAFT_LAST_TYPE, 'unknown');
+    sessionStorage.setItem(`${DRAFT_PREFIX}t1`, '{broken');
+    const s = await setup();
+    expect(s.comp.typeId()).toBeNull();
+    await pickType(s);
+    expect(s.comp.activeIndex()).toBe(0);
+  });
+
+  it('ignores an autosave without answers and with an unknown step', async () => {
+    sessionStorage.setItem(`${DRAFT_PREFIX}t1`, JSON.stringify({ v: 1, step: 'nowhere' }));
+    const s = await setup();
+    s.comp.selectType('t1');
+    expect(s.comp.activeIndex()).toBe(0);
+    expect(s.comp.saved()).toBe(false);
+  });
+
+  it('keeps working when the storage throws', async () => {
+    jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    jest.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    const s = await setup({ form: PLAIN, loggedIn: true });
+    await waitFor(() => expect(s.comp.loggedIn()).toBe(true));
+    await pickType(s);
+    s.comp.next();
+    s.comp.persistDraft();
+    expect(s.comp.saved()).toBe(false);
+    s.fixture.detectChanges();
+    await userEvent.type(field(/Titel/), 'X');
+    s.comp.next();
+    s.comp.submit();
+    expect(s.create).toHaveBeenCalled();
+  });
+
+  it('does not autosave without a type', async () => {
+    const s = await setup();
+    s.comp.persistDraft();
+    expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBeNull();
+  });
+
+  it('discards the draft after the confirmation', async () => {
+    const drafts = fakeDrafts([draft('d1')]);
+    const s = await setup({ drafts });
+    await pickType(s);
+    s.comp.next();
+    s.fixture.detectChanges();
+    await userEvent.type(field(/Titel/), 'Weg');
+    s.comp.persistDraft();
+    await userEvent.click(screen.getAllByRole('button', { name: 'Entwurf verwerfen' })[0]);
+    expect(s.comp.confirmDiscard()).toBe(true);
+    s.fixture.detectChanges();
+    const dialogButtons = screen.getAllByRole('button', { name: 'Entwurf verwerfen' });
+    await userEvent.click(dialogButtons[dialogButtons.length - 1]);
+    await waitFor(() => expect(drafts.discard).toHaveBeenCalled());
+    expect(s.comp.model).toEqual({});
+    expect(s.comp.activeIndex()).toBe(0);
+    // The autosave effect runs after the discard: past its pause, it stores nothing.
+    s.fixture.detectChanges();
+    await new Promise((r) => setTimeout(r, 600));
+    expect(sessionStorage.getItem(`${DRAFT_PREFIX}t1`)).toBeNull();
+    expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBeNull();
+    expect(s.comp.saved()).toBe(false);
+    expect(screen.queryByText('Entwurf in diesem Tab gespeichert')).toBeNull();
+  });
+
+  it('stores no autosave for a type pick without an answer', async () => {
+    jest.useFakeTimers();
+    try {
+      const s = await setup({ form: PLAIN });
+      s.comp.selectType('t1');
+      s.fixture.detectChanges();
+      s.comp.model['title'] = '  ';
+      s.comp.model['list'] = [null, { a: '', b: false }];
+      s.comp.activeIndex.set(1);
+      s.fixture.detectChanges();
+      jest.advanceTimersByTime(500);
+      expect(sessionStorage.getItem(`${DRAFT_PREFIX}t1`)).toBeNull();
+      expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBeNull();
+      expect(s.comp.saved()).toBe(false);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('removes the autosave when the last answer goes, but keeps the last type of another', async () => {
+    const s = await setup({ form: PLAIN });
+    s.comp.selectType('t1');
+    s.comp.model['title'] = 'X';
+    s.comp.model['amount'] = 0;
+    s.comp.persistDraft();
+    expect(s.comp.saved()).toBe(true);
+    delete s.comp.model['amount'];
+    s.comp.model['title'] = '';
+    s.comp.persistDraft();
+    expect(sessionStorage.getItem(`${DRAFT_PREFIX}t1`)).toBeNull();
+    expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBeNull();
+    expect(s.comp.saved()).toBe(false);
+    sessionStorage.setItem(DRAFT_LAST_TYPE, 't9');
+    s.comp.persistDraft();
+    expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBe('t9');
+  });
+
+  it('keeps the draft when the confirmation is cancelled', async () => {
+    const s = await setup();
+    await pickType(s);
+    s.comp.confirmDiscard.set(true);
+    s.fixture.detectChanges();
+    await userEvent.click(screen.getAllByRole('button', { name: 'Abbrechen' })[0]);
+    expect(s.comp.confirmDiscard()).toBe(false);
+  });
+
+  it('discards without a loaded form', async () => {
+    const s = await setup();
+    await s.comp.discardDraft();
+    expect(s.comp.activeIndex()).toBe(0);
+  });
+
+  it('renders the configured apply info as Markdown', async () => {
+    const s = await setup({ freetexts: { applyInfo: { de: '**Frist:** 1. Mai' } } });
+    expect(s.comp.applyInfoHtml()).toContain('<strong>Frist:</strong>');
+    expect(screen.getByText('Frist:')).toBeInTheDocument();
+  });
+
+  it('toasts when the types fail to load', async () => {
+    const s = await setup({ types: () => throwError(() => new Error('x')) });
+    expect(s.toast.error).toHaveBeenCalledWith('Antragsarten konnten nicht geladen werden.');
+  });
+
+  it('toasts when the form fails to load', async () => {
+    const s = await setup({ effectiveForm: () => throwError(() => new Error('x')) });
+    s.comp.selectType('t1');
+    expect(s.toast.error).toHaveBeenCalledWith('Formular konnte nicht geladen werden.');
+    expect(s.comp.loadingForm()).toBe(false);
+  });
+
+  it('ignores a second pick of the same type', async () => {
+    const effectiveForm = jest.fn(() => of(PLAIN));
+    const s = await setup({ effectiveForm });
+    s.comp.selectType('t1');
+    s.comp.selectType('t1');
+    expect(effectiveForm).toHaveBeenCalledTimes(1);
+  });
+
+  it('names a single part without a list and a type without a name', async () => {
+    const s = await setup({ form: PLAIN, loggedIn: true });
+    await waitFor(() => expect(s.comp.loggedIn()).toBe(true));
+    s.comp.selectType('t1');
+    expect(s.comp.steps()[1].hint).toBe('Antrag');
+    s.comp.types.set([]);
+    expect(s.comp.steps()[0].hint).toBe('');
+    s.comp.activeIndex.set(1);
+    expect(s.comp.stepLine()).toBe('Schritt 2 von 3');
   });
 });

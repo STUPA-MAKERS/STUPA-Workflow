@@ -3,7 +3,7 @@
 * The defaults are 12 hours to confirm and links without an expiry.
 * The PUT needs `admin.deadlines`, validates the ranges and writes a `config_change`
   audit entry that the audit log cannot revert.
-* `GET /site-config` returns `confirmTtlHours`.
+* `GET /site-config` returns `confirmTtlHours`, `linkTtlDays` and the upload limits.
 * A new magic link gets `link_ttl_days`. NULL gives a link without an expiry.
 """
 
@@ -72,7 +72,10 @@ async def test_defaults_update_audit_and_public_ttl(
         assert got.status_code == 200, got.text
         assert got.json()["confirmTtlHours"] == 12
         assert got.json()["linkTtlDays"] is None
-        assert client.get("/api/site-config").json()["confirmTtlHours"] == 12
+        public = client.get("/api/site-config").json()
+        assert public["confirmTtlHours"] == 12
+        assert public["linkTtlDays"] is None
+        assert public["attachmentLimits"]["maxDraftFiles"] == 20
 
         put = client.put(
             "/api/admin/guest-settings", json={"confirmTtlHours": 48, "linkTtlDays": 30}
@@ -84,7 +87,9 @@ async def test_defaults_update_audit_and_public_ttl(
         assert body["updatedBy"] == "deadline-admin"
         assert body["updatedAt"] is not None
 
-        assert client.get("/api/site-config").json()["confirmTtlHours"] == 48
+        public = client.get("/api/site-config").json()
+        assert public["confirmTtlHours"] == 48
+        assert public["linkTtlDays"] == 30
         assert client.get("/api/admin/guest-settings").json()["linkTtlDays"] == 30
 
     # The audit entry holds the change. It has no revision, so it is not revertable.
@@ -177,4 +182,7 @@ async def test_routes_need_admin_deadlines(
     with _client(migrated, settings, monkeypatch, None) as client:
         assert client.get("/api/admin/guest-settings").status_code == 401
         # The public site config needs no login.
-        assert client.get("/api/site-config").json()["confirmTtlHours"] == 12
+        public = client.get("/api/site-config").json()
+        assert public["confirmTtlHours"] == 12
+        assert public["linkTtlDays"] is None
+        assert public["attachmentLimits"]["maxDraftFiles"] == 20

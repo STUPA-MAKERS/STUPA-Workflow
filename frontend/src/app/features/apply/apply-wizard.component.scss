@@ -1,149 +1,294 @@
-.wizard {
+@use 'breakpoints' as bp;
+
+:host {
+  display: block;
+}
+
+/* Board Antrag-stellen: the column with the stepper beside the sheet, centred. */
+.wz {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: var(--space-7);
+}
+.wz__aside {
+  position: sticky;
+  top: var(--space-5);
+  display: flex;
+  flex: 0 0 18.125rem; // 290px
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  padding-top: var(--space-2);
+}
+.wz__intro {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  max-width: 48rem;
-  margin: 0 auto;
+  gap: var(--space-2);
+  padding: 0 6px;
 }
-
-/* Configured markdown info text below the type selection. */
-.wizard__info {
-  margin-top: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-  background: var(--color-surface-sunken);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-
-  :first-child {
-    margin-top: 0;
-  }
-  :last-child {
-    margin-bottom: 0;
-  }
-}
-
-.type-option {
-  display: flex;
-  align-items: center;
-  padding: var(--space-4) var(--space-5);
-  text-align: left;
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font: inherit;
-  color: var(--color-text);
-  transition:
-    border-color var(--motion-fast) var(--ease-standard),
-    background-color var(--motion-fast) var(--ease-standard);
-}
-
-.type-option:hover {
-  border-color: var(--color-text-muted);
-}
-
-.type-option.is-selected {
-  border-color: var(--color-primary);
-  background: var(--color-primary-subtle);
-}
-
-:host ::ng-deep formly-form {
-  display: grid;
-  /* The margin and padding around the divider give the space between two questions
-     (see formly-field + formly-field). Do not add a grid gap here. A gap stacks with
-     the padding-top and makes the question look top-heavy. */
-  gap: 0;
-}
-
-:host ::ng-deep formly-field {
-  display: block;
-  /* Grid items default to `min-width: auto`. Without this rule, an over-wide field
-     such as a table stretches the whole column, and thus all fields, past the
-     viewport. */
-  min-width: 0;
-  max-width: 100%;
-  /* `overflow-x: hidden` would force `overflow-y` to `auto` (CSS spec) and clip the
-     focus ring at the top and the bottom. `clip` keeps the Y axis `visible`.
-     `overflow-clip-margin` gives the ring a little space sideways. */
-  overflow-x: clip;
-  overflow-clip-margin: var(--space-1);
-}
-
-/* Thin divider between two questions of a step. The margin on top and the padding
-   below give equal space on both sides of the divider. */
-:host ::ng-deep formly-field + formly-field {
-  margin-top: var(--space-5);
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--color-border);
-}
-
-.summary__row {
-  display: grid;
-  grid-template-columns: minmax(8rem, 14rem) 1fr;
-  gap: var(--space-4);
-  padding: var(--space-3) 0;
-  border-bottom: var(--border-width) solid var(--color-border);
-}
-
-.summary__row dt {
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-}
-
-.summary__row dd {
+.wz__title {
   margin: 0;
-  color: var(--color-text);
 }
-
-.wizard__nav {
+.wz__lead {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.25rem;
+}
+.wz__saved {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-top: var(--space-6);
-}
-
-.wizard__nav-left,
-.wizard__nav-right {
-  display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  margin: 0;
+  padding: 0 14px;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
 }
 
-@media (max-width: 40rem) {
-  .summary__row {
-    grid-template-columns: 1fr;
-    gap: var(--space-1);
-  }
+/* The sheet: surface 1 with the large radius; the bar of the actions at its foot. */
+.wz__sheet {
+  display: flex;
+  flex: 0 1 47.5rem; // 760px
+  flex-direction: column;
+  min-width: 0;
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.wz__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 28px 36px 0;
+}
+.wz__stepLine {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.wz__stepTitle {
+  margin: 0;
+}
+.wz__body {
+  padding: 20px 36px 28px;
+  min-width: 0;
+}
+.wz__step {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+.wz__step[hidden] {
+  display: none;
+}
 
-  .wizard__nav {
-    flex-direction: column-reverse;
+/* Step 1: the types as a group of radio rows. */
+.wz__types {
+  display: flex;
+  flex-direction: column;
+}
+.wz__type {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 3.5rem;
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-md);
+  text-align: start;
+  cursor: pointer;
+}
+.wz__type:hover {
+  background: var(--color-surface-3);
+}
+.wz__type.is-selected {
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.wz__radio {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 2px var(--color-border-strong);
+}
+.is-selected .wz__radio {
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+  background: radial-gradient(circle, var(--color-accent) 0 4px, transparent 4.5px);
+}
+.wz__typeName {
+  min-width: 0;
+  font-weight: var(--fw-medium);
+}
+.wz__empty {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.wz__info {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+.wz__info :first-child {
+  margin-top: 0;
+}
+.wz__info :last-child {
+  margin-bottom: 0;
+}
+
+.wz__files {
+  margin-top: var(--space-2);
+}
+.wz__hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+.wz__contact {
+  display: grid;
+  gap: var(--space-3);
+}
+.wz__pii {
+  margin-top: var(--space-2);
+}
+.wz__sec {
+  padding: 0 var(--space-1);
+}
+
+/* A heading over its row group, spaced like the sections of the answer view. */
+.wz__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.wz__fileList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wz__file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3rem;
+  padding: 6px var(--space-4);
+}
+.wz__fileIcon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.wz__fileName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The actions stay at the foot of the window while the sheet scrolls. Fixed chrome:
+   surface 3 with a top border. */
+.wz__nav {
+  position: sticky;
+  bottom: var(--app-bottom-inset, 0px);
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding: 14px 24px;
+  border-top: var(--border-width) solid var(--color-border);
+  border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.wz__navGap {
+  flex: 1 1 auto;
+}
+/* A focused field never hides under the bar (WCAG 2.4.11): the focus scroll keeps the
+   height of the bar and a gap free above the bottom edge. */
+.wz__body ::ng-deep * {
+  scroll-margin-bottom: calc(var(--app-bottom-inset, 0px) + var(--wz-nav-clearance));
+}
+.wz {
+  --wz-nav-clearance: 5.5rem;
+}
+.wz__discardPhone {
+  display: none;
+}
+.wz__dialogText {
+  margin: 0;
+}
+
+/* Narrow: a slimmer column. */
+@include bp.narrow {
+  .wz {
+    gap: var(--space-5);
+  }
+  .wz__aside {
+    flex-basis: 15rem;
+  }
+  .wz__head {
+    padding: var(--space-5) var(--space-5) 0;
+  }
+  .wz__body {
+    padding: var(--space-4) var(--space-5) var(--space-5);
+  }
+}
+
+/* Phone: the title above the sheet; the sheet header names the step. The bar of the
+   actions sits on its own raised surface above the bottom bar. */
+@include bp.phone {
+  .wz {
+    flex-direction: column;
     align-items: stretch;
+    gap: var(--space-4);
   }
-
-  .wizard__nav-left,
-  .wizard__nav-right {
-    justify-content: space-between;
+  .wz__aside {
+    position: static;
+    flex: none;
+    gap: var(--space-3);
+    padding-top: 0;
   }
-}
-
-/* Mobile: give "Next" and "Submit" a full tap target (≥2.5rem) and make the options
-   easy to tap. */
-@media (max-width: 40rem) {
-  .wizard__nav-right app-button {
-    display: flex;
-    flex: 1 1 auto;
+  .wz__intro {
+    padding: 0;
   }
-  .wizard__nav-right ::ng-deep .btn {
-    width: 100%;
-    min-height: 2.5rem;
+  .wz__stepper,
+  .wz__lead {
+    display: none;
   }
-  .wizard__nav-left ::ng-deep .btn {
-    min-height: 2.5rem;
+  .wz__saved {
+    order: 2;
+    padding: 0;
   }
-  .type-option {
-    min-height: 2.75rem;
+  .wz__sheet {
+    flex: none;
+    margin-inline: calc(-1 * var(--space-2));
+    border-radius: var(--radius-xl);
+  }
+  .wz__head {
+    padding: var(--space-5) var(--space-4) 0;
+  }
+  .wz__body {
+    padding: var(--space-4);
+  }
+  .wz__discard,
+  .wz__navGap {
+    display: none;
+  }
+  .wz__discardPhone {
+    display: block;
+    align-self: center;
+  }
+  .wz__nav app-button {
+    flex: 1 1 0;
+  }
+  .wz__nav {
+    flex-wrap: nowrap;
+    padding: 10px var(--space-4);
+    border-radius: 0;
+    background: var(--color-surface-3);
   }
 }

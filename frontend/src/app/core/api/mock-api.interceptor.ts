@@ -14,6 +14,7 @@ import type {
   ApplicationOutWire,
   ApplicationTypeListItemWire,
   AttachmentOutWire,
+  DraftAttachmentOutWire,
   BallotResult,
   CommentOutWire,
   EffectiveForm,
@@ -22,6 +23,7 @@ import type {
   MeetingOutWire,
   MeetingPageWire,
   Page,
+  PublicSiteConfig,
   Principal,
   ProtocolOutWire,
   SearchHit,
@@ -303,11 +305,45 @@ const REVIEW_STATE: StateOutWire = {
   editAllowed: false,
 };
 
-function mockApplication(data: Record<string, unknown> = {}): ApplicationOutWire {
+/**
+ * The answers of the demo application of the applicant status page, in the keys of the
+ * demo form (`mock-applications.ts`), which the status page loads for the type.
+ */
+const MOCK_APP_DATA: Record<string, unknown> = {
+  title: 'Förderung Ersti-Wochenende 2026',
+  description: 'Zwei Tage Programm für die neuen Studierenden.',
+  event_date: '2026-10-17',
+  participants: 80,
+  category: ['event', 'firstyear'],
+};
+
+/** The attachments of the demo application (`GET …/attachments`). */
+const MOCK_APP_ATTACHMENTS: AttachmentOutWire[] = [
+  {
+    id: 'att00000-0000-0000-0000-000000000011',
+    filename: 'Kostenaufstellung.pdf',
+    mime: 'application/pdf',
+    size: 182_340,
+    scanned: true,
+    is_comparison_offer: false,
+  },
+  {
+    id: 'att00000-0000-0000-0000-000000000012',
+    filename: 'Angebot-Bus.pdf',
+    mime: 'application/pdf',
+    size: 96_512,
+    scanned: true,
+    is_comparison_offer: true,
+  },
+];
+
+function mockApplication(data: Record<string, unknown> = MOCK_APP_DATA): ApplicationOutWire {
   return {
     id: MOCK_APP_ID,
     typeId: MOCK_TYPES.items[0].id,
     state: SUBMITTED_STATE,
+    // The last event of MOCK_TIMELINE: the application went back to the applicant.
+    stateSince: '2026-06-05T13:00:00Z',
     gremiumId: null,
     amount: null,
     currency: 'EUR',
@@ -414,12 +450,17 @@ const MOCK_TASKS: ApplicationListItemWire[] = [
   },
 ];
 
+/**
+ * The status history of the demo application. The server names the applicant
+ * `applicant` (the status page shows "Du") and a member by the Gremium (A12).
+ */
 const MOCK_TIMELINE: TimelineEventOutWire[] = [
   {
     fromStateId: null,
     toStateId: SUBMITTED_STATE.id,
     toState: SUBMITTED_STATE,
-    actor: null,
+    transitionLabel: null,
+    actor: 'applicant',
     at: '2026-06-05T10:00:00Z',
     note: null,
   },
@@ -427,9 +468,19 @@ const MOCK_TIMELINE: TimelineEventOutWire[] = [
     fromStateId: SUBMITTED_STATE.id,
     toStateId: REVIEW_STATE.id,
     toState: REVIEW_STATE,
+    transitionLabel: { de: 'In Prüfung nehmen', en: 'Move to review' },
     actor: 'Finanzreferat',
     at: '2026-06-05T12:30:00Z',
     note: 'Eingang bestätigt.',
+  },
+  {
+    fromStateId: REVIEW_STATE.id,
+    toStateId: SUBMITTED_STATE.id,
+    toState: SUBMITTED_STATE,
+    transitionLabel: { de: 'Zur Überarbeitung zurückgeben', en: 'Return for changes' },
+    actor: 'Finanzreferat',
+    at: '2026-06-05T13:00:00Z',
+    note: 'Bitte ergänze die Kostenaufstellung.',
   },
 ];
 
@@ -457,7 +508,7 @@ const MOCK_VERSIONS: VersionOutWire[] = [
     version: 1,
     data: { title: 'Förderung Ersti-Wochenende', amount: '200.00' },
     diff: null,
-    changedBy: 'Antragsteller:in',
+    changedBy: 'applicant',
     at: '2026-06-05T10:00:00Z',
   },
   {
@@ -471,7 +522,7 @@ const MOCK_VERSIONS: VersionOutWire[] = [
         amount: { old: '200.00', new: '250.00' },
       },
     },
-    changedBy: 'Antragsteller:in',
+    changedBy: 'applicant',
     at: '2026-06-05T11:15:00Z',
   },
 ];
@@ -1002,6 +1053,34 @@ function mockBookingsGet(p: string, params: URLSearchParams): Observable<unknown
   return null;
 }
 
+/** The mock plays a visitor without a session (`localStorage['mockAnonymous'] = '1'`). */
+function mockAnonymous(): boolean {
+  try {
+    return localStorage.getItem('mockAnonymous') === '1';
+  } catch {
+    return false;
+  }
+}
+
+let MOCK_DRAFT_SEQ = 0;
+
+/** The answer to a draft upload: a new id, the name and size of the sent file. */
+function mockDraftUpload(body: unknown): DraftAttachmentOutWire {
+  const form = body instanceof FormData ? body : null;
+  const file = form?.get('file');
+  const n = ++MOCK_DRAFT_SEQ;
+  return {
+    id: `d0000000-0000-0000-0000-${String(n).padStart(12, '0')}`,
+    filename: file instanceof File ? file.name : `datei-${n}.pdf`,
+    mime: file instanceof File && file.type ? file.type : 'application/pdf',
+    size: file instanceof File ? file.size : 1024,
+    scanned: false,
+    is_comparison_offer: form?.get('is_comparison_offer') === 'true',
+    draftToken: 'mock-draft-token',
+    draftExpiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+  };
+}
+
 function path(url: string): string {
   return url.split('?')[0];
 }
@@ -1068,7 +1147,29 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'GET') {
-    if (p.endsWith('/auth/me')) return ok(MOCK_PRINCIPAL);
+    // The public site config: the platform defaults (links without an end, the default
+    // limits), so the pages show what they show after a real load.
+    if (/(^|\/)api\/site-config$/.test(p)) {
+      const config: PublicSiteConfig = {
+        version: 1,
+        confirmTtlHours: 12,
+        linkTtlDays: null,
+        attachmentLimits: null,
+        branding: null,
+      };
+      return ok(config);
+    }
+    // `localStorage['mockAnonymous'] = '1'` plays a visitor without a session: the
+    // public frame, the wizard with the contact step and the ALTCHA.
+    if (p.endsWith('/auth/me')) {
+      return mockAnonymous()
+        ? throwError(() => new HttpErrorResponse({ status: 401, url: req.url }))
+        : ok(MOCK_PRINCIPAL);
+    }
+    // The wizard of the demo type gets the form of the demo applications.
+    if (p.endsWith(`/application-types/${MOCK_TYPES.items[0].id}/form`)) {
+      return from(import('./mock-applications')).pipe(mergeMap((m) => ok(m.demoForm())));
+    }
     // ALTCHA is off in mock mode → 404. The widget then reports "unavailable".
     if (p.endsWith('/altcha/challenge')) {
       return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
@@ -1115,6 +1216,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         })),
       );
     }
+    if (p.endsWith(`/applications/${MOCK_APP_ID}/attachments`)) return ok([...MOCK_APP_ATTACHMENTS]);
     if (p.endsWith('/timeline')) return ok(MOCK_TIMELINE);
     if (p.endsWith('/versions')) return ok([...MOCK_VERSIONS]);
     if (p.endsWith('/comments')) return ok([...MOCK_COMMENTS]);
@@ -1200,6 +1302,8 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
 
   if (req.method === 'POST') {
     if (p.endsWith('/auth/logout')) return ok(LOGOUT_OUT);
+    // A draft upload of the wizard (Z4): the file stays in the scan, the token stays.
+    if (p.endsWith('/apply/attachments')) return ok(mockDraftUpload(req.body), 201);
     if (p.endsWith('/invoices/parse')) {
       const file = req.body instanceof FormData ? req.body.get('file') : null;
       const name = file instanceof File ? file.name : 'rechnung.pdf';
@@ -1391,6 +1495,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'DELETE') {
+    if (/\/apply\/attachments\/[^/]+$/.test(p)) return ok(null, 204);
     if (/\/meetings\/[^/]+\/protokollant-handover$/.test(p)) {
       if (!MOCK_MEETING.plannedHandover) return mockProblem(404, 'no_planned_handover', req.url);
       MOCK_MEETING = { ...MOCK_MEETING, plannedHandover: null };

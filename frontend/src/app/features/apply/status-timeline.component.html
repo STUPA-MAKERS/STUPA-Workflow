@@ -1,179 +1,225 @@
 @switch (phase()) {
   @case ('loading') {
-    <p class="text-muted text-sm" role="status">{{ 'status.loading' | t }}</p>
+    <p class="sp__loading" role="status">{{ 'status.loading' | t }}</p>
   }
 
   @case ('expired') {
-    <section class="status status--narrow">
-      <app-card [heading]="'status.expired.heading' | t">
-        <app-badge variant="warning">{{ 'status.expired.badge' | t }}</app-badge>
-        <p class="status__text">{{ 'status.expired.body' | t }}</p>
-        <a card-footer routerLink="/" class="text-primary font-semibold no-underline">{{ 'status.home' | t }}</a>
-      </app-card>
+    <section class="sp__end">
+      <article class="sp__endCard" aria-labelledby="sp-end-title">
+        <app-icon class="sp__endIcon" name="clock" [size]="28" />
+        <app-status-text kind="warn">{{ 'status.expired.badge' | t }}</app-status-text>
+        <h1 class="sp__endTitle" id="sp-end-title">{{ 'status.expired.heading' | t }}</h1>
+        <p class="sp__endText">{{ 'status.expired.body' | t }}</p>
+        <a class="sp__btn" routerLink="/">{{ 'status.home' | t }}</a>
+      </article>
     </section>
   }
 
   @case ('error') {
-    <section class="status status--narrow">
-      <app-card [heading]="'status.error.heading' | t">
-        <p class="status__text">{{ 'status.error.body' | t }}</p>
-        <a card-footer routerLink="/" class="text-primary font-semibold no-underline">{{ 'status.home' | t }}</a>
-      </app-card>
+    <section class="sp__end">
+      <article class="sp__endCard" aria-labelledby="sp-end-title">
+        <app-icon class="sp__endIcon" name="search" [size]="28" />
+        <h1 class="sp__endTitle" id="sp-end-title">{{ 'status.error.heading' | t }}</h1>
+        <p class="sp__endText">{{ 'status.error.body' | t }}</p>
+        <a class="sp__btn" routerLink="/">{{ 'status.home' | t }}</a>
+      </article>
     </section>
   }
 
   @case ('ready') {
     @if (application(); as app) {
-      <section class="status">
-        <app-page-header
-          [title]="'status.heading' | t"
-          [subtitle]="'status.case' | t: { id: app.id }"
-        >
-          <div actions class="flex flex-col items-end gap-2">
-            <div class="inline-flex gap-2 flex-wrap">
-              <app-badge variant="info" [color]="app.state?.color">{{ app.state?.label }}</app-badge>
-              @if (!canEdit()) {
-                <app-badge variant="info">{{ 'status.locked' | t }}</app-badge>
-              }
+      @if (editing()) {
+        <!-- Edit mode: the bar stays at the top while the form scrolls. -->
+        <article class="sp sp--edit" aria-labelledby="sp-edit-title">
+          <header class="sp__editBar">
+            <p class="sp__editText">
+              <!-- The title takes the focus when the edit mode opens. -->
+              <strong id="sp-edit-title" tabindex="-1" #editTitle>{{ 'status.edit.title' | t }}</strong>
+              <!-- The separator sits in the hint, so it goes with it on a phone. -->
+              <span class="sp__editHint"> · {{ 'applications.edit.versionHint' | t: { version: app.version + 1 } }}</span>
+            </p>
+            <app-button variant="text" (click)="cancelEdit()">{{ 'applications.detail.cancel' | t }}</app-button>
+            <app-button variant="fill" [loading]="saving()" (click)="save()">
+              <app-icon name="check" [size]="16" />
+              {{ 'applications.detail.save' | t }}
+            </app-button>
+          </header>
+          <!-- No form element: Enter in a field must not save the whole application. -->
+          <div class="sp__edit fe-form">
+            <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
+          </div>
+        </article>
+      } @else {
+        <article class="sp" aria-labelledby="sp-title">
+          <header class="sp__head">
+            <div class="sp__headTop">
+              <span class="sp__ref">{{ 'status.case' | t: { id: ref() } }}</span>
+              <app-row-menu
+                class="sp__menu"
+                [sections]="menu()"
+                [label]="'status.menu' | t"
+                (selected)="onMenu($event)"
+              />
             </div>
-            <app-button variant="danger" size="sm" (click)="confirmErase.set(true)">{{ 'applications.detail.eraseRequest' | t }}</app-button>
-          </div>
-        </app-page-header>
-
-        <!-- Three columns, as on the internal application detail page: actions left,
-             history and application data center, comments (chat) right. -->
-        <div class="status__shell" [class.status__shell--actions]="actions().length">
-          <!-- LEFT: applicant actions (only when enabled, actorIsApplicant) -->
-          @if (actions().length) {
-            <aside class="status__rail status__rail--left" [attr.aria-label]="'status.actions.title' | t">
-              <app-card [heading]="'status.actions.title' | t">
-                <p class="status__hint">{{ 'status.actions.lead' | t }}</p>
-                <div class="flex flex-col gap-3 mt-3">
-                  @for (t of actions(); track t.id) {
-                    <app-button size="sm"
-                      [color]="t.color"
-                      [block]="true"
-                      [loading]="firing() === t.id"
-                      [disabled]="firing() !== null && firing() !== t.id"
-                      (click)="fireAction(t)"
-                    >
-                      {{ t.label || ('status.actions.fallback' | t) }}
-                    </app-button>
-                  }
-                </div>
-              </app-card>
-            </aside>
-          }
-
-          <!-- CENTER: history + application data -->
-          <div class="status__main">
-            <app-card [heading]="'status.history.title' | t">
-              @if (timeline().length) {
-                <ol class="timeline">
-                  @for (entry of timeline(); track entry.at) {
-                    <li class="timeline__item">
-                      <span class="timeline__dot" aria-hidden="true"></span>
-                      <div class="flex flex-col gap-1 pb-4 border-0 border-b border-solid border-line">
-                        <p class="m-0 font-semibold">{{ entry.label }}</p>
-                        <time class="text-xs text-muted" [attr.datetime]="entry.at">
-                          {{ entry.at | ldate: 'medium' }}
-                        </time>
-                        @if (entry.actor) {
-                          <span class="ml-2 text-xs text-muted">{{ 'status.history.by' | t: { actor: entry.actor === 'applicant' ? ('applications.comments.author.applicant' | t) : entry.actor } }}</span>
-                        }
-                        @if (entry.note) {
-                          <p class="timeline__note">{{ noteText(entry.note) }}</p>
-                        }
-                      </div>
-                    </li>
-                  }
-                </ol>
-              } @else {
-                <p class="text-muted text-sm">{{ 'status.history.empty' | t }}</p>
+            <h1 class="sp__title" id="sp-title" tabindex="-1" #pageTitle>{{ title() }}</h1>
+            <p class="sp__state">
+              <app-status-text [kind]="stateKind()">{{ app.state?.label }}</app-status-text>
+              @if (app.stateSince) {
+                <span class="sp__sep" aria-hidden="true">·</span>
+                <span>{{ 'status.since' | t: { date: (app.stateSince | ldate: 'mediumDate') } }}</span>
               }
-            </app-card>
-
-            <app-card [heading]="'status.data.title' | t">
-              @if (canEdit()) {
-                <p class="status__hint">{{ 'status.data.editHint' | t }}</p>
-                <form>
-                  <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
-                  <div card-footer class="status__actions">
-                    <app-button size="sm" [loading]="saving()" [disabled]="saving()" (click)="save()">
-                      {{ 'status.data.save' | t }}
-                    </app-button>
-                  </div>
-                </form>
-              } @else {
-                <p class="status__hint">{{ 'status.data.readonlyHint' | t }}</p>
-                <dl class="grid gap-1 m-0">
-                  @for (row of readonlyRows(); track row.label) {
-                    <div class="readonly__row">
-                      <dt>{{ row.label }}</dt>
-                      <dd>{{ row.value }}</dd>
-                    </div>
-                  } @empty {
-                    <p class="text-muted text-sm">{{ 'status.data.empty' | t }}</p>
-                  }
-                </dl>
-              }
-            </app-card>
-
-            <!-- Attachments: the same panel as the internal view. Upload also works in
-                 locked states, so the applicant can add receipts and invoices later.
-                 Only the magic-link edit scope counts, not the state lock. -->
-            <app-attachments-panel [applicationId]="app.id" [canUpload]="canUploadAttachments()" [canDelete]="canEdit()" />
-          </div>
-
-          <!-- RIGHT: comments as a chat, identical to the internal detail view.
-               "own" marks the messages of the applicant on the right. The messages of
-               the Gremium stay on the left. -->
-          <aside class="status__rail status__rail--right">
-            <section class="det__chat" [attr.aria-label]="'status.comments.title' | t">
-              <header class="py-3 px-4 font-semibold border-0 border-b border-solid border-line">{{ 'status.comments.title' | t }}</header>
-              <div class="det__chatScroll">
-                @for (c of comments(); track c.id) {
-                  <article class="det__msg" [class.det__msg--own]="c.isOwn">
-                    <span class="det__avatar" aria-hidden="true">{{ initial(authorName(c)) }}</span>
-                    <div class="det__msgBody">
-                      <div class="flex items-baseline gap-2 text-xs text-muted">
-                        <span class="font-semibold text-text">{{ authorName(c) }}</span>
-                        <time class="det__msgTime" [attr.datetime]="c.at">{{ c.at | ldate: 'short' }}</time>
-                      </div>
-                      <div class="det__bubble">{{ c.body }}</div>
-                    </div>
-                  </article>
-                } @empty {
-                  <p class="m-auto text-center text-sm text-muted py-4 px-0">{{ 'status.comments.empty' | t }}</p>
+            </p>
+            @if (actions().length) {
+              <div class="sp__actions" role="group" [attr.aria-label]="'status.actions.title' | t">
+                @for (t of actions(); track t.id) {
+                  <app-button
+                    [variant]="looks().get(t.id) ?? 'tonal'"
+                    [loading]="firing() === t.id"
+                    [disabled]="firing() !== null && firing() !== t.id"
+                    (click)="fireAction(t)"
+                  >
+                    {{ t.label || ('status.actions.fallback' | t) }}
+                  </app-button>
                 }
               </div>
+            }
+          </header>
 
-              <form class="flex flex-col gap-2 py-3 px-4 border-0 border-t border-solid border-line" (submit)="$event.preventDefault(); addComment()">
-                <div class="flex items-end gap-2">
-                  <textarea
-                    class="det__composerInput"
-                    rows="1"
-                    [formControl]="commentBody"
-                    [placeholder]="'status.comments.placeholder' | t"
-                    (keydown.enter)="$event.preventDefault(); addComment()"
-                    [attr.aria-label]="'status.comments.label' | t"
-                  ></textarea>
-                  <app-button
-                    type="submit"
-                    size="sm"
-                    [iconOnly]="true"
-                    [ariaLabel]="'status.comments.send' | t"
-                    [disabled]="commentBody.invalid || postingComment()"
-                    [loading]="postingComment()"
+          <div class="sp__grid">
+            <div class="sp__main">
+              <ul class="rowgroup sp__rows">
+                <li>
+                  <button
+                    #editRow
+                    type="button"
+                    class="sp__row"
+                    [disabled]="!canEdit() || !effForm()"
+                    [attr.aria-describedby]="lockReason() ? 'sp-locked' : null"
+                    (click)="startEdit()"
                   >
-                    <app-icon name="send" [size]="15" />
-                  </app-button>
-                </div>
-              </form>
+                    <app-icon class="sp__rowIcon" name="edit" [size]="20" />
+                    <span class="sp__rowText">
+                      <span class="sp__rowTitle">{{ 'status.edit.row' | t }}</span>
+                      @if (lockReason(); as reason) {
+                        <span class="sp__rowSub" id="sp-locked">{{ reason | t }}</span>
+                      }
+                    </span>
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="sp__row" (click)="filesOpen.set(true)">
+                    <app-icon class="sp__rowIcon" name="clip" [size]="20" />
+                    <span class="sp__rowText">
+                      <span class="sp__rowTitle">{{ 'status.files.title' | t }}</span>
+                      @if (filesSub()) {
+                        <span class="sp__rowSub">{{ filesSub() }}</span>
+                      }
+                    </span>
+                    <app-icon class="sp__rowChev" name="right" [size]="18" />
+                  </button>
+                </li>
+                <li>
+                  <button type="button" class="sp__row" (click)="commentsOpen.set(true)">
+                    <app-icon class="sp__rowIcon" name="chat" [size]="20" />
+                    <span class="sp__rowText">
+                      <span class="sp__rowTitle">{{ 'status.comments.title' | t }}</span>
+                      <span class="sp__rowSub">{{ commentsSub() }}</span>
+                    </span>
+                    <app-icon class="sp__rowChev" name="right" [size]="18" />
+                  </button>
+                </li>
+              </ul>
+              <!-- Only after the config loaded: before, "unbegrenzt" can be wrong. -->
+              @if (linkTtlLoaded() && linkTtlDays() === null) {
+                <p class="sp__link">{{ 'status.linkUnlimited' | t }}</p>
+              }
+
+              @if (effForm(); as eff) {
+                <section class="sp__sec sp__answers" [attr.aria-label]="'status.data.title' | t">
+                  <app-answer-view
+                    [sections]="eff.sections"
+                    [data]="app.data"
+                    [context]="{ has_budget: eff.hasBudget }"
+                    [emptyText]="'status.data.empty' | t"
+                  />
+                </section>
+              }
+            </div>
+
+            <section class="sp__sec sp__history" aria-labelledby="sp-history">
+              <h2 class="sec sp__secTitle" id="sp-history">{{ 'status.history.title' | t }}</h2>
+              @if (historyEntries().length) {
+                <app-history [entries]="historyEntries()" />
+              } @else {
+                <p class="sp__empty">{{ 'status.history.empty' | t }}</p>
+              }
             </section>
-          </aside>
+          </div>
+        </article>
+      }
+
+      <app-side-sheet
+        [open]="filesOpen()"
+        (openChange)="filesOpen.set($event)"
+        [heading]="'status.files.title' | t"
+        [side]="phone() ? 'bottom' : 'end'"
+      >
+        @if (filesOpen()) {
+          <!-- The applicant uploads in locked states too (receipts after the decision);
+               a delete is a data change and follows the state lock. -->
+          <app-attachments-panel
+            [applicationId]="app.id"
+            [canUpload]="canUploadAttachments()"
+            [canDelete]="canEdit()"
+            [titled]="false"
+            (countChange)="attachmentCount.set($event)"
+          />
+        }
+      </app-side-sheet>
+
+      <app-side-sheet
+        [open]="commentsOpen()"
+        (openChange)="commentsOpen.set($event)"
+        [heading]="'status.comments.title' | t"
+        [side]="phone() ? 'bottom' : 'end'"
+      >
+        <div class="sp__chat">
+          @if (comments().length) {
+            <ul class="rowgroup rowgroup--bg3 sp__msgs">
+              @for (c of comments(); track c.id) {
+                <li class="sp__msg" [class.sp__msg--own]="c.isOwn">
+                  <span class="sp__msgHead">
+                    <strong>{{ authorName(c) }}</strong>
+                    <time [attr.datetime]="c.at">{{ c.at | ldate: 'short' }}</time>
+                  </span>
+                  <span class="sp__msgBody">{{ c.body }}</span>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="sp__empty">{{ 'status.comments.empty' | t }}</p>
+          }
+          <form class="sp__composer" (submit)="$event.preventDefault(); addComment()">
+            <textarea
+              class="sp__composerInput"
+              rows="2"
+              [formControl]="commentBody"
+              [placeholder]="'status.comments.placeholder' | t"
+              (keydown.enter)="$event.preventDefault(); addComment()"
+              [attr.aria-label]="'status.comments.label' | t"
+            ></textarea>
+            <app-button
+              type="submit"
+              [iconOnly]="true"
+              [ariaLabel]="'status.comments.send' | t"
+              [disabled]="commentBody.invalid || postingComment()"
+              [loading]="postingComment()"
+            >
+              <app-icon name="send" [size]="17" />
+            </app-button>
+          </form>
         </div>
-      </section>
+      </app-side-sheet>
 
       <app-dialog
         [open]="confirmErase()"
@@ -181,10 +227,10 @@
         [closeLabel]="'applications.detail.cancel' | t"
         (closed)="confirmErase.set(false)"
       >
-        <p>{{ 'applications.detail.eraseConfirm' | t }}</p>
+        <p class="sp__dialogText">{{ 'applications.detail.eraseConfirm' | t }}</p>
         <div dialog-footer>
-          <app-button variant="ghost" size="sm" (click)="confirmErase.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
-          <app-button variant="danger" size="sm" [loading]="requestingErasure()" (click)="doRequestErasure()">{{ 'applications.detail.eraseRequest' | t }}</app-button>
+          <app-button variant="text" (click)="confirmErase.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
+          <app-button variant="danger" [loading]="requestingErasure()" (click)="doRequestErasure()">{{ 'applications.detail.eraseRequest' | t }}</app-button>
         </div>
       </app-dialog>
     }

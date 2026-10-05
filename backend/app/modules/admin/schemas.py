@@ -508,17 +508,38 @@ class SiteConfigOut(_CamelModel):
     has_draft_changes: bool = Field(serialization_alias="hasDraftChanges")
 
 
+class AttachmentLimitsOut(_CamelModel):
+    """Upload limits of the wizard (Z4), for the text below the drop zone.
+
+    ``maxFileBytes`` is the cap of one file. ``maxDraftFiles`` and
+    ``maxDraftBytes`` are the caps of all draft files of one draft token. The
+    server checks all three on each upload; the values only tell the applicant
+    the rules before a file is refused.
+    """
+
+    max_file_bytes: int = Field(serialization_alias="maxFileBytes")
+    max_draft_files: int = Field(serialization_alias="maxDraftFiles")
+    max_draft_bytes: int = Field(serialization_alias="maxDraftBytes")
+
+
 class PublicSiteConfigOut(_CamelModel):
     """Public (auth-free) active branding config for frontend rendering.
 
     ``confirmTtlHours`` is the time a guest has to confirm the email. The
-    confirmation page of the wizard shows it.
+    confirmation page of the wizard shows it. ``linkTtlDays`` is the lifetime of a
+    new magic link in days; null means that the link does not expire. The
+    confirmation page and the status page show it. ``attachmentLimits`` holds the
+    upload limits of the wizard.
     """
 
     version: int
     branding: Branding
     confirm_ttl_hours: int = Field(
         default=DEFAULT_CONFIRM_TTL_HOURS, serialization_alias="confirmTtlHours"
+    )
+    link_ttl_days: int | None = Field(default=None, serialization_alias="linkTtlDays")
+    attachment_limits: AttachmentLimitsOut | None = Field(
+        default=None, serialization_alias="attachmentLimits"
     )
 
 

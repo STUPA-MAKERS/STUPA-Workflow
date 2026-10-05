@@ -65,12 +65,72 @@ describe('mockApiInterceptor', () => {
 
   it('serves the effective form (with sections) for the apply wizard', (done) => {
     const { api, http } = setup(true);
-    api.effectiveForm('11111111-1111-1111-1111-111111111111').subscribe((form) => {
+    api.effectiveForm('22222222-2222-2222-2222-222222222222').subscribe((form) => {
       expect(form.sections.length).toBeGreaterThan(0);
       expect(form.hasBudget).toBe(false);
       done();
     });
     http.expectNone((r) => r.url.includes('/form'));
+  });
+
+  it('serves the form of the demo applications for the demo type', async () => {
+    const { api } = setup(true);
+    const form = await firstValueFrom(api.effectiveForm('11111111-1111-1111-1111-111111111111'));
+    expect(form.sections.map((s) => s.key)).toEqual(['plan', 'costs_section', 'contact']);
+    expect(form.sections[2].fields.some((f) => f.isPII)).toBe(true);
+  });
+
+  it('plays a visitor without a session when mockAnonymous is set', async () => {
+    const { api } = setup(true);
+    localStorage.setItem('mockAnonymous', '1');
+    try {
+      await expect(firstValueFrom(api.me())).rejects.toMatchObject({ status: 401 });
+    } finally {
+      localStorage.removeItem('mockAnonymous');
+    }
+    await expect(firstValueFrom(api.me())).resolves.toBeTruthy();
+    // A storage that throws plays the signed-in user.
+    const spy = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    try {
+      await expect(firstValueFrom(api.me())).resolves.toBeTruthy();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('answers a draft upload without a form body with a default file', async () => {
+    const { http } = setup(true);
+    const client = TestBed.inject(HttpClient);
+    const res = await firstValueFrom(client.post<Record<string, unknown>>('/api/apply/attachments', {}));
+    expect(res).toMatchObject({ mime: 'application/pdf', size: 1024, is_comparison_offer: false });
+    expect(String(res['filename'])).toMatch(/^datei-\d+\.pdf$/);
+    const form = new FormData();
+    form.append('file', new File(['x'], 'ohne-typ'));
+    const typeless = await firstValueFrom(client.post<Record<string, unknown>>('/api/apply/attachments', form));
+    expect(typeless['mime']).toBe('application/pdf');
+    http.verify();
+  });
+
+  it('answers a draft upload with the file and a token, and a draft delete', async () => {
+    const { api } = setup(true);
+    const file = new File(['x'.repeat(10)], 'Angebot.pdf', { type: 'application/pdf' });
+    const res = await firstValueFrom(
+      api.uploadDraftAttachment(file, { isComparisonOffer: true, altcha: 'sol' }),
+    );
+    expect(res.attachment).toMatchObject({
+      filename: 'Angebot.pdf',
+      mime: 'application/pdf',
+      size: 10,
+      isComparisonOffer: true,
+      scanState: 'scanning',
+    });
+    expect(res.draftToken).toBe('mock-draft-token');
+    expect(Date.parse(res.draftExpiresAt)).toBeGreaterThan(Date.now());
+    await expect(
+      firstValueFrom(api.deleteDraftAttachment(res.attachment.id, res.draftToken)),
+    ).resolves.toBeNull();
   });
 
   it('creates an application returning an applicationId', (done) => {
@@ -155,7 +215,17 @@ describe('mockApiInterceptor', () => {
 
     it('GET …/timeline → events', async () => {
       const events = await get<unknown[]>('/api/applications/x/timeline');
-      expect(events.length).toBe(2);
+      expect(events.length).toBe(3);
+    });
+
+    it('GET /site-config → the platform defaults; the admin config is not this route', async () => {
+      const cfg = await get<{ linkTtlDays: number | null; confirmTtlHours: number }>('/api/site-config');
+      expect(cfg).toMatchObject({ linkTtlDays: null, confirmTtlHours: 12 });
+    });
+
+    it('GET the attachments of the magic-link demo application', async () => {
+      const list = await get<unknown[]>('/api/applications/33333333-3333-3333-3333-333333333333/attachments');
+      expect(list).toHaveLength(2);
     });
 
     it('GET …/versions → version history', async () => {

@@ -3,12 +3,13 @@
     type="button"
     class="altcha__btn"
     [disabled]="state() === 'verifying' || state() === 'solved'"
+    [attr.aria-describedby]="noteId"
     (click)="solve()"
   >
     <span class="altcha__box" aria-hidden="true">
       @switch (state()) {
         @case ('solved') {
-          ✓
+          <app-icon name="check" [size]="14" [strokeWidth]="2.6" />
         }
         @case ('verifying') {
           <span class="altcha__spinner"></span>
@@ -31,8 +32,9 @@
         }
       }
     </span>
+    <span class="altcha__brand" aria-hidden="true">ALTCHA</span>
   </button>
-  <p class="text-xs text-muted" role="status">
+  <p [id]="noteId" class="altcha__note" [class.altcha__note--error]="state() === 'error'" role="status">
     @switch (state()) {
       @case ('solved') {
         {{ 'altcha.noteSolved' | t }}

@@ -1,4 +1,4 @@
-import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, catchError, map, of, throwError } from 'rxjs';
 import { listContext } from '@core/cache/cache.interceptor';
@@ -46,6 +46,8 @@ import type {
   CommentCreateBody,
   CommentOutWire,
   CommentVisibility,
+  DraftAttachmentOutWire,
+  DraftUpload,
   EffectiveForm,
   HandoverMode,
   LogoutOut,
@@ -88,6 +90,12 @@ import type {
   VoteClosed,
   BallotResult,
 } from './models';
+
+/**
+ * Header of the draft token of the wizard uploads (Z4). A header keeps the token out of
+ * the URL and out of the access log.
+ */
+export const DRAFT_TOKEN_HEADER = 'X-Draft-Token';
 
 /**
  * Typed REST client for the OpenAPI contracts.
@@ -441,6 +449,48 @@ export class ApiClient {
     return this.http
       .post<AttachmentOutWire>(`${this.base}/applications/${id}/attachments`, form)
       .pipe(map(mapAttachment));
+  }
+
+  /**
+   * POST /apply/attachments — a file of the wizard before the application exists (Z4).
+   *
+   * The first upload of a draft has no token: an anonymous caller then sends an ALTCHA
+   * solution (`altcha`), a logged-in caller none. The response carries the token; every
+   * later upload sends it in the `X-Draft-Token` header (never in the URL), and needs no
+   * ALTCHA. Errors: 400 (ALTCHA), 413 (file or draft too large), 415 (type), 422 (token
+   * unknown or expired), 429 (rate limit), 503 (storage off).
+   */
+  uploadDraftAttachment(
+    file: File,
+    opts: {
+      token?: string | null;
+      altcha?: string | null;
+      fieldKey?: string | null;
+      isComparisonOffer?: boolean;
+    } = {},
+  ): Observable<DraftUpload> {
+    const form = new FormData();
+    form.append('file', file);
+    if (opts.fieldKey) form.append('field_key', opts.fieldKey);
+    if (opts.isComparisonOffer) form.append('is_comparison_offer', 'true');
+    if (!opts.token && opts.altcha) form.append('altcha', opts.altcha);
+    const headers = opts.token ? new HttpHeaders({ [DRAFT_TOKEN_HEADER]: opts.token }) : undefined;
+    return this.http
+      .post<DraftAttachmentOutWire>(`${this.base}/apply/attachments`, form, { headers })
+      .pipe(
+        map((wire) => ({
+          attachment: mapAttachment(wire),
+          draftToken: wire.draftToken,
+          draftExpiresAt: wire.draftExpiresAt,
+        })),
+      );
+  }
+
+  /** DELETE /apply/attachments/{id} — remove a draft file; the token must own it (Z4). */
+  deleteDraftAttachment(attachmentId: Uuid, token: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/apply/attachments/${attachmentId}`, {
+      headers: new HttpHeaders({ [DRAFT_TOKEN_HEADER]: token }),
+    });
   }
 
   /** GET /applications/{id}/attachments — existing attachments (panel hydration). */

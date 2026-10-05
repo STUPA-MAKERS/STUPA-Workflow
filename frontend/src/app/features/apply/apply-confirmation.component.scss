@@ -1,40 +1,107 @@
+@use 'breakpoints' as bp;
+
+/* Centred in the free space of the page (the shell main is a flex column). */
+:host {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: center;
+}
 .done {
-  max-width: 36rem;
-  margin: 0 auto;
+  width: min(40rem, 100%);
 }
-.done__mail {
-  font-size: 1.5rem;
-  line-height: 1;
-  color: var(--color-primary);
+/* One card on surface 1, as on the boards: icon, status, heading, text, note, meta,
+   actions. */
+.done__card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
 }
-.done__ok {
-  font-size: 1.5rem;
-  line-height: 1;
-  color: var(--color-success, var(--color-primary));
+.done__icon {
+  margin-bottom: var(--space-3);
+}
+.done__icon--ok {
+  color: var(--color-accent-text);
+}
+.done__icon--warn {
+  color: var(--color-warning);
+}
+.done__title {
+  margin: -6px 0 0;
+  font-size: var(--fs-h1);
+  line-height: var(--lh-h1);
 }
 .done__text {
-  margin-top: var(--space-4);
-  color: var(--color-text);
+  margin: var(--space-1) 0 0;
   line-height: 1.55;
 }
-.done__expiry {
-  margin-top: var(--space-4);
-  padding: var(--space-3) var(--space-4);
-  border-left: 3px solid var(--color-warning, var(--color-primary));
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-sunken);
-  color: var(--color-text);
-  font-size: var(--fs-sm);
+app-note {
+  align-self: stretch;
+  margin-top: var(--space-2);
 }
-.done__home {
-  color: var(--color-primary);
+.done__metaBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.done__meta {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.done__ref {
+  color: var(--color-text);
+}
+.done__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+/* Links in the look of the kit buttons: a link navigates, a button acts. */
+.done__btn {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-height);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-body);
   font-weight: var(--fw-semibold);
   text-decoration: none;
 }
-.done__home:hover {
-  text-decoration: underline;
+.done__btn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }
-/* The signed-in card has two footer links (record, home). Keep them apart. */
-.done__home + .done__home {
-  margin-left: var(--space-5);
+.done__btn--fill {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+.done__btn--fill:hover {
+  filter: brightness(1.06);
+}
+.done__btn--outlined {
+  box-shadow: inset 0 0 0 1px var(--color-border-strong);
+  color: var(--color-text);
+}
+.done__btn--outlined:hover,
+.done__btn--text:hover {
+  background: var(--color-surface-2);
+}
+.done__btn--text {
+  padding: 0 var(--space-3);
+  color: var(--color-accent-text);
+}
+
+@include bp.phone {
+  .done__card {
+    padding: var(--space-5);
+    border-radius: var(--radius-xl);
+  }
 }

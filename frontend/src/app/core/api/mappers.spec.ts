@@ -384,6 +384,19 @@ describe('toApplicationCreateBody', () => {
     const body = toApplicationCreateBody(input);
     expect(body.applicantName).toBeNull();
   });
+
+  it('sends the draft uploads only with ids and a token (Z4)', () => {
+    const base: NewApplication = { typeId: 't1', data: {}, lang: 'de' };
+    expect(
+      toApplicationCreateBody({ ...base, attachmentIds: ['d1'], draftToken: 'tok' }),
+    ).toMatchObject({ attachmentIds: ['d1'], draftToken: 'tok' });
+    expect(toApplicationCreateBody({ ...base, attachmentIds: [], draftToken: 'tok' })).not.toHaveProperty(
+      'draftToken',
+    );
+    expect(toApplicationCreateBody({ ...base, attachmentIds: ['d1'], draftToken: null })).not.toHaveProperty(
+      'attachmentIds',
+    );
+  });
 });
 
 describe('mapVersion', () => {

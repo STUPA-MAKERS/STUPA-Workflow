@@ -50,6 +50,13 @@ async function uploadFile(name = 'plan.pdf') {
 describe('AttachmentsPanelComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  it('shows its heading, or keeps it for screen readers only in a titled sheet', async () => {
+    const { rerender } = await setup(false);
+    expect(screen.getByRole('heading', { name: 'Anhänge' })).not.toHaveClass('sr-only');
+    await rerender({ inputs: { applicationId: APP_ID, canUpload: false, titled: false }, partialUpdate: true });
+    expect(screen.getByRole('heading', { name: 'Anhänge' })).toHaveClass('sr-only');
+  });
+
   it('shows the empty state and no upload control without permission', async () => {
     await setup(false);
     expect(screen.getByText('Noch keine Anhänge hochgeladen.')).toBeInTheDocument();
