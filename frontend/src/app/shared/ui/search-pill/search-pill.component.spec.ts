@@ -19,6 +19,28 @@ class FilterHostComponent {
   readonly query = signal('');
 }
 
+@Component({
+  standalone: true,
+  imports: [SearchPillComponent],
+  template: `
+    <form (submit)="$event.preventDefault(); submits = submits + 1">
+      <app-search-pill
+        placeholder="Benutzer suchen"
+        [clearable]="true"
+        [busy]="busy()"
+        [(value)]="query"
+        (commit)="commits = commits + 1"
+      />
+    </form>
+  `,
+})
+class ClearableHostComponent {
+  readonly query = signal('');
+  readonly busy = signal(false);
+  commits = 0;
+  submits = 0;
+}
+
 describe('SearchPillComponent', () => {
   describe('input mode', () => {
     it('is a named search box that writes back its value', async () => {
@@ -56,6 +78,42 @@ describe('SearchPillComponent', () => {
       expect(screen.getByRole('button', { name: 'Filter, 1 aktiv' })).toBeInTheDocument();
       expect(container.querySelector('label button')).toBeNull();
       expect(await runAxe(container)).toHaveNoViolations();
+    });
+
+    it('clears with the × only when clearable and filled', async () => {
+      const view = await render(ClearableHostComponent);
+      const user = userEvent.setup();
+      expect(screen.queryByRole('button', { name: 'Suche leeren' })).toBeNull();
+      const box = screen.getByRole('searchbox');
+      await user.type(box, 'Kim');
+      await user.click(screen.getByRole('button', { name: 'Suche leeren' }));
+      expect(view.fixture.componentInstance.query()).toBe('');
+      expect(box).toHaveValue('');
+      expect(box).toHaveFocus();
+      expect(screen.queryByRole('button', { name: 'Suche leeren' })).toBeNull();
+      expect(await runAxe(view.container)).toHaveNoViolations();
+    });
+
+    it('shows no × without clearable', async () => {
+      await render(FilterHostComponent);
+      await userEvent.setup().type(screen.getByRole('searchbox'), 'Kim');
+      expect(screen.queryByRole('button', { name: 'Suche leeren' })).toBeNull();
+    });
+
+    it('emits commit on Enter and submits no form around it', async () => {
+      const view = await render(ClearableHostComponent);
+      await userEvent.setup().type(screen.getByRole('searchbox'), 'Kim{Enter}');
+      expect(view.fixture.componentInstance.commits).toBe(1);
+      expect(view.fixture.componentInstance.submits).toBe(0);
+    });
+
+    it('swaps the magnifier for a spinner while busy', async () => {
+      const view = await render(ClearableHostComponent);
+      expect(view.container.querySelector('.sp__spinner')).toBeNull();
+      view.fixture.componentInstance.busy.set(true);
+      view.fixture.detectChanges();
+      expect(view.container.querySelector('.sp__spinner')).not.toBeNull();
+      expect(screen.getByRole('searchbox')).toHaveAttribute('aria-busy', 'true');
     });
 
     it('takes a separate accessible name', async () => {
