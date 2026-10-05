@@ -1,0 +1,6 @@
+@if (kickerId(); as id) {
+  <h2 class="sheet-bar__kicker ell" [id]="id" [title]="kicker() ?? ''">{{ kicker() }}</h2>
+} @else {
+  <span class="sheet-bar__kicker ell" [title]="kicker() ?? ''">{{ kicker() }}</span>
+}
+<ng-content />

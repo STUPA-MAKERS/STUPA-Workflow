@@ -59,5 +59,5 @@ USER appuser
 EXPOSE 8000
 
 # Keep forwarded-allow-ips narrow (security.md §3). Never set it to "*". The default is
-# loopback. Production passes the NPM network through FORWARDED_ALLOW_IPS.
+# loopback. Production passes the Caddy network through FORWARDED_ALLOW_IPS.
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips \"${FORWARDED_ALLOW_IPS:-127.0.0.1}\""]

@@ -125,9 +125,21 @@ export function toFormlySections(
 
 /** Section marker → non-editable heading (Formly `display`, `heading`). */
 function sectionHeading(f: FormFieldDef, lang: Lang | string): FormlyFieldConfig {
-  const props: Record<string, unknown> = { heading: true, label: resolveI18n(f.label, lang) };
-  if (f.help) props['description'] = resolveI18n(f.help, lang);
+  const label = resolveI18n(f.label, lang);
+  const props: Record<string, unknown> = { heading: true, label };
+  // A help text that only repeats the heading would show the same words twice.
+  const help = ownHelp(f, label, lang);
+  if (help) props['description'] = help;
   return { type: 'display', props };
+}
+
+/**
+ * The help text of a field, or undefined when it has none or when it only repeats the
+ * label (the form builder copies the label into an empty help text in some old forms).
+ */
+function ownHelp(f: FormFieldDef, label: string, lang: Lang | string): string | undefined {
+  const help = f.help ? resolveI18n(f.help, lang) : '';
+  return help.trim() && help.trim() !== label.trim() ? help : undefined;
 }
 
 function mapField(
@@ -136,7 +148,8 @@ function mapField(
   extraContext: Record<string, unknown>,
 ): FormlyFieldConfig {
   const label = resolveI18n(f.label, lang);
-  const help = f.help ? resolveI18n(f.help, lang) : undefined;
+  // An info text whose help repeats its label counts as an info text without help.
+  const help = f.type === 'markdown' ? ownHelp(f, label, lang) : f.help ? resolveI18n(f.help, lang) : undefined;
   const isDisplay = f.type === 'markdown' || f.type === 'computed' || f.type === 'table';
 
   const props: Record<string, unknown> = { label };

@@ -143,18 +143,17 @@ export class AgendaPaneComponent {
     return item.title || this.i18n.translate('meetings.agenda.untitled');
   }
 
-  /** "TOP 3 · Antrag · Abstimmung offen". */
-  protected sub(item: AgendaItem, index: number): string {
-    const parts = [
-      this.i18n.translate('meetings.agenda.top', { n: index + 1 }),
-      this.i18n.translate(
-        item.applicationId ? 'meetings.agenda.kindApplication' : 'meetings.agenda.kindFreetext',
-      ),
-    ];
+  /**
+   * "Antrag · Abstimmung offen". The number badge already names the TOP, and a free-text
+   * item needs no kind: it gets a sub line only for an open vote, else none.
+   */
+  protected sub(item: AgendaItem): string | null {
+    const parts: string[] = [];
+    if (item.applicationId) parts.push(this.i18n.translate('meetings.agenda.kindApplication'));
     if (this.votesFor(item.id).some((v) => v.status === 'open')) {
       parts.push(this.i18n.translate('meetings.agenda.voteOpen'));
     }
-    return parts.join(' · ');
+    return parts.length ? parts.join(' · ') : null;
   }
 
   /** The item the room handles now. */

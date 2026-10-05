@@ -1,8 +1,7 @@
 @let m = meeting();
 <article class="ms" [class.ms--split]="split()" aria-labelledby="ms-title">
   <header class="ms__head">
-    <div class="ms__bar">
-      <span class="ms__meta ell" [title]="metaLine()">{{ metaLine() }}</span>
+    <app-sheet-bar [bleed]="split()" [kicker]="metaLine()">
       @if (m.canManage && !phone()) {
         <app-button
           variant="text"
@@ -19,7 +18,7 @@
           (selected)="onMenu($event)"
         />
       }
-    </div>
+    </app-sheet-bar>
 
     <h2 id="ms-title" class="ms__title">{{ m.title }}</h2>
     <!-- Every part draws its dot before it; the line clips the dot of the first part on
@@ -87,12 +86,21 @@
                   <span class="ms__topTitle ell" [title]="row.title">
                     <span class="sr-only">{{ 'meetings.agenda.top' | t: { n: row.number } }}: </span>{{ row.title }}
                   </span>
-                  <span class="ms__topSub">
-                    {{ (row.item.applicationId ? 'meetings.agenda.kindApplication' : 'meetings.agenda.kindFreetext') | t }}
-                    @if (row.item.nonPublic) {
-                      <span aria-hidden="true"> · </span>{{ 'meetings.overview.nonPublic' | t }}
-                    }
-                  </span>
+                  <!-- A sub line only for an application or a non-public item: the number
+                       names the TOP, and "Freitext" says nothing. -->
+                  @if (row.item.applicationId || row.item.nonPublic) {
+                    <span class="ms__topSub">
+                      @if (row.item.applicationId) {
+                        {{ 'meetings.agenda.kindApplication' | t }}
+                      }
+                      @if (row.item.applicationId && row.item.nonPublic) {
+                        <span aria-hidden="true"> · </span>
+                      }
+                      @if (row.item.nonPublic) {
+                        {{ 'meetings.overview.nonPublic' | t }}
+                      }
+                    </span>
+                  }
                 </span>
                 @if (row.mark === 'done') {
                   <span class="ms__topMark">{{ 'meetings.dock.done' | t }}</span>

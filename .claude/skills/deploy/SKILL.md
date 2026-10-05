@@ -1,11 +1,11 @@
 ---
 name: deploy
-description: Single-VM docker-compose stack (web/migrate/api/worker/postgres/redis/minio/clamav/typst/altcha/backup) behind an external Nginx Proxy Manager, with nginx routing, alembic one-shot migrate, age-encrypted backup/restore, least-privilege DB roles, and .env config. Use when working on the compose topology, nginx reverse-proxy/CSP, deploy/update scripts, DB roles, or backup/restore in deploy/.
+description: Single-VM docker-compose stack (web/migrate/api/worker/postgres/redis/minio/clamav/typst/altcha/backup) behind an external Caddy reverse proxy, with nginx routing, alembic one-shot migrate, age-encrypted backup/restore, least-privilege DB roles, and .env config. Use when working on the compose topology, nginx reverse-proxy/CSP, deploy/update scripts, DB roles, or backup/restore in deploy/.
 ---
 
 # Deploy stack (one VM, docker-compose) — `deploy`
 
-**Does:** Defines the whole production stack as docker-compose for a single VM. The stack holds the SPA+nginx edge, the FastAPI api, the arq worker, a one-shot alembic migrate, Postgres/Redis/MinIO/ClamAV/typst/altcha, and a daily encrypted backup. An external Nginx Proxy Manager terminates TLS. Only `web` binds a host port (`127.0.0.1:8080`). Everything else is internal-only (no Internet ingress).
+**Does:** Defines the whole production stack as docker-compose for a single VM. The stack holds the SPA+nginx edge, the FastAPI api, the arq worker, a one-shot alembic migrate, Postgres/Redis/MinIO/ClamAV/typst/altcha, and a daily encrypted backup. An external Caddy reverse proxy terminates TLS. Only `web` binds a host port (`127.0.0.1:8080`). Everything else is internal-only (no Internet ingress).
 
 **Key files:**
 - `docker-compose.yml` — the full stack: 11 services, networks (`internal`, `typst_net` egress-less, `proxy`), volumes, healthchecks, `prod`/`backup` profiles.
@@ -26,7 +26,7 @@ description: Single-VM docker-compose stack (web/migrate/api/worker/postgres/red
 
 **Domain / data model:** Not an app domain module. This is infrastructure. The "model" is the service topology:
 - **Services:** `web` (nginx SPA + `/api` proxy, only host port `127.0.0.1:8080:80`), `migrate` (one-shot `alembic upgrade head`, `restart:no`), `api` (uvicorn `--proxy-headers`, no host port), `worker` (`arq worker.main.WorkerSettings`), `postgres:16-alpine`, `redis:7-alpine` (appendonly), `minio` (S3, console :9001), `clamav` (long ~5min signature load → 300s start_period), `typst` (md→pdf render service, typst_net only, read-only rootfs), `altcha` (ALTCHA Sentinel captcha, internal :8080), `backup` (`prod`/`backup` profiles only).
-- **Networks:** `internal` (bridge, no published ports → no ingress, egress allowed for SMTP/WebDAV/Webhooks/OIDC and the api's HTTPS to `gravatar.com` for the avatar proxy, see `be-avatars`), `typst_net` (`internal:true` → NO egress, api/worker↔typst render path, closes any exfil channel), `proxy` (in prod set `external:true` to reference the NPM-managed network).
+- **Networks:** `internal` (bridge, no published ports → no ingress, egress allowed for SMTP/WebDAV/Webhooks/OIDC and the api's HTTPS to `gravatar.com` for the avatar proxy, see `be-avatars`), `typst_net` (`internal:true` → NO egress, api/worker↔typst render path, closes any exfil channel), `proxy` (in prod set `external:true` to reference the network of the Caddy container).
 - **Volumes:** `pg_data`, `redis_data`, `minio_data`, `clamav_data`, `backups`, `altcha_data`.
 - **Startup ordering:** `migrate` waits on `postgres` healthy. `api`/`worker` wait on `migrate` `service_completed_successfully` + datastores healthy. `web` waits on `api` healthy. `worker` only waits for `clamav` *started* (the scan task retries until clamd is ready).
 - **DB roles:** `migrator` (DDL, `DB_MIGRATION_URL`), `app` (DML runtime, `DATABASE_URL`), optional `audit_writer` (INSERT/SELECT only). Migration 0001 (the baseline) sets the append-only trigger + conditional audit grant.
@@ -34,7 +34,7 @@ description: Single-VM docker-compose stack (web/migrate/api/worker/postgres/red
 **API surface:** No router here. nginx routes (`web/nginx.conf`): `GET /healthz` (container liveness, returns `ok`). `/api/` → `api:8000` (body cap 1m). `/api/applications/{id}/attachments`, `/api/apply/attachments` (draft uploads of the wizard, Z4) and `/api/invoices/(parse|file)` → larger 11m body cap. `/api/attachments/{id}/download` → its own location: the app sends the frame headers (the inline preview allows `frame-ancestors 'self'`), and the edge adds `X-Frame-Options: DENY` and a strict CSP only when the app sent none (`map $ap_download_xfo`/`$ap_download_csp`). `/api/ws/` → WS upgrade (3600s read timeout). `/.well-known/oauth-(authorization-server|protected-resource)` → api (MCP OAuth discovery). `/manifest.webmanifest` → `api:8000/api/manifest.webmanifest` (dynamic PWA manifest). The `map $ap_cache_control` gives `/api/principals/<id>/avatar` an EMPTY value, so `add_header` adds no `no-cache` beside the `Cache-Control: private, max-age=…` of the avatar proxy (every other `/api/` answer gets the server-level `no-cache` on top of its own header). `/` → SPA fallback (`try_files … /index.html`).
 
 **Conventions & gotchas:**
-- **Only `web` is host-bound** (`127.0.0.1:8080`). Never publish other service ports. The external NPM proxies to it (set `proxy` net `external:true` in prod).
+- **Only `web` is host-bound** (`127.0.0.1:8080`). Never publish other service ports. The external Caddy proxies to it (set `proxy` net `external:true` in prod).
 - **`ENVIRONMENT=production` is mandatory in prod** — it arms invoice-AV fail-closed + the X-Forwarded-* spoofing guard. `STRICT_SECURITY` (default on) keeps the hardening even when you forget it. The app default is `development`.
 - **`FORWARDED_ALLOW_IPS` must be the concrete direct upstream IP** (the web/nginx container net), NEVER whole RFC1918 ranges. A wider range lets any internal host spoof `X-Forwarded-For`. That gives a rate-limit bypass and a wrong audit IP. Production forbids `*`.
 - **`nginx.conf` is baked into the image AND bind-mounted** so prod edits (e.g. `set_real_ip_from` CIDR) need no rebuild. Edit the mounted file for the real proxy CIDR. CSP/security headers live here at the edge.

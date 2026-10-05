@@ -40,17 +40,6 @@
   justify-content: center;
 }
 
-/* The bar on top of the sheet: the gremium, the beamer and the menu. The same height as
-   the bar of the open application. */
-.vc__bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: 60px;
-}
-.vc--sheet .vc__bar {
-  margin-inline-end: calc(-1 * var(--space-3));
-}
 
 /* The vote below the bar: the reconnect line and the panel, in the rhythm of the sheet. */
 .vc__body {
@@ -72,9 +61,8 @@
   padding: 0;
   overflow: hidden;
 }
+/* The bar on top of the sheet (`app-sheet-bar`): the sheet padding moves into it. */
 .vc--ready.vc--sheet .vc__bar {
-  flex: none;
-  margin-inline-end: 0;
   padding-inline: var(--space-6) calc(var(--space-6) - var(--space-3));
 }
 .vc--ready.vc--sheet .vc__body {
@@ -105,12 +93,6 @@
   );
   -webkit-mask-image: var(--vc-fade);
   mask-image: var(--vc-fade);
-}
-.vc__meta {
-  flex: 1 1 auto;
-  min-width: 0;
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
 }
 
 .vc__line {

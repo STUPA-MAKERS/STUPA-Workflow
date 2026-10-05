@@ -109,10 +109,10 @@ export class TopSheetComponent {
 
   protected readonly tools = TOOLS;
 
-  /** "TOP 3 · Antrag". */
+  /** "TOP 3 · Antrag", or "TOP 3" for a free-text item ("Freitext" says nothing). */
   protected kindLine(t: AgendaItem): string {
-    const kind = t.applicationId ? 'meetings.agenda.kindApplication' : 'meetings.agenda.kindFreetext';
-    return `${this.i18n.translate('meetings.agenda.top', { n: this.topIndex() + 1 })} · ${this.i18n.translate(kind)}`;
+    const top = this.i18n.translate('meetings.agenda.top', { n: this.topIndex() + 1 });
+    return t.applicationId ? `${top} · ${this.i18n.translate('meetings.agenda.kindApplication')}` : top;
   }
 
   /**

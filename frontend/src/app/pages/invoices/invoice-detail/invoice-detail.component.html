@@ -1,8 +1,7 @@
 @let i = invoice();
 <article class="fd" [class.fd--split]="split()" aria-labelledby="id-title">
   <header class="fd__head">
-    <div class="fd__bar">
-      <span class="fd__meta ell" [title]="metaLine()">{{ metaLine() }}</span>
+    <app-sheet-bar [bleed]="split()" [kicker]="metaLine()">
       @if (phone()) {
         @if (canManage()) {
           <app-button variant="tonal" size="sm" (click)="edit.emit()">
@@ -32,7 +31,7 @@
       @if (menu().length) {
         <app-row-menu [label]="'invoices.detail.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />
       }
-    </div>
+    </app-sheet-bar>
     <h2 id="id-title" class="fd__title">{{ title() }}</h2>
     <p class="fd__line fd__seps">
       <span class="fd__parts">

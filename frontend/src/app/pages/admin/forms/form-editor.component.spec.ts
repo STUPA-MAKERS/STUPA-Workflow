@@ -64,6 +64,11 @@ async function setup(
   return { ...view, c, api, createFormVersion, updateApplicationType, setFormActive, toast };
 }
 
+// The suite renders the whole form builder (outline, question cards, ui-kit fields) in jsdom. One test takes 1–3 s alone, and more
+// than the default 5 s while the full run keeps every core busy, so local gates timed
+// out at random (CI passed). The same budget as the other heavy meeting suites.
+jest.setTimeout(15_000);
+
 describe('FormEditorComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
@@ -200,6 +205,23 @@ describe('FormEditorComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));
     const preview = screen.getByText('Titel', { selector: '.fe__pv-label' });
     expect(within(preview).getByText('*')).toBeInTheDocument();
+  });
+
+  it('shows an info text once in the preview, with a bold label only over its own help', async () => {
+    const { container } = await setup(
+      draft([
+        { key: 'i1', type: 'markdown', label: { de: 'Bitte Belege beilegen.', en: '' } },
+        { key: 'i2', type: 'markdown', label: { de: 'Gleich', en: '' }, help: { de: 'Gleich', en: '' } },
+        { key: 'i3', type: 'markdown', label: { de: 'Hinweis', en: '' }, help: { de: 'Mehr dazu.', en: '' } },
+      ]),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));
+    const labels = [...container.querySelectorAll('.fe__pv-label')].map((l) => l.textContent?.trim());
+    expect(labels).toEqual(['Hinweis']);
+    const texts = [...container.querySelectorAll('.fe__pv-md')].map((p) => p.textContent?.trim());
+    expect(texts).toEqual(['Bitte Belege beilegen.', 'Gleich', 'Mehr dazu.']);
+    expect(container.querySelectorAll('.fe__pv-help')).toHaveLength(0);
+    expect(screen.getAllByText('Gleich')).toHaveLength(1);
   });
 });
 

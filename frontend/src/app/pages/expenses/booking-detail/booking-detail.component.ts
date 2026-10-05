@@ -29,6 +29,7 @@ import {
   signedEur,
 } from '../../budget/expense-display.util';
 import { bookedOn } from '../../invoices/invoice-figures';
+import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
 
 /**
  * The detail of a booking (boards Fin-Buchungen, Fin-Schmal-Buchung, Fin-Tel-Buchung):
@@ -43,6 +44,7 @@ import { bookedOn } from '../../invoices/invoice-figures';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBarComponent,
     ButtonComponent,
     IconComponent,
     LocalizedDatePipe,

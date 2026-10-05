@@ -48,8 +48,10 @@ let nextId = 0;
  * (`afterRenderEffect`, before the browser paints) it enters the top layer, the frame
  * measures it and writes its place, and only then the class `cs--placed` makes it
  * visible. Until then CSS keeps it hidden, also outside the top layer. A
- * `ResizeObserver` on the popover, the anchor and the page places it again when the
- * layout changes (the feed loads, the calendar grid renders).
+ * `ResizeObserver` on the popover, the anchor and the containers of the anchor (up to
+ * `main`) places it again when the layout changes (the feed loads, the header gets a
+ * control). The page itself (`body`) is no use: on a pane page it never changes size.
+ * The window events `resize` and `scroll` catch the rest.
  *
  * A failed read says "could not be loaded" and offers a new read. A failed create of
  * the link says "could not be created" (`rotateError`); the URL that shows stays valid.
@@ -75,7 +77,6 @@ export class CalendarSubscribeComponent {
   /** A phone viewport: the bottom sheet instead of the popover. */
   readonly phone = mediaQuerySignal(MEDIA.phone);
   readonly isOpen = signal(false);
-  readonly position = signal({ top: 0, left: 0 });
   readonly headingId = `cs-title-${nextId++}`;
 
   readonly url = signal<string | null>(null);
@@ -170,15 +171,24 @@ export class CalendarSubscribeComponent {
     this.observe(el);
   }
 
-  /** Place the popover again when its size, the anchor or the page layout changes. */
+  /**
+   * Place the popover again when its size, the anchor or a container of the anchor
+   * changes. An anchor moves without a change of its own size when a box around it
+   * changes (a control appears beside it, the pane gets narrower), so each container up
+   * to `main` is observed too.
+   */
   private observe(el: HTMLElement): void {
     if (typeof ResizeObserver !== 'function') return;
     this.observer = new ResizeObserver(() => {
       if (this.isOpen() && !this.phone()) this.place();
     });
     this.observer.observe(el);
-    if (this.anchor) this.observer.observe(this.anchor);
-    this.observer.observe(document.body);
+    if (!this.anchor) return;
+    this.observer.observe(this.anchor);
+    for (let box = this.anchor.parentElement; box && box !== document.body; box = box.parentElement) {
+      this.observer.observe(box);
+      if (box.tagName === 'MAIN') break;
+    }
   }
 
   private unobserve(): void {
@@ -285,7 +295,7 @@ export class CalendarSubscribeComponent {
   /**
    * Under the anchor, aligned to its end, inside the viewport. The place goes straight
    * to the element (no template binding, which would wait for the next change detection
-   * and start at 0/0); `position` keeps a copy.
+   * and start at 0/0).
    */
   private place(): void {
     const pop = this.pop()?.nativeElement;
@@ -302,7 +312,6 @@ export class CalendarSubscribeComponent {
     }
     pop.style.top = `${top}px`;
     pop.style.left = `${left}px`;
-    this.position.set({ top, left });
   }
 }
 

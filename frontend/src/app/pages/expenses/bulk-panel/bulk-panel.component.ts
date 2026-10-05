@@ -22,6 +22,7 @@ import {
   shortDate,
   signedEur,
 } from '../../budget/expense-display.util';
+import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
 
 /**
  * The bulk actions of the selected bookings (board Fin-Buchungen-Auswahl). Side by side
@@ -36,6 +37,7 @@ import {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBarComponent,
     ButtonComponent,
     CostCentreTreeComponent,
     FormsModule,

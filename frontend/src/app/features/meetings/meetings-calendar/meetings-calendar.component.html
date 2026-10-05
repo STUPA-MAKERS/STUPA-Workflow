@@ -1,14 +1,24 @@
 <div class="cal">
-  <!-- The same header as the list view: the title, the switch and the actions do not
-       move when the view changes. -->
+  <!-- The same header as the list view: the switch and the Abo button close the header
+       in both views, so they keep their order when the view changes. -->
   <app-page-header [pane]="true" [title]="'meetings.title' | t">
-    <app-meetings-view-switch heading value="calendar" (valueChange)="viewChange.emit($event)" />
-    @if (canCreate()) {
-      <app-button actions variant="fill" (click)="create.emit()">
-        <app-icon name="plus" [size]="17" />
-        {{ 'meetings.list.new' | t }}
-      </app-button>
-    }
+    <ng-container ngProjectAs="[actions]">
+      @if (canCreate()) {
+        <app-button class="cal__new" variant="fill" (click)="create.emit()">
+          <app-icon name="plus" [size]="17" />
+          {{ 'meetings.list.new' | t }}
+        </app-button>
+      }
+      <app-meetings-view-switch value="calendar" (valueChange)="viewChange.emit($event)" />
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.overview.subscribe' | t"
+        [ariaPressed]="abo.isOpen()"
+        (click)="abo.toggle($event.currentTarget)"
+      ><app-icon name="cal" [size]="21" /></app-button>
+      <app-calendar-subscribe #abo />
+    </ng-container>
   </app-page-header>
 
   <div class="cal__tools" role="toolbar" [attr.aria-label]="'meetings.overview.toolbar' | t">
@@ -52,14 +62,6 @@
           [active]="timeline.gremiumFilter() !== ''"
         />
       }
-      <app-button
-        variant="text"
-        [iconOnly]="true"
-        [ariaLabel]="'meetings.overview.subscribe' | t"
-        [ariaPressed]="abo.isOpen()"
-        (click)="abo.toggle($event.currentTarget)"
-      ><app-icon name="cal" [size]="21" /></app-button>
-      <app-calendar-subscribe #abo />
     </div>
   </div>
 
@@ -117,9 +119,11 @@
   </div>
 
   <aside class="cal__panel" [attr.aria-label]="'meetings.overview.panel' | t">
+    <!-- The selected day is the kicker of the panel, in the same bar as on every other
+         detail sheet. It stays fixed; only the content below it scrolls. -->
+    <app-sheet-bar class="cal__dayHead" kickerId="cal-day" [kicker]="dayHeading()" aria-live="polite" />
     <div class="cal__panelScroll" appScrollFade="y">
       <section class="cal__daySec" aria-labelledby="cal-day" aria-live="polite">
-        <h2 id="cal-day" class="cal__dayHead">{{ dayHeading() }}</h2>
         @if (error()) {
           <p class="cal__note cal__note--error" role="alert">{{ 'meetings.overview.calendarError' | t }}</p>
         } @else if (loading() && !dayCards().length) {

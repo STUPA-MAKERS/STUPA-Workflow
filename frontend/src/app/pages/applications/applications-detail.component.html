@@ -61,8 +61,7 @@
   } @else {
     <article class="ad" [class.ad--split]="split()" aria-labelledby="ad-title">
       <header class="ad__head">
-        <div class="ad__bar">
-          <span class="ad__meta ell" [title]="metaLine()">{{ metaLine() }}</span>
+        <app-sheet-bar [bleed]="split()" [kicker]="metaLine()">
           @if (!phone()) {
             <!-- Outside the edit right: `application.share` decides who may read the
                  record, not who may edit it. -->
@@ -101,7 +100,7 @@
               (selected)="onMenu($event)"
             />
           }
-        </div>
+        </app-sheet-bar>
 
         <h2 id="ad-title" class="ad__title">{{ title() }}</h2>
         <!-- Every part draws its dot before it (CSS). The line clips the dot of the first

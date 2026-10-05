@@ -23,6 +23,7 @@ import {
   vatRate,
 } from '../../budget/expense-display.util';
 import { bookedOn } from '../invoice-figures';
+import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
 
 /**
  * The detail of an invoice (boards Fin-Rechnungen, Fin-Schmal-Rechnung, Fin-Tel-Rechnung):
@@ -38,6 +39,7 @@ import { bookedOn } from '../invoice-figures';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBarComponent,
     ButtonComponent,
     IconComponent,
     LocalizedDatePipe,

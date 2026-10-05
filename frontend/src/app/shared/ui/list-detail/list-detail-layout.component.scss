@@ -28,6 +28,9 @@
 :host(.ld--split) .ld__list {
   flex: none;
   width: var(--ld-list-width);
+  /* The list column (`.ld-pane`, styles.scss) takes the full height and scrolls only its
+     rows. The column reads this property, not the class of this host. */
+  --ld-pane-height: 100%;
 }
 :host(.ld--split) .ld__detail {
   flex: 1 1 0;

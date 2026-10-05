@@ -41,8 +41,7 @@
             }
           </app-vote-phone-header>
         } @else {
-          <div class="vc__bar">
-            <span class="vc__meta ell" [title]="sheetMeta() ?? ''">{{ sheetMeta() }}</span>
+          <app-sheet-bar class="vc__bar" [kicker]="sheetMeta()">
             @if (beamerLink()) {
               <app-button variant="outlined" size="sm" (click)="goBeamer()">
                 <app-icon name="monitor" [size]="16" />
@@ -58,7 +57,7 @@
                 (selected)="onMenu($event.id)"
               />
             }
-          </div>
+          </app-sheet-bar>
         }
 
         <!-- Side by side only this part scrolls, under the bar, with the shared fade at

@@ -6,7 +6,7 @@ applications, run meetings with live votes and a protocol, and manage cost cente
 budgets and invoices. The platform versions and audits all of it.
 
 Monorepo, one VM, `docker compose`. Internally everything speaks plain HTTP. An
-**external Nginx Proxy Manager** in front of the stack terminates TLS. The stack does not
+**external Caddy reverse proxy** in front of the stack terminates TLS. The stack does not
 handle certificates and does not contain a built-in identity provider.
 
 Full documentation in the [Wiki](https://github.com/STUPA-MAKERS/STUPA-Workflow/wiki).

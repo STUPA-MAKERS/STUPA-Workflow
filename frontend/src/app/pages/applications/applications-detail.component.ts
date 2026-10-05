@@ -85,6 +85,7 @@ import { ForceStatusDialogComponent } from './force-status-dialog/force-status-d
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
 import { mediaQuerySignal } from '../../layout/media-query';
 import { RailStatusService } from '../../layout/rail-status.service';
+import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
 
 /** Field types whose old and new value do not fit on one line of the history. The
  *  history opens them as blocks below the change ("Werte anzeigen"). */
@@ -119,6 +120,7 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBarComponent,
     NgTemplateOutlet,
     RouterLink,
     FormsModule,

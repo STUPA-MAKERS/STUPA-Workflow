@@ -70,7 +70,8 @@ Components:
   browser grant
 - **typst** — internal Markdown→PDF render service (`typst/`), data-driven Typst template,
   calibrated pytex layout, variants
-- **deploy** — docker-compose production stack (`deploy/`), services, networking
+- **deploy** — docker-compose production stack (`deploy/`) behind an external Caddy reverse
+  proxy (the TLS edge), services, networking
 
 ## Memory (`.claude/memory/`)
 

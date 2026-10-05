@@ -591,17 +591,17 @@ describe('VoteCastComponent', () => {
 
     it('names the gremium of the meeting in the bar', async () => {
       await setup({ page: { split: true } });
-      expect(document.querySelector('.vc__meta')).toHaveTextContent('StuPa');
+      expect(document.querySelector('.sheet-bar__kicker')).toHaveTextContent('StuPa');
     });
 
     it('names the gremium of the list row for a vote without a meeting', async () => {
       await setup({ page: { split: true }, vote: vote({ meetingId: null }) });
-      expect(document.querySelector('.vc__meta')).toHaveTextContent('Haushaltsausschuss');
+      expect(document.querySelector('.sheet-bar__kicker')).toHaveTextContent('Haushaltsausschuss');
     });
 
     it('leaves the bar line empty without a gremium', async () => {
       await setup({ page: { split: true }, vote: vote({ id: 'v9', meetingId: null }) });
-      expect(document.querySelector('.vc__meta')).toHaveTextContent('');
+      expect(document.querySelector('.sheet-bar__kicker')).toHaveTextContent('');
     });
 
     it('tells the list about a cast and stays on the vote', async () => {

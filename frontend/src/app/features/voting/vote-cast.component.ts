@@ -36,6 +36,7 @@ import { VotePanelComponent } from './vote-panel/vote-panel.component';
 import { NO_CONTEXT, type VoteContext, loadVoteContext } from './vote-panel/vote-context';
 import { VotingPageService } from './voting-page/voting-page.service';
 import { BEAMER_FROM_PARAM } from './beamer-link.util';
+import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
 
 type Phase = 'loading' | 'error' | 'ready';
 
@@ -81,6 +82,7 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetBarComponent,
     RouterLink,
     ButtonComponent,
     DialogComponent,

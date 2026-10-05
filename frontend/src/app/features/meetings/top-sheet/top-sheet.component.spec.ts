@@ -47,7 +47,8 @@ function editorOf(view: Awaited<ReturnType<typeof setup>>): MarkdownEditorCompon
 describe('TopSheetComponent', () => {
   it('names the item, its kind and the save state', async () => {
     await setup();
-    expect(screen.getByText(/TOP 1 · Freitext/)).toBeInTheDocument();
+    expect(screen.getByText('TOP 1')).toBeInTheDocument();
+    expect(screen.queryByText(/Freitext/)).toBeNull();
     expect(screen.getByRole('heading', { level: 1, name: 'Begrüßung' })).toBeInTheDocument();
     expect(screen.getByText('Gespeichert')).toBeInTheDocument();
     expect(screen.getByText('Entwurf')).toBeInTheDocument();

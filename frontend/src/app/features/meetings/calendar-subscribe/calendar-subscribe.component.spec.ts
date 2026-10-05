@@ -207,10 +207,10 @@ describe('CalendarSubscribeComponent', () => {
   });
 
   it('toggles with the anchor and keeps its place on a resize', async () => {
-    const { openIt, anchor, fixture, cmp } = await setup();
+    const { openIt, anchor, fixture } = await setup();
     await openIt();
     window.dispatchEvent(new Event('resize'));
-    expect(cmp.position().top).toBeGreaterThanOrEqual(0);
+    expect(parseFloat(document.querySelector<HTMLElement>('.cs--pop')!.style.top)).toBeGreaterThanOrEqual(0);
     await userEvent.click(anchor);
     fixture.detectChanges();
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -218,7 +218,7 @@ describe('CalendarSubscribeComponent', () => {
   });
 
   it('opens above the anchor when it does not fit below', async () => {
-    const { openIt, anchor, cmp } = await setup();
+    const { openIt, anchor } = await setup();
     const rect = (top: number, h: number) =>
       ({ top, bottom: top + h, left: 900, right: 940, width: 40, height: h, x: 900, y: top }) as DOMRect;
     jest.spyOn(anchor, 'getBoundingClientRect').mockReturnValue(rect(700, 40));
@@ -229,7 +229,7 @@ describe('CalendarSubscribeComponent', () => {
         return this.classList.contains('cs--pop') ? rect(0, 300) : original.call(this);
       });
     await openIt();
-    expect(cmp.position().top).toBe(700 - 6 - 300);
+    expect(document.querySelector<HTMLElement>('.cs--pop')!.style.top).toBe(`${700 - 6 - 300}px`);
     jest.restoreAllMocks();
   });
 
@@ -417,23 +417,67 @@ describe('CalendarSubscribeComponent', () => {
       await openIt();
       expect(observers).toHaveLength(1);
       const [ro] = observers;
-      expect(ro.targets).toEqual([document.querySelector('.cs--pop'), anchor, document.body]);
-      expect(cmp.position().top).toBe(146);
+      // The popover, the anchor and each container of the anchor, not the page: on a
+      // pane page the body never changes size.
+      expect(ro.targets.slice(0, 3)).toEqual([document.querySelector('.cs--pop'), anchor, anchor.parentElement]);
+      expect(ro.targets).not.toContain(document.body);
+      const top = () => document.querySelector<HTMLElement>('.cs--pop')!.style.top;
+      expect(top()).toBe('146px');
       // The calendar grid renders below the toolbar and moves the anchor.
       anchorTop = 160;
       ro.cb();
-      expect(cmp.position().top).toBe(206);
-      expect(document.querySelector<HTMLElement>('.cs--pop')!.style.top).toBe('206px');
+      expect(top()).toBe('206px');
       cmp.close();
       fixture.detectChanges();
       expect(ro.disconnect).toHaveBeenCalled();
       // A late callback after the close places nothing.
+      const pop = document.querySelector<HTMLElement>('.cs--pop');
       anchorTop = 300;
       ro.cb();
-      expect(cmp.position().top).toBe(206);
+      expect(pop?.style.top ?? '206px').toBe('206px');
       fixture.destroy();
     } finally {
       spy.mockRestore();
+      (globalThis as { ResizeObserver?: unknown }).ResizeObserver = originalRO;
+    }
+  });
+
+  it('observes the containers of the anchor up to main, and only the popover without one', async () => {
+    const observers: { targets: Element[] }[] = [];
+    const originalRO = (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
+      readonly entry = { targets: [] as Element[] };
+      constructor() {
+        observers.push(this.entry);
+      }
+      observe(el: Element): void {
+        this.entry.targets.push(el);
+      }
+      disconnect(): void {}
+    };
+    const outer = document.createElement('div');
+    const main = document.createElement('main');
+    const row = document.createElement('div');
+    const anchor = document.createElement('button');
+    outer.append(main);
+    main.append(row);
+    row.append(anchor);
+    document.body.append(outer);
+    try {
+      const { cmp, fixture } = await setup();
+      cmp.open(anchor);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(observers.at(-1)!.targets).toEqual([document.querySelector('.cs--pop'), anchor, row, main]);
+      cmp.close(false);
+      fixture.detectChanges();
+      cmp.open();
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(observers.at(-1)!.targets).toEqual([document.querySelector('.cs--pop')]);
+      fixture.destroy();
+    } finally {
+      outer.remove();
       (globalThis as { ResizeObserver?: unknown }).ResizeObserver = originalRO;
     }
   });

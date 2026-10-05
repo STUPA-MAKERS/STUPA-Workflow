@@ -157,13 +157,17 @@ async function setup(
 describe('SubstitutePoolComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('lists the entries with the member they represent', async () => {
+  it('lists the entries as "member → substitute" under one heading', async () => {
     await setup();
-    const rows = within(screen.getByRole('list', { name: 'Einzelne Einträge' })).getAllByRole(
+    const rows = within(screen.getByRole('list', { name: 'Stellvertretungen' })).getAllByRole(
       'listitem',
     );
-    expect(rows[0]).toHaveTextContent('Fabi Fachschaft');
-    expect(rows[0]).toHaveTextContent('Alle Mitglieder');
+    // An entry for the whole Gremium reads "Für alle Mitglieder → substitute".
+    expect(rows[0]).toHaveTextContent(/^Für alle Mitglieder\s*vertreten durch.*Fabi Fachschaft$/);
+    // One heading only: no "Einzelne Einträge", no column names over the rows.
+    expect(screen.getAllByRole('heading')).toHaveLength(1);
+    expect(screen.queryByText('Einzelne Einträge')).toBeNull();
+    expect(document.querySelector('.cap')).toBeNull();
     expect(rows[1]).toHaveTextContent('Robin');
     // A missing name falls back to the member list, then to a placeholder.
     expect(rows[2]).toHaveTextContent('Toni');
@@ -205,7 +209,7 @@ describe('SubstitutePoolComponent', () => {
     // The members are the choices of "Vertritt", one per person.
     const select = within(dialog).getByRole('combobox', { name: 'Vertritt' }) as HTMLSelectElement;
     expect([...select.options].map((o) => o.textContent?.trim())).toEqual([
-      'Alle Mitglieder',
+      'Für alle Mitglieder',
       '(ohne Namen)',
       'robin@x.de',
       'Toni',

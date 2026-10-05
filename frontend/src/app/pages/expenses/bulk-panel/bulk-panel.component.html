@@ -61,12 +61,11 @@
 } @else {
   <article class="fd fd--split bp" aria-labelledby="bp-title">
     <header class="fd__head">
-      <div class="fd__bar">
-        <span class="fd__meta">{{ 'ui.selection.toolbar' | t }}</span>
+      <app-sheet-bar [bleed]="true" [kicker]="'ui.selection.toolbar' | t">
         <app-button variant="text" [iconOnly]="true" [ariaLabel]="'expenses.bulk.stop' | t" (click)="closed.emit()">
           <app-icon name="x" [size]="20" />
         </app-button>
-      </div>
+      </app-sheet-bar>
       <h2 id="bp-title" class="fd__title">{{ 'expenses.bulk.title' | t: { count: rows().length } }}</h2>
       <p class="fd__line fd__seps">
         <span class="fd__parts">

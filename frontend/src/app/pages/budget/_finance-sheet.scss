@@ -33,20 +33,6 @@
   padding-bottom: 22px;
   border-bottom: var(--border-width) solid var(--color-border);
 }
-.fd__bar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  min-height: 60px;
-}
-.fd--split .fd__bar {
-  margin-inline-end: calc(-1 * var(--space-3));
-}
-.fd__meta {
-  flex: 1 1 auto;
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-}
 .fd__title {
   margin: 0;
   font-size: var(--fs-d2);

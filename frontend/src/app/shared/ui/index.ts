@@ -40,6 +40,7 @@ export type { SearchPillMode } from './search-pill/search-pill.component';
 export { SegBarComponent } from './seg-bar/seg-bar.component';
 export type { Seg, SegBarSize, SegTone } from './seg-bar/seg-bar.component';
 export { SelectionBarComponent } from './selection-bar/selection-bar.component';
+export { SheetBarComponent } from './sheet-bar/sheet-bar.component';
 export { SideSheetComponent } from './side-sheet/side-sheet.component';
 export type { SheetSide } from './side-sheet/side-sheet.component';
 export { SkeletonComponent } from './skeleton/skeleton.component';
