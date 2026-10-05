@@ -14,6 +14,7 @@ import { USE_MOCK_API } from '@core/api/api.config';
 import type { Meeting, MeetingOutWire, ProtocolOutWire } from '@core/api/models';
 import { WsService, type MeetingChannel } from '@core/ws/ws.service';
 import type { ServerMessage } from '@core/ws/ws-messages';
+import { AGENDA } from '../../../testing/meeting-fixtures';
 import { MeetingAgendaService } from './meeting-agenda.service';
 import { MeetingSessionService } from './meeting-session.service';
 import { MeetingsComponent } from './meetings.component';
@@ -428,6 +429,56 @@ describe('MeetingsComponent', () => {
 
     await screen.findByText('Final');
     expect(container.querySelector('.mtg__saveState')).toBeNull();
+  });
+
+  /** A closed meeting whose last keeper is somebody else, with a closed vote on TOP 1. */
+  const CLOSED_BY_OTHER: MeetingOutWire = {
+    ...MEETING,
+    status: 'closed',
+    protokollantId: 'pr-x',
+    protokollantName: 'Lea Hoffmann',
+    isProtokollant: false,
+    votes: [
+      {
+        id: 'v-9',
+        applicationId: null,
+        agendaItemId: 't-1',
+        title: 'Beschluss',
+        status: 'closed',
+        result: 'passed',
+        counts: { yes: 3, no: 1 },
+        leading: 'yes',
+        closesAt: null,
+      },
+    ],
+  };
+  const flushClosed = (http: HttpTestingController, status: 'draft' | 'final') => {
+    http.expectOne('/api/meetings/m-1').flush(CLOSED_BY_OTHER);
+    http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status });
+    http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([
+      { id: 't-1', applicationId: null, title: 'Haushalt', body: 'Aussprache.', position: 0, nonPublic: false },
+    ]);
+    flushDelegationContext(http);
+  };
+
+  it('lets every writer edit the draft of a closed meeting, not only the last keeper (O22)', async () => {
+    const { http, fixture } = await setup();
+    flushClosed(http, 'draft');
+    fixture.detectChanges();
+    expect((fixture.componentInstance as Cmp).canEditProtocol()).toBe(true);
+    expect(await screen.findByRole('toolbar', { name: 'Format' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeInTheDocument();
+  });
+
+  it('keeps the final protocol of a closed meeting locked for every writer', async () => {
+    const { http, fixture } = await setup();
+    flushClosed(http, 'final');
+    await screen.findByText('Final');
+    // The right stays; the lock of the protocol takes the editor away.
+    expect((fixture.componentInstance as Cmp).canEditProtocol()).toBe(true);
+    expect(screen.queryByRole('toolbar', { name: 'Format' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeNull();
   });
 
   it('retries a failed finalize via the toolbar repeat button', async () => {
@@ -1644,6 +1695,26 @@ describe('MeetingsComponent — methods', () => {
         .expectOne('/api/meetings/m-1/protokollant-handover')
         .flush(null, { status: 500, statusText: 'e' });
       expect(error.mock.lastCall?.[0]).toBe('Aktion fehlgeschlagen.');
+    });
+
+    it('keeps the handover dialog open on a pick of "with the next TOP" and sends it (Z3, O1)', async () => {
+      const { cmp, http, fixture } = await loaded();
+      services(fixture).agenda.agenda.set(AGENDA);
+      cmp.attendance.set([PR9]);
+      cmp.askHandover('pr-9');
+      fixture.detectChanges();
+      const dialog = await screen.findByRole('dialog', { name: 'Protokollführung übergeben' });
+      const next = within(dialog).getByRole('radio', { name: /Ab nächstem TOP/ });
+      // The native change event of the radio bubbles to the host of the dialog. It must
+      // not reach an output binding there and close the dialog.
+      await userEvent.click(next);
+      fixture.detectChanges();
+      expect(screen.getByRole('dialog', { name: 'Protokollführung übergeben' })).toBe(dialog);
+      expect(next).toBeChecked();
+      expect(screen.queryByText('Protokollführung übergeben an')).toBeNull();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+      const req = http.expectOne('/api/meetings/m-1/protokollant-handover');
+      expect(req.request.body).toEqual({ principalId: 'pr-9', mode: 'next_item' });
     });
 
     it('goes back from the handover dialog to the picker of the dock', async () => {

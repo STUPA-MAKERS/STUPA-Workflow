@@ -26,7 +26,7 @@ interface Inputs {
 }
 
 async function setup(over: Partial<Inputs> = {}) {
-  const on = { closed: jest.fn(), change: jest.fn(), confirm: jest.fn() };
+  const on = { closed: jest.fn(), repick: jest.fn(), confirm: jest.fn() };
   const view = await render(HandoverDialogComponent, {
     inputs: {
       meeting: meeting({ currentAgendaItemId: 't-2', keeperPeriods: [RUNNING] }),
@@ -52,7 +52,40 @@ describe('HandoverDialogComponent', () => {
     expect(within(dialog()).getByText('Neu')).toBeInTheDocument();
     expect(within(dialog()).getByText('Mika Mitglied')).toBeInTheDocument();
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Ändern' }));
-    expect(on.change).toHaveBeenCalled();
+    expect(on.repick).toHaveBeenCalled();
+  });
+
+  it('lets a pick of a mode reach no output of the host (the native change event bubbles)', async () => {
+    const repick = jest.fn();
+    const closed = jest.fn();
+    const confirm = jest.fn();
+    await render(
+      `<app-handover-dialog [meeting]="m" [agenda]="agenda" [target]="target"
+        (repick)="repick()" (closed)="closed()" (confirm)="confirm($event)" />`,
+      {
+        imports: [HandoverDialogComponent],
+        componentProperties: {
+          m: meeting({ currentAgendaItemId: 't-2', keeperPeriods: [RUNNING] }),
+          agenda: AGENDA,
+          target: MIKA,
+          repick,
+          closed,
+          confirm,
+        },
+      },
+    );
+    const next = within(dialog()).getByRole('radio', { name: /Ab TOP 3/ });
+    await userEvent.click(next);
+    expect(next).toBeChecked();
+    expect(repick).not.toHaveBeenCalled();
+    expect(closed).not.toHaveBeenCalled();
+    await userEvent.keyboard('{ArrowUp}');
+    expect(within(dialog()).getByRole('radio', { name: /Ab jetzt/ })).toBeChecked();
+    expect(repick).not.toHaveBeenCalled();
+    await userEvent.keyboard('{ArrowDown}');
+    expect(next).toBeChecked();
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Übergeben' }));
+    expect(confirm).toHaveBeenCalledWith('next_item');
   });
 
   it('hands over now, in the current TOP, and previews the head of the protocol (O1, O2)', async () => {

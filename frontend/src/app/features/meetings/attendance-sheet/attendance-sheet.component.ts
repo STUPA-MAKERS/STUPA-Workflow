@@ -145,8 +145,11 @@ export class AttendanceSheetComponent {
   readonly conflictId = input<Uuid | null>(null);
 
   readonly statusChange = output<AttendanceChange>();
-  /** The lead resets a row to "open". */
-  readonly reset = output<Attendance>();
+  /**
+   * The lead resets a row to "open". The name is not `reset`: a native `reset` event of a
+   * form in the sheet would bubble to the host and reach a `(reset)` binding.
+   */
+  readonly statusReset = output<Attendance>();
   /** O23: the delegation of this member (the `conflictId`) was revoked; clear the mark. */
   readonly conflictResolved = output<Uuid>();
 
@@ -298,7 +301,7 @@ export class AttendanceSheetComponent {
   protected choose(row: Row, option: ChoiceOption): void {
     if (option.blocked || this.saving() || option.value === row.value) return;
     if (option.value === 'open') {
-      this.reset.emit(row.a);
+      this.statusReset.emit(row.a);
       return;
     }
     this.statusChange.emit({ member: row.a, status: option.value });
@@ -329,11 +332,17 @@ export class AttendanceSheetComponent {
   /**
    * The tab stop of a row: the option the arrow keys moved to, else the chosen one. So
    * Tab leaves the row from where the focus is, and comes back to the chosen option.
+   * When no option has that value (the own row of a member is "open", and the member
+   * has no "Offen" option), the first option that is not blocked is the tab stop. So
+   * the control always has one tab stop.
    */
   protected tabStop(row: Row, option: ChoiceOption): 0 | -1 {
+    const options = row.options ?? [];
     const f = this.focused();
     const value = f?.id === row.a.principalId ? f.value : row.value;
-    return option.value === value ? 0 : -1;
+    const stop =
+      options.find((o) => o.value === value) ?? options.find((o) => !o.blocked) ?? options[0];
+    return option === stop ? 0 : -1;
   }
 
   /** The focus left the control of a row: its tab stop is the chosen option again. */

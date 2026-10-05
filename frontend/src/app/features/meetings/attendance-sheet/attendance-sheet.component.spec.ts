@@ -87,7 +87,7 @@ async function setup(
       conflictId: null,
       ...over,
     },
-    on: { statusChange, reset, conflictResolved },
+    on: { statusChange, statusReset: reset, conflictResolved },
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
@@ -199,6 +199,26 @@ describe('AttendanceSheetComponent', () => {
     expect(within(sheet()).getAllByRole('radiogroup')).toHaveLength(1);
     expect(within(sheet()).getAllByText('Abwesend', { selector: 'app-status-text' }).length).toBeGreaterThan(0);
     expect(within(sheet()).getByText('Offen', { selector: 'app-status-text' })).toBeInTheDocument();
+  });
+
+  it('gives the open own row of a member a tab stop on "Anwesend"', async () => {
+    const roster: Attendance[] = [{ ...ROSTER[0], status: null, source: null }, ...ROSTER.slice(1)];
+    await setup({ meeting: meeting({ canControl: false }), attendance: roster });
+    const own = row('Pia Protokoll');
+    expect(within(own).getByRole('radio', { name: 'Anwesend' })).toHaveAttribute('tabindex', '0');
+    expect(within(own).getByRole('radio', { name: 'Abwesend' })).toHaveAttribute('tabindex', '-1');
+    expect(within(own).getAllByRole('radio').every((r) => r.getAttribute('aria-checked') === 'false')).toBe(true);
+  });
+
+  it('gives the open own row the tab stop on "Abwesend" while a delegation blocks "Anwesend" (O23)', async () => {
+    const roster: Attendance[] = [{ ...ROSTER[0], status: null, source: null }, ...ROSTER.slice(1)];
+    await setup(
+      { meeting: meeting({ canControl: false }), attendance: roster },
+      [delegation({ delegatorId: 'pr-1', delegatorName: 'Pia Protokoll' })],
+    );
+    const own = row('Pia Protokoll');
+    expect(within(own).getByRole('radio', { name: 'Anwesend' })).toHaveAttribute('tabindex', '-1');
+    expect(within(own).getByRole('radio', { name: 'Abwesend' })).toHaveAttribute('tabindex', '0');
   });
 
   it('locks the own row of a member once the lead set it (O15)', async () => {

@@ -68,7 +68,7 @@ export class HandoverDialogComponent {
 
   readonly closed = output<void>();
   /** "Ändern": pick another member. */
-  readonly change = output<void>();
+  readonly repick = output<void>();
   /** "Übergeben" in the chosen mode. */
   readonly confirm = output<HandoverMode>();
 

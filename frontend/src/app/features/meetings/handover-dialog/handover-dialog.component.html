@@ -19,7 +19,7 @@
           <span class="hd__small">{{ 'meetings.handoverDialog.after' | t }}</span>
           <span class="hd__name ell" [title]="targetName()">{{ targetName() }}</span>
         </span>
-        <app-button variant="text" size="sm" (click)="change.emit()">{{ 'meetings.handoverDialog.change' | t }}</app-button>
+        <app-button variant="text" size="sm" (click)="repick.emit()">{{ 'meetings.handoverDialog.change' | t }}</app-button>
       </div>
 
       <fieldset class="hd__modes">

@@ -44,13 +44,14 @@ const TOOLS: readonly FormatTool[] = [
  * The sheet of the open agenda item: "TOP 3 · Antrag", the title, "Antrag öffnen", the
  * format bar with the save state, and the Markdown editor of the text.
  *
- * Only the minute-taker types (`editable`); everybody else with write access reads the
- * same sheet, and its foot says who keeps the minutes and the state of the protocol.
+ * In a live meeting only the minute-taker types (`editable`); everybody else with write
+ * access reads the same sheet, and its foot says who keeps the minutes and the state of
+ * the protocol.
  *
  * A closed meeting (boards Sitzung-Protokoll-Entwurf, Sitzung-Geschlossen): the protocol
  * bar on top (draft and "Finalisieren & versenden", or final and the PDF links) and the
  * keeper line below the title, "Protokoll: Lara Leitung (TOP 1–3), Uli Übernahme (ab TOP 3,
- * 18:55)". The text stays editable while the protocol is a draft (O22).
+ * 18:55)". The text stays editable for every writer while the protocol is a draft (O22).
  *
  * A vote result in the text shows as a card with "Beschluss · 18:52 · Einfache Mehrheit",
  * the counts and the result (a tie is "Abgelehnt", O18), from the votes of this meeting.

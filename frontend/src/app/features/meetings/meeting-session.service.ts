@@ -113,15 +113,20 @@ export class MeetingSessionService implements OnDestroy {
     return !m.canWrite && !m.canManage;
   });
   /**
-   * Write the minutes. Two people must not type into one protocol, so after a
-   * protokollant is named only that person edits it. Everybody else with
+   * Write the minutes. Two people must not type into one protocol, so in a live
+   * meeting with a named protokollant only that person edits it. Everybody else with
    * `canWrite` reads the pane. The server grants `canWrite` to the protokollant,
    * the manager and any `protocol.write` role alike, so this last step is the
    * frontend's alone.
+   *
+   * After the close there is no live keeper to protect. Every writer edits the draft
+   * (O22): the session lead, the finalizer and an earlier keeper, not only the last
+   * one. A final protocol stays locked through `Protocol.isLocked`.
    */
   readonly canEditProtocol = computed(() => {
     const m = this.meeting();
     if (!m?.canWrite) return false;
+    if (m.status === 'closed') return true;
     return !m.protokollantId || this.isProtokollant();
   });
 
