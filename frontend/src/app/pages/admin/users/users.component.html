@@ -14,19 +14,22 @@
     }
   </app-note>
 
-  <!-- The search never scrolls away: it sticks to the top while the list scrolls. -->
+  <!-- The search never scrolls away: it sticks to the top while the list scrolls. It
+       searches while the user types; there is no "Suchen" button. -->
   <app-sticky-bar>
-    <form class="au__search" role="search" (submit)="$event.preventDefault(); search()">
+    <div class="au__search" role="search">
       <app-search-pill
         class="au__pill"
         size="md"
+        [clearable]="true"
         [placeholder]="'admin.users.searchPlaceholder' | t"
         [label]="'admin.users.search' | t"
-        [value]="query()"
-        (valueChange)="query.set($event)"
+        [busy]="search.pending() && !loading()"
+        [value]="search.text()"
+        (valueChange)="search.set($event)"
+        (commit)="search.flush()"
       />
-      <app-button type="submit" variant="fill">{{ 'admin.users.searchAction' | t }}</app-button>
-    </form>
+    </div>
   </app-sticky-bar>
 
   @if (loading()) {

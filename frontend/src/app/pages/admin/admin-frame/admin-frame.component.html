@@ -15,6 +15,7 @@
       <app-sticky-bar class="af__search">
         <app-search-pill
           size="md"
+          [clearable]="true"
           [placeholder]="'admin.frame.search' | t"
           [value]="query()"
           (valueChange)="query.set($event)"

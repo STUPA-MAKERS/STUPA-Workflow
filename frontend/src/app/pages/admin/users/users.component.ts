@@ -6,6 +6,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
+import { liveSearch } from '@shared/live-search';
 import {
   AvatarComponent,
   EmptyStateComponent,
@@ -60,7 +61,21 @@ export class UsersComponent {
   /** OIDC `sub` of the logged-in user. The view uses it to block self-deactivation. */
   protected readonly mySub = computed(() => this.auth.principal()?.sub ?? null);
 
-  protected readonly query = signal('');
+  /**
+   * The search runs while the user types (debounced, a new query cancels the old
+   * request). Below two characters the list shows every user.
+   */
+  protected readonly search = liveSearch<AdminPrincipal[]>({
+    run: (q) => this.api.listPrincipals(q),
+    result: (list) => {
+      this.principals.set(list);
+      this.loading.set(false);
+    },
+    error: () => {
+      this.loading.set(false);
+      this.toast.error(this.i18n.translate('admin.users.loadFailed'));
+    },
+  });
   protected readonly principals = signal<AdminPrincipal[]>([]);
   protected readonly roles = signal<Role[]>([]);
   /** The global group mappings. Empty without `admin.group_mappings`. */
@@ -74,6 +89,8 @@ export class UsersComponent {
   /**
    * True until the first answer. Without it the table says "Keine Treffer" while the
    * request is still out, which asserts there is nothing when nothing has arrived yet.
+   * A later search keeps the rows and turns the magnifier into a spinner instead, so
+   * the list does not jump on every key press.
    */
   protected readonly loading = signal(true);
 
@@ -93,27 +110,12 @@ export class UsersComponent {
     // The subscription and not one read of the snapshot: the palette can send us here
     // while we are already here, and a hit on another person changes only the query
     // string. The router keeps this component, so a snapshot read would never run again.
-    // The first emission arrives before the initial search, so there is one request.
+    // The query param map emits at once, so its first value makes the initial load.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
       const q = qp.get('q') ?? '';
-      if (q === this.query()) return;
-      this.query.set(q);
-      this.search();
-    });
-    this.search();
-  }
-
-  protected search(): void {
-    this.loading.set(true);
-    this.api.listPrincipals(this.query()).subscribe({
-      next: (list) => {
-        this.principals.set(list);
-        this.loading.set(false);
-      },
-      error: () => {
-        this.loading.set(false);
-        this.toast.error(this.i18n.translate('admin.users.loadFailed'));
-      },
+      if (q === this.search.text() && this.principals().length) return;
+      this.search.sync(q);
+      this.search.refresh();
     });
   }
 
@@ -160,7 +162,7 @@ export class UsersComponent {
         this.toast.success(
           this.i18n.translate(active ? 'admin.users.activated' : 'admin.users.deactivated'),
         );
-        this.search();
+        this.search.refresh();
       },
       error: () => this.toast.error(this.i18n.translate('admin.users.actionFailed')),
     });

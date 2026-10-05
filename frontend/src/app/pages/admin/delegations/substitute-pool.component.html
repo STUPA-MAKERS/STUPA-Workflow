@@ -72,7 +72,8 @@
           autocomplete="off"
           name="person"
           [placeholder]="'admin.gremien.memberSearchPlaceholder' | t"
-          [ngModel]="query()"
+          [attr.aria-busy]="search.pending() || null"
+          [ngModel]="search.text()"
           (ngModelChange)="onSearch($event)"
         />
       </label>
@@ -94,7 +95,8 @@
             </li>
           }
         </ul>
-      } @else if (query().trim() && !searching() && !selected()) {
+      } @else if (search.applied() && !search.pending() && !selected()) {
+        <!-- "Keine Person gefunden" waits for the answer, not only for the debounce. -->
         <p class="sp__none">{{ 'admin.substitutes.noHits' | t }}</p>
       }
     </div>

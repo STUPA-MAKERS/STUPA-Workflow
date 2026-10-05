@@ -265,7 +265,11 @@ describe('SubstitutePoolComponent', () => {
     // The stream lives on after a failure.
     await userEvent.clear(search);
     expect(screen.queryByText('Keine Person gefunden.')).toBeNull();
+    // One character sends no request and says nothing yet.
     await userEvent.type(search, 'k');
+    expect(admin.listPrincipals).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('Keine Person gefunden.')).toBeNull();
+    await userEvent.type(search, 'i');
     expect(await screen.findByRole('button', { name: /Kim/ })).toBeInTheDocument();
   });
 
@@ -318,7 +322,7 @@ describe('SubstitutePoolComponent', () => {
     c.onSearch('Kimberly');
     expect(c.selected()).toBeNull();
     c.onSearch('  ');
-    expect(c.searching()).toBe(false);
+    expect(c.search.pending()).toBe(false);
     c.adding.set(true);
     c.pick(PEOPLE[0]);
     c.add();

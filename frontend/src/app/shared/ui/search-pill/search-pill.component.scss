@@ -52,6 +52,51 @@
   flex: none;
 }
 
+/* The spinner takes the place of the magnifier at the same size, so nothing moves. */
+.sp__spinner {
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  margin: 2px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-accent-text);
+  border-radius: 50%;
+  animation: sp-spin 0.7s linear infinite;
+}
+@keyframes sp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp__spinner {
+    animation-duration: 2s;
+  }
+}
+
+/* The own × replaces the browser's cancel button of a search input. */
+.sp__clear {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.sp__clear:hover {
+  background: var(--color-surface-3, var(--color-surface-2));
+  color: var(--color-text);
+}
+.sp__clear:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
 .sp__ph {
   flex: 1 1 0;
   min-width: 0;
@@ -70,6 +115,11 @@
   color: var(--color-text);
   font: inherit;
   outline: none;
+}
+.sp__input::-webkit-search-cancel-button,
+.sp__input::-webkit-search-decoration {
+  appearance: none;
+  display: none;
 }
 .sp__input::placeholder {
   color: var(--color-text-muted);

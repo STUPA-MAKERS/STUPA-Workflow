@@ -132,7 +132,8 @@ describe('UsersComponent', () => {
     const api = makeApi();
     const { inst } = await setup(api, makeAuth(null), makeToast(), { q: 'kc|alex' });
     expect(api.listPrincipals).toHaveBeenCalledWith('kc|alex');
-    expect(inst.query()).toBe('kc|alex');
+    expect(inst.search.text()).toBe('kc|alex');
+    expect(api.listPrincipals).toHaveBeenCalledTimes(1);
   });
 
   it('lists principals with the capitalized, read-only roles on one line', async () => {
@@ -231,11 +232,45 @@ describe('UsersComponent', () => {
     expect(inst.isSelf(PRINCIPALS[0])).toBe(false);
   });
 
-  it('searches by query', async () => {
-    const { api } = await setup();
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Benutzer suchen' }), 'alex');
-    await userEvent.click(screen.getByRole('button', { name: 'Suchen' }));
-    expect(api.listPrincipals).toHaveBeenLastCalledWith('alex');
+  describe('live search', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    it('searches while the user types, without a "Suchen" button', async () => {
+      const { api } = await setup();
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      expect(screen.queryByRole('button', { name: 'Suchen' })).toBeNull();
+      api.listPrincipals.mockClear();
+      await user.type(screen.getByRole('searchbox', { name: 'Benutzer suchen' }), 'alex');
+      // The debounce folds the four key presses into one request.
+      expect(api.listPrincipals).not.toHaveBeenCalled();
+      jest.advanceTimersByTime(260);
+      expect(api.listPrincipals).toHaveBeenCalledTimes(1);
+      expect(api.listPrincipals).toHaveBeenLastCalledWith('alex');
+    });
+
+    it('sends no request for one character and runs at once on Enter', async () => {
+      const { api } = await setup();
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      api.listPrincipals.mockClear();
+      const box = screen.getByRole('searchbox', { name: 'Benutzer suchen' });
+      await user.type(box, 'a');
+      jest.advanceTimersByTime(260);
+      expect(api.listPrincipals).not.toHaveBeenCalled();
+      await user.type(box, 'l{Enter}');
+      expect(api.listPrincipals).toHaveBeenCalledWith('al');
+    });
+
+    it('lists every user again when the × clears the field', async () => {
+      const { api } = await setup();
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      await user.type(screen.getByRole('searchbox', { name: 'Benutzer suchen' }), 'alex');
+      jest.advanceTimersByTime(260);
+      api.listPrincipals.mockClear();
+      await user.click(screen.getByRole('button', { name: 'Suche leeren' }));
+      expect(api.listPrincipals).toHaveBeenCalledWith('');
+      expect(screen.getByRole('searchbox', { name: 'Benutzer suchen' })).toHaveValue('');
+    });
   });
 
   it('search error path shows an error toast', async () => {

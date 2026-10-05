@@ -23,7 +23,8 @@ import {
   type SelectOption,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { Subject, Subscription, catchError, debounceTime, of, switchMap } from 'rxjs';
+import { Subscription } from 'rxjs';
+import { liveSearch } from '@shared/live-search';
 import { AdminApiService } from '../admin-api.service';
 import { type AdminPrincipal, isActiveMembership } from '../admin.models';
 
@@ -33,8 +34,6 @@ export interface PoolMember {
   name: string;
 }
 
-/** The time after the last key press until the person search runs, in ms. */
-const SEARCH_DEBOUNCE = 250;
 /** The most persons the search shows. */
 const SEARCH_LIMIT = 8;
 
@@ -87,9 +86,18 @@ export class SubstitutePoolComponent {
 
   // --- add dialog -------------------------------------------------------------
   protected readonly addOpen = signal(false);
-  protected readonly query = signal('');
   protected readonly candidates = signal<AdminPrincipal[]>([]);
-  protected readonly searching = signal(false);
+  /**
+   * The person search runs while the user types. A failed search shows no persons; the
+   * next key press searches again.
+   */
+  protected readonly search = liveSearch<AdminPrincipal[]>({
+    run: (q) => this.api.listPrincipals(q),
+    result: (list) =>
+      this.candidates.set(list.filter((p) => p.active !== false).slice(0, SEARCH_LIMIT)),
+    reset: () => this.candidates.set([]),
+    error: () => this.candidates.set([]),
+  });
   protected readonly selected = signal<AdminPrincipal | null>(null);
   /** An empty value makes a gremium-wide entry that represents every member. */
   protected readonly memberId = signal('');
@@ -101,7 +109,6 @@ export class SubstitutePoolComponent {
     ...this.memberList().map((m) => ({ value: m.id, label: m.name })),
   ]);
 
-  private readonly search$ = new Subject<string>();
   private loads?: Subscription;
 
   constructor() {
@@ -110,22 +117,7 @@ export class SubstitutePoolComponent {
       const own = this.members() === null;
       untracked(() => this.load(id, own));
     });
-    const sub = this.search$
-      .pipe(
-        debounceTime(SEARCH_DEBOUNCE),
-        // A failed search shows no persons; the next key press searches again.
-        switchMap((q) =>
-          this.api.listPrincipals(q).pipe(catchError(() => of([] as AdminPrincipal[]))),
-        ),
-      )
-      .subscribe((list) => {
-        this.searching.set(false);
-        this.candidates.set(list.filter((p) => p.active !== false).slice(0, SEARCH_LIMIT));
-      });
-    inject(DestroyRef).onDestroy(() => {
-      sub.unsubscribe();
-      this.loads?.unsubscribe();
-    });
+    inject(DestroyRef).onDestroy(() => this.loads?.unsubscribe());
   }
 
   private load(id: Uuid, ownMembers: boolean): void {
@@ -182,7 +174,7 @@ export class SubstitutePoolComponent {
   // --- add ----------------------------------------------------------------------
 
   protected openAdd(): void {
-    this.query.set('');
+    this.search.sync('');
     this.selected.set(null);
     this.candidates.set([]);
     this.memberId.set('');
@@ -191,16 +183,8 @@ export class SubstitutePoolComponent {
   }
 
   protected onSearch(q: string): void {
-    this.query.set(q);
     if (this.selected() && q !== this.label(this.selected()!)) this.selected.set(null);
-    if (q.trim()) {
-      // "Keine Person gefunden" waits for the answer, not only for the debounce.
-      this.searching.set(true);
-      this.search$.next(q.trim());
-    } else {
-      this.searching.set(false);
-      this.candidates.set([]);
-    }
+    this.search.set(q);
   }
 
   protected label(p: AdminPrincipal): string {
@@ -209,7 +193,8 @@ export class SubstitutePoolComponent {
 
   protected pick(p: AdminPrincipal): void {
     this.selected.set(p);
-    this.query.set(this.label(p));
+    // The name goes into the field without a new search.
+    this.search.sync(this.label(p));
     this.candidates.set([]);
   }
 
