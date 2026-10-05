@@ -36,8 +36,8 @@
         size="md"
         [placeholder]="'meetings.overview.searchShort' | t"
         [label]="'meetings.list.searchPlaceholder' | t"
-        [value]="timeline.searchQuery()"
-        (valueChange)="timeline.onSearch($event)"
+        [value]="query()"
+        (valueChange)="query.set($event)"
       />
       @if (showFilter()) {
         <app-filter-select

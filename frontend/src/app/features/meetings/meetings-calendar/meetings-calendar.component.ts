@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   afterNextRender,
   computed,
@@ -11,6 +12,7 @@ import {
   signal,
   untracked,
   Injector,
+  NgZone,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
@@ -81,7 +83,8 @@ interface DayCard {
  * The grid marks today, shows the meetings of each day (time and a two-line title; a
  * live meeting in the accent) and selects a day on a click or with the arrow keys. The
  * toolbar moves a month back or on, or to today, and holds the search (on the loaded
- * month, in the browser), the Gremium chip and the calendar subscription.
+ * month, in the browser only: it never asks the server), the Gremium chip and the
+ * calendar subscription. "Today" moves on at midnight while the page stays open.
  *
  * The side panel shows the meetings of the selected day: status, "Sitzung öffnen", the
  * beamer (`canManage`), edit and delete in the ⋮ menu (`canManage`), and for a live
@@ -132,12 +135,23 @@ export class MeetingsCalendarComponent {
   /** Wide (>= 1200px): the panel beside the grid, and the page does not scroll. */
   readonly wide = mediaQuerySignal(MEDIA.wide);
 
-  private readonly today = inject(OVERVIEW_NOW)();
-  readonly todayIso = isoDay(this.today);
-  readonly month = signal<MonthRef>(monthOf(this.today));
-  readonly selectedDay = signal<string>(this.todayIso);
+  private readonly now = inject(OVERVIEW_NOW);
+  /** The day of today. A timer moves it on at midnight (`scheduleMidnight`). */
+  private readonly today = signal<Date>(this.now());
+  readonly todayIso = computed(() => isoDay(this.today()));
+  readonly month = signal<MonthRef>(monthOf(this.today()));
+  readonly selectedDay = signal<string>(this.todayIso());
+  private midnightTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly zone = inject(NgZone);
 
-  readonly weeks = computed<CalendarDay[][]>(() => monthGrid(this.month(), this.today));
+  /**
+   * The search of the calendar. It filters the loaded month in the browser only; the
+   * server search of the list (`MeetingsTimelineService.onSearch`) would read pages the
+   * calendar never shows. It starts with the query of the list.
+   */
+  readonly query = signal(inject(MeetingsTimelineService).searchQuery());
+
+  readonly weeks = computed<CalendarDay[][]>(() => monthGrid(this.month(), this.today()));
   readonly monthText = computed(() => monthLabel(this.month(), this.i18n.locale()));
   readonly weekdays = computed(() => weekdayNames(this.i18n.locale()));
   private readonly range = computed(() => gridRange(this.weeks()));
@@ -150,7 +164,7 @@ export class MeetingsCalendarComponent {
 
   /** The meetings that match the search of the overview. */
   private readonly visible = computed(() => {
-    const q = this.timeline.searchQuery();
+    const q = this.query();
     return this.items().filter((m) => matchesQuery(m, q));
   });
   readonly byDay = computed(() => meetingsByDay(this.visible()));
@@ -161,14 +175,14 @@ export class MeetingsCalendarComponent {
   /** "Di., 29.09.2026 · Heute". */
   readonly dayHeading = computed(() => {
     const day = weekdayDate(this.selectedDay(), this.i18n.formatLocale());
-    return this.selectedDay() === this.todayIso
+    return this.selectedDay() === this.todayIso()
       ? `${day} · ${this.i18n.translate('meetings.overview.today')}`
       : day;
   });
 
   /** The next planned meetings (the timeline of the overview), for "Anstehend". */
   readonly upcoming = computed(() => {
-    const q = this.timeline.searchQuery();
+    const q = this.query();
     return this.timeline
       .upcomingItems()
       .filter((m) => m.status !== 'live' && matchesQuery(m, q))
@@ -185,6 +199,11 @@ export class MeetingsCalendarComponent {
   });
 
   constructor() {
+    this.scheduleMidnight();
+    inject(DestroyRef).onDestroy(() => {
+      if (this.midnightTimer !== null) clearTimeout(this.midnightTimer);
+    });
+
     // Read the days of the grid again when the month or the Gremium filter changes.
     effect(() => {
       const range = this.range();
@@ -218,8 +237,27 @@ export class MeetingsCalendarComponent {
 
   /** "Heute": the month of today, today selected. */
   goToday(): void {
-    this.month.set(monthOf(this.today));
-    this.selectedDay.set(this.todayIso);
+    this.month.set(monthOf(this.today()));
+    this.selectedDay.set(this.todayIso());
+  }
+
+  /**
+   * Move "today" on at the next midnight, and again every night after. A timer of a
+   * sleeping device fires late, so the clock is read again when it fires. The timer
+   * runs outside the zone: a pending day-long timer would keep the app from "stable".
+   */
+  private scheduleMidnight(): void {
+    const now = this.now();
+    const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    this.midnightTimer = this.zone.runOutsideAngular(() =>
+      setTimeout(
+        () => {
+          this.today.set(this.now());
+          this.scheduleMidnight();
+        },
+        Math.max(next.getTime() - now.getTime(), 1000),
+      ),
+    );
   }
 
   /** Select a day; a day of the week before or after the month also shows its month. */

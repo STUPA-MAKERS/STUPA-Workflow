@@ -185,6 +185,18 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: -2px;
 }
+/* The selection ring, the hover and the focus ring have round corners, like the grid.
+   The two bottom corner cells take the radius of the grid, so its clip does not cut
+   their ring. */
+.cal__day {
+  border-radius: var(--radius-md);
+}
+.cal__row:last-child .cal__cell:first-child .cal__day {
+  border-end-start-radius: var(--radius-xl);
+}
+.cal__row:last-child .cal__cell:last-child .cal__day {
+  border-end-end-radius: var(--radius-xl);
+}
 .cal__cell--sel .cal__day {
   box-shadow: inset 0 0 0 2px var(--color-accent);
 }
