@@ -2,13 +2,18 @@
 
 :host {
   display: flex;
-  flex: 1 0 auto;
   flex-direction: column;
   min-width: 0;
 }
+/* One pane at a time the host takes at least the free height of the shell main. Side by
+   side it is a pane page (`.pane-page`), which sets its own flex. */
+:host(:not(.pane-page)) {
+  flex: 1 0 auto;
+}
 
-/* Side by side the page does not scroll: it fills the viewport below the top padding of
-   the shell, and each pane scrolls inside itself. One pane at a time, the page scrolls. */
+/* Side by side the page does not scroll: the host is a pane page (`.pane-page` in
+   styles.scss) that takes the free height of the main column of the shell, and each pane
+   scrolls inside itself. One pane at a time, the page scrolls. */
 .apps {
   min-width: 0;
 }
@@ -24,7 +29,8 @@
   flex: 1 0 auto;
 }
 .apps--split {
-  height: calc(100dvh - var(--main-pad-top, 0px) - var(--main-pad-bottom, 0px));
+  flex: 1 1 0;
+  min-height: 0;
 }
 .apps > app-list-detail {
   --ld-list-width: 440px;

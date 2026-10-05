@@ -11,6 +11,7 @@ import { FilterSelectComponent } from '@shared/ui/filter-select/filter-select.co
 import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
+import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
@@ -47,6 +48,7 @@ import { MeetingsTimelineService } from '../meetings-timeline.service';
     IconComponent,
     PageHeaderComponent,
     SearchPillComponent,
+    StickyBarComponent,
     ListItemComponent,
     DateBlockComponent,
     StatusTextComponent,

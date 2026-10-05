@@ -1,33 +1,59 @@
 <div class="mtl">
-  <app-page-header [title]="'meetings.title' | t" [flush]="true">
-    <div actions class="mtl__actions">
-      <app-search-pill
-        class="mtl__search"
-        size="md"
-        [placeholder]="'meetings.list.searchPlaceholder' | t"
-        [value]="timeline.searchQuery()"
-        (valueChange)="timeline.onSearch($event)"
-      />
-      @if (showFilter()) {
-        <app-filter-select
-          class="mtl__chip"
-          size="md"
-          icon="building"
-          [label]="'meetings.list.committeeFilter' | t"
-          [options]="timeline.filterGremiumOptions()"
-          [value]="timeline.gremiumFilter()"
-          (valueChange)="timeline.selectGremiumFilter($event)"
-          [text]="filterLabel()"
-        />
-      }
+  <!-- The search and the filter never scroll away. Phone: the title row with "Neue
+       Sitzung" scrolls, the search and the filter below it stick to the top. Wider: the
+       title row holds the search, so the whole row sticks. -->
+  @if (phone()) {
+    <app-page-header [title]="'meetings.title' | t" [flush]="true">
       @if (canCreate()) {
-        <app-button variant="fill" (click)="createOpen.set(true)">
-          <app-icon name="plus" [size]="17" />
-          {{ 'meetings.list.new' | t }}
-        </app-button>
+        <div actions>
+          <ng-container *ngTemplateOutlet="createButton" />
+        </div>
       }
-    </div>
-  </app-page-header>
+    </app-page-header>
+    <app-sticky-bar class="mtl__actions mtl__bar">
+      <ng-container *ngTemplateOutlet="tools" />
+    </app-sticky-bar>
+  } @else {
+    <app-sticky-bar>
+      <app-page-header [title]="'meetings.title' | t" [flush]="true">
+        <div actions class="mtl__actions">
+          <ng-container *ngTemplateOutlet="tools" />
+          <ng-container *ngTemplateOutlet="createButton" />
+        </div>
+      </app-page-header>
+    </app-sticky-bar>
+  }
+
+  <ng-template #tools>
+    <app-search-pill
+      class="mtl__search"
+      size="md"
+      [placeholder]="'meetings.list.searchPlaceholder' | t"
+      [value]="timeline.searchQuery()"
+      (valueChange)="timeline.onSearch($event)"
+    />
+    @if (showFilter()) {
+      <app-filter-select
+        class="mtl__chip"
+        size="md"
+        icon="building"
+        [label]="'meetings.list.committeeFilter' | t"
+        [options]="timeline.filterGremiumOptions()"
+        [value]="timeline.gremiumFilter()"
+        (valueChange)="timeline.selectGremiumFilter($event)"
+        [text]="filterLabel()"
+      />
+    }
+  </ng-template>
+
+  <ng-template #createButton>
+    @if (canCreate()) {
+      <app-button variant="fill" (click)="createOpen.set(true)">
+        <app-icon name="plus" [size]="17" />
+        {{ 'meetings.list.new' | t }}
+      </app-button>
+    }
+  </ng-template>
 
   @if (timeline.loadingList()) {
     <app-skeleton variant="rows" [count]="5" [label]="'meetings.list.loading' | t" />

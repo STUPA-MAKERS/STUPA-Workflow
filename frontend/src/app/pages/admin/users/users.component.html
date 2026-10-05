@@ -14,17 +14,20 @@
     }
   </app-note>
 
-  <form class="au__search" role="search" (submit)="$event.preventDefault(); search()">
-    <app-search-pill
-      class="au__pill"
-      size="md"
-      [placeholder]="'admin.users.searchPlaceholder' | t"
-      [label]="'admin.users.search' | t"
-      [value]="query()"
-      (valueChange)="query.set($event)"
-    />
-    <app-button type="submit" variant="fill">{{ 'admin.users.searchAction' | t }}</app-button>
-  </form>
+  <!-- The search never scrolls away: it sticks to the top while the list scrolls. -->
+  <app-sticky-bar>
+    <form class="au__search" role="search" (submit)="$event.preventDefault(); search()">
+      <app-search-pill
+        class="au__pill"
+        size="md"
+        [placeholder]="'admin.users.searchPlaceholder' | t"
+        [label]="'admin.users.search' | t"
+        [value]="query()"
+        (valueChange)="query.set($event)"
+      />
+      <app-button type="submit" variant="fill">{{ 'admin.users.searchAction' | t }}</app-button>
+    </form>
+  </app-sticky-bar>
 
   @if (loading()) {
     <app-skeleton variant="rows" [count]="5" [label]="'admin.users.loading' | t" />

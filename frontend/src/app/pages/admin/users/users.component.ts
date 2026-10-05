@@ -12,6 +12,7 @@ import {
   NoteComponent,
   PageHeaderComponent,
   SearchPillComponent,
+  StickyBarComponent,
   SkeletonComponent,
 } from '@shared/ui';
 import { ButtonComponent, ToastService } from '@stupa-makers/ui-kit';
@@ -42,6 +43,7 @@ import type { AdminPrincipal, GroupMapping, Role } from '../admin.models';
     NoteComponent,
     PageHeaderComponent,
     SearchPillComponent,
+    StickyBarComponent,
     SkeletonComponent,
   ],
   templateUrl: './users.component.html',
