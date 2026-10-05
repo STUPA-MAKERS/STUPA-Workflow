@@ -95,7 +95,7 @@ export class CreateMeetingDialogComponent {
       .filter((m) => m.canKeepProtocol)
       .map((m) => ({
         value: m.principalId,
-        label: m.displayName || m.email || this.i18n.translate('participant.delegation.unnamed'),
+        label: m.displayName || m.email || this.i18n.translate('common.unnamed'),
       })),
   ]);
 

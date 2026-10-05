@@ -50,7 +50,7 @@ export class ParticipantRosterComponent {
       const status = a.status;
       return {
         id: a.principalId,
-        name: a.displayName || a.email || this.i18n.translate('participant.delegation.unnamed'),
+        name: a.displayName || a.email || this.i18n.translate('common.unnamed'),
         self: a.isSelf,
         keeper: a.principalId === this.protokollantId(),
         kind: status === 'present' ? 'accent' : status ? 'neutral' : 'muted',

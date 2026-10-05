@@ -364,6 +364,7 @@ export const de = {
 
   'common.yes': 'Ja',
   'common.no': 'Nein',
+  'common.unnamed': 'Ohne Namen',
 
   'apply.title': 'Antrag stellen',
   'apply.progress': 'Antrags-Fortschritt',
@@ -3268,6 +3269,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
   'common.yes': 'Yes',
   'common.no': 'No',
+  'common.unnamed': 'No name',
 
   'apply.title': 'Submit application',
   'apply.progress': 'Application progress',

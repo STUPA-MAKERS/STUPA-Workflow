@@ -85,7 +85,7 @@ export class MeetingSettingsDialogComponent {
         .filter((a) => a.canKeepProtocol || a.principalId === current)
         .map((a) => ({
           value: a.principalId,
-          label: a.displayName || a.email || this.i18n.translate('participant.delegation.unnamed'),
+          label: a.displayName || a.email || this.i18n.translate('common.unnamed'),
         })),
     ];
   });

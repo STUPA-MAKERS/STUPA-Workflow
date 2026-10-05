@@ -92,7 +92,8 @@ describe('CreateMeetingDialogComponent', () => {
     expect(cmp.title()).toBe('Sitzung des Studierendenparlament am 10. November 2026');
     const keeper = screen.getByLabelText('Protokollführung');
     const names = within(keeper).getAllByRole('option').map((o) => o.textContent?.trim());
-    // Tom has no protocol.write; the fallbacks are the e-mail and the id.
+    // Tom has no protocol.write. A member without a name shows the e-mail; without both,
+    // "Ohne Namen".
     expect(names).toEqual(['— niemand —', 'Mara Keller', 'lea@x.de', 'Ohne Namen']);
   });
 
