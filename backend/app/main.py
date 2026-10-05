@@ -35,6 +35,7 @@ from app.modules.auth.oauth_admin_router import router as oauth_admin_router
 from app.modules.auth.oauth_router import router as oauth_router
 from app.modules.auth.oauth_router import well_known_router as oauth_well_known_router
 from app.modules.auth.router import router as auth_router
+from app.modules.avatars.router import router as avatars_router
 from app.modules.backup.router import router as backup_router
 from app.modules.budget.tree_router import router as budget_tree_router
 from app.modules.calendar.router import router as calendar_router
@@ -97,6 +98,7 @@ api_router.include_router(notification_settings_router)
 api_router.include_router(mail_templates_router)
 api_router.include_router(budget_tree_router)
 api_router.include_router(calendar_router)
+api_router.include_router(avatars_router)
 api_router.include_router(antiabuse_router)
 api_router.include_router(files_router)
 api_router.include_router(audit_router)

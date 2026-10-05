@@ -8,13 +8,13 @@
   @if (target()) {
     <div class="hd">
       <div class="hd__pair">
-        <app-avatar [name]="currentName()" size="sm" [decorative]="true" />
+        <app-avatar [name]="currentName()" [principalId]="meeting().protokollantId" size="sm" [decorative]="true" />
         <span class="hd__who">
           <span class="hd__small">{{ 'meetings.handoverDialog.before' | t }}</span>
           <span class="hd__name ell" [title]="currentName()">{{ currentName() }}</span>
         </span>
         <app-icon class="hd__arrow" name="arrow" [size]="18" />
-        <app-avatar [name]="targetName()" size="sm" [accent]="true" [decorative]="true" />
+        <app-avatar [name]="targetName()" [principalId]="target()?.principalId" size="sm" [accent]="true" [decorative]="true" />
         <span class="hd__who hd__who--grow">
           <span class="hd__small">{{ 'meetings.handoverDialog.after' | t }}</span>
           <span class="hd__name ell" [title]="targetName()">{{ targetName() }}</span>

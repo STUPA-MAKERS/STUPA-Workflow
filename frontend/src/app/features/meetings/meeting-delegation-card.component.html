@@ -87,7 +87,7 @@
 
 <ng-template #outgoing let-d>
   <div class="dc__person">
-    <app-avatar [name]="d.delegateName || '—'" size="sm" [decorative]="true" />
+    <app-avatar [name]="d.delegateName || '—'" [principalId]="d.delegateId" size="sm" [decorative]="true" />
     <span class="dc__text">
       <span class="dc__strong" [class.ell]="variant() === 'inline'" [title]="'delegation.card.outgoing' | t: { name: d.delegateName || '—' }">{{ 'delegation.card.outgoing' | t: { name: d.delegateName || '—' } }}</span>
       @if (d.delegateVoting || d.viaPool) {
@@ -111,7 +111,7 @@
 
 <ng-template #incoming let-d>
   <div class="dc__person">
-    <app-avatar [name]="d.delegatorName || '—'" size="sm" [decorative]="true" />
+    <app-avatar [name]="d.delegatorName || '—'" [principalId]="d.delegatorId" size="sm" [decorative]="true" />
     <span class="dc__text">
       <span class="dc__strong" [class.ell]="variant() === 'inline'" [title]="'delegation.card.incoming' | t: { name: d.delegatorName || '—' }">{{ 'delegation.card.incoming' | t: { name: d.delegatorName || '—' } }}</span>
       @if (d.delegateVoting) {

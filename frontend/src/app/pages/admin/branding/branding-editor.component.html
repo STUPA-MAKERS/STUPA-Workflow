@@ -41,6 +41,18 @@
           </div>
         </fieldset>
 
+        <!-- Gravatar images of the avatars, through the API proxy. Off = initials only. -->
+        <fieldset class="br__group">
+          <legend>{{ 'admin.brand.avatars.group' | t }}</legend>
+          <app-switch
+            name="gravatarEnabled"
+            [hint]="'admin.brand.avatars.hint' | t"
+            [ngModel]="d.gravatarEnabled !== false"
+            (ngModelChange)="setGravatar($event)"
+            >{{ 'admin.brand.avatars.gravatar' | t }}</app-switch
+          >
+        </fieldset>
+
         <fieldset class="br__group">
           <legend>{{ 'admin.brand.logos' | t }}</legend>
           <p class="text-xs text-muted">{{ 'admin.brand.logoHint' | t: { mb: maxMb } }}</p>

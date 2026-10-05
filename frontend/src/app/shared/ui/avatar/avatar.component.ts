@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
+import { AvatarService } from './avatar.service';
 
 /** The size of an avatar: 40px (`md`) or 32px (`sm`). */
 export type AvatarSize = 'md' | 'sm';
@@ -22,11 +23,19 @@ export function initials(name: string): string {
   return (first + last).toLocaleUpperCase();
 }
 
+/** The edge length of an avatar in CSS pixels, per size. */
+const AVATAR_PX: Record<AvatarSize, number> = { md: 40, sm: 32 };
+
 /**
- * The initials of a PERSON in a circle.
+ * The initials of a PERSON in a circle, or the Gravatar image of the person.
  *
  * Only for persons: members, keepers, delegations. Never put initials on a row of a thing
  * (an application, an invoice); give that row an icon or nothing.
+ *
+ * With `principalId` (a principal id, or `'me'` for the logged-in user) the avatar loads
+ * the image through the API proxy (`AvatarService`). The initials stay below the image
+ * until it has loaded, and come back when it fails (no Gravatar, the proxy is off): the
+ * circle keeps its size, so nothing moves.
  *
  * The full name is the accessible name and the tooltip. Set `decorative` when the name
  * is already written next to the avatar, so a screen reader does not read it twice.
@@ -38,6 +47,7 @@ export function initials(name: string): string {
   host: {
     '[class.av--sm]': "size() === 'sm'",
     '[class.av--accent]': 'accent()',
+    '[class.av--img]': 'loaded()',
     '[attr.role]': "decorative() ? null : 'img'",
     '[attr.aria-label]': 'decorative() ? null : name()',
     '[attr.aria-hidden]': "decorative() ? 'true' : null",
@@ -54,8 +64,38 @@ export class AvatarComponent {
   readonly accent = input(false);
   /** The name is written next to the avatar: hide the avatar from screen readers. */
   readonly decorative = input(false);
+  /** The principal id of the person, or `'me'`. Without it the avatar shows the initials. */
+  readonly principalId = input<string | null | undefined>(null);
+
+  private readonly avatars = inject(AvatarService);
 
   protected readonly letters = computed(() => initials(this.name()));
+
+  /** The image URL, or `null` for the initials only. */
+  protected readonly src = computed(() =>
+    this.avatars.url(this.principalId(), AVATAR_PX[this.size()]),
+  );
+
+  /** The URL of the image that has loaded. A new URL starts hidden again. */
+  private readonly loadedSrc = signal<string | null>(null);
+  protected readonly loaded = computed(() => {
+    const src = this.src();
+    return src !== null && this.loadedSrc() === src;
+  });
+
+  protected onLoad(): void {
+    this.loadedSrc.set(this.src());
+  }
+
+  /**
+   * The image failed (404, 429 or a network error; the event does not tell them apart).
+   * The service keeps the initials for a retry period only, so a rate limit or a short
+   * outage does not hide the image until a reload.
+   */
+  protected onError(): void {
+    const id = this.principalId();
+    if (id) this.avatars.markFailed(id);
+  }
 }
 
 /**
@@ -82,6 +122,11 @@ export class AvatarStackComponent {
 
   /** The full names of the persons. */
   readonly names = input.required<readonly string[]>();
+  /**
+   * The principal ids of the persons, in the order of `names`. With an id the avatar shows
+   * the Gravatar image, as in a roster or a member list. A missing entry gives initials.
+   */
+  readonly principalIds = input<readonly (string | null | undefined)[]>([]);
   /** How many avatars to draw before the "+N". */
   readonly max = input(4);
   readonly size = input<AvatarSize>('sm');

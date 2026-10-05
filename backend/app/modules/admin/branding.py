@@ -223,6 +223,11 @@ class Branding(_CamelModel):
         default_factory=list, alias="legalLinks", max_length=50
     )
     freetexts: SiteFreetexts = Field(default_factory=SiteFreetexts)
+    # Show the Gravatar image of a person instead of the initials. The API fetches the
+    # image through its own proxy (`GET /principals/{id}/avatar`), so the browser never
+    # contacts gravatar.com. False turns the proxy off: it answers 404 and the frontend
+    # shows the initials. A config from before this field reads as True.
+    gravatar_enabled: bool = Field(default=True, alias="gravatarEnabled")
 
     @field_validator("copyright")
     @classmethod

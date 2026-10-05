@@ -322,6 +322,20 @@ class Settings(BaseSettings):
     # Default limit on all writing endpoints. It keys on the IP and stays generous. It
     # catches an endpoint without its own stricter limit (defense in depth).
     rl_default_write_per_hour: int = 100
+    # GET /principals/{id}/avatar: requests per hour per logged-in principal. A page
+    # with a long member list asks for one avatar per row, so the limit stays generous.
+    rl_avatar_per_hour: int = 1200
+
+    # Gravatar proxy (GET /principals/{id}/avatar). The API fetches the image from the
+    # fixed host gravatar.com and keeps the result in Redis. A found image and a missing
+    # one (404) stay for `gravatar_cache_ttl_seconds`. A failed fetch (timeout, 5xx)
+    # stays only for `gravatar_error_ttl_seconds`, so a short outage heals itself. The
+    # admin switch `gravatarEnabled` in the site config turns the proxy off.
+    # `gravatar_timeout_seconds` is one total deadline for the DNS lookup, the connect
+    # and all reads of one fetch.
+    gravatar_timeout_seconds: float = Field(default=3.0, gt=0, le=30)
+    gravatar_cache_ttl_seconds: int = Field(default=86_400, ge=60)
+    gravatar_error_ttl_seconds: int = Field(default=300, ge=1)
 
     @model_validator(mode="after")
     def _no_wildcard_proxy_in_prod(self) -> "Settings":

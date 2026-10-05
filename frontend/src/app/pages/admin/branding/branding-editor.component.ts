@@ -12,7 +12,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { ButtonComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, SwitchComponent } from '@stupa-makers/ui-kit';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
@@ -44,6 +44,7 @@ import { brandingLinkErrors } from '../branding.util';
     FormsModule,
     TranslatePipe,
     ButtonComponent,
+    SwitchComponent,
     VersionHistoryComponent,
     PageHeaderComponent,
   ],
@@ -176,6 +177,13 @@ export class BrandingEditorComponent {
   protected applyInfo(d: Branding): I18nMap {
     d.freetexts.applyInfo ??= {};
     return d.freetexts.applyInfo;
+  }
+
+  /** Turn the Gravatar images of the avatars on or off (saved with the draft). */
+  protected setGravatar(on: boolean): void {
+    this.patch((d) => {
+      d.gravatarEnabled = on;
+    });
   }
 
   /** Emit the signal again after an in-place `[(ngModel)]` change, to refresh the preview. */

@@ -5,7 +5,7 @@
   <section class="km__sec" [attr.aria-label]="'meetings.keeper.planned' | t">
     <h3 class="km__cap cap">{{ 'meetings.keeper.planned' | t }}</h3>
     <div class="km__plan" role="status">
-      <app-avatar [name]="plan.name ?? '—'" size="sm" [accent]="true" [decorative]="true" />
+      <app-avatar [name]="plan.name ?? '—'" [principalId]="plan.principalId" size="sm" [accent]="true" [decorative]="true" />
       <span class="km__names">
         <span class="km__name ell" [title]="plan.name ?? ''">{{ plan.name }}</span>
         <span class="km__sub">{{ plannedSub() }}</span>
@@ -38,7 +38,7 @@
         [attr.aria-current]="c.current ? 'true' : null"
         (click)="choose(c)"
       >
-        <app-avatar [name]="c.name" size="sm" [decorative]="true" />
+        <app-avatar [name]="c.name" [principalId]="c.principalId" size="sm" [decorative]="true" />
         <span class="km__names">
           <span class="km__name ell" [title]="c.name">{{ c.name }}</span>
           <span class="km__sub">{{ c.sub }}</span>

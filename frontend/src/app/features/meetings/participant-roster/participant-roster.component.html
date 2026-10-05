@@ -6,7 +6,7 @@
     <ul class="pr__rows rowgroup rowgroup--bg3">
       @for (r of view(); track r.id) {
         <li class="pr__row">
-          <app-avatar [name]="r.name" size="sm" [accent]="r.self" [decorative]="true" />
+          <app-avatar [name]="r.name" [principalId]="r.id" size="sm" [accent]="r.self" [decorative]="true" />
           <span class="pr__text">
             <span class="pr__name ell" [title]="r.name">
               {{ r.name }}

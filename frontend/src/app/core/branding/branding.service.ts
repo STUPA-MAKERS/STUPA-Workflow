@@ -65,6 +65,15 @@ export class BrandingService {
 
   private readonly _loaded = signal(false);
 
+  private readonly _gravatarEnabled = signal(true);
+
+  /**
+   * The admin switch for the Gravatar images of the avatars (`gravatarEnabled`). An older
+   * config without the field counts as on. Read {@link loaded} as well: the avatars load
+   * no image before the config is there.
+   */
+  readonly gravatarEnabled = this._gravatarEnabled.asReadonly();
+
   /**
    * Days a new magic link works; `null` means that it does not expire. The default of
    * the backend is `null`, and the value stays so until the config is loaded. Read
@@ -130,6 +139,7 @@ export class BrandingService {
         }
         if (cfg.attachmentLimits) this._attachmentLimits.set(cfg.attachmentLimits);
         this._freetexts.set(cfg.branding?.freetexts ?? {});
+        this._gravatarEnabled.set(cfg.branding?.gravatarEnabled !== false);
         this._loaded.set(true);
       },
       error: () => {

@@ -392,12 +392,13 @@ class ApplicationsServiceBase:
             hiddenKeys=sorted(hidden),
         )
 
-    async def _author_names(self, subs: set[str]) -> dict[str, str]:
-        """Map a `principal.sub` to its `display_name`, else its `email`.
+    async def _author_refs(self, subs: set[str]) -> dict[str, tuple[str, UUID]]:
+        """Map a `principal.sub` to its name and its principal id.
 
-        One query for all subs. A sub without a row, or a row without a name and
-        an email (an anonymized account), is missing from the map. The caller
-        must never show the raw sub instead.
+        The name is the `display_name`, else the `email`. The id serves the avatar
+        (`GET /principals/{id}/avatar`). One query for all subs. A sub without a
+        row, or a row without a name and an email (an anonymized account), is
+        missing from the map. The caller must never show the raw sub instead.
         """
         from app.modules.auth.models import Principal as PrincipalRow
 
@@ -406,16 +407,19 @@ class ApplicationsServiceBase:
             return {}
         rows = (
             await self.session.execute(
-                select(PrincipalRow.sub, PrincipalRow.display_name, PrincipalRow.email).where(
-                    PrincipalRow.sub.in_(wanted)
-                )
+                select(
+                    PrincipalRow.sub,
+                    PrincipalRow.display_name,
+                    PrincipalRow.email,
+                    PrincipalRow.id,
+                ).where(PrincipalRow.sub.in_(wanted))
             )
         ).all()
-        out: dict[str, str] = {}
-        for sub, dn, em in rows:
+        out: dict[str, tuple[str, UUID]] = {}
+        for sub, dn, em, pid in rows:
             name = dn or em
             if name:
-                out[sub] = name
+                out[sub] = (name, pid)
         return out
 
     async def _resolve_actors(
@@ -449,7 +453,7 @@ class ApplicationsServiceBase:
             and system_actor_key(v) is None
             and not (gremium is not None and v not in own)
         }
-        names = await self._author_names(subs)
+        refs = await self._author_refs(subs)
         out: dict[str, ActorOut] = {}
         for v in wanted:
             if gremium is not None and v not in own:
@@ -458,8 +462,9 @@ class ApplicationsServiceBase:
                 out[v] = ActorOut(kind="applicant")
             elif (key := system_actor_key(v)) is not None:
                 out[v] = ActorOut(kind="system", key=key)
-            elif v in names:
-                out[v] = ActorOut(kind="principal", displayName=names[v])
+            elif v in refs:
+                name, pid = refs[v]
+                out[v] = ActorOut(kind="principal", displayName=name, principalId=pid)
             else:
                 out[v] = ActorOut(kind="deleted")
         return out

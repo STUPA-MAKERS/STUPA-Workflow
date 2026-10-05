@@ -32,7 +32,7 @@
           @for (row of rows(); track row.a.principalId) {
             <li class="as__row" [class.as__row--conflict]="row.conflict">
               <div class="as__who">
-                <app-avatar [name]="row.name" size="sm" [decorative]="true" />
+                <app-avatar [name]="row.name" [principalId]="row.a.principalId" size="sm" [decorative]="true" />
                 <div class="as__names">
                   <span class="as__name ell" [title]="row.name">
                     {{ row.name }}
@@ -121,7 +121,7 @@
             <ul class="as__list rowgroup rowgroup--bg3">
               @for (d of meetingDelegations(); track d.id) {
                 <li class="as__item">
-                  <app-avatar [name]="d.delegatorName ?? '—'" size="sm" [decorative]="true" />
+                  <app-avatar [name]="d.delegatorName ?? '—'" [principalId]="d.delegatorId" size="sm" [decorative]="true" />
                   <span class="as__itemText ell" [title]="delegationLine(d)">{{ delegationLine(d) }}</span>
                   @if (d.delegateVoting) {
                     <span class="as__muted as__nowrap">{{ 'meetings.attendanceSheet.withVote' | t }}</span>

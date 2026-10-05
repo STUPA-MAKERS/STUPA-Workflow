@@ -321,7 +321,7 @@
     <div class="rowgroup ad__thread">
       @for (comment of comments(); track comment.id) {
         <article class="ad__msg" [class.ad__msg--own]="comment.isOwn">
-          <app-avatar [name]="authorName(comment)" size="sm" [decorative]="true" />
+          <app-avatar [name]="authorName(comment)" [principalId]="comment.authorInfo?.principalId" size="sm" [decorative]="true" />
           <div class="ad__msgBody">
             <div class="ad__msgHead">
               <span class="ad__msgAuthor ell">{{ authorName(comment) }}</span>

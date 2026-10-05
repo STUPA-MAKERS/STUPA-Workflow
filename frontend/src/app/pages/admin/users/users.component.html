@@ -38,7 +38,7 @@
     <ul class="rowgroup au__list" [attr.aria-label]="'admin.users.title' | t">
       @for (p of principals(); track p.id) {
         <li class="au__row" [class.au__row--off]="p.active === false">
-          <app-avatar class="au__avatar" size="sm" [name]="userLabel(p)" [decorative]="true" />
+          <app-avatar class="au__avatar" size="sm" [name]="userLabel(p)" [principalId]="p.id" [decorative]="true" />
           <div class="au__who">
             <span class="au__name">
               <span class="ell" [title]="userLabel(p)">{{ userLabel(p) }}</span>

@@ -68,6 +68,19 @@ describe('BrandingService', () => {
     expect(svc.appName()).toBe(i18n.translate('app.title'));
   });
 
+  it('reads the Gravatar switch; a config without it counts as on', () => {
+    expect(svc.gravatarEnabled()).toBe(true);
+    svc.init();
+    http.expectOne('/api/site-config').flush({ version: 1, branding: { gravatarEnabled: false } });
+    expect(svc.gravatarEnabled()).toBe(false);
+    svc.init();
+    http.expectOne('/api/site-config').flush({ version: 2, branding: {} });
+    expect(svc.gravatarEnabled()).toBe(true);
+    svc.init();
+    http.expectOne('/api/site-config').flush({ version: 3, branding: null });
+    expect(svc.gravatarEnabled()).toBe(true);
+  });
+
   it('starts with the default confirmation window of 12 hours', () => {
     expect(svc.confirmTtlHours()).toBe(BrandingService.DEFAULT_CONFIRM_TTL_HOURS);
     expect(svc.confirmTtlHours()).toBe(12);

@@ -26,7 +26,7 @@
     <ul class="rowgroup sp__list" [attr.aria-label]="'admin.substitutes.single' | t">
       @for (s of entries(); track s.id) {
         <li class="sp__row">
-          <app-avatar size="sm" [name]="entryName(s)" [decorative]="true" />
+          <app-avatar size="sm" [name]="entryName(s)" [principalId]="s.substituteId" [decorative]="true" />
           <span class="sp__name ell" [title]="entryName(s)">{{ entryName(s) }}</span>
           <span class="sp__member">
             <span class="sr-only">{{ 'admin.substitutes.col.member' | t }}: </span>

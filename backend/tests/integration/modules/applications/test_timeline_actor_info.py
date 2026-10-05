@@ -15,7 +15,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
-from sqlalchemy import Engine, event
+from sqlalchemy import Engine, event, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.modules.applications.models import StatusEvent
@@ -83,6 +83,13 @@ async def _add_anonymized(maker: async_sessionmaker[AsyncSession]) -> str:
     return sub
 
 
+async def _principal_id(maker: async_sessionmaker[AsyncSession], sub: str) -> uuid.UUID:
+    async with maker() as session:
+        pid = await session.scalar(select(PrincipalRow.id).where(PrincipalRow.sub == sub))
+    assert pid is not None
+    return pid
+
+
 async def _world(
     maker: async_sessionmaker[AsyncSession],
 ) -> tuple[ReadSeed, uuid.UUID, str, str]:
@@ -114,7 +121,8 @@ async def test_member_view_resolves_every_actor(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _, app_id, unknown, gone = await _world(maker)
+    seed, app_id, unknown, gone = await _world(maker)
+    member_id = await _principal_id(maker, seed.member_sub)
 
     api = build_read_api(migrated[1], monkeypatch)
     as_principal(api, Principal(sub="reader", permissions={"application.read"}))
@@ -122,13 +130,19 @@ async def test_member_view_resolves_every_actor(
     versions = get_json(api, f"/api/applications/{app_id}/versions")
     assert isinstance(timeline, list) and isinstance(versions, list)
 
+    # Only a member carries an id (for the avatar); no other actor does.
     assert [e["actorInfo"] for e in timeline] == [
-        {"kind": "applicant", "key": None, "displayName": None},
-        {"kind": "principal", "key": None, "displayName": MEMBER_NAME},
-        {"kind": "system", "key": "deadlines", "displayName": None},
-        {"kind": "system", "key": "auto", "displayName": None},
-        {"kind": "deleted", "key": None, "displayName": None},
-        {"kind": "deleted", "key": None, "displayName": None},
+        {"kind": "applicant", "key": None, "displayName": None, "principalId": None},
+        {
+            "kind": "principal",
+            "key": None,
+            "displayName": MEMBER_NAME,
+            "principalId": str(member_id),
+        },
+        {"kind": "system", "key": "deadlines", "displayName": None, "principalId": None},
+        {"kind": "system", "key": "auto", "displayName": None, "principalId": None},
+        {"kind": "deleted", "key": None, "displayName": None, "principalId": None},
+        {"kind": "deleted", "key": None, "displayName": None, "principalId": None},
     ]
     # The legacy string never carries a raw sub.
     assert [e["actor"] for e in timeline] == [
@@ -159,9 +173,10 @@ async def test_applicant_view_shows_the_gremium_for_all_other_actors(
     versions = get_json(api, f"/api/applications/{app_id}/versions")
     assert isinstance(timeline, list) and isinstance(versions, list)
 
-    gremium = {"kind": "gremium", "key": None, "displayName": GREMIUM_NAME}
+    # The applicant view holds no member id.
+    gremium = {"kind": "gremium", "key": None, "displayName": GREMIUM_NAME, "principalId": None}
     assert [e["actorInfo"] for e in timeline] == [
-        {"kind": "applicant", "key": None, "displayName": None},
+        {"kind": "applicant", "key": None, "displayName": None, "principalId": None},
         gremium,
         gremium,
         gremium,
@@ -169,7 +184,7 @@ async def test_applicant_view_shows_the_gremium_for_all_other_actors(
         gremium,
     ]
     assert [v["changedByInfo"] for v in versions] == [
-        {"kind": "applicant", "key": None, "displayName": None},
+        {"kind": "applicant", "key": None, "displayName": None, "principalId": None},
         gremium,
     ]
     body = str(timeline) + str(versions)
@@ -211,6 +226,9 @@ async def test_comment_of_an_unknown_author_shows_no_sub(
         (None, "deleted"),
         (MEMBER_NAME, "principal"),
     ]
+    # The member author carries the id for the avatar, the unknown one none.
+    member_id = await _principal_id(maker, seed.member_sub)
+    assert [c["authorInfo"]["principalId"] for c in comments] == [None, str(member_id)]
     assert unknown not in str(comments)
 
 
