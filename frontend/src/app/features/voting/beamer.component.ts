@@ -261,6 +261,6 @@ export class BeamerComponent implements OnDestroy {
   }
 }
 
-function sum(counts: Readonly<Record<string, number>> | null): number {
-  return Object.values(counts ?? {}).reduce((a, b) => a + b, 0);
+function sum(counts: Readonly<Record<string, number>>): number {
+  return Object.values(counts).reduce((a, b) => a + b, 0);
 }

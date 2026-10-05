@@ -331,6 +331,9 @@ describe('BeamerComponent', () => {
       jest.spyOn(fixture.debugElement.injector.get(Router), 'navigateByUrl').mockResolvedValue(true);
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(exit).toHaveBeenCalledTimes(1);
+      // A refused exit (no user gesture) is swallowed.
+      await Promise.resolve();
+      await Promise.resolve();
     });
 
     it('does not call exitFullscreen outside a fullscreen mode', async () => {
@@ -359,6 +362,29 @@ describe('BeamerComponent', () => {
       expect(exitLink()).not.toHaveClass('beamer__exit--shown');
       fireEvent.pointerMove(document);
       fixture.destroy();
+    });
+  });
+
+  describe('edge cases', () => {
+    it('counts 0 for an open vote without turnout numbers and without a tally frame', async () => {
+      const { push, fixture } = await setup({
+        votes: [vote({ tally: { counts: {}, eligible: 19, voted: null, present: null, revealed: false, quorumMet: false, leading: null } as unknown as Vote['tally'] })],
+      });
+      push(OPEN);
+      await fixture.whenStable();
+      const shown = fixture.componentInstance.vote();
+      expect(shown).toMatchObject({ status: 'open', voted: 0, present: 0 });
+    });
+
+    it('hides a closed result whose item the room has left', async () => {
+      const closedHere = { id: 'v9', status: 'closed', agendaItemId: 'ag-2' } as MeetingVote;
+      const { fixture, api } = await setup({
+        meeting: meeting({ votes: [closedHere] }),
+        votes: [vote({ status: 'closed', agendaItemId: 'ag-1', result: 'passed' })],
+      });
+      await fixture.whenStable();
+      expect(api.getVote).toHaveBeenCalledWith('v9', { quiet: true });
+      expect(fixture.componentInstance.vote()).toBeNull();
     });
   });
 });
