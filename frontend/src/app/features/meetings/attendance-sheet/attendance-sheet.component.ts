@@ -30,7 +30,10 @@ import { StatusTextComponent } from '@shared/ui/status-text/status-text.componen
 import type { StatusKind } from '@shared/status-kind.util';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { mediaQuerySignal } from '../../../layout/media-query';
-import { MeetingDelegationCardComponent } from '../meeting-delegation-card.component';
+import {
+  type DelegationCardChange,
+  MeetingDelegationCardComponent,
+} from '../meeting-delegation-card.component';
 
 /** One attendance change. `note` is the reason of an excuse; omitted keeps the stored one. */
 export interface AttendanceChange {
@@ -91,10 +94,16 @@ const SELF_CHOICES: readonly { value: Choice; label: TranslationKey }[] = [
  * - A member reports only the own row, as "Anwesend / Abwesend" (Z2), while the lead
  *   did not set it. Every other row is read-only.
  * - O23: a member with an active delegation cannot be present. The option is disabled
- *   and says why; a 409 from the server marks the row and offers the revoke.
+ *   and says why; a 409 from the server marks the row and offers the revoke. A revoke
+ *   of that delegation (here or in the own-delegation card) clears the mark.
+ * - The arrow keys move the focus between the options only; Enter, Space or a click
+ *   sets the state. So the keyboard sends no change for each step.
  * - The reason of an excuse shows only to the member and the lead (the server sends it
  *   to them only); the row menu edits it.
  * - A closed meeting freezes the attendance: every row is read-only.
+ * - The row of the minute-taker says so in the sub line.
+ * - A member who does not lead reads "abwesend" for an excuse and an absence (Z2), in the
+ *   rows and in the counts.
  *
  * Below the members: the delegations of the meeting (the lead revokes one while the
  * meeting is live, O6), the own delegation card and the people who have the meeting open.
@@ -138,6 +147,8 @@ export class AttendanceSheetComponent {
   readonly statusChange = output<AttendanceChange>();
   /** The lead resets a row to "open". */
   readonly reset = output<Attendance>();
+  /** O23: the delegation of this member (the `conflictId`) was revoked; clear the mark. */
+  readonly conflictResolved = output<Uuid>();
 
   protected readonly query = signal('');
   /** The delegations of the meeting: all of them for the lead, else the own ones. */
@@ -145,8 +156,12 @@ export class AttendanceSheetComponent {
   /** The row whose reason is being edited. */
   protected readonly editingNote = signal<Uuid | null>(null);
   protected readonly revoking = signal<Uuid | null>(null);
+  /** The option that has the keyboard focus in a row (roving tab stop), or `null`. */
+  private readonly focused = signal<{ id: Uuid; value: Choice } | null>(null);
   /** The reason field of the row in edit; it takes the focus when it appears. */
   private readonly noteInput = viewChild<ElementRef<HTMLInputElement>>('note');
+  /** The own-delegation section; a revoke in the sheet loads it again. */
+  private readonly ownCard = viewChild(MeetingDelegationCardComponent);
 
   constructor() {
     // Load the delegations when the sheet opens, and again when the server reports a
@@ -172,13 +187,19 @@ export class AttendanceSheetComponent {
   protected readonly lead = computed(() => this.meeting().canControl);
   protected readonly locked = computed(() => this.meeting().status === 'closed');
 
+  /** The counts per state. A member who does not lead reads one "abwesend" count (Z2). */
   protected readonly counts = computed(() => {
     const rows = this.attendance();
     const count = (s: AttendanceStatus | null) => rows.filter((a) => a.status === s).length;
+    const away: { n: number; key: TranslationKey }[] = this.lead()
+      ? [
+          { n: count('excused'), key: 'meetings.attendanceSheet.excused' },
+          { n: count('absent'), key: 'meetings.attendanceSheet.absent' },
+        ]
+      : [{ n: count('excused') + count('absent'), key: 'meetings.attendanceSheet.away' }];
     return [
       { n: count('present'), key: 'meetings.attendanceSheet.present' as TranslationKey },
-      { n: count('excused'), key: 'meetings.attendanceSheet.excused' as TranslationKey },
-      { n: count('absent'), key: 'meetings.attendanceSheet.absent' as TranslationKey },
+      ...away,
       { n: count(null), key: 'meetings.attendanceSheet.open' as TranslationKey },
     ];
   });
@@ -214,6 +235,7 @@ export class AttendanceSheetComponent {
       if (delegation.delegateVoting) sub.push(t('meetings.attendanceSheet.withVote'));
     }
     if (a.source === 'lead') sub.push(t('meetings.attendance.bySession'));
+    if (a.principalId === this.meeting().protokollantId) sub.push(t('meetings.keeper.keeps'));
 
     const blocked: TranslationKey | null = delegation ? 'meetings.attendanceSheet.revokeFirst' : null;
     let options: ChoiceOption[] | null = null;
@@ -282,7 +304,11 @@ export class AttendanceSheetComponent {
     this.statusChange.emit({ member: row.a, status: option.value });
   }
 
-  /** Arrow keys move the choice, as in a radio group. A blocked option is skipped. */
+  /**
+   * The arrow keys move the focus to the next option; a blocked option is skipped. They
+   * do not set the state: each step would send a change (and a reset on "Offen"), and a
+   * lead's change takes a member's own report over (O15). Enter, Space or a click sets it.
+   */
   protected onKey(event: KeyboardEvent, row: Row, index: number): void {
     const options = row.options;
     if (!options) return;
@@ -294,10 +320,27 @@ export class AttendanceSheetComponent {
       const next = (index + dir * i + options.length) % options.length;
       if (options[next].blocked) continue;
       const group = (event.currentTarget as HTMLElement).parentElement;
+      this.focused.set({ id: row.a.principalId, value: options[next].value });
       group?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus();
-      this.choose(row, options[next]);
       return;
     }
+  }
+
+  /**
+   * The tab stop of a row: the option the arrow keys moved to, else the chosen one. So
+   * Tab leaves the row from where the focus is, and comes back to the chosen option.
+   */
+  protected tabStop(row: Row, option: ChoiceOption): 0 | -1 {
+    const f = this.focused();
+    const value = f?.id === row.a.principalId ? f.value : row.value;
+    return option.value === value ? 0 : -1;
+  }
+
+  /** The focus left the control of a row: its tab stop is the chosen option again. */
+  protected onFocusOut(event: FocusEvent, row: Row): void {
+    const group = event.currentTarget as HTMLElement;
+    if (group.contains(event.relatedTarget as Node | null)) return;
+    if (this.focused()?.id === row.a.principalId) this.focused.set(null);
   }
 
   protected onMenu(row: Row, item: RowMenuItem): void {
@@ -327,12 +370,25 @@ export class AttendanceSheetComponent {
         this.revoking.set(null);
         this.toast.success(this.i18n.translate('delegation.toast.revoked'));
         this.loadDelegations(this.meeting().id);
+        this.ownCard()?.reload();
+        this.resolveConflict(d.delegatorId);
       },
       error: () => {
         this.revoking.set(null);
         this.toast.error(this.i18n.translate('delegation.toast.revokeFailed'));
       },
     });
+  }
+
+  /** The own delegation changed in the card: the rows load the delegations again. */
+  protected onOwnChange(change: DelegationCardChange): void {
+    this.loadDelegations(this.meeting().id);
+    if (change.kind === 'revoked') this.resolveConflict(change.delegation.delegatorId);
+  }
+
+  /** A revoked delegation of the refused member ends the O23 conflict of the row. */
+  private resolveConflict(delegatorId: Uuid): void {
+    if (this.conflictId() === delegatorId) this.conflictResolved.emit(delegatorId);
   }
 
   protected delegationLine(d: Delegation): string {

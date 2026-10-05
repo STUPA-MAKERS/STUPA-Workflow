@@ -189,6 +189,7 @@
   [conflictId]="attendanceConflict()"
   (statusChange)="attendanceChange.emit($event)"
   (reset)="attendanceReset.emit($event)"
+  (conflictResolved)="attendanceConflictResolved.emit($event)"
 />
 
 

@@ -5,7 +5,7 @@ import {
 } from '@angular/common/http/testing';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import type { Delegation } from '@core/api/delegations.service';
+import type { Delegation, MeetingDelegationContext } from '@core/api/delegations.service';
 import type { Attendance, Meeting } from '@core/api/models';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import {
@@ -18,8 +18,8 @@ import { AttendanceSheetComponent } from './attendance-sheet.component';
 
 const ROSTER: Attendance[] = [
   ...ATTENDANCE,
-  { principalId: 'pr-4', displayName: 'Jonas Weber', email: null, status: 'excused', source: 'self', note: 'Prüfung', isSelf: false },
-  { principalId: 'pr-5', displayName: 'Emil Hartmann', email: null, status: 'absent', source: 'lead', note: null, isSelf: false },
+  { principalId: 'pr-4', displayName: 'Vera Vertretung', email: null, status: 'excused', source: 'self', note: 'Prüfung', isSelf: false },
+  { principalId: 'pr-5', displayName: 'Fritz Fehlend', email: null, status: 'absent', source: 'lead', note: null, isSelf: false },
 ];
 
 function delegation(over: Partial<Delegation> = {}): Delegation {
@@ -31,9 +31,9 @@ function delegation(over: Partial<Delegation> = {}): Delegation {
     gremiumId: 'g-1',
     gremiumName: 'StuPa',
     delegatorId: 'pr-4',
-    delegatorName: 'Jonas Weber',
+    delegatorName: 'Vera Vertretung',
     delegateId: 'pr-9',
-    delegateName: 'Paul Neumann',
+    delegateName: 'Sven Stellvertreter',
     delegateVoting: true,
     viaPool: false,
     createdAt: '2026-10-01T00:00:00Z',
@@ -61,13 +61,22 @@ afterEach(() => {
 
 const toast = { success: jest.fn(), error: jest.fn() };
 
-/** Render the open sheet and answer its delegation list with `delegations`. */
-async function setup(over: Partial<Inputs> = {}, delegations: Delegation[] = [], media: string[] = []) {
+/**
+ * Render the open sheet and answer its delegation list with `delegations`, and the context
+ * of the own-delegation section with `context`.
+ */
+async function setup(
+  over: Partial<Inputs> = {},
+  delegations: Delegation[] = [],
+  media: string[] = [],
+  context: MeetingDelegationContext = DELEGATION_CONTEXT,
+) {
   restoreMedia = matchMediaQueries(...media);
   toast.success.mockReset();
   toast.error.mockReset();
   const statusChange = jest.fn();
   const reset = jest.fn();
+  const conflictResolved = jest.fn();
   const view = await render(AttendanceSheetComponent, {
     inputs: {
       open: true,
@@ -78,7 +87,7 @@ async function setup(over: Partial<Inputs> = {}, delegations: Delegation[] = [],
       conflictId: null,
       ...over,
     },
-    on: { statusChange, reset },
+    on: { statusChange, reset, conflictResolved },
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
@@ -87,9 +96,9 @@ async function setup(over: Partial<Inputs> = {}, delegations: Delegation[] = [],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   http.match((r) => r.url.endsWith('/delegations')).forEach((r) => r.flush(delegations));
-  http.match((r) => r.url.includes('/delegations/meetings/')).forEach((r) => r.flush(DELEGATION_CONTEXT));
+  http.match((r) => r.url.includes('/delegations/meetings/')).forEach((r) => r.flush(context));
   view.fixture.detectChanges();
-  return { ...view, http, statusChange, reset };
+  return { ...view, http, statusChange, reset, conflictResolved };
 }
 
 const sheet = () => screen.getByRole('dialog', { name: 'Anwesenheit' });
@@ -103,7 +112,7 @@ describe('AttendanceSheetComponent', () => {
     expect(counts.map((c) => c.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
       '1 anwesend', '2 entschuldigt', '1 unentschuldigt', '1 offen',
     ]);
-    await userEvent.type(within(sheet()).getByRole('searchbox', { name: 'Mitglied suchen' }), 'jon');
+    await userEvent.type(within(sheet()).getByRole('searchbox', { name: 'Mitglied suchen' }), 'vera');
     expect(within(sheet()).getAllByRole('radiogroup')).toHaveLength(1);
     await userEvent.type(within(sheet()).getByRole('searchbox', { name: 'Mitglied suchen' }), 'zzz');
     expect(within(sheet()).getByText('Kein Mitglied gefunden.')).toBeInTheDocument();
@@ -133,15 +142,43 @@ describe('AttendanceSheetComponent', () => {
     expect(reset).not.toHaveBeenCalled();
   });
 
-  it('moves the choice with the arrow keys', async () => {
-    const { statusChange } = await setup();
+  it('moves the focus with the arrow keys and sets the state only on Enter', async () => {
+    const { statusChange, reset, fixture } = await setup();
     // The sheet takes the focus when it opens; wait for that first.
     await new Promise((r) => setTimeout(r, 50));
-    const checked = within(row('Mika Mitglied')).getByRole('radio', { name: 'Entschuldigt' });
-    checked.focus();
+    const radio = (name: string) => within(row('Mika Mitglied')).getByRole('radio', { name });
+    radio('Entschuldigt').focus();
     await userEvent.keyboard('{ArrowRight}');
+    expect(radio('Unentschuldigt')).toHaveFocus();
+    // The focused option is the tab stop of the row; the state did not change.
+    expect(radio('Unentschuldigt')).toHaveAttribute('tabindex', '0');
+    expect(radio('Entschuldigt')).toHaveAttribute('tabindex', '-1');
+    expect(radio('Entschuldigt')).toHaveAttribute('aria-checked', 'true');
+    // A step onto "Offen" does not reset the record.
+    await userEvent.keyboard('{ArrowRight}');
+    expect(radio('Offen')).toHaveFocus();
+    expect(statusChange).not.toHaveBeenCalled();
+    expect(reset).not.toHaveBeenCalled();
+    await userEvent.keyboard('{ArrowLeft}{Enter}');
+    expect(statusChange).toHaveBeenCalledTimes(1);
     expect(statusChange).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'absent' }));
-    expect(within(row('Mika Mitglied')).getByRole('radio', { name: 'Unentschuldigt' })).toHaveFocus();
+    // When the focus leaves the row, its tab stop is the chosen option again.
+    radio('Unentschuldigt').blur();
+    fixture.detectChanges();
+    expect(radio('Entschuldigt')).toHaveAttribute('tabindex', '0');
+  });
+
+  it('counts an excuse and an absence as one "abwesend" for a member (Z2)', async () => {
+    await setup({ meeting: meeting({ canControl: false }) });
+    const counts = [...(sheet().querySelectorAll('.as__counts > span') as NodeListOf<HTMLElement>)];
+    expect(counts.map((c) => c.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+      '1 anwesend', '3 abwesend', '1 offen',
+    ]);
+  });
+
+  it('names the minute-taker in the sub line', async () => {
+    await setup();
+    expect(within(sheet()).getByText('führt das Protokoll', { selector: '.as__sub' })).toBeInTheDocument();
   });
 
   it('shows the source and the reason in the sub line', async () => {
@@ -169,7 +206,7 @@ describe('AttendanceSheetComponent', () => {
     await setup({ meeting: meeting({ canControl: false }), attendance: roster });
     expect(within(sheet()).queryByRole('radiogroup')).toBeNull();
     expect(within(sheet()).getByText('Abwesend', { selector: 'app-status-text' })).toBeInTheDocument();
-    expect(within(sheet()).getByText('durch Sitzungsleitung')).toBeInTheDocument();
+    expect(within(sheet()).getByText('durch Sitzungsleitung · führt das Protokoll')).toBeInTheDocument();
   });
 
   it('freezes every row of a closed meeting', async () => {
@@ -186,7 +223,7 @@ describe('AttendanceSheetComponent', () => {
     // The lead edits the own reason and the reason of a row the lead set; a member's own
     // reason stays the member's.
     expect(within(sheet()).getByRole('button', { name: 'Aktionen für Mika Mitglied' })).toBeInTheDocument();
-    expect(within(sheet()).queryByRole('button', { name: 'Aktionen für Jonas Weber' })).toBeNull();
+    expect(within(sheet()).queryByRole('button', { name: 'Aktionen für Vera Vertretung' })).toBeNull();
     await userEvent.click(within(sheet()).getByRole('button', { name: 'Aktionen für Pia Protokoll' }));
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Grund eintragen' }));
     const field = within(sheet()).getByRole('textbox', { name: 'Grund' });
@@ -208,14 +245,14 @@ describe('AttendanceSheetComponent', () => {
 
   it('blocks "present" for a member with a delegation and revokes it (O23, O6)', async () => {
     const { http, fixture } = await setup({}, [delegation()]);
-    const jonas = row('Jonas Weber');
+    const jonas = row('Vera Vertretung');
     const present = within(jonas).getByRole('radio', { name: 'Anwesend' });
     expect(present).toHaveAttribute('aria-disabled', 'true');
     expect(present).toHaveAttribute('title', 'Erst die Vertretung widerrufen.');
-    expect(within(sheet()).getByText('Grund: Prüfung · vertreten durch Paul Neumann · mit Stimmrecht')).toBeInTheDocument();
+    expect(within(sheet()).getByText('Grund: Prüfung · vertreten durch Sven Stellvertreter · mit Stimmrecht')).toBeInTheDocument();
     const section = within(sheet()).getByRole('region', { name: 'Vertretungen' });
     expect(within(section).getByText('Vertretungen · 1')).toBeInTheDocument();
-    expect(within(section).getByText('Jonas Weber → Paul Neumann')).toBeInTheDocument();
+    expect(within(section).getByText('Vera Vertretung → Sven Stellvertreter')).toBeInTheDocument();
     await userEvent.click(within(section).getByRole('button', { name: 'Widerrufen' }));
     const del = http.expectOne('/api/delegations/d-1');
     expect(del.request.method).toBe('DELETE');
@@ -223,11 +260,11 @@ describe('AttendanceSheetComponent', () => {
     expect(toast.success).toHaveBeenCalled();
     http.expectOne((r) => r.url.endsWith('/delegations')).flush([]);
     fixture.detectChanges();
-    expect(within(row('Jonas Weber')).getByRole('radio', { name: 'Anwesend' })).not.toHaveAttribute('aria-disabled');
+    expect(within(row('Vera Vertretung')).getByRole('radio', { name: 'Anwesend' })).not.toHaveAttribute('aria-disabled');
   });
 
   it('marks the row the server refused (409 delegation_active) and offers the revoke', async () => {
-    const { fixture, http } = await setup();
+    const { fixture, http, conflictResolved } = await setup();
     fixture.componentRef.setInput('conflictId', 'pr-4');
     fixture.detectChanges();
     // The refusal reloads the delegations: now the page knows the delegation.
@@ -238,6 +275,62 @@ describe('AttendanceSheetComponent', () => {
     await userEvent.click(within(alert).getByRole('button', { name: 'Vertretung widerrufen' }));
     http.expectOne('/api/delegations/d-1').flush(null);
     http.expectOne((r) => r.url.endsWith('/delegations')).flush([]);
+    // The revoke ends the conflict: the page clears it, and the alert goes away.
+    expect(conflictResolved).toHaveBeenCalledWith('pr-4');
+    fixture.componentRef.setInput('conflictId', null);
+    fixture.detectChanges();
+    http.match((r) => r.url.endsWith('/delegations')).forEach((r) => r.flush([]));
+    fixture.detectChanges();
+    expect(within(sheet()).queryByRole('alert')).toBeNull();
+    expect(within(row('Vera Vertretung')).getByRole('radio', { name: 'Anwesend' })).not.toHaveAttribute('aria-disabled');
+  });
+
+  it('ends no conflict with the revoke of another delegation', async () => {
+    const { http, conflictResolved } = await setup({ conflictId: 'pr-4' }, [delegation({ id: 'd-2', delegatorId: 'pr-5' })]);
+    await userEvent.click(within(sheet()).getByRole('button', { name: 'Widerrufen' }));
+    http.expectOne('/api/delegations/d-2').flush(null);
+    http.match((r) => r.url.endsWith('/delegations')).forEach((r) => r.flush([]));
+    expect(conflictResolved).not.toHaveBeenCalled();
+  });
+
+  it('loads the rows again after a change in the own-delegation section, and the section after a revoke here', async () => {
+    const own = delegation({ id: 'd-own', delegatorId: 'pr-1', delegatorName: 'Pia Protokoll', direction: 'outgoing' });
+    const context: MeetingDelegationContext = {
+      ...DELEGATION_CONTEXT,
+      allowVoteDelegation: true,
+      meetingStarted: false,
+      canDelegate: true,
+      myDelegation: own,
+    };
+    const { fixture, http, conflictResolved } = await setup({ conflictId: 'pr-1' }, [own], [], context);
+    const pia = () => row('Pia Protokoll');
+    expect(within(pia()).getByRole('radio', { name: 'Anwesend' })).toHaveAttribute('aria-disabled', 'true');
+    // The member revokes the own delegation in the section: the rows know it at once.
+    const section = within(sheet()).getByRole('region', { name: 'Vertretung' });
+    await userEvent.click(within(section).getByRole('button', { name: 'Vertretung widerrufen' }));
+    http.expectOne('/api/delegations/d-own').flush(null);
+    http.expectOne((r) => r.url.includes('/delegations/meetings/')).flush({ ...context, myDelegation: null });
+    http.expectOne((r) => r.url.endsWith('/delegations')).flush([]);
+    fixture.detectChanges();
+    expect(within(pia()).getByRole('radio', { name: 'Anwesend' })).not.toHaveAttribute('aria-disabled');
+    expect(within(sheet()).queryByText(/vertreten durch/)).toBeNull();
+    expect(conflictResolved).toHaveBeenCalledWith('pr-1');
+    // A new delegation in the section blocks "Anwesend" again.
+    await userEvent.click(within(section).getByRole('button', { name: 'Vertretung einrichten' }));
+    const card = fixture.debugElement.query((el) => el.name === 'app-meeting-delegation-card');
+    (card.componentInstance as { delegateId: { set(v: string): void } }).delegateId.set('pr-2');
+    fixture.detectChanges();
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Vertretung einrichten' })).getByRole('button', { name: 'Vertretung einrichten' }));
+    http.expectOne((r) => r.method === 'POST' && r.url.endsWith('/delegations')).flush(own);
+    http.expectOne((r) => r.url.includes('/delegations/meetings/')).flush(context);
+    http.expectOne((r) => r.method === 'GET' && r.url.endsWith('/delegations')).flush([own]);
+    fixture.detectChanges();
+    expect(within(pia()).getByRole('radio', { name: 'Anwesend' })).toHaveAttribute('aria-disabled', 'true');
+    // A revoke in the list of the lead loads the section again.
+    await userEvent.click(within(within(sheet()).getByRole('region', { name: 'Vertretungen' })).getByRole('button', { name: 'Widerrufen' }));
+    http.expectOne('/api/delegations/d-own').flush(null);
+    http.expectOne((r) => r.url.endsWith('/delegations')).flush([]);
+    http.expectOne((r) => r.url.includes('/delegations/meetings/')).flush({ ...context, myDelegation: null });
   });
 
   it('says only the refusal when the delegation cannot be revoked here', async () => {
@@ -270,15 +363,18 @@ describe('AttendanceSheetComponent', () => {
     fixture.componentRef.setInput('saving', false);
     fixture.detectChanges();
     // "Anwesend" of the delegator stays blocked; a click sends nothing.
-    await userEvent.click(within(row('Jonas Weber')).getByRole('radio', { name: 'Anwesend' }));
+    await userEvent.click(within(row('Vera Vertretung')).getByRole('radio', { name: 'Anwesend' }));
     expect(statusChange).not.toHaveBeenCalled();
     // The arrow keys skip the blocked option; other keys do nothing.
     await new Promise((r) => setTimeout(r, 50));
-    within(row('Jonas Weber')).getByRole('radio', { name: 'Entschuldigt' }).focus();
-    await userEvent.keyboard('{Enter}');
+    within(row('Vera Vertretung')).getByRole('radio', { name: 'Entschuldigt' }).focus();
+    await userEvent.keyboard('{Enter}{a}');
     expect(statusChange).not.toHaveBeenCalled();
-    // From "Entschuldigt" left: "Anwesend" is blocked, so the choice wraps to "Offen".
+    // From "Entschuldigt" left: "Anwesend" is blocked, so the focus wraps to "Offen".
     await userEvent.keyboard('{ArrowLeft}');
+    expect(within(row('Vera Vertretung')).getByRole('radio', { name: 'Offen' })).toHaveFocus();
+    expect(reset).not.toHaveBeenCalled();
+    await userEvent.keyboard('{Enter}');
     expect(reset).toHaveBeenCalledWith(expect.objectContaining({ principalId: 'pr-4' }));
   });
 
@@ -352,7 +448,7 @@ describe('AttendanceSheetComponent', () => {
   it('opens from the bottom on a phone and clears the search when it closes', async () => {
     const { fixture } = await setup({}, [], [MEDIA.phone]);
     expect(sheet()).toHaveClass('ss--bottom');
-    await userEvent.type(within(sheet()).getByRole('searchbox', { name: 'Mitglied suchen' }), 'jon');
+    await userEvent.type(within(sheet()).getByRole('searchbox', { name: 'Mitglied suchen' }), 'vera');
     await userEvent.keyboard('{Escape}');
     expect(fixture.componentInstance.open()).toBe(false);
     fixture.componentInstance.open.set(true);

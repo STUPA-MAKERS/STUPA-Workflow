@@ -1177,6 +1177,16 @@ describe('MeetingsComponent — methods', () => {
       cmp.setAttendance(OTHER as never, 'excused');
       http.expectOne('/api/meetings/m-1/attendance/pr-2').flush([{ ...OTHER, status: 'excused' }]);
       expect(cmp.attendanceConflict()).toBeNull();
+      // A revoke of the delegation in the attendance sheet clears it too, only for that member.
+      cmp.setAttendance(OTHER as never, 'present');
+      http
+        .expectOne('/api/meetings/m-1/attendance/pr-2')
+        .flush({ code: 'delegation_active' }, { status: 409, statusText: 'Conflict' });
+      http.expectOne('/api/meetings/m-1/attendance').flush([OTHER]);
+      cmp.clearAttendanceConflict('pr-9');
+      expect(cmp.attendanceConflict()).toBe('pr-2');
+      cmp.clearAttendanceConflict('pr-2');
+      expect(cmp.attendanceConflict()).toBeNull();
     });
 
     it('explains the own delegation (O23) to a member and reloads the roster', async () => {

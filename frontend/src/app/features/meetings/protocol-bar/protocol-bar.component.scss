@@ -68,11 +68,21 @@
   outline-offset: 2px;
 }
 
-/* A phone: the actions take their own line below the text. */
+/* A phone: the actions take their own line below the text. The icon and the text stay on
+   the first line: a zero basis lets the text wrap its words instead of moving to a line of
+   its own. */
 @include bp.phone {
   .pb {
     flex-wrap: wrap;
     padding: var(--space-3) var(--space-4);
+  }
+  .pb__text {
+    flex: 1 1 0;
+  }
+  /* A text of two lines: the icon stays with the first line (line height 20px). */
+  .pb__icon {
+    align-self: flex-start;
+    margin-top: 1px;
   }
   .pb__actions {
     flex: 1 1 100%;

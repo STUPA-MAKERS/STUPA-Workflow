@@ -128,6 +128,22 @@ describe('SessionDockComponent', () => {
       await userEvent.click(chip);
       expect(dock.panel()).toBe('none');
     });
+
+    it('puts the end edge of the minute-taker menu in line with the end edge of its chip', async () => {
+      const { fixture, container } = await setup();
+      const rect = (left: number, right: number) => ({ left, right, top: 0, bottom: 0 }) as DOMRect;
+      jest.spyOn(fixture.nativeElement as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(96, 1428));
+      const chip = screen.getByTitle('Protokollführung übergeben');
+      jest.spyOn(chip, 'getBoundingClientRect').mockReturnValue(rect(1080, 1308));
+      await userEvent.click(chip);
+      const pop = container.querySelector('.sd__pop') as HTMLElement;
+      expect(pop.style.getPropertyValue('--sd-pop-end')).toBe('120px');
+      // Right to left: the end edge is the left edge.
+      await userEvent.click(chip);
+      (fixture.nativeElement as HTMLElement).style.direction = 'rtl';
+      await userEvent.click(chip);
+      expect((container.querySelector('.sd__pop') as HTMLElement).style.getPropertyValue('--sd-pop-end')).toBe('984px');
+    });
   });
 
   describe('handover during a live meeting (Z3)', () => {
@@ -137,6 +153,8 @@ describe('SessionDockComponent', () => {
       await setup({ meeting: meeting({ canManage: false, isProtokollant: false }) });
       expect(screen.queryByTitle('Protokollführung übergeben')).toBeNull();
       expect(screen.getByText('Protokoll: Pia Protokoll')).toBeInTheDocument();
+      // The tooltip names the minute-taker in full, for a name the chip cuts off.
+      expect(screen.getByTitle('Protokoll: Pia Protokoll')).toHaveClass('sd__chip--static');
     });
 
     it('offers the handover to the minute-taker', async () => {
@@ -303,7 +321,11 @@ describe('SessionDockComponent', () => {
 
     it('names every minute-taker once, locked, and keeps the attendance', async () => {
       const { fixture } = await setup({ meeting: closed() });
-      const keepers = screen.getByTitle('Sitzung geschlossen – die Protokollführung steht fest.');
+      // The chip can cut the names off: the tooltip names them in full, then says why.
+      const keepers = screen.getByTitle(/Sitzung geschlossen – die Protokollführung steht fest\.$/);
+      expect(keepers.getAttribute('title')).toBe(
+        'Protokoll: Pia Protokoll, Mika Mitglied\nSitzung geschlossen – die Protokollführung steht fest.',
+      );
       expect(keepers).toHaveTextContent('Protokoll: Pia Protokoll, Mika Mitglied');
       expect(keepers.tagName).toBe('SPAN');
       await userEvent.click(screen.getByTitle('Anwesenheit'));

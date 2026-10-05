@@ -545,7 +545,7 @@ const MOCK_PLANNED_AGENDA = [
 
 /**
  * GET /delegations: the user represents a member in the planned meeting, and in the live
- * meeting Jonas Weber is represented by Paul Neumann (the lead sees it and can revoke it).
+ * meeting Vera Vertretung is represented by Sven Stellvertreter (the lead sees it and can revoke it).
  */
 let MOCK_DELEGATIONS = [
   {
@@ -573,9 +573,9 @@ let MOCK_DELEGATIONS = [
     gremiumId: 'g0000000-0000-0000-0000-000000000001',
     gremiumName: 'Studierendenparlament',
     delegatorId: 'p-6',
-    delegatorName: 'Jonas Weber',
+    delegatorName: 'Vera Vertretung',
     delegateId: 'p-7',
-    delegateName: 'Paul Neumann',
+    delegateName: 'Sven Stellvertreter',
     delegateVoting: true,
     viaPool: false,
     createdAt: '2026-06-10T09:00:00Z',
@@ -694,13 +694,13 @@ let MOCK_ATTENDANCE: MockAttendance[] = [
   { principalId: MOCK_PRINCIPAL.sub, displayName: MOCK_PRINCIPAL.display_name ?? null, email: MOCK_PRINCIPAL.email ?? null, status: null, source: null, note: null, isSelf: true, canKeepProtocol: true },
   { principalId: 'p-2', displayName: 'Max Mustermann', email: 'max@example.com', status: 'present', source: 'lead', note: null, isSelf: false, canKeepProtocol: true },
   { principalId: 'p-3', displayName: 'Erika Beispiel', email: 'erika@example.com', status: 'excused', source: 'self', note: 'Prüfung', isSelf: false, canKeepProtocol: false },
-  { principalId: 'p-4', displayName: 'Lea Hoffmann', email: 'lea@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: true },
-  { principalId: 'p-5', displayName: 'Tom Brandt', email: 'tom@example.com', status: 'present', source: 'lead', note: null, isSelf: false, canKeepProtocol: true },
-  // O23: Jonas Weber has a delegation for the live meeting, so "present" gives 409.
-  { principalId: 'p-6', displayName: 'Jonas Weber', email: 'jonas@example.com', status: 'excused', source: 'self', note: null, isSelf: false, canKeepProtocol: true },
-  { principalId: 'p-7', displayName: 'Paul Neumann', email: 'paul@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: false },
-  { principalId: 'p-8', displayName: 'Emil Hartmann', email: 'emil@example.com', status: 'absent', source: 'lead', note: null, isSelf: false, canKeepProtocol: false },
-  { principalId: 'p-9', displayName: 'Sophie Richter', email: 'sophie@example.com', status: null, source: null, note: null, isSelf: false, canKeepProtocol: false },
+  { principalId: 'p-4', displayName: 'Uli Übernahme', email: 'uli@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: true },
+  { principalId: 'p-5', displayName: 'Rolf Redner', email: 'rolf@example.com', status: 'present', source: 'lead', note: null, isSelf: false, canKeepProtocol: true },
+  // O23: Vera Vertretung has a delegation for the live meeting, so "present" gives 409.
+  { principalId: 'p-6', displayName: 'Vera Vertretung', email: 'vera@example.com', status: 'excused', source: 'self', note: null, isSelf: false, canKeepProtocol: true },
+  { principalId: 'p-7', displayName: 'Sven Stellvertreter', email: 'sven@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: false },
+  { principalId: 'p-8', displayName: 'Fritz Fehlend', email: 'fritz@example.com', status: 'absent', source: 'lead', note: null, isSelf: false, canKeepProtocol: false },
+  { principalId: 'p-9', displayName: 'Olga Offen', email: 'olga@example.com', status: null, source: null, note: null, isSelf: false, canKeepProtocol: false },
 ];
 
 interface MockAgendaItem {

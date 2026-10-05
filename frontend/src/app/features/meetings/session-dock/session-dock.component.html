@@ -12,7 +12,7 @@
   </app-side-sheet>
 } @else if (keeperOpen) {
   <button type="button" class="sd__backdrop" aria-hidden="true" tabindex="-1" (click)="closePanel()"></button>
-  <div class="sd__pop" role="dialog" [attr.aria-label]="panelHeading() | t">
+  <div class="sd__pop" role="dialog" [attr.aria-label]="panelHeading() | t" [style.--sd-pop-end.px]="popEnd()">
     <app-keeper-menu [meeting]="m" [attendance]="attendance()" (pick)="pickKeeper($event)" (discard)="discardHandover()" />
   </div>
 }
@@ -93,7 +93,7 @@
 <ng-template #keeperChip>
   @if (m.status === 'closed') {
     <!-- A closed meeting changes no keeper: every keeper of the meeting, locked. -->
-    <span class="sd__chip sd__chip--static" [title]="'meetings.dock.keepersLocked' | t">
+    <span class="sd__chip sd__chip--static" [title]="closedKeeperTitle()">
       <app-icon name="lock" [size]="16" />
       <span class="sd__chipText">{{ 'meetings.dock.protokollantIs' | t: { name: keepers() || '—' } }}</span>
     </span>
@@ -106,7 +106,7 @@
       [attr.aria-expanded]="keeperOpen"
       aria-haspopup="dialog"
       [title]="(canHandOver() ? 'meetings.handover.title' : 'meetings.protokollant.label') | t"
-      (click)="togglePanel('protokollant')"
+      (click)="togglePanel('protokollant', $any($event.currentTarget))"
     >
       <app-icon name="edit" [size]="18" />
       <span class="sd__chipText">{{ m.protokollantId ? ('meetings.dock.protokollantIs' | t: { name: m.protokollantName ?? '' }) : ('meetings.dock.protokollantMissing' | t) }}</span>
@@ -116,7 +116,7 @@
       <app-icon class="sd__chev" name="chevron-down" [size]="16" />
     </button>
   } @else if (m.protokollantId) {
-    <span class="sd__chip sd__chip--static">
+    <span class="sd__chip sd__chip--static" [title]="'meetings.dock.protokollantIs' | t: { name: m.protokollantName ?? '' }">
       <app-icon name="edit" [size]="18" />
       <span class="sd__chipText">{{ 'meetings.dock.protokollantIs' | t: { name: m.protokollantName ?? '' } }}</span>
     </span>

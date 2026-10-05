@@ -477,6 +477,11 @@ export class MeetingSessionService implements OnDestroy {
     this.saveAttendance(m.id, member.principalId, req, asLead);
   }
 
+  /** O23: the delegation of the member was revoked, so the refusal no longer applies. */
+  clearAttendanceConflict(principalId: Uuid): void {
+    if (this.attendanceConflict() === principalId) this.attendanceConflict.set(null);
+  }
+
   /** Reset a member to "open" (meeting lead only). The member can then report again. */
   resetAttendance(member: Attendance): void {
     const m = this.meeting();

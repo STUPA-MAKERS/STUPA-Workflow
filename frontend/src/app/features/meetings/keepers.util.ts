@@ -51,7 +51,7 @@ function span(
 
 /**
  * The keeper line of the protocol head: one name, or every period with its span,
- * "Mara Keller (TOP 1–3), Lea Hoffmann (ab TOP 3, 18:55)". A planned handover is not
+ * "Lara Leitung (TOP 1–3), Uli Übernahme (ab TOP 3, 18:55)". A planned handover is not
  * part of it. The PDF head of the render service writes the same line.
  */
 export function keeperLine(periods: readonly KeeperPeriod[], t: Translate, locale: string): string {
@@ -76,7 +76,7 @@ function line(
     .join(', ');
 }
 
-/** Every keeper of the meeting once, in the order of the periods: "Mara Keller, Lea Hoffmann". */
+/** Every keeper of the meeting once, in the order of the periods: "Lara Leitung, Uli Übernahme". */
 export function keeperNames(m: Meeting): string {
   const names = m.keeperPeriods.filter((p) => p.fromAt !== null).map(nameOf);
   const unique = [...new Set(names)];

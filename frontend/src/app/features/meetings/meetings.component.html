@@ -102,6 +102,7 @@
     (toggleBeamer)="beamerMode.set(true)"
     (attendanceChange)="setAttendance($event.member, $event.status, $event.note)"
     (attendanceReset)="resetAttendance($event)"
+    (attendanceConflictResolved)="clearAttendanceConflict($event)"
     (addTop)="openAgendaDialog()"
     (removeFromAgenda)="removeFromAgenda($event)"
     (startRename)="startRename($event)"

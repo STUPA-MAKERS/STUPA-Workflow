@@ -153,6 +153,8 @@ export class MeetingPageComponent {
   readonly toggleBeamer = output<void>();
   readonly attendanceChange = output<AttendanceChange>();
   readonly attendanceReset = output<Attendance>();
+  /** O23: the delegation of the refused member was revoked in the attendance sheet. */
+  readonly attendanceConflictResolved = output<Uuid>();
   /** Open "TOP hinzufügen". */
   readonly addTop = output<void>();
   readonly removeFromAgenda = output<Uuid>();

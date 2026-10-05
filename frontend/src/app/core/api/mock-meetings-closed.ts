@@ -44,7 +44,7 @@ interface ClosedMeeting {
   protocol: ProtocolOutWire;
 }
 
-const QUESTION = 'Soll der Antrag „Zuschuss Erstsemester-Party“ wie beschrieben gefördert werden?';
+const QUESTION = 'Soll der Antrag „Beispielantrag Sommerfest“ wie beschrieben gefördert werden?';
 
 function closedMeeting(
   id: string,
@@ -56,13 +56,13 @@ function closedMeeting(
   const prefix = id.slice(-2);
   const top = (n: number) => `ag-c${prefix}-${n}`;
   const voteBody =
-    'Die Antragstellerin stellt den Antrag vor. Tom Brandt regt an, den Posten DJ & Technik zu begrenzen; die Antragstellerin hält am Antrag fest.\n\n' +
+    'Die Antragstellerin stellt den Antrag vor. Rolf Redner regt an, einen Posten zu kürzen; die Antragstellerin hält am Antrag fest.\n\n' +
     'Die Sitzungsleitung stellt die Beschlussfrage zur Abstimmung.\n\n' +
     `> [!abstimmung] **${QUESTION}**\n> yes: 15, no: 3, abstain: 2`;
   const agenda = [
     { id: top(1), applicationId: null, title: 'Begrüßung und Beschlussfähigkeit', body: 'Die Sitzungsleitung eröffnet die Sitzung. Das Gremium ist beschlussfähig.', position: 0 },
     { id: top(2), applicationId: null, title: 'Protokoll der letzten Sitzung', body: 'Das Protokoll wird ohne Änderungen genehmigt.', position: 1 },
-    { id: top(3), applicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', title: 'Zuschuss Erstsemester-Party', body: voteBody, position: 2 },
+    { id: top(3), applicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', title: 'Beispielantrag Sommerfest', body: voteBody, position: 2 },
     { id: top(4), applicationId: null, title: 'Personalangelegenheit', body: '', position: 3, nonPublic: true },
     { id: top(5), applicationId: null, title: 'Verschiedenes', body: 'Keine Wortmeldungen.', position: 4 },
   ];
@@ -94,7 +94,7 @@ function closedMeeting(
     keeperPeriods: [
       {
         principalId: 'p-4',
-        name: 'Lea Hoffmann',
+        name: 'Uli Übernahme',
         fromAt: at(days, 18, 4),
         toAt: at(days, 18, 55),
         fromAgendaItemId: top(1),
@@ -119,7 +119,7 @@ function closedMeeting(
         id: `a0000000-0000-0000-0000-0000000001${prefix}`,
         applicationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         agendaItemId: top(3),
-        title: 'Zuschuss Erstsemester-Party',
+        title: 'Beispielantrag Sommerfest',
         question: QUESTION,
         options: ['yes', 'no', 'abstain'],
         status: 'closed',

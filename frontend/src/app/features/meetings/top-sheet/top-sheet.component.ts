@@ -49,7 +49,7 @@ const TOOLS: readonly FormatTool[] = [
  *
  * A closed meeting (boards Sitzung-Protokoll-Entwurf, Sitzung-Geschlossen): the protocol
  * bar on top (draft and "Finalisieren & versenden", or final and the PDF links) and the
- * keeper line below the title, "Protokoll: Mara Keller (TOP 1–3), Lea Hoffmann (ab TOP 3,
+ * keeper line below the title, "Protokoll: Lara Leitung (TOP 1–3), Uli Übernahme (ab TOP 3,
  * 18:55)". The text stays editable while the protocol is a draft (O22).
  *
  * A vote result in the text shows as a card with "Beschluss · 18:52 · Einfache Mehrheit",

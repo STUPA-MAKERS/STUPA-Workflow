@@ -268,6 +268,11 @@ export class MeetingsComponent {
     this.session.resetAttendance(member);
   }
 
+  /** O23: the delegation in the way was revoked; the row of the member is no conflict. */
+  clearAttendanceConflict(principalId: Uuid): void {
+    this.session.clearAttendanceConflict(principalId);
+  }
+
   /** "Abstimmung öffnen" for an agenda item. */
   openVoteDialog(item: AgendaItem): void {
     this.dialogs.voteItem.set(item);

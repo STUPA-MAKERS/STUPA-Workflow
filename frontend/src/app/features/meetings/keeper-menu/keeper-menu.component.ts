@@ -27,7 +27,7 @@ interface Candidate {
 /**
  * The minute-taker menu of the dock (board Sitzung-Menues-B).
  *
- * A live meeting: the planned handover on top ("Lea Hoffmann übernimmt ab TOP 4",
+ * A live meeting: the planned handover on top ("Uli Übernahme übernimmt ab TOP 4",
  * "Verwerfen"), then "Protokollführung übergeben an" with a member search and the
  * members who can keep the minutes. A pick opens the handover dialog, which asks when the
  * handover takes effect. A planned meeting: "Protokollführung zuweisen"; a pick names the

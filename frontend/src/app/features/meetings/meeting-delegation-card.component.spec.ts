@@ -89,21 +89,23 @@ const toast = {
   info: jest.fn(),
 };
 
-async function setup(meetingId = 'm-1') {
+async function setup(meetingId = 'm-1', framed = false) {
   toast.success.mockReset();
   toast.error.mockReset();
+  const changed = jest.fn();
   const view = await render(MeetingDelegationCardComponent, {
+    on: { changed },
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: API_BASE_URL, useValue: BASE },
       { provide: ToastService, useValue: toast },
     ],
-    inputs: { meetingId },
+    inputs: { meetingId, framed },
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   const cmp = view.fixture.componentInstance as unknown as CardInternals;
-  return { ...view, http, cmp };
+  return { ...view, http, cmp, changed };
 }
 
 /** Answer the initial context GET of the effect with `body`, or with a 403 for null. */
@@ -294,8 +296,33 @@ describe('MeetingDelegationCardComponent', () => {
     http.verify();
   });
 
+  it('shows the section as a card with a heading when framed (the follow view)', async () => {
+    const { http, fixture, container } = await setup('m-1', true);
+    flushContext(http, ctx());
+    fixture.detectChanges();
+    expect(container.querySelector('app-card')).toBeTruthy();
+    expect(container.querySelector('.dc__cap')).toBeNull();
+    expect(container.querySelector('.dc__rows')).not.toHaveClass('rowgroup--bg3');
+  });
+
+  it('shows the section with a caption on surface 3 in the attendance sheet', async () => {
+    const { http, fixture, container } = await setup();
+    flushContext(http, ctx());
+    fixture.detectChanges();
+    expect(container.querySelector('app-card')).toBeNull();
+    expect(container.querySelector('.dc__cap')).toHaveTextContent('Vertretung');
+    expect(container.querySelector('.dc__rows')).toHaveClass('rowgroup--bg3');
+  });
+
+  it('loads the context again on request', async () => {
+    const { http, fixture } = await setup();
+    flushContext(http, ctx());
+    (fixture.componentInstance as unknown as { reload(): void }).reload();
+    http.expectOne(`${BASE}/delegations/meetings/m-1/context`).flush(ctx());
+  });
+
   it('creates a delegation, toasts success and reloads the context', async () => {
-    const { http, cmp } = await setup();
+    const { http, cmp, changed } = await setup();
     flushContext(http, ctx());
     cmp.delegateId.set('r-1');
     cmp.delegateVoting.set(true);
@@ -309,6 +336,7 @@ describe('MeetingDelegationCardComponent', () => {
     expect(cmp.busy()).toBe(false);
     expect(cmp.dialogOpen()).toBe(false);
     expect(toast.success).toHaveBeenCalled();
+    expect(changed).toHaveBeenCalledWith({ kind: 'created' });
     // The reload call reads the context again.
     http.expectOne(`${BASE}/delegations/meetings/m-1/context`).flush(ctx({ myDelegation: delegation() }));
     expect(cmp.ctx()?.myDelegation).not.toBeNull();
@@ -348,7 +376,7 @@ describe('MeetingDelegationCardComponent', () => {
   });
 
   it('revokes a delegation, toasts success and reloads', async () => {
-    const { http, cmp } = await setup();
+    const { http, cmp, changed } = await setup();
     flushContext(http, ctx({ myDelegation: delegation() }));
     cmp.revoke(delegation({ id: 'd-9' }));
     const req = http.expectOne(`${BASE}/delegations/d-9`);
@@ -356,6 +384,7 @@ describe('MeetingDelegationCardComponent', () => {
     req.flush(null);
     expect(cmp.busy()).toBe(false);
     expect(toast.success).toHaveBeenCalled();
+    expect(changed).toHaveBeenCalledWith({ kind: 'revoked', delegation: expect.objectContaining({ id: 'd-9' }) });
     http.expectOne(`${BASE}/delegations/meetings/m-1/context`).flush(ctx());
   });
 

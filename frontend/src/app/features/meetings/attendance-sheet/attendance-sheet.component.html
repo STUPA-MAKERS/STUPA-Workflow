@@ -62,7 +62,12 @@
 
               <div class="as__ctl">
                 @if (row.options; as options) {
-                  <div class="as__seg" role="radiogroup" [attr.aria-label]="'meetings.attendanceSheet.statusOf' | t: { name: row.name }">
+                  <div
+                    class="as__seg"
+                    role="radiogroup"
+                    [attr.aria-label]="'meetings.attendanceSheet.statusOf' | t: { name: row.name }"
+                    (focusout)="onFocusOut($event, row)"
+                  >
                     @for (o of options; track o.value; let i = $index) {
                       <button
                         type="button"
@@ -71,7 +76,7 @@
                         [class.as__opt--on]="o.value === row.value"
                         [attr.aria-checked]="o.value === row.value"
                         [attr.aria-disabled]="o.blocked || saving() ? 'true' : null"
-                        [attr.tabindex]="o.value === row.value ? 0 : -1"
+                        [attr.tabindex]="tabStop(row, o)"
                         [title]="(o.blocked ?? o.label) | t"
                         (click)="choose(row, o)"
                         (keydown)="onKey($event, row, i)"
@@ -132,7 +137,7 @@
           </section>
         }
 
-        <app-meeting-delegation-card class="as__own" [meetingId]="m.id" />
+        <app-meeting-delegation-card class="as__own" [meetingId]="m.id" (changed)="onOwnChange($event)" />
 
         @if (m.canWrite && m.status === 'live') {
           <section class="as__sec" [attr.aria-label]="'meetings.viewers.title' | t">

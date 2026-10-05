@@ -1,11 +1,13 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   computed,
   inject,
   input,
   model,
   output,
+  signal,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -33,14 +35,15 @@ export type DockPanel = 'none' | 'attendance' | 'protokollant';
  *
  * Live: the step through the agenda ("TOP 3 von 8"), the own ballot of the open vote, or
  * the way back to the item that runs now; the attendance, the minute-taker ("Protokoll:
- * Mara Keller", the handover for the lead and the minute-taker, Z3) and the word count of
+ * Lara Leitung", the handover for the lead and the minute-taker, Z3) and the word count of
  * the open item.
  *
  * Closed: "Geschlossen um 21:12 · 8 TOPs", every minute-taker of the meeting (locked: a
  * closed meeting changes no keeper) and the attendance.
  *
- * The minute-taker menu opens as a popover above the dock, on a phone as a bottom sheet;
- * the dock then sits on the viewport above the navigation bar. A pick in a live meeting
+ * The minute-taker menu opens as a popover above the dock, its end edge in line with the
+ * end edge of the minute-taker chip; on a phone it is a bottom sheet, and the dock then
+ * sits on the viewport above the navigation bar. A pick in a live meeting
  * goes to the handover dialog of the page. The attendance chip opens the attendance sheet
  * of the page.
  */
@@ -68,6 +71,7 @@ export type DockPanel = 'none' | 'attendance' | 'protokollant';
 })
 export class SessionDockComponent {
   private readonly i18n = inject(I18nService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   /** A phone opens the panels as a bottom sheet instead of a popover. */
   protected readonly phone = mediaQuerySignal(MEDIA.phone);
@@ -81,6 +85,8 @@ export class SessionDockComponent {
   /** The own ballot of the open vote ("Ja", "abgegeben"), or `null`. */
   readonly myVote = input<string | null>(null);
   readonly panel = model<DockPanel>('none');
+  /** The distance of the popover from the end edge of the dock: the end of its chip. */
+  protected readonly popEnd = signal(0);
 
   /** Move to the previous (-1) or the next (+1) agenda item. */
   readonly step = output<-1 | 1>();
@@ -143,11 +149,34 @@ export class SessionDockComponent {
       ? this.i18n.translate('meetings.dock.closedAt', { time })
       : this.i18n.translate('meetings.status.closed');
   });
-  /** Every minute-taker of the meeting once: "Mara Keller, Lea Hoffmann". */
+  /** Every minute-taker of the meeting once: "Lara Leitung, Uli Übernahme". */
   protected readonly keepers = computed(() => keeperNames(this.meeting()));
+  /**
+   * The tooltip of the locked chip of a closed meeting: the full names (the chip can cut
+   * them off), then why the chip does not open.
+   */
+  protected readonly closedKeeperTitle = computed(
+    () =>
+      `${this.i18n.translate('meetings.dock.protokollantIs', { name: this.keepers() || '—' })}\n` +
+      this.i18n.translate('meetings.dock.keepersLocked'),
+  );
 
-  togglePanel(panel: Exclude<DockPanel, 'none'>): void {
-    this.panel.set(this.panel() === panel ? 'none' : panel);
+  /**
+   * Open or close a panel. `anchor` is the chip that opens it: the popover puts its end
+   * edge in line with the end edge of the chip.
+   */
+  togglePanel(panel: Exclude<DockPanel, 'none'>, anchor?: HTMLElement): void {
+    const opening = this.panel() !== panel;
+    if (opening && anchor) this.popEnd.set(this.endOffset(anchor));
+    this.panel.set(opening ? panel : 'none');
+  }
+
+  /** The distance from the end edge of the dock to the end edge of `anchor`, at least 0. */
+  private endOffset(anchor: HTMLElement): number {
+    const dock = this.host.nativeElement.getBoundingClientRect();
+    const chip = anchor.getBoundingClientRect();
+    const rtl = getComputedStyle(this.host.nativeElement).direction === 'rtl';
+    return Math.max(0, Math.round(rtl ? chip.left - dock.left : dock.right - chip.right));
   }
 
   closePanel(): void {

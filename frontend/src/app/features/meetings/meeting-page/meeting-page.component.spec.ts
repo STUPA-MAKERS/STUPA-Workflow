@@ -31,6 +31,7 @@ const OUTPUTS = [
   'deleteMeeting', 'toggleBeamer', 'attendanceChange', 'attendanceReset', 'addTop',
   'removeFromAgenda', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'moveTop',
   'dragStart', 'dragOver', 'dropAt', 'setProtokollant', 'pickHandover', 'cancelHandover',
+  'attendanceConflictResolved',
 ] as const;
 
 type Inputs = {
@@ -51,6 +52,7 @@ type Inputs = {
   savingAgenda: boolean;
   renamingTopId: string | null;
   renameDraft: string;
+  attendanceConflict: string | null;
 };
 
 function inputs(over: Partial<Inputs> = {}): Inputs {
@@ -72,6 +74,7 @@ function inputs(over: Partial<Inputs> = {}): Inputs {
     savingAgenda: false,
     renamingTopId: null,
     renameDraft: '',
+    attendanceConflict: null,
     ...over,
   };
 }
@@ -474,6 +477,28 @@ describe('MeetingPageComponent', () => {
       await userEvent.click(within(mika).getByRole('radio', { name: 'Offen' }));
       expect(on.attendanceReset).toHaveBeenCalled();
       flushDelegations();
+    });
+
+    it('passes the end of an attendance conflict on (O23)', async () => {
+      const { on, http, fixture } = await setup({ attendanceConflict: 'pr-2' });
+      await userEvent.click(screen.getByTitle('Anwesenheit'));
+      http.match((r) => r.url.includes('/delegations/')).forEach((req) => req.flush(DELEGATION_CONTEXT));
+      http.match((r) => r.url.endsWith('/delegations')).forEach((req) =>
+        req.flush([
+          {
+            id: 'd-1', meetingId: 'm-1', meetingTitle: 'x', meetingDate: '2026-10-15', gremiumId: 'g-1',
+            gremiumName: 'StuPa', delegatorId: 'pr-2', delegatorName: 'Mika Mitglied', delegateId: 'pr-3',
+            delegateName: 'Alina Admin', delegateVoting: false, viaPool: false,
+            createdAt: '2026-10-01T00:00:00Z', revocable: true, direction: null,
+          },
+        ]),
+      );
+      fixture.detectChanges();
+      const sheet = screen.getByRole('dialog', { name: 'Anwesenheit' });
+      await userEvent.click(within(within(sheet).getByRole('alert')).getByRole('button', { name: 'Vertretung widerrufen' }));
+      http.expectOne('/api/delegations/d-1').flush(null);
+      expect(on.attendanceConflictResolved).toHaveBeenCalledWith('pr-2');
+      http.match((r) => r.url.endsWith('/delegations')).forEach((req) => req.flush([]));
     });
 
     it('passes the keeper pick and the discard of a planned handover on', async () => {
