@@ -391,10 +391,12 @@ async def list_attendance(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> list[AttendanceOut]:
-    """Attendance roster: the current Gremium members and their status.
+    """Attendance roster of the meeting and the status of each entry.
 
-    The reason of an excuse (`note`) goes only to the member and to the meeting
-    lead (`canWrite`).
+    The roster holds the members whose membership overlaps the meeting window,
+    plus each principal with an attendance record for the meeting. The reason of
+    an excuse (`note`) goes only to the member and to the meeting lead
+    (`canWrite`).
     """
     # Only a principal that may read the meeting sees the names and the emails.
     await service.assert_can_read(meeting_id, principal)

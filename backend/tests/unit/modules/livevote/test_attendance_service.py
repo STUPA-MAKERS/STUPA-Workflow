@@ -20,7 +20,15 @@ from tests._support.flow_fakes import FakeSession, fake_session, result
 
 
 def _meeting(status: str = "closed") -> SimpleNamespace:
-    return SimpleNamespace(id=uuid4(), gremium_id=uuid4(), status=status)
+    return SimpleNamespace(
+        id=uuid4(),
+        gremium_id=uuid4(),
+        status=status,
+        date=None,
+        start_time=None,
+        started_at=None,
+        closed_at=None,
+    )
 
 
 async def test_set_self_conflict_when_closed() -> None:

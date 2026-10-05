@@ -43,7 +43,7 @@ from app.modules.admin.cd_resolver import (
     cd_variant_key_for_gremium,
     resolve_cd_variant_by_key,
 )
-from app.modules.admin.models import Gremium, GremiumMembership, MailList
+from app.modules.admin.models import Gremium, MailList
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
@@ -52,6 +52,7 @@ from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.livevote.agenda_service import agenda_order
 from app.modules.livevote.keepers import agenda_positions, keeper_periods, principal_names
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
+from app.modules.livevote.roster import meeting_roster_filter, roster_filter
 from app.modules.livevote.service import MeetingService
 from app.modules.notifications.layout import (
     reason_text,
@@ -618,7 +619,7 @@ class ProtocolService:
                 excused=header.excused,
                 absent=header.absent,
                 datalines=header.datalines,
-                quorate=await self._quorate(gremium, header.present_count),
+                quorate=await self._quorate(gremium, meeting, header.present_count),
                 markdown=assembled or protocol.markdown,
             )
         )
@@ -674,11 +675,17 @@ class ProtocolService:
             for p in periods
         ]
 
-    async def _quorate(self, gremium: object | None, present_count: int) -> bool | None:
-        """Compute the quorum from the attendees and the active members.
+    async def _quorate(
+        self, gremium: object | None, meeting: Meeting | None, present_count: int
+    ) -> bool | None:
+        """Compute the quorum from the attendees and the members of the meeting.
 
-        The threshold is `gremium.quorum_percent` when that value is set. If not, the
-        threshold is more than half of the members.
+        The members are the roster of the meeting: the members whose membership
+        overlaps the meeting window, plus each principal with an attendance record
+        (see `app.modules.livevote.roster`). A later end of a membership thus does
+        not change the quorum of a closed meeting. Without a meeting the members
+        that are valid now count. The threshold is `gremium.quorum_percent` when
+        that value is set. If not, the threshold is more than half of the members.
 
         Returns:
             The quorum result, or `None` when the Gremium or its members are missing.
@@ -687,16 +694,15 @@ class ProtocolService:
         gremium_id = getattr(gremium, "id", None)
         if gremium_id is None:
             return None
-        now = datetime.now(UTC)
+        tz_name = self._tz().key
+        if meeting is not None and getattr(meeting, "gremium_id", None) == gremium_id:
+            where = meeting_roster_filter(meeting, tz_name)
+        else:
+            now = datetime.now(UTC)
+            where = roster_filter(gremium_id, now, now)
         members = (
             await self.session.scalar(
-                select(func.count(func.distinct(GremiumMembership.principal_id))).where(
-                    GremiumMembership.gremium_id == gremium_id,
-                    (GremiumMembership.valid_from.is_(None))
-                    | (GremiumMembership.valid_from <= now),
-                    (GremiumMembership.valid_until.is_(None))
-                    | (GremiumMembership.valid_until > now),
-                )
+                select(func.count()).select_from(PrincipalRow).where(where)
             )
         ) or 0
         if members == 0:

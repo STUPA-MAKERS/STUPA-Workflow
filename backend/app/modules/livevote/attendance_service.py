@@ -1,8 +1,11 @@
 """Attendance service for a meeting.
 
-The roster holds the current members of the Gremium of the meeting. A
-membership counts when its term window is valid now. Each pair of meeting and
-member has exactly one record. The unique constraint drives the upsert.
+The roster of a meeting holds the members whose membership overlaps the meeting
+window, plus each principal with an attendance record for the meeting (see
+`app.modules.livevote.roster`). A closed meeting thus keeps its attendance, also
+when a membership ended later or the OIDC sync removed it. A change of the
+attendance needs a membership that is valid now. Each pair of meeting and member
+has exactly one record. The unique constraint drives the upsert.
 
 The rules (Z2, O15, O23, F12):
 
@@ -42,12 +45,14 @@ from app.modules.delegations.models import MeetingDelegation
 from app.modules.delegations.pool import group_names_for
 from app.modules.livevote.keepers import keeper_principal_ids
 from app.modules.livevote.models import Meeting, MeetingAttendance
+from app.modules.livevote.roster import meeting_roster_filter
 from app.modules.livevote.schemas import (
     AttendanceOut,
     AttendanceStatus,
     MeetingMemberOut,
     SelfAttendanceStatus,
 )
+from app.settings import get_settings
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
 
 _DELEGATION_ACTIVE = (
@@ -79,8 +84,14 @@ def _resolve_note(
 class AttendanceService:
     """Read the roster of a meeting and change the attendance records."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, *, tz_name: str | None = None) -> None:
         self.session = session
+        self._tz_name = tz_name
+
+    @property
+    def tz_name(self) -> str:
+        """Return the local time zone of the planned meeting start."""
+        return self._tz_name or get_settings().local_timezone
 
     async def _meeting(self, meeting_id: UUID, *, for_write: bool = False) -> Meeting:
         """Load a meeting by id.
@@ -157,14 +168,27 @@ class AttendanceService:
     ) -> list[AttendanceOut]:
         """Return the members with the attendance they have for this meeting.
 
-        A member without a record gets `status` and `source` as `None`. The `note`
-        goes only to the member and to the meeting lead (`can_write`).
-        `canKeepProtocol` marks the members who can keep the minutes (O20), for the
-        keeper picker and the handover. `substituteGroupName` names the faculty
-        group of the member (A8).
+        The list holds the members whose membership overlaps the meeting window,
+        plus each principal with a record for the meeting. A closed meeting thus
+        does not depend on the memberships that are valid now. A member without
+        a record gets `status` and `source` as `None`. The `note` goes only to
+        the member and to the meeting lead (`can_write`). `canKeepProtocol` marks
+        the members who can keep the minutes now (O20), for the keeper picker and
+        the handover. `substituteGroupName` names the faculty group of the member
+        (A8).
         """
         meeting = await self._meeting(meeting_id)
-        members = await self._current_members(meeting.gremium_id)
+        members = list(
+            (
+                await self.session.execute(
+                    select(PrincipalRow)
+                    .where(meeting_roster_filter(meeting, self.tz_name))
+                    .order_by(PrincipalRow.display_name, PrincipalRow.id)
+                )
+            )
+            .scalars()
+            .all()
+        )
         records = (
             (
                 await self.session.execute(
