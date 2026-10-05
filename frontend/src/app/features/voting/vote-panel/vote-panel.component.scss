@@ -38,6 +38,10 @@
 .vpn__app:hover {
   text-decoration: underline;
 }
+/* The meeting line may be long: it shrinks and cuts, the rules beside it do not. */
+.vpn__app.vpn__where {
+  flex: 0 1 auto;
+}
 
 .vpn__q {
   margin: 0;

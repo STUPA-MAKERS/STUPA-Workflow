@@ -63,7 +63,10 @@ describe('VotePanelComponent', () => {
   it('shows status, meeting, item, rule and question (board Arbeit-Abstimmungen)', async () => {
     await setup();
     expect(screen.getByText('Offen')).toHaveClass('st--accent');
-    expect(screen.getByText('34. Sitzung des Studierendenparlaments · TOP 3')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '34. Sitzung des Studierendenparlaments · TOP 3' })).toHaveAttribute(
+      'href',
+      '/meetings/m1',
+    );
     expect(screen.getByText('Einfache Mehrheit')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Soll der Antrag gefördert werden?' })).toBeInTheDocument();
     expect(screen.getByText('14 von 19 Anwesenden haben abgestimmt')).toBeInTheDocument();

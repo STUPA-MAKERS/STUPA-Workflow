@@ -198,7 +198,8 @@ describe('VoteCastComponent', () => {
     const { getMeeting } = await setup();
     expect(screen.getByRole('article', { name: 'Abstimmung' })).toBeInTheDocument();
     expect(screen.getByText('Offen')).toBeInTheDocument();
-    expect(screen.getByText('34. Sitzung · TOP 3')).toBeInTheDocument();
+    // The meeting line links to the meeting, as the header line of a phone does.
+    expect(screen.getByRole('link', { name: '34. Sitzung · TOP 3' })).toHaveAttribute('href', '/meetings/m1');
     expect(screen.getByText('Zweidrittelmehrheit')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Soll der Antrag gefördert werden?' })).toBeInTheDocument();
     expect(screen.getByText('5 von 12 Anwesenden haben abgestimmt')).toBeInTheDocument();
@@ -367,6 +368,13 @@ describe('VoteCastComponent', () => {
     expect(screen.getByText('Abgelehnt')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /abgeben/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/stimmberechtigt/)).not.toBeInTheDocument();
+  });
+
+  it('has no meeting link on a desktop when the meeting cannot be read', async () => {
+    await setup({ meetingError: true });
+    expect(screen.getByRole('heading', { level: 2, name: 'Soll der Antrag gefördert werden?' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /34\. Sitzung/ })).not.toBeInTheDocument();
+    expect(document.querySelector('a[href^="/meetings/"]')).toBeNull();
   });
 
   describe('standalone vote without a meeting', () => {
