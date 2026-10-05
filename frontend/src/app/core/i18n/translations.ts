@@ -1295,6 +1295,8 @@ export const de = {
   'admin.gremien.untilStart': 'Bis Sitzungsbeginn',
   'admin.gremien.noRecipients': 'Keine',
   'admin.gremien.recipientsLoadFailed': 'Die Protokoll-Empfänger konnten nicht geladen werden.',
+  'admin.gremien.recipientsLoadFailedKept':
+    'Die Protokoll-Empfänger konnten nicht geladen werden. Speichern ändert sie nicht.',
   'admin.gremien.recipientsInvalid':
     'Das Gremium ist gespeichert, aber eine Empfänger-Adresse ist ungültig. Korrigiere sie und speichere erneut.',
   'admin.gremien.recipientsFailed':
@@ -3947,6 +3949,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.gremien.untilStart': 'Until the meeting starts',
   'admin.gremien.noRecipients': 'None',
   'admin.gremien.recipientsLoadFailed': 'Could not load the minutes recipients.',
+  'admin.gremien.recipientsLoadFailedKept':
+    'Could not load the minutes recipients. Saving does not change them.',
   'admin.gremien.recipientsInvalid':
     'The committee is saved, but a recipient address is not valid. Correct it and save again.',
   'admin.gremien.recipientsFailed':

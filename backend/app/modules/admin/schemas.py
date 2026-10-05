@@ -240,6 +240,10 @@ class GremiumMembershipOut(_CamelModel):
     The display name and the e-mail address of the member come with the row, so the
     members page needs no principal list. Without them a page must load every principal,
     and the principal list stops after 50 rows.
+
+    ``active`` uses the same rule as the member count of the gremien list: the
+    principal is active and the membership is valid now. The members page shows only
+    the active rows, so its count agrees with the gremien list.
     """
 
     id: UUID
@@ -248,6 +252,7 @@ class GremiumMembershipOut(_CamelModel):
     gremium_role_id: UUID = Field(serialization_alias="gremiumRoleId")
     display_name: str | None = Field(default=None, serialization_alias="displayName")
     email: str | None = None
+    active: bool = True
 
 
 def _check_oidc_group(value: str) -> str:

@@ -58,8 +58,8 @@ class GremiumOps(ConfigServiceBase):
 
         The member count holds the current members only: a membership that is valid
         now (``valid_from``/``valid_until``, the same rule as RBAC) of an active
-        principal. The members page also lists expired memberships, so its row count
-        can be higher.
+        principal. The membership list marks each row with the same rule (``active``),
+        and the members page counts only the active rows.
         """
         rows = (await self.session.scalars(select(Gremium).order_by(Gremium.name))).all()
         now = datetime.now(UTC)

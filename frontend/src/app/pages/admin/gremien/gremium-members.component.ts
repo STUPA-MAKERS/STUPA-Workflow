@@ -1,9 +1,18 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import type { Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { PageFrameService } from '../../../layout/page-frame.service';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
 import { AvatarComponent, NoteComponent, PageHeaderComponent, SkeletonComponent } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
@@ -12,6 +21,7 @@ import {
   type Gremium,
   type GremiumMembership,
   type GremiumRole,
+  isActiveMembership,
   MEMBER_GREMIUM_ROLE_KEY,
 } from '../admin.models';
 import { SubstitutePoolComponent } from '../delegations/substitute-pool.component';
@@ -38,7 +48,7 @@ export const MEMBER_PREVIEW = 7;
  * memberships come from. The list shows the first rows; "Alle n anzeigen" shows the rest.
  * The membership rows carry the name and the e-mail of the member, so the page loads no
  * principal list. With `admin.delegations` the substitute pool of the gremium follows
- * (`app-substitute-pool`).
+ * (`app-substitute-pool`). The last crumb shows the name of the gremium once it loads.
  */
 @Component({
   selector: 'app-gremium-members',
@@ -62,7 +72,8 @@ export class GremiumMembersComponent {
   private readonly i18n = inject(I18nService);
   private readonly auth = inject(AuthService);
 
-  protected readonly gremiumId = (inject(ActivatedRoute).snapshot.paramMap.get('id') ?? '') as Uuid;
+  private readonly route = inject(ActivatedRoute);
+  protected readonly gremiumId = (this.route.snapshot.paramMap.get('id') ?? '') as Uuid;
 
   /** True until the first answer, so the list does not claim there are no members. */
   protected readonly loading = signal(true);
@@ -85,12 +96,15 @@ export class GremiumMembersComponent {
 
   private readonly rolesById = computed(() => new Map(this.gremiumRoles().map((r) => [r.id, r])));
 
-  /** One row per person, sorted by role (board, manager, own roles, member), then name. */
+  /**
+   * One row per person, sorted by role (board, manager, own roles, member), then name.
+   * Only the active memberships count, so the header agrees with the gremien list.
+   */
   readonly members = computed<Member[]>(() => {
     const seen = new Set<string>();
     const rows: Member[] = [];
     for (const m of this.memberships()) {
-      if (seen.has(m.principalId)) continue;
+      if (!isActiveMembership(m) || seen.has(m.principalId)) continue;
       seen.add(m.principalId);
       const role = this.rolesById().get(m.gremiumRoleId);
       rows.push({
@@ -114,6 +128,19 @@ export class GremiumMembersComponent {
   );
 
   constructor() {
+    // The breadcrumb names the gremium, not the page ("Gremien › Studierendenparlament").
+    const frame = inject(PageFrameService);
+    const url =
+      '/' +
+      this.route.snapshot.pathFromRoot
+        .flatMap((r) => r.url.map((s) => s.path))
+        .filter(Boolean)
+        .join('/');
+    effect(() => {
+      const name = this.gremium()?.name;
+      frame.crumbLabel.set(name ? { url, label: name } : null);
+    });
+    inject(DestroyRef).onDestroy(() => frame.crumbLabel.set(null));
     this.api.listGremienOptions().subscribe({
       next: (list) => this.gremium.set(list.find((g) => g.id === this.gremiumId) ?? null),
       error: () => this.gremium.set(null),

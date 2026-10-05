@@ -8,7 +8,7 @@ import { Injectable, signal } from '@angular/core';
  * the footer out and keeps only a small gap at the bottom, so the page itself does not
  * scroll. The page sets it and must clear it when it goes away.
  *
- * `crumbRoot`: see the field.
+ * `crumbRoot`, `crumbLabel`: see the fields.
  */
 @Injectable({ providedIn: 'root' })
 export class PageFrameService {
@@ -20,4 +20,12 @@ export class PageFrameService {
    * parent out. The frame sets it and must clear it when it goes away.
    */
   readonly crumbRoot = signal<string | null>(null);
+
+  /**
+   * A label for the current crumb that only the page knows, for example the name of a
+   * gremium that loads after the navigation. It applies only while the current crumb
+   * has this `url`, so a stale label never shows on another page. The page sets it and
+   * must clear it when it goes away.
+   */
+  readonly crumbLabel = signal<{ url: string; label: string } | null>(null);
 }

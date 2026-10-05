@@ -25,7 +25,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { Subject, Subscription, catchError, debounceTime, of, switchMap } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
-import type { AdminPrincipal } from '../admin.models';
+import { type AdminPrincipal, isActiveMembership } from '../admin.models';
 
 /** A member of the gremium: a choice of "Vertritt". */
 export interface PoolMember {
@@ -152,8 +152,9 @@ export class SubstitutePoolComponent {
           next: (rows) => {
             const seen = new Set<string>();
             const list: PoolMember[] = [];
+            // A deactivated or expired member represents nobody.
             for (const m of rows) {
-              if (seen.has(m.principalId)) continue;
+              if (!isActiveMembership(m) || seen.has(m.principalId)) continue;
               seen.add(m.principalId);
               list.push({
                 id: m.principalId,

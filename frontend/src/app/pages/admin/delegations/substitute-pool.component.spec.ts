@@ -111,6 +111,16 @@ function makeAdmin(over: Partial<Record<string, jest.Mock>> = {}) {
           displayName: null,
           email: null,
         },
+        // A deactivated member represents nobody, so it is no choice.
+        {
+          id: 'm5',
+          principalId: 'p-9',
+          gremiumId: 'g-1',
+          gremiumRoleId: 'r',
+          displayName: 'Ehemalig',
+          email: null,
+          active: false,
+        },
       ]),
     ),
     ...over,

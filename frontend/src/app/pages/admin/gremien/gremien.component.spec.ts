@@ -213,6 +213,16 @@ describe('AdminGremienComponent', () => {
     expect(screen.getByRole('button', { name: /^Neu/ })).toHaveAttribute('aria-expanded', 'true');
   });
 
+  it('keeps the shown recipients when the dialog did not save them', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    const before = c.recipients().get('g-1');
+    expect(before).toEqual(['protokolle@stupa.example', 'verteiler@lists.example']);
+    c.onSaved({ gremium: GREMIEN[0], created: false, recipients: null });
+    expect(c.recipients().get('g-1')).toEqual(before);
+  });
+
   it('closes the dialog on cancel', async () => {
     await setup();
     await userEvent.click(screen.getByRole('button', { name: /Gremium anlegen/ }));

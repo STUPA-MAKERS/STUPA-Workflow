@@ -265,3 +265,5 @@ async def test_membership_list_carries_name_and_email(session: AsyncSession) -> 
     assert by_principal[named.id].gremium_role_id == member.id
     assert by_principal[plain.id].display_name is None
     assert by_principal[plain.id].email is None
+    # Open dates and an active principal: the row counts as an active member.
+    assert by_principal[named.id].active is True

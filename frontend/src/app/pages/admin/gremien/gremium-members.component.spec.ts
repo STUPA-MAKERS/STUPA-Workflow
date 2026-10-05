@@ -7,6 +7,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { of, throwError } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
 import type { GremiumMembership, GremiumRole } from '../admin.models';
+import { PageFrameService } from '../../../layout/page-frame.service';
 import { GremiumMembersComponent, MEMBER_PREVIEW } from './gremium-members.component';
 
 const ROLES: GremiumRole[] = [
@@ -77,7 +78,16 @@ async function setup(
       },
       {
         provide: ActivatedRoute,
-        useValue: { snapshot: { paramMap: convertToParamMap({ id: 'g-1' }) } },
+        useValue: {
+          snapshot: {
+            paramMap: convertToParamMap({ id: 'g-1' }),
+            pathFromRoot: [
+              { url: [] },
+              { url: [{ path: 'admin' }] },
+              { url: [{ path: 'gremien' }, { path: 'g-1' }, { path: 'members' }] },
+            ],
+          },
+        },
       },
     ],
   });
@@ -179,6 +189,29 @@ describe('GremiumMembersComponent', () => {
     expect(screen.getByText('Noch keine Mitglieder in diesem Gremium.')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Mitglieder: …');
     expect(screen.getByText('0 Mitglieder')).toBeInTheDocument();
+  });
+
+  it('hides the inactive memberships and does not count them', async () => {
+    await setup({
+      api: makeApi({
+        listGremiumMemberships: jest.fn(() =>
+          of([MEMBERS[0], { ...member('p-9', 'Ehemalig', 'r-x'), active: false }]),
+        ),
+      }),
+    });
+    expect(screen.getByText('1 Mitglied')).toBeInTheDocument();
+    expect(names()).toEqual(['Zoe']);
+  });
+
+  it('names the gremium in the last crumb and clears it on leave', async () => {
+    const { fixture } = await setup();
+    const frame = fixture.debugElement.injector.get(PageFrameService);
+    expect(frame.crumbLabel()).toEqual({
+      url: '/admin/gremien/g-1/members',
+      label: 'Studierendenparlament',
+    });
+    fixture.destroy();
+    expect(frame.crumbLabel()).toBeNull();
   });
 
   it('says "1 Mitglied" for one member', async () => {

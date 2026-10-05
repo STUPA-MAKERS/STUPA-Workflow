@@ -667,6 +667,16 @@ export interface GremiumMembership {
   displayName?: string | null;
   /** The e-mail address of the member. `null` when the IdP gives none. */
   email?: string | null;
+  /**
+   * The principal is active and the membership is valid now, the rule of the member
+   * count in the gremien list. A missing value counts as active.
+   */
+  active?: boolean;
+}
+
+/** True when a membership counts as a current member (see `GremiumMembership.active`). */
+export function isActiveMembership(m: GremiumMembership): boolean {
+  return m.active !== false;
 }
 
 /**

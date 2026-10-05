@@ -201,9 +201,14 @@ export class AdminGremienComponent {
     this.dialogGremium.set(undefined);
   }
 
-  protected onSaved(event: { gremium: Gremium; created: boolean; recipients: string[] }): void {
+  protected onSaved(event: {
+    gremium: Gremium;
+    created: boolean;
+    recipients: string[] | null;
+  }): void {
     this.dialogGremium.set(undefined);
-    this.setRecipients(event.gremium.id, event.recipients);
+    // `null`: the dialog did not save the recipients, so the row keeps what it shows.
+    if (event.recipients) this.setRecipients(event.gremium.id, event.recipients);
     this.toast.success(
       this.i18n.translate(
         event.created ? 'admin.gremien.toast.created' : 'admin.gremien.toast.updated',

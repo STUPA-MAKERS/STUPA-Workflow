@@ -30,6 +30,9 @@ import {
   slugify,
 } from '../../admin.models';
 
+/** The largest lead time in minutes that the server accepts (30 days). */
+export const MAX_DELEGATION_LEAD_MINUTES = 60 * 24 * 30;
+
 /** The form state of a gremium. */
 export interface GremiumForm {
   name: string;
@@ -75,6 +78,8 @@ export function parseRecipients(raw: string): string[] {
  * a new gremium and never changes after), CD variant, default language, quorum, vote
  * delegation with its lead time and the delegation to external persons, and the extra
  * protocol recipients (`PUT /admin/gremien/{id}/mail-recipients`, after the base data).
+ * If the dialog cannot read the recipients, the field stays locked and a save sends only
+ * the base data: the PUT replaces the list, so an empty field would delete it.
  * There is no switch for changing a ballot after casting: a ballot never changes (O11).
  */
 @Component({
@@ -105,7 +110,8 @@ export class GremiumDialogComponent {
 
   readonly closed = output<void>();
   /** The saved gremium, after the base data and the recipients. */
-  readonly saved = output<{ gremium: Gremium; created: boolean; recipients: string[] }>();
+  /** `recipients` is `null` when the dialog did not save them (their read failed). */
+  readonly saved = output<{ gremium: Gremium; created: boolean; recipients: string[] | null }>();
 
   protected readonly form = signal<GremiumForm>(emptyGremiumForm());
   protected readonly saving = signal(false);
@@ -113,6 +119,12 @@ export class GremiumDialogComponent {
   protected readonly error = signal('');
   /** The recipients load after the opening; the field waits for them. */
   protected readonly recipientsLoading = signal(false);
+  /** The read of the recipients failed. The field stays locked and a save keeps them. */
+  protected readonly recipientsLoadFailed = signal(false);
+  /** The recipient field is locked while it loads or after its read failed. */
+  protected readonly recipientsLocked = computed(
+    () => this.recipientsLoading() || this.recipientsLoadFailed(),
+  );
   /**
    * A new gremium that the server created while its recipients failed. A second save
    * then changes this gremium and does not create another one.
@@ -145,6 +157,7 @@ export class GremiumDialogComponent {
     this.created = null;
     this.error.set('');
     this.saving.set(false);
+    this.recipientsLoadFailed.set(false);
     if (!g) {
       this.form.set(emptyGremiumForm());
       this.recipientsLoading.set(false);
@@ -168,7 +181,8 @@ export class GremiumDialogComponent {
       },
       error: () => {
         this.recipientsLoading.set(false);
-        this.error.set(this.i18n.translate('admin.gremien.recipientsLoadFailed'));
+        this.recipientsLoadFailed.set(true);
+        this.error.set(this.i18n.translate('admin.gremien.recipientsLoadFailedKept'));
       },
     });
   }
@@ -177,10 +191,13 @@ export class GremiumDialogComponent {
     this.form.update((f) => ({ ...f, [key]: value }));
   }
 
-  /** Lead time: empty or invalid gives 0, else a whole number of minutes, 0 or more. */
+  /** Lead time: empty or invalid gives 0, else whole minutes from 0 to 30 days. */
   protected patchLead(value: number | string | null): void {
     const n = Math.round(Number(value));
-    this.patch('delegationLeadMinutes', Number.isFinite(n) && n > 0 ? n : 0);
+    this.patch(
+      'delegationLeadMinutes',
+      Number.isFinite(n) ? Math.min(MAX_DELEGATION_LEAD_MINUTES, Math.max(0, n)) : 0,
+    );
   }
 
   /** Quorum: empty gives `null` (no quorum), else a whole percent from 0 to 100. */
@@ -221,6 +238,12 @@ export class GremiumDialogComponent {
     req.subscribe({
       next: (saved) => {
         if (isNew) this.created = saved;
+        // Without the stored list, the PUT would replace it with the empty field.
+        if (this.recipientsLoadFailed()) {
+          this.saving.set(false);
+          this.saved.emit({ gremium: saved, created: isNew, recipients: null });
+          return;
+        }
         this.saveRecipients(saved, isNew);
       },
       error: (err: { status?: number }) =>

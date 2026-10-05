@@ -198,6 +198,27 @@ describe('GremiumDialogComponent', () => {
     );
   });
 
+  it('keeps the stored recipients when their read failed', async () => {
+    const api = makeApi({
+      getGremiumMailRecipients: jest.fn(() => throwError(() => ({ status: 503 }))),
+    });
+    const { saved } = await setup(STUPA, api);
+    expect(within(dialog()).getByRole('alert')).toHaveTextContent('Speichern ändert sie nicht.');
+    // The empty field would delete the stored list, so it stays locked.
+    expect(within(dialog()).getByRole('textbox', { name: /Protokoll-Empfänger/ })).toBeDisabled();
+    await userEvent.clear(screen.getByRole('spinbutton', { name: 'Quorum (%)' }));
+    await userEvent.type(screen.getByRole('spinbutton', { name: 'Quorum (%)' }), '60');
+    await userEvent.click(save());
+    expect(api.updateGremium).toHaveBeenCalledWith(
+      'g-1',
+      expect.objectContaining({ quorumPercent: 60 }),
+    );
+    expect(api.setGremiumMailRecipients).not.toHaveBeenCalled();
+    expect(saved).toHaveBeenCalledWith(
+      expect.objectContaining({ created: false, recipients: null }),
+    );
+  });
+
   it('closes on cancel', async () => {
     const { closed } = await setup(STUPA);
     await userEvent.click(within(dialog()).getByText('Abbrechen'));
@@ -247,6 +268,10 @@ describe('GremiumDialogComponent', () => {
     expect(c.form().quorumPercent).toBeNull();
     c.patchLead('x');
     expect(c.form().delegationLeadMinutes).toBe(0);
+    c.patchLead(-5);
+    expect(c.form().delegationLeadMinutes).toBe(0);
+    c.patchLead(99999);
+    expect(c.form().delegationLeadMinutes).toBe(43200);
     c.patch('name', '   ');
     c.submit();
     expect(api.updateGremium).not.toHaveBeenCalled();

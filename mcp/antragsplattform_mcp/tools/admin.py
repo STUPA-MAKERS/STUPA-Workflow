@@ -137,7 +137,9 @@ async def list_gremium_memberships(gremium_id: str) -> dict:
     """List the memberships of a Gremium.
 
     A membership links a member to a role of that Gremium. Each item has the keys
-    id, principalId, gremiumId and gremiumRoleId. The list is read-only. The platform
+    id, principalId, gremiumId, gremiumRoleId, displayName, email and active. active is
+    true when the principal is active and the membership is valid now; the member
+    count of the Gremium counts only these rows. The list is read-only. The platform
     derives the memberships from the OIDC groups of the members, the membership
     mappings and the Gremium role mappings. To change a membership, change a mapping
     or the groups in the IdP.

@@ -89,7 +89,7 @@
           rows="3"
           name="mailRecipients"
           [attr.aria-busy]="recipientsLoading()"
-          [disabled]="recipientsLoading()"
+          [disabled]="recipientsLocked()"
           [ngModel]="form().mailRecipients"
           (ngModelChange)="patch('mailRecipients', $event)"
           [placeholder]="'admin.gremien.mailRecipientsPlaceholder' | t"
