@@ -531,6 +531,42 @@ describe('InvoicesComponent', () => {
     http.expectNone((r) => r.url.includes('/invoices/parse'));
   });
 
+  it('onDrop leaves a drop on the drop zone to the zone', async () => {
+    const { c, http } = await setup();
+    c.onDragEnter(dragEvent(['Files']));
+    const zone = document.createElement('app-file-drop-zone');
+    const inner = document.createElement('span');
+    zone.appendChild(inner);
+    const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
+    const ev = { ...dragEvent(['Files'], file), target: inner } as unknown as DragEvent;
+    c.onDrop(ev);
+    expect(ev.preventDefault).not.toHaveBeenCalled();
+    expect(c.dragActive()).toBe(false);
+    http.expectNone((r) => r.url.includes('/invoices/parse'));
+    // A target outside the zone, and a target without `closest`, count as the page.
+    const outside = { ...dragEvent(['Files']), target: document.createElement('div') } as unknown as DragEvent;
+    c.onDrop(outside);
+    expect(outside.preventDefault).toHaveBeenCalled();
+    const odd = { ...dragEvent(['Files']), target: {} } as unknown as DragEvent;
+    c.onDrop(odd);
+    expect(odd.preventDefault).toHaveBeenCalled();
+  });
+
+  it('onZoneFiles imports nothing for a reader', async () => {
+    const { c, http } = await setup({ canManage: false });
+    c.onZoneFiles([new File(['x'], 'a.pdf', { type: 'application/pdf' })]);
+    http.expectNone((r) => r.url.includes('/invoices/parse'));
+  });
+
+  it('onZoneFiles imports the first file for a manager', async () => {
+    const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
+    const { c, http } = await setup();
+    c.onZoneFiles([]);
+    http.expectNone((r) => r.url.includes('/invoices/parse'));
+    c.onZoneFiles([file]);
+    http.expectOne((r) => r.url.endsWith('/api/invoices/parse')).flush(PARSE);
+  });
+
   it('successful parse prefills the review dialog and says so in it, not in a toast', async () => {
     const { c, http, toast } = await setup();
     const spy = jest.spyOn(toast, 'success');

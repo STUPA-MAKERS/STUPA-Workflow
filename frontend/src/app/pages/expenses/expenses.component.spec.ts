@@ -1857,6 +1857,8 @@ describe('ExpensesComponent (batch/bulk)', () => {
 
     cmp.toggleSelect('e-5', true);
     expect(cmp.bulkDeleteOverMax()).toBe(true);
+    expect(cmp.selectionLabel()).toBe('6 ausgewählt · Löschen: max. 5');
+    expect(cmp.bulkDeleteReason()).toContain('5');
     cmp.askBulkDelete();
     expect(cmp.bulkConfirm()).toBeNull();
 
@@ -1995,6 +1997,62 @@ describe('ExpensesComponent (query-param adoption)', () => {
       .expectOne((r) => r.url.endsWith('/budget-expenses/e-42') && r.method === 'PATCH')
       .flush({ ...EXPENSE, id: 'e-42', description: 'Neu' });
     expect(cmp.selectedExpense()?.description).toBe('Neu');
+  });
+
+  it('drops the answer for a booking that is no longer open', () => {
+    const { cmp, http } = buildWithQuery([['id', 'e-42']]);
+    TestBed.tick();
+    const first = http.expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-42');
+    cmp.selectedId.set('e-43');
+    TestBed.tick();
+    const second = http.expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-43');
+    // The late answer of the first booking changes nothing.
+    first.flush(page([{ ...EXPENSE, id: 'e-42' }]));
+    expect(cmp.selectedMissing()).toBe(false);
+    // An empty answer marks the open booking as missing.
+    second.flush(page([]));
+    expect(cmp.selectedMissing()).toBe(true);
+    // A late error of a booking that is no longer open changes nothing either.
+    cmp.selectedId.set('e-44');
+    TestBed.tick();
+    const third = http.expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-44');
+    cmp.selectedId.set('e-45');
+    cmp.selectedMissing.set(false);
+    TestBed.tick();
+    third.error(new ProgressEvent('err'));
+    expect(cmp.selectedMissing()).toBe(false);
+    http.expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-45').flush(
+      page([{ ...EXPENSE, id: 'e-45' }]),
+    );
+    // A booking that is already loaded loads no second time.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (cmp as any).ensureSelected('e-45', false, []);
+    http.expectNone((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-45');
+  });
+
+  it('drops linked records that arrive after another booking opened', () => {
+    const a = { ...EXPENSE, id: 'e-1', invoiceId: 'inv-a', applicationId: 'app-a' };
+    const b = { ...EXPENSE, id: 'e-2', invoiceId: null, applicationId: null };
+    const { cmp, http } = build({ expenses: page([a, b]) });
+    cmp.selectedId.set('e-1');
+    TestBed.tick();
+    const inv = http.expectOne((r) => r.url.endsWith('/invoices/inv-a'));
+    const app = http.expectOne((r) => r.url.endsWith('/applications/app-a'));
+    cmp.selectedId.set('e-2');
+    TestBed.tick();
+    inv.flush({ ...INVOICE, id: 'inv-a' });
+    app.flush({
+      id: 'app-a',
+      typeId: 't',
+      state: { id: 's', key: 'ok', label: { de: 'Bewilligt' }, color: '#2e7d32' },
+      data: {},
+      amount: '50.00',
+      version: 1,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    });
+    expect(cmp.linkedInvoice()).toBeNull();
+    expect(cmp.linkedApplication()).toBeNull();
   });
 
   it('closes an open form when the URL opens another booking or transfer', () => {

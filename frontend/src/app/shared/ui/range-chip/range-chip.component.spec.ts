@@ -245,4 +245,63 @@ describe('RangeChipComponent', () => {
       window.requestAnimationFrame = realRaf;
     }
   });
+  it('moves the popover into the viewport and closes it when the chip leaves', async () => {
+    const realRect = Element.prototype.getBoundingClientRect;
+    let chipTop = 708;
+    let chipLeft = 1000;
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      if (this.classList.contains('rc__chip')) {
+        return { left: chipLeft, right: chipLeft + 100, top: chipTop, bottom: chipTop + 32, width: 100, height: 32 } as DOMRect;
+      }
+      if (this.classList.contains('rc__pop')) {
+        return { left: 0, right: 300, top: 0, bottom: 200, width: 300, height: 200 } as DOMRect;
+      }
+      return realRect.call(this);
+    };
+    try {
+      const { chip, user, view } = await setup();
+      // A scroll while the popover is closed changes nothing.
+      window.dispatchEvent(new Event('scroll'));
+      await user.click(chip());
+      await new Promise((r) => setTimeout(r));
+      view.fixture.detectChanges();
+      const pop = () => document.querySelector('.rc__pop') as HTMLElement;
+      // It passes the right edge and does not fit below: it moves left and above the chip.
+      expect(pop().style.left).toBe(`${window.innerWidth - 8 - 300}px`);
+      expect(pop().style.top).toBe(`${708 - 4 - 200}px`);
+
+      // No room above either: it stays below the chip.
+      chipTop = 100;
+      chipLeft = 20;
+      window.dispatchEvent(new Event('resize'));
+      view.fixture.detectChanges();
+      expect(pop().style.left).toBe('20px');
+
+      // A scroll inside the popover does not move it.
+      chipLeft = 40;
+      pop().dispatchEvent(new Event('scroll'));
+      view.fixture.detectChanges();
+      expect(pop().style.left).toBe('20px');
+
+      // The chip scrolls out of the viewport: the popover closes.
+      chipTop = -100;
+      window.dispatchEvent(new Event('scroll'));
+      view.fixture.detectChanges();
+      expect(document.querySelector('.rc__pop')).toBeNull();
+    } finally {
+      Element.prototype.getBoundingClientRect = realRect;
+    }
+  });
+  it('ignores other keys in the popover and a sheet that reports open', async () => {
+    const { chip, cmp, user } = await setup();
+    await user.click(chip());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = cmp as any;
+    const ev = new KeyboardEvent('keydown', { key: 'a' });
+    c.onPopKey(ev);
+    c.onSheetOpen(true);
+    expect(c.open()).toBe(true);
+    c.onSheetOpen(false);
+    expect(c.open()).toBe(false);
+  });
 });
