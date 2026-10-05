@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import secrets
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -96,6 +96,49 @@ async def maker(
     eng = create_async_engine(migrated[1])
     yield async_sessionmaker(eng, expire_on_commit=False)
     await eng.dispose()
+
+
+# The rows of a test that the `engine` fixture does not clear: the principals with their
+# tokens, preferences and roles, the budget, the bookings, the backups and the site config
+# versions. Without the cleanup they leak into the later tests of the session (a list of
+# all invoices or of all OAuth grants then counts them).
+_CREATED: list[tuple[list[uuid.UUID], list[str], uuid.UUID | None]] = []
+
+
+@pytest.fixture(autouse=True)
+def _cleanup(engine: Engine) -> Iterator[None]:
+    yield
+    with engine.begin() as conn:
+        for ids, subs, budget_id in _CREATED:
+            p = {"ids": ids, "subs": subs}
+            for table, column in (
+                ("oauth_token", "principal_id"),
+                ("oauth_authorization_code", "principal_id"),
+                ("auth_session", "principal_id"),
+                ("notification_preference", "principal_id"),
+                ("role_assignment", "principal_id"),
+                ("gremium_membership", "principal_id"),
+                ("delegation_substitute", "substitute_principal_id"),
+                ("delegation_substitute", "member_principal_id"),
+                ("erasure_request", "principal_id"),
+            ):
+                conn.execute(text(f"DELETE FROM {table} WHERE {column} = ANY(:ids)"), p)
+            for table, column in (
+                ("erasure_request", "requested_by"),
+                ("backup", "created_by"),
+                ("site_config_version", "created_by"),
+                ("invoice", "actor"),
+                ("budget_expense", "actor"),
+            ):
+                conn.execute(text(f"DELETE FROM {table} WHERE {column} = ANY(:subs)"), p)
+            if budget_id is not None:
+                for stmt in (
+                    "DELETE FROM budget_expense WHERE budget_id = :b",
+                    "DELETE FROM fiscal_year WHERE budget_id = :b",
+                    "DELETE FROM budget WHERE id = :b",
+                ):
+                    conn.execute(text(stmt), {"b": budget_id})
+    _CREATED.clear()
 
 
 @dataclass
@@ -366,6 +409,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             actor=old.sub, action="login", target_type="principal", target_id=str(old.id)
         )
         await session.commit()
+        _CREATED.append(([old.id, new.id, other.id], [old.sub, new.sub, other.sub], budget.id))
         return World(
             seed=seed,
             old_id=old.id,
@@ -1120,3 +1164,8 @@ async def test_merged_principal_gets_no_membership_and_no_bootstrap_admin(
         await session.commit()
         assert granted == 0
         assert await _count(session, GremiumMembership.principal_id, w.old_id) == 0
+        # The mapping table is not cleared between tests.
+        await session.execute(
+            text("DELETE FROM gremium_membership_mapping WHERE oidc_group = :g"), {"g": group}
+        )
+        await session.commit()
