@@ -2,6 +2,7 @@ import { computed, inject, signal } from '@angular/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService, type SelectOption } from '@stupa-makers/ui-kit';
+import type { Uuid } from '@core/api/models';
 import { downloadBlob } from '@shared/download.util';
 import {
   BudgetTreeApi,
@@ -426,6 +427,7 @@ export class ExpenseDialogsState {
           // A sub-booking is gone, so refresh the parent panel and the parent amount.
           this.sub.loadSub(e.parentExpenseId);
           this.list.refresh();
+          this.refreshEditedParent(e.parentExpenseId);
         } else {
           this.list.items.update((rows) => rows.filter((x) => x.id !== e.id));
           this.list.total.update((t) => Math.max(0, t - 1));
@@ -437,6 +439,26 @@ export class ExpenseDialogsState {
         this.list.saving.set(false);
         this.toast.error(this.i18n.translate('expenses.toast.failed'));
       },
+    });
+  }
+
+  /**
+   * The form of `parentId` is open and one of its sub-bookings is gone: show the new
+   * parent amount and child count. The fields the user typed stay as they are.
+   */
+  private refreshEditedParent(parentId: string): void {
+    if (this.editing()?.id !== parentId) return;
+    this.api.listExpenses({ id: parentId as Uuid, limit: 1 }).subscribe({
+      next: (page) => {
+        const fresh = page.items[0];
+        const cur = this.editing();
+        if (!fresh || cur?.id !== parentId) return;
+        // The amount of a parent is read-only, so it follows the server. When the last
+        // sub-booking went, the amount field shows the amount that the server now has.
+        if (this.editAmount() === cur.amount) this.editAmount.set(fresh.amount);
+        this.editing.set({ ...cur, amount: fresh.amount, childCount: fresh.childCount });
+      },
+      error: () => undefined,
     });
   }
 

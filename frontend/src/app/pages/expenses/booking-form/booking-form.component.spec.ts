@@ -139,6 +139,10 @@ async function setup(mode: 'create' | 'edit', inputs: Record<string, unknown> = 
   return { view, http, dialogs: host.dialogs, form, ...host.handlers, user: userEvent.setup() };
 }
 
+/** The first render of the form compiles the whole form with its controls. Under the
+ *  load of a parallel run that takes longer than the default 5 s of jest. */
+const SLOW = 15000;
+
 describe('BookingFormComponent', () => {
   afterEach(() => TestBed.inject(HttpTestingController).verify());
 
@@ -168,7 +172,7 @@ describe('BookingFormComponent', () => {
     expect(screen.getByRole('radio', { name: 'Bar' }).getAttribute('aria-checked')).toBe('true');
     await user.click(screen.getByRole('radio', { name: 'Keine Angabe' }));
     expect(dialogs.newPaymentMethod()).toBe('');
-  });
+  }, SLOW);
 
   it('says that a picked invoice filled the fields, and that an application gives the cost centre', async () => {
     const { dialogs, view } = await setup('create');

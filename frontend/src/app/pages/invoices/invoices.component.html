@@ -117,11 +117,11 @@
                     linkQueryParamsHandling="merge"
                     [selected]="i.id === selectedId()"
                   >
-                    <span sub>
+                    <span sub class="inv__sub">
                       <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
                       @if (i.number) {
                         <span class="inv__dot" aria-hidden="true">·</span>
-                        <span class="mono">{{ i.number }}</span>
+                        <span class="mono inv__no" [title]="i.number">{{ i.number }}</span>
                       }
                       @if (i.status === 'open' && i.dueDate) {
                         <span class="inv__dot" aria-hidden="true">·</span>

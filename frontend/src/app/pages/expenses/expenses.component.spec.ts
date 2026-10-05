@@ -1395,6 +1395,54 @@ describe('ExpensesComponent (sub-bookings)', () => {
     flushList(http, page([PARENT], 1));
     expect(cmp.items().map((x) => x.id)).toEqual(['parent-1']);
   });
+
+  it('keeps the parent form open when a sub-booking of it is deleted', () => {
+    const { cmp, http } = build({ expenses: page([PARENT], 1) });
+    cmp.openEdit(PARENT);
+    dlg(cmp).editDescription.set('Neu, noch nicht gespeichert');
+    cmp.askDelete(SUB);
+    cmp.doDelete();
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/sub-1') && r.method === 'DELETE')
+      .flush(null);
+    // The form of the parent stays, with the unsaved edit.
+    expect(cmp.formMode()).toBe('edit');
+    expect(cmp.editing()?.id).toBe('parent-1');
+    expect(dlg(cmp).editDescription()).toBe('Neu, noch nicht gespeichert');
+    http
+      .expectOne(
+        (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET',
+      )
+      .flush([]);
+    // The list reloads, and the parent loads alone for its new amount.
+    http
+      .expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET' && !r.params.has('id'))
+      .flush(page([{ ...PARENT, amount: '30.00', childCount: 1 }], 1));
+    http
+      .expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'parent-1')
+      .flush(page([{ ...PARENT, amount: '30.00', childCount: 1 }], 1));
+    expect(cmp.editing()?.amount).toBe('30.00');
+    expect(cmp.editing()?.childCount).toBe(1);
+    expect(dlg(cmp).editAmount()).toBe('30.00');
+    expect(dlg(cmp).editDescription()).toBe('Neu, noch nicht gespeichert');
+  });
+
+  it('closes the form when the edited booking itself is deleted', () => {
+    const { cmp, http } = build({ expenses: page([PARENT], 1) });
+    cmp.openEdit(SUB);
+    cmp.askDelete(SUB);
+    cmp.doDelete();
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/sub-1') && r.method === 'DELETE')
+      .flush(null);
+    expect(cmp.formMode()).toBeNull();
+    http
+      .expectOne(
+        (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET',
+      )
+      .flush([]);
+    flushList(http, page([PARENT], 1));
+  });
 });
 
 describe('ExpensesComponent (invoice detail)', () => {

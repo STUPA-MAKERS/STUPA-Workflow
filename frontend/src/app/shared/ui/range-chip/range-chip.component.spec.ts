@@ -185,10 +185,64 @@ describe('RangeChipComponent', () => {
     expect(document.querySelector('.rc__pop')).not.toBeNull();
   });
 
-  it('comes from the bottom on a phone', async () => {
-    const { chip, user } = await setup({ phone: true });
-    await user.click(chip());
-    expect(document.querySelector('.ss--bottom')).not.toBeNull();
-    expect(document.querySelector('.rc__pop')).toBeNull();
+  it('comes from the bottom on a phone, in the top layer', async () => {
+    const shown: Element[] = [];
+    const proto = HTMLElement.prototype as HTMLElement & { showPopover?: () => void };
+    const real = proto.showPopover;
+    proto.showPopover = function (this: HTMLElement) {
+      shown.push(this);
+    };
+    try {
+      const { chip, user, view } = await setup({ phone: true });
+      // Closed, the sheet is not in the chip row at all.
+      expect(document.querySelector('.rc__layer')).toBeNull();
+      await user.click(chip());
+      await new Promise((r) => setTimeout(r));
+      view.fixture.detectChanges();
+      const layer = document.querySelector('.rc__layer') as HTMLElement;
+      // A chip row that scrolls clips its children: the sheet goes to the top layer.
+      expect(layer.getAttribute('popover')).toBe('manual');
+      expect(shown).toContain(layer);
+      expect(layer.querySelector('.ss--bottom')).not.toBeNull();
+      expect(document.querySelector('.rc__pop')).toBeNull();
+
+      await user.keyboard('{Escape}');
+      view.fixture.detectChanges();
+      expect(document.querySelector('.rc__layer')).toBeNull();
+      expect(chip().getAttribute('aria-expanded')).toBe('false');
+    } finally {
+      proto.showPopover = real;
+    }
+  });
+
+  it('keeps the popover under its chip when the chip moves', async () => {
+    const frames: FrameRequestCallback[] = [];
+    const realRaf = window.requestAnimationFrame;
+    window.requestAnimationFrame = (cb: FrameRequestCallback) => frames.push(cb);
+    try {
+      const { chip, user, view } = await setup();
+      let left = 347;
+      chip().getBoundingClientRect = () =>
+        ({ left, right: left + 100, top: 140, bottom: 172, width: 100, height: 32, x: left, y: 140 }) as DOMRect;
+      await user.click(chip());
+      await new Promise((r) => setTimeout(r));
+      view.fixture.detectChanges();
+      const pop = () => document.querySelector('.rc__pop') as HTMLElement;
+      expect(pop().style.left).toBe('347px');
+      expect(pop().style.top).toBe('176px');
+
+      // A chip before it appears: the chip moves right, and the popover goes with it.
+      left = 500;
+      frames.splice(0).forEach((cb) => cb(0));
+      view.fixture.detectChanges();
+      expect(pop().style.left).toBe('500px');
+
+      // Closed, it checks no more.
+      await user.click(chip());
+      frames.splice(0).forEach((cb) => cb(0));
+      expect(frames.length).toBe(0);
+    } finally {
+      window.requestAnimationFrame = realRaf;
+    }
   });
 });

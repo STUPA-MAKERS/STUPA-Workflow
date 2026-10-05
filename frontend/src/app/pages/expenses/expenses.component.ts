@@ -512,7 +512,12 @@ export class ExpensesComponent implements OnDestroy {
       }
     };
     this.dialogs.onDeleted = (gone) => {
-      this.dialogs.closeForms();
+      // Close the form only when it shows the deleted booking (or a sub-booking of it).
+      // A sub-booking deleted from the form of its parent keeps that form and its edits.
+      const edited = this.dialogs.editing();
+      if (edited && (edited.id === gone.id || edited.parentExpenseId === gone.id)) {
+        this.dialogs.closeForms();
+      }
       if (!gone.parentExpenseId && gone.id === this.selectedId()) this.closeDetail();
     };
     this.transfers.onDeleted = (gone) => {

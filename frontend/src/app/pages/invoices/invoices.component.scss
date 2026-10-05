@@ -154,6 +154,24 @@
   margin-inline: 6px;
   color: var(--color-text-subtle);
 }
+/* The sub line is a flex row: only the invoice number shortens, with an ellipsis. The
+   status and the date (the due date of an open invoice) keep their width, so a long
+   number never pushes the date out of the row. */
+.inv__sub {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.inv__sub > * {
+  flex: none;
+}
+.inv__sub > .inv__no {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .inv__trail {
   display: flex;
   align-items: center;
@@ -358,6 +376,15 @@
 }
 
 @include bp.phone {
+  /* A phone row gives the sub line more width, so the number and the due date fit: less
+     padding, a smaller gap to the amount and narrower dots. */
+  .inv__row {
+    --li-pad-x: var(--space-3);
+    --li-gap: var(--space-2);
+  }
+  .inv__dot {
+    margin-inline: var(--space-1);
+  }
   /* Four segments with counts in a phone column: less padding, and a segment never gets
      narrower than its label and count, so no label gets an ellipsis. */
   .inv__seg ::ng-deep .seg {

@@ -79,8 +79,16 @@
   align-items: center;
   gap: 6px;
 }
-.exp__danger {
+/* The bulk delete icon is red, like every destructive action. The inner button of an
+   icon button sets its own grey (`.btn--text.btn--icon`), so the colour goes on the inner
+   button, with a selector that is more specific than that of the kit. A disabled button
+   keeps a muted red (the opacity and grayscale of the kit). */
+.exp__danger ::ng-deep .btn.btn--icon,
+.exp__danger ::ng-deep .btn.btn--icon:hover:not(:disabled) {
   color: var(--color-danger);
+}
+.exp__danger ::ng-deep .btn.btn--icon:hover:not(:disabled) {
+  background: var(--color-danger-subtle);
 }
 
 .exp__filters {
@@ -451,6 +459,18 @@
       #000 calc(100% - var(--exp-chip-fade)),
       transparent
     );
+  }
+  /* A phone row gives the sub line more width, so a cost-centre name stays readable:
+     less padding, a smaller gap to the amount and narrower dots. */
+  .exp__row {
+    --li-pad-x: var(--space-3);
+    --li-gap: var(--space-2);
+  }
+  .exp__dot {
+    margin-inline: var(--space-1);
+  }
+  .exp__arrow {
+    margin-inline: var(--space-1);
   }
   .exp__head {
     padding-inline-start: var(--space-1);

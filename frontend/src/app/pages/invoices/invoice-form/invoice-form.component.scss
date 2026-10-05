@@ -1,12 +1,17 @@
 @use '../../budget/finance-form';
 
-/* The receipt column is narrower than the fields. */
-.if__fileCol {
-  flex: 0.8 1 0;
-  min-width: min(100%, 14rem);
+/* No preview of the pages: the receipt is one file card. So the form is one column, the
+   file card on top at the full width and the fields below it, also at the full width.
+   Two columns would leave the receipt column empty below the card. */
+.if__cols {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
 }
+.if__fileCol,
 .if__fields {
-  flex: 1.4 1 0;
+  flex: none;
+  min-width: 0;
 }
 .if__file {
   display: flex;

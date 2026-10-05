@@ -90,7 +90,12 @@ export class RangeChipComponent {
 
   private readonly trigger = viewChild.required<ElementRef<HTMLButtonElement>>('trigger');
   private readonly pop = viewChild<ElementRef<HTMLElement>>('pop');
+  private readonly layer = viewChild<ElementRef<HTMLElement>>('layer');
   private timer: ReturnType<typeof setTimeout> | null = null;
+  /** The frame that checks the place of the chip while the popover is open. */
+  private frame: number | null = null;
+  /** The place of the chip at the last check: `left,bottom`. */
+  private lastPlace = '';
 
   constructor() {
     const inside = (root: HTMLElement | undefined, target: EventTarget | null) =>
@@ -110,6 +115,7 @@ export class RangeChipComponent {
       window.removeEventListener('scroll', onViewport, true);
       window.removeEventListener('resize', onViewport);
       if (this.timer) clearTimeout(this.timer);
+      this.stopTracking();
     });
   }
   protected readonly draftFrom = signal('');
@@ -150,16 +156,27 @@ export class RangeChipComponent {
     this.draftFrom.set(this.from());
     this.draftTo.set(this.to());
     this.open.set(true);
-    if (this.phone()) return;
+    if (this.phone()) {
+      // The sheet renders in the next change detection; then it goes to the top layer.
+      // The sheet moves the focus into itself.
+      this.timer = setTimeout(() => {
+        this.timer = null;
+        this.toTopLayer(this.layer()?.nativeElement);
+      });
+      return;
+    }
     this.placeBelow();
     // The popover renders in the next change detection; then it goes to the top layer.
     this.timer = setTimeout(() => {
       this.timer = null;
-      const pop = this.pop()?.nativeElement as (HTMLElement & { showPopover?: () => void }) | undefined;
+      const pop = this.pop()?.nativeElement;
       if (!pop) return;
-      if (typeof pop.showPopover === 'function') pop.showPopover();
-      this.fit(pop);
-      (pop.querySelector<HTMLElement>('input') ?? pop).focus();
+      this.toTopLayer(pop);
+      // The popover is a DOM child of the chip row. A focus that scrolls would move the
+      // row (and the chip) away from the place that placeBelow() read.
+      (pop.querySelector<HTMLElement>('input') ?? pop).focus({ preventScroll: true });
+      this.follow();
+      this.track();
     });
   }
 
@@ -193,8 +210,50 @@ export class RangeChipComponent {
     if (!this.open()) return;
     const wasPopover = this.popoverOpen();
     this.open.set(false);
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    this.stopTracking();
     // The sheet returns the focus itself.
     if (returnFocus && wasPopover) this.trigger().nativeElement.focus();
+  }
+
+  /** Show a popover element. It renders anew on each opening, so it is not shown yet. */
+  private toTopLayer(el: HTMLElement | undefined): void {
+    const pop = el as (HTMLElement & { showPopover?: () => void }) | undefined;
+    if (typeof pop?.showPopover === 'function') pop.showPopover();
+  }
+
+  /**
+   * Keep the popover at its chip while it is open. The chip can move without a scroll or
+   * a resize of the window: a chip before it appears when its data loads, or the row
+   * changes its scroll position. So each frame compares the place of the chip with the
+   * last one and places the popover again when it changed.
+   */
+  private track(): void {
+    if (typeof requestAnimationFrame !== 'function') return;
+    this.lastPlace = this.place();
+    const tick = () => {
+      this.frame = null;
+      if (!this.popoverOpen()) return;
+      const now = this.place();
+      if (now !== this.lastPlace) {
+        this.lastPlace = now;
+        this.follow();
+      }
+      this.frame = requestAnimationFrame(tick);
+    };
+    this.frame = requestAnimationFrame(tick);
+  }
+
+  private stopTracking(): void {
+    if (this.frame !== null && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this.frame);
+    this.frame = null;
+  }
+
+  /** The left and bottom edge of the chip, as a key to compare. */
+  private place(): string {
+    const rect = this.trigger().nativeElement.getBoundingClientRect();
+    return `${rect.left},${rect.bottom}`;
   }
 
   /** Under the chip, aligned to its start, inside the viewport. */
