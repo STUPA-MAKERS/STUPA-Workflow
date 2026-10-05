@@ -115,12 +115,6 @@
   min-width: 0;
   min-height: 0;
 }
-/* In the bottom sheet of the dialog the body scrolls by itself and passes no height
-   down. The pane takes a height of its own, so that only the tree scrolls: about 85% of
-   the screen less the handle, the header and the padding of the sheet. */
-.bd__paneBody--sheet {
-  max-height: calc(85dvh - 7.5rem - env(safe-area-inset-bottom, 0px));
-}
 /* The side sheet has the surface-2 background of the search field. The field takes the
    next surface, so that its edge shows. */
 .bd__paneBody--side app-search-pill {

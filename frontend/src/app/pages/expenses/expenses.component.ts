@@ -218,8 +218,8 @@ export class ExpensesComponent implements OnDestroy {
     return (id && this.costCentres().get(id)?.color) || null;
   });
 
-  /** Below the wide layout the cost-centre tree opens in a sheet (narrow) or a dialog
-   *  (phone, a bottom sheet). */
+  /** Below the wide layout the cost-centre tree opens in the side sheet: from the start
+   *  (narrow) or from the bottom (phone). */
   readonly pickerOpen = signal(false);
 
   readonly tabOptions = computed<SegmentedOption[]>(() => [

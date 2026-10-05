@@ -243,33 +243,25 @@
     </article>
   </div>
 
-  @if (phone()) {
-    <!-- A phone: the dialog of the ui-kit, which is a bottom sheet there (handle, swipe
-         down, scrim, Escape, focus trap). -->
-    <app-dialog
-      [open]="navOpen()"
-      [title]="'budget.dash.tree' | t"
-      [closeLabel]="'action.close' | t"
-      (closed)="navOpen.set(false)"
+  <!-- Below the wide layout: the shared side sheet, from the start or on a phone from the
+       bottom. The search stays in place and only the tree scrolls. -->
+  @if (!wide()) {
+    <app-side-sheet
+      [side]="phone() ? 'bottom' : 'start'"
+      [contentScrolls]="true"
+      [heading]="'budget.dash.tree' | t"
+      [(open)]="navOpen"
     >
-      <ng-container *ngTemplateOutlet="treePane; context: { $implicit: true }" />
-    </app-dialog>
-  } @else if (!wide()) {
-    <app-side-sheet side="start" [contentScrolls]="true" [heading]="'budget.dash.tree' | t" [(open)]="navOpen">
       <ng-container *ngTemplateOutlet="treePane" />
     </app-side-sheet>
   }
 
   <!-- The pane: year, overview, search and the cost-centre tree. The wide layout shows it
-       beside the sheet; a narrower one shows the search and the tree in the side sheet, a
-       phone in the bottom sheet of the dialog. The chips and the search stay in place;
-       only the tree scrolls, with a fade at an end where more rows are. -->
-  <ng-template #treePane let-inSheet>
-    <div
-      class="bd__paneBody"
-      [class.bd__paneBody--sheet]="inSheet"
-      [class.bd__paneBody--side]="!wide() && !inSheet"
-    >
+       beside the sheet; a narrower one shows the search and the tree in the side sheet.
+       The chips and the search stay in place; only the tree scrolls, with a fade at an
+       end where more rows are. -->
+  <ng-template #treePane>
+    <div class="bd__paneBody" [class.bd__paneBody--side]="!wide()">
       <!-- Below the wide layout the year and the overview chips sit on the page, beside
            the path chip, so the sheet holds only the search and the tree. -->
       @if (wide()) {

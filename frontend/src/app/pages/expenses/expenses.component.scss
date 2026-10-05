@@ -126,12 +126,16 @@
   padding: var(--space-2) var(--space-3) 0;
   color: var(--color-text-subtle);
 }
+/* The tree scrolls here. The block padding keeps the first and the last row clear of
+   the edge, and the top padding puts "Alle" on the line of the table header. */
 .exp__tree {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
+  padding-block: var(--space-5);
+  scroll-padding-block: var(--space-6);
 }
 
 .exp__main {

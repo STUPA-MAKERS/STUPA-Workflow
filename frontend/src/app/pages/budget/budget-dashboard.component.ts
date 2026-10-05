@@ -121,8 +121,8 @@ export const APPS_SHOWN = 5;
  * On the wide layout the page fills the height of the viewport and does not scroll: in
  * the pane only the tree scrolls, and the sheet scrolls inside itself. Below the wide
  * breakpoint the year and the overview chips sit beside a path chip on the page. The path
- * chip opens the search and the tree: in a side sheet from the start, or on a phone in
- * the dialog of the ui-kit, which is a bottom sheet there. The query params hold the
+ * chip opens the search and the tree in the shared side sheet: from the start, or on a
+ * phone from the bottom. The query params hold the
  * selection, so the view is shareable as a link. A reader with a
  * gremium scope (`viewGremiumId`) gets only the subtrees of the server response.
  */
@@ -163,8 +163,8 @@ export class BudgetDashboardComponent {
 
   /** The pane sits beside the sheet only on a wide viewport. */
   readonly wide = mediaQuerySignal(MEDIA.wide);
-  /** A phone opens the tree in the bottom sheet of the dialog, a narrow viewport in a
-   *  side sheet. */
+  /** A phone opens the tree in a sheet from the bottom, a narrow viewport in a sheet
+   *  from the start. */
   readonly phone = mediaQuerySignal(MEDIA.phone);
 
   readonly canExport = computed(() => this.auth.can('budget.export'));

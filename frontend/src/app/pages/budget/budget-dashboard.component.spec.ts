@@ -862,22 +862,22 @@ describe('BudgetDashboardComponent', () => {
       expect(dialog.querySelector('.bd__paneBody')).toHaveClass('bd__paneBody--side');
     });
 
-    it('opens the tree in the dialog of the ui-kit on a phone, which is a bottom sheet there', async () => {
+    it('opens the tree in the shared sheet from the bottom on a phone', async () => {
       const view = await setup({ wide: false, phone: true });
-      expect(view.container.querySelector('app-side-sheet')).toBeNull();
       (view.container.querySelector('.bd__pathChip') as HTMLButtonElement).click();
       view.fixture.detectChanges();
       const dialog = view.getByRole('dialog', { name: 'Kostenstellen' });
-      expect(dialog).toHaveClass('dialog');
-      // The handle of the sheet; CSS shows it only on a phone.
-      expect(dialog.querySelector('.dialog__grabber')).toBeTruthy();
-      // The search stays above the tree, which scrolls by itself.
-      const pane = dialog.querySelector('.bd__paneBody') as HTMLElement;
-      expect(pane).toHaveClass('bd__paneBody--sheet');
-      expect(pane).not.toHaveClass('bd__paneBody--side');
+      expect(dialog).toHaveClass('ss--bottom');
+      // The handle of the sheet.
+      expect(dialog.querySelector('.ss__handle')).toBeTruthy();
+      // The body passes the height down: the search stays above the tree, which scrolls
+      // by itself down to the bottom padding of the sheet.
+      expect(dialog.querySelector('.ss__body')).toHaveClass('ss__body--fill');
+      const pane = dialog.querySelector('.ss__body > .bd__paneBody') as HTMLElement;
+      expect(pane).toHaveClass('bd__paneBody--side');
       expect(pane.querySelector(':scope > app-search-pill + .bd__tree')).toBeTruthy();
-      // The close button of the dialog closes it.
-      (dialog.querySelector('.dialog__close') as HTMLButtonElement).click();
+      // The close button of the sheet closes it.
+      (dialog.querySelector('.ss__close') as HTMLButtonElement).click();
       view.fixture.detectChanges();
       const c = view.fixture.componentInstance as unknown as Inst;
       expect(c.navOpen()).toBe(false);

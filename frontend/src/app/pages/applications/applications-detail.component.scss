@@ -410,9 +410,33 @@
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
+/* The tree scrolls here, below the lead and above the fiscal year. An end fades only
+   when more rows are past it (`appScrollFade` sets the classes). */
 .ad__ccTree {
   max-height: 50vh;
+  max-height: 50dvh;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-5);
+}
+.ad__ccTree.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
+}
+.ad__ccTree.is-fade-end {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--space-5));
+  mask-image: linear-gradient(to top, transparent, #000 var(--space-5));
+}
+.ad__ccTree.is-fade-start.is-fade-end {
+  --ad-fade: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--space-5),
+    #000 calc(100% - var(--space-5)),
+    transparent
+  );
+  -webkit-mask-image: var(--ad-fade);
+  mask-image: var(--ad-fade);
 }
 .ad__ccFy {
   display: block;
