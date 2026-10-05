@@ -16,6 +16,8 @@ const listDetail = read('shared/ui/list-detail/list-detail-layout.component.scss
 const adminFrame = read('pages/admin/admin-frame/admin-frame.component.scss');
 const budget = read('pages/budget/budget-dashboard.component.scss');
 const globalStyles = readFileSync(join(app, '../styles.scss'), 'utf8');
+const meetingPage = read('features/meetings/meeting-page/meeting-page.component.scss');
+const followView = read('features/meetings/meeting-follow-view.component.scss');
 
 /** The declarations of the first rule with exactly this selector. */
 function rule(css: string, selector: string): string {
@@ -41,6 +43,15 @@ describe('rounded sheet styles', () => {
 
   it('keeps the budget sheet clipping', () => {
     expect(rule(budget, '.bd--wide .bd__sheet')).toMatch(/overflow: hidden;/);
+  });
+
+  it('makes the session page and the participant view pane pages with round card columns', () => {
+    for (const css of [meetingPage, followView]) {
+      expect(rule(css, ':host')).toMatch(/flex: 1 1 0;/);
+      expect(rule(css, ':host')).not.toMatch(/height: 100dvh/);
+    }
+    expect(rule(meetingPage, '.mp__body--wide .mp__votes')).toMatch(/border-radius: var\(--radius-xl\);/);
+    expect(rule(followView, '.fv__body--wide .fv__side')).toMatch(/border-radius: var\(--radius-xl\);/);
   });
 
   it('gives a pane page the gutter as the gap at the bottom and at the top', () => {
