@@ -3,38 +3,66 @@
   flex-direction: column;
   gap: var(--space-2);
 }
+/* A filled row like an input field: surface 2, round corners, no shadow. */
 .altcha__btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--space-3);
+  width: 100%;
+  min-height: 3.5rem;
   padding: var(--space-3) var(--space-4);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font: inherit;
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-2);
   color: var(--color-text);
-  align-self: flex-start;
+  font: inherit;
+  font-size: var(--fs-md);
+  text-align: start;
+  cursor: pointer;
+}
+.altcha__btn:hover:not(:disabled) {
+  background: var(--color-surface-3);
 }
 .altcha__btn:disabled {
   cursor: default;
 }
-.altcha[data-state='solved'] .altcha__btn {
-  border-color: var(--color-success);
-}
-.altcha[data-state='error'] .altcha__btn {
-  border-color: var(--color-danger);
-}
 .altcha__box {
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
-  width: 1.4rem;
-  height: 1.4rem;
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
-  color: var(--color-success);
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 2px var(--color-border-strong);
+}
+.altcha[data-state='solved'] .altcha__box {
+  background: var(--color-accent);
+  box-shadow: none;
+  color: var(--color-on-accent);
+}
+.altcha[data-state='error'] .altcha__box {
+  box-shadow: inset 0 0 0 2px var(--color-danger);
+}
+.altcha__label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.altcha__brand {
+  flex: none;
+  color: var(--color-text-subtle);
+  font-size: var(--fs-cap);
   font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+}
+.altcha__note {
+  margin: 0;
+  padding-inline: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.altcha__note--error {
+  color: var(--color-danger);
 }
 .altcha__spinner {
   width: 0.9rem;
@@ -47,5 +75,10 @@
 @keyframes altcha-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .altcha__spinner {
+    animation-duration: 1.8s;
   }
 }

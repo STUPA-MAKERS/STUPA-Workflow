@@ -1,246 +1,335 @@
-.status {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-  max-width: 72rem;
-  margin: 0 auto;
-}
+@use 'breakpoints' as bp;
 
-.status--narrow {
-  max-width: 36rem;
-}
-
-/* Three-column shell (actions | history+data | comments), as on the internal
-   application detail page. Without actions, two columns remain (data | comments). */
-.status__shell {
-  display: grid;
-  gap: var(--space-6);
-  align-items: start;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
-}
-
-.status__shell--actions {
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(280px, 360px);
-}
-
-.status__main,
-.status__rail {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-  min-width: 0;
-}
-
-/* Narrow viewports: stack everything in one column, actions first. */
-@media (max-width: 1024px) {
-  .status__shell,
-  .status__shell--actions {
-    grid-template-columns: 1fr;
-  }
-}
-
-.status__text,
-.status__hint {
-  color: var(--color-text-muted);
-}
-
-.status__hint {
-  margin: 0 0 var(--space-4);
-  font-size: var(--fs-sm);
-}
-
-.status__actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--space-5);
-}
-
-/* Space between the form questions, as in the internal application form. */
-:host ::ng-deep formly-form formly-field {
+:host {
   display: block;
 }
-:host ::ng-deep formly-form formly-field + formly-field {
-  margin-top: var(--space-5);
-}
 
-.timeline {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.timeline__item {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--space-4);
-}
-
-.timeline__dot {
-  width: 0.75rem;
-  height: 0.75rem;
-  margin-top: 0.35rem;
-  border-radius: var(--radius-pill);
-  background: var(--color-accent);
-}
-
-.timeline__note {
-  margin: var(--space-1) 0 0;
+.sp__loading {
   color: var(--color-text-muted);
   font-size: var(--fs-sm);
 }
 
-.readonly__row {
-  display: grid;
-  grid-template-columns: minmax(8rem, 14rem) 1fr;
-  gap: var(--space-4);
-  padding: var(--space-3) 0;
-  border-bottom: var(--border-width) solid var(--color-border);
-}
-
-.readonly__row dt {
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-}
-
-.readonly__row dd {
-  margin: 0;
-}
-
-.comments {
+/* The page: header, then rows + answers beside the history (wide), else stacked. */
+.sp {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  margin: 0 0 var(--space-5);
-  padding: 0;
-  list-style: none;
+  gap: var(--space-5);
+  max-width: 72rem;
+  margin-inline: auto;
 }
-
-.comments__item {
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-surface-sunken);
-  border-radius: var(--radius-md);
-}
-
-.comments__meta {
-  margin: 0 0 var(--space-1);
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-}
-
-.comments__body {
-  margin: 0;
-  white-space: pre-line;
-}
-
-@media (max-width: 40rem) {
-  .readonly__row {
-    grid-template-columns: 1fr;
-    gap: var(--space-1);
-  }
-}
-
-/* Mobile: action buttons as full tap targets (≥2.5rem). */
-@media (max-width: 40rem) {
-  .status__actions {
-    justify-content: stretch;
-  }
-  .status__actions app-button {
-    display: flex;
-    flex: 1 1 auto;
-  }
-  .status__actions ::ng-deep .btn {
-    width: 100%;
-    min-height: 2.5rem;
-  }
-}
-
-/* Chat (comments): identical to the internal detail view. */
-.det__chat {
+.sp__head {
   display: flex;
   flex-direction: column;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  overflow: hidden;
-  max-height: calc(100vh - var(--layout-header-height) - 6rem);
+  gap: 6px;
 }
-.det__chatScroll {
+.sp__headTop {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: var(--space-3);
-  overflow-y: auto;
-  padding: var(--space-4);
-  min-height: 5rem;
 }
-.det__msg {
+.sp__ref {
+  flex: 1 1 auto;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.sp__menu {
+  flex: none;
+}
+.sp__title {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.sp__state {
   display: flex;
-  gap: var(--space-2);
-  max-width: 90%;
-  align-self: flex-start;
-}
-.det__msg--own {
-  align-self: flex-end;
-  flex-direction: row-reverse;
-}
-.det__avatar {
-  flex: 0 0 auto;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  background: var(--color-surface-sunken);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-2);
+  margin: 0;
   color: var(--color-text-muted);
 }
-.det__msg--own .det__avatar {
-  background: var(--color-primary-subtle);
-  color: var(--color-primary);
+.sp__state app-status-text {
+  flex: none;
 }
-.det__msgBody {
+.sp__sep {
+  color: var(--color-text-subtle);
+}
+.sp__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.sp__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(20rem, 1fr);
+  align-items: start;
+  gap: var(--space-6);
+}
+.sp__main {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--space-5);
   min-width: 0;
 }
-.det__msg--own .det__msgBody {
-  align-items: flex-end;
+.sp__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
 }
-.det__msgTime {
+.sp__secTitle {
+  padding: 0 var(--space-1);
+}
+.sp__empty {
+  margin: 0;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+.sp__link {
+  margin: calc(-1 * var(--space-3)) 0 0;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+/* The rows: edit, attachments, comments. */
+.sp__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sp__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: 4rem;
+  padding: 10px var(--space-4);
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.sp__row:hover:not(:disabled) {
+  background: var(--color-surface-3);
+}
+.sp__row:disabled {
+  cursor: default;
+}
+.sp__row:disabled .sp__rowIcon,
+.sp__row:disabled .sp__rowTitle {
+  color: var(--color-text-subtle);
+}
+.sp__rowIcon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.sp__rowText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.sp__rowTitle {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+}
+.sp__rowSub {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.sp__rowChev {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+/* Edit mode: the bar sticks to the top of the window. */
+.sp--edit {
+  gap: var(--space-4);
+}
+.sp__editBar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-inline: calc(-1 * var(--space-4));
+  padding: var(--space-2) var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+  background: var(--color-surface-3);
+}
+.sp__editBar app-button {
+  flex: none;
+}
+.sp__editText {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.det__bubble {
-  padding: var(--space-2) var(--space-3);
-  border-radius: 0 var(--radius-lg) var(--radius-lg) var(--radius-lg);
-  background: var(--color-surface-sunken);
+.sp__editHint {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+.sp__edit ::ng-deep :is(input, textarea, select, button, [role='alert']) {
+  scroll-margin-top: 5rem;
+}
+
+/* Comments in the side sheet: the messages, then the composer. */
+.sp__chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.sp__msgs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sp__msg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px var(--space-4);
+}
+.sp__msg--own {
+  background: var(--color-selected);
+}
+.sp__msgHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  font-size: 0.8125rem;
+}
+.sp__msgHead time {
+  color: var(--color-text-muted);
+}
+.sp__msgBody {
   white-space: pre-wrap;
-  word-break: break-word;
-  font-size: var(--fs-sm);
-  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
-.det__msg--own .det__bubble {
-  border-radius: var(--radius-lg) 0 var(--radius-lg) var(--radius-lg);
-  background: var(--color-primary-subtle);
+.sp__composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
 }
-.det__composerInput {
-  flex: 1;
+.sp__composerInput {
+  flex: 1 1 auto;
   min-width: 0;
-  resize: none;
-  max-height: 8rem;
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-bg);
+  min-height: 3.5rem;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-3);
   color: var(--color-text);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-lg);
   font: inherit;
-  font-size: var(--fs-sm);
-  line-height: 1.4;
+  resize: vertical;
 }
-.det__composerInput:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 1px;
+.sp__composerInput:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 0;
+}
+.sp__dialogText {
+  margin: 0;
+}
+
+/* The end states (expired link, not found): one card in the free space. */
+.sp__end {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+.sp__endCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  width: min(36rem, 100%);
+  padding: var(--space-6);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.sp__endIcon {
+  color: var(--color-text-muted);
+}
+.sp__endTitle {
+  margin: 0;
+  font-size: var(--fs-h1);
+  line-height: var(--lh-h1);
+}
+.sp__endText {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.sp__btn {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-height);
+  margin-top: var(--space-2);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--color-border-strong);
+  color: var(--color-text);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+.sp__btn:hover {
+  background: var(--color-surface-2);
+}
+
+/* One column: the rows, then the history (as on the board), then the answers. */
+@include bp.below-wide {
+  .sp__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sp__main {
+    display: contents;
+  }
+  .sp__rows,
+  .sp__link {
+    order: 1;
+  }
+  .sp__history {
+    order: 2;
+  }
+  .sp__answers {
+    order: 3;
+  }
+  .sp {
+    max-width: 46rem;
+  }
+}
+
+@include bp.phone {
+  .sp {
+    gap: var(--space-4);
+  }
+  .sp__title {
+    font-size: var(--fs-h1);
+    line-height: var(--lh-h1);
+  }
+  .sp__grid,
+  .sp__main {
+    gap: var(--space-4);
+  }
+  .sp__editBar {
+    margin-inline: calc(-1 * var(--space-4));
+  }
+  .sp__editHint {
+    display: none;
+  }
+  .sp__endCard {
+    padding: var(--space-5);
+  }
 }

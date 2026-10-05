@@ -1,129 +1,208 @@
-<section class="wizard">
-  <header class="flex flex-col gap-5">
-    <h1 class="m-0">{{ 'apply.title' | t }}</h1>
+<div class="wz">
+  <aside class="wz__aside">
+    <div class="wz__intro">
+      <h1 class="wz__title">{{ 'apply.title' | t }}</h1>
+      <p class="wz__lead">{{ (loggedIn() ? 'apply.leadSignedIn' : 'apply.lead') | t }}</p>
+    </div>
     <app-stepper
+      class="wz__stepper"
+      orientation="vertical"
       [steps]="steps()"
       [activeIndex]="activeIndex()"
+      [navigable]="true"
       [ariaLabel]="'apply.progress' | t"
+      (stepSelect)="goToStep($event)"
     />
-  </header>
+    @if (saved()) {
+      <p class="wz__saved" role="status" [title]="'apply.autosaveScope' | t">
+        <app-icon name="check" [size]="15" />
+        {{ 'apply.autosave' | t }}
+      </p>
+    }
+  </aside>
 
-  <app-card>
-    @switch (currentStep()) {
-      @case ('type') {
-        <h2 class="mb-2 text-xl">{{ 'apply.type.title' | t }}</h2>
-        <p class="mb-5 text-muted">{{ 'apply.type.lead' | t }}</p>
-        <div class="grid gap-3" role="radiogroup" [attr.aria-label]="'apply.type.legend' | t">
+  <section class="wz__sheet" aria-labelledby="wz-step-title">
+    <header class="wz__head">
+      <span class="wz__stepLine">{{ stepLine() }}</span>
+      <h2 class="wz__stepTitle" id="wz-step-title">{{ stepTitle() }}</h2>
+    </header>
+
+    <div class="wz__body">
+      <!-- 1 · Antragsart -->
+      <section class="wz__step" [hidden]="currentStep() !== 'type'">
+        <div class="wz__types rowgroup" role="radiogroup" [attr.aria-label]="'apply.type.legend' | t">
           @for (t of types(); track t.id) {
             <button
               type="button"
-              class="type-option"
+              class="wz__type"
               role="radio"
               [attr.aria-checked]="typeId() === t.id"
               [class.is-selected]="typeId() === t.id"
               (click)="selectType(t.id)"
             >
-              <span class="font-medium">{{ t.name }}</span>
+              <span class="wz__radio" aria-hidden="true"></span>
+              <span class="wz__typeName">{{ t.name }}</span>
             </button>
           } @empty {
-            <p class="text-muted text-sm">{{ 'apply.type.empty' | t }}</p>
+            <p class="wz__empty">{{ 'apply.type.empty' | t }}</p>
           }
         </div>
         @if (loadingForm()) {
-          <app-skeleton variant="lines" [count]="5" [label]="'apply.form.loading' | t" />
+          <app-skeleton variant="lines" [count]="3" [label]="'apply.form.loading' | t" />
         }
         <!-- Configured info text: set per language as markdown in /admin/branding. -->
         @if (applyInfoHtml()) {
-          <div class="wizard__info" [innerHTML]="applyInfoHtml()"></div>
+          <div class="wz__info" [innerHTML]="applyInfoHtml()"></div>
         }
-      }
+      </section>
 
-      @case ('contact') {
-        <h2 class="mb-2 text-xl">{{ 'apply.contact.title' | t }}</h2>
-        <p class="mb-5 text-muted">{{ 'apply.contact.lead' | t }}</p>
-        <form class="grid gap-5" [formGroup]="contactForm">
-          <app-input
-            [label]="'apply.contact.email' | t"
-            type="email"
-            [required]="true"
-            [formControl]="contactForm.controls.email"
-            [error]="
-              contactForm.controls.email.touched && contactForm.controls.email.invalid
-                ? ('apply.contact.emailInvalid' | t)
-                : ''
-            "
-          />
-          <app-input
-            [label]="'apply.contact.name' | t"
-            [formControl]="contactForm.controls.name"
-            [hint]="'apply.contact.nameHint' | t"
-          />
-        </form>
-      }
-
-      @case ('section') {
-        @if (currentSection(); as section) {
-          <h2 class="mb-2 text-xl">{{ section.label }}</h2>
-          <formly-form [form]="section.form" [fields]="section.fields" [model]="model" />
-        }
-      }
-
-      @case ('review') {
-        <h2 class="mb-2 text-xl">{{ 'apply.review.title' | t }}</h2>
-        <dl class="grid gap-1 mb-6">
-          <div class="summary__row">
-            <dt>{{ 'apply.review.email' | t }}</dt>
-            <dd>{{ reviewEmail() }}</dd>
+      @if (effForm()) {
+        <!-- 2 · Angaben. Every form stays in the page, so the submit checks all fields. -->
+        <section class="wz__step" [hidden]="currentStep() !== 'details'">
+          <div class="fe-form">
+            <formly-form [form]="detailsForm" [fields]="detailsFields()" [model]="model" />
           </div>
-          @for (row of summary(); track row.label) {
-            <div class="summary__row">
-              <dt>{{ row.label }}</dt>
-              <dd>{{ row.value }}</dd>
-            </div>
+          <app-draft-files
+            class="wz__files"
+            [heading]="'apply.files.title' | t"
+            [summary]="true"
+            [comparison]="true"
+          />
+        </section>
+
+        <!-- 3 · Kontakt -->
+        @if (stepKeys().includes('contact')) {
+          <section class="wz__step" [hidden]="currentStep() !== 'contact'">
+            @if (loggedIn()) {
+              <h3 class="sec wz__sec">{{ 'apply.contact.account' | t }}</h3>
+              <app-field-group>
+                <app-field-row [label]="'apply.contact.name' | t">{{ account().name }}</app-field-row>
+                <app-field-row [label]="'apply.contact.email' | t">{{ account().email }}</app-field-row>
+              </app-field-group>
+            } @else {
+              <p class="wz__hint">{{ 'apply.contact.lead' | t }}</p>
+              <form class="wz__contact" [formGroup]="contactForm" (submit)="$event.preventDefault()">
+                <app-input
+                  [label]="'apply.contact.email' | t"
+                  type="email"
+                  [required]="true"
+                  [formControl]="contactForm.controls.email"
+                  [error]="
+                    contactForm.controls.email.touched && contactForm.controls.email.invalid
+                      ? ('apply.contact.emailInvalid' | t)
+                      : ''
+                  "
+                />
+                <app-input
+                  [label]="'apply.contact.nameOptional' | t"
+                  [formControl]="contactForm.controls.name"
+                  [hint]="'apply.contact.nameHint' | t"
+                />
+              </form>
+            }
+            @if (piiFields().length) {
+              <div class="fe-form wz__pii">
+                <formly-form [form]="piiForm" [fields]="piiFields()" [model]="model" />
+              </div>
+            }
+          </section>
+        }
+
+        <!-- 4 · Prüfen & absenden -->
+        <section class="wz__step wz__review" [hidden]="currentStep() !== 'review'">
+          @if (currentStep() === 'review') {
+            <app-answer-view
+              [sections]="effForm()!.sections"
+              [data]="answers()"
+              [context]="formContext()"
+              [skipKeys]="[]"
+              [emptyText]="'apply.review.empty' | t"
+            />
+            <h3 class="sec wz__sec">{{ 'apply.review.applicant' | t }}</h3>
+            <app-field-group>
+              @if (loggedIn()) {
+                <app-field-row [label]="'apply.contact.name' | t">{{ account().name }}</app-field-row>
+              } @else if (contactForm.controls.name.value) {
+                <app-field-row [label]="'apply.contact.name' | t">{{ contactForm.controls.name.value }}</app-field-row>
+              }
+              <app-field-row [label]="'apply.contact.email' | t">{{ reviewEmail() }}</app-field-row>
+            </app-field-group>
+            @if (drafts.usable().length) {
+              <section class="wz__reviewFiles" [attr.aria-label]="'apply.files.title' | t">
+                <h3 class="sec wz__sec">{{ 'apply.files.title' | t }}</h3>
+                <ul class="rowgroup wz__fileList">
+                  @for (f of drafts.usable(); track f.id) {
+                    <li class="wz__file">
+                      <app-icon class="wz__fileIcon" name="clip" [size]="17" />
+                      <span class="wz__fileName">{{ f.filename }}</span>
+                      @if (f.isComparisonOffer) {
+                        <app-badge variant="neutral">{{ 'apply.files.offerTag' | t }}</app-badge>
+                      }
+                    </li>
+                  }
+                </ul>
+              </section>
+            }
+            @if (!loggedIn()) {
+              @for (round of [altchaRound()]; track round) {
+                <app-altcha (solved)="onAltchaSolved($event)" (unavailable)="onAltchaUnavailable()" />
+              }
+            }
           }
-        </dl>
-        @if (!loggedIn()) {
-          <div class="mt-4">
-            <app-altcha (solved)="onAltchaSolved($event)" (unavailable)="onAltchaUnavailable()" />
-          </div>
-        }
+        </section>
       }
-    }
-
-    <div card-footer class="wizard__nav">
-      <div class="wizard__nav-left">
-        @if (activeIndex() > 0) {
-          <app-button size="sm" variant="secondary" (click)="prev()">{{ 'apply.nav.back' | t }}</app-button>
-        }
-        @if (effForm()) {
-          <app-button variant="ghost" size="sm" (click)="discardDraft()">
-            {{ 'apply.nav.discard' | t }}
-          </app-button>
-        }
-      </div>
-      <div class="wizard__nav-right">
-        @if (currentStep() === 'review') {
-          <app-button size="sm"
-            type="button"
-            [disabled]="!canSubmit()"
-            [loading]="submitting()"
-            (click)="submit()"
-          >
-            {{ 'apply.nav.submit' | t }}
-          </app-button>
-        } @else {
-          <app-button size="sm"
-            [disabled]="(currentStep() === 'type' && !effForm()) || loadingForm()"
-            (click)="next()"
-          >
-            {{ 'apply.nav.next' | t }}
-          </app-button>
-        }
-      </div>
     </div>
-  </app-card>
 
+    <footer class="wz__nav">
+      @if (effForm()) {
+        <app-button class="wz__discard" variant="danger" (click)="confirmDiscard.set(true)">
+          {{ 'apply.nav.discard' | t }}
+        </app-button>
+      }
+      <span class="wz__navGap"></span>
+      @if (activeIndex() > 0) {
+        <app-button variant="outlined" [block]="phone()" (click)="prev()">{{ 'apply.nav.back' | t }}</app-button>
+      }
+      @if (currentStep() === 'review') {
+        <app-button
+          variant="fill"
+          [block]="phone()"
+          [disabled]="!canSubmit()"
+          [loading]="submitting()"
+          (click)="submit()"
+        >
+          {{ 'apply.nav.submit' | t }}
+        </app-button>
+      } @else {
+        <app-button
+          variant="fill"
+          [block]="phone()"
+          [disabled]="(currentStep() === 'type' && !effForm()) || loadingForm()"
+          (click)="next()"
+        >
+          {{ 'apply.nav.next' | t }}
+        </app-button>
+      }
+    </footer>
+  </section>
+
+  <!-- Phone: the bar holds only "Zurück" and "Weiter"; the discard sits below the sheet. -->
   @if (effForm()) {
-    <p class="text-xs text-muted text-center" role="status">{{ 'apply.autosave' | t }}</p>
+    <app-button class="wz__discardPhone" variant="danger" (click)="confirmDiscard.set(true)">
+      {{ 'apply.nav.discard' | t }}
+    </app-button>
   }
-</section>
+</div>
+
+<app-dialog
+  [open]="confirmDiscard()"
+  [title]="'apply.discard.title' | t"
+  [closeLabel]="'apply.discard.cancel' | t"
+  (closed)="confirmDiscard.set(false)"
+>
+  <p class="wz__dialogText">{{ 'apply.discard.body' | t }}</p>
+  <div dialog-footer>
+    <app-button variant="text" (click)="confirmDiscard.set(false)">{{ 'apply.discard.cancel' | t }}</app-button>
+    <app-button variant="danger" (click)="discardDraft()">{{ 'apply.nav.discard' | t }}</app-button>
+  </div>
+</app-dialog>

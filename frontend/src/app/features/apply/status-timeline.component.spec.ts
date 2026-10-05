@@ -1,84 +1,107 @@
+import { signal } from '@angular/core';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { render, screen, waitFor } from '@testing-library/angular';
+import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
+import { BrandingService } from '@core/branding/branding.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type {
   Application,
   ApplicationComment,
+  ApplicationVersion,
   EffectiveForm,
   TimelineEntry,
+  Transition,
 } from '@core/api/models';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { StatusTimelineComponent } from './status-timeline.component';
 
+const ID = '3f9a2c71-1111-2222-3333-444444444444';
+
 function app(editAllowed: boolean, data: Record<string, unknown> = { title: 'Sommerfest' }): Application {
   return {
-    id: 'app-1',
+    id: ID,
     typeId: 't1',
-    state: {
-      id: 's1',
-      key: 'submitted',
-      label: editAllowed ? 'Eingereicht' : 'Beschlossen',
-      color: '#4a90d9',
-      editAllowed,
-    },
+    state: { id: 's1', key: 'agenda', label: 'Auf Tagesordnung', color: '#72a384', editAllowed },
     gremiumId: null,
     budgetPotId: null,
     amount: null,
     currency: null,
     data,
-    version: 1,
+    version: 2,
     lang: 'de',
-    createdAt: '2026-06-05T10:00:00Z',
-    updatedAt: '2026-06-05T10:00:00Z',
+    createdAt: '2026-09-26T10:00:00Z',
+    updatedAt: '2026-09-27T10:00:00Z',
+    stateSince: '2026-09-28T14:20:00Z',
     applicant: null,
-  };
+    hiddenKeys: [],
+  } as Application;
 }
 
 const EFF: EffectiveForm = {
   applicationTypeId: 't1',
   formVersionId: 'v1',
+  hasBudget: false,
   sections: [
     {
       key: 'main',
-      label: { de: 'Antrag' },
+      label: { de: 'Vorhaben' },
       fields: [
         { key: 'title', type: 'text', label: { de: 'Titel' }, required: true },
-        {
-          key: 'category',
-          type: 'select',
-          label: { de: 'Kategorie' },
-          options: [{ value: 'event', label: { de: 'Veranstaltung' } }],
-        },
-        { key: 'consent', type: 'checkbox', label: { de: 'Zustimmung' } },
-        {
-          key: 'tags',
-          type: 'multiselect',
-          label: { de: 'Tags' },
-          options: [{ value: 'a', label: { de: 'Alpha' } }],
-        },
-        { key: 'info', type: 'markdown', label: { de: 'Info' }, help: { de: 'Hinweis' } },
+        { key: 'participants', type: 'number', label: { de: 'Erwartete Teilnehmende' } },
+        { key: 'receipt', type: 'file', label: { de: 'Beleg' } },
       ],
     },
   ],
 };
 
 const TIMELINE: TimelineEntry[] = [
-  { toStateId: 's1', toState: null, label: 'Eingereicht', actor: null, at: '2026-06-05T10:00:00Z', note: null },
+  { toStateId: 's0', toState: null, label: 'Eingereicht', actor: 'applicant', at: '2026-09-26T12:12:00Z', note: null },
+  {
+    toStateId: 's1',
+    toState: { id: 's1', key: 'agenda', label: 'Auf Tagesordnung', color: '#72a384', editAllowed: false },
+    label: 'Auf Tagesordnung',
+    transitionLabel: 'Auf Tagesordnung setzen',
+    actor: 'Studierendenparlament',
+    at: '2026-09-28T14:20:00Z',
+    note: 'vote:tie',
+  },
+];
+
+const VERSIONS: ApplicationVersion[] = [
+  { version: 1, data: {}, diff: null, changedKeys: [], changedBy: 'applicant', at: '2026-09-26T12:12:00Z' },
+  {
+    version: 2,
+    data: {},
+    diff: null,
+    changedKeys: ['participants', 'unknown_key'],
+    changedBy: 'applicant',
+    at: '2026-09-27T19:05:00Z',
+  },
+  { version: 3, data: {}, diff: null, changedKeys: [], changedBy: 'Studierendenparlament', at: '2026-09-27T20:05:00Z' },
 ];
 
 const COMMENTS: ApplicationComment[] = [
   {
     id: 'c1',
-    author: 'Referat',
+    author: 'Studierendenparlament',
     authorKind: 'principal',
     body: 'Bitte ergänzen.',
     visibility: 'public',
     isPublic: true,
     isOwn: false,
-    at: '2026-06-05T13:00:00Z',
+    at: '2026-09-28T13:00:00Z',
+  },
+  {
+    id: 'c2',
+    author: 'Erika',
+    authorKind: 'applicant',
+    body: 'Erledigt.',
+    visibility: 'public',
+    isPublic: true,
+    isOwn: true,
+    at: '2026-09-28T14:00:00Z',
   },
 ];
 
@@ -91,571 +114,468 @@ interface ApiOverrides {
   applicantTransitions?: Partial<ApiClient>['applicantTransitions'];
   fireApplicant?: jest.Mock;
   timeline?: Partial<ApiClient>['timeline'];
+  versions?: Partial<ApiClient>['versions'];
   comments?: Partial<ApiClient>['comments'];
+  listAttachments?: Partial<ApiClient>['listAttachments'];
   effectiveForm?: Partial<ApiClient>['effectiveForm'];
   requestErasure?: jest.Mock;
 }
 
 function fakeApi(o: ApiOverrides = {}): Partial<ApiClient> {
   return {
-    verifyMagicLink: o.verify ?? (() => of({ application_id: 'app-1', scope: 'edit' as const })),
+    verifyMagicLink: o.verify ?? (() => of({ application_id: ID, scope: 'edit' as const })),
     getApplication: o.getApplication ?? (() => of(o.application ?? app(true))),
     timeline: o.timeline ?? (() => of(TIMELINE)),
+    versions: o.versions ?? (() => of(VERSIONS)),
     comments: o.comments ?? (() => of(COMMENTS)),
-    listAttachments: () => of([]),
+    listAttachments:
+      o.listAttachments ??
+      (() =>
+        of([
+          { id: 'f1', filename: 'Angebot.pdf', mime: 'application/pdf', size: 1000, scanned: true, isComparisonOffer: false, scanState: 'clean' as const },
+        ])),
     applicantTransitions: (o.applicantTransitions ?? (() => of([]))) as ApiClient['applicantTransitions'],
     fireApplicantTransition: (o.fireApplicant ??
-      jest.fn(() =>
-        of({ newStateId: 's2', statusEventId: 'e1', dispatchedActions: [] }),
-      )) as unknown as ApiClient['fireApplicantTransition'],
+      jest.fn(() => of({ newStateId: 's2', statusEventId: 'e1', dispatchedActions: [] }))) as unknown as ApiClient['fireApplicantTransition'],
     effectiveForm: (o.effectiveForm ?? (() => of(EFF))) as ApiClient['effectiveForm'],
-    updateApplication: (o.update ?? jest.fn(() => of(app(true)))) as unknown as ApiClient['updateApplication'],
+    updateApplication: (o.update ?? jest.fn(() => of({ ...app(true), version: 3 }))) as unknown as ApiClient['updateApplication'],
     addComment: (o.addComment ?? jest.fn(() => of(COMMENTS[0]))) as unknown as ApiClient['addComment'],
     requestErasure: (o.requestErasure ?? jest.fn(() => of(undefined))) as unknown as ApiClient['requestErasure'],
+    attachmentUrl: jest.fn(),
   };
 }
 
 interface RouteOpts {
   pathParams?: Record<string, string>;
   fragment?: string | null;
-  toast?: Partial<ToastService>;
+  linkTtlDays?: number | null;
 }
 
-async function setup(
-  api: Partial<ApiClient>,
-  params: Record<string, string>,
-  opts: RouteOpts = {},
-) {
-  const providers: Parameters<typeof render>[1]['providers'] = [
-    provideRouter([]),
-    provideFormly(),
-    { provide: ApiClient, useValue: api },
-    {
-      provide: ActivatedRoute,
-      useValue: {
-        snapshot: {
-          queryParamMap: convertToParamMap(params),
-          paramMap: convertToParamMap(opts.pathParams ?? {}),
-          fragment: opts.fragment ?? null,
+async function setup(api: Partial<ApiClient>, params: Record<string, string> = { app: ID }, opts: RouteOpts = {}) {
+  const toast = { error: jest.fn(), success: jest.fn(), show: jest.fn() };
+  const view = await render(StatusTimelineComponent, {
+    providers: [
+      provideRouter([]),
+      provideFormly(),
+      { provide: ApiClient, useValue: api },
+      { provide: ToastService, useValue: toast },
+      {
+        provide: BrandingService,
+        useValue: { linkTtlDays: signal(opts.linkTtlDays === undefined ? null : opts.linkTtlDays) },
+      },
+      {
+        provide: ActivatedRoute,
+        useValue: {
+          snapshot: {
+            queryParamMap: convertToParamMap(params),
+            paramMap: convertToParamMap(opts.pathParams ?? {}),
+            fragment: opts.fragment ?? null,
+          },
         },
       },
-    },
-  ];
-  if (opts.toast) providers.push({ provide: ToastService, useValue: opts.toast });
-  return render(StatusTimelineComponent, { providers });
+    ],
+  });
+  return { ...view, comp: view.fixture.componentInstance, toast };
 }
 
 describe('StatusTimelineComponent', () => {
-  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  beforeEach(() => {
+    localStorage.setItem('ap.locale', 'de');
+    window.scrollTo = jest.fn();
+  });
   afterEach(() => localStorage.clear());
 
-  it('verifies the magic-link token and shows status, timeline and comments', async () => {
-    await setup(fakeApi(), { t: 'tok', app: 'app-1' });
-    expect(await screen.findByText('Bitte ergänzen.')).toBeInTheDocument();
-    // Author from the mapped comment (author, not author_name).
-    expect(screen.getByText(/Referat/)).toBeInTheDocument();
-    // Status badge + timeline both carry the label.
-    expect(screen.getAllByText('Eingereicht').length).toBeGreaterThan(1);
-    // The state badge shows the configured state colour as text, not as an accent status.
-    const stateBadge = screen
-      .getAllByText('Eingereicht')
-      .find((el) => el.classList.contains('badge'));
-    expect(stateBadge).toHaveClass('badge--custom', 'badge--status');
-    expect(stateBadge).not.toHaveClass('badge--primary');
-    // editable → edit form visible
-    expect(screen.getByLabelText(/Titel/)).toBeInTheDocument();
+  it('verifies the token and shows reference, title, status and since', async () => {
+    const verify = jest.fn(() => of({ application_id: ID, scope: 'edit' as const }));
+    await setup(fakeApi({ verify: verify as unknown as ApiClient['verifyMagicLink'] }), { t: 'tok', app: ID });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Sommerfest' })).toBeInTheDocument();
+    expect(verify).toHaveBeenCalledWith('tok');
+    expect(screen.getByText('Vorgang 3F9A2C71')).toBeInTheDocument();
+    expect(screen.queryByText(ID)).toBeNull();
+    expect(screen.getAllByText('Auf Tagesordnung')[0].tagName).toBe('APP-STATUS-TEXT');
+    expect(screen.getByText(/^seit /)).toBeInTheDocument();
+    expect(screen.getByText('1 Datei')).toBeInTheDocument();
+    expect(screen.getByText('2 Kommentare')).toBeInTheDocument();
+    expect(screen.getByText('Dein Link ist unbegrenzt gültig.')).toBeInTheDocument();
   });
 
-  it('renders applicant actions and fires the chosen transition', async () => {
-    const fire = jest.fn(() => of({ newStateId: 's2', statusEventId: 'e1', dispatchedActions: [] }));
-    const tx = [
-      { id: 'tr-x', fromStateId: 's1', toStateId: 's2', label: 'Zurückziehen', color: null },
-    ];
-    await setup(
-      fakeApi({ applicantTransitions: () => of(tx), fireApplicant: fire }),
-      { t: 'tok', app: 'app-1' },
-    );
-    const btn = await screen.findByRole('button', { name: 'Zurückziehen' });
-    await userEvent.click(btn);
-    expect(fire).toHaveBeenCalledWith('app-1', { transitionId: 'tr-x' });
+  it('builds the history: status changes with the transition and versions as metadata', async () => {
+    const { comp } = await setup(fakeApi());
+    await screen.findByRole('heading', { level: 1 });
+    const entries = comp.historyEntries();
+    expect(entries.map((e) => [e.title, e.actor, e.body])).toEqual([
+      ['Eingereicht', 'Du', null],
+      ['Auf Tagesordnung', 'Studierendenparlament', 'Übergang „Auf Tagesordnung setzen“\nAbstimmungsergebnis: Abgelehnt'],
+      ['Version 2 gespeichert', 'Du', 'Geändert: Erwartete Teilnehmende, unknown_key'],
+      ['Version 3 gespeichert', 'Studierendenparlament', null],
+    ]);
+    expect(entries[0].icon).toBe('send');
+    expect(entries[1].kind).toBe('accent');
+    const history = document.querySelector('.sp__history') as HTMLElement;
+    expect(within(history).getByText('Version 2 gespeichert')).toBeInTheDocument();
   });
 
-  it('reads the token from the fragment and the id from the path (/antrag/:id#t=)', async () => {
-    await render(StatusTimelineComponent, {
-      providers: [
-        provideRouter([]),
-        provideFormly(),
-        { provide: ApiClient, useValue: fakeApi() },
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            snapshot: {
-              queryParamMap: convertToParamMap({}),
-              paramMap: convertToParamMap({ id: 'app-1' }),
-              fragment: 't=tok',
-            },
-          },
-        },
-      ],
-    });
-    // Token from the fragment → verify → status visible (no 404, no query needed).
-    expect(await screen.findByText('Bitte ergänzen.')).toBeInTheDocument();
+  it('keeps version 1 when the timeline is empty, and shows an empty history', async () => {
+    const { comp } = await setup(fakeApi({ timeline: () => of([]), versions: () => of([]) }));
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByText('Noch keine Ereignisse.')).toBeInTheDocument();
+    comp.versions.set([VERSIONS[0]]);
+    expect(comp.historyEntries().map((e) => e.title)).toEqual(['Version 1 gespeichert']);
   });
 
-  it('renders formatted read-only data and a lock badge when the status is not editable', async () => {
-    const locked = app(false, { title: 'Sommerfest', category: 'event', consent: true, tags: ['a'] });
-    await setup(fakeApi({ application: locked }), { t: 'tok', app: 'app-1' });
-    expect(await screen.findByText('Gesperrt')).toBeInTheDocument();
-    expect(screen.getByText('Sommerfest')).toBeInTheDocument();
-    expect(screen.getByText('Veranstaltung')).toBeInTheDocument(); // select → option label
-    expect(screen.getByText('Ja')).toBeInTheDocument(); // checkbox → boolean
-    expect(screen.getByText('Alpha')).toBeInTheDocument(); // multiselect → Array
-    expect(screen.queryByRole('button', { name: /Änderungen speichern/ })).not.toBeInTheDocument();
+  it('translates vote notes and keeps other notes', async () => {
+    const { comp } = await setup(fakeApi());
+    expect(comp.noteText('vote:passed')).toBe('Abstimmungsergebnis: Angenommen');
+    expect(comp.noteText('vote:rejected')).toBe('Abstimmungsergebnis: Abgelehnt');
+    expect(comp.noteText('Bitte nachreichen')).toBe('Bitte nachreichen');
   });
 
-  it('renders cost positions as a compact sum instead of [object Object]', async () => {
-    const eff: EffectiveForm = {
-      ...EFF,
-      sections: [
-        {
-          key: 'main',
-          label: { de: 'Antrag' },
-          fields: [
-            { key: 'title', type: 'text', label: { de: 'Titel' }, required: true },
-            { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } },
-          ],
-        },
-      ],
-    };
-    const locked = app(false, {
-      title: 'Sommerfest',
-      kosten: [
-        { label: 'Zelt', offers: [{ value: 120, preferred: true }, { value: 150 }] },
-        { label: 'Musik', offers: [{ value: 80, preferred: true }] },
-      ],
-    });
-    await setup(fakeApi({ application: locked, effectiveForm: () => of(eff) }), { t: 'tok', app: 'app-1' });
-    expect(await screen.findByText('Kostenaufstellung')).toBeInTheDocument();
-    expect(screen.getByText(/2 ×.*200/)).toBeInTheDocument();
-    expect(screen.queryByText(/\[object Object\]/)).not.toBeInTheDocument();
+  it('locks the edit row in a locked status and says why', async () => {
+    await setup(fakeApi({ application: app(false) }));
+    const row = (await screen.findByText('Angaben bearbeiten')).closest('button') as HTMLButtonElement;
+    expect(row).toBeDisabled();
+    expect(screen.getByText('Im aktuellen Status gesperrt')).toBeInTheDocument();
+    expect(row).toHaveAttribute('aria-describedby', 'sp-locked');
   });
 
-  it('translates machine vote notes in the timeline', async () => {
-    const timeline: TimelineEntry[] = [
-      ...TIMELINE,
-      { toStateId: 's2', toState: null, label: 'Genehmigt', actor: null, at: '2026-06-11T10:37:00Z', note: 'vote:passed' },
-    ];
-    await setup(fakeApi({ timeline: () => of(timeline) }), { t: 'tok', app: 'app-1' });
-    expect(await screen.findByText('Abstimmungsergebnis: Angenommen')).toBeInTheDocument();
-    expect(screen.queryByText('vote:passed')).not.toBeInTheDocument();
+  it('edits the answers and saves a new version', async () => {
+    const update = jest.fn(() => of({ ...app(true, { title: 'Neu' }), version: 3 }));
+    const { comp, toast, fixture } = await setup(fakeApi({ update }));
+    await userEvent.click(await screen.findByRole('button', { name: /Angaben bearbeiten/ }));
+    expect(screen.getByText(/Speichern legt Version 3 an/)).toBeInTheDocument();
+    // File fields stay out of the edit form.
+    expect(comp.editFields()[0].fieldGroup?.some((f) => f.key === 'receipt')).toBe(false);
+    const input = screen.getByLabelText(/Titel/) as HTMLInputElement;
+    await userEvent.clear(input);
+    await userEvent.type(input, 'Neu');
+    await userEvent.click(screen.getByRole('button', { name: /Speichern/ }));
+    expect(update).toHaveBeenCalledWith(ID, expect.objectContaining({ title: 'Neu' }));
+    expect(toast.success).toHaveBeenCalledWith('Änderungen gespeichert.');
+    expect(comp.editing()).toBe(false);
+    fixture.detectChanges();
+    expect(screen.getByRole('heading', { level: 1, name: 'Neu' })).toBeInTheDocument();
   });
 
-  it('saves edited data via PATCH', async () => {
-    const update = jest.fn(() => of(app(true)));
-    await setup(fakeApi({ update }), { t: 'tok', app: 'app-1' });
-    await screen.findByLabelText(/Titel/);
-    await userEvent.click(screen.getByRole('button', { name: /Änderungen speichern/ }));
-    expect(update).toHaveBeenCalledWith('app-1', expect.objectContaining({ title: 'Sommerfest' }));
+  it('cancels the edit and does not edit without a form or the right', async () => {
+    const { comp } = await setup(fakeApi());
+    await screen.findByRole('heading', { level: 1 });
+    comp.startEdit();
+    comp.cancelEdit();
+    expect(comp.editing()).toBe(false);
+    comp.effForm.set(null);
+    comp.startEdit();
+    expect(comp.editing()).toBe(false);
   });
 
-  it('posts a public comment', async () => {
-    const addComment = jest.fn(() => of(COMMENTS[0]));
-    await setup(fakeApi({ addComment }), { t: 'tok', app: 'app-1' });
-    await screen.findByLabelText(/Öffentlicher Kommentar/);
-    await userEvent.type(screen.getByLabelText(/Öffentlicher Kommentar/), 'Danke!');
-    await userEvent.click(screen.getByRole('button', { name: /Kommentar senden/ }));
-    expect(addComment).toHaveBeenCalledWith('app-1', 'Danke!');
-  });
-
-  it('shows an expired notice when the token is gone (410)', async () => {
-    await setup(fakeApi({ verify: () => throwError(() => ({ status: 410 })) }), { t: 'old' });
-    expect(await screen.findByText(/Link abgelaufen/)).toBeInTheDocument();
-  });
-
-  it('shows a generic error notice on a non-410 verify failure', async () => {
-    await setup(fakeApi({ verify: () => throwError(() => ({ status: 500 })) }), { t: 'x' });
-    expect(await screen.findByText(/Antrag nicht gefunden/)).toBeInTheDocument();
-  });
-
-  it('shows an error notice when no link is provided', async () => {
-    await setup(fakeApi(), {});
-    expect(await screen.findByText(/Antrag nicht gefunden/)).toBeInTheDocument();
-  });
-
-  it('renders the status page in English when the locale is EN', async () => {
-    localStorage.setItem('ap.locale', 'en');
-    await setup(fakeApi(), { t: 'tok', app: 'app-1' });
-    expect(await screen.findByRole('heading', { name: 'Application status' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Save changes/ })).toBeInTheDocument();
-    expect(screen.getByLabelText(/Public comment/)).toBeInTheDocument();
-    expect(screen.queryByText('Antragsstatus')).not.toBeInTheDocument();
-  });
-
-  it('localizes the expired notice in English', async () => {
-    localStorage.setItem('ap.locale', 'en');
-    await setup(fakeApi({ verify: () => throwError(() => ({ status: 410 })) }), { t: 'old' });
-    expect(await screen.findByText(/Link expired/)).toBeInTheDocument();
-  });
-
-  it('loads via existing cookie session when only an app id is present (no token)', async () => {
-    const verify = jest.fn(() => of({ application_id: 'app-1', scope: 'edit' as const }));
-    // No token, only app id → goes straight to load(), never verifies.
-    await setup(fakeApi({ verify }), { app: 'app-1' });
-    expect(await screen.findByText('Bitte ergänzen.')).toBeInTheDocument();
-    expect(verify).not.toHaveBeenCalled();
-  });
-
-  it('errors when neither token nor app id can be resolved', async () => {
-    await setup(fakeApi(), {});
-    expect(await screen.findByText(/Antrag nicht gefunden/)).toBeInTheDocument();
-  });
-
-  it('shows an expired notice when the application load fails with 410', async () => {
-    await setup(
-      fakeApi({ getApplication: () => throwError(() => ({ status: 410 })) }),
-      { app: 'app-1' },
-    );
-    expect(await screen.findByText(/Link abgelaufen/)).toBeInTheDocument();
-  });
-
-  it('shows a generic error when the application load fails (non-410)', async () => {
-    await setup(
-      fakeApi({ getApplication: () => throwError(() => ({ status: 500 })) }),
-      { app: 'app-1' },
-    );
-    expect(await screen.findByText(/Antrag nicht gefunden/)).toBeInTheDocument();
-  });
-
-  it('still becomes ready when the applicant transitions fail (catchError → [])', async () => {
-    await setup(
-      fakeApi({ applicantTransitions: () => throwError(() => ({ status: 500 })) }),
-      { t: 'tok', app: 'app-1' },
-    );
-    // Page renders despite the failed (optional) transitions call.
-    expect(await screen.findByText('Bitte ergänzen.')).toBeInTheDocument();
-  });
-
-  it('still becomes ready when the effective form fails to load', async () => {
-    const { fixture } = await setup(
-      fakeApi({ effectiveForm: () => throwError(() => ({ status: 404 })) }),
-      { t: 'tok', app: 'app-1' },
-    );
-    await screen.findByText('Bitte ergänzen.');
-    // No edit form / no readonly rows, but phase is ready.
-    expect(fixture.componentInstance.phase()).toBe('ready');
-    expect(fixture.componentInstance.editFields().length).toBe(0);
-  });
-
-  it('uses the kind-based author fallback when a comment has no explicit author', async () => {
-    const comments: ApplicationComment[] = [
-      { id: 'c2', author: null, authorKind: 'applicant', body: 'Hallo', visibility: 'public', isPublic: true, isOwn: true, at: '2026-06-05T13:00:00Z' },
-      { id: 'c3', author: null, authorKind: 'principal', body: 'Antwort', visibility: 'public', isPublic: true, isOwn: false, at: '2026-06-05T14:00:00Z' },
-    ];
-    await setup(fakeApi({ comments: () => of(comments) }), { t: 'tok', app: 'app-1' });
-    await screen.findByText('Hallo');
-    // Both fallbacks render: applicant and Gremium.
-    expect(screen.getByText('Antragsteller:in')).toBeInTheDocument();
-    expect(screen.getByText('Gremium')).toBeInTheDocument();
-  });
-
-  it('toasts when firing an applicant transition fails', async () => {
-    const toast = { error: jest.fn(), success: jest.fn() };
-    const fire = jest.fn(() => throwError(() => ({ status: 409 })));
-    const tx = [{ id: 'tr-x', fromStateId: 's1', toStateId: 's2', label: 'Zurückziehen', color: null }];
-    const { fixture } = await setup(
-      fakeApi({ applicantTransitions: () => of(tx), fireApplicant: fire }),
-      { t: 'tok', app: 'app-1' },
-      { toast },
-    );
-    const btn = await screen.findByRole('button', { name: 'Zurückziehen' });
-    await userEvent.click(btn);
-    expect(fire).toHaveBeenCalledWith('app-1', { transitionId: 'tr-x' });
-    expect(toast.error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
-    expect(fixture.componentInstance.firing()).toBeNull();
-  });
-
-  it('ignores a second fire while one transition is already firing', async () => {
-    const fire = jest.fn(() => of({ newStateId: 's2', statusEventId: 'e1', dispatchedActions: [] }));
-    const tx = [{ id: 'tr-x', fromStateId: 's1', toStateId: 's2', label: 'Zurückziehen', color: null }];
-    const { fixture } = await setup(
-      fakeApi({ applicantTransitions: () => of(tx), fireApplicant: fire }),
-      { t: 'tok', app: 'app-1' },
-    );
-    const comp = fixture.componentInstance;
-    await screen.findByRole('button', { name: 'Zurückziehen' });
-    comp.firing.set('busy'); // simulate a transition already in flight
-    comp.fireAction(tx[0]);
-    expect(fire).not.toHaveBeenCalled();
-  });
-
-  it('renders a non-vote timeline note verbatim', async () => {
-    const timeline: TimelineEntry[] = [
-      { toStateId: 's1', toState: null, label: 'Eingereicht', actor: 'applicant', at: '2026-06-05T10:00:00Z', note: 'Bitte schnell prüfen' },
-    ];
-    await setup(fakeApi({ timeline: () => of(timeline) }), { t: 'tok', app: 'app-1' });
-    expect(await screen.findByText('Bitte schnell prüfen')).toBeInTheDocument();
-  });
-
-  it('does not save when the edit form is invalid (marks touched, no PATCH)', async () => {
-    const update = jest.fn(() => of(app(true)));
-    // Title required → empty data makes the formly form invalid.
-    const blank = app(true, {});
-    const { fixture } = await setup(
-      fakeApi({ application: blank, update }),
-      { t: 'tok', app: 'app-1' },
-    );
-    await screen.findByLabelText(/Titel/);
-    const comp = fixture.componentInstance;
+  it('shows the errors of an invalid edit and sends nothing', async () => {
+    const update = jest.fn();
+    const { comp, toast } = await setup(fakeApi({ update }));
+    await screen.findByRole('heading', { level: 1 });
+    comp.startEdit();
+    comp.editModel['title'] = '';
+    comp.editForm.setErrors({ invalid: true });
     comp.save();
     expect(update).not.toHaveBeenCalled();
-    expect(comp.editForm.touched).toBe(true);
+    expect(toast.error).toHaveBeenCalledWith('Bitte prüfe die markierten Felder.');
   });
 
-  it('does not save while a save is already in flight or when not editable', async () => {
+  it('handles a 409, a 422 on a field and other failures of a save', async () => {
+    const update = jest
+      .fn()
+      .mockReturnValueOnce(throwError(() => ({ status: 409 })))
+      .mockReturnValueOnce(throwError(() => ({ status: 422, error: { errors: [{ field: 'title', msg: 'too long' }] } })))
+      .mockReturnValueOnce(throwError(() => ({ status: 422, error: { errors: [{ field: 'nope', msg: 'x' }] } })))
+      .mockReturnValueOnce(throwError(() => ({ status: 500, error: { detail: 'Kaputt.' } })));
+    const getApplication = jest.fn(() => of(app(true)));
+    const { comp, toast, fixture } = await setup(fakeApi({ update, getApplication }));
+    await screen.findByRole('heading', { level: 1 });
+    comp.startEdit();
+    comp.save();
+    expect(toast.error).toHaveBeenLastCalledWith(
+      'Antrag ist gesperrt und kann nicht mehr bearbeitet werden.',
+    );
+    expect(comp.editing()).toBe(false);
+    expect(getApplication).toHaveBeenCalledTimes(2);
+    comp.startEdit();
+    fixture.detectChanges();
+    comp.save();
+    expect(toast.error).toHaveBeenLastCalledWith('Bitte prüfe die markierten Felder.');
+    // The field error blocks the next save; a new edit starts clean.
+    comp.startEdit();
+    fixture.detectChanges();
+    comp.save();
+    expect(toast.error).toHaveBeenLastCalledWith('Speichern fehlgeschlagen.');
+    comp.save();
+    expect(toast.error).toHaveBeenLastCalledWith('Kaputt.');
+  });
+
+  it('does not save twice or without the right', async () => {
     const update = jest.fn(() => of(app(true)));
-    const { fixture } = await setup(fakeApi({ update }), { t: 'tok', app: 'app-1' });
-    await screen.findByLabelText(/Titel/);
-    const comp = fixture.componentInstance;
+    const { comp } = await setup(fakeApi({ update }));
+    await screen.findByRole('heading', { level: 1 });
     comp.saving.set(true);
     comp.save();
+    comp.saving.set(false);
+    comp.application.set(app(false));
+    comp.save();
     expect(update).not.toHaveBeenCalled();
   });
 
-  it('handles a 409 on save by re-fetching the application and toasting locked', async () => {
-    const toast = { error: jest.fn(), success: jest.fn() };
-    const getApp = jest
-      .fn()
-      .mockReturnValueOnce(of(app(true))) // initial load
-      .mockReturnValue(of(app(false))); // re-fetch after 409
-    const update = jest.fn(() => throwError(() => ({ status: 409 })));
-    const { fixture } = await setup(
-      fakeApi({ getApplication: getApp as unknown as ApiClient['getApplication'], update }),
-      { t: 'tok', app: 'app-1' },
-      { toast },
-    );
-    await screen.findByLabelText(/Titel/);
-    fixture.componentInstance.save();
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Antrag ist gesperrt und kann nicht mehr bearbeitet werden.'));
-    expect(update).toHaveBeenCalled();
-    expect(getApp.mock.calls.length).toBeGreaterThan(1);
+  it('opens the attachments in a sheet with the panel', async () => {
+    const { comp, fixture } = await setup(fakeApi());
+    await userEvent.click(await screen.findByRole('button', { name: /Anhänge/ }));
+    expect(comp.filesOpen()).toBe(true);
+    fixture.detectChanges();
+    const dialog = await screen.findByRole('dialog', { name: 'Anhänge' });
+    expect(await within(dialog).findByText('Angebot.pdf')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Schließen' }));
+    expect(comp.filesOpen()).toBe(false);
   });
 
-  it('toasts the problem detail on a non-409 save failure', async () => {
-    const toast = { error: jest.fn(), success: jest.fn() };
-    const update = jest.fn(() => throwError(() => ({ status: 422, error: { detail: 'Pflichtfeld fehlt' } })));
-    const { fixture } = await setup(fakeApi({ update }), { t: 'tok', app: 'app-1' }, { toast });
-    await screen.findByLabelText(/Titel/);
-    fixture.componentInstance.save();
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Pflichtfeld fehlt'));
+  it('hides the count when the attachments cannot be listed', async () => {
+    await setup(fakeApi({ listAttachments: () => throwError(() => new Error('x')) }));
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByText(/Datei/)).toBeNull();
   });
 
-  it('falls back to a generic save-failed toast without a problem detail', async () => {
-    const toast = { error: jest.fn(), success: jest.fn() };
-    const update = jest.fn(() => throwError(() => ({ status: 500 })));
-    const { fixture } = await setup(fakeApi({ update }), { t: 'tok', app: 'app-1' }, { toast });
-    await screen.findByLabelText(/Titel/);
-    fixture.componentInstance.save();
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.'));
-  });
-
-  it('requests erasure and toasts success', async () => {
-    const toast = { error: jest.fn(), success: jest.fn() };
-    const requestErasure = jest.fn(() => of(undefined));
-    const { fixture } = await setup(
-      fakeApi({ requestErasure }),
-      { t: 'tok', app: 'app-1' },
-      { toast },
-    );
-    await screen.findByLabelText(/Titel/);
-    const comp = fixture.componentInstance;
-    comp.confirmErase.set(true);
-    comp.doRequestErasure();
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Löschantrag eingegangen.'));
-    expect(requestErasure).toHaveBeenCalledWith('app-1');
-    expect(comp.confirmErase()).toBe(false);
-    expect(comp.requestingErasure()).toBe(false);
-  });
-
-  it('toasts a failure when the erasure request fails', async () => {
-    const toast = { error: jest.fn(), success: jest.fn() };
-    const requestErasure = jest.fn(() => throwError(() => ({ status: 500 })));
-    const { fixture } = await setup(
-      fakeApi({ requestErasure }),
-      { t: 'tok', app: 'app-1' },
-      { toast },
-    );
-    await screen.findByLabelText(/Titel/);
-    const comp = fixture.componentInstance;
-    comp.doRequestErasure();
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Löschantrag fehlgeschlagen.'));
-    expect(comp.requestingErasure()).toBe(false);
-  });
-
-  it('ignores a second erasure request while one is already in flight', async () => {
-    const requestErasure = jest.fn(() => of(undefined));
-    const { fixture } = await setup(fakeApi({ requestErasure }), { t: 'tok', app: 'app-1' });
-    await screen.findByLabelText(/Titel/);
-    const comp = fixture.componentInstance;
-    comp.requestingErasure.set(true);
-    comp.doRequestErasure();
-    expect(requestErasure).not.toHaveBeenCalled();
-  });
-
-  it('toasts when posting a comment fails', async () => {
-    const toast = { error: jest.fn(), success: jest.fn() };
-    const addComment = jest.fn(() => throwError(() => ({ status: 500 })));
-    const { fixture } = await setup(
-      fakeApi({ addComment }),
-      { t: 'tok', app: 'app-1' },
-      { toast },
-    );
-    await screen.findByLabelText(/Öffentlicher Kommentar/);
-    await userEvent.type(screen.getByLabelText(/Öffentlicher Kommentar/), 'Hi');
-    fixture.componentInstance.addComment();
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Kommentar konnte nicht gespeichert werden.'));
-    expect(fixture.componentInstance.postingComment()).toBe(false);
-  });
-
-  it('does not post an empty/whitespace comment', async () => {
+  it('opens the comments, names own ones "Du" and posts a public comment', async () => {
     const addComment = jest.fn(() => of(COMMENTS[0]));
-    const { fixture } = await setup(fakeApi({ addComment }), { t: 'tok', app: 'app-1' });
-    await screen.findByLabelText(/Öffentlicher Kommentar/);
-    const comp = fixture.componentInstance;
-    // commentBody invalid (required) when empty → guarded.
-    comp.addComment();
-    expect(addComment).not.toHaveBeenCalled();
-    // Whitespace-only also bails after the trim().
+    const { comp, fixture } = await setup(fakeApi({ addComment }));
+    await userEvent.click(await screen.findByRole('button', { name: /Kommentare/ }));
+    fixture.detectChanges();
+    const dialog = await screen.findByRole('dialog', { name: 'Kommentare' });
+    expect(within(dialog).getByText('Bitte ergänzen.')).toBeInTheDocument();
+    expect(within(dialog).getByText('Du')).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Öffentlicher Kommentar' }), 'Frage');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Kommentar senden' }));
+    expect(addComment).toHaveBeenCalledWith(ID, 'Frage');
+    expect(comp.commentBody.value).toBe('');
+  });
+
+  it('names an author by kind without a name, and shows an empty comment list', async () => {
+    const { comp, fixture } = await setup(fakeApi({ comments: () => of([]) }));
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByText('0 Kommentare')).toBeInTheDocument();
+    comp.commentsOpen.set(true);
+    fixture.detectChanges();
+    expect(await screen.findByText('Noch keine öffentlichen Kommentare.')).toBeInTheDocument();
+    expect(comp.authorName({ ...COMMENTS[0], author: null })).toBe('Gremium');
+    expect(comp.authorName({ ...COMMENTS[0], author: null, authorKind: 'applicant' })).toBe('Antragsteller:in');
+    comp.comments.set([COMMENTS[0]]);
+    expect(comp.commentsSub()).toBe('1 Kommentar');
+  });
+
+  it('toasts a failed comment and ignores an empty one', async () => {
+    const addComment = jest.fn(() => throwError(() => new Error('x')));
+    const { comp, toast } = await setup(fakeApi({ addComment }));
+    await screen.findByRole('heading', { level: 1 });
     comp.commentBody.setValue('   ');
     comp.addComment();
     expect(addComment).not.toHaveBeenCalled();
+    comp.commentBody.setValue('Hallo');
+    comp.addComment();
+    expect(toast.error).toHaveBeenCalledWith('Kommentar konnte nicht gespeichert werden.');
+    comp.postingComment.set(true);
+    comp.addComment();
+    expect(addComment).toHaveBeenCalledTimes(1);
   });
 
-  it('builds initials from a name and handles edge cases', async () => {
-    const { fixture } = await setup(fakeApi(), { t: 'tok', app: 'app-1' });
-    await screen.findByText('Bitte ergänzen.');
-    const comp = fixture.componentInstance;
-    expect(comp.initial('Max Mustermann')).toBe('MM');
-    expect(comp.initial('Cher')).toBe('C');
-    expect(comp.initial('   ')).toBe('?');
-    expect(comp.initial('a b c')).toBe('AC');
+  it('fires an applicant transition and reloads', async () => {
+    const actions: Transition[] = [
+      { id: 'tr1', label: 'Zurückziehen', color: '#c0392b', toStateId: 's9' } as Transition,
+      { id: 'tr2', label: '', color: null, toStateId: 's8' } as Transition,
+    ];
+    const fire = jest.fn(() => of({ newStateId: 's9', statusEventId: 'e1', dispatchedActions: [] }));
+    const getApplication = jest.fn(() => of(app(true)));
+    const { comp } = await setup(
+      fakeApi({ applicantTransitions: () => of(actions), fireApplicant: fire, getApplication }),
+    );
+    expect(await screen.findByRole('button', { name: 'Zurückziehen' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Aktion ausführen' })).toBeInTheDocument();
+    expect(comp.looks().get('tr1')).toBe('danger');
+    await userEvent.click(screen.getByRole('button', { name: 'Zurückziehen' }));
+    expect(fire).toHaveBeenCalledWith(ID, { transitionId: 'tr1' });
+    expect(getApplication).toHaveBeenCalledTimes(2);
   });
 
-  it('strips the magic-link token from the URL after verifying', async () => {
-    history.replaceState(null, '', '/antrag/app-1?t=secret-token');
-    await setup(fakeApi(), { t: 'secret-token', app: 'app-1' });
-    await screen.findByText('Bitte ergänzen.');
+  it('toasts a failed transition and ignores a second fire', async () => {
+    const fire = jest.fn(() => throwError(() => new Error('x')));
+    const t = { id: 'tr1', label: 'Los', color: null, toStateId: 's9' } as Transition;
+    const { comp, toast } = await setup(fakeApi({ applicantTransitions: () => of([t]), fireApplicant: fire }));
+    await screen.findByRole('heading', { level: 1 });
+    comp.fireAction(t);
+    expect(toast.error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
+    comp.firing.set('other');
+    comp.fireAction(t);
+    expect(fire).toHaveBeenCalledTimes(1);
+  });
+
+  it('requests the anonymization from the menu after a confirmation', async () => {
+    const requestErasure = jest.fn(() => of(undefined));
+    const { comp, toast, fixture } = await setup(fakeApi({ requestErasure }));
+    await screen.findByRole('heading', { level: 1 });
+    comp.onMenu({ id: 'other', label: 'x' });
+    expect(comp.confirmErase()).toBe(false);
+    comp.onMenu(comp.menu()[0].items[0]);
+    fixture.detectChanges();
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Anonymisierung beantragen' }));
+    expect(requestErasure).toHaveBeenCalledWith(ID);
+    expect(toast.success).toHaveBeenCalled();
+    expect(comp.confirmErase()).toBe(false);
+  });
+
+  it('toasts a failed anonymization request and ignores a second one', async () => {
+    const requestErasure = jest.fn(() => throwError(() => new Error('x')));
+    const { comp, toast } = await setup(fakeApi({ requestErasure }));
+    await screen.findByRole('heading', { level: 1 });
+    comp.doRequestErasure();
+    expect(toast.error).toHaveBeenCalled();
+    comp.requestingErasure.set(true);
+    comp.doRequestErasure();
+    expect(requestErasure).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the link line when links have a lifetime', async () => {
+    await setup(fakeApi(), { app: ID }, { linkTtlDays: 30 });
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByText(/unbegrenzt/)).toBeNull();
+  });
+
+  it('counts several files and names the changed keys without a form', async () => {
+    const two = [0, 1].map((i) => ({
+      id: `f${i}`,
+      filename: `f${i}.pdf`,
+      mime: 'application/pdf',
+      size: 1,
+      scanned: true,
+      isComparisonOffer: false,
+      scanState: 'clean' as const,
+    }));
+    const { comp } = await setup(
+      fakeApi({
+        listAttachments: () => of(two),
+        effectiveForm: () => throwError(() => new Error('x')),
+        versions: () =>
+          of([
+            { ...VERSIONS[1], changedKeys: ['participants'] },
+            { ...VERSIONS[2], changedKeys: undefined },
+          ]),
+        application: { ...app(true), hiddenKeys: undefined } as unknown as Application,
+      }),
+    );
+    expect(await screen.findByText('2 Dateien')).toBeInTheDocument();
+    expect(comp.historyEntries().map((e) => e.body)).toContain('Geändert: participants');
+    // Without the form there is nothing to edit.
+    comp.startEdit();
+    expect(comp.editing()).toBe(false);
+    comp.effForm.set(EFF);
+    comp.startEdit();
+    expect(comp.editing()).toBe(true);
+  });
+
+  it('becomes ready without the optional parts', async () => {
+    await setup(
+      fakeApi({
+        applicantTransitions: () => throwError(() => new Error('x')),
+        versions: () => throwError(() => new Error('x')),
+        effectiveForm: () => throwError(() => new Error('x')),
+      }),
+    );
+    expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Angaben bearbeiten/ })).toBeDisabled();
+  });
+
+  it('shows the end states: expired link, error, no link', async () => {
+    await setup(fakeApi({ verify: () => throwError(() => ({ status: 410 })) }), { t: 'tok' });
+    expect(await screen.findByRole('heading', { name: 'Link abgelaufen' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Zur Startseite' })).toHaveAttribute('href', '/');
+  });
+
+  it('shows the error state on another verify failure', async () => {
+    await setup(fakeApi({ verify: () => throwError(() => ({ status: 500 })) }), { t: 'tok' });
+    expect(await screen.findByRole('heading', { name: 'Antrag nicht gefunden' })).toBeInTheDocument();
+  });
+
+  it('shows the error state without a token and an id', async () => {
+    await setup(fakeApi(), {});
+    expect(await screen.findByRole('heading', { name: 'Antrag nicht gefunden' })).toBeInTheDocument();
+  });
+
+  it('shows the expired state when the load fails with 410, else the error state', async () => {
+    await setup(fakeApi({ getApplication: () => throwError(() => ({ status: 410 })) }));
+    expect(await screen.findByRole('heading', { name: 'Link abgelaufen' })).toBeInTheDocument();
+  });
+
+  it('shows the error state when the load fails otherwise', async () => {
+    await setup(fakeApi({ getApplication: () => throwError(() => ({ status: 500 })) }));
+    expect(await screen.findByRole('heading', { name: 'Antrag nicht gefunden' })).toBeInTheDocument();
+  });
+
+  it('errors when verify gives no id and none can be derived', async () => {
+    const verify = jest.fn(() => of({ application_id: null, scope: 'edit' as const }));
+    const { comp } = await setup(fakeApi({ verify: verify as unknown as ApiClient['verifyMagicLink'] }), { t: 'tok' });
+    expect(await screen.findByRole('heading', { name: 'Antrag nicht gefunden' })).toBeInTheDocument();
+    expect(comp.phase()).toBe('error');
+  });
+
+  it('locks the edit for an old view link', async () => {
+    const verify = jest.fn(() => of({ application_id: ID, scope: 'view' as const }));
+    const { comp } = await setup(fakeApi({ verify: verify as unknown as ApiClient['verifyMagicLink'] }), { t: 'tok', app: ID });
+    await screen.findByRole('heading', { level: 1 });
+    expect(comp.canEdit()).toBe(false);
+    expect(comp.canUploadAttachments()).toBe(false);
+  });
+
+  it('localizes the page in English', async () => {
+    localStorage.setItem('ap.locale', 'en');
+    await setup(fakeApi());
+    expect(await screen.findByText('Case 3F9A2C71')).toBeInTheDocument();
+    expect(screen.getByText('Edit details')).toBeInTheDocument();
+    expect(screen.getByText('History')).toBeInTheDocument();
+  });
+
+  it('strips a query token from the URL and keeps the id for a reload', async () => {
+    history.replaceState(null, '', '/status?t=secret-token');
+    await setup(fakeApi(), { t: 'secret-token' });
+    await screen.findByRole('heading', { level: 1 });
     expect(window.location.href).not.toContain('secret-token');
-    expect(window.location.search).not.toContain('t=');
+    expect(window.location.search).toContain(`app=${ID}`);
   });
 
-  it('strips a fragment-form token and keeps the app id in the path', async () => {
-    history.replaceState(null, '', '/antrag/app-1#t=frag-token');
-    await render(StatusTimelineComponent, {
-      providers: [
-        provideRouter([]),
-        provideFormly(),
-        { provide: ApiClient, useValue: fakeApi() },
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            snapshot: {
-              queryParamMap: convertToParamMap({}),
-              paramMap: convertToParamMap({ id: 'app-1' }),
-              fragment: 't=frag-token',
-            },
-          },
-        },
-      ],
-    });
-    await screen.findByText('Bitte ergänzen.');
-    expect(window.location.hash).not.toContain('frag-token');
-  });
-
-  it('keeps other fragment params while stripping the magic-link token', async () => {
-    // Fragment carries both a token and another param → after deleting `t`,
-    // the remaining fragment must be preserved (the non-empty hash branch).
-    history.replaceState(null, '', '/antrag/app-1#t=frag-token&foo=bar');
-    await render(StatusTimelineComponent, {
-      providers: [
-        provideRouter([]),
-        provideFormly(),
-        { provide: ApiClient, useValue: fakeApi() },
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            snapshot: {
-              queryParamMap: convertToParamMap({}),
-              paramMap: convertToParamMap({ id: 'app-1' }),
-              fragment: 't=frag-token&foo=bar',
-            },
-          },
-        },
-      ],
-    });
-    await screen.findByText('Bitte ergänzen.');
+  it('strips a fragment token and keeps the other fragment params', async () => {
+    history.replaceState(null, '', `/antrag/${ID}#t=frag-token&foo=bar`);
+    await setup(fakeApi(), {}, { pathParams: { id: ID }, fragment: 't=frag-token&foo=bar' });
+    await screen.findByRole('heading', { level: 1 });
     expect(window.location.hash).not.toContain('frag-token');
     expect(window.location.hash).toContain('foo=bar');
+    expect(window.location.search).not.toContain('app=');
   });
 
-  it('renders locked read-only edge cases: hidden field, false boolean, empty positions', async () => {
-    const eff: EffectiveForm = {
-      ...EFF,
-      sections: [
-        {
-          key: 'main',
-          label: { de: 'Antrag' },
-          fields: [
-            { key: 'title', type: 'text', label: { de: 'Titel' }, required: true },
-            { key: 'consent', type: 'checkbox', label: { de: 'Zustimmung' } },
-            {
-              key: 'hidden',
-              type: 'text',
-              label: { de: 'Versteckt' },
-              visibleIf: { '==': [{ var: 'consent' }, true] },
-            },
-            { key: 'kosten', type: 'positions', label: { de: 'Kosten' } },
-            { key: 'leer', type: 'positions', label: { de: 'Leer' } },
-          ],
-        },
-      ],
-    };
-    const locked = app(false, {
-      title: 'Sommerfest',
-      consent: false, // boolean false → "Nein" and it hides the `hidden` field
-      hidden: 'darf nicht erscheinen',
-      kosten: [{ label: 'Ohne Angebote' }, { label: 'Leeres Angebot', offers: [{ preferred: true }] }],
-      leer: 'kein-array', // non-array positions → '' → row dropped
-    });
-    await setup(fakeApi({ application: locked, effectiveForm: () => of(eff) }), { t: 'tok', app: 'app-1' });
-    expect(await screen.findByText('Gesperrt')).toBeInTheDocument();
-    expect(screen.getByText('Nein')).toBeInTheDocument(); // false boolean
-    // The template drops the hidden field (visibleIf false).
-    expect(screen.queryByText('darf nicht erscheinen')).not.toBeInTheDocument();
-    // Positions with missing/empty offers sum to 0.
-    expect(screen.getByText(/2 ×.*0/)).toBeInTheDocument();
-    // Non-array positions value dropped its row.
-    expect(screen.queryByText('Leer')).not.toBeInTheDocument();
+  it('strips only the token of a fragment that holds nothing else', async () => {
+    history.replaceState(null, '', `/antrag/${ID}#t=frag-token`);
+    await setup(fakeApi(), {}, { pathParams: { id: ID }, fragment: 't=frag-token' });
+    await screen.findByRole('heading', { level: 1 });
+    expect(window.location.hash).toBe('');
   });
 
-  it('errors when verify returns no application id and none can be derived', async () => {
-    // verify succeeds but yields no application_id and there is no fallback id
-    // in the path/query → load('') hits the empty-id guard → error phase.
-    const verify = jest.fn(() => of({ application_id: null, scope: 'edit' as const }));
-    const { fixture } = await setup(
-      fakeApi({ verify: verify as unknown as ApiClient['verifyMagicLink'] }),
-      { t: 'tok' },
-    );
-    expect(await screen.findByText(/Antrag nicht gefunden/)).toBeInTheDocument();
-    expect(fixture.componentInstance.phase()).toBe('error');
+  it('leaves a URL without a token alone', async () => {
+    history.replaceState(null, '', `/antrag/${ID}`);
+    await setup(fakeApi(), { t: 'tok' }, { pathParams: { id: ID } });
+    await screen.findByRole('heading', { level: 1 });
+    expect(window.location.pathname).toBe(`/antrag/${ID}`);
   });
 
-  it('adds ?app= when the verified id is not already in the path', async () => {
-    // URL has the token in the query but the path does NOT contain the app id,
-    // so stripTokenFromUrl must add ?app= for a later reload.
-    history.replaceState(null, '', '/status?t=tok-here');
-    await setup(fakeApi(), { t: 'tok-here' });
-    await screen.findByText('Bitte ergänzen.');
-    expect(window.location.search).toContain('app=app-1');
-    expect(window.location.search).not.toContain('t=');
+  it('loads with the cookie session when only an id is there', async () => {
+    const verify = jest.fn();
+    await setup(fakeApi({ verify: verify as unknown as ApiClient['verifyMagicLink'] }), {}, { pathParams: { id: ID } });
+    expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
+    expect(verify).not.toHaveBeenCalled();
+  });
+
+  it('falls back to a title when the answers have none', async () => {
+    const { comp } = await setup(fakeApi({ application: app(true, {}) }));
+    await waitFor(() => expect(comp.phase()).toBe('ready'));
+    expect(comp.title()).toBe('Ohne Titel');
   });
 });

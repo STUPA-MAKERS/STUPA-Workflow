@@ -14,13 +14,23 @@ describe('ApplyConfirmationComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => localStorage.clear());
 
-  async function setup(loggedIn = false, id: string | null = FULL_ID, hours?: number) {
+  async function setup(
+    loggedIn = false,
+    id: string | null = FULL_ID,
+    hours?: number,
+    linkDays: number | null = null,
+  ) {
     return render(ApplyConfirmationComponent, {
       providers: [
         provideRouter([]),
         ...(hours === undefined
           ? []
-          : [{ provide: BrandingService, useValue: { confirmTtlHours: signal(hours) } }]),
+          : [
+              {
+                provide: BrandingService,
+                useValue: { confirmTtlHours: signal(hours), linkTtlDays: signal(linkDays) },
+              },
+            ]),
         { provide: AuthService, useValue: { isAuthenticated: signal(loggedIn) } },
         {
           provide: ActivatedRoute,
@@ -111,6 +121,30 @@ describe('ApplyConfirmationComponent', () => {
     await setup(false, FULL_ID, 48);
     expect(screen.getByText(/nach 48 Stunden automatisch verworfen/)).toBeInTheDocument();
     expect(screen.queryByText(/nach 12 Stunden/)).not.toBeInTheDocument();
+  });
+
+  it('says that the link does not expire by default', async () => {
+    await setup();
+    expect(screen.getByText('Der Link in der E-Mail ist unbegrenzt gültig.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Zur Startseite' })).toHaveAttribute('href', '/');
+  });
+
+  it('names the configured lifetime of the link', async () => {
+    await setup(false, FULL_ID, 12, 30);
+    expect(screen.getByText('Der Link in der E-Mail ist 30 Tage gültig.')).toBeInTheDocument();
+    expect(screen.queryByText(/unbegrenzt/)).toBeNull();
+  });
+
+  it('shows the status as text and the heading as a level-1 heading', async () => {
+    await setup();
+    expect(screen.getByRole('heading', { level: 1, name: /E-Mail bestätigen/ })).toBeInTheDocument();
+    expect(screen.getByText('Bestätigung ausstehend').tagName).toBe('APP-STATUS-TEXT');
+  });
+
+  it('hides the reference line and the record link when the query has no id', async () => {
+    await setup(true, null);
+    expect(screen.queryByText(/Vorgangsnummer/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Antrag öffnen' })).toBeNull();
   });
 
   it('hides the reference line when the query has no id', async () => {
