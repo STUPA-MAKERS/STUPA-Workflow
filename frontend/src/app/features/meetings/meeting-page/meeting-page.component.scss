@@ -1,13 +1,16 @@
 @use 'breakpoints' as bp;
 
-/* The session page fills the viewport below the rail and above nothing: the main region
-   adds its block padding and the page gutter around the router outlet, so the host pulls
-   exactly that back. Above the phone limit the page itself does not scroll; the agenda,
-   the sheet and the vote cards scroll inside themselves. */
+/* The session page is a pane page that runs edge to edge: it takes the free height of
+   the main column of the shell (`flex: 1 1 0`, no height from the viewport), and pulls
+   the block padding and the page gutter of the main region back. The page has no footer.
+   Above the phone limit the page itself does not scroll; the agenda, the sheet and the
+   vote cards scroll inside themselves. A scroll area with round cards in it has the
+   radius of the cards, so its corners clip a card that scrolls past an end. */
 :host {
   display: flex;
+  flex: 1 1 0;
   flex-direction: column;
-  height: 100dvh;
+  min-height: 0;
   margin-block: calc(-1 * var(--main-pad-top, var(--space-8)))
     calc(-1 * var(--main-pad-bottom, var(--space-8)));
   margin-inline: calc(-1 * var(--layout-gutter));
@@ -190,11 +193,16 @@ app-button ::ng-deep .btn__label > app-icon:first-child {
 }
 .mp__body--wide .mp__prep {
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .mp__body--wide .mp__votes {
   grid-area: votes;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  /* The radius of the vote cards: the column is the window they scroll in. */
+  border-radius: var(--radius-xl);
+  scroll-padding-block: var(--space-4);
 }
 
 /* ------------------------------------------------------------------ dock */
@@ -213,7 +221,7 @@ app-button ::ng-deep .btn__label > app-icon:first-child {
    actions go into the session menu. */
 @include bp.phone {
   :host {
-    height: auto;
+    flex: 1 0 auto;
     min-height: 100dvh;
     margin-inline: calc(-1 * var(--space-4));
     padding-bottom: var(--fx-dock-h, 0px);

@@ -1,12 +1,15 @@
 @use 'breakpoints' as bp;
 
-/* The participant view fills the viewport like the session page: the host pulls the
-   block padding and the gutter of the main region back. Above the phone limit the page
-   does not scroll; the agenda, the sheet and the side column scroll inside themselves. */
+/* The participant view is a pane page like the session page: it takes the free height
+   of the main column of the shell (`flex: 1 1 0`) and pulls the block padding and the
+   gutter of the main region back. Above the phone limit the page does not scroll; the
+   agenda, the sheet and the side column scroll inside themselves. The side column has
+   the radius of its cards, so its corners clip a card that scrolls past an end. */
 :host {
   display: flex;
+  flex: 1 1 0;
   flex-direction: column;
-  height: 100dvh;
+  min-height: 0;
   margin-block: calc(-1 * var(--main-pad-top, var(--space-8)))
     calc(-1 * var(--main-pad-bottom, var(--space-8)));
   margin-inline: calc(-1 * var(--layout-gutter));
@@ -178,6 +181,12 @@ app-button ::ng-deep .btn__label > app-icon:first-child {
 .fv__body--wide .fv__side {
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* The radius of the cards in it: the column is the window they scroll in. */
+.fv__body--wide .fv__side {
+  border-radius: var(--radius-xl);
+  scroll-padding-block: var(--space-4);
 }
 .fv__body--wide .fv__main,
 .fv__body--wide .fv__sheet {
@@ -375,7 +384,7 @@ app-button ::ng-deep .btn__label > app-icon:first-child {
 
 @include bp.phone {
   :host {
-    height: auto;
+    flex: 1 0 auto;
     min-height: 0;
     margin-inline: calc(-1 * var(--space-4));
   }

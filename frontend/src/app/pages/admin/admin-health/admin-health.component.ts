@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -39,8 +39,9 @@ type BackupState = { status: 'loading' } | { status: 'ok'; list: BackupList } | 
 type ErasureState = { status: 'loading' } | { status: 'ok'; open: number } | { status: 'error' };
 
 /**
- * "Zustand" on the admin home page (board Verwaltung): three tiles that each link to
- * their page.
+ * "Zustand" at the top of the admin navigation (board Verwaltung): three tiles that each
+ * link to their page. The tiles show on the home page and in the column beside every
+ * admin page; the tile of the open page is marked.
  *
  * - Audit chain (`audit.read`): the newest stored check. Before the first stored check
  *   the tile checks the chain live, when the principal holds `audit.verify`. The live
@@ -58,7 +59,7 @@ type ErasureState = { status: 'loading' } | { status: 'ok'; open: number } | { s
   selector: 'app-admin-health',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslatePipe, IconComponent],
+  imports: [RouterLink, RouterLinkActive, TranslatePipe, IconComponent],
   templateUrl: './admin-health.component.html',
   styleUrl: './admin-health.component.scss',
 })

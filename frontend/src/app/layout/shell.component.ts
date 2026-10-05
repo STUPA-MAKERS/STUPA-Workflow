@@ -18,8 +18,9 @@ import { SiteFooterComponent } from './site-footer/site-footer.component';
  * The frame around a page.
  *
  * - `rail`: a signed-in principal. The navigation rail at the start edge, or the bottom
- *   bar on a phone; the branded footer at the end of the content.
- * - `public`: nobody signed in. The public top bar and the branded footer.
+ *   bar on a phone. The branded footer shows only on a route with `footer: true` (the
+ *   start page and the public pages).
+ * - `public`: nobody signed in. The public top bar and the branded footer, always.
  * - `bare`: route data `chrome: false` (the beamer). Only the page.
  * - `pending`: the session is not known yet. Only the page, so no frame flashes up
  *   and changes a moment later.
@@ -65,6 +66,21 @@ export class ShellComponent {
   /** The page fills the viewport (see `PageFrameService`): no footer, a small foot gap. */
   readonly fill = inject(PageFrameService).fill;
 
+  /**
+   * Route data `footer: true`: the branded footer (copyright, Impressum, Datenschutz)
+   * shows at the end of the page. Only the start page and the public pages have it. A
+   * work page (a list, a list with a detail, a meeting, the administration) has no
+   * footer, so a page that fills the viewport ends at the bottom edge of the window.
+   */
+  private readonly footerRoute = signal(false);
+
+  /** The footer shows: always in the public frame, else only where the route asks for it. */
+  readonly footer = computed(() => {
+    const frame = this.frame();
+    if (frame === 'public') return true;
+    return frame === 'rail' && this.footerRoute() && !this.fill();
+  });
+
   /** The viewport is a phone (<= 768px): bottom bar instead of the rail. */
   readonly phone = mediaQuerySignal(MEDIA.phone);
 
@@ -94,7 +110,7 @@ export class ShellComponent {
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.sessionKnown.set(true));
 
-    // `wide`, `fab` and `chrome` come from the route data. The deepest active route wins.
+    // `wide`, `fab`, `footer` and `chrome` come from the route data. The deepest active route wins.
     this.router.events
       .pipe(
         filter((e) => e instanceof NavigationEnd),
@@ -104,15 +120,18 @@ export class ShellComponent {
         let r = this.route.firstChild;
         let wide = false;
         let fab = false;
+        let footer = false;
         let chrome = true;
         while (r) {
           wide = r.snapshot.data['wide'] === true || wide;
           fab = r.snapshot.data['fab'] === true || fab;
+          footer = r.snapshot.data['footer'] === true || footer;
           if (r.snapshot.data['chrome'] === false) chrome = false;
           r = r.firstChild;
         }
         this.wide.set(wide);
         this.fab.set(fab);
+        this.footerRoute.set(footer);
         this.chrome.set(chrome);
       });
   }

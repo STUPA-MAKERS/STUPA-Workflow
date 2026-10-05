@@ -1,25 +1,38 @@
 @use 'breakpoints' as bp;
 
 :host {
-  display: block;
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  min-width: 0;
 }
 
-/* One column below wide: the navigation (home page only) above the page. */
+/* One column below wide: the navigation (home page only) above the page.
+
+   The frame has no width cap of its own and no centring. The route is `wide`, so the
+   columns start on the same content edge next to the rail as the other list and detail
+   pages (applications, budget, bookings): the side padding of the shell main is the only
+   inset. A cap with `margin-inline: auto` pushed the navigation away from the rail on a
+   wide screen. */
 .af {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
   width: 100%;
-  max-width: 1640px;
-  margin-inline: auto;
 }
 
-/* Wide: the navigation is a column beside the page and stays in view. */
+/* Wide: a pane page (`.pane-page` on the host, see styles.scss). The frame takes the
+   free height of the shell main and does not scroll as a page. The navigation and the
+   page sheet each scroll inside themselves. */
+/* The gap to the sheet is the page gutter, the same as the margin of the sheet at the
+   top, at the end edge and at the bottom. */
 .af--split {
   display: grid;
+  flex: 1 1 0;
   grid-template-columns: 19rem minmax(0, 1fr);
-  gap: var(--space-4);
-  align-items: start;
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--layout-gutter);
+  min-height: 0;
 }
 .af--split.af--home {
   grid-template-columns: 24rem minmax(0, 1fr);
@@ -32,9 +45,7 @@
   min-width: 0;
 }
 .af--split .af__nav {
-  position: sticky;
-  top: var(--main-pad-top);
-  max-height: calc(100dvh - var(--main-pad-top) - var(--space-4));
+  min-height: 0;
 }
 
 .af__navHead,
@@ -177,14 +188,66 @@
   --dt-gap: var(--color-bg);
 }
 
-/* Wide: the page sits on a sheet that reaches down to the footer. */
+/* Wide: the page sits on a sheet that reaches down to the bottom of the window. The
+   sheet is a window with round corners: it clips (`overflow: hidden` with the radius),
+   and its body is the scroll container. So the round corners clip the content at the
+   top and at the bottom in every scroll position, and a straight cut by a rectangular
+   scroll box (or by the viewport edge) cannot occur. A sticky bar of the page sticks to
+   the top or the bottom of the body. The scroll padding keeps an element that gets the
+   focus clear of the corners and the fades. */
 .af--split .af__page {
-  min-height: calc(100dvh - var(--main-pad-top) - var(--space-4));
-  padding: var(--space-6) var(--space-6) var(--space-7);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
   border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
   /* A sticky search bar of the page covers the rows with the colour of the sheet. */
   --stb-bg: var(--color-surface-1);
+}
+.af--split .af__pageBody {
+  --af-fade: var(--space-6);
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--space-6) var(--space-6) var(--space-7);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--af-fade);
+}
+/* The page in the sheet keeps its content height, and the body scrolls. A page with
+   columns of its own (the mail templates) takes the free height of the body with
+   `flex: 1 1 0` (`:host-context(.af--split)`) and scrolls its columns inside itself. */
+.af--split .af__pageBody > ::ng-deep * {
+  flex-shrink: 0;
+}
+/* The shared fades of a scroll area: an end fades only while content is hidden past it
+   (`appScrollFade` sets the classes). The mask is on the body, so the sheet keeps its
+   colour and its shape. */
+/* A page with a sticky bar (`app-sticky-bar`, the users search) has the fade of the bar
+   at the top. The top fade of the body would make the stuck bar transparent, so the body
+   fades only at the end. */
+.af--split .af__pageBody.is-fade-start:has(app-sticky-bar:not(.stb--off)) {
+  mask-image: none;
+}
+.af--split .af__pageBody.is-fade-end:has(app-sticky-bar:not(.stb--off)) {
+  mask-image: linear-gradient(to top, transparent, #000 var(--af-fade));
+}
+.af--split .af__pageBody.is-fade-start {
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--af-fade));
+}
+.af--split .af__pageBody.is-fade-end {
+  mask-image: linear-gradient(to top, transparent, #000 var(--af-fade));
+}
+.af--split .af__pageBody.is-fade-start.is-fade-end {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--af-fade),
+    #000 calc(100% - var(--af-fade)),
+    transparent
+  );
 }
 
 @include bp.phone {

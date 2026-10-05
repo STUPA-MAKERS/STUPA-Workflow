@@ -12,7 +12,9 @@ import {
  * Routing skeleton. `authGuard` protects the OIDC areas. Some areas also need an RBAC
  * permission: a global one (`data.permission`) or a gremium one in any gremium
  * (`data.gremiumPermission`). `data.chrome: false` shows the page without the frame of the
- * shell (no rail, no bars, no footer), for the beamer.
+ * shell (no rail, no bars, no footer), for the beamer. `data.footer: true` shows the
+ * branded footer below a page of the signed-in frame: only the start page and the public
+ * pages have it (the public frame shows it always).
  */
 export const routes: Routes = [
   {
@@ -24,11 +26,12 @@ export const routes: Routes = [
         // An authenticated user goes to /dashboard. Only an applicant sees the public
         // landing page.
         canActivate: [homeRedirectGuard],
+        data: { footer: true },
         loadComponent: () => import('./pages/home.component').then((m) => m.HomeComponent),
       },
       {
         path: 'apply',
-        data: { title: 'apply.title' },
+        data: { title: 'apply.title', footer: true },
         loadComponent: () =>
           import('./features/apply/apply-wizard.component').then((m) => m.ApplyWizardComponent),
       },
@@ -36,7 +39,7 @@ export const routes: Routes = [
         path: 'apply/confirmation',
         // `contextual`: this page only means something right after a submission. Opened
         // cold it tells the reader to check their mail for an application nobody sent.
-        data: { title: 'apply.confirm.heading', contextual: true },
+        data: { title: 'apply.confirm.heading', contextual: true, footer: true },
         loadComponent: () =>
           import('./features/apply/apply-confirmation.component').then(
             (m) => m.ApplyConfirmationComponent,
@@ -46,7 +49,7 @@ export const routes: Routes = [
         path: 'status',
         // `contextual`: without an application id this renders "Antrag nicht gefunden".
         // The id arrives from the magic link, never from navigating here.
-        data: { title: 'status.heading', contextual: true },
+        data: { title: 'status.heading', contextual: true, footer: true },
         loadComponent: () =>
           import('./features/apply/status-timeline.component').then(
             (m) => m.StatusTimelineComponent,
@@ -57,7 +60,7 @@ export const routes: Routes = [
         // and uses an applicant token instead of a login. The component resolves the
         // fragment and :id.
         path: 'antrag/:id',
-        data: { title: 'status.heading' },
+        data: { title: 'status.heading', footer: true },
         loadComponent: () =>
           import('./features/apply/status-timeline.component').then(
             (m) => m.StatusTimelineComponent,
@@ -67,7 +70,8 @@ export const routes: Routes = [
         path: 'dashboard',
         // Wide: the two columns of the start page fill the width (board Main).
         // Fab: on a phone the shell keeps the foot of the page free for the "Antrag" button.
-        data: { title: 'nav.dashboard', wide: true, fab: true },
+        // Footer: the start page is the only signed-in page with the branded footer.
+        data: { title: 'nav.dashboard', wide: true, fab: true, footer: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/dashboard/dashboard.component').then((m) => m.DashboardComponent),

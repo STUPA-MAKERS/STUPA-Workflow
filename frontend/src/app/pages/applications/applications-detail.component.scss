@@ -238,28 +238,12 @@
   padding: var(--space-2) 0;
   border-bottom: var(--border-width) solid var(--color-border);
 }
-/* On the sheet: the top of the sheet in surface 2, with its round corners. The bar
-   draws its surface in `::after` over a square of the page colour in `::before`. While
-   the bar is stuck, the sheet scrolls under it, and the square hides the sheet outside
-   the round corners, so the top of the sheet keeps its shape. */
+/* On the sheet: the top of the sheet in surface 2. The detail pane of the list/detail
+   layout is a window with round corners, so its corners clip the bar while it is stuck
+   and the sheet scrolls under it. */
 .ad--split .ad__editBar {
   margin-inline: calc(-1 * var(--space-6));
   padding-inline: var(--space-6);
-}
-.ad--split .ad__editBar::before,
-.ad--split .ad__editBar::after {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  content: '';
-}
-.ad--split .ad__editBar::before {
-  bottom: auto;
-  height: var(--radius-2xl);
-  background: var(--color-bg);
-}
-.ad--split .ad__editBar::after {
-  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
   background: var(--color-surface-2);
 }
 /* One pane at a time: fixed chrome on its own raised surface (surface 3, as the phone

@@ -59,18 +59,24 @@
   flex-direction: column;
   width: 100%;
   padding-block: var(--main-pad-top) var(--main-pad-bottom);
-  /* The gap that a pane page (`.pane-page`, see styles.scss) keeps below itself. Above
-     the footer it is 0: the top padding of the footer is the gap. */
-  --pane-foot-gap: 0px;
+  /* The gap that a pane page (a page that does not scroll as a page, but fills the
+     window and scrolls inside its panes, for example the budget) keeps between its panes
+     and the bottom edge of the window. Only the start page and the public pages have a
+     footer (route data `footer`), so a pane page always ends above the window edge. The
+     page pulls the bottom padding back and keeps this gap:
+     `margin-bottom: calc(var(--pane-foot-gap) - var(--main-pad-bottom))`. */
+  --pane-foot-gap: var(--layout-gutter);
 }
 /* Full width for route data `wide`: content with two sidebars, for example budget. */
 .main--wide {
   max-width: none;
 }
 
-/* Rail pages start closer to the top: the rail carries the brand, not the page. */
+/* Rail pages start closer to the top: the rail carries the brand, not the page. The top
+   gap is the page gutter, so a pane page has the same margin on every side: the gutter
+   at the top, at the end edge and (as `--pane-foot-gap`) at the bottom. */
 .frame--rail .main {
-  --main-pad-top: 28px;
+  --main-pad-top: var(--layout-gutter);
 }
 
 /* Phone: the body clears the fixed bottom bar and the gesture bar below it.
@@ -101,10 +107,9 @@
 }
 
 /* A page that fills the viewport (`PageFrameService.fill`): no footer below it, and only
-   a small gap at the bottom, so the page ends just above the viewport edge. */
+   the pane gap at the bottom, so the page ends just above the viewport edge. */
 .frame--rail .main.main--fill {
-  --main-pad-bottom: var(--space-3);
-  --pane-foot-gap: var(--main-pad-bottom);
+  --main-pad-bottom: var(--pane-foot-gap);
 }
 
 /* Beamer: nothing but the page. */
@@ -138,8 +143,7 @@
   }
   .frame--rail .main {
     --main-pad-bottom: calc(var(--space-8) + env(safe-area-inset-bottom));
-    /* No footer: a pane page keeps a small gap and the safe area clear of the edge. */
-    --pane-foot-gap: calc(var(--space-4) + env(safe-area-inset-bottom));
+    --pane-foot-gap: calc(var(--layout-gutter) + env(safe-area-inset-bottom));
   }
 }
 .frame--public .frame__footer {
