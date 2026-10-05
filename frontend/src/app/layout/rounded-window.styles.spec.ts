@@ -51,7 +51,10 @@ describe('rounded sheet styles', () => {
       expect(rule(css, ':host')).not.toMatch(/height: 100dvh/);
     }
     expect(rule(meetingPage, '.mp__body--wide .mp__votes')).toMatch(/border-radius: var\(--radius-xl\);/);
-    expect(rule(followView, '.fv__body--wide .fv__side')).toMatch(/border-radius: var\(--radius-xl\);/);
+    // The side column shares its scroll rule with the agenda; the radius is a rule of its own.
+    expect(followView).toMatch(
+      /\n\.fv__body--wide \.fv__side \{[^}]*border-radius: var\(--radius-xl\);/,
+    );
   });
 
   it('gives a pane page the gutter as the gap at the bottom and at the top', () => {

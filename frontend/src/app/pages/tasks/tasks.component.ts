@@ -77,6 +77,7 @@ interface TaskRow {
     ScrollFadeDirective,
   ],
   providers: [ApplicationsPageService],
+  host: { '[class.pane-page]': 'split()' },
   templateUrl: './tasks.component.html',
   styleUrl: './tasks.component.scss',
 })
