@@ -846,19 +846,26 @@ function mockTimeline(): { past: MeetingOutWire[]; upcoming: MeetingOutWire[] } 
     mockTimelineMeeting(1, -9, '33. Sitzung des Studierendenparlaments', 'closed', {
       startedAt: `${mockDay(-9)}T16:04:00Z`,
       closedAt: `${mockDay(-9)}T19:40:00Z`,
+      agendaItemCount: 9,
     }),
     mockTimelineMeeting(2, -16, '11. Sitzung des Haushaltsausschusses', 'closed', {
       gremiumName: 'Haushaltsausschuss',
       gremiumId: 'g0000000-0000-0000-0000-000000000002',
       startedAt: `${mockDay(-16)}T15:32:00Z`,
       closedAt: `${mockDay(-16)}T17:05:00Z`,
+      agendaItemCount: 5,
     }),
-    mockTimelineMeeting(3, -30, '32. Sitzung des Studierendenparlaments', 'closed'),
-    mockTimelineMeeting(4, -44, '31. Sitzung des Studierendenparlaments', 'closed'),
+    mockTimelineMeeting(3, -30, '32. Sitzung des Studierendenparlaments', 'closed', {
+      agendaItemCount: 7,
+    }),
+    mockTimelineMeeting(4, -44, '31. Sitzung des Studierendenparlaments', 'closed', {
+      agendaItemCount: 6,
+    }),
   ];
+  // The live meeting runs today, so the overview and its calendar show it as "Jetzt".
   const live: MeetingOutWire = {
     ...MOCK_MEETING,
-    date: MOCK_MEETING.date ?? mockDay(0),
+    date: mockDay(0),
     startTime: MOCK_MEETING.startTime ?? '18:00:00',
     startedAt: MOCK_MEETING.status === 'live' ? `${mockDay(0)}T16:04:00Z` : null,
     protokollantId: MOCK_MEETING.protokollantId ?? null,
@@ -877,14 +884,17 @@ function mockTimeline(): { past: MeetingOutWire[]; upcoming: MeetingOutWire[] } 
       canManage: false,
       canControl: false,
       canWrite: false,
+      agendaItemCount: 4,
     }),
-    mockTimelineMeeting(6, 14, '35. Sitzung des Studierendenparlaments', 'planned'),
+    mockTimelineMeeting(6, 14, '35. Sitzung des Studierendenparlaments', 'planned', {
+      agendaItemCount: 6,
+    }),
     mockTimelineMeeting(
       7,
       22,
       'Sondersitzung des Studierendenparlaments zur Haushaltsplanung mit allen Referatsleitungen',
       'planned',
-      { startTime: '16:00:00' },
+      { startTime: '16:00:00', agendaItemCount: 1 },
     ),
     mockTimelineMeeting(8, 28, '36. Sitzung des Studierendenparlaments', 'planned'),
   ];
@@ -1363,6 +1373,22 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       return ok({ blocked: false, delegatedToName: null, exercising: true, delegatedByName: 'Erika Beispiel' });
     }
     if (/\/votes\/[^/]+$/.test(p)) return ok(mockVote(p.split('/').pop() ?? MOCK_VOTE.id));
+    // The calendar view asks for the meetings of the days of its month grid.
+    const dateFrom = req.params.get('dateFrom');
+    const dateTo = req.params.get('dateTo');
+    if (p.endsWith('/meetings') && dateFrom && dateTo) {
+      const { past, upcoming } = mockTimeline();
+      const gremiumId = req.params.get('gremiumId');
+      return ok(
+        [...past, ...upcoming].filter(
+          (m) =>
+            !!m.date &&
+            m.date >= dateFrom &&
+            m.date <= dateTo &&
+            (!gremiumId || m.gremiumId === gremiumId),
+        ),
+      );
+    }
     if (p.endsWith('/meetings')) return ok([MOCK_MEETING, MOCK_PLANNED_MEETING]);
     if (p.endsWith('/delegations')) {
       const meetingId = req.params.get('meetingId');

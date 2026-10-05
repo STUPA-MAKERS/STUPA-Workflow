@@ -1,0 +1,14 @@
+/* The view fills the host. A pane view (see `MeetingsComponent`) takes the free height. */
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+:host > app-meetings-list,
+:host > app-meetings-calendar {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+:host > app-create-meeting-dialog {
+  display: contents;
+}

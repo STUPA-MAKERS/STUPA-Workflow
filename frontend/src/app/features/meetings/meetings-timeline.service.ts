@@ -7,6 +7,11 @@ import { I18nService } from '@core/i18n/i18n.service';
 import type { Meeting, Uuid } from '@core/api/models';
 import type { SelectOption } from '@stupa-makers/ui-kit';
 
+/** A change of one meeting, see `MeetingsTimelineService.lastChange`. */
+export type MeetingChange =
+  | { kind: 'updated'; meeting: Meeting }
+  | { kind: 'removed'; id: Uuid };
+
 /** Page size of a "load more" step (both directions and the search). */
 export const TIMELINE_PAGE = 15;
 /**
@@ -209,6 +214,13 @@ export class MeetingsTimelineService implements OnDestroy {
       });
   }
 
+  /**
+   * The last change that a dialog made to a meeting. The calendar view keeps its own
+   * month of meetings and applies the change to it; the list view drops the selection
+   * of a deleted meeting.
+   */
+  readonly lastChange = signal<MeetingChange | null>(null);
+
   /** Replace an updated meeting in both directions and in the search hits. */
   replaceInTimeline(updated: Meeting): void {
     const repl = (list: Meeting[]): Meeting[] =>
@@ -216,6 +228,7 @@ export class MeetingsTimelineService implements OnDestroy {
     this.upcomingItems.update(repl);
     this.pastItems.update(repl);
     this.searchItems.update(repl);
+    this.lastChange.set({ kind: 'updated', meeting: updated });
   }
 
   /** Remove a deleted meeting from both directions and from the search hits. */
@@ -224,6 +237,7 @@ export class MeetingsTimelineService implements OnDestroy {
     this.upcomingItems.update(rm);
     this.pastItems.update(rm);
     this.searchItems.update(rm);
+    this.lastChange.set({ kind: 'removed', id });
   }
 
   /** Initial load: the first upcoming page and the past preview in parallel. */

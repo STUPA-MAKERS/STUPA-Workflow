@@ -35,7 +35,7 @@ description: Meetings — planned→live→closed lifecycle, agenda items, atten
 
 **API surface:**
 - `POST /api/meetings` — create (planned). Sends a meeting mail as a background task.
-- `GET /api/meetings` / `GET /api/meetings/timeline` — list / keyset-paginated timeline (`direction=past|upcoming`, opaque `cursor`, fuzzy `q` collapses to one ranked list with offset cursor).
+- `GET /api/meetings` / `GET /api/meetings/timeline` — list / keyset-paginated timeline (`direction=past|upcoming`, opaque `cursor`, fuzzy `q` collapses to one ranked list with offset cursor). The list takes `gremiumId` and the optional `dateFrom`/`dateTo` (`YYYY-MM-DD`, both included; the calendar view reads one month this way; a meeting without a date is then not in the list; `dateFrom` after `dateTo` gives 422 `invalid_date_range`). Every list shape carries `agendaItemCount` ("n TOPs" of the overview).
 - `GET /api/meetings/gremien` — gremien filter (visibility-based, must precede `{meeting_id}`).
 - `GET /api/meetings/{id}` — state. `PATCH /api/meetings/{id}` — control and planning, broadcasts `meeting_state`. 409 `invalid_status_transition` and 409 `open_vote` (see the lifecycle invariants). `DELETE` — manager only, 409 `open_vote` while a vote of the meeting is open. This is also how a planned meeting that does not take place goes away.
 - `GET /api/gremien/{gremium_id}/meeting-members` — protokollant candidates. `canKeepProtocol` marks the members with `protocol.write` (O20). The roster (`AttendanceOut`) carries the same flag, so the keeper of a live meeting, who may lack `session.manage`, gets the candidates too.

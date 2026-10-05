@@ -1,140 +1,265 @@
 @use 'breakpoints' as bp;
+@use '../scroll-fade' as fade;
+
+/* The list/detail pane page of the applications and the tasks
+   (applications-list.component.scss), with the meetings as rows. */
 
 :host {
-  display: block;
-}
-
-/* One centred column, as wide as the board (1080px). The column is a size container, so
-   the header can fill the width when its actions no longer fit next to the title. */
-.mtl {
-  container: mtl / inline-size;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  width: 100%;
-  max-width: 1080px;
-  margin-inline: auto;
+  min-width: 0;
+}
+.mtl {
+  min-width: 0;
+}
+/* One pane at a time the column takes at least the free height and the page scrolls. */
+.mtl:not(.mtl--split) {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
+.mtl:not(.mtl--split) > app-list-detail {
+  flex: 1 0 auto;
+}
+/* Side by side the page does not scroll: each pane scrolls inside itself. */
+.mtl--split {
+  flex: 1 1 0;
+  min-height: 0;
+}
+.mtl > app-list-detail {
+  --ld-list-width: 440px;
 }
 
-.mtl__actions {
+/* ------------------------------------------------------------------ list pane */
+.mtl__pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.mtl--split .mtl__pane {
+  height: 100%;
+  min-height: 0;
+}
+
+/* The title, the view switch and the calendar subscription on one centred line. */
+.mtl__head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-height);
+  padding-inline: var(--space-4) 0;
+}
+.mtl__title {
+  flex: none;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-d2);
+  line-height: var(--lh-d2);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+.mtl__spacer {
+  flex: 1 1 auto;
+}
+.mtl__iconLink {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  border-radius: 50%;
+  color: var(--color-text-muted);
+}
+.mtl__iconLink:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.mtl__iconLink:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.mtl__head app-button app-icon {
+  margin-inline-end: 4px;
+}
+
+.mtl__filters {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.mtl__chips {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2);
+  min-width: 0;
 }
-.mtl__search {
-  width: 340px;
+.mtl__chip {
   max-width: 100%;
 }
 
-/* The Gremium filter: a chip that shows the selected label. */
-.mtl__chip {
-  max-width: 17rem;
+/* ------------------------------------------------------------------ rows */
+.mtl__scroll {
+  --mtl-fade: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* The FAB covers the end of the list: room to scroll the last row above it. */
+  padding-bottom: calc(56px + var(--space-6));
+  @include fade.fade-y(var(--mtl-fade));
+}
+.mtl--split .mtl__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--mtl-fade);
+}
+.mtl--split .mtl__scroll > * {
+  flex: none;
 }
 
-/* Rows of one group, 2px apart, rounded as one block (see `.rowgroup`). */
+.mtl__group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.mtl__month {
+  padding: 18px var(--space-4) 6px;
+}
+.mtl__group:first-child .mtl__month {
+  padding-top: var(--space-2);
+}
 .mtl__rows {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  min-width: 0;
 }
 .mtl__row {
-  --li-hover: var(--color-surface-3);
-  --li-radius: 4px;
-  border-radius: var(--li-radius);
-  background: var(--color-surface-2);
+  cursor: default;
 }
-.mtl__row:first-child {
-  --li-radius: var(--radius-lg) var(--radius-lg) 4px 4px;
-}
-.mtl__row:last-child {
-  --li-radius: 4px 4px var(--radius-lg) var(--radius-lg);
-}
-.mtl__row:only-child {
-  --li-radius: var(--radius-lg);
-}
-/* A past meeting steps back: a muted title, a subtle sub line and a muted date block
-   (`[muted]`), the status stays readable. The subtle text passes 4.5:1 on surface 2 but
-   not on surface 3, so the hovered row takes the muted sub line again. */
-.mtl__row--past {
-  --li-color: var(--color-text-muted);
-  --li-sub-color: var(--color-text-subtle);
-}
-.mtl__row--past:hover {
-  --li-sub-color: var(--color-text-muted);
+.mtl__dot {
+  margin-inline: 6px;
+  color: var(--color-text-subtle);
 }
 
-.mtl__meta {
-  display: inline;
-}
-/* A fact is inline text, not an inline box, so the ellipsis of the one-line sub line can
-   cut inside a long Gremium name instead of dropping the whole fact. */
-.mtl__fact {
-  display: inline;
-}
-.mtl__fact app-icon {
-  display: inline-block;
-  margin-inline-end: 6px;
-  vertical-align: -2px;
-}
-.mtl__fact + .mtl__fact {
-  margin-inline-start: 14px;
-}
+/* The time over the number of agenda items, at the end of the row. */
 .mtl__trail {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
+}
+.mtl__facts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.mtl__time {
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+.mtl__tops {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 .mtl__chev {
+  display: inline-flex;
+  margin-inline-end: calc(-1 * var(--space-2));
   color: var(--color-text-muted);
 }
 
-.mtl__more {
-  align-self: flex-start;
-  margin-inline-start: -8px;
-}
-
-/* "Jetzt": an accent caption between the past and the coming meetings, as on the board. */
-.mtl__now {
-  display: flex;
-  align-items: center;
-  padding: 6px 4px;
-}
-.mtl__nowLabel {
-  color: var(--color-accent-text);
-}
-
-.mtl__empty {
+.mtl__status {
   margin: 0;
-  padding: var(--space-3) 4px;
+  padding: var(--space-2) var(--space-4);
   color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.mtl__empty {
+  margin-block: var(--space-6);
+}
+.mtl__more {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+.mtl__more--start {
+  justify-content: flex-start;
+  padding-inline: var(--space-2);
+}
+.mtl__more app-icon {
+  margin-inline-end: 6px;
 }
 
-/* Below this width the title, the search, the filter and "Neue Sitzung" do not fit on
-   one line. The actions then take a row of their own over the full width, and the search
-   grows into the free space, so no empty band stays on the right. */
-@container mtl (max-width: 60rem) {
-  .mtl__actions {
-    width: 100cqi;
-  }
-  .mtl__search {
-    flex: 1 1 15rem;
-    width: auto;
-  }
+/* "Neue Sitzung": at the end of the list pane side by side, else fixed at the end of the
+   screen. */
+.mtl__fab {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
+  z-index: var(--z-sticky);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 56px;
+  padding: 0 var(--space-5) 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  box-shadow: var(--shadow-elevated);
+  cursor: pointer;
+}
+.mtl__fab:hover {
+  filter: brightness(1.08);
+}
+.mtl__fab:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.mtl--split .mtl__fab {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-4);
+}
+
+/* ------------------------------------------------------------------ detail pane */
+.mtl__detail {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+/* The empty sheet side by side: the same sheet as an open meeting, so nothing jumps. */
+.mtl__none {
+  display: grid;
+  flex: 1 1 auto;
+  place-items: center;
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
 }
 
 @include bp.phone {
-  .mtl__search {
-    flex: 1 1 100%;
-    width: auto;
+  .mtl__head {
+    gap: var(--space-1);
+    padding-inline-start: var(--space-1);
   }
-  /* The filter takes the row below the search. */
-  .mtl__chip {
-    min-width: 0;
-    max-width: 100%;
+  .mtl__title {
+    flex: 1 1 auto;
   }
-  /* The row actions move into the meeting page; the chevron stays. */
-  .mtl__trail app-button {
-    display: none;
+  .mtl__month {
+    padding-inline: var(--space-1);
+  }
+  .mtl__scroll {
+    padding-bottom: var(--space-4);
   }
 }

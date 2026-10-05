@@ -95,3 +95,55 @@ async def test_meeting_out_carries_the_agenda_summary(
         row = next(m for m in timeline if m["id"] == str(s.meeting_id))
         assert row["currentAgendaItem"]["title"] == "Sommerfest"
         assert row["startedAt"] is None
+
+
+async def test_list_and_timeline_carry_the_agenda_count(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """The overview shows "n TOPs" on each row: every list shape counts the agenda."""
+    live = await seed(maker, status="live", items=2)
+    planned = await seed(maker, status="planned", items=0)
+    with TestClient(api) as client:
+        upcoming = client.get(
+            "/api/meetings/timeline",
+            params={"direction": "upcoming", "gremiumId": str(live.gremium_id)},
+        ).json()["items"]
+        assert [(m["id"], m["agendaItemCount"]) for m in upcoming] == [(str(live.meeting_id), 2)]
+        # The planned meeting of 20.06.2026 lies in the past of the test run.
+        past = client.get(
+            "/api/meetings/timeline",
+            params={"direction": "past", "gremiumId": str(planned.gremium_id)},
+        ).json()["items"]
+        assert [(m["id"], m["agendaItemCount"]) for m in past] == [(str(planned.meeting_id), 0)]
+        hits = client.get(
+            "/api/meetings/timeline",
+            params={"q": "GV", "gremiumId": str(live.gremium_id)},
+        ).json()["items"]
+        assert [m["agendaItemCount"] for m in hits] == [2]
+
+
+async def test_list_filters_by_the_planned_date(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """The calendar reads one month: ``dateFrom`` and ``dateTo`` include both ends."""
+    s = await seed(maker, status="planned", items=3)
+    gid = str(s.gremium_id)
+    with TestClient(api) as client:
+
+        def ids(**params: str) -> list[str]:
+            res = client.get("/api/meetings", params={"gremiumId": gid, **params})
+            assert res.status_code == 200, res.text
+            return [m["id"] for m in res.json()]
+
+        assert ids(dateFrom="2026-06-01", dateTo="2026-06-30") == [str(s.meeting_id)]
+        assert ids(dateFrom="2026-06-20", dateTo="2026-06-20") == [str(s.meeting_id)]
+        assert ids(dateFrom="2026-06-21") == []
+        assert ids(dateTo="2026-06-19") == []
+        listed = client.get(
+            "/api/meetings", params={"gremiumId": gid, "dateFrom": "2026-06-01"}
+        ).json()
+        assert listed[0]["agendaItemCount"] == 3
+        bad = client.get("/api/meetings", params={"dateFrom": "2026-07-01", "dateTo": "2026-06-01"})
+        assert bad.status_code == 422
+        assert bad.headers["content-type"] == "application/problem+json"
+        assert bad.json()["code"] == "invalid_date_range"

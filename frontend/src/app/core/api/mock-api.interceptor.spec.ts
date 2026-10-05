@@ -704,6 +704,34 @@ describe('mockApiInterceptor', () => {
       expect(list[0].agendaItemCount).toBe(6);
     });
 
+    it('GET /meetings?dateFrom&dateTo → the meetings of the calendar month, with the agenda count', async () => {
+      const day = (offset: number): string => {
+        const d = new Date();
+        d.setDate(d.getDate() + offset);
+        const pad = (n: number) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      };
+      const range = new HttpParams().set('dateFrom', day(-10)).set('dateTo', day(15));
+      const rows = await get<{ title: string; status: string; date: string; agendaItemCount?: number }[]>(
+        '/api/meetings',
+        range,
+      );
+      expect(rows.map((m) => m.title).sort()).toEqual([
+        '12. Sitzung des Haushaltsausschusses',
+        '33. Sitzung des Studierendenparlaments',
+        '35. Sitzung des Studierendenparlaments',
+        'STUPA-Sitzung 12.06.',
+      ]);
+      // The live meeting runs today.
+      expect(rows.find((m) => m.status === 'live')?.date).toBe(day(0));
+      expect(rows.find((m) => m.title.startsWith('33.'))?.agendaItemCount).toBe(9);
+      const ha = await get<{ title: string }[]>(
+        '/api/meetings',
+        range.set('gremiumId', 'g0000000-0000-0000-0000-000000000002'),
+      );
+      expect(ha.map((m) => m.title)).toEqual(['12. Sitzung des Haushaltsausschusses']);
+    });
+
     it('GET /delegations → the own delegations, filtered by meetingId', async () => {
       const all = await get<{ meetingId: string; direction: string | null }[]>('/api/delegations');
       // The own one and three rows that the admin overview shows.

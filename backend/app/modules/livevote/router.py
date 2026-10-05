@@ -7,7 +7,7 @@ WebSocket closes with ``4401`` (no session) or ``4403`` (not eligible) after a
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -58,6 +58,7 @@ from app.shared.errors import (
     ForbiddenError,
     NotFoundError,
     ProblemDetail,
+    ValidationProblem,
 )
 
 router = APIRouter(tags=["livevote"])
@@ -226,14 +227,28 @@ async def list_meeting_members(
     return await attendance.members(gremium_id)
 
 
-@router.get("/meetings", response_model=list[MeetingOut], responses=_errors(401, 403))
+@router.get("/meetings", response_model=list[MeetingOut], responses=_errors(401, 403, 422))
 async def list_meetings(
     service: ServiceDep,
     principal: ReaderDep,
     gremium_id: Annotated[UUID | None, Query(alias="gremiumId")] = None,
+    date_from: Annotated[date | None, Query(alias="dateFrom")] = None,
+    date_to: Annotated[date | None, Query(alias="dateTo")] = None,
 ) -> list[MeetingOut]:
-    """List the meetings, newest first, with an optional Gremium filter."""
-    return await service.list(principal, gremium_id)
+    """List the meetings, newest first, with an optional Gremium filter.
+
+    ``dateFrom`` and ``dateTo`` (``YYYY-MM-DD``, both included) limit the list to
+    the meetings with a planned date in this range. The calendar view of the
+    overview reads one month this way. A range with ``dateFrom`` after ``dateTo``
+    gives 422.
+    """
+    if date_from is not None and date_to is not None and date_from > date_to:
+        raise ValidationProblem(
+            "dateFrom is after dateTo.",
+            code="invalid_date_range",
+            errors=[{"field": "dateFrom", "msg": "must not be after dateTo"}],
+        )
+    return await service.list(principal, gremium_id, date_from=date_from, date_to=date_to)
 
 
 @router.get("/meetings/timeline", response_model=MeetingPage, responses=_errors(400, 401, 403))

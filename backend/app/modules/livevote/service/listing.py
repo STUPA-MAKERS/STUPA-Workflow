@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Literal
 from uuid import UUID
 
@@ -46,11 +46,27 @@ class ListingOps(PermissionOps, VoteReadOps):
             votes=votes,
         )
 
-    async def list(self, principal: Principal, gremium_id: UUID | None = None) -> list[MeetingOut]:
-        """List the meetings, newest first, optionally filtered to one Gremium."""
+    async def list(
+        self,
+        principal: Principal,
+        gremium_id: UUID | None = None,
+        *,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> list[MeetingOut]:
+        """List the meetings, newest first, optionally filtered to one Gremium.
+
+        ``date_from`` and ``date_to`` limit the list to the meetings whose planned
+        date is in this range (both ends included), for example one month of the
+        calendar view. A meeting without a date is then not in the list.
+        """
         stmt = select(Meeting).order_by(Meeting.created_at.desc())
         if gremium_id is not None:
             stmt = stmt.where(Meeting.gremium_id == gremium_id)
+        if date_from is not None:
+            stmt = stmt.where(Meeting.date >= date_from)
+        if date_to is not None:
+            stmt = stmt.where(Meeting.date <= date_to)
         visible = await self._visible_gremium_ids(principal)
         if visible is not None:
             # Delegation recipients see their meetings even without a membership.

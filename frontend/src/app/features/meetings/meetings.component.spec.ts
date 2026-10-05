@@ -184,7 +184,10 @@ async function setup(
       { provide: Router, useValue: routerStub(navigate) },
       {
         provide: ActivatedRoute,
-        useValue: { paramMap: of(convertToParamMap(id ? { id } : {})) },
+        useValue: {
+          paramMap: of(convertToParamMap(id ? { id } : {})),
+          queryParamMap: of(convertToParamMap({})),
+        },
       },
     ],
   });

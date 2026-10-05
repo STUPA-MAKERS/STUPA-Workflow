@@ -718,6 +718,15 @@ describe('ApiClient', () => {
     req.flush([]);
   });
 
+  it('lists the meetings of a date range for the calendar', () => {
+    api.listMeetings(undefined, { from: '2026-08-31', to: '2026-10-04' }).subscribe();
+    const req = http.expectOne((r) => r.url === '/api/meetings');
+    expect(req.request.params.has('gremiumId')).toBe(false);
+    expect(req.request.params.get('dateFrom')).toBe('2026-08-31');
+    expect(req.request.params.get('dateTo')).toBe('2026-10-04');
+    req.flush([]);
+  });
+
   it('fetches the meetings timeline with only the direction (minimal opts)', (done) => {
     api.listMeetingsTimeline({ direction: 'upcoming' }).subscribe((page) => {
       expect(page.items).toEqual([]);

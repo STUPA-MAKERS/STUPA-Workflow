@@ -832,6 +832,21 @@ async def test_list_with_gremium_filter_and_visibility(
     assert [o.id for o in out] == [m.id]
 
 
+async def test_list_with_date_range() -> None:
+    m = _meeting()
+    sess = _QueueSession(
+        executes=[
+            res(m),  # select(Meeting) list
+            res(),  # _decorate: proto rows
+            res((m.gremium_id, "StuPa")),  # gremium names
+            res(),  # _votes_for: votes
+        ]
+    )
+    svc = MeetingService(sess)  # type: ignore[arg-type]
+    out = await svc.list(_admin(), date_from=date(2026, 9, 28), date_to=date(2026, 11, 8))
+    assert [o.id for o in out] == [m.id]
+
+
 async def test_decorate_empty() -> None:
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc._decorate([], _admin()) == []
@@ -2213,6 +2228,7 @@ class _FakeMeetingService:
         self.created: list[Any] = []
         self.deleted: list[Any] = []
         self.broadcasts = 0
+        self.list_calls: list[dict[str, Any]] = []
 
     async def can_manage(self, gremium_id: UUID, principal: Principal) -> bool:
         return self._can_manage
@@ -2222,7 +2238,10 @@ class _FakeMeetingService:
         self.created.append(out)
         return out
 
-    async def list(self, principal: Principal, gremium_id: UUID | None = None) -> list[Any]:
+    async def list(
+        self, principal: Principal, gremium_id: UUID | None = None, **kw: Any
+    ) -> list[Any]:
+        self.list_calls.append({"gremium_id": gremium_id, **kw})
         return [self._meeting_out]
 
     async def list_timeline(self, principal: Principal, **kw: Any) -> Any:
@@ -2450,6 +2469,23 @@ def test_list_meetings_ok(app: FastAPI, client: TestClient) -> None:
     r = client.get("/api/meetings")
     assert r.status_code == 200
     assert len(r.json()) == 1
+
+
+def test_list_meetings_passes_the_date_range(app: FastAPI, client: TestClient, fakes) -> None:
+    _login(app)
+    r = client.get("/api/meetings?dateFrom=2026-09-28&dateTo=2026-11-08")
+    assert r.status_code == 200
+    assert fakes["meeting"].list_calls == [
+        {"gremium_id": None, "date_from": date(2026, 9, 28), "date_to": date(2026, 11, 8)}
+    ]
+
+
+def test_list_meetings_refuses_an_inverted_range(app: FastAPI, client: TestClient) -> None:
+    _login(app)
+    r = client.get("/api/meetings?dateFrom=2026-11-08&dateTo=2026-09-28")
+    assert r.status_code == 422
+    assert r.headers["content-type"] == "application/problem+json"
+    assert r.json()["code"] == "invalid_date_range"
 
 
 def test_list_meetings_timeline_ok(app: FastAPI, client: TestClient) -> None:
