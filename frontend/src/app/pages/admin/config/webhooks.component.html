@@ -37,7 +37,7 @@
             <div class="wh__side">
               <app-switch
                 [checked]="h.active"
-                [disabled]="!canManage() || toggling() === h.id"
+                [disabled]="!canManage() || isToggling(h.id)"
                 (checkedChange)="setActive(h, $event)"
                 [ariaLabel]="('admin.webhook.active' | t) + ': ' + (h.name || h.url)"
                 >{{ 'admin.webhook.active' | t }}</app-switch

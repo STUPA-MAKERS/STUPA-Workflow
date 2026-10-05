@@ -104,9 +104,12 @@
         <span
           class="bt__num bt__avail mono"
           [class.bt__neg]="isNegative($any(row).node)"
-          [title]="availableTitle($any(row).node)"
           >{{ amount($any(row).node, 'available') }}</span
         >
+        <!-- A narrow table leaves out amounts: they stand as lines under "Verfügbar". -->
+        @for (line of hiddenAmounts($any(row).node); track $index) {
+          <span class="bt__more">{{ line }}</span>
+        }
       </ng-template>
       <ng-template appCell="color" let-row>
         @let sw = swatch($any(row).node);

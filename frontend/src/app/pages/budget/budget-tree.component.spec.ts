@@ -212,25 +212,32 @@ describe('BudgetTreeComponent', () => {
     expect(c.childParent()).toBeNull();
   });
 
-  it('leaves out the amounts a narrow page has no room for', async () => {
-    const { c } = await setup();
+  it('leaves out the amounts a narrow page has no room for and shows them under "Verfügbar"', async () => {
+    const { c, fixture } = await setup();
     const keys = (): string[] => c.columns().map((col: { key: string }) => col.key);
-    c.width.set(900);
+    // The sheet beside the admin navigation at 1440 px shows every amount.
+    c.width.set(904);
+    expect(keys()).toEqual(expect.arrayContaining(['expended', 'income']));
+    expect(c.hiddenAmounts(TREE[0])).toEqual([]);
+    c.width.set(820);
     expect(keys()).not.toContain('income');
     expect(keys()).toContain('expended');
     // Intl puts a no-break space before the currency sign.
     const plain = (t: string): string => t.replace(/\u00a0/g, ' ');
-    expect(plain(c.availableTitle(TREE[0]))).toBe('Einnahmen 0 €');
+    expect(c.hiddenAmounts(TREE[0]).map(plain)).toEqual(['Einnahmen 0 €']);
     c.width.set(700);
     expect(keys()).not.toContain('expended');
-    expect(plain(c.availableTitle(TREE[0]))).toBe('Ausgegeben 50 € · Einnahmen 0 €');
+    expect(c.hiddenAmounts(TREE[0]).map(plain)).toEqual(['Ausgegeben 50 €', 'Einnahmen 0 €']);
+    // The lines are text in the cell, so a keyboard or touch user reads them too.
+    fixture.detectChanges();
+    const more = [...(fixture.nativeElement as HTMLElement).querySelectorAll('.bt__more')].map((el) => plain(el.textContent ?? '').trim());
+    expect(more).toContain('Ausgegeben 50 €');
     c.width.set(1200);
     expect(keys()).toContain('income');
-    expect(c.availableTitle(TREE[0])).toBe('');
-    // Without an allocation view there is no tooltip.
+    // Without an allocation view there are no lines.
     c.width.set(700);
     c.selectedFyId.set('other');
-    expect(c.availableTitle(TREE[0])).toBe('');
+    expect(c.hiddenAmounts(TREE[0])).toEqual([]);
   });
 
   it('folds and unfolds a subtree', async () => {

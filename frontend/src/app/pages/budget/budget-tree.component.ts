@@ -58,13 +58,18 @@ export interface Swatch {
 /** The colour of a cost centre: `#rrggbb`, the format the dialog stores. */
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
-/** The width of an amount column: "120.000,00 €" in the mono font of the table. */
-const AMOUNT_WIDTH = '6.5rem';
+/** The width of an amount column: "120.000 €" in the mono font of the table. A longer
+ *  amount widens its column; the name column gives up the room. */
+const AMOUNT_WIDTH = '6rem';
 
-/** From this page width on, the table shows all five amounts. */
-const FULL_TABLE_MIN = 1020;
+/**
+ * From this page width on, the table shows all five amounts. The fixed columns (five
+ * amounts, colour, four row actions) take about 690 px; the rest, at least 180 px, is
+ * the name column. The sheet beside the admin navigation is 904 px wide at 1440 px.
+ */
+const FULL_TABLE_MIN = 870;
 /** From this page width on, the table leaves out only "Einnahmen". */
-const MID_TABLE_MIN = 880;
+const MID_TABLE_MIN = 780;
 
 /** The cutoff day must exist in every month (backend: 1..28). */
 const MAX_CUTOFF_DAY = 28;
@@ -129,7 +134,7 @@ export class BudgetTreeComponent {
   /** The width of the page, measured: the sheet beside the admin navigation is narrower
    *  than the viewport says. `0` until the first measure (all columns). */
   readonly width = signal(0);
-  /** The amounts a narrow page leaves out; the tooltip of "Verfügbar" names them. */
+  /** The amounts a narrow page leaves out; lines under "Verfügbar" show them. */
   readonly hidden = computed<ReadonlySet<'expended' | 'income'>>(() => {
     const w = this.width();
     // A phone shows cards: they stack the amounts and have room for all five.
@@ -293,7 +298,7 @@ export class BudgetTreeComponent {
     if (!hidden.has('income')) cols.push(money('income', 'budget.tree.col.income'));
     cols.push(
       money('available', 'budget.tree.col.available'),
-      { key: 'color', label: t('budget.tree.col.color'), width: '3.5rem' },
+      { key: 'color', label: t('budget.tree.col.color'), width: '2.75rem' },
       { key: 'actions', label: t('budget.tree.col.actions'), align: 'end', width: '9.5rem', card: 'actions' },
     );
     return cols;
@@ -380,16 +385,20 @@ export class BudgetTreeComponent {
     return a ? this.money(a[field], node.currency) : '—';
   }
 
-  /** The tooltip of "Verfügbar" in a narrow table: the amounts it leaves out. */
-  availableTitle(node: BudgetTreeNode): string {
+  /**
+   * The amounts a narrow table leaves out, as visible lines under "Verfügbar". They are
+   * text in the cell, not a tooltip, so a keyboard, touch or screen-reader user reads
+   * them too. Empty when the table shows every amount or the node has no allocation.
+   */
+  hiddenAmounts(node: BudgetTreeNode): string[] {
     const hidden = this.hidden();
-    if (!hidden.size || !this.alloc(node)) return '';
-    const parts: string[] = [];
+    if (!hidden.size || !this.alloc(node)) return [];
+    const lines: string[] = [];
     if (hidden.has('expended')) {
-      parts.push(this.i18n.translate('budget.tree.expendedTitle', { amount: this.amount(node, 'expended') }));
+      lines.push(this.i18n.translate('budget.tree.expendedTitle', { amount: this.amount(node, 'expended') }));
     }
-    parts.push(this.i18n.translate('budget.tree.incomeTitle', { amount: this.amount(node, 'income') }));
-    return parts.join(' · ');
+    lines.push(this.i18n.translate('budget.tree.incomeTitle', { amount: this.amount(node, 'income') }));
+    return lines;
   }
 
   isNegative(node: BudgetTreeNode): boolean {

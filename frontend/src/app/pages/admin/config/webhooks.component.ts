@@ -93,8 +93,11 @@ export class WebhooksComponent {
   protected readonly confirmDelete = signal<WebhookConfig | null>(null);
   /** The webhook whose delivery diagnosis is open. */
   protected readonly statusDetail = signal<WebhookConfig | null>(null);
-  /** The webhook whose active flag is being saved. */
-  protected readonly toggling = signal<string | null>(null);
+  /**
+   * The webhooks whose active flag is being saved. Each webhook saves on its own, so a
+   * switch stays usable while the save of another webhook runs.
+   */
+  protected readonly toggling = signal<ReadonlySet<string>>(new Set());
   /** Delivery state per webhook id, from `GET /admin/webhooks/delivery-status`. */
   protected readonly delivery = signal<ReadonlyMap<string, WebhookDeliveryStatus>>(new Map());
 
@@ -197,6 +200,20 @@ export class WebhooksComponent {
         this.hooks.update((list) =>
           idx === null ? [...list, saved] : list.map((h, i) => (i === idx ? saved : h)),
         );
+        // A new webhook has no delivery yet. The backend reports it as "never", so show
+        // that state at once instead of waiting for a reload.
+        if (idx === null && !this.delivery().has(saved.id)) {
+          this.delivery.update((m) =>
+            new Map(m).set(saved.id, {
+              webhookId: saved.id,
+              lastState: 'never',
+              reasonClass: 'no_deliveries',
+              responseCode: null,
+              attempts: 0,
+              lastAt: null,
+            }),
+          );
+        }
         this.toast.success(this.i18n.translate('admin.common.saved'));
         this.close();
       },
@@ -209,19 +226,38 @@ export class WebhooksComponent {
     this.statusDetail.update((cur) => (cur?.id === hook.id ? null : hook));
   }
 
-  /** The "Aktiv" switch saves the webhook at once; a failure puts the switch back. */
+  /** True while the active flag of this webhook is being saved. */
+  protected isToggling(id: string): boolean {
+    return this.toggling().has(id);
+  }
+
+  private setToggling(id: string, on: boolean): void {
+    this.toggling.update((cur) => {
+      const next = new Set(cur);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  /**
+   * The "Aktiv" switch saves the webhook at once; a failure puts the switch back. The
+   * switch of a webhook is disabled while its own save runs. Other webhooks save in
+   * parallel.
+   */
   protected setActive(hook: WebhookConfig, active: boolean): void {
-    if (this.toggling()) return;
-    this.toggling.set(hook.id);
+    if (this.isToggling(hook.id)) return;
+    const before = hook.active;
+    this.setToggling(hook.id, true);
     this.hooks.update((list) => list.map((h) => (h.id === hook.id ? { ...h, active } : h)));
     this.api.saveWebhook({ ...hook, events: [...hook.events], active }).subscribe({
       next: (saved) => {
-        this.toggling.set(null);
+        this.setToggling(hook.id, false);
         this.hooks.update((list) => list.map((h) => (h.id === saved.id ? saved : h)));
       },
       error: () => {
-        this.toggling.set(null);
-        this.hooks.update((list) => list.map((h) => (h.id === hook.id ? { ...h, active: hook.active } : h)));
+        this.setToggling(hook.id, false);
+        this.hooks.update((list) => list.map((h) => (h.id === hook.id ? { ...h, active: before } : h)));
         this.toast.error(this.i18n.translate('admin.common.saveFailed'));
       },
     });

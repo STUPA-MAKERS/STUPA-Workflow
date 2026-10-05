@@ -91,15 +91,19 @@
   flex: none;
   width: 1.75rem;
 }
+/* The name column takes only the width the fixed columns leave: the text box asks for no
+   width of its own (`width: 0`) and grows into the free room. So a long name or a deep
+   node never pushes the amounts out of the sheet. */
 .bt__nodeText {
   display: flex;
+  flex: 1 1 0;
   flex-direction: column;
+  width: 0;
   min-width: 0;
 }
-/* A long name ends in an ellipsis (its title holds the full name), so the amounts keep
-   their room. */
+/* A long name ends in an ellipsis (its title holds the full name). */
 .bt__name {
-  max-width: 11rem;
+  max-width: 100%;
   font-weight: var(--fw-semibold);
 }
 .bt__name--inactive {
@@ -118,6 +122,14 @@
 }
 .bt__avail {
   color: var(--color-accent-text);
+}
+/* The amounts a narrow table leaves out, one small line each under "Verfügbar". */
+.bt__more {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .bt__neg {
   color: var(--color-danger);
@@ -175,6 +187,10 @@
   /* A card names its depth with a small step only, and its title wraps. */
   .bt__node {
     padding-inline-start: calc(var(--bt-depth, 0) * 0.5rem);
+  }
+  .bt__nodeText {
+    flex: 1 1 auto;
+    width: auto;
   }
   .bt__name {
     max-width: none;

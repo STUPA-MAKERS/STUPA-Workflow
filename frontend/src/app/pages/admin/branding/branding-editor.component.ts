@@ -11,6 +11,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { I18nMap } from '@core/api/models';
+import { resolveI18n } from '@shared/forms/i18n-text';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { RowMenuComponent, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
@@ -159,6 +160,11 @@ export class BrandingEditorComponent {
 
   protected size(bytes: number): string {
     return formatBytes(bytes, this.i18n);
+  }
+
+  /** One text of the draft in the language that is edited now, for the preview. */
+  protected text(map: I18nMap | null | undefined): string {
+    return resolveI18n(map, this.lang());
   }
 
   /** The text map of a free text. `applyInfo` is missing in an older config. */

@@ -1,4 +1,4 @@
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
@@ -311,22 +311,55 @@ describe('WebhooksComponent', () => {
     await userEvent.click(screen.getByRole('switch', { name: 'Aktiv: A' }));
     expect(saveWebhook).toHaveBeenCalledWith(expect.objectContaining({ id: 'wh-1', active: false }));
     expect(c.hooks()[0].active).toBe(false);
-    expect(c.toggling()).toBeNull();
+    expect(c.toggling().size).toBe(0);
   });
 
   it('puts the active switch back after a failed save', async () => {
     const { c, toast } = await setup(HOOKS, { saveError: true });
     c.setActive(HOOKS[1], false);
     expect(c.hooks()[1].active).toBe(true);
-    expect(c.toggling()).toBeNull();
+    expect(c.toggling().size).toBe(0);
     expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
   });
 
-  it('ignores a second switch while one save runs', async () => {
+  it('ignores a second toggle of the same webhook while its save runs', async () => {
     const { c, saveWebhook } = await setup(HOOKS);
-    c.toggling.set('wh-1');
+    c.toggling.set(new Set(['wh-2']));
     c.setActive(HOOKS[1], false);
     expect(saveWebhook).not.toHaveBeenCalled();
+  });
+
+  it('saves a second webhook while the save of the first is pending', async () => {
+    const { c, saveWebhook } = await setup(HOOKS);
+    const pending = new Subject<WebhookConfig>();
+    saveWebhook.mockImplementationOnce(() => pending);
+    const a = screen.getByRole('switch', { name: 'Aktiv: A' });
+    const b = screen.getByRole('switch', { name: 'Aktiv: B' });
+    await userEvent.click(a);
+    expect(c.isToggling('wh-1')).toBe(true);
+    await userEvent.click(b);
+    expect(saveWebhook).toHaveBeenCalledTimes(2);
+    expect(saveWebhook).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'wh-2', active: false }));
+    // Each switch shows the state that its webhook holds.
+    expect(b).toHaveAttribute('aria-checked', String(c.hooks()[1].active));
+    expect(b).toHaveAttribute('aria-checked', 'false');
+    pending.next({ ...HOOKS[0], active: false });
+    pending.complete();
+    expect(c.toggling().size).toBe(0);
+    expect(a).toHaveAttribute('aria-checked', String(c.hooks()[0].active));
+  });
+
+  it('shows "Noch nie" for a webhook created in this session', async () => {
+    const { c, fixture } = await setup([], { status: [] });
+    c.openAdd();
+    c.patch('name', 'New');
+    c.patch('url', 'https://hook.test');
+    c.save();
+    fixture.detectChanges();
+    expect(c.statusOf('wh-new')).toEqual(
+      expect.objectContaining({ lastState: 'never', reasonClass: 'no_deliveries', attempts: 0 }),
+    );
+    expect(screen.getByText('Noch nie')).toBeInTheDocument();
   });
 
   it('reads an unknown reason class back raw', async () => {

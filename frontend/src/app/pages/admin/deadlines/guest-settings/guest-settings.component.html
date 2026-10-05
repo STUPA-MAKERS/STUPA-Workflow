@@ -37,6 +37,7 @@
           <div class="gs__link" [class.gs__link--days]="draft().mode === 'days'">
             <app-select
               [label]="'admin.guest.link' | t"
+              [hint]="'admin.guest.linkHint' | t"
               [options]="modeOptions()"
               name="linkMode"
               [ngModel]="draft().mode"
@@ -56,7 +57,6 @@
               </div>
             }
           </div>
-          <p class="gs__hint">{{ 'admin.guest.linkHint' | t }}</p>
         </div>
       </form>
     }

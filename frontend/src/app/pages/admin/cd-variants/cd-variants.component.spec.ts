@@ -126,6 +126,16 @@ describe('AdminCdVariantsComponent', () => {
     expect(c.logoDetail({ ...TITLE_UPLOAD, size: undefined, fileName: undefined })).toBe('—');
   });
 
+  it('explains under a bundled logo why it has no file', async () => {
+    await setup();
+    await screen.findByText('StuPa');
+    const hint = 'Diese Logos liefert der PDF-Renderer mit. Ein Upload ist nicht nötig.';
+    // Two bundled logos (HSRT, STUPA), none for the upload.
+    const lines = screen.getAllByText(hint).filter((el) => el.classList.contains('cdv__logoHint'));
+    expect(lines).toHaveLength(2);
+    expect(screen.getByText('wappen.png · 1,2 KB').parentElement).not.toHaveTextContent(hint);
+  });
+
   it('shows the empty state without variants', async () => {
     await setup(makeApi({ listCdVariants: jest.fn(() => of([])) }));
     expect(await screen.findByText('Noch keine Dokument-Varianten angelegt.')).toBeInTheDocument();

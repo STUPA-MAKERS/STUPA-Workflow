@@ -135,6 +135,11 @@
   color: var(--color-text-muted);
   overflow-wrap: anywhere;
 }
+/* The note under a bundled logo: the renderer ships it, so it needs no upload. */
+.cdv__logoHint {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
 .cdv__logoActions {
   display: inline-flex;
   flex: none;

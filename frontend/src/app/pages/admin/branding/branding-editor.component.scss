@@ -260,6 +260,107 @@
   box-shadow: inset 0 0 0 1px var(--color-danger);
 }
 
+/* The live preview of the draft: a disclosure below the form. */
+.br__preview {
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+}
+.br__previewSum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-xl);
+  cursor: pointer;
+  list-style: none;
+}
+.br__previewSum::-webkit-details-marker {
+  display: none;
+}
+.br__previewSum:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.br__previewChev {
+  align-self: center;
+  color: var(--color-text-muted);
+  transition: transform var(--motion-fast) var(--ease-standard);
+}
+.br__preview[open] .br__previewChev {
+  transform: rotate(90deg);
+}
+.br__previewHint {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.br__pv {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0 var(--space-4) var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-3);
+  font-size: var(--fs-sm);
+}
+.br__pvHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.br__pvLogo {
+  max-height: 2.5rem;
+}
+.br__pvWord {
+  max-height: 1.75rem;
+  max-width: 100%;
+}
+.br__pvWelcome {
+  margin: 0;
+  font-size: var(--fs-md);
+}
+.br__pvSupport {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+/* A text that is not set yet shows its field name in a muted look. */
+.br__pvPh {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+.br__pvFoot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+  padding-top: var(--space-3);
+  border-top: var(--border-width) solid var(--color-border);
+}
+.br__pvCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.br__pvLink {
+  color: var(--color-accent-text);
+  overflow-wrap: anywhere;
+}
+.br__pvCopy,
+.br__pvLegal {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+.br__pvLegal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
 @container (max-width: 30rem) {
   .br__nameRow,
   .br__pair {

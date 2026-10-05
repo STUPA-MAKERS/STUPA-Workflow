@@ -1352,6 +1352,8 @@ export const de = {
   'admin.brand.noColumns': 'Noch keine Spalte.',
   'admin.brand.noLegal': 'Noch keine rechtlichen Links.',
   'admin.brand.copyrightHint': 'Leer lassen für den Standardtext.',
+  'admin.brand.preview': 'Vorschau',
+  'admin.brand.previewHint': 'So sehen Kopf, Texte und Fußzeile mit diesem Entwurf aus.',
   'budget.tree.col.income': 'Einnahmen',
   'budget.tree.subtitle':
     'Zuteilung je Haushaltsjahr, Farbe je Kostenstelle, Unter-Kostenstellen anlegen.',
@@ -4234,6 +4236,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.brand.noColumns': 'No column yet.',
   'admin.brand.noLegal': 'No legal links yet.',
   'admin.brand.copyrightHint': 'Leave empty for the default text.',
+  'admin.brand.preview': 'Preview',
+  'admin.brand.previewHint': 'This is how the header, the texts and the footer look with this draft.',
   'budget.tree.col.income': 'Income',
   'budget.tree.subtitle': 'Allocation per fiscal year, a colour per cost centre, sub cost centres.',
   'budget.tree.createTopShort': 'Budget',

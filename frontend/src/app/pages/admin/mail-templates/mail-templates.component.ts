@@ -79,9 +79,15 @@ export class MailTemplatesComponent {
     return label === k ? key : label;
   }
 
-  readonly templateOptions = computed<FilterSelectOption[]>(() =>
-    this.templates_().map((t) => ({ value: t.key, label: this.keyLabel(t.key) })),
-  );
+  /** The choices of the phone chip. An override carries "· angepasst", as in the
+   *  desktop list, because the chip list has no second text line. */
+  readonly templateOptions = computed<FilterSelectOption[]>(() => {
+    const custom = this.i18n.translate('admin.mailTemplates.customized');
+    return this.templates_().map((t) => ({
+      value: t.key,
+      label: t.source === 'override' ? `${this.keyLabel(t.key)} · ${custom}` : this.keyLabel(t.key),
+    }));
+  });
 
   setLang(value: string | null): void {
     this.lang.set(value === 'en' ? 'en' : 'de');

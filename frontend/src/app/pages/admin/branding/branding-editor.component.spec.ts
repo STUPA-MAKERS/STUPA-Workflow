@@ -142,6 +142,35 @@ describe('BrandingEditorComponent', () => {
     expect(c.draft().legalLinks.map((l: { url: string }) => l.url)).toEqual(['https://example.org/impressum']);
   });
 
+  it('shows the draft in a live preview behind the "Vorschau" disclosure', async () => {
+    const { fixture } = await setup();
+    const summary = screen.getByText('Vorschau').closest('summary') as HTMLElement;
+    const details = summary.closest('details') as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    await userEvent.click(summary);
+    expect(details.open).toBe(true);
+    expect(screen.getByTestId('preview-welcome')).toHaveTextContent('Willkommen auf der Antragsplattform.');
+    expect(screen.getByTestId('preview-support')).toHaveTextContent('support@example.org');
+    expect(screen.getByTestId('preview-footer')).toHaveTextContent('Über uns');
+    const legal = screen.getByTestId('preview-legal');
+    expect(legal).toHaveTextContent('Impressum');
+    expect(legal).toHaveTextContent('Datenschutz');
+    // The preview follows the form at once.
+    const welcome = screen.getByRole('textbox', { name: 'Willkommenstext (DE)' });
+    await userEvent.clear(welcome);
+    await userEvent.type(welcome, 'Servus');
+    fixture.detectChanges();
+    expect(screen.getByTestId('preview-welcome')).toHaveTextContent('Servus');
+    // An empty text shows its field name as a placeholder.
+    await userEvent.clear(welcome);
+    fixture.detectChanges();
+    expect(screen.getByTestId('preview-welcome')).toHaveTextContent('Willkommenstext');
+    // The preview shows the language that is edited now.
+    await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
+    fixture.detectChanges();
+    expect(screen.getByTestId('preview-footer')).toHaveTextContent('About');
+  });
+
   it('saving a draft enables activation and bumps the version', async () => {
     const { container } = await setup();
     const activate = screen.getByRole('button', { name: 'Entwurf aktivieren' });

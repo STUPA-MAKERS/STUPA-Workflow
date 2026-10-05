@@ -249,6 +249,63 @@
       </div>
     </div>
 
+    <!-- The live preview of the draft, in the language that is edited now: the header with
+         the logos, the welcome and support texts and the footer. It is a disclosure, so the
+         form stays the first thing on the page. -->
+    <details class="br__preview">
+      <summary class="br__previewSum">
+        <app-icon class="br__previewChev" name="chevron-right" [size]="16" />
+        <span class="sec">{{ 'admin.brand.preview' | t }}</span>
+        <span class="br__previewHint">{{ 'admin.brand.previewHint' | t }}</span>
+      </summary>
+      <div class="br__pv">
+        <div class="br__pvHead" data-testid="preview-header">
+          @if (d.logos.imagemark; as im) {
+            <img class="br__pvLogo" [src]="im.url" alt="" />
+          }
+          @if (d.logos.wordmark; as wm) {
+            <img class="br__pvWord" [src]="wm.url" alt="" />
+          } @else if (d.appName || text(d.copyright)) {
+            <strong>{{ d.appName || text(d.copyright) }}</strong>
+          } @else {
+            <strong class="br__pvPh">{{ 'admin.brand.logo.wordmark' | t }}</strong>
+          }
+        </div>
+
+        @if (text(d.freetexts.welcome); as w) {
+          <p class="br__pvWelcome" data-testid="preview-welcome">{{ w }}</p>
+        } @else {
+          <p class="br__pvWelcome br__pvPh" data-testid="preview-welcome">{{ 'admin.brand.text.welcome' | t }}</p>
+        }
+        @if (text(d.freetexts.support); as sup) {
+          <p class="br__pvSupport" data-testid="preview-support">{{ sup }}</p>
+        } @else {
+          <p class="br__pvSupport br__pvPh" data-testid="preview-support">{{ 'admin.brand.text.support' | t }}</p>
+        }
+
+        <div class="br__pvFoot" data-testid="preview-footer">
+          @for (col of d.footerColumns; track $index) {
+            <div class="br__pvCol">
+              <strong>{{ text(col.label) }}</strong>
+              @for (link of col.links; track $index) {
+                <span class="br__pvLink">{{ text(link.label) || link.url }}</span>
+              }
+            </div>
+          }
+          @if (text(d.copyright); as copy) {
+            <p class="br__pvCopy">{{ copy }}</p>
+          }
+          @if (d.legalLinks.length) {
+            <p class="br__pvLegal" data-testid="preview-legal">
+              @for (link of d.legalLinks; track $index) {
+                <span class="br__pvLink">{{ text(link.label) || link.url }}</span>
+              }
+            </p>
+          }
+        </div>
+      </div>
+    </details>
+
     <app-version-history entityType="site_config" entityId="global" (restored)="loadConfig()" />
   }
 </section>

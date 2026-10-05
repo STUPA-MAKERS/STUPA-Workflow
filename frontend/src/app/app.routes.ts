@@ -280,7 +280,8 @@ export const routes: Routes = [
           {
             path: 'cost-centres',
             // `adminNav: 'xl'`: the cost-centre table with its eight columns fits beside
-            // the admin navigation from 1440 px on. Below that the page takes the full width.
+            // the admin navigation from 1440 px on (a sheet of 904 px, the table needs
+            // 870 px). Below that the page takes the full width.
             data: {
               title: 'budget.tree.title',
               permission: 'budget.structure',

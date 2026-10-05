@@ -57,6 +57,10 @@
                             <span class="cdv__muted">{{ (logo.vendoredName ? 'admin.cdVariants.sourceVendored' : 'admin.cdVariants.sourceUpload') | t }}</span>
                           </span>
                           <span class="cdv__logoName mono">{{ logoDetail(logo) }}</span>
+                          @if (logo.vendoredName) {
+                            <!-- Why this row has no file and no download. -->
+                            <span class="cdv__logoHint">{{ 'admin.cdVariants.vendoredHint' | t }}</span>
+                          }
                         </span>
                         <span class="cdv__logoActions">
                           <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="i === 0" [ariaLabel]="('admin.common.moveUp' | t) + ': ' + logoLabel(logo)" (click)="moveLogo(v, slot, i, -1)">

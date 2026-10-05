@@ -290,13 +290,13 @@ describe('MailTemplatesComponent', () => {
     afterEach(() => restore());
 
     it('picks the template with a chip instead of the list', async () => {
-      const { view } = await setup({ ...setupApi(), listMailTemplates: jest.fn(() => of([TPL, { ...TPL, key: 'task_new' }])) });
+      const { view } = await setup({ ...setupApi(), listMailTemplates: jest.fn(() => of([TPL, { ...TPL, key: 'task_new', source: 'override' }])) });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const c = view.fixture.componentInstance as any;
       expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
       expect(c.templateOptions()).toEqual([
         { value: 'magic_link', label: 'Anmelde-Link' },
-        { value: 'task_new', label: 'Neue Aufgabe' },
+        { value: 'task_new', label: 'Neue Aufgabe · angepasst' },
       ]);
       expect(screen.getByRole('button', { name: /Vorlage/ })).toBeInTheDocument();
     });
