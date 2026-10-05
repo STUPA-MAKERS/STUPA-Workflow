@@ -159,6 +159,8 @@ export class ApplicationsDetailComponent {
 
   /** The list sits beside the detail: two columns, no tabs. */
   readonly split = computed(() => this.page?.split() ?? false);
+  /** The route of the list pane: `/applications`, or `/tasks` on the tasks page. */
+  readonly listPath = computed(() => this.page?.listPath() ?? ['/applications']);
   /** Phone: every header action goes into the menu. */
   readonly phone = mediaQuerySignal(MEDIA.phone);
 
@@ -983,7 +985,7 @@ export class ApplicationsDetailComponent {
         this.confirmDelete.set(false);
         this.toast.success(this.i18n.translate('applications.detail.deleted'));
         this.page?.notify({ id: this.id, kind: 'deleted', source: 'detail' });
-        void this.router.navigate(['/applications'], { queryParamsHandling: 'preserve' });
+        void this.router.navigate([...this.listPath()], { queryParamsHandling: 'preserve' });
       },
       error: () => {
         this.deleting.set(false);

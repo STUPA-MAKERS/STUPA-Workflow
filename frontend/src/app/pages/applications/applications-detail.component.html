@@ -12,7 +12,7 @@
       [heading]="'applications.detail.notFound' | t"
       [body]="'applications.detail.notFoundBody' | t"
     >
-      <a routerLink="/applications" class="ad__backLink">
+      <a [routerLink]="listPath()" class="ad__backLink">
         {{ 'applications.detail.backToList' | t }}
       </a>
     </app-empty-state>

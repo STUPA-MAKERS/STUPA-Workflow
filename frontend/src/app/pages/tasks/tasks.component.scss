@@ -1,57 +1,183 @@
 @use 'breakpoints' as bp;
 
+/* The same two panes as the applications page (applications-list.component.scss). */
+
 :host {
+  display: block;
+  min-width: 0;
+}
+
+/* Side by side the page does not scroll: it fills the viewport below the top padding of
+   the shell, and each pane scrolls inside itself. One pane at a time, the page scrolls. */
+.tasks {
+  min-width: 0;
+}
+.tasks--split {
+  height: calc(100dvh - var(--main-pad-top, 0px) - var(--main-pad-bottom, 0px));
+}
+.tasks > app-list-detail {
+  --ld-list-width: 440px;
+}
+
+/* ------------------------------------------------------------------ list pane */
+.tasks__pane {
+  position: relative;
   display: flex;
   flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.tasks--split .tasks__pane {
+  height: 100%;
+  min-height: 0;
 }
 
-/* The title gives no width to its column (width 0) and fills the cell (min-width 100%),
-   so a long title takes the width that is left and ends in an ellipsis. It never makes
-   the table wider than the page. */
+/* The title and the count of the open tasks on one baseline (as `app-page-header`). */
+.tasks__head {
+  display: flex;
+  flex: none;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-height: var(--control-height);
+  padding-inline: var(--space-4) 0;
+}
 .tasks__title {
-  display: block;
-  width: 0;
-  min-width: 100%;
-  font-weight: var(--fw-medium);
-  color: var(--color-text);
-}
-
-/* The request failed: one line in the danger colour, like the error of the start page. */
-.tasks__error {
+  min-width: 0;
   margin: 0;
-  padding: var(--space-5) 0;
-  color: var(--color-danger);
+  font-size: var(--fs-d2);
+  line-height: var(--lh-d2);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-tight);
 }
-
-.tasks__muted {
+.tasks__meta {
+  flex: none;
   color: var(--color-text-muted);
-}
-
-/* One line, so each of these columns is as wide as its longest value and the title
-   column takes the rest. */
-.tasks__nowrap {
+  font-size: var(--fs-small);
   white-space: nowrap;
 }
 
-.tasks__waiting {
-  font-size: 0.8125rem; /* 13px */
-  color: var(--color-text-muted);
-  white-space: nowrap;
+/* ------------------------------------------------------------------ rows */
+.tasks__scroll {
+  --tasks-fade: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tasks--split .tasks__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--tasks-fade);
+}
+.tasks--split .tasks__scroll > * {
+  flex: none;
+}
+/* An end fades only while more rows lie past it (`appScrollFade` sets the classes). */
+.tasks__scroll.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--tasks-fade));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--tasks-fade));
+}
+.tasks__scroll.is-fade-end {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--tasks-fade));
+  mask-image: linear-gradient(to top, transparent, #000 var(--tasks-fade));
+}
+.tasks__scroll.is-fade-start.is-fade-end {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--tasks-fade),
+    #000 calc(100% - var(--tasks-fade)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--tasks-fade),
+    #000 calc(100% - var(--tasks-fade)),
+    transparent
+  );
 }
 
-.tasks__chev {
-  display: inline-flex;
+.tasks__group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tasks__month {
+  padding: 18px var(--space-4) 6px;
+}
+.tasks__group:first-child .tasks__month {
+  padding-top: var(--space-2);
+}
+.tasks__rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tasks__dot {
+  margin-inline: 6px;
   color: var(--color-text-subtle);
 }
 
-/* A card has the width for the full title, so it wraps there. */
+/* The amount over the waiting time, both at the end of the row. */
+.tasks__trail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.tasks__facts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.tasks__amount {
+  font-size: 0.8125rem; /* 13px */
+  white-space: nowrap;
+}
+.tasks__waiting {
+  color: var(--color-text-muted);
+  font-size: 0.75rem; /* 12px */
+  white-space: nowrap;
+}
+.tasks__chev {
+  display: inline-flex;
+  margin-inline-end: calc(-1 * var(--space-2));
+  color: var(--color-text-muted);
+}
+
+.tasks__status {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.tasks__status--error {
+  color: var(--color-danger);
+}
+.tasks__empty {
+  margin-block: var(--space-6);
+}
+
+/* ------------------------------------------------------------------ detail pane */
+.tasks__detail {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
 @include bp.phone {
-  .tasks__nowrap {
-    white-space: normal;
+  .tasks__head {
+    padding-inline-start: var(--space-1);
   }
-  .tasks__title {
-    width: auto;
-    white-space: normal;
-    overflow-wrap: anywhere;
+  .tasks__month {
+    padding-inline: var(--space-1);
+  }
+  /* The whole row is the target; the title needs the room more than the chevron. */
+  .tasks__chev {
+    display: none;
   }
 }
