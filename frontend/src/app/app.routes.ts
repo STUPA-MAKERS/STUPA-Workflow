@@ -143,7 +143,7 @@ export const routes: Routes = [
       },
       {
         path: 'voting/meeting/:id',
-        data: { title: 'voting.live.heading', gremiumPermission: VOTING_GREMIUM_PERMISSIONS },
+        data: { title: 'nav.voting', gremiumPermission: VOTING_GREMIUM_PERMISSIONS },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./features/voting/live-vote.component').then((m) => m.LiveVoteComponent),

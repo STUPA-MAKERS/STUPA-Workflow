@@ -1,0 +1,69 @@
+@let v = vote();
+@let s = status();
+
+@if (layout() === 'phone') {
+  <app-status-text class="vpn__cap" [kind]="s.kind">{{ s.key | t }} · {{ rules() }}</app-status-text>
+  <h1 class="vpn__q vpn__q--phone">{{ question() }}</h1>
+} @else {
+  <p class="vpn__meta">
+    <app-status-text [kind]="s.kind">{{ s.key | t }}</app-status-text>
+    @if (where(); as w) {
+      <span class="vpn__where ell" [title]="w">{{ w }}</span>
+      <span class="vpn__sep" aria-hidden="true">·</span>
+    } @else if (!v.meetingId && v.applicationId) {
+      <a class="vpn__app" [routerLink]="['/applications', v.applicationId]">{{ 'voting.panel.application' | t }}</a>
+      <span class="vpn__sep" aria-hidden="true">·</span>
+    }
+    <span class="vpn__rules">{{ rules() }}</span>
+  </p>
+  <h2 class="vpn__q">{{ question() }}</h2>
+}
+
+@if (notice(); as n) {
+  <app-note kind="warn" icon="alert">{{ n }}</app-note>
+}
+
+@if (layout() === 'phone' && isOpen()) {
+  <app-vote-progress
+    [voted]="v.tally.voted ?? 0"
+    [total]="turnoutTotal()"
+    [basis]="basis()"
+    [secret]="secret()"
+    [hidden]="!showBars()"
+  />
+}
+
+@if (showBallot()) {
+  <app-ballot
+    [voteId]="v.id"
+    [options]="options()"
+    [secret]="secret()"
+    [own]="own()"
+    [proxyName]="proxyName()"
+    [proxyCast]="proxyCast()"
+    [caster]="caster()"
+    [layout]="layout()"
+    (castDone)="castDone.emit($event)"
+    (castFailed)="castFailed.emit($event)"
+  />
+}
+
+@if (layout() === 'page' && isOpen()) {
+  <hr class="vpn__hr" />
+  <app-vote-progress
+    [voted]="v.tally.voted ?? 0"
+    [total]="turnoutTotal()"
+    [basis]="basis()"
+    [secret]="secret()"
+    [hidden]="!showBars()"
+  />
+}
+
+@if (showBars()) {
+  <app-vote-bars
+    [options]="options()"
+    [counts]="v.tally.counts"
+    [result]="v.status === 'closed' ? v.result : null"
+    [failedReason]="v.tally.failedReason"
+  />
+}

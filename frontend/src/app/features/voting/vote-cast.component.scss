@@ -1,55 +1,43 @@
+/* Board Arbeit-Abstimmungen: one centred column of at most 860px. */
 .vote {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  max-width: 42rem;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 860px;
   margin: 0 auto;
 }
 
-.vote--narrow {
-  max-width: 32rem;
+.vote__status,
+.vote__muted {
+  margin: 0;
+  color: var(--color-text-muted);
 }
 
+.vote__box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 28px 32px;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-1);
+}
+.vote__boxTitle {
+  margin: 0;
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semibold);
+}
 .vote__link {
-  color: var(--color-primary);
+  align-self: flex-start;
+  color: var(--color-accent-text);
   font-weight: var(--fw-semibold);
   text-decoration: none;
 }
-
-// The options need large touch targets, because a user operates them with a thumb.
-.vote__options {
-  display: grid;
-  gap: var(--space-3);
+.vote__link:hover {
+  text-decoration: underline;
 }
 
-.vote__option {
-  width: 100%;
-}
-
-.vote__option ::ng-deep .btn {
-  width: 100%;
-  min-height: 3.25rem;
-}
-
-@media (min-width: 32rem) {
-  .vote__options {
-    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-  }
-}
-
-// Mobile: stack the options full width. This block only adds rules and leaves desktop as is.
-@media (max-width: 48rem) {
-  .vote__options {
-    grid-template-columns: 1fr;
-  }
-
-  .vote__option ::ng-deep .btn {
-    min-height: 3.25rem;
-  }
-
-  .vote__link {
-    display: inline-flex;
-    align-items: center;
-    min-height: 2.75rem;
-  }
+/* Board Telefon-Abstimmen: the phone header sits closer to the panel. */
+.vote--phone {
+  gap: var(--space-2);
 }

@@ -12,13 +12,7 @@
 
   @if (vote(); as v) {
     @if (tally(); as t) {
-      <app-vote-bars
-        variant="beamer"
-        [options]="v.options"
-        [counts]="t.counts"
-        [eligible]="t.eligible"
-        [leading]="t.leading"
-      />
+      <app-vote-bars variant="beamer" [options]="v.options" [counts]="t.counts" />
 
       <footer class="flex items-baseline gap-6 flex-wrap text-2xl font-semibold">
         <p class="beamer__count">{{ 'voting.beamer.votesOf' | t: { cast: castCount(), eligible: t.eligible } }}</p>

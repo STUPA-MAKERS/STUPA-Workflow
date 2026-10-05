@@ -1,153 +1,66 @@
 @switch (phase()) {
   @case ('loading') {
-    <p class="text-muted" role="status">{{ 'voting.cast.loading' | t }}</p>
+    <p class="vote__status" role="status">{{ 'voting.cast.loading' | t }}</p>
   }
 
   @case ('error') {
-    <section class="vote vote--narrow">
-      <app-card [heading]="'voting.cast.error.heading' | t">
-        <p class="text-muted">{{ 'voting.cast.error.body' | t }}</p>
-        <a card-footer routerLink="/voting" class="vote__link">{{ 'voting.live.heading' | t }}</a>
-      </app-card>
+    <section class="vote">
+      <app-page-header [title]="'nav.voting' | t" [flush]="true" />
+      <div class="vote__box">
+        <h2 class="vote__boxTitle">{{ 'voting.cast.error.heading' | t }}</h2>
+        <p class="vote__muted">{{ 'voting.cast.error.body' | t }}</p>
+        <a routerLink="/voting" class="vote__link">{{ 'voting.cast.toOverview' | t }}</a>
+      </div>
     </section>
   }
 
   @case ('ready') {
-    @if (notEligible() && !vote()) {
-      <section class="vote vote--narrow">
-        <p class="m-0 py-3 px-4 bg-warning-subtle text-text border border-solid border-warning rounded-md" role="alert">{{ 'voting.cast.notEligible' | t }}</p>
-        <a routerLink="/voting" class="vote__link">{{ 'voting.live.heading' | t }}</a>
-      </section>
-    }
     @if (vote(); as v) {
-      <section class="vote">
-        <app-page-header [title]="'voting.cast.heading' | t" [subtitle]="subtitle()">
-          <div actions class="inline-flex gap-2 flex-wrap">
-            @if (isOpen()) {
-              <app-badge variant="success">{{ 'vote.option.yes' | t }}</app-badge>
+      <section class="vote" [class.vote--phone]="phone()">
+        @if (phone()) {
+          <app-vote-phone-header [back]="backLink()" [subtitle]="phoneSubtitle()">
+            @if (canDelete()) {
+              <app-row-menu [sections]="menu()" (selected)="onMenu($event.id)" />
             }
-            @if (isClosed()) {
-              <app-badge variant="info">{{ 'voting.cast.closedHint' | t }}</app-badge>
-              <app-badge [variant]="v.result === 'passed' ? 'success' : 'danger'">
-                {{ resultKey() | t }}
-              </app-badge>
-            }
-            @if (secret()) {
-              <app-badge variant="neutral">{{ 'vote.tally.secret' | t }}</app-badge>
-            }
-            @if (delegation()?.exercising) {
-              <app-badge variant="neutral">{{ 'voting.cast.delegation.badge' | t }}</app-badge>
+          </app-vote-phone-header>
+        } @else {
+          <app-page-header [title]="'nav.voting' | t" [flush]="true">
+            @if (beamerLink()) {
+              <app-button actions variant="outlined" (click)="goBeamer()">
+                <app-icon name="monitor" [size]="17" />
+                {{ 'voting.live.toBeamer' | t }}
+              </app-button>
             }
             @if (canDelete()) {
-              <!-- Only a draft with no ballots and no meeting can be deleted. An
-                   open vote is cancelled instead. -->
-              <app-button variant="danger" size="sm" (click)="confirmDelete.set(true)">
+              <!-- Only a draft with no ballots and no meeting can be deleted. An open
+                   vote is cancelled instead. -->
+              <app-button actions variant="danger" (click)="confirmDelete.set(true)">
                 {{ 'voting.delete.action' | t }}
               </app-button>
             }
-          </div>
-        </app-page-header>
-
-        @if (delegation(); as deleg) {
-          @if (deleg.blocked) {
-            <p class="m-0 py-3 px-4 bg-warning-subtle text-text border border-solid border-warning rounded-md" role="alert">
-              {{ 'voting.cast.delegation.blocked' | t: { name: deleg.delegatedToName || '?' } }}
-            </p>
-          }
-        }
-        @if (notEligible() && !delegation()?.blocked && !delegation()?.exercising) {
-          <p class="m-0 py-3 px-4 bg-warning-subtle text-text border border-solid border-warning rounded-md" role="alert">{{ 'voting.cast.notEligible' | t }}</p>
-        } @else if (isClosed()) {
-          <p class="text-muted">{{ 'voting.cast.closedHint' | t }}</p>
-        } @else if (!delegation()?.blocked) {
-          <p class="text-muted">{{ 'voting.cast.openHint' | t }}</p>
+          </app-page-header>
         }
 
-        @if (isOpen() && !notEligible()) {
-          @if (delegation()?.exercising) {
-            <h2 class="mt-2 text-base font-semibold">{{ 'voting.cast.delegation.ownHeading' | t }}</h2>
-          }
-          <div class="vote__options" role="group" [attr.aria-label]="'voting.cast.heading' | t">
-            @for (option of options(); track option) {
-              <app-button
-                class="vote__option"
-                size="lg"
-                [variant]="myChoice() === option ? 'primary' : 'secondary'"
-                [disabled]="submitting() || locked()"
-                (click)="cast(option)"
-              >
-                {{ optionLabel(option) }}
-              </app-button>
-            }
-          </div>
-
-          @if (myChoice(); as choice) {
-            <p class="m-0 font-medium" role="status">
-              {{ 'voting.cast.yourChoice' | t: { choice: optionLabel(choice) } }}
-              — {{ 'voting.cast.locked' | t }}
-            </p>
-          } @else if (ownCast()) {
-            <p class="m-0 font-medium" role="status">
-              {{ 'voting.cast.secretCast' | t }} — {{ 'voting.cast.locked' | t }}
-            </p>
-          }
-        }
-
-        @if (isOpen() && delegation()?.exercising) {
-          <!-- Proxy ballot: cast it separately under the voting right of the delegator.
-               The proxy choice can differ from the own choice. -->
-          <h2 class="mt-2 text-base font-semibold">
-            {{ 'voting.cast.delegation.proxyHeading' | t: { name: delegation()?.delegatedByName || '?' } }}
-          </h2>
-          <div
-            class="vote__options p-3 border border-solid border-line rounded-md bg-surface"
-            role="group"
-            [attr.aria-label]="'voting.cast.delegation.proxyHeading' | t: { name: delegation()?.delegatedByName || '?' }"
-          >
-            @for (option of options(); track option) {
-              <app-button
-                class="vote__option"
-                size="lg"
-                [variant]="proxyChoice() === option ? 'primary' : 'secondary'"
-                [disabled]="submitting() || proxyLocked()"
-                (click)="cast(option, true)"
-              >
-                {{ optionLabel(option) }}
-              </app-button>
-            }
-          </div>
-
-          @if (proxyChoice(); as choice) {
-            <p class="m-0 font-medium" role="status">
-              {{ 'voting.cast.delegation.proxyChoice' | t: { choice: optionLabel(choice) } }}
-              — {{ 'voting.cast.locked' | t }}
-            </p>
-          } @else if (proxyCast()) {
-            <p class="m-0 font-medium" role="status">
-              {{ 'voting.cast.delegation.proxyCast' | t }} — {{ 'voting.cast.locked' | t }}
-            </p>
-          }
-        }
-
-        @if (showBars()) {
-          <app-card [heading]="'voting.beamer.heading' | t">
-            <app-vote-bars
-              [options]="options()"
-              [counts]="v.tally.counts"
-              [eligible]="v.tally.eligible"
-              [leading]="v.tally.leading"
-            />
-            <p class="mt-4 text-muted text-sm">
-              {{ 'voting.beamer.votesOf' | t: { cast: castCount(), eligible: v.tally.eligible } }}
-              · {{ 'vote.tally.quorum' | t }}:
-              {{ (v.tally.quorumMet ? 'vote.tally.quorumMet' : 'vote.tally.quorumMissed') | t }}
-            </p>
-          </app-card>
-        } @else if (secret()) {
-          <p class="text-muted">{{ 'vote.tally.secretHint' | t }}</p>
-        }
-
-        <a routerLink="/voting/beamer" class="vote__link">{{ 'voting.cast.toBeamer' | t }}</a>
+        <app-vote-panel
+          [vote]="v"
+          [context]="context()"
+          [own]="own()"
+          [proxyName]="proxyName()"
+          [proxyCast]="proxyCast()"
+          [caster]="caster"
+          [notice]="notice()"
+          [layout]="phone() ? 'phone' : 'page'"
+          (castDone)="onCastDone()"
+          (castFailed)="onCastFailed($event)"
+        />
+      </section>
+    } @else {
+      <section class="vote">
+        <app-page-header [title]="'nav.voting' | t" [flush]="true" />
+        <div class="vote__box">
+          <p class="vote__muted" role="alert">{{ 'voting.cast.notEligible' | t }}</p>
+          <a routerLink="/voting" class="vote__link">{{ 'voting.cast.toOverview' | t }}</a>
+        </div>
       </section>
     }
   }
@@ -161,7 +74,7 @@
 >
   <p>{{ 'voting.delete.body' | t }}</p>
   <div dialog-footer class="flex justify-end gap-3">
-    <app-button size="sm" variant="ghost" (click)="confirmDelete.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button size="sm" variant="text" (click)="confirmDelete.set(false)">{{ 'action.cancel' | t }}</app-button>
     <app-button size="sm" variant="danger" [loading]="deleting()" (click)="doDelete()">
       {{ 'voting.delete.action' | t }}
     </app-button>

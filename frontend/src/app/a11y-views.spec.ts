@@ -31,6 +31,7 @@ import { AdminApiService } from './pages/admin/admin-api.service';
 import { BudgetTreeApi } from './pages/budget/budget-tree.api';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ApiClient } from '@core/api/api-client.service';
+import { DelegationsApiService } from '@core/api/delegations.service';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { LIVE_VOTE_SOURCE, type LiveVoteSource } from '@core/ws/live-vote.source';
 import type { MeetingChannel } from '@core/ws/ws.service';
@@ -190,13 +191,44 @@ describe('Kern-Views a11y (axe)', () => {
     })
     class LiveVoteHost {}
 
-    it('open live-vote (options + live region) has no violations', async () => {
+    it('open live-vote (ballot with a represented row) has no violations', async () => {
       const source = new FakeSource();
       const view = await render(LiveVoteHost, {
         providers: [
           provideRouter([]),
           { provide: LIVE_VOTE_SOURCE, useValue: source },
-          { provide: ApiClient, useValue: { getMeeting: () => of({ id: 'm1', canVote: true }) } },
+          {
+            provide: ApiClient,
+            useValue: {
+              getMeeting: () => of({ id: 'm1', title: 'Sitzung', canVote: true, votes: [] }),
+              listAgenda: () => of([{ id: 'ag1', position: 0 }]),
+              getVote: () =>
+                of({
+                  id: 'v1',
+                  applicationId: 'a1',
+                  meetingId: 'm1',
+                  agendaItemId: 'ag1',
+                  question: 'Beschlussfrage?',
+                  eligibleGroup: 'g1',
+                  config: { options: ['yes', 'no', 'abstain'], majorityRule: 'simple' },
+                  status: 'open',
+                  opensAt: null,
+                  closesAt: null,
+                  result: null,
+                  secret: false,
+                  tally: { counts: {}, eligible: 9, voted: 3, present: 9, revealed: false, quorumMet: false, leading: null },
+                  canCast: true,
+                  myBallot: { cast: false, choice: null },
+                }),
+            },
+          },
+          {
+            provide: DelegationsApiService,
+            useValue: {
+              voteStatus: () =>
+                of({ blocked: false, delegatedToName: null, exercising: true, delegatedByName: 'Jonas Weber' }),
+            },
+          },
           {
             provide: ActivatedRoute,
             useValue: { snapshot: { paramMap: convertToParamMap({ id: 'm1' }) } },
