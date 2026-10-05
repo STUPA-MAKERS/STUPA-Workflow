@@ -102,11 +102,23 @@ export class LiveVoteSession {
     }
   }
 
-  /** Cast a ballot over the live channel. In beamer mode this does nothing. */
-  cast(choice: string): void {
+  /**
+   * Cast a ballot over the live channel. In beamer mode this does nothing.
+   *
+   * `asDelegation` casts the ballot of the member that the caller represents. The own
+   * ballot and the represented ballot are two separate casts. The server answers a
+   * refused cast with an `error` frame (`already_voted`, `not_eligible`), which
+   * `errorCode` shows. The ballot pages cast over REST (`POST /votes/{id}/ballot`),
+   * because that call gives a definite answer per ballot.
+   */
+  cast(choice: string, asDelegation = false): void {
     const vote = this.openVote();
     if (this.beamer || !vote) return;
-    this.channel?.send({ type: 'cast', voteId: vote.voteId, choice });
+    this.channel?.send(
+      asDelegation
+        ? { type: 'cast', voteId: vote.voteId, choice, asDelegation: true }
+        : { type: 'cast', voteId: vote.voteId, choice },
+    );
   }
 
   private onClosed(): void {

@@ -1,0 +1,43 @@
+/* A 64px header with the way back; it pulls into the page padding like the board. */
+:host {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 64px;
+  margin-inline: calc(-1 * var(--space-2));
+  margin-top: calc(-1 * var(--space-2));
+}
+
+.ph__back {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--color-text);
+}
+.ph__back:hover {
+  background: var(--color-surface-2);
+}
+.ph__back:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.ph__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.ph__title {
+  font-size: var(--fs-h3);
+  line-height: 1.375rem;
+  font-weight: var(--fw-semibold);
+}
+.ph__sub {
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+}

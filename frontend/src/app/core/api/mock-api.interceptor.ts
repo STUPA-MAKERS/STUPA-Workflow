@@ -101,10 +101,13 @@ const MOCK_PRINCIPAL: Principal = {
   },
 };
 
-/** Running demo vote (GET /votes/{id}). */
+/** Running demo vote (GET /votes/{id}): item 3 of the live demo meeting. */
 const MOCK_VOTE: Vote = {
   id: 'vote-demo',
   applicationId: 'app-demo',
+  meetingId: 'd0000000-0000-0000-0000-000000000001',
+  agendaItemId: 'ag-s3',
+  question: 'Soll der Antrag „Förderung Ersti-Wochenende“ wie beschrieben gefördert werden?',
   // A vote names the gremium that votes by its id.
   eligibleGroup: 'g0000000-0000-0000-0000-000000000001',
   config: {
@@ -123,12 +126,60 @@ const MOCK_VOTE: Vote = {
   quorum: { type: 'percent', value: 50 },
   openedAt: '2026-06-06T09:00:00Z',
   closedAt: null,
-  tally: { counts: { yes: 5, no: 2, abstain: 1 }, eligible: 12, quorumMet: true, leading: 'yes' },
+  // Not every present member voted yet, so the server hides the counts.
+  tally: { counts: {}, eligible: 12, voted: 8, present: 12, revealed: false, quorumMet: true, leading: null },
   myBallot: { cast: false, choice: null },
   representedCast: false,
   canManage: true,
   canCast: true,
 };
+
+/** The ballots of the demo user in this mock session, by vote id. */
+const MOCK_BALLOTS = new Map<string, { own?: string; proxy?: string }>();
+
+/** The closed votes of the closed demo meetings (`mock-meetings-closed.ts`). */
+const CLOSED_VOTE_ID = /^a0000000-0000-0000-0000-0000000001(\d\d)$/;
+
+/** GET /votes/{id}: the demo vote under the asked id, with the own ballots of the mock. */
+function mockVote(id: string): Vote {
+  const closed = CLOSED_VOTE_ID.exec(id);
+  if (closed) {
+    return {
+      ...MOCK_VOTE,
+      id,
+      meetingId: `d0000000-0000-0000-0000-0000000001${closed[1]}`,
+      agendaItemId: `ag-c${closed[1]}-3`,
+      question: 'Soll der Antrag „Beispielantrag Sommerfest“ wie beschrieben gefördert werden?',
+      status: 'closed',
+      result: 'passed',
+      majorityRule: 'simple',
+      quorum: { type: 'count', value: 12 },
+      closedAt: '2026-06-12T16:52:00Z',
+      tally: { counts: { yes: 15, no: 3, abstain: 2 }, eligible: 20, voted: 20, present: 0, revealed: true, quorumMet: true, leading: 'yes', result: 'passed' },
+      myBallot: { cast: true, choice: 'yes' },
+    };
+  }
+  const ballots = MOCK_BALLOTS.get(id) ?? {};
+  const extra = (ballots.own ? 1 : 0) + (ballots.proxy ? 1 : 0);
+  return {
+    ...MOCK_VOTE,
+    id,
+    // The demo vote is not secret, so the own ballot keeps its choice.
+    myBallot: { cast: Boolean(ballots.own), choice: ballots.own ?? null },
+    representedCast: Boolean(ballots.proxy),
+    tally: { ...MOCK_VOTE.tally, voted: (MOCK_VOTE.tally.voted ?? 0) + extra },
+  };
+}
+
+/** POST /votes/{id}/ballot: a ballot never changes, so a second one is a 409. */
+function mockBallot(id: string, body: unknown, url: string): Observable<never> | BallotResult {
+  const { choice, asDelegation } = (body ?? {}) as { choice?: string; asDelegation?: boolean };
+  const ballots = MOCK_BALLOTS.get(id) ?? {};
+  const row = asDelegation ? 'proxy' : 'own';
+  if (ballots[row]) return mockProblem(409, 'already_voted', url);
+  MOCK_BALLOTS.set(id, { ...ballots, [row]: choice ?? 'yes' });
+  return { status: 'cast' };
+}
 
 const MOCK_TYPES: Page<ApplicationTypeListItemWire> = {
   items: [
@@ -461,6 +512,8 @@ let MOCK_MEETING: MeetingOutWire = {
   canWrite: true,
   canManageVotes: true,
   canFinalize: true,
+  // The demo user holds `vote.cast` in the gremium of the meeting.
+  canVote: true,
   // The demo user keeps the minutes since the start (Z3); a handover adds a period.
   keeperPeriods: [
     {
@@ -1076,7 +1129,11 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (bookings) return bookings.pipe(mergeMap((body) => ok(body)));
     if (p.endsWith('/search')) return ok(mockSearch(req.params.get('q') ?? ''));
     if (p.endsWith('/applications/tasks')) return ok([...MOCK_TASKS]);
-    if (/\/votes\/[^/]+$/.test(p)) return ok(MOCK_VOTE);
+    // The demo user represents a member in the demo vote: the ballot shows both rows.
+    if (/\/delegations\/votes\/[^/]+\/status$/.test(p)) {
+      return ok({ blocked: false, delegatedToName: null, exercising: true, delegatedByName: 'Erika Beispiel' });
+    }
+    if (/\/votes\/[^/]+$/.test(p)) return ok(mockVote(p.split('/').pop() ?? MOCK_VOTE.id));
     if (p.endsWith('/meetings')) return ok([MOCK_MEETING, MOCK_PLANNED_MEETING]);
     if (p.endsWith('/delegations')) {
       const meetingId = req.params.get('meetingId');
@@ -1229,8 +1286,8 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       return ok(created, 201);
     }
     if (/\/votes\/[^/]+\/ballot$/.test(p)) {
-      const res: BallotResult = { status: 'cast' };
-      return ok(res, 201);
+      const res = mockBallot(p.split('/').slice(-2)[0], req.body, req.url);
+      return 'status' in res ? ok(res, 201) : res;
     }
     if (p.endsWith('/finalize')) {
       MOCK_PROTOCOL = {

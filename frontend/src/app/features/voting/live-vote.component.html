@@ -1,53 +1,65 @@
-<section class="live">
-  <app-page-header [title]="'voting.live.heading' | t">
-    <a actions routerLink="/voting/beamer" class="live__beamer">{{ 'voting.live.toBeamer' | t }}</a>
-  </app-page-header>
-
-  @if (connection() === 'reconnecting') {
-    <p class="m-0 py-2 px-4 rounded-md bg-surface-sunken text-muted text-sm text-center bg-warning-subtle text-text" role="status">
-      {{ 'voting.live.reconnecting' | t }}
-    </p>
-  } @else if (connection() === 'connecting') {
-    <p class="m-0 py-2 px-4 rounded-md bg-surface-sunken text-muted text-sm text-center" role="status">{{ 'voting.live.connecting' | t }}</p>
-  } @else if (connection() === 'closed') {
-    <p class="m-0 py-2 px-4 rounded-md bg-surface-sunken text-muted text-sm text-center" role="status">{{ 'voting.live.closed' | t }}</p>
-  }
-
-  @if (notEligible()) {
-    <p class="m-0 p-4 bg-warning-subtle border border-solid border-warning rounded-md" role="alert">{{ 'voting.live.notEligible' | t }}</p>
-  } @else if (result(); as res) {
-    <div class="flex flex-col gap-5">
-      <app-badge [variant]="res.result === 'passed' ? 'success' : 'danger'">
-        {{ resultKey() | t }}
-      </app-badge>
-      @if (tally(); as t) {
-        <app-vote-bars [options]="vote()?.options ?? []" [counts]="t.counts" [eligible]="t.eligible" [leading]="t.leading" />
-      }
-    </div>
-  } @else if (vote(); as v) {
-    <p class="live__hint">{{ 'voting.live.castHint' | t }}</p>
-    <div class="grid gap-4" role="group" [attr.aria-label]="'voting.live.heading' | t">
-      @for (option of v.options; track option) {
-        <app-button
-          class="live__option"
-          size="lg"
-          [variant]="shownChoice() === option ? 'primary' : 'secondary'"
-          [disabled]="locked()"
-          (click)="cast(option)"
-        >
-          {{ optionLabel(option) }}
+<section class="live" [class.live--phone]="phone()">
+  @if (phone() && mode() === 'live') {
+    <app-vote-phone-header [back]="meeting() ? ['/meetings', meeting()!.id] : '/meetings'" [subtitle]="phoneSubtitle()" />
+  } @else {
+    <app-page-header [title]="'nav.voting' | t" [flush]="true">
+      @if (beamerLink() && !phone()) {
+        <app-button actions variant="outlined" (click)="goBeamer()">
+          <app-icon name="monitor" [size]="17" />
+          {{ 'voting.live.toBeamer' | t }}
         </app-button>
       }
-    </div>
-    @if (shownChoice(); as choice) {
-      <p class="m-0 font-medium text-center" role="status">{{ 'voting.live.voted' | t: { choice: optionLabel(choice) } }}</p>
-    } @else if (castWithoutChoice()) {
-      <p class="m-0 font-medium text-center" role="status">{{ 'voting.live.alreadyVoted' | t }}</p>
+    </app-page-header>
+  }
+
+  @switch (mode()) {
+    @case ('resolving') {
+      <p class="live__line" role="status">{{ 'voting.live.searching' | t }}</p>
     }
-    @if (tally(); as t) {
-      <app-vote-bars [options]="v.options" [counts]="t.counts" [eligible]="t.eligible" [leading]="t.leading" />
+    @case ('none') {
+      <app-empty-state icon="vote" [heading]="'voting.live.none' | t" />
     }
-  } @else {
-    <p class="live__waiting" role="status">{{ 'voting.live.waiting' | t }}</p>
+    @case ('pick') {
+      <nav class="live__pick" [attr.aria-label]="'voting.live.pick' | t">
+        <h2 class="sec">{{ 'voting.live.pick' | t }}</h2>
+        @for (m of liveMeetings(); track m.id) {
+          <a class="live__meeting" [routerLink]="['/voting/meeting', m.id]">
+            <span class="live__mtitle ell" [title]="m.title">{{ m.title }}</span>
+            @if (m.gremiumName) {
+              <span class="live__msub ell" [title]="m.gremiumName">{{ m.gremiumName }}</span>
+            }
+          </a>
+        }
+      </nav>
+    }
+    @case ('live') {
+      @if (connection() === 'reconnecting') {
+        <p class="live__line live__line--warn" role="status">{{ 'voting.live.reconnecting' | t }}</p>
+      } @else if (connection() === 'closed') {
+        <p class="live__line" role="status">{{ 'voting.live.closed' | t }}</p>
+      }
+
+      @if (vote(); as v) {
+        <app-vote-panel
+          [vote]="v"
+          [context]="context()"
+          [own]="own()"
+          [proxyName]="proxyName()"
+          [proxyCast]="proxyCast()"
+          [caster]="caster"
+          [notice]="notice()"
+          [layout]="phone() ? 'phone' : 'page'"
+          (castDone)="onCastDone()"
+          (castFailed)="onCastFailed($event)"
+        />
+      } @else {
+        <div class="live__wait">
+          @if (meeting(); as m) {
+            <p class="live__wtitle">{{ m.title }}</p>
+          }
+          <p class="live__line" role="status">{{ 'voting.live.waiting' | t }}</p>
+        </div>
+      }
+    }
   }
 </section>

@@ -64,5 +64,5 @@ export type ServerMessage =
   | ErrorMsg;
 
 export type ClientMessage =
-  | { type: 'cast'; voteId: string; choice: string }
+  | { type: 'cast'; voteId: string; choice: string; asDelegation?: boolean }
   | { type: 'subscribe' };

@@ -1,20 +1,25 @@
-<ul class="bars" [class.bars--beamer]="variant() === 'beamer'">
+@if (status(); as s) {
+  <p class="bars__status">
+    <app-status-text class="bars__result" [kind]="s.kind">{{ s.key | t }}</app-status-text>
+    @if (failedReason() === 'quorum') {
+      <span class="bars__reason">{{ 'vote.failedQuorum' | t }}</span>
+    }
+  </p>
+}
+<ul class="bars" [attr.aria-label]="'voting.bars.label' | t: { cast: cast() }">
   @for (row of rows(); track row.option) {
-    <li class="flex flex-col gap-2" [class.bars__row--leading]="row.leading">
-      <div class="flex items-baseline justify-between gap-3">
+    <li class="bars__row">
+      <div class="bars__line">
         <span class="bars__label">{{ row.label }}</span>
-        <span class="bars__count">{{ row.count }}</span>
+        <span class="bars__count mono">{{ row.count }}</span>
+        <span class="bars__pct mono">{{ row.pct }} %</span>
       </div>
-      <div
-        class="bars__track"
-        role="progressbar"
-        [attr.aria-valuenow]="row.count"
-        [attr.aria-valuemin]="0"
-        [attr.aria-valuemax]="eligible() || null"
-        [attr.aria-label]="row.label + ': ' + row.count"
-      >
-        <div class="bars__fill" [style.width.%]="row.pct"></div>
-      </div>
+      <app-seg-bar
+        [size]="variant() === 'beamer' ? 'fat' : 'normal'"
+        [segments]="[{ value: row.count, tone: row.tone }]"
+        [total]="cast()"
+        [label]="rowLabel(row)"
+      />
     </li>
   }
 </ul>

@@ -77,7 +77,8 @@ describe('BeamerComponent', () => {
       leading: 'yes',
     });
     detectChanges();
-    expect(screen.getAllByRole('progressbar').length).toBe(3);
+    expect(screen.getByRole('img', { name: 'Ja: 5 Stimmen, 63 %' })).toBeInTheDocument();
+    expect(screen.getAllByRole('img').length).toBe(3);
     expect(screen.getByText('8 von 12 Stimmen')).toBeInTheDocument();
     expect(screen.getByText(/Quorum:\s*erreicht/)).toBeInTheDocument();
   });
