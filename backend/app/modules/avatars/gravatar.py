@@ -135,7 +135,9 @@ class HttpGravatarFetcher:
     The fetcher resolves the host, checks the IPs with the SSRF guard and connects
     to the checked IP. The ``Host`` header and the TLS SNI keep ``gravatar.com``, so
     the certificate check still applies. Redirects are not followed. One total
-    deadline covers the connect and all reads.
+    deadline covers the DNS lookup, the connect and all reads. When the deadline
+    stops a slow lookup, the resolver thread runs on to its own end in the
+    background, but the request does not wait for it.
     """
 
     def __init__(
@@ -156,25 +158,29 @@ class HttpGravatarFetcher:
     async def fetch(self, digest: str, size: int) -> FetchResult:
         url = gravatar_url(digest, size)
         try:
-            ips = await asyncio.to_thread(
-                assert_allowed_url, url, allowlist=(GRAVATAR_HOST,), resolver=self._resolver
-            )
-        except SsrfError:
-            # The detail holds the resolved IP; keep it out of the log.
-            logger.warning("gravatar fetch blocked by the ssrf guard")
-            return FetchResult("failed")
-        ip_url, host_header = pin_url(url, _prefer_ipv4(ips))
-        try:
-            async with asyncio.timeout(self._timeout), self._client_factory() as client:
-                request = client.build_request(
-                    "GET", ip_url, headers={"Host": host_header, "Accept": "image/*"}
-                )
-                request.extensions["sni_hostname"] = GRAVATAR_HOST
-                response = await client.send(request, stream=True)
+            async with asyncio.timeout(self._timeout):
                 try:
-                    return await _read(response)
-                finally:
-                    await response.aclose()
+                    ips = await asyncio.to_thread(
+                        assert_allowed_url,
+                        url,
+                        allowlist=(GRAVATAR_HOST,),
+                        resolver=self._resolver,
+                    )
+                except SsrfError:
+                    # The detail holds the resolved IP; keep it out of the log.
+                    logger.warning("gravatar fetch blocked by the ssrf guard")
+                    return FetchResult("failed")
+                ip_url, host_header = pin_url(url, _prefer_ipv4(ips))
+                async with self._client_factory() as client:
+                    request = client.build_request(
+                        "GET", ip_url, headers={"Host": host_header, "Accept": "image/*"}
+                    )
+                    request.extensions["sni_hostname"] = GRAVATAR_HOST
+                    response = await client.send(request, stream=True)
+                    try:
+                        return await _read(response)
+                    finally:
+                        await response.aclose()
         except (httpx.HTTPError, TimeoutError) as exc:
             logger.warning("gravatar fetch failed: %s", type(exc).__name__)
             return FetchResult("failed")

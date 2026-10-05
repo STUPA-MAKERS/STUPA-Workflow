@@ -331,6 +331,8 @@ class Settings(BaseSettings):
     # one (404) stay for `gravatar_cache_ttl_seconds`. A failed fetch (timeout, 5xx)
     # stays only for `gravatar_error_ttl_seconds`, so a short outage heals itself. The
     # admin switch `gravatarEnabled` in the site config turns the proxy off.
+    # `gravatar_timeout_seconds` is one total deadline for the DNS lookup, the connect
+    # and all reads of one fetch.
     gravatar_timeout_seconds: float = Field(default=3.0, gt=0, le=30)
     gravatar_cache_ttl_seconds: int = Field(default=86_400, ge=60)
     gravatar_error_ttl_seconds: int = Field(default=300, ge=1)

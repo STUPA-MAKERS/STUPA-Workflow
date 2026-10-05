@@ -1,5 +1,11 @@
 @for (n of shown(); track $index) {
-  <app-avatar class="stack__av" [name]="n" [size]="size()" [decorative]="true" />
+  <app-avatar
+    class="stack__av"
+    [name]="n"
+    [principalId]="principalIds()[$index]"
+    [size]="size()"
+    [decorative]="true"
+  />
 }
 @if (rest() > 0) {
   <span class="stack__av stack__rest" [class.av--sm]="size() === 'sm'" aria-hidden="true">+{{ rest() }}</span>

@@ -113,7 +113,14 @@ describe('AvatarComponent with an image', () => {
 });
 
 describe('AvatarStackComponent', () => {
-  const NAMES = ['Mara Keller', 'Jonas Weber', 'Paul Neumann', 'Erika Beispiel', 'Lea Roth', 'Tom Fink'];
+  const NAMES = [
+    'Mara Keller',
+    'Jonas Weber',
+    'Paul Neumann',
+    'Erika Beispiel',
+    'Lea Roth',
+    'Tom Fink',
+  ];
 
   it('draws every person when they fit', async () => {
     const { container } = await render(AvatarStackComponent, {
@@ -121,7 +128,9 @@ describe('AvatarStackComponent', () => {
     });
     expect(container.querySelectorAll('app-avatar')).toHaveLength(3);
     expect(container.querySelector('.stack__rest')).toBeNull();
-    expect(screen.getByRole('img', { name: 'Mara Keller, Jonas Weber, Paul Neumann' })).toBeTruthy();
+    expect(
+      screen.getByRole('img', { name: 'Mara Keller, Jonas Weber, Paul Neumann' }),
+    ).toBeTruthy();
   });
 
   it('draws the first ones and counts the rest', async () => {
@@ -142,6 +151,21 @@ describe('AvatarStackComponent', () => {
     const { container } = await render(AvatarStackComponent, { inputs: { names: NAMES } });
     expect(screen.getAllByRole('img')).toHaveLength(1);
     expect(await runAxe(container)).toHaveNoViolations();
+  });
+
+  it('loads the image of a person with a principal id', async () => {
+    const { container } = await render(AvatarStackComponent, {
+      inputs: { names: NAMES.slice(0, 3), principalIds: ['p1', null] },
+      providers: [
+        {
+          provide: BrandingService,
+          useValue: { loaded: signal(true), gravatarEnabled: signal(true) },
+        },
+      ],
+    });
+    const imgs = container.querySelectorAll('app-avatar img');
+    expect(imgs).toHaveLength(1);
+    expect(imgs[0].getAttribute('src')).toBe('/api/principals/p1/avatar?s=64');
   });
 
   it('draws at least one avatar whatever the max', async () => {

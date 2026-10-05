@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { BrandingService } from '@core/branding/branding.service';
-import { AvatarService } from './avatar.service';
+import { AVATAR_RETRY_MS, AvatarService } from './avatar.service';
 
 function setup(loaded = true, enabled = true) {
   const branding = { loaded: signal(loaded), gravatarEnabled: signal(enabled) };
@@ -37,11 +37,38 @@ describe('AvatarService', () => {
     expect(svc.url('p1', 40)).toBeNull();
   });
 
-  it('remembers a failed principal for the session', () => {
-    const { svc } = setup();
-    svc.markFailed('p1');
-    svc.markFailed('p1');
-    expect(svc.url('p1', 40)).toBeNull();
-    expect(svc.url('p2', 40)).not.toBeNull();
+  describe('a failed principal', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    it('stays on the initials for the retry period', () => {
+      const { svc } = setup();
+      svc.markFailed('p1');
+      svc.markFailed('p1');
+      expect(svc.url('p1', 40)).toBeNull();
+      expect(svc.url('p2', 40)).not.toBeNull();
+      jest.advanceTimersByTime(AVATAR_RETRY_MS - 1);
+      expect(svc.url('p1', 40)).toBeNull();
+    });
+
+    it('loads the image again when the retry period is over', () => {
+      const { svc } = setup();
+      svc.markFailed('p1');
+      svc.markFailed('p2');
+      jest.advanceTimersByTime(AVATAR_RETRY_MS);
+      expect(svc.url('p1', 40)).toBe('/api/principals/p1/avatar?s=80');
+      expect(svc.url('p2', 40)).not.toBeNull();
+      // A new failure starts a new period.
+      svc.markFailed('p1');
+      expect(svc.url('p1', 40)).toBeNull();
+    });
+
+    it('stops the timers when the injector is destroyed', () => {
+      const { svc } = setup();
+      svc.markFailed('p1');
+      expect(jest.getTimerCount()).toBe(1);
+      TestBed.resetTestingModule();
+      expect(jest.getTimerCount()).toBe(0);
+    });
   });
 });

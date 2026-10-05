@@ -87,6 +87,11 @@ export class AvatarComponent {
     this.loadedSrc.set(this.src());
   }
 
+  /**
+   * The image failed (404, 429 or a network error; the event does not tell them apart).
+   * The service keeps the initials for a retry period only, so a rate limit or a short
+   * outage does not hide the image until a reload.
+   */
   protected onError(): void {
     const id = this.principalId();
     if (id) this.avatars.markFailed(id);
@@ -117,6 +122,11 @@ export class AvatarStackComponent {
 
   /** The full names of the persons. */
   readonly names = input.required<readonly string[]>();
+  /**
+   * The principal ids of the persons, in the order of `names`. With an id the avatar shows
+   * the Gravatar image, as in a roster or a member list. A missing entry gives initials.
+   */
+  readonly principalIds = input<readonly (string | null | undefined)[]>([]);
   /** How many avatars to draw before the "+N". */
   readonly max = input(4);
   readonly size = input<AvatarSize>('sm');

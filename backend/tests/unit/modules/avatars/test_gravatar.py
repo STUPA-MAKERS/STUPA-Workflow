@@ -203,3 +203,22 @@ def test_default_client_factory_builds_a_client_without_redirects() -> None:
         import asyncio
 
         asyncio.run(client.aclose())
+
+
+async def test_total_deadline_covers_the_dns_lookup() -> None:
+    import threading
+
+    release = threading.Event()
+
+    def slow_resolver(host: str) -> list[str]:
+        release.wait(5)
+        return ["192.0.73.2"]
+
+    def handler(request: httpx.Request) -> httpx.Response:  # pragma: no cover - never called
+        return httpx.Response(200, content=PNG)
+
+    try:
+        result = await _fetcher(handler, resolver=slow_resolver, timeout=0.05).fetch(DIGEST, 64)
+    finally:
+        release.set()
+    assert result.kind == "failed"
