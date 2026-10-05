@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'surface';
 
 .ss__scrim {
   position: fixed;
@@ -7,7 +8,9 @@
   background: var(--color-scrim);
 }
 
+/* The sheet is on surface 2, so a table in it steps up to surface 3. */
 .ss {
+  @include surface.context(2);
   position: fixed;
   z-index: var(--z-dialog);
   display: flex;
