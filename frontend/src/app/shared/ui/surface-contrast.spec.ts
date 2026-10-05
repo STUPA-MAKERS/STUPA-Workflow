@@ -143,3 +143,43 @@ describe('text on the selected row', () => {
     );
   });
 });
+
+describe('a table on a shared sheet steps up one surface', () => {
+  const SURFACE = readFileSync(
+    join(__dirname, '../../../../vendor/ui-kit/src/styles/_surface.scss'),
+    'utf8',
+  );
+
+  it('the side sheet (surface 2) sets the context of surface 2', () => {
+    const sheet = scss('side-sheet/side-sheet.component.scss');
+    expect(sheet).toContain("@use 'surface';");
+    expect(sheet).toMatch(
+      /\n\.ss \{\s*@include surface\.context\(2\);[^}]*background: var\(--color-surface-2\);/,
+    );
+  });
+
+  it('the wide detail pane of the list/detail layout sets the context of surface 1', () => {
+    const ld = scss('list-detail/list-detail-layout.component.scss');
+    expect(ld).toContain("@use 'surface';");
+    expect(ld).toMatch(/:host\(\.ld--split\) \.ld__detail \{\s*@include surface\.context\(1\);/);
+  });
+
+  it('the sheet of the wide admin frame sets the context of surface 1', () => {
+    const global = scss('../../../styles.scss');
+    expect(global).toContain("@use 'surface';");
+    expect(global).toMatch(/\.af--split \.af__page \{\s*@include surface\.context\(1\);/);
+    // The admin frame still draws that sheet on surface 1.
+    expect(scss('../../pages/admin/admin-frame/admin-frame.component.scss')).toMatch(
+      /\.af--split \.af__page \{[^}]*background: var\(--color-surface-1\);/,
+    );
+  });
+
+  it('the context puts the table one step above the container', () => {
+    expect(SURFACE).toMatch(/\$level == 1 \{\s*--table-bg: var\(--color-surface-2\);/);
+    expect(SURFACE).toMatch(/\$level == 2 \{\s*--table-bg: var\(--color-surface-3\);/);
+    for (const theme of ['light', 'dark'] as const) {
+      expect(semantic(theme, '--color-surface-2')).not.toBe(semantic(theme, '--color-surface-1'));
+      expect(semantic(theme, '--color-surface-3')).not.toBe(semantic(theme, '--color-surface-2'));
+    }
+  });
+});

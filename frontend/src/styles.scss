@@ -1,6 +1,7 @@
 @use 'fonts';
 @use 'tokens';
 @use 'base';
+@use 'surface';
 
 // Tailwind adds utilities only. tailwind.config.js disables preflight, so there is no
 // base reset and no visual change. Sass passes the unknown at-rules through to PostCSS
@@ -58,6 +59,16 @@
 // `app-status-text`, so it wins.
 .rowgroup--bg3 app-status-text.st--muted {
   color: var(--color-text-muted);
+}
+
+// Nested surfaces step up: a table on a container that is itself a surface takes the
+// next higher surface (see `surface.context` in the ui-kit). The shared sheets set their
+// own context: the side sheet, the dialog, the detail pane of the list/detail layout.
+// The admin pages sit on one shared sheet of the admin frame (surface 1) when the frame
+// is wide. Without the sheet, the page sits on the page background and the tables keep
+// surface 1.
+.af--split .af__page {
+  @include surface.context(1);
 }
 
 // The layout box of a page. The ui-kit ships the same rules under `.container`, but

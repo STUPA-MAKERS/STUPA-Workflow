@@ -1,3 +1,5 @@
+@use 'surface';
+
 /* The host fills the height its parent gives it; each pane scrolls on its own. */
 :host {
   --ld-list-width: 440px;
@@ -67,4 +69,10 @@
 }
 .ld__back:hover {
   background: var(--color-selected);
+}
+
+/* Wide: the detail is a sheet on surface 1 beside the list, so a table in it steps up
+   to surface 2. Narrow, the detail sits on the page and its tables keep surface 1. */
+:host(.ld--split) .ld__detail {
+  @include surface.context(1);
 }
