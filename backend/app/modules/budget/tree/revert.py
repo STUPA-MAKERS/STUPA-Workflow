@@ -13,7 +13,7 @@ from app.modules.budget.tree.allocations import AllocationOps
 from app.modules.budget.tree.expenses import ExpenseOps
 from app.modules.budget.tree.nodes import NodeOps
 from app.modules.budget.tree.service_base import _json_safe
-from app.modules.budget.tree_models import Budget, BudgetExpense, Invoice
+from app.modules.budget.tree_models import Budget, BudgetExpense
 from app.modules.budget.tree_schemas import AllocationSet, BudgetNodeUpdate, ExpenseUpdate
 from app.shared.errors import ConflictError
 
@@ -60,22 +60,17 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
     async def _revert_expense_create(
         self, expense_id: UUID, reverted_audit_id: int
     ) -> None:
-        """Delete the booking and re-open an invoice that the booking set to paid."""
+        """Delete the booking.
+
+        The linked invoice keeps its status. A booking does not set its invoice
+        to paid, so the revert has no invoice status to undo. A user sets the
+        status of the invoice with an invoice update.
+        """
         expense = await self.session.get(BudgetExpense, expense_id)
         if expense is None:
             raise ConflictError(
                 "Booking already removed; nothing to revert.", code="already_reverted"
             )
-        if expense.invoice_id is not None:
-            inv = await self.session.get(Invoice, expense.invoice_id)
-            if inv is not None and inv.status == "paid":
-                inv.status = "open"
-                await self._audit(
-                    AuditAction.BUDGET_INVOICE_UPDATE,
-                    target_type="invoice",
-                    target_id=str(inv.id),
-                    data={"status": "open", "reason": "expense_revert"},
-                )
         await self._audit(
             AuditAction.BUDGET_EXPENSE_DELETE,
             target_type="budget_expense",

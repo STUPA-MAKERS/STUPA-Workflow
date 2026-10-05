@@ -38,29 +38,31 @@
 
   <div class="fd__cols">
     <div class="fd__col">
-      <div class="td__legs">
-        <div class="td__leg">
-          <span class="td__legKind">{{ 'expenses.transfers.expenseOn' | t }}</span>
-          <span class="td__legName">
-            @if (from().color) {
-              <span class="fd__swatch" aria-hidden="true" [style.background]="from().color"></span>
-            }
-            {{ from().name }}
-          </span>
-          <span class="td__legPath mono">{{ from().path }}</span>
-          <span class="td__legAmount mono">−{{ amount() }}</span>
-        </div>
-        <span class="td__arrow" aria-hidden="true"><app-icon name="arrow" [size]="18" /></span>
-        <div class="td__leg">
-          <span class="td__legKind">{{ 'expenses.transfers.incomeOn' | t }}</span>
-          <span class="td__legName">
-            @if (to().color) {
-              <span class="fd__swatch" aria-hidden="true" [style.background]="to().color"></span>
-            }
-            {{ to().name }}
-          </span>
-          <span class="td__legPath mono">{{ to().path }}</span>
-          <span class="td__legAmount td__legAmount--in mono">+{{ amount() }}</span>
+      <div class="td__legsBox">
+        <div class="td__legs">
+          <div class="td__leg">
+            <span class="td__legKind">{{ 'expenses.transfers.expenseOn' | t }}</span>
+            <span class="td__legName">
+              @if (from().color) {
+                <span class="fd__swatch" aria-hidden="true" [style.background]="from().color"></span>
+              }
+              {{ from().name }}
+            </span>
+            <span class="td__legPath mono">{{ from().path }}</span>
+            <span class="td__legAmount mono">−{{ amount() }}</span>
+          </div>
+          <span class="td__arrow" aria-hidden="true"><app-icon name="arrow" [size]="18" /></span>
+          <div class="td__leg">
+            <span class="td__legKind">{{ 'expenses.transfers.incomeOn' | t }}</span>
+            <span class="td__legName">
+              @if (to().color) {
+                <span class="fd__swatch" aria-hidden="true" [style.background]="to().color"></span>
+              }
+              {{ to().name }}
+            </span>
+            <span class="td__legPath mono">{{ to().path }}</span>
+            <span class="td__legAmount td__legAmount--in mono">+{{ amount() }}</span>
+          </div>
         </div>
       </div>
 

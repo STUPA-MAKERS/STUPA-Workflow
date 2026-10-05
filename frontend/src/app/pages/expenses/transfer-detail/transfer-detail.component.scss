@@ -1,6 +1,12 @@
 @use '../../budget/finance-sheet';
 
-/* The two legs of the transfer, with an arrow between them. */
+/* The two legs of the transfer, with an arrow between them. The box is the query
+   container of the stack rule below. It is not .fd__col: on a phone that column has
+   `display: contents`, and an element without a box cannot be a container. */
+.td__legsBox {
+  container-type: inline-size;
+  min-width: 0;
+}
 .td__legs {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -8,6 +14,8 @@
   gap: var(--space-3);
 }
 .td__leg {
+  /* The container of the amount size below. */
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -32,9 +40,13 @@
   color: var(--color-text-muted);
   font-size: 0.8125rem;
 }
+/* The amount shrinks with the leg, so a 5- or 6-digit amount stays in the card.
+   "−125.000,00 €" has 13 mono characters, about 7.8em: 12cqi fits it. The wrap is
+   the last resort for an amount that is still too wide at the smallest size. */
 .td__legAmount {
   margin-top: var(--space-2);
-  font-size: var(--fs-xl);
+  font-size: clamp(var(--fs-sm), 12cqi, var(--fs-xl));
+  overflow-wrap: anywhere;
 }
 .td__legAmount--in {
   color: var(--color-accent-text);
@@ -57,7 +69,4 @@
     justify-self: center;
     transform: rotate(90deg);
   }
-}
-.fd__col {
-  container-type: inline-size;
 }

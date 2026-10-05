@@ -70,8 +70,9 @@ export class ExpenseDialogsState {
   readonly invoices = signal<Invoice[]>([]);
   readonly newInvoiceId = signal('');
   readonly editInvoiceId = signal('');
-  /** Open invoices, newest issue date first. A booking marks its linked invoice paid
-   *  on the server, so paid invoices drop out of the create dropdown. */
+  /** Open invoices, newest issue date first. A booking keeps its invoice open (part
+   *  bookings), and "Als bezahlt markieren" closes it, so paid invoices drop out of the
+   *  create dropdown. */
   private readonly openInvoices = computed<Invoice[]>(() =>
     this.invoices()
       .filter((i) => i.status === 'open')
@@ -150,7 +151,7 @@ export class ExpenseDialogsState {
   }
 
   /**
-   * A booking marks its linked invoice paid, so refresh the open-invoice dropdown.
+   * Refresh the open-invoice dropdown, for example after another user marked an invoice paid.
    *
    * The list has a cap and can arrive after `preselectInvoice` loaded a single invoice.
    * A picked invoice that the new rows do not contain stays in the cache, so the select

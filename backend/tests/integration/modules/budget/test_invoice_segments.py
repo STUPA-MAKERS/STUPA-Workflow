@@ -84,9 +84,6 @@ async def test_segments_and_counts(session: AsyncSession) -> None:
             ),
             actor="t",
         )
-        # A booking marks its invoice paid. "Verbucht" holds an open invoice with a
-        # booking, so open it again.
-        await svc.update_invoice(invoice_id, InvoiceUpdate(status="open"))
 
     async def ids(status: str | None = None, booked: bool | None = None) -> set[uuid.UUID]:
         page = await svc.list_invoices_paged(

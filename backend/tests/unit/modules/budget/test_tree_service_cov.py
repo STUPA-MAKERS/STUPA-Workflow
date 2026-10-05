@@ -503,14 +503,14 @@ async def test_book_expense_linked_application_not_found() -> None:
         await svc.book_expense(payload, actor="a")
 
 
-async def test_book_expense_marks_open_invoice_paid() -> None:
+async def test_book_expense_keeps_open_invoice_open() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     top = node
     fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
     inv = _invoice(id=uuid.uuid4())  # status='open'
     sess = fake_session(
         result(node), result(top), result(fy), result(),  # _actor_names, no rows
-        gets=[inv],  # _mark_invoice_paid loads the Invoice
+        gets=[inv],  # _require_invoice loads the Invoice
     )
     svc = BudgetTreeService(sess)
     payload = ExpenseCreate(
@@ -518,10 +518,10 @@ async def test_book_expense_marks_open_invoice_paid() -> None:
     )
     out = await svc.book_expense(payload, actor="")
     assert out.amount == Decimal("10.00")
-    assert inv.status == "paid"  # open becomes paid on booking
+    assert inv.status == "open"  # a booking does not pay its invoice ("Verbucht")
 
 
-async def test_book_expense_already_paid_invoice_is_noop() -> None:
+async def test_book_expense_paid_invoice_stays_paid() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     top = node
     fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
@@ -574,10 +574,10 @@ async def test_book_expense_standalone_missing_budget_id() -> None:
 async def test_update_expense_all_fields_with_app() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     app = _app(budget_id=node.id, data={"title": "T"})
-    inv = _invoice(id=uuid.uuid4())  # open, so the link marks it paid
+    inv = _invoice(id=uuid.uuid4())  # open
     expense = _expense(budget_id=node.id, application_id=app.id, actor="u-1")
-    # gets: the BudgetExpense, the Invoice to mark paid, then after the commit the
-    # Application for display.
+    # gets: the BudgetExpense, the Invoice for the existence check, then after the
+    # commit the Application for display.
     sess = fake_session(
         result(),                         # _child_counts (#subbookings), no children
         result(node),                     # _get_node for expense.budget_id after commit
@@ -595,7 +595,8 @@ async def test_update_expense_all_fields_with_app() -> None:
     assert out.amount == Decimal("99.00")
     assert out.application_title == "T"
     assert out.actor_name == "bob@x"   # display_name None gives the email
-    assert inv.status == "paid"        # the linked invoice becomes paid
+    assert inv.status == "open"        # the link does not pay the invoice
+    assert expense.invoice_id == inv.id
 
 
 async def test_update_expense_no_app() -> None:
@@ -1490,32 +1491,16 @@ async def test_revert_expense_create_no_invoice_deletes() -> None:
     assert exp in sess.deleted and sess.committed == 1
 
 
-async def test_revert_expense_create_reopens_paid_invoice() -> None:
+async def test_revert_expense_create_keeps_paid_invoice_paid() -> None:
+    """A user marked the invoice paid. The revert of a booking does not undo that."""
     inv = _invoice()
     inv.status = "paid"
     exp = _expense(id=uuid.uuid4(), invoice_id=inv.id)
-    sess = fake_session(gets=[exp, inv])
+    sess = fake_session(gets=[exp])  # the revert does not load the invoice
     svc = BudgetTreeService(sess, actor="admin")
     await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_CREATE, exp.id), "admin")
-    assert inv.status == "open"
+    assert inv.status == "paid"
     assert exp in sess.deleted and sess.committed == 1
-
-
-async def test_revert_expense_create_invoice_missing_skips_reopen() -> None:
-    exp = _expense(id=uuid.uuid4(), invoice_id=uuid.uuid4())
-    sess = fake_session(gets=[exp, None])  # the invoice is gone
-    svc = BudgetTreeService(sess, actor="admin")
-    await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_CREATE, exp.id), "admin")
-    assert exp in sess.deleted
-
-
-async def test_revert_expense_create_invoice_not_paid_unchanged() -> None:
-    inv = _invoice()  # status="open"
-    exp = _expense(id=uuid.uuid4(), invoice_id=inv.id)
-    sess = fake_session(gets=[exp, inv])
-    svc = BudgetTreeService(sess, actor="admin")
-    await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_CREATE, exp.id), "admin")
-    assert inv.status == "open" and exp in sess.deleted
 
 
 async def test_revert_transfer_create_deletes_both_rows() -> None:

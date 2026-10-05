@@ -39,6 +39,7 @@ from app.modules.budget.tree_schemas import (
     ExpenseUpdate,
     FiscalYearCreate,
     InvoiceCreate,
+    InvoiceUpdate,
     TransferCreate,
 )
 from app.modules.config_revision.revert import RevertService
@@ -99,7 +100,7 @@ async def _top_with_fy(
     return top_row, fy.id
 
 
-async def test_revert_booking_deletes_expense_and_reopens_invoice(
+async def test_revert_booking_deletes_expense_and_keeps_invoice_status(
     session: AsyncSession,
 ) -> None:
     svc = BudgetTreeService(session, actor="tester")
@@ -119,7 +120,9 @@ async def test_revert_booking_deletes_expense_and_reopens_invoice(
         actor="tester",
     )
     inv_row = await session.get(Invoice, inv.id)
-    assert inv_row is not None and inv_row.status == "paid"  # the booking pays it
+    assert inv_row is not None and inv_row.status == "open"  # a booking does not pay it
+    # A user marks the invoice paid. The revert of the booking keeps that status.
+    await svc.update_invoice(inv.id, InvoiceUpdate(status="paid"))
 
     audit_id = await _audit_id(
         session, AuditAction.BUDGET_EXPENSE_CREATE, str(booked.id)
@@ -127,7 +130,8 @@ async def test_revert_booking_deletes_expense_and_reopens_invoice(
     await RevertService(session).revert(audit_id, "admin")
 
     assert await session.get(BudgetExpense, booked.id) is None  # the booking is gone
-    assert inv_row.status == "open"  # the invoice is open again
+    await session.refresh(inv_row)
+    assert inv_row.status == "paid"  # the revert does not change the invoice status
 
     # Clean up. Nothing empties the DB between integration tests. A leftover open
     # invoice would corrupt the global invoice counter of another test.

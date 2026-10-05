@@ -168,7 +168,7 @@ class ExpenseOps(BudgetTreeServiceBase):
             },
         )
         if payload.invoice_id is not None:
-            await self._mark_invoice_paid(payload.invoice_id)
+            await self._require_invoice(payload.invoice_id)
         # With commit=False the caller bundles the booking and its follow-up
         # mutations in one transaction.
         if commit:
@@ -181,29 +181,20 @@ class ExpenseOps(BudgetTreeServiceBase):
             actor_name=names.get(expense.actor or ""),
         )
 
-    async def _mark_invoice_paid(self, invoice_id: UUID) -> None:
-        """Set the linked invoice to `paid` when a booking references it.
+    async def _require_invoice(self, invoice_id: UUID) -> None:
+        """Make sure that the invoice of a booking exists.
 
-        An invoice that is already paid stays unchanged. The method does not
-        commit. It runs inside the transaction of the booking.
+        A booking does not change the status of its invoice. The invoice stays
+        `open` ("Verbucht" in the list) until a user marks it `paid` with an
+        invoice update. A part booking thus does not close the invoice.
 
         Raises:
             NotFoundError: The invoice does not exist. The check happens here so
                 the request fails with 404 instead of on the foreign key at
                 commit time.
         """
-        inv = await self.session.get(Invoice, invoice_id)
-        if inv is None:
+        if await self.session.get(Invoice, invoice_id) is None:
             raise NotFoundError(f"invoice {invoice_id} not found")
-        if inv.status == "paid":
-            return
-        inv.status = "paid"
-        await self._audit(
-            AuditAction.BUDGET_INVOICE_UPDATE,
-            target_type="invoice",
-            target_id=str(inv.id),
-            data={"status": "paid", "reason": "expense_booked"},
-        )
 
     async def update_expense(self, expense_id: UUID, payload: ExpenseUpdate) -> ExpenseOut:
         """Update a booking.
@@ -270,7 +261,7 @@ class ExpenseOps(BudgetTreeServiceBase):
         if "invoice_id" in fields:
             expense.invoice_id = payload.invoice_id
             if payload.invoice_id is not None:
-                await self._mark_invoice_paid(payload.invoice_id)
+                await self._require_invoice(payload.invoice_id)
         # Capture the new values too. Revert uses them to detect a later edit
         # and answers 409 instead of overwriting the changes of another user.
         after: dict[str, object] = {f: _json_safe(getattr(expense, f)) for f in fields}
