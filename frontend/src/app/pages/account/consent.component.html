@@ -1,74 +1,90 @@
-<section class="flex justify-center py-5">
+<section class="cs">
   @if (loading()) {
-    <app-skeleton variant="lines" [count]="3" [label]="'common.loading' | t" />
+    <div class="cs__card">
+      <app-skeleton variant="lines" [count]="4" [label]="'common.loading' | t" />
+    </div>
   } @else if (error() && !req()) {
-    <p class="text-danger">{{ 'account.consent.error' | t }}</p>
+    <div class="cs__card">
+      <app-note kind="error" icon="alert" role="alert">{{ 'account.consent.error' | t }}</app-note>
+    </div>
   } @else if (req(); as r) {
-    <div class="consent__card border border-solid border-line rounded-lg p-5 bg-surface">
-      <header class="consent__head">
-        <app-icon name="webhook" [size]="28" />
-        <div>
-          <h1>{{ 'account.consent.title' | t }}</h1>
-          <p class="m-0 text-muted">{{ 'account.consent.intro' | t }}</p>
+    <div class="cs__card" role="group" aria-labelledby="cs-title">
+      <header class="cs__head">
+        <app-icon class="cs__headIcon" name="webhook" [size]="28" />
+        <div class="cs__headText">
+          <h1 class="cs__title" id="cs-title">{{ 'account.consent.title' | t }}</h1>
+          <p class="cs__muted">
+            {{ (r.canUseMcp ? 'account.consent.intro' : 'account.consent.introShort') | t }}
+          </p>
+          <p class="cs__client">
+            {{ 'account.consent.client' | t }}: <span class="mono cs__clientId">{{ r.clientId }}</span>
+          </p>
         </div>
       </header>
 
       @if (!r.canUseMcp) {
-        <p class="text-danger">{{ 'account.consent.notAllowed' | t }}</p>
-      }
+        <app-note kind="error" icon="lock" role="alert">{{ 'account.consent.notAllowed' | t }}</app-note>
+      } @else {
+        <div class="cs__block">
+          <span class="cap cs__cap" id="cs-scopes">{{ 'account.consent.scopes' | t }}</span>
+          <ul class="rowgroup cs__scopes" aria-labelledby="cs-scopes">
+            @for (s of r.requestedScopes; track s.key) {
+              <li class="cs__scope" [class.cs__scope--unheld]="!s.held">
+                <app-checkbox
+                  [ngModel]="selected()[s.key]"
+                  (ngModelChange)="setScope(s.key, $event)"
+                >
+                  <span class="cs__scopeText">
+                    <span class="cs__scopeLabel">{{ scopeLabel(s.key) }}</span>
+                    @if (scopeDesc(s.key); as desc) {
+                      <span class="cs__scopeDesc">{{ desc }}</span>
+                    }
+                    @if (!s.held) {
+                      <span class="cs__scopeWarn">{{ 'account.consent.notHeld' | t }}</span>
+                    }
+                  </span>
+                </app-checkbox>
+              </li>
+            }
+          </ul>
+        </div>
 
-      <h2 class="consent__label">{{ 'account.consent.scopes' | t }}</h2>
-      <ul class="consent__scopes">
-        @for (s of r.requestedScopes; track s.key) {
-          <li class="scope" [class.scope--unheld]="!s.held">
-            <label>
-              <input
-                type="checkbox"
-                [checked]="selected()[s.key]"
-                (change)="toggle(s.key)"
-              />
-              <span class="flex flex-col">
-                <span class="font-semibold">{{ scopeLabelKey(s.key) | t }}</span>
-                <span class="text-sm text-muted">{{ scopeDescKey(s.key) | t }}</span>
-                @if (!s.held) {
-                  <span class="text-xs text-danger mt-1">{{ 'account.consent.notHeld' | t }}</span>
+        <div class="cs__block">
+          <span class="cap cs__cap" id="cs-lifetime">{{ 'account.consent.lifetime' | t }}</span>
+          <div class="cs__lifetimes" role="group" aria-labelledby="cs-lifetime">
+            @for (lt of r.lifetimes; track lt) {
+              <button
+                type="button"
+                class="chip"
+                [class.on]="lifetime() === lt"
+                [attr.aria-pressed]="lifetime() === lt"
+                (click)="setLifetime(lt)"
+              >
+                @if (lifetime() === lt) {
+                  <app-icon name="check" [size]="14" />
                 }
-              </span>
-            </label>
-          </li>
-        }
-      </ul>
-
-      <h2 class="consent__label">{{ 'account.consent.lifetime' | t }}</h2>
-      <div class="flex flex-wrap gap-2">
-        @for (lt of r.lifetimes; track lt) {
-          <button
-            type="button"
-            class="chip"
-            [class.chip--active]="lifetime() === lt"
-            (click)="setLifetime(lt)"
-          >
-            {{ lifetimeKey(lt) | t }}
-          </button>
-        }
-      </div>
+                {{ lifetimeLabel(lt) }}
+              </button>
+            }
+          </div>
+        </div>
+      }
 
       @if (error()) {
-        <p class="text-danger">{{ 'account.consent.error' | t }}</p>
+        <app-note kind="error" icon="alert" role="alert">{{ 'account.consent.error' | t }}</app-note>
       }
 
-      <footer class="consent__actions">
-        <button type="button" class="btn btn--ghost" [disabled]="submitting()" (click)="deny()">
+      <footer class="cs__actions">
+        <app-button variant="text" [disabled]="submitting()" (click)="deny()">
           {{ 'account.consent.deny' | t }}
-        </button>
-        <button
-          type="button"
-          class="btn btn--primary"
+        </app-button>
+        <app-button
+          variant="fill"
           [disabled]="submitting() || !r.canUseMcp || !anySelected()"
           (click)="approve()"
         >
           {{ 'account.consent.approve' | t }}
-        </button>
+        </app-button>
       </footer>
     </div>
   }

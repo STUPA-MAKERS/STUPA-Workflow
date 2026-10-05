@@ -1,5 +1,6 @@
 import { of, throwError } from 'rxjs';
-import { render, screen, fireEvent } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
 import type { McpSetup, OAuthGrant } from '@core/api/models';
@@ -9,16 +10,16 @@ import { AccountGrantsComponent } from './grants.component';
 const GRANTS: OAuthGrant[] = [
   {
     id: 'g-1',
-    clientId: 'mcp',
-    scope: 'application:read',
+    clientId: 'antragsplattform-mcp',
+    scope: 'read meetings:write',
     createdAt: '2026-06-01T10:00:00Z',
     accessExpiresAt: '2026-07-01T10:00:00Z',
     refreshExpiresAt: null,
   },
   {
     id: 'g-2',
-    clientId: 'mcp',
-    scope: 'budget:read',
+    clientId: 'antragsplattform-mcp',
+    scope: 'read',
     createdAt: null,
     accessExpiresAt: '2026-08-01T10:00:00Z',
     refreshExpiresAt: null,
@@ -26,11 +27,11 @@ const GRANTS: OAuthGrant[] = [
 ];
 
 const SETUP: McpSetup = {
-  mcpServers: { antragsplattform: { url: 'https://x/mcp' } },
-  baseUrl: 'https://x',
-  clientId: 'mcp',
-  scopesSupported: ['application:read'],
-  install: 'npm i -g @antragsplattform/mcp',
+  mcpServers: { antragsplattform: { command: 'antragsplattform-mcp' } },
+  baseUrl: 'https://antraege.example.org',
+  clientId: 'antragsplattform-mcp',
+  scopesSupported: ['read'],
+  install: 'pip install -e .  # from the downloaded package directory',
   note: 'note',
 };
 
@@ -76,131 +77,225 @@ async function setup(opts: { canMcp?: boolean; api?: ReturnType<typeof makeApi> 
   return { ...view, api, auth, cmp };
 }
 
+/** The rows of "Aktive Zugriffe". */
+function rows(): HTMLElement[] {
+  return within(screen.getByRole('list', { name: 'Aktive Zugriffe' })).getAllByRole('listitem');
+}
+
 describe('AccountGrantsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('loads grants on init and renders the table with created/expiry', async () => {
-    const { api, cmp } = await setup();
-    expect(api.listGrants).toHaveBeenCalled();
-    expect(cmp.loading()).toBe(false);
-    expect(cmp.grants()).toHaveLength(2);
-    expect(screen.getByText('application:read')).toBeInTheDocument();
-    // Dates render through `ldate`, so a reader sees a localized date and not the raw
-    // ISO timestamp the API sends.
-    expect(screen.getByText(fmt('2026-08-01T10:00:00Z'))).toBeInTheDocument();
-    expect(screen.queryByText('2026-08-01T10:00:00Z')).not.toBeInTheDocument();
+  it('lists the grants with scope labels, Erstellt and Läuft ab, and counts them', async () => {
+    await setup();
+    expect(screen.getByRole('heading', { name: 'Aktive Zugriffe · 2' })).toBeInTheDocument();
+    const [first, second] = rows();
+    expect(first).toHaveTextContent('Lesen, Sitzungen verwalten');
+    expect(first).toHaveTextContent(`Erstellt ${fmt('2026-06-01T10:00:00Z')}`);
+    expect(first).toHaveTextContent(`Läuft ab ${fmt('2026-07-01T10:00:00Z')}`);
+    // No raw ISO time and no scope key.
+    expect(first).not.toHaveTextContent('2026-07-01T10:00:00Z');
+    expect(first).not.toHaveTextContent('meetings:write');
+    // A missing time is a dash.
+    expect(second).toHaveTextContent('Erstellt —');
   });
 
-  it('renders every scope of a grant as its own badge', async () => {
-    const api = makeApi({
-      listGrants: jest.fn(() =>
-        of([{ ...clone(GRANTS[0]), scope: 'application:read budget:read' }]),
-      ),
-    });
-    await setup({ api });
-    expect(screen.getByText('application:read')).toBeInTheDocument();
-    expect(screen.getByText('budget:read')).toBeInTheDocument();
-  });
-
-  it('marks a grant without an access expiry as never expiring', async () => {
+  it('never says "Läuft nie ab": a grant without an expiry shows a dash', async () => {
     const api = makeApi({
       listGrants: jest.fn(() => of([{ ...clone(GRANTS[0]), accessExpiresAt: null }])),
     });
     await setup({ api });
-    expect(screen.getByText('Läuft nie ab')).toBeInTheDocument();
+    expect(rows()[0]).toHaveTextContent('Läuft ab —');
+    expect(screen.queryByText(/nie ab/)).toBeNull();
   });
 
-  it('shows the empty state when there are no grants', async () => {
+  it('shows an unknown scope by its key', async () => {
+    const api = makeApi({
+      listGrants: jest.fn(() => of([{ ...clone(GRANTS[0]), scope: 'read future:write' }])),
+    });
+    await setup({ api });
+    expect(rows()[0]).toHaveTextContent('Lesen, future:write');
+  });
+
+  it('shows the empty state and no "Alle widerrufen" without grants', async () => {
     const api = makeApi({ listGrants: jest.fn(() => of([])) });
-    const { cmp } = await setup({ api });
-    expect(cmp.grants()).toEqual([]);
+    await setup({ api });
     expect(screen.getByText('Keine aktiven Zugriffe.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Aktive Zugriffe · 0' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Alle widerrufen' })).toBeNull();
   });
 
-  it('shows an error message when grants fail to load', async () => {
+  it('shows an error when the grants cannot load', async () => {
     const api = makeApi({ listGrants: jest.fn(() => throwError(() => new Error('boom'))) });
-    const { cmp } = await setup({ api });
-    expect(cmp.error()).toBe('account.grants.error');
-    expect(cmp.loading()).toBe(false);
+    await setup({ api });
+    expect(screen.getByRole('alert')).toHaveTextContent('Zugriffe konnten nicht geladen werden.');
   });
 
-  it('does NOT fetch the MCP config or render the MCP card when mcp.use is missing', async () => {
-    const { api, auth, cmp } = await setup({ canMcp: false });
-    expect(auth.canAny).toHaveBeenCalledWith('mcp.use');
-    expect(api.mcpConfig).not.toHaveBeenCalled();
-    expect(cmp.setup()).toBeNull();
-    expect(cmp.canUseMcp()).toBe(false);
-  });
-
-  it('fetches the MCP config and exposes a pretty-printed snippet when allowed', async () => {
-    const { api, cmp } = await setup({ canMcp: true });
-    expect(api.mcpConfig).toHaveBeenCalled();
-    expect(cmp.setup()).toEqual(SETUP);
-    expect(cmp.setupJson()).toBe(
-      JSON.stringify({ mcpServers: SETUP.mcpServers }, null, 2),
+  it('asks before it revokes one grant, then revokes it and loads again', async () => {
+    const { api } = await setup();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Widerrufen: Lesen, Sitzungen verwalten' }),
     );
-    expect(screen.getByText(SETUP.install)).toBeInTheDocument();
-  });
-
-  it('keeps an empty snippet when the MCP config request fails', async () => {
-    const api = makeApi({ mcpConfig: jest.fn(() => throwError(() => new Error('x'))) });
-    const { cmp } = await setup({ canMcp: true, api });
-    expect(cmp.setup()).toBeNull();
-    expect(cmp.setupJson()).toBe('');
-  });
-
-  it('revokes a single grant and reloads', async () => {
-    const api = makeApi();
-    const { cmp } = await setup({ api });
-    cmp.revoke('g-1');
+    expect(api.revokeGrant).not.toHaveBeenCalled();
+    const dialog = screen.getByRole('dialog', { name: 'Zugriff widerrufen?' });
+    expect(dialog).toHaveTextContent('„Lesen, Sitzungen verwalten“');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Widerrufen' }));
     expect(api.revokeGrant).toHaveBeenCalledWith('g-1');
     expect(api.listGrants).toHaveBeenCalledTimes(2);
   });
 
-  it('revokes all grants and reloads', async () => {
-    const api = makeApi();
-    const { cmp } = await setup({ api });
-    cmp.revokeAll();
+  it('cancels a revoke without a call', async () => {
+    const { api } = await setup();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Widerrufen: Lesen, Sitzungen verwalten' }),
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Zugriff widerrufen?' });
+    const cancel = within(dialog).getAllByRole('button', { name: 'Abbrechen' });
+    await userEvent.click(cancel[cancel.length - 1]);
+    expect(api.revokeGrant).not.toHaveBeenCalled();
+  });
+
+  it('asks before it revokes all grants, then revokes them and loads again', async () => {
+    const { api } = await setup();
+    await userEvent.click(screen.getByRole('button', { name: 'Alle widerrufen' }));
+    expect(api.revokeAllGrants).not.toHaveBeenCalled();
+    const dialog = screen.getByRole('dialog', { name: 'Alle Zugriffe widerrufen?' });
+    expect(dialog).toHaveTextContent('Alle 2 Zugriffe enden sofort.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Alle widerrufen' }));
     expect(api.revokeAllGrants).toHaveBeenCalled();
     expect(api.listGrants).toHaveBeenCalledTimes(2);
   });
 
-  it('revoke-all button is wired in the template when grants exist', async () => {
-    const api = makeApi();
-    await setup({ api });
-    fireEvent.click(screen.getByText('Alle widerrufen'));
-    expect(api.revokeAllGrants).toHaveBeenCalled();
+  it('shows an error when a revoke fails', async () => {
+    const api = makeApi({ revokeGrant: jest.fn(() => throwError(() => new Error('x'))) });
+    const { fixture } = await setup({ api });
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Widerrufen: Lesen, Sitzungen verwalten' }),
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Zugriff widerrufen?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Widerrufen' }));
+    fixture.detectChanges();
+    expect(screen.getByRole('alert')).toHaveTextContent('Widerrufen fehlgeschlagen.');
+  });
+
+  it('has no MCP card and loads no setup without mcp.use', async () => {
+    const { api, auth } = await setup({ canMcp: false });
+    expect(auth.canAny).toHaveBeenCalledWith('mcp.use');
+    expect(api.mcpConfig).not.toHaveBeenCalled();
+    expect(screen.queryByRole('heading', { name: 'MCP-Server' })).toBeNull();
+  });
+
+  it('shows the MCP card: download, steps, config and the platform URL', async () => {
+    const { api } = await setup({ canMcp: true });
+    expect(api.mcpConfig).toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: 'MCP-Server' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /MCP-Paket herunterladen/ })).toBeInTheDocument();
+    // The install command without the shell comment of the server.
+    expect(screen.getByText('pip install -e .')).toBeInTheDocument();
+    expect(screen.getByText(/"command": "antragsplattform-mcp"/)).toBeInTheDocument();
+    const url = screen.getByRole('link', { name: SETUP.baseUrl });
+    expect(url).toHaveAttribute('href', SETUP.baseUrl);
+    expect(url).toHaveAttribute('rel', 'noopener');
   });
 
   it('downloads the MCP package as a tarball', async () => {
     const dl = jest.spyOn(downloadUtil, 'downloadBlob').mockImplementation(() => undefined);
-    const api = makeApi();
-    const { cmp } = await setup({ api, canMcp: true });
-    cmp.downloadPackage();
+    const { api } = await setup({ canMcp: true });
+    await userEvent.click(screen.getByRole('button', { name: /MCP-Paket herunterladen/ }));
     expect(api.downloadMcpPackage).toHaveBeenCalled();
     expect(dl).toHaveBeenCalledWith(expect.any(Blob), 'antragsplattform-mcp.tar.gz');
     dl.mockRestore();
   });
 
-  it('copies the setup snippet to the clipboard when available', async () => {
+  it('copies the MCP config and says so', async () => {
     const writeText = jest.fn(() => Promise.resolve());
-    Object.assign(navigator, { clipboard: { writeText } });
-    const { cmp } = await setup({ canMcp: true });
-    cmp.copySetup();
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const { cmp, fixture } = await setup({ canMcp: true });
+    await userEvent.click(screen.getByRole('button', { name: 'MCP-Konfiguration kopieren' }));
     expect(writeText).toHaveBeenCalledWith(cmp.setupJson());
+    await writeText.mock.results[0].value;
+    fixture.detectChanges();
+    expect(cmp.copied()).toBe(true);
+    expect(screen.getByRole('button', { name: 'Kopiert' })).toBeInTheDocument();
   });
 
-  it('does not copy when there is no setup snippet', async () => {
+  it('keeps "Kopiert" for two seconds after the last copy, and clears the timer on destroy', async () => {
     const writeText = jest.fn(() => Promise.resolve());
-    Object.assign(navigator, { clipboard: { writeText } });
-    // mcp.use is missing, so setup is null, setupJson is empty and copy does nothing.
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    // The fake clock starts after the render: `whenStable` waits on real timers.
+    const { cmp, fixture } = await setup({ canMcp: true });
+    jest.useFakeTimers();
+    try {
+      cmp.copySetup();
+      await writeText.mock.results[0].value;
+      cmp.copySetup();
+      await writeText.mock.results[1].value;
+      expect(cmp.copied()).toBe(true);
+      jest.advanceTimersByTime(2000);
+      expect(cmp.copied()).toBe(false);
+      cmp.copySetup();
+      await writeText.mock.results[2].value;
+      fixture.destroy();
+      jest.advanceTimersByTime(2000);
+      expect(cmp.copied()).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('marks a failed copy as not copied', async () => {
+    const writeText = jest.fn(() => Promise.reject(new Error('denied')));
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const { cmp } = await setup({ canMcp: true });
+    cmp.copySetup();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(cmp.copied()).toBe(false);
+  });
+
+  it('copies nothing without the setup', async () => {
+    const writeText = jest.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     const { cmp } = await setup({ canMcp: false });
     cmp.copySetup();
     expect(writeText).not.toHaveBeenCalled();
+    expect(cmp.installCommand()).toBe('');
   });
 
-  it('tolerates a missing clipboard API when copying', async () => {
-    Object.assign(navigator, { clipboard: undefined });
+  it('keeps the download in the card when the setup cannot load', async () => {
+    const api = makeApi({ mcpConfig: jest.fn(() => throwError(() => new Error('x'))) });
+    await setup({ canMcp: true, api });
+    expect(screen.getByRole('button', { name: /MCP-Paket herunterladen/ })).toBeInTheDocument();
+    expect(screen.queryByText('MCP-Konfiguration')).toBeNull();
+  });
+
+  it('shows an error when the download fails, and ignores a second press while it runs', async () => {
+    const api = makeApi({ downloadMcpPackage: jest.fn(() => throwError(() => new Error('x'))) });
+    const { cmp, fixture } = await setup({ canMcp: true, api });
+    cmp.downloadPackage();
+    fixture.detectChanges();
+    expect(screen.getByRole('alert')).toHaveTextContent('Das MCP-Paket konnte nicht geladen werden.');
+    cmp.downloading.set(true);
+    cmp.downloadPackage();
+    expect(api.downloadMcpPackage).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing on a revoke without a question or while one runs', async () => {
+    const { api, cmp } = await setup();
+    cmp.doRevoke();
+    cmp.askRevokeAll();
+    cmp.revoking.set(true);
+    cmp.doRevoke();
+    expect(api.revokeAllGrants).not.toHaveBeenCalled();
+    expect(api.revokeGrant).not.toHaveBeenCalled();
+  });
+
+  it('reads a grant without scopes as no labels', async () => {
+    const { cmp } = await setup();
+    expect(cmp.scopeLabels({ ...clone(GRANTS[0]), scope: null as unknown as string })).toBe('');
+  });
+
+  it('tolerates a missing clipboard API', async () => {
+    Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
     const { cmp } = await setup({ canMcp: true });
     expect(() => cmp.copySetup()).not.toThrow();
   });

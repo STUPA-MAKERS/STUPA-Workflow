@@ -1325,7 +1325,10 @@ export interface OAuthGrant {
   clientId: string;
   scope: string;
   createdAt: IsoDateTime | null;
-  /** `null` means the access token never expires. Only a revocation ends it. */
+  /**
+   * Every new token expires (90 days at most). `null` comes only from a token of the time
+   * before the cap; the pages show a dash, never "Läuft nie ab".
+   */
   accessExpiresAt: IsoDateTime | null;
   refreshExpiresAt: IsoDateTime | null;
 }

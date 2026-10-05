@@ -1,77 +1,193 @@
-.grants {
+@use 'breakpoints' as bp;
+
+:host {
+  display: block;
+}
+
+.gr {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
-  max-width: 60rem;
+  gap: var(--space-6);
 }
 
-.card {
-  border: var(--border-width) solid var(--color-border);
+.gr__muted {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+/* The MCP card steps up from what it sits on: surface 2 on the sheet of the frame,
+   surface 1 on the page background (see `surface.context`). */
+.gr__mcp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border-radius: var(--radius-xl);
+  background: var(--table-bg, var(--color-surface-1));
+}
+
+.gr__mcpHead {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+.gr__mcpIcon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-accent-text);
+}
+.gr__mcpText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.gr__h2 {
+  margin: 0;
+  font-size: var(--fs-h2);
+  line-height: var(--lh-h2);
+  font-weight: var(--fw-semibold);
+}
+.gr__download {
+  flex: none;
+}
+
+.gr__steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: var(--space-6);
+}
+
+/* A command and a URL are copyable values: they wrap, they are never cut. */
+.gr__cmd {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--table-raised-bg, var(--color-surface-2));
+  font-size: var(--fs-small);
+  overflow-wrap: anywhere;
+}
+
+.gr__config {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border-radius: var(--radius-lg);
-  padding: var(--space-4) var(--space-5);
-  background: var(--color-surface);
+  background: var(--table-raised-bg, var(--color-surface-2));
 }
-
-.card h2 {
-  margin-top: 0;
-}
-
-.grants__list-head,
-.mcp__config-head {
+.gr__configHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  min-height: 2.75rem;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
 }
-
-.mcp__config-head {
-  margin-bottom: var(--space-2);
+.gr__configTitle {
   color: var(--color-text-muted);
-  font-size: var(--fs-sm);
 }
-
-.mcp__hint code,
-.mcp__steps code {
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-}
-
-.mcp__steps {
-  margin: var(--space-2) 0 var(--space-4) var(--space-5);
-  line-height: 1.7;
-}
-
-.mcp__config pre {
+.gr__json {
   margin: 0;
-  background: var(--color-surface-sunken);
-  color: var(--color-text);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
+  padding: 0 var(--space-4) var(--space-4);
   overflow-x: auto;
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-small);
+  line-height: 1.25rem;
+  color: var(--color-text);
 }
 
-.mcp__hint {
-  margin-top: var(--space-2);
+.gr__url {
+  margin: 0;
+  font-size: var(--fs-small);
   color: var(--color-text-muted);
-  font-size: var(--fs-sm);
+}
+.gr__url a {
+  color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
-@media (max-width: 768px) {
-  .grants__list-head {
-    flex-wrap: wrap;
-  }
-  .mcp__steps code {
-    word-break: break-all;
-  }
+.gr__active {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.gr__activeHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--control-height-sm);
+  padding-inline: var(--space-1);
 }
 
-/* Scopes wrap inside their cell instead of stretching the column. A personal grant
-   carries a handful, so they all stay visible. */
-.grants__scopes {
+.gr__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gr__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
+}
+.gr__rowText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.gr__scopes {
+  font-weight: var(--fw-medium);
+}
+
+/* "Erstellt … · Läuft ab …": the dot ends the first item, so a wrapped line never
+   starts with it. */
+.gr__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-1);
+  column-gap: var(--space-2);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--color-text-muted);
+}
+.gr__metaItem {
+  white-space: nowrap;
+}
+.gr__metaItem:not(:last-child)::after {
+  content: '\00a0·';
+}
+
+.gr__empty {
+  padding: var(--space-4);
+}
+
+.gr__dialogText {
+  margin: 0 0 var(--space-4);
+}
+.gr__dialogFoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+@include bp.phone {
+  .gr__mcp {
+    padding: var(--space-4);
+  }
+  .gr__mcpHead {
+    flex-wrap: wrap;
+  }
+  /* The text keeps its line beside the icon; the download takes a line of its own. */
+  .gr__mcpText {
+    flex-basis: 0;
+  }
+  .gr__download {
+    flex: 1 1 100%;
+  }
+  .gr__row {
+    padding-left: var(--space-4);
+  }
 }

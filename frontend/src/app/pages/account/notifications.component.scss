@@ -1,18 +1,49 @@
-.notif {
+@use 'breakpoints' as bp;
+
+:host {
+  display: block;
+}
+
+.nt {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-  max-width: 44rem;
 }
-.notif__list {
-  list-style: none;
+
+.nt__list {
   margin: 0;
   padding: 0;
+  list-style: none;
+}
+
+/* One row per kind: the text on the left, the switch on the right, centred on one axis. */
+.nt__row {
+  display: flex;
+  align-items: center;
+  min-height: 3.875rem;
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-5);
+}
+.nt__row app-switch {
+  flex: 1 1 auto;
+}
+
+.nt__text {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: 2px;
+  min-width: 0;
 }
-.notif__item + .notif__item {
-  border-top: var(--border-width) solid var(--color-border);
-  padding-top: var(--space-3);
+.nt__label {
+  font-weight: var(--fw-medium);
+}
+.nt__hint {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--color-text-muted);
+}
+
+@include bp.phone {
+  .nt__row {
+    padding-inline: var(--space-4) var(--space-3);
+  }
 }

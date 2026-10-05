@@ -328,3 +328,118 @@ describe('AdminFrameComponent', () => {
     expect(view.container.querySelector('.af')).not.toHaveClass('af--home');
   });
 });
+
+/** The frame in account mode, as the route `account` sets it (`data: { frame: 'account' }`). */
+async function setupAccount(perms: string[], url = '/account', wide = true) {
+  matchWide(wide);
+  const api = {
+    latestAuditVerification: jest.fn(() => of(null)),
+    verifyAuditChain: jest.fn(),
+    listBackups: jest.fn(() => of({ items: [] })),
+    listErasures: jest.fn(() => of([])),
+  };
+  const view = await render(AdminFrameComponent, {
+    componentInputs: { frame: 'account' },
+    providers: [
+      provideRouter([
+        {
+          path: 'account',
+          children: [
+            { path: '', component: StubPageComponent, pathMatch: 'full' },
+            { path: '**', component: StubPageComponent },
+          ],
+        },
+      ]),
+      { provide: AuthService, useValue: fakeAuth(perms) },
+      { provide: AdminApiService, useValue: api },
+    ],
+  });
+  await view.fixture.ngZone!.run(() => view.fixture.debugElement.injector.get(Router).navigateByUrl(url));
+  view.fixture.detectChanges();
+  await view.fixture.whenStable();
+  view.fixture.detectChanges();
+  return { ...view, api };
+}
+
+function accountLinks(): string[] {
+  const nav = screen.getByRole('navigation', { name: 'Kontobereiche' });
+  return [...nav.querySelectorAll<HTMLAnchorElement>('a.af__item')].map(
+    (a) => a.getAttribute('href') ?? '',
+  );
+}
+
+describe('AdminFrameComponent in account mode', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  it('lists the account pages under "Konto", without search, tiles and group heading', async () => {
+    const view = await setupAccount(['mcp.use']);
+    expect(screen.getByRole('heading', { name: 'Konto', level: 1 })).toBeInTheDocument();
+    expect(accountLinks()).toEqual(['/account/notifications', '/account/grants']);
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(view.container.querySelector('app-admin-health')).toBeNull();
+    expect(view.api.listBackups).not.toHaveBeenCalled();
+    expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
+    // Beside the sheet the entries keep one line, the same as beside an account page.
+    expect(screen.queryByText('E-Mails je Anlass ein- und ausschalten')).toBeNull();
+    expect(view.container.querySelector('.af')).toHaveClass('af--account');
+  });
+
+  it('falls back to the admin frame for an unknown mode', async () => {
+    matchWide(true);
+    await render(AdminFrameComponent, {
+      componentInputs: { frame: 'other' },
+      providers: [
+        provideRouter([{ path: '**', component: StubPageComponent }]),
+        { provide: AuthService, useValue: fakeAuth(['admin.users']) },
+        {
+          provide: AdminApiService,
+          useValue: { latestAuditVerification: jest.fn(() => of(null)), verifyAuditChain: jest.fn(), listBackups: jest.fn(), listErasures: jest.fn() },
+        },
+      ],
+    });
+    expect(screen.getByRole('navigation', { name: 'Verwaltungsbereiche' })).toBeInTheDocument();
+  });
+
+  it('shows "API-Zugang" only with mcp.use, like the account menu', async () => {
+    await setupAccount([]);
+    expect(accountLinks()).toEqual(['/account/notifications']);
+  });
+
+  it('wide: the home page is the navigation beside the empty sheet', async () => {
+    const view = await setupAccount(['mcp.use']);
+    expect(view.container.querySelector('.af')).toHaveClass('af--split');
+    expect(view.container.querySelector('.af__page')).not.toHaveClass('af__hidden');
+    expect(view.fixture.debugElement.injector.get(PageFrameService).fill()).toBe(true);
+  });
+
+  it('wide: an account page sits beside the navigation, with no "Zur Liste"', async () => {
+    const view = await setupAccount(['mcp.use'], '/account/notifications');
+    expect(view.container.querySelector('.af')).toHaveClass('af--split');
+    expect(screen.getByRole('link', { name: 'Benachrichtigungen' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.queryByRole('link', { name: 'Zur Liste' })).toBeNull();
+    expect(view.fixture.debugElement.injector.get(PageFrameService).crumbRoot()).toBe('account');
+  });
+
+  it('below wide: the home page is the navigation alone, with a line per entry', async () => {
+    const view = await setupAccount(['mcp.use'], '/account', false);
+    expect(screen.getByRole('navigation', { name: 'Kontobereiche' })).toBeInTheDocument();
+    expect(view.container.querySelector('.af__page')).toHaveClass('af__hidden');
+    expect(screen.getByText('E-Mails je Anlass ein- und ausschalten')).toBeInTheDocument();
+    expect(screen.getByText('MCP-Server und Zugriffe von Agenten')).toBeInTheDocument();
+  });
+
+  it('below wide: an account page fills the width and "Zur Liste" leads back', async () => {
+    const view = await setupAccount(['mcp.use'], '/account/grants', false);
+    expect(screen.queryByRole('navigation')).toBeNull();
+    expect(view.container.querySelector('.af__page')).not.toHaveClass('af__hidden');
+    const back = screen.getByRole('link', { name: 'Zur Liste' });
+    expect(back).toHaveAttribute('href', '/account');
+    await userEvent.click(back);
+    await view.fixture.whenStable();
+    view.fixture.detectChanges();
+    expect(screen.getByRole('navigation', { name: 'Kontobereiche' })).toBeInTheDocument();
+  });
+});
