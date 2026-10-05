@@ -86,26 +86,25 @@ class ReadOps(ApplicationsServiceBase):
             )
         ).all()
         out: list[TimelineEventOut] = []
-        # Map the actor sub to a display name. The user interface must never show a
-        # raw UUID.
-        names = await self._author_names({ev.actor for ev, _ in rows if ev.actor})
-        own = await self._applicant_actors(app, magic_link_view=magic_link_view)
-        gremium = await self._gremium_actor(app) if applicant_view else None
+        # Resolve every actor in one batch. The user interface must never show a
+        # raw sub or key.
+        actors = await self._resolve_actors(
+            app,
+            (ev.actor for ev, _ in rows),
+            applicant_view=applicant_view,
+            magic_link_view=magic_link_view,
+        )
         for ev, label in rows:
             to_state = await self._get_state(ev.to_state_id)
-            if not ev.actor:
-                actor = None
-            elif applicant_view and ev.actor not in own:
-                actor = gremium
-            else:
-                actor = names.get(ev.actor, ev.actor)
+            info = actors.get(ev.actor) if ev.actor else None
             out.append(
                 TimelineEventOut(
                     fromStateId=ev.from_state_id,
                     toStateId=ev.to_state_id,
                     toState=await self._state_out_resolved(to_state),
                     transitionLabel=label or None,
-                    actor=actor,
+                    actor=info.legacy(ev.actor) if info and ev.actor else None,
+                    actorInfo=info,
                     at=ev.at,
                     note=ev.note,
                 )

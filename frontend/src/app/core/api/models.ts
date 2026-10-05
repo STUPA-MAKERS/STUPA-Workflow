@@ -293,6 +293,22 @@ export interface AltchaChallenge {
   maxnumber: number;
 }
 
+/**
+ * `ActorOut`. The resolved actor of a timeline event, a version or a comment.
+ * - `principal`: a member; `displayName` is the name (or the email).
+ * - `applicant`: the applicant through the magic link; no name (PII, O21).
+ * - `system`: an automatic action; `key` names the source (`deadlines`, `flow`, `auto`, …).
+ * - `gremium`: the applicant view names the Gremium for a member (A12/O16).
+ * - `deleted`: an unknown or anonymized account; no name, no id.
+ */
+export type ActorKind = 'principal' | 'applicant' | 'system' | 'gremium' | 'deleted';
+
+export interface ActorInfo {
+  kind: ActorKind;
+  key?: string | null;
+  displayName?: string | null;
+}
+
 /** `TimelineEventOut`. A status transition in the timeline. */
 export interface TimelineEventOutWire {
   fromStateId?: Uuid | null;
@@ -302,6 +318,8 @@ export interface TimelineEventOutWire {
   transitionLabel?: I18nMap | null;
   /** In the applicant view, the Gremium for every action of a member (A12). */
   actor?: string | null;
+  /** The resolved actor. The UI renders this and never the raw `actor`. */
+  actorInfo?: ActorInfo | null;
   at: IsoDateTime;
   note?: string | null;
 }
@@ -314,6 +332,8 @@ export interface CommentOutWire {
   id: Uuid;
   author?: string | null;
   authorKind: CommentAuthorKind;
+  /** The resolved author. The UI renders this and never the raw `author`. */
+  authorInfo?: ActorInfo | null;
   body: string;
   visibility: CommentVisibility;
   at: IsoDateTime;
@@ -380,6 +400,8 @@ export interface VersionOutWire {
   diff?: DataDiffWire | null;
   changedKeys?: string[];
   changedBy?: string | null;
+  /** The resolved editor. The UI renders this and never the raw `changedBy`. */
+  changedByInfo?: ActorInfo | null;
   at: IsoDateTime;
 }
 
@@ -580,6 +602,7 @@ export interface TimelineEntry {
   /** Label of the fired transition (A3), resolved to the locale. */
   transitionLabel?: string | null;
   actor: string | null;
+  actorInfo?: ActorInfo | null;
   at: IsoDateTime;
   note: string | null;
 }
@@ -589,6 +612,7 @@ export interface ApplicationComment {
   id: Uuid;
   author: string | null;
   authorKind: CommentAuthorKind;
+  authorInfo?: ActorInfo | null;
   body: string;
   visibility: CommentVisibility;
   isPublic: boolean;
@@ -654,6 +678,7 @@ export interface ApplicationVersion {
   /** Keys of the changed fields. The applicant view gets only these (A11). */
   changedKeys?: string[];
   changedBy: string | null;
+  changedByInfo?: ActorInfo | null;
   at: IsoDateTime;
 }
 

@@ -21,6 +21,7 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type {
+  ActorInfo,
   Application,
   ApplicationComment,
   ApplicationVersion,
@@ -34,6 +35,7 @@ import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.compo
 import { toFormlySections } from '@shared/forms/formly-mapper';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
+import { actorLabel } from '@shared/actor-label.util';
 import { flowColorKind } from '@shared/status-kind.util';
 import { HistoryComponent, type HistoryEntry } from '@shared/ui/history/history.component';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
@@ -46,9 +48,6 @@ import { applicationTitle, transitionLooks } from '../../pages/applications/appl
 import { shortRef } from './apply.util';
 
 type Phase = 'loading' | 'expired' | 'error' | 'ready';
-
-/** The actor value of the applicant in the timeline and the versions. */
-const APPLICANT = 'applicant';
 
 /**
  * Status page of the applicant (board Telefon-Status; the same page on the desktop).
@@ -227,8 +226,9 @@ export class StatusTimelineComponent {
   readonly historyEntries = computed<HistoryEntry[]>(() => {
     const t = (key: TranslationKey, params?: Record<string, string | number>) =>
       this.i18n.translate(key, params);
-    const actor = (value: string | null): string | null =>
-      value === APPLICANT ? t('status.history.you') : value;
+    // The own entries read "Du"; the server sends the Gremium for the others (A12).
+    const actor = (info: ActorInfo | null | undefined, legacy: string | null): string | null =>
+      actorLabel(info, legacy, t, { applicantKey: 'status.history.you' });
     const events = [...this.timeline()].sort((a, b) => a.at.localeCompare(b.at));
     const entries: HistoryEntry[] = events.map((e, i) => {
       const lines: string[] = [];
@@ -241,7 +241,7 @@ export class StatusTimelineComponent {
         icon: i === 0 ? 'send' : 'flow',
         title: e.toState?.label || e.label,
         kind: flowColorKind(e.toState?.color),
-        actor: actor(e.actor),
+        actor: actor(e.actorInfo, e.actor),
         body: lines.join('\n') || null,
       };
     });
@@ -253,7 +253,7 @@ export class StatusTimelineComponent {
         at: v.at,
         icon: 'edit',
         title: t('status.history.version', { version: v.version }),
-        actor: actor(v.changedBy),
+        actor: actor(v.changedByInfo, v.changedBy),
         body: changed.length
           ? t('status.history.changed', { fields: changed.join(', ') })
           : null,
@@ -392,11 +392,11 @@ export class StatusTimelineComponent {
   /** Display name of a comment: "Du" for the own ones, else the author or the Gremium. */
   authorName(comment: ApplicationComment): string {
     if (comment.isOwn) return this.i18n.translate('status.history.you');
-    if (comment.author) return comment.author;
-    return this.i18n.translate(
-      comment.authorKind === 'applicant'
-        ? 'applications.comments.author.applicant'
-        : 'applications.comments.author.committee',
+    const info =
+      comment.authorInfo ?? (comment.authorKind === 'applicant' ? { kind: 'applicant' as const } : null);
+    return (
+      actorLabel(info, comment.author, (key, params) => this.i18n.translate(key, params)) ??
+      this.i18n.translate('applications.comments.author.committee')
     );
   }
 

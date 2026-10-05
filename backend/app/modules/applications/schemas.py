@@ -133,6 +133,47 @@ class ApplicationPatch(_CamelModel):
     data: dict[str, Any]
 
 
+ActorKind = Literal["principal", "applicant", "system", "gremium", "deleted"]
+
+
+class ActorOut(_CamelModel):
+    """The resolved actor of a timeline event, a version or a comment.
+
+    The frontend renders this object and never a raw stored value. ``kind`` tells
+    the type of the actor:
+
+    - ``principal``: a member. ``displayName`` holds the name, or the email when
+      the account has no name.
+    - ``applicant``: the applicant through the magic link. No name, because the
+      name is PII (O21).
+    - ``system``: an automatic action. ``key`` names the source, for example
+      ``deadlines`` for ``system:deadlines``. A plain ``system`` gives the key
+      ``auto``.
+    - ``gremium``: the applicant view shows the Gremium for each action of a
+      member (A12, O16). ``displayName`` holds the Gremium name, or null when the
+      application has no Gremium.
+    - ``deleted``: the stored ``sub`` names no known account, or the account was
+      anonymized. No name and no id.
+    """
+
+    kind: ActorKind
+    key: str | None = None
+    display_name: str | None = Field(default=None, alias="displayName")
+
+    def legacy(self, raw: str) -> str | None:
+        """Return the old string value of the ``actor`` field for this actor.
+
+        A principal and a Gremium give the name. The applicant and the system give
+        the stored key, for example ``applicant`` or ``system:deadlines``. A
+        deleted account gives null, so that no raw ``sub`` leaves the server.
+        """
+        if self.kind in ("principal", "gremium"):
+            return self.display_name
+        if self.kind in ("applicant", "system"):
+            return raw
+        return None
+
+
 class TimelineEventOut(_CamelModel):
     """One status change of the timeline.
 
@@ -146,7 +187,10 @@ class TimelineEventOut(_CamelModel):
     # The i18n label of the fired transition (A3). Null for the creation event and
     # for a revert, which fire no transition.
     transition_label: I18nMap | None = Field(default=None, alias="transitionLabel")
+    # The display string of the actor: a name, ``applicant`` or a ``system:*`` key.
+    # Never a raw ``sub``. The frontend renders ``actorInfo``.
     actor: str | None = None
+    actor_info: ActorOut | None = Field(default=None, alias="actorInfo")
     at: datetime
     note: str | None = None
 
@@ -164,7 +208,10 @@ class VersionOut(_CamelModel):
     data: dict[str, Any] | None = None
     diff: DataDiff | None = None
     changed_keys: list[str] = Field(default_factory=list, alias="changedKeys")
+    # Same rules as ``TimelineEventOut.actor``; the frontend renders
+    # ``changedByInfo``.
     changed_by: str | None = Field(default=None, alias="changedBy")
+    changed_by_info: ActorOut | None = Field(default=None, alias="changedByInfo")
     at: datetime
 
 
@@ -235,6 +282,7 @@ class CommentOut(_CamelModel):
     id: UUID
     author: str | None = None
     author_kind: Literal["principal", "applicant"] = Field(alias="authorKind")
+    author_info: ActorOut | None = Field(default=None, alias="authorInfo")
     body: str
     visibility: Literal["internal", "public"]
     at: datetime

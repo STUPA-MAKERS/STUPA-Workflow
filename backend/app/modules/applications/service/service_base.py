@@ -21,7 +21,7 @@ from app.modules.applications.models import (
     StatusEvent,
     SubmissionVersion,
 )
-from app.modules.applications.schemas import ApplicantOut, ApplicationOut, StateOut
+from app.modules.applications.schemas import ActorOut, ApplicantOut, ApplicationOut, StateOut
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.validation import extract_promoted
 from app.shared.config_schemas import FormFieldDef
@@ -101,6 +101,25 @@ def state_since_subquery() -> Subquery:
 # Actor value of a magic-link applicant in `status_event`, `submission_version` and
 # the audit log.
 APPLICANT_ACTOR = "applicant"
+
+# Actor value of an automatic action. The plain value is ``system``; a source adds a
+# suffix, for example ``system:deadlines``.
+SYSTEM_ACTOR = "system"
+_SYSTEM_PREFIX = SYSTEM_ACTOR + ":"
+# The key of the plain ``system`` actor in `ActorOut.key`.
+SYSTEM_AUTO_KEY = "auto"
+
+
+def system_actor_key(value: str) -> str | None:
+    """Return the system key of an actor value, or None for another actor.
+
+    ``system`` gives ``auto``. ``system:deadlines`` gives ``deadlines``.
+    """
+    if value == SYSTEM_ACTOR:
+        return SYSTEM_AUTO_KEY
+    if value.startswith(_SYSTEM_PREFIX):
+        return value[len(_SYSTEM_PREFIX) :] or SYSTEM_AUTO_KEY
+    return None
 
 
 async def gremium_actor_name(session: AsyncSession, gremium_id: UUID | None) -> str | None:
@@ -374,7 +393,12 @@ class ApplicationsServiceBase:
         )
 
     async def _author_names(self, subs: set[str]) -> dict[str, str]:
-        """Map an author `principal.sub` to `display_name`, `email` or the `sub`."""
+        """Map a `principal.sub` to its `display_name`, else its `email`.
+
+        One query for all subs. A sub without a row, or a row without a name and
+        an email (an anonymized account), is missing from the map. The caller
+        must never show the raw sub instead.
+        """
         from app.modules.auth.models import Principal as PrincipalRow
 
         wanted = {s for s in subs if s}
@@ -387,4 +411,55 @@ class ApplicationsServiceBase:
                 )
             )
         ).all()
-        return {sub: (dn or em or sub) for sub, dn, em in rows}
+        out: dict[str, str] = {}
+        for sub, dn, em in rows:
+            name = dn or em
+            if name:
+                out[sub] = name
+        return out
+
+    async def _resolve_actors(
+        self,
+        app: Application,
+        values: Iterable[str | None],
+        *,
+        applicant_view: bool,
+        magic_link_view: bool,
+    ) -> dict[str, ActorOut]:
+        """Resolve the stored actor values of one application to `ActorOut`.
+
+        The function reads all principal names in one query (no N+1). In the
+        ``applicant_view`` every actor that is not the applicant becomes the
+        Gremium of the application (A12, O16), so the applicant never sees a
+        member name. See `_applicant_actors` for ``magic_link_view``.
+        """
+        wanted = {v for v in values if v}
+        if not wanted:
+            return {}
+        own = await self._applicant_actors(app, magic_link_view=magic_link_view)
+        gremium: ActorOut | None = None
+        if applicant_view and any(v not in own for v in wanted):
+            gremium = ActorOut(
+                kind="gremium", displayName=await self._gremium_actor(app)
+            )
+        subs = {
+            v
+            for v in wanted
+            if v != APPLICANT_ACTOR
+            and system_actor_key(v) is None
+            and not (gremium is not None and v not in own)
+        }
+        names = await self._author_names(subs)
+        out: dict[str, ActorOut] = {}
+        for v in wanted:
+            if gremium is not None and v not in own:
+                out[v] = gremium
+            elif v == APPLICANT_ACTOR:
+                out[v] = ActorOut(kind="applicant")
+            elif (key := system_actor_key(v)) is not None:
+                out[v] = ActorOut(kind="system", key=key)
+            elif v in names:
+                out[v] = ActorOut(kind="principal", displayName=names[v])
+            else:
+                out[v] = ActorOut(kind="deleted")
+        return out

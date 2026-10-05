@@ -1018,6 +1018,52 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
+  it('renders every resolved actor and never a raw id or key', async () => {
+    const { http, detectChanges, cmp, container } = await setup();
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush([
+      { ...VERSIONS[0], changedBy: 'applicant', changedByInfo: { kind: 'applicant' } },
+      { ...VERSIONS[1], changedBy: null, changedByInfo: { kind: 'deleted' } },
+    ]);
+    http.expectOne(url('/comments')).flush([]);
+    const uuid = 'e03ad7d7-f039-40d1-b56d-7939b1628e46';
+    http.expectOne(url('/timeline')).flush([
+      { toStateId: 's1', toState: SUBMITTED, actor: 'applicant', actorInfo: { kind: 'applicant' }, at: '2026-06-05T10:00:00Z' },
+      {
+        toStateId: 's1',
+        toState: SUBMITTED,
+        actor: 'Frederik Beimgraben',
+        actorInfo: { kind: 'principal', displayName: 'Frederik Beimgraben' },
+        at: '2026-06-05T11:00:00Z',
+      },
+      {
+        toStateId: 's1',
+        toState: SUBMITTED,
+        actor: 'system:deadlines',
+        actorInfo: { kind: 'system', key: 'deadlines' },
+        at: '2026-06-05T12:00:00Z',
+      },
+      // An older server sends only the raw string: the UI still hides the id.
+      { toStateId: 's1', toState: SUBMITTED, actor: uuid, at: '2026-06-05T13:00:00Z' },
+    ]);
+    flushForm(http);
+    detectChanges();
+    flushAttachments(http);
+    const actors = cmp.historyEntries().map((e) => e.actor);
+    expect(actors).toEqual([
+      'Antragsteller:in',
+      'Frederik Beimgraben',
+      'System · Fristen',
+      'Ehemaliges Konto',
+      'Ehemaliges Konto',
+    ]);
+    detectChanges();
+    const text = container.textContent ?? '';
+    expect(text).not.toContain(uuid);
+    expect(text).not.toContain('system:deadlines');
+    http.verify();
+  });
+
   it('falls back to the label of an event without a state and to no body', async () => {
     const { http, detectChanges, cmp } = await setup();
     http.expectOne(url('')).flush(appWire());

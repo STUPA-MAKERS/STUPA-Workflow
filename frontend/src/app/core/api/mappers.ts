@@ -129,6 +129,7 @@ export function mapTimelineEvent(wire: TimelineEventOutWire, lang: string): Time
     label: toState?.label ?? '',
     transitionLabel: wire.transitionLabel ? resolveI18n(wire.transitionLabel, lang) : null,
     actor: wire.actor ?? null,
+    actorInfo: wire.actorInfo ?? null,
     at: wire.at,
     note: wire.note ?? null,
   };
@@ -139,6 +140,7 @@ export function mapComment(wire: CommentOutWire): ApplicationComment {
     id: wire.id,
     author: wire.author ?? null,
     authorKind: wire.authorKind,
+    authorInfo: wire.authorInfo ?? null,
     body: wire.body,
     visibility: wire.visibility,
     isPublic: wire.visibility === 'public',
@@ -214,6 +216,7 @@ export function mapVersion(wire: VersionOutWire): ApplicationVersion {
     diff: mapDiff(wire.diff),
     changedKeys: wire.changedKeys ?? [],
     changedBy: wire.changedBy ?? null,
+    changedByInfo: wire.changedByInfo ?? null,
     at: wire.at,
   };
 }

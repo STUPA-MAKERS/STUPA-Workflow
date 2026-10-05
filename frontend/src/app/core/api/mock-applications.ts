@@ -251,6 +251,7 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
         data: d.data,
         diff: diffOf(before, d.data),
         changedBy: 'Demo Mitglied',
+        changedByInfo: { kind: 'principal', displayName: 'Demo Mitglied' },
         at: new Date().toISOString(),
       },
     ];
@@ -284,6 +285,7 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
           toState: STATES[t.to],
           transitionLabel: { de: t.de, en: t.en },
           actor: 'Demo Mitglied',
+          actorInfo: { kind: 'principal', displayName: 'Demo Mitglied' },
           at: new Date().toISOString(),
           note: [meeting?.title, req.note].filter(Boolean).join(' · ') || null,
         },
@@ -459,6 +461,7 @@ function versionsOf(d: DemoApp): VersionOutWire[] {
     data: { ...answers(d), participants: 100 },
     diff: null,
     changedBy: 'applicant',
+    changedByInfo: { kind: 'applicant' },
     at: d.created,
   };
   if (d.n % 3 === 0) return [first];
@@ -468,7 +471,11 @@ function versionsOf(d: DemoApp): VersionOutWire[] {
       version: 2,
       data: answers(d),
       diff: { added: {}, removed: {}, changed: { participants: { old: 100, new: 120 } } },
-      changedBy: 'applicant',
+      // Every other demo: the edit came from an account that no longer exists. The
+      // server sends no name and no sub; the UI shows "Ehemaliges Konto".
+      ...(d.n % 2
+        ? { changedBy: null, changedByInfo: { kind: 'deleted' as const } }
+        : { changedBy: 'applicant', changedByInfo: { kind: 'applicant' as const } }),
       at: new Date(new Date(d.created).getTime() + 26 * 3600_000).toISOString(),
     },
   ];
@@ -483,6 +490,16 @@ const PATH: Record<StateKey, StateKey[]> = {
   rejected: ['submitted', 'rejected'],
 };
 
+/**
+ * The actor of the i-th status change of the demo timeline: the applicant submits, a
+ * member moves it on, the deadline cron fires the third step (`system:deadlines`).
+ */
+function actorOf(i: number): Pick<TimelineEventOutWire, 'actor' | 'actorInfo'> {
+  if (i === 0) return { actor: 'applicant', actorInfo: { kind: 'applicant' } };
+  if (i === 2) return { actor: 'system:deadlines', actorInfo: { kind: 'system', key: 'deadlines' } };
+  return { actor: 'Mara Keller', actorInfo: { kind: 'principal', displayName: 'Mara Keller' } };
+}
+
 /** The status changes: the submission, the way to the start state, then this session. */
 function timelineOf(d: DemoApp): TimelineEventOutWire[] {
   const start = (d.events ?? []).length ? PATH[stateBefore(d)] : PATH[d.state];
@@ -495,7 +512,7 @@ function timelineOf(d: DemoApp): TimelineEventOutWire[] {
       toStateId: STATES[key].id,
       toState: STATES[key],
       transitionLabel: t ? { de: t.de, en: t.en } : key === 'approved' ? { de: 'Bewilligen', en: 'Approve' } : null,
-      actor: i ? 'Mara Keller' : 'Erika Beispiel',
+      ...actorOf(i),
       at: new Date(base + i * 2 * 86_400_000 + 3_600_000).toISOString(),
       note: null,
     };
