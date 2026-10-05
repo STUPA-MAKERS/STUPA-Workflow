@@ -373,6 +373,44 @@ describe('MeetingsListComponent', () => {
       expect(view.router.url).toBe('/');
     });
 
+    it('keeps a deep link that fails with 403 and says why', async () => {
+      const view = await setup({ url: '/?sel=m-403' });
+      load(view);
+      view.http.expectOne('/api/meetings/m-403').flush(null, { status: 403, statusText: 'no' });
+      await view.fixture.whenStable();
+      view.fixture.detectChanges();
+      expect(view.router.url).toBe('/?sel=m-403');
+      expect(screen.getByRole('alert')).toHaveTextContent('Kein Zugriff auf diese Sitzung');
+      expect(screen.queryByRole('button', { name: 'Erneut laden' })).not.toBeInTheDocument();
+    });
+
+    it('keeps a deep link after a server or network error and reads it again on request', async () => {
+      const view = await setup({ url: '/?sel=m-500' });
+      load(view);
+      view.http.expectOne('/api/meetings/m-500').flush(null, { status: 503, statusText: 'down' });
+      await view.fixture.whenStable();
+      view.fixture.detectChanges();
+      expect(view.router.url).toBe('/?sel=m-500');
+      expect(screen.getByRole('alert')).toHaveTextContent('Sitzung nicht geladen');
+      await userEvent.click(screen.getByRole('button', { name: 'Erneut laden' }));
+      view.http.expectOne('/api/meetings/m-500').error(new ProgressEvent('error'));
+      view.fixture.detectChanges();
+      expect(screen.getByRole('alert')).toHaveTextContent('Sitzung nicht geladen');
+      await userEvent.click(screen.getByRole('button', { name: 'Erneut laden' }));
+      view.http
+        .expectOne('/api/meetings/m-500')
+        .flush(wire('m-500', 'Wieder da', 'closed', { date: '2025-01-01' }));
+      view.fixture.detectChanges();
+      flushSheet(view.http, 'm-500');
+      view.fixture.detectChanges();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: 'Wieder da' })).toBeInTheDocument();
+      // No selection: nothing to read again.
+      await view.router.navigateByUrl('/');
+      view.fixture.componentInstance.retrySelected();
+      view.http.expectNone('/api/meetings/m-500');
+    });
+
     it('keeps the selection when another meeting is deleted', async () => {
       const view = await setup({ url: '/?sel=m-35' });
       load(view);

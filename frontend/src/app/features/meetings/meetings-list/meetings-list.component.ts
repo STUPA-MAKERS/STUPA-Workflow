@@ -11,6 +11,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs/operators';
@@ -119,6 +120,12 @@ export class MeetingsListComponent {
   );
   /** A selected meeting that is not in the loaded pages (a deep link). */
   private readonly extra = signal<Meeting | null>(null);
+  /**
+   * The read of a deep-linked meeting failed for another reason than "not found": the
+   * selection stays, and the detail pane says why (`forbidden` for 403, else `failed`).
+   */
+  readonly selError = signal<{ id: Uuid; kind: 'forbidden' | 'failed' } | null>(null);
+  private requested: string | null = null;
 
   /** Every loaded meeting, to find the selected one. */
   private readonly loaded = computed(() => [
@@ -173,21 +180,13 @@ export class MeetingsListComponent {
 
   constructor() {
     // A deep link to a meeting that is not in the first pages: read it once.
-    let requested: string | null = null;
     effect(() => {
       const id = this.selParam();
       const loading = this.timeline.loadingList();
       if (!id || loading) return;
       untracked(() => {
-        if (requested === id || this.loaded().some((m) => m.id === id)) return;
-        requested = id;
-        this.api.getMeeting(id).subscribe({
-          next: (m) => this.extra.set(m),
-          error: () => {
-            requested = null;
-            this.clearSelection();
-          },
-        });
+        if (this.requested === id || this.loaded().some((m) => m.id === id)) return;
+        this.readSelected(id);
       });
     });
 
@@ -205,6 +204,34 @@ export class MeetingsListComponent {
         if (this.selParam() === change.id) this.clearSelection();
       });
     });
+  }
+
+  /**
+   * Read a deep-linked meeting. Only a 404 drops the selection (the meeting is gone).
+   * A 403, a server error or a network error keeps it and shows the reason, so a reload
+   * or "Erneut laden" can still reach the meeting.
+   */
+  private readSelected(id: Uuid): void {
+    this.requested = id;
+    this.selError.set(null);
+    this.api.getMeeting(id).subscribe({
+      next: (m) => this.extra.set(m),
+      error: (err: unknown) => {
+        this.requested = null;
+        const status = err instanceof HttpErrorResponse ? err.status : 0;
+        if (status === 404) {
+          this.clearSelection();
+          return;
+        }
+        this.selError.set({ id, kind: status === 403 ? 'forbidden' : 'failed' });
+      },
+    });
+  }
+
+  /** "Erneut laden" after a failed read of the deep-linked meeting. */
+  retrySelected(): void {
+    const id = this.selParam();
+    if (id) this.readSelected(id);
   }
 
   /** Select a meeting: its sheet shows beside the list, or as the next step. */

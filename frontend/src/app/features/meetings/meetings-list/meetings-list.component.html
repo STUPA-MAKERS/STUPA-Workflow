@@ -137,6 +137,29 @@
           (remove)="remove($event)"
           (beamer)="beamer($event)"
         />
+      } @else if (selError(); as e) {
+        @if (e.id === selParam()) {
+          <div class="mtl__none" role="alert">
+            @if (e.kind === 'forbidden') {
+              <app-empty-state
+                icon="lock"
+                [heading]="'meetings.overview.selForbidden' | t"
+                [body]="'meetings.overview.selForbiddenBody' | t"
+              />
+            } @else {
+              <app-empty-state
+                icon="alert"
+                [heading]="'meetings.overview.selFailed' | t"
+                [body]="'meetings.overview.selFailedBody' | t"
+              >
+                <app-button variant="tonal" size="sm" (click)="retrySelected()">
+                  <app-icon name="repeat" [size]="16" />
+                  {{ 'meetings.overview.selRetry' | t }}
+                </app-button>
+              </app-empty-state>
+            }
+          </div>
+        }
       } @else if (split()) {
         <div class="mtl__none">
           <app-empty-state icon="users" [heading]="'meetings.overview.none' | t" />
