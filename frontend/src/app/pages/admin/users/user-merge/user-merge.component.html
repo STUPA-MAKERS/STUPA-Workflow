@@ -1,0 +1,208 @@
+@let src = source();
+<app-dialog
+  size="lg"
+  [open]="!!src"
+  [title]="'admin.users.merge.title' | t"
+  [subtitle]="src ? ('admin.users.merge.subtitle' | t: { name: name(src) }) : ''"
+  [closeLabel]="'action.close' | t"
+  (closed)="close()"
+>
+  @switch (step()) {
+    @case ('pick') {
+      <div class="um">
+        <p class="um__lead">{{ 'admin.users.merge.pickLead' | t }}</p>
+        <app-search-pill
+          class="um__search"
+          size="md"
+          [clearable]="true"
+          [placeholder]="'admin.users.searchPlaceholder' | t"
+          [label]="'admin.users.merge.pickSearch' | t"
+          [busy]="search.pending()"
+          [value]="search.text()"
+          (valueChange)="search.set($event)"
+          (commit)="search.flush()"
+        />
+        @if (!searched()) {
+          <app-skeleton variant="rows" [count]="3" [label]="'admin.users.loading' | t" />
+        } @else {
+          <ul class="rowgroup um__hits" [attr.aria-label]="'admin.users.merge.pickList' | t">
+            @for (c of candidates(); track c.id) {
+              <li>
+                <button type="button" class="um__hit" (click)="pick(c)">
+                  <app-avatar size="sm" [name]="name(c)" [principalId]="c.id" [decorative]="true" />
+                  <span class="um__hitWho">
+                    <span class="um__hitName">
+                      {{ name(c) }}
+                      @if (c.active === false) {
+                        <span class="um__tag">{{ 'admin.users.inactive' | t }}</span>
+                      }
+                    </span>
+                    @if (c.email) {
+                      <span class="um__mail mono">{{ c.email }}</span>
+                    }
+                  </span>
+                  <span class="um__hitLogin">
+                    {{ 'admin.users.col.lastLogin' | t }}:
+                    {{ c.lastLogin ? (c.lastLogin | ldate: 'mediumDate') : ('admin.users.never' | t) }}
+                  </span>
+                  <app-icon class="um__chev" name="chevron-right" [size]="18" />
+                </button>
+              </li>
+            } @empty {
+              <li class="um__none">{{ 'admin.users.noResults' | t }}</li>
+            }
+          </ul>
+        }
+      </div>
+    }
+
+    @case ('preview') {
+      @let p = preview();
+      <div class="um">
+        @if (loadingPreview()) {
+          <app-skeleton variant="rows" [count]="4" [label]="'admin.users.merge.loadingPreview' | t" />
+        } @else if (previewFailed() || !p) {
+          <app-note kind="error" icon="alert">
+            <span>{{ 'admin.users.merge.previewFailed' | t }}</span>
+          </app-note>
+        } @else {
+          <!-- From the old account into the account that stays. -->
+          <div class="um__pair">
+            <div class="um__card">
+              <span class="um__cardLbl">{{ 'admin.users.merge.from' | t }}</span>
+              <div class="um__cardWho">
+                <app-avatar size="md" [name]="name(p.source)" [principalId]="p.source.id" [decorative]="true" />
+                <span class="um__hitWho">
+                  <span class="um__hitName">{{ name(p.source) }}</span>
+                  @if (p.source.email) {
+                    <span class="um__mail mono">{{ p.source.email }}</span>
+                  }
+                  <span class="um__muted">
+                    {{ 'admin.users.col.lastLogin' | t }}:
+                    {{ p.source.lastLogin ? (p.source.lastLogin | ldate: 'mediumDate') : ('admin.users.never' | t) }}
+                  </span>
+                </span>
+              </div>
+              <span class="um__cardNote">{{ 'admin.users.merge.fromNote' | t }}</span>
+            </div>
+            <app-icon class="um__arrow" name="arrow" [size]="22" />
+            <div class="um__card um__card--target">
+              <span class="um__cardLbl">{{ 'admin.users.merge.into' | t }}</span>
+              <div class="um__cardWho">
+                <app-avatar size="md" [name]="name(p.target)" [principalId]="p.target.id" [decorative]="true" />
+                <span class="um__hitWho">
+                  <span class="um__hitName">{{ name(p.target) }}</span>
+                  @if (p.target.email) {
+                    <span class="um__mail mono">{{ p.target.email }}</span>
+                  }
+                  <span class="um__muted">
+                    {{ 'admin.users.col.lastLogin' | t }}:
+                    {{ p.target.lastLogin ? (p.target.lastLogin | ldate: 'mediumDate') : ('admin.users.never' | t) }}
+                  </span>
+                </span>
+              </div>
+              <span class="um__cardNote">{{ 'admin.users.merge.intoNote' | t }}</span>
+            </div>
+          </div>
+
+          @if (conflicts().length) {
+            <section class="um__sec" aria-labelledby="um-conflicts">
+              <h3 class="sec um__secTitle" id="um-conflicts">{{ 'admin.users.merge.conflictsTitle' | t }}</h3>
+              <app-note kind="error" icon="alert">
+                <span>{{ 'admin.users.merge.conflictsLead' | t }}</span>
+              </app-note>
+              <ul class="rowgroup um__conflicts">
+                @for (c of conflicts(); track $index) {
+                  <li class="um__conflict">
+                    <span class="um__conflictKind">{{ conflictKey(c.kind) | t }}</span>
+                    @if (c.label) {
+                      <span class="um__conflictRef">{{ c.label }}</span>
+                    }
+                    <span class="um__muted">{{ fixKey(c.kind) | t }}</span>
+                  </li>
+                }
+              </ul>
+            </section>
+          }
+
+          <section class="um__sec" aria-labelledby="um-areas">
+            <h3 class="sec um__secTitle" id="um-areas">{{ 'admin.users.merge.areasTitle' | t }}</h3>
+            @if (previewAreas().length) {
+              <ul class="rowgroup um__areas">
+                @for (a of previewAreas(); track a.area) {
+                  <li class="um__area">
+                    <span class="um__areaName">{{ areaKey(a.area) | t }}</span>
+                    <span class="um__areaCount">{{ counts(a) }}</span>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <p class="um__muted">{{ 'admin.users.merge.nothing' | t }}</p>
+            }
+            <p class="um__legend um__muted">{{ 'admin.users.merge.legend' | t }}</p>
+          </section>
+
+          @if (p.canMerge) {
+            <app-note kind="warn" icon="lock">
+              <span>{{ 'admin.users.merge.warning' | t: { name: name(p.target) } }}</span>
+            </app-note>
+            <app-checkbox
+              class="um__ack"
+              name="understood"
+              [ngModel]="understood()"
+              (ngModelChange)="understood.set($event)"
+              >{{ 'admin.users.merge.understood' | t }}</app-checkbox
+            >
+          }
+        }
+      </div>
+    }
+
+    @case ('done') {
+      @let r = result();
+      <div class="um">
+        <app-note icon="check">
+          <span>{{ 'admin.users.merge.doneLead' | t: { from: name(r?.source ?? null), to: name(r?.target ?? null) } }}</span>
+        </app-note>
+        @if (resultAreas().length) {
+          <ul class="rowgroup um__areas" [attr.aria-label]="'admin.users.merge.areasTitle' | t">
+            @for (a of resultAreas(); track a.area) {
+              <li class="um__area">
+                <span class="um__areaName">{{ areaKey(a.area) | t }}</span>
+                <span class="um__areaCount">{{ counts(a) }}</span>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    }
+  }
+
+  <div dialog-footer class="um__foot">
+    @switch (step()) {
+      @case ('pick') {
+        <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+      }
+      @case ('preview') {
+        <app-button variant="text" [disabled]="merging()" (click)="back()">{{ 'admin.users.merge.back' | t }}</app-button>
+        @if (previewFailed()) {
+          <app-button variant="tonal" (click)="retryPreview()">{{
+            'admin.users.merge.retry' | t
+          }}</app-button>
+        } @else {
+          <app-button
+            variant="danger"
+            [disabled]="!canMerge()"
+            [loading]="merging()"
+            [title]="conflicts().length ? ('admin.users.merge.blocked' | t) : ''"
+            (click)="confirm()"
+            >{{ 'admin.users.merge.confirm' | t }}</app-button
+          >
+        }
+      }
+      @case ('done') {
+        <app-button variant="fill" (click)="close()">{{ 'admin.users.merge.finish' | t }}</app-button>
+      }
+    }
+  </div>
+</app-dialog>

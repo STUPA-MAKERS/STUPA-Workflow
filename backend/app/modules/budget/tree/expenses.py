@@ -39,19 +39,11 @@ class ExpenseOps(BudgetTreeServiceBase):
             The display name per `sub`. The name falls back to the email, then
             to the `sub` itself.
         """
-        from app.modules.auth.models import Principal as PrincipalRow
+        from app.modules.auth.identity import refs_by_sub
 
-        wanted = {s for s in subs if s}
-        if not wanted:
-            return {}
-        rows = (
-            await self.session.execute(
-                select(PrincipalRow.sub, PrincipalRow.display_name, PrincipalRow.email).where(
-                    PrincipalRow.sub.in_(wanted)
-                )
-            )
-        ).all()
-        return {sub: (dn or em or sub) for sub, dn, em in rows}
+        # A merged account shows the name of the account it was merged into.
+        refs = await refs_by_sub(self.session, subs)
+        return {sub: (ref.name or sub) for sub, ref in refs.items()}
 
     @staticmethod
     def _expense_out(

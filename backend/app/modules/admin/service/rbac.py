@@ -7,6 +7,7 @@ settings and the implicit ``member``). The admin API lists them but cannot write
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from sqlalchemy import delete, or_, select
@@ -44,7 +45,9 @@ def _assignment_out(row: RoleAssignmentRow) -> RoleAssignmentOut:
 
 
 def _principal_out(
-    row: Principal, assignments: list[RoleAssignmentRow]
+    row: Principal,
+    assignments: list[RoleAssignmentRow],
+    merged_names: dict[UUID, str | None] | None = None,
 ) -> PrincipalOut:
     return PrincipalOut(
         id=row.id,
@@ -55,6 +58,11 @@ def _principal_out(
         active=True if row.active is None else row.active,
         assignments=[_assignment_out(a) for a in assignments],
         oidc_groups=[str(g) for g in (row.oidc_groups or [])],
+        merged_into_id=row.merged_into,
+        merged_into_name=(
+            (merged_names or {}).get(row.merged_into) if row.merged_into else None
+        ),
+        merged_at=_iso(row.merged_at),
     )
 
 
@@ -195,7 +203,15 @@ class RbacOps(ConfigServiceBase):
             ).all()
             for a in assignments:
                 by_principal.setdefault(a.principal_id, []).append(a)
-        return [_principal_out(r, by_principal.get(r.id, [])) for r in rows]
+        merged_names = await self._merged_names(rows)
+        return [_principal_out(r, by_principal.get(r.id, []), merged_names) for r in rows]
+
+    async def _merged_names(self, rows: Sequence[Principal]) -> dict[UUID, str | None]:
+        """Name the accounts that the merged rows point at. One query."""
+        from app.modules.auth.identity import refs_by_id
+
+        refs = await refs_by_id(self.session, {r.merged_into for r in rows if r.merged_into})
+        return {pid: ref.name for pid, ref in refs.items()}
 
     async def set_principal_active(
         self, principal_id: UUID, active: bool, actor: str
@@ -214,6 +230,11 @@ class RbacOps(ConfigServiceBase):
             raise NotFoundError(f"principal {principal_id} not found")
         if not active and principal.sub == actor:
             raise ConflictError("you cannot deactivate your own account")
+        if active and principal.merged_into is not None:
+            # A merged account is a locked reference. It never logs in again.
+            raise ConflictError(
+                "a merged account cannot be activated", code="principal_merged"
+            )
         principal.active = active
         await self._audit(actor, AuditAction.ROLE_CHANGE, "principal", principal.id)
         await self.session.commit()
@@ -224,7 +245,9 @@ class RbacOps(ConfigServiceBase):
                 )
             )
         ).all()
-        return _principal_out(principal, list(assignments))
+        return _principal_out(
+            principal, list(assignments), await self._merged_names([principal])
+        )
 
     def list_permissions(self) -> list[str]:
         """Return the catalog of permission keys for the roles and permissions UI."""

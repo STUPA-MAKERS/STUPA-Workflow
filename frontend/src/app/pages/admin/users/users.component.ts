@@ -12,6 +12,7 @@ import {
   EmptyStateComponent,
   NoteComponent,
   PageHeaderComponent,
+  RowMenuComponent,
   SearchPillComponent,
   StickyBarComponent,
   SkeletonComponent,
@@ -19,6 +20,8 @@ import {
 import { ButtonComponent, ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, GroupMapping, Role } from '../admin.models';
+import type { RowMenuItem, RowMenuSection } from '@shared/ui';
+import { UserMergeComponent } from './user-merge/user-merge.component';
 
 /**
  * Users (board Admin-Benutzer): a search and one row per principal.
@@ -43,9 +46,11 @@ import type { AdminPrincipal, GroupMapping, Role } from '../admin.models';
     EmptyStateComponent,
     NoteComponent,
     PageHeaderComponent,
+    RowMenuComponent,
     SearchPillComponent,
     StickyBarComponent,
     SkeletonComponent,
+    UserMergeComponent,
   ],
   templateUrl: './users.component.html',
   styleUrl: './users.component.scss',
@@ -83,6 +88,11 @@ export class UsersComponent {
 
   /** The group-mappings page needs its own permission. The hint links to it only then. */
   protected readonly canManageMappings = computed(() => this.auth.can('admin.group_mappings'));
+
+  /** "Mit anderem Konto zusammenführen" needs its own permission (admin only by default). */
+  protected readonly canMerge = computed(() => this.auth.can('admin.users.merge'));
+  /** The old account of the open merge dialog. Null: the dialog is closed. */
+  protected readonly mergeSource = signal<AdminPrincipal | null>(null);
 
   protected readonly rolesById = computed(() => new Map(this.roles().map((r) => [r.id, r])));
 
@@ -154,6 +164,32 @@ export class UsersComponent {
   /** The account of the logged-in user. The view blocks a deactivation of it. */
   protected isSelf(p: AdminPrincipal): boolean {
     return this.mySub() !== null && p.sub === this.mySub();
+  }
+
+  /** The row menu of an account that is not merged. */
+  protected menuFor(p: AdminPrincipal): RowMenuSection[] {
+    return [
+      {
+        items: [
+          {
+            id: 'merge',
+            label: this.i18n.translate('admin.users.merge.action'),
+            icon: 'users',
+            danger: true,
+            disabledReason: this.isSelf(p) ? this.i18n.translate('admin.users.merge.notSelf') : null,
+          },
+        ],
+      },
+    ];
+  }
+
+  protected onMenu(item: RowMenuItem, p: AdminPrincipal): void {
+    if (item.id === 'merge') this.mergeSource.set(p);
+  }
+
+  /** The merge ran: the old account is now a reference. Reload the list. */
+  protected onMerged(): void {
+    this.search.refresh();
   }
 
   protected setActive(principal: AdminPrincipal, active: boolean): void {

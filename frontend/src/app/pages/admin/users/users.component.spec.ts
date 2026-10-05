@@ -74,10 +74,13 @@ const MAPPINGS: GroupMapping[] = [
   { id: 'gm-3', oidcGroup: 'vote:g-1', roleId: 'r-member' },
 ];
 
-function makeAuth(sub: string | null, canMappings = true) {
+function makeAuth(sub: string | null, canMappings = true, canMerge = false) {
   return {
     principal: () => (sub === null ? null : { sub }),
-    can: (p: string) => p === 'admin.users' || (canMappings && p === 'admin.group_mappings'),
+    can: (p: string) =>
+      p === 'admin.users' ||
+      (canMappings && p === 'admin.group_mappings') ||
+      (canMerge && p === 'admin.users.merge'),
   } as unknown as AuthService;
 }
 
@@ -89,6 +92,8 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
     ),
     listGroupMappings: jest.fn(() => of(MAPPINGS.map((m) => ({ ...m })))),
     setPrincipalActive: jest.fn(() => of({ id: 'p-1', active: true })),
+    previewPrincipalMerge: jest.fn(() => of(null)),
+    mergePrincipal: jest.fn(() => of(null)),
     ...over,
   };
 }
@@ -328,5 +333,59 @@ describe('UsersComponent', () => {
   it('shows the empty state when the search finds nobody', async () => {
     await setup(makeApi({ listPrincipals: jest.fn(() => of([])) }));
     expect(screen.getByText('Keine Benutzer gefunden.')).toBeInTheDocument();
+  });
+
+  describe('account merge', () => {
+    const MERGED: AdminPrincipal = {
+      id: 'p-9',
+      sub: 'e03ad7d7',
+      email: 'alt@x.de',
+      displayName: 'Alex Alt',
+      lastLogin: null,
+      assignments: [],
+      oidcGroups: [],
+      active: false,
+      mergedIntoId: 'p-1',
+      mergedIntoName: 'Alex Admin',
+      mergedAt: '2026-10-05T09:00:00+00:00',
+    };
+
+    it('a merged account shows "zusammengeführt in" and no action', async () => {
+      const api = makeApi({ listPrincipals: jest.fn(() => of([MERGED, { ...MERGED, id: 'p-8', mergedIntoName: null }])) });
+      const { container } = await setup(api, makeAuth(null, true, true));
+      expect(screen.getByText('zusammengeführt in Alex Admin')).toBeInTheDocument();
+      expect(screen.getByText('zusammengeführt in Konto ohne Namen')).toBeInTheDocument();
+      expect(screen.queryByText('deaktiviert')).toBeNull();
+      expect(container.querySelectorAll('.au__row--off')).toHaveLength(2);
+      expect(screen.queryByRole('button', { name: /Aktivieren|Deaktivieren|Weitere Aktionen/ })).toBeNull();
+    });
+
+    it('without admin.users.merge the row has no menu', async () => {
+      await setup(makeApi(), makeAuth(null));
+      expect(screen.queryByRole('button', { name: /^Weitere Aktionen/ })).toBeNull();
+    });
+
+    it('the row menu opens the merge dialog; the own account cannot be merged', async () => {
+      const { inst } = await setup(makeApi(), makeAuth('kc|alex', true, true));
+      const menus = screen.getAllByRole('button', { name: /^Weitere Aktionen: / });
+      expect(menus).toHaveLength(2);
+      const own = inst.menuFor(PRINCIPALS[0])[0].items[0];
+      expect(own.disabledReason).toBe(
+        'Dein eigenes Konto kannst du nicht in ein anderes Konto zusammenführen.',
+      );
+      const other = inst.menuFor(PRINCIPALS[1])[0].items[0];
+      expect(other).toMatchObject({ id: 'merge', danger: true, disabledReason: null });
+      inst.onMenu({ id: 'other', label: 'x' }, PRINCIPALS[1]);
+      expect(inst.mergeSource()).toBeNull();
+      inst.onMenu(other, PRINCIPALS[1]);
+      expect(inst.mergeSource()).toEqual(PRINCIPALS[1]);
+    });
+
+    it('a merge reloads the list', async () => {
+      const { api, inst } = await setup(makeApi(), makeAuth(null, true, true));
+      api.listPrincipals.mockClear();
+      inst.onMerged();
+      expect(api.listPrincipals).toHaveBeenCalled();
+    });
   });
 });

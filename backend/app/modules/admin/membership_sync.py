@@ -20,6 +20,8 @@ points:
 - at each OIDC login, after the upsert of the principal refreshes the group cache.
 - after each create, change or delete of a gremium mapping, for all principals.
 - at the erasure of a principal, whose group cache is then empty.
+- at the merge of a principal into another one. A merged principal holds no
+  membership.
 
 A membership has no term of office. It holds while the IdP puts the principal into a
 mapped group, as of the last login.
@@ -125,7 +127,11 @@ async def sync_principal_memberships(
     Returns:
         True when the function changed at least one membership.
     """
-    groups = {str(g) for g in (row.oidc_groups or [])}
+    # A merged principal is a locked reference: it holds no membership. Its group
+    # cache stays for the record, but the sync treats it as empty.
+    groups = (
+        set() if row.merged_into is not None else {str(g) for g in (row.oidc_groups or [])}
+    )
     desired = await _desired_roles(session, groups)
     existing = (
         await session.scalars(

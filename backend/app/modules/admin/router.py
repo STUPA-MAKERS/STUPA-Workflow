@@ -41,6 +41,7 @@ from app.modules.admin.branding import Branding
 from app.modules.admin.cd_logos import LogoSlot
 from app.modules.admin.gremium_roles import GremiumRoleService
 from app.modules.admin.oidc_mappings import OidcMappingService
+from app.modules.admin.principal_merge import PrincipalMergeService
 from app.modules.admin.schemas import (
     ApplicationTypeCreate,
     ApplicationTypeOut,
@@ -74,6 +75,9 @@ from app.modules.admin.schemas import (
     GroupMappingUpdate,
     GuestSettingsOut,
     GuestSettingsUpdate,
+    MergePreviewOut,
+    MergeResultOut,
+    PrincipalMergeIn,
     PrincipalOut,
     PrincipalUpdate,
     PublicSiteConfigOut,
@@ -124,6 +128,10 @@ def get_oidc_mapping_service(session: DbSession) -> OidcMappingService:
     return OidcMappingService(session)
 
 
+def get_principal_merge_service(session: DbSession) -> PrincipalMergeService:
+    return PrincipalMergeService(session)
+
+
 def get_cd_variant_service(session: DbSession, request: Request) -> CdVariantService:
     # Only the logo upload and download touch the object storage. Without MinIO
     # (development, contract CI) those two routes answer 503.
@@ -136,6 +144,7 @@ SiteServiceDep = Annotated[SiteConfigService, Depends(get_site_config_service)]
 GremiumRoleServiceDep = Annotated[GremiumRoleService, Depends(get_gremium_role_service)]
 OidcMappingServiceDep = Annotated[OidcMappingService, Depends(get_oidc_mapping_service)]
 CdVariantServiceDep = Annotated[CdVariantService, Depends(get_cd_variant_service)]
+MergeServiceDep = Annotated[PrincipalMergeService, Depends(get_principal_merge_service)]
 
 # Body cap on Content-Length for a logo upload, applied before FastAPI buffers
 # the body. It adds defense in depth next to the nginx cap and the authoritative
@@ -155,6 +164,9 @@ WebhookAdmin = Annotated[Principal, Depends(require_principal("webhook.manage"))
 # ``admin.roles`` covers /admin/roles with the role definitions. The write
 # operations of the other pages gate on their own keys.
 UsersAdmin = Annotated[Principal, Depends(require_principal("admin.users"))]
+# Account merge. A separate key: the merge rewrites the history of two accounts and
+# cannot be undone, so the user page alone does not grant it.
+MergeAdmin = Annotated[Principal, Depends(require_principal("admin.users.merge"))]
 GroupMappingsAdmin = Annotated[Principal, Depends(require_principal("admin.group_mappings"))]
 GremiumRolesAdmin = Annotated[Principal, Depends(require_principal("admin.gremium_roles"))]
 CdVariantsAdmin = Annotated[Principal, Depends(require_principal("admin.cd_variants"))]
@@ -664,6 +676,46 @@ async def patch_principal(
 ) -> PrincipalOut:
     """Activate or deactivate a user."""
     return await service.set_principal_active(principal_id, payload.active, principal.sub)
+
+
+@router.get(
+    "/principals/{principal_id}/merge-preview",
+    response_model=MergePreviewOut,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def preview_principal_merge(
+    principal_id: UUID,
+    service: MergeServiceDep,
+    _admin: MergeAdmin,
+    target_id: Annotated[UUID, Query(alias="targetId")],
+) -> MergePreviewOut:
+    """Show what a merge of this (old) account into `targetId` would do.
+
+    The answer counts per area the rows that the merge rewrites, combines and removes,
+    and lists the real conflicts that block it. It writes nothing.
+    """
+    return await service.preview(principal_id, target_id)
+
+
+@router.post(
+    "/principals/{principal_id}/merge",
+    response_model=MergeResultOut,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def merge_principal(
+    principal_id: UUID,
+    payload: PrincipalMergeIn,
+    service: MergeServiceDep,
+    admin: MergeAdmin,
+) -> MergeResultOut:
+    """Merge this (old) account into `targetId` in one transaction.
+
+    The merge rewrites the references, combines harmless duplicates and locks the old
+    account as a reference to the new one. A real conflict gives 409 `merge_conflict`
+    and changes nothing. The audit log stays as it is; the merge itself is the audit
+    action `principal_merge`.
+    """
+    return await service.merge(principal_id, payload.target_id, actor=admin.sub)
 
 
 @router.get(

@@ -26,10 +26,14 @@ import type {
   GremiumRole,
   GremiumRoleMapping,
   GroupMapping,
+  MergeArea,
+  MergeConflict,
+  MergePreview,
   Role,
   WebhookConfig,
   WebhookDeliveryStatus,
 } from './admin.models';
+import { MERGE_AREAS } from './admin.models';
 
 /** Permission catalog (mirror of `app.shared.permissions.PERMISSION_CATALOGUE`). */
 export const MOCK_PERMISSIONS: string[] = [
@@ -61,6 +65,7 @@ export const MOCK_PERMISSIONS: string[] = [
   'admin.types_delete',
   'admin.roles',
   'admin.users',
+  'admin.users.merge',
   'admin.group_mappings',
   'admin.gremium_roles',
   'admin.cd_variants',
@@ -73,6 +78,31 @@ export const MOCK_PERMISSIONS: string[] = [
 ];
 
 export const MOCK_PRINCIPALS: AdminPrincipal[] = [
+  // Keycloak-era accounts: the OIDC provider moved to authentik, so these persons log in
+  // with a new `sub` and appear twice. The first one can be merged into Robin Mitglied
+  // without a conflict; a merge into Alex Admin shows the conflicts.
+  {
+    id: 'p-old-1',
+    sub: 'e03ad7d7-5c1e-4f0a-9a3b-6f2a1d9c8b70',
+    email: 'robin.mitglied@stupa-alt.example',
+    displayName: 'Robin Mitglied (Keycloak)',
+    lastLogin: '2025-11-14T08:30:00+00:00',
+    oidcGroups: ['stupa-mitglieder'],
+    assignments: [],
+  },
+  {
+    id: 'p-old-2',
+    sub: '7b9c1f20-0d4e-4a51-8b6f-2c3e4d5f6a7b',
+    email: 'alex@stupa-alt.example',
+    displayName: 'Alex Admin (Keycloak)',
+    lastLogin: '2025-10-02T12:00:00+00:00',
+    oidcGroups: [],
+    assignments: [],
+    active: false,
+    mergedIntoId: 'p-1',
+    mergedIntoName: 'Alex Admin',
+    mergedAt: '2026-10-05T09:12:00+00:00',
+  },
   {
     id: 'p-1',
     sub: 'kc|alex.admin',
@@ -678,3 +708,59 @@ export const MOCK_FLOW: FlowGraph = {
     },
   },
 };
+
+/**
+ * The mock answer of `GET /admin/principals/{id}/merge-preview`. A merge of the
+ * Keycloak account of Robin into Alex Admin conflicts (both voted in the same vote, both
+ * delegated their seat in the same meeting); every other pair merges cleanly. Null when
+ * one of the accounts is unknown.
+ */
+export function mockMergePreview(
+  principals: readonly AdminPrincipal[],
+  sourceId: string,
+  targetId: string,
+): MergePreview | null {
+  const source = principals.find((p) => p.id === sourceId);
+  const target = principals.find((p) => p.id === targetId);
+  if (!source || !target) return null;
+  const side = (p: AdminPrincipal) => ({
+    id: p.id,
+    displayName: p.displayName ?? null,
+    email: p.email ?? null,
+    lastLogin: p.lastLogin ?? null,
+  });
+  const counts: Partial<Record<MergeArea, [number, number, number]>> = {
+    applications: [4, 0, 0],
+    versions: [7, 0, 0],
+    timeline: [12, 0, 0],
+    comments: [3, 0, 0],
+    votes: [9, 0, 0],
+    delegations: [1, 0, 0],
+    substitutes: [1, 1, 0],
+    attendance: [6, 2, 0],
+    meetings: [2, 0, 0],
+    notifications: [0, 3, 0],
+    roles: [0, 1, 0],
+    sessions: [0, 0, 2],
+    memberships: [0, 0, 1],
+    calendar: [0, 0, 1],
+  };
+  const conflicts: MergeConflict[] =
+    sourceId === 'p-old-1' && targetId === 'p-1'
+      ? [
+          { kind: 'ballot_same_vote', label: 'Haushalt 2026 beschließen' },
+          { kind: 'delegation_same_meeting', label: 'StuPa-Sitzung 12. Mai' },
+          { kind: 'erasure_open', label: null },
+        ]
+      : [];
+  return {
+    source: side(source),
+    target: side(target),
+    areas: MERGE_AREAS.map((area) => {
+      const [rewritten, combined, removed] = counts[area] ?? [0, 0, 0];
+      return { area, rewritten, combined, removed };
+    }),
+    conflicts,
+    canMerge: conflicts.length === 0,
+  };
+}

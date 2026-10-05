@@ -429,30 +429,17 @@ class ApplicationsServiceBase:
         """Map a `principal.sub` to its name and its principal id.
 
         The name is the `display_name`, else the `email`. The id serves the avatar
-        (`GET /principals/{id}/avatar`). One query for all subs. A sub without a
-        row, or a row without a name and an email (an anonymized account), is
-        missing from the map. The caller must never show the raw sub instead.
+        (`GET /principals/{id}/avatar`). One query for all subs. A sub of a merged
+        account gives the name and the id of the account it was merged into. A sub
+        without a row, or a row without a name and an email (an anonymized account),
+        is missing from the map. The caller must never show the raw sub instead.
         """
-        from app.modules.auth.models import Principal as PrincipalRow
+        from app.modules.auth.identity import refs_by_sub
 
-        wanted = {s for s in subs if s}
-        if not wanted:
-            return {}
-        rows = (
-            await self.session.execute(
-                select(
-                    PrincipalRow.sub,
-                    PrincipalRow.display_name,
-                    PrincipalRow.email,
-                    PrincipalRow.id,
-                ).where(PrincipalRow.sub.in_(wanted))
-            )
-        ).all()
         out: dict[str, tuple[str, UUID]] = {}
-        for sub, dn, em, pid in rows:
-            name = dn or em
-            if name:
-                out[sub] = (name, pid)
+        for sub, ref in (await refs_by_sub(self.session, subs)).items():
+            if ref.name:
+                out[sub] = (ref.name, ref.id)
         return out
 
     async def _resolve_actors(

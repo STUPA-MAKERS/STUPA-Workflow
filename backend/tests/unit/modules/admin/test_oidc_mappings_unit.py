@@ -378,6 +378,16 @@ async def test_sync_without_groups_removes_all(audits: list[dict[str, Any]]) -> 
     assert db.committed == 0
 
 
+async def test_sync_merged_principal_holds_no_membership(audits: list[dict[str, Any]]) -> None:
+    """A merged account is a locked reference: its cached groups give nothing."""
+    row = _principal(["stupa"])
+    row.merged_into = uuid4()
+    old = _membership(row.id, uuid4(), uuid4())
+    db = fake_session(result(old))  # no mapping query: the group set counts as empty
+    assert await membership_sync.sync_principal_memberships(db, row) is True
+    assert db.deleted == [old]
+
+
 async def test_sync_role_group_alone_gives_no_membership(
     audits: list[dict[str, Any]],
 ) -> None:

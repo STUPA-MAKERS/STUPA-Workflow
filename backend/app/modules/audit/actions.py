@@ -131,6 +131,10 @@ class AuditAction(StrEnum):
     ERASURE_EXECUTED = "erasure_executed"
     ERASURE_REJECTED = "erasure_rejected"
     PRINCIPAL_ERASED = "principal_erased"
+    # Account merge: an admin merged an old principal into a new one. The data holds
+    # the two principal ids and the counts per area. The log rows of the old principal
+    # stay unchanged; the display resolves its `sub` through `principal.merged_into`.
+    PRINCIPAL_MERGE = "principal_merge"
     RETENTION_ANONYMIZE = "retention_anonymize"
     # Budget and money mutations: cost-center CRUD, top-down allocation, bookings
     # and transfers, invoices, moves of an application to another cost center or

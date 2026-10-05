@@ -19,6 +19,7 @@ from datetime import UTC, datetime
 from app.modules.audit.models import AuditEntry
 from app.modules.audit.service import AuditService
 from tests._support.audit_fakes import fake_session, result
+from tests._support.identity_rows import id_ref, sub_ref
 
 _AT = datetime(2026, 6, 6, 12, 0, 0, tzinfo=UTC)
 
@@ -71,8 +72,8 @@ async def test_resolve_actor_names_empty_input_short_circuits() -> None:
 async def test_resolve_actor_names_prefers_display_name_else_email() -> None:
     """The display_name wins, otherwise the email fallback applies (both `or` branches)."""
     rows = [
-        ("sub-1", "Alice", "alice@example.org"),
-        ("sub-2", None, "bob@example.org"),
+        sub_ref("sub-1", "Alice", "alice@example.org"),
+        sub_ref("sub-2", None, "bob@example.org"),
     ]
     db = fake_session(result(*rows))
     out = await AuditService(db).resolve_actor_names(["sub-1", "sub-2", None])
@@ -196,9 +197,9 @@ async def test_resolve_target_labels_principal_name_then_email() -> None:
     p_email = _uuid(41)
     p_none = _uuid(42)
     rows = [
-        (p_name, "Carol", "carol@example.org"),
-        (p_email, None, "dave@example.org"),
-        (p_none, None, None),
+        id_ref(p_name, "Carol", "carol@example.org"),
+        id_ref(p_email, None, "dave@example.org"),
+        id_ref(p_none, None, None),
     ]
     db = fake_session(result(*rows))
     out = await AuditService(db).resolve_target_labels(
@@ -307,7 +308,7 @@ async def test_resolve_target_labels_all_types_together() -> None:
         result((grem_id, "Vorstand")),
         result((at_id, {"de": "Typ"})),
         result((role_id, {"de": "Admin"}, "admin")),
-        result((princ_id, "Eve", "eve@example.org")),
+        result(id_ref(princ_id, "Eve", "eve@example.org")),
         result((hook_id, "Webhook 1")),
         result((vote_id, "Frage?")),
         result((attach_id, "datei.pdf")),
@@ -342,8 +343,8 @@ async def test_list_actors_resolves_names() -> None:
     # inside resolve_actor_names and returns the name rows.
     subs = ["sub-1", "sub-2", None]
     name_rows = [
-        ("sub-1", "Alice", "alice@example.org"),
-        ("sub-2", None, "bob@example.org"),
+        sub_ref("sub-1", "Alice", "alice@example.org"),
+        sub_ref("sub-2", None, "bob@example.org"),
     ]
     db = fake_session(result(*subs), result(*name_rows))
     out = await AuditService(db).list_actors()
@@ -398,10 +399,10 @@ async def test_resolve_data_ids_all_entity_branches() -> None:
         result((vote, "Frage?")),  # vote
         result((attach, "f.pdf")),  # attachment
         result(  # principal: name, email fallback, none, dup
-            (p_name, "Carol", "c@e"),
-            (p_email, None, "d@e"),
-            (p_none, None, None),
-            (a1, "DupP", "x@e"),
+            id_ref(p_name, "Carol", "c@e"),
+            id_ref(p_email, None, "d@e"),
+            id_ref(p_none, None, None),
+            id_ref(a1, "DupP", "x@e"),
         ),
         result(  # role: i18n, key fallback, none, dup
             (r_i18n, {"de": "Administrator"}, "admin"),

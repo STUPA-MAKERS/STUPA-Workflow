@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -12,7 +13,7 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oidc import OidcClaims
 from app.modules.flow.models import State
 from app.settings import Settings, load_settings
-from app.shared.errors import GoneError
+from app.shared.errors import ForbiddenError, GoneError
 from tests._support.auth_fakes import fake_session, result
 
 NOW = datetime(2026, 6, 5, 12, 0, tzinfo=UTC)
@@ -269,6 +270,21 @@ async def test_upsert_principal_existing() -> None:
     assert row is existing
     assert row.email == "new@x.de"
     assert db.added == []  # no insert
+
+
+async def test_upsert_principal_merged_is_refused() -> None:
+    """A merged (old) account never logs in again, and the refusal changes nothing."""
+    existing = PrincipalRow(sub="old", email="old@x.de", display_name="Alt")
+    existing.merged_into = uuid.uuid4()
+    db = fake_session(result(existing))
+    claims = OidcClaims(sub="old", email="new@x.de", name="New", groups=["g"])
+    with pytest.raises(ForbiddenError) as exc:
+        await service.upsert_principal(db, claims)
+    assert exc.value.code == "account_merged"
+    assert existing.email == "old@x.de"
+    assert existing.oidc_groups is None
+    assert db.added == []
+    assert db.flushed == 0
 
 
 async def test_oidc_callback_happy(monkeypatch: pytest.MonkeyPatch) -> None:

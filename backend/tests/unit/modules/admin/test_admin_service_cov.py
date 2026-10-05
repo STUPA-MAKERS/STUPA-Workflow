@@ -55,6 +55,7 @@ from app.shared.errors import (
     NotFoundError,
     ValidationProblem,
 )
+from tests._support.identity_rows import sub_ref
 
 
 class FakeResult:
@@ -225,6 +226,8 @@ def principal_row(**kw: Any) -> Any:
         "last_login": None,
         "active": True,
         "oidc_groups": ["stupa"],
+        "merged_into": None,
+        "merged_at": None,
     }
     base.update(kw)
     return Row(**base)
@@ -954,6 +957,27 @@ async def test_set_principal_active_self_deactivate_blocked() -> None:
     s, _ = svc(gets=[principal])
     with pytest.raises(ConflictError):
         await s.set_principal_active(principal.id, False, "me")
+
+
+async def test_set_principal_active_merged_cannot_be_activated() -> None:
+    principal = principal_row(active=False, sub="old", merged_into=uuid.uuid4())
+    s, _ = svc(gets=[principal])
+    with pytest.raises(ConflictError) as exc:
+        await s.set_principal_active(principal.id, True, "admin")
+    assert exc.value.code == "principal_merged"
+    assert principal.active is False
+
+
+async def test_set_principal_active_merged_names_the_target() -> None:
+    target = uuid.uuid4()
+    principal = principal_row(active=True, sub="old", merged_into=target)
+    # Queue: the audit results, the assignments, then the merge-aware name lookup.
+    s, _ = svc(
+        [*audit_results(), res(), res(sub_ref("new", "Neu", None, target))], gets=[principal]
+    )
+    out = await s.set_principal_active(principal.id, False, "admin")
+    assert out.merged_into_id == target
+    assert out.merged_into_name == "Neu"
 
 
 async def test_set_principal_active_not_found() -> None:

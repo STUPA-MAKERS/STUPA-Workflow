@@ -40,6 +40,7 @@ from app.shared.errors import (
     NotFoundError,
     ValidationProblem,
 )
+from tests._support.identity_rows import sub_ref
 
 NOW = datetime(2026, 6, 16, 12, 0, tzinfo=UTC)
 AUTHOR_ID = UUID("00000000-0000-0000-0000-00000000a001")
@@ -833,7 +834,7 @@ async def test_timeline_resolves_actor_names_and_states() -> None:
         execute_results=[
             # timeline events with the label of the fired transition (A3)
             [(ev1, {"de": "Genehmigen"}), (ev2, None)],
-            [("sub-1", "Alice", None, AUTHOR_ID)],  # _author_refs
+            [sub_ref("sub-1", "Alice", None, AUTHOR_ID)],  # _author_refs
             [("approved", "#0f0")],  # _resolve_state_colors (cached after this call)
         ],
     )
@@ -862,7 +863,10 @@ async def test_timeline_applicant_view_names_the_gremium() -> None:
         get_results=[app, to_state, to_state, to_state],
         execute_results=[
             [(member, None), (own, None), (magic, None)],
-            [("sub-1", "Alice", None, AUTHOR_ID), ("owner-sub", "Olga", None, uuid4())],
+            [
+                sub_ref("sub-1", "Alice", None, AUTHOR_ID),
+                sub_ref("owner-sub", "Olga", None, uuid4()),
+            ],
             [("approved", "#0f0")],
         ],
         scalar_results=["StuPa"],  # name of the Gremium of the application
@@ -889,7 +893,7 @@ async def test_versions_resolves_names() -> None:
     v2 = _Obj(version=2, data={"title": "b"}, diff=None, changed_by=None, at=NOW)
     session = _Session(
         get_results=[app],
-        execute_results=[[("sub-1", None, "alice@x.de", AUTHOR_ID)]],  # _author_refs: email
+        execute_results=[[sub_ref("sub-1", None, "alice@x.de", AUTHOR_ID)]],  # _author_refs: email
         scalars_results=[[v1, v2]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -1281,9 +1285,9 @@ async def test_author_refs_resolve_display_then_email_and_skip_the_rest() -> Non
     session = _Session(
         execute_results=[
             [
-                ("s1", "Display", "e1@x.de", id1),  # display_name
-                ("s2", None, "e2@x.de", id2),  # email
-                ("s3", None, None, uuid4()),  # anonymized: missing, never the raw sub
+                sub_ref("s1", "Display", "e1@x.de", id1),  # display_name
+                sub_ref("s2", None, "e2@x.de", id2),  # email
+                sub_ref("s3", None, None, uuid4()),  # anonymized: missing, never the raw sub
             ]
         ]
     )
@@ -1296,7 +1300,7 @@ async def test_add_comment_with_author() -> None:
     app = _app()
     session = _Session(
         get_results=[app],
-        execute_results=[[("sub-1", "Alice", None, AUTHOR_ID)]],  # _author_refs
+        execute_results=[[sub_ref("sub-1", "Alice", None, AUTHOR_ID)]],  # _author_refs
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.add_comment(
@@ -1339,7 +1343,7 @@ async def test_list_comments_include_internal() -> None:
     )
     session = _Session(
         get_results=[app],
-        execute_results=[[("sub-1", "Alice", None, AUTHOR_ID)]],
+        execute_results=[[sub_ref("sub-1", "Alice", None, AUTHOR_ID)]],
         scalars_results=[[c1, c2]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -1357,7 +1361,7 @@ async def test_list_comments_public_only() -> None:
     )
     session = _Session(
         get_results=[app],
-        execute_results=[[("sub-1", "A", None, AUTHOR_ID)]],
+        execute_results=[[sub_ref("sub-1", "A", None, AUTHOR_ID)]],
         scalars_results=[[c]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -1516,7 +1520,7 @@ async def test_update_comment_by_author() -> None:
     c = _comment(application_id=app.id)
     session = _Session(
         get_results=[app],
-        execute_results=[[c], [], [], [("sub-1", "Alice", None, AUTHOR_ID)]],
+        execute_results=[[c], [], [], [sub_ref("sub-1", "Alice", None, AUTHOR_ID)]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.update_comment(

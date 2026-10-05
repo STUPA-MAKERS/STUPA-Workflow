@@ -17,6 +17,8 @@ import type { FormFieldDef } from '@core/api/models';
 import {
   BACKUP_RESTORE_CONFIRMATION,
   type AdminPrincipal,
+  type MergePreview,
+  type MergeResult,
   type Backup,
   type BackupList,
   type ApplicationTypeCreateBody,
@@ -95,6 +97,7 @@ import {
   MOCK_MAIL_TEMPLATES,
   MOCK_PERMISSIONS,
   MOCK_PRINCIPALS,
+  mockMergePreview,
   MOCK_ROLES,
   MOCK_SITE_REVISIONS,
   MOCK_WEBHOOK_STATUS,
@@ -568,6 +571,57 @@ export class AdminApiService {
       return of(structuredCopy(p ?? this.store.principals[0]));
     }
     return this.http.patch<AdminPrincipal>(`${this.base}/admin/principals/${principalId}`, { active });
+  }
+
+  /**
+   * What a merge of the (old) account `sourceId` into `targetId` would do —
+   * GET /admin/principals/{id}/merge-preview?targetId=. Needs `admin.users.merge`.
+   */
+  previewPrincipalMerge(sourceId: Uuid, targetId: Uuid): Observable<MergePreview> {
+    if (this.mock) {
+      const preview = mockMergePreview(this.store.principals, sourceId, targetId);
+      return preview ? of(preview) : throwError(() => ({ status: 404 }));
+    }
+    const params = new HttpParams().set('targetId', targetId);
+    return this.http.get<MergePreview>(
+      `${this.base}/admin/principals/${sourceId}/merge-preview`,
+      { params },
+    );
+  }
+
+  /**
+   * Merge the (old) account `sourceId` into `targetId` — POST /admin/principals/{id}/merge.
+   * A real conflict answers 409 `merge_conflict`; nothing changes then.
+   */
+  mergePrincipal(sourceId: Uuid, targetId: Uuid): Observable<MergeResult> {
+    if (this.mock) {
+      const preview = mockMergePreview(this.store.principals, sourceId, targetId);
+      if (!preview) return throwError(() => ({ status: 404 }));
+      if (!preview.canMerge) {
+        return throwError(() => ({
+          status: 409,
+          error: {
+            code: 'merge_conflict',
+            errors: preview.conflicts.map((c) => ({ field: c.kind, msg: c.label ?? '' })),
+          },
+        }));
+      }
+      const mergedAt = new Date().toISOString();
+      const source = this.store.principals.find((x) => x.id === sourceId)!;
+      source.mergedIntoId = targetId;
+      source.mergedIntoName = preview.target.displayName;
+      source.mergedAt = mergedAt;
+      source.active = false;
+      return of({
+        source: preview.source,
+        target: preview.target,
+        areas: preview.areas,
+        mergedAt,
+      });
+    }
+    return this.http.post<MergeResult>(`${this.base}/admin/principals/${sourceId}/merge`, {
+      targetId,
+    });
   }
 
   /** Delete a role — DELETE /admin/roles/{id} (admin/member protected server-side). */
