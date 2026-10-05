@@ -10,7 +10,13 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent, SelectComponent, type SelectOption } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  IconComponent,
+  InputComponent,
+  SelectComponent,
+  type SelectOption,
+} from '@stupa-makers/ui-kit';
 import {
   COMPARE_OPS,
   GUARD_ACTOR_OPERATORS,
@@ -24,14 +30,23 @@ type ValueKind = 'none' | 'role' | 'committee' | 'compare' | 'text';
 /**
  * Recursive guard editor. It builds a boolean condition tree from and/or/not and leaf
  * operators such as roleIs or compare. The input and the output use the nested `Guard`
- * JSON that the server evaluator `eval_guard` already understands. This is a controlled
+ * JSON that the server evaluator `eval_guard` already understands. A combinator shows as
+ * a box with its conditions indented inside it; a condition shows its operator and the
+ * value it needs (a role, a gremium, a field comparison). This is a controlled
  * component. It reads `guard` and emits a new object on every change.
  */
 @Component({
   selector: 'app-guard-editor',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, SelectComponent, ButtonComponent],
+  imports: [
+    FormsModule,
+    TranslatePipe,
+    SelectComponent,
+    ButtonComponent,
+    IconComponent,
+    InputComponent,
+  ],
   templateUrl: './guard-editor.component.html',
   styleUrl: './guard-editor.component.scss',
 })
@@ -46,6 +61,11 @@ export class GuardEditorComponent {
   readonly guardChange = output<Guard | null>();
 
   protected readonly compareOps = COMPARE_OPS;
+  /** The comparison operators as options. The symbols need no translation. */
+  protected readonly compareOpOptions: SelectOption[] = COMPARE_OPS.map((o) => ({
+    value: o,
+    label: o,
+  }));
 
   /** Current operator. An empty string means no guard. */
   protected readonly op = computed<string>(() => {
@@ -68,6 +88,14 @@ export class GuardEditorComponent {
   });
 
   protected readonly valueKind = computed<ValueKind>(() => this.kindForOp(this.op()));
+
+  /** What a combinator means, beside its operator: "alle Bedingungen erfüllt". */
+  protected readonly combinatorText = computed(() => {
+    const op = this.op();
+    return op === 'and' || op === 'or' || op === 'not'
+      ? this.i18n.translate(`admin.flow.guardDesc.${op}` as TranslationKey)
+      : '';
+  });
 
   protected readonly strValue = computed<string>(() => {
     const g = this.guard();

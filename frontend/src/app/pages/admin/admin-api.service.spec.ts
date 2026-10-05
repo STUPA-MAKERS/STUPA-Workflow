@@ -906,11 +906,13 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(stub).toEqual({ applicationTypeId: 'no-draft-type', active: true, fields: [] });
   });
 
-  it('returns null global flow and a deterministic mock flow id in mock mode', async () => {
+  it('serves the mock flow, stores a saved flow and returns a deterministic id in mock mode', async () => {
     const s = svc();
-    expect(await firstValueFrom(s.getGlobalFlow())).toBeNull();
+    const seeded = await firstValueFrom(s.getGlobalFlow());
+    expect(seeded?.states.some((st) => st.isInitial)).toBe(true);
     const created = await firstValueFrom(s.createGlobalFlowVersion({ states: [{ key: 's', label: {} }], transitions: [] }));
     expect(created.id).toBe('gflow-1');
+    expect((await firstValueFrom(s.getGlobalFlow()))?.states.map((st) => st.key)).toEqual(['s']);
   });
 
   it('CRUDs gremium-roles in the mock store', async () => {
@@ -977,7 +979,9 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const variants = await firstValueFrom(s.listCdVariants());
     expect(variants.map((v) => v.key)).toEqual(['stupa', 'asta', 'bericht']);
     expect((await firstValueFrom(s.listConfigRevisions('site_config', 'global'))).map((r) => r.version)).toEqual([3, 2, 1]);
-    expect(await firstValueFrom(s.listConfigRevisions('flow', 'global'))).toEqual([]);
+    expect((await firstValueFrom(s.listConfigRevisions('flow', 'global'))).map((r) => r.version)).toEqual([12, 11]);
+    expect((await firstValueFrom(s.listConfigRevisions('form', 'f-foerderung'))).map((r) => r.version)).toEqual([3, 2]);
+    expect(await firstValueFrom(s.listConfigRevisions('form', 'unknown'))).toEqual([]);
     expect(await firstValueFrom(s.putNotificationSettings({ taskReminderAfterDays: 9 }))).toEqual({
       taskReminderEnabled: true,
       taskReminderAfterDays: 9,

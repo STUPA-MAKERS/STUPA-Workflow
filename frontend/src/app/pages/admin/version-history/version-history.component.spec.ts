@@ -145,4 +145,16 @@ describe('VersionHistoryComponent', () => {
     c.doRestore();
     expect(api.restoreConfigRevision).not.toHaveBeenCalled();
   });
+
+  it('reports the number of the current version after each load, or null without one', async () => {
+    const answers = [of(REVS), of([REVS[1]]), throwError(() => new Error('x'))];
+    let call = 0;
+    const { c } = await setup({ listConfigRevisions: jest.fn(() => answers[call++]) });
+    const seen: (number | null)[] = [];
+    c.current.subscribe((v) => seen.push(v));
+    c.reload(); // only an older version: no current one
+    c.reload(); // a failed read reports nothing
+    expect(seen).toEqual([null]);
+    expect(call).toBe(3);
+  });
 });

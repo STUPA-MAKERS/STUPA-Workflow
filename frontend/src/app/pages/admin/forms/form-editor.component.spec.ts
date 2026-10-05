@@ -1,12 +1,12 @@
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { render, screen, within } from '@testing-library/angular';
+import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { FormFieldDef, I18nMap } from '@core/api/models';
 import { AdminApiService } from '../admin-api.service';
 import type { ApplicationTypeFull, FormDraft } from '../admin.models';
-import { groupsFromFields, groupsToFields } from '../form-field.util';
+import { FIELD_TYPES, groupsFromFields, groupsToFields } from '../form-field.util';
 import { FormEditorComponent } from './form-editor.component';
 
 const TYPE: ApplicationTypeFull = {
@@ -70,7 +70,8 @@ describe('FormEditorComponent', () => {
   it('loads the draft title and questions', async () => {
     await setup(draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' }, required: true }]));
     expect(screen.getByRole('heading', { name: 'Förderantrag' })).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Titel')).toBeInTheDocument();
+    // The ui-kit input writes its value once the model settles.
+    expect(await screen.findByDisplayValue('Titel')).toBeInTheDocument();
   });
 
   it('loads a markerless form as a single untitled group', async () => {
@@ -105,7 +106,7 @@ describe('FormEditorComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     expect(c.groups()).toHaveLength(1);
-    await userEvent.click(screen.getByRole('button', { name: '+ Frage hinzufügen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Frage hinzufügen' }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'Langtext' }));
     expect(c.groups()[0].fields).toHaveLength(1);
     expect(c.groups()[0].fields[0].type).toBe('textarea');
@@ -768,6 +769,346 @@ describe('FormEditorComponent — nullish/branch edges', () => {
   it('errorsFor returns an empty array for an unknown position', async () => {
     const { c } = await setup(draft([{ key: 't', type: 'text', label: { de: 'T', en: '' } }]));
     expect(c.errorsFor(9, 9)).toEqual([]);
+  });
+});
+
+describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  // jsdom in jest has no structuredClone. The duplicate action relies on the browser global.
+  const g = globalThis as unknown as { structuredClone?: <T>(v: T) => T };
+  const savedClone = g.structuredClone;
+  beforeAll(() => {
+    g.structuredClone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+  });
+  afterAll(() => {
+    g.structuredClone = savedClone;
+  });
+
+  const TWO_GROUPS: FormFieldDef[] = [
+    { key: 'section_1', type: 'section', label: { de: 'Vorhaben', en: 'Project' } },
+    { key: 'title', type: 'text', label: { de: 'Titel', en: '' }, required: true },
+    { key: 'cat', type: 'select', label: { de: 'Kategorie', en: '' }, options: [{ value: 'k', label: { de: 'Kultur', en: 'Culture' } }] },
+    { key: 'section_2', type: 'section', label: { de: 'Kosten', en: 'Costs' } },
+    { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung', en: '' } },
+    { key: 'eintritt', type: 'currency', label: { de: 'Eintritt', en: '' } },
+    { key: 'summe', type: 'computed', label: { de: 'Summe', en: '' }, compute: { var: 'eintritt' } },
+  ];
+
+  it('offers every question type in the type menu (the section marker is no question)', async () => {
+    const { c } = await setup(draft(TWO_GROUPS));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Frage hinzufügen' })[1]);
+    const items = screen.getAllByRole('menuitem').map((m) => m.textContent?.trim());
+    expect(items).toHaveLength(FIELD_TYPES.length - 1);
+    for (const type of FIELD_TYPES.filter((t) => t !== 'section')) {
+      expect(items).toContain(c.typeLabel(type));
+    }
+    expect(items).not.toContain('Abschnitt (neuer Schritt)');
+    // Every type becomes a question of the group whose menu is open.
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Kostenpositionen' }));
+    expect(c.groups()[1].fields.at(-1).type).toBe('positions');
+    expect(c.typeMenuGroup()).toBeNull();
+  });
+
+  it('lists every group with its questions in the outline: label, required mark, key and type', async () => {
+    await setup(draft(TWO_GROUPS));
+    const outline = screen.getByRole('navigation', { name: 'Fragen des Formulars' });
+    const groups = within(outline).getAllByRole('button', { name: /^Abschnitt/ });
+    expect(groups.map((g) => g.textContent?.trim())).toEqual(['Abschnitt 1 · Vorhaben', 'Abschnitt 2 · Kosten']);
+    const title = within(outline).getByRole('button', { name: /^Titel/ });
+    expect(title.textContent).toContain('title');
+    expect(title.textContent).toContain('Kurztext');
+    expect(within(title).getByLabelText('Pflichtfeld')).toHaveTextContent('*');
+  });
+
+  it('selects the first question on load and shows the cards of its group', async () => {
+    const { c, container } = await setup(draft(TWO_GROUPS));
+    expect(c.selected()).toEqual({ gi: 0, qi: 0 });
+    expect(c.groupIndex()).toBe(0);
+    expect(container.querySelectorAll('article.fe__card')).toHaveLength(2);
+    expect(container.querySelector('.fe__card--sel')?.getAttribute('data-q')).toBe('0:0');
+  });
+
+  it('a click in the outline selects a question and shows its group; a click on a group heading shows the group', async () => {
+    const { c, fixture, container } = await setup(draft(TWO_GROUPS));
+    await userEvent.click(screen.getByRole('button', { name: /^Summe/ }));
+    expect(c.selected()).toEqual({ gi: 1, qi: 2 });
+    expect(c.groupIndex()).toBe(1);
+    fixture.detectChanges();
+    expect(container.querySelector('.fe__card--sel')?.getAttribute('data-q')).toBe('1:2');
+    expect(container.querySelector('.fe__row--on')?.textContent).toContain('Summe');
+    await userEvent.click(screen.getByRole('button', { name: 'Abschnitt 1 · Vorhaben' }));
+    expect(c.groupIndex()).toBe(0);
+    expect(c.selected()).toBeNull();
+    // A click into a card selects its question without moving the page.
+    c.focusCard({ gi: 0, qi: 1 });
+    expect(c.selected()).toEqual({ gi: 0, qi: 1 });
+  });
+
+  it('shows the options of each type: choice options, cost positions and the computed expression', async () => {
+    const { c, fixture } = await setup(draft(TWO_GROUPS));
+    // Group 1: the choice question has its options with value, DE and EN.
+    expect(screen.getByText('Auswahloptionen')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('Kultur')).toBeInTheDocument();
+    c.selectGroup(1);
+    fixture.detectChanges();
+    expect(screen.getByText('Kostenpositionen', { selector: 'legend' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Min. Vergleichsangebote')).toBeInTheDocument();
+    expect(screen.getByLabelText('Min. Positionen')).toBeInTheDocument();
+    expect(screen.getByText('Verzicht auf Vergleichsangebote erlauben')).toBeInTheDocument();
+    // The expression of a computed field shows without the advanced options.
+    await waitFor(() =>
+      expect(screen.getByLabelText('Berechnung (JsonLogic)')).toHaveValue('{"var":"eintritt"}'),
+    );
+  });
+
+  it('opens the advanced options per question: PII, metric, validation and visibleIf', async () => {
+    const { c, fixture } = await setup(draft(TWO_GROUPS));
+    c.selectGroup(1);
+    fixture.detectChanges();
+    expect(screen.queryByText('Personenbezogen (PII)')).not.toBeInTheDocument();
+    const toggles = screen.getAllByRole('button', { name: 'Erweiterte Optionen' });
+    expect(toggles[1]).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(toggles[1]);
+    expect(toggles[1]).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Personenbezogen (PII)')).toBeInTheDocument();
+    expect(screen.getByText('In Kennzahl übernehmen')).toBeInTheDocument();
+    expect(screen.getByText('Validierung')).toBeInTheDocument();
+    expect(screen.getByLabelText('Minimum')).toBeInTheDocument();
+    expect(screen.getByLabelText('Sichtbar wenn (JsonLogic)')).toHaveAttribute('placeholder', 'leer: immer sichtbar');
+    // The cost positions name their automatic metric instead of the switch.
+    await userEvent.click(toggles[0]);
+    expect(screen.getByText('Fließt automatisch als Summe in den Betrag (Budget).')).toBeInTheDocument();
+  });
+
+  it('the required box sets the flag of the question', async () => {
+    const { c } = await setup(draft(TWO_GROUPS));
+    const boxes = screen.getAllByRole('checkbox', { name: 'Pflichtfeld' });
+    // The ui-kit checkbox takes its value once the model settles.
+    await waitFor(() => expect(boxes[0]).toBeChecked());
+    await userEvent.click(boxes[1]);
+    expect(c.groups()[0].fields[1].required).toBe(true);
+    await userEvent.click(boxes[0]);
+    expect(c.groups()[0].fields[0].required).toBe(false);
+  });
+
+  it('save creates a form version with every group and question', async () => {
+    const { createFormVersion } = await setup(draft(TWO_GROUPS));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(createFormVersion).toHaveBeenCalledTimes(1);
+    const fields = createFormVersion.mock.calls[0][1] as FormFieldDef[];
+    expect(fields.map((f) => f.key)).toEqual(['section_1', 'title', 'cat', 'section_2', 'kosten', 'eintritt', 'summe']);
+  });
+
+  it('the selection follows a question that moves, is duplicated, added or removed', async () => {
+    const { c } = await setup(draft(TWO_GROUPS));
+    c.moveQuestion({ gi: 0, qi: 0 }, 1);
+    expect(c.selected()).toEqual({ gi: 0, qi: 1 });
+    // At the edge the question moves into the next group, and the selection with it.
+    c.moveQuestion({ gi: 0, qi: 1 }, 1);
+    expect(c.selected()).toEqual({ gi: 1, qi: 0 });
+    expect(c.groupIndex()).toBe(1);
+    c.moveQuestion({ gi: 1, qi: 0 }, -1);
+    expect(c.selected()).toEqual({ gi: 0, qi: 1 });
+    c.duplicateQuestion({ gi: 0, qi: 1 });
+    expect(c.selected()).toEqual({ gi: 0, qi: 2 });
+    c.addQuestion(1, 'email');
+    expect(c.selected()).toEqual({ gi: 1, qi: 3 });
+    // Removing a question above the selection keeps it on the same question.
+    c.removeQuestion({ gi: 1, qi: 0 });
+    expect(c.selected()).toEqual({ gi: 1, qi: 2 });
+    c.removeQuestion({ gi: 1, qi: 2 });
+    expect(c.selected()).toBeNull();
+    // A move of another question leaves the selection alone.
+    c.selectQuestion({ gi: 0, qi: 0 }, false);
+    c.moveQuestion({ gi: 1, qi: 0 }, 1);
+    expect(c.selected()).toEqual({ gi: 0, qi: 0 });
+  });
+
+  it('moves a question by drag and drop in the outline, also into another group', async () => {
+    const { c } = await setup(draft(TWO_GROUPS));
+    const ev = () =>
+      ({ preventDefault: jest.fn(), stopPropagation: jest.fn(), dataTransfer: { setData: jest.fn() } }) as unknown as DragEvent;
+    // Drop "Titel" (selected) on "Eintritt" in group 2.
+    c.onQuestionDragStart(ev(), { gi: 0, qi: 0 });
+    c.onQuestionDrop(ev(), { gi: 1, qi: 1 });
+    expect(c.groups()[1].fields.map((f: FormFieldDef) => f.key)).toEqual(['kosten', 'title', 'eintritt', 'summe']);
+    expect(c.selected()).toEqual({ gi: 1, qi: 1 });
+    // A drop on a group appends a dragged question; the selection stays on its question.
+    c.onQuestionDragStart(ev(), { gi: 0, qi: 0 });
+    c.onDrop(1);
+    expect(c.groups()[1].fields.at(-1).key).toBe('cat');
+    expect(c.selected()).toEqual({ gi: 1, qi: 1 });
+    // A drop without a drag, or on the same row, changes nothing.
+    const before = JSON.stringify(c.groups());
+    c.onQuestionDrop(ev(), { gi: 1, qi: 0 });
+    c.onQuestionDragStart(ev(), { gi: 1, qi: 0 });
+    c.onQuestionDrop(ev(), { gi: 1, qi: 0 });
+    expect(JSON.stringify(c.groups())).toBe(before);
+  });
+
+  it('the ⋮ menu of a group moves it within the edges and deletes it; the shown group follows', async () => {
+    const { c } = await setup(draft(TWO_GROUPS));
+    const ids = (gi: number) => c.groupMenu(gi).flatMap((sec: { items: { id: string }[] }) => sec.items.map((i) => i.id));
+    expect(ids(0)).toEqual(['down', 'delete']);
+    expect(ids(1)).toEqual(['up', 'delete']);
+    c.selectGroup(1);
+    c.onGroupMenu(1, { id: 'up', label: '' });
+    expect(c.groups()[0].titleDe).toBe('Kosten');
+    expect(c.groupIndex()).toBe(0);
+    c.onGroupMenu(0, { id: 'down', label: '' });
+    expect(c.groups()[1].titleDe).toBe('Kosten');
+    expect(c.groupIndex()).toBe(1);
+    c.onGroupMenu(1, { id: 'unknown', label: '' });
+    expect(c.groups()).toHaveLength(2);
+    c.selectQuestion({ gi: 1, qi: 0 }, false);
+    c.onGroupMenu(0, { id: 'delete', label: '' });
+    expect(c.groups()).toHaveLength(1);
+    expect(c.selected()).toEqual({ gi: 0, qi: 0 });
+    expect(c.groupIndex()).toBe(0);
+  });
+
+  it('the phone header menu holds activate/deactivate and the preview', async () => {
+    const { c, setFormActive } = await setup(draft(TWO_GROUPS));
+    expect(c.headerMenu()[0].items.map((i: { id: string }) => i.id)).toEqual(['toggleActive', 'preview']);
+    c.onHeaderMenu({ id: 'preview', label: '' });
+    expect(c.preview()).toBe(true);
+    expect(c.headerMenu()[0].items[1].label).toBe('Bearbeiten');
+    c.onHeaderMenu({ id: 'toggleActive', label: '' });
+    expect(setFormActive).toHaveBeenCalledWith('f1', false);
+    c.onHeaderMenu({ id: 'other', label: '' });
+    expect(c.preview()).toBe(true);
+  });
+
+  it('shows the version beside the title and the state of the form as text', async () => {
+    const { c } = await setup(draft(TWO_GROUPS));
+    expect(c.versionMeta()).toBe('v1');
+    expect(screen.getByText('v1')).toBeInTheDocument();
+    expect(screen.getByText('Aktiv', { selector: 'app-status-text' })).toBeInTheDocument();
+  });
+
+  it('opens the type menu below its button, or above it near the bottom, and closes it on a press outside', async () => {
+    const { c } = await setup(draft(TWO_GROUPS));
+    const button = (top: number) =>
+      ({ currentTarget: { getBoundingClientRect: () => ({ left: 20, top, bottom: top + 32 }) } }) as unknown as Event;
+    c.toggleTypeMenu(0, button(100));
+    expect(c.typeMenuGroup()).toBe(0);
+    expect(c.menuPos()).toEqual({ left: 20, top: 136, bottom: null });
+    c.toggleTypeMenu(0, button(100));
+    expect(c.typeMenuGroup()).toBeNull();
+    c.toggleTypeMenu(1, button(window.innerHeight - 40));
+    expect(c.menuPos().top).toBeNull();
+    expect(c.menuPos().bottom).toBe(44);
+    // A press inside the menu keeps it; a press elsewhere closes it.
+    const inside = document.createElement('div');
+    inside.className = 'fe__menu';
+    c.onDocumentPointerDown({ target: inside } as unknown as PointerEvent);
+    expect(c.typeMenuGroup()).toBe(1);
+    c.onDocumentPointerDown({ target: document.body } as unknown as PointerEvent);
+    expect(c.typeMenuGroup()).toBeNull();
+    // A scroll closes an open menu too.
+    c.toggleTypeMenu(0, button(100));
+    window.dispatchEvent(new Event('scroll'));
+    expect(c.typeMenuGroup()).toBeNull();
+  });
+
+  it('a scroll does not close the type menu on a phone, where it is a bottom sheet', async () => {
+    const { c } = await setup(draft(TWO_GROUPS));
+    c.phone = () => true;
+    const button = { currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 100, bottom: 132 }) } } as unknown as Event;
+    c.toggleTypeMenu(0, button);
+    window.dispatchEvent(new Event('scroll'));
+    expect(c.typeMenuGroup()).toBe(0);
+  });
+
+  it('the type menu works with the keyboard: the focus goes in, arrows move, Escape closes and refocuses', async () => {
+    const { fixture } = await setup(draft(TWO_GROUPS));
+    const add = screen.getAllByRole('button', { name: 'Frage hinzufügen' })[0];
+    add.focus();
+    await userEvent.keyboard('{Enter}');
+    fixture.detectChanges();
+    const menu = await screen.findByRole('menu');
+    const items = within(menu).getAllByRole('menuitem');
+    await waitFor(() => expect(document.activeElement).toBe(items[0]));
+    await userEvent.keyboard('{ArrowDown}');
+    expect(document.activeElement).toBe(items[1]);
+    await userEvent.keyboard('{ArrowUp}{ArrowUp}');
+    expect(document.activeElement).toBe(items.at(-1));
+    await userEvent.keyboard('{Home}');
+    expect(document.activeElement).toBe(items[0]);
+    await userEvent.keyboard('{End}');
+    expect(document.activeElement).toBe(items.at(-1));
+    await userEvent.keyboard('{Escape}');
+    fixture.detectChanges();
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(document.activeElement).toBe(add);
+    // Tab leaves the menu the same way: it closes, and the button has the focus.
+    await userEvent.keyboard('{Enter}');
+    fixture.detectChanges();
+    await waitFor(() => expect(screen.getByRole('menu').contains(document.activeElement)).toBe(true));
+    await userEvent.keyboard('{Tab}');
+    fixture.detectChanges();
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(document.activeElement).toBe(add);
+  });
+
+  it('the move buttons of a card: the moved question keeps the selection, also into the next group', async () => {
+    const { c, fixture } = await setup(draft(TWO_GROUPS));
+    c.selectQuestion({ gi: 0, qi: 1 }, false);
+    fixture.detectChanges();
+    // "Kategorie" is the last question of group 1; "Nach unten" hands it to group 2.
+    const card = document.querySelector<HTMLElement>('[data-q="0:1"]')!;
+    await userEvent.click(within(card).getByRole('button', { name: 'Nach unten' }));
+    expect(c.groupIndex()).toBe(1);
+    expect(c.selected()).toEqual({ gi: 1, qi: 0 });
+    expect(c.groups()[1].fields[0].key).toBe('cat');
+    // Within a group: the selection goes with the question, not to the neighbour.
+    fixture.detectChanges();
+    const first = document.querySelector<HTMLElement>('[data-q="1:0"]')!;
+    await userEvent.click(within(first).getByRole('button', { name: 'Nach unten' }));
+    expect(c.selected()).toEqual({ gi: 1, qi: 1 });
+    expect(c.groups()[1].fields[1].key).toBe('cat');
+    // Duplicate selects the copy; delete clears the selection.
+    fixture.detectChanges();
+    const moved = document.querySelector<HTMLElement>('[data-q="1:1"]')!;
+    await userEvent.click(within(moved).getByRole('button', { name: 'Duplizieren' }));
+    expect(c.selected()).toEqual({ gi: 1, qi: 2 });
+    fixture.detectChanges();
+    const copy = document.querySelector<HTMLElement>('[data-q="1:2"]')!;
+    await userEvent.click(within(copy).getByRole('button', { name: 'Löschen' }));
+    expect(c.selected()).toBeNull();
+  });
+
+  it('the raw JsonLogic text and the open advanced options move with their question', async () => {
+    const { c } = await setup(draft(TWO_GROUPS));
+    const ev = () =>
+      ({ preventDefault: jest.fn(), stopPropagation: jest.fn(), dataTransfer: { setData: jest.fn() } }) as unknown as DragEvent;
+    c.toggleExpanded({ gi: 0, qi: 0 });
+    c.onLogicInput({ gi: 0, qi: 0 }, 'visibleIf', '{"==": [');
+    // Drag "Titel" into group 2, before "Eintritt".
+    c.onQuestionDragStart(ev(), { gi: 0, qi: 0 });
+    c.onQuestionDrop(ev(), { gi: 1, qi: 1 });
+    expect(c.logicRaw(1, 1, 'visibleIf')).toBe('{"==": [');
+    expect(c.isExpanded({ gi: 1, qi: 1 })).toBe(true);
+    // "Kategorie" now holds the old place and shows its own state.
+    expect(c.logicRaw(0, 0, 'visibleIf')).toBe('');
+    expect(c.isExpanded({ gi: 0, qi: 0 })).toBe(false);
+    // An arrow move, a duplicate, a delete and a group move re-key the state the same way.
+    c.moveQuestion({ gi: 1, qi: 1 }, -1);
+    expect(c.logicRaw(1, 0, 'visibleIf')).toBe('{"==": [');
+    c.duplicateQuestion({ gi: 1, qi: 0 });
+    expect(c.logicRaw(1, 1, 'visibleIf')).toBe('');
+    expect(c.logicRaw(1, 0, 'visibleIf')).toBe('{"==": [');
+    c.removeQuestion({ gi: 1, qi: 1 });
+    c.moveGroup(1, -1);
+    expect(c.logicRaw(0, 0, 'visibleIf')).toBe('{"==": [');
+    expect(c.isExpanded({ gi: 0, qi: 0 })).toBe(true);
+    c.removeQuestion({ gi: 0, qi: 0 });
+    expect(c.logicRaw(0, 0, 'visibleIf')).toBe('');
+    expect(c.isExpanded({ gi: 0, qi: 0 })).toBe(false);
+    c.toggleExpanded({ gi: 1, qi: 0 });
+    c.removeGroup(0);
+    expect(c.isExpanded({ gi: 0, qi: 0 })).toBe(true);
   });
 });
 

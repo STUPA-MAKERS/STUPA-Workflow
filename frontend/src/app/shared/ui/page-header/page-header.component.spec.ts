@@ -62,4 +62,14 @@ describe('PageHeaderComponent', () => {
     const host = await setup();
     expect(host.querySelector('.ph__meta')).toBeNull();
   });
+
+  it('puts a status of the heading slot in the title block, beside the title', async () => {
+    const { container } = await render(
+      `<app-page-header title="Förderantrag"><span heading class="st">Aktiv</span><button actions>Speichern</button></app-page-header>`,
+      { imports: [PageHeaderComponent] },
+    );
+    const heading = container.querySelector('.ph__heading');
+    expect(heading?.querySelector('.st')?.textContent).toBe('Aktiv');
+    expect(container.querySelector('.ph__actions')?.textContent).toBe('Speichern');
+  });
 });

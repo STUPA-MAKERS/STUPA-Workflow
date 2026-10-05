@@ -250,6 +250,17 @@
   );
 }
 
+/* Wide, a full-width page with columns of its own (`adminPane`): the frame passes the
+   free height down, and the page scrolls only inside its columns. */
+.af--pane,
+.af--pane .af__page,
+.af--pane .af__pageBody {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+}
+
 @include bp.phone {
   .af {
     gap: var(--space-5);

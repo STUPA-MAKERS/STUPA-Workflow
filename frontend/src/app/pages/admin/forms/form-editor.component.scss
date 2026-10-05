@@ -1,219 +1,227 @@
+// Form editor (boards Admin-Formular-Editor, Admin-Formular-Editor-Kosten): the outline,
+// the cards of the shown group, and the form settings with the versions.
+@use 'field' as f;
+@use 'breakpoints' as bp;
+@use '../../../features/meetings/scroll-fade' as fade;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* Wide: the admin frame passes the free height down (route data `adminPane`); the page
+   takes it and only its columns scroll. */
+:host(.fe-pane) {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
 .fe {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--space-5);
+  min-width: 0;
+}
+/* Wide: the page takes the free height and does not scroll. */
+.fe--wide {
+  min-height: 0;
 }
 
-.fe__head-tools {
+.fe__headTools {
   display: flex;
-  gap: var(--space-3);
   align-items: center;
+  gap: var(--space-2);
 }
 
-.fe__activeChip--on {
-  background: var(--color-success-subtle);
-  color: var(--color-success);
+.fe__loading {
+  padding-block: var(--space-4);
 }
 
-.fe__alert {
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  background: var(--color-danger-subtle, rgba(220, 38, 38, 0.1));
-  color: var(--color-danger);
-  font-size: var(--fs-sm);
+/* ---- Columns ------------------------------------------------------------------ */
+
+/* Phone: one column — the outline, the cards, the settings and the versions. */
+.fe__cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  min-width: 0;
 }
 
-.fe__meta,
-.fe__preview {
+/* Narrow: the outline beside the cards; the settings follow the cards. */
+@include bp.narrow {
+  .fe__cols {
+    grid-template-columns: 17rem minmax(0, 1fr);
+    align-items: start;
+  }
+  .fe__outline {
+    grid-row: span 2;
+  }
+  .fe__cols--preview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Wide: three columns that reach down to the footer gap. Each scrolls inside itself. */
+@include bp.wide {
+  .fe__cols {
+    flex: 1 1 0;
+    grid-template-columns: 20rem minmax(0, 1fr) 22.5rem;
+    grid-template-rows: minmax(0, 1fr);
+    gap: var(--space-3);
+    min-height: 0;
+  }
+  .fe__cols--preview {
+    grid-template-columns: minmax(0, 1fr) 22.5rem;
+  }
+  .fe__outline,
+  .fe__main,
+  .fe__side,
+  .fe__preview {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    @include fade.fade-y(var(--space-5));
+  }
+}
+
+/* ---- Outline --------------------------------------------------------------------- */
+
+.fe__outline {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-5);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
-}
-
-/* Group containers, one per wizard step. */
-.fe__groups {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-1) var(--space-1) var(--space-4);
 }
 
 .fe__group {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-5);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  border-top: 3px solid var(--color-primary);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  gap: 2px;
+  min-width: 0;
 }
 
-.fe__group-head {
+.fe__groupHead {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-height: 2.5rem;
+  padding: var(--space-2) 0 0 var(--space-2);
+  cursor: grab;
 }
 
-.fe__group-badge {
-  font-size: var(--fs-xs);
+/* The group heading: a caption in the accent colour; a click shows the group. */
+.fe__groupName {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--space-1) 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-cap);
+  line-height: var(--lh-cap);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-cap);
+  text-align: left;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: var(--fw-bold);
-  color: var(--color-primary);
+  color: var(--color-accent-text);
+  cursor: pointer;
 }
-
-.fe__group-empty {
-  margin: 0;
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
-
-.fe__add-group {
-  align-self: flex-start;
+.fe__groupName:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .fe__list {
-  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.fe__card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  border-left: 3px solid var(--color-primary);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-}
-
-.fe__card-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.fe__drag {
-  cursor: grab;
-  color: var(--color-text-muted);
-  font-size: var(--fs-lg);
-  user-select: none;
-}
-
-.fe__type {
-  min-width: 12rem;
-}
-
-.fe__spacer {
-  flex: 1;
+  list-style: none;
 }
 
 .fe__row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
-}
-
-@media (max-width: 40rem) {
-  .fe__row {
-    grid-template-columns: 1fr;
-  }
-}
-
-.fe__lbl {
+  position: relative;
   display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 3rem;
+  padding-left: var(--space-2);
+  border-radius: var(--radius-lg);
+  cursor: grab;
+}
+.fe__row:hover {
+  background: var(--color-surface-2);
+}
+.fe__row--on,
+.fe__row--on:hover {
+  background: var(--color-selected);
+}
+
+.fe__grip {
+  flex: none;
+  color: var(--color-text-subtle);
+}
+
+/* The whole row text is the button: a click anywhere on it selects the question. */
+.fe__rowBtn {
+  display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--space-1);
-  font-size: var(--fs-sm);
+  gap: 1px;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3) var(--space-2) 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.fe__rowBtn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+  border-radius: var(--radius-lg);
+}
+
+.fe__rowTitle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
   font-weight: var(--fw-medium);
 }
 
-.fe__lbl input,
-.fe__lbl textarea {
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-  color: inherit;
-  font: inherit;
-}
-
-.fe__sub {
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
+.fe__rowSub {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.fe__hint {
-  margin: 0;
-  font-size: var(--fs-xs);
+  align-items: baseline;
+  gap: var(--space-1);
+  min-width: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
   color: var(--color-text-muted);
 }
-
-/* The field key is a slug. Set it apart as technical text. */
-.fe__key input {
-  font-family: var(--font-mono, monospace);
-  font-size: var(--fs-sm);
+.fe__rowSub .mono {
+  flex: 0 1 auto;
 }
 
-/* Hint next to the switches, for example "auto-promoted". */
-.fe__note {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-  font-style: italic;
+.fe__row--bad .fe__rowTitle {
+  color: var(--color-danger);
+}
+.fe__rowAlert {
+  flex: none;
+  margin-left: var(--space-1);
+  color: var(--color-danger);
 }
 
-.fe__sub legend {
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
-  padding: 0 var(--space-2);
-}
-
-.fe__opt {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr auto;
-  gap: var(--space-2);
-  align-items: center;
-}
-
-.fe__opt input {
-  padding: var(--space-1) var(--space-2);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg);
-  color: inherit;
-}
-
-.fe__advanced {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border-top: var(--border-width) dashed var(--color-border);
-}
-
-.fe__toggles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-  align-items: center;
+.fe__req {
+  flex: none;
+  margin-left: 2px;
+  color: var(--color-danger);
 }
 
 .fe__add {
@@ -221,38 +229,310 @@
   align-self: flex-start;
 }
 
+/* The menu of the question types: two columns at the button (`menuPos`). */
 .fe__menu {
-  position: absolute;
-  z-index: var(--z-dropdown, 50);
-  /* The "add question" button is always the last element on the page. A menu that
-     opens downward would overflow past the footer. So the menu opens UPWARD. */
-  bottom: calc(100% + var(--space-2));
-  left: 0;
-  min-width: 14rem;
-  max-height: 18rem;
-  overflow-y: auto;
-  background: var(--color-bg-elevated);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
+  position: fixed;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 27.5rem;
+  max-width: calc(100vw - 2 * var(--space-5));
+  padding: 6px;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-3);
   box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  padding: var(--space-1);
 }
 
 .fe__menu-item {
-  text-align: start;
-  padding: var(--space-2) var(--space-3);
-  background: transparent;
+  display: flex;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0 var(--space-3);
   border: 0;
   border-radius: var(--radius-sm);
-  cursor: pointer;
-  color: inherit;
+  background: none;
   font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.fe__menu-item:hover,
+.fe__menu-item:focus-visible {
+  background: var(--color-selected);
+  outline: none;
 }
 
-.fe__menu-item:hover {
-  background: var(--color-surface-sunken);
+/* The bottom sheet of the question types on a phone: one column. */
+.fe__sheetMenu {
+  display: flex;
+  flex-direction: column;
+}
+.fe__sheetMenu .fe__menu-item {
+  min-height: 3rem;
+}
+
+.fe__addGroup {
+  align-self: flex-start;
+  margin: var(--space-3) 0 0 var(--space-2);
+}
+
+/* ---- Cards ----------------------------------------------------------------------- */
+
+.fe__main,
+.fe__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.fe__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-5);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-1);
+}
+/* The selected question: an accent outline on the inside of the card. */
+.fe__card--sel {
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+.fe__card--group {
+  gap: var(--space-3);
+}
+
+.fe__cap {
+  margin: 0;
+}
+.fe__cardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.fe__cardTitle {
+  flex: 1 1 auto;
+  color: var(--color-text-muted);
+}
+
+/* Type, key and the required box on one line. */
+.fe__base {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+.fe__required {
+  padding-inline: var(--space-2);
+}
+
+/* Two fields side by side: the DE and the EN text. */
+.fe__pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.fe__sub {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.fe__sub > legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+}
+
+/* The cost positions: a panel one surface up; its fields one more. */
+.fe__panel {
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  --color-surface-sunken: var(--color-surface-3);
+}
+.fe__panel > legend {
+  float: left;
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.fe__opt {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.fe__inlineAdd {
+  align-self: flex-start;
+  margin-left: calc(-1 * var(--space-2));
+}
+
+.fe__hint {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--color-text-muted);
+}
+
+.fe__muted {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.fe__narrow {
+  max-width: 18rem;
+}
+
+/* A text area in the look of the filled fields (JsonLogic, the description). */
+.fe__code {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.fe__codeLabel {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+}
+.fe__code textarea {
+  @include f.control;
+  & {
+    height: auto;
+    min-height: 2.75rem;
+    padding: 10px var(--space-4);
+    border-radius: var(--radius-field);
+    background: var(--color-surface-sunken);
+    font-family: var(--font-mono);
+    font-size: var(--fs-small);
+    line-height: 1.2rem;
+    resize: vertical;
+  }
+}
+.fe__code textarea:focus {
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+}
+
+/* A filled text area with its label inside the box, as `app-input` (the description). */
+.fe__area {
+  @include f.box;
+  @include f.box-labelled;
+  & {
+    align-items: stretch;
+  }
+}
+.fe__areaLabel {
+  @include f.label;
+}
+.fe__area:focus-within .fe__areaLabel {
+  @include f.label-focus;
+}
+/* The description grows with its text (three lines at least), so no line shows cut. A
+   browser without field-sizing keeps the three rows and scrolls. */
+.fe__area textarea {
+  @include f.control;
+  & {
+    height: auto;
+    min-height: calc(3lh + 32px);
+    max-height: calc(16lh + 32px);
+    padding-top: 24px;
+    padding-bottom: 8px;
+    resize: vertical;
+    field-sizing: content;
+  }
+}
+
+/* Keys, option values and patterns in the mono face (the value only, not the label). */
+.fe__mono ::ng-deep input {
+  font-family: var(--font-mono);
+}
+
+/* "Erweiterte Optionen": a line, then a toggle row over the full width. */
+.fe__advanced {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: var(--border-width) solid var(--color-border);
+}
+.fe__advToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.fe__advToggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.fe__advTitle {
+  flex: 1 1 auto;
+  font-weight: var(--fw-semibold);
+  text-align: left;
+}
+
+.fe__toggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-6);
+}
+
+.fe__alert {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+  font-size: var(--fs-sm);
+}
+
+.fe__errors {
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--color-danger);
+  font-size: var(--fs-sm);
+}
+
+/* ---- Settings column ------------------------------------------------------------- */
+
+.fe__meta {
+  gap: var(--space-3);
+}
+.fe__meta .fe__cap {
+  color: var(--color-accent-text);
+}
+.fe__indent {
+  max-width: 12rem;
+  margin-left: 1.75rem;
+}
+
+/* ---- Preview --------------------------------------------------------------------- */
+
+.fe__preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-6);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-1);
 }
 
 .fe__pv-title {
@@ -283,12 +563,14 @@
 }
 
 .fe__pv-control {
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-  color: inherit;
   max-width: 28rem;
+  min-height: var(--control-height);
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-sunken);
+  color: inherit;
+  font: inherit;
 }
 
 .fe__pv-group {
@@ -315,21 +597,34 @@
   border-top: 1px solid var(--color-border);
 }
 
-/* Mobile (≤768px): keep the editor usable down to a width of 375px. */
-@media (max-width: 768px) {
-  .fe__head-tools {
-    flex-wrap: wrap;
-  }
+/* ---- Phone ----------------------------------------------------------------------- */
 
+@include bp.phone {
+  .fe__card {
+    padding: var(--space-4);
+  }
+  /* The type and the key each take a line; the required box follows. */
+  .fe__base {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+  .fe__required {
+    padding-inline: 0;
+  }
+  .fe__pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* An option: the value over the full width, DE and EN beside the remove button. */
   .fe__opt {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    padding-bottom: var(--space-2);
   }
-
-  .fe__type {
-    flex: 1 1 100%;
-    min-width: 0;
+  .fe__opt > :first-child {
+    grid-column: 1 / -1;
   }
-
+  .fe__preview {
+    padding: var(--space-4);
+  }
   .fe__pv-control {
     max-width: 100%;
   }

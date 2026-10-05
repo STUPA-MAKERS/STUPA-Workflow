@@ -351,12 +351,14 @@ export const routes: Routes = [
           {
             path: 'forms/:id',
             // `adminNav: false`: the editor fills the width, without the admin navigation
-            // (board Admin-Formular-Editor).
+            // (board Admin-Formular-Editor). `adminPane`: wide, its three columns scroll
+            // on their own and the page does not.
             data: {
               title: 'admin.forms.edit',
               permission: 'form.configure',
               parent: ['admin', 'admin/forms'],
               adminNav: false,
+              adminPane: true,
             },
             canActivate: [authGuard],
             loadComponent: () =>
@@ -368,12 +370,14 @@ export const routes: Routes = [
             // gate must list both, or a holder of one of them opens an editor it cannot
             // save, or cannot open an editor it may save.
             // `adminNav: false`: the canvas fills the width, without the admin navigation
-            // (board Admin-Flow-Editor).
+            // (board Admin-Flow-Editor). `adminPane`: wide, the canvas and the inspector
+            // fill the window and the page does not scroll.
             data: {
               title: 'admin.flow.title',
               permission: ['flow.configure', 'admin.types'],
               parent: ['admin'],
               adminNav: false,
+              adminPane: true,
             },
             canActivate: [authGuard],
             loadComponent: () =>

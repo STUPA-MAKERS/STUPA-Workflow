@@ -3,11 +3,14 @@ import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
-  CheckboxComponent,
+  IconComponent,
+  InputComponent,
   SelectComponent,
+  SwitchComponent,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
 import type { StateDef } from '../admin.models';
+import { FlowColorComponent } from './flow-color.component';
 
 /** Row of the guard priority stack. The parent computes the label. */
 export interface GuardPriorityRow {
@@ -15,12 +18,25 @@ export interface GuardPriorityRow {
   label: string;
 }
 
-/** Inspector panel for the selected state. It edits key, labels, flags, kind and config. */
+/**
+ * Inspector panel for the selected state. It edits key, labels, colour, the flags
+ * (start, editing allowed, terminal), the kind with its gremium, the deadline and the
+ * guard priority of the exits.
+ */
 @Component({
   selector: 'app-state-inspector',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent, SelectComponent],
+  imports: [
+    FormsModule,
+    TranslatePipe,
+    ButtonComponent,
+    IconComponent,
+    InputComponent,
+    SelectComponent,
+    SwitchComponent,
+    FlowColorComponent,
+  ],
   templateUrl: './state-inspector.component.html',
   styleUrl: './state-inspector.component.scss',
 })

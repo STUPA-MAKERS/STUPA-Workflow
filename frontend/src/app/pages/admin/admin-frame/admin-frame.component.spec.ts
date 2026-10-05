@@ -50,7 +50,8 @@ async function setup(perms: string[], url = '/admin/users', wide = true, xl = fa
           path: 'admin',
           children: [
             { path: '', component: StubPageComponent, pathMatch: 'full' },
-            { path: 'flow', component: StubPageComponent, data: { adminNav: false } },
+            { path: 'flow', component: StubPageComponent, data: { adminNav: false, adminPane: true } },
+            { path: 'plain', component: StubPageComponent, data: { adminNav: false } },
             { path: 'cost-centres', component: StubPageComponent, data: { adminNav: 'xl' } },
             { path: '**', component: StubPageComponent },
           ],
@@ -200,6 +201,30 @@ describe('AdminFrameComponent', () => {
     view.fixture.detectChanges();
     expect(screen.getByRole('navigation', { name: 'Verwaltungsbereiche' })).toBeInTheDocument();
     expect(view.container.querySelector('.af')).toHaveClass('af--split');
+  });
+
+  it('passes the free height to a full-width page with adminPane, only on a wide viewport', async () => {
+    const view = await setup(ALL, '/admin/flow');
+    const frame = view.container.querySelector('.af');
+    const host = view.fixture.nativeElement as HTMLElement;
+    const pageFrame = view.fixture.debugElement.injector.get(PageFrameService);
+    expect(frame).toHaveClass('af--pane');
+    expect(host).toHaveClass('pane-page');
+    expect(pageFrame.fill()).toBe(true);
+    // A full-width page without the flag keeps the page scroll.
+    await view.fixture.ngZone!.run(() =>
+      view.fixture.debugElement.injector.get(Router).navigateByUrl('/admin/plain'),
+    );
+    view.fixture.detectChanges();
+    expect(frame).not.toHaveClass('af--pane');
+    expect(host).not.toHaveClass('pane-page');
+    expect(pageFrame.fill()).toBe(false);
+  });
+
+  it('keeps the page scroll of an adminPane page below wide', async () => {
+    const view = await setup(ALL, '/admin/flow', false);
+    expect(view.container.querySelector('.af')).not.toHaveClass('af--pane');
+    expect(view.fixture.nativeElement as HTMLElement).not.toHaveClass('pane-page');
   });
 
   it('beside an admin page the title is no heading and the entries have no description', async () => {

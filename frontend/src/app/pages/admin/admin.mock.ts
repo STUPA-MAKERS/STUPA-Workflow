@@ -15,6 +15,7 @@ import type {
   CdVariant,
   ConfigRevision,
   DeadlinePolicy,
+  FlowGraph,
   FormDraft,
   GuestSettings,
   MailTemplate,
@@ -265,10 +266,36 @@ export const MOCK_FORM_DRAFTS: Record<string, FormDraft> = {
       de: 'Bitte beschreibe dein Förderprojekt möglichst genau.\n\nAnträge werden im StuPa beraten.',
       en: 'Please describe your funding project as precisely as possible.',
     },
+    // Two steps with one field of each family that has its own options: choice options,
+    // cost positions, a currency range and a computed field.
     fields: [
+      { key: 'section_0', type: 'section', label: { de: 'Vorhaben', en: 'Project' } },
       { key: 'title', type: 'text', label: { de: 'Projekttitel', en: 'Project title' }, required: true },
-      { key: 'amount', type: 'currency', label: { de: 'Beantragte Summe', en: 'Requested amount' }, required: true },
-      { key: 'description', type: 'textarea', label: { de: 'Beschreibung', en: 'Description' }, help: { de: 'Worum geht es?', en: 'What is it about?' } },
+      { key: 'description', type: 'textarea', label: { de: 'Beschreibung', en: 'Description' }, help: { de: 'Worum geht es?', en: 'What is it about?' }, required: true },
+      { key: 'datum', type: 'date', label: { de: 'Datum', en: 'Date' } },
+      { key: 'teilnehmende', type: 'number', label: { de: 'Erwartete Teilnehmende', en: 'Expected participants' } },
+      {
+        key: 'kategorie',
+        type: 'multiselect',
+        label: { de: 'Kategorie', en: 'Category' },
+        help: { de: 'Mehrere Kategorien möglich.', en: 'Several categories possible.' },
+        options: [
+          { value: 'kultur', label: { de: 'Kultur', en: 'Culture' } },
+          { value: 'bildung', label: { de: 'Bildung', en: 'Education' } },
+          { value: 'sport', label: { de: 'Sport', en: 'Sports' } },
+        ],
+      },
+      { key: 'section_1', type: 'section', label: { de: 'Kosten', en: 'Costs' } },
+      { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung', en: 'Cost breakdown' }, required: true, validation: { minOffers: 2, minPositions: 1 } },
+      { key: 'amount', type: 'currency', label: { de: 'Beantragte Summe', en: 'Requested amount' }, required: true, validation: { min: 0 }, isPromoted: true, promoteTarget: 'amount' },
+      {
+        key: 'einnahmen',
+        type: 'computed',
+        label: { de: 'Erwartete Einnahmen', en: 'Expected income' },
+        visibleIf: { '>': [{ var: 'teilnehmende' }, 0] },
+        compute: { '*': [{ var: 'teilnehmende' }, 5] },
+      },
+      { key: 'iban', type: 'iban', label: { de: 'IBAN für die Auszahlung', en: 'IBAN for the payout' }, required: true, isPII: true },
     ],
   },
   'f-veranstaltung': {
@@ -384,6 +411,10 @@ export const MOCK_MAIL_TEMPLATES: MailTemplate[] = [
 
 /** The versions of the site config in the mock backend, newest first. */
 export const MOCK_SITE_REVISIONS: ConfigRevision[] = [
+  { id: 'rev-form-3', entityType: 'form', entityId: 'f-foerderung', version: 3, at: '2026-09-24T08:14:00Z', createdBy: 'p-1', createdByName: 'Mara Keller', isCurrent: true },
+  { id: 'rev-form-2', entityType: 'form', entityId: 'f-foerderung', version: 2, at: '2026-09-12T15:02:00Z', createdBy: 'p-1', createdByName: 'Mara Keller', isCurrent: false },
+  { id: 'rev-flow-12', entityType: 'flow', entityId: 'global', version: 12, at: '2026-09-28T10:30:00Z', createdBy: 'p-1', createdByName: 'Mara Keller', isCurrent: true },
+  { id: 'rev-flow-11', entityType: 'flow', entityId: 'global', version: 11, at: '2026-09-02T07:45:00Z', createdBy: null, createdByName: null, isCurrent: false },
   { id: 'rev-site-3', entityType: 'site_config', entityId: 'global', version: 3, at: '2026-10-02T09:12:00Z', createdBy: 'p-1', createdByName: 'Mara Keller', isCurrent: true },
   { id: 'rev-site-2', entityType: 'site_config', entityId: 'global', version: 2, at: '2026-09-14T15:40:00Z', createdBy: 'p-1', createdByName: 'Mara Keller', isCurrent: false },
   { id: 'rev-site-1', entityType: 'site_config', entityId: 'global', version: 1, at: '2026-08-30T08:00:00Z', createdBy: null, createdByName: null, isCurrent: false },
@@ -590,3 +621,60 @@ export const MOCK_AUDIT_ENTRIES: AuditEntry[] = [
     prevHash: 'h1',
   },
 ];
+
+/**
+ * The global flow of mock mode: a review step, a request for more details that comes
+ * back automatically, and a vote of the StuPa with its pass and fail branches. The
+ * positions put it on the grid of the board Admin-Flow-Editor.
+ */
+export const MOCK_FLOW: FlowGraph = {
+  states: [
+    { key: 'entwurf', label: { de: 'Entwurf', en: 'Draft' }, isInitial: true },
+    { key: 'eingereicht', label: { de: 'Eingereicht', en: 'Submitted' } },
+    { key: 'pruefung', label: { de: 'In Prüfung', en: 'In review' }, color: '#f18700', config: { deadlinePolicyKey: 'pruefung_21d' } },
+    { key: 'nachforderung', label: { de: 'Nachforderung', en: 'More details' }, color: '#f18700' },
+    {
+      key: 'tagesordnung',
+      label: { de: 'Auf Tagesordnung', en: 'On the agenda' },
+      kind: 'vote',
+      editAllowed: false,
+      config: { gremiumId: MOCK_GREMIUM_STUPA_ID },
+    },
+    { key: 'bewilligt', label: { de: 'Bewilligt', en: 'Approved' }, color: '#72a384', isTerminal: true, editAllowed: false },
+    { key: 'abgelehnt', label: { de: 'Abgelehnt', en: 'Rejected' }, color: '#ce1625', isTerminal: true, editAllowed: false },
+    { key: 'zurueckgezogen', label: { de: 'Zurückgezogen', en: 'Withdrawn' }, isTerminal: true, editAllowed: false },
+  ],
+  transitions: [
+    { from: 'entwurf', to: 'eingereicht', label: { de: 'Einreichen', en: 'Submit' }, guard: { actorIsApplicant: true } },
+    { from: 'eingereicht', to: 'pruefung', label: { de: 'Prüfung beginnen', en: 'Start review' }, guard: { roleIs: 'referent' } },
+    { from: 'eingereicht', to: 'zurueckgezogen', label: { de: 'Zurückziehen', en: 'Withdraw' }, guard: { actorIsApplicant: true }, requiresAction: false },
+    { from: 'pruefung', to: 'nachforderung', label: { de: 'Nachforderung stellen', en: 'Ask for details' }, color: '#f18700', actions: [{ type: 'notify', recipients: [{ kind: 'applicant' }] }] },
+    { from: 'nachforderung', to: 'eingereicht', label: { de: 'Angaben ergänzt', en: 'Details added' }, automatic: true, guard: { hasField: 'iban' } },
+    {
+      from: 'pruefung',
+      to: 'tagesordnung',
+      label: { de: 'Auf Tagesordnung setzen', en: 'Put on the agenda' },
+      color: '#72a384',
+      guard: { and: [{ isInCommittee: MOCK_GREMIUM_STUPA_ID }, { compare: { field: 'amount', op: '>', value: 1000 } }] },
+      actions: [
+        { type: 'addToNextSession', gremiumId: MOCK_GREMIUM_STUPA_ID },
+        { type: 'notify', recipients: [{ kind: 'applicant' }, { kind: 'gremium', ref: MOCK_GREMIUM_STUPA_ID }] },
+      ],
+    },
+    { from: 'pruefung', to: 'abgelehnt', label: { de: 'Ablehnen', en: 'Reject' }, color: '#ce1625' },
+    { from: 'tagesordnung', to: 'bewilligt', branch: 'pass' },
+    { from: 'tagesordnung', to: 'abgelehnt', branch: 'fail' },
+  ],
+  layout: {
+    positions: {
+      entwurf: { x: 40, y: 60 },
+      eingereicht: { x: 300, y: 60 },
+      pruefung: { x: 560, y: 60 },
+      zurueckgezogen: { x: 40, y: 260 },
+      nachforderung: { x: 560, y: 260 },
+      tagesordnung: { x: 560, y: 460 },
+      bewilligt: { x: 300, y: 660 },
+      abgelehnt: { x: 820, y: 660 },
+    },
+  },
+};

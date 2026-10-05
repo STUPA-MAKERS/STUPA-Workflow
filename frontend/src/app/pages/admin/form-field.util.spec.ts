@@ -5,6 +5,7 @@ import {
   duplicateKeys,
   groupsFromFields,
   groupsToFields,
+  moveQuestionTo,
   normalizeFormField,
   parseFields,
   type QuestionGroup,
@@ -328,5 +329,44 @@ describe('groupsFromFields / groupsToFields (section round-trip)', () => {
       q('a1'),
     ];
     expect(groupsToFields(groupsFromFields(fields))).toEqual(fields);
+  });
+});
+
+describe('moveQuestionTo (drag and drop in the outline of the form editor)', () => {
+  const q = (key: string): FormFieldDef => field({ key });
+  const groups = (): QuestionGroup[] => [
+    { titleDe: 'A', titleEn: '', fields: [q('a1'), q('a2'), q('a3')] },
+    { titleDe: 'B', titleEn: '', fields: [q('b1')] },
+  ];
+  const keys = (gs: QuestionGroup[]): string[][] => gs.map((g) => g.fields.map((f) => f.key));
+
+  it('moves a question down inside its group (below the target row)', () => {
+    const r = moveQuestionTo(groups(), { gi: 0, qi: 0 }, { gi: 0, qi: 2 });
+    expect(keys(r!.groups)).toEqual([['a2', 'a3', 'a1'], ['b1']]);
+    expect(r!.pos).toEqual({ gi: 0, qi: 2 });
+  });
+
+  it('moves a question up inside its group (above the target row)', () => {
+    const r = moveQuestionTo(groups(), { gi: 0, qi: 2 }, { gi: 0, qi: 0 });
+    expect(keys(r!.groups)).toEqual([['a3', 'a1', 'a2'], ['b1']]);
+    expect(r!.pos).toEqual({ gi: 0, qi: 0 });
+  });
+
+  it('moves a question into another group, and appends it past the end', () => {
+    const into = moveQuestionTo(groups(), { gi: 0, qi: 1 }, { gi: 1, qi: 0 });
+    expect(keys(into!.groups)).toEqual([['a1', 'a3'], ['a2', 'b1']]);
+    const end = moveQuestionTo(groups(), { gi: 0, qi: 1 }, { gi: 1, qi: 99 });
+    expect(keys(end!.groups)).toEqual([['a1', 'a3'], ['b1', 'a2']]);
+    expect(end!.pos).toEqual({ gi: 1, qi: 1 });
+  });
+
+  it('leaves its input alone and refuses an unknown question or group', () => {
+    const before = groups();
+    moveQuestionTo(before, { gi: 0, qi: 0 }, { gi: 1, qi: 0 });
+    expect(keys(before)).toEqual([['a1', 'a2', 'a3'], ['b1']]);
+    expect(moveQuestionTo(before, { gi: 5, qi: 0 }, { gi: 0, qi: 0 })).toBeNull();
+    expect(moveQuestionTo(before, { gi: 0, qi: 7 }, { gi: 0, qi: 0 })).toBeNull();
+    expect(moveQuestionTo(before, { gi: 0, qi: -1 }, { gi: 0, qi: 0 })).toBeNull();
+    expect(moveQuestionTo(before, { gi: 0, qi: 0 }, { gi: 3, qi: 0 })).toBeNull();
   });
 });

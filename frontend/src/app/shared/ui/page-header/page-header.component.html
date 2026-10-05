@@ -7,6 +7,7 @@
       @if (meta()) {
         <span class="ph__meta">{{ meta() }}</span>
       }
+      <ng-content select="[heading]" />
     </div>
     @if (subtitle()) {
       <p class="ph__subtitle">{{ subtitle() }}</p>
