@@ -19,6 +19,8 @@ describe('MockLiveVoteSource', () => {
     ch.messages$.subscribe(push);
     ch.send({ type: 'subscribe' });
     expect(sink.map((m) => m.type)).toEqual(['meeting_state', 'vote_opened', 'vote_tally']);
+    // Like the server, the replay marks the vote as one that was already open.
+    expect(sink[1]).toEqual(expect.objectContaining({ voteId: 'vote-demo', replay: true }));
     ch.close();
   });
 

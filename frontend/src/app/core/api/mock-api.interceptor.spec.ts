@@ -614,6 +614,63 @@ describe('mockApiInterceptor', () => {
       expect(res.status).toBe('cast');
     });
 
+    describe('vote list (mock-votes.ts)', () => {
+      type Row = { id: string; status: string; myBallot: { cast: boolean; choice: string | null }; meetingTitle: string | null };
+      type VotePage = { items: Row[]; total: number; limit: number; offset: number };
+      const list = (params = new HttpParams()) => get<VotePage>('/api/votes', params);
+
+      it('GET /votes → the open votes first, without the drafts', async () => {
+        const page = await list();
+        // The ended votes follow by the time they ended, the newest first.
+        expect(page.items.map((r) => r.status)).toEqual(['open', 'open', 'closed', 'cancelled', 'closed']);
+        expect(page.items.find((r) => r.id === 'vote-demo')?.meetingTitle).toBe('STUPA-Sitzung 12.06.');
+        expect(page.total).toBe(5);
+      });
+
+      it('filters by status, gremium and search, and pages', async () => {
+        const drafts = await list(new HttpParams().append('status', 'draft'));
+        expect(drafts.items.map((r) => r.id)).toEqual(['b0000000-0000-0000-0000-000000000002']);
+        const hha = await list(new HttpParams().set('gremiumId', 'g0000000-0000-0000-0000-000000000002'));
+        expect(hha.total).toBe(2);
+        const found = await list(new HttpParams().set('q', 'campuszeitung'));
+        expect(found.items.map((r) => r.status)).toEqual(['cancelled']);
+        const byMeeting = await list(new HttpParams().set('q', '33. sitzung'));
+        expect(byMeeting.total).toBe(1);
+        const second = await list(new HttpParams().set('limit', '2').set('offset', '2'));
+        expect(second.items).toHaveLength(2);
+        expect(second.offset).toBe(2);
+      });
+
+      it('shows the ballots of this mock session in the rows and the detail', async () => {
+        const id = 'b0000000-0000-0000-0000-000000000001';
+        expect((await get<{ myBallot: { cast: boolean } }>(`/api/votes/${id}`)).myBallot.cast).toBe(false);
+        await firstValueFrom(http.post(`/api/votes/${id}/ballot`, { choice: 'no' }));
+        const detail = await get<{ myBallot: { cast: boolean; choice: string }; tally: { voted: number } }>(
+          `/api/votes/${id}`,
+        );
+        expect(detail.myBallot).toEqual({ cast: true, choice: 'no' });
+        expect(detail.tally.voted).toBe(5);
+        const row = (await list()).items.find((r) => r.id === id);
+        expect(row?.myBallot).toEqual({ cast: true, choice: 'no' });
+      });
+
+      it('keeps the choice of a secret vote out of the row', async () => {
+        const id = 'b0000000-0000-0000-0000-000000000003';
+        await firstValueFrom(http.post(`/api/votes/${id}/ballot`, { choice: 'yes' }));
+        const row = (await list(new HttpParams().append('status', 'closed'))).items.find((r) => r.id === id);
+        expect(row?.myBallot).toEqual({ cast: true, choice: null });
+        // The detail already had a cast ballot: the turnout stays.
+        const detail = await get<{ tally: { voted: number } }>(`/api/votes/${id}`);
+        expect(detail.tally.voted).toBe(4);
+      });
+
+      it('answers 404 for an unknown demo vote', async () => {
+        await expect(
+          get('/api/votes/b0000000-0000-0000-0000-000000000099'),
+        ).rejects.toMatchObject({ status: 404 });
+      });
+    });
+
     it('GET /meetings/timeline?direction=upcoming → the live meeting first, then the planned ones', async () => {
       const page = await get<{ items: { status: string }[]; nextCursor: string | null }>(
         '/api/meetings/timeline',

@@ -1,67 +1,94 @@
 @switch (phase()) {
   @case ('loading') {
-    <p class="vote__status" role="status">{{ 'voting.cast.loading' | t }}</p>
+    <!-- The shape of the sheet, not a sentence: the reader opens this view most often. -->
+    <div class="vc vc--busy" [class.vc--sheet]="split()" aria-busy="true">
+      <span class="skel skel--line vc__skelMeta"></span>
+      <span class="skel skel--line vc__skelTitle"></span>
+      <span class="skel skel--panel"></span>
+      <span class="sr-only" role="status">{{ 'voting.cast.loading' | t }}</span>
+    </div>
   }
 
   @case ('error') {
-    <section class="vote">
-      <app-page-header [title]="'nav.voting' | t" [flush]="true" />
-      <div class="vote__box">
-        <h2 class="vote__boxTitle">{{ 'voting.cast.error.heading' | t }}</h2>
-        <p class="vote__muted">{{ 'voting.cast.error.body' | t }}</p>
-        <a routerLink="/voting" class="vote__link">{{ 'voting.cast.toOverview' | t }}</a>
-      </div>
-    </section>
+    <div class="vc vc--center" [class.vc--sheet]="split()">
+      <app-empty-state
+        icon="vote"
+        [heading]="'voting.cast.error.heading' | t"
+        [body]="'voting.cast.error.body' | t"
+      >
+        <a routerLink="/voting" queryParamsHandling="preserve" class="vc__link">{{ 'voting.cast.toOverview' | t }}</a>
+      </app-empty-state>
+    </div>
   }
 
   @case ('ready') {
     @if (vote(); as v) {
-      <section class="vote" [class.vote--phone]="phone()">
+      <article
+        class="vc vc--ready"
+        [class.vc--sheet]="split()"
+        [class.vc--phone]="phone()"
+        [attr.aria-label]="'voting.cast.heading' | t"
+      >
         @if (phone()) {
-          <app-vote-phone-header [back]="backLink()" [subtitle]="phoneSubtitle()">
+          <app-vote-phone-header
+            [back]="['/voting']"
+            [keepQuery]="true"
+            [subtitle]="phoneSubtitle()"
+            [subtitleLink]="phoneSubtitleLink()"
+          >
             @if (canDelete()) {
               <app-row-menu [sections]="menu()" (selected)="onMenu($event.id)" />
             }
           </app-vote-phone-header>
         } @else {
-          <app-page-header [title]="'nav.voting' | t" [flush]="true">
+          <div class="vc__bar">
+            <span class="vc__meta ell" [title]="sheetMeta() ?? ''">{{ sheetMeta() }}</span>
             @if (beamerLink()) {
-              <app-button actions variant="outlined" (click)="goBeamer()">
-                <app-icon name="monitor" [size]="17" />
+              <app-button variant="outlined" size="sm" (click)="goBeamer()">
+                <app-icon name="monitor" [size]="16" />
                 {{ 'voting.live.toBeamer' | t }}
               </app-button>
             }
             @if (canDelete()) {
               <!-- Only a draft with no ballots and no meeting can be deleted. An open
                    vote is cancelled instead. -->
-              <app-button actions variant="danger" (click)="confirmDelete.set(true)">
-                {{ 'voting.delete.action' | t }}
-              </app-button>
+              <app-row-menu
+                [label]="'voting.cast.menu' | t"
+                [sections]="menu()"
+                (selected)="onMenu($event.id)"
+              />
             }
-          </app-page-header>
+          </div>
         }
 
-        <app-vote-panel
-          [vote]="v"
-          [context]="context()"
-          [own]="own()"
-          [proxyName]="proxyName()"
-          [proxyCast]="proxyCast()"
-          [caster]="caster"
-          [notice]="notice()"
-          [layout]="phone() ? 'phone' : 'page'"
-          (castDone)="onCastDone()"
-          (castFailed)="onCastFailed($event)"
-        />
-      </section>
-    } @else {
-      <section class="vote">
-        <app-page-header [title]="'nav.voting' | t" [flush]="true" />
-        <div class="vote__box">
-          <p class="vote__muted" role="alert">{{ 'voting.cast.notEligible' | t }}</p>
-          <a routerLink="/voting" class="vote__link">{{ 'voting.cast.toOverview' | t }}</a>
+        <!-- Side by side only this part scrolls, under the bar, with the shared fade at
+             an end while more of the vote lies past it. -->
+        <div class="vc__body" appScrollFade="y">
+          @if (session()?.connection() === 'reconnecting') {
+            <p class="vc__line vc__line--warn" role="status">{{ 'voting.live.reconnecting' | t }}</p>
+          }
+
+          <app-vote-panel
+            [vote]="v"
+            [context]="context()"
+            [own]="own()"
+            [proxyName]="proxyName()"
+            [proxyCast]="proxyCast()"
+            [caster]="caster"
+            [notice]="notice()"
+            [flat]="split()"
+            [layout]="phone() ? 'phone' : 'page'"
+            (castDone)="onCastDone()"
+            (castFailed)="onCastFailed($event)"
+          />
         </div>
-      </section>
+      </article>
+    } @else {
+      <div class="vc vc--center" [class.vc--sheet]="split()">
+        <app-empty-state icon="vote" [heading]="'voting.cast.notEligible' | t">
+          <a routerLink="/voting" queryParamsHandling="preserve" class="vc__link">{{ 'voting.cast.toOverview' | t }}</a>
+        </app-empty-state>
+      </div>
     }
   }
 }

@@ -505,7 +505,7 @@ describe('AuditLogComponent', () => {
       'a-9',
     ]);
     expect(cmp.targetLink(entry(1, { targetType: 'vote', targetId: 'v-9' }))).toEqual([
-      '/voting/vote',
+      '/voting',
       'v-9',
     ]);
     expect(cmp.targetLink(entry(1, { targetType: 'gremium', targetId: 'g-9' }))).toEqual([

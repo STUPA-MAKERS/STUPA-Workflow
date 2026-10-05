@@ -72,6 +72,8 @@ async def test_publisher_vote_opened_for_meeting_bound_vote() -> None:
     assert channel == f"meeting:{mid}"
     assert msg["type"] == "vote_opened"
     assert msg["options"] == ["yes", "no"]
+    # A broadcast is a vote that opens now, not the replay of a connect.
+    assert msg["replay"] is False
 
 
 @pytest.mark.asyncio

@@ -13,6 +13,14 @@ describe('VotePhoneHeaderComponent', () => {
     expect(screen.getByText('TOP 3 · 34. Sitzung')).toHaveAttribute('title', 'TOP 3 · 34. Sitzung');
   });
 
+  it('makes the line a link when it has a target', async () => {
+    await render(VotePhoneHeaderComponent, {
+      providers: [provideRouter([])],
+      inputs: { back: '/voting', subtitle: '34. Sitzung', subtitleLink: ['/meetings', 'm1'] },
+    });
+    expect(screen.getByRole('link', { name: '34. Sitzung' })).toHaveAttribute('href', '/meetings/m1');
+  });
+
   it('leaves the line out without a meeting', async () => {
     const { container } = await render(VotePhoneHeaderComponent, {
       providers: [provideRouter([])],

@@ -21,7 +21,7 @@ import { ShellComponent } from './layout/shell.component';
 import { ForbiddenComponent } from './pages/forbidden.component';
 import { NotFoundComponent } from './pages/not-found.component';
 import { ApplyWizardComponent } from './features/apply/apply-wizard.component';
-import { LiveVoteComponent } from './features/voting/live-vote.component';
+import { VoteCastComponent } from './features/voting/vote-cast.component';
 import { BeamerComponent } from './features/voting/beamer.component';
 import { AdminHomeComponent } from './pages/admin/admin-home.component';
 import { UsersComponent } from './pages/admin/users/users.component';
@@ -191,12 +191,12 @@ describe('Kern-Views a11y (axe)', () => {
 
     @Component({
       standalone: true,
-      imports: [LiveVoteComponent],
-      template: `<main><app-live-vote /></main>`,
+      imports: [VoteCastComponent],
+      template: `<main><app-vote-cast /></main>`,
     })
     class LiveVoteHost {}
 
-    it('open live-vote (ballot with a represented row) has no violations', async () => {
+    it('open meeting vote (ballot with a represented row) has no violations', async () => {
       const source = new FakeSource();
       const view = await render(LiveVoteHost, {
         providers: [
@@ -236,10 +236,14 @@ describe('Kern-Views a11y (axe)', () => {
           },
           {
             provide: ActivatedRoute,
-            useValue: { snapshot: { paramMap: convertToParamMap({ id: 'm1' }) } },
+            useValue: {
+              paramMap: of(convertToParamMap({ id: 'v1' })),
+              snapshot: { paramMap: convertToParamMap({ id: 'v1' }) },
+            },
           },
         ],
       });
+      // The open meeting vote follows its meeting over the live channel.
       source.channels[0].subject.next(OPEN_VOTE);
       view.fixture.detectChanges();
       expect(await runAxe(view.container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
@@ -283,10 +287,14 @@ describe('Kern-Views a11y (axe)', () => {
           },
           {
             provide: ActivatedRoute,
-            useValue: { snapshot: { paramMap: convertToParamMap({ id: 'm1' }) } },
+            useValue: {
+              paramMap: of(convertToParamMap({ id: 'v1' })),
+              snapshot: { paramMap: convertToParamMap({ id: 'v1' }) },
+            },
           },
         ],
       });
+      // The open meeting vote follows its meeting over the live channel.
       source.channels[0].subject.next(OPEN_VOTE);
       view.fixture.detectChanges();
       expect(await runAxe(view.container, { rules: { region: { enabled: true } } })).toHaveNoViolations();

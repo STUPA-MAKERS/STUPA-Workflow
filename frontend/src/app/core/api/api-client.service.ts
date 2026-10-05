@@ -88,6 +88,8 @@ import type {
   VersionOutWire,
   Vote,
   VoteClosed,
+  VoteListItem,
+  VoteListQuery,
   BallotResult,
 } from './models';
 
@@ -529,6 +531,25 @@ export class ApiClient {
   getVote(id: Uuid, opts: { quiet?: boolean } = {}): Observable<Vote> {
     return this.http.get<Vote>(`${this.base}/votes/${id}`, {
       context: opts.quiet ? skipLoading() : undefined,
+    });
+  }
+
+  /**
+   * GET /votes — the votes the caller can read, the open ones first, with the own
+   * ballot state of each row and no tally. The server applies the read rule of
+   * `GET /votes/{id}`. The page shows its own placeholder, so the call skips the global
+   * overlay.
+   */
+  listVotes(query: VoteListQuery = {}): Observable<Page<VoteListItem>> {
+    let params = new HttpParams();
+    for (const status of query.status ?? []) params = params.append('status', status);
+    if (query.gremiumId) params = params.set('gremiumId', query.gremiumId);
+    if (query.q) params = params.set('q', query.q);
+    if (query.limit !== undefined) params = params.set('limit', String(query.limit));
+    if (query.offset !== undefined) params = params.set('offset', String(query.offset));
+    return this.http.get<Page<VoteListItem>>(`${this.base}/votes`, {
+      params,
+      context: skipLoading(),
     });
   }
 

@@ -12,6 +12,7 @@ import {
 } from '@angular/router';
 import { isObservable, type Observable } from 'rxjs';
 import { authGuard } from './auth.guard';
+import { routes } from '../../app.routes';
 import { USE_MOCK_API } from '../api/api.config';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { Principal } from '../api/models';
@@ -175,4 +176,27 @@ describe('authGuard', () => {
     const data = { permission: ['budget.view'], allowAuthenticated: true };
     expect(run(data, anyUser)).toBe(true);
   });
+
+  describe('the vote routes, for a reader of one vote', () => {
+    // A reader with `application.read` and no gremium voting right opens a vote at
+    // /voting/:id. Every way back goes to /voting, so the list child must let them in
+    // too. The empty-path child inherits the data of its parent (`emptyOnly`).
+    const shell = routes.find((r) => r.children?.some((c) => c.path === 'voting'));
+    const voting = shell!.children!.find((c) => c.path === 'voting')!;
+    const child = (path: string) => voting.children!.find((c) => c.path === path)!;
+    const reader: Principal = { ...MEMBER, gremien: [] };
+
+    it('lets them onto the list (/voting)', () => {
+      expect(run({ ...voting.data, ...child('').data }, reader)).toBe(true);
+    });
+
+    it('lets them onto the vote (/voting/:id)', () => {
+      expect(run({ ...child(':id').data }, reader)).toBe(true);
+    });
+
+    it('keeps the gate of the parent data, which the navigation entry reads', () => {
+      expect(run({ ...voting.data }, reader)).toBeInstanceOf(UrlTree);
+    });
+  });
+
 });

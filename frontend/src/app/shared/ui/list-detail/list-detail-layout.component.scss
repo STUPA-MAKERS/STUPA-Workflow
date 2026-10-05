@@ -58,6 +58,11 @@
   display: flex;
   flex-direction: column;
 }
+/* The detail takes the focus only from the script (tabindex -1) when it has no "Zur
+   Liste"; the pane itself is no control, so it draws no ring. */
+.ld__detail:focus {
+  outline: none;
+}
 
 .ld__back {
   display: inline-flex;

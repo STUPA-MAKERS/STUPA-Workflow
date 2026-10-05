@@ -104,7 +104,7 @@ export class MockLiveVoteSource implements LiveVoteSource {
       send: (msg) => {
         if (msg.type === 'subscribe') {
           subject.next(meeting);
-          subject.next(vote);
+          subject.next({ ...vote, replay: true });
           emitTally();
         } else if (msg.type === 'cast' && !beamer) {
           bump(msg.choice);

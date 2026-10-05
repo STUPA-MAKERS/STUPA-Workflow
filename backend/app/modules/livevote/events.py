@@ -77,6 +77,10 @@ class VoteOpenedEvent(_CamelModel):
     closes_at: datetime | None = Field(default=None, alias="closesAt")
     # A secret vote hides the live bars in the frontend (showBars = !secret || isClosed).
     secret: bool = False
+    # True when the server sends the frame as part of the state on a connect or on a
+    # `subscribe`, and not because the vote opened now. A client then knows that the
+    # vote did not open while it watched.
+    replay: bool = False
 
 
 class VoteTallyEvent(_CamelModel):

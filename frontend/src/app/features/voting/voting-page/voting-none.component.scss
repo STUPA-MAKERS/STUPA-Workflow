@@ -1,0 +1,15 @@
+:host {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* The same sheet the open vote sits on, so the pane does not jump when a row
+   opens. */
+.none {
+  display: grid;
+  flex: 1 1 auto;
+  place-items: center;
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}

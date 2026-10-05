@@ -25,6 +25,8 @@ from app.modules.livevote.connection import (
     resolve_ws_principal,
 )
 from app.modules.livevote.locks import InMemoryLocker
+from app.modules.voting.schemas import TallyOut, VoteOut
+from app.shared.config_schemas import VoteConfig
 
 
 class _FakeWS:
@@ -341,3 +343,50 @@ async def test_cast_allows_vote_from_own_meeting() -> None:
     assert voting.cast_calls == 1
     assert published  # the publisher sent the tally
     assert all(s.get("code") != "not_eligible" for s in conn.ws.sent)  # type: ignore[attr-defined]
+
+
+# The state on a connect marks its `vote_opened` as a replay, so that a client does
+# not take a vote that is already open for a vote that opens now.
+class _OpenVoteMeetings(_StateMeetings):
+    def __init__(self, vote_id: UUID) -> None:
+        self._vote_id = vote_id
+
+    async def open_vote(self, _meeting_id: UUID) -> object:  # noqa: F821
+        return SimpleNamespace(id=self._vote_id)
+
+
+class _OpenVoteVoting:
+    async def get(self, vote_id: UUID) -> VoteOut:
+        return VoteOut(
+            id=vote_id,
+            applicationId=uuid4(),
+            meetingId=uuid4(),
+            eligibleGroup="stupa",
+            config=VoteConfig.model_validate(
+                {"options": ["yes", "no"], "majorityRule": "simple", "secret": False}
+            ),
+            status="open",
+            secret=False,
+            tally=TallyOut(
+                counts={"yes": 1},
+                eligible=5,
+                voted=1,
+                present=5,
+                revealed=True,
+                quorumMet=False,
+                leading="yes",
+            ),
+        )
+
+
+@pytest.mark.asyncio
+async def test_send_state_marks_the_open_vote_as_replay() -> None:
+    vote_id = uuid4()
+    conn = _conn(beamer=False)
+    conn.meetings = _OpenVoteMeetings(vote_id)  # type: ignore[assignment]
+    conn.voting = _OpenVoteVoting()  # type: ignore[assignment]
+    await conn._send_state()
+    sent = conn.ws.sent  # type: ignore[attr-defined]
+    assert [m["type"] for m in sent] == ["meeting_state", "vote_opened", "vote_tally"]
+    assert sent[1]["voteId"] == str(vote_id)
+    assert sent[1]["replay"] is True

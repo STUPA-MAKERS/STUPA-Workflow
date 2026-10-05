@@ -1,0 +1,150 @@
+<div class="vl" [class.vl--split]="split()">
+  <app-list-detail
+    [detailOpen]="selectedId() !== null"
+    [backButton]="!phone()"
+    (back)="closeDetail()"
+  >
+    <section list class="vl__pane" aria-labelledby="vl-title">
+      <header class="vl__head">
+        <h1 id="vl-title" class="vl__title">{{ 'nav.voting' | t }}</h1>
+        @if (!loading() && !error() && openCount() > 0) {
+          <span class="vl__meta">{{ 'voting.list.openCount' | t: { n: openCount() } }}</span>
+        }
+      </header>
+
+      <!-- The search and the chips never scroll away: one pane at a time they stick to the
+           top of the viewport; side by side only the rows below them scroll. -->
+      <app-sticky-bar class="vl__filters">
+        <app-search-pill
+          [placeholder]="'voting.list.search' | t"
+          [value]="search.text()"
+          [clearable]="true"
+          (valueChange)="search.set($event)"
+          (commit)="search.flush()"
+        />
+        <div
+          class="vl__chips"
+          role="group"
+          appScrollFade="x"
+          [attr.aria-label]="'voting.list.filter.group' | t"
+        >
+          <app-filter-select
+            class="vl__chip"
+            [label]="'voting.list.filter.status' | t"
+            [options]="statusOptions()"
+            [value]="statusFilter()"
+            (valueChange)="setStatus($event)"
+            [text]="statusChipLabel()"
+            [active]="statusFilter() !== ''"
+            [icon]="statusFilter() ? 'check' : null"
+            [chevron]="!statusFilter()"
+          />
+          @if (showGremiumChip()) {
+            <app-filter-select
+              class="vl__chip"
+              [label]="'voting.list.filter.gremium' | t"
+              [options]="gremiumOptions()"
+              [value]="gremiumId()"
+              (valueChange)="setGremium($event)"
+              [text]="gremiumChipLabel()"
+              [active]="gremiumId() !== ''"
+              [icon]="gremiumId() ? 'check' : null"
+              [chevron]="!gremiumId()"
+            />
+          }
+          @if (activeFilterCount() > 0) {
+            <app-button variant="text" size="sm" (click)="reset()">
+              {{ 'voting.list.filter.reset' | t }}
+            </app-button>
+          }
+        </div>
+      </app-sticky-bar>
+
+      <div class="vl__scroll" appScrollFade="y">
+        @if (error()) {
+          <p class="vl__status vl__status--error" role="alert">{{ 'voting.list.error' | t }}</p>
+        } @else if (loading()) {
+          <app-skeleton variant="rows" [count]="6" [label]="'voting.list.loading' | t" />
+        } @else if (!rows().length) {
+          @if (activeFilterCount() > 0) {
+            <p class="vl__status">{{ 'voting.list.noMatch' | t }}</p>
+          } @else if (split()) {
+            <!-- Side by side the detail pane shows the empty state; one is enough. -->
+            <p class="vl__status">{{ 'voting.list.empty' | t }}</p>
+          } @else {
+            <app-empty-state
+              class="vl__empty"
+              icon="vote"
+              fill
+              [heading]="'voting.list.empty' | t"
+              [body]="'voting.list.emptyBody' | t"
+            />
+          }
+        } @else {
+          @for (group of groups(); track group.key) {
+            <section class="vl__group" [attr.aria-labelledby]="'vl-g-' + group.key">
+              <h2 class="sec vl__month" [id]="'vl-g-' + group.key">{{ group.label }}</h2>
+              <div class="vl__rows" [class.rowgroup]="!split()" role="list">
+                @for (row of group.rows; track row.item.id) {
+                  <app-list-item
+                    role="listitem"
+                    class="vl__row"
+                    [title]="row.title"
+                    [link]="['/voting', row.item.id]"
+                    linkQueryParamsHandling="preserve"
+                    [selected]="row.item.id === selectedId()"
+                  >
+                    <span sub class="vl__sub">
+                      <span class="vl__part">
+                        <app-status-text [kind]="row.status.kind">{{ row.status.key | t }}</app-status-text>
+                      </span>
+                      @if (row.where) {
+                        <span class="vl__part ell" [title]="row.where">{{ row.where }}</span>
+                      }
+                    </span>
+                    <span trail class="vl__trail">
+                      <span class="vl__facts">
+                        @if (row.ballot === 'cast') {
+                          <span class="vl__ballot vl__ballot--cast">
+                            <app-icon name="check" [size]="13" />{{ 'voting.list.ballot.cast' | t }}
+                          </span>
+                        } @else if (row.ballot === 'pending') {
+                          <span class="vl__ballot vl__ballot--pending">{{ 'voting.list.ballot.pending' | t }}</span>
+                        }
+                        @if (row.when) {
+                          <span class="vl__when" [attr.title]="row.whenTitle">{{ row.when }}</span>
+                        }
+                      </span>
+                      @if (!split()) {
+                        <app-icon class="vl__chev" name="chevron-right" [size]="17" />
+                      }
+                    </span>
+                  </app-list-item>
+                }
+              </div>
+            </section>
+          }
+
+          @if (hasMore()) {
+            <div class="vl__more">
+              @if (loadingMore()) {
+                <span class="vl__status" aria-live="polite">{{ 'voting.list.loadingMore' | t }}</span>
+              } @else {
+                <app-button variant="text" size="sm" (click)="loadMore()">
+                  {{ 'voting.list.loadMore' | t }}
+                </app-button>
+              }
+            </div>
+          }
+          <p class="vl__count" aria-live="polite">
+            {{ 'voting.list.count' | t: { count: items().length, total: total() } }}
+          </p>
+        }
+      </div>
+    </section>
+
+    <div detail class="vl__detail">
+      <router-outlet />
+    </div>
+  </app-list-detail>
+</div>
