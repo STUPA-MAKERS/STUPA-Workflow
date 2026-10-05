@@ -32,9 +32,7 @@ def app(monkeypatch: pytest.MonkeyPatch) -> FastAPI:
     class _FakeService:
         def __init__(self, _session: object) -> None: ...
 
-        async def search(
-            self, q: str, principal: Principal, *, lang: str = "de"
-        ) -> SearchResults:
+        async def search(self, q: str, principal: Principal, *, lang: str = "de") -> SearchResults:
             return SearchResults(
                 hits=[
                     SearchHit(
