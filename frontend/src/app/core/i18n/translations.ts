@@ -2478,7 +2478,6 @@ export const de = {
   'participant.delegation.substitute': 'Stellvertretung',
   'participant.delegation.member': 'Mitglied',
   'participant.delegation.external': 'Extern',
-  'participant.delegation.unnamed': 'Ohne Namen',
   'participant.delegation.votingOn':
     'Die Vertretung stimmt für dich ab. Du selbst stimmst in dieser Sitzung nicht ab.',
   'participant.delegation.votingOff':
@@ -5350,7 +5349,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'participant.delegation.substitute': 'Substitute',
   'participant.delegation.member': 'Member',
   'participant.delegation.external': 'External',
-  'participant.delegation.unnamed': 'No name',
   'participant.delegation.votingOn':
     'Your proxy votes for you. You do not vote in this meeting yourself.',
   'participant.delegation.votingOff':
