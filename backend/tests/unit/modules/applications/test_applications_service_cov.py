@@ -42,6 +42,7 @@ from app.shared.errors import (
 )
 
 NOW = datetime(2026, 6, 16, 12, 0, tzinfo=UTC)
+AUTHOR_ID = UUID("00000000-0000-0000-0000-00000000a001")
 
 
 # generic fakes
@@ -788,7 +789,7 @@ async def test_timeline_resolves_actor_names_and_states() -> None:
         execute_results=[
             # timeline events with the label of the fired transition (A3)
             [(ev1, {"de": "Genehmigen"}), (ev2, None)],
-            [("sub-1", "Alice", None)],  # _author_names
+            [("sub-1", "Alice", None, AUTHOR_ID)],  # _author_refs
             [("approved", "#0f0")],  # _resolve_state_colors (cached after this call)
         ],
     )
@@ -817,7 +818,7 @@ async def test_timeline_applicant_view_names_the_gremium() -> None:
         get_results=[app, to_state, to_state, to_state],
         execute_results=[
             [(member, None), (own, None), (magic, None)],
-            [("sub-1", "Alice", None), ("owner-sub", "Olga", None)],
+            [("sub-1", "Alice", None, AUTHOR_ID), ("owner-sub", "Olga", None, uuid4())],
             [("approved", "#0f0")],
         ],
         scalar_results=["StuPa"],  # name of the Gremium of the application
@@ -844,7 +845,7 @@ async def test_versions_resolves_names() -> None:
     v2 = _Obj(version=2, data={"title": "b"}, diff=None, changed_by=None, at=NOW)
     session = _Session(
         get_results=[app],
-        execute_results=[[("sub-1", None, "alice@x.de")]],  # _author_names falls back to email
+        execute_results=[[("sub-1", None, "alice@x.de", AUTHOR_ID)]],  # _author_refs: email
         scalars_results=[[v1, v2]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -1213,36 +1214,39 @@ async def test_list_tasks_current_state_none_skipped(
 async def test_author_names_empty_set_short_circuits() -> None:
     session = _Session()
     svc = ApplicationsService(session)  # type: ignore[arg-type]
-    assert await svc._author_names(set()) == {}
+    assert await svc._author_refs(set()) == {}
     assert session.statements == []  # no query runs
 
 
-async def test_author_names_resolves_display_then_email_and_skips_the_rest() -> None:
+async def test_author_refs_resolve_display_then_email_and_skip_the_rest() -> None:
+    id1, id2 = uuid4(), uuid4()
     session = _Session(
         execute_results=[
             [
-                ("s1", "Display", "e1@x.de"),  # display_name
-                ("s2", None, "e2@x.de"),  # email
-                ("s3", None, None),  # anonymized: missing, never the raw sub
+                ("s1", "Display", "e1@x.de", id1),  # display_name
+                ("s2", None, "e2@x.de", id2),  # email
+                ("s3", None, None, uuid4()),  # anonymized: missing, never the raw sub
             ]
         ]
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
-    names = await svc._author_names({"s1", "s2", "s3", ""})
-    assert names == {"s1": "Display", "s2": "e2@x.de"}
+    refs = await svc._author_refs({"s1", "s2", "s3", ""})
+    assert refs == {"s1": ("Display", id1), "s2": ("e2@x.de", id2)}
 
 
 async def test_add_comment_with_author() -> None:
     app = _app()
     session = _Session(
         get_results=[app],
-        execute_results=[[("sub-1", "Alice", None)]],  # _author_names
+        execute_results=[[("sub-1", "Alice", None, AUTHOR_ID)]],  # _author_refs
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.add_comment(
         app.id, author="sub-1", author_kind="principal", body="hi", visibility="public"
     )
     assert out.author == "Alice"
+    # The author carries the id for the avatar.
+    assert out.author_info is not None and out.author_info.principal_id == AUTHOR_ID
     assert out.body == "hi"
     assert session.committed == 1
 
@@ -1277,7 +1281,7 @@ async def test_list_comments_include_internal() -> None:
     )
     session = _Session(
         get_results=[app],
-        execute_results=[[("sub-1", "Alice", None)]],
+        execute_results=[[("sub-1", "Alice", None, AUTHOR_ID)]],
         scalars_results=[[c1, c2]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -1295,7 +1299,7 @@ async def test_list_comments_public_only() -> None:
     )
     session = _Session(
         get_results=[app],
-        execute_results=[[("sub-1", "A", None)]],
+        execute_results=[[("sub-1", "A", None, AUTHOR_ID)]],
         scalars_results=[[c]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -1454,7 +1458,7 @@ async def test_update_comment_by_author() -> None:
     c = _comment(application_id=app.id)
     session = _Session(
         get_results=[app],
-        execute_results=[[c], [], [], [("sub-1", "Alice", None)]],
+        execute_results=[[c], [], [], [("sub-1", "Alice", None, AUTHOR_ID)]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.update_comment(

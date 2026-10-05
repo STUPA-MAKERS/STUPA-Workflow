@@ -47,7 +47,8 @@ the public `/api/site-config` carries it, so the frontend does not ask when it i
 - The api container needs outbound HTTPS to `gravatar.com` (see `deploy`).
 - Frontend: `app-avatar` (`shared/ui/avatar`) takes `principalId` (an id or `'me'`). It puts
   the image over the initials and drops it on an error; `AvatarService` remembers the failed
-  ids per session. Comments carry `authorId` (be-applications) for the author avatar; the
-  applicant view never gets a member id. The history shows no avatars.
+  ids per session. `ActorOut.principalId` (be-applications: `actorInfo`, `changedByInfo`,
+  `authorInfo`) gives the comment author avatar its id; only `kind=principal` carries it, so
+  the applicant view never gets a member id. The history shows no avatars.
 
 **Related:** be-auth, be-admin, be-webhooks, be-antiabuse, frontend, deploy

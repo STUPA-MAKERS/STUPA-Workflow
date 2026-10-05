@@ -143,7 +143,8 @@ class ActorOut(_CamelModel):
     the type of the actor:
 
     - ``principal``: a member. ``displayName`` holds the name, or the email when
-      the account has no name.
+      the account has no name. ``principalId`` is the id of the account, for the
+      avatar (``GET /principals/{id}/avatar``).
     - ``applicant``: the applicant through the magic link. No name, because the
       name is PII (O21).
     - ``system``: an automatic action. ``key`` names the source, for example
@@ -159,6 +160,9 @@ class ActorOut(_CamelModel):
     kind: ActorKind
     key: str | None = None
     display_name: str | None = Field(default=None, alias="displayName")
+    # Only for ``principal``. The applicant view never holds a member id, because it
+    # shows the Gremium instead of the member.
+    principal_id: UUID | None = Field(default=None, alias="principalId")
 
     def legacy(self, raw: str) -> str | None:
         """Return the old string value of the ``actor`` field for this actor.
