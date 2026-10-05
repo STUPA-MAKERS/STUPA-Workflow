@@ -176,6 +176,12 @@ export const routes: Routes = [
         children: [
           {
             path: '',
+            // Every way back from a vote goes to this path: the phone back, "Zur Liste",
+            // "Zur Übersicht" and the redirect after a delete. A person who can open a
+            // vote (`:id`) must also come back to the list, else the guard sends them to
+            // /forbidden. The server filters `GET /votes` by the read scope, and the
+            // navigation entry stays gated.
+            data: { allowAuthenticated: true },
             loadComponent: () =>
               import('./features/voting/voting-page/voting-none.component').then(
                 (m) => m.VotingNoneComponent,

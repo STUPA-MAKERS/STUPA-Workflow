@@ -12,7 +12,7 @@ import type { VoteClosedMsg, VoteOpenedMsg, VoteTallyMsg } from '@core/ws/ws-mes
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../testing/meeting-fixtures';
 import { VoteCastComponent } from './vote-cast.component';
-import { VotingPageService } from './voting-page/voting-page.service';
+import { VotingPageService, type ShownVote } from './voting-page/voting-page.service';
 import { RailStatusService } from '../../layout/rail-status.service';
 
 /** A live-vote channel as signals, driven by the test. */
@@ -135,6 +135,7 @@ async function setup(opts: {
     ? {
         split: signal(opts.page.split),
         gremiumNames: signal(new Map([['v1', 'Haushaltsausschuss']])),
+        shown: signal<ShownVote | null>(null),
         notify: jest.fn(),
         follow: jest.fn(() => {
           const session = fakeSession();
@@ -581,6 +582,13 @@ describe('VoteCastComponent', () => {
       expect(page?.notify).toHaveBeenCalledWith({ id: 'v1', kind: 'cast' });
       expect(navigate).not.toHaveBeenCalled();
       expect(screen.getByText('Danke! Deine Stimme: Ja')).toBeInTheDocument();
+    });
+
+    it('tells the list which vote it shows, and nothing after it goes away', async () => {
+      const { page, fixture } = await setup({ page: { split: true } });
+      expect(page?.shown()).toEqual({ id: 'v1', meetingId: 'm1', status: 'open' });
+      fixture.destroy();
+      expect(page?.shown()).toBeNull();
     });
 
     it('shares the live channel of the page for its meeting', async () => {

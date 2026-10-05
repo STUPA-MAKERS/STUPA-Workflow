@@ -13,7 +13,7 @@ import type { VoteClosedMsg, VoteOpenedMsg, VoteTallyMsg } from '@core/ws/ws-mes
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { LIVE_SEARCH_DEBOUNCE_MS } from '@shared/live-search';
-import { VotingComponent, VOTE_LIVE_DEBOUNCE } from './voting.component';
+import { VotingComponent, VOTE_LIVE_DEBOUNCE, VOTE_MAX_LIMIT } from './voting.component';
 import { VotingNoneComponent } from './voting-none.component';
 import { VotingPageService } from './voting-page.service';
 
@@ -384,6 +384,13 @@ describe('VotingComponent', () => {
       expect(manager.listVotes).toHaveBeenCalledWith(expect.objectContaining({ status: ['draft'] }));
     });
 
+    it('drops a draft filter of the URL for a member', async () => {
+      const { cmp, listVotes } = await start('/voting?status=draft');
+      expect(cmp.statusFilter()).toBe('');
+      expect(cmp.statusChipLabel()).toBe('Status');
+      expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ status: undefined }));
+    });
+
     it('labels the status chip by its value', async () => {
       const { cmp } = await start('/voting?status=open');
       expect(cmp.statusChipLabel()).toBe('Offen');
@@ -434,6 +441,16 @@ describe('VotingComponent', () => {
       expect(cmp.total()).toBe(1);
       pageService.notify({ id: 'gone', kind: 'deleted' });
       expect(cmp.total()).toBe(1);
+    });
+
+    it('asks for at most the server limit on a refresh', async () => {
+      const many = Array.from({ length: VOTE_MAX_LIMIT + 30 }, (_, i) => item(`v${i}`));
+      const { cmp, listVotes } = await start('/voting', { pages: [page(many, 400)] });
+      listVotes.mockClear();
+      cmp.refresh();
+      expect(listVotes).toHaveBeenCalledWith(
+        expect.objectContaining({ offset: 0, limit: VOTE_MAX_LIMIT }),
+      );
     });
 
     it('reloads from the start when a refresh comes before any row', async () => {
@@ -555,6 +572,87 @@ describe('VotingComponent', () => {
         jest.useRealTimers();
         restore();
       }
+    });
+
+    it('one pane at a time, opens the vote that just opened from the list', async () => {
+      jest.useFakeTimers({ doNotFake: ['Date'] });
+      try {
+        const { sessions, harness, router, cmp } = await start('/voting', {
+          live: [{ id: 'm1', status: 'live' }],
+        });
+        expect(cmp.split()).toBe(false);
+        const navigate = jest.spyOn(router, 'navigate');
+        sessions.get('m1')!.openVote.set(opened('v7'));
+        harness.detectChanges();
+        jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
+        expect(navigate).toHaveBeenCalledWith(['/voting', 'v7'], {
+          queryParamsHandling: 'preserve',
+          replaceUrl: false,
+        });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    describe('with an ended vote of the meeting in the detail', () => {
+      const closedA = item('a', { status: 'closed', result: 'passed', meetingId: 'm1' });
+
+      async function openB(
+        url: string,
+        items: VoteListItem[],
+        before?: (s: FakeSession, pageService: VotingPageService) => void,
+      ) {
+        const ctx = await start(url, { live: [{ id: 'm1', status: 'live' }], pages: [page(items)] });
+        const navigate = jest.spyOn(ctx.router, 'navigate');
+        const s = ctx.sessions.get('m1')!;
+        before?.(s, ctx.pageService);
+        s.openVote.set(opened('b'));
+        ctx.harness.detectChanges();
+        jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
+        return { ...ctx, navigate };
+      }
+      const toB = ['/voting', 'b'];
+      const replace = { queryParamsHandling: 'preserve', replaceUrl: true };
+
+      beforeEach(() => jest.useFakeTimers({ doNotFake: ['Date'] }));
+      afterEach(() => jest.useRealTimers());
+
+      it('replaces the ended vote with the vote that just opened', async () => {
+        const { navigate } = await openB('/voting/a', [closedA]);
+        expect(navigate).toHaveBeenCalledWith(toB, replace);
+      });
+
+      it('reads the shown vote of the detail when the list does not hold it', async () => {
+        const unknown = await openB('/voting/a', []);
+        expect(unknown.navigate).not.toHaveBeenCalled();
+        TestBed.resetTestingModule();
+        const { navigate } = await openB('/voting/a', [], (_s, pageService) =>
+          pageService.shown.set({ id: 'a', meetingId: 'm1', status: 'cancelled' }),
+        );
+        expect(navigate).toHaveBeenCalledWith(toB, replace);
+      });
+
+      it('follows a close and an open in one burst', async () => {
+        const openA = item('a', { meetingId: 'm1' });
+        const { navigate } = await openB('/voting/a', [openA], (s) =>
+          s.result.set({ type: 'vote_closed', voteId: 'a', result: 'passed', counts: {} }),
+        );
+        expect(navigate).toHaveBeenCalledWith(toB, replace);
+      });
+
+      it('keeps an open vote, a draft, a vote of another meeting and the new vote itself', async () => {
+        const cases: [string, VoteListItem[]][] = [
+          ['/voting/a', [item('a', { meetingId: 'm1' })]],
+          ['/voting/a', [item('a', { status: 'draft', meetingId: 'm1' })]],
+          ['/voting/a', [item('a', { status: 'closed', result: 'passed', meetingId: 'm2' })]],
+          ['/voting/b', [closedA]],
+        ];
+        for (const [url, items] of cases) {
+          TestBed.resetTestingModule();
+          const { navigate } = await openB(url, items);
+          expect(navigate).not.toHaveBeenCalled();
+        }
+      });
     });
 
     it('does not open a vote that the list already holds (the replay of a connect)', async () => {

@@ -229,10 +229,19 @@ export class VoteCastComponent implements OnDestroy {
   constructor() {
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => this.open(pm.get('id')));
     this.followLive();
+    // Tell the list which vote is shown, so that it can follow its meeting.
+    effect(() => {
+      const vote = this.loaded();
+      const shown = vote
+        ? { id: vote.id, meetingId: vote.meetingId ?? null, status: vote.status }
+        : null;
+      untracked(() => this.page?.shown.set(shown));
+    });
   }
 
   ngOnDestroy(): void {
     this.ownSession?.close();
+    this.page?.shown.set(null);
   }
 
   goBeamer(): void {

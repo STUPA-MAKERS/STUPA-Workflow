@@ -139,7 +139,7 @@ export const AUDIT_ACTIONS = [
 /** Target type to router target: the detail page or the admin list that owns the target. */
 const TARGET_ROUTES: Record<string, (id: string) => string[]> = {
   application: (id) => ['/applications', id],
-  vote: (id) => ['/voting/vote', id],
+  vote: (id) => ['/voting', id],
   meeting: (id) => ['/meetings', id],
   gremium: () => ['/admin/gremien'],
   application_type: () => ['/admin/forms'],
