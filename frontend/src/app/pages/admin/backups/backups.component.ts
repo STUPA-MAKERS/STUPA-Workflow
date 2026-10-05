@@ -1,12 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, type OnDestroy, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { NoteComponent, PageHeaderComponent, StatusTextComponent, backupStatus } from '@shared/ui';
 import {
   ButtonComponent,
-  CardComponent,
   CellDirective,
   type ColumnDef,
   DataTableComponent,
@@ -17,7 +16,8 @@ import {
 } from '@stupa-makers/ui-kit';
 import { downloadBlob } from '@shared/download.util';
 import { AdminApiService } from '../admin-api.service';
-import type { Backup, BackupKind, BackupStatus } from '../admin.models';
+import { formatBytes } from '../admin-health/admin-health.util';
+import type { Backup, BackupKind } from '../admin.models';
 
 /** File name the browser saves an archive under. Mirrors the server-side name. */
 function archiveFileName(createdAt: string): string {
@@ -32,15 +32,18 @@ const POLL_MS = 3000;
 const POLL_TIMEOUT_MS = 30 * 60 * 1000;
 
 /**
- * Admin backup page (permission `backup.manage`).
+ * Backups (boards Admin-Backups, Admin-Backup-Zuruecksetzen; permission `backup.manage`).
  *
- * The page lists every archive, creates one, downloads one, uploads one, restores one
- * and deletes one. The archive itself never passes through this component: a download
- * is a short-lived signed URL, and an upload goes straight to the API as multipart.
+ * The page creates an archive (with an optional note), imports a `.tar.age` file, and
+ * lists every archive with its kind, status, size, contents and note. A row downloads,
+ * pins, restores and deletes an archive. The archive itself never passes through this
+ * component as a URL: the download streams through the API, and an upload goes straight
+ * to the API as multipart.
  *
  * Two things here are deliberately awkward for the user, because both are destructive:
- * a restore needs the archive picked and then confirmed in its own dialog, and a pinned
- * archive has to be unpinned before it can be deleted.
+ * a restore needs the confirmation word typed in its own dialog, and a pinned archive
+ * has to be unpinned before it can be deleted. Retention keeps the newest archives; a
+ * pinned archive and a copy taken before a restore do not count.
  */
 @Component({
   selector: 'app-admin-backups',
@@ -51,18 +54,19 @@ const POLL_TIMEOUT_MS = 30 * 60 * 1000;
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
-    CardComponent,
     DataTableComponent,
     CellDirective,
     DialogComponent,
     IconComponent,
     InputComponent,
+    NoteComponent,
     PageHeaderComponent,
+    StatusTextComponent,
   ],
   templateUrl: './backups.component.html',
   styleUrl: './backups.component.scss',
 })
-export class BackupsComponent {
+export class BackupsComponent implements OnDestroy {
   private readonly api = inject(AdminApiService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
@@ -91,42 +95,26 @@ export class BackupsComponent {
   }
 
   /**
-   * Every column carries a width except the note, which is the one elastic column.
-   *
-   * Without that, table auto-layout had no single place to put the slack and spread it
-   * across all six, which is what made the row read as a set of widely and unevenly
-   * spaced fields. One elastic column absorbs it instead and the rest stay tight to
-   * their content.
+   * The columns. The note stands under the kind and a failure under the status, so the
+   * seven values of the board fit the width of the admin sheet without a sideways scroll.
+   * Every column but the kind has a width floor; the kind takes the slack.
    */
   protected readonly columns = computed<ColumnDef[]>(() => [
     {
       key: 'createdAt',
       label: this.i18n.translate('admin.backups.col.created'),
-      width: '11rem',
+      width: '8.5rem',
+      card: 'title',
     },
-    { key: 'kind', label: this.i18n.translate('admin.backups.col.kind'), width: '7rem' },
-    {
-      key: 'status',
-      label: this.i18n.translate('admin.backups.col.status'),
-      width: '7rem',
-    },
-    {
-      key: 'size',
-      label: this.i18n.translate('admin.backups.col.size'),
-      align: 'end',
-      width: '7rem',
-    },
-    {
-      key: 'contents',
-      label: this.i18n.translate('admin.backups.col.contents'),
-      width: '9rem',
-    },
-    { key: 'note', label: this.i18n.translate('admin.backups.col.note') },
+    { key: 'kind', label: this.i18n.translate('admin.backups.col.kindNote') },
+    { key: 'status', label: this.i18n.translate('admin.backups.col.status'), width: '6rem' },
+    { key: 'size', label: this.i18n.translate('admin.backups.col.size'), width: '4.5rem' },
+    { key: 'contents', label: this.i18n.translate('admin.backups.col.contents'), width: '7.5rem' },
     {
       key: 'actions',
       label: this.i18n.translate('admin.common.actions'),
       align: 'end',
-      width: '10rem',
+      width: '9rem',
     },
   ]);
 
@@ -139,21 +127,17 @@ export class BackupsComponent {
     return this.i18n.translate(`admin.backups.kind.${kind}` as never);
   }
 
-  protected statusLabel(status: BackupStatus): string {
-    return this.i18n.translate(`admin.backups.status.${status}` as never);
-  }
+  /** Status of an archive as coloured text. */
+  protected readonly backupStatus = backupStatus;
 
   /** Human-readable size. Archives are megabytes to gigabytes, so bytes help nobody. */
   protected sizeLabel(bytes: number | null | undefined): string {
-    if (bytes == null) return '—';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    let value = bytes;
-    let unit = 0;
-    while (value >= 1024 && unit < units.length - 1) {
-      value /= 1024;
-      unit += 1;
-    }
-    return `${value.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`;
+    return formatBytes(bytes, this.i18n);
+  }
+
+  /** "Manuell · vor der Haushaltsabstimmung": the line under the restore title. */
+  protected restoreSubtitle(row: Backup): string {
+    return [this.kindLabel(row.kind), row.note?.trim()].filter((x): x is string => !!x).join(' · ');
   }
 
   protected reload(): void {

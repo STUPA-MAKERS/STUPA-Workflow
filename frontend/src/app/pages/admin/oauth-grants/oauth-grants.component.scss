@@ -1,58 +1,162 @@
 :host {
+  display: block;
+}
+
+.og {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+  container-type: inline-size;
 }
 
-.grants {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.grants__error {
-  color: var(--color-danger);
-}
-
-.grants__mono {
-  font-family: var(--font-mono, monospace);
-  font-size: var(--fs-xs);
-}
-
-.grants__owner {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.25;
-}
-
-/* One line, never wrapped, so the badge list cannot set the height of a row. What does
-   not fit is counted by `.grants__scopes-more` instead. */
-.grants__scopes {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  white-space: nowrap;
-}
-
-.grants__scopes-more {
-  color: var(--color-text-muted);
-  font-size: var(--fs-xs);
-}
-
-.grants__pager {
+.og__filters {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.grants__pagerButtons {
-  display: inline-flex;
   gap: var(--space-2);
 }
 
-.grants__warning {
+.og__error {
+  margin: 0;
   color: var(--color-danger);
-  margin: var(--space-2) 0 0;
+}
+
+.og__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.og__row {
+  display: grid;
+  grid-template-columns: 2rem minmax(10rem, 1.2fr) minmax(10rem, 1fr) 8rem 8rem 5.5rem auto;
+  grid-template-areas: 'av who scopes created access refresh act';
+  align-items: center;
+  gap: var(--space-2) 0.75rem;
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-5);
+}
+
+.og__avatar {
+  grid-area: av;
+}
+.og__who {
+  grid-area: who;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.og__name {
+  font-weight: var(--fw-semibold);
+}
+.og__client {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.og__scopes {
+  grid-area: scopes;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.og__scope {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+}
+.og__more {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+
+.og__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: var(--fs-sm);
+}
+.og__field--created {
+  grid-area: created;
+}
+.og__field--access {
+  grid-area: access;
+}
+.og__field--refresh {
+  grid-area: refresh;
+}
+.og__lbl {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+
+.og__act {
+  grid-area: act;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.og__empty {
+  padding: var(--space-6);
+}
+
+.og__pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.og__range {
+  margin-inline-end: var(--space-2);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.og__dialogText {
+  margin: 0 0 var(--space-4);
+}
+.og__dialogFoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+@container (max-width: 56.5rem) {
+  .og__row {
+    grid-template-columns: 2rem minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-areas:
+      'av who who who act'
+      '. scopes scopes scopes scopes'
+      '. created access refresh refresh';
+  }
+}
+
+@container (max-width: 34rem) {
+  .og__row {
+    grid-template-columns: 2rem minmax(0, 1fr) auto;
+    grid-template-areas:
+      'av who who'
+      '. scopes scopes'
+      '. created created'
+      '. access access'
+      '. refresh refresh'
+      '. act act';
+    padding: var(--space-3) var(--space-4);
+  }
+  .og__act {
+    justify-content: flex-start;
+    padding-top: var(--space-1);
+  }
+  .og__field {
+    flex-direction: row;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
 }

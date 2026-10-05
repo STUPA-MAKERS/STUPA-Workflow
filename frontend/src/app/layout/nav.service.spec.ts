@@ -5,7 +5,8 @@ import { USE_MOCK_API } from '@core/api/api.config';
 import type { Principal } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { createLocationMock, provideLocationMock } from '../../testing/location-mock';
-import { NAV_ITEMS, NavService } from './nav.service';
+import { ADMIN_PAGES } from '../pages/admin/admin-frame/admin-pages';
+import { ADMIN_AREA_PERMISSIONS, NAV_ITEMS, NavService } from './nav.service';
 import { routes } from '../app.routes';
 
 const BASE: Principal = { sub: '1', roles: ['member'], permissions: [], groups: [] } as unknown as Principal;
@@ -51,6 +52,14 @@ describe('NavService', () => {
 
   it('opens the administration with any area-admin right', () => {
     expect(keysFor({ ...BASE, permissions: ['backup.manage'] })).toContain('admin');
+  });
+
+  it('opens the administration for every page of the admin navigation', () => {
+    // An entry of the admin navigation must never sit behind a hidden "Verwaltung".
+    for (const page of ADMIN_PAGES) {
+      for (const p of page.permissions) expect(ADMIN_AREA_PERMISSIONS).toContain(p);
+    }
+    expect(keysFor({ ...BASE, permissions: ['budget.structure'] })).toContain('admin');
   });
 
   it('opens meetings for protocol.write in a gremium, without the voting area', () => {

@@ -1,51 +1,114 @@
-.admin-home__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
-  /* Shrink the tiles to their content, with no vertical stretch. Tiles in the same
-     row stay equally high through the grid default stretch. */
-  grid-auto-rows: auto;
-  align-content: start;
-  gap: var(--space-4);
+@use 'breakpoints' as bp;
+
+:host {
+  display: block;
 }
-.admin-home__tile {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-5);
-  text-decoration: none;
-  color: inherit;
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  transition:
-    box-shadow var(--motion-base) var(--ease-standard),
-    border-color var(--motion-base) var(--ease-standard);
-}
-.admin-home__tile:hover {
-  box-shadow: var(--shadow-md);
-  border-color: var(--color-border-strong);
-}
-.admin-home__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 3rem;
-  height: 3rem;
-  border-radius: var(--radius-md);
-  background: var(--color-primary-subtle, var(--color-surface-sunken));
-  color: var(--color-primary);
-}
-.admin-home__text {
+
+.ahm {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-5);
+}
+
+.ahm__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+.ahm__headText {
   min-width: 0;
 }
-/* Mobile (≤768px): one tile column. This prevents squeezed narrow tracks. */
-@media (max-width: 768px) {
-  .admin-home__grid {
-    grid-template-columns: 1fr;
+
+/* The page title look (d2): on the home page the gremien are the page beside the
+   navigation, but the h1 is "Verwaltung". */
+.ahm__title {
+  margin: 0;
+  font-size: var(--fs-d2);
+  line-height: var(--lh-d2);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+.ahm__subtitle {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+}
+
+.ahm__manage,
+.ahm__link {
+  font-weight: var(--fw-semibold);
+  color: var(--color-accent-text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ahm__manage:hover,
+.ahm__link:hover {
+  text-decoration: underline;
+}
+
+.ahm__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ahm__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+}
+
+.ahm__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+.ahm__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ahm__name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.ahm__label {
+  font-weight: var(--fw-semibold);
+}
+.ahm__slug {
+  flex: none;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.ahm__counts {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.ahm__links {
+  display: flex;
+  flex: none;
+  gap: var(--space-5);
+}
+
+.ahm__error {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+@include bp.phone {
+  .ahm__row {
+    flex-wrap: wrap;
+    padding: var(--space-3) var(--space-4);
+  }
+  .ahm__links {
+    width: 100%;
+    padding-left: calc(20px + var(--space-4));
   }
 }

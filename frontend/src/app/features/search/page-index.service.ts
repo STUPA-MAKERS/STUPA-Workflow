@@ -1,4 +1,5 @@
 import { Injectable, computed, inject } from '@angular/core';
+import type { Routes } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { routes } from '../../app.routes';
@@ -30,11 +31,22 @@ export class PageIndexService {
 
   readonly visible = computed<PageEntry[]>(() => {
     if (!this.auth.isAuthenticated()) return [];
-    const children = routes[0]?.children ?? [];
     const out: PageEntry[] = [];
-    for (const route of children) {
-      const path = route.path;
+    this.collect(routes[0]?.children ?? [], '', out);
+    return out;
+  });
+
+  /**
+   * Add the pages of `list` below `prefix`. A route with children is a frame (the admin
+   * frame, the applications list): its children are pages too, at the full path.
+   */
+  private collect(list: Routes, prefix: string, out: PageEntry[]): void {
+    for (const route of list) {
+      const path = [prefix, route.path ?? ''].filter(Boolean).join('/');
       const data = route.data;
+      // A frame adds its children. The frame gate is the session; each child keeps its
+      // own permission.
+      if (route.children) this.collect(route.children, path, out);
       // A page needs a static path and a title. A parameterised route (`:id`) is a
       // record view, which the record half of the search already covers.
       if (!path || path.includes(':') || !data?.['title']) continue;
@@ -44,6 +56,8 @@ export class PageIndexService {
       // submission that never happened.
       if (data['contextual'] === true) continue;
       if (!this.allowed(data)) continue;
+      // A frame and its empty-path child name the same page once.
+      if (out.some((e) => e.path === `/${path}`)) continue;
       const parent = (data['parent'] as string[] | undefined)?.[0];
       out.push({
         path: `/${path}`,
@@ -51,8 +65,7 @@ export class PageIndexService {
         parentLabel: parent ? this.i18n.translate(`nav.${parent}` as never) : null,
       });
     }
-    return out;
-  });
+  }
 
   /** The same decision `authGuard` makes, minus the redirect. */
   private allowed(data: Record<string, unknown>): boolean {

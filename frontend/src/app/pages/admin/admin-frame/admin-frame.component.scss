@@ -1,0 +1,175 @@
+@use 'breakpoints' as bp;
+
+:host {
+  display: block;
+}
+
+/* One column below wide: the navigation (home page only) above the page. */
+.af {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  width: 100%;
+  max-width: 1640px;
+  margin-inline: auto;
+}
+
+/* Wide: the navigation is a column beside the page and stays in view. */
+.af--split {
+  display: grid;
+  grid-template-columns: 19rem minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+.af--split.af--home {
+  grid-template-columns: 24rem minmax(0, 1fr);
+}
+
+.af__nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.af--split .af__nav {
+  position: sticky;
+  top: var(--main-pad-top);
+  max-height: calc(100dvh - var(--main-pad-top) - var(--space-4));
+}
+
+.af__navHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-inline: var(--space-1);
+}
+
+/* The title of the design system (d2), also when it is no heading. */
+.af__title {
+  margin: 0;
+  padding-inline: var(--space-2);
+  font-size: var(--fs-d2);
+  line-height: var(--lh-d2);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+
+/* The entries scroll inside the column; the title and the search stay. */
+.af__navBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-height: 0;
+  padding: 0 var(--space-1) var(--space-2);
+}
+.af--split .af__navBody {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.af__navBody.is-fade-start {
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--space-6));
+}
+.af__navBody.is-fade-end {
+  mask-image: linear-gradient(to top, transparent, #000 var(--space-6));
+}
+.af__navBody.is-fade-start.is-fade-end {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--space-6),
+    #000 calc(100% - var(--space-6)),
+    transparent
+  );
+}
+
+.af__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.af__groupTitle {
+  padding-inline: var(--space-3);
+}
+
+.af__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The home page below wide: the entries fill the width in columns. */
+.af:not(.af--split) .af__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+}
+
+.af__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  text-decoration: none;
+}
+.af__item:hover {
+  background: var(--color-surface-2);
+}
+.af__item:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.af__item--on,
+.af__item--on:hover {
+  background: var(--color-selected);
+}
+
+.af__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.af__item--on .af__icon {
+  color: var(--color-accent-text);
+}
+
+.af__itemText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.af__itemTitle {
+  font-weight: var(--fw-medium);
+}
+.af__itemDesc {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.af__none {
+  margin: 0;
+  padding-inline: var(--space-3);
+  color: var(--color-text-muted);
+}
+
+.af__page {
+  min-width: 0;
+}
+
+/* Wide: the page sits on a sheet that reaches down to the footer. */
+.af--split .af__page {
+  min-height: calc(100dvh - var(--main-pad-top) - var(--space-4));
+  padding: var(--space-6) var(--space-6) var(--space-7);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+
+@include bp.phone {
+  .af {
+    gap: var(--space-5);
+  }
+}

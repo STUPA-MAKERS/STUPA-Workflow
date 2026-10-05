@@ -1,6 +1,7 @@
 import { of, throwError } from 'rxjs';
 import { provideRouter } from '@angular/router';
-import { render } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
@@ -40,6 +41,8 @@ type Cmp = AuditLogComponent & {
   diffOf(e: AuditEntry): ConfigRevisionDiff | null | undefined;
   askRevert(e: AuditEntry): void;
   doRevert(): void;
+  confirmRevert(): AuditEntry | null;
+  reverting(): boolean;
 };
 
 async function setup(
@@ -57,6 +60,8 @@ async function setup(
     listAuditLog: jest.fn(() => of(page)),
     listAuditActors: jest.fn(() => of([])),
     getConfigRevisionDiff: jest.fn(() => of(DIFF)),
+    latestAuditVerification: jest.fn(() => of(null)),
+    runAuditVerification: jest.fn(),
     revertAuditEntry,
   };
   const toast = { success: jest.fn(), error: jest.fn() };
@@ -125,6 +130,63 @@ describe('AuditLogComponent — config diff + revert', () => {
     c.askRevert(c.entries()[0]);
     c.doRevert();
     expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/neuere|newer/i));
+  });
+
+  it('shows the diff, "Ziel öffnen" and "Zurücknehmen" in the opened entry, and confirms', async () => {
+    const { c, fixture, revertAuditEntry } = await setup({ entryOver: { targetType: 'role', targetId: 'r-1' } });
+    (fixture.nativeElement.querySelector('.al__row') as HTMLElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-config-diff')).not.toBeNull();
+    expect(screen.getByRole('link', { name: 'Ziel öffnen' })).toHaveAttribute('href', '/admin/roles');
+    await userEvent.click(screen.getByRole('button', { name: 'Zurücknehmen' }));
+    expect(c.confirmRevert()).not.toBeNull();
+    const dialog = screen.getByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Zurücknehmen' }));
+    expect(revertAuditEntry).toHaveBeenCalledWith(7);
+  });
+
+  it('drops a failed diff load, so a second opening tries again', async () => {
+    const { c, api } = await setup();
+    (api.getConfigRevisionDiff as jest.Mock).mockReturnValueOnce(throwError(() => new Error('x')));
+    c.toggle(7);
+    expect(c.diffOf(c.entries()[0])).toBeUndefined();
+    c.toggle(7);
+    c.toggle(7);
+    expect(api.getConfigRevisionDiff).toHaveBeenCalledTimes(2);
+    expect(c.diffOf(c.entries()[0])).toEqual(DIFF);
+  });
+
+  it('loads a diff only once and has none for an entry without a revision', async () => {
+    const { c, api } = await setup({ entryOver: { data: {} } });
+    c.toggle(7);
+    expect(api.getConfigRevisionDiff).not.toHaveBeenCalled();
+    expect(c.diffOf(c.entries()[0])).toBeUndefined();
+  });
+
+  it('doRevert does nothing without a confirmation', async () => {
+    const { c, revertAuditEntry } = await setup();
+    c.doRevert();
+    expect(revertAuditEntry).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['already_reverted', /bereits|already/i],
+    ['not_revertable', /nicht zurückgenommen|cannot/i],
+  ])('names the 409 code %s', async (code, text) => {
+    const revert = jest.fn(() => throwError(() => ({ status: 409, error: { code } })));
+    const { c, toast } = await setup({ revert });
+    c.askRevert(c.entries()[0]);
+    c.doRevert();
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(text));
+  });
+
+  it('gives the generic message for any other error', async () => {
+    const revert = jest.fn(() => throwError(() => ({ status: 500 })));
+    const { c, toast } = await setup({ revert });
+    c.askRevert(c.entries()[0]);
+    c.doRevert();
+    expect(toast.error).toHaveBeenCalledWith('Rücknahme fehlgeschlagen.');
+    expect(c.reverting()).toBe(false);
   });
 
   it('surfaces a "first state" message for the nothing_to_revert code', async () => {

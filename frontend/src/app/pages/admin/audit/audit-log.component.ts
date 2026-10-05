@@ -8,36 +8,39 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
-  BadgeComponent,
+  FilterSelectComponent,
+  type FilterSelectOption,
+  PageHeaderComponent,
+  SkeletonComponent,
+} from '@shared/ui';
+import {
   ButtonComponent,
   ConfigDiffComponent,
-  DatepickerComponent,
   DialogComponent,
-  FilterBarComponent,
-  FilterFieldComponent,
   IconComponent,
-  type IconName,
-  SelectComponent,
-  type SelectOption,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
-import type { AuditActor, AuditEntry, ConfigRevisionDiff } from '../admin.models';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import { checkedAt, formatCount, triggerLabel } from '../admin-health/admin-health.util';
+import type {
+  AuditActor,
+  AuditEntry,
+  AuditVerification,
+  ConfigRevisionDiff,
+} from '../admin.models';
+import { DateChipComponent } from './date-chip.component';
 
 const PAGE_SIZE = 50;
 
 /**
- * A UUID target id. Such an id says nothing to a reader, so the sentence leaves it out
+ * A UUID target id. Such an id says nothing to a reader, so the row leaves it out
  * (`[[no-uuids-in-ui]]`). A readable id — `global`, `1`, an export file name — stays.
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -121,68 +124,6 @@ export const AUDIT_ACTIONS = [
   'budget_fiscal_year_delete',
 ] as const;
 
-const KNOWN_ACTIONS = new Set<string>(AUDIT_ACTIONS);
-
-/** Action type to feed-row icon: a category glyph, like the Nextcloud activity feed. */
-const ACTION_ICONS: Record<string, IconName> = {
-  login: 'key',
-  status_change: 'repeat',
-  vote_cast: 'check',
-  config_change: 'gear',
-  config_activation: 'gear',
-  config_revert: 'repeat',
-  role_change: 'roles',
-  delegation_grant: 'handshake',
-  delegation_revoke: 'handshake',
-  delegation_use: 'handshake',
-  delegation_substitute_add: 'handshake',
-  delegation_substitute_remove: 'handshake',
-  export: 'export',
-  webhook_config: 'webhook',
-  attachment_upload: 'paperclip',
-  attachment_quarantine: 'paperclip',
-  attachment_delete: 'paperclip',
-  application_create: 'form',
-  guest_application_discard: 'form',
-  application_update: 'form',
-  comment_update: 'form',
-  comment_delete: 'form',
-  protocol_delete: 'document',
-  protocol_finalize: 'document',
-  vote_delete: 'check',
-  vote_open: 'check',
-  vote_close: 'check',
-  vote_cancel: 'check',
-  vote_branch_blocked: 'check',
-  // Meetings and their agenda use the glyph of the meetings page.
-  meeting_create: 'parliament',
-  meeting_update: 'parliament',
-  meeting_delete: 'parliament',
-  agenda_item_add: 'parliament',
-  agenda_item_update: 'parliament',
-  agenda_item_remove: 'parliament',
-  agenda_reorder: 'parliament',
-  attendance_set: 'parliament',
-  attendance_reset: 'parliament',
-  protokollant_handover: 'parliament',
-  // Money mutations use the euro glyph. The cost center structure uses the pie glyph of the
-  // budget tab.
-  budget_node_create: 'chart-pie',
-  budget_node_update: 'chart-pie',
-  budget_node_delete: 'chart-pie',
-  budget_allocation_set: 'chart-pie',
-  budget_expense_create: 'euro',
-  budget_expense_update: 'euro',
-  budget_expense_delete: 'euro',
-  budget_transfer_create: 'euro',
-  budget_invoice_create: 'euro',
-  budget_invoice_update: 'euro',
-  budget_invoice_delete: 'euro',
-  budget_assign: 'euro',
-  budget_move_fiscal_year: 'euro',
-  budget_fiscal_year_delete: 'euro',
-};
-
 /** Target type to router target: the detail page or the admin list that owns the target. */
 const TARGET_ROUTES: Record<string, (id: string) => string[]> = {
   application: (id) => ['/applications', id],
@@ -205,44 +146,59 @@ const TARGET_ROUTES: Record<string, (id: string) => string[]> = {
   budget_transfer: () => ['/budget'],
   budget_expense: () => ['/expenses'],
   invoice: () => ['/invoices'],
+  fiscal_year: () => ['/budget'],
+  // The config pages of the admin area. A form target carries the id of its type.
+  flow: () => ['/admin/flow'],
+  form: (id) => ['/admin/forms', id],
+  cd_variant: () => ['/admin/cd-variants'],
+  notification_settings: () => ['/admin/notifications'],
+  // The security and data pages.
+  backup: () => ['/admin/backups'],
+  erasure_request: () => ['/admin/privacy'],
+  oauth_token: () => ['/admin/oauth-grants'],
+  meeting_delegation: () => ['/admin/delegations'],
+  delegation_substitute: () => ['/admin/delegations'],
 };
 
-/** One day group of the feed. The boundaries are local days. */
-interface DayGroup {
-  key: string;
-  date: Date;
-  entries: AuditEntry[];
-}
+
+/** The state of the chain check at the top of the page. */
+type VerifyState =
+  | { status: 'loading' }
+  | { status: 'stored'; check: AuditVerification }
+  | { status: 'never' }
+  | { status: 'error' };
 
 /**
- * Audit-log view as an activity feed in the Nextcloud style. The view groups the entries by
- * day. Each row shows a category icon, a readable sentence (`admin.audit.msg.*`) and a time.
- * The sentence shows the target as a clear name and a link. A row expands to show the target
- * id, the data and the hash.
+ * The audit log (board Admin-Audit-Log).
  *
- * - Lazy infinite scroll: keyset paging over the `before` cursor. The cursor is an entry id.
- *   An `IntersectionObserver` sentinel loads more. A "load more" button is the fallback.
- * - Filters: action type, actor (resolved clear name) and time window.
+ * - The chain check at the top: "Audit-Kette intakt" or "unterbrochen" as coloured text,
+ *   when the newest stored check ran, its trigger and the number of entries
+ *   (`GET /admin/audit/verify/latest`). "Jetzt prüfen" (`audit.verify`) checks the chain
+ *   now and stores the result (`POST /admin/audit/verify`; 409 while a check runs, 429
+ *   inside the cooldown).
+ * - Filters: Aktion, Akteur (app menus), Von and Bis (dates).
+ * - One row per entry: time, action, actor, target. A row opens its details: action,
+ *   target, actor, the data, the config diff of a config change, "Ziel öffnen" and
+ *   "Zurücknehmen" (`audit.revert`, only where the server marks the entry revertable).
+ * - Keyset paging over the `before` cursor: a sentinel loads more on scroll, "Mehr
+ *   laden" is the fallback.
  */
 @Component({
   selector: 'app-audit-log',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SkeletonComponent, 
-    FormsModule,
+  imports: [
     RouterLink,
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
-    BadgeComponent,
     ConfigDiffComponent,
     DialogComponent,
-    FilterBarComponent,
-    FilterFieldComponent,
-    DatepickerComponent,
     IconComponent,
-    SelectComponent,
+    FilterSelectComponent,
     PageHeaderComponent,
+    SkeletonComponent,
+    DateChipComponent,
   ],
   templateUrl: './audit-log.component.html',
   styleUrl: './audit-log.component.scss',
@@ -265,6 +221,8 @@ export class AuditLogComponent {
   /** The `audit.revert` permission as a front-end gate. The backend stays authoritative. The
    *  value is reactive because the principal loads asynchronously. */
   protected readonly canRevert = computed(() => this.auth.can('audit.revert'));
+  /** "Jetzt prüfen" needs `audit.verify`. */
+  protected readonly canVerify = computed(() => this.auth.can('audit.verify'));
   /** Loaded config diffs per `revisionId`. A `null` value means the diff still loads. */
   protected readonly diffs = signal<ReadonlyMap<string, ConfigRevisionDiff | null>>(
     new Map(),
@@ -273,16 +231,29 @@ export class AuditLogComponent {
   protected readonly confirmRevert = signal<AuditEntry | null>(null);
   protected readonly reverting = signal(false);
 
+  /** The newest stored chain check. */
+  protected readonly verify = signal<VerifyState>({ status: 'loading' });
+  protected readonly verifying = signal(false);
+
   protected readonly action = signal('');
   protected readonly actor = signal('');
   protected readonly since = signal('');
   protected readonly until = signal('');
 
-  protected readonly actionOptions = computed<SelectOption[]>(() =>
-    AUDIT_ACTIONS.map((a) => ({ value: a, label: this.actionLabel(a) })),
+  protected readonly actionOptions = computed<FilterSelectOption[]>(() => [
+    { value: '', label: this.i18n.translate('admin.audit.filter.allActions') },
+    ...AUDIT_ACTIONS.map((a) => ({ value: a, label: this.actionLabel(a) })),
+  ]);
+  protected readonly actorOptions = computed<FilterSelectOption[]>(() => [
+    { value: '', label: this.i18n.translate('admin.audit.filter.allActors') },
+    ...this.actors().map((a) => ({ value: a.sub, label: a.name || a.sub })),
+  ]);
+  /** "Aktion: Alle Aktionen" or "Aktion: <label>". */
+  protected readonly actionChip = computed(() =>
+    this.chipText('admin.audit.filter.action', this.actionOptions(), this.action()),
   );
-  protected readonly actorOptions = computed<SelectOption[]>(() =>
-    this.actors().map((a) => ({ value: a.sub, label: a.name || a.sub })),
+  protected readonly actorChip = computed(() =>
+    this.chipText('admin.audit.filter.actor', this.actorOptions(), this.actor()),
   );
   protected readonly activeFilterCount = computed(
     () =>
@@ -292,17 +263,32 @@ export class AuditLogComponent {
       (this.until() ? 1 : 0),
   );
 
-  /** Feed groups: the entries per local day. The newest day comes first, as delivered. */
-  protected readonly groups = computed<DayGroup[]>(() => {
-    const out: DayGroup[] = [];
-    for (const e of this.entries()) {
-      const date = new Date(e.at);
-      const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-      const last = out[out.length - 1];
-      if (last && last.key === key) last.entries.push(e);
-      else out.push({ key, date, entries: [e] });
+  /** The title and the line of the chain check. */
+  protected readonly verifyView = computed(() => {
+    const state = this.verify();
+    if (state.status === 'loading') return null;
+    if (state.status === 'never') {
+      return { kind: 'muted', title: this.i18n.translate('admin.health.audit.never'), sub: '' };
     }
-    return out;
+    if (state.status === 'error') {
+      return { kind: 'muted', title: this.i18n.translate('admin.health.audit.failed'), sub: '' };
+    }
+    const check = state.check;
+    const at = new Intl.DateTimeFormat(this.i18n.formatLocale(), {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(checkedAt(check)));
+    const parts = [
+      this.i18n.translate('admin.audit.verify.checkedOn', { when: at }),
+      triggerLabel(check.trigger, this.i18n),
+      this.i18n.translate('admin.health.entries', { count: formatCount(check.checked, this.i18n) }),
+    ];
+    if (check.brokenAt != null) {
+      parts.unshift(this.i18n.translate('admin.health.audit.brokenAt', { id: check.brokenAt }));
+    }
+    return check.valid
+      ? { kind: 'ok', title: this.i18n.translate('admin.health.audit.ok'), sub: parts.join(' · ') }
+      : { kind: 'error', title: this.i18n.translate('admin.health.audit.broken'), sub: parts.join(' · ') };
   });
 
   private readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
@@ -311,6 +297,10 @@ export class AuditLogComponent {
     this.api.listAuditActors().subscribe({
       next: (a) => this.actors.set(a),
       error: () => this.actors.set([]),
+    });
+    this.api.latestAuditVerification().subscribe({
+      next: (check) => this.verify.set(check ? { status: 'stored', check } : { status: 'never' }),
+      error: () => this.verify.set({ status: 'error' }),
     });
     this.reload();
 
@@ -325,6 +315,36 @@ export class AuditLogComponent {
       );
       obs.observe(el);
       onCleanup(() => obs.disconnect());
+    });
+  }
+
+  private chipText(label: TranslationKey, options: FilterSelectOption[], value: string): string {
+    const hit = options.find((o) => o.value === value) ?? options[0];
+    return `${this.i18n.translate(label)}: ${hit.label}`;
+  }
+
+  /** Check the chain now. The server stores the result, so the tiles see it too. */
+  protected runVerify(): void {
+    if (this.verifying()) return;
+    this.verifying.set(true);
+    this.api.runAuditVerification().subscribe({
+      next: (check) => {
+        this.verifying.set(false);
+        this.verify.set({ status: 'stored', check });
+        this.toast.success(
+          this.i18n.translate(check.valid ? 'admin.audit.verify.done' : 'admin.audit.verify.broken'),
+        );
+      },
+      error: (err: { status?: number }) => {
+        this.verifying.set(false);
+        const key: TranslationKey =
+          err?.status === 409
+            ? 'admin.audit.verify.running'
+            : err?.status === 429
+              ? 'admin.audit.verify.cooldown'
+              : 'admin.audit.verify.failed';
+        this.toast.error(this.i18n.translate(key));
+      },
     });
   }
 
@@ -469,9 +489,10 @@ export class AuditLogComponent {
         before: reset ? undefined : (this.cursor() ?? undefined),
         action: this.action() || undefined,
         actor: this.actor() || undefined,
-        // Day boundaries: since starts at 00:00 and until ends at 23:59:59, in local time.
-        since: this.since() ? `${this.since()}T00:00:00` : undefined,
-        until: this.until() ? `${this.until()}T23:59:59` : undefined,
+        // Day boundaries: since starts at 00:00 and until ends at 23:59:59, in local
+        // time, sent as an aware UTC time.
+        since: this.since() ? localDayBound(this.since(), false) : undefined,
+        until: this.until() ? localDayBound(this.until(), true) : undefined,
       })
       .subscribe({
         next: (page) => {
@@ -487,46 +508,11 @@ export class AuditLogComponent {
       });
   }
 
-  /** Day heading: today, yesterday or a localized date. */
-  protected dayLabel(g: DayGroup): string {
-    const today = new Date();
-    const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
-    if (this.sameDay(g.date, today)) return this.i18n.translate('admin.audit.today');
-    if (this.sameDay(g.date, yesterday)) return this.i18n.translate('admin.audit.yesterday');
-    return new Intl.DateTimeFormat(this.i18n.formatLocale(), { dateStyle: 'full' }).format(g.date);
-  }
-
-  private sameDay(a: Date, b: Date): boolean {
-    return (
-      a.getFullYear() === b.getFullYear() &&
-      a.getMonth() === b.getMonth() &&
-      a.getDate() === b.getDate()
-    );
-  }
-
-  protected icon(action: string): IconName {
-    return ACTION_ICONS[action] ?? 'audit';
-  }
-
-  /** Localized action label for the detail badge and the filter options. */
+  /** Localized action label for the rows, the details and the filter options. */
   protected actionLabel(action: string): string {
     const key = `admin.audit.action.${action}`;
     const label = this.i18n.translate(key as TranslationKey);
     return label === key ? action : label;
-  }
-
-  /** Readable sentence for an entry. Each action type has a template, plus a fallback. */
-  protected message(e: AuditEntry): string {
-    const key = KNOWN_ACTIONS.has(e.action)
-      ? `admin.audit.msg.${e.action}`
-      : 'admin.audit.msg.unknown';
-    return this.i18n.translate(key as TranslationKey, {
-      actor: this.actorLabel(e),
-      action: this.actionLabel(e.action),
-      target: this.targetLabel(e),
-      targetType: e.targetType ?? '',
-      targetId: e.targetId ?? '',
-    });
   }
 
   /** Localized target type. An unknown type gives the raw key back. */
@@ -536,13 +522,26 @@ export class AuditLogComponent {
     return label === key ? type : label;
   }
 
+  /**
+   * The target in a row: "Antrag · Zuschuss Sommerfest". The label the backend resolved
+   * wins; without it a readable id stands after the type. A UUID stays out of the row,
+   * because it tells the reader nothing; the details still show it.
+   */
+  protected targetText(e: AuditEntry): string {
+    const type = e.targetType ? this.targetTypeLabel(e.targetType) : null;
+    const id = e.targetId && !UUID_RE.test(e.targetId) ? e.targetId : null;
+    const name = e.targetLabel ?? id;
+    return [type, name].filter((x): x is string => !!x).join(' · ') || '—';
+  }
+
   /** Router target for the target of the entry, if a page exists for it. */
   protected targetLink(e: AuditEntry): string[] | null {
     if (!e.targetType || !e.targetId) return null;
     return TARGET_ROUTES[e.targetType]?.(e.targetId) ?? null;
   }
 
-  private actorLabel(e: AuditEntry): string {
+  /** The actor of a row: the clear name, the raw sub, or "System". */
+  protected actorLabel(e: AuditEntry): string {
     return e.actorName ?? e.actor ?? this.i18n.translate('admin.audit.system');
   }
 
@@ -552,26 +551,7 @@ export class AuditLogComponent {
     return e.actorName ?? e.actor ?? this.i18n.translate('admin.audit.system');
   }
 
-  /**
-   * Target in the sentence.
-   *
-   * The label that the backend resolved wins, in the quotation marks of the active
-   * locale. Without a label the sentence shows the localized target type, plus the
-   * id when that id is readable — `global`, `1` or an export file name. A UUID id
-   * stays out of the sentence, because it tells the reader nothing. The details of
-   * the entry still show it in full, together with the type.
-   */
-  private targetLabel(e: AuditEntry): string {
-    if (e.targetLabel) {
-      return this.i18n.translate('admin.audit.targetQuoted', { label: e.targetLabel });
-    }
-    const type = e.targetType ? this.targetTypeLabel(e.targetType) : null;
-    const id = e.targetId && !UUID_RE.test(e.targetId) ? e.targetId : null;
-    if (type && id) return `${type}:${id}`;
-    return type ?? id ?? '—';
-  }
-
-  /** The `data` content as (key, value) pairs for the detail chips. A UUID value with a
+  /** The `data` content as (key, value) pairs for the details. A UUID value with a
    *  known clear name reads as "<name> · <uuid>", else as the raw UUID. */
   protected dataPairs(e: AuditEntry): [string, string][] {
     const resolved = e.resolvedIds ?? {};
@@ -581,4 +561,17 @@ export class AuditLogComponent {
     };
     return Object.entries(e.data ?? {}).map(([k, v]) => [k, fmt(v)]);
   }
+}
+
+/**
+ * The start (00:00:00) or the end (23:59:59.999) of a local day as a UTC time, for
+ * example `2026-05-31T22:00:00.000Z` for the start of 1 June in Berlin summer time.
+ *
+ * The server takes only aware times. A UTC time with `Z` is aware and has no `+` sign:
+ * Angular sends a `+` in a query parameter as it is, and the server reads it as a space.
+ */
+export function localDayBound(day: string, end: boolean): string {
+  const [y, m, d] = day.split('-').map(Number);
+  const date = end ? new Date(y, m - 1, d, 23, 59, 59, 999) : new Date(y, m - 1, d, 0, 0, 0, 0);
+  return date.toISOString();
 }

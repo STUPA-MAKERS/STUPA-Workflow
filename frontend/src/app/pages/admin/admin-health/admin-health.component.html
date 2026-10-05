@@ -1,0 +1,26 @@
+@if (tiles().length) {
+  <section class="ah" aria-labelledby="ah-title">
+    <h2 class="sec ah__head" id="ah-title">{{ 'admin.health.title' | t }}</h2>
+    <ul class="rowgroup ah__list">
+      @for (t of tiles(); track t.key) {
+        <li>
+          <a class="ah__tile" [class]="'ah__tile ah__tile--' + t.kind" [routerLink]="t.link">
+            <app-icon class="ah__icon" [name]="t.icon" [size]="20" />
+            <span class="ah__text">
+              @if (t.title === null) {
+                <span class="skel skel--bar ah__skel" aria-hidden="true"></span>
+                <span class="sr-only">{{ 'common.loading' | t }}</span>
+              } @else {
+                <span class="ah__title">{{ t.title }}</span>
+              }
+              @if (t.sub) {
+                <span class="ah__sub">{{ t.sub }}</span>
+              }
+            </span>
+            <app-icon class="ah__chev" name="chevron-right" [size]="16" />
+          </a>
+        </li>
+      }
+    </ul>
+  </section>
+}

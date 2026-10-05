@@ -127,13 +127,20 @@ describe('GroupMappingsComponent', () => {
     expect(api.listGremiumRoles).toHaveBeenCalledWith('g2', { quiet: true });
   });
 
-  it('the columns fit each section', async () => {
+  it('shows each section as rows "group → target", a gremium role after its gremium', async () => {
     const { c } = await setup();
-    const keys = (cols: { key: string }[]) => cols.map((col) => col.key);
-    expect(keys(c.globalColumns())).toEqual(['oidcGroup', 'roleLabel', 'actions']);
-    expect(keys(c.membershipColumns())).toEqual(['oidcGroup', 'gremiumLabel', 'actions']);
-    expect(keys(c.roleColumns())).toEqual(['oidcGroup', 'gremiumLabel', 'roleLabel', 'actions']);
-    expect(c.rowId({ id: 'x' })).toBe('x');
+    expect(c.sections().map((sec: { kind: string }) => sec.kind)).toEqual(['global', 'membership', 'role']);
+    expect(c.sections()[0].rows[0]).toEqual({ id: 'm1', oidcGroup: 'stupa-vorstand', target: 'Vorstand', role: null });
+    expect(c.sections()[2].rows[0]).toEqual({
+      id: 'rm1',
+      oidcGroup: 'stupa-praesidium',
+      target: 'StuPa',
+      role: 'Präsidium',
+    });
+    const role = screen.getByRole('region', { name: 'Gremien-Rollen' });
+    expect(within(role).getByText('Präsidium').tagName).toBe('STRONG');
+    // The reserved prefix stands once at the foot of the page.
+    expect(screen.getByText('Das Präfix „vote:“ ist reserviert.')).toBeInTheDocument();
   });
 
   it('role names follow the locale → de → key fallbacks', async () => {
@@ -175,7 +182,7 @@ describe('GroupMappingsComponent', () => {
   ])('a failed %s shows a toast and ends the %s loading state', async (method, kind) => {
     const api = makeApi({ [method]: jest.fn(() => throwError(() => new Error('x'))) });
     const { c, toast } = await setup(api);
-    expect(toast.error).toHaveBeenCalledWith('Mappings konnten nicht geladen werden.');
+    expect(toast.error).toHaveBeenCalledWith('Die Zuordnungen konnten nicht geladen werden.');
     expect(c.loading()[kind]).toBe(false);
   });
 
@@ -197,7 +204,7 @@ describe('GroupMappingsComponent', () => {
     await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Globale Rolle zuordnen' }));
     const dialog = screen.getByRole('dialog', { name: 'Globale Rolle zuordnen' });
-    expect(within(dialog).getByLabelText('OIDC-Gruppe')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(/OIDC-Gruppe/)).toBeInTheDocument();
     expect(within(dialog).getByText('Rolle')).toBeInTheDocument();
     expect(within(dialog).queryByText('Gremium')).toBeNull();
   });
@@ -335,8 +342,9 @@ describe('GroupMappingsComponent', () => {
     c.openAdd('membership');
     c.oidcGroup.set('vote:x');
     fixture.detectChanges();
-    expect(screen.getByText('Das Präfix „vote:“ ist reserviert.')).toBeInTheDocument();
-    expect(screen.getByLabelText('OIDC-Gruppe')).toHaveAttribute('aria-invalid', 'true');
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Das Präfix „vote:“ ist reserviert.')).toBeInTheDocument();
+    expect(within(dialog).getByLabelText(/OIDC-Gruppe/)).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('save is a no-op without a dialog, when invalid, or while a save runs', async () => {
@@ -366,7 +374,7 @@ describe('GroupMappingsComponent', () => {
     expect(api[create]).toHaveBeenCalledWith({ oidcGroup: 'new-grp', ...extra });
     expect(c.dialog()).toBeNull();
     expect(c.saving()).toBe(false);
-    expect(toast.success).toHaveBeenCalledWith('Mapping gespeichert.');
+    expect(toast.success).toHaveBeenCalledWith('Zuordnung gespeichert.');
     expect(api[list]).toHaveBeenCalledTimes(2);
   });
 
@@ -387,7 +395,7 @@ describe('GroupMappingsComponent', () => {
   it.each([
     [409, 'Diese Zuordnung gibt es schon.'],
     [422, 'Ungültiger Gruppenname: leer oder mit dem reservierten Präfix „vote:“.'],
-    [404, 'Das Gremium oder die Rolle gibt es nicht mehr. Laden Sie die Seite neu.'],
+    [404, 'Das Gremium oder die Rolle gibt es nicht mehr. Lade die Seite neu.'],
     [500, 'Aktion fehlgeschlagen.'],
     [undefined, 'Aktion fehlgeschlagen.'],
   ])('a save that answers %s names the reason and keeps the dialog open', async (status, text) => {
@@ -422,7 +430,7 @@ describe('GroupMappingsComponent', () => {
     c.remove();
     expect(api[del]).toHaveBeenCalledWith(id);
     expect(c.confirm()).toBeNull();
-    expect(toast.success).toHaveBeenCalledWith('Mapping gelöscht.');
+    expect(toast.success).toHaveBeenCalledWith('Zuordnung gelöscht.');
     expect(api[list]).toHaveBeenCalledTimes(2);
   });
 

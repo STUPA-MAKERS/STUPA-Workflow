@@ -68,20 +68,28 @@ describe('PrivacyComponent', () => {
     expect(api.listErasures).toHaveBeenCalled();
     expect(api.getPrivacySettings).toHaveBeenCalled();
     expect(screen.getByText('a@x')).toBeInTheDocument();
-    // The executed row has no email, so the table shows an em dash.
-    expect(screen.getByText('—')).toBeInTheDocument();
+    // The executed row has no email any more: it reads "anonymisiert".
+    expect(screen.getByText('anonymisiert')).toBeInTheDocument();
     // The retention input shows the loaded default.
     expect(screen.getByDisplayValue('24')).toBeInTheDocument();
+  });
+
+  it('shows a dash for an open request without an e-mail address', async () => {
+    const api = makeApi({ listErasures: jest.fn(() => of([{ ...OPEN, email: null }])) });
+    await setup(api);
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.queryByText('anonymisiert')).toBeNull();
   });
 
   it('translates status and subject labels and renders the localized columns', async () => {
     const { fixture } = await setup();
     const cmp = fixture.componentInstance as unknown as {
-      statusLabel: (s: string) => string;
       subjectLabel: (s: string) => string;
       columns: () => { key: string }[];
     };
-    expect(cmp.statusLabel('open')).toContain('Offen');
+    // The status is coloured text: an open request waits (warn).
+    const open = screen.getByText('Offen');
+    expect(open.closest('app-status-text')).toHaveClass('st--warn');
     expect(cmp.subjectLabel('applicant')).toBeTruthy();
     expect(cmp.columns().map((c) => c.key)).toEqual([
       'status',

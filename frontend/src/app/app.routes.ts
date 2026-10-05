@@ -222,209 +222,224 @@ export const routes: Routes = [
           import('./pages/invoices/invoices.component').then((m) => m.InvoicesComponent),
       },
       {
-        path: 'admin/cost-centres',
-        data: { title: 'budget.tree.title', permission: 'budget.structure', parent: ['admin'], wide: true },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/budget/budget-tree.component').then((m) => m.BudgetTreeComponent),
-      },
-      // The page was called budget-pots while the pot feature existed. Bookmarks and
-      // shared links from that time still work.
-      { path: 'admin/budget-pots', redirectTo: 'admin/cost-centres', pathMatch: 'full' },
-      {
+        // The admin frame (board Verwaltung): the admin navigation beside every admin
+        // page. The frame itself needs only a session; each page below keeps its own
+        // permission gate. `wide`: the navigation and the page fill the width.
         path: 'admin',
-        data: {
-          title: 'nav.admin',
-          // Every area-admin role can reach the admin overview.
-          permission: ADMIN_AREA_PERMISSIONS,
-        },
+        data: { wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
-          import('./pages/admin/admin-home.component').then((m) => m.AdminHomeComponent),
-      },
-      {
-        path: 'admin/users',
-        data: { title: 'admin.users.title', permission: 'admin.users', parent: ['admin'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/users/users.component').then((m) => m.UsersComponent),
-      },
-      {
-        path: 'admin/roles',
-        data: { title: 'admin.roles.title', permission: 'admin.roles', parent: ['admin'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/roles/roles.component').then((m) => m.AdminRolesComponent),
-      },
-      {
-        // Maps an OIDC group to a role.
-        path: 'admin/group-mappings',
-        data: { title: 'admin.groupMappings.title', permission: 'admin.group_mappings', parent: ['admin'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/group-mappings/group-mappings.component').then(
-            (m) => m.GroupMappingsComponent,
+          import('./pages/admin/admin-frame/admin-frame.component').then(
+            (m) => m.AdminFrameComponent,
           ),
-      },
-      {
-        path: 'admin/mail-templates',
-        data: { title: 'admin.mailTemplates.title', permission: 'admin.notifications', parent: ['admin'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/mail-templates/mail-templates.component').then(
-            (m) => m.MailTemplatesComponent,
-          ),
-      },
-      {
-        path: 'admin/forms',
-        data: { title: 'admin.forms.listTitle', permission: 'form.configure', parent: ['admin'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/forms/forms-list.component').then((m) => m.FormsListComponent),
-      },
-      {
-        path: 'admin/forms/:id',
-        data: { title: 'admin.forms.edit', permission: 'form.configure', parent: ['admin', 'admin/forms'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/forms/form-editor.component').then((m) => m.FormEditorComponent),
-      },
-      {
-        path: 'admin/flow',
-        // The save (POST /admin/flow-versions/global) accepts either key. The route
-        // gate must list both, or a holder of one of them opens an editor it cannot
-        // save, or cannot open an editor it may save.
-        data: {
-          title: 'admin.flow.title',
-          permission: ['flow.configure', 'admin.types'],
-          parent: ['admin'],
-        },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/flow-editor/flow-editor.component').then(
-            (m) => m.FlowEditorComponent,
-          ),
-      },
-      {
-        path: 'admin/backups',
-        data: { title: 'admin.backups.title', permission: 'backup.manage', parent: ['admin'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/backups/backups.component').then(
-            (m) => m.BackupsComponent,
-          ),
-      },
-      {
-        path: 'admin/privacy',
-        data: { title: 'admin.privacy.title', permission: 'privacy.manage', parent: ['admin'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/privacy/privacy.component').then(
-            (m) => m.PrivacyComponent,
-          ),
-      },
-      {
-        path: 'admin/gremien',
-        data: { title: 'admin.gremien.title', permission: 'admin.gremien', parent: ['admin'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/gremien/gremien.component').then((m) => m.AdminGremienComponent),
-      },
-      {
-        path: 'admin/gremien/:id/members',
-        data: { title: 'admin.gremien.membersOf', permission: 'admin.gremien', parent: ['admin', 'admin/gremien'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/gremien/gremium-members.component').then(
-            (m) => m.GremiumMembersComponent,
-          ),
-      },
-      {
-        path: 'admin/branding',
-        data: { title: 'admin.brand.title', permission: 'admin.site', parent: ['admin'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/branding/branding-editor.component').then(
-            (m) => m.BrandingEditorComponent,
-          ),
-      },
-      {
-        path: 'admin/cd-variants',
-        data: { title: 'admin.cdVariants.title', permission: 'admin.cd_variants', parent: ['admin'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/cd-variants/cd-variants.component').then(
-            (m) => m.AdminCdVariantsComponent,
-          ),
-      },
-      {
-        path: 'admin/webhooks',
-        data: { title: 'admin.webhook.title', permission: 'webhook.manage', parent: ['admin'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/config/webhooks.component').then((m) => m.WebhooksComponent),
-      },
-      {
-        path: 'admin/gremien/:id/roles',
-        data: { title: 'admin.gremiumRoles.title', permission: 'admin.gremium_roles', parent: ['admin', 'admin/gremien'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/gremium-roles/gremium-roles.component').then(
-            (m) => m.GremiumRolesComponent,
-          ),
-      },
-      {
-        // Agent tokens (OAuth grants) of every principal, with a kill switch.
-        path: 'admin/oauth-grants',
-        data: {
-          title: 'admin.oauthGrants.title',
-          permission: 'admin.users',
-          parent: ['admin'],
-        },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/oauth-grants/oauth-grants.component').then(
-            (m) => m.AdminOAuthGrantsComponent,
-          ),
-      },
-      {
-        path: 'admin/audit',
-        data: { title: 'admin.audit.title', permission: 'audit.read', parent: ['admin'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/audit/audit-log.component').then((m) => m.AuditLogComponent),
-      },
-      {
-        path: 'admin/delegations',
-        data: { title: 'admin.deleg.title', permission: 'admin.delegations', parent: ['admin'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/delegations/delegations.component').then(
-            (m) => m.DelegationsComponent,
-          ),
-      },
-      {
-        path: 'admin/deadlines',
-        data: { title: 'admin.deadlines.title', permission: 'admin.deadlines', parent: ['admin'] },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/deadlines/deadlines.component').then(
-            (m) => m.AdminDeadlinesComponent,
-          ),
-      },
-      {
-        // Platform-wide notification settings, such as the task reminders.
-        path: 'admin/notifications',
-        data: {
-          title: 'admin.notifications.title',
-          permission: 'admin.notifications',
-          parent: ['admin'],
-        },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/admin/notifications/notification-settings.component').then(
-            (m) => m.NotificationSettingsComponent,
-          ),
+        children: [
+          {
+            path: 'cost-centres',
+            data: { title: 'budget.tree.title', permission: 'budget.structure', parent: ['admin'], wide: true },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/budget/budget-tree.component').then((m) => m.BudgetTreeComponent),
+          },
+          // The page was called budget-pots while the pot feature existed. Bookmarks and
+          // shared links from that time still work.
+          { path: 'budget-pots', redirectTo: 'cost-centres', pathMatch: 'full' },
+          {
+            path: '',
+            pathMatch: 'full',
+            data: {
+              title: 'nav.admin',
+              // Every area-admin role can reach the admin overview.
+              permission: ADMIN_AREA_PERMISSIONS,
+            },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/admin-home.component').then((m) => m.AdminHomeComponent),
+          },
+          {
+            path: 'users',
+            data: { title: 'admin.users.title', permission: 'admin.users', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/users/users.component').then((m) => m.UsersComponent),
+          },
+          {
+            path: 'roles',
+            data: { title: 'admin.roles.title', permission: 'admin.roles', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/roles/roles.component').then((m) => m.AdminRolesComponent),
+          },
+          {
+            // Maps an OIDC group to a role.
+            path: 'group-mappings',
+            data: { title: 'admin.groupMappings.title', permission: 'admin.group_mappings', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/group-mappings/group-mappings.component').then(
+                (m) => m.GroupMappingsComponent,
+              ),
+          },
+          {
+            path: 'mail-templates',
+            data: { title: 'admin.mailTemplates.title', permission: 'admin.notifications', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/mail-templates/mail-templates.component').then(
+                (m) => m.MailTemplatesComponent,
+              ),
+          },
+          {
+            path: 'forms',
+            data: { title: 'admin.forms.listTitle', permission: 'form.configure', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/forms/forms-list.component').then((m) => m.FormsListComponent),
+          },
+          {
+            path: 'forms/:id',
+            data: { title: 'admin.forms.edit', permission: 'form.configure', parent: ['admin', 'admin/forms'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/forms/form-editor.component').then((m) => m.FormEditorComponent),
+          },
+          {
+            path: 'flow',
+            // The save (POST /admin/flow-versions/global) accepts either key. The route
+            // gate must list both, or a holder of one of them opens an editor it cannot
+            // save, or cannot open an editor it may save.
+            data: {
+              title: 'admin.flow.title',
+              permission: ['flow.configure', 'admin.types'],
+              parent: ['admin'],
+            },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/flow-editor/flow-editor.component').then(
+                (m) => m.FlowEditorComponent,
+              ),
+          },
+          {
+            path: 'backups',
+            data: { title: 'admin.backups.title', permission: 'backup.manage', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/backups/backups.component').then(
+                (m) => m.BackupsComponent,
+              ),
+          },
+          {
+            path: 'privacy',
+            data: { title: 'admin.privacy.title', permission: 'privacy.manage', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/privacy/privacy.component').then(
+                (m) => m.PrivacyComponent,
+              ),
+          },
+          {
+            path: 'gremien',
+            data: { title: 'admin.gremien.title', permission: 'admin.gremien', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/gremien/gremien.component').then((m) => m.AdminGremienComponent),
+          },
+          {
+            path: 'gremien/:id/members',
+            data: { title: 'admin.gremien.membersOf', permission: 'admin.gremien', parent: ['admin', 'admin/gremien'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/gremien/gremium-members.component').then(
+                (m) => m.GremiumMembersComponent,
+              ),
+          },
+          {
+            path: 'branding',
+            data: { title: 'admin.brand.title', permission: 'admin.site', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/branding/branding-editor.component').then(
+                (m) => m.BrandingEditorComponent,
+              ),
+          },
+          {
+            path: 'cd-variants',
+            data: { title: 'admin.cdVariants.title', permission: 'admin.cd_variants', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/cd-variants/cd-variants.component').then(
+                (m) => m.AdminCdVariantsComponent,
+              ),
+          },
+          {
+            path: 'webhooks',
+            data: { title: 'admin.webhook.title', permission: 'webhook.manage', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/config/webhooks.component').then((m) => m.WebhooksComponent),
+          },
+          {
+            path: 'gremien/:id/roles',
+            data: { title: 'admin.gremiumRoles.title', permission: 'admin.gremium_roles', parent: ['admin', 'admin/gremien'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/gremium-roles/gremium-roles.component').then(
+                (m) => m.GremiumRolesComponent,
+              ),
+          },
+          {
+            // Agent tokens (OAuth grants) of every principal, with a kill switch.
+            path: 'oauth-grants',
+            data: {
+              title: 'admin.oauthGrants.title',
+              permission: 'admin.users',
+              parent: ['admin'],
+            },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/oauth-grants/oauth-grants.component').then(
+                (m) => m.AdminOAuthGrantsComponent,
+              ),
+          },
+          {
+            path: 'audit',
+            data: { title: 'admin.audit.title', permission: 'audit.read', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/audit/audit-log.component').then((m) => m.AuditLogComponent),
+          },
+          {
+            path: 'delegations',
+            data: { title: 'admin.deleg.title', permission: 'admin.delegations', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/delegations/delegations.component').then(
+                (m) => m.DelegationsComponent,
+              ),
+          },
+          {
+            path: 'deadlines',
+            data: { title: 'admin.deadlines.title', permission: 'admin.deadlines', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/deadlines/deadlines.component').then(
+                (m) => m.AdminDeadlinesComponent,
+              ),
+          },
+          {
+            // Platform-wide notification settings, such as the task reminders.
+            path: 'notifications',
+            data: {
+              title: 'admin.notifications.title',
+              permission: 'admin.notifications',
+              parent: ['admin'],
+            },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/notifications/notification-settings.component').then(
+                (m) => m.NotificationSettingsComponent,
+              ),
+          },
+        ],
       },
       {
         // OAuth consent: after the login the user picks the scope and the token lifetime.

@@ -1,119 +1,142 @@
+@use 'breakpoints' as bp;
+
 :host {
+  display: block;
+}
+
+.bk {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-6);
 }
 
-.bk__row {
+.bk__cards {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.bk__card {
+  /* The fields sit on surface 2 here, so they take surface 3. */
+  --color-surface-sunken: var(--color-surface-3);
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
   gap: var(--space-3);
-  flex-wrap: wrap;
+  padding: var(--space-5);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
 }
-
-.bk__row--import {
-  align-items: center;
-  justify-content: space-between;
-  margin-top: var(--space-4);
-  padding-top: var(--space-4);
-  border-top: var(--border-width) solid var(--color-border);
-}
-
-.bk__grow {
-  flex: 1 1 18rem;
-}
-
-.bk__label {
+.bk__cardTitle {
   margin: 0;
-  font-weight: var(--fw-medium);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
 }
-
-/* Why a control beside this text is dead. Warning-coloured rather than muted: it is the
-   reason an admin cannot do the thing they came for, not a footnote. */
-.bk__disabledHint {
-  margin: var(--space-2) 0 0;
-  max-width: 44rem;
-  color: var(--color-warning-text, var(--color-text));
+.bk__hint {
+  margin: 0;
   font-size: var(--fs-sm);
-}
-
-/* The native file input is replaced by its label, so the control matches the buttons
-   next to it. The input stays in the DOM and keeps the keyboard and screen-reader
-   behaviour that a div would throw away. */
-.bk__file {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-
-  &:focus-within {
-    outline: 2px solid var(--color-focus);
-    outline-offset: 2px;
-  }
-
-  &:has(input:disabled) {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  input {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    opacity: 0;
-    pointer-events: none;
-  }
-}
-
-.bk__kind {
-  margin-right: var(--space-2);
-}
-
-.bk__status {
-  font-weight: var(--fw-medium);
-
-  &--running,
-  &--pending {
-    color: var(--color-warning-text, var(--color-text));
-  }
-
-  &--done {
-    color: var(--color-success-text, var(--color-text));
-  }
-
-  &--failed {
-    color: var(--color-danger-text, var(--color-text));
-  }
-}
-
-.bk__error {
-  display: block;
-  font-size: var(--fs-xs);
   color: var(--color-text-muted);
 }
+.bk__disabledHint {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-warning);
+}
 
-/* The restore dialog. The warning leads, because the action is not reversible except
-   through the safety archive the worker takes first. */
-.bk__warn {
-  margin-top: 0;
-  font-weight: var(--fw-medium);
-  color: var(--color-danger-text, var(--color-text));
+.bk__createForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.bk__note {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+/* The native file input stays in the DOM for the click, but has no box. */
+.bk__file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .bk__list {
-  margin: 0 0 var(--space-4);
-  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.bk__listHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-4);
+  padding-inline: var(--space-1);
+}
+
+.bk__nowrap {
+  white-space: nowrap;
+}
+.bk__date {
+  font-size: var(--fs-sm);
+}
+.bk__kind {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+.bk__pinMark {
+  color: var(--color-accent-text);
+}
+.bk__noteText {
+  display: block;
+  max-width: 18rem;
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
 }
-
+.bk__error {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--color-danger);
+}
 .bk__actions {
+  display: inline-flex;
+  gap: 2px;
+  justify-content: flex-end;
+}
+
+.bk__restore {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.bk__warn {
+  margin: 0;
+  font-weight: var(--fw-semibold);
+  color: var(--color-danger);
+}
+.bk__points {
+  margin: 0;
+  padding-inline-start: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.bk__target,
+.bk__dialogText {
+  margin: 0;
+}
+.bk__dialogFoot {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
+  gap: var(--space-3);
+}
+
+@include bp.below-wide {
+  .bk__cards {
+    grid-template-columns: 1fr;
+  }
 }

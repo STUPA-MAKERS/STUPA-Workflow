@@ -1,61 +1,61 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { type IconName, IconComponent } from '@stupa-makers/ui-kit';
-
-interface AdminTile {
-  link: string;
-  title: TranslationKey;
-  desc: TranslationKey;
-  icon: IconName;
-  /** Visible if the user holds at least ONE of these permissions (ANY-of). It mirrors
-   *  the route-guard right in `app.routes.ts`. This is UX only. The backend stays
-   *  authoritative. */
-  permissions: string[];
-}
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import { IconComponent } from '@stupa-makers/ui-kit';
+import { AdminApiService } from './admin-api.service';
+import type { Gremium } from './admin.models';
 
 /**
- * Admin landing. Entry into the config UIs. Each tile is its own (lazy) route with
- * an icon-left layout and a one-line description.
+ * The admin home page `/admin` (board Verwaltung).
+ *
+ * The admin frame shows the overview beside it: the "Zustand" tiles and every admin
+ * page with one line each. This page lists the gremien: name, slug, "n Mitglieder ·
+ * n Rollen", and the links to the members and the gremium roles.
+ *
+ * `admin.gremien` reads the admin list with the counts. A principal with only
+ * `admin.gremium_roles` gets the master-data list without counts, so the role pages of
+ * each gremium stay reachable. Without either permission the frame shows no page here.
  */
 @Component({
   selector: 'app-admin-home',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslatePipe, IconComponent, PageHeaderComponent],
+  imports: [RouterLink, TranslatePipe, IconComponent, EmptyStateComponent, SkeletonComponent],
   templateUrl: './admin-home.component.html',
   styleUrl: './admin-home.component.scss',
 })
 export class AdminHomeComponent {
+  private readonly api = inject(AdminApiService);
   private readonly auth = inject(AuthService);
 
-  protected readonly tiles: AdminTile[] = [
-    { link: 'users', title: 'admin.home.users', desc: 'admin.home.usersDesc', icon: 'members', permissions: ['admin.users'] },
-    { link: 'roles', title: 'admin.home.roles', desc: 'admin.home.rolesDesc', icon: 'roles', permissions: ['admin.roles'] },
-    { link: 'group-mappings', title: 'admin.home.groupMappings', desc: 'admin.home.groupMappingsDesc', icon: 'key', permissions: ['admin.group_mappings'] },
-    { link: 'oauth-grants', title: 'admin.oauthGrants.title', desc: 'admin.home.oauthGrantsDesc', icon: 'key', permissions: ['admin.users'] },
-    { link: 'gremien', title: 'admin.home.gremien', desc: 'admin.home.gremienDesc', icon: 'parliament', permissions: ['admin.gremien'] },
-    { link: 'cost-centres', title: 'budget.tree.title', desc: 'admin.home.costCentresDesc', icon: 'euro', permissions: ['budget.structure'] },
-    { link: 'forms', title: 'admin.home.formBuilder', desc: 'admin.home.formBuilderDesc', icon: 'form', permissions: ['form.configure'] },
-    // The flow editor route and its save both accept either key.
-    { link: 'flow', title: 'admin.home.flowEditor', desc: 'admin.home.flowEditorDesc', icon: 'flow', permissions: ['flow.configure', 'admin.types'] },
-    { link: 'branding', title: 'admin.home.branding', desc: 'admin.home.brandingDesc', icon: 'palette', permissions: ['admin.site'] },
-    { link: 'cd-variants', title: 'admin.cdVariants.title', desc: 'admin.home.cdVariantsDesc', icon: 'document', permissions: ['admin.cd_variants'] },
-    { link: 'webhooks', title: 'admin.home.webhooks', desc: 'admin.home.webhooksDesc', icon: 'webhook', permissions: ['webhook.manage'] },
-    { link: 'delegations', title: 'admin.home.delegations', desc: 'admin.home.delegationsDesc', icon: 'repeat', permissions: ['admin.delegations'] },
-    { link: 'audit', title: 'admin.audit.title', desc: 'admin.audit.desc', icon: 'audit', permissions: ['audit.read'] },
-    { link: 'deadlines', title: 'admin.deadlines.title', desc: 'admin.deadlines.subtitle', icon: 'clock', permissions: ['admin.deadlines'] },
-    { link: 'privacy', title: 'admin.home.privacy', desc: 'admin.home.privacyDesc', icon: 'key', permissions: ['privacy.manage'] },
-    { link: 'backups', title: 'admin.home.backups', desc: 'admin.home.backupsDesc', icon: 'export', permissions: ['backup.manage'] },
-    { link: 'notifications', title: 'admin.notifications.title', desc: 'admin.notifications.intro', icon: 'bell', permissions: ['admin.notifications'] },
-    { link: 'mail-templates', title: 'admin.home.mailTemplates', desc: 'admin.home.mailTemplatesDesc', icon: 'send', permissions: ['admin.notifications'] },
-  ];
+  /** The gremien list and its manage link (`admin.gremien`). */
+  protected readonly canGremien = this.auth.can('admin.gremien');
+  /** The roles link of each gremium (`admin.gremium_roles`). */
+  protected readonly canRoles = this.auth.can('admin.gremium_roles');
+  /** The page shows at all. */
+  protected readonly visible = this.canGremien || this.canRoles;
 
-  /** Only tiles the user has the right for. Admin sees everything (auth.can). */
-  protected readonly visibleTiles = computed(() =>
-    this.tiles.filter((t) => this.auth.canAny(...t.permissions)),
-  );
+  protected readonly gremien = signal<Gremium[]>([]);
+  protected readonly loading = signal(true);
+  protected readonly failed = signal(false);
+
+  constructor() {
+    if (!this.visible) return;
+    const list = this.canGremien
+      ? this.api.listGremien({ quiet: true })
+      : this.api.listGremienOptions();
+    list.subscribe({
+      next: (rows) => {
+        this.gremien.set(rows);
+        this.loading.set(false);
+      },
+      error: () => {
+        this.failed.set(true);
+        this.loading.set(false);
+      },
+    });
+  }
 }

@@ -1,97 +1,161 @@
-.users__search {
+:host {
+  display: block;
+}
+
+.au {
   display: flex;
-  flex-wrap: wrap;
-  align-items: end;
+  flex-direction: column;
+  gap: var(--space-5);
+  container-type: inline-size;
+}
+
+.au__noteLink {
+  margin-inline-start: var(--space-2);
+  font-weight: var(--fw-semibold);
+  color: var(--color-accent-text);
+  white-space: nowrap;
+}
+
+.au__search {
+  display: flex;
+  align-items: center;
   gap: var(--space-3);
 }
-
-.users__search-lbl {
-  flex-basis: 100%;
-  font-weight: var(--fw-semibold);
+.au__pill {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
-.users__search input {
-  flex: 1 1 18rem;
-  height: var(--control-height);
-  box-sizing: border-box;
-  padding: 0 var(--space-4);
-  font: inherit;
-  font-size: var(--fs-md);
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
+.au__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.users__search input:hover {
-  border-color: var(--color-text-muted);
-}
-
-.users__search input:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 1px;
-}
-
-/* Keep the search button as high as the input next to it. */
-.users__search app-button button.btn {
-  height: var(--control-height);
-}
-
-/* The user table follows the Nextcloud user table. */
-.users__table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--fs-sm);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-
-.users__table thead th {
-  text-align: start;
-  padding: var(--space-3) var(--space-4);
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
-  background: var(--color-surface-sunken);
-  border-bottom: var(--border-width) solid var(--color-border);
-}
-
-.users__row td {
-  padding: var(--space-3) var(--space-4);
-  border-bottom: var(--border-width) solid var(--color-border);
-  vertical-align: middle;
-}
-
-.users__row:hover td {
-  background: var(--color-surface-sunken);
-}
-
-.users__mono {
-  font-family: var(--font-mono, monospace);
-  font-size: var(--fs-xs);
-}
-
-.users__roles {
-  display: flex;
-  flex-wrap: nowrap;
+/* One row: the person, three fields, the action. The fields drop below the person in a
+   narrower container. */
+.au__row {
+  display: grid;
+  grid-template-columns: 2rem minmax(11rem, 1.3fr) minmax(7rem, 1fr) minmax(9rem, 1.2fr) 9rem 7.5rem;
+  grid-template-areas: 'av who roles groups login act';
   align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-4) var(--space-5);
+}
+.au__row--off .au__avatar,
+.au__row--off .au__who,
+.au__row--off .au__field {
+  opacity: 0.6;
+}
+
+.au__avatar {
+  grid-area: av;
+}
+
+.au__who {
+  grid-area: who;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.au__name {
+  display: flex;
+  align-items: baseline;
   gap: var(--space-2);
-  overflow-x: auto;
-  max-width: 100%;
-  scrollbar-width: thin;
+  min-width: 0;
+  font-weight: var(--fw-semibold);
+}
+.au__offTag {
+  flex: none;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-regular);
+  color: var(--color-text-muted);
+}
+/* An e-mail address wraps; it is never cut. */
+.au__mail {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
 }
 
-/* A group name is an identifier from the IdP, so it keeps its exact spelling. */
-.users__group {
-  font-family: var(--font-mono, monospace);
+.au__field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.au__field--roles {
+  grid-area: roles;
+}
+.au__field--groups {
+  grid-area: groups;
+}
+.au__field--login {
+  grid-area: login;
+}
+.au__lbl {
   font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+.au__val {
+  overflow-wrap: anywhere;
+}
+.au__val--muted {
+  color: var(--color-text-muted);
 }
 
-.users__col-actions {
-  text-align: end;
-  white-space: nowrap;
+/* An OIDC group keeps its exact spelling from the IdP. */
+.au__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.au__tag {
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+
+.au__act {
+  grid-area: act;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.au__empty {
+  padding: var(--space-6);
+}
+
+@container (max-width: 54rem) {
+  .au__row {
+    grid-template-columns: 2rem minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-areas:
+      'av who who act'
+      '. roles login login'
+      '. groups groups groups';
+  }
+}
+
+@container (max-width: 34rem) {
+  .au__search {
+    flex-wrap: wrap;
+  }
+  .au__row {
+    grid-template-columns: 2rem minmax(0, 1fr) auto;
+    grid-template-areas:
+      'av who who'
+      '. roles roles'
+      '. login login'
+      '. groups groups'
+      '. act act';
+    padding: var(--space-3) var(--space-4);
+  }
+  .au__act {
+    justify-content: flex-start;
+    padding-top: var(--space-1);
+  }
 }

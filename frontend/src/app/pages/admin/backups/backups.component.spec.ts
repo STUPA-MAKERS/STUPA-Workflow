@@ -88,8 +88,8 @@ describe('BackupsComponent', () => {
     };
     expect(cmp.sizeLabel(null)).toBe('—');
     expect(cmp.sizeLabel(512)).toBe('512 B');
-    expect(cmp.sizeLabel(48_234_496)).toBe('46.0 MB');
-    expect(cmp.sizeLabel(3_221_225_472)).toBe('3.0 GB');
+    expect(cmp.sizeLabel(48_234_496)).toBe('46 MB');
+    expect(cmp.sizeLabel(3_221_225_472)).toBe('3,0 GB');
   });
 
   it('explains itself instead of offering a button when backups are not configured', async () => {
