@@ -47,51 +47,7 @@ interface MultiOption {
       }
     </fieldset>
   `,
-  styles: [
-    `
-      .multi {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-        border: none;
-        padding: 0;
-        margin: 0;
-      }
-      .multi__legend {
-        font-size: var(--fs-sm);
-        font-weight: var(--fw-medium);
-        color: var(--color-text);
-        padding: 0;
-        margin-bottom: var(--space-1);
-      }
-      .multi__req {
-        color: var(--color-danger);
-      }
-      .multi__row {
-        display: inline-flex;
-        align-items: center;
-        gap: var(--space-3);
-        cursor: pointer;
-      }
-      .multi__box {
-        width: 1.15rem;
-        height: 1.15rem;
-        accent-color: var(--color-primary);
-      }
-      .multi__label {
-        font-size: var(--fs-md);
-        color: var(--color-text);
-      }
-      .multi__hint {
-        font-size: var(--fs-xs);
-        color: var(--color-text-muted);
-      }
-      .multi__error {
-        font-size: var(--fs-xs);
-        color: var(--color-danger);
-      }
-    `,
-  ],
+  styleUrl: './formly-multicheckbox.type.scss',
 })
 export class FormlyMultiCheckboxType extends FieldType<FieldTypeConfig> {
   get optionList(): MultiOption[] {

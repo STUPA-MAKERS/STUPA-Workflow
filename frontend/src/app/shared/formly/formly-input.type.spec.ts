@@ -40,6 +40,15 @@ describe('FormlyInputType (rendered branches)', () => {
     expect(host.model['title']).toBe('Hallo');
   });
 
+  it('shows the help text of the form definition as the hint', async () => {
+    await renderField({
+      key: 'name',
+      type: 'input',
+      props: { label: 'Name', description: 'z. B. Sommerfest 2026' },
+    });
+    expect(screen.getByText('z. B. Sommerfest 2026')).toBeInTheDocument();
+  });
+
   it('defaults the html type to text when props.type is unset', async () => {
     await renderField({ key: 'a', type: 'input', props: { label: 'Default' } });
     expect(screen.getByLabelText(/Default/)).toBeInTheDocument();

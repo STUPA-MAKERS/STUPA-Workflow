@@ -298,6 +298,55 @@ const MOCK_EFFECTIVE_FORM: EffectiveForm = {
         },
       ],
     },
+    {
+      // One field of each remaining type, so the wizard of "Sonstiger Antrag" shows
+      // every field look of the forms engine.
+      key: 'more',
+      label: { de: 'Eckdaten', en: 'Key facts' },
+      fields: [
+        {
+          key: 'more_info',
+          type: 'markdown',
+          label: { de: 'Ein Info-Text ohne eigene Hilfe.', en: 'An info text without help.' },
+        },
+        {
+          key: 'more_name',
+          type: 'text',
+          label: { de: 'Name der Veranstaltung', en: 'Event name' },
+          help: { de: 'z. B. Sommerfest 2026', en: 'e.g. summer party 2026' },
+        },
+        {
+          key: 'more_count',
+          type: 'number',
+          label: { de: 'Anzahl Teilnehmende', en: 'Participants' },
+          required: true,
+          validation: { min: 1 },
+        },
+        { key: 'more_date', type: 'date', label: { de: 'Stichtag', en: 'Reference date' } },
+        {
+          key: 'more_range',
+          type: 'daterange',
+          label: { de: 'Zeitraum der Veranstaltung', en: 'Event period' },
+          required: true,
+        },
+        {
+          key: 'more_kinds',
+          type: 'multiselect',
+          label: { de: 'Zielgruppen', en: 'Audiences' },
+          options: [
+            { value: 'first', label: { de: 'Erstsemester', en: 'First year' } },
+            { value: 'all', label: { de: 'Alle Studierenden', en: 'All students' } },
+          ],
+        },
+        { key: 'more_file', type: 'file', label: { de: 'Programm', en: 'Programme' } },
+        {
+          key: 'more_confirm',
+          type: 'checkbox',
+          label: { de: 'Die Angaben sind vollständig.', en: 'The details are complete.' },
+          required: true,
+        },
+      ],
+    },
   ],
 };
 
