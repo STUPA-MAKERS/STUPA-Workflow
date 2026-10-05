@@ -60,7 +60,7 @@
                 </div>
               </div>
 
-              <div class="as__ctl">
+              <div class="as__ctl" [class.as__ctl--seg]="!!row.options">
                 @if (row.options; as options) {
                   <div
                     class="as__seg"
@@ -93,7 +93,7 @@
                     [label]="'meetings.attendanceSheet.rowMenu' | t: { name: row.name }"
                     (selected)="onMenu(row, $event)"
                   />
-                } @else if (!locked() && lead()) {
+                } @else if (anyMenu()) {
                   <span class="as__menuGap" aria-hidden="true"></span>
                 }
               </div>

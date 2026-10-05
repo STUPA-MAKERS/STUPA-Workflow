@@ -95,14 +95,15 @@
   list-style: none;
 }
 
-/* A member: avatar, name and sub line, then the control and the row menu. */
+/* A member: avatar, name and sub line, then the control and the row menu. The right
+   inset is the same as the left inset, so the status at the end does not touch the edge. */
 .as__row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1) var(--space-3);
   min-height: 56px;
-  padding: var(--space-2) var(--space-2) var(--space-2) 14px;
+  padding: var(--space-2) 14px;
 }
 .as__who {
   display: flex;
@@ -250,9 +251,10 @@
   padding-top: 14px;
 }
 
-/* A phone: the control takes its own line below the name. */
+/* A phone: the control takes its own line below the name. A read-only status stays at
+   the end of the name line. */
 @include bp.phone {
-  .as__ctl {
+  .as__ctl--seg {
     flex: 1 1 100%;
     margin-inline-start: 0;
   }
