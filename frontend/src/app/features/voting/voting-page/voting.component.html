@@ -4,17 +4,17 @@
     [backButton]="!phone()"
     (back)="closeDetail()"
   >
-    <section list class="vl__pane" aria-labelledby="vl-title">
-      <header class="vl__head">
-        <h1 id="vl-title" class="vl__title">{{ 'nav.voting' | t }}</h1>
-        @if (!loading() && !error() && openCount() > 0) {
-          <span class="vl__meta">{{ 'voting.list.openCount' | t: { n: openCount() } }}</span>
-        }
-      </header>
+    <section list class="ld-pane vl__pane" aria-labelledby="vl-title">
+      <app-page-header
+        [pane]="true"
+        titleId="vl-title"
+        [title]="'nav.voting' | t"
+        [meta]="!loading() && !error() && openCount() > 0 ? ('voting.list.openCount' | t: { n: openCount() }) : null"
+      />
 
       <!-- The search and the chips never scroll away: one pane at a time they stick to the
            top of the viewport; side by side only the rows below them scroll. -->
-      <app-sticky-bar class="vl__filters">
+      <app-sticky-bar class="ld-pane__filters">
         <app-search-pill
           [placeholder]="'voting.list.search' | t"
           [value]="search.text()"

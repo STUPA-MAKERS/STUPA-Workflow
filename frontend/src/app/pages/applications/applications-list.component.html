@@ -1,41 +1,42 @@
 <div class="apps" [class.apps--split]="split()">
   <app-list-detail [detailOpen]="selectedId() !== null" (back)="closeDetail()">
-    <section list class="apps__pane" aria-labelledby="apps-title">
-      <header class="apps__head">
-        <h1 id="apps-title" class="apps__title">{{ 'applications.list.title' | t }}</h1>
-        @if (phone()) {
-          <!-- Phone: the title and one menu. The sort orders and the export sit in it. -->
-          <app-row-menu
-            [label]="'applications.list.menu' | t"
-            [sections]="phoneMenuSections()"
-            (selected)="onHeaderMenu($event)"
-          />
-        } @else {
-          <!-- The export has no `mine` filter: hide it while `mine` is set, so that it
-               never exports more rows than the list shows. -->
-          @if (exportShown()) {
-            <app-button
-              variant="text"
-              [iconOnly]="true"
-              [loading]="exporting()"
-              [ariaLabel]="'applications.list.export' | t"
-              (click)="onExport()"
-            >
-              <app-icon name="download" [size]="21" />
-            </app-button>
+    <section list class="ld-pane" aria-labelledby="apps-title">
+      <app-page-header [pane]="true" titleId="apps-title" [title]="'applications.list.title' | t">
+        <ng-container ngProjectAs="[actions]">
+          @if (phone()) {
+            <!-- Phone: the title and one menu. The sort orders and the export sit in it. -->
+            <app-row-menu
+              [label]="'applications.list.menu' | t"
+              [sections]="phoneMenuSections()"
+              (selected)="onHeaderMenu($event)"
+            />
+          } @else {
+            <!-- The export has no `mine` filter: hide it while `mine` is set, so that it
+                 never exports more rows than the list shows. -->
+            @if (exportShown()) {
+              <app-button
+                variant="text"
+                [iconOnly]="true"
+                [loading]="exporting()"
+                [ariaLabel]="'applications.list.export' | t"
+                (click)="onExport()"
+              >
+                <app-icon name="download" [size]="21" />
+              </app-button>
+            }
+            <app-row-menu
+              icon="sort"
+              [label]="'applications.list.sort.title' | t"
+              [sections]="sortSections()"
+              (selected)="onHeaderMenu($event)"
+            />
           }
-          <app-row-menu
-            icon="sort"
-            [label]="'applications.list.sort.title' | t"
-            [sections]="sortSections()"
-            (selected)="onHeaderMenu($event)"
-          />
-        }
-      </header>
+        </ng-container>
+      </app-page-header>
 
       <!-- The search and the chips never scroll away: one pane at a time they stick to the
            top of the viewport; side by side only the rows below them scroll. -->
-      <app-sticky-bar class="apps__filters">
+      <app-sticky-bar class="ld-pane__filters">
         <app-search-pill
           [placeholder]="searchPlaceholder()"
           [label]="'applications.list.searchLabel' | t"

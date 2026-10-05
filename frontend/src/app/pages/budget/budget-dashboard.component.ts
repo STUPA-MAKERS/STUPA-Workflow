@@ -24,6 +24,7 @@ import {
   type Seg,
   SegBarComponent,
   SideSheetComponent,
+  PageHeaderComponent,
   SkeletonComponent,
   StatusTextComponent,
   type StatusKind,
@@ -133,6 +134,7 @@ export const APPS_SHOWN = 5;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PageHeaderComponent,
     NgTemplateOutlet,
     RouterLink,
     TranslatePipe,

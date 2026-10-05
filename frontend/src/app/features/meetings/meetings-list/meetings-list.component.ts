@@ -48,6 +48,7 @@ import {
 import { MeetingsTimelineService } from '../meetings-timeline.service';
 import { MeetingsViewSwitchComponent } from '../meetings-view-switch/meetings-view-switch.component';
 import { beamerUrl } from '../../voting/beamer-link.util';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /**
  * The list view of the meeting overview (`/meetings`, board Sitzungen, variant A): a
@@ -69,6 +70,7 @@ import { beamerUrl } from '../../voting/beamer-link.util';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PageHeaderComponent,
     NgTemplateOutlet,
     TranslatePipe,
     ButtonComponent,

@@ -1,42 +1,43 @@
 <div class="mtl" [class.mtl--split]="split()">
   <app-list-detail [detailOpen]="selParam() !== null" (back)="clearSelection()">
-    <section list class="mtl__pane" aria-labelledby="mtl-title">
-      <header class="mtl__head">
-        <h1 id="mtl-title" class="mtl__title">{{ 'meetings.title' | t }}</h1>
-        @if (phone()) {
-          <!-- Phone: the title, one main action and one menu (DECISIONS: phone headers). -->
-          @if (canCreate()) {
-            <app-button variant="fill" size="sm" (click)="create.emit()">
-              <app-icon name="plus" [size]="16" />
-              {{ 'meetings.overview.newShort' | t }}
-            </app-button>
-          }
-          <app-row-menu
-            [label]="'meetings.overview.menu' | t"
-            [sections]="phoneMenu()"
-            (selected)="onPhoneMenu($event, abo)"
-          />
-        } @else {
-          @if (showSwitch()) {
-            <app-meetings-view-switch value="list" (valueChange)="viewChange.emit($event)" />
-          }
-          <span class="mtl__spacer"></span>
-          <app-button
-            variant="text"
-            [iconOnly]="true"
-            [ariaLabel]="'meetings.overview.subscribe' | t"
-            [ariaPressed]="abo.isOpen()"
-            (click)="abo.toggle($event.currentTarget)"
-          ><app-icon name="cal" [size]="21" /></app-button>
+    <section list class="ld-pane" aria-labelledby="mtl-title">
+      <app-page-header [pane]="true" titleId="mtl-title" [title]="'meetings.title' | t">
+        @if (!phone() && showSwitch()) {
+          <app-meetings-view-switch heading value="list" (valueChange)="viewChange.emit($event)" />
         }
-        <app-calendar-subscribe #abo />
-      </header>
+        <ng-container ngProjectAs="[actions]">
+          @if (phone()) {
+            <!-- Phone: the title, one main action and one menu (DECISIONS: phone headers). -->
+            @if (canCreate()) {
+              <app-button variant="fill" size="sm" (click)="create.emit()">
+                <app-icon name="plus" [size]="16" />
+                {{ 'meetings.overview.newShort' | t }}
+              </app-button>
+            }
+            <app-row-menu
+              [label]="'meetings.overview.menu' | t"
+              [sections]="phoneMenu()"
+              (selected)="onPhoneMenu($event, abo)"
+            />
+          } @else {
+            <app-button
+              variant="text"
+              [iconOnly]="true"
+              [ariaLabel]="'meetings.overview.subscribe' | t"
+              [ariaPressed]="abo.isOpen()"
+              (click)="abo.toggle($event.currentTarget)"
+            ><app-icon name="cal" [size]="21" /></app-button>
+          }
+          <app-calendar-subscribe #abo />
+        </ng-container>
+      </app-page-header>
 
       <!-- The search and the chip never scroll away: one pane at a time they stick to the
            top of the viewport; side by side only the rows below them scroll. -->
-      <app-sticky-bar class="mtl__filters">
+      <app-sticky-bar class="ld-pane__filters">
+        <!-- The large search of every list column; the phone keeps its compact field. -->
         <app-search-pill
-          size="md"
+          [size]="phone() ? 'md' : 'lg'"
           [placeholder]="(phone() ? 'meetings.overview.searchShort' : 'meetings.list.searchPlaceholder') | t"
           [label]="'meetings.list.searchPlaceholder' | t"
           [value]="timeline.searchQuery()"

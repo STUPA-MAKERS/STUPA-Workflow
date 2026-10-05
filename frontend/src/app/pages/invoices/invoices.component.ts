@@ -31,6 +31,7 @@ import {
   EmptyStateComponent,
   FileDropZoneComponent,
   ListDetailLayoutComponent,
+  PageHeaderComponent,
   ListItemComponent,
   RangeChipComponent,
   type RangeValue,
@@ -106,6 +107,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PageHeaderComponent,
     ButtonComponent,
     DialogComponent,
     EmptyStateComponent,

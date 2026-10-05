@@ -33,6 +33,7 @@ import { mediaQuerySignal } from '../../../layout/media-query';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { AdminHealthComponent } from '../admin-health/admin-health.component';
 import { ADMIN_GROUPS, ADMIN_PAGES, type AdminGroupKey, type AdminPage } from './admin-pages';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /** One group of the navigation with the pages the principal may open. */
 interface NavGroup {
@@ -128,6 +129,7 @@ const sheetScroll = new Map<number, number>();
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PageHeaderComponent,
     RouterOutlet,
     RouterLink,
     RouterLinkActive,

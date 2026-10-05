@@ -27,6 +27,7 @@ import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
   host: {
     '[class.ph--flush]': 'flush()',
     '[class.ph--rail]': 'rail()',
+    '[class.ph--pane]': 'pane()',
   },
   templateUrl: './page-header.component.html',
   styleUrl: './page-header.component.scss',
@@ -69,4 +70,25 @@ export class PageHeaderComponent {
    * first place.
    */
   readonly rail = input(false);
+
+  /**
+   * The header of a list column beside a detail sheet (applications, tasks, votes,
+   * meetings, bookings, invoices, the budget tree, the Verwaltung navigation).
+   *
+   * The pane header is one line at the height of a control: the title inset like the
+   * rows, the `heading` slot beside it, the `actions` at the end edge of the column. It
+   * has no breadcrumbs and no bottom margin (the column spaces its children). Every list
+   * column uses it, so the columns share one title geometry; a page never styles its
+   * list header itself.
+   */
+  readonly pane = input(false);
+
+  /** The id of the title element, for an `aria-labelledby` of the region it names. */
+  readonly titleId = input<string | null>(null);
+
+  /**
+   * The element of the title. `p` is for a title that is no heading of the page: the
+   * Verwaltung navigation beside an admin page, whose page has the h1.
+   */
+  readonly titleTag = input<'h1' | 'p'>('h1');
 }

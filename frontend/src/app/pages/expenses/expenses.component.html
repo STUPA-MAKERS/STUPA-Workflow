@@ -3,11 +3,11 @@
      scrolls below its search and chips, the sheet scrolls inside itself. -->
 <div class="exp" [class.exp--split]="split()">
   <app-list-detail [detailOpen]="detailOpen()" (back)="closeDetail()">
-    <section list class="exp__pane" aria-labelledby="exp-title">
+    <section list class="ld-pane" aria-labelledby="exp-title">
       @if (phone() && selecting()) {
         <!-- Phone: while rows are selected the title row is the bar of the bulk actions
              (board Fin-Tel-Auswahl). -->
-        <header class="exp__head exp__head--select" role="toolbar" [attr.aria-label]="'ui.selection.toolbar' | t">
+        <header class="exp__selBar" role="toolbar" [attr.aria-label]="'ui.selection.toolbar' | t">
           <app-button
             variant="text"
             [iconOnly]="true"
@@ -18,51 +18,52 @@
           <ng-container *ngTemplateOutlet="bulkIcons" />
         </header>
       } @else {
-        <header class="exp__head">
-          <h1 id="exp-title" class="exp__title">{{ 'expenses.title' | t }}</h1>
-          @if (phone()) {
-            @if (canManage()) {
-              <app-button size="sm" data-testid="exp-add" (click)="tab() === 'transfers' ? openTransfer() : openCreate()">
-                <span class="exp__btn"
-                  ><app-icon name="add" [size]="16" />{{
-                    (tab() === 'transfers' ? 'expenses.transferShort' : 'expenses.addShort') | t
-                  }}</span
-                >
-              </app-button>
+        <app-page-header [pane]="true" titleId="exp-title" [title]="'expenses.title' | t">
+          <ng-container ngProjectAs="[actions]">
+            @if (phone()) {
+              @if (canManage()) {
+                <app-button size="sm" data-testid="exp-add" (click)="tab() === 'transfers' ? openTransfer() : openCreate()">
+                  <span class="exp__btn"
+                    ><app-icon name="add" [size]="16" />{{
+                      (tab() === 'transfers' ? 'expenses.transferShort' : 'expenses.addShort') | t
+                    }}</span
+                  >
+                </app-button>
+              }
+            } @else {
+              @if (canExport() && tab() === 'bookings') {
+                <app-button
+                  variant="text"
+                  [iconOnly]="true"
+                  [loading]="exporting()"
+                  [ariaLabel]="'expenses.export' | t"
+                  [title]="'expenses.export' | t"
+                  (click)="onExport()"
+                ><app-icon name="download" [size]="21" /></app-button>
+              }
+              @if (tab() === 'bookings') {
+                <app-row-menu
+                  icon="sort"
+                  [label]="'expenses.sort.title' | t"
+                  [sections]="sortSections()"
+                  (selected)="onHeaderMenu($event)"
+                />
+              }
             }
-          } @else {
-            @if (canExport() && tab() === 'bookings') {
-              <app-button
-                variant="text"
-                [iconOnly]="true"
-                [loading]="exporting()"
-                [ariaLabel]="'expenses.export' | t"
-                [title]="'expenses.export' | t"
-                (click)="onExport()"
-              ><app-icon name="download" [size]="21" /></app-button>
-            }
-            @if (tab() === 'bookings') {
+            @if (headerMenu().length) {
               <app-row-menu
-                icon="sort"
-                [label]="'expenses.sort.title' | t"
-                [sections]="sortSections()"
+                [label]="'expenses.moreActions' | t"
+                [sections]="headerMenu()"
                 (selected)="onHeaderMenu($event)"
               />
             }
-          }
-          @if (headerMenu().length) {
-            <app-row-menu
-              [label]="'expenses.moreActions' | t"
-              [sections]="headerMenu()"
-              (selected)="onHeaderMenu($event)"
-            />
-          }
-        </header>
+          </ng-container>
+        </app-page-header>
       }
 
       <!-- The search and the chips never scroll away: one pane at a time they stick to
            the top of the viewport; side by side only the rows below them scroll. -->
-      <app-sticky-bar class="exp__filters">
+      <app-sticky-bar class="ld-pane__filters">
         <app-search-pill
           [placeholder]="'expenses.search' | t"
           [label]="'expenses.searchLabel' | t"

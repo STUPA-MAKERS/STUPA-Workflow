@@ -121,6 +121,45 @@
   display: contents;
 }
 
+// ONE list/detail geometry. Every page with a list or a navigation column beside a sheet
+// (applications, tasks, votes, meetings, bookings, invoices, the budget tree, Verwaltung)
+// takes the width of that column and the gap to the sheet from these two tokens. A page
+// never sets them itself; list-geometry.contract.spec.ts fails if one does.
+//
+// The column is 440px from a 1375px viewport on. Below that it gets narrower with the
+// viewport (32vw), down to 320px, so the sheet keeps its room on the first wide screens.
+:root {
+  --ld-list-width: clamp(20rem, 32vw, 27.5rem);
+  --ld-gap: var(--space-3);
+}
+
+// The list column of such a page, in this order: the header (`app-page-header` with
+// `pane`), the search bar with its chips (`.ld-pane__filters`, normally on an
+// `app-sticky-bar`), then the rows. The search is the large search pill on every list.
+// Side by side the column takes the full height and only its rows scroll; one pane at a
+// time the page scrolls.
+.ld-pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.ld--split .ld-pane,
+.ld-pane--fill {
+  height: 100%;
+  min-height: 0;
+}
+// Two classes: the bar is mostly an `app-sticky-bar`, whose own host style
+// (`display: block`) would win over one global class.
+.ld-pane > .ld-pane__filters {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
 // Mobile: the page itself must NEVER scroll horizontally. An element that overflows,
 // such as a long link or a wide table cell, may only scroll inside its own overflow
 // container. `clip` instead of `hidden`: it makes no new scroll container, so

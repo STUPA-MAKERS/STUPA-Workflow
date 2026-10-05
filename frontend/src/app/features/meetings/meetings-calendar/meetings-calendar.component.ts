@@ -60,6 +60,7 @@ import {
 import { MeetingsTimelineService } from '../meetings-timeline.service';
 import { MeetingsViewSwitchComponent } from '../meetings-view-switch/meetings-view-switch.component';
 import { beamerUrl } from '../../voting/beamer-link.util';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /** A cell shows this many meetings; the rest is "+n" and shows in the side panel. */
 export const CELL_ENTRIES = 2;
@@ -100,6 +101,7 @@ interface DayCard {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PageHeaderComponent,
     TranslatePipe,
     ButtonComponent,
     IconComponent,

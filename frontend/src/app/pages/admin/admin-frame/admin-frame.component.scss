@@ -24,42 +24,25 @@
 /* Wide: a pane page (`.pane-page` on the host, see styles.scss). The frame takes the
    free height of the shell main and does not scroll as a page. The navigation and the
    page sheet each scroll inside themselves. */
-/* The column has ONE width on the home page and on every admin page, so the column and
-   the sheet never move when an entry opens. */
-/* The gap to the sheet is the page gutter, the same as the margin of the sheet at the
-   top, at the end edge and at the bottom. */
+/* The column has the one list width of the app and the same gap to the sheet as every
+   list/detail page (`--ld-list-width`, `--ld-gap` in styles.scss), on the home page and
+   beside every admin page. */
 .af--split {
   display: grid;
   flex: 1 1 0;
-  grid-template-columns: 19rem minmax(0, 1fr);
+  grid-template-columns: var(--ld-list-width) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
-  gap: var(--layout-gutter);
+  gap: var(--ld-gap);
   min-height: 0;
 }
 
-.af__nav {
-  display: flex;
-  flex-direction: column;
+/* The column is a list column (`.ld-pane`, styles.scss). One column keeps its wider
+   gap. */
+.af:not(.af--split) .af__nav {
   gap: var(--space-4);
-  min-width: 0;
 }
 .af--split .af__nav {
   min-height: 0;
-}
-
-.af__navHead,
-.af__search {
-  padding-inline: var(--space-1);
-}
-
-/* The title of the design system (d2), also when it is no heading. */
-.af__title {
-  margin: 0;
-  padding-inline: var(--space-2);
-  font-size: var(--fs-d2);
-  line-height: var(--lh-d2);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-tight);
 }
 
 /* The entries scroll inside the column; the title and the search stay. */
@@ -78,10 +61,10 @@
 /* One column: the title, the search, the tiles and the entries start on the content
    edge, the same as the gremien under them. The inset only keeps the focus rings and
    the fades clear of the edge of the scrolling column. */
-.af:not(.af--split) .af__navHead,
-.af:not(.af--split) .af__search,
-.af:not(.af--split) .af__navBody,
-.af:not(.af--split) .af__title {
+.af:not(.af--split) {
+  --ph-inset: 0px;
+}
+.af:not(.af--split) .af__navBody {
   padding-inline: 0;
 }
 

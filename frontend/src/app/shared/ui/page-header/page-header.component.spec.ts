@@ -72,4 +72,25 @@ describe('PageHeaderComponent', () => {
     expect(heading?.querySelector('.st')?.textContent).toBe('Aktiv');
     expect(container.querySelector('.ph__actions')?.textContent).toBe('Speichern');
   });
+
+  it('is the header of a list column with `pane`: no breadcrumbs, an h1 with an id', async () => {
+    const host = await setup({ pane: true, titleId: 'apps-title' });
+    expect(host.classList.contains('ph--pane')).toBe(true);
+    expect(host.querySelector('app-breadcrumbs')).toBeNull();
+    const title = host.querySelector('h1.ph__title');
+    expect(title?.id).toBe('apps-title');
+  });
+
+  it('keeps the breadcrumbs and gives the title no id by default', async () => {
+    const host = await setup();
+    expect(host.querySelector('app-breadcrumbs')).not.toBeNull();
+    expect(host.querySelector('h1.ph__title')?.hasAttribute('id')).toBe(false);
+  });
+
+  it('renders the title as a paragraph when it is no heading of the page', async () => {
+    // The Verwaltung navigation beside an admin page: the page has the h1.
+    const host = await setup({ pane: true, titleTag: 'p' });
+    expect(host.querySelector('h1')).toBeNull();
+    expect(host.querySelector('p.ph__title')?.textContent).toBe('Anträge');
+  });
 });

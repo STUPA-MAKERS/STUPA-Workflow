@@ -35,6 +35,7 @@ import {
   FilterSelectComponent,
   type FilterSelectOption,
   ListDetailLayoutComponent,
+  PageHeaderComponent,
   ListItemComponent,
   RangeChipComponent,
   type RangeValue,
@@ -121,6 +122,7 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PageHeaderComponent,
     BookingDetailComponent,
     BookingFormComponent,
     BulkPanelComponent,

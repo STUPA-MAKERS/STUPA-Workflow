@@ -41,6 +41,7 @@ import { PageFrameService } from '../../../layout/page-frame.service';
 import { LIVE_MAX_PAGES, LIVE_PAGE_LIMIT } from '../../../layout/rail-status.service';
 import { groupByMonth } from '../../../pages/applications/applications.util';
 import { VotingPageService } from './voting-page.service';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /** The status chip: the server default, the open votes, the ended votes, the drafts. */
 export type VoteStatusFilter = '' | 'open' | 'ended' | 'draft';
@@ -118,6 +119,7 @@ export interface VoteGroup {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PageHeaderComponent,
     RouterOutlet,
     TranslatePipe,
     ButtonComponent,

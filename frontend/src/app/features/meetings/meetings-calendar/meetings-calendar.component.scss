@@ -36,25 +36,7 @@
 }
 
 /* ------------------------------------------------------------------ header + toolbar */
-.cal__head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  min-height: var(--control-height);
-  padding-inline-start: var(--space-1);
-}
-.cal__title {
-  flex: none;
-  margin: 0;
-  font-size: var(--fs-d2);
-  line-height: var(--lh-d2);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-tight);
-}
-.cal__spacer {
-  flex: 1 1 auto;
-}
-.cal__head app-icon,
+app-page-header app-icon,
 .cal__actions app-icon {
   margin-inline-end: 6px;
 }

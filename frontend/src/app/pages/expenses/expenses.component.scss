@@ -26,43 +26,19 @@
   flex: 1 1 0;
   min-height: 0;
 }
-.exp > app-list-detail {
-  --ld-list-width: 440px;
-}
 
 /* ------------------------------------------------------------------ list pane */
-.exp__pane {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
-}
-.exp--split .exp__pane {
-  height: 100%;
-  min-height: 0;
-}
+/* The column, its header and the search bar are the shared list geometry: `.ld-pane`
+   (styles.scss) and `app-page-header` with `pane`. */
 
-.exp__head {
+/* Phone: the title row as the bar of the bulk actions. */
+.exp__selBar {
   display: flex;
   flex: none;
   align-items: center;
   gap: var(--space-1);
   min-height: var(--control-height);
-  padding-inline: var(--space-4) 0;
-}
-.exp__title {
-  flex: 1 1 auto;
-  min-width: 0;
-  margin: 0;
-  font-size: var(--fs-d2);
-  line-height: var(--lh-d2);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-tight);
-}
-/* Phone: the title row as the bar of the bulk actions. */
-.exp__head--select {
-  padding-inline: 0;
+  padding-inline: var(--space-1) 0;
   border-radius: var(--radius-lg);
   background: var(--color-selected);
   color: var(--color-on-selected);
@@ -91,13 +67,6 @@
   background: var(--color-danger-subtle);
 }
 
-.exp__filters {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
-}
 .exp__chips {
   display: flex;
   flex-wrap: wrap;
@@ -471,9 +440,6 @@
   }
   .exp__arrow {
     margin-inline: var(--space-1);
-  }
-  .exp__head {
-    padding-inline-start: var(--space-1);
   }
   .exp__month {
     padding-inline: var(--space-1);
