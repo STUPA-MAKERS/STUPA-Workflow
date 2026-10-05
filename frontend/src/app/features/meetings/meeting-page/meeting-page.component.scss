@@ -16,8 +16,9 @@
   margin-inline: calc(-1 * var(--layout-gutter));
 }
 
-/* An icon before the label of a button keeps the gap of the design (8px). */
-app-button ::ng-deep .btn__label > app-icon:first-child {
+/* An icon before the label of a button keeps the gap of the design (8px). An icon
+   button has no label: a margin there would push its glyph off the centre. */
+app-button ::ng-deep .btn:not(.btn--icon) .btn__label > app-icon:first-child {
   margin-inline-end: var(--space-1);
 }
 
