@@ -36,8 +36,8 @@
         size="md"
         [placeholder]="'meetings.overview.searchShort' | t"
         [label]="'meetings.list.searchPlaceholder' | t"
-        [value]="timeline.searchQuery()"
-        (valueChange)="timeline.onSearch($event)"
+        [value]="query()"
+        (valueChange)="query.set($event)"
       />
       @if (showFilter()) {
         <app-filter-select
@@ -52,12 +52,14 @@
           [active]="timeline.gremiumFilter() !== ''"
         />
       }
-      <a
-        class="cal__iconLink"
-        routerLink="/account/calendar"
-        [attr.aria-label]="'meetings.overview.subscribe' | t"
-        [title]="'meetings.overview.subscribe' | t"
-      ><app-icon name="cal" [size]="21" /></a>
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.overview.subscribe' | t"
+        [ariaPressed]="abo.isOpen()"
+        (click)="abo.toggle($event.currentTarget)"
+      ><app-icon name="cal" [size]="21" /></app-button>
+      <app-calendar-subscribe #abo />
     </div>
   </div>
 

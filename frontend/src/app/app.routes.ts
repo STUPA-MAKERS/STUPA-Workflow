@@ -531,12 +531,11 @@ export const routes: Routes = [
           ),
       },
       {
-        // Calendar subscription: the personal iCal feed URL for your meetings.
+        // The calendar subscription is a popover of the meetings page now. Old links and
+        // bookmarks of the former account page land there.
         path: 'account/calendar',
-        data: { title: 'account.calendar.title' },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/account/calendar.component').then((m) => m.AccountCalendarComponent),
+        redirectTo: '/meetings',
+        pathMatch: 'full',
       },
       {
         path: 'forbidden',

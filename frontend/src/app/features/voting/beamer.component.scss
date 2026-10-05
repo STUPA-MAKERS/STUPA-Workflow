@@ -6,24 +6,38 @@
   background: var(--color-bg);
 }
 
-/* Invisible on the projector, shown on focus or hover in the top start corner. */
+/* Hidden on the projector. A pointer movement (`--shown`), a hover or the keyboard
+   shows it in the top start corner; it fades out again when the pointer rests. */
 .beamer__exit {
   position: fixed;
-  inset-block-start: var(--space-2);
-  inset-inline-start: var(--space-2);
+  inset-block-start: var(--space-3);
+  inset-inline-start: var(--space-3);
   z-index: 1;
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+  padding: 0 var(--space-4) 0 var(--space-3);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
   color: var(--color-text);
   font-weight: var(--fw-semibold);
   text-decoration: none;
+  box-shadow: var(--shadow-elevated);
   opacity: 0;
-  transition: opacity var(--motion-fast) var(--ease-standard);
+  pointer-events: none;
+  transition: opacity var(--motion-base) var(--ease-standard);
 
+  &--shown,
   &:hover,
   &:focus-visible {
     opacity: 1;
+    pointer-events: auto;
+  }
+
+  &:hover {
+    background: var(--color-surface-4);
   }
 
   &:focus-visible {

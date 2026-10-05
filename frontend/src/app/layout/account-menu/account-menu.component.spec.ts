@@ -15,7 +15,7 @@ import { AccountMenuComponent, type AccountMenuVariant } from './account-menu.co
 @Component({ standalone: true, template: '' })
 class StubPage {}
 
-const ACCOUNT_ROUTES = ['account/notifications', 'account/calendar', 'account/grants'].map((path) => ({
+const ACCOUNT_ROUTES = ['account/notifications', 'account/grants'].map((path) => ({
   path,
   component: StubPage,
 }));
@@ -92,7 +92,8 @@ describe('AccountMenuComponent', () => {
         'href',
         '/account/notifications',
       );
-      expect(screen.getByRole('link', { name: 'Kalender-Abo' })).toHaveAttribute('href', '/account/calendar');
+      // The calendar subscription is a popover of the meetings page, not an account page.
+      expect(screen.queryByRole('link', { name: 'Kalender-Abo' })).not.toBeInTheDocument();
       // API access only with mcp.use.
       expect(screen.queryByRole('link', { name: 'API-Zugang' })).not.toBeInTheDocument();
     });
@@ -154,7 +155,9 @@ describe('AccountMenuComponent', () => {
       screen.getByRole('link', { name: 'Benachrichtigungen' }).focus();
       await userEvent.tab();
       fixture.detectChanges();
-      expect(screen.getByRole('link', { name: 'Kalender-Abo' })).toHaveFocus();
+      const region = screen.getByRole('region', { name: 'Konto' });
+      expect(document.activeElement).not.toBe(screen.getByRole('link', { name: 'Benachrichtigungen' }));
+      expect(region).toContainElement(document.activeElement as HTMLElement);
       expect(fixture.componentInstance.open()).toBe(true);
     });
 
@@ -171,7 +174,7 @@ describe('AccountMenuComponent', () => {
       const { fixture } = await setup();
       await userEvent.click(trigger());
       fixture.detectChanges();
-      await userEvent.click(screen.getByRole('link', { name: 'Kalender-Abo' }));
+      await userEvent.click(screen.getByRole('link', { name: 'Benachrichtigungen' }));
       fixture.detectChanges();
       expect(screen.queryByRole('region', { name: 'Konto' })).not.toBeInTheDocument();
     });

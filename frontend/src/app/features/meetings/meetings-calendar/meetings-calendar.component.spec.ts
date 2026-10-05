@@ -81,7 +81,14 @@ afterEach(() => {
   restoreMedia = null;
 });
 
-async function setup(opts: { wide?: boolean; canCreate?: boolean } = {}) {
+async function setup(
+  opts: {
+    wide?: boolean;
+    canCreate?: boolean;
+    now?: () => Date;
+    before?: (timeline: MeetingsTimelineService) => void;
+  } = {},
+) {
   if (opts.wide) restoreMedia = matchMediaQueries(MEDIA.wide);
   const on = { viewChange: jest.fn(), create: jest.fn() };
   const view = await render(MeetingsCalendarComponent, {
@@ -91,11 +98,18 @@ async function setup(opts: { wide?: boolean; canCreate?: boolean } = {}) {
       provideHttpClient(),
       provideHttpClientTesting(),
       provideRouter([{ path: '**', children: [] }]),
-      MeetingsTimelineService,
+      {
+        provide: MeetingsTimelineService,
+        useFactory: () => {
+          const timeline = new MeetingsTimelineService();
+          opts.before?.(timeline);
+          return timeline;
+        },
+      },
       MeetingDialogsService,
       MeetingSessionService,
       MeetingAgendaService,
-      { provide: OVERVIEW_NOW, useValue: () => NOW },
+      { provide: OVERVIEW_NOW, useValue: opts.now ?? (() => NOW) },
       { provide: USE_MOCK_API, useValue: false },
       {
         provide: AuthService,
@@ -194,7 +208,11 @@ describe('MeetingsCalendarComponent', () => {
     expect(view.router.url).toBe('/meetings/m-34');
     const open = jest.spyOn(window, 'open').mockImplementation(() => null);
     await userEvent.click(within(card).getByRole('button', { name: /Beamer/ }));
-    expect(open).toHaveBeenCalledWith('/voting/beamer/m-34', '_blank', 'noopener');
+    expect(open).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/voting\/beamer\/m-34\?from=/),
+      '_blank',
+      'noopener',
+    );
     open.mockRestore();
     const menu = async () => {
       await userEvent.click(within(card).getByRole('button', { name: /Weitere Aktionen/ }));
@@ -305,16 +323,45 @@ describe('MeetingsCalendarComponent', () => {
     expect(cmp.tops({ ...view.timeline.upcomingItems()[0], agendaItemCount: undefined })).toBe('keine TOPs');
   });
 
-  it('filters the grid and the upcoming list by the search of the overview', async () => {
+  it('filters the grid and the upcoming list in the browser, without a server search', async () => {
     const view = await setup();
     load(view);
-    view.timeline.searchQuery.set('finanz');
+    const onSearch = jest.spyOn(view.timeline, 'onSearch');
+    await userEvent.type(screen.getByRole('searchbox'), 'finanz');
     view.fixture.detectChanges();
     expect(view.container.querySelectorAll('.cal__entry')).toHaveLength(1);
     expect(screen.getByText('Keine Sitzung an diesem Tag.')).toBeInTheDocument();
-    const onSearch = jest.spyOn(view.timeline, 'onSearch').mockImplementation(() => undefined);
-    await userEvent.type(screen.getByRole('searchbox'), 'x');
-    expect(onSearch).toHaveBeenCalled();
+    expect(onSearch).not.toHaveBeenCalled();
+    expect(view.timeline.searchQuery()).toBe('');
+    view.http.expectNone((r) => r.url === '/api/meetings' && r.params.has('q'));
+  });
+
+  it('starts with the query of the list', async () => {
+    const view = await setup({
+      before: (timeline) => timeline.searchQuery.set('finanz'),
+    });
+    load(view);
+    view.fixture.detectChanges();
+    expect(screen.getByRole('searchbox')).toHaveValue('finanz');
+    expect(view.container.querySelectorAll('.cal__entry')).toHaveLength(1);
+  });
+
+  it('moves today on at midnight', async () => {
+    jest.useFakeTimers({ now: new Date(2026, 8, 29, 23, 59, 0) });
+    let clock = new Date(2026, 8, 29, 23, 59, 0);
+    const view = await setup({ now: () => clock });
+    load(view);
+    const cmp = view.fixture.componentInstance;
+    expect(cmp.todayIso()).toBe('2026-09-29');
+    clock = new Date(2026, 8, 30, 0, 0, 1);
+    jest.advanceTimersByTime(60_000);
+    expect(cmp.todayIso()).toBe('2026-09-30');
+    view.fixture.detectChanges();
+    expect(view.container.querySelector('.cal__num--today')?.textContent?.trim()).toBe('30');
+    cmp.goToday();
+    expect(cmp.selectedDay()).toBe('2026-09-30');
+    view.fixture.destroy();
+    jest.useRealTimers();
   });
 
   it('reads the month again for another Gremium and drops a late answer', async () => {
@@ -358,7 +405,7 @@ describe('MeetingsCalendarComponent', () => {
     expect(screen.getByText('Keine Sitzung an diesem Tag.')).toBeInTheDocument();
   });
 
-  it('switches the view, creates a meeting and links the calendar subscription', async () => {
+  it('switches the view, creates a meeting and opens the calendar subscription', async () => {
     const view = await setup({ wide: true });
     load(view);
     expect(view.fixture.nativeElement).toHaveClass('cal--wide');
@@ -366,7 +413,11 @@ describe('MeetingsCalendarComponent', () => {
     expect(view.on.viewChange).toHaveBeenCalledWith('list');
     await userEvent.click(screen.getByRole('button', { name: 'Neue Sitzung' }));
     expect(view.on.create).toHaveBeenCalled();
-    expect(screen.getByRole('link', { name: 'Kalender-Abo' })).toHaveAttribute('href', '/account/calendar');
+    await userEvent.click(screen.getByRole('button', { name: 'Kalender-Abo' }));
+    view.http.expectOne('/api/calendar/me').flush({ url: null });
+    view.fixture.detectChanges();
+    expect(screen.getByRole('dialog', { name: 'Kalender-Abo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Kalender-Abo' })).toHaveAttribute('aria-pressed', 'true');
     view.fixture.componentRef.setInput('canCreate', false);
     view.fixture.detectChanges();
     expect(screen.queryByRole('button', { name: 'Neue Sitzung' })).toBeNull();

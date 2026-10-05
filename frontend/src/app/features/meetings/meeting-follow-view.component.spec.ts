@@ -120,14 +120,15 @@ describe('MeetingFollowViewComponent', () => {
   describe('planned meeting (board Teilnahme-Vorher)', () => {
     const planned = () => member({ status: 'planned', startedAt: null, currentAgendaItemId: null });
 
-    it('says when the meeting starts and links the calendar', async () => {
+    it('says when the meeting starts and offers the calendar subscription', async () => {
       const { context } = await setup({ meeting: planned() });
       context();
       expect(screen.getByRole('heading', { level: 1, name: 'Konstituierende Sitzung' })).toBeInTheDocument();
       expect(screen.getByText('Geplant')).toBeInTheDocument();
       expect(screen.getByText('StuPa · Do., 15.10.2026 · 18:00')).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'Die Sitzung beginnt am Do., 15.10.2026 um 18:00' })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'Kalender abonnieren' })).toHaveAttribute('href', '/account/calendar');
+      const subscribe = screen.getByRole('button', { name: 'Kalender abonnieren' });
+      expect(subscribe).toHaveAttribute('aria-expanded', 'false');
       // No dock before the start.
       expect(screen.queryByRole('contentinfo')).toBeNull();
     });

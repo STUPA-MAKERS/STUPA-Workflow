@@ -49,6 +49,7 @@ import { type SaveState, TopSheetComponent } from '../top-sheet/top-sheet.compon
 import { VoteCardComponent } from '../vote-card/vote-card.component';
 import { voteSnippet, voteSnippetHead } from '../meetings.util';
 import { clockTime, voteOptionLabel } from '../meetings-display.util';
+import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 
 /** The ids of the session menu. */
 type SessionAction = 'settings' | 'attendance' | 'beamer' | 'close' | 'delete';
@@ -75,6 +76,7 @@ type SessionAction = 'settings' | 'attendance' | 'beamer' | 'close' | 'delete';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ScrollFadeDirective,
     NgTemplateOutlet,
     TranslatePipe,
     ButtonComponent,

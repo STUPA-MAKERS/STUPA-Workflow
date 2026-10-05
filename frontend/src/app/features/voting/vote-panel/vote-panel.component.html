@@ -23,7 +23,9 @@
   <p class="vpn__meta">
     <app-status-text [kind]="s.kind">{{ s.key | t }}</app-status-text>
     @if (where(); as w) {
-      <span class="vpn__where ell" [title]="w">{{ w }}</span>
+      <!-- The meeting of the vote, as a link: on a phone the header line does this. The
+           context holds a meeting only when the reader may read it. -->
+      <a class="vpn__app vpn__where ell" [routerLink]="['/meetings', context().meeting!.id]" [title]="w">{{ w }}</a>
       <span class="vpn__sep" aria-hidden="true">·</span>
     } @else if (!v.meetingId && v.applicationId) {
       <a class="vpn__app" [routerLink]="['/applications', v.applicationId]">{{ 'voting.panel.application' | t }}</a>

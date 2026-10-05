@@ -236,6 +236,47 @@ describe('FilterSelectComponent', () => {
     }
   });
 
+  it('opens above the chip without room below, follows a scroll and closes when the chip leaves', async () => {
+    const { chip, user } = await setup();
+    const chipRect = { top: 700, bottom: 732, left: 20, right: 120, width: 100, height: 32 } as DOMRect;
+    const chipSpy = jest.spyOn(chip(), 'getBoundingClientRect').mockReturnValue(chipRect);
+    const rect = jest
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({ top: 0, bottom: 200, left: 0, right: 240, width: 240, height: 200 } as DOMRect);
+    try {
+      await user.click(chip());
+      const menu = () => document.querySelector('.fs__menu') as HTMLElement | null;
+      await waitFor(() => expect(menu()!.style.top).toBe(`${700 - 4 - 200}px`));
+      // A scroll inside the list does not move it; a scroll of the page does.
+      fireEvent.scroll(menu()!);
+      window.dispatchEvent(new Event('resize'));
+      expect(menu()).not.toBeNull();
+      // The chip scrolls out of the viewport: the list closes.
+      chipSpy.mockReturnValue({ ...chipRect, top: -100, bottom: -68 } as DOMRect);
+      fireEvent.scroll(window);
+      expect(menu()).toBeNull();
+      // Closed: a scroll changes nothing.
+      fireEvent.scroll(window);
+    } finally {
+      rect.mockRestore();
+    }
+  });
+
+  it('ignores other keys on the chip and moves into an open list with the arrows', async () => {
+    const { chip, user } = await setup();
+    chip().focus();
+    await user.keyboard('{Escape}');
+    await user.keyboard('a');
+    expect(screen.queryByRole('listbox')).toBeNull();
+    await user.click(chip());
+    chip().focus();
+    await user.keyboard('{ArrowUp}');
+    await waitFor(() => expect(focusedName()).toBe('Veranstaltung'));
+    // Space on an option chooses it (native click), it starts no type-ahead.
+    await user.keyboard(' ');
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
   it('toggles several values and stays open (multiple)', async () => {
     const { chip, user, host, view } = await setup({ multiple: true });
     await user.click(chip());

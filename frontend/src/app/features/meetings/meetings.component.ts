@@ -50,6 +50,7 @@ import {
   voteStatusKey,
   voteStatusVariant,
 } from './meetings-display.util';
+import { beamerUrl } from '../voting/beamer-link.util';
 
 /**
  * Meetings page: the overview (`/meetings`, `MeetingsOverviewComponent`: list or
@@ -174,7 +175,7 @@ export class MeetingsComponent {
    * stays open (`/voting/beamer/:id`, no chrome).
    */
   openBeamer(m: Meeting): void {
-    const url = this.router.serializeUrl(this.router.createUrlTree(['/voting/beamer', m.id]));
+    const url = this.router.serializeUrl(beamerUrl(this.router, m.id));
     window.open(url, '_blank', 'noopener');
   }
 

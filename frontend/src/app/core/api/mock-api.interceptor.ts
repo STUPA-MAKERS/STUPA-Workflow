@@ -775,9 +775,20 @@ let MOCK_SUBSTITUTES = [
   },
 ];
 
+/** The calendar subscription of the demo user: no link until "Abo-Link erzeugen". */
+let MOCK_CALENDAR_URL: string | null = null;
+let MOCK_CALENDAR_SEQ = 0;
+
 /** The answer to `/delegations/substitutes` (GET, POST, DELETE), or null for another path. */
 function mockSubstitutes(req: HttpRequest<unknown>, p: string): Observable<HttpEvent<unknown>> | null {
   const reply = <T>(body: T, status = 200) => of(new HttpResponse({ status, body })).pipe(delay(120));
+  // GET /calendar/me and POST /calendar/me/rotate: the iCal feed of the demo user.
+  if (req.method === 'GET' && p.endsWith('/calendar/me')) return reply({ url: MOCK_CALENDAR_URL });
+  if (req.method === 'POST' && p.endsWith('/calendar/me/rotate')) {
+    MOCK_CALENDAR_SEQ += 1;
+    MOCK_CALENDAR_URL = `https://stupa.example/api/calendar/demo-feed-token-${MOCK_CALENDAR_SEQ}-7f3c9a2e5b8d41f0a6c2.ics`;
+    return reply({ url: MOCK_CALENDAR_URL });
+  }
   if (req.method === 'GET' && p.endsWith('/delegations/substitutes')) {
     const gremiumId = req.params.get('gremiumId');
     return reply(MOCK_SUBSTITUTES.filter((s) => s.gremiumId === gremiumId));

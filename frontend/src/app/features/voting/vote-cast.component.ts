@@ -35,6 +35,7 @@ import { VotePhoneHeaderComponent } from './phone-header/phone-header.component'
 import { VotePanelComponent } from './vote-panel/vote-panel.component';
 import { NO_CONTEXT, type VoteContext, loadVoteContext } from './vote-panel/vote-context';
 import { VotingPageService } from './voting-page/voting-page.service';
+import { BEAMER_FROM_PARAM } from './beamer-link.util';
 
 type Phase = 'loading' | 'error' | 'ready';
 
@@ -270,7 +271,8 @@ export class VoteCastComponent implements OnDestroy {
 
   goBeamer(): void {
     const link = this.beamerLink();
-    if (link) void this.router.navigate(link);
+    if (!link) return;
+    void this.router.navigate(link, { queryParams: { [BEAMER_FROM_PARAM]: this.router.url } });
   }
 
   onMenu(id: string): void {

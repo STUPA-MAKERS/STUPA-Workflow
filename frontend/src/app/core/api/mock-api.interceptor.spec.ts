@@ -845,6 +845,16 @@ describe('mockApiInterceptor', () => {
       expect((await get<Row[]>('/api/delegations/substitutes', stupa)).length).toBe(before.length);
     });
 
+    it('/calendar/me → no link until rotate, then a new link on each rotate', async () => {
+      type Feed = { url: string | null };
+      expect(await get<Feed>('/api/calendar/me')).toEqual({ url: null });
+      const first = await firstValueFrom(http.post<Feed>('/api/calendar/me/rotate', {}));
+      expect(first.url).toMatch(/^https:\/\/.+\.ics$/);
+      expect(await get<Feed>('/api/calendar/me')).toEqual(first);
+      const second = await firstValueFrom(http.post<Feed>('/api/calendar/me/rotate', {}));
+      expect(second.url).not.toBe(first.url);
+    });
+
     it('GET …/attendance → roster', async () => {
       const roster = await get<unknown[]>('/api/meetings/m1/attendance');
       expect(roster.length).toBe(9);

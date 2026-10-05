@@ -1,13 +1,13 @@
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
-import { render, screen } from '@testing-library/angular';
+import { fireEvent, render, screen } from '@testing-library/angular';
 import { ApiClient } from '@core/api/api-client.service';
 import type { AgendaItem, Meeting, MeetingVote, Vote } from '@core/api/models';
 import { ThemeService } from '@core/theme/theme.service';
 import { LIVE_VOTE_SOURCE, type LiveVoteSource } from '@core/ws/live-vote.source';
 import type { MeetingChannel } from '@core/ws/ws.service';
 import type { ClientMessage, ServerMessage } from '@core/ws/ws-messages';
-import { BeamerComponent } from './beamer.component';
+import { BEAMER_IDLE_MS, BeamerComponent } from './beamer.component';
 
 class FakeChannel implements MeetingChannel {
   readonly subject = new Subject<ServerMessage>();
@@ -76,7 +76,9 @@ const OPEN: ServerMessage = {
   closesAt: null,
 };
 
-async function setup(opts: { id?: string | null; meeting?: Meeting; votes?: Vote[] } = {}) {
+async function setup(
+  opts: { id?: string | null; meeting?: Meeting; votes?: Vote[]; from?: string } = {},
+) {
   const source = new FakeSource();
   const votes = [...(opts.votes ?? [vote()])];
   const api = {
@@ -95,7 +97,12 @@ async function setup(opts: { id?: string | null; meeting?: Meeting; votes?: Vote
       { provide: ApiClient, useValue: api },
       {
         provide: ActivatedRoute,
-        useValue: { snapshot: { paramMap: convertToParamMap(id ? { id } : {}) } },
+        useValue: {
+          snapshot: {
+            paramMap: convertToParamMap(id ? { id } : {}),
+            queryParamMap: convertToParamMap(opts.from ? { from: opts.from } : {}),
+          },
+        },
       },
     ],
   });
@@ -285,5 +292,99 @@ describe('BeamerComponent', () => {
     push(OPEN);
     expect(api.getVote).toHaveBeenCalled();
     expect(screen.getByText('Zurzeit keine aktive Abstimmung.')).toBeInTheDocument();
+  });
+
+  describe('leaving', () => {
+    const exitLink = () => screen.getByRole('link', { name: 'Beamer-Ansicht verlassen' });
+    const setFullscreen = (el: Element | null, exit: () => Promise<void>) => {
+      Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: el });
+      Object.defineProperty(document, 'exitFullscreen', { configurable: true, value: exit });
+    };
+
+    afterEach(() => {
+      jest.useRealTimers();
+      setFullscreen(null, () => Promise.resolve());
+    });
+
+    it('goes back to the page that opened the beamer', async () => {
+      await setup({ from: '/meetings?sel=m1' });
+      expect(exitLink()).toHaveAttribute('href', '/meetings?sel=m1');
+    });
+
+    it('ignores an origin that is not an app path', async () => {
+      await setup({ from: '//evil.example/x' });
+      expect(exitLink()).toHaveAttribute('href', '/meetings/m1');
+    });
+
+    it('leaves on Escape, for the origin page', async () => {
+      const { fixture } = await setup({ from: '/voting/v1' });
+      const router = fixture.debugElement.injector.get(Router);
+      const navigate = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(router.serializeUrl(navigate.mock.calls[0][0] as never)).toBe('/voting/v1');
+    });
+
+    it('ends a fullscreen mode when it leaves', async () => {
+      const exit = jest.fn(() => Promise.reject(new Error('not allowed')));
+      setFullscreen(document.body, exit);
+      const { fixture } = await setup();
+      jest.spyOn(fixture.debugElement.injector.get(Router), 'navigateByUrl').mockResolvedValue(true);
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(exit).toHaveBeenCalledTimes(1);
+      // A refused exit (no user gesture) is swallowed.
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    it('does not call exitFullscreen outside a fullscreen mode', async () => {
+      const exit = jest.fn(() => Promise.resolve());
+      setFullscreen(null, exit);
+      const { fixture } = await setup();
+      jest.spyOn(fixture.debugElement.injector.get(Router), 'navigateByUrl').mockResolvedValue(true);
+      fireEvent.click(exitLink());
+      expect(exit).not.toHaveBeenCalled();
+    });
+
+    it('shows the exit control on a pointer movement and hides it when the pointer rests', async () => {
+      const { fixture } = await setup();
+      jest.useFakeTimers();
+      expect(exitLink()).not.toHaveClass('beamer__exit--shown');
+      fireEvent.pointerMove(document);
+      fixture.detectChanges();
+      expect(exitLink()).toHaveClass('beamer__exit--shown');
+      jest.advanceTimersByTime(BEAMER_IDLE_MS - 100);
+      fireEvent.pointerMove(document);
+      jest.advanceTimersByTime(BEAMER_IDLE_MS - 100);
+      fixture.detectChanges();
+      expect(exitLink()).toHaveClass('beamer__exit--shown');
+      jest.advanceTimersByTime(200);
+      fixture.detectChanges();
+      expect(exitLink()).not.toHaveClass('beamer__exit--shown');
+      fireEvent.pointerMove(document);
+      fixture.destroy();
+    });
+  });
+
+  describe('edge cases', () => {
+    it('counts 0 for an open vote without turnout numbers and without a tally frame', async () => {
+      const { push, fixture } = await setup({
+        votes: [vote({ tally: { counts: {}, eligible: 19, voted: null, present: null, revealed: false, quorumMet: false, leading: null } as unknown as Vote['tally'] })],
+      });
+      push(OPEN);
+      await fixture.whenStable();
+      const shown = fixture.componentInstance.vote();
+      expect(shown).toMatchObject({ status: 'open', voted: 0, present: 0 });
+    });
+
+    it('hides a closed result whose item the room has left', async () => {
+      const closedHere = { id: 'v9', status: 'closed', agendaItemId: 'ag-2' } as MeetingVote;
+      const { fixture, api } = await setup({
+        meeting: meeting({ votes: [closedHere] }),
+        votes: [vote({ status: 'closed', agendaItemId: 'ag-1', result: 'passed' })],
+      });
+      await fixture.whenStable();
+      expect(api.getVote).toHaveBeenCalledWith('v9', { quiet: true });
+      expect(fixture.componentInstance.vote()).toBeNull();
+    });
   });
 });

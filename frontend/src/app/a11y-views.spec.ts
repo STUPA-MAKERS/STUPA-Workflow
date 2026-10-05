@@ -289,7 +289,10 @@ describe('Kern-Views a11y (axe)', () => {
             provide: ActivatedRoute,
             useValue: {
               paramMap: of(convertToParamMap({ id: 'v1' })),
-              snapshot: { paramMap: convertToParamMap({ id: 'v1' }) },
+              snapshot: {
+                paramMap: convertToParamMap({ id: 'v1' }),
+                queryParamMap: convertToParamMap({}),
+              },
             },
           },
         ],

@@ -14,20 +14,22 @@
           <app-row-menu
             [label]="'meetings.overview.menu' | t"
             [sections]="phoneMenu()"
-            (selected)="onPhoneMenu($event)"
+            (selected)="onPhoneMenu($event, abo)"
           />
         } @else {
           @if (showSwitch()) {
             <app-meetings-view-switch value="list" (valueChange)="viewChange.emit($event)" />
           }
           <span class="mtl__spacer"></span>
-          <a
-            class="mtl__iconLink"
-            routerLink="/account/calendar"
-            [attr.aria-label]="'meetings.overview.subscribe' | t"
-            [title]="'meetings.overview.subscribe' | t"
-          ><app-icon name="cal" [size]="21" /></a>
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'meetings.overview.subscribe' | t"
+            [ariaPressed]="abo.isOpen()"
+            (click)="abo.toggle($event.currentTarget)"
+          ><app-icon name="cal" [size]="21" /></app-button>
         }
+        <app-calendar-subscribe #abo />
       </header>
 
       <!-- The search and the chip never scroll away: one pane at a time they stick to the
@@ -137,6 +139,29 @@
           (remove)="remove($event)"
           (beamer)="beamer($event)"
         />
+      } @else if (selError(); as e) {
+        @if (e.id === selParam()) {
+          <div class="mtl__none" role="alert">
+            @if (e.kind === 'forbidden') {
+              <app-empty-state
+                icon="lock"
+                [heading]="'meetings.overview.selForbidden' | t"
+                [body]="'meetings.overview.selForbiddenBody' | t"
+              />
+            } @else {
+              <app-empty-state
+                icon="alert"
+                [heading]="'meetings.overview.selFailed' | t"
+                [body]="'meetings.overview.selFailedBody' | t"
+              >
+                <app-button variant="tonal" size="sm" (click)="retrySelected()">
+                  <app-icon name="repeat" [size]="16" />
+                  {{ 'meetings.overview.selRetry' | t }}
+                </app-button>
+              </app-empty-state>
+            }
+          </div>
+        }
       } @else if (split()) {
         <div class="mtl__none">
           <app-empty-state icon="users" [heading]="'meetings.overview.none' | t" />

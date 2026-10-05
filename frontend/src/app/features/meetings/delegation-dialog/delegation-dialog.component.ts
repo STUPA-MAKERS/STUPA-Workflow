@@ -138,7 +138,7 @@ export class DelegationDialogComponent {
   }
 
   protected name(r: DelegationRecipient): string {
-    return r.displayName || this.i18n.translate('participant.delegation.unnamed');
+    return r.displayName || this.i18n.translate('common.unnamed');
   }
 
   protected search(q: string): void {

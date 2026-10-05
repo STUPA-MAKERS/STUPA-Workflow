@@ -1,0 +1,75 @@
+<ng-template #body>
+  <p class="cs__intro">{{ 'account.calendar.intro' | t }}</p>
+  @if (error()) {
+    <p class="cs__error" role="alert">{{ 'account.calendar.error' | t }}</p>
+  }
+  @if (loading()) {
+    <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
+  } @else if (url(); as feedUrl) {
+    <span class="cs__label" id="{{ headingId }}-url">{{ 'account.calendar.urlLabel' | t }}</span>
+    <!-- Never cut: the URL wraps and stays fully selectable. -->
+    <code class="cs__url" [attr.aria-labelledby]="headingId + '-url'">{{ feedUrl }}</code>
+    @if (confirming()) {
+      <div class="cs__confirm" role="group" [attr.aria-label]="'account.calendar.rotate' | t">
+        <p class="cs__confirmText">{{ 'account.calendar.rotateHint' | t }}</p>
+        <div class="cs__actions">
+          <app-button variant="text" size="sm" (click)="cancelRotate()">{{ 'action.cancel' | t }}</app-button>
+          <app-button variant="danger" size="sm" [loading]="busy()" (click)="rotate()">
+            {{ 'account.calendar.rotate' | t }}
+          </app-button>
+        </div>
+      </div>
+    } @else {
+      <div class="cs__actions">
+        <app-button variant="danger" size="sm" (click)="askRotate()">
+          <app-icon name="repeat" [size]="16" />
+          {{ 'account.calendar.rotate' | t }}
+        </app-button>
+        <app-button variant="tonal" size="sm" (click)="copy()">
+          <app-icon [name]="copied() ? 'check' : 'copy'" [size]="16" />
+          {{ (copied() ? 'account.calendar.copied' : 'account.calendar.copy') | t }}
+        </app-button>
+      </div>
+    }
+    <span class="cs__live" aria-live="polite">{{ copied() ? ('account.calendar.copied' | t) : '' }}</span>
+  } @else if (error()) {
+    <div class="cs__actions">
+      <app-button variant="tonal" size="sm" (click)="load()">{{ 'meetings.overview.selRetry' | t }}</app-button>
+    </div>
+  } @else {
+    <p class="cs__none">{{ 'account.calendar.none' | t }}</p>
+    <div class="cs__actions">
+      <app-button variant="fill" size="sm" [loading]="busy()" (click)="rotate()">
+        <app-icon name="link" [size]="16" />
+        {{ 'account.calendar.generate' | t }}
+      </app-button>
+    </div>
+  }
+</ng-template>
+
+@if (isOpen()) {
+  @if (phone()) {
+    <div #layer class="cs__layer" popover="manual">
+      <app-side-sheet side="bottom" [heading]="'account.calendar.title' | t" [open]="true" (openChange)="onSheetOpen($event)">
+        <div class="cs cs--sheet">
+          <ng-container [ngTemplateOutlet]="body" />
+        </div>
+      </app-side-sheet>
+    </div>
+  } @else {
+    <div
+      #pop
+      class="cs cs--pop"
+      popover="manual"
+      role="dialog"
+      tabindex="-1"
+      [attr.aria-labelledby]="headingId"
+      [style.top.px]="position().top"
+      [style.left.px]="position().left"
+      (keydown)="onKey($event)"
+    >
+      <h2 class="cs__title" [id]="headingId">{{ 'account.calendar.title' | t }}</h2>
+      <ng-container [ngTemplateOutlet]="body" />
+    </div>
+  }
+}

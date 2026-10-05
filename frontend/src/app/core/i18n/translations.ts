@@ -77,7 +77,6 @@ export const de = {
   'ui.history.after': 'Nachher',
   'account.menu.apiAccess': 'API-Zugang',
   'account.menu.notifications': 'Benachrichtigungen',
-  'account.menu.calendar': 'Kalender-Abo',
   'account.calendar.title': 'Kalender-Abo',
   'account.calendar.intro':
     'Abonniere deine Sitzungstermine im Kalender (Google, Apple, Outlook …). Die URL ist persönlich — teile sie nicht.',
@@ -364,6 +363,7 @@ export const de = {
 
   'common.yes': 'Ja',
   'common.no': 'Nein',
+  'common.unnamed': 'Ohne Namen',
 
   'apply.title': 'Antrag stellen',
   'apply.progress': 'Antrags-Fortschritt',
@@ -881,6 +881,11 @@ export const de = {
   'meetings.overview.emptyBody': 'Sobald dein Gremium eine Sitzung plant, steht sie hier.',
   'meetings.overview.emptyCreate': 'Lege mit „Neue Sitzung“ die erste Sitzung an.',
   'meetings.overview.none': 'Keine Sitzung gewählt',
+  'meetings.overview.selForbidden': 'Kein Zugriff auf diese Sitzung',
+  'meetings.overview.selForbiddenBody': 'Für diese Sitzung fehlt dir die Berechtigung.',
+  'meetings.overview.selFailed': 'Sitzung nicht geladen',
+  'meetings.overview.selFailedBody': 'Die Sitzung konnte gerade nicht geladen werden.',
+  'meetings.overview.selRetry': 'Erneut laden',
   'meetings.overview.undated': 'ohne Datum',
   'meetings.overview.groupUpcoming': 'Anstehend · {month}',
   'meetings.overview.groupPast': 'Vergangen · {month}',
@@ -2473,7 +2478,6 @@ export const de = {
   'participant.delegation.substitute': 'Stellvertretung',
   'participant.delegation.member': 'Mitglied',
   'participant.delegation.external': 'Extern',
-  'participant.delegation.unnamed': 'Ohne Namen',
   'participant.delegation.votingOn':
     'Die Vertretung stimmt für dich ab. Du selbst stimmst in dieser Sitzung nicht ab.',
   'participant.delegation.votingOff':
@@ -2986,7 +2990,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'ui.history.after': 'After',
   'account.menu.apiAccess': 'API access',
   'account.menu.notifications': 'Notifications',
-  'account.menu.calendar': 'Calendar feed',
   'account.calendar.title': 'Calendar subscription',
   'account.calendar.intro':
     'Subscribe to your meeting dates in your calendar (Google, Apple, Outlook …). The URL is personal — do not share it.',
@@ -3268,6 +3271,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
   'common.yes': 'Yes',
   'common.no': 'No',
+  'common.unnamed': 'No name',
 
   'apply.title': 'Submit application',
   'apply.progress': 'Application progress',
@@ -3773,6 +3777,11 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.overview.emptyBody': 'When your committee plans a meeting, it shows here.',
   'meetings.overview.emptyCreate': 'Use “New meeting” to create the first meeting.',
   'meetings.overview.none': 'No meeting selected',
+  'meetings.overview.selForbidden': 'No access to this meeting',
+  'meetings.overview.selForbiddenBody': 'You do not have the permission for this meeting.',
+  'meetings.overview.selFailed': 'Meeting not loaded',
+  'meetings.overview.selFailedBody': 'The meeting could not be loaded just now.',
+  'meetings.overview.selRetry': 'Load again',
   'meetings.overview.undated': 'no date',
   'meetings.overview.groupUpcoming': 'Upcoming · {month}',
   'meetings.overview.groupPast': 'Past · {month}',
@@ -5340,7 +5349,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'participant.delegation.substitute': 'Substitute',
   'participant.delegation.member': 'Member',
   'participant.delegation.external': 'External',
-  'participant.delegation.unnamed': 'No name',
   'participant.delegation.votingOn':
     'Your proxy votes for you. You do not vote in this meeting yourself.',
   'participant.delegation.votingOff':

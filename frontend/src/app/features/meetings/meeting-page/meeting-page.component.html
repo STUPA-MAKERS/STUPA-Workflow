@@ -75,7 +75,7 @@
   }
 </header>
 
-<div class="mp__body" [class.mp__body--wide]="wide()" [class.mp__body--votes]="showVotes()">
+<div class="mp__body" appScrollFade="y" [class.mp__body--wide]="wide()" [class.mp__body--votes]="showVotes()">
   @if (wide()) {
     <section class="mp__agenda" [attr.aria-label]="'meetings.agenda.title' | t">
       <ng-container [ngTemplateOutlet]="agendaTpl" />

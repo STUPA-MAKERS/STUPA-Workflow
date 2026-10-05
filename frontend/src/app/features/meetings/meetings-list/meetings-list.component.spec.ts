@@ -92,7 +92,6 @@ async function setup(
       provideHttpClientTesting(),
       provideRouter([
         { path: 'meetings/:id', children: [] },
-        { path: 'account/calendar', children: [] },
         { path: '**', children: [] },
       ]),
       MeetingsTimelineService,
@@ -373,6 +372,44 @@ describe('MeetingsListComponent', () => {
       expect(view.router.url).toBe('/');
     });
 
+    it('keeps a deep link that fails with 403 and says why', async () => {
+      const view = await setup({ url: '/?sel=m-403' });
+      load(view);
+      view.http.expectOne('/api/meetings/m-403').flush(null, { status: 403, statusText: 'no' });
+      await view.fixture.whenStable();
+      view.fixture.detectChanges();
+      expect(view.router.url).toBe('/?sel=m-403');
+      expect(screen.getByRole('alert')).toHaveTextContent('Kein Zugriff auf diese Sitzung');
+      expect(screen.queryByRole('button', { name: 'Erneut laden' })).not.toBeInTheDocument();
+    });
+
+    it('keeps a deep link after a server or network error and reads it again on request', async () => {
+      const view = await setup({ url: '/?sel=m-500' });
+      load(view);
+      view.http.expectOne('/api/meetings/m-500').flush(null, { status: 503, statusText: 'down' });
+      await view.fixture.whenStable();
+      view.fixture.detectChanges();
+      expect(view.router.url).toBe('/?sel=m-500');
+      expect(screen.getByRole('alert')).toHaveTextContent('Sitzung nicht geladen');
+      await userEvent.click(screen.getByRole('button', { name: 'Erneut laden' }));
+      view.http.expectOne('/api/meetings/m-500').error(new ProgressEvent('error'));
+      view.fixture.detectChanges();
+      expect(screen.getByRole('alert')).toHaveTextContent('Sitzung nicht geladen');
+      await userEvent.click(screen.getByRole('button', { name: 'Erneut laden' }));
+      view.http
+        .expectOne('/api/meetings/m-500')
+        .flush(wire('m-500', 'Wieder da', 'closed', { date: '2025-01-01' }));
+      view.fixture.detectChanges();
+      flushSheet(view.http, 'm-500');
+      view.fixture.detectChanges();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: 'Wieder da' })).toBeInTheDocument();
+      // No selection: nothing to read again.
+      await view.router.navigateByUrl('/');
+      view.fixture.componentInstance.retrySelected();
+      view.http.expectNone('/api/meetings/m-500');
+    });
+
     it('keeps the selection when another meeting is deleted', async () => {
       const view = await setup({ url: '/?sel=m-35' });
       load(view);
@@ -395,7 +432,11 @@ describe('MeetingsListComponent', () => {
       expect(view.dialogs.deleteMeeting()?.id).toBe('m-35');
       const open = jest.spyOn(window, 'open').mockImplementation(() => null);
       await userEvent.click(screen.getByRole('button', { name: /Beamer-Ansicht/ }));
-      expect(open).toHaveBeenCalledWith('/voting/beamer/m-35', '_blank', 'noopener');
+      expect(open).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/voting\/beamer\/m-35\?from=/),
+        '_blank',
+        'noopener',
+      );
       open.mockRestore();
     });
 
@@ -404,7 +445,10 @@ describe('MeetingsListComponent', () => {
       load(view);
       await userEvent.click(screen.getByRole('radio', { name: 'Kalender' }));
       expect(view.on.viewChange).toHaveBeenCalledWith('calendar');
-      expect(screen.getByRole('link', { name: 'Kalender-Abo' })).toHaveAttribute('href', '/account/calendar');
+      await userEvent.click(screen.getByRole('button', { name: 'Kalender-Abo' }));
+      view.http.expectOne('/api/calendar/me').flush({ url: 'https://x/api/calendar/T.ics' });
+      view.fixture.detectChanges();
+      expect(screen.getByRole('dialog', { name: 'Kalender-Abo' })).toHaveTextContent('https://x/api/calendar/T.ics');
       await userEvent.click(screen.getByRole('button', { name: 'Neue Sitzung' }));
       expect(view.on.create).toHaveBeenCalled();
       view.fixture.componentRef.setInput('showSwitch', false);
@@ -456,8 +500,12 @@ describe('MeetingsListComponent', () => {
       expect(view.on.create).toHaveBeenCalled();
       await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
       await userEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Kalender-Abo' }));
+      view.http.expectOne('/api/calendar/me').flush({ url: null });
       await view.fixture.whenStable();
-      expect(view.router.url).toBe('/account/calendar');
+      view.fixture.detectChanges();
+      // A phone shows the subscription as a bottom sheet.
+      expect(screen.getByRole('dialog', { name: 'Kalender-Abo' })).toHaveTextContent('Abo-Link erzeugen');
+      expect(view.router.url).toBe('/');
     });
 
     it('puts the time and the agenda count into the sub line and wraps the title', async () => {

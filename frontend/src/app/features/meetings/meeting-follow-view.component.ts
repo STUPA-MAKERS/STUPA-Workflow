@@ -9,7 +9,6 @@ import {
   output,
   signal,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import type { MeetingDelegationContext } from '@core/api/delegations.service';
 import type { AgendaItem, Attendance, Meeting, MeetingVote, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -39,6 +38,7 @@ import { ParticipantVoteComponent } from './participant-vote/participant-vote.co
 import { ParticipantVoteService } from './participant-vote/participant-vote.service';
 import { TopSheetComponent } from './top-sheet/top-sheet.component';
 import { VoteCardComponent } from './vote-card/vote-card.component';
+import { CalendarSubscribeComponent } from './calendar-subscribe/calendar-subscribe.component';
 
 /** The length of the protocol excerpt on a phone, in characters. */
 const EXCERPT_LENGTH = 160;
@@ -74,7 +74,6 @@ const EXCERPT_LENGTH = 160;
   providers: [ParticipantVoteService],
   imports: [
     NgTemplateOutlet,
-    RouterLink,
     TranslatePipe,
     ScrollFadeDirective,
     ButtonComponent,
@@ -88,6 +87,7 @@ const EXCERPT_LENGTH = 160;
     ParticipantRosterComponent,
     VoteCardComponent,
     MeetingDelegationCardComponent,
+    CalendarSubscribeComponent,
   ],
   templateUrl: './meeting-follow-view.component.html',
   styleUrl: './meeting-follow-view.component.scss',

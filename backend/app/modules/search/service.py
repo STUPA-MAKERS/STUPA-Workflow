@@ -44,6 +44,10 @@ PER_KIND = 5
 #: Below this the query matches too much to be useful and every source scans.
 MIN_QUERY_LENGTH = 2
 
+#: The title of a record that has no name of its own. A raw id in the palette tells the
+#: reader nothing, so a nameless record reads as "untitled" in the reader's language.
+UNTITLED: Mapping[str, str] = {"de": "Ohne Titel", "en": "Untitled"}
+
 #: Where a hit of each kind sends the reader.
 #:
 #: Every template names the record: a path segment where the record has a page of its
@@ -139,7 +143,7 @@ class SearchService:
             SearchHit(
                 kind="application",
                 id=str(item.id),
-                title=item.title or str(item.id),
+                title=item.title or _untitled(lang),
                 subtitle=(
                     resolve_i18n(item.state.label, lang, "de") if item.state is not None else None
                 ),
@@ -180,7 +184,7 @@ class SearchService:
             SearchHit(
                 kind="invoice",
                 id=str(inv.id),
-                title=inv.number or inv.supplier or str(inv.id),
+                title=inv.number or inv.supplier or _untitled(lang),
                 subtitle=_money(inv.gross_amount, inv.supplier),
                 url=HIT_URL["invoice"].format(id=inv.id),
             )
@@ -200,7 +204,7 @@ class SearchService:
             SearchHit(
                 kind="expense",
                 id=str(e.id),
-                title=e.description or str(e.id),
+                title=e.description or _untitled(lang),
                 subtitle=_money(e.amount, e.correspondent),
                 url=HIT_URL["expense"].format(id=e.id),
             )
@@ -289,10 +293,15 @@ def _has_budget_read(principal: Principal) -> bool:
     return any(principal.has(p) for p in ("budget.view", "budget.structure", "budget.book"))
 
 
+def _untitled(lang: str) -> str:
+    """The title of a nameless record, in the reader's language (German as fallback)."""
+    return UNTITLED.get(lang, UNTITLED["de"])
+
+
 def _money(amount: Decimal | None, other: str | None) -> str | None:
     """Join an amount and a name into one subtitle line, skipping what is missing."""
     parts = [p for p in (f"{amount}" if amount is not None else None, other) if p]
     return " · ".join(parts) or None
 
 
-__all__ = ["PER_KIND", "SearchService"]
+__all__ = ["PER_KIND", "UNTITLED", "SearchService"]

@@ -64,24 +64,8 @@
 .mtl__spacer {
   flex: 1 1 auto;
 }
-.mtl__iconLink {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: var(--control-height);
-  height: var(--control-height);
-  border-radius: 50%;
-  color: var(--color-text-muted);
-}
-.mtl__iconLink:hover {
-  background: var(--color-surface-2);
-  color: var(--color-text);
-}
-.mtl__iconLink:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
-}
-.mtl__head app-button app-icon {
+/* The gap between the icon and the text of a header button; an icon button has none. */
+.mtl__head app-button ::ng-deep .btn:not(.btn--icon) app-icon {
   margin-inline-end: 4px;
 }
 
