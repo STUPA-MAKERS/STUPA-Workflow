@@ -1,58 +1,58 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import type { Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { Uuid } from '@core/api/models';
-import {
-  BadgeComponent,
-  ButtonComponent,
-  CellDirective,
-  type ColumnDef,
-  DataTableComponent,
-  DialogComponent,
-  IconComponent,
-  SelectComponent,
-  type SelectOption,
-} from '@stupa-makers/ui-kit';
-import { ToastService } from '@stupa-makers/ui-kit';
-import { type DelegationSubstitute, DelegationsApiService } from '@core/api/delegations.service';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
+import { AvatarComponent, NoteComponent, PageHeaderComponent, SkeletonComponent } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
-import type { AdminPrincipal, Gremium, GremiumMembership, GremiumRole } from '../admin.models';
+import {
+  FORCED_GREMIUM_ROLE_KEYS,
+  type Gremium,
+  type GremiumMembership,
+  type GremiumRole,
+  MEMBER_GREMIUM_ROLE_KEY,
+} from '../admin.models';
+import { SubstitutePoolComponent } from '../delegations/substitute-pool.component';
 
+/** One row of the member list. */
 interface Member {
   id: string;
   name: string;
   email: string | null;
-  roleLabel: string;
+  role: string;
+  /** Sort rank of the role: board and manager first, `member` last. */
+  rank: number;
 }
 
+/** The rows the list shows before "Alle n anzeigen". */
+export const MEMBER_PREVIEW = 7;
+
 /**
- * Members of a gremium on its own subpage at `/admin/gremien/:id`.
+ * Members of a gremium on its own page (`/admin/gremien/:id/members`, board
+ * Admin-Gremium-Mitglieder).
  *
- * The members come only from the OIDC groups of the IdP, so the member table is
- * read-only. The OIDC group mappings live on `/admin/group-mappings`. The backend
- * syncs the memberships at each login and after each mapping change.
+ * The members come only from the OIDC groups of the IdP, so the list is read-only: avatar,
+ * name, e-mail and the gremium role. The note links to the group mappings, where the
+ * memberships come from. The list shows the first rows; "Alle n anzeigen" shows the rest.
+ * The membership rows carry the name and the e-mail of the member, so the page loads no
+ * principal list. With `admin.delegations` the substitute pool of the gremium follows
+ * (`app-substitute-pool`).
  */
 @Component({
   selector: 'app-gremium-members',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    FormsModule,
     RouterLink,
     TranslatePipe,
-    ButtonComponent,
-    BadgeComponent,
-    SelectComponent,
-    DialogComponent,
-    DataTableComponent,
-    CellDirective,
-    IconComponent,
+    CapitalizePipe,
+    AvatarComponent,
+    NoteComponent,
     PageHeaderComponent,
+    SkeletonComponent,
+    SubstitutePoolComponent,
   ],
   templateUrl: './gremium-members.component.html',
   styleUrl: './gremium-members.component.scss',
@@ -60,193 +60,96 @@ interface Member {
 export class GremiumMembersComponent {
   private readonly api = inject(AdminApiService);
   private readonly i18n = inject(I18nService);
-  private readonly toast = inject(ToastService);
-  private readonly route = inject(ActivatedRoute);
   private readonly auth = inject(AuthService);
 
-  /**
-   * True until the first answer. Without it the table shows its empty text while the
-   * request is still out, which asserts there is nothing when nothing has arrived yet.
-   */
+  protected readonly gremiumId = (inject(ActivatedRoute).snapshot.paramMap.get('id') ?? '') as Uuid;
+
+  /** True until the first answer, so the list does not claim there are no members. */
   protected readonly loading = signal(true);
+  protected readonly failed = signal(false);
+  protected readonly showAll = signal(false);
+  protected readonly preview = MEMBER_PREVIEW;
 
-  /** The hint links to the mappings page only with its permission. The value is
-   *  reactive, because the principal loads asynchronously. */
+  /** The note links to the mappings page only with its permission. */
   protected readonly canManageMappings = computed(() => this.auth.can('admin.group_mappings'));
-
-  private readonly gremiumId = this.route.snapshot.paramMap.get('id') ?? '';
+  /** The substitute pool needs `admin.delegations` (or `session.manage` in the gremium). */
+  protected readonly canPool = computed(
+    () =>
+      this.auth.can('admin.delegations') ||
+      this.auth.canInGremium(this.gremiumId, 'session.manage'),
+  );
 
   readonly gremium = signal<Gremium | null>(null);
-  private readonly principalsById = signal<Map<string, AdminPrincipal>>(new Map());
   private readonly gremiumRoles = signal<GremiumRole[]>([]);
   private readonly memberships = signal<GremiumMembership[]>([]);
 
-  private readonly rolesById = computed(
-    () => new Map(this.gremiumRoles().map((r) => [r.id, r])),
-  );
+  private readonly rolesById = computed(() => new Map(this.gremiumRoles().map((r) => [r.id, r])));
 
-  readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'name', label: this.i18n.translate('admin.users.col.name'), card: 'title' },
-    { key: 'email', label: this.i18n.translate('admin.users.col.email') },
-    { key: 'roleLabel', label: this.i18n.translate('admin.gremien.memberRole') },
-  ]);
-  readonly rowId = (m: unknown): string => (m as Member).id;
-
+  /** One row per person, sorted by role (board, manager, own roles, member), then name. */
   readonly members = computed<Member[]>(() => {
-    const byId = this.principalsById();
-    return this.memberships().map((m) => {
-      const p = byId.get(m.principalId);
-      return {
-        id: m.id,
-        name: p ? p.displayName || p.email || p.sub : m.principalId,
-        email: p?.email ?? null,
-        roleLabel: this.roleLabel(m.gremiumRoleId),
-      };
-    });
-  });
-
-  // --- substitute pool -------------------------------------------------------
-
-  private readonly delegationsApi = inject(DelegationsApiService);
-  readonly substitutes = signal<DelegationSubstitute[]>([]);
-  readonly addSubOpen = signal(false);
-  readonly subQuery = signal('');
-  readonly subCandidates = signal<AdminPrincipal[]>([]);
-  readonly subSelected = signal<AdminPrincipal | null>(null);
-  /** An empty value makes a gremium-wide substitute that represents every member. */
-  readonly subMemberId = signal('');
-
-  readonly subColumns = computed<ColumnDef[]>(() => [
-    {
-      key: 'substitute',
-      label: this.i18n.translate('admin.substitutes.col.substitute'),
-      card: 'title',
-    },
-    { key: 'member', label: this.i18n.translate('admin.substitutes.col.member') },
-    { key: 'actions', label: this.i18n.translate('admin.users.col.actions'), align: 'end' },
-  ]);
-  readonly subRowId = (s: unknown): string => (s as DelegationSubstitute).id;
-
-  /** Options for "represents": all members or one specific member. */
-  readonly memberOptions = computed<SelectOption[]>(() => {
-    const byId = this.principalsById();
     const seen = new Set<string>();
-    const opts: SelectOption[] = [
-      { value: '', label: this.i18n.translate('admin.substitutes.allMembers') },
-    ];
+    const rows: Member[] = [];
     for (const m of this.memberships()) {
       if (seen.has(m.principalId)) continue;
       seen.add(m.principalId);
-      const p = byId.get(m.principalId);
-      opts.push({ value: m.principalId, label: p ? p.displayName || p.email || p.sub : m.principalId });
+      const role = this.rolesById().get(m.gremiumRoleId);
+      rows.push({
+        id: m.principalId,
+        name: m.displayName || m.email || this.i18n.translate('admin.gremien.unknownMember'),
+        email: m.email ?? null,
+        role: role ? this.roleName(role) : '—',
+        rank: this.rank(role),
+      });
     }
-    return opts;
+    return rows.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
   });
 
+  protected readonly visible = computed(() =>
+    this.showAll() ? this.members() : this.members().slice(0, MEMBER_PREVIEW),
+  );
+
+  /** The options of "Vertritt" in the substitute pool: every member. */
+  protected readonly poolMembers = computed(() =>
+    this.members().map((m) => ({ id: m.id, name: m.name })),
+  );
+
   constructor() {
-    this.api
-      .listGremien()
-      .pipe(takeUntilDestroyed())
-      .subscribe((list) => this.gremium.set(list.find((g) => g.id === this.gremiumId) ?? null));
-    this.api.listGremiumRoles(this.gremiumId as Uuid).subscribe({
+    this.api.listGremienOptions().subscribe({
+      next: (list) => this.gremium.set(list.find((g) => g.id === this.gremiumId) ?? null),
+      error: () => this.gremium.set(null),
+    });
+    this.api.listGremiumRoles(this.gremiumId, { quiet: true }).subscribe({
       next: (r) => this.gremiumRoles.set(r),
       error: () => this.gremiumRoles.set([]),
     });
-    this.api.listPrincipals('').subscribe({
-      next: (p) => this.principalsById.set(new Map(p.map((x) => [x.id, x]))),
-      error: () => this.principalsById.set(new Map()),
+    this.api.listGremiumMemberships(this.gremiumId).subscribe({
+      next: (m) => {
+        this.memberships.set(m);
+        this.loading.set(false);
+      },
+      // Show the failure, for example a 403, and never an empty list.
+      error: () => {
+        this.memberships.set([]);
+        this.failed.set(true);
+        this.loading.set(false);
+      },
     });
-    this.refresh();
-    this.refreshSubstitutes();
   }
 
   private roleName(role: GremiumRole): string {
     return role.name[this.i18n.locale()] ?? role.name['de'] ?? role.key;
   }
 
-  private roleLabel(roleId: string): string {
-    const role = this.rolesById().get(roleId);
-    return role ? this.roleName(role) : roleId;
+  private rank(role: GremiumRole | undefined): number {
+    if (!role) return 99;
+    if (role.key === MEMBER_GREMIUM_ROLE_KEY) return 50;
+    const i = (FORCED_GREMIUM_ROLE_KEYS as readonly string[]).indexOf(role.key);
+    return i < 0 ? 10 : i;
   }
 
-  // --- substitute pool -------------------------------------------------------
-
-  openAddSub(): void {
-    this.subQuery.set('');
-    this.subSelected.set(null);
-    this.subCandidates.set([]);
-    this.subMemberId.set('');
-    this.addSubOpen.set(true);
-  }
-
-  onSubSearch(q: string): void {
-    this.subQuery.set(q);
-    this.api.listPrincipals(q).subscribe({
-      next: (list) => this.subCandidates.set(list.slice(0, 8)),
-      error: () => this.subCandidates.set([]),
-    });
-  }
-
-  pickSub(c: AdminPrincipal): void {
-    this.subSelected.set(c);
-    this.subQuery.set(c.displayName || c.email || c.sub);
-    this.subCandidates.set([]);
-  }
-
-  addSub(): void {
-    const s = this.subSelected();
-    if (!s) return;
-    this.delegationsApi
-      .addSubstitute({
-        gremiumId: this.gremiumId as Uuid,
-        memberId: this.subMemberId() ? (this.subMemberId() as Uuid) : null,
-        substituteId: s.id,
-      })
-      .subscribe({
-        next: () => {
-          this.toast.success(this.i18n.translate('admin.substitutes.added'));
-          this.addSubOpen.set(false);
-          this.refreshSubstitutes();
-        },
-        error: (err: { status?: number }) =>
-          this.toast.error(
-            this.i18n.translate(
-              err.status === 409 ? 'admin.substitutes.duplicate' : 'admin.substitutes.failed',
-            ),
-          ),
-      });
-  }
-
-  removeSub(id: string): void {
-    this.delegationsApi.removeSubstitute(id as Uuid).subscribe({
-      next: () => {
-        this.toast.success(this.i18n.translate('admin.substitutes.removed'));
-        this.refreshSubstitutes();
-      },
-      error: () => this.toast.error(this.i18n.translate('admin.substitutes.failed')),
-    });
-  }
-
-  private refreshSubstitutes(): void {
-    this.delegationsApi.substitutes(this.gremiumId as Uuid).subscribe({
-      next: (list) => this.substitutes.set(list),
-      error: () => this.substitutes.set([]),
-    });
-  }
-
-  private refresh(): void {
-    this.loading.set(true);
-    this.api.listGremiumMemberships(this.gremiumId as Uuid).subscribe({
-      next: (m) => {
-        this.memberships.set(m);
-        this.loading.set(false);
-      },
-      // Do not swallow the error. Show a 403 or another failure, not an empty table.
-      error: () => {
-        this.memberships.set([]);
-        this.loading.set(false);
-        this.toast.error(this.i18n.translate('admin.gremien.membersLoadFailed'));
-      },
+  protected countLabel(n: number): string {
+    return this.i18n.translate(n === 1 ? 'admin.home.memberCountOne' : 'admin.home.memberCount', {
+      count: n,
     });
   }
 }

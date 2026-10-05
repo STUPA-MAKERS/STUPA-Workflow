@@ -2,6 +2,7 @@ import {
   type HttpEvent,
   HttpErrorResponse,
   type HttpInterceptorFn,
+  type HttpRequest,
   HttpResponse,
 } from '@angular/common/http';
 import { inject, isDevMode } from '@angular/core';
@@ -699,7 +700,96 @@ let MOCK_DELEGATIONS: Delegation[] = [
     revocable: true,
     direction: null,
   },
+  // Two delegations of upcoming meetings for the admin overview: one with the vote, one
+  // to a pool substitute.
+  {
+    id: 'f0000000-0000-0000-0000-000000000003',
+    meetingId: 'd0000000-0000-0000-0000-000000000106',
+    meetingTitle: '35. Sitzung des Studierendenparlaments',
+    meetingDate: mockDay(14),
+    gremiumId: 'g0000000-0000-0000-0000-000000000001',
+    gremiumName: 'Studierendenparlament',
+    delegatorId: 'p-8',
+    delegatorName: 'Mika Muster',
+    delegateId: 'p-9',
+    delegateName: 'Charlie Probe',
+    delegateVoting: true,
+    viaPool: false,
+    createdAt: '2026-09-28T09:00:00Z',
+    revocable: true,
+    direction: null,
+  },
+  {
+    id: 'f0000000-0000-0000-0000-000000000004',
+    meetingId: 'd0000000-0000-0000-0000-000000000106',
+    meetingTitle: '35. Sitzung des Studierendenparlaments',
+    meetingDate: mockDay(14),
+    gremiumId: 'g0000000-0000-0000-0000-000000000001',
+    gremiumName: 'Studierendenparlament',
+    delegatorId: 'p-10',
+    delegatorName: 'Dana Demo',
+    delegateId: 'p-12',
+    delegateName: 'Fabi Fachschaft',
+    delegateVoting: true,
+    viaPool: true,
+    createdAt: '2026-09-29T09:00:00Z',
+    revocable: true,
+    direction: null,
+  },
 ];
+
+/** GET /delegations/substitutes: the substitute pool of each Gremium. */
+let MOCK_SUBSTITUTES = [
+  {
+    id: 'f1000000-0000-0000-0000-000000000001',
+    gremiumId: 'g0000000-0000-0000-0000-000000000001',
+    memberId: null as string | null,
+    memberName: null as string | null,
+    substituteId: 'p-12',
+    substituteName: 'Fabi Fachschaft',
+  },
+  {
+    id: 'f1000000-0000-0000-0000-000000000002',
+    gremiumId: 'g0000000-0000-0000-0000-000000000001',
+    memberId: 'p-8' as string | null,
+    memberName: 'Mika Muster' as string | null,
+    substituteId: 'p-3',
+    substituteName: 'Sam Neu',
+  },
+];
+
+/** The answer to `/delegations/substitutes` (GET, POST, DELETE), or null for another path. */
+function mockSubstitutes(req: HttpRequest<unknown>, p: string): Observable<HttpEvent<unknown>> | null {
+  const reply = <T>(body: T, status = 200) => of(new HttpResponse({ status, body })).pipe(delay(120));
+  if (req.method === 'GET' && p.endsWith('/delegations/substitutes')) {
+    const gremiumId = req.params.get('gremiumId');
+    return reply(MOCK_SUBSTITUTES.filter((s) => s.gremiumId === gremiumId));
+  }
+  if (req.method === 'POST' && p.endsWith('/delegations/substitutes')) {
+    const body = req.body as { gremiumId: string; memberId?: string | null; substituteId: string };
+    const memberId = body.memberId ?? null;
+    if (MOCK_SUBSTITUTES.some((s) => s.gremiumId === body.gremiumId && s.substituteId === body.substituteId && s.memberId === memberId)) {
+      return mockProblem(409, 'substitute_exists', req.url);
+    }
+    const row = {
+      id: `f1000000-0000-0000-0000-${String(MOCK_SUBSTITUTES.length + 100).padStart(12, '0')}`,
+      gremiumId: body.gremiumId,
+      memberId,
+      memberName: memberId,
+      substituteId: body.substituteId,
+      substituteName: body.substituteId,
+    };
+    MOCK_SUBSTITUTES = [...MOCK_SUBSTITUTES, row];
+    return reply(row, 201);
+  }
+  const del = /\/delegations\/substitutes\/([^/]+)$/.exec(p);
+  if (req.method === 'DELETE' && del) {
+    MOCK_SUBSTITUTES = MOCK_SUBSTITUTES.filter((s) => s.id !== del[1]);
+    return reply(null, 204);
+  }
+  return null;
+}
+
 /** A local `YYYY-MM-DD` date, `days` away from today. */
 function mockDay(days: number): string {
   const d = new Date();
@@ -1102,6 +1192,9 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   const p = path(req.url);
   const ok = <T>(body: T, status = 200): Observable<HttpEvent<unknown>> =>
     of(new HttpResponse({ status, body })).pipe(delay(120));
+
+  const substitutes = mockSubstitutes(req, p);
+  if (substitutes) return substitutes;
 
   // The demo applications of the list page and their detail paths. The demo data loads
   // on first use, so it stays out of the initial bundle.

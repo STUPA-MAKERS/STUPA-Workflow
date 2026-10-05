@@ -1,383 +1,304 @@
-import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { USE_MOCK_API } from '@core/api/api.config';
-import type { CdVariantOption, Gremium } from '../admin.models';
+import { AuthService } from '@core/auth/auth.service';
+import { ToastService } from '@stupa-makers/ui-kit';
+import { of, throwError } from 'rxjs';
+import { AdminApiService } from '../admin-api.service';
+import type { Gremium } from '../admin.models';
 import { AdminGremienComponent } from './gremien.component';
 
-const GREMIUM: Gremium = {
-  id: 'g-1',
-  name: 'Studierendenparlament',
-  slug: 'stupa',
-  cdVariantId: 'cd-1',
-  defaultLang: 'de',
-  allowVoteDelegation: false,
-};
-
-const CD_VARIANTS: CdVariantOption[] = [
-  { id: 'cd-1', key: 'stupa', name: 'StuPa' },
-  { id: 'cd-2', key: 'asta', name: 'AStA' },
+const GREMIEN: Gremium[] = [
+  {
+    id: 'g-1',
+    name: 'Studierendenparlament',
+    slug: 'stupa',
+    cdVariantId: 'cd-1',
+    defaultLang: 'de',
+    allowVoteDelegation: true,
+    delegationLeadMinutes: 60,
+    delegationAllowExternal: false,
+    quorumPercent: 50,
+    memberCount: 23,
+    roleCount: 4,
+  },
+  {
+    id: 'g-2',
+    name: 'AStA',
+    slug: 'asta',
+    cdVariantId: null,
+    defaultLang: 'en',
+    allowVoteDelegation: false,
+    quorumPercent: null,
+    memberCount: 1,
+    roleCount: 1,
+  },
+  {
+    id: 'g-3',
+    name: 'Ohne Zahlen',
+    slug: 'oz',
+    cdVariantId: 'cd-x',
+    defaultLang: 'de',
+    allowVoteDelegation: true,
+    delegationLeadMinutes: 0,
+    delegationAllowExternal: true,
+  },
 ];
 
-/** Flush the CD-variant dropdown source the page loads on construction. */
-function flushCdVariants(http: HttpTestingController, options: CdVariantOption[] = CD_VARIANTS) {
-  http.expectOne((r) => r.url.endsWith('/api/cd-variants') && r.method === 'GET').flush(options);
+const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+
+function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
+  return {
+    listGremien: jest.fn(() => of(clone(GREMIEN))),
+    listCdVariantOptions: jest.fn(() =>
+      of([{ id: 'cd-1', key: 'stupa', name: 'StuPa-Protokoll' }]),
+    ),
+    getGremiumMailRecipients: jest.fn((id: string) =>
+      of({
+        recipients: id === 'g-1' ? ['protokolle@stupa.example', 'verteiler@lists.example'] : [],
+      }),
+    ),
+    setGremiumMailRecipients: jest.fn((_id: string, recipients: string[]) => of({ recipients })),
+    createGremium: jest.fn((b: Partial<Gremium>) => of({ id: 'g-new', ...b })),
+    updateGremium: jest.fn((id: string, b: Partial<Gremium>) => of({ ...GREMIEN[0], id, ...b })),
+    deleteGremium: jest.fn(() => of(void 0)),
+    listGremiumRoles: jest.fn((gid: string) =>
+      of([
+        {
+          id: `${gid}-v`,
+          gremiumId: gid,
+          key: 'vorstand',
+          name: { de: 'Vorstand' },
+          forced: true,
+          permissions: ['session.manage'],
+        },
+      ]),
+    ),
+    listRoleMappings: jest.fn(() => of([])),
+    listMembershipMappings: jest.fn(() => of([])),
+    createGremiumRole: jest.fn((gid: string, b: object) =>
+      of({ id: 'gr-new', gremiumId: gid, forced: false, ...b }),
+    ),
+    ...over,
+  };
 }
 
-async function setup(gremien: Gremium[] = [GREMIUM]) {
+async function setup(opts: { api?: ReturnType<typeof makeApi>; perms?: string[] } = {}) {
+  const api = opts.api ?? makeApi();
+  const perms = opts.perms ?? ['admin.gremien', 'admin.gremium_roles', 'admin.group_mappings'];
+  const toast = { success: jest.fn(), error: jest.fn() };
   const view = await render(AdminGremienComponent, {
     providers: [
-      provideHttpClient(),
-      provideHttpClientTesting(),
       provideRouter([]),
-      { provide: USE_MOCK_API, useValue: false },
+      { provide: AdminApiService, useValue: api },
+      { provide: ToastService, useValue: toast },
+      { provide: AuthService, useValue: { can: (p: string) => perms.includes(p) } },
     ],
   });
-  const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  http.expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'GET').flush(gremien);
-  flushCdVariants(http);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const c = view.fixture.componentInstance as any;
-  return { ...view, http, c };
+  // NgModel writes its value after a microtask.
+  await view.fixture.whenStable();
+  view.fixture.detectChanges();
+  return { ...view, api, toast };
 }
+
+const item = (name: string) =>
+  screen.getByRole('button', { name: new RegExp(`^${name}`) }).closest('li') as HTMLElement;
 
 describe('AdminGremienComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('lists existing committees from /admin/gremien', async () => {
-    const { http, c } = await setup();
-    expect(await screen.findByText('Studierendenparlament')).toBeInTheDocument();
-    expect(c.loading()).toBe(false);
-    expect(c.loadError()).toBe(false);
-    http.verify();
+  it('lists the gremien with slug and counts; the first row starts open', async () => {
+    const { api } = await setup();
+    const first = item('Studierendenparlament');
+    expect(within(first).getByText('stupa')).toBeInTheDocument();
+    expect(within(first).getByText('23 Mitglieder · 4 Rollen')).toBeInTheDocument();
+    expect(within(item('AStA')).getByText('1 Mitglied · 1 Rolle')).toBeInTheDocument();
+    expect(within(item('Ohne Zahlen')).queryByText(/Rolle/)).toBeNull();
+    expect(
+      within(first).getByRole('link', { name: 'Mitglieder: Studierendenparlament' }),
+    ).toHaveAttribute('href', '/admin/gremien/g-1/members');
+    expect(screen.getByRole('button', { name: /^Studierendenparlament/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: /^AStA/ })).toHaveAttribute('aria-expanded', 'false');
+    expect(api.listGremiumRoles).toHaveBeenCalledWith('g-1', { quiet: true });
+    expect(api.listGremiumRoles).not.toHaveBeenCalledWith('g-2', expect.anything());
   });
 
-  it('shows the empty state when there are none', async () => {
-    const { http } = await setup([]);
-    expect(await screen.findByText('Noch keine Gremien angelegt.')).toBeInTheDocument();
-    http.verify();
+  it('shows every setting of an open row; the recipients wrap in full', async () => {
+    await setup();
+    const first = item('Studierendenparlament');
+    const value = (label: string) =>
+      within(first).getByText(label).nextElementSibling?.textContent?.trim();
+    expect(value('CD-Variante')).toBe('StuPa-Protokoll');
+    expect(value('Standardsprache')).toBe('Deutsch');
+    expect(value('Quorum')).toBe('50 %');
+    expect(value('Stimm-Delegation erlauben')).toBe('Ja');
+    expect(value('Vorlauf für Delegationen')).toBe('60 Minuten');
+    expect(value('Delegation an Externe erlauben')).toBe('Nein');
+    expect(value('Zusätzliche Protokoll-Empfänger')).toBe(
+      'protokolle@stupa.example, verteiler@lists.example',
+    );
+    expect(within(first).queryByText(/Stimme nach Abgabe/)).toBeNull();
+    expect(
+      within(first).getByRole('heading', { name: 'Gremienrollen und Berechtigungen' }),
+    ).toBeInTheDocument();
   });
 
-  it('sets loadError when the list request fails', async () => {
-    const view = await render(AdminGremienComponent, {
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        provideRouter([]),
-        { provide: USE_MOCK_API, useValue: false },
-      ],
+  it('opens and closes a row with its name and with the chevron', async () => {
+    const { api } = await setup();
+    await userEvent.click(screen.getByRole('button', { name: /^AStA/ }));
+    const asta = item('AStA');
+    const value = (label: string) =>
+      within(asta).getByText(label).nextElementSibling?.textContent?.trim();
+    expect(value('CD-Variante')).toBe('Standard des PDF-Renderers');
+    expect(value('Standardsprache')).toBe('Englisch');
+    expect(value('Quorum')).toBe('Kein Quorum');
+    expect(within(asta).queryByText('Vorlauf für Delegationen')).toBeNull();
+    expect(value('Zusätzliche Protokoll-Empfänger')).toBe('Keine');
+    await userEvent.click(screen.getByRole('button', { name: 'Zuklappen: AStA' }));
+    expect(screen.getByRole('button', { name: /^AStA/ })).toHaveAttribute('aria-expanded', 'false');
+    // Opening again reads the recipients only once.
+    await userEvent.click(screen.getByRole('button', { name: 'Aufklappen: AStA' }));
+    expect(api.getGremiumMailRecipients.mock.calls.filter(([id]) => id === 'g-2')).toHaveLength(1);
+  });
+
+  it('names "until the start" for a lead time of 0 and a failed recipient read', async () => {
+    const api = makeApi({
+      getGremiumMailRecipients: jest.fn(() => throwError(() => ({ status: 500 }))),
     });
-    const http = view.fixture.debugElement.injector.get(HttpTestingController);
-    http
-      .expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'GET')
-      .flush('boom', { status: 500, statusText: 'Server Error' });
-    // The dropdown source fails too: the page keeps an empty variant list.
-    http
-      .expectOne((r) => r.url.endsWith('/api/cd-variants') && r.method === 'GET')
-      .flush('boom', { status: 500, statusText: 'Server Error' });
+    await setup({ api });
+    await userEvent.click(screen.getByRole('button', { name: /^Ohne Zahlen/ }));
+    const oz = item('Ohne Zahlen');
+    const value = (label: string) =>
+      within(oz).getByText(label).nextElementSibling?.textContent?.trim();
+    expect(value('Vorlauf für Delegationen')).toBe('Bis Sitzungsbeginn');
+    expect(value('Delegation an Externe erlauben')).toBe('Ja');
+    expect(value('CD-Variante')).toBe('Standard des PDF-Renderers');
+    expect(value('Zusätzliche Protokoll-Empfänger')).toBe(
+      'Die Protokoll-Empfänger konnten nicht geladen werden.',
+    );
+  });
+
+  it('edits a gremium in the dialog and reloads the list', async () => {
+    const { api, toast } = await setup();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Bearbeiten: Studierendenparlament' }),
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Gremium bearbeiten' });
+    await waitFor(() =>
+      expect(within(dialog).getByRole('textbox', { name: /Name/ })).toHaveValue(
+        'Studierendenparlament',
+      ),
+    );
+    await userEvent.click(within(dialog).getByText('Speichern'));
+    expect(api.updateGremium).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith('Gremium gespeichert.');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(api.listGremien).toHaveBeenCalledTimes(2);
+  });
+
+  it('creates a gremium and opens its row', async () => {
+    const api = makeApi();
+    const { toast } = await setup({ api });
+    await userEvent.click(screen.getByRole('button', { name: /Gremium anlegen/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Gremium anlegen' });
+    await userEvent.type(within(dialog).getByRole('textbox', { name: /Name/ }), 'Neu');
+    api.listGremien.mockReturnValue(
+      of([...clone(GREMIEN), { ...clone(GREMIEN[1]), id: 'g-new', name: 'Neu', slug: 'neu' }]),
+    );
+    await userEvent.click(within(dialog).getByText('Anlegen'));
+    expect(toast.success).toHaveBeenCalledWith('Gremium angelegt.');
+    expect(screen.getByRole('button', { name: /^Neu/ })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('closes the dialog on cancel', async () => {
+    await setup();
+    await userEvent.click(screen.getByRole('button', { name: /Gremium anlegen/ }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByText('Abbrechen'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('deletes a gremium after the confirmation', async () => {
+    const api = makeApi();
+    const { toast } = await setup({ api });
+    await userEvent.click(screen.getByRole('button', { name: 'Löschen: AStA' }));
+    const dialog = screen.getByRole('dialog', { name: 'Gremium löschen' });
+    expect(dialog).toHaveTextContent('„AStA"');
+    await userEvent.click(within(dialog).getByText('Löschen'));
+    expect(api.deleteGremium).toHaveBeenCalledWith('g-2');
+    expect(toast.success).toHaveBeenCalledWith('Gremium gelöscht.');
+  });
+
+  it('names a failed delete and keeps the dialog', async () => {
+    const api = makeApi({ deleteGremium: jest.fn(() => throwError(() => ({ status: 500 }))) });
+    const { toast } = await setup({ api });
+    await userEvent.click(screen.getByRole('button', { name: 'Löschen: AStA' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByText('Löschen'));
+    expect(toast.error).toHaveBeenCalledWith('Das Gremium konnte nicht gelöscht werden.');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await userEvent.click(within(screen.getByRole('dialog')).getByText('Abbrechen'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('updates the role count of a row after a role change', async () => {
+    const api = makeApi();
+    await setup({ api });
+    const first = item('Studierendenparlament');
+    await userEvent.click(within(first).getByRole('button', { name: /Gremium-Rolle hinzufügen/ }));
+    const dialog = screen.getByRole('dialog', { name: /Gremium-Rolle hinzufügen/ });
+    await userEvent.type(within(dialog).getByRole('textbox', { name: /Schlüssel/ }), 'kasse');
+    await userEvent.click(within(dialog).getByText('Speichern'));
+    expect(api.createGremiumRole).toHaveBeenCalledWith(
+      'g-1',
+      expect.objectContaining({ key: 'kasse' }),
+    );
+    expect(within(first).getByText('23 Mitglieder · 2 Rollen')).toBeInTheDocument();
+  });
+
+  it('links to the group mappings only with that permission', async () => {
+    await setup();
+    expect(screen.getByRole('link', { name: 'Gruppen-Zuordnung' })).toHaveAttribute(
+      'href',
+      '/admin/group-mappings',
+    );
+  });
+
+  it('links to the group mappings only with that permission (2)', async () => {
+    await setup({ perms: ['admin.gremien'] });
+    expect(screen.queryByRole('link', { name: 'Gruppen-Zuordnung' })).toBeNull();
+  });
+
+  it('names a failed load and an empty list', async () => {
+    await setup({
+      api: makeApi({ listGremien: jest.fn(() => throwError(() => ({ status: 500 }))) }),
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('Gremien konnten nicht geladen werden.');
+  });
+
+  it('names a failed load and an empty list (2)', async () => {
+    await setup({
+      api: makeApi({
+        listGremien: jest.fn(() => of([])),
+        listCdVariantOptions: jest.fn(() => throwError(() => ({ status: 403 }))),
+      }),
+    });
+    expect(screen.getByText('Noch keine Gremien angelegt.')).toBeInTheDocument();
+  });
+
+  it('shows an ellipsis while the recipients load and guards the delete', async () => {
+    const api = makeApi({ getGremiumMailRecipients: jest.fn(() => of({ recipients: [] })) });
+    const { fixture } = await setup({ api });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = view.fixture.componentInstance as any;
-    expect(c.loadError()).toBe(true);
-    expect(c.loading()).toBe(false);
-    expect(c.cdVariants()).toEqual([]);
-    http.verify();
-  });
-
-  it('resolves the CD-variant id to its name and shows a dash without one', async () => {
-    const { c } = await setup();
-    expect(c.cdVariantName(GREMIUM)).toBe('StuPa');
-    expect(c.cdVariantName({ ...GREMIUM, cdVariantId: null })).toBe('—');
-    expect(c.cdOptions()).toEqual([
-      { value: 'cd-1', label: 'StuPa' },
-      { value: 'cd-2', label: 'AStA' },
-    ]);
-  });
-
-  it('slugPreview shows a dash for an empty name and the slug otherwise', async () => {
-    const { c } = await setup([]);
-    expect(c.slugPreview()).toBe('—');
-    c.patch('name', 'AStA Vorstand');
-    expect(c.slugPreview()).toBe('asta-vorstand');
-  });
-
-  it('patchLead clamps to 0 for empty/invalid/negative, keeps positive ints', async () => {
-    const { c } = await setup([]);
-    c.openCreate();
-    c.patchLead(15);
-    expect(c.form().delegationLeadMinutes).toBe(15);
-    c.patchLead('');
-    expect(c.form().delegationLeadMinutes).toBe(0);
-    c.patchLead(-5);
-    expect(c.form().delegationLeadMinutes).toBe(0);
-    c.patchLead('abc');
-    expect(c.form().delegationLeadMinutes).toBe(0);
-    c.patchLead(7.6);
-    expect(c.form().delegationLeadMinutes).toBe(8); // rounds
-  });
-
-  it('patchQuorum: null/empty/undefined → null, else clamps to 0..100', async () => {
-    const { c } = await setup([]);
-    c.openCreate();
-    c.patchQuorum(null);
-    expect(c.form().quorumPercent).toBeNull();
-    c.patchQuorum('');
-    expect(c.form().quorumPercent).toBeNull();
-    c.patchQuorum(undefined);
-    expect(c.form().quorumPercent).toBeNull();
-    c.patchQuorum(50);
-    expect(c.form().quorumPercent).toBe(50);
-    c.patchQuorum(150);
-    expect(c.form().quorumPercent).toBe(100);
-    c.patchQuorum(-10);
-    expect(c.form().quorumPercent).toBe(0);
-    c.patchQuorum('abc');
-    expect(c.form().quorumPercent).toBeNull(); // NaN → null
-    c.patchQuorum(33.4);
-    expect(c.form().quorumPercent).toBe(33); // rounds
-  });
-
-  it('creates a committee via a dialog with an auto-generated slug', async () => {
-    const { http } = await setup([]);
-    await userEvent.click(screen.getByRole('button', { name: 'Gremium hinzufügen' }));
-    await userEvent.type(screen.getByLabelText(/^Name/), 'AStA Vorstand');
-    await userEvent.selectOptions(screen.getByLabelText(/CD-Variante/), 'cd-2');
-    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
-
-    const post = http.expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'POST');
-    expect(post.request.body).toEqual({
-      name: 'AStA Vorstand',
-      slug: 'asta-vorstand',
-      cdVariantId: 'cd-2',
-      defaultLang: 'de',
-      allowVoteDelegation: false,
-      delegationLeadMinutes: 0,
-      delegationAllowExternal: false,
-      quorumPercent: null,
-    });
-    post.flush({ ...GREMIUM, id: 'g-2', name: 'AStA Vorstand', slug: 'asta-vorstand' });
-    const putMail = http.expectOne(
-      (r) => r.url.endsWith('/admin/gremien/g-2/mail-recipients') && r.method === 'PUT',
-    );
-    expect(putMail.request.body).toEqual({ recipients: [] });
-    putMail.flush({ recipients: [] });
-    http.expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'GET').flush([]);
-    http.verify();
-  });
-
-  it('create slug falls back to the lowercased trimmed name when slugify is empty', async () => {
-    const { http, c } = await setup([]);
-    c.openCreate();
-    c.patch('name', '???'); // slugify → '' → fallback to lowercased trimmed name
-    c.patch('mailRecipients', 'a@x.de\nb@y.de, c@z.de; d@w.de');
-    c.submit(new Event('submit'));
-    const post = http.expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'POST');
-    expect(post.request.body.slug).toBe('???');
-    post.flush({ ...GREMIUM, id: 'g-9', name: '???' });
-    const putMail = http.expectOne(
-      (r) => r.url.endsWith('/admin/gremien/g-9/mail-recipients') && r.method === 'PUT',
-    );
-    // parseRecipients splits on newlines/commas/semicolons and trims
-    expect(putMail.request.body).toEqual({ recipients: ['a@x.de', 'b@y.de', 'c@z.de', 'd@w.de'] });
-    putMail.flush({ recipients: [] });
-    http.expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'GET').flush([]);
-    http.verify();
-  });
-
-  it('edits a committee via PATCH (slug stays) incl. extra recipients', async () => {
-    const { http } = await setup();
-    await screen.findByText('Studierendenparlament');
-    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
-    http
-      .expectOne((r) => r.url.endsWith('/admin/gremien/g-1/mail-recipients') && r.method === 'GET')
-      .flush({ recipients: ['alt@x.de'] });
-    const name = screen.getByLabelText(/^Name/);
-    await userEvent.clear(name);
-    await userEvent.type(name, 'StuPa 2026');
-    await userEvent.selectOptions(screen.getByLabelText(/Standardsprache/), 'en');
-    const mail = screen.getByLabelText('Zusätzliche Protokoll-Empfänger');
-    await userEvent.clear(mail);
-    await userEvent.type(mail, 'neu@y.org');
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-
-    const patch = http.expectOne((r) => r.url.endsWith('/admin/gremien/g-1') && r.method === 'PATCH');
-    expect(patch.request.body).toEqual({
-      name: 'StuPa 2026',
-      cdVariantId: 'cd-1',
-      defaultLang: 'en',
-      allowVoteDelegation: false,
-      delegationLeadMinutes: 0,
-      delegationAllowExternal: false,
-      quorumPercent: null,
-    });
-    patch.flush({ ...GREMIUM, name: 'StuPa 2026', defaultLang: 'en' });
-    const putMail = http.expectOne(
-      (r) => r.url.endsWith('/admin/gremien/g-1/mail-recipients') && r.method === 'PUT',
-    );
-    expect(putMail.request.body).toEqual({ recipients: ['neu@y.org'] });
-    putMail.flush({ recipients: ['neu@y.org'] });
-    http.expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'GET').flush([]);
-    http.verify();
-  });
-
-  it('openEdit loads existing values incl. optional delegation/quorum fields', async () => {
-    const full: Gremium = {
-      ...GREMIUM,
-      allowVoteDelegation: true,
-      delegationLeadMinutes: 30,
-      delegationAllowExternal: true,
-      quorumPercent: 50,
-    };
-    const { http, c } = await setup([full]);
-    c.openEdit(full);
-    // mail-recipients lazy load on edit
-    http
-      .expectOne((r) => r.url.endsWith('/admin/gremien/g-1/mail-recipients') && r.method === 'GET')
-      .flush({ recipients: ['x@y.de', 'z@w.de'] });
-    expect(c.editingId()).toBe('g-1');
-    expect(c.form()).toEqual({
-      name: 'Studierendenparlament',
-      cdVariantId: 'cd-1',
-      defaultLang: 'de',
-      allowVoteDelegation: true,
-      delegationLeadMinutes: 30,
-      delegationAllowExternal: true,
-      quorumPercent: 50,
-      mailRecipients: 'x@y.de\nz@w.de',
-    });
-    http.verify();
-  });
-
-  it('openEdit defaults optional fields when absent and ignores recipient load errors', async () => {
-    const { http, c } = await setup();
-    c.openEdit({ ...GREMIUM, cdVariantId: null });
-    http
-      .expectOne((r) => r.url.endsWith('/admin/gremien/g-1/mail-recipients') && r.method === 'GET')
-      .flush('no', { status: 500, statusText: 'err' });
-    expect(c.form().cdVariantId).toBe(''); // no variant → the placeholder option
-    expect(c.form().delegationLeadMinutes).toBe(0);
-    expect(c.form().delegationAllowExternal).toBe(false);
-    expect(c.form().quorumPercent).toBeNull();
-    expect(c.form().mailRecipients).toBe(''); // unchanged on error
-    http.verify();
-  });
-
-  it('submit is a no-op for a blank name', async () => {
-    const { http, c } = await setup([]);
-    c.openCreate();
-    c.patch('name', '   ');
-    c.submit(new Event('submit'));
-    expect(c.saving()).toBe(false);
-    http.verify(); // no POST emitted
-  });
-
-  it('submit is a no-op while already saving', async () => {
-    const { http, c } = await setup([]);
-    c.openCreate();
-    c.patch('name', 'X');
-    c.saving.set(true);
-    c.submit(new Event('submit'));
-    http.verify(); // no request since saving guard short-circuits
-  });
-
-  it('closeDialog closes the dialog', async () => {
-    const { c } = await setup([]);
-    c.openCreate();
-    expect(c.dialogOpen()).toBe(true);
-    c.closeDialog();
-    expect(c.dialogOpen()).toBe(false);
-  });
-
-  it('create error path resets saving and shows an error toast', async () => {
-    const { http, c } = await setup([]);
-    c.openCreate();
-    c.patch('name', 'Boom');
-    c.submit(new Event('submit'));
-    http
-      .expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'POST')
-      .flush('no', { status: 500, statusText: 'err' });
-    expect(c.saving()).toBe(false);
-    http.verify();
-  });
-
-  it('update error path resets saving and shows an error toast', async () => {
-    const { http, c } = await setup();
-    c.editingId.set('g-1');
-    c.patch('name', 'New');
-    c.submit(new Event('submit'));
-    http
-      .expectOne((r) => r.url.endsWith('/admin/gremien/g-1') && r.method === 'PATCH')
-      .flush('no', { status: 500, statusText: 'err' });
-    expect(c.saving()).toBe(false);
-    http.verify();
-  });
-
-  it('recipients-save error path resets saving', async () => {
-    const { http, c } = await setup([]);
-    c.openCreate();
-    c.patch('name', 'X');
-    c.submit(new Event('submit'));
-    http
-      .expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'POST')
-      .flush({ ...GREMIUM, id: 'g-2', name: 'X' });
-    http
-      .expectOne((r) => r.url.endsWith('/admin/gremien/g-2/mail-recipients') && r.method === 'PUT')
-      .flush('no', { status: 500, statusText: 'err' });
-    expect(c.saving()).toBe(false);
-    http.verify();
-  });
-
-  it('askDelete + doDelete deletes and reloads; success state cleared', async () => {
-    const { http, c } = await setup();
-    c.askDelete(GREMIUM);
-    expect(c.confirmDelete()).toEqual(GREMIUM);
+    const c = fixture.componentInstance as any;
+    const fresh = { ...GREMIEN[1], id: 'g-fresh' };
+    const last = c.settings(fresh).at(-1);
+    expect(last.value).toBe('…');
     c.doDelete();
-    http
-      .expectOne((r) => r.url.endsWith('/admin/gremien/g-1') && r.method === 'DELETE')
-      .flush(null);
-    http.expectOne((r) => r.url.endsWith('/admin/gremien') && r.method === 'GET').flush([]);
-    expect(c.deleting()).toBe(false);
-    expect(c.confirmDelete()).toBeNull();
-    http.verify();
-  });
-
-  it('doDelete is a no-op without a confirm target or while deleting', async () => {
-    const { http, c } = await setup();
-    c.doDelete(); // no target
-    c.confirmDelete.set(GREMIUM);
+    c.confirmDelete.set(GREMIEN[1]);
     c.deleting.set(true);
-    c.doDelete(); // already deleting
-    http.verify(); // no DELETE
-  });
-
-  it('doDelete error path resets deleting and shows an error toast', async () => {
-    const { http, c } = await setup();
-    c.askDelete(GREMIUM);
     c.doDelete();
-    http
-      .expectOne((r) => r.url.endsWith('/admin/gremien/g-1') && r.method === 'DELETE')
-      .flush('no', { status: 500, statusText: 'err' });
-    expect(c.deleting()).toBe(false);
-    http.verify();
-  });
-
-  it('keeps create disabled until a name is set', async () => {
-    await setup([]);
-    await userEvent.click(screen.getByRole('button', { name: 'Gremium hinzufügen' }));
-    const add = screen.getByRole('button', { name: 'Anlegen' });
-    expect(add).toBeDisabled();
-    await userEvent.type(screen.getByLabelText(/^Name/), 'X');
-    expect(add).toBeEnabled();
-  });
-
-  it('openCreate resets to a fresh empty form', async () => {
-    const { c } = await setup();
-    c.editingId.set('g-1');
-    c.patch('name', 'leftover');
-    c.openCreate();
-    expect(c.editingId()).toBeNull();
-    expect(c.form().name).toBe('');
-    expect(c.dialogOpen()).toBe(true);
+    expect(api.deleteGremium).not.toHaveBeenCalled();
   });
 });

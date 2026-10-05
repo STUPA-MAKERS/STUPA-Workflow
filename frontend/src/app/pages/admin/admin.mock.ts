@@ -134,6 +134,26 @@ export const MOCK_PRINCIPALS: AdminPrincipal[] = [
     oidcGroups: ['stupa-mitglieder'],
     assignments: [],
   },
+  ...(
+    [
+      ['p-6', 'pat.protokoll', 'Pat Protokoll', ['stupa-mitglieder', 'stupa-protokoll']],
+      ['p-7', 'toni.vorsitz', 'Toni Vorsitz', ['stupa-mitglieder', 'stupa-sitzungsleitung', 'asta-referate', 'asta-vorstand']],
+      ['p-8', 'mika.muster', 'Mika Muster', ['stupa-mitglieder']],
+      ['p-9', 'charlie.probe', 'Charlie Probe', ['stupa-mitglieder']],
+      ['p-10', 'dana.demo', 'Dana Demo', ['stupa-mitglieder']],
+      ['p-11', 'eli.exempel', 'Eli Exempel', ['stupa-mitglieder']],
+    ] as const
+  ).map(
+    ([id, user, name, groups]): AdminPrincipal => ({
+      id,
+      sub: `kc|${user}`,
+      email: `${user}@stupa.example`,
+      displayName: name,
+      lastLogin: '2026-06-03T16:00:00+00:00',
+      oidcGroups: [...groups],
+      assignments: [],
+    }),
+  ),
 ];
 
 /**
@@ -144,8 +164,8 @@ export const MOCK_PRINCIPALS: AdminPrincipal[] = [
 export const MOCK_GREMIUM_STUPA_ID = 'g0000000-0000-0000-0000-000000000001';
 
 export const MOCK_GREMIEN: Gremium[] = [
-  { id: MOCK_GREMIUM_STUPA_ID, name: 'Studierendenparlament', slug: 'stupa', cdVariantId: 'cd-stupa', defaultLang: 'de', allowVoteDelegation: true },
-  { id: 'g-asta', name: 'AStA', slug: 'asta', cdVariantId: 'cd-asta', defaultLang: 'de', allowVoteDelegation: false },
+  { id: MOCK_GREMIUM_STUPA_ID, name: 'Studierendenparlament', slug: 'stupa', cdVariantId: 'cd-stupa', defaultLang: 'de', allowVoteDelegation: true, delegationLeadMinutes: 60, delegationAllowExternal: false, quorumPercent: 50 },
+  { id: 'g-asta', name: 'AStA', slug: 'asta', cdVariantId: 'cd-asta', defaultLang: 'de', allowVoteDelegation: false, delegationLeadMinutes: 0, delegationAllowExternal: false, quorumPercent: null },
 ];
 
 /**
@@ -160,17 +180,32 @@ export const MOCK_ROLES: Role[] = [
   { id: 'r-admin', key: 'admin', label: { de: 'Administration', en: 'Administration' }, permissions: [...MOCK_PERMISSIONS] },
 ];
 
-/** The forced roles of each mock gremium (board, manager, member). */
-export const MOCK_GREMIUM_ROLES: GremiumRole[] = MOCK_GREMIEN.flatMap((g) => [
-  { id: `gr-${g.slug}-board`, gremiumId: g.id, key: 'board', name: { de: 'Vorstand', en: 'Board' }, forced: true, permissions: ['session.manage', 'vote.manage', 'vote.cast', 'protocol.write', 'protocol.finalize'] },
-  { id: `gr-${g.slug}-manager`, gremiumId: g.id, key: 'manager', name: { de: 'Sitzungsleitung', en: 'Chair' }, forced: true, permissions: ['session.manage', 'vote.manage', 'vote.cast'] },
-  { id: `gr-${g.slug}-member`, gremiumId: g.id, key: 'member', name: { de: 'Mitglied', en: 'Member' }, forced: true, permissions: ['vote.cast'] },
-]);
+/**
+ * The forced roles of each mock gremium (mirror of `FORCED_GREMIUM_ROLES` in the backend)
+ * and one own role of the Studierendenparlament.
+ */
+export const MOCK_GREMIUM_ROLES: GremiumRole[] = [
+  ...MOCK_GREMIEN.flatMap((g) => [
+    { id: `gr-${g.slug}-vorstand`, gremiumId: g.id, key: 'vorstand', name: { de: 'Vorstand', en: 'Board' }, forced: true, permissions: ['session.manage', 'vote.manage', 'vote.cast', 'protocol.write', 'protocol.finalize'] },
+    { id: `gr-${g.slug}-manager`, gremiumId: g.id, key: 'manager', name: { de: 'Manager', en: 'Manager' }, forced: true, permissions: ['session.manage', 'vote.manage', 'vote.cast', 'protocol.write', 'protocol.finalize'] },
+    { id: `gr-${g.slug}-member`, gremiumId: g.id, key: 'member', name: { de: 'Mitglied', en: 'Member' }, forced: true, permissions: ['vote.cast'] },
+  ]),
+  { id: 'gr-stupa-protokoll', gremiumId: MOCK_GREMIUM_STUPA_ID, key: 'protokoll', name: { de: 'Protokoll', en: 'Minutes' }, forced: false, permissions: ['vote.cast', 'protocol.write'] },
+];
 
 /** Read-only memberships. In the real backend the OIDC group sync writes them. */
 export const MOCK_GREMIUM_MEMBERSHIPS: GremiumMembership[] = [
-  { id: 'gms-1', principalId: 'p-1', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-board' },
+  { id: 'gms-1', principalId: 'p-1', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-vorstand' },
   { id: 'gms-2', principalId: 'p-2', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-member' },
+  { id: 'gms-3', principalId: 'p-6', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-protokoll' },
+  { id: 'gms-4', principalId: 'p-7', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-manager' },
+  { id: 'gms-5', principalId: 'p-4', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-member' },
+  { id: 'gms-6', principalId: 'p-8', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-member' },
+  { id: 'gms-7', principalId: 'p-9', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-member' },
+  { id: 'gms-8', principalId: 'p-10', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-member' },
+  { id: 'gms-9', principalId: 'p-11', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-member' },
+  { id: 'gms-10', principalId: 'p-4', gremiumId: 'g-asta', gremiumRoleId: 'gr-asta-member' },
+  { id: 'gms-11', principalId: 'p-7', gremiumId: 'g-asta', gremiumRoleId: 'gr-asta-vorstand' },
 ];
 
 /** OIDC group → global role. */
@@ -187,8 +222,16 @@ export const MOCK_GREMIUM_MEMBERSHIP_MAPPINGS: GremiumMembershipMapping[] = [
 
 /** OIDC group → role of one gremium. */
 export const MOCK_GREMIUM_ROLE_MAPPINGS: GremiumRoleMapping[] = [
-  { id: 'grm-1', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-board', oidcGroup: 'stupa-praesidium' },
+  { id: 'grm-1', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-vorstand', oidcGroup: 'stupa-praesidium' },
+  { id: 'grm-2', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-manager', oidcGroup: 'stupa-sitzungsleitung' },
+  { id: 'grm-3', gremiumId: MOCK_GREMIUM_STUPA_ID, gremiumRoleId: 'gr-stupa-protokoll', oidcGroup: 'stupa-protokoll' },
+  { id: 'grm-4', gremiumId: 'g-asta', gremiumRoleId: 'gr-asta-vorstand', oidcGroup: 'asta-vorstand' },
 ];
+
+/** Extra protocol recipients per gremium (`/admin/gremien/{id}/mail-recipients`). */
+export const MOCK_GREMIUM_MAIL_RECIPIENTS: Record<string, string[]> = {
+  [MOCK_GREMIUM_STUPA_ID]: ['protokolle@stupa.example', 'verteiler@lists.stupa.example'],
+};
 
 /** Seed for the forms overview, until `/admin/application-types` is real. */
 export const MOCK_FORMS: FormOverviewItem[] = [

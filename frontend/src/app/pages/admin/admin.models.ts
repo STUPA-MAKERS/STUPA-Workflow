@@ -550,13 +550,18 @@ export interface GremiumRole {
   gremiumId: Uuid;
   key: string;
   name: I18nMap;
-  /** Forced role (board/manager/member) — present in every gremium, not deletable. */
+  /** Forced role (`vorstand`, `manager`, `member`): present in every gremium, not deletable. */
   forced?: boolean;
-  /** Granular meeting permissions (session.manage/vote.manage/vote.cast/protocol.write). */
+  /** The gremium permissions of the role, a subset of {@link GREMIUM_PERMISSIONS}. */
   permissions?: string[];
 }
 
-/** Configurable granular gremium-role permissions. */
+/**
+ * The fixed catalogue of gremium permissions (O7), in display order. It mirrors
+ * `GREMIUM_PERMISSIONS` in `backend/app/modules/admin/gremium_roles.py`. The catalogue
+ * is not configurable, so this list is the source of the role matrix and the role
+ * dialog.
+ */
 export const GREMIUM_PERMISSIONS = [
   'session.manage',
   'vote.manage',
@@ -564,6 +569,30 @@ export const GREMIUM_PERMISSIONS = [
   'protocol.write',
   'protocol.finalize',
 ] as const;
+
+/** One key of the fixed gremium permission catalogue. */
+export type GremiumPermission = (typeof GREMIUM_PERMISSIONS)[number];
+
+/**
+ * The keys of the forced gremium roles, in display order. Every gremium has them and
+ * nobody can delete them. A member without a role mapping gets `member`.
+ */
+export const FORCED_GREMIUM_ROLE_KEYS = ['vorstand', 'manager', 'member'] as const;
+
+/** The key of the forced role that every member without a role mapping gets. */
+export const MEMBER_GREMIUM_ROLE_KEY = 'member';
+
+/**
+ * Sort the roles of one gremium for display: the forced roles first, in the order of
+ * {@link FORCED_GREMIUM_ROLE_KEYS}, then the other roles by name.
+ */
+export function sortGremiumRoles(roles: readonly GremiumRole[], label: (r: GremiumRole) => string): GremiumRole[] {
+  const rank = (r: GremiumRole): number => {
+    const i = (FORCED_GREMIUM_ROLE_KEYS as readonly string[]).indexOf(r.key);
+    return i < 0 ? FORCED_GREMIUM_ROLE_KEYS.length : i;
+  };
+  return [...roles].sort((a, b) => rank(a) - rank(b) || label(a).localeCompare(label(b)));
+}
 
 /** Kind of a named deadline policy. */
 export type DeadlineKind =
@@ -634,6 +663,10 @@ export interface GremiumMembership {
   principalId: Uuid;
   gremiumId: Uuid;
   gremiumRoleId: Uuid;
+  /** The display name of the member. `null` when the IdP gives none. */
+  displayName?: string | null;
+  /** The e-mail address of the member. `null` when the IdP gives none. */
+  email?: string | null;
 }
 
 /**

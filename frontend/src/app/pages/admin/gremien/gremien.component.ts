@@ -1,263 +1,224 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import type { Uuid } from '@core/api/models';
+import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { Uuid } from '@core/api/models';
+import {
+  EmptyStateComponent,
+  NoteComponent,
+  PageHeaderComponent,
+  SkeletonComponent,
+} from '@shared/ui';
 import {
   ButtonComponent,
-  CellDirective,
-  CheckboxComponent,
-  type ColumnDef,
-  DataTableComponent,
   DialogComponent,
   IconComponent,
-  InputComponent,
-  SelectComponent,
-  type SelectOption,
+  ToastService,
 } from '@stupa-makers/ui-kit';
-import { ToastService } from '@stupa-makers/ui-kit';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { AdminApiService } from '../admin-api.service';
-import {
-  type CdVariantOption,
-  type Gremium,
-  type GremiumCreateBody,
-  type GremiumUpdateBody,
-  slugify,
-} from '../admin.models';
+import type { CdVariantOption, Gremium } from '../admin.models';
+import { GremiumRoleMatrixComponent } from '../gremium-roles/gremium-role-matrix.component';
+import { GremiumDialogComponent } from './gremium-dialog/gremium-dialog.component';
 
-/** Edit form state of a gremium. The page builds the slug automatically. */
-interface GremiumForm {
-  name: string;
-  /** Id of the chosen CD variant. `''` = none, which sends `null`. */
-  cdVariantId: string;
-  defaultLang: string;
-  allowVoteDelegation: boolean;
-  /** Lead time in minutes before meeting start for non-pool delegations. */
-  delegationLeadMinutes: number;
-  /** Allow a delegation to an external person outside the gremium and the pool. */
-  delegationAllowExternal: boolean;
-  /** Default quorum in percent of eligible voters. Null means no default. */
-  quorumPercent: number | null;
-  /** Extra protocol recipients, one address per line. */
-  mailRecipients: string;
-}
-
-function emptyForm(): GremiumForm {
-  return {
-    name: '',
-    cdVariantId: '',
-    defaultLang: 'de',
-    allowVoteDelegation: false,
-    delegationLeadMinutes: 0,
-    delegationAllowExternal: false,
-    quorumPercent: null,
-    mailRecipients: '',
-  };
-}
-
-/** Split the textarea content into addresses. Newline, comma and semicolon separate. */
-function parseRecipients(raw: string): string[] {
-  return raw
-    .split(/[\n,;]+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+/** One setting of a gremium in the read-out of an open row. */
+interface Setting {
+  label: string;
+  value: string;
+  /** The value is a list of e-mail addresses: it wraps and never gets cut. */
+  copyable?: boolean;
 }
 
 /**
- * Gremien administration.
+ * Gremien administration (`/admin/gremien`, boards Verwaltung-Gremium-Dialog and
+ * Verwaltung-Gremiumrolle-Dialog).
  *
- * The table lists all gremien. Create and edit run in a dialog, not inline. The page
- * builds the slug from the name. Vote delegation is a per-gremium setting. "Members"
- * opens the subpage of a gremium at `/admin/gremien/:id`.
+ * One row per gremium: name, slug, "n Mitglieder · n Rollen", the link to the members,
+ * edit, delete and the toggle. An open row shows the settings (gaps N38) and the role
+ * matrix of the gremium (`app-gremium-role-matrix`); the first row starts open. The
+ * memberships come from the OIDC groups, so this page has no member editing. The dialog
+ * `app-gremium-dialog` creates and edits a gremium.
  */
 @Component({
   selector: 'app-admin-gremien',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    FormsModule,
     RouterLink,
     TranslatePipe,
     ButtonComponent,
-    CheckboxComponent,
-    InputComponent,
-    SelectComponent,
     DialogComponent,
-    DataTableComponent,
-    CellDirective,
     IconComponent,
+    EmptyStateComponent,
+    NoteComponent,
     PageHeaderComponent,
+    SkeletonComponent,
+    GremiumDialogComponent,
+    GremiumRoleMatrixComponent,
   ],
   templateUrl: './gremien.component.html',
   styleUrl: './gremien.component.scss',
 })
 export class AdminGremienComponent {
   private readonly api = inject(AdminApiService);
+  private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
   readonly gremien = signal<Gremium[]>([]);
   readonly loading = signal(true);
   readonly loadError = signal(false);
-  readonly saving = signal(false);
-  readonly dialogOpen = signal(false);
-  readonly editingId = signal<Uuid | null>(null);
-  readonly form = signal<GremiumForm>(emptyForm());
+  /** CD variants from `GET /cd-variants`: the dropdown source and the read-out names. */
+  readonly cdVariants = signal<CdVariantOption[]>([]);
+  /** The ids of the open rows. */
+  protected readonly expanded = signal<ReadonlySet<string>>(new Set());
+  /** The extra protocol recipients of the open rows, by gremium id. */
+  private readonly recipients = signal<ReadonlyMap<string, string[] | null>>(new Map());
+
+  /** The dialog: `undefined` = closed, `null` = a new gremium, else the gremium to edit. */
+  protected readonly dialogGremium = signal<Gremium | null | undefined>(undefined);
+  /** The last gremium of the dialog. It stays while the dialog closes. */
+  protected readonly lastDialogGremium = signal<Gremium | null>(null);
   readonly confirmDelete = signal<Gremium | null>(null);
   readonly deleting = signal(false);
-  /** CD variants from `GET /cd-variants` — the source of the dropdown. */
-  readonly cdVariants = signal<CdVariantOption[]>([]);
 
-  readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'name', label: this.i18n.translate('admin.gremien.name') },
-    { key: 'slug', label: this.i18n.translate('admin.gremien.slug') },
-    { key: 'cdVariant', label: this.i18n.translate('admin.gremien.cdVariant') },
-    { key: 'defaultLang', label: this.i18n.translate('admin.gremien.defaultLang') },
-    { key: 'delegation', label: this.i18n.translate('admin.gremien.delegationShort'), align: 'start', width: '7rem' },
-    { key: 'actions', label: this.i18n.translate('admin.gremien.actions'), align: 'end' },
-  ]);
-  readonly rowId = (g: unknown): string => (g as Gremium).id;
-
-  readonly cdOptions = computed<SelectOption[]>(() =>
-    this.cdVariants().map((v) => ({ value: v.id, label: v.name })),
-  );
-  readonly langOptions = computed<SelectOption[]>(() => [
-    { value: 'de', label: this.i18n.translate('admin.gremien.langDe') },
-    { value: 'en', label: this.i18n.translate('admin.gremien.langEn') },
-  ]);
-
-  readonly slugPreview = computed(() => slugify(this.form().name) || '—');
+  /** The note links to the group mappings only with that permission. */
+  protected readonly canMappings = computed(() => this.auth.can('admin.group_mappings'));
 
   constructor() {
-    this.reload();
+    this.reload(true);
     this.api.listCdVariantOptions().subscribe({
       next: (v) => this.cdVariants.set(v),
       error: () => this.cdVariants.set([]),
     });
   }
 
-  /** Resolve a gremium's CD-variant id to its name. Never show the raw id. */
-  cdVariantName(g: Gremium): string {
-    const hit = this.cdVariants().find((v) => v.id === g.cdVariantId);
-    return hit ? hit.name : '—';
+  protected isOpen(g: Gremium): boolean {
+    return this.expanded().has(g.id);
   }
 
-  patch<K extends keyof GremiumForm>(key: K, value: GremiumForm[K]): void {
-    this.form.update((f) => ({ ...f, [key]: value }));
-  }
-
-  /** Lead-time input: empty/invalid → 0, otherwise a non-negative integer. */
-  patchLead(value: number | string | null): void {
-    const n = Math.round(Number(value));
-    this.form.update((f) => ({
-      ...f,
-      delegationLeadMinutes: Number.isFinite(n) && n > 0 ? n : 0,
-    }));
-  }
-
-  /** Quorum input: empty → null (no default), otherwise clamped to 0–100. */
-  patchQuorum(value: number | string | null): void {
-    let next: number | null;
-    if (value === null || value === '' || value === undefined) {
-      next = null;
+  protected toggle(g: Gremium): void {
+    const next = new Set(this.expanded());
+    if (next.has(g.id)) {
+      next.delete(g.id);
     } else {
-      const n = Math.round(Number(value));
-      next = Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : null;
+      next.add(g.id);
+      this.loadRecipients(g.id);
     }
-    this.form.update((f) => ({ ...f, quorumPercent: next }));
+    this.expanded.set(next);
   }
 
-  openCreate(): void {
-    this.editingId.set(null);
-    this.form.set(emptyForm());
-    this.dialogOpen.set(true);
-  }
-
-  openEdit(g: Gremium): void {
-    this.editingId.set(g.id);
-    this.form.set({
-      name: g.name,
-      cdVariantId: g.cdVariantId ?? '',
-      defaultLang: g.defaultLang,
-      allowVoteDelegation: g.allowVoteDelegation,
-      delegationLeadMinutes: g.delegationLeadMinutes ?? 0,
-      delegationAllowExternal: g.delegationAllowExternal ?? false,
-      quorumPercent: g.quorumPercent ?? null,
-      mailRecipients: '',
-    });
-    this.dialogOpen.set(true);
-    this.api.getGremiumMailRecipients(g.id).subscribe({
-      next: ({ recipients }) =>
-        this.form.update((f) => ({ ...f, mailRecipients: recipients.join('\n') })),
-      error: () => {},
+  private loadRecipients(id: Uuid): void {
+    if (this.recipients().has(id)) return;
+    this.api.getGremiumMailRecipients(id).subscribe({
+      next: ({ recipients }) => this.setRecipients(id, recipients),
+      error: () => this.setRecipients(id, null),
     });
   }
 
-  closeDialog(): void {
-    this.dialogOpen.set(false);
+  private setRecipients(id: string, list: string[] | null): void {
+    this.recipients.update((m) => new Map(m).set(id, list));
   }
 
-  submit(event: Event): void {
-    event.preventDefault();
-    const f = this.form();
-    if (!f.name.trim() || this.saving()) return;
-    this.saving.set(true);
-    const id = this.editingId();
-    if (id) {
-      const body: GremiumUpdateBody = {
-        name: f.name.trim(),
-        cdVariantId: f.cdVariantId || null,
-        defaultLang: f.defaultLang,
-        allowVoteDelegation: f.allowVoteDelegation,
-        delegationLeadMinutes: f.delegationLeadMinutes,
-        delegationAllowExternal: f.delegationAllowExternal,
-        quorumPercent: f.quorumPercent,
-      };
-      this.api.updateGremium(id, body).subscribe({
-        next: () => this.saveRecipients(id, 'admin.gremien.toast.updated'),
-        error: () => this.onSaveError(),
-      });
-    } else {
-      const body: GremiumCreateBody = {
-        name: f.name.trim(),
-        slug: slugify(f.name) || f.name.trim().toLowerCase(),
-        cdVariantId: f.cdVariantId || null,
-        defaultLang: f.defaultLang,
-        allowVoteDelegation: f.allowVoteDelegation,
-        delegationLeadMinutes: f.delegationLeadMinutes,
-        delegationAllowExternal: f.delegationAllowExternal,
-        quorumPercent: f.quorumPercent,
-      };
-      this.api.createGremium(body).subscribe({
-        next: (created) => this.saveRecipients(created.id, 'admin.gremien.toast.created'),
-        error: () => this.onSaveError(),
-      });
+  /** "n Mitglieder · n Rollen" of a row, or `null` without the counts. */
+  protected counts(g: Gremium): string | null {
+    if (g.memberCount === undefined || g.roleCount === undefined) return null;
+    const members = this.i18n.translate(
+      g.memberCount === 1 ? 'admin.home.memberCountOne' : 'admin.home.memberCount',
+      { count: g.memberCount },
+    );
+    const roles = this.i18n.translate(
+      g.roleCount === 1 ? 'admin.home.roleCountOne' : 'admin.home.roleCount',
+      {
+        count: g.roleCount,
+      },
+    );
+    return `${members} · ${roles}`;
+  }
+
+  /** The settings of a gremium as label and value, for the read-out of an open row. */
+  protected settings(g: Gremium): Setting[] {
+    const t = (k: Parameters<I18nService['translate']>[0], p?: Record<string, string | number>) =>
+      this.i18n.translate(k, p);
+    const yesNo = (v: boolean | undefined) => t(v ? 'admin.gremien.yes' : 'admin.gremien.no');
+    const cd = this.cdVariants().find((v) => v.id === g.cdVariantId);
+    const lead = g.delegationLeadMinutes ?? 0;
+    const recipients = this.recipients().get(g.id);
+    const list: Setting[] = [
+      {
+        label: t('admin.gremien.cdVariant'),
+        value: cd ? cd.name : t('admin.gremien.cdVariantDefault'),
+      },
+      {
+        label: t('admin.gremien.defaultLang'),
+        value: t(g.defaultLang === 'en' ? 'admin.gremien.langEn' : 'admin.gremien.langDe'),
+      },
+      {
+        label: t('admin.gremien.quorumShort'),
+        value:
+          g.quorumPercent === null || g.quorumPercent === undefined
+            ? t('admin.gremien.noQuorum')
+            : t('admin.gremien.percent', { value: g.quorumPercent }),
+      },
+      { label: t('admin.gremien.delegation'), value: yesNo(g.allowVoteDelegation) },
+    ];
+    if (g.allowVoteDelegation) {
+      list.push(
+        {
+          label: t('admin.gremien.delegationLeadShort'),
+          value:
+            lead > 0 ? t('admin.gremien.minutes', { value: lead }) : t('admin.gremien.untilStart'),
+        },
+        { label: t('admin.gremien.delegationExternal'), value: yesNo(g.delegationAllowExternal) },
+      );
     }
-  }
-
-  /** Save extra protocol recipients after the base data. */
-  private saveRecipients(
-    id: Uuid,
-    key: 'admin.gremien.toast.created' | 'admin.gremien.toast.updated',
-  ): void {
-    this.api.setGremiumMailRecipients(id, parseRecipients(this.form().mailRecipients)).subscribe({
-      next: () => this.onSaved(key),
-      error: () => this.onSaveError(),
+    list.push({
+      label: t('admin.gremien.mailRecipients'),
+      value:
+        recipients === undefined
+          ? '…'
+          : recipients === null
+            ? t('admin.gremien.recipientsLoadFailed')
+            : recipients.length
+              ? recipients.join(', ')
+              : t('admin.gremien.noRecipients'),
+      copyable: !!recipients?.length,
     });
+    return list;
   }
 
-  private onSaved(key: 'admin.gremien.toast.created' | 'admin.gremien.toast.updated'): void {
-    this.saving.set(false);
-    this.dialogOpen.set(false);
-    this.toast.success(this.i18n.translate(key));
-    this.reload();
+  protected openCreate(): void {
+    this.lastDialogGremium.set(null);
+    this.dialogGremium.set(null);
   }
 
-  private onSaveError(): void {
-    this.saving.set(false);
-    this.toast.error(this.i18n.translate('admin.gremien.toast.failed'));
+  protected openEdit(g: Gremium): void {
+    this.lastDialogGremium.set(g);
+    this.dialogGremium.set(g);
+  }
+
+  protected closeDialog(): void {
+    this.dialogGremium.set(undefined);
+  }
+
+  protected onSaved(event: { gremium: Gremium; created: boolean; recipients: string[] }): void {
+    this.dialogGremium.set(undefined);
+    this.setRecipients(event.gremium.id, event.recipients);
+    this.toast.success(
+      this.i18n.translate(
+        event.created ? 'admin.gremien.toast.created' : 'admin.gremien.toast.updated',
+      ),
+    );
+    // A new gremium opens, so its roles show at once.
+    if (event.created) this.expanded.update((s) => new Set(s).add(event.gremium.id));
+    this.reload(false);
+  }
+
+  /** A role was added or deleted in the matrix: the count of the row follows. */
+  protected onRoleCount(g: Gremium, count: number): void {
+    this.gremien.update((list) =>
+      list.map((x) => (x.id === g.id ? { ...x, roleCount: count } : x)),
+    );
   }
 
   askDelete(g: Gremium): void {
@@ -273,22 +234,24 @@ export class AdminGremienComponent {
         this.deleting.set(false);
         this.confirmDelete.set(null);
         this.toast.success(this.i18n.translate('admin.gremien.toast.deleted'));
-        this.reload();
+        this.reload(false);
       },
       error: () => {
         this.deleting.set(false);
-        this.toast.error(this.i18n.translate('admin.gremien.toast.failed'));
+        this.toast.error(this.i18n.translate('admin.gremien.deleteFailed'));
       },
     });
   }
 
-  private reload(): void {
-    this.loading.set(true);
+  /** `first`: the first load opens the first row, as on the board. */
+  private reload(first: boolean): void {
+    if (first) this.loading.set(true);
     this.loadError.set(false);
     this.api.listGremien({ quiet: true }).subscribe({
       next: (g) => {
         this.gremien.set(g);
         this.loading.set(false);
+        if (first && g.length) this.toggle(g[0]);
       },
       error: () => {
         this.loadError.set(true);

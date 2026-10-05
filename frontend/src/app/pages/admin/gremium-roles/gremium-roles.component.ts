@@ -1,201 +1,42 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { I18nService } from '@core/i18n/i18n.service';
-import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Uuid } from '@core/api/models';
-import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import {
-  ButtonComponent,
-  CellDirective,
-  CheckboxComponent,
-  type ColumnDef,
-  DataTableComponent,
-  DialogComponent,
-  IconComponent,
-  InputComponent,
-  ToastService,
-} from '@stupa-makers/ui-kit';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { PageHeaderComponent } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
-import { GREMIUM_PERMISSIONS, ROLE_KEY_PATTERN, type GremiumRole } from '../admin.models';
-import type { TranslationKey } from '@core/i18n/translations';
-
-interface RoleDraft {
-  key: string;
-  labelDe: string;
-  labelEn: string;
-  permissions: string[];
-}
-
-function emptyDraft(): RoleDraft {
-  return { key: '', labelDe: '', labelEn: '', permissions: ['vote.cast'] };
-}
+import { GremiumRoleMatrixComponent } from './gremium-role-matrix.component';
 
 /**
- * Catalog of gremium roles.
+ * The roles of one gremium on their own page (`/admin/gremien/:id/roles`, permission
+ * `admin.gremium_roles`).
  *
- * Gremien have their own role set, separate from the global roles. This page
- * creates, reads, updates and deletes them through the admin API. Create and edit
- * run in a dialog. The members subpage of a gremium makes the time-bound
- * assignment.
+ * The gremien page shows the same matrix inside the row of a gremium. This page serves a
+ * principal with `admin.gremium_roles` but without `admin.gremien`, and the "Rollen"
+ * links of the admin home page. The gremium name comes from `GET /gremien`, which every
+ * signed-in principal may read.
  */
 @Component({
   selector: 'app-gremium-roles',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    FormsModule,
-    TranslatePipe,
-    CapitalizePipe,
-    PageHeaderComponent,
-    ButtonComponent,
-    DataTableComponent,
-    CellDirective,
-    DialogComponent,
-    IconComponent,
-    InputComponent,
-    CheckboxComponent,
-  ],
+  imports: [TranslatePipe, PageHeaderComponent, GremiumRoleMatrixComponent],
   templateUrl: './gremium-roles.component.html',
   styleUrl: './gremium-roles.component.scss',
 })
 export class GremiumRolesComponent {
   private readonly api = inject(AdminApiService);
-  private readonly i18n = inject(I18nService);
-  private readonly toast = inject(ToastService);
-  private readonly route = inject(ActivatedRoute);
 
   /** The gremium that owns these roles. Each role belongs to one gremium. */
-  private readonly gremiumId = this.route.snapshot.paramMap.get('id') as Uuid;
-
-  /**
-   * True until the first answer. Without it the table shows its empty text while the
-   * request is still out, which asserts there is nothing when nothing has arrived yet.
-   */
-  protected readonly loading = signal(true);
-
-  protected readonly roles = signal<GremiumRole[]>([]);
-  protected readonly draft = signal<RoleDraft | null>(null);
-  protected readonly editingId = signal<string | null>(null);
-  protected readonly confirmDelete = signal<GremiumRole | null>(null);
-
-  /**
-   * The draft key can be saved. A new key must match ROLE_KEY_PATTERN, because the
-   * server refuses other keys with 422. An existing key never changes, so the edit
-   * does not check it against the pattern.
-   */
-  protected readonly keyValid = computed(() => {
-    const d = this.draft();
-    if (!d) return false;
-    const key = d.key.trim();
-    return this.editingId() === null ? ROLE_KEY_PATTERN.test(key) : key !== '';
-  });
-  /** The error text under the key input. Empty for a blank key, a valid key or an edit. */
-  protected readonly keyError = computed(() => {
-    const d = this.draft();
-    if (!d || this.editingId() !== null || !d.key.trim() || this.keyValid()) return '';
-    return this.i18n.translate('admin.common.roleKeyInvalid');
-  });
-
-  protected readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'name', label: this.i18n.translate('admin.gremiumRoles.col.name') },
-    { key: 'key', label: this.i18n.translate('admin.gremiumRoles.col.key') },
-    { key: 'permissions', label: this.i18n.translate('admin.gremiumRoles.permissions') },
-    { key: 'actions', label: this.i18n.translate('admin.common.actions'), align: 'end', width: '7rem' },
-  ]);
-
-  protected readonly allPermissions = GREMIUM_PERMISSIONS;
-
-  protected permLabel(p: string): TranslationKey {
-    return `admin.gremiumPerm.${p}` as TranslationKey;
-  }
-
-  protected togglePerm(perm: string, on: boolean): void {
-    this.draft.update((d) => {
-      if (!d) return d;
-      const set = new Set(d.permissions);
-      if (on) set.add(perm);
-      else set.delete(perm);
-      return { ...d, permissions: GREMIUM_PERMISSIONS.filter((p) => set.has(p)) };
-    });
-  }
+  protected readonly gremiumId = (inject(ActivatedRoute).snapshot.paramMap.get('id') ?? '') as Uuid;
+  protected readonly gremiumName = signal('');
+  protected readonly titleSuffix = computed(() =>
+    this.gremiumName() ? `: ${this.gremiumName()}` : '',
+  );
 
   constructor() {
-    this.api.listGremiumRoles(this.gremiumId).subscribe({
-      next: (r) => {
-        this.roles.set(r);
-        this.loading.set(false);
-      },
-      error: () => this.loading.set(false),
-    });
-  }
-
-  protected label(r: GremiumRole | null): string {
-    if (!r) return '';
-    return r.name[this.i18n.locale()] ?? r.name['de'] ?? r.key;
-  }
-
-  protected openAdd(): void {
-    this.editingId.set(null);
-    this.draft.set(emptyDraft());
-  }
-
-  protected openEdit(i: number): void {
-    const r = this.roles()[i];
-    this.editingId.set(r.id);
-    this.draft.set({
-      key: r.key,
-      labelDe: r.name['de'] ?? '',
-      labelEn: r.name['en'] ?? '',
-      permissions: [...(r.permissions ?? [])],
-    });
-  }
-
-  protected close(): void {
-    this.draft.set(null);
-    this.editingId.set(null);
-  }
-
-  protected patch<K extends keyof RoleDraft>(key: K, value: RoleDraft[K]): void {
-    this.draft.update((d) => (d ? { ...d, [key]: value } : d));
-  }
-
-  protected save(): void {
-    const d = this.draft();
-    if (!d || !this.keyValid()) return;
-    const name = { de: d.labelDe.trim() || d.key, en: d.labelEn.trim() || d.labelDe.trim() || d.key };
-    const permissions = [...d.permissions];
-    const id = this.editingId();
-    const req = id
-      ? this.api.updateGremiumRole(id, { name, permissions })
-      : this.api.createGremiumRole(this.gremiumId, { key: d.key.trim(), name, permissions });
-    req.subscribe({
-      next: (saved) => {
-        this.roles.update((list) =>
-          id ? list.map((r) => (r.id === id ? saved : r)) : [...list, saved],
-        );
-        this.toast.success(this.i18n.translate('admin.common.saved'));
-        this.close();
-      },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
-    });
-  }
-
-  protected askDelete(r: GremiumRole): void {
-    this.confirmDelete.set(r);
-  }
-
-  protected doDelete(): void {
-    const r = this.confirmDelete();
-    if (!r) return;
-    this.api.deleteGremiumRole(r.id).subscribe({
-      next: () => {
-        this.roles.update((list) => list.filter((x) => x.id !== r.id));
-        this.confirmDelete.set(null);
-        this.toast.success(this.i18n.translate('admin.common.saved'));
-      },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+    this.api.listGremienOptions().subscribe({
+      next: (list) => this.gremiumName.set(list.find((g) => g.id === this.gremiumId)?.name ?? ''),
+      error: () => this.gremiumName.set(''),
     });
   }
 }

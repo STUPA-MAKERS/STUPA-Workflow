@@ -1,0 +1,243 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.rm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.rm__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  min-height: 2.5rem;
+}
+.rm__title {
+  margin: 0;
+}
+/* Without a heading the button sits at the end. */
+.rm__add:only-child {
+  margin-inline-start: auto;
+}
+
+.rm__error {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+/* The matrix: the role column, one column per right of the catalogue, the actions. All
+   rows use the same columns, so the boxes line up under their header. */
+.rm__table {
+  min-width: 0;
+}
+.rm__row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 2.2fr) repeat(5, minmax(4.25rem, 1fr)) 5.5rem;
+  align-items: center;
+  min-height: 3.75rem;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
+}
+
+.rm__row--head {
+  min-height: 4rem;
+  padding-block: var(--space-2);
+}
+.rm__colRole {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.rm__colPerm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-inline: var(--space-1);
+  text-align: center;
+}
+.rm__colLabel {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  line-height: 1.15rem;
+}
+/* The key in the header is a technical aid. It wraps after its dot, never inside a word. */
+.rm__colKey {
+  font-size: 0.6875rem;
+  line-height: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.rm__role {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding-block: var(--space-2);
+}
+.rm__nameLine {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.rm__name {
+  font-weight: var(--fw-semibold);
+}
+.rm__forced {
+  flex: none;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--color-text-muted);
+}
+/* A group keeps its exact spelling from the IdP; a long one wraps and is never cut. */
+.rm__groups {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.rm__cell {
+  display: flex;
+  align-self: stretch;
+  justify-content: center;
+  min-width: 0;
+}
+
+/* The whole cell is the label of its box, so a click anywhere in the cell toggles it. */
+.rm__chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  margin: 2px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.rm__chip:hover {
+  background: var(--color-surface-3);
+}
+.rm--bg3 .rm__chip:hover {
+  background: var(--color-surface-4);
+}
+.rm__chip--off,
+.rm__chip--off:hover {
+  background: none;
+  cursor: default;
+}
+.rm__chipText {
+  display: none;
+}
+
+/* The box of the ui-kit checkbox: 18px with a 2px edge; checked, an accent square with a
+   dark tick. */
+.rm__box {
+  flex: none;
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-content: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--color-border-strong);
+  cursor: inherit;
+}
+.rm__box:checked {
+  background: var(--color-accent)
+    url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%230b1d12" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>')
+    center / 13px 13px no-repeat;
+  box-shadow: none;
+}
+.rm__box:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+/* A save in flight: the box waits. A read-only matrix keeps the full contrast. */
+.rm__chip:not(.rm__chip--off) .rm__box:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.rm__act {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.rm__row--empty {
+  display: block;
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+}
+
+.rm__dialogText {
+  margin: 0;
+}
+.rm__dialogFoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+/* A narrow container: no header; the role and its actions on the first line, the rights
+   as chips with their names below (board Schmal-Verwaltung-Gremien). */
+@container (max-width: 44rem) {
+  /* More specific than `.rm__row` below, so the header stays hidden. */
+  .rm__row.rm__row--head {
+    display: none;
+  }
+  .rm__row--head + .rm__row {
+    border-top-left-radius: var(--radius-lg);
+    border-top-right-radius: var(--radius-lg);
+  }
+  .rm__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-3) var(--space-4) var(--space-4);
+  }
+  .rm__role {
+    flex: 1 1 calc(100% - 6rem);
+    order: 0;
+    padding-block: 0;
+  }
+  .rm__act {
+    flex: 0 0 5rem;
+    order: 1;
+  }
+  .rm__cell {
+    flex: none;
+    order: 2;
+  }
+  .rm__chip {
+    width: auto;
+    min-height: 2rem;
+    margin: 0;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-sm);
+    box-shadow: inset 0 0 0 1px var(--color-border);
+    font-size: var(--fs-sm);
+  }
+  .rm__chip--on {
+    background: var(--color-selected);
+    box-shadow: none;
+  }
+  .rm__chip--off.rm__chip--on,
+  .rm__chip--off.rm__chip--on:hover {
+    background: var(--color-selected);
+  }
+  .rm__chipText {
+    display: inline;
+  }
+}

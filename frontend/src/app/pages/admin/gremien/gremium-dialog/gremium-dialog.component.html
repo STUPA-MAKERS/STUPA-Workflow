@@ -1,0 +1,118 @@
+<app-dialog
+  size="lg"
+  [open]="open()"
+  [title]="(isNew() ? 'admin.gremien.create' : 'admin.gremien.edit') | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="close()"
+>
+  <form class="gd" (submit)="$event.preventDefault(); submit()">
+    <div class="gd__cols">
+      <div class="gd__col">
+        <div class="gd__field">
+          <app-input
+            [label]="'admin.gremien.name' | t"
+            [required]="true"
+            name="name"
+            [ngModel]="form().name"
+            (ngModelChange)="patch('name', $event)"
+          />
+          <p class="gd__hint">
+            {{ 'admin.gremien.slug' | t }}: <span class="mono gd__slug">{{ slug() }}</span>
+          </p>
+        </div>
+        <app-select
+          [label]="'admin.gremien.cdVariant' | t"
+          [placeholder]="'admin.gremien.cdVariantNone' | t"
+          [options]="cdOptions()"
+          [hint]="'admin.gremien.cdVariantHint' | t"
+          [ngModel]="form().cdVariantId"
+          (ngModelChange)="patch('cdVariantId', $event)"
+          name="cdVariantId"
+        />
+        <app-select
+          [label]="'admin.gremien.defaultLang' | t"
+          [options]="langOptions()"
+          [ngModel]="form().defaultLang"
+          (ngModelChange)="patch('defaultLang', $event)"
+          name="defaultLang"
+        />
+        <app-input
+          type="number"
+          [label]="'admin.gremien.quorum' | t"
+          [hint]="'admin.gremien.quorumHint' | t"
+          name="quorumPercent"
+          [ngModel]="form().quorumPercent"
+          (ngModelChange)="patchQuorum($event)"
+        />
+      </div>
+
+      <div class="gd__col">
+        <app-switch
+          class="gd__switch"
+          name="allowVoteDelegation"
+          [hint]="'admin.gremien.delegationHint' | t"
+          [ngModel]="form().allowVoteDelegation"
+          (ngModelChange)="patch('allowVoteDelegation', $event)"
+          >{{ 'admin.gremien.delegation' | t }}</app-switch
+        >
+        <!-- The delegation settings apply only while the delegation is allowed. -->
+        @if (form().allowVoteDelegation) {
+          <div class="gd__nested">
+            <app-input
+              type="number"
+              [label]="'admin.gremien.delegationLead' | t"
+              [hint]="'admin.gremien.delegationLeadHint' | t"
+              name="delegationLeadMinutes"
+              [ngModel]="form().delegationLeadMinutes"
+              (ngModelChange)="patchLead($event)"
+            />
+            <app-switch
+              class="gd__switch"
+              name="delegationAllowExternal"
+              [hint]="'admin.gremien.delegationExternalHint' | t"
+              [ngModel]="form().delegationAllowExternal"
+              (ngModelChange)="patch('delegationAllowExternal', $event)"
+              >{{ 'admin.gremien.delegationExternal' | t }}</app-switch
+            >
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Extra protocol recipients. They get the finalized protocol, together with the
+         active members. -->
+    <div class="gd__field">
+      <label class="gd__mail">
+        <span class="gd__mailLabel">{{ 'admin.gremien.mailRecipients' | t }}</span>
+        <textarea
+          class="mono gd__mailInput"
+          rows="3"
+          name="mailRecipients"
+          [attr.aria-busy]="recipientsLoading()"
+          [disabled]="recipientsLoading()"
+          [ngModel]="form().mailRecipients"
+          (ngModelChange)="patch('mailRecipients', $event)"
+          [placeholder]="'admin.gremien.mailRecipientsPlaceholder' | t"
+          aria-describedby="gd-mail-hint"
+        ></textarea>
+      </label>
+      <p class="gd__hint" id="gd-mail-hint">{{ 'admin.gremien.mailRecipientsHint' | t }}</p>
+    </div>
+
+    @if (error()) {
+      <p class="gd__error" role="alert">{{ error() }}</p>
+    }
+    <button type="submit" hidden></button>
+  </form>
+
+  <div dialog-footer class="gd__foot">
+    <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+    <app-button
+      variant="fill"
+      [disabled]="!canSave() || recipientsLoading()"
+      [loading]="saving()"
+      (click)="submit()"
+      >{{ (isNew() ? 'admin.gremien.add' : 'action.save') | t }}</app-button
+    >
+  </div>
+</app-dialog>

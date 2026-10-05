@@ -884,7 +884,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
   it('CRUDs gremium-roles in the mock store', async () => {
     const s = svc();
     // The seed gives each mock gremium its forced roles.
-    expect((await firstValueFrom(s.listGremiumRoles(MOCK_GREMIUM_STUPA_ID))).map((r) => r.key)).toEqual(['board', 'manager', 'member']);
+    expect((await firstValueFrom(s.listGremiumRoles(MOCK_GREMIUM_STUPA_ID))).map((r) => r.key)).toEqual(['vorstand', 'manager', 'member', 'protokoll']);
     expect(await firstValueFrom(s.listGremiumRoles('g-empty'))).toEqual([]);
     const created = await firstValueFrom(s.createGremiumRole('g-empty', { key: 'chair', name: { de: 'Vorsitz' } }));
     expect(created.gremiumId).toBe('g-empty');
@@ -934,8 +934,12 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
 
   it('returns the seeded memberships of one gremium in mock mode', async () => {
     const s = svc();
-    expect((await firstValueFrom(s.listGremiumMemberships(MOCK_GREMIUM_STUPA_ID))).length).toBe(2);
-    expect(await firstValueFrom(s.listGremiumMemberships('g-asta'))).toEqual([]);
+    const stupa = await firstValueFrom(s.listGremiumMemberships(MOCK_GREMIUM_STUPA_ID));
+    expect(stupa.length).toBe(9);
+    // The server joins the name and the e-mail of each member.
+    expect(stupa.find((m) => m.principalId === 'p-1')).toMatchObject({ displayName: 'Alex Admin', email: 'alex@stupa.example' });
+    expect((await firstValueFrom(s.listGremiumMemberships('g-asta'))).map((m) => m.principalId)).toEqual(['p-4', 'p-7']);
+    expect(await firstValueFrom(s.listGremiumMemberships('g-none'))).toEqual([]);
   });
 
   it('CRUDs the global group mappings in the mock store', async () => {
@@ -968,8 +972,8 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
 
   it('CRUDs the role mappings in the mock store and derives the gremium from the role', async () => {
     const s = svc();
-    expect((await firstValueFrom(s.listRoleMappings())).length).toBe(1);
-    const created = await firstValueFrom(s.createRoleMapping({ oidcGroup: 'x', gremiumRoleId: 'gr-asta-board' }));
+    expect((await firstValueFrom(s.listRoleMappings())).length).toBe(4);
+    const created = await firstValueFrom(s.createRoleMapping({ oidcGroup: 'x', gremiumRoleId: 'gr-asta-vorstand' }));
     expect(created.gremiumId).toBe('g-asta');
     const moved = await firstValueFrom(s.updateRoleMapping(created.id, { gremiumRoleId: 'gr-stupa-member' }));
     expect(moved.gremiumId).toBe(MOCK_GREMIUM_STUPA_ID);
@@ -981,7 +985,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(orphan.gremiumId).toBe('');
     await firstValueFrom(s.deleteRoleMapping(created.id));
     await firstValueFrom(s.deleteRoleMapping(orphan.id));
-    expect((await firstValueFrom(s.listRoleMappings())).length).toBe(1);
+    expect((await firstValueFrom(s.listRoleMappings())).length).toBe(4);
   });
 
   it('pages and filters the mock audit log', async () => {
@@ -1040,8 +1044,26 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const s = svc();
     const gremien = await firstValueFrom(s.listGremien());
     const stupa = gremien.find((g) => g.id === MOCK_GREMIUM_STUPA_ID);
-    expect(stupa?.memberCount).toBe(2);
-    expect(stupa?.roleCount).toBe(3);
+    expect(stupa?.memberCount).toBe(9);
+    expect(stupa?.roleCount).toBe(4);
+  });
+
+  it('keeps the extra protocol recipients per gremium in the mock store', async () => {
+    const s = svc();
+    expect((await firstValueFrom(s.getGremiumMailRecipients(MOCK_GREMIUM_STUPA_ID))).recipients).toHaveLength(2);
+    expect((await firstValueFrom(s.getGremiumMailRecipients('g-asta'))).recipients).toEqual([]);
+    await firstValueFrom(s.setGremiumMailRecipients('g-asta', ['a@x.de']));
+    expect((await firstValueFrom(s.getGremiumMailRecipients('g-asta'))).recipients).toEqual(['a@x.de']);
+  });
+
+  it('gives a new mock gremium the forced roles', async () => {
+    const s = svc();
+    const created = await firstValueFrom(
+      s.createGremium({ name: 'Neu', slug: 'neu', cdVariantId: null, defaultLang: 'de' }),
+    );
+    const roles = await firstValueFrom(s.listGremiumRoles(created.id));
+    expect(roles.map((r) => r.key)).toEqual(['vorstand', 'manager', 'member']);
+    expect(roles.every((r) => r.forced && r.gremiumId === created.id)).toBe(true);
   });
 
   it('returns default notification settings in mock mode', async () => {

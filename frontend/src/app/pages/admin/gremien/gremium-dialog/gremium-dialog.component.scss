@@ -1,0 +1,114 @@
+:host {
+  display: contents;
+}
+
+.gd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  container-type: inline-size;
+}
+
+/* Two columns: the master data at the start, the delegation at the end. */
+.gd__cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5) var(--space-6);
+  align-items: start;
+}
+.gd__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.gd__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.gd__hint {
+  margin: 0;
+  padding-inline: var(--space-1);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.gd__slug {
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+/* The label of a switch takes the free width, so the switch sits at the end. */
+.gd__switch {
+  display: block;
+}
+.gd__switch ::ng-deep .sw {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+.gd__switch ::ng-deep .sw__label {
+  font-weight: var(--fw-semibold);
+}
+
+/* The delegation settings hang under their switch. */
+.gd__nested {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-inline-start: var(--space-1);
+  padding-inline-start: var(--space-4);
+  border-inline-start: 2px solid var(--color-border);
+}
+
+/* The recipients: a filled field like the ui-kit input, one address per line. */
+.gd__mail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  border-radius: var(--radius-field);
+  background: var(--color-surface-sunken);
+}
+.gd__mail:focus-within {
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+}
+.gd__mailLabel {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+.gd__mailInput {
+  min-height: 4.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  resize: vertical;
+}
+.gd__mailInput:focus {
+  outline: none;
+}
+.gd__mailInput::placeholder {
+  color: var(--color-text-muted);
+}
+
+.gd__error {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+.gd__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+@container (max-width: 34rem) {
+  .gd__cols {
+    grid-template-columns: 1fr;
+  }
+}

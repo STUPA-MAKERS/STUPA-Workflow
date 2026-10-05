@@ -80,10 +80,12 @@ import {
   MOCK_FORM_DRAFTS,
   MOCK_FORMS,
   MOCK_GREMIEN,
+  MOCK_GREMIUM_MAIL_RECIPIENTS,
   MOCK_GREMIUM_MEMBERSHIP_MAPPINGS,
   MOCK_GREMIUM_MEMBERSHIPS,
   MOCK_GREMIUM_ROLE_MAPPINGS,
   MOCK_GREMIUM_ROLES,
+  MOCK_GREMIUM_STUPA_ID,
   MOCK_GROUP_MAPPINGS,
   MOCK_PERMISSIONS,
   MOCK_PRINCIPALS,
@@ -129,6 +131,7 @@ export class AdminApiService {
     groupMappings: structuredCopy(MOCK_GROUP_MAPPINGS),
     membershipMappings: structuredCopy(MOCK_GREMIUM_MEMBERSHIP_MAPPINGS),
     roleMappings: structuredCopy(MOCK_GREMIUM_ROLE_MAPPINGS),
+    mailRecipients: structuredCopy(MOCK_GREMIUM_MAIL_RECIPIENTS),
     deadlinePolicies: [] as DeadlinePolicy[],
     erasures: structuredCopy(MOCK_ERASURES) as ErasureRequest[],
     audit: structuredCopy(MOCK_AUDIT_ENTRIES) as AuditEntry[],
@@ -187,6 +190,15 @@ export class AdminApiService {
     if (this.mock) {
       const created: Gremium = { id: `g-${this.store.gremien.length + 1}`, allowVoteDelegation: false, ...body };
       this.store.gremien.push(created);
+      // The server creates the forced roles together with the gremium.
+      this.store.gremiumRoles = [
+        ...this.store.gremiumRoles,
+        ...MOCK_GREMIUM_ROLES.filter((r) => r.gremiumId === MOCK_GREMIUM_STUPA_ID && r.forced).map((r) => ({
+          ...structuredCopy(r),
+          id: `${created.id}-${r.key}`,
+          gremiumId: created.id,
+        })),
+      ];
       return of(structuredCopy(created));
     }
     return this.http.post<Gremium>(`${this.base}/admin/gremien`, body);
@@ -212,7 +224,7 @@ export class AdminApiService {
 
   /** GET /admin/gremien/{id}/mail-recipients — extra protocol recipients. */
   getGremiumMailRecipients(id: Uuid): Observable<{ recipients: string[] }> {
-    if (this.mock) return of({ recipients: [] });
+    if (this.mock) return of({ recipients: [...(this.store.mailRecipients[id] ?? [])] });
     return this.http.get<{ recipients: string[] }>(
       `${this.base}/admin/gremien/${id}/mail-recipients`,
     );
@@ -220,7 +232,10 @@ export class AdminApiService {
 
   /** PUT /admin/gremien/{id}/mail-recipients — replace extra recipients (idempotent). */
   setGremiumMailRecipients(id: Uuid, recipients: string[]): Observable<{ recipients: string[] }> {
-    if (this.mock) return of({ recipients });
+    if (this.mock) {
+      this.store.mailRecipients[id] = [...recipients];
+      return of({ recipients });
+    }
     return this.http.put<{ recipients: string[] }>(
       `${this.base}/admin/gremien/${id}/mail-recipients`,
       { recipients },
@@ -839,7 +854,15 @@ export class AdminApiService {
   /** Memberships of one gremium (read-only). The OIDC group sync writes them. */
   listGremiumMemberships(gremiumId: Uuid): Observable<GremiumMembership[]> {
     if (this.mock) {
-      return of(structuredCopy(MOCK_GREMIUM_MEMBERSHIPS.filter((m) => m.gremiumId === gremiumId)));
+      // The server joins the name and the e-mail of each member.
+      const byId = new Map(this.store.principals.map((p) => [p.id, p]));
+      return of(
+        structuredCopy(MOCK_GREMIUM_MEMBERSHIPS.filter((m) => m.gremiumId === gremiumId)).map((m) => ({
+          ...m,
+          displayName: byId.get(m.principalId)?.displayName ?? null,
+          email: byId.get(m.principalId)?.email ?? null,
+        })),
+      );
     }
     return this.http.get<GremiumMembership[]>(`${this.base}/admin/gremien/${gremiumId}/memberships`);
   }
