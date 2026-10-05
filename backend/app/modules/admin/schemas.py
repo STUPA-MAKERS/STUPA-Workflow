@@ -137,6 +137,18 @@ class GremiumOut(_CamelModel):
     )
 
 
+class GremiumAdminOut(GremiumOut):
+    """A gremium in the admin list (``GET /admin/gremien``), with its counts.
+
+    ``memberCount`` is the number of persons with a membership in the gremium.
+    ``roleCount`` is the number of gremium roles, the forced roles included. The
+    public master-data list (``GET /gremien``) does not have these fields.
+    """
+
+    member_count: int = Field(default=0, serialization_alias="memberCount")
+    role_count: int = Field(default=0, serialization_alias="roleCount")
+
+
 class GremiumCreate(_CamelModel):
     name: str = Field(min_length=1)
     slug: str = Field(min_length=1)

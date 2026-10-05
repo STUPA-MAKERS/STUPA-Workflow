@@ -135,20 +135,22 @@ describe('UsersComponent', () => {
     expect(inst.query()).toBe('kc|alex');
   });
 
-  it('lists principals with capitalized, read-only role tags', async () => {
+  it('lists principals with the capitalized, read-only roles on one line', async () => {
     await setup();
     expect(screen.getByText('Alex Admin')).toBeInTheDocument();
-    expect(screen.getAllByText('Administrator').length).toBeGreaterThan(0);
-    expect(screen.getByText('Referent')).toBeInTheDocument();
-    expect(screen.queryByText('administrator')).not.toBeInTheDocument();
+    expect(screen.getByText('Administrator, Referent')).toBeInTheDocument();
+    expect(screen.queryByText(/administrator/)).not.toBeInTheDocument();
     expect(screen.getByText('Keine Rollen zugewiesen.')).toBeInTheDocument();
+    // The e-mail address shows in full; a principal without one shows none.
+    expect(screen.getByText('alex@x.de')).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
     // No role editing is left: no assign, edit or revoke control.
     expect(screen.queryByRole('button', { name: /Entziehen|Zuweisung|Rolle \+/ })).toBeNull();
   });
 
   it('shows the OIDC groups of each user, or a placeholder', async () => {
     await setup();
-    expect(screen.getByRole('columnheader', { name: 'OIDC-Gruppen' })).toBeInTheDocument();
+    expect(screen.getAllByText('OIDC-Gruppen')).toHaveLength(2);
     expect(screen.getByText('stupa-referat')).toBeInTheDocument();
     expect(screen.getByText('unmapped')).toBeInTheDocument();
     expect(screen.getByText('Keine Gruppen.')).toBeInTheDocument();
@@ -167,7 +169,7 @@ describe('UsersComponent', () => {
     expect(
       screen.getByText(/Die Rollen kommen aus den OIDC-Gruppen/),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Gruppen-Mappings verwalten' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Gruppen-Zuordnung' })).toHaveAttribute(
       'href',
       '/admin/group-mappings',
     );
@@ -177,7 +179,7 @@ describe('UsersComponent', () => {
     const api = makeApi();
     const { inst } = await setup(api, makeAuth(null, false));
     expect(api.listGroupMappings).not.toHaveBeenCalled();
-    expect(screen.queryByRole('link', { name: 'Gruppen-Mappings verwalten' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Gruppen-Zuordnung' })).toBeNull();
     expect(inst.roleIds(PRINCIPALS[0])).toEqual(['r-admin']);
   });
 
@@ -195,11 +197,6 @@ describe('UsersComponent', () => {
   it('mySub is set when a principal is logged in', async () => {
     const { inst } = await setup(makeApi(), makeAuth('kc|alex'));
     expect(inst.mySub()).toBe('kc|alex');
-  });
-
-  it('rowId exposes the principal id', async () => {
-    const { inst } = await setup();
-    expect(inst.rowId(PRINCIPALS[0])).toBe('p-1');
   });
 
   it('roleLabel resolves locale→de→key, raw id when unknown', async () => {
@@ -263,9 +260,38 @@ describe('UsersComponent', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  it('renders the principals as a table without the oidc-subject column', async () => {
+  it('deactivates from the row, and the own account only with a reason', async () => {
+    const { api } = await setup(makeApi(), makeAuth('kc|sam'));
+    const own = screen.getAllByRole('button', { name: /^Deaktivieren: / });
+    // Alex can be deactivated; Sam is the signed-in user.
+    expect(own[0]).toBeEnabled();
+    expect(own[1]).toBeDisabled();
+    expect(own[1]).toHaveAttribute('title', 'Du kannst dein eigenes Konto nicht deaktivieren.');
+    // The button names its person, so a list of the buttons tells the rows apart.
+    expect(own[0]).toHaveAccessibleName('Deaktivieren: Alex Admin');
+    await userEvent.click(own[0]);
+    expect(api.setPrincipalActive).toHaveBeenCalledWith('p-1', false);
+  });
+
+  it('greys out an inactive principal and offers "Aktivieren"', async () => {
+    const api = makeApi({
+      listPrincipals: jest.fn(() => of([{ ...PRINCIPALS[1], active: false }])),
+    });
+    const { container } = await setup(api);
+    expect(container.querySelector('.au__row--off')).not.toBeNull();
+    expect(screen.getByText('deaktiviert')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Aktivieren: / }));
+    expect(api.setPrincipalActive).toHaveBeenCalledWith('p-3', true);
+  });
+
+  it('shows the last login as a date, else "nie"', async () => {
     await setup();
-    expect(screen.getByRole('table')).toBeInTheDocument();
-    expect(screen.queryByRole('columnheader', { name: 'OIDC-Subject' })).not.toBeInTheDocument();
+    expect(screen.getByText('nie')).toBeInTheDocument();
+    expect(screen.getByText(/06\.06\.2026/)).toBeInTheDocument();
+  });
+
+  it('shows the empty state when the search finds nobody', async () => {
+    await setup(makeApi({ listPrincipals: jest.fn(() => of([])) }));
+    expect(screen.getByText('Keine Benutzer gefunden.')).toBeInTheDocument();
   });
 });

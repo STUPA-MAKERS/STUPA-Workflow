@@ -37,7 +37,7 @@ description: Admin/config API — gremien, gremium-roles, the OIDC group mapping
 
 **API surface:**
 - `GET /api/admin/config-schemas` — JSON-schemas for FE editors (any admin area).
-- `GET|POST /api/admin/gremien`, `PATCH|DELETE /api/admin/gremien/{id}`, `GET|PUT /api/admin/gremien/{id}/mail-recipients` — gremien CRUD + protocol recipients (admin.gremien).
+- `GET|POST /api/admin/gremien`, `PATCH|DELETE /api/admin/gremien/{id}`, `GET|PUT /api/admin/gremien/{id}/mail-recipients` — gremien CRUD + protocol recipients (admin.gremien). The list (`GremiumAdminOut`) also gives `memberCount` (distinct members) and `roleCount` (gremium roles, forced ones included) from two grouped counts (`list_gremien_admin`), so the admin overview needs no request per gremium. The public `GET /api/gremien` has no counts.
 - `GET|POST /api/admin/gremien/{id}/roles`, `PATCH|DELETE /api/admin/gremium-roles/{id}` — per-gremium roles (admin.gremium_roles to write, admin.gremien may also list).
 - `GET /api/admin/gremien/{id}/memberships` — read-only derived memberships (admin.gremien).
 - `GET|POST /api/admin/gremium-membership-mappings`, `PATCH|DELETE .../{id}` and `GET|POST /api/admin/gremium-role-mappings`, `PATCH|DELETE .../{id}` — the gremium mappings (admin.group_mappings; every write re-syncs all principals). `vote:` prefix → 422. All three mapping kinds live on the one page `/admin/group-mappings`.

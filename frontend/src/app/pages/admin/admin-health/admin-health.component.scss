@@ -1,0 +1,86 @@
+:host {
+  display: block;
+}
+
+.ah {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ah__head {
+  padding-inline: var(--space-3);
+}
+
+.ah__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The whole row is the link. */
+.ah__tile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3.5rem;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  color: var(--color-text);
+  text-decoration: none;
+  border-radius: inherit;
+}
+.ah__tile:hover {
+  background: var(--color-surface-3);
+}
+.ah__tile:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.ah__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.ah__tile--ok .ah__icon {
+  color: var(--color-accent-text);
+}
+.ah__tile--warn .ah__icon {
+  color: var(--color-warning);
+}
+.ah__tile--error .ah__icon,
+.ah__tile--error .ah__title {
+  color: var(--color-danger);
+}
+
+.ah__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ah__title {
+  font-weight: var(--fw-semibold);
+}
+
+/* The secondary line of the board (12.5 px), so the audit line fits on one line in the
+   home navigation column. */
+.ah__sub {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--color-text-muted);
+}
+.ah__alert {
+  color: var(--color-danger);
+}
+
+.ah__skel {
+  width: 70%;
+  margin: 0.35rem 0;
+}
+
+.ah__chev {
+  flex: none;
+  color: var(--color-text-muted);
+}

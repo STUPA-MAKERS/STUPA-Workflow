@@ -53,3 +53,25 @@ test('@gating Admin Form-Editor: Frage hinzufügen → Form-Version persistiert'
   await save.click();
   await expect(page.getByText('Gespeichert.')).toBeVisible();
 });
+
+/**
+ * The admin frame (board Verwaltung): the admin navigation stands beside every admin page.
+ * The home page lists the pages; a click opens one, and the navigation stays and marks it.
+ * Desktop Chrome is 1280px wide, so the navigation is a column (from 1200px).
+ */
+test('Admin-Rahmen: über die Verwaltungsnavigation zur Formularliste', async ({ page }) => {
+  await page.goto('/admin');
+  await expect(page.getByRole('heading', { name: 'Verwaltung', level: 1 })).toBeVisible();
+  const nav = page.getByRole('navigation', { name: 'Verwaltungsbereiche' });
+  await nav.getByRole('link', { name: /Anträge & Formulare/ }).click();
+  await expect(page).toHaveURL(/\/admin\/forms$/);
+  await expect(nav.getByRole('link', { name: /Anträge & Formulare/ })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  // The settings search narrows the entries.
+  await nav.getByRole('searchbox', { name: 'Einstellungen durchsuchen' }).fill('Kostenstellen');
+  await expect(nav.getByRole('link')).toHaveCount(1);
+  await nav.getByRole('link', { name: /Kostenstellen/ }).click();
+  await expect(page).toHaveURL(/\/admin\/cost-centres$/);
+});

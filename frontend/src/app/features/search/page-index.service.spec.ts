@@ -40,6 +40,16 @@ describe('PageIndexService', () => {
     expect(svc.visible().map((e) => e.path)).toContain('/admin/roles');
   });
 
+  it('offers the pages inside the admin frame at their full path, once each', () => {
+    const svc = setup({ canAny: () => true });
+    const paths = svc.visible().map((e) => e.path);
+    expect(paths).toContain('/admin');
+    expect(paths).toContain('/admin/cost-centres');
+    expect(paths).toContain('/admin/backups');
+    expect(paths.filter((p) => p === '/admin')).toHaveLength(1);
+    expect(svc.visible().find((e) => e.path === '/admin/backups')?.parentLabel).toBe('nav.admin');
+  });
+
   it('withholds a page whose permission the caller lacks', () => {
     const svc = setup({});
     expect(svc.visible().map((e) => e.path)).not.toContain('/admin/roles');

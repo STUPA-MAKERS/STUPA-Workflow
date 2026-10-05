@@ -1,5 +1,6 @@
 import { of, throwError } from 'rxjs';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { Role } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
@@ -71,21 +72,105 @@ describe('AdminRolesComponent', () => {
     expect(inst.isLocked({ key: 'member' })).toBe(false);
   });
 
-  it('canDelete protects admin + member only', async () => {
+  it('marks admin and member as fixed, without a delete button (N40)', async () => {
     const { inst } = await setup();
-    expect(inst.canDelete({ key: 'admin' })).toBe(false);
-    expect(inst.canDelete({ key: 'member' })).toBe(false);
-    expect(inst.canDelete({ key: 'referent' })).toBe(true);
+    expect(inst.isFixed({ key: 'admin' })).toBe(true);
+    expect(inst.isFixed({ key: 'member' })).toBe(true);
+    expect(inst.isFixed({ key: 'referent' })).toBe(false);
+    expect(screen.getAllByText('fest')).toHaveLength(2);
+    // Only the referent row has a delete button.
+    expect(screen.getAllByRole('button', { name: /^Rolle löschen/ })).toHaveLength(1);
   });
 
-  it('onRowClick toggles the row expansion both ways', async () => {
+  it('opens and closes a row with its toggle', async () => {
     const { inst } = await setup();
-    expect(inst.rowExpanded(ROLES[2])).toBe(false);
-    inst.onRowClick(ROLES[2]);
-    expect(inst.rowExpanded(ROLES[2])).toBe(true);
-    expect(inst.expanded().has('r-ref')).toBe(true);
-    inst.onRowClick(ROLES[2]);
-    expect(inst.rowExpanded(ROLES[2])).toBe(false);
+    const toggle = screen.getByRole('button', { name: /^Referent/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(inst.isOpen(ROLES[2])).toBe(true);
+    expect(screen.getByRole('button', { name: 'Namen speichern' })).toBeInTheDocument();
+    await userEvent.click(toggle);
+    expect(inst.isOpen(ROLES[2])).toBe(false);
+  });
+
+  it('shows the rights of the API catalogue in sections, and only those', async () => {
+    const api = makeApi({
+      listPermissions: jest.fn(() =>
+        of(['application.read', 'budget.view', 'meeting.view_all', 'admin.roles', 'audit.read', 'x.new']),
+      ),
+      // The role still holds a key the server removed. It never shows and never counts.
+      listRoles: jest.fn(() =>
+        of([{ id: 'r-ref', key: 'referent', label: { de: 'Referent' }, permissions: ['budget.view', 'vote.cast'] }]),
+      ),
+    });
+    const { fixture } = await setup(api);
+    expect(screen.getByText('1 / 6')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Referent/ }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    for (const name of ['Anträge', 'Budget', 'Sitzungen und Abstimmungen', 'Verwaltung', 'Sicherheit und Daten', 'Weitere']) {
+      expect(screen.getByRole('group', { name })).toBeInTheDocument();
+    }
+    expect(within(screen.getByRole('group', { name: 'Weitere' })).getByText('x.new')).toBeInTheDocument();
+    expect(screen.queryByText('vote.cast')).toBeNull();
+    expect(screen.getByRole('checkbox', { name: 'budget.view' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'application.read' })).not.toBeChecked();
+  });
+
+  it('shows the admin role with every right, read-only', async () => {
+    const { fixture } = await setup();
+    expect(screen.getAllByText('3 / 3').length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('button', { name: /^Administrator/ }));
+    // ngModel writes the value and the disabled state in a microtask.
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const boxes = screen.getAllByRole('checkbox');
+    expect(boxes.every((b) => (b as HTMLInputElement).checked && (b as HTMLInputElement).disabled)).toBe(true);
+    expect(screen.getByText(/hat immer alle Rechte und ist hier nicht bearbeitbar/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+  });
+
+  it('saves only keys of the catalogue', async () => {
+    const { inst, api } = await setup();
+    inst.togglePerm(ROLES[2], 'removed.key', true);
+    inst.togglePerm(inst.roles().find((r: Role) => r.id === 'r-ref'), 'flow.configure', true);
+    inst.saveRole(inst.roles().find((r: Role) => r.id === 'r-ref'));
+    expect(api.saveRolePermissions).toHaveBeenCalledWith('r-ref', ['flow.configure']);
+  });
+
+  it('opens the new role after the create, so its rights are next', async () => {
+    const { inst } = await setup();
+    inst.openAdd();
+    inst.patchDraft('key', 'kultur');
+    inst.createRole();
+    expect(inst.expanded().has('r-new')).toBe(true);
+  });
+
+  it('shows a 422 and a 409 of the create under the key field', async () => {
+    const api = makeApi({ createRole: jest.fn(() => throwError(() => ({ status: 422 }))) });
+    const { inst, toast } = await setup(api);
+    inst.openAdd();
+    inst.patchDraft('key', 'kultur');
+    inst.createRole();
+    expect(inst.keyError()).toContain('Der Schlüssel muss mit einem Kleinbuchstaben beginnen');
+    expect(toast.error).not.toHaveBeenCalled();
+    // A change of the key clears the answer of the server.
+    inst.patchDraft('key', 'kultur2');
+    expect(inst.keyError()).toBe('');
+    api.createRole.mockReturnValue(throwError(() => ({ status: 409 })));
+    inst.createRole();
+    expect(inst.keyError()).toBe('Diesen Schlüssel gibt es schon.');
+    expect(inst.addOpen()).toBe(true);
+  });
+
+  it('creates a role from the dialog', async () => {
+    const { api } = await setup();
+    await userEvent.click(screen.getByRole('button', { name: /Globale Rolle hinzufügen/ }));
+    expect(screen.getByText('Die Rechte setzt du danach in der aufgeklappten Rolle.')).toBeInTheDocument();
+    await userEvent.type(screen.getByRole('textbox', { name: /Schlüssel/ }), 'kultur');
+    await userEvent.click(screen.getByRole('button', { name: 'Hinzufügen' }));
+    expect(api.createRole).toHaveBeenCalledWith({ key: 'kultur', label: {}, permissions: [] });
   });
 
   it('togglePerm adds and removes a permission on the local role', async () => {

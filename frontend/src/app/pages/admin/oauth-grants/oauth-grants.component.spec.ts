@@ -21,20 +21,20 @@ const NAMED: OAuthGrantAdmin = {
   principalName: 'Alex Admin',
   principalEmail: 'alex@x.de',
   clientId: 'antragsplattform-mcp',
-  scope: 'mcp:read mcp:write',
+  scope: 'read meetings:write votes:write applications:write',
   createdAt: '2026-06-01T10:00:00+00:00',
   accessExpiresAt: '2026-09-01T10:00:00+00:00',
   refreshExpiresAt: '2026-12-01T10:00:00+00:00',
 };
 
-/** No owner name and no expiry: placeholder + "never expires". */
+/** No owner name and no expiry: the placeholder and dashes. */
 const ANONYMOUS: OAuthGrantAdmin = {
   id: 'grant-2',
   principalId: 'p-3',
   principalName: null,
   principalEmail: null,
   clientId: 'cli-agent',
-  scope: 'mcp:read',
+  scope: 'read',
   createdAt: '2026-05-02T08:30:00+00:00',
   accessExpiresAt: null,
   refreshExpiresAt: null,
@@ -77,7 +77,7 @@ describe('AdminOAuthGrantsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('lists the grants with owner, client and scope', async () => {
-    const { api } = await setup();
+    const { api, container } = await setup();
     expect(api.listOAuthGrants).toHaveBeenCalledWith({
       limit: 25,
       offset: 0,
@@ -86,9 +86,14 @@ describe('AdminOAuthGrantsComponent', () => {
     expect(screen.getByText('Alex Admin')).toBeInTheDocument();
     expect(screen.getByText('antragsplattform-mcp')).toBeInTheDocument();
     expect(screen.getByText('cli-agent')).toBeInTheDocument();
-    expect(screen.getByText('mcp:write')).toBeInTheDocument();
-    // The owner email is a second line, because it adds to the name.
-    expect(screen.getByText('alex@x.de')).toBeInTheDocument();
+    // Three scopes show, the fourth is counted; the title names them all.
+    expect(screen.getByText('meetings:write')).toBeInTheDocument();
+    const tags = [...container.querySelectorAll('code.og__scope')].map((c) => c.textContent);
+    expect(tags).not.toContain('applications:write');
+    expect(screen.getByText('+1 weitere')).toBeInTheDocument();
+    // The owner email is the tooltip of the name, because it adds to the name.
+    expect(screen.getByText('Alex Admin')).toHaveAttribute('title', 'alex@x.de');
+    expect(screen.getByText('Person ohne Namen')).toHaveAttribute('title', 'Person ohne Namen');
   });
 
   it('shows a placeholder instead of an id when the owner has no name', async () => {
@@ -103,10 +108,14 @@ describe('AdminOAuthGrantsComponent', () => {
     expect(inst.ownerEmail({ ...NAMED, principalName: 'alex@x.de' })).toBeNull();
   });
 
-  it('renders a null expiry as "never expires" instead of an empty cell', async () => {
-    await setup();
-    // Access and refresh token of the second row both never expire.
-    expect(screen.getAllByText('Läuft nie ab')).toHaveLength(2);
+  it('renders a missing expiry as a dash, never as "never expires"', async () => {
+    const { container } = await setup();
+    const rows = container.querySelectorAll('.og__row');
+    expect(rows[1].querySelector('.og__field--access')?.textContent).toContain('—');
+    expect(rows[1].querySelector('.og__field--refresh')?.textContent).toContain('—');
+    expect(screen.queryByText(/nie ab/)).toBeNull();
+    // A set expiry shows as a date.
+    expect(rows[0].querySelector('.og__field--access')?.textContent).toContain('01.09.2026');
   });
 
   it('renders the load error instead of the table', async () => {
@@ -136,10 +145,10 @@ describe('AdminOAuthGrantsComponent', () => {
       offset: 0,
       principalId: 'p-1',
     });
-    expect(inst.activeFilterCount()).toBe(1);
-    // The reset clears the filter and reloads without it.
-    inst.resetFilters();
-    expect(inst.activeFilterCount()).toBe(0);
+    expect(inst.principalChipText()).toBe('Person: Alex Admin');
+    // "Alle Personen" clears the filter and reloads without it.
+    inst.setPrincipal('');
+    expect(inst.principalChipText()).toBe('Person: Alle Personen');
     expect(api.listOAuthGrants).toHaveBeenLastCalledWith({
       limit: 25,
       offset: 0,
@@ -157,13 +166,14 @@ describe('AdminOAuthGrantsComponent', () => {
     ]);
   });
 
-  it('filters through the select in the filter bar', async () => {
+  it('filters through the person chip, an app menu', async () => {
     const { api } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: /Filter/ }));
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Person' }), 'p-1');
+    await userEvent.click(screen.getByRole('button', { name: 'Person: Alle Personen' }));
+    await userEvent.click(screen.getByRole('option', { name: 'Alex Admin' }));
     expect(api.listOAuthGrants).toHaveBeenLastCalledWith(
       expect.objectContaining({ principalId: 'p-1' }),
     );
+    expect(screen.getByRole('button', { name: 'Person: Alex Admin' })).toBeInTheDocument();
   });
 
   // --- paging ---------------------------------------------------------------
@@ -203,6 +213,38 @@ describe('AdminOAuthGrantsComponent', () => {
     expect(inst.offset()).toBe(0);
   });
 
+  it('steps back one page when a revoke empties the last page', async () => {
+    let lastPageGone = false;
+    const second = [{ ...NAMED, id: 'grant-3' }];
+    const api = makeApi({
+      listOAuthGrants: jest.fn((q: OAuthGrantQuery = {}) => {
+        if (q.offset === 25) return of(lastPageGone ? page([], 25, 25) : page(second, 26, 25));
+        return of(page(GRANTS, lastPageGone ? 25 : 26, 0));
+      }),
+    });
+    const { inst, toast } = await setup(api);
+    inst.nextPage();
+    expect(inst.offset()).toBe(25);
+    inst.askRevoke(second[0]);
+    lastPageGone = true;
+    inst.doRevoke();
+    expect(toast.success).toHaveBeenCalledWith('Zugang widerrufen.');
+    // The empty page was not kept: the list went back to the page before.
+    expect(inst.offset()).toBe(0);
+    expect(api.listOAuthGrants).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 0 }));
+    expect(inst.rangeLabel()).toBe('1–2 von 25');
+    expect(inst.hasPrev()).toBe(false);
+  });
+
+  it('lets screen readers read the counted scopes and the owner email', async () => {
+    const { container } = await setup();
+    const row = container.querySelector('.og__row');
+    const srText = [...(row?.querySelectorAll('.sr-only') ?? [])].map((e) => e.textContent?.trim());
+    expect(srText).toContain('applications:write');
+    expect(srText).toContain(', alex@x.de');
+    expect(screen.getByText('+1 weitere')).toHaveAttribute('aria-hidden', 'true');
+  });
+
   it('reports an empty page as 0 of 0', async () => {
     const api = makeApi({ listOAuthGrants: jest.fn(() => of(page([], 0))) });
     const { inst } = await setup(api);
@@ -214,12 +256,12 @@ describe('AdminOAuthGrantsComponent', () => {
 
   it('revokes a grant after the confirmation names owner and client', async () => {
     const { api, inst, toast } = await setup();
-    await userEvent.click(screen.getAllByRole('button', { name: 'Widerrufen' })[0]);
+    await userEvent.click(screen.getByRole('button', { name: 'Widerrufen: Alex Admin' }));
     expect(inst.confirmRevoke()).toEqual(NAMED);
     expect(
-      screen.getByText(/Zugang von Alex Admin für die Anwendung .antragsplattform-mcp./),
+      screen.getByText(/Zugang von Alex Admin für die Anwendung .antragsplattform-mcp. vom 01\.06\.2026/),
     ).toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent('Der Agent verliert den Zugriff sofort.');
+    expect(screen.getByText(/Der Agent verliert den Zugriff sofort\./)).toBeInTheDocument();
 
     const before = api.listOAuthGrants.mock.calls.length;
     inst.doRevoke();
@@ -292,8 +334,7 @@ describe('AdminOAuthGrantsComponent', () => {
   it('hides the revoke column and control without admin.users', async () => {
     const { inst } = await setup(makeApi(), makeAuth(false));
     expect(inst.canRevoke()).toBe(false);
-    expect(inst.columns().some((c: { key: string }) => c.key === 'actions')).toBe(false);
-    expect(screen.queryByRole('button', { name: 'Widerrufen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Widerrufen/ })).not.toBeInTheDocument();
     // The list itself stays readable.
     expect(screen.getByText('Alex Admin')).toBeInTheDocument();
   });
@@ -301,7 +342,6 @@ describe('AdminOAuthGrantsComponent', () => {
   it('shows the revoke column with admin.users', async () => {
     const { inst } = await setup();
     expect(inst.canRevoke()).toBe(true);
-    expect(inst.columns().some((c: { key: string }) => c.key === 'actions')).toBe(true);
-    expect(screen.getAllByRole('button', { name: 'Widerrufen' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: /^Widerrufen:/ })).toHaveLength(2);
   });
 });

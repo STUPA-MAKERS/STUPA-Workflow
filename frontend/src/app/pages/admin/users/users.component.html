@@ -1,90 +1,103 @@
-<section class="flex flex-col gap-6">
+<section class="au">
   <app-page-header
     [flush]="true"
     [title]="'admin.users.title' | t"
     [subtitle]="'admin.users.subtitle' | t"
   />
 
-  <p class="users__hint text-muted text-sm m-0" role="note">
-    {{ 'admin.users.rolesFromGroups' | t }}
+  <app-note class="au__note">
+    <span>{{ 'admin.users.rolesFromGroups' | t }}</span>
     @if (canManageMappings()) {
-      <a routerLink="/admin/group-mappings">{{ 'admin.users.manageGroupMappings' | t }}</a>
+      <a class="au__noteLink" routerLink="/admin/group-mappings">{{
+        'admin.users.manageGroupMappings' | t
+      }}</a>
     }
-  </p>
+  </app-note>
 
-  <form class="users__search" (submit)="$event.preventDefault(); search()" role="search">
-    <label class="users__search-lbl" for="user-search">{{ 'admin.users.search' | t }}</label>
-    <input
-      id="user-search"
-      type="search"
-      [ngModel]="query()"
-      (ngModelChange)="query.set($event)"
-      name="q"
-      [attr.placeholder]="'admin.users.searchPlaceholder' | t"
+  <form class="au__search" role="search" (submit)="$event.preventDefault(); search()">
+    <app-search-pill
+      class="au__pill"
+      size="md"
+      [placeholder]="'admin.users.searchPlaceholder' | t"
+      [label]="'admin.users.search' | t"
+      [value]="query()"
+      (valueChange)="query.set($event)"
     />
-    <app-button type="submit" size="sm">{{ 'admin.users.searchAction' | t }}</app-button>
+    <app-button type="submit" variant="fill">{{ 'admin.users.searchAction' | t }}</app-button>
   </form>
 
-  <app-data-table
-    [columns]="columns()"
-    [rows]="principals()"
-    [rowKey]="rowId"
-    [loading]="loading()"
-    [loadingText]="'admin.users.loading' | t"
-    [emptyText]="'admin.users.noResults' | t"
-  >
-    <ng-template appCell="name" let-p>
-      <span class="font-medium">{{ userLabel($any(p)) }}</span>
-      @if ($any(p).active === false) {
-        <app-badge variant="info">{{ 'admin.users.inactive' | t }}</app-badge>
+  @if (loading()) {
+    <app-skeleton variant="rows" [count]="5" [label]="'admin.users.loading' | t" />
+  } @else {
+    <ul class="rowgroup au__list" [attr.aria-label]="'admin.users.title' | t">
+      @for (p of principals(); track p.id) {
+        <li class="au__row" [class.au__row--off]="p.active === false">
+          <app-avatar class="au__avatar" size="sm" [name]="userLabel(p)" [decorative]="true" />
+          <div class="au__who">
+            <span class="au__name">
+              <span class="ell" [title]="userLabel(p)">{{ userLabel(p) }}</span>
+              @if (p.active === false) {
+                <span class="au__offTag">{{ 'admin.users.inactive' | t }}</span>
+              }
+            </span>
+            @if (p.email) {
+              <span class="au__mail mono">{{ p.email }}</span>
+            }
+          </div>
+          <div class="au__field au__field--roles">
+            <span class="au__lbl">{{ 'admin.users.col.roles' | t }}</span>
+            @if (roleText(p); as roles) {
+              <span class="au__val">{{ roles }}</span>
+            } @else {
+              <span class="au__val au__val--muted">{{ 'admin.users.noRoles' | t }}</span>
+            }
+          </div>
+          <div class="au__field au__field--groups">
+            <span class="au__lbl">{{ 'admin.users.col.groups' | t }}</span>
+            <span class="au__tags">
+              @for (g of p.oidcGroups; track g) {
+                <code class="au__tag">{{ g }}</code>
+              } @empty {
+                <span class="au__val au__val--muted">{{ 'admin.users.noGroups' | t }}</span>
+              }
+            </span>
+          </div>
+          <div class="au__field au__field--login">
+            <span class="au__lbl">{{ 'admin.users.col.lastLogin' | t }}</span>
+            <span class="au__val">{{
+              p.lastLogin ? (p.lastLogin | ldate: 'medium') : ('admin.users.never' | t)
+            }}</span>
+          </div>
+          <div class="au__act">
+            @if (p.active === false) {
+              <app-button
+                size="sm"
+                variant="tonal"
+                [ariaLabel]="('admin.users.activate' | t) + ': ' + userLabel(p)"
+                (click)="setActive(p, true)"
+                >{{ 'admin.users.activate' | t }}</app-button
+              >
+            } @else {
+              <app-button
+                size="sm"
+                variant="danger"
+                [disabled]="isSelf(p)"
+                [ariaLabel]="('admin.users.deactivate' | t) + ': ' + userLabel(p)"
+                [title]="isSelf(p) ? ('admin.users.cannotDeactivateSelf' | t) : ''"
+                (click)="setActive(p, false)"
+                >{{ 'admin.users.deactivate' | t }}</app-button
+              >
+              @if (isSelf(p)) {
+                <span class="sr-only">{{ 'admin.users.cannotDeactivateSelf' | t }}</span>
+              }
+            }
+          </div>
+        </li>
+      } @empty {
+        <li class="au__empty">
+          <app-empty-state icon="users" [heading]="'admin.users.noResults' | t" />
+        </li>
       }
-    </ng-template>
-    <ng-template appCell="email" let-p
-      ><span class="text-muted">{{ $any(p).email || '—' }}</span></ng-template
-    >
-    <ng-template appCell="roles" let-p>
-      <div class="users__roles">
-        @for (id of roleIds($any(p)); track id) {
-          <app-badge variant="neutral">{{ roleLabel(id) | capitalize }}</app-badge>
-        } @empty {
-          <span class="text-muted">{{ 'admin.users.noRoles' | t }}</span>
-        }
-      </div>
-    </ng-template>
-    <ng-template appCell="groups" let-p>
-      <div class="users__roles">
-        @for (g of $any(p).oidcGroups; track g) {
-          <app-badge variant="neutral"><code class="users__group">{{ g }}</code></app-badge>
-        } @empty {
-          <span class="text-muted">{{ 'admin.users.noGroups' | t }}</span>
-        }
-      </div>
-    </ng-template>
-    <ng-template appCell="lastLogin" let-p>
-      <span class="text-muted">{{
-        $any(p).lastLogin ? ($any(p).lastLogin | slice: 0 : 10) : ('admin.users.never' | t)
-      }}</span>
-    </ng-template>
-    <ng-template appCell="actions" let-p>
-      <span class="inline-flex gap-1 justify-end">
-        <app-button
-          variant="ghost"
-          size="sm"
-          [iconOnly]="true"
-          [disabled]="isSelf($any(p)) && $any(p).active !== false"
-          [ariaLabel]="
-            ($any(p).active === false ? 'admin.users.activate' : 'admin.users.deactivate') | t
-          "
-          [attr.title]="
-            isSelf($any(p)) && $any(p).active !== false
-              ? ('admin.users.cannotDeactivateSelf' | t)
-              : null
-          "
-          (click)="setActive($any(p), $any(p).active === false)"
-        >
-          <app-icon name="power" />
-        </app-button>
-      </span>
-    </ng-template>
-  </app-data-table>
+    </ul>
+  }
 </section>

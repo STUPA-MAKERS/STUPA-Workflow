@@ -270,7 +270,7 @@ describe('GremiumMembersComponent', () => {
   it('has no mapping controls, only the hint with a link to the mappings page', async () => {
     await setup();
     expect(screen.getByRole('note')).toHaveTextContent('Die Mitgliedschaft kommt aus den OIDC-Gruppen der Person');
-    expect(screen.getByRole('link', { name: 'Gruppen-Mappings verwalten' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Gruppen-Zuordnung' })).toHaveAttribute(
       'href',
       '/admin/group-mappings',
     );
@@ -282,7 +282,7 @@ describe('GremiumMembersComponent', () => {
     const { c } = await setup(makeApi(), makeDelegationsApi(), makeToast(), false);
     expect(c.canManageMappings()).toBe(false);
     expect(screen.getByRole('note')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Gruppen-Mappings verwalten' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Gruppen-Zuordnung' })).toBeNull();
   });
 
   it('lists substitutes when present', async () => {

@@ -13,7 +13,12 @@ export const VOTING_GREMIUM_PERMISSIONS = ['vote.cast', 'vote.manage', 'session.
 /** The global permissions of the budget pages (budget, bookings, invoices). */
 export const BUDGET_PERMISSIONS = ['budget.view', 'budget.structure', 'budget.book'];
 
-/** Every area-admin permission. Each one opens the admin overview. */
+/**
+ * Every permission of an admin page. Each one opens the admin overview and shows the
+ * "Verwaltung" entry. The list holds the permission of every entry of the admin
+ * navigation (`ADMIN_PAGES`, a spec keeps the two in step) plus `admin.gremium_roles`,
+ * whose pages the overview links per gremium.
+ */
 export const ADMIN_AREA_PERMISSIONS = [
   'admin.site',
   'admin.gremien',
@@ -30,6 +35,9 @@ export const ADMIN_AREA_PERMISSIONS = [
   'webhook.manage',
   'audit.read',
   'backup.manage',
+  'budget.structure',
+  'form.configure',
+  'flow.configure',
 ];
 
 /** The key of a navigation entry. */

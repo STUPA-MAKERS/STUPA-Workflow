@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, type ActivatedRouteSnapshot } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs';
@@ -6,6 +6,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { IconComponent } from '@stupa-makers/ui-kit';
 import type { TranslationKey } from '@core/i18n/translations';
+import { PageFrameService } from './page-frame.service';
 
 interface Crumb {
   label: string;
@@ -33,8 +34,20 @@ interface Crumb {
 export class BreadcrumbsComponent {
   private readonly router = inject(Router);
   private readonly i18n = inject(I18nService);
+  private readonly frame = inject(PageFrameService);
 
-  readonly crumbs = signal<Crumb[]>([]);
+  /** The crumbs of the route, the parent that a frame shows included. */
+  private readonly all = signal<Crumb[]>([]);
+
+  /**
+   * The crumbs to show. A parent that the frame around the page shows already (the
+   * admin navigation shows "Verwaltung") is left out.
+   */
+  readonly crumbs = computed<Crumb[]>(() => {
+    const root = this.frame.crumbRoot();
+    const list = this.all();
+    return root ? list.filter((c, i) => i === list.length - 1 || c.url !== `/${root}`) : list;
+  });
 
   /** Path to i18n title key, taken from the route config to resolve parents. */
   private titleByPath: Map<string, TranslationKey> | null = null;
@@ -50,7 +63,7 @@ export class BreadcrumbsComponent {
   }
 
   private refresh(): void {
-    this.crumbs.set(this.build());
+    this.all.set(this.build());
   }
 
   private build(): Crumb[] {

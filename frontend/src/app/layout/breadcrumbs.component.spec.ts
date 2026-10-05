@@ -3,6 +3,7 @@ import { Router, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import { BreadcrumbsComponent } from './breadcrumbs.component';
 import { I18nService } from '@core/i18n/i18n.service';
+import { PageFrameService } from './page-frame.service';
 
 @Component({ standalone: true, template: 'page' })
 class StubPage {}
@@ -110,6 +111,21 @@ describe('BreadcrumbsComponent', () => {
       'aria-current',
       'page',
     );
+  });
+
+  it('leaves out the parent that the frame around the page already shows', async () => {
+    const { router, fixture, i18n } = await setup();
+    const frame = fixture.debugElement.injector.get(PageFrameService);
+    frame.crumbRoot.set('admin');
+    await router.navigateByUrl('/admin/users');
+    fixture.detectChanges();
+    // Only the current page is left, so the bar hides.
+    expect(screen.queryByRole('navigation', { name: BREADCRUMB })).not.toBeInTheDocument();
+    // Another root keeps every crumb.
+    frame.crumbRoot.set('budget');
+    fixture.detectChanges();
+    expect(screen.getByRole('link', { name: i18n.translate('nav.admin') })).toBeInTheDocument();
+    frame.crumbRoot.set(null);
   });
 
   it('refreshes the crumbs on every navigation', async () => {

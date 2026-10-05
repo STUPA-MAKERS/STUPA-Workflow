@@ -68,20 +68,28 @@ describe('PrivacyComponent', () => {
     expect(api.listErasures).toHaveBeenCalled();
     expect(api.getPrivacySettings).toHaveBeenCalled();
     expect(screen.getByText('a@x')).toBeInTheDocument();
-    // The executed row has no email, so the table shows an em dash.
-    expect(screen.getByText('—')).toBeInTheDocument();
+    // The executed row has no email any more: it reads "anonymisiert".
+    expect(screen.getByText('anonymisiert')).toBeInTheDocument();
     // The retention input shows the loaded default.
     expect(screen.getByDisplayValue('24')).toBeInTheDocument();
+  });
+
+  it('shows a dash for an open request without an e-mail address', async () => {
+    const api = makeApi({ listErasures: jest.fn(() => of([{ ...OPEN, email: null }])) });
+    await setup(api);
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.queryByText('anonymisiert')).toBeNull();
   });
 
   it('translates status and subject labels and renders the localized columns', async () => {
     const { fixture } = await setup();
     const cmp = fixture.componentInstance as unknown as {
-      statusLabel: (s: string) => string;
       subjectLabel: (s: string) => string;
       columns: () => { key: string }[];
     };
-    expect(cmp.statusLabel('open')).toContain('Offen');
+    // The status is coloured text: an open request waits (warn).
+    const open = screen.getByText('Offen');
+    expect(open.closest('app-status-text')).toHaveClass('st--warn');
     expect(cmp.subjectLabel('applicant')).toBeTruthy();
     expect(cmp.columns().map((c) => c.key)).toEqual([
       'status',
@@ -95,7 +103,7 @@ describe('PrivacyComponent', () => {
   it('executes an open erasure after confirmation and reloads', async () => {
     const api = makeApi();
     const { toast } = await setup(api);
-    await userEvent.click(screen.getByRole('button', { name: 'Ausführen' }));
+    await userEvent.click(screen.getAllByRole('button', { name: /^Ausführen: / })[0]);
     const confirm = screen.getAllByRole('button', { name: 'Ausführen' });
     await userEvent.click(confirm[confirm.length - 1]);
     expect(api.executeErasure).toHaveBeenCalledWith('er-1');
@@ -330,10 +338,21 @@ describe('PrivacyComponent', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
+  it('names the request in each row button and leaves a closed row without actions', async () => {
+    const { container } = await setup();
+    expect(screen.getByRole('button', { name: 'Ablehnen: a@x' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ausführen: a@x' })).toBeInTheDocument();
+    // The done row renders nothing in its actions cell, so the card leaves the label out.
+    const cells = [...container.querySelectorAll('td[data-label="Aktionen"]')];
+    expect(cells).toHaveLength(2);
+    expect(cells[1].children).toHaveLength(0);
+    expect(container.querySelector('.dt--rowgroup')).not.toBeNull();
+  });
+
   it('wires the reject action button click through the queue row', async () => {
     // This covers the rendered template and the openReject path that opens the dialog.
     const { container } = await setup();
-    fireEvent.click(screen.getByRole('button', { name: 'Ablehnen' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Ablehnen: / }));
     expect(container.querySelector('textarea')).toBeInTheDocument();
   });
 

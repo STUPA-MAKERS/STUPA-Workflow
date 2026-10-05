@@ -1,33 +1,27 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import type { Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
-  BadgeComponent,
-  ButtonComponent,
-  CellDirective,
-  type ColumnDef,
-  DataTableComponent,
-  DialogComponent,
-  FilterBarComponent,
-  FilterFieldComponent,
-  IconComponent,
-  type SelectOption,
-  SelectComponent,
-  ToastService,
-} from '@stupa-makers/ui-kit';
+  AvatarComponent,
+  EmptyStateComponent,
+  FilterSelectComponent,
+  type FilterSelectOption,
+  NoteComponent,
+  PageHeaderComponent,
+  SkeletonComponent,
+} from '@shared/ui';
+import { ButtonComponent, DialogComponent, ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, OAuthGrantAdmin } from '../admin.models';
 
-/** Rows per page. The backend caps `limit` at 200 and defaults to 50. */
 /* A token usually carries every scope. Showing all of them wrapped each row over three
    lines and set the height of the whole table, so the rest are counted instead. */
 const MAX_VISIBLE_SCOPES = 3;
 
+/** Rows per page. The backend caps `limit` at 200 and defaults to 50. */
 const PAGE_SIZE = 25;
 
 /** HTTP status of a failed request, or 0 when the error carries none. */
@@ -40,17 +34,18 @@ function errorStatus(err: unknown): number {
 }
 
 /**
- * Agent tokens (OAuth grants) of EVERY principal, with a kill switch.
+ * Agent access (OAuth grants) of EVERY principal, with a kill switch (boards
+ * Admin-Agenten-Tokens, Admin-Agenten-Tokens-Dialog).
  *
  * `/account/grants` is the self-service twin: it shows the grants of the caller only.
  * A leaked or compromised token of somebody else can therefore be killed here and
- * nowhere else. The page lists the live grants newest first, filters them by owner and
- * revokes one grant after a confirmation.
+ * nowhere else. The page lists the live grants newest first, filters them by person
+ * (`principalId` on the server) and revokes one grant after a confirmation.
  *
- * Two rules shape the rendering. An owner without a display name and without an email
- * arrives as `principalName: null`; the row then shows a localized placeholder, never
- * the id. An expiry of `null` means the token never expires, which the row states in
- * words instead of leaving the cell empty.
+ * A row: the person (a placeholder when the server sends no name, never the id), the
+ * client, the scope keys, Erstellt, Zugriff bis, Erneuerung bis and "Widerrufen". The
+ * server caps every token lifetime, so there is no "never expires"; a missing time
+ * shows as a dash.
  *
  * The page and the revoke control both need `admin.users`. That gate is UX only — the
  * server enforces the same permission.
@@ -60,19 +55,16 @@ function errorStatus(err: unknown): number {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    FormsModule,
     TranslatePipe,
     LocalizedDatePipe,
-    BadgeComponent,
+    AvatarComponent,
     ButtonComponent,
-    CellDirective,
-    DataTableComponent,
     DialogComponent,
-    FilterBarComponent,
-    FilterFieldComponent,
-    IconComponent,
-    SelectComponent,
+    EmptyStateComponent,
+    FilterSelectComponent,
+    NoteComponent,
     PageHeaderComponent,
+    SkeletonComponent,
   ],
   templateUrl: './oauth-grants.component.html',
   styleUrl: './oauth-grants.component.scss',
@@ -101,34 +93,8 @@ export class AdminOAuthGrantsComponent {
   /** The revoke control needs the same permission as the route. UX only. */
   readonly canRevoke = computed(() => this.auth.can('admin.users'));
 
-  readonly columns = computed<ColumnDef[]>(() => {
-    const cols: ColumnDef[] = [
-      { key: 'owner', label: this.i18n.translate('admin.oauthGrants.col.owner') },
-      { key: 'client', label: this.i18n.translate('admin.oauthGrants.col.client') },
-      { key: 'scope', label: this.i18n.translate('admin.oauthGrants.col.scope') },
-      { key: 'created', label: this.i18n.translate('admin.oauthGrants.col.created') },
-      {
-        key: 'accessExpires',
-        label: this.i18n.translate('admin.oauthGrants.col.accessExpires'),
-      },
-      {
-        key: 'refreshExpires',
-        label: this.i18n.translate('admin.oauthGrants.col.refreshExpires'),
-      },
-    ];
-    if (this.canRevoke()) {
-      cols.push({
-        key: 'actions',
-        label: this.i18n.translate('admin.common.actions'),
-        align: 'end',
-        width: '7rem',
-      });
-    }
-    return cols;
-  });
-
-  /** Owner dropdown. A principal without a name or an email gets the placeholder. */
-  readonly principalOptions = computed<SelectOption[]>(() => [
+  /** The person filter. A principal without a name or an email gets the placeholder. */
+  readonly principalOptions = computed<FilterSelectOption[]>(() => [
     { value: '', label: this.i18n.translate('admin.oauthGrants.filter.allPrincipals') },
     ...this.principals().map((p) => ({
       value: p.id,
@@ -136,7 +102,13 @@ export class AdminOAuthGrantsComponent {
     })),
   ]);
 
-  readonly activeFilterCount = computed(() => (this.principalId() ? 1 : 0));
+  /** The text of the person chip: "Person: Alle Personen" or "Person: <name>". */
+  readonly principalChipText = computed(() => {
+    const id = this.principalId();
+    const hit = this.principalOptions().find((o) => o.value === id);
+    const name = hit?.label ?? this.i18n.translate('admin.oauthGrants.filter.allPrincipals');
+    return `${this.i18n.translate('admin.oauthGrants.filter.principal')}: ${name}`;
+  });
 
   readonly hasPrev = computed(() => this.offset() > 0);
   readonly hasNext = computed(() => this.offset() + this.grants().length < this.total());
@@ -149,8 +121,6 @@ export class AdminOAuthGrantsComponent {
       total: this.total(),
     }),
   );
-
-  readonly rowId = (g: unknown): string => (g as OAuthGrantAdmin).id;
 
   constructor() {
     this.load();
@@ -175,6 +145,12 @@ export class AdminOAuthGrantsComponent {
       })
       .subscribe({
         next: (page) => {
+          // The last row of the last page went away (a revoke): step back one page.
+          if (!page.items.length && this.offset() > 0) {
+            this.offset.update((o) => Math.max(0, o - PAGE_SIZE));
+            this.load();
+            return;
+          }
           this.grants.set(page.items);
           this.total.set(page.total);
           this.loading.set(false);
@@ -191,10 +167,6 @@ export class AdminOAuthGrantsComponent {
     this.principalId.set(id as Uuid | '');
     this.offset.set(0);
     this.load();
-  }
-
-  resetFilters(): void {
-    this.setPrincipal('');
   }
 
   prevPage(): void {
@@ -216,7 +188,7 @@ export class AdminOAuthGrantsComponent {
     return grant.principalName ?? this.i18n.translate('admin.oauthGrants.unknownOwner');
   }
 
-  /** The email as a second line — only when it adds something to the name. */
+  /** The email beside the name — only when it adds something to the name. */
   ownerEmail(grant: OAuthGrantAdmin): string | null {
     return grant.principalEmail && grant.principalEmail !== grant.principalName
       ? grant.principalEmail
@@ -228,7 +200,7 @@ export class AdminOAuthGrantsComponent {
     return grant.scope.split(/\s+/).filter(Boolean);
   }
 
-  /** The scopes that get a badge. The rest are counted, not drawn. */
+  /** The scopes that get a tag. The rest are counted, not drawn. */
   visibleScopes(grant: OAuthGrantAdmin): string[] {
     return this.scopes(grant).slice(0, MAX_VISIBLE_SCOPES);
   }
@@ -236,6 +208,11 @@ export class AdminOAuthGrantsComponent {
   /** How many scopes the badges leave out, or 0 when they all fit. */
   hiddenScopeCount(grant: OAuthGrantAdmin): number {
     return Math.max(0, this.scopes(grant).length - MAX_VISIBLE_SCOPES);
+  }
+
+  /** The scopes the badges leave out. Screen readers read them; the title shows them. */
+  hiddenScopes(grant: OAuthGrantAdmin): string[] {
+    return this.scopes(grant).slice(MAX_VISIBLE_SCOPES);
   }
 
   // --- revoke --------------------------------------------------------------

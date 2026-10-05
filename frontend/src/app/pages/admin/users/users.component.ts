@@ -1,51 +1,48 @@
-import { SlicePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
-  BadgeComponent,
-  ButtonComponent,
-  CellDirective,
-  type ColumnDef,
-  DataTableComponent,
-  IconComponent,
-  ToastService,
-} from '@stupa-makers/ui-kit';
+  AvatarComponent,
+  EmptyStateComponent,
+  NoteComponent,
+  PageHeaderComponent,
+  SearchPillComponent,
+  SkeletonComponent,
+} from '@shared/ui';
+import { ButtonComponent, ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, GroupMapping, Role } from '../admin.models';
 
 /**
- * Users and roles as a table. The table follows the Nextcloud user table.
+ * Users (board Admin-Benutzer): a search and one row per principal.
  *
- * Each row holds one principal: name, e-mail, the global roles, the OIDC groups and
- * the last login. The roles are read-only. They come from the OIDC groups through the
- * group mappings (`/admin/group-mappings`), plus the bootstrap assignments (`admin`
- * from the settings and the implicit `member`). Gremium membership and gremium roles
- * have their own mappings on the same page. The frontend only gates the UX. The
- * server stays authoritative.
+ * A row shows the person, the global roles, the OIDC groups and the last login, and
+ * "Deaktivieren" or "Aktivieren". The roles are read-only. They come from the OIDC
+ * groups through the group mappings (`/admin/group-mappings`), plus the bootstrap
+ * assignments (`admin` from the settings and the implicit `member`). Gremium membership
+ * and gremium roles have their own mappings on the same page. The frontend only gates
+ * the UX. The server stays authoritative.
  */
 @Component({
   selector: 'app-admin-users',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    FormsModule,
     RouterLink,
-    SlicePipe,
     TranslatePipe,
-    CapitalizePipe,
+    LocalizedDatePipe,
     ButtonComponent,
-    BadgeComponent,
-    DataTableComponent,
-    CellDirective,
-    IconComponent,
+    AvatarComponent,
+    EmptyStateComponent,
+    NoteComponent,
     PageHeaderComponent,
+    SearchPillComponent,
+    SkeletonComponent,
   ],
   templateUrl: './users.component.html',
   styleUrl: './users.component.scss',
@@ -56,6 +53,7 @@ export class UsersComponent {
   private readonly i18n = inject(I18nService);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
+  private readonly capitalize = new CapitalizePipe();
 
   /** OIDC `sub` of the logged-in user. The view uses it to block self-deactivation. */
   protected readonly mySub = computed(() => this.auth.principal()?.sub ?? null);
@@ -76,30 +74,6 @@ export class UsersComponent {
    * request is still out, which asserts there is nothing when nothing has arrived yet.
    */
   protected readonly loading = signal(true);
-
-  /**
-   * Widths are floors: the table scrolls rather than crushing a column. A `width` alone
-   * is a suggestion under `table-layout: auto`, so a column can be squeezed until every
-   * value wraps and no two rows are the same height.
-   */
-  protected readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'name', label: this.i18n.translate('admin.users.col.name'), width: '14rem', card: 'title' },
-    // Long enough for a full university address without a mid-domain break.
-    { key: 'email', label: this.i18n.translate('admin.users.col.email'), width: '22rem' },
-    { key: 'roles', label: this.i18n.translate('admin.users.col.roles'), width: '16rem' },
-    { key: 'groups', label: this.i18n.translate('admin.users.col.groups'), width: '16rem' },
-    { key: 'lastLogin', label: this.i18n.translate('admin.users.col.lastLogin'), width: '9rem' },
-    {
-      key: 'actions',
-      label: this.i18n.translate('admin.users.col.actions'),
-      align: 'end',
-      // Pinned, so the row's actions stay reachable while the rest scrolls under them.
-      sticky: 'end',
-      width: '5rem',
-    },
-  ]);
-
-  protected readonly rowId = (p: unknown): string => (p as AdminPrincipal).id;
 
   constructor() {
     this.api.listRoles().subscribe((r) => this.roles.set(r));
@@ -160,6 +134,13 @@ export class UsersComponent {
     const role = this.rolesById().get(roleId);
     if (!role) return roleId;
     return role.label[this.i18n.locale()] ?? role.label['de'] ?? role.key;
+  }
+
+  /** The global roles of one principal as one line, for example "Administration, Mitglied". */
+  protected roleText(p: AdminPrincipal): string {
+    return this.roleIds(p)
+      .map((id) => this.capitalize.transform(this.roleLabel(id)))
+      .join(', ');
   }
 
   protected userLabel(p: AdminPrincipal): string {

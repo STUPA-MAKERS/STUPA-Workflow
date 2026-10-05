@@ -1,0 +1,31 @@
+<button
+  type="button"
+  class="chip dc__chip"
+  [class.on]="!!value()"
+  [class.dc__chip--set]="!!value()"
+  [attr.aria-label]="text()"
+  (click)="open()"
+>
+  <app-icon name="cal" [size]="15" />
+  <span class="dc__text">{{ text() }}</span>
+</button>
+@if (value()) {
+  <button
+    type="button"
+    class="dc__clear"
+    [attr.aria-label]="('admin.audit.filter.clearDay' | t) + ': ' + label()"
+    [title]="'admin.audit.filter.clearDay' | t"
+    (click)="clear()"
+  >
+    <app-icon name="x" [size]="14" />
+  </button>
+}
+<input
+  #picker
+  class="dc__picker"
+  type="date"
+  tabindex="-1"
+  aria-hidden="true"
+  [value]="value()"
+  (change)="onPick($event)"
+/>

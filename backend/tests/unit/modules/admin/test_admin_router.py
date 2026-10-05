@@ -29,6 +29,7 @@ from app.modules.admin.router import (
 from app.modules.admin.schemas import (
     ApplicationTypeOut,
     FlowVersionOut,
+    GremiumAdminOut,
     GremiumMailRecipients,
     GremiumMembershipMappingOut,
     GremiumMembershipOut,
@@ -61,6 +62,20 @@ _ALL_PERMS = {
 
 
 class _FakeConfig:
+    async def list_gremien_admin(self):
+        return [
+            GremiumAdminOut(
+                id=uuid4(),
+                name="StuPa",
+                slug="stupa",
+                cd_variant_id=None,
+                default_lang="de",
+                allow_vote_delegation=False,
+                member_count=23,
+                role_count=4,
+            )
+        ]
+
     async def list_gremien(self):
         return [
             GremiumOut(
@@ -429,6 +444,16 @@ def test_list_create_update_gremium(app: FastAPI, client: TestClient) -> None:
     assert r.status_code == 201 and r.json()["defaultLang"] == "de"
     patched = client.patch(f"/api/admin/gremien/{uuid4()}", json={"name": "Neu"})
     assert patched.status_code == 200
+
+
+def test_admin_gremien_list_has_counts(app: FastAPI, client: TestClient) -> None:
+    """The admin list names the member and role counts; the public list does not."""
+    _as_admin(app)
+    row = client.get("/api/admin/gremien").json()[0]
+    assert row["memberCount"] == 23
+    assert row["roleCount"] == 4
+    public = client.get("/api/gremien").json()[0]
+    assert "memberCount" not in public and "roleCount" not in public
 
 
 def test_update_gremium_404(app: FastAPI, client: TestClient) -> None:

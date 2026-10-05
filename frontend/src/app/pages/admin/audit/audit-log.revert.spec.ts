@@ -1,6 +1,7 @@
 import { of, throwError } from 'rxjs';
 import { provideRouter } from '@angular/router';
-import { render } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
@@ -40,6 +41,8 @@ type Cmp = AuditLogComponent & {
   diffOf(e: AuditEntry): ConfigRevisionDiff | null | undefined;
   askRevert(e: AuditEntry): void;
   doRevert(): void;
+  confirmRevert(): AuditEntry | null;
+  reverting(): boolean;
 };
 
 async function setup(
@@ -57,6 +60,8 @@ async function setup(
     listAuditLog: jest.fn(() => of(page)),
     listAuditActors: jest.fn(() => of([])),
     getConfigRevisionDiff: jest.fn(() => of(DIFF)),
+    latestAuditVerification: jest.fn(() => of(null)),
+    runAuditVerification: jest.fn(),
     revertAuditEntry,
   };
   const toast = { success: jest.fn(), error: jest.fn() };
@@ -78,6 +83,59 @@ describe('AuditLogComponent — config diff + revert', () => {
     c.toggle(7);
     expect(api.getConfigRevisionDiff).toHaveBeenCalledWith('rev-2');
     expect(c.diffOf(c.entries()[0])).toEqual(DIFF);
+  });
+
+  it('shows the diff as one code block with "-" and "+" lines and the revision in the target', async () => {
+    localStorage.setItem('ap.locale', 'de');
+    const { c, fixture, container } = await setup({
+      entryOver: {},
+    });
+    (c as unknown as { diffs: { set(m: Map<string, ConfigRevisionDiff>): void } }).diffs.set(
+      new Map([
+        [
+          'rev-2',
+          {
+            ...DIFF,
+            diff: {
+              changed: [{ key: 'state:review', old: 'A', new: 'B' }],
+              added: [{ key: 'state:new', value: { x: 1 } }],
+              removed: [{ key: 'state:old', value: 'Z' }],
+            },
+          },
+        ],
+      ]),
+    );
+    c.toggle(7);
+    fixture.detectChanges();
+    const block = container.querySelector('.al__code');
+    expect(block).not.toBeNull();
+    expect(container.querySelector('app-config-diff')).toBeNull();
+    const items = [...(block?.querySelectorAll('.al__codeItem') ?? [])].map((i) =>
+      [...i.children].map((c) => (c.textContent ?? '').replace(/\s+/g, ' ').trim()),
+    );
+    expect(items).toEqual([
+      ['state:review', '- vorher: "A"', '+ nachher: "B"'],
+      ['state:new', '+ nachher: {"x":1}'],
+      ['state:old', '- vorher: "Z"'],
+    ]);
+    expect(container.querySelector('.al__codeDel')).not.toBeNull();
+    expect(container.querySelector('.al__codeIns')).not.toBeNull();
+    // The revision id sits in the target line; "version" reads as "Revision".
+    const details = container.querySelector('.al__details')?.textContent ?? '';
+    expect(details).toContain('rev rev-2');
+    expect(details).toContain('Revision');
+    expect(details).not.toContain('revisionId');
+  });
+
+  it('says so when the diff has no changes', async () => {
+    localStorage.setItem('ap.locale', 'de');
+    const { c, fixture } = await setup();
+    (c as unknown as { diffs: { set(m: Map<string, ConfigRevisionDiff>): void } }).diffs.set(
+      new Map([['rev-2', { ...DIFF, diff: { added: [], removed: [], changed: [] } }]]),
+    );
+    c.toggle(7);
+    fixture.detectChanges();
+    expect(screen.getByText('Keine Änderungen')).toBeInTheDocument();
   });
 
   it('offers revert with the audit.revert permission', async () => {
@@ -125,6 +183,63 @@ describe('AuditLogComponent — config diff + revert', () => {
     c.askRevert(c.entries()[0]);
     c.doRevert();
     expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/neuere|newer/i));
+  });
+
+  it('shows the diff, "Ziel öffnen" and "Zurücknehmen" in the opened entry, and confirms', async () => {
+    const { c, fixture, revertAuditEntry } = await setup({ entryOver: { targetType: 'role', targetId: 'r-1' } });
+    (fixture.nativeElement.querySelector('.al__row') as HTMLElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.al__code')).not.toBeNull();
+    expect(screen.getByRole('link', { name: 'Ziel öffnen' })).toHaveAttribute('href', '/admin/roles');
+    await userEvent.click(screen.getByRole('button', { name: 'Zurücknehmen' }));
+    expect(c.confirmRevert()).not.toBeNull();
+    const dialog = screen.getByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Zurücknehmen' }));
+    expect(revertAuditEntry).toHaveBeenCalledWith(7);
+  });
+
+  it('drops a failed diff load, so a second opening tries again', async () => {
+    const { c, api } = await setup();
+    (api.getConfigRevisionDiff as jest.Mock).mockReturnValueOnce(throwError(() => new Error('x')));
+    c.toggle(7);
+    expect(c.diffOf(c.entries()[0])).toBeUndefined();
+    c.toggle(7);
+    c.toggle(7);
+    expect(api.getConfigRevisionDiff).toHaveBeenCalledTimes(2);
+    expect(c.diffOf(c.entries()[0])).toEqual(DIFF);
+  });
+
+  it('loads a diff only once and has none for an entry without a revision', async () => {
+    const { c, api } = await setup({ entryOver: { data: {} } });
+    c.toggle(7);
+    expect(api.getConfigRevisionDiff).not.toHaveBeenCalled();
+    expect(c.diffOf(c.entries()[0])).toBeUndefined();
+  });
+
+  it('doRevert does nothing without a confirmation', async () => {
+    const { c, revertAuditEntry } = await setup();
+    c.doRevert();
+    expect(revertAuditEntry).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['already_reverted', /bereits|already/i],
+    ['not_revertable', /nicht zurückgenommen|cannot/i],
+  ])('names the 409 code %s', async (code, text) => {
+    const revert = jest.fn(() => throwError(() => ({ status: 409, error: { code } })));
+    const { c, toast } = await setup({ revert });
+    c.askRevert(c.entries()[0]);
+    c.doRevert();
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(text));
+  });
+
+  it('gives the generic message for any other error', async () => {
+    const revert = jest.fn(() => throwError(() => ({ status: 500 })));
+    const { c, toast } = await setup({ revert });
+    c.askRevert(c.entries()[0]);
+    c.doRevert();
+    expect(toast.error).toHaveBeenCalledWith('Rücknahme fehlgeschlagen.');
+    expect(c.reverting()).toBe(false);
   });
 
   it('surfaces a "first state" message for the nothing_to_revert code', async () => {

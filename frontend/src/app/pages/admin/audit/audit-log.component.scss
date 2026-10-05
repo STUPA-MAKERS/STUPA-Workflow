@@ -1,113 +1,256 @@
 :host {
+  display: block;
+}
+
+.al {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  container-type: inline-size;
+}
+
+/* The chain check. */
+.al__verify {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.al__verifyIcon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.al__verifyText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.al__verifyTitle {
+  font-weight: var(--fw-semibold);
+}
+.al__verifySub {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.al__verifySkel {
+  width: 50%;
+}
+.al__verify--ok .al__verifyIcon,
+.al__verify--ok .al__verifyTitle {
+  color: var(--color-accent-text);
+}
+.al__verify--error .al__verifyIcon,
+.al__verify--error .al__verifyTitle {
+  color: var(--color-danger);
+}
+
+.al__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.al__reset {
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.al__reset:hover {
+  text-decoration: underline;
+}
+
+.al__error {
+  margin: 0;
+  color: var(--color-danger);
+}
+.al__empty {
+  margin: 0;
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.al__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The whole row opens the details. */
+.al__row {
+  display: grid;
+  grid-template-columns: 10.5rem minmax(8rem, 1fr) minmax(6rem, 0.8fr) minmax(8rem, 1.4fr) 1rem;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.al__row:hover {
+  background: var(--color-surface-3);
+}
+.al__row:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.al__time {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.al__action {
+  font-weight: var(--fw-semibold);
+}
+.al__actor,
+.al__target {
+  font-size: var(--fs-sm);
+}
+.al__actor {
+  color: var(--color-text-muted);
+}
+.al__chev {
+  color: var(--color-text-muted);
+}
+
+.al__details {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  padding: var(--space-1) var(--space-4) var(--space-5) calc(10.5rem + 2 * var(--space-4));
 }
-.audit__day {
-  margin: var(--space-3) 0 var(--space-2);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.audit__item + .audit__item {
-  border-top: var(--border-width) solid var(--color-border);
-}
-.audit__row {
+.al__meta {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+  font-size: var(--fs-sm);
 }
-.audit__row:hover {
-  background: var(--color-surface-sunken);
-}
-.audit__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 50%;
-  background: var(--color-surface-sunken);
+.al__meta dt {
   color: var(--color-text-muted);
-  flex-shrink: 0;
 }
-.audit__msg {
-  min-width: 0;
+.al__meta dd {
+  margin: 0;
+}
+/* Ids and data values wrap; they are never cut. */
+.al__wrap {
   overflow-wrap: anywhere;
 }
-.audit__time {
-  color: var(--color-text-muted);
-  font-size: var(--fs-xs);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+.al__diff {
+  min-width: 0;
 }
-.audit__chev {
-  color: var(--color-text-muted);
-}
-.audit__details {
+/* The config diff as one compact code block (board Admin-Audit-Log). */
+.al__code {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: 0 var(--space-3) var(--space-3) calc(1.75rem + 2 * var(--space-3));
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-3);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
 }
-.audit__meta {
-  display: grid;
-  gap: var(--space-1);
-  margin: 0;
-}
-.audit__metaRow {
-  display: grid;
-  grid-template-columns: minmax(6rem, 9rem) 1fr;
-  gap: var(--space-3);
-  align-items: baseline;
-}
-.audit__metaRow dt {
-  margin: 0;
+.al__codeKey {
   color: var(--color-text-muted);
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
-.audit__metaRow dd {
-  margin: 0;
-  font-size: var(--fs-sm);
+.al__codeKey,
+.al__codeDel,
+.al__codeIns {
   overflow-wrap: anywhere;
 }
-.audit__mono {
-  font-family: var(--font-mono, monospace);
-  font-size: var(--fs-xs);
-}
-@media (max-width: 40rem) {
-  .audit__metaRow {
-    grid-template-columns: 1fr;
-    gap: 0;
-  }
-}
-.audit__status--error {
+.al__codeDel {
   color: var(--color-danger);
 }
-.audit__sentinel {
+.al__codeIns {
+  color: var(--color-success);
+}
+.al__codeNone {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.al__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+.al__open {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--color-accent-text);
+}
+
+.al__sentinel {
   height: 1px;
 }
-@media (max-width: 40rem) {
-  .audit__row {
-    grid-template-columns: auto 1fr auto;
+.al__more {
+  display: flex;
+  justify-content: center;
+}
+
+.al__dialogText {
+  margin: 0;
+}
+.al__dialogFoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+/* Narrower: time and action on the first line, actor and target below. */
+@container (max-width: 44rem) {
+  .al__row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 1rem;
+    grid-template-areas:
+      'action action chev'
+      'time actor chev'
+      'target target chev';
+    gap: 2px var(--space-3);
+    padding-block: var(--space-3);
   }
-  .audit__chev {
-    display: none;
+  .al__action {
+    grid-area: action;
   }
-  .audit__details {
-    padding-left: var(--space-3);
+  .al__time {
+    grid-area: time;
+  }
+  .al__actor {
+    grid-area: actor;
+  }
+  .al__target {
+    grid-area: target;
+    color: var(--color-text-muted);
+  }
+  .al__chev {
+    grid-area: chev;
+  }
+  .al__details {
+    padding: var(--space-1) var(--space-4) var(--space-4);
+  }
+  /* The icon stays beside the text; the button goes below it. */
+  .al__verify {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-3);
+  }
+  .al__verify app-button {
+    grid-column: 2;
+    justify-self: start;
   }
 }

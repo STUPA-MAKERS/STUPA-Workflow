@@ -4,10 +4,9 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { PageHeaderComponent, StatusTextComponent, erasureStatus } from '@shared/ui';
 import {
   ButtonComponent,
-  CardComponent,
   CellDirective,
   type ColumnDef,
   DataTableComponent,
@@ -20,11 +19,16 @@ import { AdminApiService } from '../admin-api.service';
 import type { ErasureRequest } from '../admin.models';
 
 /**
- * Admin privacy page (permission `privacy.manage`) for GDPR administration.
+ * Privacy (board Admin-Datenschutz, permission `privacy.manage`) for GDPR administration.
  *
- * The page has four areas. The erasure-request queue executes or rejects a request.
- * Principal erasure covers Art. 17. The access export covers Art. 15 and returns XLSX.
- * The global retention default covers Art. 5(1)(e). The server audits every mutation.
+ * - Erasure requests (Art. 17): status as coloured text, subject, e-mail, date. An open
+ *   request is rejected (with an optional reason) or executed; executing erases data and
+ *   is the danger action. Both ask for a confirmation.
+ * - Access export (Art. 15): every record of an e-mail address as XLSX.
+ * - Account erasure (Art. 17): clears the personal data of one account (danger).
+ * - Retention (Art. 5(1)(e)): months until a closed application is anonymized.
+ *
+ * The server audits every mutation.
  */
 @Component({
   selector: 'app-admin-privacy',
@@ -35,13 +39,13 @@ import type { ErasureRequest } from '../admin.models';
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
-    CardComponent,
     DataTableComponent,
     CellDirective,
     DialogComponent,
     IconComponent,
     InputComponent,
     PageHeaderComponent,
+    StatusTextComponent,
   ],
   templateUrl: './privacy.component.html',
   styleUrl: './privacy.component.scss',
@@ -69,12 +73,15 @@ export class PrivacyComponent {
   protected readonly retentionMonths = signal<number | null>(null);
 
   protected readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'status', label: this.i18n.translate('admin.privacy.col.status') },
-    { key: 'subjectType', label: this.i18n.translate('admin.privacy.col.subject') },
-    { key: 'email', label: this.i18n.translate('admin.privacy.col.email') },
-    { key: 'createdAt', label: this.i18n.translate('admin.privacy.col.created') },
-    { key: 'actions', label: this.i18n.translate('admin.common.actions'), align: 'end', width: '9rem' },
+    { key: 'status', label: this.i18n.translate('admin.privacy.col.status'), width: '8rem' },
+    { key: 'subjectType', label: this.i18n.translate('admin.privacy.col.subject'), width: '7rem' },
+    { key: 'email', label: this.i18n.translate('admin.privacy.col.email'), card: 'title' },
+    { key: 'createdAt', label: this.i18n.translate('admin.privacy.col.created'), width: '8rem' },
+    { key: 'actions', label: this.i18n.translate('admin.common.actions'), align: 'end', width: '13rem' },
   ]);
+
+  /** Status of a request as coloured text. */
+  protected readonly erasureStatus = erasureStatus;
 
   constructor() {
     this.reload();
@@ -89,10 +96,6 @@ export class PrivacyComponent {
       },
       error: () => this.loading.set(false),
     });
-  }
-
-  protected statusLabel(status: string): string {
-    return this.i18n.translate(`admin.privacy.status.${status}` as TranslationKey);
   }
 
   protected subjectLabel(subject: string): string {
