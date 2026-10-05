@@ -67,6 +67,7 @@ async def list_expenses(
 async def list_invoices(
     q: str | None = None,
     status: Literal["open", "paid"] | None = None,
+    booked: bool | None = None,
     gross_min: str | None = None,
     gross_max: str | None = None,
     issue_from: str | None = None,
@@ -79,14 +80,18 @@ async def list_invoices(
     """List the invoices, offset-paged, with the newest issue date first.
 
     Filter by status, by gross range and by date. Requires budget.view or budget.book.
+    The response carries ``counts`` with the size of each list segment (all, inbox,
+    booked, paid) under the other filters.
 
     Args:
         q: A fuzzy search over the invoice number, the supplier and the note.
+        booked: True keeps the invoices with a booking, False the ones without. With
+            ``status="open"`` this gives the "Verbucht" and the "Eingang" segment.
     """
     return await api().get(
         "/invoices",
         params=params(
-            q=q, status=status, grossMin=gross_min, grossMax=gross_max,
+            q=q, status=status, booked=booked, grossMin=gross_min, grossMax=gross_max,
             issueFrom=issue_from, issueTo=issue_to, dueFrom=due_from, dueTo=due_to,
             limit=limit, offset=offset,
         ),
