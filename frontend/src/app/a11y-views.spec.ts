@@ -465,7 +465,16 @@ describe('Kern-Views a11y (axe)', () => {
           fakeDelegations,
           {
             provide: ActivatedRoute,
-            useValue: { snapshot: { paramMap: convertToParamMap({ id: MOCK_GREMIUM_STUPA_ID }) } },
+            useValue: {
+              snapshot: {
+                paramMap: convertToParamMap({ id: MOCK_GREMIUM_STUPA_ID }),
+                pathFromRoot: [
+                  { url: [] },
+                  { url: [{ path: 'admin' }] },
+                  { url: [{ path: 'gremien' }, { path: MOCK_GREMIUM_STUPA_ID }, { path: 'members' }] },
+                ],
+              },
+            },
           },
         ],
       });
