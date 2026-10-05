@@ -74,11 +74,13 @@
         @if (stepKeys().includes('contact')) {
           <section class="wz__step" [hidden]="currentStep() !== 'contact'">
             @if (loggedIn()) {
-              <h3 class="sec wz__sec">{{ 'apply.contact.account' | t }}</h3>
-              <app-field-group>
-                <app-field-row [label]="'apply.contact.name' | t">{{ account().name }}</app-field-row>
-                <app-field-row [label]="'apply.contact.email' | t">{{ account().email }}</app-field-row>
-              </app-field-group>
+              <section class="wz__block" [attr.aria-label]="'apply.contact.account' | t">
+                <h3 class="sec wz__sec">{{ 'apply.contact.account' | t }}</h3>
+                <app-field-group>
+                  <app-field-row [label]="'apply.contact.name' | t">{{ account().name }}</app-field-row>
+                  <app-field-row [label]="'apply.contact.email' | t">{{ account().email }}</app-field-row>
+                </app-field-group>
+              </section>
             } @else {
               <p class="wz__hint">{{ 'apply.contact.lead' | t }}</p>
               <form class="wz__contact" [formGroup]="contactForm" (submit)="$event.preventDefault()">
@@ -118,17 +120,19 @@
               [skipKeys]="[]"
               [emptyText]="'apply.review.empty' | t"
             />
-            <h3 class="sec wz__sec">{{ 'apply.review.applicant' | t }}</h3>
-            <app-field-group>
-              @if (loggedIn()) {
-                <app-field-row [label]="'apply.contact.name' | t">{{ account().name }}</app-field-row>
-              } @else if (contactForm.controls.name.value) {
-                <app-field-row [label]="'apply.contact.name' | t">{{ contactForm.controls.name.value }}</app-field-row>
-              }
-              <app-field-row [label]="'apply.contact.email' | t">{{ reviewEmail() }}</app-field-row>
-            </app-field-group>
+            <section class="wz__block" [attr.aria-label]="'apply.review.applicant' | t">
+              <h3 class="sec wz__sec">{{ 'apply.review.applicant' | t }}</h3>
+              <app-field-group>
+                @if (loggedIn()) {
+                  <app-field-row [label]="'apply.contact.name' | t">{{ account().name }}</app-field-row>
+                } @else if (contactForm.controls.name.value) {
+                  <app-field-row [label]="'apply.contact.name' | t">{{ contactForm.controls.name.value }}</app-field-row>
+                }
+                <app-field-row [label]="'apply.contact.email' | t">{{ reviewEmail() }}</app-field-row>
+              </app-field-group>
+            </section>
             @if (drafts.usable().length) {
-              <section class="wz__reviewFiles" [attr.aria-label]="'apply.files.title' | t">
+              <section class="wz__block" [attr.aria-label]="'apply.files.title' | t">
                 <h3 class="sec wz__sec">{{ 'apply.files.title' | t }}</h3>
                 <ul class="rowgroup wz__fileList">
                   @for (f of drafts.usable(); track f.id) {
