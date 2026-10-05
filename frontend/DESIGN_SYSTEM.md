@@ -161,7 +161,7 @@ Angular Testing Library, and `a11y.spec.ts` runs axe over them.
   on/off toggle. The older names `primary`, `success` (= fill), `secondary` (= tonal),
   `ghost` (= text) and `danger-outline` (= danger) stay as aliases.
 - `app-switch` — `role="switch"` for a setting that applies at once.
-- `app-segmented` — a radio group in one row (Ausgabe/Einnahme, Anwesend/Abwesend).
+- `app-segmented` — a radio group in one row (Ausgabe/Einnahme, Anwesend/Abwesend). `width="equal"` makes the segments equal (list views), `width="fill"` lets them share the width of a form or a column; an option can carry a `count` (invoice segments), and `[check]="false"` leaves out the check mark where the column is narrow.
 - `app-tabs` — a tab bar with optional counts (Antrag | Verlauf 4).
 - `app-input`, `app-select`, `app-datepicker`, `app-time-input`, `app-currency-input` —
   filled fields with the label inside the box. `app-checkbox` — an 18px box.

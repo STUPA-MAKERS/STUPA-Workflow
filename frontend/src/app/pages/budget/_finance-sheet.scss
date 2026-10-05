@@ -1,0 +1,416 @@
+// The detail sheet of the finance pages (bookings, transfers, invoices): the header with
+// the meta line, the title and the line "Status · … · Betrag", then two columns of
+// sections with cards. The detail components `@use` this file, so the three sheets look
+// the same. Side by side the sheet is surface 1 with a large radius; one pane at a time it
+// sits on the page.
+@use 'breakpoints' as bp;
+
+:host {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fd {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+.fd--split {
+  padding: 0 var(--space-6) var(--space-6);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+
+/* ------------------------------------------------------------------ header */
+.fd__head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 22px;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.fd__bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 60px;
+}
+.fd--split .fd__bar {
+  margin-inline-end: calc(-1 * var(--space-3));
+}
+.fd__meta {
+  flex: 1 1 auto;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.fd__title {
+  margin: 0;
+  font-size: var(--fs-d2);
+  line-height: var(--lh-d2);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-tight);
+  overflow-wrap: anywhere;
+}
+.fd__line {
+  --fd-sep: 24px;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-md);
+  min-width: 0;
+}
+/* Items with a dot between two of them, also after a wrap: every part draws its dot
+   before it, and the line clips the dot of the first part on each line. */
+.fd__seps {
+  overflow-x: clip;
+}
+.fd__parts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin-inline-start: calc(-1 * var(--fd-sep));
+  min-width: 0;
+}
+.fd__part {
+  min-width: 0;
+  white-space: nowrap;
+}
+.fd__part::before {
+  display: inline-block;
+  width: var(--fd-sep);
+  color: var(--color-text-subtle);
+  text-align: center;
+  content: '·';
+  content: '·' / '';
+}
+.fd__amount {
+  color: var(--color-text);
+}
+.fd__cc {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+}
+.fd__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.fd__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ------------------------------------------------------------------ body */
+.fd__cols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+  align-items: flex-start;
+}
+.fd__col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+.fd__col:first-child {
+  flex: 1.3 1 0;
+  min-width: min(100%, 20rem);
+}
+.fd__col:last-child {
+  flex: 1 1 0;
+  min-width: min(100%, 18rem);
+}
+/* On a phone the two columns become one. The sections then take the order of the Tel
+   boards: a section sets its place with --fd-phone-order (default 0 = the DOM order). */
+@include bp.phone {
+  .fd__cols {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+  }
+  .fd__col {
+    display: contents;
+  }
+  .fd__sec {
+    order: var(--fd-phone-order, 0);
+  }
+}
+.fd__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.fd__secTitle {
+  padding: 0 var(--space-1);
+}
+.fd__secHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--control-height-sm);
+}
+.fd__secLink {
+  padding: 0 var(--space-1);
+  color: var(--color-accent-text);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+.fd__secLink:hover {
+  text-decoration: underline;
+}
+.fd__count {
+  margin-inline-start: 4px;
+  color: var(--color-text-muted);
+  font-weight: var(--fw-regular);
+}
+.fd__none {
+  margin: 0;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+
+/* A card of label/value pairs. */
+.fd__card {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  min-width: 0;
+}
+.fd__card dt,
+.fd__figs dt {
+  color: var(--color-text-muted);
+  font-size: 0.78125rem;
+  line-height: 1.125rem;
+}
+.fd__card dd,
+.fd__figs dd {
+  margin: 2px 0 0;
+  font-size: var(--fs-md);
+  line-height: 1.375rem;
+  min-width: 0;
+}
+.fd__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
+  gap: var(--space-3) var(--space-4);
+}
+.fd__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+/* Copyable values wrap, never an ellipsis. */
+.fd__wrap,
+.fd__note {
+  overflow-wrap: anywhere;
+}
+.fd__note {
+  white-space: pre-line;
+}
+.fd__swatch {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.fd__dot {
+  margin-inline: 6px;
+  color: var(--color-text-subtle);
+}
+.fd__ccLine .fd__swatch {
+  margin-inline-end: 8px;
+  vertical-align: 0;
+}
+
+/* A row that links to another record (application, invoice, booking). */
+.fd__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3.5rem;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text);
+  text-decoration: none;
+}
+.fd__link:hover {
+  background: var(--color-surface-3);
+}
+.fd__link:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.fd__linkIcon,
+.fd__chev {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.fd__linkBody {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.fd__linkKind {
+  color: var(--color-text-muted);
+  font-size: 0.78125rem;
+}
+.fd__linkTitle {
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+/* One line: only the cost-centre name shortens, with an ellipsis. The kind, the dots,
+   the swatch and the date keep their width. */
+.fd__linkMeta {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.fd__linkMeta > * {
+  flex: none;
+}
+.fd__linkMeta > .fd__linkCc {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fd__linkMeta .fd__swatch {
+  margin-inline-end: 6px;
+}
+.fd__linkAmount {
+  flex: none;
+  font-size: 0.8125rem;
+}
+
+/* "Verbucht 900,00 € von 2.890,00 €" with its bar. */
+.fd__booked {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+.fd__bookedLine {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--fs-small);
+}
+.fd__bookedRest {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+
+/* Sub-booking rows. */
+.fd__subRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3.5rem;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+}
+.fd__subMark {
+  flex: none;
+  color: var(--color-text-subtle);
+}
+.fd__subBody {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.fd__subTitle {
+  font-weight: var(--fw-medium);
+}
+.fd__subMeta {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.fd__subAmount {
+  flex: none;
+  font-size: 0.8125rem;
+}
+.fd__subSum {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.fd__subSum .mono {
+  color: var(--color-text);
+}
+
+/* The cost-centre card with its figures. */
+.fd__ccCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.fd__ccHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.fd__ccName {
+  flex: 1 1 auto;
+  font-weight: var(--fw-semibold);
+}
+.fd__ccPath {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.fd__figs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+}
+.fd__pos {
+  color: var(--color-accent-text);
+}
+.fd__neg {
+  color: var(--color-danger);
+}
+
+/* A short note with an icon (the locked pair of a transfer). */
+.fd__hint {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+
+@include bp.phone {
+  .fd__title {
+    font-size: var(--fs-h1, 1.5rem);
+    line-height: 1.25;
+  }
+}

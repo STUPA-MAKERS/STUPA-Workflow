@@ -1,4 +1,4 @@
-import type { BudgetTreeNode } from './budget-tree.api';
+import type { BudgetAllocationView, BudgetTreeNode, ExpenseKind } from './budget-tree.api';
 import { toFormatLocale } from '@core/i18n/i18n.service';
 import { simplifyPathKey } from '@shared/budget-path';
 import { nodeColors } from './budget-color.util';
@@ -9,19 +9,6 @@ export function formatEur(value: number, locale: string): string {
     style: 'currency',
     currency: 'EUR',
   });
-}
-
-export function sortIndicator(active: boolean, order: 'asc' | 'desc'): string {
-  if (!active) return '';
-  return order === 'asc' ? ' ↑' : ' ↓';
-}
-
-export function ariaSortDir(
-  active: boolean,
-  order: 'asc' | 'desc',
-): 'ascending' | 'descending' | 'none' {
-  if (!active) return 'none';
-  return order === 'asc' ? 'ascending' : 'descending';
 }
 
 /** Human-readable `detail` of a problem+json error. */
@@ -85,41 +72,144 @@ export function costCentreLabel(
   return { name: path, path, color: null };
 }
 
-/**
- * How many columns a bookings or invoice table shows.
- *
- * * `full` — every column. A phone also gets every column: the table stacks into cards
- *   there, and each column says by its card role whether the card shows it.
- * * `compact` — below the full width the secondary columns go (invoice date and kind of
- *   a booking; net and tax of an invoice), so the description keeps a readable width.
- *   The full width is 1400px for invoices and 1536px for bookings
- *   ({@link BOOKINGS_COLUMNS_FULL_MEDIA}).
- * * `tight` — below 1000px a third one goes as well.
- *
- * A dropped column moves into a kept cell, as a second line or a tooltip: the payee
- * under the description of a booking and its invoice date into the tooltip of the
- * payment date; the due date under the issue date of an invoice, and net and tax under
- * its gross. A reader without `budget.book` has no dialog, so the value must stay on
- * the row.
- */
-export type ColumnSet = 'full' | 'compact' | 'tight';
+/** The amount with its sign: "−" for an expense, "+" for an income. */
+export function signedEur(kind: ExpenseKind, amount: string, locale: string): string {
+  return (kind === 'income' ? '+' : '−') + formatEur(Number(amount), locale);
+}
 
-/** The viewport from which a table shows every column. */
-export const COLUMNS_FULL_MEDIA = '(min-width: 1400px)';
-/**
- * The viewport from which the bookings table shows every column.
- *
- * Higher than {@link COLUMNS_FULL_MEDIA}: the cost-centre pane takes about 400px of the
- * page, and the fixed columns of the full set take about 860px. At 1440px the full set
- * left the description about 120px of text, less than the compact set gets at 1280px.
- * From 1536px the description gets at least about 270px.
- */
-export const BOOKINGS_COLUMNS_FULL_MEDIA = '(min-width: 1536px)';
-/** The viewport below which a table drops to its tightest set. */
-export const COLUMNS_TIGHT_MEDIA = '(max-width: 999.98px)';
+/** A node of the forest by id, or null. */
+export function findBudgetNode(nodes: readonly BudgetTreeNode[], id: string): BudgetTreeNode | null {
+  for (const n of nodes) {
+    if (n.id === id) return n;
+    const hit = findBudgetNode(n.children, id);
+    if (hit) return hit;
+  }
+  return null;
+}
 
-/** The column set for the viewport flags. */
-export function columnSet(flags: { phone: boolean; full: boolean; tight: boolean }): ColumnSet {
-  if (flags.phone || flags.full) return 'full';
-  return flags.tight ? 'tight' : 'compact';
+/**
+ * The names on the way to a cost centre below its root, for example "Fachschaften ›
+ * Maschinenbau". The root (the whole budget) is left out unless it is the cost centre
+ * itself. Null for a cost centre outside the forest.
+ */
+export function costCentreTrail(nodes: readonly BudgetTreeNode[], id: string): string | null {
+  const walk = (list: readonly BudgetTreeNode[], trail: string[]): string[] | null => {
+    for (const n of list) {
+      const next = [...trail, n.name];
+      if (n.id === id) return next;
+      const hit = walk(n.children, next);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  const names = walk(nodes, []);
+  if (!names) return null;
+  return (names.length > 1 ? names.slice(1) : names).join(' › ');
+}
+
+/** The figures of a cost centre in one fiscal year, as numbers. */
+export interface CostCentreFigures {
+  allocated: number;
+  expended: number;
+  bound: number;
+  available: number;
+}
+
+/** The figures of a node in a fiscal year, or null when the year has no allocation row. */
+export function costCentreFigures(
+  node: BudgetTreeNode | null,
+  fiscalYearId: string,
+): CostCentreFigures | null {
+  const row: BudgetAllocationView | undefined = node?.byFiscalYear.find(
+    (f) => f.fiscalYearId === fiscalYearId,
+  );
+  if (!row) return null;
+  return {
+    allocated: Number(row.allocated),
+    expended: Number(row.expended),
+    bound: Number(row.bound),
+    available: Number(row.available),
+  };
+}
+
+/** A group of list rows: the rows of one month, or one group without a heading. */
+export interface MonthGroup<T> {
+  key: string;
+  /** "September 2026", or empty for the single group of a list that is not by date. */
+  label: string;
+  items: T[];
+}
+
+/**
+ * Groups rows by the month of a date, in the order of the rows. A row without a date
+ * goes into a group of its own at the place it comes in. `byDate` false gives one group
+ * without a heading (a list sorted by amount).
+ */
+export function monthGroups<T>(
+  rows: readonly T[],
+  dateOf: (row: T) => string | null,
+  locale: string,
+  byDate = true,
+): MonthGroup<T>[] {
+  if (!rows.length) return [];
+  if (!byDate) return [{ key: 'all', label: '', items: [...rows] }];
+  const fmt = new Intl.DateTimeFormat(toFormatLocale(locale), {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  const groups: MonthGroup<T>[] = [];
+  for (const row of rows) {
+    const iso = dateOf(row);
+    const key = iso ? iso.slice(0, 7) : 'none';
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) {
+      last.items.push(row);
+      continue;
+    }
+    let label = '';
+    if (iso) {
+      const [y, m] = iso.split('-').map(Number);
+      label = fmt.format(new Date(Date.UTC(y, m - 1, 1)));
+    }
+    groups.push({ key, label, items: [row] });
+  }
+  return groups;
+}
+
+/** A date as day and month, "28.09." in German, "28/09" in English. */
+export function shortDate(iso: string | null, locale: string): string {
+  if (!iso) return '';
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return '';
+  const text = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(toFormatLocale(locale), {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'UTC',
+  });
+  return locale === 'de' ? `${text}.`.replace('..', '.') : text;
+}
+
+/** The common VAT rates in percent. Only these show as a rate. */
+const VAT_RATES = [0, 5, 7, 16, 19];
+
+/**
+ * The VAT rate of an invoice in percent, when tax / net gives one of the common rates
+ * (to 0.1 percentage points). Null otherwise, or when net or tax is missing.
+ */
+export function vatRate(net: string | null, tax: string | null): number | null {
+  if (net === null || tax === null) return null;
+  const n = Number(net);
+  const t = Number(tax);
+  if (!(n > 0) || !Number.isFinite(t)) return null;
+  const rate = (t / n) * 100;
+  return VAT_RATES.find((r) => Math.abs(r - rate) < 0.1) ?? null;
+}
+
+/** Whole calendar days from `today` to the ISO date `iso` (negative in the past). */
+export function daysUntil(iso: string, today: Date = new Date()): number {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  const due = Date.UTC(y, m - 1, d);
+  const now = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((due - now) / 86_400_000);
 }

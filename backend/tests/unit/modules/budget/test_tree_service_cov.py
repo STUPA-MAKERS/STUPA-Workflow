@@ -65,7 +65,7 @@ from app.shared.errors import (
 
 
 class _R:
-    """Minimal `Result` stub: FIFO items, iterable, `scalars()`/`all()`/`first()`."""
+    """Minimal `Result` stub: FIFO items, iterable, `scalars()`/`all()`/`one()`/`first()`."""
 
     def __init__(self, *items: Any) -> None:
         self._items = list(items)
@@ -78,6 +78,9 @@ class _R:
 
     def all(self) -> list[Any]:
         return list(self._items)
+
+    def one(self) -> Any:
+        return self._items[0]
 
     def first(self) -> Any:
         return self._items[0] if self._items else None
@@ -156,6 +159,11 @@ class _Session:
 
 def result(*items: Any) -> _R:
     return _R(*items)
+
+
+def counts(all_: int = 0, inbox: int = 0, booked: int = 0, paid: int = 0) -> _R:
+    """The row of the segment counts of the invoice list (FE10c), the first query."""
+    return _R((all_, inbox, booked, paid))
 
 
 def fake_session(*results: _R, gets: list[Any] | None = None) -> Any:
@@ -495,14 +503,14 @@ async def test_book_expense_linked_application_not_found() -> None:
         await svc.book_expense(payload, actor="a")
 
 
-async def test_book_expense_marks_open_invoice_paid() -> None:
+async def test_book_expense_keeps_open_invoice_open() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     top = node
     fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
     inv = _invoice(id=uuid.uuid4())  # status='open'
     sess = fake_session(
         result(node), result(top), result(fy), result(),  # _actor_names, no rows
-        gets=[inv],  # _mark_invoice_paid loads the Invoice
+        gets=[inv],  # _require_invoice loads the Invoice
     )
     svc = BudgetTreeService(sess)
     payload = ExpenseCreate(
@@ -510,10 +518,10 @@ async def test_book_expense_marks_open_invoice_paid() -> None:
     )
     out = await svc.book_expense(payload, actor="")
     assert out.amount == Decimal("10.00")
-    assert inv.status == "paid"  # open becomes paid on booking
+    assert inv.status == "open"  # a booking does not pay its invoice ("Verbucht")
 
 
-async def test_book_expense_already_paid_invoice_is_noop() -> None:
+async def test_book_expense_paid_invoice_stays_paid() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     top = node
     fy = _fy(id=uuid.uuid4(), budget_id=top.id, active=True)
@@ -566,10 +574,10 @@ async def test_book_expense_standalone_missing_budget_id() -> None:
 async def test_update_expense_all_fields_with_app() -> None:
     node = _budget(id=uuid.uuid4(), path_key="VS", key="VS")
     app = _app(budget_id=node.id, data={"title": "T"})
-    inv = _invoice(id=uuid.uuid4())  # open, so the link marks it paid
+    inv = _invoice(id=uuid.uuid4())  # open
     expense = _expense(budget_id=node.id, application_id=app.id, actor="u-1")
-    # gets: the BudgetExpense, the Invoice to mark paid, then after the commit the
-    # Application for display.
+    # gets: the BudgetExpense, the Invoice for the existence check, then after the
+    # commit the Application for display.
     sess = fake_session(
         result(),                         # _child_counts (#subbookings), no children
         result(node),                     # _get_node for expense.budget_id after commit
@@ -587,7 +595,8 @@ async def test_update_expense_all_fields_with_app() -> None:
     assert out.amount == Decimal("99.00")
     assert out.application_title == "T"
     assert out.actor_name == "bob@x"   # display_name None gives the email
-    assert inv.status == "paid"        # the linked invoice becomes paid
+    assert inv.status == "open"        # the link does not pay the invoice
+    assert expense.invoice_id == inv.id
 
 
 async def test_update_expense_no_app() -> None:
@@ -811,7 +820,7 @@ async def test_delete_expense_transfer_pair() -> None:
 
 async def test_list_invoices_compat() -> None:
     inv = _invoice(file_key="invoices/x/a.pdf", file_name="a.pdf")
-    sess = fake_session(result(0), result(inv))  # count, rows
+    sess = fake_session(counts(1, 1), result(0), result(inv))  # counts, count, rows
     svc = BudgetTreeService(sess)
     out = await svc.list_invoices()
     assert len(out) == 1
@@ -820,7 +829,7 @@ async def test_list_invoices_compat() -> None:
 
 async def test_list_invoices_paged_all_filters_and_search() -> None:
     inv = _invoice()
-    sess = _pg_session(result(2), result(inv))  # count, rows
+    sess = _pg_session(counts(2, 2), result(2), result(inv))  # counts, count, rows
     svc = BudgetTreeService(sess)
     page = await svc.list_invoices_paged(
         q="acme", status="open", gross_min=Decimal("1"), gross_max=Decimal("999"),
@@ -831,10 +840,20 @@ async def test_list_invoices_paged_all_filters_and_search() -> None:
     assert page.items[0].has_file is False
 
 
+@pytest.mark.parametrize("booked", [True, False])
+async def test_list_invoices_paged_by_segment(booked: bool) -> None:
+    """FE10c: ``booked`` narrows to invoices with or without a visible booking."""
+    inv = _invoice()
+    sess = _pg_session(counts(1, 0, 1), result(1), result(inv))  # counts, count, rows
+    page = await BudgetTreeService(sess).list_invoices_paged(status="open", booked=booked)
+    assert page.total == 1
+    assert page.counts.booked == 1
+
+
 async def test_list_invoices_paged_by_exact_id() -> None:
     """``id`` narrows the list to one invoice, which is where a search hit lands."""
     inv = _invoice()
-    sess = _pg_session(result(1), result(inv))  # count, rows
+    sess = _pg_session(counts(1, 1), result(1), result(inv))  # counts, count, rows
     svc = BudgetTreeService(sess)
     page = await svc.list_invoices_paged(invoice_id=inv.id)
     assert page.total == 1
@@ -842,10 +861,12 @@ async def test_list_invoices_paged_by_exact_id() -> None:
 
 
 async def test_list_invoices_paged_no_search_blank_q() -> None:
-    sess = fake_session(result(None), result())  # a count of None becomes 0, no rows
+    # A count of None becomes 0, no rows.
+    sess = fake_session(counts(), result(None), result())
     svc = BudgetTreeService(sess)
     page = await svc.list_invoices_paged(q="")
     assert page.total == 0
+    assert page.counts.model_dump() == {"all": 0, "inbox": 0, "booked": 0, "paid": 0}
 
 
 async def test_get_invoice_ok() -> None:
@@ -1470,32 +1491,16 @@ async def test_revert_expense_create_no_invoice_deletes() -> None:
     assert exp in sess.deleted and sess.committed == 1
 
 
-async def test_revert_expense_create_reopens_paid_invoice() -> None:
+async def test_revert_expense_create_keeps_paid_invoice_paid() -> None:
+    """A user marked the invoice paid. The revert of a booking does not undo that."""
     inv = _invoice()
     inv.status = "paid"
     exp = _expense(id=uuid.uuid4(), invoice_id=inv.id)
-    sess = fake_session(gets=[exp, inv])
+    sess = fake_session(gets=[exp])  # the revert does not load the invoice
     svc = BudgetTreeService(sess, actor="admin")
     await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_CREATE, exp.id), "admin")
-    assert inv.status == "open"
+    assert inv.status == "paid"
     assert exp in sess.deleted and sess.committed == 1
-
-
-async def test_revert_expense_create_invoice_missing_skips_reopen() -> None:
-    exp = _expense(id=uuid.uuid4(), invoice_id=uuid.uuid4())
-    sess = fake_session(gets=[exp, None])  # the invoice is gone
-    svc = BudgetTreeService(sess, actor="admin")
-    await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_CREATE, exp.id), "admin")
-    assert exp in sess.deleted
-
-
-async def test_revert_expense_create_invoice_not_paid_unchanged() -> None:
-    inv = _invoice()  # status="open"
-    exp = _expense(id=uuid.uuid4(), invoice_id=inv.id)
-    sess = fake_session(gets=[exp, inv])
-    svc = BudgetTreeService(sess, actor="admin")
-    await svc.revert_audit(_entry(AuditAction.BUDGET_EXPENSE_CREATE, exp.id), "admin")
-    assert inv.status == "open" and exp in sess.deleted
 
 
 async def test_revert_transfer_create_deletes_both_rows() -> None:
@@ -2149,7 +2154,8 @@ async def test_list_invoices_paged_carries_linked_bookings_full_view() -> None:
     inv, other = _invoice(), _invoice(number="R-2")
     bid = uuid.uuid4()
     row = _booking_row(inv, budget_id=bid, path="VS-800", name="Kultur")
-    sess = fake_session(result(2), result(inv, other), result(row))  # count, rows, bookings
+    # counts, count, rows, bookings
+    sess = fake_session(counts(2, 1, 1), result(2), result(inv, other), result(row))
     page = await BudgetTreeService(sess).list_invoices_paged()
     first, second = page.items
     assert [b.budget_id for b in first.linked_bookings] == [bid]
@@ -2163,7 +2169,8 @@ async def test_list_invoices_paged_carries_linked_bookings_full_view() -> None:
 
 
 async def test_list_invoices_paged_without_rows_runs_no_booking_query() -> None:
-    sess = fake_session(result(0), result())
+    # The root paths of the member Gremien (none), then the counts, the count, no rows.
+    sess = fake_session(result(), counts(), result(0), result())
     page = await BudgetTreeService(sess).list_invoices_paged(visible_gremium_ids={uuid.uuid4()})
     assert page.items == []
     assert sess._results == []  # noqa: SLF001 - nothing extra was read

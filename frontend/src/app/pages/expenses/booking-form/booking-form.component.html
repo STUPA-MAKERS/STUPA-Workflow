@@ -1,0 +1,450 @@
+@let s = state();
+@let e = editingRow();
+<form
+  class="ff"
+  [class.ff--pane]="layout() === 'pane'"
+  [class.ff--page]="layout() === 'page'"
+  [class.ff--sheet]="layout() === 'sheet'"
+  [attr.aria-labelledby]="layout() === 'sheet' ? null : 'bf-title-' + mode()"
+  (submit)="submit($event)"
+>
+  @if (layout() !== 'sheet') {
+    <header class="ff__head">
+      <div class="ff__titles">
+        <h2 class="ff__title" [id]="'bf-title-' + mode()">{{ (mode() === 'create' ? 'expenses.add' : 'expenses.edit') | t }}</h2>
+        <p class="ff__subtitle">{{ subtitle() }}</p>
+      </div>
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="close()">
+        <app-icon name="x" [size]="20" />
+      </app-button>
+    </header>
+  }
+
+  <div class="ff__body" appScrollFade="y">
+    <div class="ff__cols">
+      <div class="ff__col">
+        @if (mode() === 'edit' && e) {
+          <!-- "Fest": what the booking keeps (board Fin-Buchung-Bearbeiten). -->
+          <fieldset class="ff__sec">
+            <legend class="sec ff__secTitle">{{ 'expenses.form.fixed' | t }}</legend>
+            <div class="ff__grid">
+              <div class="ff__box ff__box--locked">
+                <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.filter.kind' | t }}</span>
+                <span class="ff__locked">{{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</span>
+              </div>
+              <div class="ff__box ff__box--locked">
+                <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.field.fiscalYear' | t }}</span>
+                <span class="ff__locked">{{ fyLabel() ? ('expenses.detail.fy' | t: { fy: fyLabel()! }) : '—' }}</span>
+              </div>
+            </div>
+            @if (e.applicationId) {
+              <div class="ff__box ff__box--locked">
+                <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.col.application' | t }}</span>
+                <span class="ff__locked">{{ e.applicationTitle || ('expenses.col.application' | t) }}</span>
+              </div>
+            }
+            @if (!editOwnsCostCentre()) {
+              <div class="ff__box ff__box--locked">
+                <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.field.costCentre' | t }}</span>
+                <span class="ff__locked">{{ ccTrail() }}</span>
+              </div>
+              <p class="ff__info">
+                <app-icon name="info" [size]="16" />
+                <span>{{
+                  (e.applicationId ? 'expenses.field.inheritedCostCentre' : 'expenses.sub.inheritsShort') | t
+                }}</span>
+              </p>
+            }
+          </fieldset>
+        }
+
+        <fieldset class="ff__sec">
+          <legend class="sec ff__secTitle">{{ 'expenses.form.what' | t }}</legend>
+          @if (mode() === 'create') {
+            <app-segmented
+              [ariaLabel]="'expenses.filter.kind' | t"
+              width="fill"
+              [options]="kindOptions()"
+              [value]="s.newKind()"
+              (valueChange)="setKind($event)"
+            />
+            <app-input
+              name="description"
+              [label]="'expenses.field.description' | t"
+              [required]="true"
+              [placeholder]="'expenses.field.descriptionPlaceholder' | t"
+              [ngModel]="s.newDescription()"
+              (ngModelChange)="s.newDescription.set($event)"
+            />
+            <div class="ff__grid">
+              <app-currency-input
+                name="amount"
+                [label]="'expenses.field.amount' | t"
+                [required]="true"
+                [ngModel]="s.newAmount()"
+                (ngModelChange)="s.newAmount.set($event)"
+              />
+              <app-input
+                name="cat"
+                [label]="'expenses.field.category' | t"
+                [ngModel]="s.newCategory()"
+                (ngModelChange)="s.newCategory.set($event)"
+              />
+            </div>
+          } @else {
+            <app-input
+              name="edesc"
+              [label]="'expenses.field.description' | t"
+              [required]="true"
+              [ngModel]="s.editDescription()"
+              (ngModelChange)="s.editDescription.set($event)"
+            />
+            <div class="ff__grid">
+              @if (parentAmount(); as sum) {
+                <!-- The parent amount is the sum of its sub-bookings and read-only on the server. -->
+                <div class="ff__box ff__box--static">
+                  <span class="ff__label">{{ 'expenses.field.amount' | t }}</span>
+                  <span class="ff__static mono">{{ sum }}</span>
+                  <span class="ff__hintLine">{{ 'expenses.sub.parentAmount' | t }}</span>
+                </div>
+              } @else {
+                <app-currency-input
+                  name="eamount"
+                  [label]="'expenses.field.amount' | t"
+                  [required]="true"
+                  [ngModel]="s.editAmount()"
+                  (ngModelChange)="s.editAmount.set($event)"
+                />
+              }
+              <app-input
+                name="ecat"
+                [label]="'expenses.field.category' | t"
+                [ngModel]="s.editCategory()"
+                (ngModelChange)="s.editCategory.set($event)"
+              />
+            </div>
+          }
+        </fieldset>
+
+        @if (mode() === 'create' || editOwnsCostCentre()) {
+          <fieldset class="ff__sec">
+            <legend class="sec ff__secTitle">{{ 'expenses.form.where' | t }}</legend>
+            @if (mode() === 'create' && s.newKind() === 'expense') {
+              <!-- The application search: a combobox in a filled field like the kit inputs. -->
+              <div class="ff__app">
+                <div class="ff__box">
+                  <label class="ff__label" for="booking-app">{{ 'expenses.field.linkApplication' | t }}</label>
+                  @if (s.newApplicationId()) {
+                    <span class="ff__picked">
+                      <span class="ell" [title]="s.appQuery()">{{ s.appQuery() }}</span>
+                      <button
+                        type="button"
+                        class="ff__iconBtn"
+                        [attr.aria-label]="'expenses.field.unlink' | t"
+                        [title]="'expenses.field.unlink' | t"
+                        (click)="s.clearApp()"
+                      >
+                        <app-icon name="x" [size]="16" />
+                      </button>
+                    </span>
+                  } @else {
+                    <input
+                      id="booking-app"
+                      class="ff__control"
+                      type="search"
+                      autocomplete="off"
+                      name="appSearch"
+                      role="combobox"
+                      aria-autocomplete="list"
+                      aria-controls="booking-app-list"
+                      [attr.aria-expanded]="suggestOpen()"
+                      [placeholder]="'expenses.field.linkApplicationPlaceholder' | t"
+                      [ngModel]="s.appQuery()"
+                      (ngModelChange)="s.onAppSearch($event)"
+                    />
+                    <app-icon class="ff__searchIcon" name="search" [size]="18" />
+                  }
+                </div>
+                @if (suggestOpen()) {
+                  <ul id="booking-app-list" class="ff__suggest" role="listbox">
+                    @for (a of s.appCandidates(); track a.id) {
+                      <li role="presentation">
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected="false"
+                          class="ff__option ell"
+                          [title]="a.title"
+                          (click)="s.pickApp(a)"
+                        >
+                          {{ a.title }}
+                        </button>
+                      </li>
+                    }
+                  </ul>
+                }
+              </div>
+            }
+            @if (mode() === 'create' && s.newApplicationId()) {
+              <p class="ff__info">
+                <app-icon name="info" [size]="16" />
+                <span>{{ 'expenses.field.inheritedCostCentre' | t }}</span>
+              </p>
+            } @else {
+              <div class="ff__grid">
+                <!-- The cost centre: the tree of the applications page opens below the
+                     field. -->
+                <div class="ff__box">
+                  <span class="ff__label" [id]="'bf-cc-' + mode()">{{ 'expenses.field.costCentre' | t }} *</span>
+                  <button
+                    type="button"
+                    class="ff__pick"
+                    [attr.aria-labelledby]="'bf-cc-' + mode() + ' bf-ccv-' + mode()"
+                    [attr.aria-expanded]="treeOpen()"
+                    (click)="treeOpen.set(!treeOpen())"
+                  >
+                    @if (ccValue(); as v) {
+                      @if (v.color) {
+                        <span class="ff__swatch" aria-hidden="true" [style.background]="v.color"></span>
+                      }
+                      <span class="ell" [id]="'bf-ccv-' + mode()" [title]="v.name">{{ v.name }}</span>
+                    } @else {
+                      <span class="ell ff__placeholder" [id]="'bf-ccv-' + mode()">{{
+                        'expenses.field.costCentrePlaceholder' | t
+                      }}</span>
+                    }
+                    <app-icon [name]="treeOpen() ? 'chevron-up' : 'chevron-down'" [size]="18" />
+                  </button>
+                </div>
+                @if (mode() === 'create') {
+                  <app-select
+                    name="fy"
+                    [label]="'expenses.field.fiscalYear' | t"
+                    [placeholder]="'expenses.field.fiscalYearPlaceholder' | t"
+                    [options]="s.fiscalYearOptions()"
+                    [required]="true"
+                    [error]="s.newBudgetId() && !s.fiscalYearOptions().length ? ('expenses.field.noFiscalYear' | t) : ''"
+                    [ngModel]="s.newFiscalYearId()"
+                    (ngModelChange)="s.newFiscalYearId.set($event)"
+                  />
+                } @else {
+                  <div class="ff__box ff__box--locked">
+                    <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.field.fiscalYear' | t }}</span>
+                    <span class="ff__locked">{{ fyLabel() ? ('expenses.detail.fy' | t: { fy: fyLabel()! }) : '—' }}</span>
+                  </div>
+                }
+              </div>
+              @if (treeOpen()) {
+                <div class="ff__tree">
+                  <app-cost-centre-tree
+                    [nodes]="tree()"
+                    [selectedId]="ccId()"
+                    [ariaLabel]="'expenses.field.costCentre' | t"
+                    [emptyLabel]="'expenses.field.noCostCentres' | t"
+                    (picked)="pickCostCentre($event)"
+                  />
+                </div>
+              }
+            }
+          </fieldset>
+        }
+
+        @if (mode() === 'edit' && e && !e.parentExpenseId) {
+          <fieldset class="ff__sec">
+            <legend class="sec ff__secTitle">{{ 'expenses.sub.title' | t }}</legend>
+            @if (subRows().length) {
+              <div class="rowgroup" [class.rowgroup--bg3]="layout() === 'sheet'" role="list">
+                @for (r of subRows(); track r.id) {
+                  <div class="ff__row" role="listitem">
+                    <span class="ff__rowBody">
+                      <span class="ell" [title]="r.description">↳ {{ r.description }}</span>
+                      <span class="ff__rowMeta ell">
+                        {{ r.paymentDate ? (r.paymentDate | ldate: 'mediumDate') : '—' }}
+                        @if (r.correspondent) {
+                          · {{ r.correspondent }}
+                        }
+                      </span>
+                    </span>
+                    <span class="mono">{{ signed(r) }}</span>
+                    <app-row-menu
+                      [label]="'expenses.rowMenu' | t: { description: r.description }"
+                      [sections]="subMenu()"
+                      (selected)="onSubMenu($event, r)"
+                    />
+                  </div>
+                }
+                <div class="ff__sum">
+                  <span>{{ 'expenses.sub.sumLine' | t }}</span>
+                  <span class="mono">{{ signed(e) }}</span>
+                </div>
+              </div>
+            }
+            <app-button variant="text" size="sm" (click)="addSub.emit()">
+              <span class="ff__btn"><app-icon name="add" [size]="16" />{{ 'expenses.sub.add' | t }}</span>
+            </app-button>
+          </fieldset>
+        }
+      </div>
+
+      <div class="ff__col">
+        <fieldset class="ff__sec">
+          <legend class="sec ff__secTitle">{{ 'expenses.form.receipt' | t }}</legend>
+          @if (mode() === 'create') {
+            <app-select
+              name="invoice"
+              [label]="'expenses.field.invoice' | t"
+              [placeholder]="'expenses.field.invoicePlaceholder' | t"
+              [options]="s.invoiceOptions()"
+              [ngModel]="s.newInvoiceId()"
+              (ngModelChange)="s.onPickInvoice($event)"
+            />
+            @if (invoiceTaken()) {
+              <p class="ff__info">
+                <app-icon name="check" [size]="16" />
+                <span>{{ 'expenses.form.fromInvoice' | t }}</span>
+              </p>
+            }
+            <div class="ff__grid">
+              <app-input
+                name="corr"
+                [label]="'expenses.field.correspondent' | t"
+                [placeholder]="'expenses.field.correspondentPlaceholder' | t"
+                [ngModel]="s.newCorrespondent()"
+                (ngModelChange)="s.newCorrespondent.set($event)"
+              />
+              <app-input
+                name="ref"
+                [label]="'expenses.field.referenceNumber' | t"
+                [ngModel]="s.newReferenceNumber()"
+                (ngModelChange)="s.newReferenceNumber.set($event)"
+              />
+              <app-datepicker
+                name="invDate"
+                [label]="'expenses.field.invoiceDate' | t"
+                [ngModel]="s.newInvoiceDate()"
+                (ngModelChange)="s.newInvoiceDate.set($event)"
+              />
+              <app-datepicker
+                name="payDate"
+                [label]="'expenses.field.paymentDate' | t"
+                [ngModel]="s.newPaymentDate()"
+                (ngModelChange)="s.newPaymentDate.set($event)"
+              />
+            </div>
+          } @else {
+            <app-select
+              name="einvoice"
+              [label]="'expenses.field.invoice' | t"
+              [placeholder]="'expenses.field.invoicePlaceholder' | t"
+              [options]="s.editInvoiceOptions()"
+              [ngModel]="s.editInvoiceId()"
+              (ngModelChange)="s.onPickEditInvoice($event)"
+            />
+            <div class="ff__grid">
+              <app-input
+                name="ecorr"
+                [label]="'expenses.field.correspondent' | t"
+                [placeholder]="'expenses.field.correspondentPlaceholder' | t"
+                [ngModel]="s.editCorrespondent()"
+                (ngModelChange)="s.editCorrespondent.set($event)"
+              />
+              <app-input
+                name="eref"
+                [label]="'expenses.field.referenceNumber' | t"
+                [ngModel]="s.editReferenceNumber()"
+                (ngModelChange)="s.editReferenceNumber.set($event)"
+              />
+              <app-datepicker
+                name="einvDate"
+                [label]="'expenses.field.invoiceDate' | t"
+                [ngModel]="s.editInvoiceDate()"
+                (ngModelChange)="s.editInvoiceDate.set($event)"
+              />
+              <app-datepicker
+                name="epayDate"
+                [label]="'expenses.field.paymentDate' | t"
+                [ngModel]="s.editPaymentDate()"
+                (ngModelChange)="s.editPaymentDate.set($event)"
+              />
+            </div>
+          }
+        </fieldset>
+
+        <fieldset class="ff__sec">
+          <legend class="sec ff__secTitle" [id]="'bf-method-' + mode()">{{ 'expenses.field.paymentMethod' | t }}</legend>
+          <div class="ff__chips" role="radiogroup" [attr.aria-labelledby]="'bf-method-' + mode()">
+            @for (m of methods(); track m.value) {
+              <button
+                type="button"
+                class="chip"
+                role="radio"
+                [class.on]="method() === m.value"
+                [attr.aria-checked]="method() === m.value"
+                (click)="setMethod(m.value)"
+              >
+                @if (method() === m.value) {
+                  <app-icon name="check" [size]="14" />
+                }
+                {{ m.label }}
+              </button>
+            }
+          </div>
+        </fieldset>
+
+        <fieldset class="ff__sec">
+          <legend class="sec ff__secTitle">{{ 'expenses.field.note' | t }}</legend>
+          <label class="ff__box ff__box--area" [for]="'booking-note-' + mode()">
+            <span class="ff__label">{{ 'expenses.field.note' | t }}</span>
+            @if (mode() === 'create') {
+              <textarea
+                [id]="'booking-note-' + mode()"
+                class="ff__area"
+                name="note"
+                rows="3"
+                [ngModel]="s.newNote()"
+                (ngModelChange)="s.newNote.set($event)"
+              ></textarea>
+            } @else {
+              <textarea
+                [id]="'booking-note-' + mode()"
+                class="ff__area"
+                name="enote"
+                rows="3"
+                [ngModel]="s.editNote()"
+                (ngModelChange)="s.editNote.set($event)"
+              ></textarea>
+            }
+          </label>
+        </fieldset>
+      </div>
+    </div>
+  </div>
+
+  <footer class="ff__foot">
+    @if (mode() === 'edit') {
+      <!-- A phone sheet has no room for three labelled buttons: delete is an icon. -->
+      <app-button
+        variant="danger"
+        [iconOnly]="layout() === 'sheet'"
+        [ariaLabel]="'action.delete' | t"
+        (click)="remove.emit()"
+      >
+        <span class="ff__btn"
+          ><app-icon name="delete" [size]="16" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
+        >
+      </app-button>
+    }
+    <div class="ff__footEnd">
+      <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+      @if (mode() === 'create') {
+        <app-button [disabled]="!s.canSubmitCreate()" [loading]="saving()" (click)="submit($event)">
+          <span class="ff__btn"><app-icon name="add" [size]="16" />{{
+            (layout() === 'sheet' ? 'expenses.form.addShort' : 'expenses.add') | t
+          }}</span>
+        </app-button>
+      } @else {
+        <app-button [loading]="saving()" (click)="submit($event)">{{ 'action.save' | t }}</app-button>
+      }
+    </div>
+  </footer>
+</form>

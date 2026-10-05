@@ -146,6 +146,24 @@ describe('ListItemComponent', () => {
     expect(screen.getByRole('link', { name: 'Druckkosten' })).toHaveAttribute('href', '/applications/a1?type=t1');
   });
 
+  it('merges its own query params into the link', async () => {
+    const { fixture } = await render(ListItemComponent, {
+      inputs: {
+        title: 'Lastenrad',
+        link: ['/expenses'],
+        linkQueryParams: { id: 'e1' },
+        linkQueryParamsHandling: 'merge',
+      },
+      providers: [provideRouter([{ path: '**', component: BlankComponent }])],
+    });
+    await TestBed.inject(Router).navigateByUrl('/expenses?kind=expense');
+    fixture.detectChanges();
+    expect(screen.getByRole('link', { name: 'Lastenrad' })).toHaveAttribute(
+      'href',
+      '/expenses?kind=expense&id=e1',
+    );
+  });
+
   it('shows a plain sub line from the input', async () => {
     const { container } = await render(ListItemComponent, {
       inputs: { title: 'Lastenrad', sub: 'Fachschaftsmittel' },
@@ -189,6 +207,19 @@ describe('ListItemComponent', () => {
       'title',
       'Lastenrad\nFachschaftsmittel für das Sommersemester',
     );
+  });
+
+  it('adds no tooltip line for a cut sub line without text', async () => {
+    const view = await render(ListItemComponent, { inputs: { title: 'Lastenrad', sub: ' ' } });
+    const line = view.container.querySelector('.li__sub') as HTMLElement;
+    setWidths(line, 300, 120);
+    fireEvent.pointerEnter(view.container.querySelector('.li') as HTMLElement);
+    view.fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Lastenrad' })).toHaveAttribute('title', 'Lastenrad');
+    Object.defineProperty(line, 'textContent', { configurable: true, get: () => null });
+    fireEvent.pointerEnter(view.container.querySelector('.li') as HTMLElement);
+    view.fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Lastenrad' })).toHaveAttribute('title', 'Lastenrad');
   });
 
   it('has no a11y violations', async () => {

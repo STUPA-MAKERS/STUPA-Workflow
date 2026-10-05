@@ -1,0 +1,245 @@
+@let d = dialogs();
+@let t = transfers();
+<form
+  class="ff"
+  [class.ff--pane]="layout() === 'pane'"
+  [class.ff--page]="layout() === 'page'"
+  [class.ff--sheet]="layout() === 'sheet'"
+  [attr.aria-labelledby]="layout() === 'sheet' ? null : 'tf-title-' + mode()"
+  (submit)="submit($event)"
+>
+  @if (layout() !== 'sheet') {
+    <header class="ff__head">
+      <div class="ff__titles">
+        <h2 class="ff__title" [id]="'tf-title-' + mode()">{{
+          (mode() === 'create' ? 'expenses.transferNew' : 'expenses.transfers.editTitle') | t
+        }}</h2>
+        <p class="ff__subtitle">
+          @if (mode() === 'create') {
+            {{ 'expenses.form.required' | t }}
+          } @else {
+            {{ t.editing()?.description }}
+          }
+        </p>
+      </div>
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="close()">
+        <app-icon name="x" [size]="20" />
+      </app-button>
+    </header>
+  }
+
+  <div class="ff__body" appScrollFade="y">
+    <div class="ff__cols">
+      @if (mode() === 'create') {
+        <div class="ff__col">
+          <fieldset class="ff__sec">
+            <legend class="sec ff__secTitle">{{ 'expenses.transfers.pairTitle' | t }}</legend>
+            @for (which of ['from', 'to']; track which) {
+              @let id = which === 'from' ? d.tFromId() : d.tToId();
+              @let v = label(id);
+              <div class="ff__box">
+                <span class="ff__label" [id]="'tf-' + which">{{
+                  (which === 'from' ? 'expenses.transferFrom' : 'expenses.transferTo') | t
+                }} *</span>
+                <button
+                  type="button"
+                  class="ff__pick"
+                  [attr.aria-labelledby]="'tf-' + which + ' tf-' + which + '-v'"
+                  [attr.aria-expanded]="picking() === which"
+                  (click)="toggle($any(which))"
+                >
+                  @if (v) {
+                    @if (v.color) {
+                      <span class="ff__swatch" aria-hidden="true" [style.background]="v.color"></span>
+                    }
+                    <span class="ell" [id]="'tf-' + which + '-v'" [title]="v.name"
+                      >{{ v.name }} <span class="ff__mono">{{ v.path }}</span></span
+                    >
+                  } @else {
+                    <span class="ell ff__placeholder" [id]="'tf-' + which + '-v'">{{
+                      'expenses.field.costCentrePlaceholder' | t
+                    }}</span>
+                  }
+                  <app-icon [name]="picking() === which ? 'chevron-up' : 'chevron-down'" [size]="18" />
+                </button>
+              </div>
+              @if (picking() === which) {
+                <div class="ff__tree">
+                  <app-cost-centre-tree
+                    [nodes]="tree()"
+                    [selectedId]="id"
+                    [ariaLabel]="(which === 'from' ? 'expenses.transferFrom' : 'expenses.transferTo') | t"
+                    (picked)="pick($any(which), $event)"
+                  />
+                </div>
+              }
+            }
+            @if (d.tFromId() && d.tFromId() === d.tToId()) {
+              <p class="ff__error" role="alert">{{ 'expenses.transfers.samePair' | t }}</p>
+            }
+            <div class="ff__grid">
+              <app-select
+                name="tfy"
+                [label]="'expenses.field.fiscalYear' | t"
+                [placeholder]="'expenses.field.fiscalYearPlaceholder' | t"
+                [options]="d.transferFyOptions()"
+                [required]="true"
+                [error]="d.tFromId() && !d.transferFyOptions().length ? ('expenses.field.noFiscalYear' | t) : ''"
+                [ngModel]="d.tFiscalYearId()"
+                (ngModelChange)="d.tFiscalYearId.set($event)"
+              />
+              <app-currency-input
+                name="tamount"
+                [label]="'expenses.field.amount' | t"
+                [required]="true"
+                [ngModel]="d.tAmount()"
+                (ngModelChange)="d.tAmount.set($event)"
+              />
+            </div>
+            <app-input
+              name="tdesc"
+              [label]="'expenses.field.description' | t"
+              [required]="true"
+              [placeholder]="'expenses.field.descriptionPlaceholder' | t"
+              [ngModel]="d.tDescription()"
+              (ngModelChange)="d.tDescription.set($event)"
+            />
+          </fieldset>
+        </div>
+        <div class="ff__col">
+          <section class="ff__sec" aria-labelledby="tf-preview">
+            <h3 id="tf-preview" class="sec ff__secTitle">{{ 'expenses.transfers.preview' | t }}</h3>
+            @if (preview(); as p) {
+              <div class="tf__leg">
+                <span class="tf__kind">{{ 'expenses.transfers.expenseOn' | t }}</span>
+                <span class="tf__name">{{ p.from.cc.name }}</span>
+                <span class="ff__mono">
+                  {{ p.from.cc.path }}
+                  @if (p.from.after) {
+                    · {{ 'expenses.transfers.availableAfter' | t: { amount: p.from.after } }}
+                  }
+                </span>
+                <span class="tf__amount mono">−{{ p.amount }}</span>
+              </div>
+              <div class="tf__leg">
+                <span class="tf__kind">{{ 'expenses.transfers.incomeOn' | t }}</span>
+                <span class="tf__name">{{ p.to.cc.name }}</span>
+                <span class="ff__mono">
+                  {{ p.to.cc.path }}
+                  @if (p.to.after) {
+                    · {{ 'expenses.transfers.availableAfter' | t: { amount: p.to.after } }}
+                  }
+                </span>
+                <span class="tf__amount tf__amount--in mono">+{{ p.amount }}</span>
+              </div>
+            } @else {
+              <p class="ff__info">
+                <app-icon name="repeat" [size]="16" />
+                <span>{{ 'expenses.transfers.previewEmpty' | t }}</span>
+              </p>
+            }
+            <p class="tf__later">{{ 'expenses.transfers.later' | t }}</p>
+          </section>
+        </div>
+      } @else {
+        <div class="ff__col">
+          <fieldset class="ff__sec">
+            <legend class="sec ff__secTitle">{{ 'expenses.form.fixed' | t }}</legend>
+            @if (pair(); as p) {
+              <div class="ff__grid">
+                <div class="ff__box ff__box--locked">
+                  <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.transferFrom' | t }}</span>
+                  <span class="ff__locked">{{ p.from.name }}</span>
+                </div>
+                <div class="ff__box ff__box--locked">
+                  <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.transferTo' | t }}</span>
+                  <span class="ff__locked">{{ p.to.name }}</span>
+                </div>
+              </div>
+            }
+            <div class="ff__box ff__box--locked">
+              <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.field.fiscalYear' | t }}</span>
+              <span class="ff__locked">{{ fyLabel() ? ('expenses.detail.fy' | t: { fy: fyLabel()! }) : '—' }}</span>
+            </div>
+            <p class="ff__info">
+              <app-icon name="lock" [size]="16" />
+              <span>{{ 'expenses.transfers.pairLocked' | t }}</span>
+            </p>
+          </fieldset>
+        </div>
+        <div class="ff__col">
+          <fieldset class="ff__sec">
+            <legend class="sec ff__secTitle">{{ 'expenses.detail.data' | t }}</legend>
+            <app-input
+              name="tedesc"
+              [label]="'expenses.field.description' | t"
+              [required]="true"
+              [ngModel]="t.editDescription()"
+              (ngModelChange)="t.editDescription.set($event)"
+            />
+            <app-currency-input
+              name="teamount"
+              [label]="'expenses.field.amount' | t"
+              [required]="true"
+              [ngModel]="t.editAmount()"
+              (ngModelChange)="t.editAmount.set($event)"
+            />
+            <div class="ff__grid">
+              <app-datepicker
+                name="teinv"
+                [label]="'expenses.field.invoiceDate' | t"
+                [ngModel]="t.editInvoiceDate()"
+                (ngModelChange)="t.editInvoiceDate.set($event)"
+              />
+              <app-datepicker
+                name="tepay"
+                [label]="'expenses.field.paymentDate' | t"
+                [ngModel]="t.editPaymentDate()"
+                (ngModelChange)="t.editPaymentDate.set($event)"
+              />
+            </div>
+            <label class="ff__box ff__box--area" for="transfer-note">
+              <span class="ff__label">{{ 'expenses.field.note' | t }}</span>
+              <textarea
+                id="transfer-note"
+                class="ff__area"
+                name="tenote"
+                rows="3"
+                [ngModel]="t.editNote()"
+                (ngModelChange)="t.editNote.set($event)"
+              ></textarea>
+            </label>
+          </fieldset>
+        </div>
+      }
+    </div>
+  </div>
+
+  <footer class="ff__foot">
+    @if (mode() === 'edit') {
+      <!-- A phone sheet has no room for three labelled buttons: delete is an icon. -->
+      <app-button
+        variant="danger"
+        [iconOnly]="layout() === 'sheet'"
+        [ariaLabel]="'action.delete' | t"
+        (click)="remove.emit()"
+      >
+        <span class="ff__btn"
+          ><app-icon name="delete" [size]="16" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
+        >
+      </app-button>
+    }
+    <div class="ff__footEnd">
+      <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+      @if (mode() === 'create') {
+        <app-button [disabled]="!d.canSubmitTransfer()" [loading]="saving()" (click)="submit($event)">
+          <span class="ff__btn"><app-icon name="repeat" [size]="16" />{{ 'expenses.transferConfirm' | t }}</span>
+        </app-button>
+      } @else {
+        <app-button [disabled]="!t.canSubmitEdit()" [loading]="saving()" (click)="submit($event)">{{
+          'action.save' | t
+        }}</app-button>
+      }
+    </div>
+  </footer>
+</form>

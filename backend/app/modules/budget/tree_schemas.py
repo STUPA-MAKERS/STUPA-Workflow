@@ -15,6 +15,7 @@ from uuid import UUID
 from pydantic import Field, model_validator
 
 from app.modules.budget.schemas import _CamelModel
+from app.shared.paging import Page
 
 # Money cap that matches the DB column `numeric(12, 2)`. An input field applies
 # it as `le`, so an oversized amount gives a clean 422 instead of a
@@ -475,6 +476,27 @@ class InvoiceOut(_CamelModel):
     linked_bookings: list[InvoiceBookingOut] = Field(
         default_factory=list, alias="linkedBookings"
     )
+
+
+class InvoiceSegmentCounts(_CamelModel):
+    """The number of invoices in each segment of the invoice list.
+
+    The counts apply every filter of the request except ``status`` and ``booked``,
+    so that each segment shows how many hits it holds. ``inbox`` is an open invoice
+    without a visible booking ("Eingang"), ``booked`` an open invoice with at least
+    one ("Verbucht"). ``inbox + booked + paid`` is ``all``.
+    """
+
+    all: int
+    inbox: int
+    booked: int
+    paid: int
+
+
+class InvoicePage(Page[InvoiceOut]):
+    """One page of invoices plus the counts of the list segments."""
+
+    counts: InvoiceSegmentCounts
 
 
 class TransferCreate(_CamelModel):

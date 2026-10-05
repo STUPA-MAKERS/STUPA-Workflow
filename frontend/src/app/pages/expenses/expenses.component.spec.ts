@@ -9,6 +9,8 @@ import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ExpensesComponent } from './expenses.component';
 import { ExpensesListState } from './expenses-list.state';
+import type { ExpenseDialogsState } from './expense-dialogs.state';
+import type { ExpenseSubBookingsState } from './expense-sub-bookings.state';
 import type {
   BudgetTreeNode,
   Expense,
@@ -28,6 +30,14 @@ function routeStub(query: [string, string][]) {
   const map = convertToParamMap(Object.fromEntries(query));
   return { snapshot: { queryParamMap: map }, queryParamMap: of(map) };
 }
+
+/** The state modules behind the facade. The forms read and set their signals directly. */
+const dlg = (c: ExpensesComponent): ExpenseDialogsState =>
+  (c as unknown as { dialogs: ExpenseDialogsState }).dialogs;
+const subs = (c: ExpensesComponent): ExpenseSubBookingsState =>
+  (c as unknown as { sub: ExpenseSubBookingsState }).sub;
+const lst = (c: ExpensesComponent): ExpensesListState =>
+  (c as unknown as { list: ExpensesListState }).list;
 
 const EXPENSE: Expense = {
   id: 'e-1',
@@ -76,7 +86,6 @@ function setViewport(...parts: string[]): void {
   })) as unknown as typeof window.matchMedia;
 }
 const WIDE = 'min-width: 1200px';
-const FULL = 'min-width: 1536px';
 const PHONE = 'max-width: 768px';
 const realMatchMedia = window.matchMedia;
 afterEach(() => {
@@ -88,7 +97,7 @@ function fakeAuth(perms: string[]): Partial<AuthService> {
   return { can: (p: string) => set.has(p), canAny: (...p: string[]) => p.some((x) => set.has(x)) };
 }
 
-async function setup(opts: { perms?: string[]; page?: ExpensePage } = {}) {
+async function setup(opts: { perms?: string[]; page?: ExpensePage; tree?: BudgetTreeNode[] } = {}) {
   const view = await render(ExpensesComponent, {
     providers: [
       provideRouter([]),
@@ -101,7 +110,7 @@ async function setup(opts: { perms?: string[]; page?: ExpensePage } = {}) {
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   // The constructor loads the cost center tree, the invoices and the first page of
   // bookings.
-  http.match((r) => r.url.endsWith('/budgets')).forEach((req) => req.flush([]));
+  http.match((r) => r.url.endsWith('/budgets')).forEach((req) => req.flush(opts.tree ?? []));
   // `listInvoices` reads a page, so the answer must be a paged shape and not an array.
   // Otherwise `page.items` is undefined and the `invoiceOptions` computed throws.
   http
@@ -112,89 +121,6 @@ async function setup(opts: { perms?: string[]; page?: ExpensePage } = {}) {
     .forEach((req) => req.flush(opts.page ?? page([])));
   return { ...view, http };
 }
-
-describe('ExpensesComponent (rendered)', () => {
-  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
-
-  it('lists bookings with description, kind badge and signed amount', async () => {
-    await setup({ page: page([EXPENSE]) });
-    expect(await screen.findByText('Druckkosten Flyer')).toBeInTheDocument();
-    expect(screen.getByText('VS-800')).toBeInTheDocument();
-    expect(screen.getByText(/−.*120/)).toBeInTheDocument();
-  });
-
-  it('shows the empty state when there are no bookings', async () => {
-    await setup();
-    expect(await screen.findByText('Keine Buchungen gefunden.')).toBeInTheDocument();
-  });
-
-  it('renders invoice date, payment date and payee/payer columns (#1-1/#3)', async () => {
-    setViewport(WIDE, FULL);
-    await setup({ page: page([EXPENSE]) });
-    expect(await screen.findByText('Druckkosten Flyer')).toBeInTheDocument();
-    expect(screen.getByText('Copyshop Müller')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Rechnungsdatum/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Zahldatum/ })).toBeInTheDocument();
-  });
-
-  it('books a standalone expense via POST /expenses', async () => {
-    const { http } = await setup();
-    await userEvent.click(await screen.findByRole('button', { name: 'Buchung hinzufügen' }));
-    const dialog = within(screen.getByRole('dialog', { name: 'Buchung hinzufügen' }));
-    await userEvent.type(dialog.getByLabelText(/^Beschreibung/), 'Kaffee');
-    await userEvent.type(dialog.getByLabelText(/^Betrag \(€\)/), '12.50');
-    // A cost center is required. Without a selection the submit button stays disabled.
-    // This test only checks the request shape after the select holds a cost center.
-    const select = dialog.getByLabelText(/^Kostenstelle/) as HTMLSelectElement;
-    // The tree is empty, so the select has no real option and nothing can be selected.
-    expect(select).toBeInTheDocument();
-    http.verify();
-  });
-
-  it('shows the linked application as a link under the description (N29)', async () => {
-    await setup({
-      page: page([{ ...EXPENSE, applicationId: 'app-1', applicationTitle: 'Sommerfest' }]),
-    });
-    const link = await screen.findByRole('link', { name: 'Sommerfest' });
-    expect(link.getAttribute('href')).toBe('/applications/app-1');
-  });
-
-  it('puts the cost-centre tree in a pane beside the list on the wide layout', async () => {
-    setViewport(WIDE);
-    const { container } = await setup({ page: page([EXPENSE]) });
-    expect(container.querySelector('.exp__pane app-cost-centre-tree')).not.toBeNull();
-    expect(container.querySelector('.exp__ccChip')).toBeNull();
-  });
-
-  it('opens the tree from the chip in a side sheet below the wide layout', async () => {
-    const { container, fixture } = await setup({ page: page([EXPENSE]) });
-    expect(container.querySelector('.exp__pane')).toBeNull();
-    const chip = container.querySelector('.exp__ccChip') as HTMLButtonElement;
-    expect(chip.textContent).toContain('Alle Kostenstellen');
-    chip.click();
-    fixture.detectChanges();
-    expect(chip.getAttribute('aria-expanded')).toBe('true');
-    expect(container.querySelector('app-side-sheet app-cost-centre-tree')).not.toBeNull();
-  });
-
-  it('opens the tree in a bottom sheet on a phone and keeps one action in the title row', async () => {
-    setViewport(PHONE);
-    const { container, fixture } = await setup({ page: page([EXPENSE]) });
-    // "Buchung" alone in the title row; transfer and export sit in the menu.
-    expect(screen.getByRole('button', { name: 'Buchung' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Übertrag/ })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Weitere Aktionen' })).toBeInTheDocument();
-    (container.querySelector('.exp__ccChip') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(container.querySelector('.ss--bottom app-cost-centre-tree')).not.toBeNull();
-  });
-
-  it('hides add/edit controls for a viewer without budget.book', async () => {
-    await setup({ perms: ['budget.view'], page: page([EXPENSE]) });
-    expect(await screen.findByText('Druckkosten Flyer')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Buchung hinzufügen' })).toBeNull();
-  });
-});
 
 // Direct component tests for the methods and branches, without DOM rendering. Every
 // method runs through the HttpTestingController, and the test checks the signal state.
@@ -365,8 +291,8 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.items()).toEqual([EXPENSE]);
     expect(cmp.total()).toBe(1);
     expect(cmp.loading()).toBe(false);
-    expect(cmp.costCentreOptions().length).toBe(2);
-    const label = cmp.invoiceOptions()[0];
+    expect(lst(cmp).costCentreOptions().length).toBe(2);
+    const label = dlg(cmp).invoiceOptions()[0];
     expect(label.value).toBe('inv-1');
     // Intl separates with a narrow no-break space, so normalize to plain whitespace.
     expect(label.label.replace(/\s/g, ' ')).toBe('RE-2026-1 · Acme GmbH · 119,00 €');
@@ -428,27 +354,27 @@ describe('ExpensesComponent (unit)', () => {
     };
     const { cmp } = build({ invoices: [sparse] });
     // Only the amount remains (number/supplier filtered out).
-    expect(cmp.invoiceOptions()[0].label).toMatch(/5,00\s?€/);
-    expect(cmp.invoiceOptions()[0].label).not.toContain('·');
+    expect(dlg(cmp).invoiceOptions()[0].label).toMatch(/5,00\s?€/);
+    expect(dlg(cmp).invoiceOptions()[0].label).not.toContain('·');
   });
 
   it('lists only open invoices; edit keeps a linked paid invoice visible', () => {
     const paid: Invoice = { ...INVOICE, id: 'inv-paid', number: 'RE-PAID', status: 'paid' };
     const { cmp } = build({ invoices: [INVOICE, paid] });
     // Create dropdown: only open invoices (paid ones hidden).
-    expect(cmp.invoiceOptions().map((o) => o.value)).toEqual(['inv-1']);
+    expect(dlg(cmp).invoiceOptions().map((o) => o.value)).toEqual(['inv-1']);
     // Edit without a selection: also only open ones.
-    expect(cmp.editInvoiceOptions().map((o) => o.value)).toEqual(['inv-1']);
+    expect(dlg(cmp).editInvoiceOptions().map((o) => o.value)).toEqual(['inv-1']);
     // The linked (already paid) invoice stays visible in the edit dropdown.
-    cmp.editInvoiceId.set('inv-paid');
-    expect(cmp.editInvoiceOptions().map((o) => o.value)).toEqual(['inv-paid', 'inv-1']);
+    dlg(cmp).editInvoiceId.set('inv-paid');
+    expect(dlg(cmp).editInvoiceOptions().map((o) => o.value)).toEqual(['inv-paid', 'inv-1']);
   });
 
   it('sorts open invoices by issue date, newest first', () => {
     const older: Invoice = { ...INVOICE, id: 'inv-old', issueDate: '2026-01-01' };
     const newer: Invoice = { ...INVOICE, id: 'inv-new', issueDate: '2026-09-01' };
     const { cmp } = build({ invoices: [older, newer] });
-    expect(cmp.invoiceOptions().map((o) => o.value)).toEqual(['inv-new', 'inv-old']);
+    expect(dlg(cmp).invoiceOptions().map((o) => o.value)).toEqual(['inv-new', 'inv-old']);
   });
 
   it('setKind, selectBudget reload the list with the new filter', () => {
@@ -509,10 +435,10 @@ describe('ExpensesComponent (unit)', () => {
     const { cmp, http } = build();
     cmp.onSearch('a');
     cmp.onSearch('ab');
-    cmp.onAmountFilter('min', '5');
-    cmp.onAmountFilter('max', '50');
-    cmp.onDateFilter('from', '2026-01-01');
-    cmp.onDateFilter('to', '2026-12-31');
+    lst(cmp).onAmountFilter('min', '5');
+    lst(cmp).onAmountFilter('max', '50');
+    lst(cmp).onDateFilter('from', '2026-01-01');
+    lst(cmp).onDateFilter('to', '2026-12-31');
     expect(cmp.q()).toBe('ab');
     expect(cmp.amountMin()).toBe('5');
     expect(cmp.amountMax()).toBe('50');
@@ -555,18 +481,6 @@ describe('ExpensesComponent (unit)', () => {
     flushList(http, page([]));
   });
 
-  it('sortInd and ariaSort describe the active sort column', () => {
-    const { cmp } = build();
-    // the default sort is paymentDate desc
-    expect(cmp.sortInd('paymentDate')).toBe(' ↓');
-    expect(cmp.sortInd('amount')).toBe('');
-    expect(cmp.ariaSort('paymentDate')).toBe('descending');
-    expect(cmp.ariaSort('amount')).toBe('none');
-    cmp.sortOrder.set('asc');
-    expect(cmp.sortInd('paymentDate')).toBe(' ↑');
-    expect(cmp.ariaSort('paymentDate')).toBe('ascending');
-  });
-
   it('loadMore appends the next page and advances the offset', () => {
     const { cmp, http } = build({ expenses: page([EXPENSE], 3) });
     expect(cmp.hasMore()).toBe(true);
@@ -602,98 +516,98 @@ describe('ExpensesComponent (unit)', () => {
     cmp.budgetId.set('child-1');
     cmp.openCreate();
     expect(cmp.createOpen()).toBe(true);
-    expect(cmp.newKind()).toBe('expense');
-    expect(cmp.newBudgetId()).toBe('child-1');
+    expect(dlg(cmp).newKind()).toBe('expense');
+    expect(dlg(cmp).newBudgetId()).toBe('child-1');
     // the fiscal-year load resolves child-1 to its top node top-1
     const req = http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years'));
     req.flush([FY_ACTIVE]);
-    expect(cmp.fiscalYearOptions()).toEqual([{ value: 'fy-active', label: '2026' }]);
+    expect(dlg(cmp).fiscalYearOptions()).toEqual([{ value: 'fy-active', label: '2026' }]);
     // exactly one active fiscal year → preselected
-    expect(cmp.newFiscalYearId()).toBe('fy-active');
+    expect(dlg(cmp).newFiscalYearId()).toBe('fy-active');
   });
 
   it('openCreate without a preselected budget skips the fiscal-year load', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
     cmp.openCreate();
     expect(cmp.createOpen()).toBe(true);
-    expect(cmp.newBudgetId()).toBe('');
-    expect(cmp.fiscalYearOptions()).toEqual([]);
+    expect(dlg(cmp).newBudgetId()).toBe('');
+    expect(dlg(cmp).fiscalYearOptions()).toEqual([]);
     http.expectNone((r) => r.url.includes('/fiscal-years'));
   });
 
   it('onPickBudget loads fiscal years; multiple active years are not auto-selected', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
-    cmp.onPickBudget('child-1');
-    expect(cmp.newBudgetId()).toBe('child-1');
+    dlg(cmp).onPickBudget('child-1');
+    expect(dlg(cmp).newBudgetId()).toBe('child-1');
     const secondActive: FiscalYear = { ...FY_ACTIVE, id: 'fy-2', display: '2026/27' };
     http
       .expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years'))
       .flush([FY_ACTIVE, secondActive, FY_OLD]);
-    expect(cmp.fiscalYearOptions().length).toBe(3);
+    expect(dlg(cmp).fiscalYearOptions().length).toBe(3);
     // two active → no preselection
-    expect(cmp.newFiscalYearId()).toBe('');
+    expect(dlg(cmp).newFiscalYearId()).toBe('');
   });
 
   it('onPickBudget with empty id clears the fiscal-year selection without a request', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
-    cmp.newFiscalYearId.set('fy-x');
-    cmp.fiscalYearOptions.set([{ value: 'fy-x', label: 'X' }]);
-    cmp.onPickBudget('');
-    expect(cmp.newBudgetId()).toBe('');
-    expect(cmp.newFiscalYearId()).toBe('');
-    expect(cmp.fiscalYearOptions()).toEqual([]);
+    dlg(cmp).newFiscalYearId.set('fy-x');
+    dlg(cmp).fiscalYearOptions.set([{ value: 'fy-x', label: 'X' }]);
+    dlg(cmp).onPickBudget('');
+    expect(dlg(cmp).newBudgetId()).toBe('');
+    expect(dlg(cmp).newFiscalYearId()).toBe('');
+    expect(dlg(cmp).fiscalYearOptions()).toEqual([]);
     http.expectNone((r) => r.url.includes('/fiscal-years'));
   });
 
   it('loadFiscalYears resets options on error', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
-    cmp.fiscalYearOptions.set([{ value: 'x', label: 'X' }]);
-    cmp.onPickBudget('child-1');
+    dlg(cmp).fiscalYearOptions.set([{ value: 'x', label: 'X' }]);
+    dlg(cmp).onPickBudget('child-1');
     http
       .expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years'))
       .error(new ProgressEvent('err'));
-    expect(cmp.fiscalYearOptions()).toEqual([]);
+    expect(dlg(cmp).fiscalYearOptions()).toEqual([]);
   });
 
   it('loadFiscalYears is skipped when the budget id is not in the tree', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
-    cmp.onPickBudget('unknown-id');
+    dlg(cmp).onPickBudget('unknown-id');
     // the top-node lookup returns null, so no request runs and the options stay empty
     http.expectNone((r) => r.url.includes('/fiscal-years'));
-    expect(cmp.fiscalYearOptions()).toEqual([]);
+    expect(dlg(cmp).fiscalYearOptions()).toEqual([]);
   });
 
   it('canSubmitCreate enforces description, amount and (for standalone) budget+fy', () => {
     const { cmp } = build();
     expect(cmp.canSubmitCreate()).toBe(false);
-    cmp.newDescription.set('Kaffee');
+    dlg(cmp).newDescription.set('Kaffee');
     expect(cmp.canSubmitCreate()).toBe(false); // amount missing
-    cmp.newAmount.set('0');
+    dlg(cmp).newAmount.set('0');
     expect(cmp.canSubmitCreate()).toBe(false); // amount must be > 0
-    cmp.newAmount.set('12');
+    dlg(cmp).newAmount.set('12');
     expect(cmp.canSubmitCreate()).toBe(false); // standalone needs budget+fy
-    cmp.newBudgetId.set('b-1');
+    dlg(cmp).newBudgetId.set('b-1');
     expect(cmp.canSubmitCreate()).toBe(false); // fy missing
-    cmp.newFiscalYearId.set('fy-1');
+    dlg(cmp).newFiscalYearId.set('fy-1');
     expect(cmp.canSubmitCreate()).toBe(true);
     // a linked booking needs only an application, which carries cost center and year
-    cmp.newBudgetId.set('');
-    cmp.newFiscalYearId.set('');
-    cmp.newApplicationId.set('app-9');
+    dlg(cmp).newBudgetId.set('');
+    dlg(cmp).newFiscalYearId.set('');
+    dlg(cmp).newApplicationId.set('app-9');
     expect(cmp.canSubmitCreate()).toBe(true);
   });
 
   it('create posts a standalone booking, toasts and reloads', () => {
     const { cmp, http } = build();
-    cmp.newDescription.set('  Kaffee  ');
-    cmp.newAmount.set('12.50');
-    cmp.newBudgetId.set('b-1');
-    cmp.newFiscalYearId.set('fy-1');
-    cmp.newCorrespondent.set(' Bäckerei ');
-    cmp.newReferenceNumber.set(' R-1 ');
-    cmp.newPaymentMethod.set('bar');
-    cmp.newCategory.set(' Bewirtung ');
-    cmp.newNote.set(' lecker ');
+    dlg(cmp).newDescription.set('  Kaffee  ');
+    dlg(cmp).newAmount.set('12.50');
+    dlg(cmp).newBudgetId.set('b-1');
+    dlg(cmp).newFiscalYearId.set('fy-1');
+    dlg(cmp).newCorrespondent.set(' Bäckerei ');
+    dlg(cmp).newReferenceNumber.set(' R-1 ');
+    dlg(cmp).newPaymentMethod.set('bar');
+    dlg(cmp).newCategory.set(' Bewirtung ');
+    dlg(cmp).newNote.set(' lecker ');
     cmp.create(new Event('submit'));
     const req = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'POST');
     expect(req.request.body).toMatchObject({
@@ -718,11 +632,11 @@ describe('ExpensesComponent (unit)', () => {
 
   it('create posts a linked booking nulling budget/fy and blank metadata', () => {
     const { cmp, http } = build();
-    cmp.newDescription.set('Gebunden');
-    cmp.newAmount.set('5');
-    cmp.newApplicationId.set('app-9');
-    cmp.newBudgetId.set('ignored');
-    cmp.newFiscalYearId.set('ignored');
+    dlg(cmp).newDescription.set('Gebunden');
+    dlg(cmp).newAmount.set('5');
+    dlg(cmp).newApplicationId.set('app-9');
+    dlg(cmp).newBudgetId.set('ignored');
+    dlg(cmp).newFiscalYearId.set('ignored');
     cmp.create(new Event('submit'));
     const req = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'POST');
     expect(req.request.body).toMatchObject({
@@ -745,9 +659,9 @@ describe('ExpensesComponent (unit)', () => {
     cmp.create(new Event('submit')); // invalid → no request
     http.expectNone((r) => r.url.endsWith('/expenses') && r.method === 'POST');
     // valid but saving
-    cmp.newDescription.set('x');
-    cmp.newAmount.set('1');
-    cmp.newApplicationId.set('app-1');
+    dlg(cmp).newDescription.set('x');
+    dlg(cmp).newAmount.set('1');
+    dlg(cmp).newApplicationId.set('app-1');
     cmp.saving.set(true);
     cmp.create(new Event('submit'));
     http.expectNone((r) => r.url.endsWith('/expenses') && r.method === 'POST');
@@ -759,9 +673,9 @@ describe('ExpensesComponent (unit)', () => {
       (cmp as unknown as { toast: { error: (m: string) => void } }).toast,
       'error',
     );
-    cmp.newDescription.set('x');
-    cmp.newAmount.set('1');
-    cmp.newApplicationId.set('app-1');
+    dlg(cmp).newDescription.set('x');
+    dlg(cmp).newAmount.set('1');
+    dlg(cmp).newApplicationId.set('app-1');
     cmp.create(new Event('submit'));
     http
       .expectOne((r) => r.url.endsWith('/expenses') && r.method === 'POST')
@@ -779,21 +693,21 @@ describe('ExpensesComponent (unit)', () => {
 
   it('setNewKindIncome switches to income and clears any application link', () => {
     const { cmp } = build();
-    cmp.newApplicationId.set('app-1');
-    cmp.appQuery.set('Antrag X');
-    cmp.appCandidates.set([{ id: 'app-1', title: 'Antrag X' }]);
-    cmp.setNewKindIncome();
-    expect(cmp.newKind()).toBe('income');
-    expect(cmp.newApplicationId()).toBe('');
-    expect(cmp.appQuery()).toBe('');
-    expect(cmp.appCandidates()).toEqual([]);
+    dlg(cmp).newApplicationId.set('app-1');
+    dlg(cmp).appQuery.set('Antrag X');
+    dlg(cmp).appCandidates.set([{ id: 'app-1', title: 'Antrag X' }]);
+    dlg(cmp).setNewKindIncome();
+    expect(dlg(cmp).newKind()).toBe('income');
+    expect(dlg(cmp).newApplicationId()).toBe('');
+    expect(dlg(cmp).appQuery()).toBe('');
+    expect(dlg(cmp).appCandidates()).toEqual([]);
   });
 
   it('onAppSearch queries applications and maps candidates (title fallback to id)', () => {
     const { cmp, http } = build();
-    cmp.onAppSearch('  flyer ');
+    dlg(cmp).onAppSearch('  flyer ');
     // appQuery holds the raw value. Only the request param is trimmed.
-    expect(cmp.appQuery()).toBe('  flyer ');
+    expect(dlg(cmp).appQuery()).toBe('  flyer ');
     const req = http.expectOne((r) => r.url.endsWith('/applications'));
     expect(req.request.params.get('q')).toBe('flyer');
     expect(req.request.params.get('limit')).toBe('8');
@@ -806,7 +720,7 @@ describe('ExpensesComponent (unit)', () => {
       limit: 8,
       offset: 0,
     });
-    expect(cmp.appCandidates()).toEqual([
+    expect(dlg(cmp).appCandidates()).toEqual([
       { id: 'app-1', title: 'Flyer-Antrag' },
       { id: 'app-2', title: 'app-2' },
     ]);
@@ -814,48 +728,48 @@ describe('ExpensesComponent (unit)', () => {
 
   it('onAppSearch clears candidates for an empty query without a request', () => {
     const { cmp, http } = build();
-    cmp.appCandidates.set([{ id: 'x', title: 'X' }]);
-    cmp.onAppSearch('   ');
-    expect(cmp.appQuery()).toBe('   ');
-    expect(cmp.appCandidates()).toEqual([]);
+    dlg(cmp).appCandidates.set([{ id: 'x', title: 'X' }]);
+    dlg(cmp).onAppSearch('   ');
+    expect(dlg(cmp).appQuery()).toBe('   ');
+    expect(dlg(cmp).appCandidates()).toEqual([]);
     http.expectNone((r) => r.url.endsWith('/applications'));
   });
 
   it('onAppSearch clears candidates on error', () => {
     const { cmp, http } = build();
-    cmp.onAppSearch('z');
+    dlg(cmp).onAppSearch('z');
     http.expectOne((r) => r.url.endsWith('/applications')).error(new ProgressEvent('err'));
-    expect(cmp.appCandidates()).toEqual([]);
+    expect(dlg(cmp).appCandidates()).toEqual([]);
   });
 
   it('pickApp / clearApp manage the selected application', () => {
     const { cmp } = build();
-    cmp.appCandidates.set([{ id: 'app-1', title: 'Antrag X' }]);
-    cmp.pickApp({ id: 'app-1', title: 'Antrag X' });
-    expect(cmp.newApplicationId()).toBe('app-1');
-    expect(cmp.appQuery()).toBe('Antrag X');
-    expect(cmp.appCandidates()).toEqual([]);
-    cmp.clearApp();
-    expect(cmp.newApplicationId()).toBe('');
-    expect(cmp.appQuery()).toBe('');
+    dlg(cmp).appCandidates.set([{ id: 'app-1', title: 'Antrag X' }]);
+    dlg(cmp).pickApp({ id: 'app-1', title: 'Antrag X' });
+    expect(dlg(cmp).newApplicationId()).toBe('app-1');
+    expect(dlg(cmp).appQuery()).toBe('Antrag X');
+    expect(dlg(cmp).appCandidates()).toEqual([]);
+    dlg(cmp).clearApp();
+    expect(dlg(cmp).newApplicationId()).toBe('');
+    expect(dlg(cmp).appQuery()).toBe('');
   });
 
   it('onPickInvoice prefills amount, payee, reference and invoice date', () => {
     const { cmp } = build({ invoices: [INVOICE] });
-    cmp.onPickInvoice('inv-1');
-    expect(cmp.newInvoiceId()).toBe('inv-1');
-    expect(cmp.newAmount()).toBe('119.00');
-    expect(cmp.newCorrespondent()).toBe('Acme GmbH');
-    expect(cmp.newReferenceNumber()).toBe('RE-2026-1');
-    expect(cmp.newInvoiceDate()).toBe('2026-04-01');
+    dlg(cmp).onPickInvoice('inv-1');
+    expect(dlg(cmp).newInvoiceId()).toBe('inv-1');
+    expect(dlg(cmp).newAmount()).toBe('119.00');
+    expect(dlg(cmp).newCorrespondent()).toBe('Acme GmbH');
+    expect(dlg(cmp).newReferenceNumber()).toBe('RE-2026-1');
+    expect(dlg(cmp).newInvoiceDate()).toBe('2026-04-01');
   });
 
   it('onPickInvoice with unknown id only stores the id (no prefill)', () => {
     const { cmp } = build({ invoices: [INVOICE] });
-    cmp.onPickInvoice('nope');
-    expect(cmp.newInvoiceId()).toBe('nope');
-    expect(cmp.newAmount()).toBe('');
-    expect(cmp.newCorrespondent()).toBe('');
+    dlg(cmp).onPickInvoice('nope');
+    expect(dlg(cmp).newInvoiceId()).toBe('nope');
+    expect(dlg(cmp).newAmount()).toBe('');
+    expect(dlg(cmp).newCorrespondent()).toBe('');
   });
 
   it('onPickInvoice handles sparse invoices (null gross, missing fields)', () => {
@@ -870,35 +784,53 @@ describe('ExpensesComponent (unit)', () => {
       issueDate: null,
     } as unknown as Invoice;
     const { cmp } = build({ invoices: [sparse] });
-    cmp.newAmount.set('preset');
-    cmp.newCorrespondent.set('keep');
-    cmp.newReferenceNumber.set('keep');
-    cmp.newInvoiceDate.set('keep');
-    cmp.onPickInvoice('inv-3');
-    expect(cmp.newAmount()).toBe('');
-    expect(cmp.newCorrespondent()).toBe('keep');
-    expect(cmp.newReferenceNumber()).toBe('keep');
-    expect(cmp.newInvoiceDate()).toBe('keep');
+    dlg(cmp).newAmount.set('preset');
+    dlg(cmp).newCorrespondent.set('keep');
+    dlg(cmp).newReferenceNumber.set('keep');
+    dlg(cmp).newInvoiceDate.set('keep');
+    dlg(cmp).onPickInvoice('inv-3');
+    expect(dlg(cmp).newAmount()).toBe('');
+    expect(dlg(cmp).newCorrespondent()).toBe('keep');
+    expect(dlg(cmp).newReferenceNumber()).toBe('keep');
+    expect(dlg(cmp).newInvoiceDate()).toBe('keep');
   });
 
   it('onPickEditInvoice prefills the edit form, unknown id is a no-op', () => {
     const { cmp } = build({ invoices: [INVOICE] });
-    cmp.onPickEditInvoice('inv-1');
-    expect(cmp.editInvoiceId()).toBe('inv-1');
-    expect(cmp.editAmount()).toBe('119.00');
-    expect(cmp.editCorrespondent()).toBe('Acme GmbH');
-    expect(cmp.editReferenceNumber()).toBe('RE-2026-1');
-    expect(cmp.editInvoiceDate()).toBe('2026-04-01');
-    cmp.onPickEditInvoice('nope');
-    expect(cmp.editInvoiceId()).toBe('nope');
+    dlg(cmp).onPickEditInvoice('inv-1');
+    expect(dlg(cmp).editInvoiceId()).toBe('inv-1');
+    expect(dlg(cmp).editAmount()).toBe('119.00');
+    expect(dlg(cmp).editCorrespondent()).toBe('Acme GmbH');
+    expect(dlg(cmp).editReferenceNumber()).toBe('RE-2026-1');
+    expect(dlg(cmp).editInvoiceDate()).toBe('2026-04-01');
+    dlg(cmp).onPickEditInvoice('nope');
+    expect(dlg(cmp).editInvoiceId()).toBe('nope');
   });
 
   it('onPickEditInvoice coerces a null gross amount to empty string', () => {
     const sparse = { ...INVOICE, id: 'inv-4', grossAmount: null } as unknown as Invoice;
     const { cmp } = build({ invoices: [sparse] });
-    cmp.editAmount.set('preset');
-    cmp.onPickEditInvoice('inv-4');
-    expect(cmp.editAmount()).toBe('');
+    dlg(cmp).editAmount.set('preset');
+    dlg(cmp).onPickEditInvoice('inv-4');
+    expect(dlg(cmp).editAmount()).toBe('');
+  });
+
+  it('onPickEditInvoice keeps the fields an invoice without data cannot fill', () => {
+    const bare = { ...INVOICE, id: 'inv-5', supplier: null, number: null, issueDate: null } as unknown as Invoice;
+    const undated = { ...INVOICE, id: 'inv-6', issueDate: null } as unknown as Invoice;
+    const { cmp } = build({ invoices: [bare, undated, INVOICE] });
+    // Invoices without a date sort after the dated one.
+    expect(dlg(cmp).invoiceOptions()[0].value).toBe('inv-1');
+    dlg(cmp).editCorrespondent.set('Alt');
+    dlg(cmp).editReferenceNumber.set('R-1');
+    dlg(cmp).editInvoiceDate.set('2026-01-01');
+    dlg(cmp).onPickEditInvoice('inv-5');
+    expect(dlg(cmp).editCorrespondent()).toBe('Alt');
+    expect(dlg(cmp).editReferenceNumber()).toBe('R-1');
+    expect(dlg(cmp).editInvoiceDate()).toBe('2026-01-01');
+    // A linked invoice that the list does not hold adds no option.
+    dlg(cmp).editInvoiceId.set('inv-gone');
+    expect(dlg(cmp).editInvoiceOptions().map((o) => o.value)).not.toContain('inv-gone');
   });
 
   it('openEdit fills the edit form, coalescing null metadata to empty strings', () => {
@@ -916,38 +848,38 @@ describe('ExpensesComponent (unit)', () => {
     };
     cmp.openEdit(e);
     expect(cmp.editing()).toBe(e);
-    expect(cmp.editAmount()).toBe(e.amount);
-    expect(cmp.editDescription()).toBe(e.description);
-    expect(cmp.editInvoiceId()).toBe('');
-    expect(cmp.editInvoiceDate()).toBe('');
-    expect(cmp.editPaymentDate()).toBe('');
-    expect(cmp.editCorrespondent()).toBe('');
-    expect(cmp.editReferenceNumber()).toBe('');
-    expect(cmp.editPaymentMethod()).toBe('');
-    expect(cmp.editCategory()).toBe('');
-    expect(cmp.editNote()).toBe('');
+    expect(dlg(cmp).editAmount()).toBe(e.amount);
+    expect(dlg(cmp).editDescription()).toBe(e.description);
+    expect(dlg(cmp).editInvoiceId()).toBe('');
+    expect(dlg(cmp).editInvoiceDate()).toBe('');
+    expect(dlg(cmp).editPaymentDate()).toBe('');
+    expect(dlg(cmp).editCorrespondent()).toBe('');
+    expect(dlg(cmp).editReferenceNumber()).toBe('');
+    expect(dlg(cmp).editPaymentMethod()).toBe('');
+    expect(dlg(cmp).editCategory()).toBe('');
+    expect(dlg(cmp).editNote()).toBe('');
   });
 
   it('openEdit keeps populated metadata fields', () => {
     const { cmp } = build();
     cmp.openEdit({ ...EXPENSE, invoiceId: 'inv-1' });
-    expect(cmp.editInvoiceId()).toBe('inv-1');
-    expect(cmp.editPaymentMethod()).toBe('ueberweisung');
-    expect(cmp.editCategory()).toBe('Werbung');
+    expect(dlg(cmp).editInvoiceId()).toBe('inv-1');
+    expect(dlg(cmp).editPaymentMethod()).toBe('ueberweisung');
+    expect(dlg(cmp).editCategory()).toBe('Werbung');
   });
 
   it('saveEdit patches the booking and updates the matching list row', () => {
     const other = { ...EXPENSE, id: 'e-2', description: 'Andere' };
     const { cmp, http } = build({ expenses: page([EXPENSE, other], 2) });
     cmp.openEdit(EXPENSE);
-    cmp.editAmount.set('200');
-    cmp.editDescription.set('  Neu  ');
-    cmp.editInvoiceId.set('inv-9');
-    cmp.editCorrespondent.set(' X ');
-    cmp.editReferenceNumber.set(' Y ');
-    cmp.editPaymentMethod.set('karte');
-    cmp.editCategory.set(' Z ');
-    cmp.editNote.set(' note ');
+    dlg(cmp).editAmount.set('200');
+    dlg(cmp).editDescription.set('  Neu  ');
+    dlg(cmp).editInvoiceId.set('inv-9');
+    dlg(cmp).editCorrespondent.set(' X ');
+    dlg(cmp).editReferenceNumber.set(' Y ');
+    dlg(cmp).editPaymentMethod.set('karte');
+    dlg(cmp).editCategory.set(' Z ');
+    dlg(cmp).editNote.set(' note ');
     cmp.saveEdit(new Event('submit'));
     const req = http.expectOne(
       (r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH',
@@ -973,14 +905,14 @@ describe('ExpensesComponent (unit)', () => {
   it('saveEdit nulls blank metadata fields', () => {
     const { cmp, http } = build();
     cmp.openEdit(EXPENSE);
-    cmp.editInvoiceId.set('');
-    cmp.editInvoiceDate.set('');
-    cmp.editPaymentDate.set('');
-    cmp.editCorrespondent.set('   ');
-    cmp.editReferenceNumber.set('');
-    cmp.editPaymentMethod.set('');
-    cmp.editCategory.set('');
-    cmp.editNote.set('');
+    dlg(cmp).editInvoiceId.set('');
+    dlg(cmp).editInvoiceDate.set('');
+    dlg(cmp).editPaymentDate.set('');
+    dlg(cmp).editCorrespondent.set('   ');
+    dlg(cmp).editReferenceNumber.set('');
+    dlg(cmp).editPaymentMethod.set('');
+    dlg(cmp).editCategory.set('');
+    dlg(cmp).editNote.set('');
     cmp.saveEdit(new Event('submit'));
     const req = http.expectOne(
       (r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH',
@@ -1123,7 +1055,7 @@ describe('ExpensesComponent (unit)', () => {
 
   it('paymentMethodOptions lists all methods localized', () => {
     const { cmp } = build();
-    const opts = cmp.paymentMethodOptions();
+    const opts = dlg(cmp).paymentMethodOptions();
     expect(opts.map((o) => o.value)).toEqual([
       'ueberweisung',
       'bar',
@@ -1141,7 +1073,7 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.transferOpen()).toBe(true);
     expect(cmp.tFromId()).toBe('child-1');
     http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE]);
-    expect(cmp.transferFyOptions()).toEqual([{ value: 'fy-active', label: '2026' }]);
+    expect(dlg(cmp).transferFyOptions()).toEqual([{ value: 'fy-active', label: '2026' }]);
     expect(cmp.tFiscalYearId()).toBe('fy-active');
   });
 
@@ -1155,7 +1087,7 @@ describe('ExpensesComponent (unit)', () => {
   it('onTransferFrom reloads fiscal years for the new source budget', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
     cmp.tFiscalYearId.set('stale');
-    cmp.onTransferFrom('child-1');
+    dlg(cmp).onTransferFrom('child-1');
     expect(cmp.tFromId()).toBe('child-1');
     expect(cmp.tFiscalYearId()).toBe('');
     http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE]);
@@ -1164,7 +1096,7 @@ describe('ExpensesComponent (unit)', () => {
 
   it('onTransferFrom with empty id clears the source without a request', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
-    cmp.onTransferFrom('');
+    dlg(cmp).onTransferFrom('');
     expect(cmp.tFromId()).toBe('');
     http.expectNone((r) => r.url.includes('/fiscal-years'));
   });
@@ -1172,22 +1104,22 @@ describe('ExpensesComponent (unit)', () => {
   it('loadTransferFy is skipped for an unknown budget and resets on error', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
     // an unknown budget has no top node, so no request runs
-    cmp.onTransferFrom('ghost');
+    dlg(cmp).onTransferFrom('ghost');
     http.expectNone((r) => r.url.includes('/fiscal-years'));
     // known but error → options reset
-    cmp.transferFyOptions.set([{ value: 'x', label: 'X' }]);
-    cmp.onTransferFrom('child-1');
+    dlg(cmp).transferFyOptions.set([{ value: 'x', label: 'X' }]);
+    dlg(cmp).onTransferFrom('child-1');
     http
       .expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years'))
       .error(new ProgressEvent('err'));
-    expect(cmp.transferFyOptions()).toEqual([]);
+    expect(dlg(cmp).transferFyOptions()).toEqual([]);
   });
 
   it('loadTransferFy does not auto-select when there is no single active year', () => {
     const { cmp, http } = build({ tree: ROOT_TREE });
-    cmp.onTransferFrom('child-1');
+    dlg(cmp).onTransferFrom('child-1');
     http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_OLD]);
-    expect(cmp.transferFyOptions().length).toBe(1);
+    expect(dlg(cmp).transferFyOptions().length).toBe(1);
     expect(cmp.tFiscalYearId()).toBe('');
   });
 
@@ -1299,79 +1231,55 @@ describe('ExpensesComponent (sub-bookings)', () => {
     }
   });
 
-  it('toggleSub expands a parent, loads children once and collapses again', () => {
-    const { cmp, http } = build({ expenses: page([PARENT], 1) });
-    expect(cmp.isSubExpanded('parent-1')).toBe(false);
-    expect(cmp.subOf('parent-1')).toEqual([]);
-    cmp.toggleSub(PARENT);
-    expect(cmp.isSubExpanded('parent-1')).toBe(true);
-    expect(cmp.isLoadingSub('parent-1')).toBe(true);
-    http
-      .expectOne(
-        (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET',
-      )
-      .flush([SUB]);
-    expect(cmp.isLoadingSub('parent-1')).toBe(false);
-    expect(cmp.subOf('parent-1')).toEqual([SUB]);
-    // a collapse fires no request
-    cmp.toggleSub(PARENT);
-    expect(cmp.isSubExpanded('parent-1')).toBe(false);
-    http.expectNone((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings'));
-    // a second expand takes the children from the cache and does not reload
-    cmp.toggleSub(PARENT);
-    expect(cmp.isSubExpanded('parent-1')).toBe(true);
-    http.expectNone((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings'));
-  });
-
   it('loadSub clears the loading flag and toasts on error', () => {
     const { cmp, http } = build({ expenses: page([PARENT], 1) });
     const { error } = toastSpies(cmp);
-    cmp.toggleSub(PARENT);
+    subs(cmp).loadSub('parent-1');
     http
       .expectOne(
         (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET',
       )
       .error(new ProgressEvent('err'));
-    expect(cmp.isLoadingSub('parent-1')).toBe(false);
+    expect(subs(cmp).isLoadingSub('parent-1')).toBe(false);
     expect(error).toHaveBeenCalledWith('Unterbuchungen konnten nicht geladen werden.');
   });
 
   it('openCreateSub seeds an empty dialog; closeCreateSub clears the parent', () => {
     const { cmp } = build();
-    cmp.subAmount.set('stale');
-    cmp.subDescription.set('stale');
-    cmp.subPaymentDate.set('stale');
-    cmp.subCorrespondent.set('stale');
+    subs(cmp).subAmount.set('stale');
+    subs(cmp).subDescription.set('stale');
+    subs(cmp).subPaymentDate.set('stale');
+    subs(cmp).subCorrespondent.set('stale');
     cmp.openCreateSub(PARENT);
     expect(cmp.subParent()).toBe(PARENT);
-    expect(cmp.subAmount()).toBe('');
-    expect(cmp.subDescription()).toBe('');
-    expect(cmp.subPaymentDate()).toBe('');
-    expect(cmp.subCorrespondent()).toBe('');
-    cmp.closeCreateSub();
+    expect(subs(cmp).subAmount()).toBe('');
+    expect(subs(cmp).subDescription()).toBe('');
+    expect(subs(cmp).subPaymentDate()).toBe('');
+    expect(subs(cmp).subCorrespondent()).toBe('');
+    subs(cmp).closeCreateSub();
     expect(cmp.subParent()).toBeNull();
   });
 
   it('canSubmitSub requires amount and description', () => {
     const { cmp } = build();
-    expect(cmp.canSubmitSub()).toBe(false);
-    cmp.subAmount.set('10');
-    expect(cmp.canSubmitSub()).toBe(false);
-    cmp.subDescription.set('  ');
-    expect(cmp.canSubmitSub()).toBe(false);
-    cmp.subDescription.set('Teil');
-    expect(cmp.canSubmitSub()).toBe(true);
+    expect(subs(cmp).canSubmitSub()).toBe(false);
+    subs(cmp).subAmount.set('10');
+    expect(subs(cmp).canSubmitSub()).toBe(false);
+    subs(cmp).subDescription.set('  ');
+    expect(subs(cmp).canSubmitSub()).toBe(false);
+    subs(cmp).subDescription.set('Teil');
+    expect(subs(cmp).canSubmitSub()).toBe(true);
   });
 
   it('createSub posts the sub-booking, expands the parent, reloads and toasts', () => {
     const { cmp, http } = build({ expenses: page([PARENT], 1) });
     const { success } = toastSpies(cmp);
     cmp.openCreateSub(PARENT);
-    cmp.subAmount.set('10');
-    cmp.subDescription.set('  Teil  ');
-    cmp.subPaymentDate.set('2026-06-01');
-    cmp.subCorrespondent.set('  Bank  ');
-    cmp.createSub(new Event('submit'));
+    subs(cmp).subAmount.set('10');
+    subs(cmp).subDescription.set('  Teil  ');
+    subs(cmp).subPaymentDate.set('2026-06-01');
+    subs(cmp).subCorrespondent.set('  Bank  ');
+    subs(cmp).createSub(new Event('submit'));
     const req = http.expectOne(
       (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'POST',
     );
@@ -1384,7 +1292,6 @@ describe('ExpensesComponent (sub-bookings)', () => {
     req.flush(SUB);
     expect(cmp.saving()).toBe(false);
     expect(cmp.subParent()).toBeNull();
-    expect(cmp.isSubExpanded('parent-1')).toBe(true);
     expect(success).toHaveBeenCalledWith('Unterbuchung hinzugefügt.');
     // reload the child list and the parent amount, which is the sum of the children
     http
@@ -1398,10 +1305,10 @@ describe('ExpensesComponent (sub-bookings)', () => {
   it('createSub nulls blank payment date and correspondent', () => {
     const { cmp, http } = build({ expenses: page([PARENT], 1) });
     cmp.openCreateSub(PARENT);
-    cmp.subAmount.set('5');
-    cmp.subDescription.set('Teil');
+    subs(cmp).subAmount.set('5');
+    subs(cmp).subDescription.set('Teil');
     // a call without an event takes the optional-chaining branch and skips preventDefault
-    cmp.createSub();
+    subs(cmp).createSub();
     const req = http.expectOne(
       (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'POST',
     );
@@ -1422,17 +1329,17 @@ describe('ExpensesComponent (sub-bookings)', () => {
 
   it('createSub is a no-op without a parent, when invalid or while saving', () => {
     const { cmp, http } = build();
-    cmp.subAmount.set('10');
-    cmp.subDescription.set('Teil');
-    cmp.createSub(new Event('submit')); // no parent dialog open
+    subs(cmp).subAmount.set('10');
+    subs(cmp).subDescription.set('Teil');
+    subs(cmp).createSub(new Event('submit')); // no parent dialog open
     http.expectNone((r) => r.url.includes('/sub-bookings'));
     cmp.openCreateSub(PARENT); // dialog open but fields reset → invalid
-    cmp.createSub(new Event('submit'));
+    subs(cmp).createSub(new Event('submit'));
     http.expectNone((r) => r.url.includes('/sub-bookings'));
-    cmp.subAmount.set('10');
-    cmp.subDescription.set('Teil');
+    subs(cmp).subAmount.set('10');
+    subs(cmp).subDescription.set('Teil');
     cmp.saving.set(true);
-    cmp.createSub(new Event('submit'));
+    subs(cmp).createSub(new Event('submit'));
     http.expectNone((r) => r.url.includes('/sub-bookings'));
   });
 
@@ -1440,9 +1347,9 @@ describe('ExpensesComponent (sub-bookings)', () => {
     const { cmp, http } = build();
     const { error } = toastSpies(cmp);
     cmp.openCreateSub(PARENT);
-    cmp.subAmount.set('10');
-    cmp.subDescription.set('Teil');
-    cmp.createSub(new Event('submit'));
+    subs(cmp).subAmount.set('10');
+    subs(cmp).subDescription.set('Teil');
+    subs(cmp).createSub(new Event('submit'));
     http
       .expectOne(
         (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'POST',
@@ -1457,7 +1364,7 @@ describe('ExpensesComponent (sub-bookings)', () => {
   it('saveEdit on a sub-booking refreshes the parent panel and the list', () => {
     const { cmp, http } = build({ expenses: page([PARENT], 1) });
     cmp.openEdit(SUB);
-    cmp.editDescription.set('Teil neu');
+    dlg(cmp).editDescription.set('Teil neu');
     cmp.saveEdit(new Event('submit'));
     http
       .expectOne((r) => r.url.endsWith('/budget-expenses/sub-1') && r.method === 'PATCH')
@@ -1470,13 +1377,13 @@ describe('ExpensesComponent (sub-bookings)', () => {
       )
       .flush([{ ...SUB, description: 'Teil neu' }]);
     flushList(http, page([PARENT], 1));
-    expect(cmp.subOf('parent-1')[0].description).toBe('Teil neu');
+    expect(subs(cmp).subOf('parent-1')[0].description).toBe('Teil neu');
   });
 
   it('saveEdit sends budgetId only for a changed standalone cost centre and preserves childCount', () => {
     const { cmp, http } = build({ expenses: page([PARENT], 1) });
     cmp.openEdit(PARENT);
-    cmp.editBudgetId.set('b-2'); // standalone + changed → gets sent
+    dlg(cmp).editBudgetId.set('b-2'); // standalone + changed → gets sent
     cmp.saveEdit(new Event('submit'));
     const req = http.expectOne(
       (r) => r.url.endsWith('/budget-expenses/parent-1') && r.method === 'PATCH',
@@ -1506,6 +1413,54 @@ describe('ExpensesComponent (sub-bookings)', () => {
     flushList(http, page([PARENT], 1));
     expect(cmp.items().map((x) => x.id)).toEqual(['parent-1']);
   });
+
+  it('keeps the parent form open when a sub-booking of it is deleted', () => {
+    const { cmp, http } = build({ expenses: page([PARENT], 1) });
+    cmp.openEdit(PARENT);
+    dlg(cmp).editDescription.set('Neu, noch nicht gespeichert');
+    cmp.askDelete(SUB);
+    cmp.doDelete();
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/sub-1') && r.method === 'DELETE')
+      .flush(null);
+    // The form of the parent stays, with the unsaved edit.
+    expect(cmp.formMode()).toBe('edit');
+    expect(cmp.editing()?.id).toBe('parent-1');
+    expect(dlg(cmp).editDescription()).toBe('Neu, noch nicht gespeichert');
+    http
+      .expectOne(
+        (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET',
+      )
+      .flush([]);
+    // The list reloads, and the parent loads alone for its new amount.
+    http
+      .expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET' && !r.params.has('id'))
+      .flush(page([{ ...PARENT, amount: '30.00', childCount: 1 }], 1));
+    http
+      .expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'parent-1')
+      .flush(page([{ ...PARENT, amount: '30.00', childCount: 1 }], 1));
+    expect(cmp.editing()?.amount).toBe('30.00');
+    expect(cmp.editing()?.childCount).toBe(1);
+    expect(dlg(cmp).editAmount()).toBe('30.00');
+    expect(dlg(cmp).editDescription()).toBe('Neu, noch nicht gespeichert');
+  });
+
+  it('closes the form when the edited booking itself is deleted', () => {
+    const { cmp, http } = build({ expenses: page([PARENT], 1) });
+    cmp.openEdit(SUB);
+    cmp.askDelete(SUB);
+    cmp.doDelete();
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/sub-1') && r.method === 'DELETE')
+      .flush(null);
+    expect(cmp.formMode()).toBeNull();
+    http
+      .expectOne(
+        (r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings') && r.method === 'GET',
+      )
+      .flush([]);
+    flushList(http, page([PARENT], 1));
+  });
 });
 
 describe('ExpensesComponent (invoice detail)', () => {
@@ -1518,39 +1473,6 @@ describe('ExpensesComponent (invoice detail)', () => {
     }
   });
 
-  it('openInvoiceDialog is a no-op without a linked invoice', () => {
-    const { cmp, http } = build();
-    cmp.openInvoiceDialog({ ...EXPENSE, invoiceId: null });
-    expect(cmp.viewingInvoice()).toBeNull();
-    http.expectNone((r) => r.url.includes('/invoices/'));
-  });
-
-  it('openInvoiceDialog serves a cached invoice without a request', () => {
-    const { cmp, http } = build({ invoices: [INVOICE] });
-    cmp.openInvoiceDialog({ ...EXPENSE, invoiceId: 'inv-1' });
-    expect(cmp.viewingInvoice()).toEqual(INVOICE);
-    http.expectNone((r) => r.url.includes('/invoices/'));
-  });
-
-  it('openInvoiceDialog fetches an uncached (paid/old) invoice by id', () => {
-    const { cmp, http } = build({ invoices: [INVOICE] });
-    cmp.openInvoiceDialog({ ...EXPENSE, invoiceId: 'inv-paid' });
-    const paid: Invoice = { ...INVOICE, id: 'inv-paid', status: 'paid' };
-    http.expectOne((r) => r.url.endsWith('/invoices/inv-paid') && r.method === 'GET').flush(paid);
-    expect(cmp.viewingInvoice()).toEqual(paid);
-  });
-
-  it('openInvoiceDialog surfaces the problem detail when the fetch fails', () => {
-    const { cmp, http } = build();
-    const { error } = toastSpies(cmp);
-    cmp.openInvoiceDialog({ ...EXPENSE, invoiceId: 'inv-gone' });
-    http
-      .expectOne((r) => r.url.endsWith('/invoices/inv-gone'))
-      .flush({ detail: 'Rechnung nicht gefunden' }, { status: 404, statusText: 'Not Found' });
-    expect(cmp.viewingInvoice()).toBeNull();
-    expect(error).toHaveBeenCalledWith('Rechnung nicht gefunden');
-  });
-
   it('openInvoiceFile streams the file blob and downloads it (fileName fallback)', () => {
     (URL as unknown as { createObjectURL?: unknown }).createObjectURL = () => 'blob:mock';
     (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
@@ -1561,7 +1483,7 @@ describe('ExpensesComponent (invoice detail)', () => {
       .mockImplementation(() => undefined);
     const { cmp, http } = build();
     // a null fileName falls back to 'beleg.pdf'
-    cmp.openInvoiceFile({ ...INVOICE, fileName: null });
+    dlg(cmp).openInvoiceFile({ ...INVOICE, fileName: null });
     http
       .expectOne((r) => r.url.endsWith('/invoices/inv-1/file') && r.method === 'GET')
       .flush(new Blob(['pdf']));
@@ -1575,7 +1497,7 @@ describe('ExpensesComponent (invoice detail)', () => {
   it('openInvoiceFile toasts the problem detail on error', () => {
     const { cmp, http } = build();
     const { error } = toastSpies(cmp);
-    cmp.openInvoiceFile(INVOICE);
+    dlg(cmp).openInvoiceFile(INVOICE);
     http
       .expectOne((r) => r.url.endsWith('/invoices/inv-1/file'))
       .flush(new Blob(['nope']), { status: 500, statusText: 'Server Error' });
@@ -1692,14 +1614,6 @@ describe('ExpensesComponent (batch/bulk)', () => {
     jest.useRealTimers();
   });
 
-  it('ksLink resolves the top budget node; null when the cost centre is unknown', () => {
-    const inTree: Expense = { ...EXPENSE, budgetId: 'child-1' };
-    const { cmp } = build({ tree: ROOT_TREE, expenses: page([inTree], 1) });
-    expect(cmp.ksLink(inTree)).toEqual({ budget: 'top-1', ks: 'child-1', fy: 'fy-1' });
-    // the budgetId is not part of the tree, so there is no top node
-    expect(cmp.ksLink(EXPENSE)).toEqual({ budget: null, ks: 'b-1', fy: 'fy-1' });
-  });
-
   it('isSelected/toggleSelect add and remove a single row', () => {
     const { cmp } = build();
     expect(cmp.isSelected('e-1')).toBe(false);
@@ -1723,39 +1637,34 @@ describe('ExpensesComponent (batch/bulk)', () => {
     expect(cmp.allSelected()).toBe(false);
   });
 
-  it('askBulk only opens the confirm dialog when something is selected', () => {
+  it('askBulkDelete only opens the confirmation with a selection under the cap', () => {
     const { cmp } = build({ expenses: page([EXPENSE], 1) });
-    cmp.askBulk('delete'); // nothing selected → no-op
+    cmp.askBulkDelete(); // nothing selected → no-op
     expect(cmp.bulkConfirm()).toBeNull();
     cmp.toggleSelect('e-1', true);
-    cmp.askBulk('delete');
+    cmp.askBulkDelete();
     expect(cmp.bulkConfirm()).toBe('delete');
   });
 
-  it('runBulk is a no-op while busy or without a pending action', () => {
+  it('runBulkDelete and runBulkExport are no-ops while busy or without a selection', () => {
     const { cmp } = build({ expenses: page([EXPENSE], 1) });
-    cmp.runBulk(); // bulkConfirm null → nothing
+    cmp.runBulkDelete(); // nothing selected
+    cmp.runBulkExport();
     cmp.toggleSelect('e-1', true);
-    cmp.bulkConfirm.set('delete');
     cmp.bulkBusy.set(true);
-    cmp.runBulk(); // busy → nothing (no DELETE below)
-    // Direct empty-selection guards inside runBulkDelete / runBulkExport.
-    cmp.bulkBusy.set(false);
-    cmp.selected.set(new Set());
-    cmp.runBulk();
-    cmp.bulkConfirm.set('export');
-    cmp.runBulk(); // ids empty → no export request
+    cmp.runBulkDelete(); // busy → no DELETE
+    cmp.runBulkExport(); // busy → no export
   });
 
-  it('runBulk delete removes the selected rows, refreshes and toasts', () => {
+  it('runBulkDelete removes the selected rows, refreshes and toasts', () => {
     const e2 = { ...EXPENSE, id: 'e-2' };
     const e3 = { ...EXPENSE, id: 'e-3' };
     const { cmp, http } = build({ expenses: page([EXPENSE, e2, e3], 3) });
     const { success } = toastSpies(cmp);
     cmp.toggleSelect('e-1', true);
     cmp.toggleSelect('e-2', true);
-    cmp.askBulk('delete');
-    cmp.runBulk();
+    cmp.askBulkDelete();
+    cmp.runBulkDelete();
     http
       .expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'DELETE')
       .flush(null);
@@ -1772,12 +1681,12 @@ describe('ExpensesComponent (batch/bulk)', () => {
     expect(cmp.selectedCount()).toBe(0);
   });
 
-  it('runBulk delete toasts an error and still refreshes on a failed delete', () => {
+  it('runBulkDelete toasts an error and still refreshes on a failed delete', () => {
     const { cmp, http } = build({ expenses: page([EXPENSE], 1) });
     const { error } = toastSpies(cmp);
     cmp.toggleSelect('e-1', true);
-    cmp.askBulk('delete');
-    cmp.runBulk();
+    cmp.askBulkDelete();
+    cmp.runBulkDelete();
     http
       .expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'DELETE')
       .error(new ProgressEvent('err'));
@@ -1787,32 +1696,28 @@ describe('ExpensesComponent (batch/bulk)', () => {
     expect(error).toHaveBeenCalledWith('Sammel-Löschung fehlgeschlagen.');
   });
 
-  it('runBulk export streams only the selected ids as xlsx', () => {
+  it('runBulkExport streams only the selected ids as xlsx', () => {
     const dl = stubDownload();
     const { cmp, http } = build({ expenses: page([EXPENSE], 1) });
     cmp.toggleSelect('e-1', true);
-    cmp.askBulk('export');
-    cmp.runBulk();
+    cmp.runBulkExport();
     expect(cmp.bulkBusy()).toBe(true);
     const req = http.expectOne((r) => r.url.endsWith('/expenses/export.xlsx'));
     expect(req.request.params.getAll('ids')).toEqual(['e-1']);
     expect(req.request.responseType).toBe('blob');
     req.flush(new Blob(['x']));
     expect(cmp.bulkBusy()).toBe(false);
-    expect(cmp.bulkConfirm()).toBeNull();
     expect(dl.create).toHaveBeenCalled();
     dl.restore();
   });
 
-  it('runBulk export clears busy and toasts on error', () => {
+  it('runBulkExport clears busy and toasts on error', () => {
     const { cmp, http } = build({ expenses: page([EXPENSE], 1) });
     const { error } = toastSpies(cmp);
     cmp.toggleSelect('e-1', true);
-    cmp.bulkConfirm.set('export');
-    cmp.runBulk();
+    cmp.runBulkExport();
     http.expectOne((r) => r.url.endsWith('/expenses/export.xlsx')).error(new ProgressEvent('err'));
     expect(cmp.bulkBusy()).toBe(false);
-    expect(cmp.bulkConfirm()).toBeNull();
     expect(error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
   });
 
@@ -1929,12 +1834,11 @@ describe('ExpensesComponent (batch/bulk)', () => {
     expect(nav).toHaveBeenLastCalledWith(
       [],
       expect.objectContaining({
-        queryParams: { id: null, budget: null, kind: null, q: null },
+        queryParams: { budget: null, kind: null, q: null, view: null },
         queryParamsHandling: 'merge',
         replaceUrl: true,
       }),
     );
-    cmp.expenseId.set('e-9');
     cmp.budgetId.set('b-1');
     cmp.kind.set('income');
     cmp.q.set('  flyer  ');
@@ -1942,7 +1846,7 @@ describe('ExpensesComponent (batch/bulk)', () => {
     expect(nav).toHaveBeenLastCalledWith(
       [],
       expect.objectContaining({
-        queryParams: { id: 'e-9', budget: 'b-1', kind: 'income', q: 'flyer' },
+        queryParams: { budget: 'b-1', kind: 'income', q: 'flyer', view: null },
       }),
     );
     nav.mockRestore();
@@ -1953,14 +1857,11 @@ describe('ExpensesComponent (batch/bulk)', () => {
     const { cmp } = build({ expenses: page([EXPENSE, e2], 2) });
     cmp.toggleSelectAll(true);
     expect(cmp.bulkDeleteBlocked()).toBe(true);
-    cmp.askBulk('delete'); // blocked → dialog stays closed
+    cmp.askBulkDelete(); // blocked → dialog stays closed
     expect(cmp.bulkConfirm()).toBeNull();
-    cmp.askBulk('export'); // non-destructive actions stay available
-    expect(cmp.bulkConfirm()).toBe('export');
-    cmp.bulkConfirm.set(null);
     cmp.toggleSelect('e-2', false); // partial selection → delete allowed again
     expect(cmp.bulkDeleteBlocked()).toBe(false);
-    cmp.askBulk('delete');
+    cmp.askBulkDelete();
     expect(cmp.bulkConfirm()).toBe('delete');
   });
 
@@ -1974,15 +1875,13 @@ describe('ExpensesComponent (batch/bulk)', () => {
 
     cmp.toggleSelect('e-5', true);
     expect(cmp.bulkDeleteOverMax()).toBe(true);
-    cmp.askBulk('delete');
+    expect(cmp.selectionLabel()).toBe('6 ausgewählt · Löschen: max. 5');
+    expect(cmp.bulkDeleteReason()).toContain('5');
+    cmp.askBulkDelete();
     expect(cmp.bulkConfirm()).toBeNull();
 
-    cmp.askBulk('export');
-    expect(cmp.bulkConfirm()).toBe('export');
-    cmp.bulkConfirm.set(null);
-
     cmp.toggleSelect('e-5', false);
-    cmp.askBulk('delete');
+    cmp.askBulkDelete();
     expect(cmp.bulkConfirm()).toBe('delete');
   });
 });
@@ -2045,16 +1944,165 @@ describe('ExpensesComponent (query-param adoption)', () => {
     expect(cmp.budgetId()).toBe('b-2');
   });
 
-  it('adopts the exact-booking id: hidden filter, counted as active + resettable', () => {
+  it('opens the booking of ?id= and loads it when it is not among the rows', () => {
     const { cmp, http } = buildWithQuery([['id', 'e-42']]);
-    expect(cmp.expenseId()).toBe('e-42');
-    // hidden filter still counts, so the filter-bar reset button can clear it
-    expect(cmp.activeFilterCount()).toBe(1);
-    cmp.resetFilters();
-    expect(cmp.expenseId()).toBe('');
-    const req = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET');
-    expect(req.request.params.has('id')).toBe(false);
-    req.flush(page([]));
+    expect(cmp.selectedId()).toBe('e-42');
+    // The id opens a row; it does not narrow the list.
+    expect(cmp.activeFilterCount()).toBe(0);
+    TestBed.tick();
+    const one = http.expectOne(
+      (r) => r.url.endsWith('/expenses') && r.method === 'GET' && r.params.get('id') === 'e-42',
+    );
+    expect(one.request.params.get('limit')).toBe('1');
+    one.flush(page([{ ...EXPENSE, id: 'e-42' }]));
+    expect(cmp.selectedExpense()?.id).toBe('e-42');
+    expect(cmp.detailView()).toBe('booking');
+    expect(cmp.detailOpen()).toBe(true);
+    TestBed.tick();
+    // The fiscal-year labels need the tree, which is empty here: no request.
+    http.expectNone((r) => r.url.includes('/fiscal-years'));
+  });
+
+  it('says that the booking of ?id= is not there', () => {
+    const { cmp, http } = buildWithQuery([['id', 'e-gone']]);
+    TestBed.tick();
+    http
+      .expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-gone')
+      .flush(page([]));
+    expect(cmp.selectedMissing()).toBe(true);
+    expect(cmp.detailView()).toBe('missing');
+  });
+
+  it('says that the booking of ?id= is not there when the request fails', () => {
+    const { cmp, http } = buildWithQuery([['id', 'e-err']]);
+    TestBed.tick();
+    http
+      .expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-err')
+      .error(new ProgressEvent('err'));
+    expect(cmp.selectedMissing()).toBe(true);
+  });
+
+  it('keeps the open booking when a refresh drops it from the filtered list', () => {
+    const { cmp, http } = buildWithQuery([['id', 'e-1']]);
+    lst(cmp).items.set([EXPENSE]);
+    TestBed.tick();
+    // The row is among the loaded rows: no request by id.
+    http.expectNone((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-1');
+    // A bulk "Umbuchen" moved the booking out of the cost-centre filter.
+    lst(cmp).refresh();
+    flushList(http, page([]));
+    TestBed.tick();
+    // The detail keeps the row as the list showed it until the booking loads by its id.
+    expect(cmp.detailView()).toBe('booking');
+    expect(cmp.selectedExpense()?.budgetId).toBe('b-1');
+    http
+      .expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-1')
+      .flush(page([{ ...EXPENSE, budgetId: 'b-9' }]));
+    expect(cmp.detailView()).toBe('booking');
+    expect(cmp.selectedExpense()?.budgetId).toBe('b-9');
+  });
+
+  it('keeps a loaded booking of a deep link up to date after an edit', () => {
+    const { cmp, http } = buildWithQuery([['id', 'e-42']]);
+    TestBed.tick();
+    http
+      .expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-42')
+      .flush(page([{ ...EXPENSE, id: 'e-42' }]));
+    cmp.openEdit(cmp.selectedExpense()!);
+    dlg(cmp).editDescription.set('Neu');
+    cmp.saveEdit(new Event('submit'));
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/e-42') && r.method === 'PATCH')
+      .flush({ ...EXPENSE, id: 'e-42', description: 'Neu' });
+    expect(cmp.selectedExpense()?.description).toBe('Neu');
+  });
+
+  it('drops the answer for a booking that is no longer open', () => {
+    const { cmp, http } = buildWithQuery([['id', 'e-42']]);
+    TestBed.tick();
+    const first = http.expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-42');
+    cmp.selectedId.set('e-43');
+    TestBed.tick();
+    const second = http.expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-43');
+    // The late answer of the first booking changes nothing.
+    first.flush(page([{ ...EXPENSE, id: 'e-42' }]));
+    expect(cmp.selectedMissing()).toBe(false);
+    // An empty answer marks the open booking as missing.
+    second.flush(page([]));
+    expect(cmp.selectedMissing()).toBe(true);
+    // A late error of a booking that is no longer open changes nothing either.
+    cmp.selectedId.set('e-44');
+    TestBed.tick();
+    const third = http.expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-44');
+    cmp.selectedId.set('e-45');
+    cmp.selectedMissing.set(false);
+    TestBed.tick();
+    third.error(new ProgressEvent('err'));
+    expect(cmp.selectedMissing()).toBe(false);
+    http.expectOne((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-45').flush(
+      page([{ ...EXPENSE, id: 'e-45' }]),
+    );
+    // A booking that is already loaded loads no second time.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (cmp as any).ensureSelected('e-45', false, []);
+    http.expectNone((r) => r.url.endsWith('/expenses') && r.params.get('id') === 'e-45');
+  });
+
+  it('drops linked records that arrive after another booking opened', () => {
+    const a = { ...EXPENSE, id: 'e-1', invoiceId: 'inv-a', applicationId: 'app-a' };
+    const b = { ...EXPENSE, id: 'e-2', invoiceId: null, applicationId: null };
+    const { cmp, http } = build({ expenses: page([a, b]) });
+    cmp.selectedId.set('e-1');
+    TestBed.tick();
+    const inv = http.expectOne((r) => r.url.endsWith('/invoices/inv-a'));
+    const app = http.expectOne((r) => r.url.endsWith('/applications/app-a'));
+    cmp.selectedId.set('e-2');
+    TestBed.tick();
+    inv.flush({ ...INVOICE, id: 'inv-a' });
+    app.flush({
+      id: 'app-a',
+      typeId: 't',
+      state: { id: 's', key: 'ok', label: { de: 'Bewilligt' }, color: '#2e7d32' },
+      data: {},
+      amount: '50.00',
+      version: 1,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    });
+    expect(cmp.linkedInvoice()).toBeNull();
+    expect(cmp.linkedApplication()).toBeNull();
+  });
+
+  it('closes an open form when the URL opens another booking or transfer', () => {
+    const { cmp } = buildWithQuery([]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const adopt = (q: Record<string, string>) => (cmp as any).applyQueryParams(convertToParamMap(q));
+    cmp.openEdit(EXPENSE);
+    expect(cmp.formMode()).toBe('edit');
+    adopt({ id: 'e-2' });
+    expect(cmp.formMode()).toBeNull();
+    // A form on the open row stays while the URL keeps that row.
+    cmp.openEdit(EXPENSE);
+    adopt({ id: 'e-2' });
+    expect(cmp.formMode()).toBe('edit');
+    adopt({ transfer: 't-1' });
+    expect(cmp.formMode()).toBeNull();
+  });
+
+  it('keeps a preselected invoice when the invoice list arrives after it', () => {
+    const { cmp, http } = buildWithQuery([]);
+    dlg(cmp).openCreate({ invoiceId: 'inv-paid' });
+    http
+      .expectOne((r) => r.url.endsWith('/invoices/inv-paid'))
+      .flush({ ...INVOICE, id: 'inv-paid', number: 'RE-OLD', status: 'paid' });
+    // A later refresh of the capped list does not hold the paid invoice.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dlg(cmp) as any).loadInvoices();
+    http
+      .expectOne((r) => r.url.endsWith('/invoices') && r.method === 'GET')
+      .flush({ items: [INVOICE], total: 1, limit: 200, offset: 0 });
+    expect(dlg(cmp).newInvoiceId()).toBe('inv-paid');
+    expect(dlg(cmp).invoiceOptions().map((o) => o.value)).toEqual(['inv-paid', 'inv-1']);
   });
 
   it('re-filters when the palette sends it here while it is already here', () => {
@@ -2083,19 +2131,31 @@ describe('ExpensesComponent (query-param adoption)', () => {
       .flush({ items: [], total: 0, limit: 200, offset: 0 });
     http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET').flush(page([]));
 
+    // Another booking opens: the list stays as it is.
     params.next(convertToParamMap({ id: 'e-9' }));
-    expect(cmp.expenseId()).toBe('e-9');
-    const again = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET');
-    expect(again.request.params.get('id')).toBe('e-9');
+    expect(cmp.selectedId()).toBe('e-9');
+    http.expectNone((r) => r.url.endsWith('/expenses') && !r.params.has('id'));
+
+    // Another filter reloads the list.
+    params.next(convertToParamMap({ id: 'e-9', budget: 'b-2' }));
+    const again = http.expectOne(
+      (r) => r.url.endsWith('/expenses') && r.method === 'GET' && !r.params.has('id'),
+    );
+    expect(again.request.params.get('budget')).toBe('b-2');
     again.flush(page([]));
 
-    // A parameter that goes away clears its filter. Every one of these four is written
-    // back into the URL, so absence means the reader took it away.
+    // A parameter that goes away clears its filter. Each of them is written back into
+    // the URL, so absence means the reader took it away.
     params.next(convertToParamMap({}));
-    expect(cmp.expenseId()).toBe('');
-    const cleared = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET');
-    expect(cleared.request.params.has('id')).toBe(false);
+    expect(cmp.selectedId()).toBe('');
+    expect(cmp.budgetId()).toBe('');
+    const cleared = http.expectOne(
+      (r) => r.url.endsWith('/expenses') && r.method === 'GET' && !r.params.has('id'),
+    );
+    expect(cleared.request.params.has('budget')).toBe(false);
     cleared.flush(page([]));
+    // The look-up of the booking from before is still open; answer it.
+    http.match((r) => r.params.get('id') === 'e-42').forEach((r) => r.flush(page([])));
   });
 });
 
@@ -2130,7 +2190,7 @@ describe('ExpensesListState.refresh', () => {
   it('a reload discards the stale response of an older filter state', () => {
     const { state, http } = buildState();
     state.reload(); // request A (old filter state)
-    state.expenseId.set('e-1');
+    state.kind.set('income');
     state.reload(); // request B (new filter state)
     const [reqA, reqB] = http.match((r) => r.url.endsWith('/expenses') && r.method === 'GET');
     // The filtered request B resolves first, then the stale request A arrives. Request
@@ -2177,7 +2237,7 @@ describe('ExpensesListState.refresh', () => {
   it('a stale fetch ERROR leaves the loading flags of the newer request alone', () => {
     const { state, http } = buildState();
     state.reload(); // request A, the old filter state
-    state.expenseId.set('e-1');
+    state.kind.set('income');
     state.reload(); // request B, the new filter state, so A is stale from here on
     const [reqA, reqB] = http.match((r) => r.url.endsWith('/expenses') && r.method === 'GET');
     // A fails late. Its error handler must return early on the epoch mismatch.
@@ -2275,8 +2335,8 @@ describe('ExpensesComponent — transfers tab', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = ctx.fixture.componentInstance as any;
     c.openTransferEdit(TRANSFER);
-    c.tEditAmount.set('75.00');
-    c.tEditDescription.set('  Korrigiert  ');
+    c.transfers.editAmount.set('75.00');
+    c.transfers.editDescription.set('  Korrigiert  ');
     c.saveTransferEdit(new Event('submit'));
 
     const patch = ctx.http.expectOne('/api/budget-transfers/tr-1');
@@ -2408,9 +2468,9 @@ describe('ExpensesComponent — transfers tab', () => {
     c.doDeleteTransfer();
 
     c.openTransferEdit(TRANSFER);
-    c.tEditDescription.set('   ');
+    c.transfers.editDescription.set('   ');
     c.saveTransferEdit(new Event('submit'));
-    c.tEditDescription.set('ok');
+    c.transfers.editDescription.set('ok');
     c.transferSaving.set(true);
     c.saveTransferEdit(new Event('submit'));
     c.closeTransferEdit();
@@ -2456,92 +2516,6 @@ describe('ExpensesComponent — transfers tab', () => {
     ctx.http.verify();
   });
 
-  it('outlines rows inside the real table while the first page loads', async () => {
-    // Two attempts got this wrong before the migration: first loose bars with no header,
-    // then a hand-rolled skeleton that had to be kept in step with the shared one by
-    // hand. The table is the shared one now, so there is one implementation to be right.
-    const view = await render(ExpensesComponent, {
-      providers: [
-        provideRouter([]),
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: USE_MOCK_API, useValue: false },
-        { provide: AuthService, useValue: fakeAuth(['budget.view', 'budget.book']) },
-      ],
-    });
-    view.fixture.detectChanges();
-
-    // The shared table now, so the selectors are its own. What matters is unchanged:
-    // the header survives and the rows are outlined INSIDE the table, not instead of it.
-    const table = view.container.querySelector('.dt__table');
-    expect(table).not.toBeNull();
-    expect(table?.querySelectorAll('thead th').length).toBeGreaterThan(0);
-    expect(table?.querySelectorAll('.dt__skeleton-row').length).toBeGreaterThan(0);
-
-    const http = view.fixture.debugElement.injector.get(HttpTestingController);
-    for (const req of http.match(() => true))
-      req.flush({ items: [], total: 0, limit: 50, offset: 0 });
-  });
-});
-
-describe('ExpensesComponent — shared table wiring', () => {
-  it('pins the actions column for a booker', async () => {
-    // Explicit width and `sticky: 'end'`. A self-sized sticky column grew to 246px and
-    // covered the amount beside it, which is the defect this migration inherits a fix
-    // for and must not reintroduce.
-    const { container, fixture } = await setup({
-      perms: ['budget.view', 'budget.book'],
-      page: page([EXPENSE]),
-    });
-    fixture.detectChanges();
-    expect(container.querySelector('tbody td.dt__cell--stickyEnd')).not.toBeNull();
-  });
-
-  it('has no actions column at all for a reader', async () => {
-    const { container, fixture } = await setup({
-      perms: ['budget.view'],
-      page: page([EXPENSE]),
-    });
-    fixture.detectChanges();
-    expect(container.querySelector('.dt__cell--stickyEnd')).toBeNull();
-  });
-
-  it('offers selection to a booker only', async () => {
-    const booker = await setup({
-      perms: ['budget.view', 'budget.book'],
-      page: page([EXPENSE]),
-    });
-    booker.fixture.detectChanges();
-    // In the BODY, not only the select-all in the header: without the pass below, these
-    // assertions ran against the skeleton rows and proved nothing about a real row.
-    expect(booker.container.querySelectorAll('tbody input[type=checkbox]').length).toBeGreaterThan(
-      0,
-    );
-  });
-
-  it('offers no selection to a reader', async () => {
-    const reader = await setup({ perms: ['budget.view'], page: page([EXPENSE]) });
-    reader.fixture.detectChanges();
-    expect(reader.container.querySelectorAll('input[type=checkbox]').length).toBe(0);
-  });
-
-  it('keeps the selection keyed by booking id, so a re-sort cannot move it', async () => {
-    const { container, fixture } = await setup({
-      perms: ['budget.view', 'budget.book'],
-      page: page([
-        { ...EXPENSE, id: 'e-1' },
-        { ...EXPENSE, id: 'e-2' },
-      ]),
-    });
-    fixture.detectChanges();
-    const boxes = container.querySelectorAll<HTMLInputElement>('tbody input[type=checkbox]');
-    boxes[1].click();
-    fixture.detectChanges();
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    expect(c.selected()).toEqual(new Set(['e-2']));
-  });
 });
 
 describe('ExpensesComponent (filters, generically)', () => {
@@ -2582,7 +2556,35 @@ describe('ExpensesComponent (filters, generically)', () => {
   });
 });
 
-describe('ExpensesComponent (redesign wiring)', () => {
+// --- list/detail (FE10c) ---------------------------------------------------
+
+/** A tree with figures for the fiscal year `fy-1`, so the detail shows its numbers. */
+const FIG_TREE: BudgetTreeNode[] = [
+  {
+    ...ROOT_TREE[0],
+    children: [
+      {
+        ...ROOT_TREE[0].children[0],
+        id: 'b-1',
+        color: '#2f7fc1',
+        byFiscalYear: [
+          {
+            fiscalYearId: 'fy-1',
+            allocated: '1000.00',
+            bound: '100.00',
+            expended: '300.00',
+            income: '0',
+            committed: '400.00',
+            requested: '0',
+            available: '600.00',
+          },
+        ],
+      },
+    ],
+  },
+];
+
+describe('ExpensesComponent (list/detail)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => {
     try {
@@ -2592,102 +2594,565 @@ describe('ExpensesComponent (redesign wiring)', () => {
     }
   });
 
-  const COLOURED: BudgetTreeNode[] = [
-    { ...ROOT_TREE[0], children: [{ ...ROOT_TREE[0].children[0], color: '#2f7fc1' }] },
-  ];
-
-  it('names the chosen cost centre and its colour for the chip, "all" without one', () => {
-    const { cmp, http } = build({ tree: COLOURED });
-    expect(cmp.costCentreName()).toBe('Alle Kostenstellen');
-    expect(cmp.costCentreColor()).toBeNull();
-    cmp.pickerOpen.set(true);
-    cmp.selectBudget('child-1');
-    flushList(http, page([]));
-    expect(cmp.costCentreName()).toBe('Öffentlichkeit');
-    expect(cmp.costCentreColor()).toBe('#2f7fc1');
-    // Picking closes the sheet of the narrower layouts.
-    expect(cmp.pickerOpen()).toBe(false);
-    // An unknown id falls back to "all".
-    cmp.budgetId.set('gone');
-    expect(cmp.costCentreName()).toBe('Alle Kostenstellen');
-    expect(cmp.costCentreColor()).toBeNull();
+  it('lists the bookings by month with kind, cost centre, date and the signed amount', async () => {
+    setViewport(WIDE);
+    const income = { ...EXPENSE, id: 'e-2', kind: 'income' as const, description: 'Pfand', paymentDate: '2026-04-02' };
+    const { container } = await setup({ page: page([EXPENSE, income]), tree: FIG_TREE });
+    expect(await screen.findByText('Druckkosten Flyer')).toBeInTheDocument();
+    const months = [...container.querySelectorAll('.exp__month')].map((h) => h.textContent?.trim());
+    expect(months).toEqual(['Mai 2026', 'April 2026']);
+    expect(screen.getByText(/−120,00/)).toBeInTheDocument();
+    expect(screen.getByText(/\+120,00/)).toBeInTheDocument();
+    expect(screen.getByText('28.05.')).toBeInTheDocument();
+    // A row is a link that opens the booking beside the list.
+    const link = screen.getByRole('link', { name: /Druckkosten Flyer/ });
+    expect(link.getAttribute('href')).toContain('id=e-1');
+    // Side by side, nothing open: the detail says so.
+    expect(screen.getByText('Keine Buchung geöffnet')).toBeInTheDocument();
+    expect(screen.getByText('2 von 2')).toBeInTheDocument();
   });
 
-  it('builds the phone menu from the rights and runs its items', () => {
-    const { cmp, http } = build();
-    expect(cmp.phoneMenu()[0].items.map((i) => i.id)).toEqual(['transfer', 'export']);
-    cmp.onPhoneMenu({ id: 'transfer', label: '' });
-    expect(cmp.transferOpen()).toBe(true);
-    cmp.onPhoneMenu({ id: 'export', label: '' });
-    // The export runs; a failed one only ends the busy state.
-    http.expectOne((r) => r.url.endsWith('/expenses/export.xlsx')).error(new ProgressEvent('err'));
-    expect(cmp.exporting()).toBe(false);
-    // An unknown item does nothing.
-    cmp.onPhoneMenu({ id: 'other', label: '' });
-    http.verify();
-  });
-
-  it('leaves the phone menu empty for a reader', () => {
-    const { cmp } = build({ perms: ['budget.view'] });
-    expect(cmp.phoneMenu()[0].items).toEqual([]);
-  });
-
-  it('names the selection and, past the cap, the delete limit', () => {
-    const items = Array.from({ length: 7 }, (_, i) => ({ ...EXPENSE, id: `e-${i}` }));
-    const { cmp } = build({ expenses: page(items) });
-    cmp.toggleSelect('e-0', true);
-    cmp.toggleSelect('e-1', true);
-    expect(cmp.selectionLabel()).toBe('2 ausgewählt');
-    expect(cmp.bulkDeleteReason()).toBeNull();
-    cmp.toggleSelectAll(true);
-    expect(cmp.selectionLabel()).toContain('7 ausgewählt');
-    expect(cmp.selectionLabel()).toContain('max. 5');
-    expect(cmp.bulkDeleteReason()).toContain('5');
-  });
-
-  it('blocks the bulk delete of an "all" selection and says why', () => {
-    const items = [
-      { ...EXPENSE, id: 'e-1' },
-      { ...EXPENSE, id: 'e-2' },
-    ];
-    const { cmp } = build({ expenses: page(items) });
-    cmp.toggleSelectAll(true);
-    expect(cmp.bulkDeleteReason()).toContain('Alle auswählen');
-  });
-
-  it('maps the table sort and selection back onto the state', () => {
-    const { cmp, http } = build();
-    expect(cmp.sortState()).toEqual({ key: 'paymentDate', direction: 'desc' });
-    cmp.onSortChange({ key: 'amount', direction: 'desc' });
-    flushList(http, page([]));
+  it('shows one group without a heading while it sorts by amount', () => {
+    const { cmp, http } = build({ expenses: page([EXPENSE]) });
+    cmp.onHeaderMenu({ id: 'amount:asc', label: '' });
+    flushList(http, page([EXPENSE]));
     expect(cmp.sortField()).toBe('amount');
-    cmp.onSortChange({ key: 'amount', direction: 'asc' });
+    expect(cmp.sortOrder()).toBe('asc');
+    expect(cmp.groups()).toEqual([{ key: 'all', label: '', items: [EXPENSE] }]);
+    // Sorted by invoice date or by the record date, the months follow that date.
+    cmp.onHeaderMenu({ id: 'invoiceDate:desc', label: '' });
+    flushList(http, page([EXPENSE]));
+    expect(cmp.groups()[0].label).toBe('Mai 2026');
+    cmp.onHeaderMenu({ id: 'createdAt:desc', label: '' });
+    flushList(http, page([{ ...EXPENSE, paymentDate: null }]));
+    expect(cmp.groups()[0].key).toBe('2026-05');
+    // The checked sort order shows in the menu.
+    const checked = cmp.sortSections()[0].items.filter((i) => i.checked).map((i) => i.id);
+    expect(checked).toEqual(['createdAt:desc']);
+  });
+
+  it('shows the empty list with a reset only while a filter is set', async () => {
+    setViewport(WIDE);
+    const { fixture } = await setup();
+    expect(await screen.findByText('Keine Buchungen gefunden.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Filter zurücksetzen' })).toBeNull();
+    // An empty list leaves a neutral sheet beside it.
+    expect(fixture.nativeElement.querySelector('.exp__none--skeleton')).not.toBeNull();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.kind.set('income');
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    expect(c.kind()).toBe('');
+    const http = TestBed.inject(HttpTestingController);
+    http.match((r) => r.url.endsWith('/expenses')).forEach((r) => r.flush(page([])));
+  });
+
+  it('opens the cost-centre tree as a sheet and filters by the picked node', async () => {
+    const { fixture, http } = await setup({ page: page([EXPENSE]), tree: FIG_TREE });
+    const chip = await screen.findByRole('button', { name: /^Kostenstelle: Kostenstelle/ });
+    await userEvent.click(chip);
+    expect(chip.getAttribute('aria-expanded')).toBe('true');
+    await userEvent.click(screen.getByRole('button', { name: /Öffentlichkeit/ }));
+    const req = http.expectOne((r) => r.url.endsWith('/expenses') && r.params.get('budget') === 'b-1');
+    req.flush(page([EXPENSE]));
+    fixture.detectChanges();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    expect(c.pickerOpen()).toBe(false);
+    expect(c.costCentreName()).toBe('Öffentlichkeit');
+    expect(c.costCentreColor()).toBe('#2f7fc1');
+  });
+
+  it('runs the kind, period and amount chips', () => {
+    const { cmp, http } = build();
+    cmp.setKind('expense');
+    expect(flushParams(http).get('kind')).toBe('expense');
+    expect(cmp.kindChipLabel()).toBe('Ausgabe');
+    cmp.setKind('nonsense');
+    flushParams(http);
+    expect(cmp.kindChipLabel()).toBe('Art');
+    cmp.onDateRange({ from: '2026-01-01', to: '2026-06-30' });
+    const dates = flushParams(http);
+    expect(dates.get('createdFrom')).toBe('2026-01-01');
+    expect(dates.get('createdTo')).toBe('2026-06-30');
+    cmp.onAmountRange({ from: '10', to: '' });
+    const amounts = flushParams(http);
+    expect(amounts.get('amountMin')).toBe('10');
+    expect(amounts.has('amountMax')).toBe(false);
+    expect(cmp.activeFilterCount()).toBe(3);
+  });
+
+  it('filters the transfers with the same chips while they show', () => {
+    const { cmp, http } = build();
+    cmp.setTab('transfers');
+    http.expectOne((r) => r.url.endsWith('/budget-transfers')).flush(transferPage([]));
+    cmp.onSearch('fest');
+    http.expectOne((r) => r.url.endsWith('/budget-transfers')).flush(transferPage([]));
+    cmp.onDateRange({ from: '2026-01-01', to: '' });
     flushList(http, page([]));
-    expect(cmp.sortState()).toEqual({ key: 'amount', direction: 'asc' });
-    cmp.onSelectionChange(new Set(['x']));
-    expect(cmp.selected()).toEqual(new Set(['x']));
+    http.expectOne((r) => r.url.endsWith('/budget-transfers')).flush(transferPage([]));
+    cmp.onAmountRange({ from: '1', to: '2' });
+    flushList(http, page([]));
+    http.expectOne((r) => r.url.endsWith('/budget-transfers')).flush(transferPage([]));
+    cmp.selectBudget('b-1');
+    flushList(http, page([]));
+    http.expectOne((r) => r.url.endsWith('/budget-transfers')).flush(transferPage([]));
+    cmp.resetFilters();
+    flushList(http, page([]));
+    http.expectOne((r) => r.url.endsWith('/budget-transfers')).flush(transferPage([]));
+    // The debounced search of the bookings fires later; answer it.
+    jest.useFakeTimers();
+    jest.useRealTimers();
+    http.match((r) => r.url.endsWith('/expenses')).forEach((r) => r.flush(page([])));
   });
 
-  it('links a cost centre to the Budget page at its top budget and year', () => {
-    const { cmp } = build({ tree: ROOT_TREE });
-    expect(cmp.budgetLink({ ...EXPENSE, budgetId: 'child-1' })).toEqual({
-      budget: 'top-1',
-      ks: 'child-1',
-      fy: 'fy-1',
-    });
-  });
-
-  it('picks the full column set only on a wide or a phone viewport', () => {
-    setViewport(FULL);
-    expect(build().cmp.columnSet()).toBe('full');
+  it('builds the header menu from the rights, the view and the viewport', () => {
+    const { cmp } = build();
+    expect(cmp.headerMenu().flatMap((s) => s.items.map((i) => i.id))).toEqual(['transfer', 'select']);
     TestBed.resetTestingModule();
     setViewport(PHONE);
-    expect(build().cmp.columnSet()).toBe('full');
-    TestBed.resetTestingModule();
-    setViewport('max-width: 999.98px');
-    expect(build().cmp.columnSet()).toBe('tight');
+    const phone = build();
+    const ids = phone.cmp.headerMenu().flatMap((s) => s.items.map((i) => i.id));
+    expect(ids).toContain('transfer');
+    expect(ids).toContain('paymentDate:desc');
+    expect(ids).toContain('export');
     TestBed.resetTestingModule();
     setViewport();
-    expect(build().cmp.columnSet()).toBe('compact');
+    const reader = build({ perms: ['budget.view'] });
+    expect(reader.cmp.headerMenu()).toEqual([]);
+  });
+
+  it('runs the items of the header menu', () => {
+    const { cmp, http } = build();
+    cmp.onHeaderMenu({ id: 'transfer', label: '' });
+    expect(cmp.transferOpen()).toBe(true);
+    expect(cmp.formMode()).toBe('transfer-create');
+    expect(cmp.formTitle()).toBe('Übertrag buchen');
+    cmp.onHeaderMenu({ id: 'select', label: '' });
+    expect(cmp.selecting()).toBe(true);
+    cmp.onHeaderMenu({ id: 'export', label: '' });
+    http.expectOne((r) => r.url.endsWith('/expenses/export.xlsx')).error(new ProgressEvent('err'));
+    // An unknown item does nothing.
+    cmp.onHeaderMenu({ id: 'other', label: '' });
+  });
+
+  it('names each form for the sheet of a phone', () => {
+    const { cmp } = build({ expenses: page([EXPENSE]) });
+    expect(cmp.formTitle()).toBe('');
+    cmp.openCreate();
+    expect(cmp.formTitle()).toBe('Buchung hinzufügen');
+    cmp.openEdit(EXPENSE);
+    expect(cmp.createOpen()).toBe(false);
+    expect(cmp.formTitle()).toBe('Buchung bearbeiten');
+    cmp.openTransferEdit(TRANSFER);
+    expect(cmp.editing()).toBeNull();
+    expect(cmp.formMode()).toBe('transfer-edit');
+    expect(cmp.formTitle()).toBe('Übertrag bearbeiten');
+    expect(cmp.detailView()).toBe('form');
+    expect(cmp.detailOpen()).toBe(true);
+    // "Zur Liste" with a form open closes the form.
+    cmp.closeDetail();
+    expect(cmp.formMode()).toBeNull();
+  });
+
+  it('opens and closes a row through the URL', () => {
+    const { cmp } = build();
+    const router = TestBed.inject(Router);
+    const nav = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+    cmp.openBooking('e-7');
+    expect(nav).toHaveBeenLastCalledWith(
+      [],
+      expect.objectContaining({ queryParams: { id: 'e-7', transfer: null } }),
+    );
+    cmp.openTransferRow('tr-1');
+    expect(nav).toHaveBeenLastCalledWith(
+      [],
+      expect.objectContaining({ queryParams: { transfer: 'tr-1', id: null } }),
+    );
+    cmp.closeDetail();
+    expect(nav).toHaveBeenLastCalledWith(
+      [],
+      expect.objectContaining({ queryParams: { id: null, transfer: null } }),
+    );
+    nav.mockRestore();
+  });
+
+  it('opens a new booking after the create', () => {
+    const { cmp, http } = build({ tree: ROOT_TREE });
+    const router = TestBed.inject(Router);
+    const nav = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+    cmp.openCreate();
+    dlg(cmp).newDescription.set('Kaffee');
+    dlg(cmp).newAmount.set('5');
+    dlg(cmp).newBudgetId.set('child-1');
+    dlg(cmp).newFiscalYearId.set('fy-1');
+    cmp.create(new Event('submit'));
+    http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'POST').flush({ ...EXPENSE, id: 'e-new' });
+    http.expectOne((r) => r.url.endsWith('/invoices')).flush({ items: [], total: 0, limit: 200, offset: 0 });
+    flushList(http, page([]));
+    expect(nav).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { id: 'e-new', transfer: null } }));
+    nav.mockRestore();
+  });
+
+  it('closes the detail of a deleted booking and of a deleted transfer', () => {
+    const { cmp, http } = build({ expenses: page([EXPENSE]) });
+    const router = TestBed.inject(Router);
+    const nav = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+    cmp.selectedId.set('e-1');
+    cmp.openEdit(EXPENSE);
+    cmp.askDelete(EXPENSE);
+    cmp.doDelete();
+    http.expectOne((r) => r.url.endsWith('/budget-expenses/e-1')).flush(null);
+    expect(cmp.editing()).toBeNull();
+    expect(nav).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { id: null, transfer: null } }));
+    nav.mockClear();
+    // A sub-booking leaves the open parent alone.
+    cmp.askDelete({ ...EXPENSE, id: 'sub-9', parentExpenseId: 'e-1' });
+    cmp.doDelete();
+    http.expectOne((r) => r.url.endsWith('/budget-expenses/sub-9')).flush(null);
+    http.expectOne((r) => r.url.endsWith('/sub-bookings')).flush([]);
+    flushList(http, page([EXPENSE]));
+    expect(nav).not.toHaveBeenCalled();
+
+    cmp.selectedTransferId.set('tr-1');
+    cmp.openTransferEdit(TRANSFER);
+    cmp.askDeleteTransfer(TRANSFER);
+    cmp.doDeleteTransfer();
+    http.expectOne((r) => r.url.endsWith('/budget-transfers/tr-1')).flush(null);
+    flushList(http, page([EXPENSE]));
+    expect(cmp.editingTransfer()).toBeNull();
+    expect(nav).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { id: null, transfer: null } }));
+    // Another transfer leaves the open one alone.
+    nav.mockClear();
+    cmp.askDeleteTransfer({ ...TRANSFER, transferId: 'tr-2' });
+    cmp.doDeleteTransfer();
+    http.expectOne((r) => r.url.endsWith('/budget-transfers/tr-2')).flush(null);
+    flushList(http, page([EXPENSE]));
+    expect(nav).not.toHaveBeenCalled();
+    nav.mockRestore();
+  });
+
+  it('loads the invoice, the application, the sub-bookings and the year of the open booking', () => {
+    const parent = { ...EXPENSE, budgetId: 'child-1', invoiceId: 'inv-9', applicationId: 'app-1', childCount: 2 };
+    const { cmp, http } = build({ tree: ROOT_TREE, expenses: page([parent]) });
+    cmp.selectedId.set('e-1');
+    TestBed.tick();
+    http.expectOne((r) => r.url.endsWith('/invoices/inv-9')).flush({ ...INVOICE, id: 'inv-9' });
+    http.expectOne((r) => r.url.endsWith('/applications/app-1')).flush({
+      id: 'app-1',
+      typeId: 't',
+      state: { id: 's', key: 'ok', label: { de: 'Bewilligt' }, color: '#2e7d32' },
+      data: {},
+      amount: '50.00',
+      version: 1,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    });
+    http.expectOne((r) => r.url.endsWith('/budget-expenses/e-1/sub-bookings')).flush([SUB]);
+    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([{ ...FY_ACTIVE, id: 'fy-1' }]);
+    expect(cmp.linkedInvoice()?.id).toBe('inv-9');
+    expect(cmp.linkedApplication()?.id).toBe('app-1');
+    expect(cmp.fyLabel('fy-1')).toBe('2026');
+    expect(cmp.fyLabel('fy-x')).toBeNull();
+    // The year labels load once per top cost centre.
+    cmp.selectedId.set('');
+    TestBed.tick();
+    cmp.selectedId.set('e-1');
+    TestBed.tick();
+    http.expectNone((r) => r.url.includes('/fiscal-years'));
+  });
+
+  it('takes a cached invoice and keeps going when a linked record fails', () => {
+    const linked = { ...EXPENSE, invoiceId: 'inv-1', applicationId: 'app-x' };
+    const { cmp, http } = build({ tree: ROOT_TREE, invoices: [INVOICE], expenses: page([linked]) });
+    cmp.selectedId.set('e-1');
+    TestBed.tick();
+    expect(cmp.linkedInvoice()).toEqual(INVOICE);
+    http.expectOne((r) => r.url.endsWith('/applications/app-x')).flush(null, { status: 403, statusText: 'x' });
+    expect(cmp.linkedApplication()).toBeNull();
+    // An uncached invoice that fails to load leaves the card without its data.
+    TestBed.resetTestingModule();
+    const other = build({ expenses: page([{ ...EXPENSE, invoiceId: 'inv-gone' }]) });
+    other.cmp.selectedId.set('e-1');
+    TestBed.tick();
+    other.http.expectOne((r) => r.url.endsWith('/invoices/inv-gone')).error(new ProgressEvent('err'));
+    expect(other.cmp.linkedInvoice()).toBeNull();
+  });
+
+  it('retries the year labels after a failed load', () => {
+    const { cmp, http } = build({ tree: ROOT_TREE, expenses: page([{ ...EXPENSE, budgetId: 'child-1' }]) });
+    cmp.selectedId.set('e-1');
+    TestBed.tick();
+    http.expectOne((r) => r.url.endsWith('/fiscal-years')).error(new ProgressEvent('err'));
+    cmp.selectedId.set('');
+    TestBed.tick();
+    cmp.selectedId.set('e-1');
+    TestBed.tick();
+    http.expectOne((r) => r.url.endsWith('/fiscal-years')).flush([]);
+  });
+
+  it('opens the form of a new booking from the invoices page and cleans the URL', () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: routeStub([['new', 'booking'], ['invoice', 'inv-1']]) },
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: AuthService, useValue: fakeAuth(['budget.view', 'budget.book']) },
+      ],
+    });
+    const router = TestBed.inject(Router);
+    const nav = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+    const http = TestBed.inject(HttpTestingController);
+    const cmp = TestBed.runInInjectionContext(() => new ExpensesComponent());
+    http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
+    http.expectOne((r) => r.url.endsWith('/invoices') && !r.url.includes('inv-1')).flush({
+      items: [],
+      total: 0,
+      limit: 200,
+      offset: 0,
+    });
+    flushList(http, page([]));
+    expect(cmp.createOpen()).toBe(true);
+    // The invoice is not in the cache: it loads, then fills the form.
+    http.expectOne((r) => r.url.endsWith('/invoices/inv-1')).flush(INVOICE);
+    expect(dlg(cmp).newInvoiceId()).toBe('inv-1');
+    expect(dlg(cmp).newCorrespondent()).toBe('Acme GmbH');
+    expect(nav).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({ queryParams: { new: null, invoice: null }, replaceUrl: true }),
+    );
+    nav.mockRestore();
+  });
+
+  it('ignores the create link for a reader', () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: routeStub([['new', 'booking']]) },
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: AuthService, useValue: fakeAuth(['budget.view']) },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const cmp = TestBed.runInInjectionContext(() => new ExpensesComponent());
+    http.expectOne((r) => r.url.endsWith('/budgets')).flush([]);
+    http.expectOne((r) => r.url.endsWith('/invoices')).flush({ items: [], total: 0, limit: 200, offset: 0 });
+    flushList(http, page([]));
+    expect(cmp.createOpen()).toBe(false);
+  });
+
+  it('opens the transfers from ?view=transfers with the open transfer', () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: routeStub([['view', 'transfers'], ['transfer', 'tr-1']]) },
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: AuthService, useValue: fakeAuth(['budget.view', 'budget.book']) },
+      ],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const cmp = TestBed.runInInjectionContext(() => new ExpensesComponent());
+    http.expectOne((r) => r.url.endsWith('/budgets')).flush(ROOT_TREE);
+    http.expectOne((r) => r.url.endsWith('/invoices')).flush({ items: [], total: 0, limit: 200, offset: 0 });
+    flushList(http, page([]));
+    http.expectOne((r) => r.url.endsWith('/budget-transfers')).flush(transferPage([{ ...TRANSFER, fromBudgetId: 'child-1' }]));
+    expect(cmp.tab()).toBe('transfers');
+    expect(cmp.selectedTransfer()?.transferId).toBe('tr-1');
+    expect(cmp.detailView()).toBe('transfer');
+    expect(cmp.detailOpen()).toBe(true);
+    expect(cmp.transferGroups()[0].label).toBe('Mai 2026');
+    TestBed.tick();
+    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([]);
+    // A transfer that is not loaded leaves the detail empty.
+    cmp.selectedTransferId.set('tr-9');
+    expect(cmp.selectedTransfer()).toBeNull();
+    expect(cmp.detailView()).toBe('none');
+  });
+
+  it('builds the row menus from the rights and runs them', () => {
+    const { cmp, http } = build({ expenses: page([EXPENSE]) });
+    const withInvoice = { ...EXPENSE, invoiceId: 'inv-1' };
+    expect(cmp.rowMenu(withInvoice).flatMap((s) => s.items.map((i) => i.id))).toEqual([
+      'edit',
+      'sub',
+      'invoice',
+      'delete',
+    ]);
+    const router = TestBed.inject(Router);
+    const nav = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+    cmp.onRowMenu({ id: 'invoice', label: '' }, withInvoice);
+    expect(nav).toHaveBeenCalledWith(['/invoices'], { queryParams: { id: 'inv-1' } });
+    cmp.onRowMenu({ id: 'invoice', label: '' }, EXPENSE); // no invoice: nothing
+    cmp.onRowMenu({ id: 'edit', label: '' }, EXPENSE);
+    expect(cmp.editing()).toBe(EXPENSE);
+    cmp.onRowMenu({ id: 'sub', label: '' }, EXPENSE);
+    expect(cmp.subParent()).toBe(EXPENSE);
+    cmp.onRowMenu({ id: 'delete', label: '' }, EXPENSE);
+    expect(cmp.confirmDelete()).toBe(EXPENSE);
+    cmp.onRowMenu({ id: 'other', label: '' }, EXPENSE);
+    expect(cmp.rowMenuLabel(EXPENSE)).toBe('Aktionen für „Druckkosten Flyer“');
+    nav.mockRestore();
+
+    cmp.onTransferMenu({ id: 'edit', label: '' }, TRANSFER);
+    expect(cmp.editingTransfer()).toBe(TRANSFER);
+    cmp.onTransferMenu({ id: 'delete', label: '' }, TRANSFER);
+    expect(cmp.confirmDeleteTransfer()).toBe(TRANSFER);
+    cmp.onTransferMenu({ id: 'other', label: '' }, TRANSFER);
+    expect(cmp.transferMenu().length).toBe(2);
+    http.verify();
+
+    TestBed.resetTestingModule();
+    const reader = build({ perms: ['budget.view'] });
+    expect(reader.cmp.rowMenu(EXPENSE)).toEqual([]);
+    expect(reader.cmp.rowMenu(withInvoice).flatMap((s) => s.items.map((i) => i.id))).toEqual(['invoice']);
+  });
+
+  it('selects rows in the selection mode and leaves it again', () => {
+    const e2 = { ...EXPENSE, id: 'e-2' };
+    const { cmp } = build({ expenses: page([EXPENSE, e2]) });
+    cmp.onRowActivate(EXPENSE); // not selecting: the link opens the row
+    expect(cmp.selectedCount()).toBe(0);
+    cmp.startSelecting();
+    cmp.onRowActivate(EXPENSE);
+    expect(cmp.isSelected('e-1')).toBe(true);
+    expect(cmp.selectedRows()).toEqual([EXPENSE]);
+    cmp.onRowActivate(EXPENSE);
+    expect(cmp.isSelected('e-1')).toBe(false);
+    cmp.toggleSelect('e-2', true);
+    cmp.openBulkReassign();
+    expect(cmp.bulkReassignOpen()).toBe(true);
+    // A view change ends the selection.
+    cmp.setTab('bookings');
+    expect(cmp.selecting()).toBe(false);
+    expect(cmp.selectedCount()).toBe(0);
+    expect(cmp.bulkReassignOpen()).toBe(false);
+    // A reader cannot select.
+    TestBed.resetTestingModule();
+    const reader = build({ perms: ['budget.view'] });
+    reader.cmp.startSelecting();
+    expect(reader.cmp.selecting()).toBe(false);
+  });
+
+  it('shows the bulk panel beside the list and the bulk bar one pane at a time', async () => {
+    setViewport(WIDE);
+    const e2 = { ...EXPENSE, id: 'e-2', description: 'Plakate' };
+    const { fixture, container } = await setup({
+      perms: ['budget.view', 'budget.book', 'budget.export'],
+      page: page([EXPENSE, e2]),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.startSelecting();
+    fixture.detectChanges();
+    const boxes = container.querySelectorAll<HTMLInputElement>('app-list-item input[type=checkbox]');
+    expect(boxes.length).toBe(2);
+    boxes[0].click();
+    fixture.detectChanges();
+    expect(c.detailView()).toBe('bulk');
+    expect(screen.getByRole('heading', { name: '1 Buchungen ausgewählt' })).toBeInTheDocument();
+    // The select-all box of the bar selects every row.
+    const all = screen.getByRole('checkbox', { name: 'Alle wählen' });
+    await userEvent.click(all);
+    expect(c.selectedCount()).toBe(2);
+    await userEvent.click(screen.getByRole('button', { name: 'Alle wählen' }));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Auswahl beenden' })[0]);
+    expect(c.selecting()).toBe(false);
+  });
+
+  it('shows the bulk actions as icons in the bar one pane at a time', async () => {
+    const { fixture } = await setup({
+      perms: ['budget.view', 'budget.book', 'budget.export'],
+      page: page([EXPENSE]),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.startSelecting();
+    c.toggleSelect('e-1', true);
+    fixture.detectChanges();
+    expect(c.detailView()).toBe('none');
+    await userEvent.click(screen.getByRole('button', { name: 'Umbuchen' }));
+    expect(c.bulkReassignOpen()).toBe(true);
+    expect(screen.getByRole('button', { name: 'Auswahl exportieren' })).toBeInTheDocument();
+  });
+
+  it('turns the title row into the bar of the bulk actions on a phone', async () => {
+    setViewport(PHONE);
+    const { fixture } = await setup({ page: page([EXPENSE]) });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.startSelecting();
+    c.toggleSelect('e-1', true);
+    fixture.detectChanges();
+    expect(screen.getByRole('heading', { name: '1 ausgewählt' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Löschen' }));
+    expect(c.bulkConfirm()).toBe('delete');
+  });
+
+  it('shows the open booking, the open transfer and a missing booking in the detail', async () => {
+    setViewport(WIDE);
+    const { fixture, http } = await setup({ page: page([{ ...EXPENSE, budgetId: 'b-1', fiscalYearId: 'fy-1' }]), tree: FIG_TREE });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.selectedId.set('e-1');
+    fixture.detectChanges();
+    http.match((r) => r.url.includes('/fiscal-years')).forEach((r) => r.flush([{ ...FY_ACTIVE, id: 'fy-1' }]));
+    fixture.detectChanges();
+    expect(screen.getByRole('heading', { name: 'Druckkosten Flyer' })).toBeInTheDocument();
+    expect(screen.getByText('Buchung · HHJ 2026')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Buchung bearbeiten' }));
+    expect(c.editing()?.id).toBe('e-1');
+    // The form replaces the detail.
+    expect(screen.getByRole('heading', { name: 'Buchung bearbeiten' })).toBeInTheDocument();
+    c.closeDetail();
+
+    c.selectedId.set('e-gone');
+    c.selectedMissing.set(true);
+    fixture.detectChanges();
+    expect(screen.getByText('Buchung nicht gefunden')).toBeInTheDocument();
+    http.match((r) => r.params.get('id') === 'e-gone').forEach((r) => r.flush(page([])));
+  });
+
+  it('opens the form of a phone as a bottom sheet', async () => {
+    setViewport(PHONE);
+    const { fixture } = await setup({ page: page([EXPENSE]) });
+    await userEvent.click(screen.getByRole('button', { name: 'Buchung' }));
+    fixture.detectChanges();
+    const sheet = screen.getByRole('dialog', { name: 'Buchung hinzufügen' });
+    expect(sheet.classList.contains('ss--bottom')).toBe(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    expect(c.detailView()).toBe('none');
+    await userEvent.click(within(sheet).getAllByRole('button', { name: 'Schließen' })[0]);
+    expect(c.createOpen()).toBe(false);
+  });
+
+  it('marks the page as a pane page side by side and clears the frame flag on destroy', async () => {
+    setViewport(WIDE);
+    const { fixture } = await setup();
+    expect(fixture.nativeElement.classList.contains('pane-page')).toBe(true);
+    fixture.destroy();
+  });
+
+  it('formats days, signed amounts and cost centres', () => {
+    const { cmp } = build({ tree: FIG_TREE });
+    expect(cmp.day('2026-09-28')).toBe('28.09.');
+    expect(cmp.day(null)).toBe('');
+    expect(cmp.signed({ ...EXPENSE, kind: 'income' }).replace(/\s/g, ' ')).toBe('+120,00 €');
+    expect(cmp.costCentre('b-1', null).name).toBe('Öffentlichkeit');
+    expect(cmp.costCentre('b-x', 'VS-1').name).toBe('VS-1');
   });
 });
+
+/** Answer the next GET /expenses with an empty page and return its params. */
+function flushParams(http: HttpTestingController) {
+  const req = http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET');
+  req.flush(page([]));
+  return req.request.params;
+}

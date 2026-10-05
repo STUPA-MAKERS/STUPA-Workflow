@@ -31,6 +31,8 @@ export { ListItemComponent } from './list-item/list-item.component';
 export { NoteComponent } from './note/note.component';
 export type { NoteKind } from './note/note.component';
 export { PageHeaderComponent } from './page-header/page-header.component';
+export { RangeChipComponent } from './range-chip/range-chip.component';
+export type { RangeKind, RangeValue } from './range-chip/range-chip.component';
 export { RowMenuComponent } from './row-menu/row-menu.component';
 export type { RowMenuItem, RowMenuSection } from './row-menu/row-menu.component';
 export { SearchPillComponent } from './search-pill/search-pill.component';

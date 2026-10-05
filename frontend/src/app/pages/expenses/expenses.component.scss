@@ -5,284 +5,480 @@
   flex-direction: column;
   min-width: 0;
 }
-/* The wide layout does not scroll as a page: the pane and the list each scroll inside
-   themselves. The host is then a pane page (`.pane-page` in styles.scss): it takes the
-   free height of the main column of the shell and gives it to the grid. */
+/* One pane at a time the host takes at least the free height of the shell main. Side by
+   side it is a pane page (`.pane-page`), which sets its own flex. */
+:host(:not(.pane-page)) {
+  flex: 1 0 auto;
+}
 
 .exp {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
   min-width: 0;
 }
-.exp--wide {
+.exp:not(.exp--split) {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
+.exp:not(.exp--split) > app-list-detail {
+  flex: 1 0 auto;
+}
+.exp--split {
   flex: 1 1 0;
   min-height: 0;
 }
-
-/* ------------------------------------------------------------------ title row
-   Wide: title, then search, filter and export, then the two actions, on one line.
-   Narrower: title and actions on the first line; the tools and the views below it in a
-   sticky bar. */
-.exp__head {
-  display: grid;
-  grid-template-areas: 'title actions';
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-4) var(--space-3);
+.exp > app-list-detail {
+  --ld-list-width: 440px;
 }
-.exp--wide .exp__head {
-  grid-template-areas: 'title tools actions';
-  grid-template-columns: auto minmax(0, 1fr) auto;
+
+/* ------------------------------------------------------------------ list pane */
+.exp__pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.exp--split .exp__pane {
+  height: 100%;
+  min-height: 0;
+}
+
+.exp__head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--control-height);
+  padding-inline: var(--space-4) 0;
 }
 .exp__title {
-  grid-area: title;
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
   font-size: var(--fs-d2);
   line-height: var(--lh-d2);
   font-weight: var(--fw-semibold);
   letter-spacing: var(--tracking-tight);
 }
-.exp__tools {
-  display: flex;
-  grid-area: tools;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
+/* Phone: the title row as the bar of the bulk actions. */
+.exp__head--select {
+  padding-inline: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-selected);
+  color: var(--color-on-selected);
 }
-.exp--wide .exp__tools {
-  justify-content: flex-end;
-}
-.exp__search {
+.exp__selTitle {
   flex: 1 1 auto;
   min-width: 0;
-}
-.exp--wide .exp__search {
-  flex: 0 1 16.25rem;
-}
-/* The sticky bar below the wide layout: the tools, then the chip and the views. */
-.exp__sticky {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-.exp__actions {
-  display: flex;
-  grid-area: actions;
-  align-items: center;
-  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
 }
 .exp__btn {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  white-space: nowrap;
+  gap: 6px;
 }
-/* Below the wide layout the export is an icon button, as on the Schmal board. */
-.exp:not(.exp--wide) .exp__btnText {
-  display: none;
+/* The bulk delete icon is red, like every destructive action. The inner button of an
+   icon button sets its own grey (`.btn--text.btn--icon`), so the colour goes on the inner
+   button, with a selector that is more specific than that of the kit. A disabled button
+   keeps a muted red (the opacity and grayscale of the kit). */
+.exp__danger ::ng-deep .btn.btn--icon,
+.exp__danger ::ng-deep .btn.btn--icon:hover:not(:disabled) {
+  color: var(--color-danger);
 }
-.exp__kinds {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
-@include bp.phone {
-  .exp__selText {
-    display: none;
-  }
-  .exp__title {
-    font-size: var(--fs-h1);
-    line-height: var(--lh-h1);
-  }
+.exp__danger ::ng-deep .btn.btn--icon:hover:not(:disabled) {
+  background: var(--color-danger-subtle);
 }
 
-/* ------------------------------------------------------------------ body */
-.exp__body {
+.exp__filters {
   display: flex;
+  flex: none;
   flex-direction: column;
+  gap: var(--space-3);
   min-width: 0;
 }
-.exp--wide .exp__body {
-  display: grid;
-  flex: 1 1 0;
-  grid-template-columns: 13.5rem minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
-  gap: var(--space-5);
-  min-height: 0;
-}
-
-/* The cost-centre pane: a caption, then the tree, which scrolls by itself. */
-.exp__pane {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-  min-height: 0;
-}
-.exp__paneTitle {
-  margin: 0;
-  padding: var(--space-2) var(--space-3) 0;
-  color: var(--color-text-subtle);
-}
-/* The tree scrolls here. The block padding keeps the first and the last row clear of
-   the edge, and the top padding puts "Alle" on the line of the table header. */
-.exp__tree {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  padding-block: var(--space-5);
-  scroll-padding-block: var(--space-6);
-}
-
-.exp__main {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  min-width: 0;
-  min-height: 0;
-}
-/* Chip (narrower layouts), the two views and the count. */
-.exp__bar {
+.exp__chips {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2) var(--space-3);
+  gap: var(--space-2);
   min-width: 0;
 }
-.exp__count {
-  margin-inline-start: auto;
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
-  white-space: nowrap;
+.exp__chip {
+  max-width: 100%;
 }
-
-/* The cost-centre chip: as wide as its label, the selection colour while one is set. */
-.exp__ccChip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  max-width: 16rem;
-  height: var(--control-height-sm);
-  padding: 0 var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  font-size: 0.84375rem;
-  font-weight: var(--fw-medium);
-  cursor: pointer;
-}
-.exp__ccChip:hover {
-  background: var(--color-surface-2);
-}
-.exp__ccChip--on,
-.exp__ccChip--on:hover {
-  border-color: transparent;
-  background: var(--color-selected);
-  color: var(--color-on-selected);
-}
-.exp__ccChip:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+/* The whole chip is the button: the icons never take the click. */
+.exp__chip app-icon,
+.exp__chip .exp__swatch {
+  pointer-events: none;
 }
 .exp__swatch {
+  display: inline-block;
   flex: none;
-  width: 0.5rem;
-  height: 0.5rem;
+  width: 9px;
+  height: 9px;
   border-radius: 2px;
 }
 
-/* The list. On the wide layout it scrolls inside its box; a fade shows at an end only
-   while more rows are past it. */
-.exp__scroll {
+.exp__bar,
+.exp__selbar {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-height);
   min-width: 0;
 }
-.exp--wide .exp__scroll {
+/* Equal segments that share the width of the control. */
+.exp__tabs {
+  flex: none;
+}
+.exp__count {
+  margin-inline-start: auto;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+.exp__selbar {
+  gap: var(--space-2);
+  padding: 0 var(--space-2) 0 var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.exp__selText {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-md);
+}
+.exp__check {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+/* The row check box sits above the stretched title, so it takes its own click. */
+.exp__check--row {
+  position: relative;
+  z-index: 1;
+}
+
+/* ------------------------------------------------------------------ rows */
+.exp__scroll {
+  --exp-fade: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* The FAB covers the end of the list: room to scroll the last row above it. */
+  padding-bottom: calc(56px + var(--space-6));
+}
+.exp--split .exp__scroll {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
+  scroll-padding-block: var(--exp-fade);
 }
-.exp--wide .exp__scroll.is-fade-start,
-.exp__tree.is-fade-start {
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--space-6));
-  mask-image: linear-gradient(to bottom, transparent, #000 var(--space-6));
+.exp--split .exp__scroll > * {
+  flex: none;
 }
-.exp--wide .exp__scroll.is-fade-end,
-.exp__tree.is-fade-end {
-  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--space-6));
-  mask-image: linear-gradient(to top, transparent, #000 var(--space-6));
+/* An end fades only while more rows lie past it (`appScrollFade` sets the classes). */
+.exp__scroll.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--exp-fade));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--exp-fade));
 }
-.exp--wide .exp__scroll.is-fade-start.is-fade-end,
-.exp__tree.is-fade-start.is-fade-end {
+.exp__scroll.is-fade-end {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--exp-fade));
+  mask-image: linear-gradient(to top, transparent, #000 var(--exp-fade));
+}
+.exp__scroll.is-fade-start.is-fade-end {
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent,
-    #000 var(--space-6),
-    #000 calc(100% - var(--space-6)),
+    #000 var(--exp-fade),
+    #000 calc(100% - var(--exp-fade)),
     transparent
   );
   mask-image: linear-gradient(
     to bottom,
     transparent,
-    #000 var(--space-6),
-    #000 calc(100% - var(--space-6)),
+    #000 var(--exp-fade),
+    #000 calc(100% - var(--exp-fade)),
     transparent
   );
 }
-/* Room at the end of the list, so the floating selection bar never hides the last row. */
-.exp__scroll--selbar {
-  padding-bottom: 5rem;
+
+.exp__group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.exp__month {
+  padding: 18px var(--space-4) 6px;
+}
+.exp__group:first-child .exp__month {
+  padding-top: var(--space-2);
+}
+.exp__rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.exp__row--checked {
+  --li-bg: var(--color-selected);
+  --li-hover: var(--color-selected);
+  --li-color: var(--color-on-selected);
+}
+.exp__dot {
+  margin-inline: 6px;
+  color: var(--color-text-subtle);
+}
+/* The sub line is a flex row: only the cost-centre name shortens, with an ellipsis. The
+   kind, the dots, the date, the arrow and the receipt icon keep their width, so a long
+   name never pushes them out of the row. */
+.exp__sub {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.exp__sub > * {
+  flex: none;
+}
+.exp__sub > .exp__cc {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.exp__cc .exp__swatch {
+  margin-inline-end: 6px;
+  vertical-align: 0;
+}
+.exp__arrow {
+  display: inline-flex;
+  margin-inline: 6px;
+  vertical-align: middle;
+  color: var(--color-text-subtle);
+}
+.exp__receipt {
+  display: inline-flex;
+  margin-inline-start: 6px;
+  vertical-align: middle;
+}
+.exp__trail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-end: calc(-1 * var(--space-2));
+}
+.exp__amount {
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+.exp__amount--in {
+  color: var(--color-accent-text);
+}
+
+/* With a pointer, the row menu shows on hover, on focus and while it is open. It keeps
+   its place, so nothing shifts. One pane at a time a chevron sits in that place while
+   the menu is hidden. Without hover (touch), the menu always shows. */
+.exp__menuSlot {
+  position: relative;
+  display: inline-flex;
+}
+.exp__chev {
+  display: none;
+}
+@media (hover: hover) {
+  .exp__menu,
+  .exp__chev {
+    transition: opacity var(--motion-fast) var(--ease-standard);
+  }
+  .exp__menu {
+    opacity: 0;
+  }
+  .exp__chev {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted);
+    pointer-events: none;
+  }
+  .exp__row:hover .exp__menu,
+  .exp__row:focus-within .exp__menu,
+  .exp__menu:has([aria-expanded='true']) {
+    opacity: 1;
+  }
+  .exp__row:hover .exp__chev,
+  .exp__row:focus-within .exp__chev,
+  .exp__menuSlot:has([aria-expanded='true']) .exp__chev {
+    opacity: 0;
+  }
+}
+
+.exp__sentinel {
+  height: 1px;
 }
 .exp__more {
   display: flex;
   justify-content: center;
-}
-.exp__sentinel {
-  height: 1px;
+  margin-top: var(--space-3);
 }
 
-/* ------------------------------------------------------------------ dialogs */
-.exp__inv {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: var(--space-2) var(--space-5);
-  margin: 0 0 var(--space-4);
-}
-.exp__inv > div {
-  display: contents;
-}
-.exp__inv dt {
-  color: var(--color-text-muted);
-}
-.exp__inv dd {
-  margin: 0;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.exp__invGross {
+/* "Buchung hinzufügen": at the end of the list pane side by side, else fixed at the end
+   of the screen. */
+.exp__fab {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
+  z-index: var(--z-sticky);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 56px;
+  padding: 0 var(--space-5) 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font: inherit;
+  font-size: var(--fs-md);
   font-weight: var(--fw-semibold);
+  box-shadow: var(--shadow-elevated);
+  cursor: pointer;
 }
-.exp__confirm {
-  margin: 0;
+.exp__fab:hover {
+  filter: brightness(1.08);
 }
-.exp__form {
+.exp__fab:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.exp--split .exp__fab {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-4);
+}
+
+/* ------------------------------------------------------------------ detail pane */
+.exp__detail {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+/* The empty sheet: the same surface the open booking sits on, so nothing jumps. */
+.exp__none {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+.exp--split .exp__none {
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.exp__none--skeleton {
   gap: var(--space-4);
+  padding: 76px var(--space-6) var(--space-6);
+}
+.exp__ghost {
+  display: block;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.exp__ghost--title {
+  width: 45%;
+  height: 30px;
+}
+.exp__ghost--meta {
+  width: 30%;
+  height: 12px;
+}
+.exp__ghost--rule {
+  height: 1px;
+  margin-block: var(--space-2);
+  background: var(--color-border);
+}
+.exp__ghostCols {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: var(--space-5);
+}
+.exp__ghost--card {
+  height: 120px;
+}
+
+.exp__confirm {
   margin: 0;
 }
 .exp__footer {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-3);
+  gap: var(--space-2);
+}
+
+@include bp.phone {
+  /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
+  .exp__chips {
+    --exp-chip-fade: var(--space-6);
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .exp__chips::-webkit-scrollbar {
+    display: none;
+  }
+  .exp__chips.is-fade-start {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--exp-chip-fade));
+    mask-image: linear-gradient(to right, transparent, #000 var(--exp-chip-fade));
+  }
+  .exp__chips.is-fade-end {
+    -webkit-mask-image: linear-gradient(to left, transparent, #000 var(--exp-chip-fade));
+    mask-image: linear-gradient(to left, transparent, #000 var(--exp-chip-fade));
+  }
+  .exp__chips.is-fade-start.is-fade-end {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--exp-chip-fade),
+      #000 calc(100% - var(--exp-chip-fade)),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--exp-chip-fade),
+      #000 calc(100% - var(--exp-chip-fade)),
+      transparent
+    );
+  }
+  /* A phone row gives the sub line more width, so a cost-centre name stays readable:
+     less padding, a smaller gap to the amount and narrower dots. */
+  .exp__row {
+    --li-pad-x: var(--space-3);
+    --li-gap: var(--space-2);
+  }
+  .exp__dot {
+    margin-inline: var(--space-1);
+  }
+  .exp__arrow {
+    margin-inline: var(--space-1);
+  }
+  .exp__head {
+    padding-inline-start: var(--space-1);
+  }
+  .exp__month {
+    padding-inline: var(--space-1);
+  }
+  .exp__scroll {
+    padding-bottom: var(--space-6);
+  }
 }

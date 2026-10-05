@@ -3,14 +3,16 @@
   min-width: 0;
 }
 
+/* `--li-pad-x` and `--li-gap` let a narrow list give more width to the text. */
 .li {
   position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--li-gap, var(--space-4));
   min-height: 4rem;
-  padding: 10px var(--space-4);
+  padding: 10px var(--li-pad-x, var(--space-4));
   border-radius: var(--li-radius, var(--radius-lg));
+  background: var(--li-bg, transparent);
   color: var(--li-color, var(--color-text));
   transition: background-color var(--motion-fast) var(--ease-standard);
 }

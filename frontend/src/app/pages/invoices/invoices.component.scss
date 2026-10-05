@@ -1,218 +1,319 @@
 @use 'breakpoints' as bp;
 
 :host {
-  display: block;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
 }
+/* One pane at a time the host takes at least the free height of the shell main. Side by
+   side it is a pane page (`.pane-page`), which sets its own flex. */
+:host(:not(.pane-page)) {
+  flex: 1 0 auto;
+}
+
 .inv {
+  min-width: 0;
+}
+.inv:not(.inv--split) {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
+.inv:not(.inv--split) > app-list-detail {
+  flex: 1 0 auto;
+}
+.inv--split {
+  flex: 1 1 0;
+  min-height: 0;
+}
+.inv > app-list-detail {
+  --ld-list-width: 440px;
+}
+
+/* ------------------------------------------------------------------ list pane */
+.inv__pane {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-3);
   min-width: 0;
-  min-height: 60vh;
+}
+.inv--split .inv__pane {
+  height: 100%;
+  min-height: 0;
 }
 
-/* ------------------------------------------------------------------ title row
-   Wide: title and lead line, then search and filter, then the two actions. Below the
-   wide layout the tools take a line of their own: a sticky bar below the title row. */
 .inv__head {
-  display: grid;
-  grid-template-areas: 'titles actions';
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  flex: none;
   align-items: center;
-  gap: var(--space-4) var(--space-3);
-}
-@include bp.wide {
-  .inv__head {
-    grid-template-areas: 'titles tools actions';
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-  .inv__tools {
-    justify-content: flex-end;
-  }
-  .inv__search {
-    flex: 0 1 17.5rem;
-  }
-}
-.inv__titles {
-  grid-area: titles;
-  min-width: 0;
+  gap: var(--space-1);
+  min-height: var(--control-height);
+  padding-inline: var(--space-4) 0;
 }
 .inv__title {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
   font-size: var(--fs-d2);
   line-height: var(--lh-d2);
   font-weight: var(--fw-semibold);
   letter-spacing: var(--tracking-tight);
 }
-.inv__subtitle {
-  margin: var(--space-1) 0 0;
-  color: var(--color-text-muted);
-}
-.inv__tools {
+
+.inv__filters {
   display: flex;
-  grid-area: tools;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.inv__chips {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
 }
-.inv__search {
+
+.inv__count {
+  margin-inline-start: auto;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+.inv__selText {
   flex: 1 1 auto;
   min-width: 0;
-}
-.inv__actions {
-  display: flex;
-  grid-area: actions;
-  align-items: center;
-  gap: var(--space-2);
-}
-.inv__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  white-space: nowrap;
-}
-.inv__statuses {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-@include bp.phone {
-  .inv__title {
-    font-size: var(--fs-h1);
-    line-height: var(--lh-h1);
-  }
-  /* The lead line is a second sentence beside the title; a phone has no room for it. */
-  .inv__subtitle {
-    display: none;
-  }
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-md);
 }
 
-/* ------------------------------------------------------------------ table */
-/* Tighter cells than the kit default, as on the board: up to eleven columns share the
-   width. The kit owns the cell, so the rule has to reach into it. */
-@include bp.not-phone {
-  .inv__table ::ng-deep .dt .dt__scroll .dt__table th,
-  .inv__table ::ng-deep .dt .dt__scroll .dt__table td {
-    padding-inline: var(--space-2);
-  }
-}
-.inv__date,
-.inv__money,
-.inv__number {
-  white-space: nowrap;
-  font-size: 0.8125rem; /* 13px */
-}
-.inv__muted {
-  color: var(--color-text-muted);
-}
-/* A dropped column as a second line of a kept cell: the due date under the issue
-   date, the tax under gross. */
-.inv__grossCell {
+/* ------------------------------------------------------------------ rows */
+.inv__scroll {
+  --inv-fade: var(--space-6);
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-}
-.inv__sub {
-  display: block;
-  font-size: 0.75rem; /* 12px */
-  line-height: 1.3;
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-/* The supplier takes the width the fixed columns leave and ends in an ellipsis. Its
-   7rem are the floor: supplier and number identify an invoice, so on a narrow screen
-   the table scrolls sideways before the name is cut to a few letters. */
-.inv__supplier {
-  display: block;
-  width: 7rem;
-  min-width: 100%;
-}
-/* Buchungen: the first booking (swatch, cost centre, amount) and "+n" for the rest. */
-.inv__booking {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 0;
-  min-width: 100%;
-}
-.inv__swatch {
-  flex: none;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 2px;
-}
-.inv__bookingName {
   min-width: 0;
+  /* The FAB covers the end of the list: room to scroll the last row above it. */
+  padding-bottom: calc(56px + var(--space-6));
 }
-.inv__bookingAmount,
-.inv__bookingMore {
+.inv--split .inv__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--inv-fade);
+}
+.inv--split .inv__scroll > * {
   flex: none;
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
-  white-space: nowrap;
 }
-/* The narrow column: swatch and name on the first line, amount and "+n" below the name. */
-.inv__booking--stacked {
-  display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
-  gap: 0 var(--space-2);
-  align-items: center;
-  line-height: 1.3;
+/* An end fades only while more rows lie past it (`appScrollFade` sets the classes). */
+.inv__scroll.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--inv-fade));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--inv-fade));
 }
-.inv__booking--stacked .inv__swatch {
-  grid-area: 1 / 1;
+.inv__scroll.is-fade-end {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--inv-fade));
+  mask-image: linear-gradient(to top, transparent, #000 var(--inv-fade));
 }
-.inv__booking--stacked .inv__bookingName {
-  grid-area: 1 / 2 / auto / -1;
-}
-.inv__booking--stacked .inv__bookingAmount {
-  grid-area: 2 / 2;
-  font-size: 0.75rem;
-}
-.inv__booking--stacked .inv__bookingMore {
-  grid-area: 2 / 3;
-  justify-self: start;
-  font-size: 0.75rem;
+.inv__scroll.is-fade-start.is-fade-end {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--inv-fade),
+    #000 calc(100% - var(--inv-fade)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--inv-fade),
+    #000 calc(100% - var(--inv-fade)),
+    transparent
+  );
 }
 
-/* "5 von 48" beside "Mehr laden", centred under the table. */
-.inv__foot {
+.inv__group {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  min-width: 0;
+}
+.inv__month {
+  padding: 18px var(--space-4) 6px;
+}
+.inv__group:first-child .inv__month {
+  padding-top: var(--space-2);
+}
+.inv__rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.inv__dot {
+  margin-inline: 6px;
+  color: var(--color-text-subtle);
+}
+/* The sub line is a flex row: only the invoice number shortens, with an ellipsis. The
+   status and the date (the due date of an open invoice) keep their width, so a long
+   number never pushes the date out of the row. */
+.inv__sub {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
+  min-width: 0;
 }
-.inv__count {
+.inv__sub > * {
+  flex: none;
+}
+.inv__sub > .inv__no {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inv__trail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-end: calc(-1 * var(--space-2));
+}
+.inv__amount {
   font-size: 0.8125rem;
-  color: var(--color-text-muted);
+  white-space: nowrap;
 }
+
+/* With a pointer, the row menu shows on hover, on focus and while it is open. It keeps
+   its place, so nothing shifts. One pane at a time a chevron sits in that place while
+   the menu is hidden. Without hover (touch), the menu always shows. */
+.inv__menuSlot {
+  position: relative;
+  display: inline-flex;
+}
+.inv__chev {
+  display: none;
+}
+@media (hover: hover) {
+  .inv__menu,
+  .inv__chev {
+    transition: opacity var(--motion-fast) var(--ease-standard);
+  }
+  .inv__menu {
+    opacity: 0;
+  }
+  .inv__chev {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted);
+    pointer-events: none;
+  }
+  .inv__row:hover .inv__menu,
+  .inv__row:focus-within .inv__menu,
+  .inv__menu:has([aria-expanded='true']) {
+    opacity: 1;
+  }
+  .inv__row:hover .inv__chev,
+  .inv__row:focus-within .inv__chev,
+  .inv__menuSlot:has([aria-expanded='true']) .inv__chev {
+    opacity: 0;
+  }
+}
+
 .inv__sentinel {
   height: 1px;
 }
-
-/* A PDF dragged over the page: the whole page is the drop target. */
-.inv__dropOverlay {
-  position: absolute;
-  inset: 0;
-  z-index: 20;
+.inv__more {
   display: flex;
-  align-items: center;
   justify-content: center;
-  border: 2px dashed var(--color-accent);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg));
-  pointer-events: none;
+  margin-top: var(--space-3);
 }
-.inv__dropInner {
-  display: flex;
-  flex-direction: column;
+
+/* "Rechnung hinzufügen": at the end of the list pane side by side, else fixed at the end
+   of the screen. */
+.inv__fab {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
+  z-index: var(--z-sticky);
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  color: var(--color-accent-text);
+  gap: var(--space-3);
+  height: 56px;
+  padding: 0 var(--space-5) 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font: inherit;
+  font-size: var(--fs-md);
   font-weight: var(--fw-semibold);
+  box-shadow: var(--shadow-elevated);
+  cursor: pointer;
+}
+.inv__fab:hover {
+  filter: brightness(1.08);
+}
+.inv__fab:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.inv--split .inv__fab {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-4);
+}
+
+/* ------------------------------------------------------------------ detail pane */
+.inv__detail {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+/* The empty sheet: the same surface the open booking sits on, so nothing jumps. */
+.inv__none {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+.inv--split .inv__none {
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.inv__none--skeleton {
+  gap: var(--space-4);
+  padding: 76px var(--space-6) var(--space-6);
+}
+.inv__ghost {
+  display: block;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.inv__ghost--title {
+  width: 45%;
+  height: 30px;
+}
+.inv__ghost--meta {
+  width: 30%;
+  height: 12px;
+}
+.inv__ghost--rule {
+  height: 1px;
+  margin-block: var(--space-2);
+  background: var(--color-border);
+}
+.inv__ghostCols {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: var(--space-5);
+}
+.inv__ghost--card {
+  height: 120px;
 }
 
 .inv__confirm {
@@ -221,14 +322,124 @@
 .inv__footer {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
-/* A card has the room for the whole booking line. */
+.inv {
+  position: relative;
+}
+/* The segments: equal parts that fill the width of the column. */
+.inv__seg {
+  display: block;
+  width: 100%;
+}
+.inv__zone {
+  flex: none;
+}
+
+/* Board Fin-Rechnung-Ablegen: a PDF dragged over the page makes the whole page the drop
+   target. */
+.inv__dropOverlay {
+  position: fixed;
+  inset: var(--space-3) var(--space-3) var(--space-3) calc(var(--rail-width, 0px) + var(--space-3));
+  z-index: var(--z-dialog);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--color-accent);
+  border-radius: var(--radius-2xl);
+  background: color-mix(in srgb, var(--color-bg) 82%, transparent);
+  pointer-events: none;
+}
+.inv__dropInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+.inv__dropIcon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.inv__dropTitle {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+}
+.inv__dropHint {
+  color: var(--color-text-muted);
+}
+
 @include bp.phone {
-  .inv__booking,
-  .inv__supplier {
-    width: auto;
-    min-width: 0;
+  /* A phone row gives the sub line more width, so the number and the due date fit: less
+     padding, a smaller gap to the amount and narrower dots. */
+  .inv__row {
+    --li-pad-x: var(--space-3);
+    --li-gap: var(--space-2);
   }
+  .inv__dot {
+    margin-inline: var(--space-1);
+  }
+  /* Four segments with counts in a phone column: less padding, and a segment never gets
+     narrower than its label and count, so no label gets an ellipsis. */
+  .inv__seg ::ng-deep .seg {
+    grid-auto-columns: minmax(max-content, 1fr);
+  }
+  .inv__seg ::ng-deep .seg__opt {
+    padding-inline: var(--space-2);
+  }
+  /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
+  .inv__chips {
+    --inv-chip-fade: var(--space-6);
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .inv__chips::-webkit-scrollbar {
+    display: none;
+  }
+  .inv__chips.is-fade-start {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--inv-chip-fade));
+    mask-image: linear-gradient(to right, transparent, #000 var(--inv-chip-fade));
+  }
+  .inv__chips.is-fade-end {
+    -webkit-mask-image: linear-gradient(to left, transparent, #000 var(--inv-chip-fade));
+    mask-image: linear-gradient(to left, transparent, #000 var(--inv-chip-fade));
+  }
+  .inv__chips.is-fade-start.is-fade-end {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--inv-chip-fade),
+      #000 calc(100% - var(--inv-chip-fade)),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--inv-chip-fade),
+      #000 calc(100% - var(--inv-chip-fade)),
+      transparent
+    );
+  }
+  .inv__head {
+    padding-inline-start: var(--space-1);
+  }
+  .inv__month {
+    padding-inline: var(--space-1);
+  }
+  .inv__scroll {
+    padding-bottom: var(--space-6);
+  }
+}
+
+.inv__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }

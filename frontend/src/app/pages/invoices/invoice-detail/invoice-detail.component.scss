@@ -1,0 +1,89 @@
+@use '../../budget/finance-sheet';
+
+/* The receipt: the file to open. */
+.id__file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  border: 0;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.id__file:hover {
+  background: var(--color-surface-3);
+}
+.id__file:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.id__fileIcon,
+.id__fileOpen {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.id__fileBody {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.id__fileName {
+  font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
+}
+.id__fileMeta {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.id__full {
+  grid-column: 1 / -1;
+}
+
+/* Net, VAT and gross: label left, amount right; gross in bold below a line. */
+.id__amounts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.id__amounts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.id__amounts dd {
+  margin: 0;
+}
+.id__amounts dt {
+  font-size: var(--fs-md);
+  color: var(--color-text-muted);
+}
+.id__gross {
+  padding-top: var(--space-2);
+  border-top: var(--border-width) solid var(--color-border);
+}
+.id__gross dt {
+  color: var(--color-text);
+}
+.id__gross dd {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold, 700);
+}
+
+/* The order on a phone (board Fin-Tel-Rechnung): Beleg, Buchungen, Beträge, Angaben.
+   Side by side the two columns keep the desktop order. */
+.id__secFile {
+  --fd-phone-order: 1;
+}
+.id__secBookings {
+  --fd-phone-order: 2;
+}
+.id__secAmounts {
+  --fd-phone-order: 3;
+}
+.id__secData {
+  --fd-phone-order: 4;
+}

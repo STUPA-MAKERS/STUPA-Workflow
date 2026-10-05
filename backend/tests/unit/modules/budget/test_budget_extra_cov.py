@@ -246,10 +246,16 @@ class _FakeService:
         return AssignBudgetOut(applicationId=application_id, budgetId=_BID, fiscalYearId=_FYID)
 
     async def list_invoices_paged(self, **kwargs: Any) -> Any:
-        from app.shared.paging import Page
+        from app.modules.budget.tree_schemas import InvoicePage, InvoiceSegmentCounts
 
         self.calls["list_invoices_paged"] = kwargs
-        return Page(items=[_invoice_out()], total=1, limit=kwargs.get("limit", 50), offset=0)
+        return InvoicePage(
+            items=[_invoice_out()],
+            total=1,
+            limit=kwargs.get("limit", 50),
+            offset=0,
+            counts=InvoiceSegmentCounts(all=1, inbox=1, booked=0, paid=0),
+        )
 
     async def create_invoice(self, payload: Any, *, actor: str) -> InvoiceOut:
         self.calls["create_invoice"] = (payload, actor)

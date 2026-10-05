@@ -4,13 +4,13 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ToastService } from '@stupa-makers/ui-kit';
 import * as downloadUtil from '@shared/download.util';
 import { InvoicesComponent } from './invoices.component';
 import type {
-  BudgetTreeNode,
   Invoice,
   InvoiceBooking,
   InvoiceFileResult,
@@ -143,48 +143,30 @@ describe('InvoicesComponent', () => {
     expect(c.hasMore()).toBe(true);
   });
 
-  it('asks for the one invoice the URL names', async () => {
-    // Where a global-search hit lands. A bare `/invoices` would open the whole list and
-    // leave the reader to find the invoice they had already named.
-    localStorage.setItem('ap.locale', 'de');
-    const auth = new FakeAuth();
-    const view = await render(InvoicesComponent, {
-      providers: [
-        provideRouter([]),
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: USE_MOCK_API, useValue: false },
-        { provide: AuthService, useValue: auth },
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            snapshot: { queryParamMap: convertToParamMap({ id: 'i-42' }) },
-            queryParamMap: of(convertToParamMap({ id: 'i-42' })),
-          },
-        },
-      ],
-    });
-    const http = TestBed.inject(HttpTestingController);
-    // One request, and it already carries the filter. A second, unfiltered one could
-    // resolve last and overwrite the row the reader came for.
-    const req = http.expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'GET');
-    expect(req.request.params.get('id')).toBe('i-42');
-    req.flush(page([inv({ id: 'i-42' })], 1));
-    view.fixture.detectChanges();
-
-    const c = view.fixture.componentInstance as unknown as {
-      activeFilterCount(): number;
-      invoiceId(): string;
-    };
-    // It counts, so the filter badge says the list is narrowed and the reset clears it.
-    expect(c.invoiceId()).toBe('i-42');
-    expect(c.activeFilterCount()).toBe(1);
-    http.verify();
+  it('opens the invoice the URL names and loads it when the list does not hold it', async () => {
+    // Where a global-search hit lands: the list stays whole, the invoice opens beside it.
+    const { c, http, fixture } = await setup({ queryParams: { id: 'i-42' } });
+    expect(c.selectedId()).toBe('i-42');
+    expect(c.activeFilterCount()).toBe(0);
+    fixture.detectChanges();
+    http.expectOne((r) => r.url.endsWith('/api/invoices/i-42')).flush(inv({ id: 'i-42' }));
+    fixture.detectChanges();
+    expect(c.selectedInvoice()?.id).toBe('i-42');
+    expect(c.detailView()).toBe('invoice');
+    expect(c.detailOpen()).toBe(true);
   });
 
-  it('re-filters when the palette sends it here while it is already here', async () => {
-    // Same route, new query string: the router keeps this component, so reading the
-    // snapshot once would leave the list showing the invoice the reader came from.
+  it('says that the invoice of the URL is not there', async () => {
+    const { c, http, fixture } = await setup({ queryParams: { id: 'gone' } });
+    fixture.detectChanges();
+    http
+      .expectOne((r) => r.url.endsWith('/api/invoices/gone'))
+      .flush(null, { status: 404, statusText: 'x' });
+    expect(c.selectedMissing()).toBe(true);
+    expect(c.detailView()).toBe('missing');
+  });
+
+  it('opens another invoice when the palette sends it here, without a new list', async () => {
     localStorage.setItem('ap.locale', 'de');
     const params = new BehaviorSubject(convertToParamMap({ id: 'i-1' }));
     const view = await render(InvoicesComponent, {
@@ -201,103 +183,56 @@ describe('InvoicesComponent', () => {
       ],
     });
     const http = TestBed.inject(HttpTestingController);
-    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([inv({ id: 'i-1' })], 1));
+    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([inv({ id: 'i-1' }), inv({ id: 'i-9' })], 2));
     view.fixture.detectChanges();
-
     params.next(convertToParamMap({ id: 'i-9' }));
+    view.fixture.detectChanges();
+    http.expectNone((r) => r.url.endsWith('/api/invoices'));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((view.fixture.componentInstance as any).selectedInvoice()?.id).toBe('i-9');
+    // A filter of the URL reloads the list; one that goes away clears.
+    params.next(convertToParamMap({ id: 'i-9', seg: 'paid', q: 'acme' }));
     const again = http.expectOne((r) => r.url.endsWith('/api/invoices'));
-    expect(again.request.params.get('id')).toBe('i-9');
-    again.flush(page([inv({ id: 'i-9' })], 1));
+    expect(again.request.params.get('status')).toBe('paid');
+    expect(again.request.params.get('q')).toBe('acme');
+    again.flush(page([inv({ id: 'i-9', status: 'paid' })], 1));
+    params.next(convertToParamMap({}));
+    const cleared = http.expectOne((r) => r.url.endsWith('/api/invoices'));
+    expect(cleared.request.params.has('status')).toBe(false);
+    cleared.flush(page([], 0));
     http.verify();
   });
 
-  it('writes a cleared filter back, so the palette can send you to it again', async () => {
-    // The bug this holds: the page read `?id=` but never wrote it. A reset cleared the
-    // list but left `?id=i-1` in the address bar, so picking that same invoice in the
-    // palette navigated to the URL the browser was ALREADY on. The router drops a
-    // same-URL navigation, `queryParamMap` never fired, and nothing happened at all.
-    localStorage.setItem('ap.locale', 'de');
-    const params = new BehaviorSubject(convertToParamMap({ id: 'i-1' }));
-    const view = await render(InvoicesComponent, {
-      providers: [
-        provideRouter([]),
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: USE_MOCK_API, useValue: false },
-        { provide: AuthService, useValue: new FakeAuth() },
-        {
-          provide: ActivatedRoute,
-          useValue: { snapshot: { queryParamMap: params.value }, queryParamMap: params },
-        },
-      ],
-    });
-    const http = TestBed.inject(HttpTestingController);
-    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([inv({ id: 'i-1' })], 1));
-    view.fixture.detectChanges();
-
+  it('writes the segment and the filters back into the URL', async () => {
+    const { c, http, fixture } = await setup();
     const navigate = jest.spyOn(TestBed.inject(Router), 'navigate');
-    const c = view.fixture.componentInstance as unknown as { resetFilters(): void };
-    c.resetFilters();
-    view.fixture.detectChanges();
-
-    // The URL loses the id, so it states what the list is actually showing.
+    c.setSegment('inbox');
+    fixture.detectChanges();
     expect(navigate).toHaveBeenCalledWith(
       [],
       expect.objectContaining({
-        queryParams: expect.objectContaining({ id: null }),
+        queryParams: expect.objectContaining({ seg: 'inbox', q: null }),
         replaceUrl: true,
       }),
     );
     http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([], 0));
-    http.verify();
+    // The same segment again sends nothing; an unknown one is "all".
+    c.setSegment('inbox');
+    c.setSegment('nonsense');
+    expect(c.segment()).toBe('all');
+    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([], 0));
   });
 
-  it('drops a filter the URL no longer carries', async () => {
-    // Absence clears. Reading only what is present let a filter outlive the URL that
-    // put it there, which is the other half of the same drift.
-    localStorage.setItem('ap.locale', 'de');
-    const params = new BehaviorSubject(convertToParamMap({ id: 'i-1' }));
-    const view = await render(InvoicesComponent, {
-      providers: [
-        provideRouter([]),
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: USE_MOCK_API, useValue: false },
-        { provide: AuthService, useValue: new FakeAuth() },
-        {
-          provide: ActivatedRoute,
-          useValue: { snapshot: { queryParamMap: params.value }, queryParamMap: params },
-        },
-      ],
-    });
-    const http = TestBed.inject(HttpTestingController);
-    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([inv({ id: 'i-1' })], 1));
-    view.fixture.detectChanges();
-
-    params.next(convertToParamMap({}));
-    const again = http.expectOne((r) => r.url.endsWith('/api/invoices'));
-    expect(again.request.params.get('id')).toBeNull();
-    again.flush(page([inv({ id: 'i-1' }), inv({ id: 'i-2' })], 2));
-    http.verify();
+  it('adopts every filter and the segment the URL carries', async () => {
+    const { c } = await setup({ queryParams: { grossMin: '10', seg: 'booked' } });
+    expect(c.grossMin()).toBe('10');
+    expect(c.segment()).toBe('booked');
   });
 
-  it('adopts every filter the URL carries, not only the invoice id', async () => {
-    // Reading the whole set is what makes the URL a faithful description of the list.
-    const { c, http } = await setup({ queryParams: { grossMin: '10', status: 'paid' } });
-    const typed = c as unknown as { grossMin(): string; statusFilter(): string };
-    expect(typed.grossMin()).toBe('10');
-    expect(typed.statusFilter()).toBe('paid');
-    http.verify();
-  });
-
-  it('refuses a filter value the panel could never produce', async () => {
-    // The query string is typed by whoever holds the link. Reading every filter from it
-    // is what makes a bad number or an unknown status reachable at all.
-    const { c, http } = await setup({ queryParams: { grossMin: 'abc', status: 'nonsense' } });
-    const typed = c as unknown as { grossMin(): string; statusFilter(): string };
-    expect(typed.grossMin()).toBe('');
-    expect(typed.statusFilter()).toBe('');
-    http.verify();
+  it('refuses a value the chips could never produce', async () => {
+    const { c } = await setup({ queryParams: { grossMin: 'abc', seg: 'nonsense' } });
+    expect(c.grossMin()).toBe('');
+    expect(c.segment()).toBe('all');
   });
 
   it('clears items/total on an initial load error', async () => {
@@ -314,25 +249,6 @@ describe('InvoicesComponent', () => {
 
   // These two hold what the shared table brings: the header and the skeleton stay
   // through a filter, a search or a reload, and the pinned actions column survives one.
-  it('keeps the table and its header on screen while reloading', async () => {
-    const { c, fixture, container } = await setup({ initial: [inv({ id: 'a' })] });
-    c.loading.set(true);
-    fixture.detectChanges();
-    expect(container.querySelector('table')).not.toBeNull();
-    expect(container.querySelectorAll('th').length).toBeGreaterThan(0);
-    expect(container.querySelectorAll('.dt__skeleton-row').length).toBeGreaterThan(0);
-  });
-
-  it('pins the actions column for a user who may book', async () => {
-    const { container } = await setup({ initial: [inv({ id: 'a' })], canManage: true });
-    expect(container.querySelector('td.dt__cell--stickyEnd')).not.toBeNull();
-  });
-
-  it('has no actions column at all for a user who may only read', async () => {
-    const { container } = await setup({ initial: [inv({ id: 'a' })], canManage: false });
-    expect(container.querySelector('.dt__cell--stickyEnd')).toBeNull();
-  });
-
   it('money() formats in de-DE vs en-GB per locale', async () => {
     const { c } = await setup();
     const de = c.money('119.00');
@@ -389,55 +305,59 @@ describe('InvoicesComponent', () => {
     req.flush(page([]));
   });
 
-  it('setStatus filters immediately (no debounce)', async () => {
+  it('asks each segment with its status and booked filter, and keeps the counts', async () => {
     const { c, http } = await setup();
-    c.setStatus('paid');
-    expect(c.statusFilter()).toBe('paid');
-    const req = lastInvoicesReq(http);
-    expect(req.request.params.get('status')).toBe('paid');
-    req.flush(page([inv({ status: 'paid' })]));
+    const cases: [string, Record<string, string | null>][] = [
+      ['inbox', { status: 'open', booked: 'false' }],
+      ['booked', { status: 'open', booked: 'true' }],
+      ['paid', { status: 'paid', booked: null }],
+      ['all', { status: null, booked: null }],
+    ];
+    for (const [seg, want] of cases) {
+      c.setSegment(seg);
+      const req = lastInvoicesReq(http);
+      expect(req.request.params.get('status')).toBe(want['status']);
+      expect(req.request.params.get('booked')).toBe(want['booked']);
+      req.flush({ ...page([]), counts: { all: 9, inbox: 2, booked: 3, paid: 4 } });
+    }
+    expect(c.counts()).toEqual({ all: 9, inbox: 2, booked: 3, paid: 4 });
+    expect(c.segmentOptions().map((o: { label: string; count: number }) => `${o.label} ${o.count}`)).toEqual([
+      'Alle 9',
+      'Eingang 2',
+      'Verbucht 3',
+      'Bezahlt 4',
+    ]);
   });
 
-  it('onGrossFilter sets min and max and passes numeric params', async () => {
+  it('shows no counts from a backend without them', async () => {
+    const { c } = await setup();
+    expect(c.counts()).toBeNull();
+    expect(c.segmentOptions()[0].count).toBeNull();
+  });
+
+  it('applies the amount and the two date chips at once', async () => {
     const { c, http } = await setup();
-    jest.useFakeTimers();
-    c.onGrossFilter('min', '10');
-    c.onGrossFilter('max', '50');
-    expect(c.grossMin()).toBe('10');
-    expect(c.grossMax()).toBe('50');
-    jest.advanceTimersByTime(400);
-    jest.useRealTimers();
-    const req = lastInvoicesReq(http);
+    c.onGrossRange({ from: '10', to: '50' });
+    let req = lastInvoicesReq(http);
     expect(req.request.params.get('grossMin')).toBe('10');
     expect(req.request.params.get('grossMax')).toBe('50');
     req.flush(page([]));
-  });
-
-  it('onDateFilter sets each of the four date fields', async () => {
-    const { c, http } = await setup();
-    jest.useFakeTimers();
-    c.onDateFilter('issueFrom', '2026-01-01');
-    c.onDateFilter('issueTo', '2026-02-01');
-    c.onDateFilter('dueFrom', '2026-03-01');
-    c.onDateFilter('dueTo', '2026-04-01');
-    expect(c.issueFrom()).toBe('2026-01-01');
-    expect(c.issueTo()).toBe('2026-02-01');
-    expect(c.dueFrom()).toBe('2026-03-01');
-    expect(c.dueTo()).toBe('2026-04-01');
-    jest.advanceTimersByTime(400);
-    jest.useRealTimers();
-    const req = lastInvoicesReq(http);
+    c.onIssueRange({ from: '2026-01-01', to: '2026-02-01' });
+    req = lastInvoicesReq(http);
     expect(req.request.params.get('issueFrom')).toBe('2026-01-01');
     expect(req.request.params.get('issueTo')).toBe('2026-02-01');
+    req.flush(page([]));
+    c.onDueRange({ from: '2026-03-01', to: '2026-04-01' });
+    req = lastInvoicesReq(http);
     expect(req.request.params.get('dueFrom')).toBe('2026-03-01');
     expect(req.request.params.get('dueTo')).toBe('2026-04-01');
     req.flush(page([]));
   });
 
-  it('activeFilterCount counts non-empty filters (search excluded)', async () => {
+  it('activeFilterCount counts non-empty filters and the search', async () => {
     const { c } = await setup();
     expect(c.activeFilterCount()).toBe(0);
-    c.statusFilter.set('open');
+    c.q.set('acme');
     c.grossMin.set(' 5 ');
     c.grossMax.set('   '); // Whitespace does not count as an active filter.
     c.issueFrom.set('2026-01-01');
@@ -446,7 +366,7 @@ describe('InvoicesComponent', () => {
 
   it('resetFilters clears every filter and reloads', async () => {
     const { c, http } = await setup();
-    c.statusFilter.set('open');
+    c.q.set('acme');
     c.grossMin.set('1');
     c.grossMax.set('2');
     c.issueFrom.set('a');
@@ -611,6 +531,42 @@ describe('InvoicesComponent', () => {
     http.expectNone((r) => r.url.includes('/invoices/parse'));
   });
 
+  it('onDrop leaves a drop on the drop zone to the zone', async () => {
+    const { c, http } = await setup();
+    c.onDragEnter(dragEvent(['Files']));
+    const zone = document.createElement('app-file-drop-zone');
+    const inner = document.createElement('span');
+    zone.appendChild(inner);
+    const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
+    const ev = { ...dragEvent(['Files'], file), target: inner } as unknown as DragEvent;
+    c.onDrop(ev);
+    expect(ev.preventDefault).not.toHaveBeenCalled();
+    expect(c.dragActive()).toBe(false);
+    http.expectNone((r) => r.url.includes('/invoices/parse'));
+    // A target outside the zone, and a target without `closest`, count as the page.
+    const outside = { ...dragEvent(['Files']), target: document.createElement('div') } as unknown as DragEvent;
+    c.onDrop(outside);
+    expect(outside.preventDefault).toHaveBeenCalled();
+    const odd = { ...dragEvent(['Files']), target: {} } as unknown as DragEvent;
+    c.onDrop(odd);
+    expect(odd.preventDefault).toHaveBeenCalled();
+  });
+
+  it('onZoneFiles imports nothing for a reader', async () => {
+    const { c, http } = await setup({ canManage: false });
+    c.onZoneFiles([new File(['x'], 'a.pdf', { type: 'application/pdf' })]);
+    http.expectNone((r) => r.url.includes('/invoices/parse'));
+  });
+
+  it('onZoneFiles imports the first file for a manager', async () => {
+    const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
+    const { c, http } = await setup();
+    c.onZoneFiles([]);
+    http.expectNone((r) => r.url.includes('/invoices/parse'));
+    c.onZoneFiles([file]);
+    http.expectOne((r) => r.url.endsWith('/api/invoices/parse')).flush(PARSE);
+  });
+
   it('successful parse prefills the review dialog and says so in it, not in a toast', async () => {
     const { c, http, toast } = await setup();
     const spy = jest.spyOn(toast, 'success');
@@ -670,7 +626,7 @@ describe('InvoicesComponent', () => {
       .flush({ ...PARSE, duplicate: true, number: 'DUP' });
     fixture.detectChanges();
     expect(c.importDuplicate()).toBe('DUP');
-    const dialog = within(screen.getByRole('dialog', { name: 'Importierte Rechnung prüfen' }));
+    const dialog = within(screen.getByRole('form', { name: 'Importierte Rechnung prüfen' }));
     expect(dialog.getByText('Rechnung gelesen — bitte prüfen.')).toBeInTheDocument();
     expect(dialog.getByText(/Mögliche Dublette: Rechnung „DUP“/)).toBeInTheDocument();
     expect(dialog.getByText('parsed.pdf')).toBeInTheDocument();
@@ -1020,6 +976,8 @@ describe('InvoicesComponent', () => {
     req.flush(inv({ id: 'e1', number: null, supplier: null, status: 'paid' }));
     expect(c.editing()).toBe(null);
     expect(c.items()[0].status).toBe('paid');
+    // The status moves the invoice to another segment: the list loads again.
+    lastInvoicesReq(http).flush(page([]));
   });
 
   it('canSubmitEdit is false for a non-positive gross', async () => {
@@ -1169,6 +1127,8 @@ describe('InvoicesComponent', () => {
     expect(c.items().map((x: Invoice) => x.id)).toEqual(['d2']);
     expect(c.total()).toBe(1);
     expect(spy).toHaveBeenCalled();
+    // The counts of the segments change: the list loads again.
+    lastInvoicesReq(http).flush(page([inv({ id: 'd2' })], 1));
   });
 
   it('doDelete clamps the total at zero', async () => {
@@ -1177,6 +1137,7 @@ describe('InvoicesComponent', () => {
     c.doDelete();
     http.expectOne((r) => r.url.endsWith('/api/invoices/d1') && r.method === 'DELETE').flush(null);
     expect(c.total()).toBe(0);
+    lastInvoicesReq(http).flush(page([]));
   });
 
   it('doDelete is a no-op without a confirm target', async () => {
@@ -1316,27 +1277,26 @@ describe('InvoicesComponent filter declaration', () => {
     filterSignals: readonly {
       signal: { (): string; set(v: string): void };
       key: string;
-      clearedByReset: boolean;
     }[];
     filterParams(): Record<string, unknown>;
     resetFilters(): void;
     activeFilterCount(): number;
+    segment(): string;
   }
 
-  it('resets exactly the filters it declares as reset by the button', async () => {
+  it('resets every filter it declares and keeps the segment', async () => {
     // The count, the reset and the request each kept their own list. A filter added to
     // one and forgotten in another is invisible: the control moves, and the list does
     // not change. This is what /applications was reported broken for.
-    const { c, http } = await setup();
+    const { c, http } = await setup({ queryParams: { seg: 'paid' } });
     const host = c as unknown as FilterHost;
     for (const f of host.filterSignals) f.signal.set('x');
 
     host.resetFilters();
     http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([], 0));
 
-    for (const f of host.filterSignals) {
-      expect(f.signal()).toBe(f.clearedByReset ? '' : 'x');
-    }
+    for (const f of host.filterSignals) expect(f.signal()).toBe('');
+    expect(host.segment()).toBe('paid');
   });
 
   it('sends every declared filter that has a value', async () => {
@@ -1348,297 +1308,309 @@ describe('InvoicesComponent filter declaration', () => {
     expect(Object.keys(params).sort()).toEqual(host.filterSignals.map((f) => f.key).sort());
   });
 
-  it('counts only the filters the reset button owns', async () => {
-    // The search box sits in the page header, outside the filter panel, so counting it
-    // would show a badge no button in that panel can clear.
+  it('counts every declared filter', async () => {
     const { c } = await setup();
     const host = c as unknown as FilterHost;
     for (const f of host.filterSignals) f.signal.set('7');
-
-    expect(host.activeFilterCount()).toBe(
-      host.filterSignals.filter((f) => f.clearedByReset).length,
-    );
+    expect(host.activeFilterCount()).toBe(host.filterSignals.length);
   });
 });
 
-describe('InvoicesComponent bookings column and redesign wiring', () => {
-  const realMatchMedia = window.matchMedia;
+// --- list/detail (FE10c) ---------------------------------------------------
+
+/** Let `matchMedia` match the queries that contain one of the given parts. */
+function setViewport(...parts: string[]): void {
+  window.matchMedia = ((query: string) => ({
+    matches: parts.some((p) => query.includes(p)),
+    media: query,
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+const realMatchMedia = window.matchMedia;
+
+const BOOKING: InvoiceBooking = {
+  id: 'b-1',
+  budgetId: 'cc-1',
+  pathKey: 'VS-220',
+  budgetName: 'Maschinenbau',
+  fiscalYearId: 'fy',
+  kind: 'expense',
+  amount: '50.00',
+  description: 'Anzahlung',
+  paymentDate: '2026-01-05',
+  parentExpenseId: null,
+  createdAt: '2026-01-05T00:00:00Z',
+};
+
+describe('InvoicesComponent (list/detail)', () => {
   afterEach(() => {
     window.matchMedia = realMatchMedia;
     TestBed.inject(HttpTestingController).verify();
   });
 
-  function setViewport(...parts: string[]): void {
-    window.matchMedia = ((query: string) => ({
-      matches: parts.some((p) => query.includes(p)),
-      media: query,
-      onchange: null,
-      addEventListener: () => undefined,
-      removeEventListener: () => undefined,
-      addListener: () => undefined,
-      removeListener: () => undefined,
-      dispatchEvent: () => false,
-    })) as unknown as typeof window.matchMedia;
-  }
-
-  function booking(over: Partial<InvoiceBooking> = {}): InvoiceBooking {
-    return {
-      id: 'e-1',
-      budgetId: 'b-1',
-      pathKey: 'VS-800',
-      budgetName: 'Maschinenbau',
-      fiscalYearId: 'fy-1',
-      kind: 'expense',
-      amount: '900.00',
-      description: 'Lastenrad',
-      paymentDate: '2026-09-25',
-      parentExpenseId: null,
-      createdAt: '2026-09-25T10:00:00Z',
-      ...over,
-    };
-  }
-
-  const TREE: BudgetTreeNode[] = [
-    {
-      id: 'b-1',
-      parentId: null,
-      gremiumId: null,
-      key: 'VS',
-      pathKey: 'VS-800',
-      name: 'Maschinenbau',
-      currency: 'EUR',
-      active: true,
-      color: '#e08a1e',
-      acceptedStateKeys: [],
-      deniedStateKeys: [],
-      hiddenInBudget: false,
-      viewGremiumId: null,
-      fiscalStartMonth: 1,
-      fiscalStartDay: 1,
-      byFiscalYear: [],
-      children: [],
-    },
-  ];
-
-  it('hides the bookings column when the server sends no linkedBookings', async () => {
-    const { c, container } = await setup({ initial: [inv()] });
-    expect(c.showBookings()).toBe(false);
-    expect(container.textContent).not.toContain('Buchungen');
-  });
-
-  it('shows the first booking with "+n" and loads the tree once for the swatch (A6)', async () => {
-    const two = inv({
-      id: 'i-2',
-      linkedBookings: [booking(), booking({ id: 'e-2', amount: '100.00', kind: 'income' })],
+  it('lists the invoices by month with status, number and due date', async () => {
+    setViewport('min-width: 1200px');
+    const { container } = await setup({
+      initial: [inv(), inv({ id: 'i-2', status: 'paid', supplier: null, number: 'R-2', issueDate: '2025-12-20' })],
     });
-    const none = inv({ id: 'i-3', linkedBookings: [] });
-    const { c, http, fixture, container } = await setup({ initial: [two, none] });
-    // One tree request for the colours, not one per invoice.
-    http.expectOne((r) => r.url.endsWith('/api/budgets')).flush(TREE);
+    const months = [...container.querySelectorAll('.inv__month')].map((h) => h.textContent?.trim());
+    expect(months).toEqual(['Januar 2026', 'Dezember 2025']);
+    expect(screen.getByRole('link', { name: /ACME GmbH/ }).getAttribute('href')).toContain('id=i-1');
+    // A row without supplier is named by its number.
+    expect(screen.getByRole('link', { name: /^R-2/ })).toBeInTheDocument();
+    expect(screen.getByText('fällig 31.01.')).toBeInTheDocument();
+    expect(screen.getByText('Keine Rechnung geöffnet')).toBeInTheDocument();
+  });
+
+  it('names a row without supplier and number, and shows the empty sheet of an empty list', async () => {
+    setViewport('min-width: 1200px');
+    const { c, container, fixture, http } = await setup({ initial: [] });
+    expect(container.querySelector('.inv__none--skeleton')).not.toBeNull();
+    expect(c.titleOf(inv({ supplier: null, number: null }))).toBe('Rechnung ohne Lieferant');
+    c.q.set('x');
     fixture.detectChanges();
-    expect(c.showBookings()).toBe(true);
-    const cell = container.querySelector('.inv__booking') as HTMLElement;
-    expect(cell.textContent).toContain('Maschinenbau');
-    expect(cell.textContent).toMatch(/−900,00/);
-    expect(cell.textContent).toContain('+1');
-    expect(cell.getAttribute('title')).toContain('+100,00');
-    const swatch = cell.querySelector('.inv__swatch') as HTMLElement;
-    expect(swatch.style.background).toBeTruthy();
-    // The empty invoice shows a dash.
-    expect(c.bookingLabel(booking({ budgetId: 'unknown', pathKey: '' })).name).toBe('—');
-    // A second page with bookings asks for no further tree.
-    c.total.set(5);
-    c.loadMore();
-    http
-      .expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'GET')
-      .flush(page([inv({ id: 'i-4', linkedBookings: [booking()] })], 5, 2));
-    http.expectNone((r) => r.url.endsWith('/api/budgets'));
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    expect(c.q()).toBe('');
+    lastInvoicesReq(http).flush(page([]));
   });
 
-  it('lists every booking in the tooltip, by name or else by path', async () => {
-    const { c, http } = await setup({ initial: [inv()] });
-    http.expectNone((r) => r.url.endsWith('/api/budgets'));
-    expect(c.bookingsTitle(inv())).toBe('');
-    const title = c.bookingsTitle(
-      inv({ linkedBookings: [booking(), booking({ budgetName: '', kind: 'income' })] }),
-    );
-    expect(title.split('\n')).toHaveLength(2);
-    expect(title).toMatch(/^Maschinenbau −900,00/);
-    expect(title).toMatch(/\nVS-800 \+900,00/);
+  it('shows the open invoice and its actions; marks it paid and creates a booking', async () => {
+    setViewport('min-width: 1200px');
+    const { c, http, fixture, toast } = await setup({ initial: [inv({ linkedBookings: [BOOKING] })] });
+    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    c.selectedId.set('i-1');
+    fixture.detectChanges();
+    // The tree loads once, for the swatches of the bookings.
+    http.expectOne((r) => r.url.endsWith('/api/budgets')).flush([]);
+    fixture.detectChanges();
+    expect(screen.getByRole('heading', { name: 'ACME GmbH' })).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('button', { name: 'Buchung anlegen' })[0]);
+    expect(navigate).toHaveBeenCalledWith(['/expenses'], { queryParams: { new: 'booking', invoice: 'i-1' } });
+
+    const success = jest.spyOn(toast, 'success');
+    await userEvent.click(screen.getByRole('button', { name: 'Als bezahlt markieren' }));
+    expect(c.markingPaid()).toBe('i-1');
+    // A second click while it runs sends nothing.
+    c.markPaid(c.items()[0]);
+    const patch = http.expectOne((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'PATCH');
+    expect(patch.request.body).toEqual({ status: 'paid' });
+    patch.flush(inv({ status: 'paid', linkedBookings: [BOOKING] }));
+    expect(success).toHaveBeenCalledWith('Rechnung als bezahlt markiert.');
+    lastInvoicesReq(http).flush(page([inv({ status: 'paid', linkedBookings: [BOOKING] })]));
+    expect(c.items()[0].status).toBe('paid');
+    // A paid invoice is not marked again.
+    c.markPaid(c.items()[0]);
+    navigate.mockRestore();
   });
 
-  it('narrows the bookings column on the tight set', async () => {
-    setViewport('max-width: 999.98px');
-    const { c, http } = await setup({ initial: [inv({ linkedBookings: [] })] });
-    http.expectNone((r) => r.url.endsWith('/api/budgets'));
-    const col = c.columns().find((x: { key: string }) => x.key === 'bookings');
-    expect(col.width).toBe('8rem');
-  });
-
-  it('keeps room for the supplier below the full set', async () => {
-    setViewport();
-    const { c } = await setup({ initial: [inv({ linkedBookings: [] })] });
-    expect(c.columnSet()).toBe('compact');
-    const cols = c.columns();
-    const by = (key: string) => cols.find((x: { key: string }) => x.key === key);
-    expect(by('bookings').width).toBe('9rem');
-    expect(by('supplier').width).toBeUndefined();
-    // The short header keeps the date column at its own width.
-    expect(by('issueDate').label).toBe('Datum');
-  });
-
-  it('keeps the swatches off when the tree fails', async () => {
-    const { c, http } = await setup({ initial: [inv({ linkedBookings: [booking()] })] });
-    http
-      .expectOne((r) => r.url.endsWith('/api/budgets'))
-      .flush(null, { status: 403, statusText: 'Forbidden' });
-    expect(c.bookingLabel(booking()).color).toBeNull();
-  });
-
-  it('runs edit and delete from the row menu', async () => {
-    const { c } = await setup();
-    const row = inv();
-    c.onRowMenu({ id: 'edit', label: '' }, row);
-    expect(c.editing()).toEqual(row);
-    c.onRowMenu({ id: 'delete', label: '' }, row);
-    expect(c.confirmDelete()).toEqual(row);
-    c.onRowMenu({ id: 'other', label: '' }, inv({ id: 'x' }));
-    expect(c.confirmDelete()).toEqual(row);
-    expect(c.rowMenuLabel(row)).toContain('R-001');
-    expect(c.rowMenuLabel(inv({ number: null }))).toContain('ACME');
-    expect(c.rowMenuLabel(inv({ number: null, supplier: null }))).toBe('Aktionen für Rechnung ');
-  });
-
-  it('imports the first PDF of the drop zone and names a rejected file', async () => {
+  it('reports a failed "mark paid"', async () => {
     const { c, http, toast } = await setup();
-    const spy = jest.spyOn(toast, 'error');
-    c.onZoneFiles([new File(['x'], 'a.pdf', { type: 'application/pdf' })]);
-    http.expectOne((r) => r.url.endsWith('/api/invoices/parse')).flush(PARSE);
-    c.onZoneFiles([]);
-    c.onZoneRejected();
-    expect(spy).toHaveBeenCalledWith('Nur PDF-Dateien lassen sich importieren.');
+    const error = jest.spyOn(toast, 'error');
+    c.markPaid(c.items()[0]);
+    http
+      .expectOne((r) => r.url.endsWith('/api/invoices/i-1'))
+      .flush({ detail: 'Nein' }, { status: 409, statusText: 'x' });
+    expect(error).toHaveBeenCalledWith('Nein');
+    expect(c.markingPaid()).toBeNull();
   });
 
-  it('ignores the drop zone for a reader', async () => {
-    const { c, http } = await setup({ canManage: false });
-    c.onZoneFiles([new File(['x'], 'a.pdf', { type: 'application/pdf' })]);
-    http.expectNone((r) => r.url.endsWith('/api/invoices/parse'));
+  it('keeps a loaded invoice of a deep link up to date after "mark paid"', async () => {
+    const { c, http, fixture } = await setup({ initial: [], queryParams: { id: 'i-7' } });
+    fixture.detectChanges();
+    http.expectOne((r) => r.url.endsWith('/api/invoices/i-7')).flush(inv({ id: 'i-7' }));
+    c.markPaid(c.selectedInvoice());
+    http.expectOne((r) => r.url.endsWith('/api/invoices/i-7')).flush(inv({ id: 'i-7', status: 'paid' }));
+    lastInvoicesReq(http).flush(page([]));
+    expect(c.selectedInvoice().status).toBe('paid');
   });
 
-  it('leaves a drag over the drop zone to the zone, so one drop imports once', async () => {
+  it('keeps the open invoice in the detail when "mark paid" drops it from "Eingang"', async () => {
+    const { c, http, fixture } = await setup({ queryParams: { id: 'i-1', seg: 'inbox' } });
+    expect(c.segment()).toBe('inbox');
+    expect(c.detailView()).toBe('invoice');
+    c.markPaid(c.selectedInvoice());
+    http
+      .expectOne((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'PATCH')
+      .flush(inv({ status: 'paid' }));
+    // The reload of the segment no longer holds the paid invoice.
+    lastInvoicesReq(http).flush(page([inv({ id: 'i-9' })]));
+    fixture.detectChanges();
+    expect(c.items().map((i: Invoice) => i.id)).toEqual(['i-9']);
+    expect(c.detailView()).toBe('invoice');
+    expect(c.selectedInvoice().status).toBe('paid');
+    // The kept copy is current: no request by id.
+    http.expectNone((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'GET');
+  });
+
+  it('loads the open invoice by its id when a filter change drops it from the list', async () => {
+    const { c, http, fixture } = await setup({ queryParams: { id: 'i-1' } });
+    c.setSegment('paid');
+    lastInvoicesReq(http).flush(page([inv({ id: 'i-9', status: 'paid' })]));
+    fixture.detectChanges();
+    http.expectOne((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'GET').flush(inv());
+    expect(c.detailView()).toBe('invoice');
+    expect(c.selectedInvoice().id).toBe('i-1');
+  });
+
+  it('closes an open form when the URL opens another row', async () => {
+    const { c } = await setup({ initial: [inv(), inv({ id: 'i-2' })] });
+    c.openEdit(c.items()[0]);
+    expect(c.detailView()).toBe('form');
+    c.adoptUrl(convertToParamMap({ id: 'i-2' }));
+    expect(c.formMode()).toBeNull();
+    expect(c.detailView()).toBe('invoice');
+    expect(c.selectedInvoice().id).toBe('i-2');
+    // A form opened on the open row stays while the URL keeps that row.
+    c.openEdit(c.items()[1]);
+    c.adoptUrl(convertToParamMap({ id: 'i-2' }));
+    expect(c.formMode()).toBe('edit');
+  });
+
+  it('builds the row menu from the rights and runs every item', async () => {
     const { c, http } = await setup();
-    const zone = document.createElement('app-file-drop-zone');
-    const inner = document.createElement('div');
-    zone.appendChild(inner);
-    const ev = (type: string) =>
-      ({
-        type,
-        target: inner,
-        preventDefault: jest.fn(),
-        dataTransfer: {
-          types: ['Files'],
-          files: [new File(['x'], 'a.pdf')] as unknown as FileList,
-        },
-      }) as unknown as DragEvent;
-    c.onDragEnter(ev('dragenter'));
-    expect(c.dragActive()).toBe(false);
-    c.dragActive.set(true);
-    c.onDragLeave(ev('dragleave'));
-    expect(c.dragActive()).toBe(true);
-    c.onDrop(ev('drop'));
-    expect(c.dragActive()).toBe(false);
-    http.expectNone((r) => r.url.endsWith('/api/invoices/parse'));
+    const row = c.items()[0];
+    expect(c.rowMenu(row).flatMap((s: { items: { id: string }[] }) => s.items.map((i) => i.id))).toEqual([
+      'edit',
+      'paid',
+      'book',
+      'file',
+      'delete',
+    ]);
+    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    c.onRowMenu({ id: 'book', label: '' }, row);
+    expect(navigate).toHaveBeenCalledWith(['/expenses'], { queryParams: { new: 'booking', invoice: 'i-1' } });
+    c.onRowMenu({ id: 'edit', label: '' }, row);
+    expect(c.editing()).toBe(row);
+    c.onRowMenu({ id: 'delete', label: '' }, row);
+    expect(c.confirmDelete()).toBe(row);
+    const blob = jest.spyOn(downloadUtil, 'downloadBlob').mockImplementation(() => undefined);
+    c.onRowMenu({ id: 'file', label: '' }, row);
+    http.expectOne((r) => r.url.endsWith('/api/invoices/i-1/file')).flush(new Blob(['x']));
+    c.onRowMenu({ id: 'paid', label: '' }, row);
+    http.expectOne((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'PATCH').flush(inv({ status: 'paid' }));
+    lastInvoicesReq(http).flush(page([inv({ status: 'paid' })]));
+    c.onRowMenu({ id: 'other', label: '' }, row);
+    expect(c.rowMenuLabel(row)).toBe('Aktionen für Rechnung R-001');
+    expect(c.rowMenuLabel(inv({ number: null, supplier: null }))).toBe('Aktionen für Rechnung ');
+    blob.mockRestore();
+    navigate.mockRestore();
   });
 
-  it('keeps one action in the title row of a phone and hides the drop zone', async () => {
+  it('offers a reader only the receipt in the row menu', async () => {
+    const { c } = await setup({ canManage: false });
+    expect(c.rowMenu(inv({ hasFile: false }))).toEqual([]);
+    expect(c.rowMenu(inv()).flatMap((s: { items: { id: string }[] }) => s.items.map((i) => i.id))).toEqual(['file']);
+  });
+
+  it('opens and closes a row and a form through the URL', async () => {
+    const { c } = await setup();
+    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    c.openInvoice('i-3');
+    expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { id: 'i-3' } }));
+    c.closeDetail();
+    expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { id: null } }));
+    navigate.mockClear();
+    c.openCreate();
+    expect(c.formMode()).toBe('create');
+    expect(c.detailView()).toBe('form');
+    expect(c.formTitle()).toBe('Rechnung hinzufügen');
+    c.closeDetail();
+    expect(c.formMode()).toBeNull();
+    expect(navigate).not.toHaveBeenCalled();
+    c.openEdit(c.items()[0]);
+    expect(c.formTitle()).toBe('Rechnung bearbeiten');
+    navigate.mockRestore();
+  });
+
+  it('opens a new invoice after the create', async () => {
+    const { c, http } = await setup();
+    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    c.openCreate();
+    c.newNumber.set('R-9');
+    c.newSupplier.set('X');
+    c.newGross.set('10');
+    c.create({ preventDefault: jest.fn() } as unknown as Event);
+    http.expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'POST').flush(inv({ id: 'new' }));
+    lastInvoicesReq(http).flush(page([inv({ id: 'new' })]));
+    expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { id: 'new' } }));
+    navigate.mockRestore();
+  });
+
+  it('closes the detail of a deleted invoice', async () => {
+    const { c, http } = await setup();
+    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    c.selectedId.set('i-1');
+    c.openEdit(c.items()[0]);
+    c.askDelete(c.items()[0]);
+    c.doDelete();
+    http.expectOne((r) => r.method === 'DELETE').flush(null);
+    lastInvoicesReq(http).flush(page([]));
+    expect(c.editing()).toBeNull();
+    expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { id: null } }));
+    navigate.mockRestore();
+  });
+
+  it('searches the number of a duplicate in every segment ("Vorhandene öffnen")', async () => {
+    const { c, http } = await setup({ queryParams: { seg: 'paid' } });
+    c.openDuplicate(); // nothing to open yet
+    const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
+    c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
+    http.expectOne((r) => r.url.endsWith('/api/invoices/parse')).flush({ ...PARSE, duplicate: true, number: 'DUP' });
+    expect(c.importFileSize()).toBe(1);
+    expect(c.formTitle()).toBe('Importierte Rechnung prüfen');
+    c.openDuplicate();
+    expect(c.createOpen()).toBe(false);
+    expect(c.q()).toBe('DUP');
+    expect(c.segment()).toBe('all');
+    const req = lastInvoicesReq(http);
+    expect(req.request.params.get('q')).toBe('DUP');
+    req.flush(page([]));
+  });
+
+  it('opens the file picker from the header menu of a phone', async () => {
     setViewport('max-width: 768px');
-    const { container, c } = await setup();
+    const { c, container } = await setup();
+    const input = container.querySelector('input[type=file]') as HTMLInputElement;
+    const click = jest.spyOn(input, 'click').mockImplementation(() => undefined);
+    c.onHeaderMenu({ id: 'import', label: '' });
+    expect(click).toHaveBeenCalled();
+    c.onHeaderMenu({ id: 'other', label: '' });
+    expect(click).toHaveBeenCalledTimes(1);
+    // The phone has the form in a bottom sheet.
     expect(screen.getByRole('button', { name: 'Rechnung' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Importieren' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Weitere Aktionen' })).toBeInTheDocument();
-    expect(container.querySelector('app-file-drop-zone')).toBeNull();
-    expect(c.phoneMenu()[0].items[0].id).toBe('import');
+    await userEvent.click(screen.getByRole('button', { name: 'Rechnung' }));
+    expect(screen.getByRole('dialog', { name: 'Rechnung hinzufügen' }).classList.contains('ss--bottom')).toBe(true);
+    expect(c.detailView()).toBe('none');
   });
 
-  it('drops net and tax below 1400px and the due date below 1000px', async () => {
-    setViewport('min-width: 1400px');
-    let keys = (await setup()).c.columns().map((col: { key: string }) => col.key);
-    expect(keys).toEqual(expect.arrayContaining(['dueDate', 'net', 'tax']));
-    TestBed.inject(HttpTestingController).verify();
-    TestBed.resetTestingModule();
-    setViewport();
-    keys = (await setup()).c.columns().map((col: { key: string }) => col.key);
-    expect(keys).toContain('dueDate');
-    expect(keys).not.toContain('net');
-    TestBed.inject(HttpTestingController).verify();
-    TestBed.resetTestingModule();
-    setViewport('max-width: 999.98px');
-    keys = (await setup()).c.columns().map((col: { key: string }) => col.key);
-    expect(keys).not.toContain('dueDate');
-  });
-
-  it('moves a dropped column into a second line, so a reader still sees it', async () => {
-    setViewport('max-width: 999.98px');
-    const { c, container } = await setup({
-      canManage: false,
-      initial: [inv(), inv({ id: 'i-2', taxAmount: null, dueDate: null })],
-    });
-    const due = container.querySelectorAll('[data-testid="inv-due-line"]');
-    // Only the invoice with a due date gets the line.
-    expect(due).toHaveLength(1);
-    expect(due[0].textContent).toMatch(/^fällig 31\.01\.2026/);
-    const split = [...container.querySelectorAll('[data-testid="inv-split"]')].map((e) =>
-      e.textContent?.trim(),
-    );
-    // The tax when the invoice states it; else the net amount.
-    expect(split[0]).toMatch(/^USt\. 19,00/);
-    expect(split[1]).toMatch(/^netto 100,00/);
-    const gross = container.querySelector('.inv__grossCell') as HTMLElement;
-    expect(gross.getAttribute('title')).toMatch(/^Netto 100,00\s€ · USt\. 19,00\s€$/);
-    expect(c.splitLine(inv({ netAmount: null, taxAmount: null }))).toBeNull();
-    expect(c.netTaxTitle(inv({ netAmount: null, taxAmount: null }))).toBe('Netto — · USt. —');
-  });
-
-  it('shows the due date as a field of its own on the phone card', async () => {
-    setViewport('max-width: 768px');
-    const { c, container } = await setup({ canManage: false });
-    expect(c.columnSet()).toBe('full');
-    expect(c.showDueLine()).toBe(false);
-    expect(container.querySelector('[data-testid="inv-due-line"]')).toBeNull();
-    const cell = container.querySelector('tbody td[data-label="Fällig"]') as HTMLElement;
-    expect(cell.getAttribute('data-card')).toBeNull();
-    expect(cell.textContent?.trim()).toBe('31.01.2026');
-  });
-
-  it('keeps the split columns and no second lines at full width', async () => {
-    setViewport('min-width: 1400px');
-    const { container } = await setup();
-    expect(container.querySelector('[data-testid="inv-split"]')).toBeNull();
-    expect(container.querySelector('[data-testid="inv-due-line"]')).toBeNull();
-  });
-
-  it('gives the bookings column more room at full width', async () => {
-    setViewport('min-width: 1400px');
-    const { c, http, fixture, container } = await setup({
-      initial: [inv({ linkedBookings: [booking()] })],
-    });
-    http.expectOne((r) => r.url.endsWith('/api/budgets')).flush(TREE);
+  it('shows the whole page as the drop target while a PDF is dragged over it', async () => {
+    const { c, fixture, container } = await setup();
+    c.dragActive.set(true);
     fixture.detectChanges();
-    const col = c.columns().find((x: { key: string }) => x.key === 'bookings');
-    expect(col.width).toBe('15rem');
-    expect(c.columns()[0].label).toBe('Rechnungsdatum');
-    // One line: swatch, name, amount.
-    expect(container.querySelector('.inv__booking--stacked')).toBeNull();
+    expect(container.querySelector('.inv__dropOverlay')?.textContent).toContain('PDF hier ablegen, um zu importieren');
   });
 
-  it('puts the booking amount under the cost centre in the narrow column', async () => {
-    setViewport('max-width: 999.98px');
-    const { http, fixture, container } = await setup({
-      initial: [inv({ linkedBookings: [booking()] })],
-    });
-    http.expectOne((r) => r.url.endsWith('/api/budgets')).flush(TREE);
+  it('formats days and loads the tree only once', async () => {
+    const { c, http, fixture } = await setup({ initial: [inv({ linkedBookings: [BOOKING] }), inv({ id: 'i-2', linkedBookings: [BOOKING] })] });
+    expect(c.day('2026-09-28')).toBe('28.09.');
+    c.selectedId.set('i-1');
     fixture.detectChanges();
-    const cell = container.querySelector('.inv__booking--stacked') as HTMLElement;
-    expect(cell.textContent).toContain('Maschinenbau');
+    http.expectOne((r) => r.url.endsWith('/api/budgets')).error(new ProgressEvent('x'));
+    c.selectedId.set('i-2');
+    fixture.detectChanges();
+    http.expectNone((r) => r.url.endsWith('/api/budgets'));
+    expect(c.tree()).toEqual([]);
+  });
+
+  it('marks the page as a pane page side by side', async () => {
+    setViewport('min-width: 1200px');
+    const { fixture } = await setup();
+    expect(fixture.nativeElement.classList.contains('pane-page')).toBe(true);
+    fixture.destroy();
   });
 });

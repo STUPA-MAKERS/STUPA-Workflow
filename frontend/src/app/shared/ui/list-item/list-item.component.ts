@@ -8,7 +8,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { RouterLink, type QueryParamsHandling } from '@angular/router';
+import { type Params, RouterLink, type QueryParamsHandling } from '@angular/router';
 
 /**
  * One row of a list: a lead, a title with a sub line, and a trailing slot.
@@ -37,7 +37,8 @@ import { RouterLink, type QueryParamsHandling } from '@angular/router';
  * the ellipsis first), `[sub]` and `[trail]`. Set `--li-hover` on the host to change the
  * hover surface (for example in a row group on surface 2), `--li-color` to change the
  * text colour (for example a muted row of the past), `--li-sub-color` to change the colour
- * of the sub line and `--li-radius` to match the corners of a row group.
+ * of the sub line, `--li-radius` to match the corners of a row group and `--li-bg` to give
+ * the row a surface of its own (for example a checked row of a multiple selection).
  */
 @Component({
   selector: 'app-list-item',
@@ -62,6 +63,11 @@ export class ListItemComponent {
    * example the filters of a list whose rows open a detail beside it.
    */
   readonly linkQueryParamsHandling = input<QueryParamsHandling>('');
+  /**
+   * Query params of the link, for example the row a list/detail page opens in its detail
+   * (`{ id: row.id }` with `linkQueryParamsHandling: 'merge'`).
+   */
+  readonly linkQueryParams = input<Params | null>(null);
   /** The row is the one open in the detail pane. */
   readonly selected = input(false);
   /**

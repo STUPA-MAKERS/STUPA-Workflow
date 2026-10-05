@@ -1,0 +1,117 @@
+@let t = transfer();
+<article class="fd" [class.fd--split]="split()" aria-labelledby="tdt-title">
+  <header class="fd__head">
+    <div class="fd__bar">
+      <span class="fd__meta ell" [title]="metaLine()">{{ metaLine() }}</span>
+      @if (canManage()) {
+        @if (phone()) {
+          <app-button variant="tonal" size="sm" (click)="edit.emit()">
+            <span class="fd__btn"><app-icon name="edit" [size]="16" />{{ 'action.edit' | t }}</span>
+          </app-button>
+        } @else {
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'expenses.transfers.editTitle' | t"
+            [title]="'expenses.transfers.editTitle' | t"
+            (click)="edit.emit()"
+          ><app-icon name="edit" [size]="19" /></app-button>
+        }
+      }
+      @if (menu().length) {
+        <app-row-menu [label]="'expenses.detail.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />
+      }
+    </div>
+    <h2 id="tdt-title" class="fd__title">{{ t.description }}</h2>
+    <p class="fd__line fd__seps">
+      <span class="fd__parts">
+        <span class="fd__part fd__cc">
+          {{ from().name }}
+          <app-icon name="arrow" [size]="14" />
+          <span class="sr-only">{{ 'expenses.transfers.to' | t }}</span>
+          {{ to().name }}
+        </span>
+        <span class="fd__part"><span class="mono fd__amount">{{ amount() }}</span></span>
+      </span>
+    </p>
+  </header>
+
+  <div class="fd__cols">
+    <div class="fd__col">
+      <div class="td__legsBox">
+        <div class="td__legs">
+          <div class="td__leg">
+            <span class="td__legKind">{{ 'expenses.transfers.expenseOn' | t }}</span>
+            <span class="td__legName">
+              @if (from().color) {
+                <span class="fd__swatch" aria-hidden="true" [style.background]="from().color"></span>
+              }
+              {{ from().name }}
+            </span>
+            <span class="td__legPath mono">{{ from().path }}</span>
+            <span class="td__legAmount mono">−{{ amount() }}</span>
+          </div>
+          <span class="td__arrow" aria-hidden="true"><app-icon name="arrow" [size]="18" /></span>
+          <div class="td__leg">
+            <span class="td__legKind">{{ 'expenses.transfers.incomeOn' | t }}</span>
+            <span class="td__legName">
+              @if (to().color) {
+                <span class="fd__swatch" aria-hidden="true" [style.background]="to().color"></span>
+              }
+              {{ to().name }}
+            </span>
+            <span class="td__legPath mono">{{ to().path }}</span>
+            <span class="td__legAmount td__legAmount--in mono">+{{ amount() }}</span>
+          </div>
+        </div>
+      </div>
+
+      <section class="fd__sec" aria-labelledby="tdt-data">
+        <h3 id="tdt-data" class="sec fd__secTitle">{{ 'expenses.detail.data' | t }}</h3>
+        <dl class="fd__card fd__grid">
+          <div>
+            <dt>{{ 'expenses.col.amount' | t }}</dt>
+            <dd class="mono">{{ amount() }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'expenses.field.paymentDate' | t }}</dt>
+            <dd class="mono">{{ t.paymentDate ? (t.paymentDate | ldate: 'mediumDate') : '—' }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'expenses.field.invoiceDate' | t }}</dt>
+            <dd class="mono">{{ t.invoiceDate ? (t.invoiceDate | ldate: 'mediumDate') : '—' }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'expenses.field.fiscalYear' | t }}</dt>
+            <dd>{{ fyLabel() ? ('expenses.detail.fy' | t: { fy: fyLabel()! }) : '—' }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'expenses.field.note' | t }}</dt>
+            <dd class="fd__note">{{ t.note || '—' }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <p class="fd__hint">
+        <app-icon name="lock" [size]="16" />
+        <span>{{ 'expenses.transfers.pairLocked' | t }}</span>
+      </p>
+    </div>
+
+    <div class="fd__col">
+      <section class="fd__sec" aria-labelledby="tdt-details">
+        <h3 id="tdt-details" class="sec fd__secTitle">{{ 'expenses.detail.details' | t }}</h3>
+        <dl class="fd__card fd__stack">
+          <div>
+            <dt>{{ 'expenses.detail.createdBy' | t }}</dt>
+            <dd>{{ t.actorName || '—' }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'expenses.detail.createdAt' | t }}</dt>
+            <dd class="mono">{{ createdAt() }}</dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+  </div>
+</article>

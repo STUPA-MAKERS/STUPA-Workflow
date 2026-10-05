@@ -7,48 +7,50 @@ import {
   effect,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
-import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
-import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NgTemplateOutlet } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, type ParamMap, Router } from '@angular/router';
 import { from } from 'rxjs';
 import { concatMap } from 'rxjs/operators';
+import { ApiClient } from '@core/api/api-client.service';
+import type { Application, Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
-  CurrencyInputComponent,
-  DatepickerComponent,
   DialogComponent,
-  FilterBarComponent,
-  FilterFieldComponent,
-  FilterRangeComponent,
   IconComponent,
-  InputComponent,
   MEDIA,
   SegmentedComponent,
   type SegmentedOption,
-  SelectComponent,
-  type SortState,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import {
-  NoteComponent,
+  EmptyStateComponent,
+  FilterSelectComponent,
+  type FilterSelectOption,
+  ListDetailLayoutComponent,
+  ListItemComponent,
+  RangeChipComponent,
+  type RangeValue,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
   SearchPillComponent,
-  StickyBarComponent,
-  SelectionBarComponent,
   SideSheetComponent,
+  SkeletonComponent,
   StatusTextComponent,
-  invoiceStatus,
+  StickyBarComponent,
 } from '@shared/ui';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
+import { downloadBlob } from '@shared/download.util';
+import { mediaQuerySignal } from '../../layout/media-query';
+import { PageFrameService } from '../../layout/page-frame.service';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import {
   BudgetTreeApi,
@@ -58,75 +60,92 @@ import {
   type ExpenseUpdate,
   type Invoice,
 } from '../budget/budget-tree.api';
-import type { Uuid } from '@core/api/models';
 import {
-  ariaSortDir,
-  BOOKINGS_COLUMNS_FULL_MEDIA,
-  COLUMNS_TIGHT_MEDIA,
-  columnSet,
+  type CostCentreLabel,
   costCentreIndex,
+  costCentreLabel,
   findTopBudgetNode,
   formatEur,
+  monthGroups,
   problemDetail,
-  sortIndicator,
+  shortDate,
+  signedEur,
 } from '../budget/expense-display.util';
-import { downloadBlob } from '@shared/download.util';
-import { mediaQuerySignal } from '../../layout/media-query';
-import { BookingDialogComponent } from './booking-dialog/booking-dialog.component';
+import { BookingDetailComponent } from './booking-detail/booking-detail.component';
+import { BookingFormComponent } from './booking-form/booking-form.component';
+import { BulkPanelComponent } from './bulk-panel/bulk-panel.component';
 import { ExpenseDialogsState } from './expense-dialogs.state';
 import { ExpenseSubBookingsState } from './expense-sub-bookings.state';
 import { ExpenseTransfersState } from './expense-transfers.state';
-import { type BudgetLink, ExpensesTableComponent } from './expenses-table/expenses-table.component';
 import { ExpensesListState, type ExpenseSortField } from './expenses-list.state';
 import { SubBookingDialogComponent } from './sub-booking-dialog/sub-booking-dialog.component';
-import { TransferDialogComponent } from './transfer-dialog/transfer-dialog.component';
-import { TransfersTableComponent } from './transfers-table/transfers-table.component';
+import { TransferDetailComponent } from './transfer-detail/transfer-detail.component';
+import { TransferFormComponent } from './transfer-form/transfer-form.component';
 
 /** The two views of the page. Bookings are the default. */
 export type ExpensesTab = 'bookings' | 'transfers';
 
+/** The form that replaces the detail: a booking or a transfer, new or under edit. */
+export type ExpenseFormMode = 'create' | 'edit' | 'transfer-create' | 'transfer-edit';
+
+/** The sort orders of the header menu, as `field:order`. */
+const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: string }[] = [
+  { field: 'paymentDate', order: 'desc', key: 'expenses.sort.paymentDesc' },
+  { field: 'paymentDate', order: 'asc', key: 'expenses.sort.paymentAsc' },
+  { field: 'invoiceDate', order: 'desc', key: 'expenses.sort.invoiceDesc' },
+  { field: 'createdAt', order: 'desc', key: 'expenses.sort.createdDesc' },
+  { field: 'amount', order: 'desc', key: 'expenses.sort.amountDesc' },
+  { field: 'amount', order: 'asc', key: 'expenses.sort.amountAsc' },
+];
+
 /**
- * Bookings tab. It shows, creates, and manages expense and income bookings.
+ * Bookings (boards Fin-Buchungen and the other Fin-Buchung* boards): a list of bookings
+ * or transfers beside a detail sheet, like the applications page.
  *
- * A booking is either standalone or bound to an application. A standalone booking needs
- * a cost center and a fiscal year. A bound booking inherits both. This class is a thin
- * facade over the state modules below. Its public surface also drives the specs.
+ * The list: title with export, sort and a menu; the search and the chips (cost centre as
+ * the tree sheet of the applications page, kind, period, amount); "Buchungen |
+ * Überträge" and "n von m"; the rows by month. The detail: the open booking or transfer
+ * (`?id=` and `?transfer=` in the URL, so the global search lands on a booking), the
+ * form of a new or an edited booking or transfer, or, while rows are selected, the
+ * panel of the bulk actions.
+ *
+ * A booking is standalone or bound to an application. A standalone booking needs a cost
+ * centre and a fiscal year; a bound booking takes both from the application. This class
+ * is a facade over the state modules; its public surface drives the specs.
  */
 @Component({
   selector: 'app-expenses',
-  // A pane page (styles.scss): the panes fill the free height and scroll by themselves.
-  host: { '[class.pane-page]': 'wide()' },
+  // A pane page (styles.scss): side by side the panes fill the free height and scroll by
+  // themselves.
+  host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    BookingDialogComponent,
+    BookingDetailComponent,
+    BookingFormComponent,
+    BulkPanelComponent,
     ButtonComponent,
     CostCentreTreeComponent,
-    CurrencyInputComponent,
-    DatepickerComponent,
     DialogComponent,
-    ExpensesTableComponent,
-    FilterBarComponent,
-    FilterFieldComponent,
-    FilterRangeComponent,
+    EmptyStateComponent,
+    FilterSelectComponent,
     FormsModule,
     IconComponent,
-    InputComponent,
-    LocalizedDatePipe,
+    ListDetailLayoutComponent,
+    ListItemComponent,
     NgTemplateOutlet,
-    NoteComponent,
+    RangeChipComponent,
     RowMenuComponent,
     ScrollFadeDirective,
     SearchPillComponent,
-    StickyBarComponent,
     SegmentedComponent,
-    SelectComponent,
-    SelectionBarComponent,
     SideSheetComponent,
+    SkeletonComponent,
     StatusTextComponent,
+    StickyBarComponent,
     SubBookingDialogComponent,
-    TransferDialogComponent,
-    TransfersTableComponent,
+    TransferDetailComponent,
+    TransferFormComponent,
     TranslatePipe,
   ],
   templateUrl: './expenses.component.html',
@@ -138,29 +157,26 @@ export class ExpensesComponent implements OnDestroy {
   // The state modules share this root toast instance. Specs spy on it here.
   private readonly toast = inject(ToastService);
   private readonly api = inject(BudgetTreeApi);
+  private readonly apps = inject(ApiClient);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly frame = inject(PageFrameService);
 
-  // The state modules. The template hands them to the table and the dialogs, which read
-  // and set their signals directly; the methods below are the facade the specs drive.
+  // The state modules. The template hands them to the forms, which read and set their
+  // signals directly; the methods below are the facade the specs drive.
   protected readonly list = new ExpensesListState();
   protected readonly sub = new ExpenseSubBookingsState(this.list);
   protected readonly transfers = new ExpenseTransfersState(this.list);
   protected readonly dialogs = new ExpenseDialogsState(this.list, this.sub, this.transfers);
 
-  /** >= 1200px: the cost-centre pane beside the table, and the page does not scroll. */
-  readonly wide = mediaQuerySignal(MEDIA.wide);
-  /** < 768px: one primary action in the title row, the rest in a menu. */
+  /** < 768px: one primary action in the title row, the rest in a menu; forms as a sheet. */
   readonly phone = mediaQuerySignal(MEDIA.phone);
-  private readonly fullColumns = mediaQuerySignal(BOOKINGS_COLUMNS_FULL_MEDIA);
-  private readonly tightColumns = mediaQuerySignal(COLUMNS_TIGHT_MEDIA);
-  /** Which table columns fit the viewport. */
-  readonly columnSet = computed(() =>
-    columnSet({ phone: this.phone(), full: this.fullColumns(), tight: this.tightColumns() }),
-  );
+  /** The list-detail layout, for its split state. */
+  private readonly layout = viewChild(ListDetailLayoutComponent);
+  /** The list and the detail sit side by side. */
+  readonly split = computed(() => this.layout()?.collapsed() === false);
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
-
   readonly canExport = computed(() => this.auth.can('budget.export'));
 
   readonly budgetTree = this.list.budgetTree;
@@ -177,15 +193,56 @@ export class ExpensesComponent implements OnDestroy {
   readonly createdFrom = this.list.createdFrom;
   readonly createdTo = this.list.createdTo;
   readonly budgetId = this.list.budgetId;
-  readonly expenseId = this.list.expenseId;
   readonly sortField = this.list.sortField;
   readonly sortOrder = this.list.sortOrder;
   readonly activeFilterCount = this.list.activeFilterCount;
-  readonly costCentreOptions = this.list.costCentreOptions;
   readonly exporting = this.list.exporting;
   readonly refreshing = this.list.refreshing;
 
-  // Batch and bulk actions. See.
+  /** The display label of every cost centre: name, path and swatch colour (O19). */
+  readonly costCentres = computed(() => costCentreIndex(this.budgetTree()));
+
+  // --- the open row ------------------------------------------------------------------
+  /** The booking open in the detail (`?id=`). */
+  readonly selectedId = signal('');
+  /** The transfer open in the detail (`?transfer=`). */
+  readonly selectedTransferId = signal('');
+  /** The open booking when it is not among the loaded rows (a deep link, or a row that
+   *  a refresh dropped from the filtered list). */
+  private readonly fetchedExpense = signal<Expense | null>(null);
+  /** The open booking as the list showed it last. When a refresh drops the row, the
+   *  detail keeps this copy until the booking loads by its id. */
+  private seenRow: Expense | null = null;
+  /** The open booking was asked for and does not exist (or is out of reach). */
+  readonly selectedMissing = signal(false);
+
+  readonly selectedExpense = computed<Expense | null>(() => {
+    const id = this.selectedId();
+    if (!id) return null;
+    const row = this.items().find((e) => e.id === id);
+    if (row) return row;
+    const fetched = this.fetchedExpense();
+    return fetched?.id === id ? fetched : null;
+  });
+
+  readonly selectedTransfer = computed<BudgetTransfer | null>(() => {
+    const id = this.selectedTransferId();
+    if (!id) return null;
+    return this.transferItems().find((t) => t.transferId === id) ?? null;
+  });
+
+  // --- linked records of the open booking --------------------------------------------
+  /** The invoice of the open booking, from the cache or loaded once. */
+  readonly linkedInvoice = signal<Invoice | null>(null);
+  /** The application of the open booking, when the reader may read it. */
+  readonly linkedApplication = signal<Application | null>(null);
+  /** The fiscal-year labels ("2026", "2025/26") by id, loaded per top cost centre. */
+  readonly fyLabels = signal<ReadonlyMap<string, string>>(new Map());
+  private readonly fyRequested = new Set<string>();
+
+  // --- selection (bulk) ------------------------------------------------------------
+  /** The rows show check boxes. */
+  readonly selecting = signal(false);
   readonly selected = signal<ReadonlySet<Uuid>>(new Set());
   readonly bulkBusy = signal(false);
   readonly selectedCount = computed(() => this.selected().size);
@@ -193,66 +250,24 @@ export class ExpensesComponent implements OnDestroy {
     const list = this.items();
     return list.length > 0 && list.every((e) => this.selected().has(e.id));
   });
-  /** The bulk confirm dialog signal is null when closed. Otherwise it holds the
-   *  pending action, delete or export. */
-  readonly bulkConfirm = signal<null | 'delete' | 'export'>(null);
-  /** Select-all must not enable mass deletion. The user must pick each row for the
-   *  destructive bulk action. See. */
+  readonly selectedRows = computed(() => this.items().filter((e) => this.selected().has(e.id)));
+  /** The bulk delete confirmation is open. */
+  readonly bulkConfirm = signal<null | 'delete'>(null);
   /** Most rows one bulk delete may take. Selecting more stays allowed; deleting them does not. */
   readonly bulkDeleteMax = 5;
   readonly bulkDeleteOverMax = computed(() => this.selectedCount() > this.bulkDeleteMax);
+  /** Select-all must not enable mass deletion: the user picks each row for the
+   *  destructive bulk action. */
   readonly bulkDeleteBlocked = computed(
     () => this.bulkDeleteOverMax() || (this.allSelected() && this.selectedCount() > 1),
   );
+  /** "Umbuchen" in a sheet: the layouts without the bulk panel. */
   readonly bulkReassignOpen = signal(false);
   readonly bulkBudgetId = signal('');
   readonly bulkCategory = signal('');
-  /** The display label of every cost centre: name, path and swatch colour (O19). */
-  readonly costCentres = computed(() => costCentreIndex(this.budgetTree()));
-
-  /** The cost centre the list shows, for the chip of the narrower layouts. */
-  readonly costCentreName = computed(() => {
-    const id = this.budgetId();
-    return (id && this.costCentres().get(id)?.name) || this.i18n.translate('expenses.filter.allCostCentres');
-  });
-
-  /** The colour swatch of the chosen cost centre, null for "all". */
-  readonly costCentreColor = computed(() => {
-    const id = this.budgetId();
-    return (id && this.costCentres().get(id)?.color) || null;
-  });
-
-  /** Below the wide layout the cost-centre tree opens in the side sheet: from the start
-   *  (narrow) or from the bottom (phone). */
-  readonly pickerOpen = signal(false);
-
-  readonly tabOptions = computed<SegmentedOption[]>(() => [
-    { value: 'bookings', label: this.i18n.translate('expenses.tab.bookings') },
-    { value: 'transfers', label: this.i18n.translate('expenses.tab.transfers') },
-  ]);
-
-  /** The table speaks `SortState`; the list state speaks a field plus an order. */
-  readonly sortState = computed<SortState>(() => ({
-    key: this.sortField(),
-    direction: this.sortOrder() === 'asc' ? 'asc' : 'desc',
-  }));
-
-  /** The page actions that do not fit the title row of a phone. */
-  readonly phoneMenu = computed<RowMenuSection[]>(() => {
-    const items: RowMenuItem[] = [];
-    if (this.canManage()) {
-      items.push({ id: 'transfer', label: this.i18n.translate('expenses.transfer'), icon: 'repeat' });
-    }
-    if (this.canExport()) {
-      items.push({ id: 'export', label: this.i18n.translate('expenses.export'), icon: 'download' });
-    }
-    return [{ items }];
-  });
-
-  onPhoneMenu(item: RowMenuItem): void {
-    if (item.id === 'transfer') this.openTransfer();
-    else if (item.id === 'export') this.onExport();
-  }
+  readonly canSubmitReassign = computed(
+    () => !!this.bulkBudgetId() || !!this.bulkCategory().trim(),
+  );
 
   /** "7 ausgewählt", plus the delete cap once the selection is past it. */
   readonly selectionLabel = computed(() => {
@@ -273,69 +288,131 @@ export class ExpensesComponent implements OnDestroy {
     return null;
   });
 
-  /** The Budget query of a cost-centre cell. */
-  readonly budgetLink = (e: Expense): BudgetLink => this.ksLink(e);
+  // --- filters ---------------------------------------------------------------------
+  /** The open filter sheet: the cost-centre tree. */
+  readonly pickerOpen = signal(false);
+  /** Phone: filters and pickers open from the bottom; wider: from the start edge. */
+  readonly sheetSide = computed(() => (this.phone() ? 'bottom' : 'start'));
 
-  /** The status of the invoice in the detail dialog. */
-  readonly invoiceStatus = invoiceStatus;
+  /** The cost centre the list shows, for its chip. */
+  readonly costCentreName = computed(() => {
+    const id = this.budgetId();
+    return (
+      (id && this.costCentres().get(id)?.name) || this.i18n.translate('expenses.filter.costCentre')
+    );
+  });
 
-  onSortChange(next: SortState): void {
-    this.onSort(next.key as ExpenseSortField);
+  /** The colour swatch of the chosen cost centre, null for "all". */
+  readonly costCentreColor = computed(() => {
+    const id = this.budgetId();
+    return (id && this.costCentres().get(id)?.color) || null;
+  });
+
+  readonly kindOptions = computed<FilterSelectOption[]>(() => [
+    { value: '', label: this.i18n.translate('expenses.filter.all') },
+    { value: 'expense', label: this.i18n.translate('expenses.kind.expense') },
+    { value: 'income', label: this.i18n.translate('expenses.kind.income') },
+  ]);
+
+  readonly kindChipLabel = computed(() => {
+    const k = this.kind();
+    return k
+      ? this.i18n.translate(k === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense')
+      : this.i18n.translate('expenses.filter.kind');
+  });
+
+  readonly tabOptions = computed<SegmentedOption[]>(() => [
+    { value: 'bookings', label: this.i18n.translate('expenses.tab.bookings') },
+    { value: 'transfers', label: this.i18n.translate('expenses.tab.transfers') },
+  ]);
+
+  // --- header menus ----------------------------------------------------------------
+  readonly sortSections = computed<RowMenuSection[]>(() => {
+    const current = `${this.sortField()}:${this.sortOrder()}`;
+    return [
+      {
+        label: this.i18n.translate('expenses.sort.title'),
+        items: SORTS.map((s) => ({
+          id: `${s.field}:${s.order}`,
+          label: this.i18n.translate(s.key as Parameters<I18nService['translate']>[0]),
+          checked: `${s.field}:${s.order}` === current,
+        })),
+      },
+    ];
+  });
+
+  /** The page actions in the ⋮ menu of the header. On a phone the sort and the export
+   *  join them. */
+  readonly headerMenu = computed<RowMenuSection[]>(() => {
+    const items: RowMenuItem[] = [];
+    if (this.canManage()) {
+      items.push({ id: 'transfer', label: this.i18n.translate('expenses.transferNew'), icon: 'repeat' });
+      if (this.tab() === 'bookings') {
+        items.push({ id: 'select', label: this.i18n.translate('expenses.bulk.start'), icon: 'check' });
+      }
+    }
+    const sections: RowMenuSection[] = items.length ? [{ items }] : [];
+    if (this.phone()) {
+      if (this.tab() === 'bookings') sections.push(...this.sortSections());
+      if (this.canExport()) {
+        sections.push({
+          items: [{ id: 'export', label: this.i18n.translate('expenses.export'), icon: 'download' }],
+        });
+      }
+    }
+    return sections;
+  });
+
+  onHeaderMenu(item: RowMenuItem): void {
+    if (item.id === 'transfer') this.openTransfer();
+    else if (item.id === 'select') this.startSelecting();
+    else if (item.id === 'export') this.onExport();
+    else if (item.id.includes(':')) {
+      const [field, order] = item.id.split(':') as [ExpenseSortField, 'asc' | 'desc'];
+      this.list.sortField.set(field);
+      this.list.sortOrder.set(order);
+      this.list.reload();
+    }
   }
 
-  onSelectionChange(next: Set<unknown>): void {
-    this.selected.set(next as ReadonlySet<Uuid>);
-  }
-
-  readonly canSubmitReassign = computed(
-    () => !!this.bulkBudgetId() || !!this.bulkCategory().trim(),
-  );
-
+  // --- forms -----------------------------------------------------------------------
   readonly createOpen = this.dialogs.createOpen;
-  readonly newKind = this.dialogs.newKind;
-  readonly newAmount = this.dialogs.newAmount;
-  readonly newDescription = this.dialogs.newDescription;
-  readonly newBudgetId = this.dialogs.newBudgetId;
-  readonly newFiscalYearId = this.dialogs.newFiscalYearId;
-  readonly newApplicationId = this.dialogs.newApplicationId;
-  readonly appQuery = this.dialogs.appQuery;
-  readonly appCandidates = this.dialogs.appCandidates;
-  readonly fiscalYearOptions = this.dialogs.fiscalYearOptions;
-  readonly newInvoiceDate = this.dialogs.newInvoiceDate;
-  readonly newPaymentDate = this.dialogs.newPaymentDate;
-  readonly newCorrespondent = this.dialogs.newCorrespondent;
-  readonly newReferenceNumber = this.dialogs.newReferenceNumber;
-  readonly newPaymentMethod = this.dialogs.newPaymentMethod;
-  readonly newCategory = this.dialogs.newCategory;
-  readonly newNote = this.dialogs.newNote;
-  readonly paymentMethodOptions = this.dialogs.paymentMethodOptions;
   readonly editing = this.dialogs.editing;
-  readonly editAmount = this.dialogs.editAmount;
-  readonly editDescription = this.dialogs.editDescription;
-  readonly editBudgetId = this.dialogs.editBudgetId;
-  readonly editInvoiceDate = this.dialogs.editInvoiceDate;
-  readonly editPaymentDate = this.dialogs.editPaymentDate;
-  readonly editCorrespondent = this.dialogs.editCorrespondent;
-  readonly editReferenceNumber = this.dialogs.editReferenceNumber;
-  readonly editPaymentMethod = this.dialogs.editPaymentMethod;
-  readonly editCategory = this.dialogs.editCategory;
-  readonly editNote = this.dialogs.editNote;
   readonly confirmDelete = this.dialogs.confirmDelete;
   readonly invoices = this.dialogs.invoices;
-  readonly newInvoiceId = this.dialogs.newInvoiceId;
-  readonly editInvoiceId = this.dialogs.editInvoiceId;
-  readonly viewingInvoice = this.dialogs.viewingInvoice;
-  readonly invoiceOptions = this.dialogs.invoiceOptions;
-  readonly editInvoiceOptions = this.dialogs.editInvoiceOptions;
   readonly transferOpen = this.dialogs.transferOpen;
   readonly tFromId = this.dialogs.tFromId;
   readonly tToId = this.dialogs.tToId;
   readonly tFiscalYearId = this.dialogs.tFiscalYearId;
   readonly tAmount = this.dialogs.tAmount;
   readonly tDescription = this.dialogs.tDescription;
-  readonly transferFyOptions = this.dialogs.transferFyOptions;
   readonly canSubmitTransfer = this.dialogs.canSubmitTransfer;
   readonly canSubmitCreate = this.dialogs.canSubmitCreate;
+
+  /** The open form, or null. */
+  readonly formMode = computed<ExpenseFormMode | null>(() => {
+    if (this.createOpen()) return 'create';
+    if (this.editing()) return 'edit';
+    if (this.transferOpen()) return 'transfer-create';
+    if (this.transfers.editing()) return 'transfer-edit';
+    return null;
+  });
+
+  /** The heading of the form sheet of a phone. */
+  readonly formTitle = computed(() => {
+    switch (this.formMode()) {
+      case 'create':
+        return this.i18n.translate('expenses.add');
+      case 'edit':
+        return this.i18n.translate('expenses.edit');
+      case 'transfer-create':
+        return this.i18n.translate('expenses.transferNew');
+      case 'transfer-edit':
+        return this.i18n.translate('expenses.transfers.editTitle');
+      default:
+        return '';
+    }
+  });
 
   // Transfers tab. The route also admits `budget.view`, but the server lists, edits
   // and deletes transfers only for `budget.book` (the create permission). So the tab
@@ -348,54 +425,105 @@ export class ExpensesComponent implements OnDestroy {
   readonly transferHasMore = this.transfers.hasMore;
   readonly transferSaving = this.transfers.saving;
   readonly editingTransfer = this.transfers.editing;
-  readonly tEditAmount = this.transfers.editAmount;
-  readonly tEditDescription = this.transfers.editDescription;
-  readonly tEditNote = this.transfers.editNote;
-  readonly tEditInvoiceDate = this.transfers.editInvoiceDate;
-  readonly tEditPaymentDate = this.transfers.editPaymentDate;
   readonly confirmDeleteTransfer = this.transfers.confirmDelete;
-  readonly canSubmitTransferEdit = this.transfers.canSubmitEdit;
 
   readonly subParent = this.sub.subParent;
-  readonly subAmount = this.sub.subAmount;
-  readonly subDescription = this.sub.subDescription;
-  readonly subPaymentDate = this.sub.subPaymentDate;
-  readonly subCorrespondent = this.sub.subCorrespondent;
+
+  /** What the detail pane shows. */
+  readonly detailView = computed<'form' | 'bulk' | 'transfer' | 'booking' | 'missing' | 'none'>(
+    () => {
+      if (this.formMode() && !this.phone()) return 'form';
+      if (this.selecting() && this.selectedCount() > 0 && this.split()) return 'bulk';
+      if (this.tab() === 'transfers') return this.selectedTransfer() ? 'transfer' : 'none';
+      if (this.selectedExpense()) return 'booking';
+      if (this.selectedId() && this.selectedMissing()) return 'missing';
+      return 'none';
+    },
+  );
+
+  /** One pane at a time the detail shows while a row or a form is open. */
+  readonly detailOpen = computed(() => {
+    if (this.formMode() && !this.phone()) return true;
+    if (this.tab() === 'transfers') return !!this.selectedTransferId();
+    return !!this.selectedId();
+  });
+
+  /** The list groups by month while it sorts by a date. */
+  readonly groups = computed(() => {
+    const field = this.sortField();
+    const date = (e: Expense): string | null =>
+      field === 'invoiceDate'
+        ? e.invoiceDate
+        : field === 'createdAt'
+          ? e.createdAt
+          : (e.paymentDate ?? e.createdAt);
+    return monthGroups(this.items(), date, this.i18n.locale(), field !== 'amount');
+  });
+
+  readonly transferGroups = computed(() =>
+    monthGroups(this.transferItems(), (t) => t.paymentDate ?? t.createdAt, this.i18n.locale()),
+  );
 
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
-  /** The scroll box of the list. It scrolls on the wide layout only. */
+  /** The scroll box of the list. It scrolls side by side only. */
   readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
   constructor() {
-    // Apply the URL filters first, then load data exactly once. The URL keeps the view
-    // shareable, survives a browser reload, and is the target of cross-links from
-    // Budget. The state module sends no request on its own. If the unfiltered
-    // reload resolves last, it can overwrite the filtered one. See.
+    // Apply the URL first, then load data exactly once. The URL keeps the view shareable,
+    // survives a reload, and is the target of links from the budget page, the invoices
+    // page and the global search. A second, unfiltered request could resolve last and
+    // overwrite the filtered list.
     this.applyQueryParams(this.route.snapshot.queryParamMap);
     this.list.reload();
 
     // The palette can send us here while we are already here: a hit on another booking
-    // changes only the query string, and the router keeps this component alive. A
-    // snapshot read alone would never run again, and the write-back effect below would
-    // put the old filters straight back into the URL.
+    // changes only the query string, and the router keeps this component alive. The
+    // stream also emits the current parameters once, which opens the form of a create
+    // link.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
       if (this.applyQueryParams(qp)) this.list.reload();
+      this.adoptCreateLink(qp);
     });
 
+    // Write the filters back, so the URL always states what the list shows.
     effect(() => {
       const queryParams = {
-        id: this.expenseId() || null,
         budget: this.budgetId() || null,
         kind: this.kind() || null,
         q: this.q().trim() || null,
+        view: this.tab() === 'transfers' ? 'transfers' : null,
       };
-      void this.router.navigate([], {
-        relativeTo: this.route,
-        queryParams,
-        queryParamsHandling: 'merge',
-        replaceUrl: true,
-      });
+      untracked(() =>
+        void this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams,
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        }),
+      );
     });
+
+    // A new booking opens in the detail; a deleted one leaves it, with its form.
+    this.dialogs.onCreated = (created) => this.openBooking(created.id);
+    // A saved booking that is open but not among the rows: keep its detail current.
+    this.dialogs.onSaved = (saved) => {
+      if (saved.id === this.selectedId() && !this.items().some((e) => e.id === saved.id)) {
+        this.fetchedExpense.set(saved);
+      }
+    };
+    this.dialogs.onDeleted = (gone) => {
+      // Close the form only when it shows the deleted booking (or a sub-booking of it).
+      // A sub-booking deleted from the form of its parent keeps that form and its edits.
+      const edited = this.dialogs.editing();
+      if (edited && (edited.id === gone.id || edited.parentExpenseId === gone.id)) {
+        this.dialogs.closeForms();
+      }
+      if (!gone.parentExpenseId && gone.id === this.selectedId()) this.closeDetail();
+    };
+    this.transfers.onDeleted = (gone) => {
+      this.transfers.closeEdit();
+      if (gone.transferId === this.selectedTransferId()) this.closeDetail();
+    };
 
     // Remove selected ids for rows that no longer exist after a refresh, reload,
     // or delete.
@@ -406,15 +534,43 @@ export class ExpensesComponent implements OnDestroy {
       );
     });
 
-    // Infinite scroll. The wide layout scrolls the list inside its own box, so the box is
-    // the root there; the narrower layouts scroll the page.
+    // The open booking: load what is not among the rows, its invoice, its application,
+    // its sub-bookings and the label of its fiscal year.
+    // The rows are tracked too: a refresh after an edit or a bulk "Umbuchen" can move the
+    // open booking out of the filter. It then loads by its id.
+    effect(() => {
+      const id = this.selectedId();
+      const loading = this.loading();
+      const rows = this.items();
+      untracked(() => this.ensureSelected(id, loading, rows));
+    });
+    effect(() => {
+      const e = this.selectedExpense();
+      untracked(() => this.loadLinked(e));
+    });
+    // The fiscal-year label of the open row needs the tree, which can come later.
+    effect(() => {
+      const id = this.selectedTransfer()?.fromBudgetId ?? this.selectedExpense()?.budgetId;
+      const tree = this.budgetTree();
+      untracked(() => {
+        if (id) this.loadFyLabels(id, tree);
+      });
+    });
+
+    effect(() => this.frame.fill.set(this.split()));
+
+    // Infinite scroll. Side by side the list scrolls inside its own box, so the box is the
+    // root there; one pane at a time the page scrolls.
     effect((onCleanup) => {
       const el = this.sentinel()?.nativeElement;
       if (!el || typeof IntersectionObserver === 'undefined') return;
-      const root = this.wide() ? (this.scroller()?.nativeElement ?? null) : null;
+      const root = this.split() ? (this.scroller()?.nativeElement ?? null) : null;
       const obs = new IntersectionObserver(
         (entries) => {
-          if (entries.some((e) => e.isIntersecting)) this.loadMore();
+          if (entries.some((e) => e.isIntersecting)) {
+            if (this.tab() === 'transfers') this.loadMoreTransfers();
+            else this.loadMore();
+          }
         },
         { root, rootMargin: '400px' },
       );
@@ -423,79 +579,236 @@ export class ExpensesComponent implements OnDestroy {
     });
   }
 
-  /** Read the id, budget, kind, and q filters from the URL. Return true if the
-   *  URL carried at least one of them. `id` is a deep link to one exact booking.
-   *  It has no dedicated control, but it counts as an active filter and resets
-   *  with the others. */
+  /**
+   * Read the filters, the view and the open row from the URL. Return true if a filter of
+   * the list changed (the caller then reloads it).
+   */
   private applyQueryParams(qp: ParamMap): boolean {
     const raw = qp.get('kind');
     const kind: '' | ExpenseKind = raw === 'expense' || raw === 'income' ? raw : '';
-    const next = {
-      expenseId: qp.get('id') ?? '',
-      budgetId: qp.get('budget') ?? '',
-      q: qp.get('q') ?? '',
-    };
+    const budgetId = qp.get('budget') ?? '';
+    const q = qp.get('q') ?? '';
     let changed = false;
-    // Absence clears. Every one of these four is written back into the URL by the effect
-    // in the constructor, so a parameter that is gone was taken away, not merely omitted.
-    if (next.expenseId !== this.expenseId()) {
-      this.expenseId.set(next.expenseId);
-      changed = true;
-    }
-    if (next.budgetId !== this.budgetId()) {
-      this.budgetId.set(next.budgetId);
+    // Absence clears. Each of these is written back into the URL by the effect in the
+    // constructor, so a parameter that is gone was taken away, not merely omitted.
+    if (budgetId !== this.budgetId()) {
+      this.budgetId.set(budgetId);
       changed = true;
     }
     if (kind !== this.kind()) {
       this.kind.set(kind);
       changed = true;
     }
-    if (next.q !== this.q()) {
-      this.q.set(next.q);
+    if (q !== this.q()) {
+      this.q.set(q);
       changed = true;
     }
+    const view: ExpensesTab =
+      qp.get('view') === 'transfers' && this.canManage() ? 'transfers' : 'bookings';
+    if (view !== this.tab()) {
+      this.tab.set(view);
+      if (view === 'transfers') this.transfers.reload();
+    } else if (changed && view === 'transfers') {
+      this.transfers.reload();
+    }
+    // A click on another row while a form is open: the row replaces the form, so the
+    // highlighted row and the detail always agree.
+    const id = qp.get('id') ?? '';
+    if (id !== this.selectedId()) {
+      if (id) this.dialogs.closeForms();
+      this.selectedId.set(id);
+      this.selectedMissing.set(false);
+    }
+    const transferId = qp.get('transfer') ?? '';
+    if (transferId && transferId !== this.selectedTransferId()) this.dialogs.closeForms();
+    this.selectedTransferId.set(transferId);
     return changed;
+  }
+
+  /**
+   * `?new=booking&invoice=<id>` ("Buchung anlegen" on the invoices page) opens the form
+   * of a new booking with that invoice. The page then takes the two parameters away, so
+   * a reload does not open the form again.
+   */
+  private adoptCreateLink(qp: ParamMap): void {
+    if (qp.get('new') !== 'booking') return;
+    if (this.canManage()) {
+      const invoiceId = qp.get('invoice');
+      this.dialogs.openCreate(invoiceId ? { invoiceId } : {});
+    }
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { new: null, invoice: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  /**
+   * Load the open booking when it is not among the loaded rows: a deep link, or a row
+   * that a refresh dropped (an edit or a bulk "Umbuchen" moved it out of the filter).
+   * A dropped row stays in the detail as the list showed it until the server answers.
+   */
+  private ensureSelected(id: string, loading: boolean, rows: readonly Expense[]): void {
+    if (!id || loading) return;
+    const row = rows.find((e) => e.id === id);
+    if (row) {
+      this.seenRow = row;
+      return;
+    }
+    const dropped = this.seenRow?.id === id ? this.seenRow : null;
+    this.seenRow = null;
+    if (dropped) this.fetchedExpense.set(dropped);
+    else if (this.fetchedExpense()?.id === id) return;
+    this.api.listExpenses({ id: id as Uuid, limit: 1 }).subscribe({
+      next: (page) => {
+        if (this.selectedId() !== id) return;
+        const hit = page.items[0] ?? null;
+        this.fetchedExpense.set(hit);
+        this.selectedMissing.set(!hit);
+      },
+      error: () => {
+        if (this.selectedId() === id) this.selectedMissing.set(true);
+      },
+    });
+  }
+
+  /** The linked records of the open booking. Each request runs once per booking. */
+  private loadLinked(e: Expense | null): void {
+    const invoiceId = e?.invoiceId ?? null;
+    if (this.linkedInvoice()?.id !== invoiceId) this.linkedInvoice.set(null);
+    if (invoiceId) {
+      const cached = this.invoices().find((i) => i.id === invoiceId);
+      if (cached) this.linkedInvoice.set(cached);
+      else
+        this.api.getInvoice(invoiceId).subscribe({
+          next: (inv) => {
+            if (this.selectedExpense()?.invoiceId === inv.id) this.linkedInvoice.set(inv);
+          },
+          error: () => this.linkedInvoice.set(null),
+        });
+    }
+    const appId = e?.applicationId ?? null;
+    if (this.linkedApplication()?.id !== appId) this.linkedApplication.set(null);
+    if (appId && this.linkedApplication()?.id !== appId) {
+      // A budget reader may lack the right to read the application: the card then shows
+      // only the title the booking carries.
+      this.apps.getApplication(appId, { quiet: true }).subscribe({
+        next: (app) => {
+          if (this.selectedExpense()?.applicationId === app.id) this.linkedApplication.set(app);
+        },
+        error: () => this.linkedApplication.set(null),
+      });
+    }
+    if (e && (e.childCount ?? 0) > 0 && !this.sub.subRows().has(e.id) && !this.sub.isLoadingSub(e.id)) {
+      this.sub.loadSub(e.id);
+    }
+  }
+
+  /** Load the fiscal years of the top cost centre of `budgetId` once, for their labels. */
+  private loadFyLabels(budgetId: string, tree = this.budgetTree()): void {
+    const top = findTopBudgetNode(tree, budgetId);
+    if (!top || this.fyRequested.has(top.id)) return;
+    this.fyRequested.add(top.id);
+    this.api.listFiscalYears(top.id).subscribe({
+      next: (fys) =>
+        this.fyLabels.update((m) => {
+          const next = new Map(m);
+          for (const f of fys) next.set(f.id, f.display);
+          return next;
+        }),
+      error: () => this.fyRequested.delete(top.id),
+    });
   }
 
   ngOnDestroy(): void {
     this.list.dispose();
+    this.frame.fill.set(false);
   }
 
+  // --- formatting ------------------------------------------------------------------
   money(amount: string): string {
     return formatEur(Number(amount), this.i18n.locale());
   }
 
-  sortInd(field: ExpenseSortField): string {
-    return sortIndicator(this.sortField() === field, this.sortOrder());
+  signed(e: Expense): string {
+    return signedEur(e.kind, e.amount, this.i18n.locale());
   }
 
-  ariaSort(field: ExpenseSortField): 'ascending' | 'descending' | 'none' {
-    return ariaSortDir(this.sortField() === field, this.sortOrder());
+  day(iso: string | null): string {
+    return shortDate(iso, this.i18n.locale());
   }
 
-  setKind(k: '' | ExpenseKind): void {
-    this.list.setKind(k);
+  costCentre(id: string, pathKey: string | null): CostCentreLabel {
+    return costCentreLabel(this.costCentres(), id, pathKey);
+  }
+
+  fyLabel(id: string): string | null {
+    return this.fyLabels().get(id) ?? null;
+  }
+
+  // --- the open row ------------------------------------------------------------------
+  /** Open a booking in the detail. The URL keeps it, so the back button closes it. */
+  openBooking(id: string): void {
+    this.dialogs.closeForms();
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { id, transfer: null },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  openTransferRow(id: string): void {
+    this.dialogs.closeForms();
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { transfer: id, id: null },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  /** "Zur Liste": close the form, else the open row. The filters stay. */
+  closeDetail(): void {
+    if (this.formMode()) {
+      this.dialogs.closeForms();
+      return;
+    }
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { id: null, transfer: null },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  // --- filters ---------------------------------------------------------------------
+  setKind(k: string): void {
+    this.list.setKind(k === 'expense' || k === 'income' ? k : '');
   }
 
   selectBudget(id: string): void {
-    this.list.selectBudget(id);
     this.pickerOpen.set(false);
+    this.list.selectBudget(id);
+    if (this.tab() === 'transfers') this.transfers.reload();
   }
 
   onSearch(value: string): void {
     this.list.onSearch(value);
+    if (this.tab() === 'transfers') this.transfers.reload();
   }
 
-  onAmountFilter(which: 'min' | 'max', value: string): void {
-    this.list.onAmountFilter(which, value);
+  onAmountRange(v: RangeValue): void {
+    this.list.setAmountRange(v.from, v.to);
+    if (this.tab() === 'transfers') this.transfers.reload();
   }
 
-  onDateFilter(which: 'from' | 'to', value: string): void {
-    this.list.onDateFilter(which, value);
+  onDateRange(v: RangeValue): void {
+    this.list.setDateRange(v.from, v.to);
+    if (this.tab() === 'transfers') this.transfers.reload();
   }
 
   resetFilters(): void {
     this.list.resetFilters();
+    if (this.tab() === 'transfers') this.transfers.reload();
   }
 
   onSort(field: ExpenseSortField): void {
@@ -510,80 +823,26 @@ export class ExpensesComponent implements OnDestroy {
     this.list.onExport();
   }
 
-  isSubExpanded(id: string): boolean {
-    return this.sub.isSubExpanded(id);
+  /** Switch the view. The transfers load on every visit, because a booking change can
+   *  remove a leg. */
+  setTab(tab: ExpensesTab): void {
+    if (tab === 'transfers' && !this.canManage()) return;
+    this.tab.set(tab);
+    this.stopSelecting();
+    if (tab === 'transfers') this.transfers.reload();
   }
 
-  subOf(id: string): Expense[] {
-    return this.sub.subOf(id);
+  loadMoreTransfers(): void {
+    this.transfers.loadMore();
   }
 
-  isLoadingSub(id: string): boolean {
-    return this.sub.isLoadingSub(id);
-  }
-
-  toggleSub(e: Expense): void {
-    this.sub.toggleSub(e);
-  }
-
-  openCreateSub(parent: Expense): void {
-    this.sub.openCreateSub(parent);
-  }
-
-  closeCreateSub(): void {
-    this.sub.closeCreateSub();
-  }
-
-  canSubmitSub(): boolean {
-    return this.sub.canSubmitSub();
-  }
-
-  createSub(event?: Event): void {
-    this.sub.createSub(event);
-  }
-
+  // --- forms -----------------------------------------------------------------------
   openCreate(): void {
     this.dialogs.openCreate();
   }
 
   create(event: Event): void {
     this.dialogs.create(event);
-  }
-
-  setNewKindIncome(): void {
-    this.dialogs.setNewKindIncome();
-  }
-
-  onAppSearch(value: string): void {
-    this.dialogs.onAppSearch(value);
-  }
-
-  pickApp(a: { id: string; title: string }): void {
-    this.dialogs.pickApp(a);
-  }
-
-  clearApp(): void {
-    this.dialogs.clearApp();
-  }
-
-  onPickBudget(id: string): void {
-    this.dialogs.onPickBudget(id);
-  }
-
-  onPickInvoice(id: string): void {
-    this.dialogs.onPickInvoice(id);
-  }
-
-  onPickEditInvoice(id: string): void {
-    this.dialogs.onPickEditInvoice(id);
-  }
-
-  openInvoiceDialog(e: Expense): void {
-    this.dialogs.openInvoiceDialog(e);
-  }
-
-  openInvoiceFile(inv: Invoice): void {
-    this.dialogs.openInvoiceFile(inv);
   }
 
   openEdit(e: Expense): void {
@@ -606,27 +865,12 @@ export class ExpensesComponent implements OnDestroy {
     this.dialogs.openTransfer();
   }
 
-  onTransferFrom(id: string): void {
-    this.dialogs.onTransferFrom(id);
-  }
-
   createTransfer(event: Event): void {
     this.dialogs.createTransfer(event);
   }
 
-  /** Switch the view. The transfers load lazily on the first visit and then
-   *  again on every visit, because a booking change can remove a leg. */
-  setTab(tab: ExpensesTab): void {
-    if (tab === 'transfers' && !this.canManage()) return;
-    this.tab.set(tab);
-    if (tab === 'transfers') this.transfers.reload();
-  }
-
-  loadMoreTransfers(): void {
-    this.transfers.loadMore();
-  }
-
   openTransferEdit(t: BudgetTransfer): void {
+    this.dialogs.closeForms();
     this.transfers.openEdit(t);
   }
 
@@ -650,16 +894,77 @@ export class ExpensesComponent implements OnDestroy {
     this.transfers.doDelete();
   }
 
-  /** Deep-link target for the cost-center cell. It opens the Budget tab drilled into
-   *  this cost center. See. */
-  ksLink(e: Expense): { budget: string | null; ks: string; fy: string } {
-    const top = findTopBudgetNode(this.budgetTree(), e.budgetId);
-    return { budget: top?.id ?? null, ks: e.budgetId, fy: e.fiscalYearId };
+  openCreateSub(parent: Expense): void {
+    this.sub.openCreateSub(parent);
+  }
+
+  openInvoiceFile(inv: Invoice): void {
+    this.dialogs.openInvoiceFile(inv);
+  }
+
+  /** The row menu of a booking. */
+  rowMenu(e: Expense): RowMenuSection[] {
+    const main: RowMenuItem[] = [];
+    if (this.canManage()) {
+      main.push({ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' });
+      main.push({ id: 'sub', label: this.i18n.translate('expenses.sub.add'), icon: 'add' });
+    }
+    if (e.invoiceId) {
+      main.push({
+        id: 'invoice',
+        label: this.i18n.translate('expenses.action.viewInvoice'),
+        icon: 'receipt',
+      });
+    }
+    const sections: RowMenuSection[] = main.length ? [{ items: main }] : [];
+    if (this.canManage()) {
+      sections.push({
+        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'delete', danger: true }],
+      });
+    }
+    return sections;
+  }
+
+  onRowMenu(item: RowMenuItem, e: Expense): void {
+    if (item.id === 'edit') this.openEdit(e);
+    else if (item.id === 'sub') this.openCreateSub(e);
+    else if (item.id === 'invoice' && e.invoiceId) {
+      void this.router.navigate(['/invoices'], { queryParams: { id: e.invoiceId } });
+    } else if (item.id === 'delete') this.askDelete(e);
+  }
+
+  readonly transferMenu = computed<RowMenuSection[]>(() => [
+    { items: [{ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' }] },
+    {
+      items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'delete', danger: true }],
+    },
+  ]);
+
+  onTransferMenu(item: RowMenuItem, t: BudgetTransfer): void {
+    if (item.id === 'edit') this.openTransferEdit(t);
+    else if (item.id === 'delete') this.askDeleteTransfer(t);
+  }
+
+  rowMenuLabel(e: Expense): string {
+    return this.i18n.translate('expenses.rowMenu', { description: e.description });
+  }
+
+  // --- selection -------------------------------------------------------------------
+  startSelecting(): void {
+    if (!this.canManage()) return;
+    this.selecting.set(true);
+  }
+
+  stopSelecting(): void {
+    this.selecting.set(false);
+    this.selected.set(new Set());
+    this.bulkReassignOpen.set(false);
   }
 
   isSelected(id: Uuid): boolean {
     return this.selected().has(id);
   }
+
   toggleSelect(id: Uuid, checked: boolean): void {
     this.selected.update((cur) => {
       const next = new Set(cur);
@@ -668,25 +973,20 @@ export class ExpensesComponent implements OnDestroy {
       return next;
     });
   }
+
   toggleSelectAll(checked: boolean): void {
     this.selected.set(checked ? new Set(this.items().map((e) => e.id)) : new Set());
   }
 
-  askBulk(kind: 'delete' | 'export'): void {
-    if (!this.selectedCount()) return;
-    if (kind === 'delete' && this.bulkDeleteBlocked()) return;
-    this.bulkConfirm.set(kind);
-  }
-  runBulk(): void {
-    if (this.bulkBusy()) return;
-    if (this.bulkConfirm() === 'delete') this.runBulkDelete();
-    else if (this.bulkConfirm() === 'export') this.runBulkExport();
+  askBulkDelete(): void {
+    if (!this.selectedCount() || this.bulkDeleteBlocked()) return;
+    this.bulkConfirm.set('delete');
   }
 
-  private runBulkDelete(): void {
+  runBulkDelete(): void {
     const ids = [...this.selected()];
     // The disabled button is an affordance, not a control: check the cap here too.
-    if (!ids.length || this.bulkDeleteBlocked()) return;
+    if (!ids.length || this.bulkBusy() || this.bulkDeleteBlocked()) return;
     this.bulkBusy.set(true);
     let done = 0;
     from(ids)
@@ -701,19 +1001,17 @@ export class ExpensesComponent implements OnDestroy {
   }
 
   /** Export only the selected bookings. The server filters the export by `ids`. */
-  private runBulkExport(): void {
+  runBulkExport(): void {
     const ids = [...this.selected()];
-    if (!ids.length) return;
+    if (!ids.length || this.bulkBusy()) return;
     this.bulkBusy.set(true);
     this.api.exportExpensesXlsx({ ids }).subscribe({
       next: (blob) => {
         downloadBlob(blob, 'buchungen-auswahl.xlsx');
         this.bulkBusy.set(false);
-        this.bulkConfirm.set(null);
       },
       error: (err) => {
         this.bulkBusy.set(false);
-        this.bulkConfirm.set(null);
         this.toast.error(problemDetail(err) ?? this.i18n.translate('expenses.toast.failed'));
       },
     });
@@ -725,6 +1023,7 @@ export class ExpensesComponent implements OnDestroy {
     this.bulkCategory.set('');
     this.bulkReassignOpen.set(true);
   }
+
   runBulkReassign(): void {
     const ids = [...this.selected()];
     if (!ids.length || this.bulkBusy() || !this.canSubmitReassign()) return;
@@ -760,6 +1059,8 @@ export class ExpensesComponent implements OnDestroy {
     this.bulkBusy.set(false);
     this.bulkConfirm.set(null);
     this.bulkReassignOpen.set(false);
+    this.bulkBudgetId.set('');
+    this.bulkCategory.set('');
     this.list.refresh(); // Get server truth, e.g. transfer legs. Prune effect fixes the selection.
     if (failed) {
       const key = kind === 'delete' ? 'expenses.bulk.deleteError' : 'expenses.bulk.reassignError';
@@ -768,5 +1069,10 @@ export class ExpensesComponent implements OnDestroy {
       const key = kind === 'delete' ? 'expenses.bulk.deleteDone' : 'expenses.bulk.reassignDone';
       this.toast.success(this.i18n.translate(key, { count: String(count) }));
     }
+  }
+
+  /** A row in selection mode: a click toggles it. */
+  onRowActivate(e: Expense): void {
+    if (this.selecting()) this.toggleSelect(e.id, !this.isSelected(e.id));
   }
 }

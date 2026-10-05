@@ -42,23 +42,14 @@ export class ExpensesListState {
   readonly createdFrom = signal('');
   readonly createdTo = signal('');
   readonly budgetId = signal('');
-  /** Exact-booking filter for a deep link. Only the URL sets it,
-   *  and no control shows it. It still counts as an active filter, so the reset button
-   *  clears it. */
-  readonly expenseId = signal('');
   readonly sortField = signal<ExpenseSortField>('paymentDate');
   readonly sortOrder = signal<'asc' | 'desc'>('desc');
 
+  /** The filters set in the chips (cost centre, kind, period, amount) and the search. */
   readonly activeFilterCount = computed(
     () =>
-      [
-        this.kind(),
-        this.expenseId(),
-        this.amountMin().trim(),
-        this.amountMax().trim(),
-        this.createdFrom(),
-        this.createdTo(),
-      ].filter((v) => String(v ?? '').trim() !== '').length,
+      this.filterSignals.filter((f) => f.clearedByReset && String(f.signal() ?? '').trim() !== '')
+        .length,
   );
 
   readonly costCentreOptions = computed<SelectOption[]>(() =>
@@ -92,6 +83,20 @@ export class ExpensesListState {
     this.debouncedReload();
   }
 
+  /** The amount chip: both bounds at once, then one reload. */
+  setAmountRange(min: string, max: string): void {
+    this.amountMin.set(min);
+    this.amountMax.set(max);
+    this.reload();
+  }
+
+  /** The period chip: both bounds at once, then one reload. */
+  setDateRange(from: string, to: string): void {
+    this.createdFrom.set(from);
+    this.createdTo.set(to);
+    this.reload();
+  }
+
   onAmountFilter(which: 'min' | 'max', value: string): void {
     (which === 'min' ? this.amountMin : this.amountMax).set(value);
     this.debouncedReload();
@@ -103,26 +108,23 @@ export class ExpensesListState {
   }
 
   /**
-   * Every filter that reaches the request, and whether "Zurücksetzen" clears it.
+   * Every filter that reaches the request, and whether "Filter zurücksetzen" clears it.
    *
    * The reset and the request builder both read this list, so a filter reaches both or
    * neither. A filter wired into one alone is invisible: the control moves and the list
    * does not change. `filterSignals` is what the spec walks.
    *
-   * `q` and `budgetId` are NOT cleared. Both are controls outside the filter panel — the
-   * search box in the page header and the cost-centre tree beside the table — and the
-   * reset button belongs to the panel. /applications clears both, because there the
-   * search sits inside its panel.
+   * Every filter of the list is a chip or the search above it, and the reset of the empty
+   * list clears them all, as on /applications.
    */
   readonly filterSignals: readonly { signal: WritableSignal<string>; clearedByReset: boolean }[] = [
     { signal: this.kind as WritableSignal<string>, clearedByReset: true },
-    { signal: this.expenseId, clearedByReset: true },
     { signal: this.amountMin, clearedByReset: true },
     { signal: this.amountMax, clearedByReset: true },
     { signal: this.createdFrom, clearedByReset: true },
     { signal: this.createdTo, clearedByReset: true },
-    { signal: this.q, clearedByReset: false },
-    { signal: this.budgetId, clearedByReset: false },
+    { signal: this.q, clearedByReset: true },
+    { signal: this.budgetId, clearedByReset: true },
   ];
 
   resetFilters(): void {
@@ -175,7 +177,6 @@ export class ExpensesListState {
   /** Active filters as the shared query part for {@link fetch} and {@link refresh}. */
   private filterParams() {
     return {
-      id: this.expenseId() || undefined,
       budget: this.budgetId() || undefined,
       kind: this.kind() || undefined,
       q: this.q().trim() || undefined,

@@ -1,4 +1,3 @@
-import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -8,277 +7,165 @@ import {
   effect,
   inject,
   signal,
+  untracked,
   viewChild,
   type WritableSignal,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, type ParamMap, Router } from '@angular/router';
-import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
-  CellDirective,
-  type ColumnDef,
-  CurrencyInputComponent,
-  DataTableComponent,
-  DatepickerComponent,
   DialogComponent,
-  FilterBarComponent,
-  FilterFieldComponent,
-  FilterRangeComponent,
   IconComponent,
   MEDIA,
+  SegmentedComponent,
+  type SegmentedOption,
   type SelectOption,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import {
+  EmptyStateComponent,
   FileDropZoneComponent,
+  ListDetailLayoutComponent,
+  ListItemComponent,
+  RangeChipComponent,
+  type RangeValue,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
   SearchPillComponent,
-  StickyBarComponent,
+  SideSheetComponent,
+  SkeletonComponent,
   StatusTextComponent,
+  StickyBarComponent,
   invoiceStatus,
 } from '@shared/ui';
+import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { downloadBlob } from '@shared/download.util';
 import { mediaQuerySignal } from '../../layout/media-query';
+import { PageFrameService } from '../../layout/page-frame.service';
 import {
   BudgetTreeApi,
   type BudgetTreeNode,
   type Invoice,
-  type InvoiceBooking,
   type InvoiceParseResult,
   type InvoiceQuery,
+  type InvoiceSegmentCounts,
   type InvoiceStatus,
 } from '../budget/budget-tree.api';
+import { costCentreIndex, formatEur, monthGroups, shortDate } from '../budget/expense-display.util';
+import { InvoiceDetailComponent } from './invoice-detail/invoice-detail.component';
 import {
-  COLUMNS_FULL_MEDIA,
-  COLUMNS_TIGHT_MEDIA,
-  type CostCentreLabel,
-  columnSet,
-  costCentreIndex,
-  costCentreLabel,
-} from '../budget/expense-display.util';
-import {
-  type InvoiceDialogHost,
-  InvoiceImportDialogComponent,
+  type InvoiceFormHost,
+  InvoiceFormComponent,
   invoiceFieldsValid,
-} from './invoice-import-dialog/invoice-import-dialog.component';
+} from './invoice-form/invoice-form.component';
 
-/** What the import found, for the note at the top of the review dialog. */
+/** What the import found, for the note at the top of the review form. */
 export type ImportNotice = 'parsed' | 'manual' | null;
 
 /**
- * Invoices tab. It shows, creates, and manages invoices. An invoice is a standalone
- * entity. A booking can reference one invoice. So one invoice can serve many bookings.
+ * The segments of the list: every invoice, "Eingang" (open, no booking), "Verbucht"
+ * (open, with a booking), "Bezahlt".
+ */
+export type InvoiceSegment = 'all' | 'inbox' | 'booked' | 'paid';
+
+const SEGMENTS: readonly InvoiceSegment[] = ['all', 'inbox', 'booked', 'paid'];
+
+/** The query of a segment. */
+const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booked'>> = {
+  all: {},
+  inbox: { status: 'open', booked: false },
+  booked: { status: 'open', booked: true },
+  paid: { status: 'paid' },
+};
+
+/**
+ * Invoices (boards Fin-Rechnungen and the other Fin-Rechnung* boards): a list of invoices
+ * beside a detail sheet, like the applications page. An invoice is a document of its own;
+ * a booking can reference one invoice, so one invoice can serve many bookings.
  *
- * For import, the user drops a ZUGFeRD or Factur-X PDF on the overlay, or picks it with
- * the file dialog. The parsed fields prefill the entry dialog for review and
- * confirmation. If the PDF embeds no valid ZUGFeRD data (422 `invoice_not_zugferd`), the
- * empty dialog opens for manual entry.
+ * The list: title with the import; the search and the chips (invoice date, due date,
+ * amount); the segments Alle / Eingang / Verbucht / Bezahlt with their counts; the drop
+ * zone; the rows by month. The detail: the open invoice (`?id=`, also the target of the
+ * global search), or the form of a new, an imported or an edited invoice.
+ *
+ * Import: a ZUGFeRD or Factur-X PDF dropped on the page or picked with the file dialog.
+ * The parsed fields fill the review form. A PDF without ZUGFeRD data (422
+ * `invoice_not_zugferd`) opens the empty form for manual entry, with the PDF as receipt.
  */
 @Component({
   selector: 'app-invoices',
+  // A pane page (styles.scss): side by side the panes fill the free height and scroll by
+  // themselves.
+  host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    NgTemplateOutlet,
     ButtonComponent,
-    CellDirective,
-    CurrencyInputComponent,
-    DataTableComponent,
-    DatepickerComponent,
     DialogComponent,
+    EmptyStateComponent,
     FileDropZoneComponent,
-    FilterBarComponent,
-    FilterFieldComponent,
-    FilterRangeComponent,
-    FormsModule,
     IconComponent,
-    InvoiceImportDialogComponent,
-    LocalizedDatePipe,
+    InvoiceDetailComponent,
+    InvoiceFormComponent,
+    ListDetailLayoutComponent,
+    ListItemComponent,
+    NgTemplateOutlet,
+    RangeChipComponent,
     RowMenuComponent,
+    ScrollFadeDirective,
     SearchPillComponent,
-    StickyBarComponent,
+    SegmentedComponent,
+    SideSheetComponent,
+    SkeletonComponent,
     StatusTextComponent,
+    StickyBarComponent,
     TranslatePipe,
   ],
   templateUrl: './invoices.component.html',
   styleUrl: './invoices.component.scss',
 })
-export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
+export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   private readonly api = inject(BudgetTreeApi);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly frame = inject(PageFrameService);
 
   readonly canManage = computed(() => this.auth.can('budget.book'));
 
-  /** < 768px: one primary action in the title row, the rest in a menu. */
+  /** < 768px: one primary action in the title row, the rest in a menu; forms as a sheet. */
   readonly phone = mediaQuerySignal(MEDIA.phone);
-  /** >= 1200px: the search sits in the title row, and the whole row sticks. */
-  readonly wide = mediaQuerySignal(MEDIA.wide);
-  private readonly fullColumns = mediaQuerySignal(COLUMNS_FULL_MEDIA);
-  private readonly tightColumns = mediaQuerySignal(COLUMNS_TIGHT_MEDIA);
-  /** Which table columns fit the viewport. */
-  readonly columnSet = computed(() =>
-    columnSet({ phone: this.phone(), full: this.fullColumns(), tight: this.tightColumns() }),
-  );
-
-  /**
-   * The due date as a second line under the issue date. Only the tight set has no
-   * due-date column. A reader without `budget.book` has no dialog, so the date must
-   * stay on the row. The phone card shows the due date as a field of its own.
-   */
-  readonly showDueLine = computed(() => this.columnSet() === 'tight');
-
-  /**
-   * The bookings column needs `linkedBookings` (A6). A backend without it sends no field:
-   * the column then stays away, instead of a request per invoice for its bookings.
-   */
-  readonly showBookings = computed(() => this.items().some((i) => i.linkedBookings !== undefined));
-
-  /**
-   * The actions column exists only for a user who may book, and it is pinned so the
-   * menu stays reachable while this wide table scrolls sideways.
-   */
-  readonly columns = computed<ColumnDef[]>(() => {
-    const t = (key: TranslationKey): string => this.i18n.translate(key);
-    const set = this.columnSet();
-    // Below the full set the short header "Datum" keeps the date column at its 7rem:
-    // "Rechnungsdatum" alone made it 134px wide. The width goes to the supplier.
-    const cols: ColumnDef[] = [
-      {
-        key: 'issueDate',
-        label: t(set === 'full' ? 'invoices.col.issueDate' : 'invoices.col.date'),
-        width: '7rem',
-      },
-    ];
-    if (set !== 'tight') {
-      // The phone card keeps the due date as a field of its own: a second line beside
-      // the issue date has no room there and gets cut.
-      cols.push({ key: 'dueDate', label: t('invoices.col.dueDate'), width: '6.5rem' });
-    }
-    // The number is what names an invoice, so it heads the card. Net and tax are off
-    // it: gross is the figure a reader checks, and the split belongs to the detail.
-    // Below the full set a dropped column moves into a second line of a kept cell:
-    // the due date under the issue date, net and tax under gross. A reader without
-    // `budget.book` has no dialog, so the value must stay on the row.
-    cols.push(
-      { key: 'number', label: t('invoices.col.number'), width: '6.5rem', card: 'title' },
-      // No width: the supplier takes the rest. Its cell keeps at least 7rem (see the
-      // stylesheet), and the bookings column gives up its room first.
-      { key: 'supplier', label: t('invoices.col.supplier') },
-    );
-    if (set === 'full') {
-      cols.push(
-        { key: 'net', label: t('invoices.col.net'), align: 'end', width: '6rem', card: 'hidden' },
-        { key: 'tax', label: t('invoices.col.tax'), align: 'end', width: '5rem', card: 'hidden' },
-      );
-    }
-    cols.push(
-      { key: 'gross', label: t('invoices.col.gross'), align: 'end', width: '6rem' },
-      { key: 'status', label: t('invoices.col.status'), width: '5rem' },
-    );
-    if (this.showBookings()) {
-      cols.push({
-        key: 'bookings',
-        label: t('invoices.col.bookings'),
-        // At full width the cost centre name gets the room it needs (board
-        // Arbeit-Rechnungen: "Maschinenbau −900,00 €"). Below it the amount moves under
-        // the name, and the column stays narrow, so that the supplier keeps its room.
-        width: set === 'full' ? '15rem' : set === 'tight' ? '8rem' : '9rem',
-      });
-    }
-    cols.push({ key: 'file', label: t('invoices.col.file'), align: 'end', width: '3rem' });
-    if (this.canManage()) {
-      cols.push({ key: 'actions', label: t('table.actions'), align: 'end', width: '3.5rem', sticky: 'end', card: 'actions' });
-    }
-    return cols;
-  });
-
-  /** "Netto 100,00 € · USt. 19,00 €": the tooltip of gross without the split columns. */
-  netTaxTitle(i: Invoice): string {
-    return this.i18n.translate('invoices.netTax', {
-      net: i.netAmount ? this.money(i.netAmount) : '—',
-      tax: i.taxAmount ? this.money(i.taxAmount) : '—',
-    });
-  }
-
-  /**
-   * The second line of gross without the split columns: "USt. 19,00 €", or the net
-   * amount when the invoice states no tax. One line is enough, because the other part
-   * is gross minus this one. `null` when the invoice states neither.
-   */
-  splitLine(i: Invoice): string | null {
-    if (i.taxAmount) return this.i18n.translate('invoices.taxLine', { amount: this.money(i.taxAmount) });
-    if (i.netAmount) return this.i18n.translate('invoices.netLine', { amount: this.money(i.netAmount) });
-    return null;
-  }
+  /** The list-detail layout, for its split state. */
+  private readonly layout = viewChild(ListDetailLayoutComponent);
+  readonly split = computed(() => this.layout()?.collapsed() === false);
 
   /** The status as coloured text. */
   readonly invoiceStatus = invoiceStatus;
-
-  /** The row actions of an invoice. */
-  readonly rowMenu = computed<RowMenuSection[]>(() => [
-    { items: [{ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' }] },
-    {
-      items: [
-        { id: 'delete', label: this.i18n.translate('action.delete'), icon: 'delete', danger: true },
-      ],
-    },
-  ]);
-
-  onRowMenu(item: RowMenuItem, i: Invoice): void {
-    if (item.id === 'edit') this.openEdit(i);
-    else if (item.id === 'delete') this.askDelete(i);
-  }
 
   /** The page actions that do not fit the title row of a phone. */
   readonly phoneMenu = computed<RowMenuSection[]>(() => [
     { items: [{ id: 'import', label: this.i18n.translate('invoices.import'), icon: 'upload' }] },
   ]);
 
-  rowMenuLabel(i: Invoice): string {
-    return this.i18n.translate('invoices.rowMenu', { number: i.number || i.supplier || '' });
-  }
-
-  /** The cost-centre tree, only for the swatch colours of the bookings column. It loads
-   *  once the first invoice with a booking shows up. */
-  private readonly tree = signal<BudgetTreeNode[]>([]);
+  /** The cost-centre tree, for the swatches of the bookings in the detail. It loads once
+   *  the first open invoice with a booking shows up. */
+  readonly tree = signal<BudgetTreeNode[]>([]);
   private treeRequested = false;
   readonly costCentres = computed(() => costCentreIndex(this.tree()));
-
-  /** The first booking of an invoice, as the column shows it. */
-  bookingLabel(b: InvoiceBooking): CostCentreLabel {
-    return costCentreLabel(this.costCentres(), b.budgetId, b.pathKey || null);
-  }
-
-  /** "Maschinenbau −900,00 €": the cost centre name is the server's, the colour ours. */
-  bookingAmount(b: InvoiceBooking): string {
-    return (b.kind === 'income' ? '+' : '−') + this.money(b.amount);
-  }
-
-  /** The full list of bookings, for the tooltip of the cell. */
-  bookingsTitle(i: Invoice): string {
-    return (i.linkedBookings ?? [])
-      .map((b) => `${b.budgetName || b.pathKey} ${this.bookingAmount(b)} · ${b.description}`)
-      .join('\n');
-  }
-
-  /** Track by the invoice id, so paging in more rows does not re-create the earlier ones. */
-  readonly rowId = (row: unknown): unknown => (row as Invoice).id;
 
   private readonly PAGE = 20;
   readonly items = signal<Invoice[]>([]);
   readonly total = signal(0);
+  /** The size of each segment under the other filters; null from a backend before FE10c. */
+  readonly counts = signal<InvoiceSegmentCounts | null>(null);
   private nextOffset = 0;
   readonly loading = signal(true);
   readonly loadingMore = signal(false);
@@ -286,54 +173,45 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
   readonly q = signal('');
   readonly saving = signal(false);
   readonly importing = signal(false);
-  /** True while a manual receipt upload runs in the create dialog. */
+  /** True while a manual receipt upload runs in the create form. */
   readonly attaching = signal(false);
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Monotone request generation: a late answer of an older filter state is dropped. */
+  private fetchEpoch = 0;
 
-  /** Filters are status, gross range, issue date, and due date. They drive the
-   *  server query. */
-  readonly statusFilter = signal<'' | InvoiceStatus>('');
+  readonly segment = signal<InvoiceSegment>('all');
   readonly grossMin = signal('');
   readonly grossMax = signal('');
   readonly issueFrom = signal('');
   readonly issueTo = signal('');
   readonly dueFrom = signal('');
   readonly dueTo = signal('');
-  /** Exact-invoice filter for a deep link, such as a hit in the global search. Only the
-   *  URL sets it and no control shows it. It still counts as an active filter, so the
-   *  reset button clears it and the badge says the list is narrowed. */
-  readonly invoiceId = signal('');
 
   /**
-   * Every filter, declared once.
+   * Every filter of the chips and the search, declared once.
    *
-   * The count, the reset and the request each had their own hand-kept list. A filter
-   * added to one and forgotten in another is invisible: the control moves, the badge
-   * counts, and the list does not change. `filterSignals` is what the spec walks.
-   *
-   * `q` is not cleared by the reset. It is the search box in the page header, outside
-   * the filter panel the reset button belongs to. This mirrors /expenses.
+   * The count, the reset and the request each read this list. A filter added to one and
+   * forgotten in another is invisible: the control moves and the list does not change.
+   * `filterSignals` is what the spec walks. The segment is not a filter of this list: it
+   * keeps its value when the filters reset.
    */
   readonly filterSignals: readonly {
     readonly signal: WritableSignal<string>;
     readonly key: keyof InvoiceQuery;
-    readonly clearedByReset: boolean;
     readonly numeric?: boolean;
   }[] = [
-    { signal: this.statusFilter as WritableSignal<string>, key: 'status', clearedByReset: true },
-    { signal: this.invoiceId, key: 'id', clearedByReset: true },
-    { signal: this.grossMin, key: 'grossMin', clearedByReset: true, numeric: true },
-    { signal: this.grossMax, key: 'grossMax', clearedByReset: true, numeric: true },
-    { signal: this.issueFrom, key: 'issueFrom', clearedByReset: true },
-    { signal: this.issueTo, key: 'issueTo', clearedByReset: true },
-    { signal: this.dueFrom, key: 'dueFrom', clearedByReset: true },
-    { signal: this.dueTo, key: 'dueTo', clearedByReset: true },
-    { signal: this.q, key: 'q', clearedByReset: false },
+    { signal: this.grossMin, key: 'grossMin', numeric: true },
+    { signal: this.grossMax, key: 'grossMax', numeric: true },
+    { signal: this.issueFrom, key: 'issueFrom' },
+    { signal: this.issueTo, key: 'issueTo' },
+    { signal: this.dueFrom, key: 'dueFrom' },
+    { signal: this.dueTo, key: 'dueTo' },
+    { signal: this.q, key: 'q' },
   ];
 
-  /** Active filters as the query part of a list request. */
+  /** Active filters as the query part of a list request, with the segment. */
   filterParams(): InvoiceQuery {
-    const params: InvoiceQuery = {};
+    const params: InvoiceQuery = { ...SEGMENT_QUERY[this.segment()] };
     for (const f of this.filterSignals) {
       const value = f.signal().trim();
       if (value === '') continue;
@@ -342,12 +220,43 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
     return params;
   }
 
-  /** Number of active filters for the filter-button indicator. The search stays out. */
+  /** The number of set filters (chips and search). */
   readonly activeFilterCount = computed(
-    () => this.filterSignals.filter((f) => f.clearedByReset && f.signal().trim() !== '').length,
+    () => this.filterSignals.filter((f) => f.signal().trim() !== '').length,
+  );
+
+  /** The segments with their counts. */
+  readonly segmentOptions = computed<SegmentedOption[]>(() => {
+    const c = this.counts();
+    return SEGMENTS.map((value) => ({
+      value,
+      label: this.i18n.translate(`invoices.segment.${value}`),
+      count: c ? c[value] : null,
+    }));
+  });
+
+  // --- the open row ------------------------------------------------------------------
+  /** The invoice open in the detail (`?id=`). */
+  readonly selectedId = signal('');
+  private readonly fetchedInvoice = signal<Invoice | null>(null);
+  readonly selectedMissing = signal(false);
+
+  readonly selectedInvoice = computed<Invoice | null>(() => {
+    const id = this.selectedId();
+    if (!id) return null;
+    const row = this.items().find((i) => i.id === id);
+    if (row) return row;
+    const fetched = this.fetchedInvoice();
+    return fetched?.id === id ? fetched : null;
+  });
+
+  /** The rows by the month of their invoice date. */
+  readonly groups = computed(() =>
+    monthGroups(this.items(), (i) => i.issueDate ?? i.createdAt, this.i18n.locale()),
   );
 
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
+  readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
   /** Debounced search, about 400 ms. It drives the `q` param of the server query. */
   onSearch(value: string): void {
@@ -355,29 +264,33 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
     this.debouncedReload();
   }
 
-  setStatus(value: '' | InvoiceStatus): void {
-    this.statusFilter.set(value);
+  setSegment(value: string): void {
+    const next = (SEGMENTS as readonly string[]).includes(value) ? (value as InvoiceSegment) : 'all';
+    if (next === this.segment()) return;
+    this.segment.set(next);
     this.reload();
   }
 
-  /** Gross-range filter. It debounces, because the user types the value. */
-  onGrossFilter(which: 'min' | 'max', value: string): void {
-    (which === 'min' ? this.grossMin : this.grossMax).set(value);
-    this.debouncedReload();
+  onGrossRange(v: RangeValue): void {
+    this.grossMin.set(v.from);
+    this.grossMax.set(v.to);
+    this.reload();
   }
 
-  onDateFilter(which: 'issueFrom' | 'issueTo' | 'dueFrom' | 'dueTo', value: string): void {
-    ({
-      issueFrom: this.issueFrom,
-      issueTo: this.issueTo,
-      dueFrom: this.dueFrom,
-      dueTo: this.dueTo,
-    })[which].set(value);
-    this.debouncedReload();
+  onIssueRange(v: RangeValue): void {
+    this.issueFrom.set(v.from);
+    this.issueTo.set(v.to);
+    this.reload();
+  }
+
+  onDueRange(v: RangeValue): void {
+    this.dueFrom.set(v.from);
+    this.dueTo.set(v.to);
+    this.reload();
   }
 
   resetFilters(): void {
-    for (const f of this.filterSignals) if (f.clearedByReset) f.signal.set('');
+    for (const f of this.filterSignals) f.signal.set('');
     this.reload();
   }
 
@@ -388,11 +301,12 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
 
   ngOnDestroy(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.frame.fill.set(false);
   }
 
   readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
 
-  /** What the import found: the note at the top of the review dialog. */
+  /** What the import found: the note at the top of the review form. */
   readonly importNotice = signal<ImportNotice>(null);
   /** The number of an invoice that exists already (N31), or null. */
   readonly importDuplicate = signal<string | null>(null);
@@ -420,9 +334,11 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
   /** Receipt handle from the import. An empty value means manual entry. */
   readonly importToken = signal('');
   readonly importFileName = signal('');
+  /** The size of the dropped or picked file in bytes, 0 when unknown. */
+  readonly importFileSize = signal(0);
   private importFileMime = '';
 
-  /** Number, supplier and a positive gross are required (board Arbeit-Rechnung-Import). */
+  /** Number, supplier and a positive gross are required (board Fin-Rechnung-Import). */
   readonly canSubmitCreate = computed(() =>
     invoiceFieldsValid(this.newNumber(), this.newSupplier(), this.newGross()),
   );
@@ -451,51 +367,91 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
       Number(this.editGross()) > 0,
   );
   readonly confirmDelete = signal<Invoice | null>(null);
+  /** "Als bezahlt markieren" runs for this invoice. */
+  readonly markingPaid = signal<string | null>(null);
+
+  /** The open form, or null. */
+  readonly formMode = computed<'create' | 'edit' | null>(() =>
+    this.createOpen() ? 'create' : this.editing() ? 'edit' : null,
+  );
+
+  /** The heading of the form sheet of a phone. */
+  readonly formTitle = computed(() => {
+    const mode = this.formMode();
+    if (mode === 'edit') return this.i18n.translate('invoices.edit');
+    if (mode === 'create' && this.importNotice() === 'parsed') {
+      return this.i18n.translate('invoices.importReview');
+    }
+    return this.i18n.translate('invoices.add');
+  });
+
+  /** What the detail pane shows. */
+  readonly detailView = computed<'form' | 'invoice' | 'missing' | 'none'>(() => {
+    if (this.formMode() && !this.phone()) return 'form';
+    if (this.selectedInvoice()) return 'invoice';
+    if (this.selectedId() && this.selectedMissing()) return 'missing';
+    return 'none';
+  });
+
+  /** One pane at a time the detail shows while a row or a form is open. */
+  readonly detailOpen = computed(() => (!!this.formMode() && !this.phone()) || !!this.selectedId());
 
   constructor() {
-    this.adoptUrlFilters(this.route.snapshot.queryParamMap);
+    this.adoptUrl(this.route.snapshot.queryParamMap);
     this.reload();
 
     // The palette can send us here while we are already here: a hit on another invoice
-    // changes only the query string, and the router keeps this component alive. Without
-    // this the URL named one invoice and the list went on showing the previous one.
+    // changes only the query string, and the router keeps this component alive.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
-      if (this.adoptUrlFilters(qp)) this.reload();
+      if (this.adoptUrl(qp)) this.reload();
     });
 
     // Write the filters back, so the URL always states what the list is showing.
-    //
-    // Reading the URL without writing it let the two drift apart, and the drift broke
-    // the palette. Reset cleared the filters but left `?id=…` behind; picking that same
-    // invoice again then navigated to the URL the browser was ALREADY on, the router
-    // dropped it as a same-URL navigation, `queryParamMap` never emitted — and nothing
-    // happened at all. Keeping the URL true means the palette's target differs from the
-    // current URL exactly when the list would actually change.
-    //
     // `replaceUrl`, so filtering does not fill the back button with one entry per
-    // keystroke. This mirrors /expenses.
+    // keystroke. The open row is a navigation of its own (see `openInvoice`).
     effect(() => {
-      const queryParams: Record<string, string | null> = {};
+      const queryParams: Record<string, string | null> = {
+        seg: this.segment() === 'all' ? null : this.segment(),
+      };
       for (const f of this.filterSignals) {
         queryParams[f.key as string] = f.signal().trim() || null;
       }
-      void this.router.navigate([], {
-        relativeTo: this.route,
-        queryParams,
-        queryParamsHandling: 'merge',
-        replaceUrl: true,
-      });
+      untracked(
+        () =>
+          void this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams,
+            queryParamsHandling: 'merge',
+            replaceUrl: true,
+          }),
+      );
     });
 
-    // Infinite scroll. When the sentinel at the list end appears, load the next page.
+    // The rows are tracked too: a reload can drop the open invoice from the list (for
+    // example after "Als bezahlt markieren" in "Eingang"). It then loads by its id.
+    effect(() => {
+      const id = this.selectedId();
+      const loading = this.loading();
+      const rows = this.items();
+      untracked(() => this.ensureSelected(id, loading, rows));
+    });
+    effect(() => {
+      const inv = this.selectedInvoice();
+      untracked(() => this.loadTreeOnce(inv));
+    });
+
+    effect(() => this.frame.fill.set(this.split()));
+
+    // Infinite scroll. Side by side the list scrolls inside its own box.
     effect((onCleanup) => {
       const el = this.sentinel()?.nativeElement;
       if (!el || typeof IntersectionObserver === 'undefined') return;
+      const root = this.split() ? (this.scroller()?.nativeElement ?? null) : null;
       const obs = new IntersectionObserver(
         (entries) => {
           if (entries.some((e) => e.isIntersecting)) this.loadMore();
         },
-        { rootMargin: '400px' },
+        { root, rootMargin: '400px' },
       );
       obs.observe(el);
       onCleanup(() => obs.disconnect());
@@ -503,72 +459,66 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
   }
 
   /**
-   * Adopt the filters the URL carries. Returns whether any of them changed.
-   *
-   * `/invoices?id=…` is where a global-search hit lands. This runs before the first
-   * request rather than after it: reading it later would fire an unfiltered request
-   * first, and that one can resolve last and overwrite the filtered list.
-   *
-   * `id` is the only one read. This page does not write its panel filters into the URL,
-   * so a parameter that is absent says nothing about what the reader has set, and
-   * clearing on absence would wipe it.
+   * Adopt the filters, the segment and the open row of the URL. Returns whether a filter
+   * of the list changed.
    */
-  private adoptUrlFilters(qp: ParamMap): boolean {
+  private adoptUrl(qp: ParamMap): boolean {
     let changed = false;
     for (const f of this.filterSignals) {
-      // Absence clears. Every one of these is written back by the effect in the
-      // constructor, so a parameter that is gone was taken away rather than merely
-      // omitted — the same rule /expenses states. Reading only what was present is what
-      // let a filter survive in the list after the URL had dropped it.
+      // Absence clears: each of these is written back by the effect in the constructor.
       const next = this.sanitizeFilter(f, qp.get(f.key as string) ?? '');
       if (next !== f.signal()) {
         f.signal.set(next);
         changed = true;
       }
     }
+    const raw = qp.get('seg') ?? 'all';
+    const seg = (SEGMENTS as readonly string[]).includes(raw) ? (raw as InvoiceSegment) : 'all';
+    if (seg !== this.segment()) {
+      this.segment.set(seg);
+      changed = true;
+    }
+    const id = qp.get('id') ?? '';
+    if (id !== this.selectedId()) {
+      // A click on another row while a form is open: the row replaces the form, so the
+      // highlighted row and the detail always agree.
+      if (id) this.closeForms();
+      this.selectedId.set(id);
+      this.selectedMissing.set(false);
+    }
     return changed;
   }
 
   /**
-   * A query string is typed by whoever holds the link, so it can name a value the panel
-   * itself could never produce. Reading every filter from it — rather than only `id` —
-   * is what makes that reachable, so each one is checked on the way in: a bad number
-   * would otherwise reach the request as `NaN`, and a bad status as a word the API has
-   * no case for.
+   * A query string is typed by whoever holds the link, so it can name a value the chips
+   * could never produce. A bad number would reach the request as `NaN`.
    */
-  private sanitizeFilter(
-    f: { readonly key: keyof InvoiceQuery; readonly numeric?: boolean },
-    raw: string,
-  ): string {
+  private sanitizeFilter(f: { readonly numeric?: boolean }, raw: string): string {
     const value = raw.trim();
     if (value === '') return '';
     if (f.numeric) return Number.isFinite(Number(value)) ? value : '';
-    if (f.key === 'status') return value === 'open' || value === 'paid' ? value : '';
     return value;
   }
 
   money(amount: string): string {
-    return Number(amount).toLocaleString(this.i18n.formatLocale(), {
-      style: 'currency',
-      currency: 'EUR',
-    });
+    return formatEur(Number(amount), this.i18n.locale());
   }
 
-  /**
-   * Reload page 0 after a filter or sort change, WITHOUT emptying the list first.
-   *
-   * Clearing the rows made every sort and every filter flash: the table dropped to
-   * skeletons and back, and a reader who had scrolled a wide table sideways lost their
-   * place, because an empty box has nothing to scroll and the browser clamps the
-   * position to 0. `fetch(true)` replaces the rows, so keeping them costs nothing.
-   *
-   * `loading` keeps its narrow meaning of "nothing to show yet". The old total stays
-   * for the same reason: a number a moment out of date reads better than a 0 that was
-   * never true.
-   */
+  day(iso: string | null): string {
+    return shortDate(iso, this.i18n.locale());
+  }
+
+  /** The title of a row: the supplier, else the number. */
+  titleOf(i: Invoice): string {
+    return i.supplier || i.number || this.i18n.translate('invoices.untitled');
+  }
+
+  /** Reload page 0 after a filter change, without emptying the list first. */
   private reload(): void {
+    this.fetchEpoch++;
     this.nextOffset = 0;
     this.loading.set(this.items().length === 0);
+    this.loadingMore.set(false);
     this.fetch(true);
   }
 
@@ -579,6 +529,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
   }
 
   private fetch(initial: boolean): void {
+    const epoch = this.fetchEpoch;
     this.api
       .listInvoicesPaged({
         ...this.filterParams(),
@@ -587,14 +538,16 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
       })
       .subscribe({
         next: (page) => {
+          if (epoch !== this.fetchEpoch) return;
           this.total.set(page.total);
+          this.counts.set(page.counts ?? null);
           this.items.update((cur) => (initial ? page.items : [...cur, ...page.items]));
           this.nextOffset = page.offset + page.items.length;
           this.loading.set(false);
           this.loadingMore.set(false);
-          this.loadTreeOnce(page.items);
         },
         error: () => {
+          if (epoch !== this.fetchEpoch) return;
           if (initial) {
             this.items.set([]);
             this.total.set(0);
@@ -605,9 +558,25 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
       });
   }
 
+  /** Load the open invoice when it is not among the loaded rows (a deep link, or a row
+   *  that a reload dropped). */
+  private ensureSelected(id: string, loading: boolean, rows: readonly Invoice[]): void {
+    if (!id || loading || rows.some((i) => i.id === id)) return;
+    if (this.fetchedInvoice()?.id === id) return;
+    this.api.getInvoice(id).subscribe({
+      next: (inv) => {
+        if (this.selectedId() !== id) return;
+        this.fetchedInvoice.set(inv);
+      },
+      error: () => {
+        if (this.selectedId() === id) this.selectedMissing.set(true);
+      },
+    });
+  }
+
   /** Load the tree for the swatches, once, and only when a booking needs a colour. */
-  private loadTreeOnce(rows: readonly Invoice[]): void {
-    if (this.treeRequested || !rows.some((i) => (i.linkedBookings?.length ?? 0) > 0)) return;
+  private loadTreeOnce(inv: Invoice | null): void {
+    if (this.treeRequested || !(inv?.linkedBookings?.length ?? 0)) return;
     this.treeRequested = true;
     this.api.tree().subscribe({
       next: (nodes) => this.tree.set(nodes),
@@ -615,6 +584,36 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
     });
   }
 
+  // --- the open row ------------------------------------------------------------------
+  /** Open an invoice in the detail. The URL keeps it, so the back button closes it. */
+  openInvoice(id: string): void {
+    this.closeForms();
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { id },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  /** "Zur Liste": close the form, else the open row. */
+  closeDetail(): void {
+    if (this.formMode()) {
+      this.closeForms();
+      return;
+    }
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { id: null },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  closeForms(): void {
+    this.createOpen.set(false);
+    this.editing.set(null);
+  }
+
+  // --- import ----------------------------------------------------------------------
   /** A drag event that the drop zone handles itself. The page overlay leaves it alone, so
    *  one drop never imports twice. */
   private inDropZone(event: DragEvent): boolean {
@@ -676,14 +675,18 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
     this.toast.error(this.i18n.translate('invoices.toast.notPdf'));
   }
 
-  /** Parse a PDF. On success, prefill the dialog. Without ZUGFeRD data, open it empty. */
+  onHeaderMenu(item: RowMenuItem): void {
+    if (item.id === 'import') this.fileInput()?.nativeElement.click();
+  }
+
+  /** Parse a PDF. On success, prefill the form. Without ZUGFeRD data, open it empty. */
   private importFile(file: File): void {
     if (this.importing()) return;
     this.importing.set(true);
     this.api.parseInvoice(file).subscribe({
       next: (parsed) => {
         this.importing.set(false);
-        this.prefillFromParse(parsed);
+        this.prefillFromParse(parsed, file.size);
       },
       error: (err) => {
         this.importing.set(false);
@@ -701,7 +704,8 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
     });
   }
 
-  private prefillFromParse(p: InvoiceParseResult): void {
+  private prefillFromParse(p: InvoiceParseResult, size: number): void {
+    this.closeForms();
     this.newNumber.set(p.number ?? '');
     this.newSupplier.set(p.supplier ?? '');
     this.newIssueDate.set(p.issueDate ?? '');
@@ -713,9 +717,10 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
     this.newNote.set('');
     this.importToken.set(p.fileToken);
     this.importFileName.set(p.fileName);
+    this.importFileSize.set(size);
     this.importFileMime = p.fileMime;
     this.importNotice.set('parsed');
-    // The server sets the flag when an invoice with the same number exists. The dialog
+    // The server sets the flag when an invoice with the same number exists. The form
     // shows it as a warning above the fields (N31).
     this.importDuplicate.set(p.duplicate ? (p.number ?? '') : null);
     this.createOpen.set(true);
@@ -731,6 +736,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
         this.attaching.set(false);
         this.importToken.set(res.fileToken);
         this.importFileName.set(res.fileName);
+        this.importFileSize.set(file.size);
         this.importFileMime = res.fileMime;
       },
       error: (err) => {
@@ -750,10 +756,26 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
   clearAttachment(): void {
     this.importToken.set('');
     this.importFileName.set('');
+    this.importFileSize.set(0);
     this.importFileMime = '';
   }
 
+  /**
+   * "Vorhandene öffnen" at a duplicate: search for the number in every segment. The
+   * review closes; the list shows the invoice that exists.
+   */
+  openDuplicate(): void {
+    const number = this.importDuplicate();
+    if (!number) return;
+    this.closeForms();
+    this.q.set(number);
+    this.segment.set('all');
+    this.reload();
+  }
+
+  // --- forms -----------------------------------------------------------------------
   openCreate(): void {
+    this.closeForms();
     this.newNumber.set('');
     this.newSupplier.set('');
     this.newIssueDate.set('');
@@ -765,6 +787,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
     this.newNote.set('');
     this.importToken.set('');
     this.importFileName.set('');
+    this.importFileSize.set(0);
     this.importFileMime = '';
     this.importNotice.set(null);
     this.importDuplicate.set(null);
@@ -791,11 +814,12 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
         fileMime: this.importToken() ? this.importFileMime || null : null,
       })
       .subscribe({
-        next: () => {
+        next: (created) => {
           this.saving.set(false);
           this.createOpen.set(false);
           this.toast.success(this.i18n.translate('invoices.toast.created'));
           this.reload();
+          if (created?.id) this.openInvoice(created.id);
         },
         error: (err) => {
           this.saving.set(false);
@@ -805,6 +829,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
   }
 
   openEdit(i: Invoice): void {
+    this.closeForms();
     this.editing.set(i);
     this.editNumber.set(i.number ?? '');
     this.editSupplier.set(i.supplier ?? '');
@@ -838,14 +863,52 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
         next: (updated) => {
           this.saving.set(false);
           this.editing.set(null);
-          this.items.update((list) => list.map((x) => (x.id === updated.id ? updated : x)));
+          this.replaceRow(updated);
           this.toast.success(this.i18n.translate('invoices.toast.saved'));
+          // The status or the amount can move the invoice to another segment.
+          if (updated.status !== i.status) this.reload();
         },
         error: (err) => {
           this.saving.set(false);
           this.toast.error(this.problemDetail(err));
         },
       });
+  }
+
+  /** "Als bezahlt markieren": the existing update with `status: paid`. */
+  markPaid(i: Invoice): void {
+    if (this.markingPaid() || i.status === 'paid') return;
+    this.markingPaid.set(i.id);
+    this.api.updateInvoice(i.id, { status: 'paid' }).subscribe({
+      next: (updated) => {
+        this.markingPaid.set(null);
+        this.replaceRow(updated);
+        this.toast.success(this.i18n.translate('invoices.toast.paid'));
+        // The invoice leaves "Eingang" and "Verbucht"; the counts change.
+        this.reload();
+      },
+      error: (err) => {
+        this.markingPaid.set(null);
+        this.toast.error(this.problemDetail(err));
+      },
+    });
+  }
+
+  /** "Buchung anlegen": the booking form of the bookings page with this invoice. */
+  createBooking(i: Invoice): void {
+    void this.router.navigate(['/expenses'], { queryParams: { new: 'booking', invoice: i.id } });
+  }
+
+  /**
+   * Put a saved invoice into the list. The open invoice is also kept apart: a reload
+   * after a status change can drop its row from the segment, and the detail must still
+   * show it.
+   */
+  private replaceRow(updated: Invoice): void {
+    this.items.update((list) => list.map((x) => (x.id === updated.id ? { ...x, ...updated } : x)));
+    if (updated.id === this.selectedId() || this.fetchedInvoice()?.id === updated.id) {
+      this.fetchedInvoice.set(updated);
+    }
   }
 
   askDelete(i: Invoice): void {
@@ -860,9 +923,12 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
       next: () => {
         this.saving.set(false);
         this.confirmDelete.set(null);
+        this.closeForms();
         this.items.update((list) => list.filter((x) => x.id !== i.id));
         this.total.update((t) => Math.max(0, t - 1));
         this.toast.success(this.i18n.translate('invoices.toast.deleted'));
+        if (i.id === this.selectedId()) this.closeDetail();
+        this.reload();
       },
       error: () => {
         this.saving.set(false);
@@ -879,6 +945,38 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
       next: (blob) => downloadBlob(blob, i.fileName || 'beleg.pdf'),
       error: () => this.toast.error(this.i18n.translate('invoices.toast.failed')),
     });
+  }
+
+  /** The row menu of an invoice. */
+  rowMenu(i: Invoice): RowMenuSection[] {
+    const items: RowMenuItem[] = [];
+    if (this.canManage()) {
+      items.push({ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' });
+      if (i.status === 'open') {
+        items.push({ id: 'paid', label: this.i18n.translate('invoices.markPaid'), icon: 'check' });
+      }
+      items.push({ id: 'book', label: this.i18n.translate('invoices.createBooking'), icon: 'add' });
+    }
+    if (i.hasFile) items.push({ id: 'file', label: this.i18n.translate('invoices.openFile'), icon: 'file' });
+    const sections: RowMenuSection[] = items.length ? [{ items }] : [];
+    if (this.canManage()) {
+      sections.push({
+        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'delete', danger: true }],
+      });
+    }
+    return sections;
+  }
+
+  onRowMenu(item: RowMenuItem, i: Invoice): void {
+    if (item.id === 'edit') this.openEdit(i);
+    else if (item.id === 'paid') this.markPaid(i);
+    else if (item.id === 'book') this.createBooking(i);
+    else if (item.id === 'file') this.openFile(i);
+    else if (item.id === 'delete') this.askDelete(i);
+  }
+
+  rowMenuLabel(i: Invoice): string {
+    return this.i18n.translate('invoices.rowMenu', { number: i.number || i.supplier || '' });
   }
 
   private problemDetail(err: unknown): string {

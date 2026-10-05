@@ -29,6 +29,8 @@ from app.modules.budget.tree_schemas import (
     ExpenseOut,
     FiscalYearOut,
     InvoiceOut,
+    InvoicePage,
+    InvoiceSegmentCounts,
     TransferRowOut,
 )
 from app.settings import load_settings
@@ -204,9 +206,15 @@ class _FakeService:
         self.calls["fy_labels"] = True
         return {_FYID: "2026"}
 
-    async def list_invoices_paged(self, **kwargs: Any) -> Page[InvoiceOut]:
+    async def list_invoices_paged(self, **kwargs: Any) -> InvoicePage:
         self.calls["list_invoices_paged"] = kwargs
-        return Page(items=[_invoice_out()], total=1, limit=50, offset=0)
+        return InvoicePage(
+            items=[_invoice_out()],
+            total=1,
+            limit=50,
+            offset=0,
+            counts=InvoiceSegmentCounts(all=1, inbox=1, booked=0, paid=0),
+        )
 
     async def create_invoice(self, payload: Any, *, actor: str) -> InvoiceOut:
         self.calls["create_invoice"] = (payload, actor)
@@ -413,6 +421,24 @@ def test_invoices_list_readable_by_view(fake: _FakeService) -> None:
     assert kwargs["q"] == "Acme"
     assert kwargs["status"] == "open"
     assert kwargs["limit"] == 20
+    assert kwargs["booked"] is None
+    assert body["counts"] == {"all": 1, "inbox": 1, "booked": 0, "paid": 0}
+
+
+@pytest.mark.parametrize(("raw", "expected"), [("true", True), ("false", False)])
+def test_invoices_list_passes_the_booked_filter(
+    fake: _FakeService, raw: str, expected: bool
+) -> None:
+    """FE10c: the segments "Eingang" and "Verbucht" filter on a linked booking."""
+    r = _app_as(fake, {"budget.view"}).get(f"/api/invoices?status=open&booked={raw}")
+    assert r.status_code == 200
+    assert fake.calls["list_invoices_paged"]["booked"] is expected
+
+
+def test_invoices_list_rejects_a_bad_booked_value(fake: _FakeService) -> None:
+    r = _app_as(fake, {"budget.view"}).get("/api/invoices?booked=maybe")
+    assert r.status_code == 422
+    assert r.headers["content-type"].startswith("application/problem+json")
 
 
 def test_invoice_create_requires_book(fake: _FakeService) -> None:

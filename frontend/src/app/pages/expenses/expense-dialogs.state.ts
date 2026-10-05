@@ -2,6 +2,7 @@ import { computed, inject, signal } from '@angular/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService, type SelectOption } from '@stupa-makers/ui-kit';
+import type { Uuid } from '@core/api/models';
 import { downloadBlob } from '@shared/download.util';
 import {
   BudgetTreeApi,
@@ -17,8 +18,9 @@ import type { ExpenseSubBookingsState } from './expense-sub-bookings.state';
 import type { ExpenseTransfersState } from './expense-transfers.state';
 
 /**
- * Booking dialogs: create (standalone or application-bound), edit, delete, transfer
- * between cost centers, and the linked-invoice cache with its detail dialog.
+ * Booking forms: create (standalone or application-bound), edit, delete, transfer
+ * between cost centres, and the invoice cache behind the invoice field and the
+ * "Verknüpft" card of the detail. One form shows at a time.
  */
 export class ExpenseDialogsState {
   private readonly api = inject(BudgetTreeApi);
@@ -68,17 +70,25 @@ export class ExpenseDialogsState {
   readonly invoices = signal<Invoice[]>([]);
   readonly newInvoiceId = signal('');
   readonly editInvoiceId = signal('');
-  readonly viewingInvoice = signal<Invoice | null>(null);
-  /** Open invoices, newest issue date first. A booking marks its linked invoice paid
-   *  on the server, so paid invoices drop out of the create dropdown. */
+  /** Open invoices, newest issue date first. A booking keeps its invoice open (part
+   *  bookings), and "Als bezahlt markieren" closes it, so paid invoices drop out of the
+   *  create dropdown. */
   private readonly openInvoices = computed<Invoice[]>(() =>
     this.invoices()
       .filter((i) => i.status === 'open')
       .sort((a, b) => (b.issueDate ?? '').localeCompare(a.issueDate ?? '')),
   );
-  readonly invoiceOptions = computed<SelectOption[]>(() =>
-    this.openInvoices().map((i) => ({ value: i.id, label: this.invoiceLabel(i) })),
-  );
+  /** Open invoices. A preselected paid one ("Buchung anlegen" on a paid invoice) stays
+   *  selectable, like the linked invoice of an edit. */
+  readonly invoiceOptions = computed<SelectOption[]>(() => {
+    const opts = this.openInvoices().map((i) => ({ value: i.id, label: this.invoiceLabel(i) }));
+    const picked = this.newInvoiceId();
+    if (picked && !opts.some((o) => o.value === picked)) {
+      const inv = this.invoices().find((i) => i.id === picked);
+      if (inv) opts.unshift({ value: inv.id, label: this.invoiceLabel(inv) });
+    }
+    return opts;
+  });
   /** Edit keeps the currently linked (possibly paid) invoice selectable. */
   readonly editInvoiceOptions = computed<SelectOption[]>(() => {
     const opts = this.openInvoices().map((i) => ({ value: i.id, label: this.invoiceLabel(i) }));
@@ -115,6 +125,13 @@ export class ExpenseDialogsState {
     return !!this.newBudgetId() && !!this.newFiscalYearId();
   });
 
+  /** Called with the new booking after a create, so the page can open it. */
+  onCreated: ((created: Expense) => void) | null = null;
+  /** Called with the saved booking after an edit, so the page can update its detail. */
+  onSaved: ((saved: Expense) => void) | null = null;
+  /** Called with the booking after a delete, so the page can close its detail. */
+  onDeleted: ((gone: Expense) => void) | null = null;
+
   constructor(
     private readonly list: ExpensesListState,
     private readonly sub: ExpenseSubBookingsState,
@@ -133,15 +150,41 @@ export class ExpenseDialogsState {
     return problemDetail(err) ?? this.i18n.translate('expenses.toast.failed');
   }
 
-  /** A booking marks its linked invoice paid, so refresh the open-invoice dropdown. */
+  /**
+   * Refresh the open-invoice dropdown, for example after another user marked an invoice paid.
+   *
+   * The list has a cap and can arrive after `preselectInvoice` loaded a single invoice.
+   * A picked invoice that the new rows do not contain stays in the cache, so the select
+   * keeps showing it.
+   */
   private loadInvoices(): void {
     this.api.listInvoices().subscribe({
-      next: (rows) => this.invoices.set(rows),
-      error: () => this.invoices.set([]),
+      next: (rows) => this.invoices.set(this.keepPicked(rows)),
+      error: () => this.invoices.set(this.keepPicked([])),
     });
   }
 
-  openCreate(): void {
+  /** `rows` plus the cached invoices of the two invoice fields that `rows` does not hold. */
+  private keepPicked(rows: Invoice[]): Invoice[] {
+    const picked = new Set([this.newInvoiceId(), this.editInvoiceId()].filter((id) => !!id));
+    const kept = this.invoices().filter((i) => picked.has(i.id) && !rows.some((r) => r.id === i.id));
+    return kept.length ? [...rows, ...kept] : rows;
+  }
+
+  /** Close every booking and transfer form. Only one form shows at a time. */
+  closeForms(): void {
+    this.createOpen.set(false);
+    this.editing.set(null);
+    this.transferOpen.set(false);
+    this.transfers.closeEdit();
+  }
+
+  /**
+   * Open the form for a new booking. `invoiceId` preselects an invoice and takes its data
+   * ("Buchung anlegen" on the invoices page).
+   */
+  openCreate(opts: { invoiceId?: string } = {}): void {
+    this.closeForms();
     this.newKind.set('expense');
     this.newAmount.set('');
     this.newDescription.set('');
@@ -161,6 +204,22 @@ export class ExpenseDialogsState {
     this.fiscalYearOptions.set([]);
     if (this.list.budgetId()) this.loadFiscalYears(this.list.budgetId());
     this.createOpen.set(true);
+    if (opts.invoiceId) this.preselectInvoice(opts.invoiceId);
+  }
+
+  /** Pick an invoice for the new booking; load it first when the cache does not hold it. */
+  private preselectInvoice(id: string): void {
+    if (this.invoices().some((i) => i.id === id)) {
+      this.onPickInvoice(id);
+      return;
+    }
+    this.api.getInvoice(id).subscribe({
+      next: (inv) => {
+        this.invoices.update((rows) => [...rows.filter((r) => r.id !== inv.id), inv]);
+        this.onPickInvoice(inv.id);
+      },
+      error: (err) => this.toast.error(this.failureText(err)),
+    });
   }
 
   setNewKindIncome(): void {
@@ -259,32 +318,19 @@ export class ExpenseDialogsState {
         note: this.newNote().trim() || null,
       })
       .subscribe({
-        next: () => {
+        next: (created) => {
           this.list.saving.set(false);
           this.createOpen.set(false);
           this.toast.success(this.i18n.translate('expenses.toast.created'));
           this.loadInvoices();
           this.list.refresh();
+          if (created) this.onCreated?.(created);
         },
         error: (err) => {
           this.list.saving.set(false);
           this.toast.error(this.failureText(err));
         },
       });
-  }
-
-  openInvoiceDialog(e: Expense): void {
-    if (!e.invoiceId) return;
-    const cached = this.invoices().find((i) => i.id === e.invoiceId);
-    if (cached) {
-      this.viewingInvoice.set(cached);
-      return;
-    }
-    // A linked invoice is often paid or old and can sit outside the capped list cache.
-    this.api.getInvoice(e.invoiceId).subscribe({
-      next: (inv) => this.viewingInvoice.set(inv),
-      error: (err) => this.toast.error(this.failureText(err)),
-    });
   }
 
   /** MinIO is internal only, so the API streams the PDF as a blob. */
@@ -296,6 +342,7 @@ export class ExpenseDialogsState {
   }
 
   openEdit(e: Expense): void {
+    this.closeForms();
     this.editing.set(e);
     this.editAmount.set(e.amount);
     this.editDescription.set(e.description);
@@ -353,6 +400,7 @@ export class ExpenseDialogsState {
               parentExpenseId: e.parentExpenseId,
             };
             this.list.items.update((rows) => rows.map((x) => (x.id === merged.id ? merged : x)));
+            this.onSaved?.(merged);
           }
           this.toast.success(this.i18n.translate('expenses.toast.saved'));
           this.loadInvoices();
@@ -380,11 +428,13 @@ export class ExpenseDialogsState {
           // A sub-booking is gone, so refresh the parent panel and the parent amount.
           this.sub.loadSub(e.parentExpenseId);
           this.list.refresh();
+          this.refreshEditedParent(e.parentExpenseId);
         } else {
           this.list.items.update((rows) => rows.filter((x) => x.id !== e.id));
           this.list.total.update((t) => Math.max(0, t - 1));
         }
         this.toast.success(this.i18n.translate('expenses.toast.deleted'));
+        this.onDeleted?.(e);
       },
       error: () => {
         this.list.saving.set(false);
@@ -393,7 +443,28 @@ export class ExpenseDialogsState {
     });
   }
 
+  /**
+   * The form of `parentId` is open and one of its sub-bookings is gone: show the new
+   * parent amount and child count. The fields the user typed stay as they are.
+   */
+  private refreshEditedParent(parentId: string): void {
+    if (this.editing()?.id !== parentId) return;
+    this.api.listExpenses({ id: parentId as Uuid, limit: 1 }).subscribe({
+      next: (page) => {
+        const fresh = page.items[0];
+        const cur = this.editing();
+        if (!fresh || cur?.id !== parentId) return;
+        // The amount of a parent is read-only, so it follows the server. When the last
+        // sub-booking went, the amount field shows the amount that the server now has.
+        if (this.editAmount() === cur.amount) this.editAmount.set(fresh.amount);
+        this.editing.set({ ...cur, amount: fresh.amount, childCount: fresh.childCount });
+      },
+      error: () => undefined,
+    });
+  }
+
   openTransfer(): void {
+    this.closeForms();
     this.tFromId.set(this.list.budgetId() || '');
     this.tToId.set('');
     this.tFiscalYearId.set('');

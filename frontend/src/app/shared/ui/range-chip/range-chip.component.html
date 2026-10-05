@@ -1,0 +1,90 @@
+<button
+  #trigger
+  type="button"
+  class="chip rc__chip"
+  [class.on]="active()"
+  aria-haspopup="dialog"
+  [attr.aria-expanded]="open()"
+  [title]="chipText()"
+  (click)="toggle()"
+>
+  @if (active()) {
+    <app-icon name="check" [size]="15" />
+  }
+  <span class="ell">{{ chipText() }}</span>
+  @if (!active()) {
+    <app-icon class="rc__chev" name="down" [size]="15" />
+  }
+</button>
+
+<ng-template #rangeForm>
+  <div class="rc__form">
+    <div class="rc__fields" role="group" [attr.aria-label]="label()">
+      @if (kind() === 'amount') {
+        <app-currency-input
+          name="rangeFrom"
+          [label]="'ui.range.from' | t"
+          [ngModel]="draftFrom()"
+          (ngModelChange)="draftFrom.set($event ?? '')"
+        />
+        <app-currency-input
+          name="rangeTo"
+          [label]="'ui.range.to' | t"
+          [ngModel]="draftTo()"
+          (ngModelChange)="draftTo.set($event ?? '')"
+        />
+      } @else {
+        <app-datepicker
+          name="rangeFrom"
+          [label]="'ui.range.from' | t"
+          [ngModel]="draftFrom()"
+          (ngModelChange)="draftFrom.set($event ?? '')"
+        />
+        <app-datepicker
+          name="rangeTo"
+          [label]="'ui.range.to' | t"
+          [ngModel]="draftTo()"
+          (ngModelChange)="draftTo.set($event ?? '')"
+        />
+      }
+    </div>
+    @if (!draftValid()) {
+      <p class="rc__error" role="alert">{{ 'ui.range.invalid' | t }}</p>
+    }
+    <div class="rc__actions">
+      <app-button variant="text" size="sm" (click)="reset()">{{ 'ui.range.reset' | t }}</app-button>
+      <app-button variant="fill" size="sm" [disabled]="!draftValid()" (click)="apply()">{{
+        'ui.range.apply' | t
+      }}</app-button>
+    </div>
+  </div>
+</ng-template>
+
+<!-- Desktop: a popover under the chip, with the look of the list of app-filter-select. It
+     sits in the top layer, so a chip row that scrolls or fades does not clip it. -->
+@if (popoverOpen()) {
+  <div
+    #pop
+    class="rc__pop"
+    popover="manual"
+    role="dialog"
+    tabindex="-1"
+    [attr.aria-label]="label()"
+    [style.top.px]="position().top"
+    [style.left.px]="position().left"
+    (keydown)="onPopKey($event)"
+  >
+    <ng-container [ngTemplateOutlet]="rangeForm" />
+  </div>
+}
+
+<!-- Phone: the shared bottom sheet, like the other filter sheets. It exists only while it
+     is open and returns the focus to the chip when it goes. It sits in the top layer
+     (popover), so a chip row that scrolls or fades (overflow, mask) does not clip it. -->
+@if (sheetOpen()) {
+  <div #layer class="rc__layer" popover="manual">
+    <app-side-sheet side="bottom" [heading]="label()" [open]="true" (openChange)="onSheetOpen($event)">
+      <ng-container [ngTemplateOutlet]="rangeForm" />
+    </app-side-sheet>
+  </div>
+}

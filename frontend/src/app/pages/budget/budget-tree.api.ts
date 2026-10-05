@@ -294,6 +294,11 @@ export interface InvoiceQuery {
   id?: string;
   q?: string;
   status?: InvoiceStatus;
+  /**
+   * With (`true`) or without (`false`) a booking the reader can see. With `status: 'open'`
+   * this gives the list segments "Verbucht" and "Eingang".
+   */
+  booked?: boolean;
   grossMin?: number;
   grossMax?: number;
   issueFrom?: string;
@@ -304,12 +309,25 @@ export interface InvoiceQuery {
   offset?: number;
 }
 
+/**
+ * The size of each segment of the invoice list under the other filters of the request:
+ * all, "Eingang" (open, no booking), "Verbucht" (open, with a booking) and "Bezahlt".
+ */
+export interface InvoiceSegmentCounts {
+  all: number;
+  inbox: number;
+  booked: number;
+  paid: number;
+}
+
 /** Offset page of invoices. */
 export interface InvoicePage {
   items: Invoice[];
   total: number;
   limit: number;
   offset: number;
+  /** The segment counts. A backend before FE10c sends none. */
+  counts?: InvoiceSegmentCounts;
 }
 
 /** Filter/paging of the bookings list. */

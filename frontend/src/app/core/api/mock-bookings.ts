@@ -68,6 +68,7 @@ const INV = {
   print: 'd1000000-0000-0000-0000-000000000002',
   sport: 'd1000000-0000-0000-0000-000000000003',
   stage: 'd1000000-0000-0000-0000-000000000004',
+  copy: 'd1000000-0000-0000-0000-000000000005',
 };
 
 type Row = Partial<Expense> & Pick<Expense, 'id' | 'description' | 'amount' | 'budgetId'>;
@@ -185,6 +186,20 @@ const EXPENSES: Expense[] = [
     paymentMethod: 'bar',
   }),
   expense({
+    id: 'e1000000-0000-0000-0000-000000000009',
+    description: 'Anzahlung Bühnentechnik Sommerfest',
+    amount: '900.00',
+    budgetId: cc('12'),
+    invoiceDate: '2026-09-24',
+    paymentDate: '2026-09-26',
+    correspondent: 'Bühnentechnik Verleih',
+    invoiceId: INV.stage,
+    invoiceNumber: 'BT-2026-118',
+    referenceNumber: 'BT-2026-118',
+    category: 'Anschaffung',
+    note: 'Anzahlung, der Rest folgt bei Lieferung.',
+  }),
+  expense({
     id: 'e1000000-0000-0000-0000-000000000008',
     description: 'Exkursion Busanmietung',
     amount: '1350.00',
@@ -276,6 +291,17 @@ function invoice(row: InvoiceRow): Invoice {
 
 const INVOICES: Invoice[] = [
   invoice({
+    id: INV.copy,
+    number: 'K-2026-311',
+    issueDate: '2026-09-29',
+    dueDate: '2026-10-13',
+    supplier: 'Copyshop am Campus',
+    netAmount: '156.64',
+    taxAmount: '29.76',
+    grossAmount: '186.40',
+    status: 'open',
+  }),
+  invoice({
     id: INV.stage,
     number: 'BT-2026-118',
     issueDate: '2026-09-24',
@@ -285,6 +311,7 @@ const INVOICES: Invoice[] = [
     taxAmount: '461.43',
     grossAmount: '2890.00',
     status: 'open',
+    note: 'Anzahlung 900,00 € geleistet, Rest bei Lieferung.',
     fileName: 'BT-2026-118.pdf',
     hasFile: true,
   }),
@@ -364,18 +391,34 @@ export function mockTransfers(params: URLSearchParams): TransferPage {
   return page(TRANSFERS, params);
 }
 
-/** GET /invoices: status, search and the exact invoice of a deep link. */
+/**
+ * GET /invoices: search, the exact invoice of a deep link, the segment (`status` plus
+ * `booked`) and the counts of the segments under the other filters.
+ */
 export function mockInvoices(params: URLSearchParams): InvoicePage {
   const status = params.get('status');
+  const booked = params.get('booked');
   const id = params.get('id');
   const q = (params.get('q') ?? '').trim().toLowerCase();
-  const rows = INVOICES.filter(
+  const hasBooking = (i: Invoice): boolean => (i.linkedBookings?.length ?? 0) > 0;
+  const base = INVOICES.filter(
+    (i) => (!id || i.id === id) && (!q || matches(i.number, q) || matches(i.supplier, q)),
+  );
+  const rows = base.filter(
     (i) =>
       (!status || i.status === status) &&
-      (!id || i.id === id) &&
-      (!q || matches(i.number, q) || matches(i.supplier, q)),
+      (booked === null || hasBooking(i) === (booked === 'true')),
   );
-  return page(rows, params);
+  const open = base.filter((i) => i.status === 'open');
+  return {
+    ...page(rows, params),
+    counts: {
+      all: base.length,
+      inbox: open.filter((i) => !hasBooking(i)).length,
+      booked: open.filter(hasBooking).length,
+      paid: base.filter((i) => i.status === 'paid').length,
+    },
+  };
 }
 
 /** GET /invoices/{id}. */
@@ -388,7 +431,7 @@ export function mockInvoice(id: string): Invoice | null {
  * which exists already, so the review dialog shows its duplicate warning.
  */
 export function mockParseInvoice(fileName: string): InvoiceParseResult {
-  const known = INVOICES[1];
+  const known = INVOICES.find((i) => i.id === INV.tools) as Invoice;
   return {
     number: known.number,
     issueDate: known.issueDate,
