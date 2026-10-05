@@ -85,6 +85,34 @@ describe('BrandingService', () => {
     expect(svc.confirmTtlHours()).toBe(12);
   });
 
+  it('starts with links without an expiry and the default upload limits', () => {
+    expect(svc.linkTtlDays()).toBeNull();
+    expect(svc.attachmentLimits()).toEqual(BrandingService.DEFAULT_ATTACHMENT_LIMITS);
+    expect(svc.freetexts()).toEqual({});
+  });
+
+  it('takes the link lifetime, the upload limits and the free texts from the config', () => {
+    svc.init();
+    const limits = { maxFileBytes: 5, maxDraftFiles: 3, maxDraftBytes: 9 };
+    http.expectOne('/api/site-config').flush({
+      version: 1,
+      branding: { freetexts: { welcome: { de: 'Hallo' } } },
+      linkTtlDays: 30,
+      attachmentLimits: limits,
+    });
+    expect(svc.linkTtlDays()).toBe(30);
+    expect(svc.attachmentLimits()).toEqual(limits);
+    expect(svc.freetexts()).toEqual({ welcome: { de: 'Hallo' } });
+  });
+
+  it('keeps unlimited links and the default limits when the config has none', () => {
+    svc.init();
+    http.expectOne('/api/site-config').flush({ version: 1, branding: null, linkTtlDays: null });
+    expect(svc.linkTtlDays()).toBeNull();
+    expect(svc.attachmentLimits()).toEqual(BrandingService.DEFAULT_ATTACHMENT_LIMITS);
+    expect(svc.freetexts()).toEqual({});
+  });
+
   it('keeps the i18n fallback when the config request errors', () => {
     svc.init();
     http

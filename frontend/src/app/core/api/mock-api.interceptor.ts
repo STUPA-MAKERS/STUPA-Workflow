@@ -14,6 +14,7 @@ import type {
   ApplicationOutWire,
   ApplicationTypeListItemWire,
   AttachmentOutWire,
+  DraftAttachmentOutWire,
   BallotResult,
   CommentOutWire,
   EffectiveForm,
@@ -1002,6 +1003,34 @@ function mockBookingsGet(p: string, params: URLSearchParams): Observable<unknown
   return null;
 }
 
+/** The mock plays a visitor without a session (`localStorage['mockAnonymous'] = '1'`). */
+function mockAnonymous(): boolean {
+  try {
+    return localStorage.getItem('mockAnonymous') === '1';
+  } catch {
+    return false;
+  }
+}
+
+let MOCK_DRAFT_SEQ = 0;
+
+/** The answer to a draft upload: a new id, the name and size of the sent file. */
+function mockDraftUpload(body: unknown): DraftAttachmentOutWire {
+  const form = body instanceof FormData ? body : null;
+  const file = form?.get('file');
+  const n = ++MOCK_DRAFT_SEQ;
+  return {
+    id: `d0000000-0000-0000-0000-${String(n).padStart(12, '0')}`,
+    filename: file instanceof File ? file.name : `datei-${n}.pdf`,
+    mime: file instanceof File && file.type ? file.type : 'application/pdf',
+    size: file instanceof File ? file.size : 1024,
+    scanned: false,
+    is_comparison_offer: form?.get('is_comparison_offer') === 'true',
+    draftToken: 'mock-draft-token',
+    draftExpiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+  };
+}
+
 function path(url: string): string {
   return url.split('?')[0];
 }
@@ -1068,7 +1097,17 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'GET') {
-    if (p.endsWith('/auth/me')) return ok(MOCK_PRINCIPAL);
+    // `localStorage['mockAnonymous'] = '1'` plays a visitor without a session: the
+    // public frame, the wizard with the contact step and the ALTCHA.
+    if (p.endsWith('/auth/me')) {
+      return mockAnonymous()
+        ? throwError(() => new HttpErrorResponse({ status: 401, url: req.url }))
+        : ok(MOCK_PRINCIPAL);
+    }
+    // The wizard of the demo type gets the form of the demo applications.
+    if (p.endsWith(`/application-types/${MOCK_TYPES.items[0].id}/form`)) {
+      return from(import('./mock-applications')).pipe(mergeMap((m) => ok(m.demoForm())));
+    }
     // ALTCHA is off in mock mode → 404. The widget then reports "unavailable".
     if (p.endsWith('/altcha/challenge')) {
       return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
@@ -1200,6 +1239,8 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
 
   if (req.method === 'POST') {
     if (p.endsWith('/auth/logout')) return ok(LOGOUT_OUT);
+    // A draft upload of the wizard (Z4): the file stays in the scan, the token stays.
+    if (p.endsWith('/apply/attachments')) return ok(mockDraftUpload(req.body), 201);
     if (p.endsWith('/invoices/parse')) {
       const file = req.body instanceof FormData ? req.body.get('file') : null;
       const name = file instanceof File ? file.name : 'rechnung.pdf';
@@ -1391,6 +1432,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'DELETE') {
+    if (/\/apply\/attachments\/[^/]+$/.test(p)) return ok(null, 204);
     if (/\/meetings\/[^/]+\/protokollant-handover$/.test(p)) {
       if (!MOCK_MEETING.plannedHandover) return mockProblem(404, 'no_planned_handover', req.url);
       MOCK_MEETING = { ...MOCK_MEETING, plannedHandover: null };

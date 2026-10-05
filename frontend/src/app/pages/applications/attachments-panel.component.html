@@ -7,7 +7,7 @@
   (drop)="onDrop($event)"
 >
   <div class="att__head">
-    <h3 id="att-title" class="sec att__title">{{ 'applications.attachments.title' | t }}</h3>
+    <h3 id="att-title" class="sec att__title" [class.sr-only]="!titled()">{{ 'applications.attachments.title' | t }}</h3>
     @if (canUpload()) {
       <input
         #fileInput

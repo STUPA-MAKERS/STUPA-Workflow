@@ -308,5 +308,10 @@ export function toApplicationCreateBody(input: NewApplication): ApplicationCreat
     applicantName: input.applicantName ?? null,
     lang: input.lang,
     altcha: input.altcha ?? null,
+    // Only with draft uploads: the server reads an empty list without a token as "no
+    // drafts", but a token without ids is still valid, so both stay out then.
+    ...(input.attachmentIds?.length && input.draftToken
+      ? { attachmentIds: input.attachmentIds, draftToken: input.draftToken }
+      : {}),
   };
 }

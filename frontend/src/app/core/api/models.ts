@@ -42,6 +42,13 @@ export interface PublicSiteConfig {
    * application (admin setting `guest_application_settings.confirm_ttl_hours`).
    */
   confirmTtlHours?: number;
+  /**
+   * Lifetime of a new magic link in days (admin setting
+   * `guest_application_settings.link_ttl_days`). `null`: the link does not expire.
+   */
+  linkTtlDays?: number | null;
+  /** Upload limits of the wizard (Z4): one file, and all draft files of a draft token. */
+  attachmentLimits?: AttachmentLimits | null;
   branding?: {
     /** Configured app name (language neutral). Empty falls back to i18n or the default. */
     appName?: string;
@@ -57,6 +64,13 @@ export interface PublicSiteConfig {
       Record<'loginHint' | 'welcome' | 'support' | 'emailFooter' | 'applyInfo', I18nMap>
     >;
   } | null;
+}
+
+/** Upload limits of the wizard (`attachmentLimits` of the public site config). */
+export interface AttachmentLimits {
+  maxFileBytes: number;
+  maxDraftFiles: number;
+  maxDraftBytes: number;
 }
 
 /** Uniform problem object (close to RFC 9457). */
@@ -388,6 +402,15 @@ export interface AttachmentOutWire {
 }
 
 /**
+ * `DraftAttachmentOut` (files/schemas.py): 201 of `POST /apply/attachments` (Z4). The
+ * attachment fields stay snake_case like `AttachmentOut`; the token fields are camelCase.
+ */
+export interface DraftAttachmentOutWire extends AttachmentOutWire {
+  draftToken: string;
+  draftExpiresAt: IsoDateTime;
+}
+
+/**
  * `SignedUrlOut` (files/schemas.py). An app-relative /download route behind an
  * authorization check. `expiresIn` is an advisory cache hint for the frontend. It
  * is not a URL expiry.
@@ -407,6 +430,10 @@ export interface ApplicationCreateBody {
   applicantName?: string | null;
   lang: Lang;
   altcha?: string | null;
+  /** Draft uploads of the wizard to bind (Z4). Needs `draftToken`. */
+  attachmentIds?: Uuid[];
+  /** The token of the draft uploads (Z4). */
+  draftToken?: string | null;
 }
 
 /** Body for `POST /applications/{id}/comments` (`CommentCreate`). */
@@ -665,6 +692,25 @@ export interface NewApplication {
   applicantName?: string | null;
   lang: Lang;
   altcha?: string | null;
+  /** Draft uploads of the wizard to bind (Z4). */
+  attachmentIds?: Uuid[];
+  /** The token of the draft uploads; required with `attachmentIds`. */
+  draftToken?: string | null;
+}
+
+/**
+ * A draft upload of the wizard (Z4), frontend view: the attachment plus the field it
+ * belongs to (`null` = the general block "Anhänge").
+ */
+export interface DraftAttachment extends Attachment {
+  fieldKey: string | null;
+}
+
+/** The result of `POST /apply/attachments`: the draft and its (new) token. */
+export interface DraftUpload {
+  attachment: Attachment;
+  draftToken: string;
+  draftExpiresAt: IsoDateTime;
 }
 
 // Form definition. A mirror of the backend `FormFieldDef`.

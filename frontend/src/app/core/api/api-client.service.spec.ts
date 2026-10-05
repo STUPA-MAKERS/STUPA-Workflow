@@ -247,6 +247,61 @@ describe('ApiClient', () => {
     );
   });
 
+  it('uploads the first draft file with ALTCHA and no token header (Z4)', (done) => {
+    const file = new File(['hello'], 'Angebot.pdf', { type: 'application/pdf' });
+    api
+      .uploadDraftAttachment(file, { altcha: 'sol', fieldKey: 'offer', isComparisonOffer: true })
+      .subscribe((res) => {
+        expect(res.attachment).toMatchObject({ id: 'd1', isComparisonOffer: true, scanState: 'scanning' });
+        expect(res.draftToken).toBe('tok');
+        expect(res.draftExpiresAt).toBe('2026-10-12T00:00:00Z');
+        done();
+      });
+    const req = http.expectOne('/api/apply/attachments');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.headers.has('X-Draft-Token')).toBe(false);
+    const form = req.request.body as FormData;
+    expect(form.get('altcha')).toBe('sol');
+    expect(form.get('field_key')).toBe('offer');
+    expect(form.get('is_comparison_offer')).toBe('true');
+    req.flush(
+      {
+        id: 'd1',
+        filename: 'Angebot.pdf',
+        mime: 'application/pdf',
+        size: 5,
+        scanned: false,
+        is_comparison_offer: true,
+        draftToken: 'tok',
+        draftExpiresAt: '2026-10-12T00:00:00Z',
+      },
+      { status: 201, statusText: 'Created' },
+    );
+  });
+
+  it('sends the draft token in the header, never ALTCHA or the token in the URL', () => {
+    const file = new File(['x'], 'b.pdf', { type: 'application/pdf' });
+    api.uploadDraftAttachment(file, { token: 'tok', altcha: 'ignored' }).subscribe();
+    const req = http.expectOne('/api/apply/attachments');
+    expect(req.request.headers.get('X-Draft-Token')).toBe('tok');
+    const form = req.request.body as FormData;
+    expect(form.has('altcha')).toBe(false);
+    expect(form.has('field_key')).toBe(false);
+    expect(form.has('is_comparison_offer')).toBe(false);
+    expect(req.request.urlWithParams).not.toContain('tok');
+    req.flush({});
+    api.uploadDraftAttachment(file).subscribe();
+    http.expectOne('/api/apply/attachments').flush({});
+  });
+
+  it('deletes a draft file with the token header', () => {
+    api.deleteDraftAttachment('d1', 'tok').subscribe();
+    const req = http.expectOne('/api/apply/attachments/d1');
+    expect(req.request.method).toBe('DELETE');
+    expect(req.request.headers.get('X-Draft-Token')).toBe('tok');
+    req.flush(null, { status: 204, statusText: 'No Content' });
+  });
+
   it('GETs a signed download URL for an attachment', (done) => {
     api.attachmentUrl('att-9').subscribe((signed) => {
       expect(signed.url).toContain('minio');

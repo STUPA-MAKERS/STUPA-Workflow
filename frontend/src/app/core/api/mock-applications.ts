@@ -396,6 +396,11 @@ const DEMO_FORM: EffectiveForm = {
   ],
 };
 
+/** The form of the demo type "Finanzantrag", for the apply wizard of the mock API. */
+export function demoForm(): EffectiveForm {
+  return DEMO_FORM;
+}
+
 /** The cost positions of a demo amount: three positions, the last without offers. */
 function positionsFor(amount: number): Record<string, unknown>[] {
   const a = Math.round(amount * 45) / 100;

@@ -313,29 +313,9 @@
   color: var(--color-text-muted);
   font-size: 0.875rem;
 }
+/* The fields of the form: the global `.fe-form` grid (styles.scss). */
 .ad__edit {
   min-width: 0;
-  container-type: inline-size;
-}
-/* The fields of the form: two columns, long fields over both (`toFormlySections`).
-   Formly draws the fields, so the rules reach into its elements. */
-.ad__edit ::ng-deep .fe-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-  min-width: 0;
-}
-.ad__edit ::ng-deep .fe-grid > formly-field {
-  display: block;
-  min-width: 0;
-}
-.ad__edit ::ng-deep .fe-grid > .fe-full {
-  grid-column: 1 / -1;
-}
-@container (max-width: 32rem) {
-  .ad__edit ::ng-deep .fe-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 /* ------------------------------------------------------------------ comments */

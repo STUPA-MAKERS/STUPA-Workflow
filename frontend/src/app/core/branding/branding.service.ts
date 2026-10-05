@@ -1,8 +1,17 @@
 import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { ApiClient } from '@core/api/api-client.service';
-import type { I18nMap, PublicFooterColumn, PublicFooterLink } from '@core/api/models';
+import type {
+  AttachmentLimits,
+  I18nMap,
+  PublicFooterColumn,
+  PublicFooterLink,
+  PublicSiteConfig,
+} from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
+
+/** The free texts of the branding, keyed by their slot. */
+export type FreeTexts = NonNullable<NonNullable<PublicSiteConfig['branding']>['freetexts']>;
 
 /**
  * App name from the active site config, which needs no authentication.
@@ -40,6 +49,31 @@ export class BrandingService {
   static readonly DEFAULT_CONFIRM_TTL_HOURS = 12;
 
   private readonly _confirmTtlHours = signal(BrandingService.DEFAULT_CONFIRM_TTL_HOURS);
+
+  /** The upload limits of the backend defaults (10 MB per file, 20 files, 50 MB). */
+  static readonly DEFAULT_ATTACHMENT_LIMITS: AttachmentLimits = {
+    maxFileBytes: 10 * 1024 * 1024,
+    maxDraftFiles: 20,
+    maxDraftBytes: 50 * 1024 * 1024,
+  };
+
+  private readonly _linkTtlDays = signal<number | null>(null);
+  private readonly _attachmentLimits = signal<AttachmentLimits>(
+    BrandingService.DEFAULT_ATTACHMENT_LIMITS,
+  );
+  private readonly _freetexts = signal<FreeTexts>({});
+
+  /**
+   * Days a new magic link works; `null` means that it does not expire. The default of
+   * the backend is `null`, and the value stays so until the config is loaded.
+   */
+  readonly linkTtlDays = this._linkTtlDays.asReadonly();
+
+  /** The upload limits of the wizard (Z4). The backend defaults until the config loads. */
+  readonly attachmentLimits = this._attachmentLimits.asReadonly();
+
+  /** The free texts of the branding (Freitexte), per locale. Empty until loaded. */
+  readonly freetexts = this._freetexts.asReadonly();
 
   /**
    * Hours a guest has to confirm the email. The wizard confirmation page shows it.
@@ -85,6 +119,11 @@ export class BrandingService {
         if (typeof cfg.confirmTtlHours === 'number' && cfg.confirmTtlHours > 0) {
           this._confirmTtlHours.set(cfg.confirmTtlHours);
         }
+        if (typeof cfg.linkTtlDays === 'number' && cfg.linkTtlDays > 0) {
+          this._linkTtlDays.set(cfg.linkTtlDays);
+        }
+        if (cfg.attachmentLimits) this._attachmentLimits.set(cfg.attachmentLimits);
+        this._freetexts.set(cfg.branding?.freetexts ?? {});
       },
       error: () => {
         /* Keep everything empty so the i18n default fallbacks stay. */

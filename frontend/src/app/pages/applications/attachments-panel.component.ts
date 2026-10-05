@@ -69,6 +69,9 @@ export class AttachmentsPanelComponent {
 
   readonly applicationId = input.required<Uuid>();
   readonly canUpload = input(false);
+  /** Show the heading "Anhänge". A side sheet that has the same title hides it (it stays
+   *  for screen readers). */
+  readonly titled = input(true);
   /**
    * Delete is a data change. The backend refuses it for an applicant in a locked state
    * (409), although an upload works there. Without this input the panel uses
