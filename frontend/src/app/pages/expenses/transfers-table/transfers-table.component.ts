@@ -58,7 +58,7 @@ export class TransfersTableComponent {
       { key: 'amount', label: t('expenses.col.amount'), align: 'end', width: '6.5rem' },
     );
     if (this.canManage()) {
-      cols.push({ key: 'actions', label: t('table.actions'), align: 'end', width: '4rem', sticky: 'end' });
+      cols.push({ key: 'actions', label: t('table.actions'), align: 'end', width: '4rem', sticky: 'end', card: 'actions' });
     }
     return cols;
   });

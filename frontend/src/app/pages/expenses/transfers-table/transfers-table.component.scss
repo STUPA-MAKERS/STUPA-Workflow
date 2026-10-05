@@ -46,8 +46,13 @@
   border-radius: 2px;
 }
 
-/* A card has the room for the full text. */
+/* A card has the room for the full text. The card cell spaces the heading, so the
+   description adds no block padding: its first line sits on the line of the row menu
+   in the card header. */
 @include bp.phone {
+  .tt__desc {
+    padding-block: 0;
+  }
   .tt__desc,
   .tt__cc {
     width: auto;

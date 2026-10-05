@@ -29,12 +29,39 @@
   gap: 6px;
 }
 
+/* The select-all box sits on the same x as the row boxes below it: the rows have an
+   inline-start padding of --space-4, and the bar has the same. The 44px touch target
+   (see below) reaches back into that padding. */
 .att__bulkbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
-  padding-inline: var(--space-1);
+  padding-inline: var(--space-4) var(--space-1);
+}
+/* Every checkbox of the panel has a 44px touch target around its 18px box. The
+   negative margins keep the box where it was and the row or bar at its height. */
+.att__bulkbar app-checkbox ::ng-deep label,
+.att__row app-checkbox ::ng-deep label {
+  min-height: 2.75rem;
+  margin-block: calc((1.125rem - 2.75rem) / 2);
+}
+.att__bulkbar app-checkbox ::ng-deep label {
+  padding-inline: calc((2.75rem - 1.125rem) / 2);
+  margin-inline: calc((1.125rem - 2.75rem) / 2) 0;
+}
+/* A row box has no text of its own (the file name names it), so its label is the box
+   and its target only, centred on the box. */
+.att__row app-checkbox {
+  flex: none;
+}
+.att__row app-checkbox ::ng-deep label {
+  justify-content: center;
+  width: 2.75rem;
+  margin-inline: calc((1.125rem - 2.75rem) / 2);
+}
+.att__row app-checkbox ::ng-deep .cbx__label:empty {
+  display: none;
 }
 .att__bulkcount {
   color: var(--color-text-muted);
