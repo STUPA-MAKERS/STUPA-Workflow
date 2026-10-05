@@ -192,6 +192,8 @@ describe('toFormlyFields', () => {
     const [cfg] = toFormlyFields(fields, 'de');
     expect(cfg.type).toBe('display');
     expect(cfg.props?.['text']).toBe('Nur Label');
+    // The text shows once: no bold label over the same text.
+    expect(cfg.props?.['label']).toBeUndefined();
     // Display fields never carry required, even when the definition sets it.
     expect(cfg.props?.['required']).toBeUndefined();
   });

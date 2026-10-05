@@ -36,45 +36,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
       }
     </div>
   `,
-  styles: [
-    `
-      .check {
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-      }
-      .check__row {
-        display: inline-flex;
-        /* Box vertikal zentriert zum Label → gleich viel Luft oben wie unten,
-           wie bei <app-checkbox>. */
-        align-items: center;
-        gap: var(--space-3);
-        cursor: pointer;
-      }
-      .check__box {
-        flex: none;
-        width: 1.15rem;
-        height: 1.15rem;
-        margin: 0;
-        accent-color: var(--color-primary);
-      }
-      .check__label {
-        font-size: var(--fs-md);
-        color: var(--color-text);
-      }
-      .check__req {
-        color: var(--color-danger);
-      }
-      .check__hint {
-        font-size: var(--fs-xs);
-        color: var(--color-text-muted);
-      }
-      .check__error {
-        font-size: var(--fs-xs);
-        color: var(--color-danger);
-      }
-    `,
-  ],
+  styleUrl: './formly-checkbox.type.scss',
 })
 export class FormlyCheckboxType extends FieldType<FieldTypeConfig> {
   get controlId(): string {

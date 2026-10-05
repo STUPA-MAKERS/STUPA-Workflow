@@ -1,0 +1,44 @@
+// A consent checkbox of the form engine with the box of the ui-kit (`app-checkbox`).
+@use 'check' as c;
+@use 'field' as f;
+
+.check {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.check__row {
+  display: inline-flex;
+  // The box centred on the label line, as in `app-checkbox`.
+  align-items: center;
+  gap: var(--space-3);
+  padding-inline: var(--space-1);
+  cursor: pointer;
+}
+.check__box {
+  @include c.box;
+}
+.check__box[aria-invalid='true'] {
+  @include c.box-invalid;
+}
+.check__label {
+  font-size: var(--fs-md);
+  color: var(--color-text);
+}
+.check__req {
+  color: var(--color-danger);
+}
+.check__hint,
+.check__error {
+  @include f.message;
+  // Below the label, not below the box.
+  & {
+    padding-inline: calc(var(--space-1) + 18px + var(--space-3)) 0;
+  }
+}
+.check__hint {
+  color: var(--color-text-muted);
+}
+.check__error {
+  color: var(--color-danger);
+}

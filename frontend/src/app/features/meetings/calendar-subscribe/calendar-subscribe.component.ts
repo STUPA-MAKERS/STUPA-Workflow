@@ -3,8 +3,11 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  NgZone,
+  effect,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
@@ -18,6 +21,8 @@ import { mediaQuerySignal } from '../../../layout/media-query';
 /** The gap between the anchor and the popover, and the least gap to the viewport edge. */
 const GAP = 6;
 const EDGE = 8;
+/** "Kopiert!" shows this long, then the button reads "Kopieren" again. */
+export const COPIED_MS = 2000;
 
 let nextId = 0;
 
@@ -35,7 +40,12 @@ let nextId = 0;
  * "Kopieren" puts it on the clipboard.
  *
  * Desktop: a popover under the anchor, aligned to its end, inside the viewport. Escape
- * and a pointer down outside close it, and the focus goes back to the anchor.
+ * and a pointer down outside close it, and the focus goes back to the anchor. A resize
+ * across the phone limit while it is open swaps the popover and the sheet, and puts the
+ * new one into the top layer.
+ *
+ * A failed read says "could not be loaded" and offers a new read. A failed create of
+ * the link says "could not be created" (`rotateError`); the URL that shows stays valid.
  */
 @Component({
   selector: 'app-calendar-subscribe',
@@ -64,6 +74,8 @@ export class CalendarSubscribeComponent {
   readonly url = signal<string | null>(null);
   readonly loading = signal(false);
   readonly error = signal(false);
+  /** The last create of the link ("Abo-Link erzeugen", "Neue URL erzeugen") failed. */
+  readonly rotateError = signal(false);
   readonly busy = signal(false);
   readonly copied = signal(false);
   /** "Neue URL erzeugen" waits for the confirmation. */
@@ -75,6 +87,8 @@ export class CalendarSubscribeComponent {
   private readonly layer = viewChild<ElementRef<HTMLElement>>('layer');
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private copiedTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly zone = inject(NgZone);
 
   constructor() {
     const onPointer = (e: Event) => {
@@ -96,6 +110,17 @@ export class CalendarSubscribeComponent {
       window.removeEventListener('resize', onResize);
       window.removeEventListener('scroll', onResize, true);
       if (this.timer !== null) clearTimeout(this.timer);
+      this.clearCopied();
+    });
+
+    // The popover and the sheet are two elements: a resize across the phone limit while
+    // the component is open renders the other one, which must enter the top layer too.
+    let wasPhone = untracked(() => this.phone());
+    effect(() => {
+      const phone = this.phone();
+      if (phone === wasPhone) return;
+      wasPhone = phone;
+      if (untracked(() => this.isOpen())) this.later(() => this.reveal());
     });
   }
 
@@ -109,19 +134,23 @@ export class CalendarSubscribeComponent {
   open(anchor: EventTarget | null = null): void {
     this.anchor = anchor instanceof HTMLElement ? anchor : null;
     this.confirming.set(false);
-    this.copied.set(false);
+    this.clearCopied();
+    this.rotateError.set(false);
     this.isOpen.set(true);
     if (!this.loaded) this.load();
-    this.later(() => {
-      if (this.phone()) {
-        showPopover(this.layer()?.nativeElement);
-        return;
-      }
-      const pop = this.pop()?.nativeElement;
-      showPopover(pop);
-      this.place();
-      pop?.focus();
-    });
+    this.later(() => this.reveal());
+  }
+
+  /** Put the sheet (phone) or the popover into the top layer; the popover gets the focus. */
+  private reveal(): void {
+    if (this.phone()) {
+      showPopover(this.layer()?.nativeElement);
+      return;
+    }
+    const pop = this.pop()?.nativeElement;
+    showPopover(pop);
+    this.place();
+    pop?.focus();
   }
 
   /** Close; `returnFocus` puts the focus back on the anchor. */
@@ -175,8 +204,8 @@ export class CalendarSubscribeComponent {
   rotate(): void {
     if (this.busy()) return;
     this.busy.set(true);
-    this.error.set(false);
-    this.copied.set(false);
+    this.rotateError.set(false);
+    this.clearCopied();
     this.api.rotateCalendar().subscribe({
       next: (feed) => {
         this.loaded = true;
@@ -185,20 +214,39 @@ export class CalendarSubscribeComponent {
         this.confirming.set(false);
       },
       error: () => {
-        this.error.set(true);
+        this.rotateError.set(true);
         this.busy.set(false);
       },
     });
   }
 
-  /** Copy the subscription URL to the clipboard. The Clipboard API can be absent. */
+  /**
+   * Copy the subscription URL to the clipboard. The Clipboard API can be absent.
+   * "Kopiert!" shows for {@link COPIED_MS}, then the button reads "Kopieren" again.
+   */
   copy(): void {
     const url = this.url();
     if (!url) return;
     void navigator.clipboard?.writeText(url)?.then(
-      () => this.copied.set(true),
-      () => this.copied.set(false),
+      () => {
+        this.clearCopied();
+        this.copied.set(true);
+        // Outside the zone: the timer is no pending task that keeps the page unstable.
+        this.copiedTimer = this.zone.runOutsideAngular(() =>
+          setTimeout(() => {
+            this.copiedTimer = null;
+            this.copied.set(false);
+          }, COPIED_MS),
+        );
+      },
+      () => this.clearCopied(),
     );
+  }
+
+  private clearCopied(): void {
+    if (this.copiedTimer !== null) clearTimeout(this.copiedTimer);
+    this.copiedTimer = null;
+    this.copied.set(false);
   }
 
   /** Under the anchor, aligned to its end, inside the viewport. */
@@ -230,5 +278,17 @@ export class CalendarSubscribeComponent {
 /** Put a popover element into the top layer. It renders anew on each opening. */
 function showPopover(el: HTMLElement | undefined): void {
   const pop = el as (HTMLElement & { showPopover?: () => void }) | undefined;
-  if (typeof pop?.showPopover === 'function') pop.showPopover();
+  if (typeof pop?.showPopover !== 'function') return;
+  // A second call on an open popover throws.
+  if (typeof pop.matches === 'function' && safeMatches(pop, ':popover-open')) return;
+  pop.showPopover();
+}
+
+/** `matches` throws for a selector the engine does not know (jsdom, old browsers). */
+function safeMatches(el: Element, selector: string): boolean {
+  try {
+    return el.matches(selector);
+  } catch {
+    return false;
+  }
 }

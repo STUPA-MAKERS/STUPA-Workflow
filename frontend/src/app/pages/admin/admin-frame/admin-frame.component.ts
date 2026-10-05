@@ -102,14 +102,16 @@ const sheetScroll = new Map<number, number>();
  *   the 403 page. The guard and the server stay authoritative.
  * - The "Zustand" tiles lead the navigation wherever it shows: on the home page, and in
  *   the column beside every admin page.
- * - The home page `/admin`: the navigation is the overview, with a description under
- *   each entry; the page beside it lists the gremien.
+ * - The home page `/admin`: beside the navigation the empty sheet of a list/detail page
+ *   (`AdminHomeComponent`). The column and the sheet have the same width and place as on
+ *   every other admin page, so nothing moves when an entry opens. One column at a time
+ *   the navigation is the page, with a description under each entry, and the empty
+ *   sheet does not show.
  * - Wide (`MEDIA.wide`): a pane page. The navigation is a column beside the page and
  *   stays in view; the page sits on a sheet with round corners that scrolls inside
  *   itself, so the corners clip its content in every scroll position. The breadcrumbs
  *   then leave out "Verwaltung", because the navigation shows it.
  * - Narrower: an admin page fills the width and the breadcrumb "Verwaltung" leads back.
- *   The home page shows the navigation above the gremien.
  * - A route with `data: { adminNav: false }` (the flow editor, the form editor) fills
  *   the width at every size, the same as the narrow mode. A route with
  *   `data: { adminNav: 'xl' }` (the cost centres) does so below 1440 px.
@@ -183,17 +185,11 @@ export class AdminFrameComponent {
   readonly query = signal('');
 
   /**
-   * The home page has a page beside the navigation: the gremien. Without a gremium
-   * permission the home page is the navigation alone.
+   * The navigation is a column beside the page (else it is above the page or hidden).
+   * The home page has a page beside it too: the empty sheet ("Keine Seite geöffnet"),
+   * so the column and the sheet keep their width and place on every admin page.
    */
-  private readonly homeHasPage = computed(
-    () => this.auth.can('admin.gremien') || this.auth.can('admin.gremium_roles'),
-  );
-
-  /** The navigation is a column beside the page (else it is above the page or hidden). */
-  readonly split = computed(
-    () => this.wide() && !this.fullWidth() && (!this.home() || this.homeHasPage()),
-  );
+  readonly split = computed(() => this.wide() && !this.fullWidth());
 
   /** The navigation shows: always on the home page, else only as the column. */
   readonly showNav = computed(() => this.home() || (this.wide() && !this.fullWidth()));

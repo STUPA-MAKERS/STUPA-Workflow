@@ -210,7 +210,8 @@ export class MeetingsListComponent {
   /**
    * Read a deep-linked meeting. Only a 404 drops the selection (the meeting is gone).
    * A 403, a server error or a network error keeps it and shows the reason, so a reload
-   * or "Erneut laden" can still reach the meeting.
+   * or "Erneut laden" can still reach the meeting. The read runs once per id: after a
+   * failure only the button reads again, not the next change of the list state.
    */
   private readSelected(id: Uuid): void {
     this.requested = id;
@@ -218,12 +219,14 @@ export class MeetingsListComponent {
     this.api.getMeeting(id).subscribe({
       next: (m) => this.extra.set(m),
       error: (err: unknown) => {
-        this.requested = null;
         const status = err instanceof HttpErrorResponse ? err.status : 0;
         if (status === 404) {
+          this.requested = null;
           this.clearSelection();
           return;
         }
+        // `requested` stays: a later change of the list state must not read again. Only
+        // "Erneut laden" (`retrySelected`) does.
         this.selError.set({ id, kind: status === 403 ? 'forbidden' : 'failed' });
       },
     });

@@ -391,6 +391,12 @@ describe('MeetingsListComponent', () => {
       view.fixture.detectChanges();
       expect(view.router.url).toBe('/?sel=m-500');
       expect(screen.getByRole('alert')).toHaveTextContent('Sitzung nicht geladen');
+      // A later change of the list state does not read it again; only the button does.
+      view.timeline.loadingList.set(true);
+      view.fixture.detectChanges();
+      view.timeline.loadingList.set(false);
+      view.fixture.detectChanges();
+      view.http.expectNone('/api/meetings/m-500');
       await userEvent.click(screen.getByRole('button', { name: 'Erneut laden' }));
       view.http.expectOne('/api/meetings/m-500').error(new ProgressEvent('error'));
       view.fixture.detectChanges();

@@ -157,7 +157,12 @@ function mapField(
 
   applyValidation(f, props);
 
-  if (f.type === 'markdown') props['text'] = help ?? label;
+  if (f.type === 'markdown') {
+    props['text'] = help ?? label;
+    // An info text without help has its text in the label. Show it once, not as a
+    // bold label over the same text.
+    if (!help) delete props['label'];
+  }
   if (f.type === 'computed') props['computed'] = true;
   if (f.type === 'table') props['text'] = '(Tabellen-Eingabe wird in einem späteren Schritt ergänzt.)';
   if (f.type === 'positions') {

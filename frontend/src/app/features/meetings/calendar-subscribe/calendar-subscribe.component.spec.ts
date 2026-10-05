@@ -6,7 +6,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { CalendarFeed } from '@core/api/models';
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
-import { CalendarSubscribeComponent } from './calendar-subscribe.component';
+import { COPIED_MS, CalendarSubscribeComponent } from './calendar-subscribe.component';
 
 @Component({
   standalone: true,
@@ -72,6 +72,35 @@ describe('CalendarSubscribeComponent', () => {
     fixture.detectChanges();
     expect(writeText).toHaveBeenCalledWith(URL);
     expect(screen.getByRole('button', { name: 'Kopiert!' })).toBeInTheDocument();
+  });
+
+  it('reads "Kopieren" again after a short time', async () => {
+    const writeText = jest.fn(() => Promise.resolve());
+    Object.assign(navigator, { clipboard: { writeText } });
+    const { openIt, fixture, cmp } = await setup();
+    await openIt();
+    jest.useFakeTimers();
+    try {
+      cmp.copy();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(cmp.copied()).toBe(true);
+      // A second copy starts the time again.
+      cmp.copy();
+      await Promise.resolve();
+      await Promise.resolve();
+      jest.advanceTimersByTime(COPIED_MS - 1);
+      expect(cmp.copied()).toBe(true);
+      jest.advanceTimersByTime(1);
+      expect(cmp.copied()).toBe(false);
+      cmp.copy();
+      await Promise.resolve();
+      await Promise.resolve();
+      fixture.destroy();
+      jest.advanceTimersByTime(COPIED_MS);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('forgets "copied" when the clipboard refuses, and does nothing without a URL', async () => {
@@ -143,9 +172,14 @@ describe('CalendarSubscribeComponent', () => {
     cmp.askRotate();
     cmp.rotate();
     fixture.detectChanges();
-    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Der Abo-Link konnte nicht erzeugt werden.');
     expect(cmp.busy()).toBe(false);
+    expect(cmp.error()).toBe(false);
     expect(screen.getByRole('dialog')).toHaveTextContent(URL);
+    // A new opening starts without the old message.
+    cmp.close();
+    await openIt();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 
   it('closes on Escape and on a press outside, and returns the focus to the anchor', async () => {
@@ -242,6 +276,76 @@ describe('CalendarSubscribeComponent', () => {
       cmp.open();
       fixture.destroy();
     } finally {
+      delete (HTMLElement.prototype as { showPopover?: unknown }).showPopover;
+    }
+  });
+
+  it('swaps the popover and the sheet on a resize across the phone limit while open', async () => {
+    let listener: ((e: { matches: boolean }) => void) | null = null;
+    const original = window.matchMedia;
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: (query: string) => ({
+        matches: false,
+        media: query,
+        addEventListener: (_: string, fn: (e: { matches: boolean }) => void) => {
+          if (query === MEDIA.phone) listener = fn;
+        },
+        removeEventListener: () => {},
+      }),
+    });
+    const shown: HTMLElement[] = [];
+    Object.defineProperty(HTMLElement.prototype, 'showPopover', {
+      configurable: true,
+      value(this: HTMLElement) {
+        shown.push(this);
+      },
+    });
+    try {
+      const { fixture, cmp } = await setup();
+      // Closed: a resize changes nothing.
+      listener!({ matches: true });
+      fixture.detectChanges();
+      listener!({ matches: false });
+      fixture.detectChanges();
+      cmp.open();
+      fixture.detectChanges();
+      await new Promise((r) => setTimeout(r));
+      expect(shown.at(-1)).toHaveClass('cs--pop');
+      listener!({ matches: true });
+      fixture.detectChanges();
+      await new Promise((r) => setTimeout(r));
+      expect(shown.at(-1)).toHaveClass('cs__layer');
+      listener!({ matches: false });
+      fixture.detectChanges();
+      await new Promise((r) => setTimeout(r));
+      expect(shown.at(-1)).toHaveClass('cs--pop');
+      expect(shown).toHaveLength(3);
+      fixture.destroy();
+    } finally {
+      delete (HTMLElement.prototype as { showPopover?: unknown }).showPopover;
+      Object.defineProperty(window, 'matchMedia', { writable: true, value: original });
+    }
+  });
+
+  it('does not show a popover that is already open', async () => {
+    const show = jest.fn();
+    Object.defineProperty(HTMLElement.prototype, 'showPopover', { configurable: true, value: show });
+    const original = Element.prototype.matches;
+    const matches = jest
+      .spyOn(Element.prototype, 'matches')
+      .mockImplementation(function (this: Element, sel: string) {
+        return sel === ':popover-open' || original.call(this, sel);
+      });
+    try {
+      const { fixture, cmp } = await setup();
+      cmp.open();
+      fixture.detectChanges();
+      await new Promise((r) => setTimeout(r));
+      expect(show).not.toHaveBeenCalled();
+      fixture.destroy();
+    } finally {
+      matches.mockRestore();
       delete (HTMLElement.prototype as { showPopover?: unknown }).showPopover;
     }
   });
