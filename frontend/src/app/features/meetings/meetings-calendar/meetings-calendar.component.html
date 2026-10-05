@@ -120,8 +120,9 @@
 
   <aside class="cal__panel" [attr.aria-label]="'meetings.overview.panel' | t">
     <!-- The selected day is the kicker of the panel, in the same bar as on every other
-         detail sheet. It stays fixed; only the content below it scrolls. -->
-    <app-sheet-bar class="cal__dayHead" kickerId="cal-day" [kicker]="dayHeading()" aria-live="polite" />
+         detail sheet. It stays fixed; only the content below it scrolls. The person picks
+         the day, so only the meetings of the day are a live region (one region). -->
+    <app-sheet-bar class="cal__dayHead" kickerId="cal-day" [kicker]="dayHeading()" />
     <div class="cal__panelScroll" appScrollFade="y">
       <section class="cal__daySec" aria-labelledby="cal-day" aria-live="polite">
         @if (error()) {

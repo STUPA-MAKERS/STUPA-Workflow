@@ -64,9 +64,10 @@ async function setup(
   return { ...view, c, api, createFormVersion, updateApplicationType, setFormActive, toast };
 }
 
-// The suite renders the whole form builder (outline, question cards, ui-kit fields) in jsdom. One test takes 1–3 s alone, and more
-// than the default 5 s while the full run keeps every core busy, so local gates timed
-// out at random (CI passed). The same budget as the other heavy meeting suites.
+// The suite renders the whole form builder (outline, question cards, ui-kit fields)
+// in jsdom. One test takes 1–3 s alone, and more than the default 5 s while the full
+// run keeps every core busy, so local gates timed out at random (CI passed). The same
+// budget as the other heavy meeting suites.
 jest.setTimeout(15_000);
 
 describe('FormEditorComponent', () => {

@@ -23,3 +23,13 @@
   font-weight: var(--fw-medium);
   letter-spacing: normal;
 }
+
+/* A projected kicker (`appSheetBarKicker`) keeps the font of the text kicker. Its own
+   items (for example the links of a breadcrumb) shrink inside it; the bar never grows
+   past the width of the sheet. */
+.sheet-bar__kicker--slot {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}

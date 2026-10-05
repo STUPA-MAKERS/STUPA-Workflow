@@ -2,6 +2,7 @@
 
 The module holds the queries that more than one part of the meeting module needs:
 
+* `member_permissions` gives the gremium-role permissions of each current member.
 * `keeper_principal_ids` gives the members of a gremium who can keep the minutes.
   O20: the keeper needs the gremium permission `protocol.write`.
 * `agenda_positions` gives the 1-based number of each agenda item in the agenda
@@ -28,14 +29,20 @@ from app.modules.livevote.schemas import KeeperPeriodOut
 # The gremium permission that a protocol keeper needs (O20).
 KEEPER_PERMISSION = "protocol.write"
 
+# The gremium permission that gives a member the own vote (the cast gate of voting).
+VOTE_PERMISSION = "vote.cast"
+
 # Per meeting: the running and ended periods in time order, and the planned one.
 KeeperSummary = tuple[list[KeeperPeriodOut], KeeperPeriodOut | None]
 
 
-async def keeper_principal_ids(
+async def member_permissions(
     session: AsyncSession, gremium_id: UUID, now: datetime | None = None
-) -> set[UUID]:
-    """Return the current members of the gremium whose role grants `protocol.write`."""
+) -> dict[UUID, frozenset[str]]:
+    """Return the gremium-role permissions of each current member of the gremium.
+
+    A member with more than one active membership gets the union of the roles.
+    """
     now = now or datetime.now(UTC)
     rows = (
         await session.execute(
@@ -49,7 +56,18 @@ async def keeper_principal_ids(
             )
         )
     ).all()
-    return {pid for pid, perms in rows if KEEPER_PERMISSION in (perms or [])}
+    out: dict[UUID, set[str]] = {}
+    for pid, perms in rows:
+        out.setdefault(pid, set()).update(perms or [])
+    return {pid: frozenset(perms) for pid, perms in out.items()}
+
+
+async def keeper_principal_ids(
+    session: AsyncSession, gremium_id: UUID, now: datetime | None = None
+) -> set[UUID]:
+    """Return the current members of the gremium whose role grants `protocol.write`."""
+    perms = await member_permissions(session, gremium_id, now)
+    return {pid for pid, held in perms.items() if KEEPER_PERMISSION in held}
 
 
 async def agenda_positions(session: AsyncSession, meeting_ids: Sequence[UUID]) -> dict[UUID, int]:

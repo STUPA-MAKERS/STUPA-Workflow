@@ -306,7 +306,9 @@ export class AttendanceSheetComponent {
 
   /**
    * O6: the lead enters a substitute for a missing member while the meeting is live. A
-   * member who is present, or who already has a delegation, needs none.
+   * member who is present, or who already has a delegation, needs none. The server
+   * refuses a member without an own vote and a member who already substitutes another
+   * member in this meeting (no chains), so the action is not offered for them.
    */
   private substitutable(a: Attendance): boolean {
     const m = this.meeting();
@@ -315,7 +317,9 @@ export class AttendanceSheetComponent {
       m.canManage &&
       !a.isSelf &&
       a.status !== 'present' &&
-      this.delegationOf(a.principalId) === null
+      a.canVote !== false &&
+      this.delegationOf(a.principalId) === null &&
+      !this.delegations().some((d) => d.delegateId === a.principalId)
     );
   }
 

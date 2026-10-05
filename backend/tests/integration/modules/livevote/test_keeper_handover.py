@@ -450,6 +450,10 @@ async def test_members_and_roster_mark_the_possible_keepers(
         assert resp.status_code == 200, resp.text
         flags: dict[str, Any] = {r["principalId"]: r["canKeepProtocol"] for r in resp.json()}
         assert flags == {str(anna): True, str(vera): False}
+    # The roster also marks the members with an own vote: only they can be
+    # substituted by the lead (O6).
+    votes: dict[str, Any] = {r["principalId"]: r["canVote"] for r in roster.json()}
+    assert votes == {str(anna): False, str(vera): True}
 
 
 async def test_meeting_list_carries_the_periods(

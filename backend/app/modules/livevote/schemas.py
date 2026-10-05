@@ -272,6 +272,9 @@ class AttendanceOut(_CamelModel):
     # O20: the member holds the gremium permission ``protocol.write`` and can keep
     # the minutes. The keeper pickers offer only these members.
     can_keep_protocol: bool = Field(default=False, alias="canKeepProtocol")
+    # The member has an own vote now (gremium permission ``vote.cast``). Only such a
+    # member can delegate, so the lead offers "Vertretung eintragen" only for them (O6).
+    can_vote: bool = Field(default=False, alias="canVote")
     # A8: name of the faculty group of the member (Z5), or ``None`` without one.
     substitute_group_name: I18nMap | None = Field(default=None, alias="substituteGroupName")
 

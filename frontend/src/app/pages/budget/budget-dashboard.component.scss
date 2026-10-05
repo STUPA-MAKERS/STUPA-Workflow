@@ -324,27 +324,27 @@ button.tn__chev:hover:not(:disabled) {
   scrollbar-width: thin;
 }
 
-.bd__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-3);
+/* The bar on top of the wide sheet (`app-sheet-bar`): the breadcrumb is the kicker, the
+   actions sit at the end on the same axis. It stays in place while the body scrolls, and
+   takes the side padding of the sheet, as on the other detail sheets. */
+.bd__bar {
+  padding-inline: var(--space-6);
 }
-.bd__headText {
-  display: flex;
-  flex: 1 1 16rem;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
+.bd__bar .bd__actions {
+  flex: none;
+  flex-wrap: nowrap;
+  margin-inline-start: var(--space-3);
 }
+/* The title sits 10px below the bar, as on the other detail sheets. */
+.bd--wide .bd__sheetBody {
+  padding-top: 10px;
+}
+/* The breadcrumb takes the font and colour of the kicker from the bar. */
 .bd__crumbs {
   display: flex;
   align-items: center;
   gap: var(--space-1);
   min-width: 0;
-  font-size: 0.78125rem;
-  line-height: 1.125rem;
-  color: var(--color-text-muted);
 }
 .bd__crumb {
   min-width: 0;
@@ -360,8 +360,10 @@ button.bd__crumb:hover {
   color: var(--color-text);
   text-decoration: underline;
 }
+/* In a narrow bar the parents shorten first; the current cost centre keeps its name up
+   to the maximum width. */
 .bd__crumb--current {
-  color: var(--color-text);
+  flex-shrink: 0;
   cursor: default;
 }
 .bd__crumbSep {
@@ -371,7 +373,10 @@ button.bd__crumb:hover {
   flex: none;
   margin-inline-start: var(--space-2);
 }
+/* The title is a child of the scrolling flex column. It clips its text (ellipsis), so
+   without `flex: none` the column would shrink it to zero height. */
 .bd__name {
+  flex: none;
   margin: 0;
   font-size: var(--fs-d2);
   line-height: 2.25rem;

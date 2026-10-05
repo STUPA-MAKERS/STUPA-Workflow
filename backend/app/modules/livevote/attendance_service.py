@@ -43,7 +43,12 @@ from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.delegations.models import MeetingDelegation
 from app.modules.delegations.pool import group_names_for
-from app.modules.livevote.keepers import keeper_principal_ids
+from app.modules.livevote.keepers import (
+    KEEPER_PERMISSION,
+    VOTE_PERMISSION,
+    keeper_principal_ids,
+    member_permissions,
+)
 from app.modules.livevote.models import Meeting, MeetingAttendance
 from app.modules.livevote.roster import meeting_roster_filter
 from app.modules.livevote.schemas import (
@@ -174,8 +179,10 @@ class AttendanceService:
         a record gets `status` and `source` as `None`. The `note` goes only to
         the member and to the meeting lead (`can_write`). `canKeepProtocol` marks
         the members who can keep the minutes now (O20), for the keeper picker and
-        the handover. `substituteGroupName` names the faculty group of the member
-        (A8).
+        the handover. `canVote` marks the members with an own vote now (gremium
+        permission `vote.cast`): only they can be substituted (O6). A former member
+        with a record has neither flag. `substituteGroupName` names the faculty
+        group of the member (A8).
         """
         meeting = await self._meeting(meeting_id)
         members = list(
@@ -199,7 +206,7 @@ class AttendanceService:
             .all()
         )
         by_principal = {r.principal_id: r for r in records}
-        keepers = await keeper_principal_ids(self.session, meeting.gremium_id)
+        perms = await member_permissions(self.session, meeting.gremium_id)
         groups = await group_names_for(
             self.session, meeting.gremium_id, (m.id for m in members)
         )
@@ -207,6 +214,7 @@ class AttendanceService:
         for m in members:
             rec = by_principal.get(m.id)
             is_self = m.sub == requester_sub
+            held = perms.get(m.id, frozenset())
             out.append(
                 AttendanceOut(
                     principalId=m.id,
@@ -216,7 +224,8 @@ class AttendanceService:
                     source=rec.source if rec else None,  # type: ignore[arg-type]
                     note=rec.note if rec and (is_self or can_write) else None,
                     isSelf=is_self,
-                    canKeepProtocol=m.id in keepers,
+                    canKeepProtocol=KEEPER_PERMISSION in held,
+                    canVote=VOTE_PERMISSION in held,
                     substituteGroupName=groups.get(m.id),
                 )
             )

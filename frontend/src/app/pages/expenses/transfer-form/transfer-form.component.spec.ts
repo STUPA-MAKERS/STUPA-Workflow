@@ -124,9 +124,10 @@ async function setup(mode: 'create' | 'edit', layout: 'pane' | 'sheet' = 'pane')
   return { view, http, host, form, user: userEvent.setup() };
 }
 
-// The suite renders the whole transfer form with its two cost-centre trees in jsdom. One test takes 1–3 s alone, and more
-// than the default 5 s while the full run keeps every core busy, so local gates timed
-// out at random (CI passed). The same budget as the other heavy meeting suites.
+// The suite renders the whole transfer form with its two cost-centre trees
+// in jsdom. One test takes 1–3 s alone, and more than the default 5 s while the full
+// run keeps every core busy, so local gates timed out at random (CI passed). The same
+// budget as the other heavy meeting suites.
 jest.setTimeout(15_000);
 
 describe('TransferFormComponent', () => {

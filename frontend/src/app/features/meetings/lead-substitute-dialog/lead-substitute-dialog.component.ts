@@ -129,13 +129,20 @@ export class LeadSubstituteDialogComponent {
         if (this.member()?.principalId === memberId) this.pool.set(rows);
       },
       error: () => {
+        if (this.member()?.principalId !== memberId) return;
         this.pool.set([]);
         this.failed.set(true);
       },
     });
+    // A late answer for a member of an earlier opening must not reach the dialog that is
+    // now open for another member.
     this.api.meetingContext(meetingId, { quiet: true }).subscribe({
-      next: (c) => this.context.set(c),
-      error: () => this.context.set(null),
+      next: (c) => {
+        if (this.member()?.principalId === memberId) this.context.set(c);
+      },
+      error: () => {
+        if (this.member()?.principalId === memberId) this.context.set(null);
+      },
     });
   }
 
@@ -160,11 +167,10 @@ export class LeadSubstituteDialogComponent {
           this.toast.success(this.i18n.translate('meetings.leadSubstitute.created'));
           this.created.emit(d);
         },
-        error: (err: { error?: { detail?: string } }) => {
+        // The detail of the server is English; the toast keeps the language of the UI.
+        error: () => {
           this.busy.set(false);
-          this.toast.error(
-            err.error?.detail ?? this.i18n.translate('meetings.leadSubstitute.failed'),
-          );
+          this.toast.error(this.i18n.translate('meetings.leadSubstitute.failed'));
         },
       });
   }

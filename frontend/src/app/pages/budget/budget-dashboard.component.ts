@@ -25,6 +25,8 @@ import {
   SegBarComponent,
   SideSheetComponent,
   PageHeaderComponent,
+  SheetBarComponent,
+  SheetBarKickerDirective,
   SkeletonComponent,
   StatusTextComponent,
   type StatusKind,
@@ -135,6 +137,8 @@ export const APPS_SHOWN = 5;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     PageHeaderComponent,
+    SheetBarComponent,
+    SheetBarKickerDirective,
     NgTemplateOutlet,
     RouterLink,
     TranslatePipe,

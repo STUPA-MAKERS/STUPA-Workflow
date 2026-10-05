@@ -504,6 +504,17 @@ describe('AttendanceSheetComponent', () => {
       expect(await screen.findByRole('menuitem', { name: 'Vertretung eintragen' })).toBeInTheDocument();
     });
 
+    it('offers no entry for a member without a vote or a member who already substitutes', async () => {
+      const roster = ROSTER.map((a) => (a.displayName === 'Alina Admin' ? { ...a, canVote: false } : a));
+      // Fritz already substitutes a member of another row: no chains (the server refuses).
+      await setup({ attendance: roster }, [delegation({ id: 'd-2', delegatorId: 'pr-7', delegateId: 'pr-5' })]);
+      expect(menu('Alina Admin')).toBeNull();
+      expect(menu('Fritz Fehlend')).toBeNull();
+      // A member with the vote right, and a row without the flag (older server), keep it.
+      expect(menu('Mika Mitglied')).toBeInTheDocument();
+      expect(menu('Vera Vertretung')).toBeInTheDocument();
+    });
+
     it.each([
       ['a planned meeting', { status: 'planned' as const }],
       ['a member who does not manage', { canManage: false }],

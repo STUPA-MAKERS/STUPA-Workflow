@@ -1,6 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { SheetBarComponent } from './sheet-bar.component';
+import { SheetBarComponent, SheetBarKickerDirective } from './sheet-bar.component';
 
 @Component({
   standalone: true,
@@ -16,6 +16,18 @@ class HostComponent {
   readonly id = signal<string | null>(null);
   readonly bleed = signal(false);
 }
+
+@Component({
+  standalone: true,
+  imports: [SheetBarComponent, SheetBarKickerDirective],
+  template: `
+    <app-sheet-bar kicker="ignored">
+      <nav appSheetBarKicker aria-label="Pfad"><button type="button">Haushalt</button></nav>
+      <button type="button">Export</button>
+    </app-sheet-bar>
+  `,
+})
+class SlotHostComponent {}
 
 describe('SheetBarComponent', () => {
   function render() {
@@ -66,5 +78,20 @@ describe('SheetBarComponent', () => {
     fixture.componentInstance.bleed.set(true);
     fixture.detectChanges();
     expect(bar.classList).toContain('sheet-bar--bleed');
+  });
+
+  it('puts a projected kicker in the place of the text kicker', () => {
+    const fixture = TestBed.createComponent(SlotHostComponent);
+    fixture.detectChanges();
+    const bar = (fixture.nativeElement as HTMLElement).querySelector('app-sheet-bar') as HTMLElement;
+    const kickers = bar.querySelectorAll('.sheet-bar__kicker');
+    expect(kickers).toHaveLength(1);
+    const k = kickers[0] as HTMLElement;
+    expect(k).toHaveClass('sheet-bar__kicker--slot');
+    expect(k.firstElementChild?.tagName).toBe('NAV');
+    expect(bar.textContent).not.toContain('ignored');
+    // The kicker comes first, the actions after it.
+    expect(bar.firstElementChild).toBe(k);
+    expect(bar.lastElementChild?.textContent).toBe('Export');
   });
 });

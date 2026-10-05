@@ -1,12 +1,12 @@
 """O6: the meeting lead enters a substitution for a missing member while live.
 
 * Only the lead (`session.manage` in the gremium) may send `delegatorId`, and
-  only while the meeting is live.
+  only while the meeting is live (not planned, not closed).
 * The member is missing: no attendance record, `excused` or `absent`.
 * The delegate is in the substitute pool for the member: a personal entry for
   the member or a gremium-wide entry. A substitute of a faculty group does not
-  count (the faculty groups are not in use), and a person outside the pool
-  neither.
+  count (the faculty groups are not in use), an entry in the pool of another
+  gremium neither, and a person outside the pool neither.
 * The existing checks still apply: the vote right of the member and no second
   delegation.
 * The row stores the lead as `created_by` and `via_pool = true`.
@@ -206,6 +206,26 @@ async def test_only_the_lead_and_only_while_live(
     assert scoped.status_code == 403, scoped.text
 
 
+@pytest.mark.parametrize("status", ["planned", "closed"])
+async def test_the_lead_entry_needs_a_live_meeting(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI, status: str
+) -> None:
+    """Before the start and after the close the lead entry is refused (422)."""
+    s = await _setup(maker, status=status)
+    act(api, s.lead)
+    with TestClient(api) as client:
+        refused = client.post("/api/delegations", json=_body(s))
+    assert refused.status_code == 422, refused.text
+    assert refused.headers["content-type"].startswith("application/problem+json")
+    async with maker() as session:
+        rows = (
+            await session.scalars(
+                select(MeetingDelegation).where(MeetingDelegation.meeting_id == s.meeting_id)
+            )
+        ).all()
+    assert rows == []
+
+
 async def test_the_checks_of_the_lead_entry(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
@@ -257,6 +277,34 @@ async def test_personal_entry_of_another_member_does_not_count(
     with TestClient(api) as client:
         refused = client.post("/api/delegations", json=_body(s, delegate=for_c))
     assert refused.status_code == 403, refused.text
+
+
+async def test_substitute_from_the_pool_of_another_gremium_does_not_count(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """The pool is per gremium: an entry in the pool of another gremium is refused (403).
+
+    The person is a gremium-wide substitute and a personal substitute of A in the
+    other gremium. Neither entry makes the person a substitute in this meeting,
+    and the recipient list of the lead does not offer the person.
+    """
+    s = await _setup(maker)
+    other = await gremium(maker)
+    _, foreign = await person(maker, "Foreign")
+    await pool_entry(maker, other, foreign)
+    await pool_entry(maker, other, foreign, for_member=s.a)
+    url = f"/api/delegations/meetings/{s.meeting_id}/recipients"
+    act(api, s.lead)
+    with TestClient(api) as client:
+        refused = client.post("/api/delegations", json=_body(s, delegate=foreign))
+        listed = client.get(url, params={"delegatorId": str(s.a)})
+        searched = client.get(url, params={"delegatorId": str(s.a), "q": "for"})
+    assert refused.status_code == 403, refused.text
+    assert refused.headers["content-type"].startswith("application/problem+json")
+    assert listed.status_code == 200, listed.text
+    assert [r["principalId"] for r in listed.json()] == [str(s.b)]
+    assert searched.status_code == 200, searched.text
+    assert searched.json() == []
 
 
 async def test_faculty_group_substitute_does_not_count(
