@@ -166,8 +166,13 @@
   gap: var(--space-1);
 }
 
-/* A card has the room for the full text, so it wraps there. */
+/* A card has the room for the full text, so it wraps there. The card cell spaces the
+   heading, so the description adds no block padding: the first line has to sit on the
+   line of the checkbox and the row menu in the card header. */
 @include bp.phone {
+  .et__desc {
+    padding-block: 0;
+  }
   .et__desc,
   .et__corr,
   .et__cc {

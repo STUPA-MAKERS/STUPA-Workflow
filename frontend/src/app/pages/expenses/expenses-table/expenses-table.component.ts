@@ -138,7 +138,7 @@ export class ExpensesTableComponent {
     );
     if (this.canManage()) {
       // An explicit width: a self-sized pinned column grew and covered its neighbour.
-      cols.push({ key: 'actions', label: t('table.actions'), align: 'end', width: '5rem', sticky: 'end' });
+      cols.push({ key: 'actions', label: t('table.actions'), align: 'end', width: '5rem', sticky: 'end', card: 'actions' });
     }
     return cols;
   });

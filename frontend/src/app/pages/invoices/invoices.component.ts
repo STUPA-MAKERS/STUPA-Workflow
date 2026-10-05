@@ -193,7 +193,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
     }
     cols.push({ key: 'file', label: t('invoices.col.file'), align: 'end', width: '3rem' });
     if (this.canManage()) {
-      cols.push({ key: 'actions', label: t('table.actions'), align: 'end', width: '3.5rem', sticky: 'end' });
+      cols.push({ key: 'actions', label: t('table.actions'), align: 'end', width: '3.5rem', sticky: 'end', card: 'actions' });
     }
     return cols;
   });
