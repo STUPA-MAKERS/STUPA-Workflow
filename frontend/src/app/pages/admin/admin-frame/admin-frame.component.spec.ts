@@ -206,8 +206,55 @@ describe('AdminFrameComponent', () => {
     const view = await setup(ALL, '/admin/users');
     expect(screen.queryByRole('heading', { name: 'Verwaltung' })).toBeNull();
     expect(screen.queryByText('Benutzer und Rollenzuweisungen')).toBeNull();
-    expect(view.container.querySelector('app-admin-health')).toBeNull();
     expect(view.container.querySelector('.af')).toHaveClass('af--split');
+  });
+
+  it('keeps "Zustand" in the column beside an admin page, in the same order, and marks the open tile', async () => {
+    const view = await setup(ALL, '/admin/audit');
+    const nav = screen.getByRole('navigation', { name: 'Verwaltungsbereiche' });
+    const health = nav.querySelector('app-admin-health');
+    expect(health).not.toBeNull();
+    // The tiles lead the column, before the first group of entries.
+    expect(nav.querySelector('.af__navBody')?.firstElementChild).toBe(health);
+    const tiles = [...health!.querySelectorAll<HTMLAnchorElement>('a.ah__tile')];
+    expect(tiles.map((a) => a.getAttribute('href'))).toEqual([
+      '/admin/audit',
+      '/admin/backups',
+      '/admin/privacy',
+    ]);
+    await view.fixture.whenStable();
+    view.fixture.detectChanges();
+    expect(tiles[0]).toHaveClass('ah__tile--on');
+    expect(tiles[0]).toHaveAttribute('aria-current', 'page');
+    expect(tiles[1]).not.toHaveClass('ah__tile--on');
+  });
+
+  it('beside an admin page is a pane page: it fills the window, and clears that when it goes', async () => {
+    const view = await setup(ALL, '/admin/users');
+    const frame = view.fixture.debugElement.injector.get(PageFrameService);
+    expect(frame.fill()).toBe(true);
+    // The sheet is the window: its body is the scroll container of the page.
+    expect(view.container.querySelector('.af__page > .af__pageBody')).not.toBeNull();
+    view.fixture.destroy();
+    expect(frame.fill()).toBe(false);
+  });
+
+  it('does not fill the window in one column', async () => {
+    const view = await setup(ALL, '/admin/users', false);
+    expect(view.fixture.debugElement.injector.get(PageFrameService).fill()).toBe(false);
+  });
+
+  it('starts a new admin page at the top of the sheet', async () => {
+    const view = await setup(ALL, '/admin/users');
+    const body = view.container.querySelector<HTMLElement>('.af__pageBody')!;
+    // jsdom does no layout: a plain property stands in for the scroll offset.
+    Object.defineProperty(body, 'scrollTop', { value: 300, writable: true, configurable: true });
+    await view.fixture.ngZone!.run(() =>
+      view.fixture.debugElement.injector.get(Router).navigateByUrl('/admin/audit'),
+    );
+    view.fixture.detectChanges();
+    await view.fixture.whenStable();
+    expect(body.scrollTop).toBe(0);
   });
 
   it('hides the navigation below wide on an admin page', async () => {

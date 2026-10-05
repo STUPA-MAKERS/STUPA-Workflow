@@ -28,7 +28,7 @@
       <router-outlet />
     </main>
 
-    @if ((frame() === 'rail' || frame() === 'public') && !fill()) {
+    @if (footer()) {
       <app-site-footer class="frame__footer" />
     }
   </div>

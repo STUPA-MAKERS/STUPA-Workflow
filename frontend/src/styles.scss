@@ -95,11 +95,13 @@
 // applications list beside the detail). The page host gets the class, for example with
 // `host: { '[class.pane-page]': 'wide()' }`.
 //
-// - `flex: 1 1 0` takes the free height of `.main` (a flex column above the footer). A
-//   basis of 0 keeps the rows from pushing the page taller than the viewport.
+// - `flex: 1 1 0` takes the free height of `.main` (a flex column). A basis of 0 keeps the
+//   rows from pushing the page taller than the viewport.
 // - The bottom padding of `.main` is for a page that scrolls. A pane page pulls it back
-//   and keeps only `--pane-foot-gap`, which the shell sets: 0 above the footer (the top
-//   padding of the footer is the gap), a small gap where the footer is left out.
+//   and keeps only `--pane-foot-gap`, which the shell sets: the page gutter (plus the
+//   safe area in the installed app). Work pages have no footer (route data `footer`).
+// - A large sheet with round corners in a pane page must clip what scrolls in it: the
+//   rounded element is the scroll container, or an `overflow: hidden` parent of it.
 // - A dialog or a side sheet of the page is an overlay. Closed, it is empty, but as a
 //   flex item it would still take the gap of the host. `display: contents` gives it no
 //   box of its own.

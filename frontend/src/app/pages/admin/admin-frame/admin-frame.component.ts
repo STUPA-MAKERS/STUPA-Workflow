@@ -15,12 +15,12 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   type ActivatedRouteSnapshot,
   NavigationEnd,
+  NavigationStart,
   Router,
   RouterLink,
   RouterLinkActive,
   RouterOutlet,
 } from '@angular/router';
-import { filter } from 'rxjs';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -71,6 +71,15 @@ function navMode(root: ActivatedRouteSnapshot): AdminNavMode {
 const XL = '(min-width: 1440px)';
 
 /**
+ * The scroll position of the page sheet per navigation id. Beside the navigation the
+ * window does not scroll, the sheet does, so the scroll restoration of the router (which
+ * moves the window) has nothing to do. The frame does the same for the sheet: a new page
+ * starts at the top, Back and Forward restore the position. Module scope, so the
+ * positions survive a visit to a page outside the administration.
+ */
+const sheetScroll = new Map<number, number>();
+
+/**
  * The frame of the admin area (board Verwaltung): the admin navigation beside every
  * admin page.
  *
@@ -78,11 +87,14 @@ const XL = '(min-width: 1440px)';
  *   entries by title and description, in the browser), and the groups of `ADMIN_GROUPS`.
  *   An entry shows only with one of its permissions, so the navigation never leads to
  *   the 403 page. The guard and the server stay authoritative.
- * - The home page `/admin`: the navigation is the overview. It shows the "Zustand" tiles
- *   and a description under each entry; the page beside it lists the gremien.
- * - Wide (`MEDIA.wide`): the navigation is a column beside the page and stays in view;
- *   the page sits on a sheet. The breadcrumbs then leave out "Verwaltung", because the
- *   navigation shows it.
+ * - The "Zustand" tiles lead the navigation wherever it shows: on the home page, and in
+ *   the column beside every admin page.
+ * - The home page `/admin`: the navigation is the overview, with a description under
+ *   each entry; the page beside it lists the gremien.
+ * - Wide (`MEDIA.wide`): a pane page. The navigation is a column beside the page and
+ *   stays in view; the page sits on a sheet with round corners that scrolls inside
+ *   itself, so the corners clip its content in every scroll position. The breadcrumbs
+ *   then leave out "Verwaltung", because the navigation shows it.
  * - Narrower: an admin page fills the width and the breadcrumb "Verwaltung" leads back.
  *   The home page shows the navigation above the gremien.
  * - A route with `data: { adminNav: false }` (the flow editor, the form editor) fills
@@ -108,6 +120,7 @@ const XL = '(min-width: 1440px)';
     ScrollFadeDirective,
     AdminHealthComponent,
   ],
+  host: { '[class.pane-page]': 'split()' },
   templateUrl: './admin-frame.component.html',
   styleUrl: './admin-frame.component.scss',
 })
@@ -117,6 +130,9 @@ export class AdminFrameComponent {
   private readonly router = inject(Router);
   private readonly pageFrame = inject(PageFrameService);
   private readonly injector = inject(Injector);
+
+  /** The page sheet. Beside the navigation it is the scroll container of the page. */
+  private readonly page = viewChild<ElementRef<HTMLElement>>('page');
 
   /** The scrolling part of the navigation column (absent while the navigation is hidden). */
   private readonly navBody = viewChild<ElementRef<HTMLElement>>('navBody');
@@ -173,18 +189,37 @@ export class AdminFrameComponent {
     })).filter((g) => g.pages.length > 0);
   });
 
+  /** The id of the navigation that shows the current page (see {@link sheetScroll}). */
+  private lastId = this.router.lastSuccessfulNavigation?.id ?? 0;
+  /** The navigation id that Back or Forward restores, else null. */
+  private restoreId: number | null = null;
+
   constructor() {
-    this.router.events
-      .pipe(
-        filter((e): e is NavigationEnd => e instanceof NavigationEnd),
-        takeUntilDestroyed(),
-      )
-      .subscribe((e) => {
+    this.router.events.pipe(takeUntilDestroyed()).subscribe((e) => {
+      if (e instanceof NavigationStart) {
+        const sheet = this.page()?.nativeElement;
+        if (sheet) sheetScroll.set(this.lastId, sheet.scrollTop);
+        this.restoreId = e.navigationTrigger === 'popstate' ? (e.restoredState?.navigationId ?? null) : null;
+      } else if (e instanceof NavigationEnd) {
+        this.lastId = e.id;
         this.home.set(pathOf(e.urlAfterRedirects) === HOME);
         this.navMode.set(navMode(this.router.routerState.snapshot.root));
-        afterNextRender(() => this.revealActive(), { injector: this.injector });
-      });
+        const top = this.restoreId === null ? 0 : (sheetScroll.get(this.restoreId) ?? 0);
+        afterNextRender(
+          () => {
+            this.revealActive();
+            this.scrollSheet(top);
+          },
+          { injector: this.injector },
+        );
+      }
+    });
     afterNextRender(() => this.revealActive());
+
+    // Beside the navigation the frame is a pane page: it fills the window, without the
+    // bottom padding of a page that scrolls.
+    effect(() => this.pageFrame.fill.set(this.split()));
+    inject(DestroyRef).onDestroy(() => this.pageFrame.fill.set(false));
 
     // The navigation shows "Verwaltung" beside the page, so the breadcrumbs leave it out.
     effect(() => this.pageFrame.crumbRoot.set(this.split() ? 'admin' : null));
@@ -215,6 +250,13 @@ export class AdminFrameComponent {
     if (item.top >= box.top && item.bottom <= box.bottom) return;
     const top = item.top - box.top + body.scrollTop;
     body.scrollTop = Math.max(0, top - (body.clientHeight - item.height) / 2);
+  }
+
+  /** Put the page sheet at `top` (it is a scroll container only beside the navigation). */
+  private scrollSheet(top: number): void {
+    if (!this.split()) return;
+    const sheet = this.page()?.nativeElement;
+    if (sheet) sheet.scrollTop = top;
   }
 
   /** The full path of an entry. */

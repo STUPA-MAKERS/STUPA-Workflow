@@ -30,6 +30,15 @@
 }
 :host(.ld--split) .ld__detail {
   flex: 1 1 0;
+  /* The detail pane is a window with round corners (the radius of the detail sheet,
+     `--ld-detail-radius`). The pane is the scroll container, so the round corners clip
+     everything that scrolls in it: the sheet, a sticky bar of the sheet, the end of a
+     long sheet. Without the radius here the sheet was round only at its own top and
+     bottom, and the rectangular pane cut it with a straight line at the window edges.
+     The scroll padding keeps an element that gets the focus clear of the corners. */
+  border-radius: var(--ld-detail-radius, var(--radius-2xl));
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-4);
 }
 
 /* Narrow: one pane at a time, at the full width. */

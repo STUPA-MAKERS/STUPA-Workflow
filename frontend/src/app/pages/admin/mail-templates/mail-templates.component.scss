@@ -9,6 +9,25 @@
   gap: var(--space-5);
   align-items: start;
 }
+/* Beside the admin navigation the page sits in the sheet of the admin frame, which is a
+   window of fixed height. The page takes the free height of the sheet, and the list and
+   the editor each scroll inside themselves. */
+:host-context(.af--split) {
+  flex: 1 1 0;
+  min-height: 0;
+}
+:host-context(.af--split) .mt__layout {
+  flex: 1 1 0;
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  min-height: 0;
+}
+:host-context(.af--split) .mt__layout > nav,
+:host-context(.af--split) .mt__editor {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 @media (max-width: 48rem) {
   .mt__layout {
     grid-template-columns: 1fr;

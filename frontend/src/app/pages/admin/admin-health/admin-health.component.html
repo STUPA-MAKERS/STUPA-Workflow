@@ -4,7 +4,12 @@
     <ul class="rowgroup ah__list">
       @for (t of tiles(); track t.key) {
         <li>
-          <a class="ah__tile" [class]="'ah__tile ah__tile--' + t.kind" [routerLink]="t.link">
+          <a
+            [class]="'ah__tile ah__tile--' + t.kind"
+            [routerLink]="t.link"
+            routerLinkActive="ah__tile--on"
+            ariaCurrentWhenActive="page"
+          >
             <app-icon class="ah__icon" [name]="t.icon" [size]="20" />
             <span class="ah__text">
               @if (t.title === null) {

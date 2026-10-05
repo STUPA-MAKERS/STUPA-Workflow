@@ -25,7 +25,7 @@ const MEMBER: Principal = {
 class StubPage {}
 
 const ROUTES: Routes = [
-  { path: 'dashboard', component: StubPage },
+  { path: 'dashboard', component: StubPage, data: { footer: true } },
   { path: 'tasks', component: StubPage },
   { path: 'beamer', component: StubPage, data: { chrome: false } },
   { path: 'start', component: StubPage, data: { fab: true } },
@@ -126,13 +126,14 @@ describe('ShellComponent', () => {
       expect(container.querySelector('app-command-palette')).toBeNull();
     });
 
-    it('frames a signed-in principal with the rail and the footer, without the public bar', async () => {
+    it('frames a signed-in principal with the rail, without the public bar', async () => {
       const { container } = await setup(MEMBER);
       expect(mainNav()).toBeInTheDocument();
       expect(container.querySelector('app-nav-rail')).not.toBeNull();
       expect(container.querySelector('app-bottom-bar')).toBeNull();
       expect(container.querySelector('app-public-header')).toBeNull();
-      expect(container.querySelector('app-site-footer')).not.toBeNull();
+      // No route with `footer: true` is open: a signed-in page has no footer.
+      expect(container.querySelector('app-site-footer')).toBeNull();
       expect(container.querySelector('app-command-palette')).not.toBeNull();
     });
 
@@ -315,15 +316,39 @@ describe('ShellComponent', () => {
       expect(within(footer).getByRole('link', { name: 'AStA-Büro' })).toBeInTheDocument();
     });
 
-    it('shows the same footer at the end of a signed-in page', async () => {
-      await setup(MEMBER, { branding });
+    it('shows the footer on every public page, also without route data `footer`', async () => {
+      const { router, fixture } = await setup(null, { branding });
+      await router.navigateByUrl('/tasks');
+      fixture.detectChanges();
+      expect(screen.getByRole('contentinfo')).toBeInTheDocument();
+    });
+
+    it('shows the same footer at the end of a signed-in page with route data `footer` (the start page)', async () => {
+      const { router, fixture } = await setup(MEMBER, { branding });
+      await router.navigateByUrl('/dashboard');
+      fixture.detectChanges();
       const footer = screen.getByRole('contentinfo');
       expect(within(footer).getByRole('link', { name: 'Impressum' })).toBeInTheDocument();
       expect(within(footer).getByRole('heading', { name: 'Kontakt' })).toBeInTheDocument();
     });
 
+    it('leaves the footer out on a signed-in work page, and brings it back on the start page', async () => {
+      const { router, fixture } = await setup(MEMBER, { branding });
+      await router.navigateByUrl('/tasks');
+      fixture.detectChanges();
+      expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
+      await router.navigateByUrl('/budget/wide');
+      fixture.detectChanges();
+      expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
+      await router.navigateByUrl('/dashboard');
+      fixture.detectChanges();
+      expect(screen.getByRole('contentinfo')).toBeInTheDocument();
+    });
+
     it('leaves the footer out while the page fills the viewport', async () => {
       const view = await setup(MEMBER, { branding });
+      await view.router.navigateByUrl('/dashboard');
+      view.fixture.detectChanges();
       const frame = view.fixture.debugElement.injector.get(PageFrameService);
       frame.fill.set(true);
       view.fixture.detectChanges();

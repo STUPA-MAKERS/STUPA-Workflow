@@ -1,6 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { render } from '@testing-library/angular';
-import { StickyBarComponent } from './sticky-bar.component';
+import { StickyBarComponent, scrollParent } from './sticky-bar.component';
 
 @Component({
   standalone: true,
@@ -10,6 +10,16 @@ import { StickyBarComponent } from './sticky-bar.component';
 class Host {
   readonly sticky = signal(true);
 }
+
+/** The bar in a box that scrolls by itself (the body of the admin sheet). */
+@Component({
+  standalone: true,
+  imports: [StickyBarComponent],
+  template: `<div class="pane" style="overflow-y: auto">
+    <app-sticky-bar><input aria-label="Suche" /></app-sticky-bar>
+  </div>`,
+})
+class PaneHost {}
 
 /** jsdom lays nothing out, so the box of the bar is stated directly. */
 function place(el: HTMLElement, top: number, height = 60): void {
@@ -111,5 +121,42 @@ describe('StickyBarComponent', () => {
     window.dispatchEvent(new Event('scroll'));
     await flushFrame();
     expect(document.documentElement.style.getPropertyValue('scroll-padding-top')).toBe('80px');
+  });
+
+  describe('in a box that scrolls by itself', () => {
+    async function setupPane() {
+      const view = await render(PaneHost);
+      const pane = view.container.querySelector('.pane') as HTMLElement;
+      const bar = view.container.querySelector('app-sticky-bar') as HTMLElement;
+      pane.getBoundingClientRect = () =>
+        ({ top: 24, height: 800, bottom: 824, left: 0, right: 0, width: 0, x: 0, y: 24 }) as DOMRect;
+      return { view, pane, bar };
+    }
+
+    it('finds the box as its scroll container', async () => {
+      const { pane, bar } = await setupPane();
+      expect(scrollParent(bar)).toBe(pane);
+    });
+
+    it('is stuck when the box scrolled and the bar sits at the top of the box, also with the window at the top', async () => {
+      const { view, pane, bar } = await setupPane();
+      place(bar, 24);
+      Object.defineProperty(pane, 'scrollTop', { value: 200, writable: true, configurable: true });
+      pane.dispatchEvent(new Event('scroll'));
+      await flushFrame();
+      view.fixture.detectChanges();
+      expect(bar).toHaveClass('stb--stuck');
+    });
+
+    it('puts the focus scroll padding on the box, not on the document, and removes it', async () => {
+      const { view, pane, bar } = await setupPane();
+      place(bar, 24, 56);
+      pane.dispatchEvent(new Event('scroll'));
+      await flushFrame();
+      expect(pane.style.getPropertyValue('scroll-padding-top')).toBe('56px');
+      expect(document.documentElement.style.getPropertyValue('scroll-padding-top')).toBe('');
+      view.fixture.destroy();
+      expect(pane.style.getPropertyValue('scroll-padding-top')).toBe('');
+    });
   });
 });

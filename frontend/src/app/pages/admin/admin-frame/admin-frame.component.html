@@ -22,11 +22,11 @@
       </app-sticky-bar>
 
       <div #navBody class="af__navBody" appScrollFade="y">
-        <!-- A class hides the tiles during a search. They are not destroyed, so a cleared
-             search does not load them again. -->
-        @if (home()) {
-          <app-admin-health [class.af__hidden]="!!query()" />
-        }
+        <!-- "Zustand" stays in the column on every admin page, not only on the home page.
+             The navigation shows below wide only on the home page, so the one-column
+             layout shows the tiles there only. A class hides the tiles during a search.
+             They are not destroyed, so a cleared search does not load them again. -->
+        <app-admin-health [class.af__hidden]="!!query()" />
 
         @for (g of groups(); track g.key) {
           <section class="af__group" [attr.aria-labelledby]="'af-group-' + g.key">
@@ -59,7 +59,11 @@
     </nav>
   }
 
+  <!-- Beside the navigation the page sheet is a window with round corners: the sheet
+       clips, the body in it scrolls, so the corners clip what scrolls. -->
   <div class="af__page">
-    <router-outlet />
+    <div #page class="af__pageBody" appScrollFade="y">
+      <router-outlet />
+    </div>
   </div>
 </div>
