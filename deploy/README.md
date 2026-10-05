@@ -111,7 +111,11 @@ Then point `DATABASE_URL` to user `app` and `DB_MIGRATION_URL` to user `migrator
 ## Networks
 
 - `internal` — bridge with no published ports, so there is no ingress. Egress stays open.
-  The worker needs SMTP, WebDAV and webhooks, and the api needs OIDC.
+  The worker needs SMTP, WebDAV and webhooks. The api needs OIDC and outbound HTTPS to
+  `gravatar.com` (port 443) for the avatar proxy (`GET /api/principals/{id}/avatar`).
+  If your firewall limits the egress of the VM, allow that host, or turn the proxy off
+  in the admin area (site config, "Gravatar-Bilder zeigen"). Without the egress the
+  proxy answers 404 after its timeout and the app shows the initials.
 - `typst_net` — `internal: true`, so there is no egress. api and worker reach the typst
   render service over it, and the typst container sits on this network only.
 - `proxy` — in production this is the network of the Nginx Proxy Manager. Set `external: true`
