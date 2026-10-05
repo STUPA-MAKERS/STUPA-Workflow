@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use '../scroll-fade' as fade;
 
 /* The session page is a pane page that runs edge to edge: it takes the free height of
    the main column of the shell (`flex: 1 1 0`, no height from the viewport), and pulls
@@ -206,6 +207,20 @@ app-button ::ng-deep .btn:not(.btn--icon) .btn__label > app-icon:first-child {
   scroll-padding-block: var(--space-4);
 }
 
+/* Below wide (above the phone limit) the body is the one scroll area of the vote cards
+   and the sheet. Its edges are the edges of the cards and it has their radius, so a card
+   that scrolls past an end is clipped round, not with a straight line; an end fades
+   while more content lies past it. */
+@include bp.below-wide {
+  .mp__body:not(.mp__body--wide) {
+    margin-inline: var(--space-3);
+    padding-inline: 0;
+    border-radius: var(--radius-xl);
+    overscroll-behavior: contain;
+    @include fade.fade-y(var(--space-6));
+  }
+}
+
 /* ------------------------------------------------------------------ dock */
 .mp__dock {
   flex: none;
@@ -240,7 +255,11 @@ app-button ::ng-deep .btn:not(.btn--icon) .btn__label > app-icon:first-child {
     font-size: var(--fs-h2);
     line-height: 1.375rem;
   }
-  .mp__body {
+  .mp__body,
+  .mp__body:not(.mp__body--wide) {
+    margin-inline: 0;
+    padding-inline: var(--space-3);
+    border-radius: 0;
     overflow: visible;
   }
   .mp__sheet {
