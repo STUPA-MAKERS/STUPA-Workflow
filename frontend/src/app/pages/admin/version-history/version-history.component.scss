@@ -42,6 +42,10 @@
 }
 .vh__version {
   font-weight: var(--fw-semibold);
+  white-space: nowrap;
+}
+.vh__meta time {
+  white-space: nowrap;
 }
 .vh__meta {
   display: inline-flex;
@@ -103,18 +107,20 @@
   gap: var(--space-2);
 }
 
+/* A narrow sheet (a phone): one column. Version and state, then time and person, then
+   the actions; "Version 2" and the time never break inside. */
 @container (max-width: 34rem) {
   .vh__row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    row-gap: 0;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-1);
   }
   .vh__meta {
-    grid-column: 1;
     grid-row: 2;
   }
   .vh__actions {
-    grid-column: 2;
-    grid-row: 1 / span 2;
+    grid-row: 3;
+    justify-content: space-between;
+    margin-inline-start: calc(-1 * var(--space-2));
   }
 }
 
