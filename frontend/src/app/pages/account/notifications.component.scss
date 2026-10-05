@@ -36,6 +36,12 @@
 .nt__label {
   font-weight: var(--fw-medium);
 }
+/* No kind to switch: one muted line under the header. */
+.nt__empty {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
 .nt__hint {
   font-size: var(--fs-small);
   line-height: var(--lh-small);

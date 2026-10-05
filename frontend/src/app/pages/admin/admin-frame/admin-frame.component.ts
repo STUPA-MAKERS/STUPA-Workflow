@@ -163,8 +163,10 @@ export class AdminFrameComponent {
   private readonly navBody = viewChild<ElementRef<HTMLElement>>('navBody');
 
   /**
-   * The area of the frame. The route sets it with `data: { frame: 'account' }` (bound
-   * as an input); without it the frame is the admin frame.
+   * The area of the frame. The route sets it with `data: { frame: 'admin' }` or
+   * `data: { frame: 'account' }` (bound as an input). Both routes set it, because the
+   * input binding also reads query parameters, and only route data wins over them. An
+   * unknown or absent value gives the admin frame.
    */
   readonly frame = input<FrameModeKey>('admin');
 

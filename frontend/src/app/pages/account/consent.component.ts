@@ -15,8 +15,9 @@ import { scopeDesc, scopeLabel } from './scope-labels';
  * OAuth consent page (board Konto-OAuth-Einwilligung), step two of the MCP login.
  *
  * The page names the client (`clientId`) and lists EVERY scope that the client asks for,
- * with its label and description; all start ticked. A scope the person does not hold
- * says so: the agent does not get it. The lifetimes come from the server (no "never",
+ * with its label and description. A scope the person holds starts ticked. A scope the
+ * person does not hold starts unticked and says so: the agent does not get it. A ticked
+ * box thus never promises a right the agent does not get. The lifetimes come from the server (no "never",
  * every token expires), the default one starts chosen.
  *
  * Without `mcp.use` (`canUseMcp` false) the page shows the error line instead of the
@@ -52,7 +53,7 @@ export class OAuthConsentComponent {
   readonly error = signal<string | null>(null);
   readonly submitting = signal(false);
 
-  /** Selected scopes, keyed by scope key. Every requested scope starts on. */
+  /** Selected scopes, keyed by scope key. A held scope starts on, an unheld one off. */
   readonly selected = signal<Record<string, boolean>>({});
   readonly lifetime = signal<string>('30d');
 
@@ -62,7 +63,7 @@ export class OAuthConsentComponent {
     this.api.consentRequest().subscribe({
       next: (r) => {
         this.req.set(r);
-        this.selected.set(Object.fromEntries(r.requestedScopes.map((s) => [s.key, true])));
+        this.selected.set(Object.fromEntries(r.requestedScopes.map((s) => [s.key, s.held])));
         this.lifetime.set(r.defaultLifetime);
         this.loading.set(false);
       },

@@ -25,7 +25,10 @@ const HIDDEN_KINDS: ReadonlySet<string> = new Set(['vote', 'role_change']);
  * essential and have no switch.
  *
  * A switch saves at once and sends every switch in one PUT (the hidden kinds too, with
- * their stored value). When the save fails, the switch goes back and an error shows.
+ * their stored value). Only one PUT runs at a time: a switch that flips during a PUT
+ * shows at once, and one more PUT with the latest state follows when the running one
+ * ends. When a save fails, every switch goes back to the last state that the server
+ * confirmed and an error shows. Thus the page and the server always agree after a save.
  */
 @Component({
   selector: 'app-account-notifications',
@@ -44,12 +47,20 @@ export class AccountNotificationsComponent {
   readonly loading = signal(true);
   readonly error = signal<TranslationKey | null>(null);
 
+  /** The last state that the server sent or confirmed. A failed save goes back to it. */
+  private confirmed: NotificationPreference[] = [];
+  /** A PUT runs. */
+  private saving = false;
+  /** A switch flipped while a PUT ran: send the latest state when the PUT ends. */
+  private dirty = false;
+
   /** The kinds that get a row. */
   readonly rows = computed(() => this.prefs().filter((p) => !HIDDEN_KINDS.has(p.kind)));
 
   constructor() {
     this.api.listNotificationPreferences().subscribe({
       next: (p) => {
+        this.confirmed = p;
         this.prefs.set(p);
         this.loading.set(false);
       },
@@ -62,14 +73,34 @@ export class AccountNotificationsComponent {
 
   /** Flip one switch and save at once. The server returns the effective state. */
   toggle(kind: string, enabled: boolean): void {
-    const before = this.prefs();
-    const next = before.map((p) => (p.kind === kind ? { ...p, enabled } : p));
-    this.prefs.set(next);
+    this.prefs.update((all) => all.map((p) => (p.kind === kind ? { ...p, enabled } : p)));
     this.error.set(null);
-    this.api.setNotificationPreferences(next).subscribe({
-      next: (saved) => this.prefs.set(saved),
+    this.save();
+  }
+
+  /**
+   * Send the current state. While a PUT runs, only mark the state as dirty; the running
+   * PUT then sends it when it ends.
+   */
+  private save(): void {
+    if (this.saving) {
+      this.dirty = true;
+      return;
+    }
+    this.saving = true;
+    this.dirty = false;
+    this.api.setNotificationPreferences(this.prefs()).subscribe({
+      next: (saved) => {
+        this.saving = false;
+        this.confirmed = saved;
+        // A switch flipped during the PUT: keep it on screen and send it now.
+        if (this.dirty) this.save();
+        else this.prefs.set(saved);
+      },
       error: () => {
-        this.prefs.set(before);
+        this.saving = false;
+        this.dirty = false;
+        this.prefs.set(this.confirmed);
         this.error.set('account.notifications.saveError');
       },
     });

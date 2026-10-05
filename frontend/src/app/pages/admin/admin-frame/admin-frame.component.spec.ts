@@ -1,6 +1,8 @@
 import { Component } from '@angular/core';
 import { of } from 'rxjs';
-import { Router, provideRouter } from '@angular/router';
+import { TestBed } from '@angular/core/testing';
+import { Router, provideRouter, withComponentInputBinding } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
@@ -441,5 +443,43 @@ describe('AdminFrameComponent in account mode', () => {
     await view.fixture.whenStable();
     view.fixture.detectChanges();
     expect(screen.getByRole('navigation', { name: 'Kontobereiche' })).toBeInTheDocument();
+  });
+});
+
+describe('AdminFrameComponent mode from the route', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  it('keeps the admin mode on /admin?frame=account: the route data wins', async () => {
+    matchWide(true);
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter(
+          [
+            {
+              path: 'admin',
+              component: AdminFrameComponent,
+              data: { frame: 'admin' },
+              children: [{ path: '**', component: StubPageComponent }],
+            },
+          ],
+          withComponentInputBinding(),
+        ),
+        { provide: AuthService, useValue: fakeAuth(['admin.users']) },
+        {
+          provide: AdminApiService,
+          useValue: {
+            latestAuditVerification: jest.fn(() => of(null)),
+            verifyAuditChain: jest.fn(),
+            listBackups: jest.fn(() => of({ items: [] })),
+            listErasures: jest.fn(() => of([])),
+          },
+        },
+      ],
+    });
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/admin?frame=account');
+    harness.detectChanges();
+    expect(screen.getByRole('navigation', { name: 'Verwaltungsbereiche' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Kontobereiche' })).toBeNull();
   });
 });

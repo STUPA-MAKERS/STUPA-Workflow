@@ -82,11 +82,11 @@ describe('OAuthConsentComponent', () => {
     expect(screen.getByText('antragsplattform-mcp')).toBeInTheDocument();
   });
 
-  it('lists every requested scope by its label, all ticked', async () => {
+  it('lists every requested scope by its label, the held ones ticked', async () => {
     const { container } = await setup();
     const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
     expect(boxes).toHaveLength(8);
-    expect(boxes.every((b) => b.checked)).toBe(true);
+    expect(boxes.filter((b) => !b.checked)).toHaveLength(1);
     for (const label of LABELS) {
       expect(screen.getByRole('checkbox', { name: new RegExp(`^${label}`) })).toBeInTheDocument();
     }
@@ -102,6 +102,14 @@ describe('OAuthConsentComponent', () => {
       screen.getByRole('checkbox', { name: /^Workflows bearbeiten.*Du besitzt dieses Recht aktuell nicht/ }),
     ).toBeInTheDocument();
     expect(screen.getAllByText(/Du besitzt dieses Recht aktuell nicht/)).toHaveLength(1);
+  });
+
+  it('starts a scope the person does not hold unticked', async () => {
+    await setup();
+    const unheld = screen.getByRole('checkbox', { name: /^Workflows bearbeiten/ }) as HTMLInputElement;
+    expect(unheld.checked).toBe(false);
+    const held = screen.getByRole('checkbox', { name: /^Sitzungen verwalten/ }) as HTMLInputElement;
+    expect(held.checked).toBe(true);
   });
 
   it('shows an unknown scope by its key', async () => {
@@ -144,7 +152,7 @@ describe('OAuthConsentComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Erlauben' }));
     expect(api.submitConsent).toHaveBeenCalledWith({
       approve: true,
-      scopes: ALL_SCOPES.filter((s) => s !== 'admin:write'),
+      scopes: ALL_SCOPES.filter((s) => s !== 'admin:write' && s !== 'flows:write'),
       lifetime: '8h',
     });
     expect(loc.assign).toHaveBeenCalledWith('http://127.0.0.1:9999/cb?code=abc');

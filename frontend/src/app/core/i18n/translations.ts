@@ -101,6 +101,7 @@ export const de = {
     'Wähle, welche E-Mail-Benachrichtigungen du erhalten möchtest. Login-Links werden immer zugestellt.',
   'account.notifications.error': 'Einstellungen konnten nicht geladen werden.',
   'account.notifications.saveError': 'Speichern fehlgeschlagen — bitte erneut versuchen.',
+  'account.notifications.empty': 'Für dein Konto gibt es keine Benachrichtigungen zum Ausschalten.',
   'account.notifications.kind.status_update': 'Status-Updates zu Anträgen',
   'account.notifications.hint.status_update':
     'Wenn sich der Status eines Antrags ändert, der dich betrifft.',
@@ -151,7 +152,7 @@ export const de = {
     'Der Agent mit „{scopes}“ verliert den Zugriff sofort. Für einen neuen Zugriff meldet er sich erneut an.',
   'account.grants.revokeAllTitle': 'Alle Zugriffe widerrufen?',
   'account.grants.revokeAllConfirm':
-    'Alle {count} Zugriffe enden sofort. Jeder Agent meldet sich für einen neuen Zugriff erneut an.',
+    'Alle Zugriffe enden sofort. Jeder Agent meldet sich für einen neuen Zugriff erneut an.',
   'account.grants.revokeError': 'Widerrufen fehlgeschlagen. Bitte erneut versuchen.',
   'account.grants.created': 'Erstellt',
   'account.grants.expires': 'Läuft ab',
@@ -3101,6 +3102,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'Choose which email notifications you want to receive. Login links are always delivered.',
   'account.notifications.error': 'Settings could not be loaded.',
   'account.notifications.saveError': 'Saving failed — please try again.',
+  'account.notifications.empty': 'There are no notifications that you can turn off for your account.',
   'account.notifications.kind.status_update': 'Status updates on applications',
   'account.notifications.hint.status_update':
     'When the status of an application that concerns you changes.',
@@ -3149,7 +3151,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'The agent with “{scopes}” loses its access at once. For new access it signs in again.',
   'account.grants.revokeAllTitle': 'Revoke all grants?',
   'account.grants.revokeAllConfirm':
-    'All {count} grants end at once. Each agent signs in again for new access.',
+    'All grants end at once. Each agent signs in again for new access.',
   'account.grants.revokeError': 'Revoking failed. Please try again.',
   'account.grants.created': 'Created',
   'account.grants.expires': 'Expires',

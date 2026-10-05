@@ -14,7 +14,6 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { downloadBlob } from '@shared/download.util';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
@@ -44,7 +43,6 @@ const COPIED_MS = 2000;
   imports: [
     ButtonComponent,
     DialogComponent,
-    EmptyStateComponent,
     IconComponent,
     LocalizedDatePipe,
     NoteComponent,
@@ -62,6 +60,8 @@ export class AccountGrantsComponent {
 
   readonly grants = signal<OAuthGrant[]>([]);
   readonly loading = signal(true);
+  /** The list loaded once. Until then the heading shows no count. */
+  readonly loaded = signal(false);
   /** The list could not load. */
   readonly loadError = signal(false);
   /** A revoke or the download failed. */
@@ -111,6 +111,7 @@ export class AccountGrantsComponent {
     this.api.listGrants().subscribe({
       next: (g) => {
         this.grants.set(g);
+        this.loaded.set(true);
         this.loadError.set(false);
         this.loading.set(false);
       },

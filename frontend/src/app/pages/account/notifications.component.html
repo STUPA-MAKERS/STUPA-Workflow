@@ -26,5 +26,7 @@
         </li>
       }
     </ul>
+  } @else if (!error()) {
+    <p class="nt__empty">{{ 'account.notifications.empty' | t }}</p>
   }
 </section>

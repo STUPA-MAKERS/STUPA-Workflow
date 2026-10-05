@@ -268,9 +268,11 @@ export const routes: Routes = [
       {
         // The admin frame (board Verwaltung): the admin navigation beside every admin
         // page. The frame itself needs only a session; each page below keeps its own
-        // permission gate. `wide`: the navigation and the page fill the width.
+        // permission gate. `wide`: the navigation and the page fill the width. `frame`:
+        // the route data sets the mode of the frame, so a query parameter `?frame=` cannot
+        // change it (route data wins over query parameters in the input binding).
         path: 'admin',
-        data: { wide: true },
+        data: { wide: true, frame: 'admin' },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/admin-frame/admin-frame.component').then(

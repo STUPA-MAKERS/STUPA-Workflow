@@ -88,13 +88,18 @@
 .gr__configTitle {
   color: var(--color-text-muted);
 }
+/* 13 px on a 20 px line, as on the board. The `code` inside takes the size of the
+   block, not the smaller size of the global `code` rule. */
 .gr__json {
   margin: 0;
   padding: 0 var(--space-4) var(--space-4);
   overflow-x: auto;
-  font-size: var(--fs-small);
+  font-size: 0.8125rem;
   line-height: 1.25rem;
   color: var(--color-text);
+}
+.gr__json code {
+  font-size: inherit;
 }
 
 .gr__url {
@@ -160,8 +165,12 @@
   content: '\00a0·';
 }
 
+/* No grants: one muted line in the row group, the height of a row. */
 .gr__empty {
-  padding: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--color-text-muted);
 }
 
 .gr__dialogText {

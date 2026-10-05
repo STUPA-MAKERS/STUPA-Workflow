@@ -46,7 +46,7 @@
               {{ (copied() ? 'account.mcp.copied' : 'action.copy') | t }}
             </app-button>
           </div>
-          <pre class="gr__json mono" aria-labelledby="gr-config-title"><code>{{ setupJson() }}</code></pre>
+          <pre class="gr__json mono"><code>{{ setupJson() }}</code></pre>
         </div>
         <span class="sr-only" aria-live="polite">{{ copied() ? ('account.mcp.copied' | t) : '' }}</span>
 
@@ -61,7 +61,11 @@
   <section class="gr__active" aria-labelledby="gr-active-title">
     <div class="gr__activeHead">
       <h2 class="sec gr__activeTitle" id="gr-active-title">
-        {{ 'account.grants.activeCount' | t: { count: grants().length } }}
+        @if (loaded()) {
+          {{ 'account.grants.activeCount' | t: { count: grants().length } }}
+        } @else {
+          {{ 'account.grants.active' | t }}
+        }
       </h2>
       @if (grants().length > 0) {
         <app-button variant="danger" size="sm" (click)="askRevokeAll()">
@@ -103,9 +107,7 @@
             </app-button>
           </li>
         } @empty {
-          <li class="gr__empty">
-            <app-empty-state icon="key" [heading]="'account.grants.empty' | t" />
-          </li>
+          <li class="gr__empty">{{ 'account.grants.empty' | t }}</li>
         }
       </ul>
     }
@@ -123,7 +125,7 @@
       @if (c.kind === 'one') {
         {{ 'account.grants.revokeConfirm' | t: { scopes: scopeLabels(c.grant) } }}
       } @else {
-        {{ 'account.grants.revokeAllConfirm' | t: { count: grants().length } }}
+        {{ 'account.grants.revokeAllConfirm' | t }}
       }
     </p>
   }

@@ -1,4 +1,4 @@
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
@@ -124,6 +124,26 @@ describe('AccountGrantsComponent', () => {
     expect(screen.queryByRole('button', { name: 'Alle widerrufen' })).toBeNull();
   });
 
+  it('shows no count in the heading while the list loads for the first time', async () => {
+    const api = makeApi({ listGrants: jest.fn(() => NEVER) });
+    await setup({ api });
+    expect(screen.getByRole('heading', { name: 'Aktive Zugriffe' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Aktive Zugriffe · / })).toBeNull();
+  });
+
+  it('shows the empty list as one line in the row group, not as a large empty state', async () => {
+    const api = makeApi({ listGrants: jest.fn(() => of([])) });
+    const view = await setup({ api });
+    const list = screen.getByRole('list', { name: 'Aktive Zugriffe' });
+    expect(within(list).getByRole('listitem')).toHaveTextContent('Keine aktiven Zugriffe.');
+    expect(view.container.querySelector('app-empty-state')).toBeNull();
+  });
+
+  it('does not name the MCP config block with aria-labelledby (a pre has no name)', async () => {
+    const view = await setup({ canMcp: true });
+    expect(view.container.querySelector('pre.gr__json')).not.toHaveAttribute('aria-labelledby');
+  });
+
   it('shows an error when the grants cannot load', async () => {
     const api = makeApi({ listGrants: jest.fn(() => throwError(() => new Error('boom'))) });
     await setup({ api });
@@ -159,7 +179,7 @@ describe('AccountGrantsComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Alle widerrufen' }));
     expect(api.revokeAllGrants).not.toHaveBeenCalled();
     const dialog = screen.getByRole('dialog', { name: 'Alle Zugriffe widerrufen?' });
-    expect(dialog).toHaveTextContent('Alle 2 Zugriffe enden sofort.');
+    expect(dialog).toHaveTextContent('Alle Zugriffe enden sofort.');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Alle widerrufen' }));
     expect(api.revokeAllGrants).toHaveBeenCalled();
     expect(api.listGrants).toHaveBeenCalledTimes(2);
