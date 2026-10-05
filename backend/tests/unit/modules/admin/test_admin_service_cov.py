@@ -475,9 +475,22 @@ async def test_set_gremium_mail_recipients_not_found() -> None:
 
 
 async def test_list_application_types() -> None:
-    s, _ = svc([res(type_row(), type_row(key="b"))])
+    s, _ = svc(
+        [res((type_row(), None), (type_row(key="b", active_form_version_id=uuid.uuid4()), 7))]
+    )
     out = await s.list_application_types()
     assert len(out) == 2
+    assert out[0].active_form_version is None
+    assert out[1].active_form_version == 7
+    dumped = out[1].model_dump(by_alias=True)
+    assert dumped["activeFormVersion"] == 7
+
+
+async def test_update_application_type_returns_active_version() -> None:
+    row = type_row(active_form_version_id=uuid.uuid4())
+    s, _ = svc([*audit_results()], gets=[row], scalars=[3])
+    out = await s.update_application_type(row.id, ApplicationTypeUpdate(), "admin")
+    assert out.active_form_version == 3
 
 
 async def test_create_application_type_with_comparison_offers() -> None:

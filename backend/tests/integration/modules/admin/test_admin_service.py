@@ -339,6 +339,37 @@ async def test_application_type_crud_and_conflict(session: AsyncSession) -> None
         created.id, ApplicationTypeUpdate(hasBudget=False), _ACTOR
     )
     assert updated.has_budget is False
+    assert updated.active_form_version is None
+
+
+async def test_application_type_list_gives_the_active_form_version(
+    session: AsyncSession,
+) -> None:
+    from app.modules.forms.models import FormVersion
+
+    svc = ConfigService(session)
+    with_form = ApplicationType(
+        key=f"with-{uuid.uuid4().hex[:8]}", name_i18n={"de": "Mit"}, has_budget=False
+    )
+    without_form = ApplicationType(
+        key=f"without-{uuid.uuid4().hex[:8]}", name_i18n={"de": "Ohne"}, has_budget=False
+    )
+    session.add_all([with_form, without_form])
+    await session.flush()
+    old = FormVersion(application_type_id=with_form.id, version=1, active=False)
+    active = FormVersion(application_type_id=with_form.id, version=2, active=True)
+    session.add_all([old, active])
+    await session.flush()
+    with_form.active_form_version_id = active.id
+    await session.commit()
+
+    listed = {t.key: t for t in await svc.list_application_types()}
+    assert listed[with_form.key].active_form_version == 2
+    assert listed[without_form.key].active_form_version is None
+    updated = await svc.update_application_type(
+        with_form.id, ApplicationTypeUpdate(hasBudget=True), _ACTOR
+    )
+    assert updated.active_form_version == 2
 
 
 async def test_role_crud_and_listing(session: AsyncSession) -> None:
