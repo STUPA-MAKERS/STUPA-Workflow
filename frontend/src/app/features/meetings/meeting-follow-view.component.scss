@@ -122,7 +122,11 @@ app-button ::ng-deep .btn__label > app-icon:first-child {
   min-height: 0;
 }
 
-/* The start of a planned meeting, in the place of the sheet. */
+/* The start of a planned meeting, in the place of the sheet. Side by side it fills the
+   column like the sheet; one column at a time it takes only its own height. */
+.fv__body:not(.fv__body--wide) .fv__main:has(> .fv__start) {
+  flex: none;
+}
 .fv__start {
   display: flex;
   flex: 1 1 auto;
