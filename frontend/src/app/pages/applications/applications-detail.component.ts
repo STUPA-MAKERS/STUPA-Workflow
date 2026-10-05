@@ -17,6 +17,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type {
+  ActorInfo,
   Application,
   ApplicationComment,
   ApplicationType,
@@ -30,6 +31,7 @@ import type {
   Uuid,
 } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
+import { actorLabel } from '@shared/actor-label.util';
 import { toFormlySections } from '@shared/forms/formly-mapper';
 import { formatAnswer, formatEuro, formatFieldValue } from '@shared/forms/answer-format';
 import {
@@ -506,12 +508,9 @@ export class ApplicationsDetailComponent {
     ];
   }
 
-  /** "Antragsteller:in" for the applicant, else the name the server sent. */
-  private versionActor(version: ApplicationVersion): string | null {
-    if (!version.changedBy) return null;
-    return version.changedBy === 'applicant'
-      ? this.i18n.translate('applications.comments.author.applicant')
-      : version.changedBy;
+  /** The label of an actor: a name, "Antragsteller:in", "System · Fristen", …. */
+  private actor(info: ActorInfo | null | undefined, legacy: string | null): string | null {
+    return actorLabel(info, legacy, (key, params) => this.i18n.translate(key, params));
   }
 
   /**
@@ -541,7 +540,7 @@ export class ApplicationsDetailComponent {
         icon: i === 0 ? 'send' : 'flow',
         title: e.toState?.label || e.label,
         kind: flowColorKind(e.toState?.color),
-        actor: e.actor,
+        actor: this.actor(e.actorInfo, e.actor),
         body: lines.join('\n') || null,
       };
     });
@@ -552,7 +551,7 @@ export class ApplicationsDetailComponent {
         at: v.at,
         icon: 'edit',
         title: t('applications.history.version', { version: v.version }),
-        actor: this.versionActor(v),
+        actor: this.actor(v.changedByInfo, v.changedBy),
         body:
           v.version === 1
             ? t('applications.history.initial')
@@ -1026,11 +1025,11 @@ export class ApplicationsDetailComponent {
 
   /** Display name of a comment: the author, or a fallback based on the role. */
   protected authorName(comment: ApplicationComment): string {
-    if (comment.author) return comment.author;
-    return this.i18n.translate(
-      comment.authorKind === 'applicant'
-        ? 'applications.comments.author.applicant'
-        : 'applications.comments.author.committee',
+    const info =
+      comment.authorInfo ?? (comment.authorKind === 'applicant' ? { kind: 'applicant' as const } : null);
+    return (
+      this.actor(info, comment.author) ??
+      this.i18n.translate('applications.comments.author.committee')
     );
   }
 

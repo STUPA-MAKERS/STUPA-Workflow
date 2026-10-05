@@ -6,8 +6,8 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from app.modules.applications.models import Comment
-from app.modules.applications.schemas import CommentOut
+from app.modules.applications.models import Application, Comment
+from app.modules.applications.schemas import ActorOut, CommentOut
 from app.modules.applications.service.service_base import ApplicationsServiceBase
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
@@ -46,7 +46,7 @@ class CommentOps(ApplicationsServiceBase):
         visibility: str,
         allow_unconfirmed: bool = True,
     ) -> CommentOut:
-        await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
+        app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         comment = Comment(
             application_id=application_id,
             author=author,
@@ -56,11 +56,12 @@ class CommentOps(ApplicationsServiceBase):
         )
         self.session.add(comment)
         await self.session.commit()
-        names = await self._author_names({author} if author else set())
+        info = await self._comment_author_info(app, author, author_kind)
         return CommentOut(
             id=comment.id,
-            author=names.get(author, author) if author else None,
+            author=info.legacy(author) if author else None,
             authorKind=author_kind,  # type: ignore[arg-type] — validated against CHECK
+            authorInfo=info,  # type: ignore[arg-type] — validated against CHECK
             body=comment.body,
             visibility=visibility,  # type: ignore[arg-type]
             at=comment.at,
@@ -93,22 +94,25 @@ class CommentOps(ApplicationsServiceBase):
         if not include_internal:
             stmt = stmt.where(Comment.visibility == "public")
         rows = (await self.session.scalars(stmt.order_by(Comment.at))).all()
-        names = await self._author_names({c.author for c in rows if c.author})
-        own = await self._applicant_actors(app, magic_link_view=viewer_is_applicant)
-        gremium = await self._gremium_actor(app) if applicant_view else None
+        actors = await self._resolve_actors(
+            app,
+            (c.author for c in rows),
+            applicant_view=applicant_view,
+            magic_link_view=viewer_is_applicant,
+        )
 
-        def _author(c: Comment) -> str | None:
-            if not c.author:
-                return None
-            if applicant_view and c.author not in own:
-                return gremium
-            return names.get(c.author, c.author)
+        def _info(c: Comment) -> ActorOut:
+            if c.author and c.author in actors:
+                return actors[c.author]
+            # An applicant comment stores no sub.
+            return ActorOut(kind="applicant" if c.author_kind == "applicant" else "deleted")
 
         return [
             CommentOut(
                 id=c.id,
-                author=_author(c),
+                author=_info(c).legacy(c.author) if c.author else None,
                 authorKind=c.author_kind,  # type: ignore[arg-type]
+                authorInfo=_info(c),
                 body=c.body,
                 visibility=c.visibility,  # type: ignore[arg-type]
                 at=c.at,
@@ -121,6 +125,21 @@ class CommentOps(ApplicationsServiceBase):
             )
             for c in rows
         ]
+
+    async def _comment_author_info(
+        self, app: Application, author: str | None, author_kind: str
+    ) -> ActorOut:
+        """Resolve the author of a comment that the viewer just wrote or changed.
+
+        The viewer is the author, so the Gremium mask of the applicant view does
+        not apply.
+        """
+        if not author:
+            return ActorOut(kind="applicant" if author_kind == "applicant" else "deleted")
+        actors = await self._resolve_actors(
+            app, (author,), applicant_view=False, magic_link_view=False
+        )
+        return actors[author]
 
     async def _get_comment(self, application_id: UUID, comment_id: UUID) -> Comment:
         """Load one comment of this application.
@@ -212,7 +231,7 @@ class CommentOps(ApplicationsServiceBase):
             NotFoundError: The application or the comment does not exist (404).
             ForbiddenError: The caller is neither the author nor a manager (403).
         """
-        await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
+        app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         comment = await self._get_comment(application_id, comment_id)
         self._assert_may_write(
             comment,
@@ -223,11 +242,12 @@ class CommentOps(ApplicationsServiceBase):
         comment.body = body
         await self._audit_comment(comment, AuditAction.COMMENT_UPDATE, actor=actor)
         await self.session.commit()
-        names = await self._author_names({comment.author} if comment.author else set())
+        info = await self._comment_author_info(app, comment.author, comment.author_kind)
         return CommentOut(
             id=comment.id,
-            author=names.get(comment.author, comment.author) if comment.author else None,
+            author=info.legacy(comment.author) if comment.author else None,
             authorKind=comment.author_kind,  # type: ignore[arg-type] — validated against CHECK
+            authorInfo=info,
             body=comment.body,
             visibility=comment.visibility,  # type: ignore[arg-type]
             at=comment.at,

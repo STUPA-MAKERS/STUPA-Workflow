@@ -192,9 +192,20 @@ describe('mapTimelineEvent', () => {
       label: 'Submitted',
       transitionLabel: null,
       actor: 'Referat',
+      actorInfo: null,
       at: '2026-06-05T10:00:00Z',
       note: 'ok',
     });
+  });
+
+  it('passes the resolved actor through', () => {
+    const wire: TimelineEventOutWire = {
+      toStateId: 's1',
+      actor: 'system:deadlines',
+      actorInfo: { kind: 'system', key: 'deadlines' },
+      at: '2026-06-05T10:00:00Z',
+    };
+    expect(mapTimelineEvent(wire, 'de').actorInfo).toEqual({ kind: 'system', key: 'deadlines' });
   });
 
   it('resolves the transition label to the locale (A3)', () => {
@@ -232,6 +243,7 @@ describe('mapComment', () => {
       id: 'c1',
       author: 'Referat',
       authorKind: 'principal',
+      authorInfo: null,
       body: 'Hallo',
       visibility: 'public',
       isPublic: true,
@@ -411,6 +423,7 @@ describe('mapVersion', () => {
     const v = mapVersion(wire);
     expect(v.diff).toBeNull();
     expect(v.changedBy).toBeNull();
+    expect(v.changedByInfo).toBeNull();
     expect(v.data).toEqual({ title: 'Alt' });
   });
 

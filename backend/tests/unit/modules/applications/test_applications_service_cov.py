@@ -1217,19 +1217,19 @@ async def test_author_names_empty_set_short_circuits() -> None:
     assert session.statements == []  # no query runs
 
 
-async def test_author_names_resolves_display_then_email_then_sub() -> None:
+async def test_author_names_resolves_display_then_email_and_skips_the_rest() -> None:
     session = _Session(
         execute_results=[
             [
                 ("s1", "Display", "e1@x.de"),  # display_name
                 ("s2", None, "e2@x.de"),  # email
-                ("s3", None, None),  # sub
+                ("s3", None, None),  # anonymized: missing, never the raw sub
             ]
         ]
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     names = await svc._author_names({"s1", "s2", "s3", ""})
-    assert names == {"s1": "Display", "s2": "e2@x.de", "s3": "s3"}
+    assert names == {"s1": "Display", "s2": "e2@x.de"}
 
 
 async def test_add_comment_with_author() -> None:
@@ -1493,8 +1493,10 @@ async def test_update_comment_by_manager_of_foreign_comment() -> None:
         viewer_is_applicant=False,
         can_manage=True,
     )
-    # The manager is not the author, so the response is not marked as own.
-    assert out.is_own is False and out.author == "other"
+    # The manager is not the author, so the response is not marked as own. The
+    # author sub names no account, so the response carries no name and no sub.
+    assert out.is_own is False and out.author is None
+    assert out.author_info is not None and out.author_info.kind == "deleted"
 
 
 async def test_update_comment_of_applicant_by_applicant() -> None:

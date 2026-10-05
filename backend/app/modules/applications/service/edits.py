@@ -280,29 +280,28 @@ class EditOps(ApplicationsServiceBase):
             )
         ).all()
         hidden = await self._pii_keys_for_type(app.type_id) if strip_pii else set()
-        own = await self._applicant_actors(app, magic_link_view=magic_link_view)
-        gremium = await self._gremium_actor(app) if applicant_view else None
-        # Resolve the editor sub to a display name. The UI never shows a raw UUID.
-        names = await self._author_names({r.changed_by for r in rows if r.changed_by})
+        # Resolve every editor in one batch. The UI never shows a raw sub or key.
+        actors = await self._resolve_actors(
+            app,
+            (r.changed_by for r in rows),
+            applicant_view=applicant_view,
+            magic_link_view=magic_link_view,
+        )
         out: list[VersionOut] = []
         for r in rows:
             diff = _scrub_diff(r.diff, hidden) if r.diff else None
             changed = sorted(
                 {k for bucket in (diff or {}).values() for k in (bucket or {})}
             )
-            if not r.changed_by:
-                changed_by = None
-            elif applicant_view and r.changed_by not in own:
-                changed_by = gremium
-            else:
-                changed_by = names.get(r.changed_by, r.changed_by)
+            info = actors.get(r.changed_by) if r.changed_by else None
             out.append(
                 VersionOut(
                     version=r.version,
                     data=None if applicant_view else _without_keys(r.data, hidden),
                     diff=None if applicant_view else diff,  # type: ignore[arg-type] — stored DataDiff
                     changedKeys=changed,
-                    changedBy=changed_by,
+                    changedBy=info.legacy(r.changed_by) if info and r.changed_by else None,
+                    changedByInfo=info,
                     at=r.at,
                 )
             )
