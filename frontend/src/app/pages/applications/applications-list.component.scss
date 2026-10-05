@@ -1,7 +1,9 @@
 @use 'breakpoints' as bp;
 
 :host {
-  display: block;
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
   min-width: 0;
 }
 
@@ -9,6 +11,17 @@
    the shell, and each pane scrolls inside itself. One pane at a time, the page scrolls. */
 .apps {
   min-width: 0;
+}
+/* One pane at a time the column takes at least the free height of the shell main and
+   passes it down to the pane. A short pane, such as "application not found", then
+   centres in the page instead of sitting at the top. A long pane still grows the page. */
+.apps:not(.apps--split) {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
+.apps:not(.apps--split) > app-list-detail {
+  flex: 1 0 auto;
 }
 .apps--split {
   height: calc(100dvh - var(--main-pad-top, 0px) - var(--main-pad-bottom, 0px));

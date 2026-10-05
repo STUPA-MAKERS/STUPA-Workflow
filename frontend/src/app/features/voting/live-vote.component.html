@@ -1,4 +1,4 @@
-<section class="live" [class.live--phone]="phone()">
+<section class="live" [class.live--phone]="phone()" [class.live--fill]="mode() === 'none'">
   @if (phone() && mode() === 'live') {
     <app-vote-phone-header [back]="meeting() ? ['/meetings', meeting()!.id] : '/meetings'" [subtitle]="phoneSubtitle()" />
   } @else {
@@ -17,7 +17,7 @@
       <p class="live__line" role="status">{{ 'voting.live.searching' | t }}</p>
     }
     @case ('none') {
-      <app-empty-state icon="vote" [heading]="'voting.live.none' | t" />
+      <app-empty-state icon="vote" fill [heading]="'voting.live.none' | t" />
     }
     @case ('pick') {
       <nav class="live__pick" [attr.aria-label]="'voting.live.pick' | t">

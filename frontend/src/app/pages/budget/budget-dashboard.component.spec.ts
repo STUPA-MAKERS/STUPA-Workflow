@@ -1224,6 +1224,16 @@ describe('BudgetDashboardComponent', () => {
       expect(view.container.querySelector('.bd__empty')).toBeTruthy();
     });
 
+    it('centres the "nothing is configured" state in the free page height', async () => {
+      const view = await setup({ tree: [], fys: [] });
+      expect(view.container.querySelector('.bd__empty app-empty-state')).toHaveClass('es-host--fill');
+    });
+
+    it('centres the "no fiscal year" state in the free page height', async () => {
+      const view = await setup({ fys: [] });
+      expect(view.container.querySelector('.bd__empty app-empty-state')).toHaveClass('es-host--fill');
+    });
+
     it('claims neither empty state while the fiscal years are still on the wire', async () => {
       const { c, http, fixture } = await bare();
       http.expectOne((r) => r.url.endsWith('/budgets')).flush(TREE);

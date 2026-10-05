@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { booleanAttribute, ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
 
 /**
@@ -10,6 +10,10 @@ import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
  *
  * The action is projected, so the caller decides whether there is a way forward and what
  * it is.
+ *
+ * Set `fill` when the empty state is the whole page. The host then takes the free height
+ * of its flex-column parent and centres the content vertically in it. Do not set it in a
+ * card or a list row: there the empty state stays at the top, where the reader looks.
  */
 @Component({
   selector: 'app-empty-state',
@@ -18,6 +22,7 @@ import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
   imports: [IconComponent],
   templateUrl: './empty-state.component.html',
   styleUrl: './empty-state.component.scss',
+  host: { '[class.es-host--fill]': 'fill()' },
 })
 export class EmptyStateComponent {
   /** Short statement of what is missing. Never an error code on its own. */
@@ -28,4 +33,9 @@ export class EmptyStateComponent {
   readonly icon = input<IconName>('document');
   /** Displayed above the heading, for a code such as 404. */
   readonly code = input<string | null>(null);
+  /**
+   * Fill the free height of the parent and centre in it. The parent must be a flex
+   * column that has that height.
+   */
+  readonly fill = input(false, { transform: booleanAttribute });
 }

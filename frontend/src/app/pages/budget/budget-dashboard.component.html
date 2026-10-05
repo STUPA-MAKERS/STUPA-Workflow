@@ -26,6 +26,7 @@
   <div class="bd__empty">
     <app-empty-state
       icon="cal"
+      fill
       [heading]="'budget.empty.noFiscalYear.title' | t"
       [body]="'budget.empty.noFiscalYear.body' | t"
     >
@@ -39,7 +40,7 @@
 } @else if (emptyReason()) {
   <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
   <div class="bd__empty">
-    <app-empty-state icon="pie" [heading]="'budget.empty.title' | t" [body]="'budget.empty.body' | t" />
+    <app-empty-state icon="pie" fill [heading]="'budget.empty.title' | t" [body]="'budget.empty.body' | t" />
   </div>
 } @else {
   <div class="bd" [class.bd--wide]="wide()">
