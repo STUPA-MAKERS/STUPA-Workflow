@@ -237,6 +237,18 @@ describe('AttendanceSheetComponent', () => {
     expect(within(sheet()).queryByText(/Live dabei/)).toBeNull();
   });
 
+  it('keeps a gap for the row menu only while some row has a menu', async () => {
+    // Mika Mitglied: an excuse the lead set, so the row has a menu; the others keep a gap.
+    const { rerender } = await setup();
+    const gaps = () => sheet().querySelectorAll('.as__menuGap').length;
+    expect(within(sheet()).getByRole('button', { name: 'Aktionen für Mika Mitglied' })).toBeInTheDocument();
+    expect(gaps()).toBe(ROSTER.length - 1);
+    // No row has a menu: no row keeps a gap, so the control ends at the inset of the row.
+    await rerender({ inputs: { attendance: [ROSTER[0], ROSTER[2], ROSTER[4]] }, partialUpdate: true });
+    expect(within(sheet()).queryByRole('button', { name: /^Aktionen für/ })).toBeNull();
+    expect(gaps()).toBe(0);
+  });
+
   it('edits the reason of an excuse from the row menu', async () => {
     const roster: Attendance[] = [{ ...ROSTER[0], status: 'excused', note: null }, ROSTER[1], ROSTER[3]];
     const { statusChange } = await setup({ attendance: roster });

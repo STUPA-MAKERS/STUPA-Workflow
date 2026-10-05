@@ -83,7 +83,10 @@ export class MeetingSettingsDialogComponent {
       { value: '', label: this.i18n.translate('meetings.protokollant.none') },
       ...this.roster()
         .filter((a) => a.canKeepProtocol || a.principalId === current)
-        .map((a) => ({ value: a.principalId, label: a.displayName || a.email || a.principalId })),
+        .map((a) => ({
+          value: a.principalId,
+          label: a.displayName || a.email || this.i18n.translate('participant.delegation.unnamed'),
+        })),
     ];
   });
 

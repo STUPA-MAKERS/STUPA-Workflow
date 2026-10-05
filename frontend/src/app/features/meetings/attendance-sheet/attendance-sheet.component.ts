@@ -231,6 +231,12 @@ export class AttendanceSheetComponent {
       .map((a) => this.row(a, t));
   });
 
+  /**
+   * Some row has a row menu. Only then do the other rows keep a gap at the end, so that
+   * all controls line up. Without a menu the control ends at the right inset of the row.
+   */
+  protected readonly anyMenu = computed(() => this.rows().some((r) => r.menu.length > 0));
+
   private row(
     a: Attendance,
     t: (key: TranslationKey, params?: Record<string, string | number>) => string,

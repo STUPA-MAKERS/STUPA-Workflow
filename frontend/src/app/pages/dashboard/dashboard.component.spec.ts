@@ -473,8 +473,11 @@ describe('DashboardComponent', () => {
       const c = cmp(fixture);
       expect(c.sessions()).toEqual([]);
       expect(c.delegations()).toEqual([]);
-      // Without the types the type falls back to its id.
-      expect(c.name({ typeId: 't1' })).toBe('t1');
+      // Without the types no raw id shows: an untitled row reads "Ohne Titel", and the
+      // sub line leaves the type out.
+      expect(c.name({ typeId: 't1' })).toBe('');
+      expect(c.titleOf({ typeId: 't1', title: null })).toBe('Ohne Titel');
+      expect(c.typeOf({ typeId: 't1', title: 'Sommerfest' })).toBeNull();
       http.verify();
     });
 

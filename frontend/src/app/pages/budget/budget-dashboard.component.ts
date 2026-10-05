@@ -502,9 +502,9 @@ export class BudgetDashboardComponent {
       }));
   });
 
-  /** Application title. It falls back to the short id when no title is set. */
-  titleOf(app: Pick<BudgetApplication, 'applicationId' | 'title'>): string {
-    return app.title?.trim() || `${this.shortId(app.applicationId)}…`;
+  /** Application title. It falls back to "Ohne Titel" when no title is set. */
+  titleOf(app: Pick<BudgetApplication, 'title'>): string {
+    return app.title?.trim() || this.i18n.translate('applications.list.untitled');
   }
 
   /** Resolve an i18n label map in the active locale. It falls back to de, then en,
@@ -608,10 +608,6 @@ export class BudgetDashboardComponent {
       currency: currency || 'EUR',
       maximumFractionDigits: 0,
     }).format(value);
-  }
-
-  shortId(id: Uuid): string {
-    return id.slice(0, 8);
   }
 
   private load(): void {

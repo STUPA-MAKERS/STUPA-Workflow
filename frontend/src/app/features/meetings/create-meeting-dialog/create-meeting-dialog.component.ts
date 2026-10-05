@@ -93,7 +93,10 @@ export class CreateMeetingDialogComponent {
     { value: '', label: this.i18n.translate('meetings.protokollant.none') },
     ...this.members()
       .filter((m) => m.canKeepProtocol)
-      .map((m) => ({ value: m.principalId, label: m.displayName || m.email || m.principalId })),
+      .map((m) => ({
+        value: m.principalId,
+        label: m.displayName || m.email || this.i18n.translate('participant.delegation.unnamed'),
+      })),
   ]);
 
   readonly step1Valid = computed(

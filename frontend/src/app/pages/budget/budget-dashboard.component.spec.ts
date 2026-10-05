@@ -701,14 +701,14 @@ describe('BudgetDashboardComponent', () => {
       expect(first.querySelector('a.li__title')?.getAttribute('href')).toBe('/applications/a-new');
     });
 
-    it('shows at most five and falls back to the short id without a title', async () => {
+    it('shows at most five and falls back to "Ohne Titel" without a title, never to the id', async () => {
       const apps = Array.from({ length: 7 }, (_, i) =>
         app({ applicationId: `abcdefgh-${i}`, title: i === 6 ? null : `A${i}`, createdAt: `2026-0${i + 1}-01T00:00:00Z` }),
       );
       const view = await setup({ apps });
       const c = view.fixture.componentInstance as unknown as Inst;
       expect(c.appRows()).toHaveLength(5);
-      expect(c.appRows()[0].title).toBe('abcdefgh…');
+      expect(c.appRows()[0].title).toBe('Ohne Titel');
       expect(view.container.querySelectorAll('[aria-labelledby="bd-apps"] app-list-item')).toHaveLength(5);
     });
 
@@ -1047,7 +1047,6 @@ describe('BudgetDashboardComponent', () => {
     // A node without a currency still formats in euro.
     expect(c.money(1, '')).toContain('€');
     expect(c.moneyShort(1, '')).toContain('€');
-    expect(c.shortId('aaaaaaaa-1111')).toBe('aaaaaaaa');
   });
 
   // ------------------------------------------------------------------ load + states
