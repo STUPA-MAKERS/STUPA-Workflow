@@ -1,3 +1,11 @@
+/* A flex column that takes the free height of the shell main, so that an empty page
+   can centre in it. */
+:host {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
+
 /* Board Arbeit-Abstimmungen: one centred column of at most 860px. */
 .live {
   display: flex;
@@ -16,6 +24,12 @@
 }
 .live__line--warn {
   color: var(--color-warning);
+}
+
+/* No running meeting: the column fills the page, and the empty state centres in the
+   height below the header. */
+.live--fill {
+  flex: 1 0 auto;
 }
 
 /* No open vote: the meeting, and that the page waits. */

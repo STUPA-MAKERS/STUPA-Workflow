@@ -1,5 +1,19 @@
 /* Centred in the space it is given, so a missing page and an empty list read the same
    way instead of one being a corner note and the other a full screen. */
+:host {
+  display: block;
+}
+
+/* `fill`: the whole page is empty. The host takes the free height of its flex-column
+   parent and centres the block in it, so the state does not sit at the top of an empty
+   page. */
+:host(.es-host--fill) {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .es {
   display: flex;
   flex-direction: column;
@@ -10,6 +24,8 @@
 }
 
 .es__icon {
+  /* A block box, so the glyph never sits on a text baseline. */
+  display: block;
   color: var(--color-text-subtle);
 }
 

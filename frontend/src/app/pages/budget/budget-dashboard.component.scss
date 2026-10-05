@@ -22,9 +22,16 @@
 .bd__status--error {
   color: var(--color-danger);
 }
+/* No cost centres or no fiscal year: the page holds nothing but the empty state. The
+   host takes the free height of the shell main, and the empty state centres in the
+   height below the title. */
+:host:has(> .bd__empty) {
+  flex: 1 0 auto;
+}
 .bd__empty {
   display: flex;
-  justify-content: center;
+  flex: 1 0 auto;
+  flex-direction: column;
 }
 .bd__emptyLink {
   color: var(--color-accent-text);

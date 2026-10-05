@@ -522,6 +522,18 @@ describe('LiveVoteComponent', () => {
       expect(screen.getByText('Gerade läuft keine Abstimmung.')).toBeInTheDocument();
     });
 
+    it('centres the empty state in the free page height', async () => {
+      const { fixture } = await setup({ routeId: null, pages: [{ items: [], nextCursor: null }] });
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.querySelector('.live')).toHaveClass('live--fill');
+      expect(host.querySelector('app-empty-state')).toHaveClass('es-host--fill');
+    });
+
+    it('keeps the column at its own height while a meeting runs', async () => {
+      const { fixture } = await setup();
+      expect((fixture.nativeElement as HTMLElement).querySelector('.live')).not.toHaveClass('live--fill');
+    });
+
     it('says so when the timeline fails', async () => {
       await setup({ routeId: null, pages: 'error' });
       expect(screen.getByText('Gerade läuft keine Abstimmung.')).toBeInTheDocument();
