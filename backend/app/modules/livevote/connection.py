@@ -245,6 +245,7 @@ class LiveVoteConnection:
                 options=vote_out.config.options,
                 closesAt=vote_out.closes_at,
                 secret=vote_out.secret,
+                replay=True,
             ).dump()
         )
         # `from_vote` applies the rule that a secret vote reveals the counts

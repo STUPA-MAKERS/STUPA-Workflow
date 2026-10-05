@@ -41,3 +41,17 @@
   line-height: 1.125rem;
   color: var(--color-text-muted);
 }
+/* The line as a link: to the meeting or to the application of the vote. */
+.ph__sub--link {
+  color: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+.ph__sub--link:hover {
+  text-decoration: underline;
+}
+.ph__sub--link:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}

@@ -419,9 +419,31 @@ describe('VoteCastComponent', () => {
     it('shows the phone header with the way back to the list', async () => {
       await setup();
       expect(screen.getByRole('link', { name: 'Zurück' })).toHaveAttribute('href', '/voting');
-      expect(screen.getByText('TOP 3 · 34. Sitzung')).toBeInTheDocument();
+      // The way back goes to the list; the meeting line goes to the meeting.
+      expect(screen.getByRole('link', { name: 'TOP 3 · 34. Sitzung' })).toHaveAttribute(
+        'href',
+        '/meetings/m1',
+      );
       expect(document.querySelector('.vc__bar')).toBeNull();
       expect(document.querySelector('app-ballot')).toHaveClass('ballot--phone');
+    });
+
+    it('links the application of a vote without a meeting', async () => {
+      await setup({ vote: vote({ meetingId: null, agendaItemId: null }) });
+      expect(screen.getByRole('link', { name: 'Antrag öffnen' })).toHaveAttribute(
+        'href',
+        '/applications/a1',
+      );
+    });
+
+    it('shows no line when the meeting cannot be read', async () => {
+      await setup({ meetingError: true });
+      expect(document.querySelector('.ph__sub')).toBeNull();
+    });
+
+    it('shows no line for a vote without a meeting and without an application', async () => {
+      await setup({ vote: vote({ meetingId: null, agendaItemId: null, applicationId: null }) });
+      expect(document.querySelector('.ph__sub')).toBeNull();
     });
 
     it('names only the meeting when the item is unknown', async () => {

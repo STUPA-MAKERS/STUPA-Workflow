@@ -60,11 +60,13 @@ function fakeSession() {
 }
 type FakeSession = ReturnType<typeof fakeSession>;
 
-const opened = (voteId: string): VoteOpenedMsg => ({
+/** A `vote_opened` frame; `replay` marks the state that a channel sends on a connect. */
+const opened = (voteId: string, replay = false): VoteOpenedMsg => ({
   type: 'vote_opened',
   voteId,
   options: ['yes', 'no', 'abstain'],
   closesAt: null,
+  ...(replay ? { replay: true } : {}),
 });
 
 interface Opts {
@@ -655,23 +657,70 @@ describe('VotingComponent', () => {
       });
     });
 
-    it('does not open a vote that the list already holds (the replay of a connect)', async () => {
+    it('does not open the vote that a connect replays, but a vote that opens after it', async () => {
       const restore = matchMediaQueries(MEDIA.wide);
       jest.useFakeTimers({ doNotFake: ['Date'] });
       try {
         // The first row is closed, so the first load opens nothing by itself.
-        const { sessions, harness, router } = await start('/voting', {
+        const { sessions, harness, router, listVotes } = await start('/voting', {
           live: [{ id: 'm1', status: 'live' }],
-          pages: [page([item('c1', { status: 'closed', result: 'passed' }), item('v7', { meetingId: 'm1' })])],
+          pages: [page([item('c1', { status: 'closed', result: 'passed' })])],
         });
         const navigate = jest.spyOn(router, 'navigate');
-        sessions.get('m1')!.openVote.set(opened('v7'));
+        const s = sessions.get('m1')!;
+        listVotes.mockClear();
+        s.openVote.set(opened('v7', true));
+        harness.detectChanges();
+        jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
+        // The list still loads again; only the detail stays.
+        expect(listVotes).toHaveBeenCalledTimes(1);
+        expect(navigate).not.toHaveBeenCalled();
+        // A reconnect replays the same vote: no event at all.
+        s.openVote.set(opened('v7', true));
         harness.detectChanges();
         jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
         expect(navigate).not.toHaveBeenCalled();
+        s.openVote.set(opened('v8'));
+        harness.detectChanges();
+        jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
+        expect(navigate).toHaveBeenCalledWith(['/voting', 'v8'], {
+          queryParamsHandling: 'preserve',
+          replaceUrl: false,
+        });
       } finally {
         jest.useRealTimers();
         restore();
+      }
+    });
+
+    it('keeps a filtered list when a connect replays a vote that the filter hides', async () => {
+      jest.useFakeTimers({ doNotFake: ['Date'] });
+      try {
+        // One pane at a time, the ended votes only, and a live meeting with an open vote
+        // that the filter hides.
+        for (const url of ['/voting?status=ended', '/voting?gremium=g2', '/voting?q=Mensa']) {
+          TestBed.resetTestingModule();
+          const { sessions, harness, router } = await start(url, {
+            live: [{ id: 'm1', status: 'live' }],
+            pages: [page([item('c1', { status: 'closed', result: 'passed' })])],
+          });
+          const navigate = jest.spyOn(router, 'navigate');
+          const s = sessions.get('m1')!;
+          s.openVote.set(opened('v7', true));
+          harness.detectChanges();
+          jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
+          expect(navigate).not.toHaveBeenCalled();
+          // A vote that opens now still opens, with the filters kept.
+          s.openVote.set(opened('v8'));
+          harness.detectChanges();
+          jest.advanceTimersByTime(VOTE_LIVE_DEBOUNCE);
+          expect(navigate).toHaveBeenCalledWith(['/voting', 'v8'], {
+            queryParamsHandling: 'preserve',
+            replaceUrl: false,
+          });
+        }
+      } finally {
+        jest.useRealTimers();
       }
     });
 

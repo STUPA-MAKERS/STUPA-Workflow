@@ -24,7 +24,7 @@
   @case ('ready') {
     @if (vote(); as v) {
       <article
-        class="vc"
+        class="vc vc--ready"
         [class.vc--sheet]="split()"
         [class.vc--phone]="phone()"
         [attr.aria-label]="'voting.cast.heading' | t"
@@ -34,6 +34,7 @@
             [back]="['/voting']"
             [keepQuery]="true"
             [subtitle]="phoneSubtitle()"
+            [subtitleLink]="phoneSubtitleLink()"
           >
             @if (canDelete()) {
               <app-row-menu [sections]="menu()" (selected)="onMenu($event.id)" />
@@ -60,23 +61,27 @@
           </div>
         }
 
-        @if (session()?.connection() === 'reconnecting') {
-          <p class="vc__line vc__line--warn" role="status">{{ 'voting.live.reconnecting' | t }}</p>
-        }
+        <!-- Side by side only this part scrolls, under the bar, with the shared fade at
+             an end while more of the vote lies past it. -->
+        <div class="vc__body" appScrollFade="y">
+          @if (session()?.connection() === 'reconnecting') {
+            <p class="vc__line vc__line--warn" role="status">{{ 'voting.live.reconnecting' | t }}</p>
+          }
 
-        <app-vote-panel
-          [vote]="v"
-          [context]="context()"
-          [own]="own()"
-          [proxyName]="proxyName()"
-          [proxyCast]="proxyCast()"
-          [caster]="caster"
-          [notice]="notice()"
-          [flat]="split()"
-          [layout]="phone() ? 'phone' : 'page'"
-          (castDone)="onCastDone()"
-          (castFailed)="onCastFailed($event)"
-        />
+          <app-vote-panel
+            [vote]="v"
+            [context]="context()"
+            [own]="own()"
+            [proxyName]="proxyName()"
+            [proxyCast]="proxyCast()"
+            [caster]="caster"
+            [notice]="notice()"
+            [flat]="split()"
+            [layout]="phone() ? 'phone' : 'page'"
+            (castDone)="onCastDone()"
+            (castFailed)="onCastFailed($event)"
+          />
+        </div>
       </article>
     } @else {
       <div class="vc vc--center" [class.vc--sheet]="split()">

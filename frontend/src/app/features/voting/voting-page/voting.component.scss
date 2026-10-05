@@ -231,6 +231,11 @@
   flex-direction: column;
   min-width: 0;
 }
+/* Side by side the detail is as high as the pane, so the vote sheet can scroll inside
+   itself under its bar. */
+.vl--split .vl__detail {
+  min-height: 0;
+}
 
 @include bp.phone {
   /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */

@@ -18,6 +18,11 @@ export interface VoteOpenedMsg {
   closesAt: string | null;
   /** A secret vote shows no interim tally. Older servers do not send it. */
   secret?: boolean;
+  /**
+   * The server sent the vote as part of the state on a connect or a `subscribe`: the
+   * vote was already open, it did not open now. Older servers do not send it.
+   */
+  replay?: boolean;
 }
 export interface VoteTallyMsg {
   type: 'vote_tally';

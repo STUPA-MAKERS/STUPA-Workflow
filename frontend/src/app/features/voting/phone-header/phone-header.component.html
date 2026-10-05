@@ -7,7 +7,11 @@
 <div class="ph__text">
   <span class="ph__title">{{ 'voting.cast.heading' | t }}</span>
   @if (subtitle(); as sub) {
-    <span class="ph__sub ell" [title]="sub">{{ sub }}</span>
+    @if (subtitleLink(); as link) {
+      <a class="ph__sub ph__sub--link ell" [routerLink]="link" [title]="sub">{{ sub }}</a>
+    } @else {
+      <span class="ph__sub ell" [title]="sub">{{ sub }}</span>
+    }
   }
 </div>
 <ng-content />

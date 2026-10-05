@@ -105,8 +105,9 @@ export interface VoteGroup {
  * - Live: the page follows the running meetings over the WebSocket. A vote that opens,
  *   closes or is cancelled reloads the list. The page opens a vote that just opened when
  *   no vote is open in the detail (also on a phone, from the list), or when the detail
- *   shows an ended vote of the same meeting. On the first load side by side the page
- *   opens the first open vote, as the board shows it.
+ *   shows an ended vote of the same meeting. A vote that the channel replays on a
+ *   connect was open before, so it does not open by itself. On the first load side by
+ *   side the page opens the first open vote, as the board shows it.
  * - One pane at a time (narrow, phone): the list, then the vote with a way back.
  */
 @Component({
@@ -463,9 +464,9 @@ export class VotingComponent implements OnDestroy {
       // The open vote and the last result of every followed meeting. A change of this
       // signature is a vote that opened, closed or was cancelled.
       const sessions = [...this.page.sessions()];
-      const opened = sessions.map(([, s]) => s.openVote()?.voteId ?? null);
+      const opened = sessions.map(([, s]) => s.openVote());
       const signature = sessions
-        .map(([, s], i) => `${opened[i] ?? '-'}:${s.result()?.voteId ?? '-'}`)
+        .map(([, s], i) => `${opened[i]?.voteId ?? '-'}:${s.result()?.voteId ?? '-'}`)
         .join('|');
       untracked(() => {
         if (last === null) {
@@ -473,16 +474,17 @@ export class VotingComponent implements OnDestroy {
           return;
         }
         if (signature === last) return;
-        // A channel replays the open vote on each connect: a vote that the list already
-        // holds did not just open. Before the first rows arrive, nothing is new: the
-        // first load opens the first open vote itself.
-        const known = new Set([
-          ...last.split('|').map((part) => part.split(':')[0]),
-          ...this.items().map((i) => i.id),
-        ]);
+        const known = new Set(last.split('|').map((part) => part.split(':')[0]));
         last = signature;
-        const at = this.loading() ? -1 : opened.findIndex((id) => id !== null && !known.has(id));
-        this.onLive(at < 0 ? null : { id: opened[at]!, meetingId: sessions[at]![0] });
+        // A channel replays the open vote on each connect and marks it as a replay: that
+        // vote was open before, so it did not just open. The flag comes from the channel,
+        // not from the rows, so a filter that hides the vote (status "Beendet", another
+        // gremium, a search) does not make it new. Before the first rows arrive, nothing
+        // is new: the first load opens the first open vote itself.
+        const at = this.loading()
+          ? -1
+          : opened.findIndex((msg) => !!msg && msg.replay !== true && !known.has(msg.voteId));
+        this.onLive(at < 0 ? null : { id: opened[at]!.voteId, meetingId: sessions[at]![0] });
       });
     });
   }

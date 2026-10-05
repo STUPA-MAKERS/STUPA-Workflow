@@ -20,6 +20,7 @@ import type { MyBallot, ProblemDetail, Vote } from '@core/api/models';
 import { LiveVoteService, type LiveVoteSession } from '@core/ws/live-vote.service';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { RowMenuComponent, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
+import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import {
   ButtonComponent,
   DialogComponent,
@@ -67,13 +68,15 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  *   the beamer for a person who may run the meeting. A vote without a meeting links its
  *   application, and a draft of it can be deleted.
  * - A phone gets the layout of board Telefon-Abstimmen: back to the list,
- *   "Abstimmung", the meeting line, and the button bar of the ballot pinned at the
- *   bottom.
+ *   "Abstimmung", the meeting line as a link to the meeting ("Antrag öffnen" for a vote
+ *   without a meeting), and the button bar of the ballot pinned at the bottom.
  * - The route reuses the component from one vote to the next, so the pane loads again
  *   on each change of `:id`.
  */
 @Component({
   selector: 'app-vote-cast',
+  // Side by side the sheet fills the pane and scrolls inside itself.
+  host: { '[class.vc-host--split]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
@@ -83,6 +86,7 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
     EmptyStateComponent,
     IconComponent,
     RowMenuComponent,
+    ScrollFadeDirective,
     TranslatePipe,
     VotePanelComponent,
     VotePhoneHeaderComponent,
@@ -199,13 +203,33 @@ export class VoteCastComponent implements OnDestroy {
     return (id && this.page?.gremiumNames().get(id)) || null;
   });
 
-  /** The line below the phone title: "TOP 3 · 34. Sitzung des Studierendenparlaments". */
+  /**
+   * The line below the phone title. A meeting vote names its meeting and agenda item
+   * ("TOP 3 · 34. Sitzung des Studierendenparlaments"); a vote without a meeting reads
+   * "Antrag öffnen". The way back goes to the list, so this line is the way to the
+   * meeting or to the application (`phoneSubtitleLink`).
+   */
   readonly phoneSubtitle = computed<string | null>(() => {
+    const vote = this.loaded();
     const { meeting, position } = this.context();
-    if (!meeting) return null;
-    return position === null
-      ? meeting.title
-      : this.i18n.translate('voting.panel.wherePhone', { meeting: meeting.title, n: position });
+    if (meeting) {
+      return position === null
+        ? meeting.title
+        : this.i18n.translate('voting.panel.wherePhone', { meeting: meeting.title, n: position });
+    }
+    if (vote && !vote.meetingId && vote.applicationId) {
+      return this.i18n.translate('voting.panel.application');
+    }
+    return null;
+  });
+
+  /** The target of the phone line: the meeting, else the application, of the vote. */
+  readonly phoneSubtitleLink = computed<string[] | null>(() => {
+    const vote = this.loaded();
+    const meeting = this.context().meeting;
+    if (meeting) return ['/meetings', meeting.id];
+    if (vote && !vote.meetingId && vote.applicationId) return ['/applications', vote.applicationId];
+    return null;
   });
 
   /** The ⋮ menu. The template shows it only while `canDelete` holds. */
