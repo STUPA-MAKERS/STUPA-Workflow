@@ -83,6 +83,10 @@
   );
 }
 
+.af__hidden {
+  display: none;
+}
+
 .af__group {
   display: flex;
   flex-direction: column;
@@ -158,6 +162,11 @@
 
 .af__page {
   min-width: 0;
+}
+/* Without the sheet the page sits on the page background: the rows of a row-group
+   table (`surface="rowgroup"`) take that colour between them. */
+.af:not(.af--split) .af__page {
+  --dt-gap: var(--color-bg);
 }
 
 /* Wide: the page sits on a sheet that reaches down to the footer. */

@@ -5,6 +5,7 @@
   <section class="pv__queue" aria-labelledby="pv-queue">
     <h2 class="sec pv__secTitle" id="pv-queue">{{ 'admin.privacy.queueTitle' | t }}</h2>
     <app-data-table
+      surface="rowgroup"
       [loading]="loading()"
       [loadingText]="'common.loading' | t"
       [columns]="columns()"
@@ -31,8 +32,22 @@
       <ng-template appCell="actions" let-r>
         @if ($any(r).status === 'open') {
           <span class="pv__rowActions">
-            <app-button variant="tonal" size="sm" (click)="openReject($any(r))">{{ 'admin.privacy.reject' | t }}</app-button>
-            <app-button variant="danger" size="sm" (click)="askExecute($any(r))">{{ 'admin.privacy.execute' | t }}</app-button>
+            <!-- Each button names its request, so a list of the buttons tells the rows apart. -->
+            @let who = $any(r).email || subjectLabel($any(r).subjectType);
+            <app-button
+              variant="tonal"
+              size="sm"
+              [ariaLabel]="('admin.privacy.reject' | t) + ': ' + who"
+              (click)="openReject($any(r))"
+              >{{ 'admin.privacy.reject' | t }}</app-button
+            >
+            <app-button
+              variant="danger"
+              size="sm"
+              [ariaLabel]="('admin.privacy.execute' | t) + ': ' + who"
+              (click)="askExecute($any(r))"
+              >{{ 'admin.privacy.execute' | t }}</app-button
+            >
           </span>
         }
       </ng-template>

@@ -318,12 +318,17 @@ async def test_list_gremien_admin_counts() -> None:
     a = gremium_row(name="A")
     b = gremium_row(name="B")
     # Queue: the gremien, then the member counts, then the role counts. B has no member.
-    s, _ = svc([res(a, b), res((a.id, 3)), res((a.id, 4), (b.id, 3))])
+    s, session = svc([res(a, b), res((a.id, 3)), res((a.id, 4), (b.id, 3))])
     out = await s.list_gremien_admin()
     assert [(g.name, g.member_count, g.role_count) for g in out] == [
         ("A", 3, 4),
         ("B", 0, 3),
     ]
+    # The member count keeps current memberships of active principals only.
+    member_sql = str(session.statements[1])
+    assert "valid_until" in member_sql
+    assert "valid_from" in member_sql
+    assert "principal.active" in member_sql
     assert out[0].model_dump(by_alias=True)["memberCount"] == 3
 
 

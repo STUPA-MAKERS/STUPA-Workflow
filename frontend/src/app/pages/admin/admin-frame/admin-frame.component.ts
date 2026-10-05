@@ -8,7 +8,14 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import {
+  type ActivatedRouteSnapshot,
+  NavigationEnd,
+  Router,
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet,
+} from '@angular/router';
 import { filter } from 'rxjs';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -38,6 +45,27 @@ function pathOf(url: string): string {
 }
 
 /**
+ * The `data.adminNav` value of the deepest active route:
+ *
+ * - `false`: the page needs the full width at every size (the flow editor, the form
+ *   editor), so the frame leaves out the navigation column.
+ * - `'xl'`: the page fits beside the navigation only from {@link XL} on (the cost
+ *   centres). Below that it takes the full width.
+ * - anything else: the navigation column shows on a wide viewport.
+ */
+type AdminNavMode = 'always' | 'xl' | 'never';
+
+function navMode(root: ActivatedRouteSnapshot): AdminNavMode {
+  let r: ActivatedRouteSnapshot = root;
+  while (r.firstChild) r = r.firstChild;
+  const v: unknown = r.data['adminNav'];
+  return v === false ? 'never' : v === 'xl' ? 'xl' : 'always';
+}
+
+/** From this width on, a page with `adminNav: 'xl'` fits beside the navigation. */
+const XL = '(min-width: 1440px)';
+
+/**
  * The frame of the admin area (board Verwaltung): the admin navigation beside every
  * admin page.
  *
@@ -52,6 +80,11 @@ function pathOf(url: string): string {
  *   navigation shows it.
  * - Narrower: an admin page fills the width and the breadcrumb "Verwaltung" leads back.
  *   The home page shows the navigation above the gremien.
+ * - A route with `data: { adminNav: false }` (the flow editor, the form editor) fills
+ *   the width at every size, the same as the narrow mode. A route with
+ *   `data: { adminNav: 'xl' }` (the cost centres) does so below 1440 px.
+ * - The "Zustand" tiles stay while the search hides them, so a cleared search does not
+ *   load them again.
  */
 @Component({
   selector: 'app-admin-frame',
@@ -82,6 +115,18 @@ export class AdminFrameComponent {
   /** The admin home page is open. */
   readonly home = signal(pathOf(this.router.url) === HOME);
 
+  /** The viewport is wide enough for a page with `adminNav: 'xl'` beside the navigation. */
+  private readonly xl = mediaQuerySignal(XL);
+
+  /** The `data.adminNav` mode of the active page. */
+  private readonly navMode = signal(navMode(this.router.routerState.snapshot.root));
+
+  /** The active page takes the full width, without the navigation column. */
+  readonly fullWidth = computed(() => {
+    const mode = this.navMode();
+    return mode === 'never' || (mode === 'xl' && !this.xl());
+  });
+
   /** The text of "Einstellungen durchsuchen". */
   readonly query = signal('');
 
@@ -94,10 +139,12 @@ export class AdminFrameComponent {
   );
 
   /** The navigation is a column beside the page (else it is above the page or hidden). */
-  readonly split = computed(() => this.wide() && (!this.home() || this.homeHasPage()));
+  readonly split = computed(
+    () => this.wide() && !this.fullWidth() && (!this.home() || this.homeHasPage()),
+  );
 
   /** The navigation shows: always on the home page, else only as the column. */
-  readonly showNav = computed(() => this.home() || this.wide());
+  readonly showNav = computed(() => this.home() || (this.wide() && !this.fullWidth()));
 
   /** The groups with the pages the principal may open and the search finds. */
   readonly groups = computed<NavGroup[]>(() => {
@@ -120,7 +167,10 @@ export class AdminFrameComponent {
         filter((e): e is NavigationEnd => e instanceof NavigationEnd),
         takeUntilDestroyed(),
       )
-      .subscribe((e) => this.home.set(pathOf(e.urlAfterRedirects) === HOME));
+      .subscribe((e) => {
+        this.home.set(pathOf(e.urlAfterRedirects) === HOME);
+        this.navMode.set(navMode(this.router.routerState.snapshot.root));
+      });
 
     // The navigation shows "Verwaltung" beside the page, so the breadcrumbs leave it out.
     effect(() => this.pageFrame.crumbRoot.set(this.split() ? 'admin' : null));

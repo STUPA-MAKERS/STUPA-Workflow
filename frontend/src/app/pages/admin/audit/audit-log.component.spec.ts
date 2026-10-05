@@ -1,4 +1,5 @@
 import { Subject, of, throwError } from 'rxjs';
+import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -26,7 +27,7 @@ type Cmp = AuditLogComponent & {
   targetLink(e: AuditEntry): string[] | null;
   targetText(e: AuditEntry): string;
   actorLabel(e: AuditEntry): string;
-  dataPairs(e: AuditEntry): [string, string][];
+  dataRows(e: AuditEntry): { key: string; label: string; value: string; known: boolean }[];
   activeFilterCount(): number;
   actionOptions(): { value: string; label: string }[];
   actionChip(): string;
@@ -111,6 +112,86 @@ async function setup(opts: SetupOpts = {}) {
   const cmp = view.fixture.componentInstance as unknown as Cmp;
   return { ...view, cmp, listAuditLog, listAuditActors, api, toast };
 }
+
+/**
+ * Copy of the `AuditAction` values in `backend/app/modules/audit/actions.py`, in file order.
+ * When the backend adds an action, add it here, to `AUDIT_ACTIONS` and to the de and en
+ * labels `admin.audit.action.<key>`.
+ */
+const BACKEND_AUDIT_ACTIONS = [
+  'login',
+  'status_change',
+  'vote_cast',
+  'config_change',
+  'config_activation',
+  'config_revert',
+  'role_change',
+  'delegation_grant',
+  'delegation_revoke',
+  'delegation_use',
+  'delegation_substitute_add',
+  'delegation_substitute_remove',
+  'export',
+  'meeting_delete',
+  'meeting_create',
+  'meeting_update',
+  'agenda_item_add',
+  'agenda_item_update',
+  'agenda_item_remove',
+  'agenda_reorder',
+  'attendance_set',
+  'attendance_reset',
+  'application_delete',
+  'application_create',
+  'guest_application_discard',
+  'application_update',
+  'application_archive',
+  'application_unarchive',
+  'application_share',
+  'application_share_revoke',
+  'webhook_config',
+  'attachment_upload',
+  'attachment_quarantine',
+  'attachment_delete',
+  'comment_update',
+  'comment_delete',
+  'protocol_delete',
+  'protocol_finalize',
+  'protokollant_handover',
+  'vote_delete',
+  'vote_open',
+  'vote_close',
+  'vote_cancel',
+  'vote_branch_blocked',
+  'pii_access',
+  'pii_deletion',
+  'pii_export',
+  'anonymization',
+  'erasure_requested',
+  'erasure_executed',
+  'erasure_rejected',
+  'principal_erased',
+  'retention_anonymize',
+  'budget_node_create',
+  'budget_node_update',
+  'budget_node_delete',
+  'budget_fiscal_year_delete',
+  'budget_allocation_set',
+  'budget_expense_create',
+  'budget_expense_update',
+  'budget_expense_delete',
+  'budget_transfer_create',
+  'budget_invoice_create',
+  'budget_invoice_update',
+  'budget_invoice_delete',
+  'budget_assign',
+  'budget_move_fiscal_year',
+  'backup_create',
+  'backup_delete',
+  'backup_export',
+  'backup_import',
+  'backup_restore',
+] as const;
 
 describe('AuditLogComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
@@ -383,40 +464,22 @@ describe('AuditLogComponent', () => {
     expect(cmp.actionLabel('made_up_action')).toBe('made_up_action');
   });
 
-  it('reads the newly recorded actions instead of the unknown fallback', async () => {
+  it('mirrors the backend action catalog and labels every action in de and en', async () => {
+    expect([...AUDIT_ACTIONS].sort()).toEqual([...BACKEND_AUDIT_ACTIONS].sort());
+    for (const locale of ['de', 'en']) {
+      localStorage.setItem('ap.locale', locale);
+      TestBed.resetTestingModule();
+      const { cmp } = await setup();
+      for (const action of AUDIT_ACTIONS) {
+        // The label never falls back to the raw key.
+        expect(cmp.actionLabel(action)).not.toBe(action);
+      }
+    }
+  });
+
+  it('labels and links the target types of the recorded actions', async () => {
     localStorage.setItem('ap.locale', 'de');
     const { cmp } = await setup();
-    const fresh = [
-      'comment_update',
-      'comment_delete',
-      'protocol_delete',
-      'protocol_finalize',
-      'vote_delete',
-      'budget_fiscal_year_delete',
-      'vote_open',
-      'vote_close',
-      'vote_cancel',
-      'vote_branch_blocked',
-      'meeting_create',
-      'meeting_update',
-      'meeting_delete',
-      'agenda_item_add',
-      'agenda_item_update',
-      'agenda_item_remove',
-      'agenda_reorder',
-      'application_create',
-      'guest_application_discard',
-      'attendance_set',
-      'attendance_reset',
-      'attachment_upload',
-      'protokollant_handover',
-    ] as const;
-    for (const action of fresh) {
-      // Every one of them is in the catalog, so the filter offers it.
-      expect(AUDIT_ACTIONS).toContain(action);
-      // The label never falls back to the raw key.
-      expect(cmp.actionLabel(action)).not.toBe(action);
-    }
     expect(cmp.targetTypeLabel('fiscal_year')).toBe('Haushaltsjahr');
     expect(cmp.targetTypeLabel('protocol')).toBe('Protokoll');
     expect(cmp.targetTypeLabel('comment')).toBe('Kommentar');
@@ -594,20 +657,30 @@ describe('AuditLogComponent', () => {
     expect(cmp.actorLabel(entry(1, { actorName: null, actor: null }))).toBe('System');
   });
 
-  it('dataPairs stringifies primitives and JSON-encodes objects', async () => {
+  it('dataRows stringifies primitives and JSON-encodes objects', async () => {
     const { cmp } = await setup();
-    const pairs = cmp.dataPairs(
-      entry(1, { data: { count: 3, flag: true, nested: { a: 1 }, note: 'hi' } }),
-    );
-    expect(pairs).toContainEqual(['count', '3']);
-    expect(pairs).toContainEqual(['flag', 'true']);
-    expect(pairs).toContainEqual(['nested', '{"a":1}']);
-    expect(pairs).toContainEqual(['note', 'hi']);
+    const rows = cmp
+      .dataRows(entry(1, { data: { count: 3, flag: true, nested: { a: 1 }, note: 'hi' } }))
+      .map((r) => [r.label, r.value]);
+    expect(rows).toContainEqual(['count', '3']);
+    expect(rows).toContainEqual(['flag', 'true']);
+    expect(rows).toContainEqual(['nested', '{"a":1}']);
+    expect(rows).toContainEqual(['note', 'hi']);
   });
 
-  it('dataPairs yields an empty list when data is null/absent', async () => {
+  it('dataRows labels known keys and leaves the revision id to the target line', async () => {
+    localStorage.setItem('ap.locale', 'de');
     const { cmp } = await setup();
-    expect(cmp.dataPairs(entry(1, { data: null as unknown as Record<string, unknown> }))).toEqual([]);
+    const rows = cmp.dataRows(entry(1, { data: { revisionId: 'rev-12', version: 12, other: 'x' } }));
+    expect(rows).toEqual([
+      { key: 'version', label: 'Revision', value: '12', known: true },
+      { key: 'other', label: 'other', value: 'x', known: false },
+    ]);
+  });
+
+  it('dataRows yields an empty list when data is null/absent', async () => {
+    const { cmp } = await setup();
+    expect(cmp.dataRows(entry(1, { data: null as unknown as Record<string, unknown> }))).toEqual([]);
   });
 
   // --- the chain check --------------------------------------------------------

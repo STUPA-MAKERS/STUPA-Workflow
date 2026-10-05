@@ -1,4 +1,5 @@
 import { of, throwError } from 'rxjs';
+import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import { AuthService } from '@core/auth/auth.service';
@@ -87,7 +88,9 @@ describe('AdminHealthComponent', () => {
     expect(back).toContain('Manuell · Fertig · 413 MB');
     expect(erasure).toContain('2 offene Löschanträge');
     expect(erasure).toContain('Art. 17 DSGVO');
-    expect(api.listErasures).toHaveBeenCalledWith('open');
+    // The tiles show their own placeholders, so the calls skip the global overlay.
+    expect(api.listErasures).toHaveBeenCalledWith('open', { quiet: true });
+    expect(api.listBackups).toHaveBeenCalledWith({ quiet: true });
     expect(api.verifyAuditChain).not.toHaveBeenCalled();
   });
 
@@ -195,6 +198,54 @@ describe('AdminHealthComponent', () => {
       ),
     });
     expect(tileTexts(view.container)[0]).toContain('Automatisch');
+  });
+
+  it('keeps the last finished archive while a newer one runs', async () => {
+    const { view } = await setup(['backup.manage'], {
+      listBackups: jest.fn(() =>
+        of(
+          list([
+            backup({ id: 'run', status: 'running', sizeBytes: null, createdAt: '2026-06-01T18:46:00+02:00' }),
+            backup({ id: 'done', createdAt: '2026-06-01T17:45:00+02:00' }),
+          ]),
+        ),
+      ),
+    });
+    const tile = view.container.querySelector('.ah__tile');
+    expect(tile).toHaveClass('ah__tile--ok');
+    expect(tileTexts(view.container)[0]).toContain('Manuell · Fertig · 413 MB');
+    expect(tileTexts(view.container)[0]).not.toContain('Läuft');
+  });
+
+  it('marks the tile red when an archive after the last finished one failed', async () => {
+    const { view } = await setup(['backup.manage'], {
+      listBackups: jest.fn(() =>
+        of(
+          list([
+            backup({ id: 'done', createdAt: '2026-06-01T17:45:00+02:00' }),
+            backup({ id: 'bad', status: 'failed', sizeBytes: null, createdAt: '2026-06-02T04:00:00+02:00' }),
+          ]),
+        ),
+      ),
+    });
+    const tile = view.container.querySelector('.ah__tile');
+    expect(tile).toHaveClass('ah__tile--error');
+    expect(tileTexts(view.container)[0]).toContain('Manuell · Fertig · 413 MB');
+    expect(tile?.querySelector('.ah__alert')?.textContent).toContain('Letzte Sicherung fehlgeschlagen');
+  });
+
+  it('runs the live chain check only one time per session', async () => {
+    const verify = jest.fn(() => of({ valid: true, checked: 12, brokenAt: null, reason: null }));
+    const { view } = await setup(['audit.read', 'audit.verify'], {
+      latestAuditVerification: jest.fn(() => of(null)),
+      verifyAuditChain: verify,
+    });
+    view.fixture.destroy();
+    // A second set of tiles in the same session (a return to /admin) takes the result.
+    const second = TestBed.createComponent(AdminHealthComponent);
+    second.detectChanges();
+    expect(verify).toHaveBeenCalledTimes(1);
+    expect((second.nativeElement as HTMLElement).textContent).toContain('Gerade geprüft · 12 Einträge');
   });
 
   it('shows a placeholder while the data loads', async () => {

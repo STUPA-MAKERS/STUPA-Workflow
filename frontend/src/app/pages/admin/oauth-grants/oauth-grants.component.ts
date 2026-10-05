@@ -17,11 +17,11 @@ import { ButtonComponent, DialogComponent, ToastService } from '@stupa-makers/ui
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, OAuthGrantAdmin } from '../admin.models';
 
-/** Rows per page. The backend caps `limit` at 200 and defaults to 50. */
 /* A token usually carries every scope. Showing all of them wrapped each row over three
    lines and set the height of the whole table, so the rest are counted instead. */
 const MAX_VISIBLE_SCOPES = 3;
 
+/** Rows per page. The backend caps `limit` at 200 and defaults to 50. */
 const PAGE_SIZE = 25;
 
 /** HTTP status of a failed request, or 0 when the error carries none. */
@@ -122,8 +122,6 @@ export class AdminOAuthGrantsComponent {
     }),
   );
 
-  readonly rowId = (g: unknown): string => (g as OAuthGrantAdmin).id;
-
   constructor() {
     this.load();
     this.api.listPrincipals().subscribe({
@@ -147,6 +145,12 @@ export class AdminOAuthGrantsComponent {
       })
       .subscribe({
         next: (page) => {
+          // The last row of the last page went away (a revoke): step back one page.
+          if (!page.items.length && this.offset() > 0) {
+            this.offset.update((o) => Math.max(0, o - PAGE_SIZE));
+            this.load();
+            return;
+          }
           this.grants.set(page.items);
           this.total.set(page.total);
           this.loading.set(false);
@@ -184,7 +188,7 @@ export class AdminOAuthGrantsComponent {
     return grant.principalName ?? this.i18n.translate('admin.oauthGrants.unknownOwner');
   }
 
-  /** The email as the tooltip of the name — only when it adds something to the name. */
+  /** The email beside the name — only when it adds something to the name. */
   ownerEmail(grant: OAuthGrantAdmin): string | null {
     return grant.principalEmail && grant.principalEmail !== grant.principalName
       ? grant.principalEmail
@@ -204,6 +208,11 @@ export class AdminOAuthGrantsComponent {
   /** How many scopes the badges leave out, or 0 when they all fit. */
   hiddenScopeCount(grant: OAuthGrantAdmin): number {
     return Math.max(0, this.scopes(grant).length - MAX_VISIBLE_SCOPES);
+  }
+
+  /** The scopes the badges leave out. Screen readers read them; the title shows them. */
+  hiddenScopes(grant: OAuthGrantAdmin): string[] {
+    return this.scopes(grant).slice(MAX_VISIBLE_SCOPES);
   }
 
   // --- revoke --------------------------------------------------------------

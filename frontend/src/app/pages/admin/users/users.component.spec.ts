@@ -262,11 +262,13 @@ describe('UsersComponent', () => {
 
   it('deactivates from the row, and the own account only with a reason', async () => {
     const { api } = await setup(makeApi(), makeAuth('kc|sam'));
-    const own = screen.getAllByRole('button', { name: 'Deaktivieren' });
+    const own = screen.getAllByRole('button', { name: /^Deaktivieren: / });
     // Alex can be deactivated; Sam is the signed-in user.
     expect(own[0]).toBeEnabled();
     expect(own[1]).toBeDisabled();
     expect(own[1]).toHaveAttribute('title', 'Du kannst dein eigenes Konto nicht deaktivieren.');
+    // The button names its person, so a list of the buttons tells the rows apart.
+    expect(own[0]).toHaveAccessibleName('Deaktivieren: Alex Admin');
     await userEvent.click(own[0]);
     expect(api.setPrincipalActive).toHaveBeenCalledWith('p-1', false);
   });
@@ -278,7 +280,7 @@ describe('UsersComponent', () => {
     const { container } = await setup(api);
     expect(container.querySelector('.au__row--off')).not.toBeNull();
     expect(screen.getByText('deaktiviert')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Aktivieren' }));
+    await userEvent.click(screen.getByRole('button', { name: /^Aktivieren: / }));
     expect(api.setPrincipalActive).toHaveBeenCalledWith('p-3', true);
   });
 

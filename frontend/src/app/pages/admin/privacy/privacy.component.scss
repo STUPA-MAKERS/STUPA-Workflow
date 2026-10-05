@@ -44,6 +44,9 @@
 .pv__card {
   /* The fields sit on surface 2 here, so they take surface 3. */
   --color-surface-sunken: var(--color-surface-3);
+  /* The field label sits on that fill. The subtle text colour gives less than 4.5:1 on
+     surface 3, so the label takes the muted text colour. */
+  --color-text-subtle: var(--color-text-muted);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);

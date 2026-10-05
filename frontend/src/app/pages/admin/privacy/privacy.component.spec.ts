@@ -103,7 +103,7 @@ describe('PrivacyComponent', () => {
   it('executes an open erasure after confirmation and reloads', async () => {
     const api = makeApi();
     const { toast } = await setup(api);
-    await userEvent.click(screen.getByRole('button', { name: 'Ausführen' }));
+    await userEvent.click(screen.getAllByRole('button', { name: /^Ausführen: / })[0]);
     const confirm = screen.getAllByRole('button', { name: 'Ausführen' });
     await userEvent.click(confirm[confirm.length - 1]);
     expect(api.executeErasure).toHaveBeenCalledWith('er-1');
@@ -338,10 +338,21 @@ describe('PrivacyComponent', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
+  it('names the request in each row button and leaves a closed row without actions', async () => {
+    const { container } = await setup();
+    expect(screen.getByRole('button', { name: 'Ablehnen: a@x' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ausführen: a@x' })).toBeInTheDocument();
+    // The done row renders nothing in its actions cell, so the card leaves the label out.
+    const cells = [...container.querySelectorAll('td[data-label="Aktionen"]')];
+    expect(cells).toHaveLength(2);
+    expect(cells[1].children).toHaveLength(0);
+    expect(container.querySelector('.dt--rowgroup')).not.toBeNull();
+  });
+
   it('wires the reject action button click through the queue row', async () => {
     // This covers the rendered template and the openReject path that opens the dialog.
     const { container } = await setup();
-    fireEvent.click(screen.getByRole('button', { name: 'Ablehnen' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Ablehnen: / }));
     expect(container.querySelector('textarea')).toBeInTheDocument();
   });
 

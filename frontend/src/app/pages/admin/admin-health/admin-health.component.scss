@@ -64,9 +64,15 @@
   font-weight: var(--fw-semibold);
 }
 
+/* The secondary line of the board (12.5 px), so the audit line fits on one line in the
+   home navigation column. */
 .ah__sub {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
   color: var(--color-text-muted);
+}
+.ah__alert {
+  color: var(--color-danger);
 }
 
 .ah__skel {

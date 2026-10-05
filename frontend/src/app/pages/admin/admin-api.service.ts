@@ -1031,7 +1031,11 @@ export class AdminApiService {
   }
 
   // Every DSGVO/privacy endpoint below needs P(privacy.manage).
-  listErasures(status?: ErasureStatus): Observable<ErasureRequest[]> {
+  /** `quiet` = the caller shows its own loading state (no overlay). */
+  listErasures(
+    status?: ErasureStatus,
+    opts: { quiet?: boolean } = {},
+  ): Observable<ErasureRequest[]> {
     if (this.mock) {
       const rows = status
         ? this.store.erasures.filter((r) => r.status === status)
@@ -1042,6 +1046,7 @@ export class AdminApiService {
     if (status) params = params.set('status', status);
     return this.http.get<ErasureRequest[]>(`${this.base}/admin/privacy/erasures`, {
       params,
+      context: opts.quiet ? skipLoading() : undefined,
     });
   }
 
@@ -1093,8 +1098,11 @@ export class AdminApiService {
   // Backups (P backup.manage). The archive itself never passes through the browser
   // except as a signed download; these calls move metadata only.
 
-  /** GET /admin/backups — the catalogue plus what this installation can do. */
-  listBackups(): Observable<BackupList> {
+  /**
+   * GET /admin/backups — the catalogue plus what this installation can do.
+   * `quiet` = the caller shows its own loading state (no overlay).
+   */
+  listBackups(opts: { quiet?: boolean } = {}): Observable<BackupList> {
     if (this.mock) {
       return of({
         items: structuredCopy(this.store.backups),
@@ -1103,7 +1111,9 @@ export class AdminApiService {
         retentionCount: 14,
       });
     }
-    return this.http.get<BackupList>(`${this.base}/admin/backups`);
+    return this.http.get<BackupList>(`${this.base}/admin/backups`, {
+      context: opts.quiet ? skipLoading() : undefined,
+    });
   }
 
   /** GET /admin/backups/{id} — one row. The page polls this while a job runs. */

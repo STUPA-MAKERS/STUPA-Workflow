@@ -77,7 +77,7 @@ describe('AdminOAuthGrantsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('lists the grants with owner, client and scope', async () => {
-    const { api } = await setup();
+    const { api, container } = await setup();
     expect(api.listOAuthGrants).toHaveBeenCalledWith({
       limit: 25,
       offset: 0,
@@ -88,7 +88,8 @@ describe('AdminOAuthGrantsComponent', () => {
     expect(screen.getByText('cli-agent')).toBeInTheDocument();
     // Three scopes show, the fourth is counted; the title names them all.
     expect(screen.getByText('meetings:write')).toBeInTheDocument();
-    expect(screen.queryByText('applications:write')).toBeNull();
+    const tags = [...container.querySelectorAll('code.og__scope')].map((c) => c.textContent);
+    expect(tags).not.toContain('applications:write');
     expect(screen.getByText('+1 weitere')).toBeInTheDocument();
     // The owner email is the tooltip of the name, because it adds to the name.
     expect(screen.getByText('Alex Admin')).toHaveAttribute('title', 'alex@x.de');
@@ -210,6 +211,38 @@ describe('AdminOAuthGrantsComponent', () => {
     inst.nextPage(); // the single page holds every row
     expect(api.listOAuthGrants.mock.calls.length).toBe(calls);
     expect(inst.offset()).toBe(0);
+  });
+
+  it('steps back one page when a revoke empties the last page', async () => {
+    let lastPageGone = false;
+    const second = [{ ...NAMED, id: 'grant-3' }];
+    const api = makeApi({
+      listOAuthGrants: jest.fn((q: OAuthGrantQuery = {}) => {
+        if (q.offset === 25) return of(lastPageGone ? page([], 25, 25) : page(second, 26, 25));
+        return of(page(GRANTS, lastPageGone ? 25 : 26, 0));
+      }),
+    });
+    const { inst, toast } = await setup(api);
+    inst.nextPage();
+    expect(inst.offset()).toBe(25);
+    inst.askRevoke(second[0]);
+    lastPageGone = true;
+    inst.doRevoke();
+    expect(toast.success).toHaveBeenCalledWith('Zugang widerrufen.');
+    // The empty page was not kept: the list went back to the page before.
+    expect(inst.offset()).toBe(0);
+    expect(api.listOAuthGrants).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 0 }));
+    expect(inst.rangeLabel()).toBe('1–2 von 25');
+    expect(inst.hasPrev()).toBe(false);
+  });
+
+  it('lets screen readers read the counted scopes and the owner email', async () => {
+    const { container } = await setup();
+    const row = container.querySelector('.og__row');
+    const srText = [...(row?.querySelectorAll('.sr-only') ?? [])].map((e) => e.textContent?.trim());
+    expect(srText).toContain('applications:write');
+    expect(srText).toContain(', alex@x.de');
+    expect(screen.getByText('+1 weitere')).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('reports an empty page as 0 of 0', async () => {

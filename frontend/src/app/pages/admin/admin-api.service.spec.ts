@@ -4,6 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { I18nService } from '@core/i18n/i18n.service';
+import { SKIP_LOADING } from '@core/loading/loading.interceptor';
 import type { FormFieldDef } from '@core/api/models';
 import { AdminApiService } from './admin-api.service';
 import { MOCK_GREMIUM_STUPA_ID } from './admin.mock';
@@ -545,7 +546,14 @@ describe('AdminApiService — real mode (contract)', () => {
     s.listErasures('open').subscribe();
     const filtered = http.expectOne((r) => r.url === '/api/admin/privacy/erasures');
     expect(filtered.request.params.get('status')).toBe('open');
+    expect(filtered.request.context.get(SKIP_LOADING)).toBe(false);
     filtered.flush([]);
+
+    // A caller with its own loading state (the health tiles) skips the overlay.
+    s.listErasures('open', { quiet: true }).subscribe();
+    const quiet = http.expectOne((r) => r.url === '/api/admin/privacy/erasures');
+    expect(quiet.request.context.get(SKIP_LOADING)).toBe(true);
+    quiet.flush([]);
 
     s.executeErasure('e-1').subscribe();
     expect(http.expectOne('/api/admin/privacy/erasures/e-1/execute').request.method).toBe('POST');
@@ -608,7 +616,14 @@ describe('AdminApiService — real mode (contract)', () => {
   describe('backups', () => {
     it('lists the catalogue', () => {
       s.listBackups().subscribe();
-      expect(http.expectOne('/api/admin/backups').request.method).toBe('GET');
+      const req = http.expectOne('/api/admin/backups');
+      expect(req.request.method).toBe('GET');
+      expect(req.request.context.get(SKIP_LOADING)).toBe(false);
+    });
+
+    it('lists the catalogue without the overlay for a quiet caller', () => {
+      s.listBackups({ quiet: true }).subscribe();
+      expect(http.expectOne('/api/admin/backups').request.context.get(SKIP_LOADING)).toBe(true);
     });
 
     it('polls one row without raising the global loading overlay', () => {

@@ -8,6 +8,7 @@ import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AuditChainCheck, AuditVerification, Backup, BackupList } from '../admin.models';
 import { checkedAt, formatBytes, formatCount, formatWhen } from './admin-health.util';
+import { AuditLiveCheckService } from './audit-live-check.service';
 
 /** The colour of a tile: the icon, and the title for an error. */
 export type HealthKind = 'ok' | 'warn' | 'error' | 'muted';
@@ -21,6 +22,8 @@ export interface HealthTile {
   /** Null while the data loads: the tile shows a placeholder line. */
   title: string | null;
   sub: string;
+  /** A second line in the danger colour, for example a failed newer backup. */
+  alert?: string;
 }
 
 /** The state of the audit tile. */
@@ -40,12 +43,16 @@ type ErasureState = { status: 'loading' } | { status: 'ok'; open: number } | { s
  * their page.
  *
  * - Audit chain (`audit.read`): the newest stored check. Before the first stored check
- *   the tile checks the chain live, when the principal holds `audit.verify`.
- * - Last backup (`backup.manage`): time, kind, status and size of the newest archive.
+ *   the tile checks the chain live, when the principal holds `audit.verify`. The live
+ *   check runs at most one time per session ({@link AuditLiveCheckService}).
+ * - Last backup (`backup.manage`): time, kind, status and size of the newest finished
+ *   archive. A running archive does not replace it. A failed archive that is newer than
+ *   the last finished one turns the tile red and adds a line.
  * - Open erasure requests (`privacy.manage`).
  *
  * Each tile shows only with its permission. A failed request gives a muted line, never
- * an alarm, because the tile cannot know the state.
+ * an alarm, because the tile cannot know the state. The tiles show their own
+ * placeholders, so their requests skip the global loading overlay.
  */
 @Component({
   selector: 'app-admin-health',
@@ -59,6 +66,7 @@ export class AdminHealthComponent {
   private readonly api = inject(AdminApiService);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
+  private readonly liveCheck = inject(AuditLiveCheckService);
 
   private readonly canAudit = this.auth.can('audit.read');
   private readonly canBackup = this.auth.can('backup.manage');
@@ -79,13 +87,13 @@ export class AdminHealthComponent {
   constructor() {
     if (this.canAudit) this.loadAudit();
     if (this.canBackup) {
-      this.api.listBackups().subscribe({
+      this.api.listBackups({ quiet: true }).subscribe({
         next: (list) => this.backup.set({ status: 'ok', list }),
         error: () => this.backup.set({ status: 'error' }),
       });
     }
     if (this.canPrivacy) {
-      this.api.listErasures('open').subscribe({
+      this.api.listErasures('open', { quiet: true }).subscribe({
         next: (rows) => this.erasure.set({ status: 'ok', open: rows.length }),
         error: () => this.erasure.set({ status: 'error' }),
       });
@@ -99,7 +107,7 @@ export class AdminHealthComponent {
           this.audit.set({ status: 'stored', check });
         } else if (this.auth.can('audit.verify')) {
           // No stored check yet (a fresh installation before the nightly job): check live.
-          this.api.verifyAuditChain().subscribe({
+          this.liveCheck.check().subscribe({
             next: (live) => this.audit.set({ status: 'live', check: live }),
             error: () => this.audit.set({ status: 'error' }),
           });
@@ -146,23 +154,30 @@ export class AdminHealthComponent {
     const tile: HealthTile = { key: 'backup', link: '/admin/backups', icon: 'db', kind: 'muted', title: null, sub: '' };
     if (state.status === 'loading') return tile;
     if (state.status === 'error') return { ...tile, title: this.t('admin.health.backup.failed') };
-    const newest = newestBackup(state.list.items);
-    if (!newest) {
+    const shown = lastFinished(state.list.items) ?? newestBackup(state.list.items);
+    if (!shown) {
       const key = state.list.enabled ? 'admin.health.backup.none' : 'admin.health.backup.off';
       return { ...tile, title: this.t(key) };
     }
     const parts = [
-      this.t(`admin.backups.kind.${newest.kind}` as TranslationKey),
-      this.t(`admin.backups.status.${newest.status}` as TranslationKey),
+      this.t(`admin.backups.kind.${shown.kind}` as TranslationKey),
+      this.t(`admin.backups.status.${shown.status}` as TranslationKey),
     ];
-    if (newest.sizeBytes != null) parts.push(formatBytes(newest.sizeBytes, this.i18n));
+    if (shown.sizeBytes != null) parts.push(formatBytes(shown.sizeBytes, this.i18n));
+    // A failed archive after the shown one: the last attempt did not give a backup.
+    const failed = newestBackup(state.list.items.filter((b) => b.status === 'failed'));
+    const alert =
+      failed && failed !== shown && time(failed) > time(shown)
+        ? this.t('admin.health.backup.laterFailed', { when: formatWhen(failed.createdAt, this.i18n) })
+        : undefined;
     const kind: HealthKind =
-      newest.status === 'done' ? 'ok' : newest.status === 'failed' ? 'error' : 'muted';
+      shown.status === 'failed' || alert ? 'error' : shown.status === 'done' ? 'ok' : 'muted';
     return {
       ...tile,
       kind,
-      title: this.t('admin.health.backup.last', { when: formatWhen(newest.createdAt, this.i18n) }),
+      title: this.t('admin.health.backup.last', { when: formatWhen(shown.createdAt, this.i18n) }),
       sub: parts.join(' · '),
+      alert,
     };
   }
 
@@ -186,11 +201,20 @@ export class AdminHealthComponent {
   }
 }
 
+function time(b: Backup): number {
+  return new Date(b.createdAt).getTime();
+}
+
 /** The newest archive by creation time. The list order of the server is not relied on. */
 function newestBackup(items: Backup[]): Backup | null {
   let best: Backup | null = null;
   for (const b of items) {
-    if (!best || new Date(b.createdAt).getTime() > new Date(best.createdAt).getTime()) best = b;
+    if (!best || time(b) > time(best)) best = b;
   }
   return best;
+}
+
+/** The newest finished archive (status `done`), or null. */
+function lastFinished(items: Backup[]): Backup | null {
+  return newestBackup(items.filter((b) => b.status === 'done'));
 }

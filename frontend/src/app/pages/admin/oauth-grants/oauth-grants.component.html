@@ -29,18 +29,24 @@
         <li class="og__row">
           <app-avatar class="og__avatar" size="sm" [name]="ownerName(g)" [decorative]="true" />
           <div class="og__who">
-            <span class="og__name ell" [title]="ownerEmail(g) ?? ownerName(g)">{{ ownerName(g) }}</span>
+            <span class="og__name ell" [title]="ownerEmail(g) ?? ownerName(g)"
+              >{{ ownerName(g) }}@if (ownerEmail(g); as mail) {<span class="sr-only">, {{ mail }}</span>}</span
+            >
             <span class="og__client mono">{{ g.clientId }}</span>
           </div>
           <!-- A token usually carries every scope. The first few show, the rest are
-               counted; the title carries the full list. -->
+               counted. The title shows the full list on hover; screen readers read the
+               counted scopes as text. -->
           <div class="og__scopes" [title]="scopes(g).join(' ')">
             <span class="sr-only">{{ 'admin.oauthGrants.col.scope' | t }}:</span>
             @for (s of visibleScopes(g); track s) {
               <code class="og__scope">{{ s }}</code>
             }
             @if (hiddenScopeCount(g); as extra) {
-              <span class="og__more">{{ 'admin.oauthGrants.moreScopes' | t: { count: extra } }}</span>
+              <span class="og__more" aria-hidden="true">{{
+                'admin.oauthGrants.moreScopes' | t: { count: extra }
+              }}</span>
+              <span class="sr-only">{{ hiddenScopes(g).join(', ') }}</span>
             }
           </div>
           <div class="og__field og__field--created">

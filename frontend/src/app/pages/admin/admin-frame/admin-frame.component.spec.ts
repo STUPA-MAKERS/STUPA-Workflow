@@ -21,9 +21,10 @@ function fakeAuth(perms: string[]): Partial<AuthService> {
 const ALL = [...new Set(ADMIN_PAGES.flatMap((p) => p.permissions))];
 
 /** Let `matchMedia` report a wide viewport (or not). jsdom has none of its own. */
-function matchWide(wide: boolean): void {
+function matchWide(wide: boolean, xl = false): void {
   window.matchMedia = ((query: string) => ({
-    matches: wide && query.includes('min-width: 1200px'),
+    matches:
+      (wide && query.includes('min-width: 1200px')) || (xl && query.includes('min-width: 1440px')),
     media: query,
     onchange: null,
     addEventListener: () => undefined,
@@ -34,8 +35,8 @@ function matchWide(wide: boolean): void {
   })) as unknown as typeof window.matchMedia;
 }
 
-async function setup(perms: string[], url = '/admin/users', wide = true) {
-  matchWide(wide);
+async function setup(perms: string[], url = '/admin/users', wide = true, xl = false) {
+  matchWide(wide, xl);
   const api = {
     latestAuditVerification: jest.fn(() => of(null)),
     verifyAuditChain: jest.fn(() => of({ valid: true, checked: 1, brokenAt: null, reason: null })),
@@ -49,6 +50,8 @@ async function setup(perms: string[], url = '/admin/users', wide = true) {
           path: 'admin',
           children: [
             { path: '', component: StubPageComponent, pathMatch: 'full' },
+            { path: 'flow', component: StubPageComponent, data: { adminNav: false } },
+            { path: 'cost-centres', component: StubPageComponent, data: { adminNav: 'xl' } },
             { path: '**', component: StubPageComponent },
           ],
         },
@@ -124,9 +127,44 @@ describe('AdminFrameComponent', () => {
     expect(view.container.querySelector('app-admin-health')).not.toBeNull();
     expect(screen.getByText('Benutzer und Rollenzuweisungen')).toBeInTheDocument();
     expect(view.container.querySelector('.af')).toHaveClass('af--home');
-    // The search hides the tiles: they are no entries.
+    // The search hides the tiles: they are no entries. They stay in the DOM, so a
+    // cleared search does not load them again.
+    const api = view.fixture.debugElement.injector.get(AdminApiService) as unknown as {
+      listBackups: jest.Mock;
+    };
+    expect(api.listBackups).toHaveBeenCalledTimes(1);
     await userEvent.type(screen.getByRole('searchbox'), 'audit');
-    expect(view.container.querySelector('app-admin-health')).toBeNull();
+    expect(view.container.querySelector('app-admin-health')).toHaveClass('af__hidden');
+    await userEvent.clear(screen.getByRole('searchbox'));
+    expect(view.container.querySelector('app-admin-health')).not.toHaveClass('af__hidden');
+    expect(api.listBackups).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves out the navigation beside an adminNav: xl page below 1440 px', async () => {
+    const view = await setup(ALL, '/admin/cost-centres', true, false);
+    expect(screen.queryByRole('navigation')).toBeNull();
+    expect(view.container.querySelector('.af')).not.toHaveClass('af--split');
+  });
+
+  it('shows the navigation beside an adminNav: xl page from 1440 px', async () => {
+    const view = await setup(ALL, '/admin/cost-centres', true, true);
+    expect(screen.getByRole('navigation', { name: 'Verwaltungsbereiche' })).toBeInTheDocument();
+    expect(view.container.querySelector('.af')).toHaveClass('af--split');
+  });
+
+  it('leaves out the navigation for a page with adminNav: false, and keeps the crumb', async () => {
+    const view = await setup(ALL, '/admin/flow');
+    expect(screen.queryByRole('navigation')).toBeNull();
+    expect(view.container.querySelector('.af')).not.toHaveClass('af--split');
+    // Without the column the breadcrumb "Verwaltung" is the way back.
+    expect(view.fixture.debugElement.injector.get(PageFrameService).crumbRoot()).toBeNull();
+    // Back on a normal page the column returns.
+    await view.fixture.ngZone!.run(() =>
+      view.fixture.debugElement.injector.get(Router).navigateByUrl('/admin/users'),
+    );
+    view.fixture.detectChanges();
+    expect(screen.getByRole('navigation', { name: 'Verwaltungsbereiche' })).toBeInTheDocument();
+    expect(view.container.querySelector('.af')).toHaveClass('af--split');
   });
 
   it('beside an admin page the title is no heading and the entries have no description', async () => {

@@ -18,8 +18,10 @@
       </div>
 
       <div class="af__navBody" appScrollFade="y">
-        @if (home() && !query()) {
-          <app-admin-health />
+        <!-- A class hides the tiles during a search. They are not destroyed, so a cleared
+             search does not load them again. -->
+        @if (home()) {
+          <app-admin-health [class.af__hidden]="!!query()" />
         }
 
         @for (g of groups(); track g.key) {

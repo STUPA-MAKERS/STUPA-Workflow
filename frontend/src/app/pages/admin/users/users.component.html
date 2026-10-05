@@ -70,14 +70,19 @@
           </div>
           <div class="au__act">
             @if (p.active === false) {
-              <app-button size="sm" variant="tonal" (click)="setActive(p, true)">{{
-                'admin.users.activate' | t
-              }}</app-button>
+              <app-button
+                size="sm"
+                variant="tonal"
+                [ariaLabel]="('admin.users.activate' | t) + ': ' + userLabel(p)"
+                (click)="setActive(p, true)"
+                >{{ 'admin.users.activate' | t }}</app-button
+              >
             } @else {
               <app-button
                 size="sm"
                 variant="danger"
                 [disabled]="isSelf(p)"
+                [ariaLabel]="('admin.users.deactivate' | t) + ': ' + userLabel(p)"
                 [title]="isSelf(p) ? ('admin.users.cannotDeactivateSelf' | t) : ''"
                 (click)="setActive(p, false)"
                 >{{ 'admin.users.deactivate' | t }}</app-button

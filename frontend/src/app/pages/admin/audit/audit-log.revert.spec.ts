@@ -85,6 +85,59 @@ describe('AuditLogComponent — config diff + revert', () => {
     expect(c.diffOf(c.entries()[0])).toEqual(DIFF);
   });
 
+  it('shows the diff as one code block with "-" and "+" lines and the revision in the target', async () => {
+    localStorage.setItem('ap.locale', 'de');
+    const { c, fixture, container } = await setup({
+      entryOver: {},
+    });
+    (c as unknown as { diffs: { set(m: Map<string, ConfigRevisionDiff>): void } }).diffs.set(
+      new Map([
+        [
+          'rev-2',
+          {
+            ...DIFF,
+            diff: {
+              changed: [{ key: 'state:review', old: 'A', new: 'B' }],
+              added: [{ key: 'state:new', value: { x: 1 } }],
+              removed: [{ key: 'state:old', value: 'Z' }],
+            },
+          },
+        ],
+      ]),
+    );
+    c.toggle(7);
+    fixture.detectChanges();
+    const block = container.querySelector('.al__code');
+    expect(block).not.toBeNull();
+    expect(container.querySelector('app-config-diff')).toBeNull();
+    const items = [...(block?.querySelectorAll('.al__codeItem') ?? [])].map((i) =>
+      [...i.children].map((c) => (c.textContent ?? '').replace(/\s+/g, ' ').trim()),
+    );
+    expect(items).toEqual([
+      ['state:review', '- vorher: "A"', '+ nachher: "B"'],
+      ['state:new', '+ nachher: {"x":1}'],
+      ['state:old', '- vorher: "Z"'],
+    ]);
+    expect(container.querySelector('.al__codeDel')).not.toBeNull();
+    expect(container.querySelector('.al__codeIns')).not.toBeNull();
+    // The revision id sits in the target line; "version" reads as "Revision".
+    const details = container.querySelector('.al__details')?.textContent ?? '';
+    expect(details).toContain('rev rev-2');
+    expect(details).toContain('Revision');
+    expect(details).not.toContain('revisionId');
+  });
+
+  it('says so when the diff has no changes', async () => {
+    localStorage.setItem('ap.locale', 'de');
+    const { c, fixture } = await setup();
+    (c as unknown as { diffs: { set(m: Map<string, ConfigRevisionDiff>): void } }).diffs.set(
+      new Map([['rev-2', { ...DIFF, diff: { added: [], removed: [], changed: [] } }]]),
+    );
+    c.toggle(7);
+    fixture.detectChanges();
+    expect(screen.getByText('Keine Änderungen')).toBeInTheDocument();
+  });
+
   it('offers revert with the audit.revert permission', async () => {
     const { c } = await setup({ canRevert: true });
     expect(c.isRevertable(c.entries()[0])).toBe(true);
@@ -136,7 +189,7 @@ describe('AuditLogComponent — config diff + revert', () => {
     const { c, fixture, revertAuditEntry } = await setup({ entryOver: { targetType: 'role', targetId: 'r-1' } });
     (fixture.nativeElement.querySelector('.al__row') as HTMLElement).click();
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('app-config-diff')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.al__code')).not.toBeNull();
     expect(screen.getByRole('link', { name: 'Ziel öffnen' })).toHaveAttribute('href', '/admin/roles');
     await userEvent.click(screen.getByRole('button', { name: 'Zurücknehmen' }));
     expect(c.confirmRevert()).not.toBeNull();

@@ -16,6 +16,9 @@
               @if (t.sub) {
                 <span class="ah__sub">{{ t.sub }}</span>
               }
+              @if (t.alert) {
+                <span class="ah__sub ah__alert">{{ t.alert }}</span>
+              }
             </span>
             <app-icon class="ah__chev" name="chevron-right" [size]="16" />
           </a>

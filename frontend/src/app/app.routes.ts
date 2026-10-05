@@ -235,7 +235,15 @@ export const routes: Routes = [
         children: [
           {
             path: 'cost-centres',
-            data: { title: 'budget.tree.title', permission: 'budget.structure', parent: ['admin'], wide: true },
+            // `adminNav: 'xl'`: the tree and the table fit beside the admin navigation from
+            // 1440 px on. Below that the page takes the full width.
+            data: {
+              title: 'budget.tree.title',
+              permission: 'budget.structure',
+              parent: ['admin'],
+              wide: true,
+              adminNav: 'xl',
+            },
             canActivate: [authGuard],
             loadComponent: () =>
               import('./pages/budget/budget-tree.component').then((m) => m.BudgetTreeComponent),
@@ -297,7 +305,14 @@ export const routes: Routes = [
           },
           {
             path: 'forms/:id',
-            data: { title: 'admin.forms.edit', permission: 'form.configure', parent: ['admin', 'admin/forms'] },
+            // `adminNav: false`: the editor fills the width, without the admin navigation
+            // (board Admin-Formular-Editor).
+            data: {
+              title: 'admin.forms.edit',
+              permission: 'form.configure',
+              parent: ['admin', 'admin/forms'],
+              adminNav: false,
+            },
             canActivate: [authGuard],
             loadComponent: () =>
               import('./pages/admin/forms/form-editor.component').then((m) => m.FormEditorComponent),
@@ -307,10 +322,13 @@ export const routes: Routes = [
             // The save (POST /admin/flow-versions/global) accepts either key. The route
             // gate must list both, or a holder of one of them opens an editor it cannot
             // save, or cannot open an editor it may save.
+            // `adminNav: false`: the canvas fills the width, without the admin navigation
+            // (board Admin-Flow-Editor).
             data: {
               title: 'admin.flow.title',
               permission: ['flow.configure', 'admin.types'],
               parent: ['admin'],
+              adminNav: false,
             },
             canActivate: [authGuard],
             loadComponent: () =>

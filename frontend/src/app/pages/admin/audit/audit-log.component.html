@@ -79,20 +79,41 @@
                 @if (e.targetType || e.targetId) {
                   <dt>{{ 'admin.audit.detail.target' | t }}</dt>
                   <dd class="al__wrap">
-                    @if (e.targetType) {<span>{{ targetTypeLabel(e.targetType) }}</span>}@if (e.targetLabel) {<span> · {{ e.targetLabel }}</span>}@if (e.targetId) {<span class="mono"> · {{ e.targetId }}</span>}
+                    @if (e.targetType) {<span>{{ targetTypeLabel(e.targetType) }}</span>}@if (e.targetLabel) {<span> · {{ e.targetLabel }}</span>}@if (e.targetId) {<span class="mono"> · {{ e.targetId }}</span>}@if (revisionId(e); as rev) {<span> · </span><span class="mono">rev {{ rev }}</span>}
                   </dd>
                 }
                 <dt>{{ 'admin.audit.detail.actor' | t }}</dt>
                 <dd class="al__wrap">{{ actorDisplay(e) }}</dd>
-                @for (p of dataPairs(e); track p[0]) {
-                  <dt class="mono">{{ p[0] }}</dt>
-                  <dd class="al__wrap mono">{{ p[1] }}</dd>
+                @for (row of dataRows(e); track row.key) {
+                  <dt [class.mono]="!row.known">{{ row.label }}</dt>
+                  <dd class="al__wrap" [class.mono]="!row.known">{{ row.value }}</dd>
                 }
               </dl>
               @if (revisionId(e)) {
                 <div class="al__diff">
                   @if (diffOf(e); as d) {
-                    <app-config-diff [diff]="d.diff" />
+                    @if (diffLines(d); as lines) {
+                      <!-- One compact code block: the field, "-" the old value, "+" the new. -->
+                      <div class="al__code mono" role="group" [attr.aria-label]="'admin.audit.diff.label' | t">
+                        @for (l of lines; track l.key) {
+                          <div class="al__codeItem">
+                            <div class="al__codeKey">{{ l.key }}</div>
+                            @if (l.before !== null) {
+                              <div class="al__codeDel">
+                                <span aria-hidden="true">- </span><span class="sr-only">{{ 'admin.audit.diff.before' | t }}: </span>{{ l.before }}
+                              </div>
+                            }
+                            @if (l.after !== null) {
+                              <div class="al__codeIns">
+                                <span aria-hidden="true">+ </span><span class="sr-only">{{ 'admin.audit.diff.after' | t }}: </span>{{ l.after }}
+                              </div>
+                            }
+                          </div>
+                        } @empty {
+                          <p class="al__codeNone">{{ 'admin.audit.diff.none' | t }}</p>
+                        }
+                      </div>
+                    }
                   } @else {
                     <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
                   }

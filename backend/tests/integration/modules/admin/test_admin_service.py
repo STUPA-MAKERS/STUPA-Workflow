@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator, Iterator
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import Engine, create_engine, func, select, text
@@ -254,7 +255,10 @@ async def test_gremium_crud_and_slug_conflict(session: AsyncSession) -> None:
 
 
 async def test_admin_gremien_list_counts_members_and_roles(session: AsyncSession) -> None:
-    """The admin list counts the distinct members and the roles of each gremium."""
+    """The admin list counts the current members and the roles of each gremium.
+
+    An expired membership and a deactivated principal do not count.
+    """
     svc = ConfigService(session)
     full = await svc.create_gremium(
         GremiumCreate(name="Zählgremium", slug=f"z-{uuid.uuid4().hex[:8]}"), _ACTOR
@@ -275,6 +279,32 @@ async def test_admin_gremien_list_counts_members_and_roles(session: AsyncSession
                 principal_id=principal.id, gremium_id=full.id, gremium_role_id=member_role.id
             )
         )
+    expired = Principal(sub=f"s-{uuid.uuid4()}", display_name="Ehemalig")
+    inactive = Principal(sub=f"s-{uuid.uuid4()}", display_name="Gesperrt", active=False)
+    future = Principal(sub=f"s-{uuid.uuid4()}", display_name="Später")
+    session.add_all([expired, inactive, future])
+    await session.flush()
+    now = datetime.now(UTC)
+    session.add_all(
+        [
+            GremiumMembership(
+                principal_id=expired.id,
+                gremium_id=full.id,
+                gremium_role_id=member_role.id,
+                valid_from=now - timedelta(days=60),
+                valid_until=now - timedelta(days=1),
+            ),
+            GremiumMembership(
+                principal_id=inactive.id, gremium_id=full.id, gremium_role_id=member_role.id
+            ),
+            GremiumMembership(
+                principal_id=future.id,
+                gremium_id=full.id,
+                gremium_role_id=member_role.id,
+                valid_from=now + timedelta(days=1),
+            ),
+        ]
+    )
     await session.commit()
 
     by_id = {g.id: g for g in await svc.list_gremien_admin()}

@@ -22,7 +22,6 @@ import {
 } from '@shared/ui';
 import {
   ButtonComponent,
-  ConfigDiffComponent,
   DialogComponent,
   IconComponent,
   ToastService,
@@ -47,8 +46,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 /**
  * Audit action types. The list mirrors `AuditAction` in
- * `backend/app/modules/audit/actions.py`. It fills the action filter. It also tells the view
- * if a specific message template exists. If not, the view uses `admin.audit.msg.unknown`.
+ * `backend/app/modules/audit/actions.py`, and a spec compares the two. It fills the action
+ * filter. Each action has a label `admin.audit.action.<key>`. Without a label, the view
+ * shows the raw action key.
  */
 export const AUDIT_ACTIONS = [
   'login',
@@ -85,6 +85,12 @@ export const AUDIT_ACTIONS = [
   'application_create',
   'guest_application_discard',
   'application_update',
+  // Archive, public share link and delete of an application.
+  'application_archive',
+  'application_unarchive',
+  'application_share',
+  'application_share_revoke',
+  'application_delete',
   'comment_update',
   'comment_delete',
   'protocol_delete',
@@ -122,6 +128,12 @@ export const AUDIT_ACTIONS = [
   'budget_assign',
   'budget_move_fiscal_year',
   'budget_fiscal_year_delete',
+  // Whole-platform backup and restore. They mirror the BACKUP_* values in actions.py.
+  'backup_create',
+  'backup_delete',
+  'backup_export',
+  'backup_import',
+  'backup_restore',
 ] as const;
 
 /** Target type to router target: the detail page or the admin list that owns the target. */
@@ -161,6 +173,37 @@ const TARGET_ROUTES: Record<string, (id: string) => string[]> = {
 };
 
 
+/**
+ * Data keys with a label of their own. `version` is the revision of a config change or
+ * the data version of an application.
+ */
+const DATA_LABELS: Readonly<Record<string, TranslationKey>> = {
+  version: 'admin.audit.data.version',
+};
+
+/** Data keys that the details show in the target line, not as a data row. */
+const TARGET_KEYS = new Set(['revisionId']);
+
+/** One data row of the details. A known key has a label; any other key shows as code. */
+export interface AuditDataRow {
+  key: string;
+  label: string;
+  value: string;
+  known: boolean;
+}
+
+/** One changed field of a config diff: the old value (`-`) and the new value (`+`). */
+export interface AuditDiffLine {
+  key: string;
+  before: string | null;
+  after: string | null;
+}
+
+/** A diff value as code: a string in quotes, any other value as JSON. */
+function diffValue(v: unknown): string {
+  return v === undefined ? 'null' : JSON.stringify(v);
+}
+
 /** The state of the chain check at the top of the page. */
 type VerifyState =
   | { status: 'loading' }
@@ -178,7 +221,8 @@ type VerifyState =
  *   inside the cooldown).
  * - Filters: Aktion, Akteur (app menus), Von and Bis (dates).
  * - One row per entry: time, action, actor, target. A row opens its details: action,
- *   target, actor, the data, the config diff of a config change, "Ziel öffnen" and
+ *   target (with the revision of a config change), actor, the data, the config diff of
+ *   a config change as one compact code block (`-` old, `+` new), "Ziel öffnen" and
  *   "Zurücknehmen" (`audit.revert`, only where the server marks the entry revertable).
  * - Keyset paging over the `before` cursor: a sentinel loads more on scroll, "Mehr
  *   laden" is the fallback.
@@ -192,7 +236,6 @@ type VerifyState =
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
-    ConfigDiffComponent,
     DialogComponent,
     IconComponent,
     FilterSelectComponent,
@@ -551,15 +594,36 @@ export class AuditLogComponent {
     return e.actorName ?? e.actor ?? this.i18n.translate('admin.audit.system');
   }
 
-  /** The `data` content as (key, value) pairs for the details. A UUID value with a
-   *  known clear name reads as "<name> · <uuid>", else as the raw UUID. */
-  protected dataPairs(e: AuditEntry): [string, string][] {
+  /**
+   * The `data` content as rows for the details. A known key gets its label; the
+   * `revisionId` shows in the target line instead. A UUID value with a known clear name
+   * reads as "<name> · <uuid>", else as the raw UUID.
+   */
+  protected dataRows(e: AuditEntry): AuditDataRow[] {
     const resolved = e.resolvedIds ?? {};
     const fmt = (v: unknown): string => {
       if (typeof v === 'string' && resolved[v]) return `${resolved[v]} · ${v}`;
       return v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v);
     };
-    return Object.entries(e.data ?? {}).map(([k, v]) => [k, fmt(v)]);
+    return Object.entries(e.data ?? {})
+      .filter(([k]) => !TARGET_KEYS.has(k))
+      .map(([key, v]) => {
+        const labelKey = DATA_LABELS[key];
+        return labelKey
+          ? { key, label: this.i18n.translate(labelKey), value: fmt(v), known: true }
+          : { key, label: key, value: fmt(v), known: false };
+      });
+  }
+
+  /** The changed fields of a config diff, in the order changed, added, removed. */
+  protected diffLines(d: ConfigRevisionDiff): AuditDiffLine[] {
+    const diff = d.diff;
+    if (!diff) return [];
+    return [
+      ...diff.changed.map((c) => ({ key: c.key, before: diffValue(c.old), after: diffValue(c.new) })),
+      ...diff.added.map((a) => ({ key: a.key, before: null, after: diffValue(a.value) })),
+      ...diff.removed.map((r) => ({ key: r.key, before: diffValue(r.value), after: null })),
+    ];
   }
 }
 
