@@ -34,6 +34,7 @@ import {
   type DelegationCardChange,
   MeetingDelegationCardComponent,
 } from '../meeting-delegation-card.component';
+import { LeadSubstituteDialogComponent } from '../lead-substitute-dialog/lead-substitute-dialog.component';
 import { meetingLine } from '../meetings-display.util';
 
 /** One attendance change. `note` is the reason of an excuse; omitted keeps the stored one. */
@@ -103,6 +104,10 @@ const SELF_CHOICES: readonly { value: Choice; label: TranslationKey }[] = [
  *   to them only); the row menu edits it.
  * - A closed meeting freezes the attendance: every row is read-only.
  * - The row of the minute-taker says so in the sub line.
+ * - O6: while the meeting is live, the meeting lead (`canManage`) enters a substitute
+ *   from the pool for a missing member (open, excused or absent, without a delegation):
+ *   the row menu item "Vertretung eintragen" opens the picker. The row then says
+ *   "vertreten durch …".
  * - A member who does not lead reads "abwesend" for an excuse and an absence (Z2), in the
  *   rows and in the counts.
  *
@@ -124,6 +129,7 @@ const SELF_CHOICES: readonly { value: Choice; label: TranslationKey }[] = [
     StatusTextComponent,
     ScrollFadeDirective,
     MeetingDelegationCardComponent,
+    LeadSubstituteDialogComponent,
   ],
   templateUrl: './attendance-sheet.component.html',
   styleUrl: './attendance-sheet.component.scss',
@@ -160,6 +166,8 @@ export class AttendanceSheetComponent {
   /** The row whose reason is being edited. */
   protected readonly editingNote = signal<Uuid | null>(null);
   protected readonly revoking = signal<Uuid | null>(null);
+  /** O6: the missing member for whom the lead picks a substitute, or `null`. */
+  protected readonly substituteFor = signal<Attendance | null>(null);
   /** The option that has the keyboard focus in a row (roving tab stop), or `null`. */
   private readonly focused = signal<{ id: Uuid; value: Choice } | null>(null);
   /** The reason field of the row in edit; it takes the focus when it appears. */
@@ -181,6 +189,7 @@ export class AttendanceSheetComponent {
         untracked(() => {
           this.query.set('');
           this.editingNote.set(null);
+          this.substituteFor.set(null);
         });
       }
     });
@@ -295,8 +304,30 @@ export class AttendanceSheetComponent {
     return a.isSelf && a.source !== 'lead';
   }
 
+  /**
+   * O6: the lead enters a substitute for a missing member while the meeting is live. A
+   * member who is present, or who already has a delegation, needs none.
+   */
+  private substitutable(a: Attendance): boolean {
+    const m = this.meeting();
+    return (
+      m.status === 'live' &&
+      m.canManage &&
+      !a.isSelf &&
+      a.status !== 'present' &&
+      this.delegationOf(a.principalId) === null
+    );
+  }
+
   private menuOf(a: Attendance): RowMenuSection[] {
     const items: RowMenuItem[] = [];
+    if (this.substitutable(a)) {
+      items.push({
+        id: 'substitute',
+        label: this.i18n.translate('meetings.leadSubstitute.action'),
+        icon: 'repeat',
+      });
+    }
     if (this.noteEditable(a)) {
       items.push({
         id: 'note',
@@ -365,6 +396,13 @@ export class AttendanceSheetComponent {
 
   protected onMenu(row: Row, item: RowMenuItem): void {
     if (item.id === 'note') this.editingNote.set(row.a.principalId);
+    else if (item.id === 'substitute') this.substituteFor.set(row.a);
+  }
+
+  /** O6: the lead entered a substitute; the row shows "vertreten durch …". */
+  protected onSubstituted(): void {
+    this.substituteFor.set(null);
+    this.loadDelegations(this.meeting().id);
   }
 
   /** Save a changed reason. An empty field removes it. */

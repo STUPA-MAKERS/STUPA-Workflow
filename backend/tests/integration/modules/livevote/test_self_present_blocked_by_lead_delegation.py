@@ -17,12 +17,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tests.integration.modules.delegations.conftest import (
     act,
-    faculty_group,
     gremium,
     make_api,
     meeting,
     member,
     person,
+    pool_entry,
 )
 
 pytestmark = pytest.mark.integration
@@ -46,7 +46,7 @@ async def test_own_present_waits_for_the_revoke(
     lead, _ = await member(maker, gid, "Lead", ("session.manage", "vote.cast"))
     anna, a = await member(maker, gid, "Anna")
     _, b = await person(maker, "Bert")
-    await faculty_group(maker, gid, members=(a,), substitutes=(b,))
+    await pool_entry(maker, gid, b, for_member=a)
     mid = await meeting(maker, gid, status="live")
     me = f"/api/meetings/{mid}/attendance/me"
     with TestClient(api) as client:

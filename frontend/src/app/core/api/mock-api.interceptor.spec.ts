@@ -1443,6 +1443,33 @@ describe('mockApiInterceptor', () => {
         const lead = await get<Ctx>('/api/delegations/meetings/d0000000-0000-0000-0000-000000000002/context');
         expect(lead.meetingStarted).toBe(false);
       });
+
+      it('O6: lists the pool of a missing member and enters the substitute', async () => {
+        const LIVE = 'd0000000-0000-0000-0000-000000000001';
+        const recipients = `/api/delegations/meetings/${LIVE}/recipients`;
+        const fritz = await get<{ displayName: string }[]>(recipients, new HttpParams().set('delegatorId', 'p-8'));
+        expect(fritz.map((r) => r.displayName)).toEqual(['Emma Vogel', 'Paula Persönlich', 'Sven Stellvertreter']);
+        const other = await get<{ displayName: string }[]>(recipients, new HttpParams().set('delegatorId', 'p-2'));
+        expect(other.map((r) => r.displayName)).toEqual(['Emma Vogel', 'Sven Stellvertreter']);
+        const made = await firstValueFrom(
+          http.post<{ id: string; delegatorName: string; delegateName: string; viaPool: boolean; direction: null }>(
+            '/api/delegations',
+            { meetingId: LIVE, delegatorId: 'p-8', delegateId: 'p-11', delegateVoting: true },
+          ),
+        );
+        expect(made).toMatchObject({
+          delegatorName: 'Fritz Fehlend', delegateName: 'Paula Persönlich', viaPool: true, direction: null,
+        });
+        const unknown = await firstValueFrom(
+          http.post<{ id: string; delegatorName: string | null; delegateName: string | null }>('/api/delegations', {
+            meetingId: LIVE, delegatorId: 'p-99', delegateId: 'p-98',
+          }),
+        );
+        expect(unknown).toMatchObject({ delegatorName: null, delegateName: null });
+        // Leave the demo data as it was for the other tests.
+        await firstValueFrom(http.delete(`/api/delegations/${made.id}`));
+        await firstValueFrom(http.delete(`/api/delegations/${unknown.id}`));
+      });
     });
 
     describe('FE7: keepers, attendance with delegations, closed meetings', () => {

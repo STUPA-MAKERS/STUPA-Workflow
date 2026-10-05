@@ -40,13 +40,16 @@ async def test_substitutes_for_defaults_the_time() -> None:
     assert await pool.substitutes_for(db, GREMIUM_ID, uuid4()) == set()
 
 
-async def test_group_substitutes_for_reads_the_groups_only() -> None:
+async def test_substitutes_for_without_groups_reads_the_pool_only() -> None:
+    """O6: the lead entry reads only `delegation_substitute`, not the faculty groups."""
     a = uuid4()
     db = fake_session(result(a))
-    assert await pool.group_substitutes_for(db, GREMIUM_ID, uuid4()) == {a}
+    assert await pool.substitutes_for(db, GREMIUM_ID, uuid4(), include_groups=False) == {a}
     sql = _sql(db.statements[0])
-    assert "delegation_substitute " not in sql
-    assert "substitute_group_member" in sql
+    assert "UNION" not in sql
+    assert "delegation_substitute" in sql
+    assert "substitute_group" not in sql
+    assert "gremium_membership" not in sql
 
 
 async def test_substitute_gremien_by_id_and_by_sub() -> None:

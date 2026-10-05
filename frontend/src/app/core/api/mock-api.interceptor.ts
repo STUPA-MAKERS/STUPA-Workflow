@@ -1463,7 +1463,15 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   if (req.method === 'GET' && MEMBER_MOCK_PATH.test(p)) {
     return from(import('./mock-meetings-member')).pipe(
       mergeMap((m) =>
-        ok(m.memberMeetingGet(p, req.params.get('q') ?? '', MOCK_MEETING, MOCK_DELEGATIONS)),
+        ok(
+          m.memberMeetingGet(
+            p,
+            req.params.get('q') ?? '',
+            MOCK_MEETING,
+            MOCK_DELEGATIONS,
+            req.params.get('delegatorId'),
+          ),
+        ),
       ),
     );
   }

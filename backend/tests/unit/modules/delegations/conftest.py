@@ -30,6 +30,5 @@ async def _no_groups(*_args: Any, **_kw: Any) -> dict[UUID, dict[str, str]]:
 @pytest.fixture(autouse=True)
 def _queued_pool(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(service_mod, "substitutes_for", _one_queued_set)
-    monkeypatch.setattr(service_mod, "group_substitutes_for", _one_queued_set)
     monkeypatch.setattr(service_mod, "substitute_gremien_for_sub", _one_queued_set)
     monkeypatch.setattr(service_mod, "group_names_for", _no_groups)

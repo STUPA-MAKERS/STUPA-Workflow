@@ -401,8 +401,9 @@ async def create_delegation(delegation: S.DelegationCreate) -> dict:
     delegates for themselves while the meeting is planned. With `delegatorId` the
     meeting lead (session.manage in the gremium) enters a substitution for a missing
     member (no attendance record, excused or absent) while the meeting is live. The
-    delegate must then be a substitute of the member's faculty group. The lead
-    cannot name themselves as the delegate.
+    delegate must then be in the substitute pool of the gremium for that member: a
+    personal entry for the member or a gremium-wide entry. The lead cannot name
+    themselves as the delegate.
     """
     return await api().post("/delegations", json=dump_create(delegation))
 

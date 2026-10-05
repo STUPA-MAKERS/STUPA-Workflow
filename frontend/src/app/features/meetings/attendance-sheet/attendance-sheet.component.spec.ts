@@ -239,7 +239,7 @@ describe('AttendanceSheetComponent', () => {
 
   it('keeps a gap for the row menu only while some row has a menu', async () => {
     // Mika Mitglied: an excuse the lead set, so the row has a menu; the others keep a gap.
-    const { rerender } = await setup();
+    const { rerender } = await setup({ meeting: meeting({ canManage: false }) });
     const gaps = () => sheet().querySelectorAll('.as__menuGap').length;
     expect(within(sheet()).getByRole('button', { name: 'Aktionen für Mika Mitglied' })).toBeInTheDocument();
     expect(gaps()).toBe(ROSTER.length - 1);
@@ -251,7 +251,7 @@ describe('AttendanceSheetComponent', () => {
 
   it('edits the reason of an excuse from the row menu', async () => {
     const roster: Attendance[] = [{ ...ROSTER[0], status: 'excused', note: null }, ROSTER[1], ROSTER[3]];
-    const { statusChange } = await setup({ attendance: roster });
+    const { statusChange } = await setup({ attendance: roster, meeting: meeting({ canManage: false }) });
     // The lead edits the own reason and the reason of a row the lead set; a member's own
     // reason stays the member's.
     expect(within(sheet()).getByRole('button', { name: 'Aktionen für Mika Mitglied' })).toBeInTheDocument();
@@ -412,7 +412,7 @@ describe('AttendanceSheetComponent', () => {
 
   it('edits an existing reason, keeps an unchanged one and removes an emptied one', async () => {
     const roster: Attendance[] = [{ ...ROSTER[0], status: 'excused', note: 'Zug' }];
-    const { statusChange } = await setup({ attendance: roster });
+    const { statusChange } = await setup({ attendance: roster, meeting: meeting({ canManage: false }) });
     const edit = async () => {
       await userEvent.click(within(sheet()).getByRole('button', { name: 'Aktionen für Pia Protokoll' }));
       await userEvent.click(await screen.findByRole('menuitem', { name: 'Grund bearbeiten' }));
@@ -486,5 +486,71 @@ describe('AttendanceSheetComponent', () => {
     fixture.componentInstance.open.set(true);
     fixture.detectChanges();
     expect(within(sheet()).getByRole('searchbox', { name: 'Mitglied suchen' })).toHaveValue('');
+  });
+
+  describe('O6: the lead enters a substitute from the pool', () => {
+    const menu = (name: string) => within(sheet()).queryByRole('button', { name: `Aktionen für ${name}` });
+
+    it('offers the entry for a missing member without a delegation', async () => {
+      await setup({}, [delegation()]);
+      // Missing: excused (Mika), open (Alina), absent (Fritz). Pia is present and the
+      // lead herself; Vera already has a delegation.
+      for (const name of ['Mika Mitglied', 'Alina Admin', 'Fritz Fehlend']) {
+        expect(menu(name)).toBeInTheDocument();
+      }
+      expect(menu('Pia Protokoll')).toBeNull();
+      expect(menu('Vera Vertretung')).toBeNull();
+      await userEvent.click(menu('Alina Admin')!);
+      expect(await screen.findByRole('menuitem', { name: 'Vertretung eintragen' })).toBeInTheDocument();
+    });
+
+    it.each([
+      ['a planned meeting', { status: 'planned' as const }],
+      ['a member who does not manage', { canManage: false }],
+    ])('offers no entry in %s', async (_label, over) => {
+      await setup({ meeting: meeting(over), attendance: [ROSTER[3], ROSTER[4]] });
+      expect(within(sheet()).queryByRole('button', { name: /^Aktionen für/ })).toBeNull();
+    });
+
+    it('picks a substitute and shows it in the row', async () => {
+      const { http, fixture } = await setup();
+      await userEvent.click(menu('Fritz Fehlend')!);
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Vertretung eintragen' }));
+      const picker = screen.getByRole('dialog', { name: 'Vertretung eintragen' });
+      expect(within(picker).getByText('für Fritz Fehlend')).toBeInTheDocument();
+      http
+        .expectOne('/api/delegations/meetings/m-1/recipients?delegatorId=pr-5')
+        .flush([{ principalId: 'pr-9', displayName: 'Sven Stellvertreter', viaPool: true, isMember: false }]);
+      http.expectOne('/api/delegations/meetings/m-1/context').flush({ ...DELEGATION_CONTEXT, allowVoteDelegation: true });
+      fixture.detectChanges();
+      await userEvent.click(within(picker).getByRole('radio', { name: /Sven Stellvertreter/ }));
+      await userEvent.click(within(picker).getByRole('button', { name: 'Vertretung eintragen' }));
+      const made = delegation({ id: 'd-2', delegatorId: 'pr-5', delegatorName: 'Fritz Fehlend', delegateVoting: false });
+      const post = http.expectOne((r) => r.method === 'POST' && r.url === '/api/delegations');
+      expect(post.request.body).toMatchObject({ delegatorId: 'pr-5', delegateId: 'pr-9' });
+      post.flush(made);
+      http.expectOne((r) => r.method === 'GET' && r.url.endsWith('/delegations')).flush([made]);
+      fixture.detectChanges();
+      expect(screen.queryByRole('dialog', { name: 'Vertretung eintragen' })).toBeNull();
+      expect(within(sheet()).getByText('vertreten durch Sven Stellvertreter · durch Sitzungsleitung')).toBeInTheDocument();
+      expect(menu('Fritz Fehlend')).toBeNull();
+    });
+
+    it('closes the picker on cancel and when the sheet closes', async () => {
+      const { http, fixture } = await setup();
+      const open = async () => {
+        await userEvent.click(menu('Alina Admin')!);
+        await userEvent.click(await screen.findByRole('menuitem', { name: 'Vertretung eintragen' }));
+        http.match((r) => r.url.includes('/delegations/meetings/')).forEach((r) => r.flush([]));
+      };
+      await open();
+      const picker = screen.getByRole('dialog', { name: 'Vertretung eintragen' });
+      await userEvent.click(within(picker).getAllByRole('button', { name: 'Abbrechen' })[0]);
+      expect(screen.queryByRole('dialog', { name: 'Vertretung eintragen' })).toBeNull();
+      await open();
+      fixture.componentInstance.open.set(false);
+      fixture.detectChanges();
+      expect(screen.queryByRole('dialog', { name: 'Vertretung eintragen' })).toBeNull();
+    });
   });
 });

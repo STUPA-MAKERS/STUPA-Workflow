@@ -158,3 +158,11 @@
     </div>
   }
 </app-side-sheet>
+
+<!-- O6: outside the side sheet, so that Escape in the picker does not close the sheet. -->
+<app-lead-substitute-dialog
+  [meetingId]="m.id"
+  [member]="substituteFor()"
+  (closed)="substituteFor.set(null)"
+  (created)="onSubstituted()"
+/>

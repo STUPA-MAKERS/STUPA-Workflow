@@ -12,6 +12,11 @@ Every path that reads the pool uses the helpers of this module: the delegation
 create (`via_pool`), the recipient list, the meeting context, the roster guard,
 the meeting visibility and `/auth/me` (`inSubstitutePool`). Do not query the
 pool tables directly in another place.
+
+The faculty groups are not in use (user decision 2026-10-05). The lead entry
+during a live meeting (O6) and its recipient list read only
+`delegation_substitute` (`substitutes_for(..., include_groups=False)`). A later
+cleanup removes the faculty-group tables.
 """
 
 from __future__ import annotations
@@ -65,22 +70,13 @@ def _group_substitutes_stmt(
     )
 
 
-async def group_substitutes_for(
-    session: AsyncSession, gremium_id: UUID, member_id: UUID, now: datetime | None = None
-) -> set[UUID]:
-    """Return the substitutes of the faculty group of `member_id` only.
-
-    The meeting lead uses this set during a live meeting (O6): only a substitute
-    of the group of the missing member may step in. The set is empty while the
-    member has no active membership in the gremium.
-    """
-    now = now or datetime.now(UTC)
-    stmt = _group_substitutes_stmt(gremium_id, member_id, now)
-    return set((await session.execute(stmt)).scalars().all())
-
-
 async def substitutes_for(
-    session: AsyncSession, gremium_id: UUID, member_id: UUID, now: datetime | None = None
+    session: AsyncSession,
+    gremium_id: UUID,
+    member_id: UUID,
+    now: datetime | None = None,
+    *,
+    include_groups: bool = True,
 ) -> set[UUID]:
     """Return every pool substitute that may represent `member_id` in the gremium.
 
@@ -88,8 +84,12 @@ async def substitutes_for(
     `delegation_substitute` and of the substitutes of the faculty group of the
     member. The faculty group counts only while the member has an active
     membership in the gremium.
+
+    With `include_groups=False` the set has only the personal and the
+    gremium-wide entries, and the statement does not read the faculty-group
+    tables. The lead entry during a live meeting (O6) uses this form: the
+    faculty groups are not in use.
     """
-    now = now or datetime.now(UTC)
     personal = select(DelegationSubstitute.substitute_principal_id).where(
         DelegationSubstitute.gremium_id == gremium_id,
         or_(
@@ -97,6 +97,9 @@ async def substitutes_for(
             DelegationSubstitute.member_principal_id == member_id,
         ),
     )
+    if not include_groups:
+        return set((await session.execute(personal)).scalars().all())
+    now = now or datetime.now(UTC)
     stmt = union(personal, _group_substitutes_stmt(gremium_id, member_id, now))
     return set((await session.execute(stmt)).scalars().all())
 

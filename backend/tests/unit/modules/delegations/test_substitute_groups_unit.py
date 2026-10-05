@@ -19,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.deps import Principal, get_current_principal
 from app.main import create_app
+from app.modules.delegations import service as service_mod
 from app.modules.delegations.models import SubstituteGroup, SubstituteGroupMember
 from app.modules.delegations.router import get_delegation_service
 from app.modules.delegations.schemas import (
@@ -417,7 +418,7 @@ async def test_lead_entry_for_missing_member() -> None:
         result(a),
         result(b),
         result(["vote.cast"]),  # A may vote
-        result(b.id),  # B is a substitute of the group of A
+        result(b.id),  # B is in the pool for A
         result(),  # advisory lock
         result(),  # existing delegations
         result(),  # audit lock
@@ -550,11 +551,11 @@ async def test_lead_entry_refuses_a_present_member() -> None:
         await _svc(db).create(_lead_payload(a, b), _actor())
 
 
-async def test_lead_entry_needs_a_group_substitute() -> None:
+async def test_lead_entry_needs_a_pool_substitute() -> None:
     a, b = _person("a"), _person("b")
     db = _lead_db(result(a), result(b), result(["vote.cast"]), result(uuid4()))
     db.scalar_results = ["excused"]
-    with pytest.raises(ForbiddenError, match="faculty group"):
+    with pytest.raises(ForbiddenError, match="pool substitute"):
         await _svc(db).create(_lead_payload(a, b), _actor())
 
 
@@ -570,6 +571,73 @@ async def test_lead_entry_refuses_a_second_delegation_409() -> None:
     )
     with pytest.raises(ConflictError, match="already delegated"):
         await _svc(db).create(_lead_payload(a, b), _actor())
+
+
+async def test_lead_entry_reads_the_pool_without_the_groups(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """O6: the lead entry asks the pool helper without the faculty groups."""
+    a, b = _person("a"), _person("b")
+    seen: list[dict[str, Any]] = []
+
+    async def spy(
+        _session: Any, gremium_id: UUID, member_id: UUID, *_a: Any, **kw: Any
+    ) -> set[UUID]:
+        seen.append({"gremium": gremium_id, "member": member_id, **kw})
+        return set()
+
+    monkeypatch.setattr(service_mod, "substitutes_for", spy)
+    db = _lead_db(result(a), result(b), result(["vote.cast"]))
+    with pytest.raises(ForbiddenError, match="pool substitute"):
+        await _svc(db).create(_lead_payload(a, b), _actor())
+    assert seen == [{"gremium": GREMIUM_ID, "member": a.id, "include_groups": False}]
+
+
+def _lead_view_db(*tail: Any) -> FakeSession:
+    """Queue the reads of the lead recipient list: view guard, then the lead check."""
+    db = fake_session(_lead_roles(), _lead_roles(), *tail)
+    db.get_results = [_meeting(), _gremium()]
+    return db
+
+
+async def test_lead_recipients_list_the_pool_of_the_member() -> None:
+    """O6: the lead gets the pool substitutes of A, without A and without the lead."""
+    lead, a = _person("lead"), _person("a")
+    bert, carla = uuid4(), uuid4()
+    db = _lead_view_db(
+        result(lead),  # the lead
+        result(bert, carla, lead.id, a.id),  # pool for A
+        result(carla),  # members
+        result((bert, "Bert", None), (carla, None, "carla@x.de")),  # names
+    )
+    out = await _svc(db).recipients(MEETING_ID, "", _actor(), a.id)
+    assert [(r.principal_id, r.via_pool, r.is_member) for r in out] == [
+        (bert, True, False),
+        (carla, True, True),
+    ]
+    assert out[0].substitute_group_name is None
+
+
+async def test_lead_recipients_filter_by_the_needle() -> None:
+    a = _person("a")
+    bert, carla = uuid4(), uuid4()
+    db = _lead_view_db(
+        result(),  # no principal row for the lead
+        result(bert, carla),
+        result(),
+        result((bert, "Bert", None), (carla, "Carla", None)),
+    )
+    out = await _svc(db).recipients(MEETING_ID, " car ", _actor(), a.id)
+    assert [r.principal_id for r in out] == [carla]
+
+
+async def test_lead_recipients_need_the_lead() -> None:
+    """A member sees the roster but cannot list the pool of another member (403)."""
+    member = result((GREMIUM_ID, SimpleNamespace(permissions=[])))
+    db = fake_session(member, result())
+    db.get_results = [_meeting(), _gremium()]
+    with pytest.raises(ForbiddenError, match="meeting lead"):
+        await _svc(db).recipients(MEETING_ID, "", _actor("m"), uuid4())
 
 
 # ---------------------------------------------------------------- list and revoke

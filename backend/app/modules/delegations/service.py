@@ -57,7 +57,6 @@ from app.modules.delegations.models import (
 )
 from app.modules.delegations.pool import (
     group_names_for,
-    group_substitutes_for,
     substitute_gremien_for_sub,
     substitutes_for,
 )
@@ -511,7 +510,9 @@ class DelegationService:
         """Enter a substitution for a missing member during a live meeting (O6).
 
         The meeting lead (`can_manage`) names the missing member A (`delegatorId`)
-        and a substitute B of the faculty group of A. The checks are the same as
+        and a substitute B from the pool of the gremium for A: a personal entry
+        for A or a gremium-wide entry. The faculty groups do not count. The
+        checks are the same as
         before the meeting: the gremium allows delegations, A may vote, the vote
         transfer switch, and no chains. A is missing when A has no attendance
         record, or the record is `excused` or `absent`. The lead cannot name
@@ -520,8 +521,8 @@ class DelegationService:
 
         Raises:
             ForbiddenError: The caller is not the meeting lead, the gremium does not
-                allow delegations, B is the lead, A may not vote, or B is no
-                substitute of the faculty group of A (403).
+                allow delegations, B is the lead, A may not vote, or B is not in
+                the pool for A (403).
             NotFoundError: The meeting, A or B does not exist (404).
             ConflictError: A already has a delegation, or B already carries a
                 delegated vote (409).
@@ -579,12 +580,10 @@ class DelegationService:
                 "The member is present and needs no substitution.",
                 errors=[{"field": "delegatorId", "msg": "member is not missing"}],
             )
-        if delegate.id not in await group_substitutes_for(
-            self.session, gremium.id, delegator.id, now
+        if delegate.id not in await substitutes_for(
+            self.session, gremium.id, delegator.id, now, include_groups=False
         ):
-            raise ForbiddenError(
-                "Recipient must be a substitute of the member's faculty group."
-            )
+            raise ForbiddenError("Recipient must be a pool substitute of the member.")
         row = await self._insert(
             meeting,
             gremium,
@@ -856,23 +855,34 @@ class DelegationService:
             recipients=recipients,
         )
 
-    async def recipients(self, meeting_id: UUID, q: str, actor: Principal) -> list[RecipientOut]:
+    async def recipients(
+        self,
+        meeting_id: UUID,
+        q: str,
+        actor: Principal,
+        delegator_id: UUID | None = None,
+    ) -> list[RecipientOut]:
         """List the eligible recipients for the typeahead.
 
         With `delegation_allow_external` the search also covers the whole platform
         by name and email. The returned names are PII. Only an authorized caller
-        may read them.
+        may read them. With `delegator_id` the meeting lead gets the pool
+        substitutes of that member for the lead entry (O6), see
+        `_lead_recipients`.
 
         Raises:
             NotFoundError: The meeting does not exist (404).
             ForbiddenError: The actor is not a member, a pool substitute or a
-                manager of the meeting gremium (403).
+                manager of the meeting gremium, or the actor sends
+                `delegator_id` and is not the meeting lead (403).
         """
         now = datetime.now(UTC)
         meeting = await self._meeting(meeting_id)
         gremium = await self._gremium(meeting.gremium_id)
         # Check the view rights before the code resolves the recipient names.
         await self._assert_can_view_gremium(gremium.id, actor)
+        if delegator_id is not None:
+            return await self._lead_recipients(gremium.id, delegator_id, q, actor, now)
         me = await self._principal_row(sub=actor.sub)
         if me is None:
             return []
@@ -923,6 +933,43 @@ class DelegationService:
             )
         out.sort(key=lambda r: (not r.via_pool, not r.is_member, (r.display_name or "").lower()))
         return out[:20]
+
+    async def _lead_recipients(
+        self, gremium_id: UUID, delegator_id: UUID, q: str, actor: Principal, now: datetime
+    ) -> list[RecipientOut]:
+        """List the pool substitutes of a member for the lead entry (O6).
+
+        The list has the personal entries for the member and the gremium-wide
+        entries, the same set that `_create_by_lead` accepts. It does not read the
+        faculty groups. The lead and the member are not in the list: the lead
+        cannot name themselves, and a member cannot represent themselves.
+
+        Raises:
+            ForbiddenError: The actor is not the meeting lead (403).
+        """
+        if not await self._can_manage(gremium_id, actor):
+            raise ForbiddenError("Only the meeting lead may list the substitutes of a member.")
+        me = await self._principal_row(sub=actor.sub)
+        excluded = {delegator_id} | ({me.id} if me is not None else set())
+        pool_ids = await substitutes_for(
+            self.session, gremium_id, delegator_id, now, include_groups=False
+        )
+        ids = pool_ids - excluded
+        member_ids = await self._member_ids(gremium_id, now)
+        names = await self._names(ids)
+        needle = q.strip().lower()
+        out = [
+            RecipientOut(
+                principal_id=pid,
+                display_name=names.get(pid),
+                via_pool=True,
+                is_member=pid in member_ids,
+            )
+            for pid in ids
+            if not needle or needle in (names.get(pid) or "").lower()
+        ]
+        out.sort(key=lambda r: (r.display_name or "").lower())
+        return out
 
     async def vote_status(self, vote_id: UUID, actor: Principal) -> VoteDelegationStatus:
         """Return the delegation view of one vote for the frontend banner."""
