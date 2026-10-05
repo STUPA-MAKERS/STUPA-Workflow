@@ -484,7 +484,8 @@ class DelegationCreate(WireModel):
         default=None,
         description=(
             "Meeting lead only, while the meeting is live (O6): the missing member to "
-            "substitute. The delegate must be a substitute of the member's faculty group. "
+            "substitute. The delegate must be in the substitute pool for that member "
+            "(a personal entry for the member or a gremium-wide entry). "
             "Leave unset to delegate for yourself while the meeting is planned."
         ),
     )

@@ -39,7 +39,8 @@ class DelegationCreate(_CamelModel):
     Without `delegatorId` the caller delegates for themselves, only while the
     meeting is planned. With `delegatorId` the meeting lead (`can_manage`)
     enters a substitution for a missing member during a live meeting (O6). The
-    delegate must then be a substitute of the faculty group of that member.
+    delegate must then be in the pool for that member: a personal entry for the
+    member or a gremium-wide entry.
     """
 
     meeting_id: UUID = Field(alias="meetingId")

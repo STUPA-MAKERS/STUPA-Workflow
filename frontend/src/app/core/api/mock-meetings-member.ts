@@ -112,6 +112,18 @@ const SUBSTITUTES: DelegationRecipient[] = [
   { principalId: 'p-7', displayName: 'Sven Stellvertreter', viaPool: true, isMember: false },
   { principalId: 'p-10', displayName: 'Emma Vogel', viaPool: true, isMember: false },
 ];
+/** O6: the personal pool entries of the missing members of the live meeting. */
+const PERSONAL: Record<string, DelegationRecipient[]> = {
+  'p-8': [{ principalId: 'p-11', displayName: 'Paula Persönlich', viaPool: true, isMember: false }],
+  'p-9': [{ principalId: 'p-12', displayName: 'Karl Kern', viaPool: true, isMember: false }],
+};
+
+/** O6: the pool of one member for the lead entry: the personal and the gremium-wide entries. */
+function poolOf(delegatorId: string): DelegationRecipient[] {
+  return [...(PERSONAL[delegatorId] ?? []), ...SUBSTITUTES].sort((a, b) =>
+    (a.displayName ?? '').localeCompare(b.displayName ?? ''),
+  );
+}
 
 /** The delegation context of a meeting for the demo user. */
 function context(
@@ -166,9 +178,11 @@ export function memberMeetingGet(
   query: string,
   live: MeetingOutWire,
   delegations: readonly Delegation[],
+  delegatorId: string | null = null,
 ): unknown {
   const ctx = /\/delegations\/meetings\/([^/]+)\/(context|recipients)$/.exec(path);
   if (ctx) {
+    if (ctx[2] === 'recipients' && delegatorId) return poolOf(delegatorId);
     const c = context(ctx[1], live, delegations);
     if (ctx[2] === 'context') return c;
     const needle = query.trim().toLowerCase();
@@ -178,17 +192,45 @@ export function memberMeetingGet(
   return path.endsWith(MEMBER_PLANNED_ID) ? plannedMeeting() : liveMeeting(live);
 }
 
-/** POST /delegations: the demo user hands a meeting over (participant view). */
+/**
+ * POST /delegations: the demo user hands a meeting over (participant view), or the lead
+ * enters a substitute from the pool for a missing member (O6, `delegatorId`).
+ */
 export function memberDelegationCreate(
   body: unknown,
   seq: number,
   roster: readonly { principalId: string; displayName: string | null }[],
 ): Delegation {
-  const { meetingId = '', delegateId = '', delegateVoting = false } = (body ?? {}) as Partial<{
+  const {
+    meetingId = '',
+    delegateId = '',
+    delegateVoting = false,
+    delegatorId,
+  } = (body ?? {}) as Partial<{
     meetingId: string;
     delegateId: string;
     delegateVoting: boolean;
+    delegatorId: string;
   }>;
+  if (delegatorId) {
+    return {
+      id: `f0000000-0000-0000-0000-0000000003${String(seq).padStart(2, '0')}`,
+      meetingId,
+      meetingTitle: null,
+      meetingDate: null,
+      gremiumId: 'g0000000-0000-0000-0000-000000000001',
+      gremiumName: null,
+      delegatorId,
+      delegatorName: roster.find((a) => a.principalId === delegatorId)?.displayName ?? null,
+      delegateId,
+      delegateName: poolOf(delegatorId).find((r) => r.principalId === delegateId)?.displayName ?? null,
+      delegateVoting,
+      viaPool: true,
+      createdAt: new Date().toISOString(),
+      revocable: true,
+      direction: null,
+    };
+  }
   const substitute = SUBSTITUTES.find((r) => r.principalId === delegateId);
   return {
     id: `f0000000-0000-0000-0000-0000000002${String(seq).padStart(2, '0')}`,

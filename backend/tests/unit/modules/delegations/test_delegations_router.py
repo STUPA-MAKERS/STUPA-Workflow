@@ -90,7 +90,8 @@ class _FakeService:
             ],
         )
 
-    async def recipients(self, meeting_id, q, actor):  # noqa: ANN001
+    async def recipients(self, meeting_id, q, actor, delegator_id=None):  # noqa: ANN001
+        self.recipients_delegator = delegator_id
         return []
 
     async def vote_status(self, vote_id, actor):  # noqa: ANN001
@@ -240,6 +241,21 @@ def test_vote_status_camelcase() -> None:
 def test_recipients_requires_session_401() -> None:
     r = _client(None).get(f"/api/delegations/meetings/{uuid4()}/recipients?q=x")
     assert r.status_code == 401
+
+
+def test_recipients_passes_the_delegator_id() -> None:
+    """O6: the lead asks for the pool substitutes of one member."""
+    service = _FakeService()
+    a = uuid4()
+    client = _client(_MEMBER, service)
+    plain = client.get(f"/api/delegations/meetings/{uuid4()}/recipients")
+    assert plain.status_code == 200
+    assert service.recipients_delegator is None
+    lead = client.get(f"/api/delegations/meetings/{uuid4()}/recipients?delegatorId={a}")
+    assert lead.status_code == 200
+    assert service.recipients_delegator == a
+    bad = client.get(f"/api/delegations/meetings/{uuid4()}/recipients?delegatorId=x")
+    assert bad.status_code == 422
 
 
 def test_substitutes_list_camelcase() -> None:

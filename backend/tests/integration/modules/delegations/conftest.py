@@ -25,7 +25,11 @@ from app.main import create_app
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
-from app.modules.delegations.models import SubstituteGroup, SubstituteGroupMember
+from app.modules.delegations.models import (
+    DelegationSubstitute,
+    SubstituteGroup,
+    SubstituteGroupMember,
+)
 from app.modules.livevote.broker import InMemoryBroker
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.publisher import NullPublisher, get_meeting_publisher
@@ -189,6 +193,25 @@ async def faculty_group(
             )
         await session.commit()
         return group.id
+
+
+async def pool_entry(
+    maker: async_sessionmaker[AsyncSession],
+    gremium_id: uuid.UUID,
+    substitute: uuid.UUID,
+    *,
+    for_member: uuid.UUID | None = None,
+) -> None:
+    """Write a pool entry: personal for `for_member`, or gremium-wide for `None`."""
+    async with maker() as session:
+        session.add(
+            DelegationSubstitute(
+                gremium_id=gremium_id,
+                member_principal_id=for_member,
+                substitute_principal_id=substitute,
+            )
+        )
+        await session.commit()
 
 
 async def meeting(

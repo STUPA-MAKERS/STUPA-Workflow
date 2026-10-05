@@ -139,16 +139,21 @@ async def meeting_context(
 @router.get(
     "/meetings/{meeting_id}/recipients",
     response_model=list[RecipientOut],
-    responses=_errors(401, 404),
+    responses=_errors(401, 403, 404),
 )
 async def recipients(
     meeting_id: UUID,
     service: ServiceDep,
     principal: Member,
     q: Annotated[str, Query(max_length=100)] = "",
+    delegator_id: Annotated[UUID | None, Query(alias="delegatorId")] = None,
 ) -> list[RecipientOut]:
-    """List the recipients for the typeahead: members, pool and maybe external users."""
-    return await service.recipients(meeting_id, q, principal)
+    """List the recipients for the typeahead: members, pool and maybe external users.
+
+    With `delegatorId` the meeting lead gets the pool substitutes of that member
+    for the lead entry during a live meeting (O6).
+    """
+    return await service.recipients(meeting_id, q, principal, delegator_id)
 
 
 @router.get(

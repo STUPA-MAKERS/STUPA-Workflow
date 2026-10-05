@@ -3,8 +3,10 @@
 * Only the lead (`session.manage` in the gremium) may send `delegatorId`, and
   only while the meeting is live.
 * The member is missing: no attendance record, `excused` or `absent`.
-* The delegate is a substitute of the faculty group of the member. A personal
-  pool entry is not enough.
+* The delegate is in the substitute pool for the member: a personal entry for
+  the member or a gremium-wide entry. A substitute of a faculty group does not
+  count (the faculty groups are not in use), and a person outside the pool
+  neither.
 * The existing checks still apply: the vote right of the member and no second
   delegation.
 * The row stores the lead as `created_by` and `via_pool = true`.
@@ -27,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.modules.audit.models import AuditEntry
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
-from app.modules.delegations.models import DelegationSubstitute, MeetingDelegation
+from app.modules.delegations.models import MeetingDelegation
 from app.modules.delegations.schemas import DelegationCreate
 from app.modules.delegations.service import DelegationService
 from app.modules.livevote.models import Meeting, MeetingAttendance
@@ -42,6 +44,7 @@ from tests.integration.modules.delegations.conftest import (
     meeting,
     member,
     person,
+    pool_entry,
 )
 
 pytestmark = pytest.mark.integration
@@ -52,7 +55,7 @@ CONFIG = VoteConfig.model_validate(
 
 
 class _Setup:
-    """Ids of one live meeting with a lead, a member A and a group substitute B."""
+    """Ids of one live meeting with a lead, a member A and a pool substitute B of A."""
 
     def __init__(self) -> None:
         self.gremium_id = uuid.uuid4()
@@ -70,7 +73,7 @@ async def _setup(maker: async_sessionmaker[AsyncSession], *, status: str = "live
     s.lead, _ = await member(maker, s.gremium_id, "Lead", ("session.manage", "vote.cast"))
     s.a_sub, s.a = await member(maker, s.gremium_id, "Anna")
     s.b_sub, s.b = await person(maker, "Bert")
-    await faculty_group(maker, s.gremium_id, members=(s.a,), substitutes=(s.b,))
+    await pool_entry(maker, s.gremium_id, s.b, for_member=s.a)
     s.meeting_id = await meeting(maker, s.gremium_id, status=status)
     return s
 
@@ -207,18 +210,11 @@ async def test_the_checks_of_the_lead_entry(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
     s = await _setup(maker)
-    _, personal = await person(maker, "Pool")
+    _, outsider = await person(maker, "Outsider")
     _, voteless = await member(maker, s.gremium_id, "Guest", ())
-    async with maker() as session:
-        session.add(
-            DelegationSubstitute(
-                gremium_id=s.gremium_id, member_principal_id=s.a, substitute_principal_id=personal
-            )
-        )
-        await session.commit()
     act(api, s.lead)
     with TestClient(api) as client:
-        not_in_group = client.post("/api/delegations", json=_body(s, delegate=personal))
+        not_in_pool = client.post("/api/delegations", json=_body(s, delegate=outsider))
         same = client.post("/api/delegations", json=_body(s, delegate=s.a))
         unknown = client.post("/api/delegations", json=_body(s, delegate=uuid.uuid4()))
         no_vote = client.post(
@@ -227,12 +223,83 @@ async def test_the_checks_of_the_lead_entry(
         )
         first = client.post("/api/delegations", json=_body(s))
         second = client.post("/api/delegations", json=_body(s, voting=False))
-    assert not_in_group.status_code == 403, not_in_group.text
+    assert not_in_pool.status_code == 403, not_in_pool.text
     assert same.status_code == 422, same.text
     assert unknown.status_code == 404, unknown.text
     assert no_vote.status_code == 403, no_vote.text
     assert first.status_code == 201, first.text
     assert second.status_code == 409, second.text
+
+
+async def test_gremium_wide_substitute_may_step_in(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """A gremium-wide pool entry applies to every member, also to A."""
+    s = await _setup(maker)
+    _, wide = await person(maker, "Wide")
+    await pool_entry(maker, s.gremium_id, wide)
+    act(api, s.lead)
+    with TestClient(api) as client:
+        created = client.post("/api/delegations", json=_body(s, delegate=wide, voting=False))
+    assert created.status_code == 201, created.text
+    assert (created.json()["delegateId"], created.json()["viaPool"]) == (str(wide), True)
+
+
+async def test_personal_entry_of_another_member_does_not_count(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """A personal entry for member C does not make the person a substitute of A."""
+    s = await _setup(maker)
+    _, c = await member(maker, s.gremium_id, "Carla")
+    _, for_c = await person(maker, "ForCarla")
+    await pool_entry(maker, s.gremium_id, for_c, for_member=c)
+    act(api, s.lead)
+    with TestClient(api) as client:
+        refused = client.post("/api/delegations", json=_body(s, delegate=for_c))
+    assert refused.status_code == 403, refused.text
+
+
+async def test_faculty_group_substitute_does_not_count(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """The faculty groups are not in use: a group substitute of A is refused (403)."""
+    s = await _setup(maker)
+    _, group_sub = await person(maker, "Group")
+    await faculty_group(maker, s.gremium_id, members=(s.a,), substitutes=(group_sub,))
+    act(api, s.lead)
+    with TestClient(api) as client:
+        refused = client.post("/api/delegations", json=_body(s, delegate=group_sub))
+    assert refused.status_code == 403, refused.text
+
+
+async def test_lead_lists_the_pool_substitutes_of_a_member(
+    maker: async_sessionmaker[AsyncSession], api: FastAPI
+) -> None:
+    """The recipient list with `delegatorId` has the pool for A, not the groups."""
+    s = await _setup(maker)
+    lead_id = await _principal_id(maker, s.lead)
+    _, wide = await person(maker, "Wide")
+    _, group_sub = await person(maker, "Group")
+    _, c = await member(maker, s.gremium_id, "Carla")
+    _, for_c = await person(maker, "ForCarla")
+    await pool_entry(maker, s.gremium_id, wide)
+    await pool_entry(maker, s.gremium_id, lead_id)
+    await pool_entry(maker, s.gremium_id, for_c, for_member=c)
+    await faculty_group(maker, s.gremium_id, members=(s.a,), substitutes=(group_sub,))
+    url = f"/api/delegations/meetings/{s.meeting_id}/recipients"
+    with TestClient(api) as client:
+        act(api, s.lead)
+        listed = client.get(url, params={"delegatorId": str(s.a)})
+        searched = client.get(url, params={"delegatorId": str(s.a), "q": "wid"})
+        act(api, s.a_sub)
+        by_member = client.get(url, params={"delegatorId": str(s.a)})
+    assert listed.status_code == 200, listed.text
+    assert [(r["principalId"], r["viaPool"]) for r in listed.json()] == [
+        (str(s.b), True),
+        (str(wide), True),
+    ]
+    assert [r["principalId"] for r in searched.json()] == [str(wide)]
+    assert by_member.status_code == 403, by_member.text
 
 
 async def test_a_present_member_needs_no_substitution(
@@ -271,9 +338,9 @@ async def test_lead_cannot_name_themselves(
 ) -> None:
     s = await _setup(maker)
     lead_id = await _principal_id(maker, s.lead)
-    # The lead is also a substitute of the group of A. Still the lead cannot take
-    # the vote of A without the consent of A.
-    await faculty_group(maker, s.gremium_id, substitutes=(lead_id,), name="Technik")
+    # The lead is also a gremium-wide substitute. Still the lead cannot take the
+    # vote of A without the consent of A.
+    await pool_entry(maker, s.gremium_id, lead_id)
     act(api, s.lead)
     with TestClient(api) as client:
         refused = client.post("/api/delegations", json=_body(s, delegate=lead_id))

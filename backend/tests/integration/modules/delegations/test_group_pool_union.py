@@ -26,7 +26,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.modules.admin.models import Gremium
 from app.modules.delegations.models import DelegationSubstitute
 from app.modules.delegations.pool import (
-    group_substitutes_for,
     substitute_gremien,
     substitutes_for,
 )
@@ -145,7 +144,11 @@ async def test_union_with_personal_and_gremium_wide_entries(
         assert await substitutes_for(session, gid, mia) == {group_sub, personal, wide}
         # Ben is in no group: only the gremium-wide entry.
         assert await substitutes_for(session, gid, ben) == {wide}
-        assert await group_substitutes_for(session, gid, mia) == {group_sub}
+        # Without the groups (O6 lead entry): the personal and gremium-wide entries.
+        assert await substitutes_for(session, gid, mia, include_groups=False) == {
+            personal,
+            wide,
+        }
         assert await substitute_gremien(session, group_sub) == {gid}
         assert await substitute_gremien(session, foreign) == {other}
         assert await substitute_gremien(session, wide) == {gid}
@@ -165,7 +168,6 @@ async def test_inactive_member_does_not_count(
     async with maker() as session:
         now = datetime.now(UTC)
         assert await substitutes_for(session, gid, gone, now) == set()
-        assert await group_substitutes_for(session, gid, gone, now) == set()
         assert await substitutes_for(session, gid, never, now) == set()
     act(api, "office", permissions={"admin.delegations"})
     with TestClient(api) as client:
