@@ -59,8 +59,15 @@ let nextKey = 0;
  * - The submit sends `attachmentIds()` and the token. A 422 that names missing ids
  *   (`markFailed`) marks those files; the applicant uploads them again. A token that
  *   the server no longer knows ends the whole draft.
+ * - `scopeToFields` keeps the files of the file fields of the current form. A type
+ *   switch deletes the files of the fields that the new form does not have (best
+ *   effort), so they are not bound and do not count for the limits. The general files
+ *   (`fieldKey` null) stay.
  * - `discard` deletes every draft on the server (best effort) and forgets the token;
  *   `clear` only forgets it, after the submit bound the files.
+ * - The scan state of a file is the state of the upload response. The service does not
+ *   read it again; a file that the scan finds infected shows as lost at the submit
+ *   (422).
  */
 @Injectable()
 export class DraftAttachmentsService {
@@ -71,6 +78,8 @@ export class DraftAttachmentsService {
 
   private readonly _token = signal<string | null>(null);
   private expiresAt: string | null = null;
+  /** The file fields of the current form; `null` until the wizard sets them. */
+  private fieldScope: ReadonlySet<string> | null = null;
 
   /** The uploaded files, oldest first. */
   readonly files = signal<DraftFile[]>([]);
@@ -133,6 +142,11 @@ export class DraftAttachmentsService {
       this.pending.update((list) => [...list, pending]);
       try {
         const draft = await this.send(file, fieldKey, opts.isComparisonOffer === true);
+        if (!this.inScope(draft)) {
+          // The type changed during the upload: the new form has no such field.
+          void this.deleteQuietly([draft.id]);
+          continue;
+        }
         uploaded.push(draft);
         this.files.update((list) => [...list, draft]);
         this.store();
@@ -196,12 +210,37 @@ export class DraftAttachmentsService {
     return ids;
   }
 
+  /**
+   * Keep only the files of these file fields and the general files. The others leave
+   * the list at once and the server deletes them (best effort). Resolves when the
+   * deletes are done.
+   */
+  async scopeToFields(fieldKeys: ReadonlySet<string>): Promise<void> {
+    this.fieldScope = new Set(fieldKeys);
+    const out = this.files().filter((f) => !this.inScope(f));
+    if (!out.length) return;
+    const gone = new Set(out.map((f) => f.id));
+    this.files.update((list) => list.filter((f) => !gone.has(f.id)));
+    this.store();
+    await this.deleteQuietly(out.filter((f) => !f.failed).map((f) => f.id));
+  }
+
   /** Delete every draft on the server (best effort) and forget the draft. */
   async discard(): Promise<void> {
     const token = this._token();
     const ids = this.attachmentIds();
     this.forget();
-    if (!token) return;
+    await this.deleteQuietly(ids, token);
+  }
+
+  /** True for a general file and for a file of a field of the current form. */
+  private inScope(file: DraftFile): boolean {
+    return !file.fieldKey || this.fieldScope === null || this.fieldScope.has(file.fieldKey);
+  }
+
+  /** Delete drafts on the server; a failed delete is ignored (the draft expires). */
+  private async deleteQuietly(ids: Uuid[], token = this._token()): Promise<void> {
+    if (!token || !ids.length) return;
     await Promise.all(
       ids.map((id) =>
         firstValueFrom(this.api.deleteDraftAttachment(id, token)).catch(() => undefined),

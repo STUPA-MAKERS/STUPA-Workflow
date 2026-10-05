@@ -215,7 +215,17 @@ describe('mockApiInterceptor', () => {
 
     it('GET …/timeline → events', async () => {
       const events = await get<unknown[]>('/api/applications/x/timeline');
-      expect(events.length).toBe(2);
+      expect(events.length).toBe(3);
+    });
+
+    it('GET /site-config → the platform defaults; the admin config is not this route', async () => {
+      const cfg = await get<{ linkTtlDays: number | null; confirmTtlHours: number }>('/api/site-config');
+      expect(cfg).toMatchObject({ linkTtlDays: null, confirmTtlHours: 12 });
+    });
+
+    it('GET the attachments of the magic-link demo application', async () => {
+      const list = await get<unknown[]>('/api/applications/33333333-3333-3333-3333-333333333333/attachments');
+      expect(list).toHaveLength(2);
     });
 
     it('GET …/versions → version history', async () => {

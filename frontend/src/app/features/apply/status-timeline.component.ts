@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { catchError, forkJoin, of } from 'rxjs';
@@ -60,8 +70,14 @@ const APPLICANT = 'applicant';
  *   applicant's own entries read "Du".
  *
  * "Angaben bearbeiten" turns the page into the edit form with a bar "Speichern legt
- * Version n+1 an". The magic link keeps working without an end when the platform gives
- * links no lifetime; the page then says so.
+ * Version n+1 an". The focus then goes to the title of the bar; "Abbrechen" and a
+ * save bring it back to the row. The magic link keeps working without an end when the
+ * platform gives links no lifetime; the page then says so (only after the public
+ * config loaded, and as the current setting: the verify response has no expiry of the
+ * link).
+ *
+ * The comment composer sends on Enter; Shift+Enter makes a line break, as in the
+ * chat of the internal detail page.
  */
 @Component({
   selector: 'app-status-timeline',
@@ -93,6 +109,11 @@ export class StatusTimelineComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
+  private readonly injector = inject(Injector);
+
+  private readonly editTitle = viewChild<ElementRef<HTMLElement>>('editTitle');
+  private readonly editRow = viewChild<ElementRef<HTMLButtonElement>>('editRow');
+  private readonly pageTitle = viewChild<ElementRef<HTMLElement>>('pageTitle');
 
   protected readonly phone = mediaQuerySignal(MEDIA.phone);
 
@@ -133,6 +154,13 @@ export class StatusTimelineComponent {
     () => this.editScope() && Boolean(this.application()?.state?.editAllowed),
   );
 
+  /** Why "Angaben bearbeiten" is off: the link (old view scope) or the status. */
+  readonly lockReason = computed<TranslationKey | null>(() => {
+    if (!this.editScope()) return 'status.edit.linkOnly';
+    if (!this.application()?.state?.editAllowed) return 'status.edit.locked';
+    return null;
+  });
+
   /**
    * The applicant can add attachments in locked states too, for example receipts and
    * invoices after the decision. Only the magic-link scope counts here. A delete is a
@@ -143,6 +171,8 @@ export class StatusTimelineComponent {
 
   /** Days a magic link works; `null`: no end. */
   protected readonly linkTtlDays = this.branding.linkTtlDays;
+  /** The config loaded, so `linkTtlDays` is the real setting. */
+  protected readonly linkTtlLoaded = this.branding.loaded;
 
   readonly ref = computed(() => shortRef(this.application()?.id));
   readonly title = computed(() =>
@@ -410,10 +440,26 @@ export class StatusTimelineComponent {
     this.editForm = new FormGroup({});
     this.editing.set(true);
     window.scrollTo({ top: 0 });
+    this.focusAfterRender(() => this.editTitle());
   }
 
   cancelEdit(): void {
+    this.leaveEdit();
+  }
+
+  /**
+   * Close the edit mode and give the focus back to the row "Angaben bearbeiten". When
+   * the status locked the application (409), the row goes off, so the focus goes to
+   * the title of the page.
+   */
+  private leaveEdit(locked = false): void {
     this.editing.set(false);
+    this.focusAfterRender(() => (locked ? this.pageTitle() : this.editRow()));
+  }
+
+  /** Focus an element once the view drew it (the edit mode swaps the whole article). */
+  private focusAfterRender(target: () => ElementRef<HTMLElement> | undefined): void {
+    afterNextRender(() => target()?.nativeElement.focus(), { injector: this.injector });
   }
 
   save(): void {
@@ -430,7 +476,7 @@ export class StatusTimelineComponent {
       next: (updated) => {
         this.application.set(updated);
         this.saving.set(false);
-        this.editing.set(false);
+        this.leaveEdit();
         this.toast.success(this.i18n.translate('status.toast.saved'));
         this.api.timeline(app.id, { quiet: true }).subscribe((t) => this.timeline.set(t));
         this.api.versions(app.id).subscribe({ next: (v) => this.versions.set(v), error: () => undefined });
@@ -439,7 +485,7 @@ export class StatusTimelineComponent {
         this.saving.set(false);
         if (err.status === 409) {
           this.toast.error(this.i18n.translate('status.toast.locked'));
-          this.editing.set(false);
+          this.leaveEdit(true);
           this.api.getApplication(app.id, { quiet: true }).subscribe((a) => this.application.set(a));
           return;
         }

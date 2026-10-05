@@ -152,6 +152,7 @@
 .sp--edit {
   gap: var(--space-4);
 }
+/* The bar has the same edges as the form below it; on a phone it spans the gutters. */
 .sp__editBar {
   position: sticky;
   top: 0;
@@ -159,9 +160,10 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-inline: calc(-1 * var(--space-4));
   padding: var(--space-2) var(--space-4);
-  border-bottom: var(--border-width) solid var(--color-border);
+  border: var(--border-width) solid var(--color-border);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   background: var(--color-surface-3);
 }
 .sp__editBar app-button {
@@ -178,6 +180,12 @@
 .sp__editHint {
   color: var(--color-text-muted);
   font-size: var(--fs-sm);
+}
+/* Targets of a programmatic focus only (tabindex -1, not in the tab order): no ring.
+   The text of the bar clips its overflow, so a ring would show as a stray line. */
+.sp__title:focus,
+.sp__editText strong:focus {
+  outline: none;
 }
 .sp__edit ::ng-deep :is(input, textarea, select, button, [role='alert']) {
   scroll-margin-top: 5rem;
@@ -325,6 +333,8 @@
   }
   .sp__editBar {
     margin-inline: calc(-1 * var(--space-4));
+    border-inline: 0;
+    border-radius: 0;
   }
   .sp__editHint {
     display: none;

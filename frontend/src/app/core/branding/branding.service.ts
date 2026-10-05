@@ -63,11 +63,17 @@ export class BrandingService {
   );
   private readonly _freetexts = signal<FreeTexts>({});
 
+  private readonly _loaded = signal(false);
+
   /**
    * Days a new magic link works; `null` means that it does not expire. The default of
-   * the backend is `null`, and the value stays so until the config is loaded.
+   * the backend is `null`, and the value stays so until the config is loaded. Read
+   * {@link loaded} before a text says "unbegrenzt".
    */
   readonly linkTtlDays = this._linkTtlDays.asReadonly();
+
+  /** True after the public config loaded. A failed load keeps it false. */
+  readonly loaded = this._loaded.asReadonly();
 
   /** The upload limits of the wizard (Z4). The backend defaults until the config loads. */
   readonly attachmentLimits = this._attachmentLimits.asReadonly();
@@ -124,6 +130,7 @@ export class BrandingService {
         }
         if (cfg.attachmentLimits) this._attachmentLimits.set(cfg.attachmentLimits);
         this._freetexts.set(cfg.branding?.freetexts ?? {});
+        this._loaded.set(true);
       },
       error: () => {
         /* Keep everything empty so the i18n default fallbacks stay. */

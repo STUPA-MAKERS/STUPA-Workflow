@@ -33,8 +33,10 @@
         <article class="sp sp--edit" aria-labelledby="sp-edit-title">
           <header class="sp__editBar">
             <p class="sp__editText">
-              <strong id="sp-edit-title">{{ 'status.edit.title' | t }}</strong>
-              <span class="sp__editHint">· {{ 'applications.edit.versionHint' | t: { version: app.version + 1 } }}</span>
+              <!-- The title takes the focus when the edit mode opens. -->
+              <strong id="sp-edit-title" tabindex="-1" #editTitle>{{ 'status.edit.title' | t }}</strong>
+              <!-- The separator sits in the hint, so it goes with it on a phone. -->
+              <span class="sp__editHint"> · {{ 'applications.edit.versionHint' | t: { version: app.version + 1 } }}</span>
             </p>
             <app-button variant="text" (click)="cancelEdit()">{{ 'applications.detail.cancel' | t }}</app-button>
             <app-button variant="fill" [loading]="saving()" (click)="save()">
@@ -59,7 +61,7 @@
                 (selected)="onMenu($event)"
               />
             </div>
-            <h1 class="sp__title" id="sp-title">{{ title() }}</h1>
+            <h1 class="sp__title" id="sp-title" tabindex="-1" #pageTitle>{{ title() }}</h1>
             <p class="sp__state">
               <app-status-text [kind]="stateKind()">{{ app.state?.label }}</app-status-text>
               @if (app.stateSince) {
@@ -88,17 +90,18 @@
               <ul class="rowgroup sp__rows">
                 <li>
                   <button
+                    #editRow
                     type="button"
                     class="sp__row"
                     [disabled]="!canEdit() || !effForm()"
-                    [attr.aria-describedby]="canEdit() ? null : 'sp-locked'"
+                    [attr.aria-describedby]="lockReason() ? 'sp-locked' : null"
                     (click)="startEdit()"
                   >
                     <app-icon class="sp__rowIcon" name="edit" [size]="20" />
                     <span class="sp__rowText">
                       <span class="sp__rowTitle">{{ 'status.edit.row' | t }}</span>
-                      @if (!canEdit()) {
-                        <span class="sp__rowSub" id="sp-locked">{{ 'status.edit.locked' | t }}</span>
+                      @if (lockReason(); as reason) {
+                        <span class="sp__rowSub" id="sp-locked">{{ reason | t }}</span>
                       }
                     </span>
                   </button>
@@ -126,7 +129,8 @@
                   </button>
                 </li>
               </ul>
-              @if (linkTtlDays() === null) {
+              <!-- Only after the config loaded: before, "unbegrenzt" can be wrong. -->
+              @if (linkTtlLoaded() && linkTtlDays() === null) {
                 <p class="sp__link">{{ 'status.linkUnlimited' | t }}</p>
               }
 
@@ -201,6 +205,7 @@
               rows="2"
               [formControl]="commentBody"
               [placeholder]="'status.comments.placeholder' | t"
+              (keydown.enter)="$event.preventDefault(); addComment()"
               [attr.aria-label]="'status.comments.label' | t"
             ></textarea>
             <app-button

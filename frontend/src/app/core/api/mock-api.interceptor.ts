@@ -23,6 +23,7 @@ import type {
   MeetingOutWire,
   MeetingPageWire,
   Page,
+  PublicSiteConfig,
   Principal,
   ProtocolOutWire,
   SearchHit,
@@ -304,11 +305,45 @@ const REVIEW_STATE: StateOutWire = {
   editAllowed: false,
 };
 
-function mockApplication(data: Record<string, unknown> = {}): ApplicationOutWire {
+/**
+ * The answers of the demo application of the applicant status page, in the keys of the
+ * demo form (`mock-applications.ts`), which the status page loads for the type.
+ */
+const MOCK_APP_DATA: Record<string, unknown> = {
+  title: 'Förderung Ersti-Wochenende 2026',
+  description: 'Zwei Tage Programm für die neuen Studierenden.',
+  event_date: '2026-10-17',
+  participants: 80,
+  category: ['event', 'firstyear'],
+};
+
+/** The attachments of the demo application (`GET …/attachments`). */
+const MOCK_APP_ATTACHMENTS: AttachmentOutWire[] = [
+  {
+    id: 'att00000-0000-0000-0000-000000000011',
+    filename: 'Kostenaufstellung.pdf',
+    mime: 'application/pdf',
+    size: 182_340,
+    scanned: true,
+    is_comparison_offer: false,
+  },
+  {
+    id: 'att00000-0000-0000-0000-000000000012',
+    filename: 'Angebot-Bus.pdf',
+    mime: 'application/pdf',
+    size: 96_512,
+    scanned: true,
+    is_comparison_offer: true,
+  },
+];
+
+function mockApplication(data: Record<string, unknown> = MOCK_APP_DATA): ApplicationOutWire {
   return {
     id: MOCK_APP_ID,
     typeId: MOCK_TYPES.items[0].id,
     state: SUBMITTED_STATE,
+    // The last event of MOCK_TIMELINE: the application went back to the applicant.
+    stateSince: '2026-06-05T13:00:00Z',
     gremiumId: null,
     amount: null,
     currency: 'EUR',
@@ -415,12 +450,17 @@ const MOCK_TASKS: ApplicationListItemWire[] = [
   },
 ];
 
+/**
+ * The status history of the demo application. The server names the applicant
+ * `applicant` (the status page shows "Du") and a member by the Gremium (A12).
+ */
 const MOCK_TIMELINE: TimelineEventOutWire[] = [
   {
     fromStateId: null,
     toStateId: SUBMITTED_STATE.id,
     toState: SUBMITTED_STATE,
-    actor: null,
+    transitionLabel: null,
+    actor: 'applicant',
     at: '2026-06-05T10:00:00Z',
     note: null,
   },
@@ -428,9 +468,19 @@ const MOCK_TIMELINE: TimelineEventOutWire[] = [
     fromStateId: SUBMITTED_STATE.id,
     toStateId: REVIEW_STATE.id,
     toState: REVIEW_STATE,
+    transitionLabel: { de: 'In Prüfung nehmen', en: 'Move to review' },
     actor: 'Finanzreferat',
     at: '2026-06-05T12:30:00Z',
     note: 'Eingang bestätigt.',
+  },
+  {
+    fromStateId: REVIEW_STATE.id,
+    toStateId: SUBMITTED_STATE.id,
+    toState: SUBMITTED_STATE,
+    transitionLabel: { de: 'Zur Überarbeitung zurückgeben', en: 'Return for changes' },
+    actor: 'Finanzreferat',
+    at: '2026-06-05T13:00:00Z',
+    note: 'Bitte ergänze die Kostenaufstellung.',
   },
 ];
 
@@ -458,7 +508,7 @@ const MOCK_VERSIONS: VersionOutWire[] = [
     version: 1,
     data: { title: 'Förderung Ersti-Wochenende', amount: '200.00' },
     diff: null,
-    changedBy: 'Antragsteller:in',
+    changedBy: 'applicant',
     at: '2026-06-05T10:00:00Z',
   },
   {
@@ -472,7 +522,7 @@ const MOCK_VERSIONS: VersionOutWire[] = [
         amount: { old: '200.00', new: '250.00' },
       },
     },
-    changedBy: 'Antragsteller:in',
+    changedBy: 'applicant',
     at: '2026-06-05T11:15:00Z',
   },
 ];
@@ -1097,6 +1147,18 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'GET') {
+    // The public site config: the platform defaults (links without an end, the default
+    // limits), so the pages show what they show after a real load.
+    if (/(^|\/)api\/site-config$/.test(p)) {
+      const config: PublicSiteConfig = {
+        version: 1,
+        confirmTtlHours: 12,
+        linkTtlDays: null,
+        attachmentLimits: null,
+        branding: null,
+      };
+      return ok(config);
+    }
     // `localStorage['mockAnonymous'] = '1'` plays a visitor without a session: the
     // public frame, the wizard with the contact step and the ALTCHA.
     if (p.endsWith('/auth/me')) {
@@ -1154,6 +1216,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         })),
       );
     }
+    if (p.endsWith(`/applications/${MOCK_APP_ID}/attachments`)) return ok([...MOCK_APP_ATTACHMENTS]);
     if (p.endsWith('/timeline')) return ok(MOCK_TIMELINE);
     if (p.endsWith('/versions')) return ok([...MOCK_VERSIONS]);
     if (p.endsWith('/comments')) return ok([...MOCK_COMMENTS]);

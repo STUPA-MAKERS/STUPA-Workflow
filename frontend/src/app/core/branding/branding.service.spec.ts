@@ -86,6 +86,7 @@ describe('BrandingService', () => {
   });
 
   it('starts with links without an expiry and the default upload limits', () => {
+    expect(svc.loaded()).toBe(false);
     expect(svc.linkTtlDays()).toBeNull();
     expect(svc.attachmentLimits()).toEqual(BrandingService.DEFAULT_ATTACHMENT_LIMITS);
     expect(svc.freetexts()).toEqual({});
@@ -108,6 +109,7 @@ describe('BrandingService', () => {
   it('keeps unlimited links and the default limits when the config has none', () => {
     svc.init();
     http.expectOne('/api/site-config').flush({ version: 1, branding: null, linkTtlDays: null });
+    expect(svc.loaded()).toBe(true);
     expect(svc.linkTtlDays()).toBeNull();
     expect(svc.attachmentLimits()).toEqual(BrandingService.DEFAULT_ATTACHMENT_LIMITS);
     expect(svc.freetexts()).toEqual({});

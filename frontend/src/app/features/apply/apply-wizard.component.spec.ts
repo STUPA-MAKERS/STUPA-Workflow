@@ -98,6 +98,7 @@ function fakeDrafts(files: DraftFile[] = []) {
     }),
     clear: jest.fn(),
     discard: jest.fn(async () => undefined),
+    scopeToFields: jest.fn(async () => undefined),
     upload: jest.fn(),
     remove: jest.fn(),
   };
@@ -193,6 +194,7 @@ describe('ApplyWizardComponent', () => {
   });
   afterEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     jest.restoreAllMocks();
   });
 
@@ -325,8 +327,55 @@ describe('ApplyWizardComponent', () => {
     expect(payload.data).toMatchObject({ title: 'Party', iban: 'DE89370400440532013000', receipt: ['d2'] });
     expect(drafts.clear).toHaveBeenCalled();
     expect(s.navigate).toHaveBeenCalledWith(['/apply/confirmation'], { queryParams: { id: 'app-1' } });
-    expect(localStorage.getItem(`${DRAFT_PREFIX}t1`)).toBeNull();
-    expect(localStorage.getItem(DRAFT_LAST_TYPE)).toBeNull();
+    expect(sessionStorage.getItem(`${DRAFT_PREFIX}t1`)).toBeNull();
+    expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBeNull();
+  });
+
+  it('clears the autosave of every type on the submit', async () => {
+    sessionStorage.setItem(`${DRAFT_PREFIX}t9`, JSON.stringify({ v: 1, model: { title: 'Alt' } }));
+    sessionStorage.setItem('ap.other', 'keep');
+    const s = await setup({ form: PLAIN, loggedIn: true });
+    await waitFor(() => expect(s.comp.loggedIn()).toBe(true));
+    await pickType(s);
+    s.comp.next();
+    s.fixture.detectChanges();
+    await userEvent.type(field(/Titel/), 'X');
+    s.comp.persistDraft();
+    s.comp.next();
+    s.comp.submit();
+    expect(s.create).toHaveBeenCalled();
+    expect(sessionStorage.getItem(`${DRAFT_PREFIX}t9`)).toBeNull();
+    expect(sessionStorage.getItem(`${DRAFT_PREFIX}t1`)).toBeNull();
+    expect(sessionStorage.getItem('ap.other')).toBe('keep');
+  });
+
+  it('gives a file field its draft files back after a reload, so a required field passes', async () => {
+    const required: EffectiveForm = {
+      ...PLAIN,
+      sections: [
+        {
+          key: 'main',
+          label: { de: 'Antrag' },
+          fields: [
+            { key: 'title', type: 'text', label: { de: 'Titel' }, required: true },
+            { key: 'receipt', type: 'file', label: { de: 'Beleg' }, required: true },
+          ],
+        },
+      ],
+    };
+    // The tab reloaded: the autosave (without the file field) and the draft files are back.
+    sessionStorage.setItem(DRAFT_LAST_TYPE, 't1');
+    sessionStorage.setItem(`${DRAFT_PREFIX}t1`, JSON.stringify({ v: 1, model: { title: 'X' }, step: 'details' }));
+    const lost = { ...draft('d3', 'receipt'), failed: true };
+    const drafts = fakeDrafts([draft('d1'), draft('d2', 'receipt'), lost]);
+    const s = await setup({ form: required, loggedIn: true, drafts });
+    await waitFor(() => expect(s.comp.currentStep()).toBe('details'));
+    s.fixture.detectChanges();
+    expect(drafts.scopeToFields).toHaveBeenCalledWith(new Set(['receipt']));
+    expect(s.comp.model['receipt']).toEqual(['d2']);
+    expect(s.comp.detailsForm.get('receipt')?.value).toEqual(['d2']);
+    s.comp.next();
+    expect(s.comp.currentStep()).toBe('review');
   });
 
   it('submits without a solution when ALTCHA is off, and without drafts no token', async () => {
@@ -484,14 +533,15 @@ describe('ApplyWizardComponent', () => {
     await toReview(s);
     s.comp.model['receipt'] = ['d1'];
     s.comp.persistDraft();
-    const stored = JSON.parse(localStorage.getItem(`${DRAFT_PREFIX}t1`) as string);
+    const stored = JSON.parse(sessionStorage.getItem(`${DRAFT_PREFIX}t1`) as string);
     expect(stored).toEqual({ v: 1, model: { title: 'Party' }, step: 'review' });
     expect(JSON.stringify(stored)).not.toContain('a@b.de');
     expect(JSON.stringify(stored)).not.toContain('Erika');
     expect(JSON.stringify(stored)).not.toContain('DE89');
-    expect(localStorage.getItem(DRAFT_LAST_TYPE)).toBe('t1');
-    expect(screen.getByText('Entwurf auf diesem Gerät gespeichert')).toBeInTheDocument();
-    expect(sessionStorage.length).toBe(0);
+    expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBe('t1');
+    expect(screen.getByText('Entwurf in diesem Tab gespeichert')).toBeInTheDocument();
+    // Nothing of the draft goes into localStorage (only the language is there).
+    expect(Object.keys(localStorage)).toEqual(['ap.locale']);
   });
 
   it('writes the autosave a short time after a change', async () => {
@@ -504,15 +554,15 @@ describe('ApplyWizardComponent', () => {
       s.comp.activeIndex.set(1);
       s.fixture.detectChanges();
       jest.advanceTimersByTime(500);
-      expect(JSON.parse(localStorage.getItem(`${DRAFT_PREFIX}t1`) as string).model).toEqual({ title: 'Neu' });
+      expect(JSON.parse(sessionStorage.getItem(`${DRAFT_PREFIX}t1`) as string).model).toEqual({ title: 'Neu' });
     } finally {
       jest.useRealTimers();
     }
   });
 
   it('restores the autosave of the last type, but not past an empty contact step', async () => {
-    localStorage.setItem(DRAFT_LAST_TYPE, 't1');
-    localStorage.setItem(
+    sessionStorage.setItem(DRAFT_LAST_TYPE, 't1');
+    sessionStorage.setItem(
       `${DRAFT_PREFIX}t1`,
       JSON.stringify({ v: 1, model: { title: 'Gespeichert', iban: 'leak', receipt: ['x'] }, step: 'review' }),
     );
@@ -526,15 +576,15 @@ describe('ApplyWizardComponent', () => {
   });
 
   it('restores the stored step of a signed-in user', async () => {
-    localStorage.setItem(DRAFT_LAST_TYPE, 't1');
-    localStorage.setItem(`${DRAFT_PREFIX}t1`, JSON.stringify({ v: 1, model: { title: 'X' }, step: 'review' }));
+    sessionStorage.setItem(DRAFT_LAST_TYPE, 't1');
+    sessionStorage.setItem(`${DRAFT_PREFIX}t1`, JSON.stringify({ v: 1, model: { title: 'X' }, step: 'review' }));
     const s = await setup({ form: PLAIN, loggedIn: true });
     await waitFor(() => expect(s.comp.currentStep()).toBe('review'));
   });
 
   it('ignores a broken autosave and an unknown last type', async () => {
-    localStorage.setItem(DRAFT_LAST_TYPE, 'unknown');
-    localStorage.setItem(`${DRAFT_PREFIX}t1`, '{broken');
+    sessionStorage.setItem(DRAFT_LAST_TYPE, 'unknown');
+    sessionStorage.setItem(`${DRAFT_PREFIX}t1`, '{broken');
     const s = await setup();
     expect(s.comp.typeId()).toBeNull();
     await pickType(s);
@@ -542,7 +592,7 @@ describe('ApplyWizardComponent', () => {
   });
 
   it('ignores an autosave without answers and with an unknown step', async () => {
-    localStorage.setItem(`${DRAFT_PREFIX}t1`, JSON.stringify({ v: 1, step: 'nowhere' }));
+    sessionStorage.setItem(`${DRAFT_PREFIX}t1`, JSON.stringify({ v: 1, step: 'nowhere' }));
     const s = await setup();
     s.comp.selectType('t1');
     expect(s.comp.activeIndex()).toBe(0);
@@ -575,7 +625,7 @@ describe('ApplyWizardComponent', () => {
   it('does not autosave without a type', async () => {
     const s = await setup();
     s.comp.persistDraft();
-    expect(localStorage.getItem(DRAFT_LAST_TYPE)).toBeNull();
+    expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBeNull();
   });
 
   it('discards the draft after the confirmation', async () => {
@@ -594,7 +644,8 @@ describe('ApplyWizardComponent', () => {
     await waitFor(() => expect(drafts.discard).toHaveBeenCalled());
     expect(s.comp.model).toEqual({});
     expect(s.comp.activeIndex()).toBe(0);
-    expect(localStorage.getItem(`${DRAFT_PREFIX}t1`)).toBeNull();
+    expect(sessionStorage.getItem(`${DRAFT_PREFIX}t1`)).toBeNull();
+    expect(sessionStorage.getItem(DRAFT_LAST_TYPE)).toBeNull();
   });
 
   it('keeps the draft when the confirmation is cancelled', async () => {

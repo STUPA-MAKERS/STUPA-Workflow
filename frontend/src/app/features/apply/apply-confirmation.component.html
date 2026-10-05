@@ -34,13 +34,16 @@
             {{ 'apply.confirm.ref' | t }} <span class="mono done__ref">{{ shortRef() }}</span>
           </p>
         }
-        <p class="done__meta">
-          @if (linkTtlDays(); as days) {
-            {{ 'apply.confirm.linkDays' | t: { days: days } }}
-          } @else {
-            {{ 'apply.confirm.linkUnlimited' | t }}
-          }
-        </p>
+        <!-- Only after the config loaded: before, "unbegrenzt" can be wrong. -->
+        @if (linkTtlLoaded()) {
+          <p class="done__meta">
+            @if (linkTtlDays(); as days) {
+              {{ 'apply.confirm.linkDays' | t: { days: days } }}
+            } @else {
+              {{ 'apply.confirm.linkUnlimited' | t }}
+            }
+          </p>
+        }
         <p class="done__meta">{{ 'apply.confirm.hint' | t }}</p>
       </div>
       <div class="done__actions">

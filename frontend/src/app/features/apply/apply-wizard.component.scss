@@ -205,6 +205,14 @@
 .wz__navGap {
   flex: 1 1 auto;
 }
+/* A focused field never hides under the bar (WCAG 2.4.11): the focus scroll keeps the
+   height of the bar and a gap free above the bottom edge. */
+.wz__body ::ng-deep * {
+  scroll-margin-bottom: calc(var(--app-bottom-inset, 0px) + var(--wz-nav-clearance));
+}
+.wz {
+  --wz-nav-clearance: 5.5rem;
+}
 .wz__discardPhone {
   display: none;
 }

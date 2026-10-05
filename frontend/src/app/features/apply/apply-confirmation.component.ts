@@ -21,7 +21,9 @@ import { shortRef } from './apply.util';
  *   the magic-link email ("Bestätigung ausstehend"). That link opens the edit and
  *   status view without a login; the note names the time after which an unconfirmed
  *   application is discarded (`confirmTtlHours`) and the page names the lifetime of
- *   the link (`linkTtlDays`, "unbegrenzt" without one).
+ *   the link (`linkTtlDays`, "unbegrenzt" without one). The lifetime shows only
+ *   after the public config loaded: before, or after a failed load, the value is not
+ *   known.
  * - Signed in: the backend confirms the address at creation time, from the session.
  *   The application is already submitted ("Eingereicht"), so the page links to the
  *   record instead of asking for a confirmation that is done.
@@ -52,6 +54,8 @@ export class ApplyConfirmationComponent {
   protected readonly confirmTtlHours = this.branding.confirmTtlHours;
   /** Days a new magic link works; `null`: no expiry. */
   protected readonly linkTtlDays = this.branding.linkTtlDays;
+  /** The config loaded, so `linkTtlDays` is the real setting. */
+  protected readonly linkTtlLoaded = this.branding.loaded;
 
   readonly applicationId = toSignal(
     this.route.queryParamMap.pipe(map((p) => p.get('id'))),

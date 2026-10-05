@@ -482,9 +482,10 @@ export const de = {
   'apply.nav.discard': 'Entwurf verwerfen',
   'apply.nav.submit': 'Antrag absenden',
   'apply.nav.next': 'Weiter',
-  'apply.autosave': 'Entwurf auf diesem Gerät gespeichert',
+  'apply.autosave': 'Entwurf in diesem Tab gespeichert',
 
-  'apply.confirm.heading': 'Fast geschafft – E-Mail bestätigen',
+  // U+2011 (non-breaking hyphen): a narrow screen must not break "E-Mail".
+  'apply.confirm.heading': 'Fast geschafft – E\u2011Mail bestätigen',
   'apply.confirm.badge': 'Bestätigung ausstehend',
   'apply.confirm.body':
     'Vielen Dank! Wir haben dir eine E-Mail mit einem persönlichen Link gesendet. Bestätige darüber deine Adresse – erst dann wird dein Antrag eingereicht und sichtbar. Über denselben Link verfolgst du jederzeit den Status und bearbeitest deinen Antrag, ohne dich anzumelden.',
@@ -516,7 +517,7 @@ export const de = {
   'apply.contact.account': 'Dein Konto',
   'apply.contact.nameOptional': 'Name (optional)',
   'apply.autosaveScope':
-    'Ohne Kontaktdaten und personenbezogene Angaben. Dateien bleiben nur in diesem Tab.',
+    'Ohne Kontaktdaten und personenbezogene Angaben. Angaben und Dateien bleiben nur in diesem Tab.',
   'apply.error.invalid': 'Bitte prüfe die markierten Felder.',
   'apply.discard.title': 'Entwurf verwerfen?',
   'apply.discard.body': 'Deine Angaben und die hochgeladenen Dateien werden gelöscht.',
@@ -584,6 +585,7 @@ export const de = {
   'status.since': 'seit {date}',
   'status.edit.row': 'Angaben bearbeiten',
   'status.edit.locked': 'Im aktuellen Status gesperrt',
+  'status.edit.linkOnly': 'Mit diesem Link nicht möglich',
   'status.edit.title': 'Angaben bearbeiten',
   'status.files.title': 'Anhänge',
   'status.files.one': '1 Datei',
@@ -3065,7 +3067,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.nav.discard': 'Discard draft',
   'apply.nav.submit': 'Submit application',
   'apply.nav.next': 'Next',
-  'apply.autosave': 'Draft saved on this device',
+  'apply.autosave': 'Draft saved in this tab',
 
   'apply.confirm.heading': 'Almost done – confirm your email',
   'apply.confirm.badge': 'Confirmation pending',
@@ -3097,7 +3099,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.review.applicant': 'Applicant',
   'apply.contact.account': 'Your account',
   'apply.contact.nameOptional': 'Name (optional)',
-  'apply.autosaveScope': 'Without contact details and personal data. Files stay in this tab only.',
+  'apply.autosaveScope':
+    'Without contact details and personal data. Answers and files stay in this tab only.',
   'apply.error.invalid': 'Please check the marked fields.',
   'apply.discard.title': 'Discard the draft?',
   'apply.discard.body': 'Your answers and the uploaded files are deleted.',
@@ -3165,6 +3168,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'status.since': 'since {date}',
   'status.edit.row': 'Edit details',
   'status.edit.locked': 'Locked in the current status',
+  'status.edit.linkOnly': 'Not possible with this link',
   'status.edit.title': 'Edit details',
   'status.files.title': 'Attachments',
   'status.files.one': '1 file',

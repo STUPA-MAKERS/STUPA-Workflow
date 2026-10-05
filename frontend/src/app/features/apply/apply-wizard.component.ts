@@ -58,7 +58,7 @@ import { FormlyDraftFilesType } from './draft-files/formly-draft-files.type';
 /** The steps of the wizard. `contact` drops out for a signed-in user without PII fields. */
 export type StepKey = 'type' | 'details' | 'contact' | 'review';
 
-/** The autosave of one application type (`localStorage`, this device). */
+/** The autosave of one application type (`sessionStorage`, this tab). */
 interface StoredAnswers {
   v: 1;
   model: Record<string, unknown>;
@@ -109,10 +109,16 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
  * All forms stay in the page (only the current one shows), so the submit checks every
  * field even after a restore jumped over a step.
  *
- * Autosave: the answers go into `localStorage` per type (this device), WITHOUT the
- * contact step, the PII fields and the file fields. A storage that throws only ends the
- * autosave. The submit clears it. The draft token of the files stays in
- * `sessionStorage` (see the service).
+ * Autosave: the answers go into `sessionStorage` per type (this tab only, as before
+ * the redesign), WITHOUT the contact step, the PII fields and the file fields. A
+ * storage that throws only ends the autosave. The submit and "Entwurf verwerfen" clear
+ * the autosave of every type. The draft token of the files also stays in
+ * `sessionStorage` (see the service). The values of the file fields come back from
+ * the draft files, which survive a reload in the same tab.
+ *
+ * A type switch keeps the general files ("Anhänge") but deletes the files of the file
+ * fields that the new form does not have: the server would bind them with a field
+ * reference that the new form does not know.
  */
 @Component({
   selector: 'app-apply-wizard',
@@ -354,6 +360,7 @@ export class ApplyWizardComponent {
         this.effForm.set(eff);
         this.buildFields(eff);
         this.restoreDraft(id);
+        this.syncFileFields();
         this.restoring = false;
         this.loadingForm.set(false);
       },
@@ -362,6 +369,24 @@ export class ApplyWizardComponent {
         this.toast.error(this.i18n.translate('apply.error.formLoad'));
       },
     });
+  }
+
+  /**
+   * Match the draft files to the file fields of the current form. The files of a field
+   * that the form does not have go (a type switch); each file field gets the ids of its
+   * files as value, because the autosave leaves them out.
+   */
+  private syncFileFields(): void {
+    const keys = this.fileKeys();
+    void this.drafts.scopeToFields(keys);
+    for (const key of keys) {
+      const ids = this.drafts
+        .filesOf(key)
+        .filter((f) => !f.failed)
+        .map((f) => f.id);
+      if (ids.length) this.model[key] = ids;
+    }
+    this.touchModel();
   }
 
   /** Build the fields of "Angaben" and of the PII part of "Kontakt". */
@@ -617,8 +642,8 @@ export class ApplyWizardComponent {
     }
     const draft: StoredAnswers = { v: 1, model, step: this.currentStep() };
     try {
-      localStorage.setItem(key, JSON.stringify(draft));
-      localStorage.setItem(DRAFT_LAST_TYPE, typeId);
+      sessionStorage.setItem(key, JSON.stringify(draft));
+      sessionStorage.setItem(DRAFT_LAST_TYPE, typeId);
       this.saved.set(true);
     } catch {
       /* storage blocked: the autosave is best effort */
@@ -654,13 +679,17 @@ export class ApplyWizardComponent {
     this.activeIndex.set(target);
   }
 
+  /** Remove the autosave of every type and the last type. */
   private clearAutosave(): void {
     if (this.autosaveTimer) clearTimeout(this.autosaveTimer);
     this.autosaveTimer = null;
-    const key = this.draftKey();
     try {
-      if (key) localStorage.removeItem(key);
-      localStorage.removeItem(DRAFT_LAST_TYPE);
+      const keys: string[] = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key?.startsWith(DRAFT_PREFIX)) keys.push(key);
+      }
+      for (const key of keys) sessionStorage.removeItem(key);
     } catch {
       /* storage blocked: nothing to clear */
     }
@@ -710,10 +739,10 @@ export class ApplyWizardComponent {
   }
 }
 
-/** Read a `localStorage` entry; a storage that throws gives null. */
+/** Read a `sessionStorage` entry; a storage that throws gives null. */
 function readStorage(key: string): string | null {
   try {
-    return localStorage.getItem(key);
+    return sessionStorage.getItem(key);
   } catch {
     return null;
   }

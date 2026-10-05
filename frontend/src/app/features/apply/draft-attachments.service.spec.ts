@@ -304,6 +304,45 @@ describe('DraftAttachmentsService', () => {
     expect(remove).toHaveBeenCalledTimes(2);
   });
 
+  it('deletes the files of fields that the new form does not have, and keeps the general ones', async () => {
+    const { svc, remove } = setup();
+    await svc.upload([file('a.pdf')], { fieldKey: 'receipt' });
+    await svc.upload([file('b.pdf')], { fieldKey: 'offer' });
+    await svc.upload([file('c.pdf')]);
+    // Type B has the field "offer" only.
+    await svc.scopeToFields(new Set(['offer']));
+    expect(remove.mock.calls.map((c) => c[0])).toEqual(['d1']);
+    expect(svc.files().map((f) => f.id)).toEqual(['d2', 'd3']);
+    expect(svc.attachmentIds()).toEqual(['d2', 'd3']);
+    expect(svc.count()).toBe(2);
+    expect(JSON.parse(sessionStorage.getItem(DRAFT_FILES_KEY) as string).files).toHaveLength(2);
+    // Nothing more to delete: no call.
+    await svc.scopeToFields(new Set(['offer']));
+    expect(remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('takes a lost file of another field only off the list, and ignores a failed delete', async () => {
+    const remove = jest.fn(() => throwError(() => httpError(500)));
+    const { svc } = setup({ remove });
+    await svc.upload([file('a.pdf'), file('b.pdf')], { fieldKey: 'receipt' });
+    svc.markFailed({
+      code: 'draft_attachments_missing',
+      errors: [{ field: 'attachmentIds.d1', msg: 'missing' }],
+    } as ProblemDetail);
+    await svc.scopeToFields(new Set());
+    expect(remove.mock.calls.map((c) => c[0])).toEqual(['d2']);
+    expect(svc.files()).toEqual([]);
+  });
+
+  it('deletes an upload that ends after a switch to a form without its field', async () => {
+    const { svc, remove } = setup();
+    await svc.scopeToFields(new Set(['receipt']));
+    const res = await svc.upload([file('a.pdf')], { fieldKey: 'gone' });
+    expect(res.uploaded).toEqual([]);
+    expect(svc.files()).toEqual([]);
+    expect(remove).toHaveBeenCalledWith('d1', 'tok');
+  });
+
   it('shows a file as pending while it uploads', async () => {
     const answer = new Subject<DraftUpload>();
     const upload = jest.fn(() => answer);

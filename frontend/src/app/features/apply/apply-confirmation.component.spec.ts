@@ -28,7 +28,11 @@ describe('ApplyConfirmationComponent', () => {
           : [
               {
                 provide: BrandingService,
-                useValue: { confirmTtlHours: signal(hours), linkTtlDays: signal(linkDays) },
+                useValue: {
+                  confirmTtlHours: signal(hours),
+                  linkTtlDays: signal(linkDays),
+                  loaded: signal(true),
+                },
               },
             ]),
         { provide: AuthService, useValue: { isAuthenticated: signal(loggedIn) } },
@@ -44,7 +48,7 @@ describe('ApplyConfirmationComponent', () => {
 
   it('asks to confirm the email, shows the 12h-discard note and reference id', async () => {
     await setup();
-    expect(screen.getByText(/E-Mail bestätigen/)).toBeInTheDocument();
+    expect(screen.getByText(/E\u2011Mail bestätigen/)).toBeInTheDocument();
     expect(screen.getByText(/persönlichen Link/)).toBeInTheDocument();
     expect(screen.getByText(/nach 12 Stunden automatisch verworfen/)).toBeInTheDocument();
     expect(screen.getByText(SHORT_REF)).toBeInTheDocument();
@@ -56,7 +60,7 @@ describe('ApplyConfirmationComponent', () => {
     expect(screen.getByText(/confirm your email/)).toBeInTheDocument();
     expect(screen.getByText(/personal link/)).toBeInTheDocument();
     expect(screen.getByText(/discarded after 12 hours/)).toBeInTheDocument();
-    expect(screen.queryByText(/E-Mail bestätigen/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/E\u2011Mail bestätigen/)).not.toBeInTheDocument();
   });
 
   // The backend confirms the address of a signed-in submitter at creation time, so the
@@ -65,7 +69,7 @@ describe('ApplyConfirmationComponent', () => {
     await setup(true);
     expect(screen.getByText('Antrag eingereicht')).toBeInTheDocument();
     expect(screen.getByText('Eingereicht')).toBeInTheDocument();
-    expect(screen.queryByText(/E-Mail bestätigen/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/E\u2011Mail bestätigen/)).not.toBeInTheDocument();
     expect(screen.queryByText(/persönlichen Link/)).not.toBeInTheDocument();
     expect(screen.queryByText(/nach 12 Stunden automatisch verworfen/)).not.toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'Antrag öffnen' });
@@ -83,7 +87,7 @@ describe('ApplyConfirmationComponent', () => {
 
   it('keeps the anonymous copy and shows no record link when nobody is signed in', async () => {
     await setup(false);
-    expect(screen.getByText(/Fast geschafft – E-Mail bestätigen/)).toBeInTheDocument();
+    expect(screen.getByText(/Fast geschafft – E\u2011Mail bestätigen/)).toBeInTheDocument();
     expect(screen.getByText('Bestätigung ausstehend')).toBeInTheDocument();
     expect(screen.getByText(/nach 12 Stunden automatisch verworfen/)).toBeInTheDocument();
     expect(screen.queryByText('Antrag eingereicht')).not.toBeInTheDocument();
@@ -123,10 +127,16 @@ describe('ApplyConfirmationComponent', () => {
     expect(screen.queryByText(/nach 12 Stunden/)).not.toBeInTheDocument();
   });
 
-  it('says that the link does not expire by default', async () => {
-    await setup();
+  it('says that the link does not expire when the loaded config has no lifetime', async () => {
+    await setup(false, FULL_ID, 12, null);
     expect(screen.getByText('Der Link in der E-Mail ist unbegrenzt gültig.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Zur Startseite' })).toHaveAttribute('href', '/');
+  });
+
+  it('names no lifetime of the link before the config loaded', async () => {
+    await setup();
+    expect(screen.queryByText(/unbegrenzt/)).toBeNull();
+    expect(screen.queryByText(/Tage gültig/)).toBeNull();
   });
 
   it('names the configured lifetime of the link', async () => {
@@ -137,7 +147,7 @@ describe('ApplyConfirmationComponent', () => {
 
   it('shows the status as text and the heading as a level-1 heading', async () => {
     await setup();
-    expect(screen.getByRole('heading', { level: 1, name: /E-Mail bestätigen/ })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: /E\u2011Mail bestätigen/ })).toBeInTheDocument();
     expect(screen.getByText('Bestätigung ausstehend').tagName).toBe('APP-STATUS-TEXT');
   });
 
@@ -149,7 +159,7 @@ describe('ApplyConfirmationComponent', () => {
 
   it('hides the reference line when the query has no id', async () => {
     await setup(false, null);
-    expect(screen.getByText(/Fast geschafft – E-Mail bestätigen/)).toBeInTheDocument();
+    expect(screen.getByText(/Fast geschafft – E\u2011Mail bestätigen/)).toBeInTheDocument();
     expect(screen.queryByText(/Vorgangsnummer/)).not.toBeInTheDocument();
   });
 });

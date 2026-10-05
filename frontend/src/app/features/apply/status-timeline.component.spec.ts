@@ -149,6 +149,8 @@ interface RouteOpts {
   pathParams?: Record<string, string>;
   fragment?: string | null;
   linkTtlDays?: number | null;
+  /** The public config loaded (default true). */
+  loaded?: boolean;
 }
 
 async function setup(api: Partial<ApiClient>, params: Record<string, string> = { app: ID }, opts: RouteOpts = {}) {
@@ -161,7 +163,10 @@ async function setup(api: Partial<ApiClient>, params: Record<string, string> = {
       { provide: ToastService, useValue: toast },
       {
         provide: BrandingService,
-        useValue: { linkTtlDays: signal(opts.linkTtlDays === undefined ? null : opts.linkTtlDays) },
+        useValue: {
+          linkTtlDays: signal(opts.linkTtlDays === undefined ? null : opts.linkTtlDays),
+          loaded: signal(opts.loaded ?? true),
+        },
       },
       {
         provide: ActivatedRoute,
@@ -242,7 +247,10 @@ describe('StatusTimelineComponent', () => {
     const update = jest.fn(() => of({ ...app(true, { title: 'Neu' }), version: 3 }));
     const { comp, toast, fixture } = await setup(fakeApi({ update }));
     await userEvent.click(await screen.findByRole('button', { name: /Angaben bearbeiten/ }));
-    expect(screen.getByText(/Speichern legt Version 3 an/)).toBeInTheDocument();
+    // The separator keeps its space before the hint.
+    expect(screen.getByText(/Speichern legt Version 3 an/).textContent).toMatch(/^ · Speichern/);
+    // The focus moves to the title of the edit bar.
+    await waitFor(() => expect(document.activeElement?.id).toBe('sp-edit-title'));
     // File fields stay out of the edit form.
     expect(comp.editFields()[0].fieldGroup?.some((f) => f.key === 'receipt')).toBe(false);
     const input = screen.getByLabelText(/Titel/) as HTMLInputElement;
@@ -254,14 +262,22 @@ describe('StatusTimelineComponent', () => {
     expect(comp.editing()).toBe(false);
     fixture.detectChanges();
     expect(screen.getByRole('heading', { level: 1, name: 'Neu' })).toBeInTheDocument();
+    // The focus goes back to the row.
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: /Angaben bearbeiten/ })),
+    );
   });
 
   it('cancels the edit and does not edit without a form or the right', async () => {
-    const { comp } = await setup(fakeApi());
+    const { comp, fixture } = await setup(fakeApi());
     await screen.findByRole('heading', { level: 1 });
     comp.startEdit();
-    comp.cancelEdit();
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
     expect(comp.editing()).toBe(false);
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: /Angaben bearbeiten/ })),
+    );
     comp.effForm.set(null);
     comp.startEdit();
     expect(comp.editing()).toBe(false);
@@ -295,6 +311,9 @@ describe('StatusTimelineComponent', () => {
       'Antrag ist gesperrt und kann nicht mehr bearbeitet werden.',
     );
     expect(comp.editing()).toBe(false);
+    fixture.detectChanges();
+    // The row may go off, so the focus goes to the title of the page.
+    await waitFor(() => expect(document.activeElement?.id).toBe('sp-title'));
     expect(getApplication).toHaveBeenCalledTimes(2);
     comp.startEdit();
     fixture.detectChanges();
@@ -350,6 +369,13 @@ describe('StatusTimelineComponent', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Kommentar senden' }));
     expect(addComment).toHaveBeenCalledWith(ID, 'Frage');
     expect(comp.commentBody.value).toBe('');
+    // Enter sends as well; Shift+Enter makes a line break.
+    const box = within(dialog).getByRole('textbox', { name: 'Öffentlicher Kommentar' });
+    await userEvent.type(box, 'Zeile 1{Shift>}{Enter}{/Shift}Zeile 2');
+    expect(addComment).toHaveBeenCalledTimes(1);
+    expect(comp.commentBody.value).toBe('Zeile 1\nZeile 2');
+    await userEvent.type(box, '{Enter}');
+    expect(addComment).toHaveBeenLastCalledWith(ID, 'Zeile 1\nZeile 2');
   });
 
   it('names an author by kind without a name, and shows an empty comment list', async () => {
@@ -442,6 +468,12 @@ describe('StatusTimelineComponent', () => {
     expect(screen.queryByText(/unbegrenzt/)).toBeNull();
   });
 
+  it('hides the link line until the config loaded', async () => {
+    await setup(fakeApi(), { app: ID }, { loaded: false });
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByText(/unbegrenzt/)).toBeNull();
+  });
+
   it('counts several files and names the changed keys without a form', async () => {
     const two = [0, 1].map((i) => ({
       id: `f${i}`,
@@ -525,6 +557,9 @@ describe('StatusTimelineComponent', () => {
     await screen.findByRole('heading', { level: 1 });
     expect(comp.canEdit()).toBe(false);
     expect(comp.canUploadAttachments()).toBe(false);
+    // The reason is the link, not the status.
+    expect(screen.getByText('Mit diesem Link nicht möglich')).toBeInTheDocument();
+    expect(screen.queryByText('Im aktuellen Status gesperrt')).toBeNull();
   });
 
   it('localizes the page in English', async () => {
