@@ -88,6 +88,7 @@ export const de = {
   'account.calendar.rotate': 'Neue URL erzeugen',
   'account.calendar.rotateHint': 'Erzeugt eine neue URL — die bisherige wird ungültig.',
   'account.calendar.error': 'Der Abo-Link konnte nicht geladen werden.',
+  'account.calendar.rotateError': 'Der Abo-Link konnte nicht erzeugt werden.',
   'pwa.updateReady': 'Eine neue Version der App ist verfügbar — Seite neu laden, um sie zu nutzen.',
   'account.notifications.title': 'Benachrichtigungen',
   'account.notifications.intro':
@@ -3055,6 +3056,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'account.calendar.rotate': 'Generate new URL',
   'account.calendar.rotateHint': 'Creates a new URL — the old one stops working.',
   'account.calendar.error': 'Could not load the feed link.',
+  'account.calendar.rotateError': 'Could not create the feed link.',
   'pwa.updateReady': 'A new version of the app is available — reload the page to use it.',
   'account.notifications.title': 'Notifications',
   'account.notifications.intro':

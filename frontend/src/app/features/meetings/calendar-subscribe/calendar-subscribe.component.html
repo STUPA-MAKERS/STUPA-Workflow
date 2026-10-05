@@ -3,6 +3,9 @@
   @if (error()) {
     <p class="cs__error" role="alert">{{ 'account.calendar.error' | t }}</p>
   }
+  @if (rotateError()) {
+    <p class="cs__error" role="alert">{{ 'account.calendar.rotateError' | t }}</p>
+  }
   @if (loading()) {
     <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
   } @else if (url(); as feedUrl) {
