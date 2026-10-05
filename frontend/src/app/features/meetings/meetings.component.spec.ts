@@ -14,6 +14,7 @@ import { USE_MOCK_API } from '@core/api/api.config';
 import type { Meeting, MeetingOutWire, ProtocolOutWire } from '@core/api/models';
 import { WsService, type MeetingChannel } from '@core/ws/ws.service';
 import type { ServerMessage } from '@core/ws/ws-messages';
+import { AGENDA } from '../../../testing/meeting-fixtures';
 import { MeetingAgendaService } from './meeting-agenda.service';
 import { MeetingSessionService } from './meeting-session.service';
 import { MeetingsComponent } from './meetings.component';
@@ -334,9 +335,10 @@ describe('MeetingsComponent', () => {
   });
 
   it('offers separate internal + public PDF links when a redacted variant exists', async () => {
-    // Non-public TOPs ⇒ the backend returns both URLs.
+    // Non-public TOPs ⇒ the backend returns both URLs. The protocol bar of the closed
+    // meeting carries them.
     const { http } = await setup();
-    http.expectOne('/api/meetings/m-1').flush(MEETING);
+    http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
     http.expectOne('/api/meetings/m-1/protocol').flush({
       ...PROTOCOL,
       status: 'final',
@@ -347,16 +349,16 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/agenda').flush([]);
     flushDelegationContext(http);
 
-    const internal = await screen.findByRole('link', { name: 'Internes Protokoll' });
+    const internal = await screen.findByRole('link', { name: 'PDF intern' });
     expect(internal).toHaveAttribute('href', '/api/protocols/p-1/pdf');
-    const pub = await screen.findByRole('link', { name: 'Öffentliches Protokoll' });
+    const pub = await screen.findByRole('link', { name: 'PDF öffentlich' });
     expect(pub).toHaveAttribute('href', '/api/protocols/p-1/pdf/public');
   });
 
   it('offers a single generic PDF link when nothing is redacted', async () => {
     // No non-public TOPs ⇒ only one PDF (publicPdfUrl null) for internal and public use.
     const { http } = await setup();
-    http.expectOne('/api/meetings/m-1').flush(MEETING);
+    http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
     http.expectOne('/api/meetings/m-1/protocol').flush({
       ...PROTOCOL,
       status: 'final',
@@ -366,11 +368,11 @@ describe('MeetingsComponent', () => {
     http.expectOne('/api/meetings/m-1/agenda').flush([]);
     flushDelegationContext(http);
 
-    expect(await screen.findByRole('link', { name: 'PDF öffnen' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'PDF' })).toHaveAttribute(
       'href',
       '/api/protocols/p-1/pdf',
     );
-    expect(screen.queryByRole('link', { name: 'Öffentliches Protokoll' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'PDF öffentlich' })).toBeNull();
   });
 
   it('marks non-public TOPs with a NÖ badge once the meeting is closed and finalized', async () => {
@@ -429,6 +431,56 @@ describe('MeetingsComponent', () => {
     expect(container.querySelector('.mtg__saveState')).toBeNull();
   });
 
+  /** A closed meeting whose last keeper is somebody else, with a closed vote on TOP 1. */
+  const CLOSED_BY_OTHER: MeetingOutWire = {
+    ...MEETING,
+    status: 'closed',
+    protokollantId: 'pr-x',
+    protokollantName: 'Lea Hoffmann',
+    isProtokollant: false,
+    votes: [
+      {
+        id: 'v-9',
+        applicationId: null,
+        agendaItemId: 't-1',
+        title: 'Beschluss',
+        status: 'closed',
+        result: 'passed',
+        counts: { yes: 3, no: 1 },
+        leading: 'yes',
+        closesAt: null,
+      },
+    ],
+  };
+  const flushClosed = (http: HttpTestingController, status: 'draft' | 'final') => {
+    http.expectOne('/api/meetings/m-1').flush(CLOSED_BY_OTHER);
+    http.expectOne('/api/meetings/m-1/protocol').flush({ ...PROTOCOL, status });
+    http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([
+      { id: 't-1', applicationId: null, title: 'Haushalt', body: 'Aussprache.', position: 0, nonPublic: false },
+    ]);
+    flushDelegationContext(http);
+  };
+
+  it('lets every writer edit the draft of a closed meeting, not only the last keeper (O22)', async () => {
+    const { http, fixture } = await setup();
+    flushClosed(http, 'draft');
+    fixture.detectChanges();
+    expect((fixture.componentInstance as Cmp).canEditProtocol()).toBe(true);
+    expect(await screen.findByRole('toolbar', { name: 'Format' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeInTheDocument();
+  });
+
+  it('keeps the final protocol of a closed meeting locked for every writer', async () => {
+    const { http, fixture } = await setup();
+    flushClosed(http, 'final');
+    await screen.findByText('Final');
+    // The right stays; the lock of the protocol takes the editor away.
+    expect((fixture.componentInstance as Cmp).canEditProtocol()).toBe(true);
+    expect(screen.queryByRole('toolbar', { name: 'Format' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeNull();
+  });
+
   it('retries a failed finalize via the toolbar repeat button', async () => {
     const { http } = await setup();
     // The meeting is closed and the protocol is back to draft ⇒ the render failed.
@@ -470,7 +522,8 @@ describe('MeetingsComponent', () => {
     await screen.findByText('Sitzungssteuerung');
     ws.subject.next({ type: 'meeting_state', activeApplicationId: 'app-2', status: 'closed' });
     fixture.detectChanges();
-    expect(screen.getByText('Geschlossen')).toBeInTheDocument();
+    // The header status, and the dock until the read gives the close time.
+    expect(screen.getByText('Geschlossen', { selector: 'app-status-text' })).toBeInTheDocument();
   });
 
   it('shows an error notice when the meeting fails to load', async () => {
@@ -520,11 +573,8 @@ describe('MeetingsComponent', () => {
     expect(req.request.method).toBe('PATCH');
     expect(req.request.body.protokollantId).toBe('pr-1');
     req.flush({ ...MEETING, protokollantId: 'pr-1', protokollantName: 'Max P' });
-    // The roster marks the minute-taker after saving.
-    await userEvent.click(await screen.findByTitle('Anwesenheit'));
-    const popover = await screen.findByRole('dialog', { name: 'Anwesenheit' });
-    expect(within(popover).getByText(/Max P/)).toBeInTheDocument();
-    expect(within(popover).getByText('Protokollführung')).toBeInTheDocument();
+    // The dock names the minute-taker after saving.
+    expect(await screen.findByText('Protokoll: Max P')).toBeInTheDocument();
   });
 
   it('gives non-protokollants the live read/vote view once a protokollant is assigned', async () => {
@@ -673,6 +723,10 @@ function services(fixture: { debugElement: { injector: { get<T>(t: new (...a: ne
 }
 
 /** Set up a loaded detail meeting and return the instance. */
+/** Members who can take the minutes over (O20). */
+const PR9 = { principalId: 'pr-9', displayName: 'Neu', email: null, status: 'present' as const, source: 'self' as const, note: null, isSelf: false, canKeepProtocol: true };
+const PR2 = { ...PR9, principalId: 'pr-2', displayName: 'B' };
+
 async function loaded(opts: Parameters<typeof setup>[0] = {}) {
   const view = await setup(opts);
   view.http.expectOne('/api/meetings/m-1').flush(MEETING);
@@ -1158,16 +1212,32 @@ describe('MeetingsComponent — methods', () => {
       expect(spy).toHaveBeenLastCalledWith('Aktion fehlgeschlagen.');
     });
 
-    it('explains an active delegation (O23) and reloads the roster', async () => {
+    it('marks the row of an active delegation (O23) and reloads the roster', async () => {
       const { cmp, http, fixture } = await loaded();
       const spy = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
       cmp.setAttendance(OTHER as never, 'present');
       http
         .expectOne('/api/meetings/m-1/attendance/pr-2')
         .flush({ code: 'delegation_active' }, { status: 409, statusText: 'Conflict' });
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('Vertretung'));
+      // The attendance sheet marks the row and offers the revoke; no toast.
+      expect(cmp.attendanceConflict()).toBe('pr-2');
+      expect(spy).not.toHaveBeenCalled();
       http.expectOne('/api/meetings/m-1/attendance').flush([OTHER]);
       expect(cmp.attendance()).toEqual([OTHER]);
+      // A later save of the row clears the mark.
+      cmp.setAttendance(OTHER as never, 'excused');
+      http.expectOne('/api/meetings/m-1/attendance/pr-2').flush([{ ...OTHER, status: 'excused' }]);
+      expect(cmp.attendanceConflict()).toBeNull();
+      // A revoke of the delegation in the attendance sheet clears it too, only for that member.
+      cmp.setAttendance(OTHER as never, 'present');
+      http
+        .expectOne('/api/meetings/m-1/attendance/pr-2')
+        .flush({ code: 'delegation_active' }, { status: 409, statusText: 'Conflict' });
+      http.expectOne('/api/meetings/m-1/attendance').flush([OTHER]);
+      cmp.clearAttendanceConflict('pr-9');
+      expect(cmp.attendanceConflict()).toBe('pr-2');
+      cmp.clearAttendanceConflict('pr-2');
+      expect(cmp.attendanceConflict()).toBeNull();
     });
 
     it('explains the own delegation (O23) to a member and reloads the roster', async () => {
@@ -1516,14 +1586,17 @@ describe('MeetingsComponent — methods', () => {
       const { cmp, http, fixture } = await loaded();
       const toast = fixture.debugElement.injector.get(ToastService);
       const success = jest.spyOn(toast, 'success');
-      cmp.handOver(cmp.meeting()!, 'pr-9', 'now');
+      cmp.attendance.set([PR9, PR2]);
+      cmp.askHandover('pr-9');
+      cmp.handOver(cmp.meeting()!, 'now');
       const now = http.expectOne('/api/meetings/m-1/protokollant-handover');
       expect(now.request.method).toBe('POST');
       expect(now.request.body).toEqual({ principalId: 'pr-9', mode: 'now' });
       now.flush({ ...MEETING, protokollantId: 'pr-9', protokollantName: 'Neu' });
       expect(cmp.meeting()!.protokollantId).toBe('pr-9');
       expect(success).toHaveBeenLastCalledWith('Protokollführung übergeben.');
-      cmp.handOver(cmp.meeting()!, 'pr-2', 'next_item');
+      cmp.askHandover('pr-2');
+      cmp.handOver(cmp.meeting()!, 'next_item');
       const plan = {
         principalId: 'pr-2',
         name: 'B',
@@ -1595,27 +1668,66 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.protocol()?.id).toBe('p-1');
     });
 
-    it('reports a refused handover', async () => {
+    it('reports a refused handover in the dialog, or as a toast', async () => {
       const { cmp, http, fixture } = await loaded();
       const error = jest.spyOn(fixture.debugElement.injector.get(ToastService), 'error');
-      cmp.handOver(cmp.meeting()!, 'pr-9', 'now');
+      cmp.attendance.set([PR9]);
+      cmp.askHandover('pr-9');
+      cmp.handOver(cmp.meeting()!, 'now');
       http
         .expectOne('/api/meetings/m-1/protokollant-handover')
         .flush(
           { detail: 'x', code: 'protokollant_needs_protocol_write' },
           { status: 422, statusText: 'Unprocessable' },
         );
-      expect(error).toHaveBeenLastCalledWith('Diese Person hat im Gremium kein Protokollrecht.');
-      cmp.handOver(cmp.meeting()!, 'pr-9', 'next_item');
+      fixture.detectChanges();
+      const dialog = await screen.findByRole('dialog', { name: 'Protokollführung übergeben' });
+      expect(within(dialog).getByRole('alert')).toHaveTextContent('Diese Person hat im Gremium kein Protokollrecht.');
+      cmp.handOver(cmp.meeting()!, 'next_item');
       http
         .expectOne('/api/meetings/m-1/protokollant-handover')
         .flush({ detail: 'last item', code: 'no_next_item' }, { status: 409, statusText: 'c' });
-      expect(error.mock.lastCall?.[0]).toContain('last item');
-      cmp.handOver(cmp.meeting()!, 'pr-9', 'now');
+      fixture.detectChanges();
+      expect(within(dialog).getByRole('alert')).toHaveTextContent('Der aktuelle TOP ist der letzte.');
+      expect(error).not.toHaveBeenCalled();
+      cmp.handOver(cmp.meeting()!, 'now');
       http
         .expectOne('/api/meetings/m-1/protokollant-handover')
         .flush(null, { status: 500, statusText: 'e' });
       expect(error.mock.lastCall?.[0]).toBe('Aktion fehlgeschlagen.');
+    });
+
+    it('keeps the handover dialog open on a pick of "with the next TOP" and sends it (Z3, O1)', async () => {
+      const { cmp, http, fixture } = await loaded();
+      services(fixture).agenda.agenda.set(AGENDA);
+      cmp.attendance.set([PR9]);
+      cmp.askHandover('pr-9');
+      fixture.detectChanges();
+      const dialog = await screen.findByRole('dialog', { name: 'Protokollführung übergeben' });
+      const next = within(dialog).getByRole('radio', { name: /Ab nächstem TOP/ });
+      // The native change event of the radio bubbles to the host of the dialog. It must
+      // not reach an output binding there and close the dialog.
+      await userEvent.click(next);
+      fixture.detectChanges();
+      expect(screen.getByRole('dialog', { name: 'Protokollführung übergeben' })).toBe(dialog);
+      expect(next).toBeChecked();
+      expect(screen.queryByText('Protokollführung übergeben an')).toBeNull();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Übergeben' }));
+      const req = http.expectOne('/api/meetings/m-1/protokollant-handover');
+      expect(req.request.body).toEqual({ principalId: 'pr-9', mode: 'next_item' });
+    });
+
+    it('goes back from the handover dialog to the picker of the dock', async () => {
+      const { cmp, fixture } = await loaded();
+      cmp.attendance.set([PR9]);
+      cmp.askHandover('pr-9');
+      fixture.detectChanges();
+      const dialog = await screen.findByRole('dialog', { name: 'Protokollführung übergeben' });
+      expect(within(dialog).getByText('Kopf des Protokolls')).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Ändern' }));
+      // The dialog is gone; the picker of the dock (a popover of the same name) is open.
+      expect(screen.queryByText('Kopf des Protokolls')).toBeNull();
+      expect(screen.getByText('Protokollführung übergeben an')).toBeInTheDocument();
     });
 
     it('discards the planned handover', async () => {

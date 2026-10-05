@@ -107,3 +107,14 @@
   gap: var(--space-2);
   margin-top: var(--space-1);
 }
+
+/* The result is in the text of the item. */
+.vc__inProtocol {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  color: var(--color-accent-text);
+}

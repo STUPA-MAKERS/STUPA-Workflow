@@ -17,6 +17,7 @@ import type {
   BallotResult,
   CommentOutWire,
   EffectiveForm,
+  KeeperPeriod,
   MagicLinkVerifyResult,
   MeetingOutWire,
   MeetingPageWire,
@@ -460,6 +461,20 @@ let MOCK_MEETING: MeetingOutWire = {
   canWrite: true,
   canManageVotes: true,
   canFinalize: true,
+  // The demo user keeps the minutes since the start (Z3); a handover adds a period.
+  keeperPeriods: [
+    {
+      principalId: MOCK_PRINCIPAL.sub,
+      name: MOCK_PRINCIPAL.display_name ?? null,
+      fromAt: '2026-06-12T16:04:00Z',
+      toAt: null,
+      fromAgendaItemId: 'ag-s1',
+      toAgendaItemId: null,
+      fromPosition: 1,
+      toPosition: null,
+    },
+  ],
+  plannedHandover: null,
   votes: [
     {
       id: 'a0000000-0000-0000-0000-0000000000a1',
@@ -528,8 +543,11 @@ const MOCK_PLANNED_AGENDA = [
   { id: 'ag-p3', applicationId: null, title: 'Verschiedenes', body: '', position: 2 },
 ];
 
-/** GET /delegations: the user represents a member in the planned meeting. */
-const MOCK_DELEGATIONS = [
+/**
+ * GET /delegations: the user represents a member in the planned meeting, and in the live
+ * meeting Vera Vertretung is represented by Sven Stellvertreter (the lead sees it and can revoke it).
+ */
+let MOCK_DELEGATIONS = [
   {
     id: 'f0000000-0000-0000-0000-000000000001',
     meetingId: MOCK_PLANNED_MEETING.id,
@@ -546,6 +564,23 @@ const MOCK_DELEGATIONS = [
     createdAt: '2026-06-02T09:00:00Z',
     revocable: false,
     direction: 'incoming',
+  },
+  {
+    id: 'f0000000-0000-0000-0000-000000000002',
+    meetingId: MOCK_MEETING_ID,
+    meetingTitle: 'STUPA-Sitzung 12.06.',
+    meetingDate: '2026-06-12',
+    gremiumId: 'g0000000-0000-0000-0000-000000000001',
+    gremiumName: 'Studierendenparlament',
+    delegatorId: 'p-6',
+    delegatorName: 'Vera Vertretung',
+    delegateId: 'p-7',
+    delegateName: 'Sven Stellvertreter',
+    delegateVoting: true,
+    viaPool: false,
+    createdAt: '2026-06-10T09:00:00Z',
+    revocable: true,
+    direction: null,
   },
 ];
 /** A local `YYYY-MM-DD` date, `days` away from today. */
@@ -659,6 +694,13 @@ let MOCK_ATTENDANCE: MockAttendance[] = [
   { principalId: MOCK_PRINCIPAL.sub, displayName: MOCK_PRINCIPAL.display_name ?? null, email: MOCK_PRINCIPAL.email ?? null, status: null, source: null, note: null, isSelf: true, canKeepProtocol: true },
   { principalId: 'p-2', displayName: 'Max Mustermann', email: 'max@example.com', status: 'present', source: 'lead', note: null, isSelf: false, canKeepProtocol: true },
   { principalId: 'p-3', displayName: 'Erika Beispiel', email: 'erika@example.com', status: 'excused', source: 'self', note: 'Prüfung', isSelf: false, canKeepProtocol: false },
+  { principalId: 'p-4', displayName: 'Uli Übernahme', email: 'uli@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: true },
+  { principalId: 'p-5', displayName: 'Rolf Redner', email: 'rolf@example.com', status: 'present', source: 'lead', note: null, isSelf: false, canKeepProtocol: true },
+  // O23: Vera Vertretung has a delegation for the live meeting, so "present" gives 409.
+  { principalId: 'p-6', displayName: 'Vera Vertretung', email: 'vera@example.com', status: 'excused', source: 'self', note: null, isSelf: false, canKeepProtocol: true },
+  { principalId: 'p-7', displayName: 'Sven Stellvertreter', email: 'sven@example.com', status: 'present', source: 'self', note: null, isSelf: false, canKeepProtocol: false },
+  { principalId: 'p-8', displayName: 'Fritz Fehlend', email: 'fritz@example.com', status: 'absent', source: 'lead', note: null, isSelf: false, canKeepProtocol: false },
+  { principalId: 'p-9', displayName: 'Olga Offen', email: 'olga@example.com', status: null, source: null, note: null, isSelf: false, canKeepProtocol: false },
 ];
 
 interface MockAgendaItem {
@@ -769,6 +811,104 @@ function mockSearch(q: string): SearchResults {
   return { hits, truncated: false, failed: [] };
 }
 
+/**
+ * The closed demo meetings of `mock-meetings-closed.ts` (draft and final protocol), by
+ * meeting id and by protocol id. The data itself loads on first use.
+ */
+const CLOSED_MOCK_MEETING = /\/meetings\/(d0000000-0000-0000-0000-00000000010[12])(\/|$)/;
+const CLOSED_MOCK_PROTOCOL = /\/protocols\/e0000000-0000-0000-0000-0000000001(0[12])(\/|$)/;
+
+/** The id of the closed demo meeting a path belongs to, or `null`. */
+function closedMockId(p: string): string | null {
+  const meeting = CLOSED_MOCK_MEETING.exec(p);
+  if (meeting) return meeting[1];
+  const protocol = CLOSED_MOCK_PROTOCOL.exec(p);
+  return protocol ? `d0000000-0000-0000-0000-0000000001${protocol[1]}` : null;
+}
+
+/** The 1-based number of an agenda item of the live mock meeting, or `null`. */
+function mockPosition(itemId: string | null | undefined): number | null {
+  const index = MOCK_AGENDA.findIndex((a) => a.id === itemId);
+  return index >= 0 ? index + 1 : null;
+}
+
+/** A problem+json error of the mock with a stable `code`. */
+function mockProblem(status: number, code: string, url: string): Observable<never> {
+  return throwError(
+    () => new HttpErrorResponse({ status, url, error: { status, code, detail: code } }),
+  );
+}
+
+/**
+ * POST /meetings/{id}/protokollant-handover of the live mock meeting (Z3, O1, O20): `now`
+ * ends the running period and starts one for the new keeper; `next_item` plans it.
+ */
+function mockHandover(body: { principalId?: string; mode?: string } | null, url: string): Observable<HttpEvent<unknown>> | MeetingOutWire {
+  const target = MOCK_ATTENDANCE.find((a) => a.principalId === body?.principalId);
+  if (!target?.canKeepProtocol) return mockProblem(422, 'protokollant_needs_protocol_write', url);
+  if (target.principalId === MOCK_MEETING.protokollantId) {
+    return mockProblem(409, 'already_protokollant', url);
+  }
+  const current = MOCK_MEETING.currentAgendaItemId ?? null;
+  const pos = mockPosition(current);
+  const next: KeeperPeriod = {
+    principalId: target.principalId,
+    name: target.displayName,
+    fromAt: null,
+    toAt: null,
+    fromAgendaItemId: null,
+    toAgendaItemId: null,
+    fromPosition: null,
+    toPosition: null,
+  };
+  if (body?.mode === 'next_item') {
+    if (pos === null || pos >= MOCK_AGENDA.length) return mockProblem(409, 'no_next_item', url);
+    const nextItem = MOCK_AGENDA[pos];
+    MOCK_MEETING = {
+      ...MOCK_MEETING,
+      plannedHandover: { ...next, fromAgendaItemId: nextItem.id, fromPosition: pos + 1 },
+    };
+    return MOCK_MEETING;
+  }
+  const now = new Date().toISOString();
+  MOCK_MEETING = {
+    ...MOCK_MEETING,
+    keeperPeriods: [
+      ...(MOCK_MEETING.keeperPeriods ?? []).map((p) =>
+        p.toAt === null ? { ...p, toAt: now, toAgendaItemId: current, toPosition: pos } : p,
+      ),
+      { ...next, fromAt: now, fromAgendaItemId: current, fromPosition: pos },
+    ],
+    plannedHandover: null,
+    protokollantId: target.principalId,
+    protokollantName: target.displayName,
+    isProtokollant: target.principalId === MOCK_PRINCIPAL.sub,
+  };
+  return MOCK_MEETING;
+}
+
+/** A forward move of the current item starts the planned handover (A13). */
+function mockStartPlannedHandover(fromItem: string | null | undefined, toItem: string | null | undefined): void {
+  const plan = MOCK_MEETING.plannedHandover;
+  const from = mockPosition(fromItem) ?? 0;
+  const to = mockPosition(toItem);
+  if (!plan || to === null || to <= from) return;
+  const now = new Date().toISOString();
+  MOCK_MEETING = {
+    ...MOCK_MEETING,
+    keeperPeriods: [
+      ...(MOCK_MEETING.keeperPeriods ?? []).map((p) =>
+        p.toAt === null ? { ...p, toAt: now, toAgendaItemId: fromItem ?? null, toPosition: from || null } : p,
+      ),
+      { ...plan, fromAt: now, fromAgendaItemId: toItem ?? null, fromPosition: to },
+    ],
+    plannedHandover: null,
+    protokollantId: plan.principalId,
+    protokollantName: plan.name,
+    isProtokollant: plan.principalId === MOCK_PRINCIPAL.sub,
+  };
+}
+
 /** The paths of the demo applications in `mock-applications.ts` (id prefix `a1000000-`). */
 const DEMO_APPLICATION_PATH =
   /\/applications\/a1000000-[^/]+(\/(transitions|attachments|shares|flow-states|form|timeline|versions|transition|archive|force-status))?$/;
@@ -845,6 +985,21 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     req.params.get('gremiumId') === DEMO_GREMIUM
   ) {
     return from(import('./mock-applications')).pipe(mergeMap((m) => ok(m.agendaMeetings())));
+  }
+
+  // The closed demo meetings (draft and final protocol). The data loads on first use.
+  const closedId = closedMockId(p);
+  if (closedId && !/\/(attendance|delegations)/.test(p)) {
+    return from(import('./mock-meetings-closed')).pipe(
+      mergeMap((m) => {
+        const body =
+          req.method === 'GET'
+            ? m.closedMeetingGet(closedId, p)
+            : m.closedMeetingWrite(closedId, req.method, p, req.body);
+        if (body === undefined) return mockProblem(409, 'meeting_closed', req.url);
+        return ok(body);
+      }),
+    );
   }
 
   if (req.method === 'GET') {
@@ -953,6 +1108,13 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       const body = (req.body as { status?: string; note?: string | null } | null) ?? {};
       const status = (body.status ?? 'present') as MockAttendance['status'];
       const target = att[1];
+      // O23: a member with a delegation of this meeting cannot be present.
+      const meetingId = /\/meetings\/([^/]+)\//.exec(p)?.[1];
+      const delegator = target === 'me' ? MOCK_PRINCIPAL.sub : target;
+      const delegated = MOCK_DELEGATIONS.some(
+        (d) => d.meetingId === meetingId && d.delegatorId === delegator,
+      );
+      if (status === 'present' && delegated) return mockProblem(409, 'delegation_active', req.url);
       // Like the server: only an excuse keeps a reason; an omitted note keeps the stored one.
       const noteFor = (a: MockAttendance): string | null =>
         status !== 'excused' ? null : body.note !== undefined ? body.note : a.note;
@@ -973,6 +1135,10 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       const file = req.body instanceof FormData ? req.body.get('file') : null;
       const name = file instanceof File ? file.name : 'rechnung.pdf';
       return from(import('./mock-bookings')).pipe(mergeMap((m) => ok(m.mockParseInvoice(name))));
+    }
+    if (/\/meetings\/[^/]+\/protokollant-handover$/.test(p)) {
+      const out = mockHandover(req.body as { principalId?: string; mode?: string } | null, req.url);
+      return 'id' in out ? ok(out) : out;
     }
     if (/\/meetings\/[^/]+\/votes$/.test(p)) {
       const body = req.body as { applicationId?: string; question?: string | null } | null;
@@ -1107,6 +1273,9 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
 
   if (req.method === 'PATCH' && /\/meetings\/[^/]+$/.test(p)) {
     const body = (req.body as { status?: MeetingOutWire['status']; activeApplicationId?: string; currentAgendaItemId?: string | null; date?: string | null; startTime?: string | null; endTime?: string | null; protokollantId?: string | null } | null) ?? {};
+    if (body.currentAgendaItemId !== undefined) {
+      mockStartPlannedHandover(MOCK_MEETING.currentAgendaItemId, body.currentAgendaItemId);
+    }
     MOCK_MEETING = {
       ...MOCK_MEETING,
       status: body.status ?? MOCK_MEETING.status,
@@ -1153,6 +1322,16 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'DELETE') {
+    if (/\/meetings\/[^/]+\/protokollant-handover$/.test(p)) {
+      if (!MOCK_MEETING.plannedHandover) return mockProblem(404, 'no_planned_handover', req.url);
+      MOCK_MEETING = { ...MOCK_MEETING, plannedHandover: null };
+      return ok(MOCK_MEETING);
+    }
+    const delegation = /\/delegations\/([^/]+)$/.exec(p);
+    if (delegation) {
+      MOCK_DELEGATIONS = MOCK_DELEGATIONS.filter((d) => d.id !== delegation[1]);
+      return ok(null, 204);
+    }
     const agenda = /\/meetings\/[^/]+\/agenda\/([^/]+)$/.exec(p);
     if (agenda) {
       MOCK_AGENDA = MOCK_AGENDA.filter((a) => a.id !== agenda[1]);

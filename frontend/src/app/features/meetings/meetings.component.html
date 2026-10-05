@@ -81,6 +81,7 @@
     [savingAgenda]="savingAgenda()"
     [renamingTopId]="renamingTopId()"
     [(renameDraft)]="renameDraft"
+    [attendanceConflict]="attendanceConflict()"
     (back)="goBack()"
     (selectTop)="jumpTo($event)"
     (bodyChange)="onTopBodyChange($event.itemId, $event.body)"
@@ -95,12 +96,13 @@
     (finalize)="finalize()"
     (openSettings)="openSettings(m)"
     (setProtokollant)="setProtokollant(m, $event)"
-    (handOver)="handOver(m, $event.principalId, $event.mode)"
+    (pickHandover)="askHandover($event)"
     (cancelHandover)="cancelHandover(m)"
     (deleteMeeting)="askDeleteMeeting(m)"
     (toggleBeamer)="beamerMode.set(true)"
     (attendanceChange)="setAttendance($event.member, $event.status, $event.note)"
     (attendanceReset)="resetAttendance($event)"
+    (attendanceConflictResolved)="clearAttendanceConflict($event)"
     (addTop)="openAgendaDialog()"
     (removeFromAgenda)="removeFromAgenda($event)"
     (startRename)="startRename($event)"
@@ -183,6 +185,20 @@
     (closed)="dialogs.agendaOpen.set(false)"
     (added)="agendaAdded($event)"
   />
+
+  <!-- Z3: when the minutes of the live meeting change hands. -->
+  @if (m.status === 'live') {
+    <app-handover-dialog
+      [meeting]="m"
+      [agenda]="agenda()"
+      [target]="dialogs.handoverTarget()"
+      [saving]="dialogs.handoverSaving()"
+      [refusal]="dialogs.handoverRefusal()"
+      (closed)="dialogs.closeHandover()"
+      (repick)="changeHandover()"
+      (confirm)="handOver(m, $event)"
+    />
+  }
 
   <!-- The close never finalizes the protocol (O13). -->
   <app-close-meeting-dialog

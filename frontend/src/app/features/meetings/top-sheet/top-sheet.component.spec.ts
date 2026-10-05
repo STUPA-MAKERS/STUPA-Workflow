@@ -19,6 +19,7 @@ interface Inputs {
 
 async function setup(over: Partial<Inputs> = {}) {
   const bodyChange = jest.fn();
+  const finalize = jest.fn();
   const view = await render(TopSheetComponent, {
     inputs: {
       meeting: meeting(),
@@ -31,10 +32,10 @@ async function setup(over: Partial<Inputs> = {}) {
       revision: 0,
       ...over,
     },
-    on: { bodyChange },
+    on: { bodyChange, finalize },
     providers: [provideRouter([])],
   });
-  return { ...view, bodyChange };
+  return { ...view, bodyChange, finalize };
 }
 
 function editorOf(view: Awaited<ReturnType<typeof setup>>): MarkdownEditorComponent {
@@ -102,47 +103,68 @@ describe('TopSheetComponent', () => {
     expect(screen.getByText(/Pia Protokoll führt das Protokoll/)).toBeInTheDocument();
   });
 
-  it('offers the PDFs of a final protocol and hides the save state', async () => {
-    await setup({
-      editable: false,
-      meeting: meeting({ status: 'closed' }),
-      protocol: protocol({ status: 'final', isFinal: true, isLocked: true, pdfUrl: '/p.pdf', publicPdfUrl: '/pub.pdf' }),
-    });
-    expect(screen.getByText('Final')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Internes Protokoll' })).toHaveAttribute('href', '/p.pdf');
-    expect(screen.getByRole('link', { name: 'Öffentliches Protokoll' })).toHaveAttribute('href', '/pub.pdf');
+  it('carries the state, the finalize and the PDFs of a closed meeting in the protocol bar', async () => {
+    const { fixture, finalize, container } = await setup({ meeting: meeting({ status: 'closed' }) });
+    const bar = screen.getByRole('status');
+    expect(bar).toHaveTextContent('Entwurf · Das Protokoll ist noch nicht versandt.');
+    // The foot of a live meeting is gone; the bar says it all.
+    expect(container.querySelector('.ts__foot')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
+    expect(finalize).toHaveBeenCalled();
+    fixture.componentRef.setInput(
+      'protocol',
+      protocol({ status: 'final', isFinal: true, isLocked: true, pdfUrl: '/p.pdf', publicPdfUrl: '/pub.pdf', sentAt: '2026-10-16T08:00:00Z' }),
+    );
+    fixture.componentRef.setInput('editable', false);
+    fixture.detectChanges();
+    expect(screen.getByRole('status')).toHaveTextContent('Final · Das Protokoll ist final und wurde versandt.');
+    expect(screen.getByRole('link', { name: 'PDF intern' })).toHaveAttribute('href', '/p.pdf');
+    expect(screen.getByRole('link', { name: 'PDF öffentlich' })).toHaveAttribute('href', '/pub.pdf');
+    expect(screen.queryByRole('button', { name: 'Finalisieren & versenden' })).toBeNull();
     expect(screen.queryByText('Gespeichert')).toBeNull();
-    // The status says "Final"; the footer adds no sentence.
-    expect(screen.queryByText(/Gremien-Recht/)).toBeNull();
   });
 
-  it('offers one PDF link when nothing is redacted', async () => {
-    await setup({ protocol: protocol({ status: 'final', isFinal: true, isLocked: true, pdfUrl: '/p.pdf' }) });
-    expect(screen.getByRole('link', { name: 'PDF öffnen' })).toBeInTheDocument();
-  });
-
-  it('says only why a closed meeting has no finalize for this person', async () => {
+  it('keeps the live foot: the protocol state and who writes', async () => {
     const { fixture, container } = await setup({ protocol: protocol({ status: 'rendering', isLocked: true }) });
-    expect(screen.getByText('Wird gerendert …')).toBeInTheDocument();
     const foot = () => container.querySelector('.ts__foot') as HTMLElement;
     expect(foot().textContent?.trim()).toBe('Wird gerendert …');
-    // Live, or closed with the finalize right: the header already shows the next step.
     fixture.componentRef.setInput('protocol', protocol());
+    fixture.componentRef.setInput('canEdit', false);
     fixture.detectChanges();
-    expect(foot().textContent?.trim()).toBe('Entwurf');
-    fixture.componentRef.setInput('meeting', meeting({ status: 'closed' }));
+    expect(foot()).toHaveTextContent('Entwurf');
+    expect(foot()).toHaveTextContent('Pia Protokoll führt das Protokoll — du liest mit.');
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('names every keeper of a closed meeting below the title', async () => {
+    const periods = [
+      { principalId: 'pr-1', name: 'Pia Protokoll', fromAt: '2026-10-15T16:04:00Z', toAt: '2026-10-15T16:55:00Z', fromAgendaItemId: 't-1', toAgendaItemId: 't-2', fromPosition: 1, toPosition: 2 },
+      { principalId: 'pr-2', name: 'Mika Mitglied', fromAt: '2026-10-15T16:55:00Z', toAt: '2026-10-15T19:12:00Z', fromAgendaItemId: 't-2', toAgendaItemId: 't-3', fromPosition: 2, toPosition: 3 },
+    ];
+    const { fixture } = await setup({ meeting: meeting({ status: 'closed', keeperPeriods: periods }) });
+    expect(screen.getByText('Protokoll: Pia Protokoll (TOP 1–2), Mika Mitglied (TOP 2–3)')).toBeInTheDocument();
+    // A live meeting names its keeper in the dock, not here.
+    fixture.componentRef.setInput('meeting', meeting({ keeperPeriods: periods }));
     fixture.detectChanges();
-    expect(foot().textContent?.trim()).toBe('Entwurf');
-    // A live meeting without the right: the close comes first.
-    fixture.componentRef.setInput('meeting', meeting({ canFinalize: false }));
-    fixture.detectChanges();
-    expect(screen.queryByText(/Gremien-Recht/)).toBeNull();
-    fixture.componentRef.setInput('meeting', meeting({ status: 'closed', canFinalize: false }));
-    fixture.detectChanges();
-    expect(screen.getByText(/Gremien-Recht „Protokoll finalisieren“/)).toBeInTheDocument();
-    fixture.componentRef.setInput('meeting', meeting({ status: 'closed', canFinalize: false, canWrite: false }));
-    fixture.detectChanges();
-    expect(screen.queryByText(/Gremien-Recht/)).toBeNull();
+    expect(screen.queryByText(/^Protokoll: Pia Protokoll \(/)).toBeNull();
+  });
+
+  it('gives the vote cards of the text the result of the closed votes of the meeting', async () => {
+    const closed = {
+      id: 'v-1', applicationId: null, agendaItemId: 't-1', title: null, question: 'Frage?', options: ['yes', 'no', 'abstain'],
+      status: 'closed' as const, result: 'rejected', counts: { yes: 2, no: 2, abstain: 0 }, leading: null, closesAt: null,
+      voted: 4, present: 4, revealed: true, failedReason: 'majority' as const, majorityRule: 'simple' as const,
+      closedAt: '2026-10-15T16:52:00Z',
+    };
+    const view = await setup({
+      meeting: meeting({ votes: [closed] }),
+      top: { ...AGENDA[0], body: '> [!abstimmung] **Frage?**\n> yes: 2, no: 2, abstain: 0' },
+    });
+    const card = view.container.querySelector('.mde__vote') as HTMLElement;
+    expect(card.dataset['result']).toBe('rejected');
+    expect(card.querySelector('.mde__voteKind')?.textContent).toMatch(/^Beschluss · \d\d:52 · Einfache Mehrheit$/);
+    // O18: a tie is a rejection.
+    expect(card.querySelector('.mde__voteResult')?.textContent).toBe('Abgelehnt');
   });
 
   it('explains the empty states', async () => {

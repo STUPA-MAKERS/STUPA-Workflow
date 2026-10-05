@@ -1,15 +1,9 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { AgendaItem, Attendance, Meeting } from '@core/api/models';
 import {
   AGENDA,
   ATTENDANCE,
-  DELEGATION_CONTEXT,
   WITH_VOTER,
   matchMediaQueries,
   meeting,
@@ -17,18 +11,13 @@ import {
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { type DockPanel, SessionDockComponent } from './session-dock.component';
 
-const OUTPUTS = [
-  'step', 'jumpNow', 'attendanceChange', 'attendanceReset', 'setProtokollant', 'handOver',
-  'cancelHandover',
-] as const;
+const OUTPUTS = ['step', 'jumpNow', 'setProtokollant', 'pickHandover', 'cancelHandover'] as const;
 
 interface Inputs {
   meeting: Meeting;
   agenda: AgendaItem[];
   topIndex: number;
   attendance: Attendance[];
-  savingAttendance: boolean;
-  viewers: string[];
   wordCount: number;
   myVote: string | null;
   panel: DockPanel;
@@ -54,18 +43,14 @@ async function setup(over: Partial<Inputs> = {}, media: string[] = []) {
       agenda: AGENDA,
       topIndex: 0,
       attendance: ATTENDANCE,
-      savingAttendance: false,
-      viewers: ['Pia Protokoll', 'Alina Admin'],
       wordCount: 12,
       myVote: null,
       panel: 'none',
       ...over,
     },
     on,
-    providers: [provideHttpClient(), provideHttpClientTesting()],
   });
-  const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  return { ...view, on, http };
+  return { ...view, on };
 }
 
 const planned = (over: Partial<Meeting> = {}) => meeting({ status: 'planned', ...over });
@@ -115,52 +100,49 @@ describe('SessionDockComponent', () => {
       expect(screen.getByText('Jetzt läuft TOP 2 · Unbenannter TOP')).toBeInTheDocument();
     });
 
-    it('opens the attendance with the room state and the viewers', async () => {
-      const { on, http } = await setup();
-      await userEvent.click(screen.getByTitle('Anwesenheit'));
-      const popover = screen.getByRole('dialog', { name: 'Anwesenheit' });
-      expect(within(popover).getByText('Anwesend 1 von 3')).toBeInTheDocument();
-      expect(within(popover).getByText('Mika Mitglied')).toBeInTheDocument();
-      expect(within(popover).getByText('Protokollführung')).toBeInTheDocument();
-      // Once in the roster, once in the viewer list.
-      expect(within(popover).getAllByText('Alina Admin')).toHaveLength(2);
-      expect(within(popover).getByText('2 live')).toBeInTheDocument();
-      const [, mika] = within(popover).getAllByRole('group', { name: 'Anwesenheit' });
-      await userEvent.click(within(mika).getByRole('button', { name: 'Auf „Offen“ zurücksetzen' }));
-      expect(on.attendanceReset).toHaveBeenCalledWith(expect.objectContaining({ principalId: 'pr-2' }));
-      await userEvent.click(within(mika).getByRole('button', { name: 'Unentschuldigt' }));
-      expect(on.attendanceChange).toHaveBeenCalledWith({
-        member: expect.objectContaining({ principalId: 'pr-2' }),
-        status: 'absent',
-      });
-      http.match((r) => r.url.includes('/delegations/')).forEach((req) => req.flush(DELEGATION_CONTEXT));
+    it('counts the present members and opens the attendance sheet of the page', async () => {
+      const { fixture } = await setup();
+      const chip = screen.getByTitle('Anwesenheit');
+      expect(chip).toHaveTextContent('Anwesend 1 von 3');
+      await userEvent.click(chip);
+      expect(fixture.componentInstance.panel()).toBe('attendance');
+      expect(chip).toHaveAttribute('aria-expanded', 'true');
+      // The sheet is the page's; the dock opens no popover for it.
+      expect(screen.queryByRole('dialog')).toBeNull();
+      await userEvent.click(chip);
+      expect(fixture.componentInstance.panel()).toBe('none');
     });
 
-    it('says when nobody has the meeting open and hides the live count from a reader', async () => {
-      const { fixture, http } = await setup({ viewers: [] });
-      await userEvent.click(screen.getByTitle('Anwesenheit'));
-      expect(screen.getByText('Niemand hat die Sitzung gerade geöffnet.')).toBeInTheDocument();
-      fixture.componentRef.setInput('meeting', meeting({ canWrite: false }));
-      fixture.detectChanges();
-      expect(screen.queryByText('0 live')).toBeNull();
-      http.match((r) => r.url.includes('/delegations/')).forEach((req) => req.flush(DELEGATION_CONTEXT));
-    });
-
-    it('closes a popover on the backdrop, on the close button, on Escape and on a second click', async () => {
+    it('closes the minute-taker menu on the backdrop, on Escape and on a second click', async () => {
       const { fixture, container } = await setup();
       const dock = fixture.componentInstance;
-      await userEvent.click(screen.getByTitle('Anwesenheit'));
-      await userEvent.click(screen.getByRole('button', { name: 'Schließen' }));
-      expect(dock.panel()).toBe('none');
-      await userEvent.click(screen.getByTitle('Anwesenheit'));
+      const chip = screen.getByTitle('Protokollführung übergeben');
+      await userEvent.click(chip);
+      expect(screen.getByRole('dialog', { name: 'Protokollführung übergeben' })).toBeInTheDocument();
       await userEvent.keyboard('{Escape}');
       expect(dock.panel()).toBe('none');
-      await userEvent.click(screen.getByTitle('Anwesenheit'));
+      await userEvent.click(chip);
       await userEvent.click(container.querySelector('.sd__backdrop') as HTMLElement);
       expect(dock.panel()).toBe('none');
-      await userEvent.click(screen.getByTitle('Anwesenheit'));
-      await userEvent.click(screen.getByTitle('Anwesenheit'));
+      await userEvent.click(chip);
+      await userEvent.click(chip);
       expect(dock.panel()).toBe('none');
+    });
+
+    it('puts the end edge of the minute-taker menu in line with the end edge of its chip', async () => {
+      const { fixture, container } = await setup();
+      const rect = (left: number, right: number) => ({ left, right, top: 0, bottom: 0 }) as DOMRect;
+      jest.spyOn(fixture.nativeElement as HTMLElement, 'getBoundingClientRect').mockReturnValue(rect(96, 1428));
+      const chip = screen.getByTitle('Protokollführung übergeben');
+      jest.spyOn(chip, 'getBoundingClientRect').mockReturnValue(rect(1080, 1308));
+      await userEvent.click(chip);
+      const pop = container.querySelector('.sd__pop') as HTMLElement;
+      expect(pop.style.getPropertyValue('--sd-pop-end')).toBe('120px');
+      // Right to left: the end edge is the left edge.
+      await userEvent.click(chip);
+      (fixture.nativeElement as HTMLElement).style.direction = 'rtl';
+      await userEvent.click(chip);
+      expect((container.querySelector('.sd__pop') as HTMLElement).style.getPropertyValue('--sd-pop-end')).toBe('984px');
     });
   });
 
@@ -171,6 +153,8 @@ describe('SessionDockComponent', () => {
       await setup({ meeting: meeting({ canManage: false, isProtokollant: false }) });
       expect(screen.queryByTitle('Protokollführung übergeben')).toBeNull();
       expect(screen.getByText('Protokoll: Pia Protokoll')).toBeInTheDocument();
+      // The tooltip names the minute-taker in full, for a name the chip cuts off.
+      expect(screen.getByTitle('Protokoll: Pia Protokoll')).toHaveClass('sd__chip--static');
     });
 
     it('offers the handover to the minute-taker', async () => {
@@ -178,48 +162,25 @@ describe('SessionDockComponent', () => {
       expect(chip()).toHaveTextContent('Protokoll: Pia Protokoll');
     });
 
-    it('hands over now to a member who can keep the minutes (O20)', async () => {
+    it('passes a pick on to the handover dialog, only for members who can keep the minutes (O20)', async () => {
       const { on } = await setup({ attendance: WITH_VOTER });
       await userEvent.click(chip());
-      const sheet = screen.getByRole('dialog', { name: 'Protokollführung übergeben' });
-      expect(within(sheet).getByText('Protokoll: Pia Protokoll')).toBeInTheDocument();
-      expect(within(sheet).queryByRole('button', { name: /Vera Votum/ })).toBeNull();
-      // The current minute-taker is no target.
-      await userEvent.click(within(sheet).getByRole('button', { name: /Pia Protokoll/, pressed: true }));
-      expect(on.handOver).not.toHaveBeenCalled();
+      const menu = screen.getByRole('dialog', { name: 'Protokollführung übergeben' });
+      expect(within(menu).getByText('Protokollführung übergeben an')).toBeInTheDocument();
+      expect(within(menu).queryByRole('button', { name: /Vera Votum/ })).toBeNull();
+      // The current minute-taker is marked and is no target.
+      const current = within(menu).getByRole('button', { name: /Pia Protokoll/ });
+      expect(current).toHaveAttribute('aria-current', 'true');
+      expect(current).toHaveTextContent('Anwesend · führt das Protokoll');
+      await userEvent.click(current);
+      expect(on.pickHandover).not.toHaveBeenCalled();
+      expect(screen.queryByRole('dialog', { name: 'Protokollführung übergeben' })).toBeNull();
       await userEvent.click(chip());
       const again = screen.getByRole('dialog', { name: 'Protokollführung übergeben' });
       await userEvent.click(within(again).getByRole('button', { name: /Mika Mitglied/ }));
-      expect(on.handOver).toHaveBeenCalledWith({ principalId: 'pr-2', mode: 'now' });
+      expect(on.pickHandover).toHaveBeenCalledWith('pr-2');
+      expect(on.setProtokollant).not.toHaveBeenCalled();
       expect(screen.queryByRole('dialog', { name: 'Protokollführung übergeben' })).toBeNull();
-    });
-
-    it('plans the handover for the next item', async () => {
-      const { on } = await setup();
-      await userEvent.click(chip());
-      const sheet = screen.getByRole('dialog', { name: 'Protokollführung übergeben' });
-      const next = within(sheet).getByRole('button', { name: 'Ab nächstem TOP' });
-      expect(next).not.toBeDisabled();
-      await userEvent.click(next);
-      expect(next).toHaveAttribute('aria-pressed', 'true');
-      await userEvent.click(within(sheet).getByRole('button', { name: 'Ab jetzt' }));
-      await userEvent.click(next);
-      await userEvent.click(within(sheet).getByRole('button', { name: /Alina Admin/ }));
-      expect(on.handOver).toHaveBeenCalledWith({ principalId: 'pr-3', mode: 'next_item' });
-    });
-
-    it('hands over now on the last item, which has no next one', async () => {
-      const { on, fixture } = await setup({ meeting: meeting({ currentAgendaItemId: 't-3' }) });
-      await userEvent.click(chip());
-      const sheet = screen.getByRole('dialog', { name: 'Protokollführung übergeben' });
-      expect(within(sheet).getByRole('button', { name: 'Ab nächstem TOP' })).toBeDisabled();
-      // A stale choice from before the last item still sends `now`.
-      (fixture.componentInstance as unknown as { handoverMode: { set(v: string): void } }).handoverMode.set(
-        'next_item',
-      );
-      fixture.detectChanges();
-      await userEvent.click(within(sheet).getByRole('button', { name: /Mika Mitglied/ }));
-      expect(on.handOver).toHaveBeenCalledWith({ principalId: 'pr-2', mode: 'now' });
     });
 
     it('shows and discards the planned handover', async () => {
@@ -228,18 +189,25 @@ describe('SessionDockComponent', () => {
         name: 'Mika Mitglied',
         fromAt: null,
         toAt: null,
-        fromAgendaItemId: null,
+        fromAgendaItemId: 't-2',
         toAgendaItemId: null,
-        fromPosition: null,
+        fromPosition: 2,
         toPosition: null,
       };
-      const { on } = await setup({ meeting: meeting({ plannedHandover: plan }) });
+      const { on, fixture } = await setup({ meeting: meeting({ plannedHandover: plan }) });
       expect(within(chip()).getByText(/Übergabe geplant/)).toBeInTheDocument();
       await userEvent.click(chip());
-      const sheet = screen.getByRole('dialog', { name: 'Protokollführung übergeben' });
-      expect(within(sheet).getByText('Übergabe an Mika Mitglied mit dem nächsten TOP geplant.')).toBeInTheDocument();
-      await userEvent.click(within(sheet).getByRole('button', { name: 'Verwerfen' }));
+      const menu = screen.getByRole('dialog', { name: 'Protokollführung übergeben' });
+      expect(within(menu).getByText('Geplant')).toBeInTheDocument();
+      expect(within(menu).getByText('übernimmt ab TOP 2')).toBeInTheDocument();
+      await userEvent.click(within(menu).getByRole('button', { name: 'Verwerfen' }));
       expect(on.cancelHandover).toHaveBeenCalled();
+      expect(fixture.componentInstance.panel()).toBe('none');
+      // Without a known TOP number the plan says "with the next item".
+      fixture.componentRef.setInput('meeting', meeting({ plannedHandover: { ...plan, fromPosition: null } }));
+      fixture.detectChanges();
+      await userEvent.click(chip());
+      expect(screen.getByText('übernimmt mit dem nächsten TOP')).toBeInTheDocument();
     });
   });
 
@@ -253,13 +221,14 @@ describe('SessionDockComponent', () => {
     });
 
     it('marks a missing minute-taker and opens the picker', async () => {
-      const { container } = await setup({ meeting: planned({ protokollantId: null, protokollantName: null }) });
+      await setup({ meeting: planned({ protokollantId: null, protokollantName: null }) });
       const chip = screen.getByRole('button', { name: /Protokollführung fehlt/ });
       expect(chip).toHaveClass('sd__chip--warn');
       expect(chip).toHaveAttribute('aria-expanded', 'false');
       await userEvent.click(chip);
       expect(chip).toHaveAttribute('aria-expanded', 'true');
-      expect(container.querySelector('.sd__pop--narrow')).toBeTruthy();
+      expect(screen.getByRole('dialog', { name: 'Protokollführung wählen' })).toBeInTheDocument();
+      expect(screen.getByText('Protokollführung zuweisen')).toBeInTheDocument();
     });
 
     it('names the minute-taker on the chip once one is set', async () => {
@@ -267,13 +236,14 @@ describe('SessionDockComponent', () => {
       expect(screen.getByRole('button', { name: /Protokoll: Pia Protokoll/ })).not.toHaveClass('sd__chip--warn');
     });
 
-    it('searches the roster and names the picked member', async () => {
+    it('searches the roster and names the picked member at once', async () => {
       const { on } = await setup({ meeting: planned({ protokollantId: null, protokollantName: null }) });
       await userEvent.click(screen.getByRole('button', { name: /Protokollführung fehlt/ }));
       const picker = screen.getByRole('dialog', { name: 'Protokollführung wählen' });
       expect(within(picker).getByText('PP')).toBeInTheDocument();
       expect(within(picker).getByText('Anwesend')).toBeInTheDocument();
       expect(within(picker).getByText('Offen')).toBeInTheDocument();
+      expect(within(picker).getByText('Nur Mitglieder mit dem Recht „Protokoll führen“.')).toBeInTheDocument();
       const search = within(picker).getByRole('searchbox', { name: 'Mitglied suchen' });
       await userEvent.type(search, 'mika');
       expect(within(picker).getAllByRole('button', { name: /Mika Mitglied/ })).toHaveLength(1);
@@ -284,6 +254,7 @@ describe('SessionDockComponent', () => {
       await userEvent.clear(search);
       await userEvent.click(within(picker).getByRole('button', { name: /Alina Admin/ }));
       expect(on.setProtokollant).toHaveBeenCalledWith('pr-3');
+      expect(on.pickHandover).not.toHaveBeenCalled();
       expect(screen.queryByRole('dialog', { name: 'Protokollführung wählen' })).toBeNull();
     });
 
@@ -298,11 +269,12 @@ describe('SessionDockComponent', () => {
     it('does not send the minute-taker that is already set', async () => {
       const { on } = await setup({ meeting: planned() });
       await userEvent.click(screen.getByRole('button', { name: /Protokoll: Pia Protokoll/ }));
-      await userEvent.click(screen.getByRole('button', { name: /Pia Protokoll/, pressed: true }));
+      const picker = screen.getByRole('dialog', { name: 'Protokollführung wählen' });
+      await userEvent.click(within(picker).getByRole('button', { name: /Pia Protokoll/ }));
       expect(on.setProtokollant).not.toHaveBeenCalled();
     });
 
-    it('falls back to the e-mail and the id for a member without a name', async () => {
+    it('falls back to the e-mail for a member without a name, never to the id', async () => {
       await setup({
         meeting: planned(),
         attendance: [
@@ -313,9 +285,10 @@ describe('SessionDockComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: /Protokoll: Pia Protokoll/ }));
       const picker = screen.getByRole('dialog', { name: 'Protokollführung wählen' });
       expect(within(picker).getByText('kai.klar@x.de')).toBeInTheDocument();
-      expect(within(picker).getByText('pr-8')).toBeInTheDocument();
-      await userEvent.type(within(picker).getByRole('searchbox', { name: 'Mitglied suchen' }), 'kai');
       expect(within(picker).queryByText('pr-8')).toBeNull();
+      expect(within(picker).getByText('—')).toBeInTheDocument();
+      await userEvent.type(within(picker).getByRole('searchbox', { name: 'Mitglied suchen' }), 'kai');
+      expect(within(picker).queryByText('—')).toBeNull();
     });
 
     it('shows a plain mark to a lead who may not name the minute-taker', async () => {
@@ -325,45 +298,80 @@ describe('SessionDockComponent', () => {
     });
   });
 
-  describe('on a phone', () => {
-    it('opens the attendance as a bottom sheet over the navigation bar', async () => {
-      const { fixture, container, http } = await setup({}, [MEDIA.phone]);
-      const dock = fixture.componentInstance;
-      const host = fixture.nativeElement as HTMLElement;
-      expect(host.style.zIndex).toBe('');
-      await userEvent.click(screen.getByTitle('Anwesenheit'));
-      const sheet = screen.getByRole('dialog', { name: 'Anwesenheit' });
-      expect(sheet).toHaveClass('ss', 'ss--bottom');
-      expect(sheet).toHaveAttribute('aria-modal', 'true');
-      expect(sheet.querySelector('.ss__handle')).not.toBeNull();
-      expect(within(sheet).getByText('Anwesend 1 von 3')).toBeInTheDocument();
-      // No popover and no own backdrop: the sheet has its scrim.
-      expect(container.querySelector('.sd__pop')).toBeNull();
-      expect(container.querySelector('.sd__backdrop')).toBeNull();
-      expect(host.style.zIndex).toBe('var(--z-dialog)');
-      await userEvent.click(container.querySelector('.ss__scrim') as HTMLElement);
-      expect(dock.panel()).toBe('none');
-      expect(screen.queryByRole('dialog')).toBeNull();
-      expect(host.style.zIndex).toBe('');
-      http.match((r) => r.url.includes('/delegations/')).forEach((req) => req.flush(DELEGATION_CONTEXT));
+  describe('closed', () => {
+    const closed = (over: Partial<Meeting> = {}) =>
+      meeting({
+        status: 'closed',
+        closedAt: '2026-10-15T19:12:00Z',
+        keeperPeriods: [
+          { principalId: 'pr-1', name: 'Pia Protokoll', fromAt: '2026-10-15T16:04:00Z', toAt: '2026-10-15T16:55:00Z', fromAgendaItemId: 't-1', toAgendaItemId: 't-2', fromPosition: 1, toPosition: 2 },
+          { principalId: 'pr-2', name: 'Mika Mitglied', fromAt: '2026-10-15T16:55:00Z', toAt: '2026-10-15T19:12:00Z', fromAgendaItemId: 't-2', toAgendaItemId: 't-3', fromPosition: 2, toPosition: 3 },
+          { principalId: 'pr-1', name: 'Pia Protokoll', fromAt: '2026-10-15T19:00:00Z', toAt: '2026-10-15T19:12:00Z', fromAgendaItemId: 't-3', toAgendaItemId: 't-3', fromPosition: 3, toPosition: 3 },
+        ],
+        ...over,
+      });
+
+    it('says when the meeting closed, counts the TOPs and steps no more', async () => {
+      await setup({ meeting: closed() });
+      expect(screen.getByText(/^Geschlossen um \d\d:12$/)).toBeInTheDocument();
+      expect(screen.getByText('3 TOPs')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Nächster TOP' })).toBeNull();
+      expect(screen.queryByText(/Wörter/)).toBeNull();
     });
 
-    it('picks the minute-taker in a bottom sheet and closes it on Escape', async () => {
-      const { fixture, on } = await setup(
+    it('names every minute-taker once, locked, and keeps the attendance', async () => {
+      const { fixture } = await setup({ meeting: closed() });
+      // The chip can cut the names off: the tooltip names them in full, then says why.
+      const keepers = screen.getByTitle(/Sitzung geschlossen – die Protokollführung steht fest\.$/);
+      expect(keepers.getAttribute('title')).toBe(
+        'Protokoll: Pia Protokoll, Mika Mitglied\nSitzung geschlossen – die Protokollführung steht fest.',
+      );
+      expect(keepers).toHaveTextContent('Protokoll: Pia Protokoll, Mika Mitglied');
+      expect(keepers.tagName).toBe('SPAN');
+      await userEvent.click(screen.getByTitle('Anwesenheit'));
+      expect(fixture.componentInstance.panel()).toBe('attendance');
+    });
+
+    it('falls back to the minute-taker and to the bare state without periods and a close time', async () => {
+      await setup({ meeting: closed({ keeperPeriods: [], closedAt: null }), agenda: [AGENDA[0]] });
+      expect(screen.getByText('Geschlossen')).toBeInTheDocument();
+      expect(screen.getByText('1 TOP')).toBeInTheDocument();
+      expect(screen.getByText('Protokoll: Pia Protokoll')).toBeInTheDocument();
+    });
+  });
+
+  describe('on a phone', () => {
+    it('opens the minute-taker menu as a bottom sheet over the navigation bar', async () => {
+      const { fixture, container, on } = await setup(
         { meeting: planned({ protokollantId: null, protokollantName: null }) },
         [MEDIA.phone],
       );
       const dock = fixture.componentInstance;
+      const host = fixture.nativeElement as HTMLElement;
+      expect(host.style.zIndex).toBe('');
       await userEvent.click(screen.getByRole('button', { name: /Protokollführung fehlt/ }));
       let sheet = screen.getByRole('dialog', { name: 'Protokollführung wählen' });
-      expect(sheet).toHaveClass('ss--bottom');
+      expect(sheet).toHaveClass('ss', 'ss--bottom');
+      expect(sheet.querySelector('.ss__handle')).not.toBeNull();
+      // No popover and no own backdrop: the sheet has its scrim.
+      expect(container.querySelector('.sd__pop')).toBeNull();
+      expect(container.querySelector('.sd__backdrop')).toBeNull();
+      expect(host.style.zIndex).toBe('var(--z-dialog)');
       await userEvent.keyboard('{Escape}');
       expect(dock.panel()).toBe('none');
+      expect(host.style.zIndex).toBe('');
       await userEvent.click(screen.getByRole('button', { name: /Protokollführung fehlt/ }));
       sheet = screen.getByRole('dialog', { name: 'Protokollführung wählen' });
       await userEvent.click(within(sheet).getByRole('button', { name: /Mika Mitglied/ }));
       expect(on.setProtokollant).toHaveBeenCalledWith('pr-2');
       expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('keeps the dock below the dialog level while the attendance sheet of the page is open', async () => {
+      const { fixture } = await setup({}, [MEDIA.phone]);
+      await userEvent.click(screen.getByTitle('Anwesenheit'));
+      expect(fixture.componentInstance.panel()).toBe('attendance');
+      expect((fixture.nativeElement as HTMLElement).style.zIndex).toBe('');
     });
 
     it('opens no sheet for the minute-taker without the right to change it', async () => {

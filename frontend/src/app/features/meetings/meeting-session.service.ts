@@ -61,6 +61,11 @@ export class MeetingSessionService implements OnDestroy {
   /** Live viewers of the meeting page (WS `viewers`). */
   readonly viewers = signal<string[]>([]);
   readonly savingAttendance = signal(false);
+  /**
+   * O23: the member whose "present" the server refused with 409 `delegation_active`. The
+   * attendance sheet marks the row and offers the revoke of the delegation.
+   */
+  readonly attendanceConflict = signal<Uuid | null>(null);
 
   /** Date/time editor of an already created, planned meeting. */
   readonly planDate = signal('');
@@ -108,15 +113,20 @@ export class MeetingSessionService implements OnDestroy {
     return !m.canWrite && !m.canManage;
   });
   /**
-   * Write the minutes. Two people must not type into one protocol, so after a
-   * protokollant is named only that person edits it. Everybody else with
+   * Write the minutes. Two people must not type into one protocol, so in a live
+   * meeting with a named protokollant only that person edits it. Everybody else with
    * `canWrite` reads the pane. The server grants `canWrite` to the protokollant,
    * the manager and any `protocol.write` role alike, so this last step is the
    * frontend's alone.
+   *
+   * After the close there is no live keeper to protect. Every writer edits the draft
+   * (O22): the session lead, the finalizer and an earlier keeper, not only the last
+   * one. A final protocol stays locked through `Protocol.isLocked`.
    */
   readonly canEditProtocol = computed(() => {
     const m = this.meeting();
     if (!m?.canWrite) return false;
+    if (m.status === 'closed') return true;
     return !m.protokollantId || this.isProtokollant();
   });
 
@@ -155,6 +165,7 @@ export class MeetingSessionService implements OnDestroy {
 
   private adoptMeeting(m: Meeting): void {
     this.meeting.set(m);
+    this.attendanceConflict.set(null);
     this.planDate.set(m.date ?? '');
     this.planTime.set(m.startTime ?? '');
     this.connectLive(m.id);
@@ -468,7 +479,12 @@ export class MeetingSessionService implements OnDestroy {
     const req = asLead
       ? this.api.setMemberAttendance(m.id, member.principalId, status, note)
       : this.api.setOwnAttendance(m.id, status as SelfAttendanceStatus, note);
-    this.saveAttendance(m.id, req, asLead);
+    this.saveAttendance(m.id, member.principalId, req, asLead);
+  }
+
+  /** O23: the delegation of the member was revoked, so the refusal no longer applies. */
+  clearAttendanceConflict(principalId: Uuid): void {
+    if (this.attendanceConflict() === principalId) this.attendanceConflict.set(null);
   }
 
   /** Reset a member to "open" (meeting lead only). The member can then report again. */
@@ -476,35 +492,51 @@ export class MeetingSessionService implements OnDestroy {
     const m = this.meeting();
     if (!m || !m.canControl || this.savingAttendance() || member.status === null) return;
     this.savingAttendance.set(true);
-    this.saveAttendance(m.id, this.api.resetMemberAttendance(m.id, member.principalId));
+    this.saveAttendance(
+      m.id,
+      member.principalId,
+      this.api.resetMemberAttendance(m.id, member.principalId),
+    );
   }
 
-  private saveAttendance(meetingId: Uuid, req: Observable<Attendance[]>, asLead = true): void {
+  private saveAttendance(
+    meetingId: Uuid,
+    principalId: Uuid,
+    req: Observable<Attendance[]>,
+    asLead = true,
+  ): void {
     req.subscribe({
       next: (rows) => {
         this.savingAttendance.set(false);
         this.attendance.set(rows);
+        if (this.attendanceConflict() === principalId) this.attendanceConflict.set(null);
       },
       error: (err: unknown) => {
         this.savingAttendance.set(false);
-        this.attendanceFailed(meetingId, err, asLead);
+        this.attendanceFailed(meetingId, principalId, err, asLead);
       },
     });
   }
 
   /**
    * Explain a refused attendance change. O23: a member with a delegation cannot be set or
-   * report present. O15: the lead set the record of the member. Both reload the roster,
-   * because it changed in another tab or by the lead.
+   * report present; for the lead the attendance sheet marks the row and offers the
+   * revoke. O15: the lead set the record of the member. Both reload the roster, because
+   * it changed in another tab or by the lead.
    */
-  private attendanceFailed(meetingId: Uuid, err: unknown, asLead: boolean): void {
+  private attendanceFailed(
+    meetingId: Uuid,
+    principalId: Uuid,
+    err: unknown,
+    asLead: boolean,
+  ): void {
     const code = errorCode(err);
     if (code === 'delegation_active') {
-      this.toast.error(
-        this.i18n.translate(
-          asLead ? 'meetings.toast.attendanceDelegationActive' : 'meetings.toast.ownDelegationActive',
-        ),
-      );
+      if (asLead) {
+        this.attendanceConflict.set(principalId);
+      } else {
+        this.toast.error(this.i18n.translate('meetings.toast.ownDelegationActive'));
+      }
     } else if (code === 'attendance_set_by_lead') {
       this.toast.error(this.i18n.translate('meetings.toast.attendanceSetByLead'));
     } else {

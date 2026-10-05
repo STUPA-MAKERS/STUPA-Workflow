@@ -10,16 +10,13 @@ import {
   memberAttendanceKey,
   selfAttendanceKey,
 } from './meetings-display.util';
+import type { AttendanceChange } from './attendance-sheet/attendance-sheet.component';
 
-/** One attendance change. `note` is the reason of an excuse; omitted keeps the stored one. */
-export interface AttendanceChange {
-  member: Attendance;
-  status: AttendanceStatus;
-  note?: string | null;
-}
+export type { AttendanceChange };
 
 /**
- * Attendance roster table (Z2, O15).
+ * Attendance roster table of the follow view (Z2, O15). The session page uses the
+ * attendance sheet (`AttendanceSheetComponent`).
  *
  * The meeting lead (`editAll`) sets every row to present, excused or unexcused, and
  * resets a row to "open". A member reports only the own row, as present or absent

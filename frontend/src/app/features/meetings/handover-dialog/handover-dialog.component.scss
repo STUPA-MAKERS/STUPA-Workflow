@@ -1,0 +1,122 @@
+@use '../dialog-form' as df;
+@use 'breakpoints' as bp;
+
+@include df.host;
+
+.hd {
+  @include df.form;
+  gap: 18px;
+}
+
+.hd__small {
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+}
+.hd__name {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+}
+
+/* Before → after, on surface 3. */
+.hd__pair {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 14px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-3);
+}
+.hd__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hd__who--grow {
+  flex: 1 1 auto;
+}
+.hd__arrow {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+.hd__modes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.hd__cap {
+  margin-bottom: 6px;
+  padding: 0 var(--space-1);
+}
+.hd__mode {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: var(--space-3) 14px;
+  cursor: pointer;
+}
+.rowgroup.rowgroup--bg3 > .hd__mode--on {
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.hd__mode--on .hd__small {
+  color: inherit;
+}
+.hd__mode--off {
+  cursor: not-allowed;
+}
+.hd__mode--off .hd__modeLabel {
+  color: var(--color-text-muted);
+}
+.hd__radio {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--color-accent);
+  cursor: inherit;
+}
+.hd__modeText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hd__modeLabel {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+}
+
+.hd__preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) 14px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-3);
+}
+.hd__previewText {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
+}
+
+.hd__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--color-danger);
+}
+
+/* A phone: "Ändern" goes below the pair, so both names keep their room. */
+@include bp.phone {
+  .hd__pair {
+    flex-wrap: wrap;
+  }
+}

@@ -30,7 +30,8 @@ const OUTPUTS = [
   'voteDelete', 'voteDialog', 'startSession', 'closeSession', 'finalize', 'openSettings',
   'deleteMeeting', 'toggleBeamer', 'attendanceChange', 'attendanceReset', 'addTop',
   'removeFromAgenda', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'moveTop',
-  'dragStart', 'dragOver', 'dropAt', 'setProtokollant', 'handOver', 'cancelHandover',
+  'dragStart', 'dragOver', 'dropAt', 'setProtokollant', 'pickHandover', 'cancelHandover',
+  'attendanceConflictResolved',
 ] as const;
 
 type Inputs = {
@@ -51,6 +52,7 @@ type Inputs = {
   savingAgenda: boolean;
   renamingTopId: string | null;
   renameDraft: string;
+  attendanceConflict: string | null;
 };
 
 function inputs(over: Partial<Inputs> = {}): Inputs {
@@ -72,6 +74,7 @@ function inputs(over: Partial<Inputs> = {}): Inputs {
     savingAgenda: false,
     renamingTopId: null,
     renameDraft: '',
+    attendanceConflict: null,
     ...over,
   };
 }
@@ -95,8 +98,10 @@ async function setup(over: Partial<Inputs> = {}, media: string[] = []) {
     providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  const flushDelegations = () =>
+  const flushDelegations = () => {
     http.match((r) => r.url.includes('/delegations/')).forEach((req) => req.flush(DELEGATION_CONTEXT));
+    http.match((r) => r.url.endsWith('/delegations')).forEach((req) => req.flush([]));
+  };
   return { ...view, on, http, flushDelegations };
 }
 
@@ -254,7 +259,7 @@ describe('MeetingPageComponent', () => {
       expect(screen.getByRole('dialog', { name: 'Tagesordnung' })).toHaveClass('ss--start');
     });
 
-    it('moves the close and the finalize into the menu on a phone', async () => {
+    it('moves the close into the menu on a phone; the finalize stays in the protocol bar', async () => {
       const { on, fixture } = await setup({}, [MEDIA.phone]);
       expect(screen.queryByRole('button', { name: 'Sitzung schließen' })).toBeNull();
       let menu = await openMenu();
@@ -263,8 +268,17 @@ describe('MeetingPageComponent', () => {
       fixture.componentRef.setInput('meeting', meeting({ status: 'closed' }));
       fixture.detectChanges();
       menu = await openMenu();
-      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Finalisieren & versenden' }));
+      expect(within(menu).queryByRole('menuitem', { name: 'Finalisieren & versenden' })).toBeNull();
+      // A closed meeting has nothing for the beamer.
+      expect(within(menu).queryByRole('menuitem', { name: 'Beamer-Ansicht' })).toBeNull();
+      await userEvent.keyboard('{Escape}');
+      await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
       expect(on.finalize).toHaveBeenCalled();
+    });
+
+    it('shows no beamer for a closed meeting on a wide screen', async () => {
+      await setup({ meeting: meeting({ status: 'closed' }) }, [MEDIA.wide]);
+      expect(screen.queryByRole('button', { name: 'Beamer-Ansicht' })).toBeNull();
     });
   });
 
@@ -451,15 +465,40 @@ describe('MeetingPageComponent', () => {
       expect(on.selectTop).toHaveBeenCalledWith('t-2');
       await userEvent.click(screen.getByTitle('Protokollführung übergeben'));
       await userEvent.click(screen.getByRole('button', { name: /Mika Mitglied/ }));
-      expect(on.handOver).toHaveBeenCalledWith({ principalId: 'pr-2', mode: 'now' });
+      // The page asks when the handover takes effect: the dialog of MeetingsComponent.
+      expect(on.pickHandover).toHaveBeenCalledWith('pr-2');
       await userEvent.click(screen.getByTitle('Anwesenheit'));
-      const popover = screen.getByRole('dialog', { name: 'Anwesenheit' });
-      const [, mika] = within(popover).getAllByRole('group', { name: 'Anwesenheit' });
-      await userEvent.click(within(mika).getByRole('button', { name: 'Unentschuldigt' }));
-      expect(on.attendanceChange).toHaveBeenCalled();
-      await userEvent.click(within(mika).getByRole('button', { name: 'Auf „Offen“ zurücksetzen' }));
+      const sheet = screen.getByRole('dialog', { name: 'Anwesenheit' });
+      const mika = within(sheet).getByRole('radiogroup', { name: 'Anwesenheit von Mika Mitglied' });
+      await userEvent.click(within(mika).getByRole('radio', { name: 'Unentschuldigt' }));
+      expect(on.attendanceChange).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'absent' }),
+      );
+      await userEvent.click(within(mika).getByRole('radio', { name: 'Offen' }));
       expect(on.attendanceReset).toHaveBeenCalled();
       flushDelegations();
+    });
+
+    it('passes the end of an attendance conflict on (O23)', async () => {
+      const { on, http, fixture } = await setup({ attendanceConflict: 'pr-2' });
+      await userEvent.click(screen.getByTitle('Anwesenheit'));
+      http.match((r) => r.url.includes('/delegations/')).forEach((req) => req.flush(DELEGATION_CONTEXT));
+      http.match((r) => r.url.endsWith('/delegations')).forEach((req) =>
+        req.flush([
+          {
+            id: 'd-1', meetingId: 'm-1', meetingTitle: 'x', meetingDate: '2026-10-15', gremiumId: 'g-1',
+            gremiumName: 'StuPa', delegatorId: 'pr-2', delegatorName: 'Mika Mitglied', delegateId: 'pr-3',
+            delegateName: 'Alina Admin', delegateVoting: false, viaPool: false,
+            createdAt: '2026-10-01T00:00:00Z', revocable: true, direction: null,
+          },
+        ]),
+      );
+      fixture.detectChanges();
+      const sheet = screen.getByRole('dialog', { name: 'Anwesenheit' });
+      await userEvent.click(within(within(sheet).getByRole('alert')).getByRole('button', { name: 'Vertretung widerrufen' }));
+      http.expectOne('/api/delegations/d-1').flush(null);
+      expect(on.attendanceConflictResolved).toHaveBeenCalledWith('pr-2');
+      http.match((r) => r.url.endsWith('/delegations')).forEach((req) => req.flush([]));
     });
 
     it('passes the keeper pick and the discard of a planned handover on', async () => {
@@ -588,7 +627,7 @@ describe('MeetingPageComponent', () => {
       const closed = vote({ status: 'closed', result: 'passed', counts: { yes: 3, no: 1, abstain: 0 }, leading: 'yes', revealed: true });
       // A trailing hard break from a phone keyboard must not survive as an empty line.
       const { on, fixture } = await setup({ meeting: meeting({ votes: [closed] }), top: item({ body: 'Aussprache.\\\n' }) });
-      await userEvent.click(screen.getByRole('button', { name: 'Ergebnis ins Protokoll übernehmen' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Ins Protokoll übernehmen' }));
       const payload = on.bodyChange.mock.calls[0][0] as { itemId: string; body: string };
       expect(payload.itemId).toBe('t-1');
       expect(payload.body).toBe(
@@ -596,11 +635,11 @@ describe('MeetingPageComponent', () => {
       );
       fixture.componentRef.setInput('top', item({ body: payload.body }));
       fixture.detectChanges();
-      expect(screen.queryByRole('button', { name: 'Ergebnis ins Protokoll übernehmen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeNull();
       // An empty text takes the result alone.
       fixture.componentRef.setInput('top', item({ body: null }));
       fixture.detectChanges();
-      await userEvent.click(screen.getByRole('button', { name: 'Ergebnis ins Protokoll übernehmen' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Ins Protokoll übernehmen' }));
       const bodies = on.bodyChange.mock.calls.map((c) => (c[0] as { body: string }).body);
       expect(bodies.some((b) => b.startsWith('> [!abstimmung]'))).toBe(true);
     });
@@ -608,7 +647,7 @@ describe('MeetingPageComponent', () => {
     it('inserts nothing without an open item and offers no insert to a reader', async () => {
       const closed = vote({ status: 'closed', result: 'passed', counts: { yes: 3 } });
       const { on, fixture } = await setup({ meeting: meeting({ votes: [closed] }), canEdit: false });
-      expect(screen.queryByRole('button', { name: 'Ergebnis ins Protokoll übernehmen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeNull();
       fixture.componentRef.setInput('top', null);
       fixture.detectChanges();
       fixture.componentInstance.insertResult(closed);

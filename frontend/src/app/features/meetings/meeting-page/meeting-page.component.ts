@@ -19,7 +19,6 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type {
   AgendaItem,
   Attendance,
-  HandoverMode,
   Meeting,
   MeetingVote,
   Protocol,
@@ -40,7 +39,10 @@ import {
   AgendaPaneComponent,
   canChangeAgenda,
 } from '../agenda-pane/agenda-pane.component';
-import type { AttendanceChange } from '../meeting-attendance-table.component';
+import {
+  type AttendanceChange,
+  AttendanceSheetComponent,
+} from '../attendance-sheet/attendance-sheet.component';
 import { PrepChecklistComponent } from '../prep-checklist/prep-checklist.component';
 import { type DockPanel, SessionDockComponent } from '../session-dock/session-dock.component';
 import { type SaveState, TopSheetComponent } from '../top-sheet/top-sheet.component';
@@ -49,17 +51,20 @@ import { voteSnippet, voteSnippetHead } from '../meetings.util';
 import { clockTime, voteOptionLabel } from '../meetings-display.util';
 
 /** The ids of the session menu. */
-type SessionAction = 'settings' | 'attendance' | 'beamer' | 'close' | 'finalize' | 'delete';
+type SessionAction = 'settings' | 'attendance' | 'beamer' | 'close' | 'delete';
 
 /**
  * The session page of the meeting lead and the minute-taker (`/meetings/:id`).
  *
  * The header carries the title, the status, "Gremium · date · seit HH:MM", the people
- * who have the meeting open, the beamer, the session menu and the one main action (open,
- * close, or finalize after the close). Below it the agenda pane, the sheet of the open
- * item and the cards of its votes; a planned meeting shows the preparation instead of the
- * sheet. The dock at the foot steps through the agenda and holds the attendance and the
- * minute-taker.
+ * who have the meeting open, the beamer, the session menu and the one main action (open
+ * or close). Below it the agenda pane, the sheet of the open item and the cards of its
+ * votes; a planned meeting shows the preparation instead of the sheet. The dock at the
+ * foot steps through the agenda and holds the attendance and the minute-taker.
+ *
+ * A closed meeting finalizes its protocol from the protocol bar of the sheet (O13). The
+ * attendance opens as a side sheet. A minute-taker picked in the dock of a live meeting
+ * goes to the handover dialog of `MeetingsComponent` (Z3).
  *
  * Wide (>= 1200px): three columns. Below that the agenda moves into a sheet from the
  * start edge, and the vote cards go above the item. On a phone the agenda sheet, the
@@ -82,6 +87,7 @@ type SessionAction = 'settings' | 'attendance' | 'beamer' | 'close' | 'finalize'
     SessionDockComponent,
     TopSheetComponent,
     VoteCardComponent,
+    AttendanceSheetComponent,
   ],
   templateUrl: './meeting-page.component.html',
   styleUrl: './meeting-page.component.scss',
@@ -126,6 +132,8 @@ export class MeetingPageComponent {
   readonly savingAgenda = input.required<boolean>();
   readonly renamingTopId = input.required<Uuid | null>();
   readonly renameDraft = model<string>('');
+  /** O23: the member whose "present" the server refused (409 `delegation_active`). */
+  readonly attendanceConflict = input<Uuid | null>(null);
 
   /** Leave the session page for the meeting list. */
   readonly back = output<void>();
@@ -145,6 +153,8 @@ export class MeetingPageComponent {
   readonly toggleBeamer = output<void>();
   readonly attendanceChange = output<AttendanceChange>();
   readonly attendanceReset = output<Attendance>();
+  /** O23: the delegation of the refused member was revoked in the attendance sheet. */
+  readonly attendanceConflictResolved = output<Uuid>();
   /** Open "TOP hinzufügen". */
   readonly addTop = output<void>();
   readonly removeFromAgenda = output<Uuid>();
@@ -159,8 +169,8 @@ export class MeetingPageComponent {
   readonly dropAt = output<number>();
   /** Name the minute-taker of a planned meeting. */
   readonly setProtokollant = output<Uuid>();
-  /** Hand the minutes of a live meeting over, now or with the next item (Z3). */
-  readonly handOver = output<{ principalId: Uuid; mode: HandoverMode }>();
+  /** A member was picked in the dock to take the minutes of a live meeting over (Z3). */
+  readonly pickHandover = output<Uuid>();
   /** Discard the planned handover. */
   readonly cancelHandover = output<void>();
 
@@ -170,6 +180,7 @@ export class MeetingPageComponent {
   readonly agendaOpen = signal(false);
   /** The list of the people who have the meeting open. */
   protected readonly presenceOpen = signal(false);
+
   /** Raised by an insert from outside the editor, so the editor loads the new text. */
   protected readonly revision = signal(0);
 
@@ -234,24 +245,21 @@ export class MeetingPageComponent {
   );
 
   /**
-   * The main action of the header: open a planned meeting, close a live one, or finalize
-   * the protocol of a closed one (O13). `null` when the viewer has none.
+   * The main action of the header: open a planned meeting or close a live one. A closed
+   * meeting finalizes its protocol in the protocol bar of the sheet (O13). `null` when the
+   * viewer has none.
    */
-  protected readonly mainAction = computed<'open' | 'close' | 'finalize' | null>(() => {
+  protected readonly mainAction = computed<'open' | 'close' | null>(() => {
     const m = this.meeting();
-    const p = this.protocol();
     if (m.status === 'planned' && m.canControl) return 'open';
     if (m.status === 'live' && m.canControl) return 'close';
-    if (m.status === 'closed' && m.canFinalize && p && !p.isFinal && p.status !== 'rendering') {
-      return 'finalize';
-    }
     return null;
   });
 
   /**
    * The session menu: settings, attendance and delete. Below the wide layout the beamer
-   * goes in here too; on a phone the header keeps only the title, so the close and the
-   * finalize move in as well (the opening is on the preparation page).
+   * of a planned or live meeting goes in here too; on a phone the header keeps only the title, so the close moves in
+   * as well (the opening is on the preparation page, the finalize in the protocol bar).
    */
   protected readonly menu = computed<RowMenuSection[]>(() => {
     const m = this.meeting();
@@ -259,9 +267,9 @@ export class MeetingPageComponent {
     const main: RowMenuItem[] = [];
     if (m.canManage) main.push({ id: 'settings', label: t('meetings.settings.title'), icon: 'edit' });
     main.push({ id: 'attendance', label: t('meetings.page.recordAttendance'), icon: 'users' });
-    if (!this.wide()) main.push({ id: 'beamer', label: t('meetings.beamer.enter'), icon: 'monitor' });
-    if (this.phone() && this.mainAction() === 'finalize') {
-      main.push({ id: 'finalize', label: t('meetings.protocol.finalize'), icon: 'send' });
+    // The beamer follows a running meeting; a closed meeting has nothing to show there.
+    if (!this.wide() && m.status !== 'closed') {
+      main.push({ id: 'beamer', label: t('meetings.beamer.enter'), icon: 'monitor' });
     }
     const sections: RowMenuSection[] = [{ items: main }];
     const danger: RowMenuItem[] = [];
@@ -343,6 +351,11 @@ export class MeetingPageComponent {
     return body ? body.split(/\s+/).length : 0;
   });
 
+  /** The result of a closed vote is in the text of the open item. */
+  protected inText(vote: MeetingVote): boolean {
+    return vote.status === 'closed' && (this.top()?.body ?? '').includes(voteSnippetHead(vote));
+  }
+
   protected myChoice(voteId: Uuid): string | null {
     return this.choices()[voteId] ?? null;
   }
@@ -397,9 +410,6 @@ export class MeetingPageComponent {
         break;
       case 'close':
         this.closeSession.emit();
-        break;
-      case 'finalize':
-        this.finalize.emit();
         break;
       case 'delete':
         this.deleteMeeting.emit();

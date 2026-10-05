@@ -1,0 +1,91 @@
+@use 'breakpoints' as bp;
+
+:host {
+  display: block;
+}
+
+/* One line on surface 2 across the top of the sheet. */
+.pb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 60px;
+  padding: var(--space-3) var(--space-4) var(--space-3) 28px;
+  background: var(--color-surface-2);
+}
+.pb__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.pb__icon--accent {
+  color: var(--color-accent-text);
+}
+.pb__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: 1.25rem;
+}
+.pb__text strong {
+  font-weight: var(--fw-semibold);
+}
+.pb__hint {
+  display: block;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.pb__actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.pb__actions:empty {
+  display: none;
+}
+/* The PDF links look like small tonal buttons; they are links, so they stay `<a>`. */
+.pb__pdf {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--control-height-sm);
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.pb__pdf:hover {
+  background: var(--color-surface-4);
+}
+.pb__pdf:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* A phone: the actions take their own line below the text. The icon and the text stay on
+   the first line: a zero basis lets the text wrap its words instead of moving to a line of
+   its own. */
+@include bp.phone {
+  .pb {
+    flex-wrap: wrap;
+    padding: var(--space-3) var(--space-4);
+  }
+  .pb__text {
+    flex: 1 1 0;
+  }
+  /* A text of two lines: the icon stays with the first line (line height 20px). */
+  .pb__icon {
+    align-self: flex-start;
+    margin-top: 1px;
+  }
+  .pb__actions {
+    flex: 1 1 100%;
+    padding-inline-start: 28px;
+  }
+}

@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -12,8 +22,8 @@ import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
+import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import {
-  BadgeComponent,
   ButtonComponent,
   CardComponent,
   CheckboxComponent,
@@ -23,11 +33,15 @@ import {
 } from '@stupa-makers/ui-kit';
 import { ToastService } from '@stupa-makers/ui-kit';
 
+/** A change of the own delegation: a new one, or a revoked one with its delegator. */
+export type DelegationCardChange = { kind: 'created' } | { kind: 'revoked'; delegation: Delegation };
+
 /**
- * Delegation card on the meeting page.
+ * The own delegations of a meeting, as a section of the attendance sheet ("Vertretung").
+ * With `framed`, the section is a card, as on the follow view.
  *
- * The card shows the own outgoing delegation, which stays revocable until the
- * meeting starts, and the delegations directed at me. The setup dialog picks the
+ * The section shows the own outgoing delegation, which stays revocable until the
+ * meeting starts, and the delegations directed at me, as rows of one group. The setup dialog picks the
  * recipient from the Gremium members and the substitute pool. It also runs a
  * server-side name search when external recipients are enabled. The server enforces
  * all rules: deadline, recipient set and chains. The card only hides what is
@@ -39,9 +53,10 @@ import { ToastService } from '@stupa-makers/ui-kit';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    NgTemplateOutlet,
     TranslatePipe,
     LocalizedDatePipe,
-    BadgeComponent,
+    AvatarComponent,
     ButtonComponent,
     CardComponent,
     CheckboxComponent,
@@ -57,6 +72,10 @@ export class MeetingDelegationCardComponent {
   private readonly toast = inject(ToastService);
 
   readonly meetingId = input.required<Uuid>();
+  /** Show the section as a card between other cards (the follow view). */
+  readonly framed = input(false);
+  /** The own delegation changed. The attendance sheet then loads its delegations again. */
+  readonly changed = output<DelegationCardChange>();
 
   protected readonly ctx = signal<MeetingDelegationContext | null>(null);
   protected readonly dialogOpen = signal(false);
@@ -73,6 +92,14 @@ export class MeetingDelegationCardComponent {
     const c = this.ctx();
     if (!c || !c.allowVoteDelegation) return false;
     return c.canDelegate || c.myDelegation !== null || c.incoming.length > 0;
+  });
+
+  /** The section has a row to show: the own delegation, the setup, the deadline or an incoming one. */
+  protected readonly hasRows = computed(() => {
+    const c = this.ctx();
+    if (!c) return false;
+    const deadlineRow = c.canDelegate && c.deadlinePassed && !c.meetingStarted;
+    return c.myDelegation !== null || this.canCreate() || deadlineRow || c.incoming.length > 0;
   });
 
   /** True when the user may delegate, the meeting is still planned and a window is
@@ -150,6 +177,7 @@ export class MeetingDelegationCardComponent {
           this.dialogOpen.set(false);
           this.toast.success(this.i18n.translate('delegation.toast.created'));
           this.reload();
+          this.changed.emit({ kind: 'created' });
         },
         error: (err: { error?: { detail?: string } }) => {
           this.busy.set(false);
@@ -166,6 +194,7 @@ export class MeetingDelegationCardComponent {
         this.busy.set(false);
         this.toast.success(this.i18n.translate('delegation.toast.revoked'));
         this.reload();
+        this.changed.emit({ kind: 'revoked', delegation: d });
       },
       error: () => {
         this.busy.set(false);
@@ -174,7 +203,8 @@ export class MeetingDelegationCardComponent {
     });
   }
 
-  private reload(): void {
+  /** Load the context again, for example after a delegation changed somewhere else. */
+  reload(): void {
     this.api.meetingContext(this.meetingId(), { quiet: true }).subscribe({
       next: (c) => this.ctx.set(c),
       error: () => {},

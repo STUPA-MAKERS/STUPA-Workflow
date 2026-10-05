@@ -2,6 +2,9 @@
 @let proto = protocol();
 
 <article class="ts">
+  @if (proto && m.status === 'closed') {
+    <app-protocol-bar [meeting]="m" [protocol]="proto" [finalizing]="finalizing()" (finalize)="finalize.emit()" />
+  }
   @if (top(); as t) {
     <header class="ts__head">
       <div class="ts__titles">
@@ -24,7 +27,16 @@
       }
     </header>
 
+    @if (m.status === 'closed' && keepers()) {
+      <p class="ts__keepers">
+        <app-icon name="edit" [size]="14" />
+        <span class="ell" [title]="'meetings.dock.protokollantIs' | t: { name: keepers() }">{{ 'meetings.dock.protokollantIs' | t: { name: keepers() } }}</span>
+      </p>
+    }
+
     @if (proto) {
+      <!-- A locked protocol has no format bar and no save state, so no rule either. -->
+      @if (!proto.isLocked) {
       <div class="ts__bar">
         @if (editable()) {
           <div class="ts__tools" role="toolbar" [attr.aria-label]="'meetings.editor.toolbar' | t">
@@ -45,22 +57,22 @@
           </div>
         }
         <span class="ts__spacer"></span>
-        @if (!proto.isLocked) {
-          <span class="ts__save mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
-            @switch (saveState()) {
-              @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
-              @case ('saved') { <app-icon name="check" [size]="16" /> {{ 'meetings.protocol.saved' | t }} }
-              @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
-              @default {}
-            }
-          </span>
-        }
+        <span class="ts__save mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
+          @switch (saveState()) {
+            @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
+            @case ('saved') { <app-icon name="check" [size]="16" /> {{ 'meetings.protocol.saved' | t }} }
+            @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
+            @default {}
+          }
+        </span>
       </div>
       <div class="ts__rule"></div>
+      }
       <app-markdown-editor
         #ed
         class="ts__editor"
         [docKey]="t.id + ':' + revision()"
+        [voteInfo]="voteInfo()"
         [value]="t.body ?? ''"
         [disabled]="!editable()"
         [placeholder]="'meetings.protocol.placeholder' | t"
@@ -82,21 +94,14 @@
     <p class="ts__muted ts__pad">{{ (m.status === 'planned' ? 'meetings.protocol.beforeStart' : 'meetings.protocol.none') | t }}</p>
   }
 
-  @if (proto) {
+  <!-- A live meeting: the state and who writes. A closed meeting carries the state, the
+       finalize and the PDF links in the bar on top. -->
+  @if (proto && m.status !== 'closed') {
     @let ps = protocolState(proto);
     <footer class="ts__foot">
       <app-status-text [kind]="ps.kind">{{ ps.key | t }}</app-status-text>
-      @if (proto.publicPdfUrl) {
-        <a class="ts__link" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdfInternal' | t }}</a>
-        <a class="ts__link" [href]="proto.publicPdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdfPublic' | t }}</a>
-      } @else if (proto.pdfUrl) {
-        <a class="ts__link" [href]="proto.pdfUrl" target="_blank" rel="noopener">{{ 'meetings.protocol.pdf' | t }}</a>
-      }
       @if (!proto.isLocked && !canEdit() && m.canWrite) {
         <span>{{ 'meetings.protocol.takenBy' | t: { name: m.protokollantName ?? '' } }}</span>
-      }
-      @if (protocolHint(proto); as hint) {
-        <span>{{ hint | t }}</span>
       }
     </footer>
   }

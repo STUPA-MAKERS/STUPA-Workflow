@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -25,6 +32,7 @@ import { PageHeaderComponent } from '@shared/ui/page-header/page-header.componen
 import { AgendaItemDialogComponent } from './agenda-item-dialog/agenda-item-dialog.component';
 import { CloseMeetingDialogComponent } from './close-meeting-dialog/close-meeting-dialog.component';
 import { DeleteMeetingDialogComponent } from './delete-meeting-dialog/delete-meeting-dialog.component';
+import { HandoverDialogComponent } from './handover-dialog/handover-dialog.component';
 import { MeetingAgendaService } from './meeting-agenda.service';
 import { MeetingBeamerComponent } from './meeting-beamer.component';
 import { MeetingDialogsService } from './meeting-dialogs.service';
@@ -82,6 +90,7 @@ import {
     CloseMeetingDialogComponent,
     VoteOpenDialogComponent,
     AgendaItemDialogComponent,
+    HandoverDialogComponent,
   ],
   templateUrl: './meetings.component.html',
   styleUrl: './meetings.component.scss',
@@ -94,6 +103,8 @@ export class MeetingsComponent {
   private readonly agendaSvc = inject(MeetingAgendaService);
   private readonly timeline = inject(MeetingsTimelineService);
   protected readonly dialogs = inject(MeetingDialogsService);
+  /** The session page, for "Ändern" in the handover dialog (back to the dock picker). */
+  private readonly page = viewChild(MeetingPageComponent);
 
   /** Detail route (`/meetings/:id`) vs. list (`/meetings`). */
   readonly detailMode = signal(false);
@@ -108,6 +119,8 @@ export class MeetingsComponent {
   readonly viewers = this.session.viewers;
   readonly savingAttendance = this.session.savingAttendance;
   readonly finalizing = this.session.finalizing;
+  /** O23: the member whose "present" the server refused (409 `delegation_active`). */
+  readonly attendanceConflict = this.session.attendanceConflict;
   readonly casting = this.session.casting;
   readonly deletingVote = this.session.deletingVote;
   protected readonly myChoices = this.session.myChoices;
@@ -174,15 +187,30 @@ export class MeetingsComponent {
     this.dialogs.setProtokollant(m, principalId);
   }
 
+  /** A member was picked in the dock: the handover dialog asks when (Z3). */
+  askHandover(principalId: Uuid): void {
+    const member = this.attendance().find((a) => a.principalId === principalId);
+    if (member) this.dialogs.askHandover(member);
+  }
+
+  /** "Ändern" in the handover dialog: back to the picker of the dock. */
+  changeHandover(): void {
+    this.dialogs.closeHandover();
+    this.page()?.panel.set('protokollant');
+  }
+
   /**
    * Hand the minutes of a live meeting over (Z3). The open text of the item is saved
    * first, because the write right can move with the handover. The handover request
    * starts only after the response of that save.
    */
-  handOver(m: Meeting, principalId: Uuid, mode: HandoverMode): void {
+  handOver(m: Meeting, mode: HandoverMode): void {
+    const target = this.dialogs.handoverTarget();
+    if (!target) return;
+    this.dialogs.handoverSaving.set(true);
     this.agendaSvc
       .settlePendingBody(this.meeting()?.id ?? null)
-      .subscribe(() => this.dialogs.handOver(m, principalId, mode));
+      .subscribe(() => this.dialogs.handOver(m, target.principalId, mode));
   }
 
   /** Discard the planned handover. */
@@ -238,6 +266,11 @@ export class MeetingsComponent {
 
   resetAttendance(member: Attendance): void {
     this.session.resetAttendance(member);
+  }
+
+  /** O23: the delegation in the way was revoked; the row of the member is no conflict. */
+  clearAttendanceConflict(principalId: Uuid): void {
+    this.session.clearAttendanceConflict(principalId);
   }
 
   /** "Abstimmung öffnen" for an agenda item. */

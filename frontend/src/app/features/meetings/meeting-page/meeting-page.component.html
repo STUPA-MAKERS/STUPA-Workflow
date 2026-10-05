@@ -40,7 +40,7 @@
     </div>
   }
 
-  @if (wide()) {
+  @if (wide() && m.status !== 'closed') {
     <app-button class="mp__beamer" variant="outlined" (click)="toggleBeamer.emit()">
       <app-icon name="monitor" [size]="18" />
       {{ 'meetings.beamer.enter' | t }}
@@ -51,8 +51,8 @@
 
   <!-- One main action. Only a live meeting closes, and "closed" is terminal: a planned
        meeting that does not take place is deleted (O13). The finalize is a step of its
-       own after the close, also after a failed render. A phone keeps the title alone:
-       the opening is on the preparation page, the rest is in the menu. -->
+       own after the close, in the protocol bar of the sheet. A phone keeps the title
+       alone: the opening is on the preparation page, the close is in the menu. -->
   @if (!phone()) {
     @switch (mainAction()) {
       @case ('open') {
@@ -68,12 +68,6 @@
         }
         <app-button variant="danger" [loading]="finalizing()" [disabled]="anyOpenVote()" [title]="(anyOpenVote() ? 'meetings.page.closeBlocked' : 'meetings.control.closeSession') | t" (click)="closeSession.emit()">
           {{ 'meetings.control.closeSession' | t }}
-        </app-button>
-      }
-      @case ('finalize') {
-        <app-button variant="fill" [loading]="finalizing()" (click)="finalize.emit()">
-          <app-icon name="send" [size]="16" />
-          {{ 'meetings.protocol.finalize' | t }}
         </app-button>
       }
     }
@@ -117,6 +111,7 @@
           [deleting]="deletingVote()"
           [locked]="locked()"
           [canInsert]="pendingResult()?.id === vote.id && editable()"
+          [inProtocol]="inText(vote)"
           [otherOpen]="anyOpenVote()"
           (close)="voteClose.emit($event)"
           (cancel)="voteCancel.emit($event)"
@@ -159,7 +154,9 @@
         [canEdit]="canEdit()"
         [saveState]="saveState()"
         [revision]="revision()"
+        [finalizing]="finalizing()"
         (bodyChange)="bodyChange.emit($event)"
+        (finalize)="finalize.emit()"
       />
     }
   </div>
@@ -171,19 +168,30 @@
   [agenda]="agenda()"
   [topIndex]="topIndex()"
   [attendance]="attendance()"
-  [savingAttendance]="savingAttendance()"
-  [viewers]="viewers()"
   [wordCount]="wordCount()"
   [myVote]="myVote()"
   [(panel)]="panel"
   (step)="step($event)"
   (jumpNow)="jump($event)"
-  (attendanceChange)="attendanceChange.emit($event)"
-  (attendanceReset)="attendanceReset.emit($event)"
   (setProtokollant)="setProtokollant.emit($event)"
-  (handOver)="handOver.emit($event)"
+  (pickHandover)="pickHandover.emit($event)"
   (cancelHandover)="cancelHandover.emit()"
 />
+
+<!-- The attendance: a side sheet from the end, a bottom sheet on a phone. -->
+<app-attendance-sheet
+  [open]="panel() === 'attendance'"
+  (openChange)="$event || panel.set('none')"
+  [meeting]="m"
+  [attendance]="attendance()"
+  [saving]="savingAttendance()"
+  [viewers]="viewers()"
+  [conflictId]="attendanceConflict()"
+  (statusChange)="attendanceChange.emit($event)"
+  (statusReset)="attendanceReset.emit($event)"
+  (conflictResolved)="attendanceConflictResolved.emit($event)"
+/>
+
 
 <ng-template #agendaTpl let-inSheet="inSheet">
   <app-agenda-pane

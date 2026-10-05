@@ -2,11 +2,18 @@ import { Injectable, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
-import type { AgendaItem, HandoverMode, Meeting, Uuid } from '@core/api/models';
+import type { AgendaItem, Attendance, HandoverMode, Meeting, Uuid } from '@core/api/models';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { MeetingSessionService } from './meeting-session.service';
 import { MeetingsTimelineService } from './meetings-timeline.service';
 import { errorCode, errorDetail } from './meetings-display.util';
+
+/** The refusals of a handover that the dialog explains in its body. */
+const HANDOVER_REFUSALS = new Set([
+  'protokollant_needs_protocol_write',
+  'no_next_item',
+  'already_protokollant',
+]);
 
 /**
  * Which meeting dialog is open, and the meeting actions that come from the dock.
@@ -35,6 +42,12 @@ export class MeetingDialogsService {
   readonly agendaOpen = signal(false);
   /** "Abstimmung öffnen" for this agenda item of the loaded meeting. */
   readonly voteItem = signal<AgendaItem | null>(null);
+  /** "Protokollführung übergeben" to this member of the loaded live meeting (Z3). */
+  readonly handoverTarget = signal<Attendance | null>(null);
+  /** The handover request runs. */
+  readonly handoverSaving = signal(false);
+  /** The `code` of the last refusal of the handover, for the dialog body. */
+  readonly handoverRefusal = signal<string | null>(null);
 
   openSettings(m: Meeting): void {
     this.settingsMeeting.set(m);
@@ -97,13 +110,31 @@ export class MeetingDialogsService {
     });
   }
 
+  /** Open the handover dialog for a member picked in the dock. */
+  askHandover(member: Attendance): void {
+    this.handoverRefusal.set(null);
+    this.handoverSaving.set(false);
+    this.handoverTarget.set(member);
+  }
+
+  closeHandover(): void {
+    this.handoverTarget.set(null);
+    this.handoverRefusal.set(null);
+  }
+
   /**
    * Hand the minutes of a live meeting over (Z3): `now` at once, `next_item` with the
-   * next agenda item. The server answers 422 for a member without `protocol.write`.
+   * next agenda item. A refusal the dialog can explain stays in the dialog: 422
+   * `protokollant_needs_protocol_write` (O20), 409 `no_next_item` (the last TOP) and
+   * 409 `already_protokollant`. Any other refusal is a toast.
    */
   handOver(m: Meeting, principalId: Uuid, mode: HandoverMode): void {
+    this.handoverSaving.set(true);
+    this.handoverRefusal.set(null);
     this.api.handOverProtokollant(m.id, principalId, mode).subscribe({
       next: (updated) => {
+        this.handoverSaving.set(false);
+        this.closeHandover();
         this.applyUpdated(updated);
         this.toast.success(
           this.i18n.translate(
@@ -111,7 +142,15 @@ export class MeetingDialogsService {
           ),
         );
       },
-      error: (err: unknown) => this.keeperChangeFailed(err),
+      error: (err: unknown) => {
+        this.handoverSaving.set(false);
+        const code = errorCode(err);
+        if (HANDOVER_REFUSALS.has(code)) {
+          this.handoverRefusal.set(code);
+          return;
+        }
+        this.keeperChangeFailed(err);
+      },
     });
   }
 

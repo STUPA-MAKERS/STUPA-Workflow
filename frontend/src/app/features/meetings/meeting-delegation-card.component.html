@@ -1,59 +1,74 @@
-@if (visible()) {
-  <app-card [heading]="'delegation.card.title' | t">
-    @if (ctx(); as c) {
-      <div class="flex flex-col gap-4">
-        @if (c.myDelegation; as d) {
-          <div class="flex flex-col gap-2">
-            <p class="flex items-center gap-2 flex-wrap m-0">
-              {{ 'delegation.card.outgoing' | t: { name: d.delegateName || d.delegateId } }}
-              @if (d.delegateVoting) {
-                <app-badge variant="neutral">{{ 'delegation.card.votingBadge' | t }}</app-badge>
-              }
-              @if (d.viaPool) {
-                <app-badge variant="neutral">{{ 'delegation.card.poolBadge' | t }}</app-badge>
-              }
-            </p>
-            @if (d.revocable) {
-              <div class="flex mt-1">
-                <app-button variant="ghost" size="sm" [loading]="busy()" (click)="revoke(d)">
-                  {{ 'delegation.card.revoke' | t }}
-                </app-button>
-              </div>
-            }
-          </div>
-        } @else if (canCreate()) {
-          <div class="flex flex-col gap-2">
-            <p class="text-muted text-sm m-0">{{ 'delegation.card.lead' | t }}</p>
-            @if (c.deadline && !c.deadlinePassed) {
-              <p class="text-muted text-sm m-0">
-                {{ 'delegation.card.deadline' | t: { date: (c.deadline | ldate: 'short') } }}
-              </p>
-            }
-            <div class="flex mt-1">
-              <app-button size="sm" (click)="openDialog()">
-                {{ 'delegation.card.setup' | t }}
-              </app-button>
-            </div>
-          </div>
-        } @else if (c.canDelegate && c.deadlinePassed && !c.meetingStarted) {
-          <p class="text-muted text-sm m-0">{{ 'delegation.card.deadlinePassed' | t }}</p>
-        }
-        @if (c.incoming.length > 0) {
-          <div class="flex flex-col gap-2 border-0 border-t border-solid border-line pt-3">
-            @for (d of c.incoming; track d.id) {
-              <p class="flex items-center gap-2 flex-wrap m-0 text-sm">
-                {{ 'delegation.card.incoming' | t: { name: d.delegatorName || d.delegatorId } }}
-                @if (d.delegateVoting) {
-                  <app-badge variant="neutral">{{ 'delegation.card.votingBadge' | t }}</app-badge>
-                }
-              </p>
-            }
-          </div>
-        }
-      </div>
-    }
-  </app-card>
+@if (visible() && hasRows()) {
+  @if (framed()) {
+    <!-- The follow view: a card between the other cards of the page. -->
+    <app-card [heading]="'delegation.card.title' | t">
+      <ng-container [ngTemplateOutlet]="rowsTpl" />
+    </app-card>
+  } @else {
+    <!-- The attendance sheet: a section with a caption on surface 2. -->
+    <section class="dc" [attr.aria-label]="'delegation.card.title' | t">
+      <h3 class="dc__cap cap">{{ 'delegation.card.title' | t }}</h3>
+      <ng-container [ngTemplateOutlet]="rowsTpl" />
+    </section>
+  }
+}
 
+<ng-template #rowsTpl>
+  @if (ctx(); as c) {
+    <ul class="dc__rows rowgroup" [class.rowgroup--bg3]="!framed()">
+      @if (c.myDelegation; as d) {
+        <li class="dc__row">
+          <app-avatar [name]="d.delegateName || '—'" size="sm" [decorative]="true" />
+          <span class="dc__text">
+            <span>{{ 'delegation.card.outgoing' | t: { name: d.delegateName || '—' } }}</span>
+            @if (d.delegateVoting || d.viaPool) {
+              <span class="dc__sub">
+                @if (d.delegateVoting) {
+                  <span>{{ 'delegation.card.votingBadge' | t }}</span>
+                }
+                @if (d.viaPool) {
+                  <span>{{ 'delegation.card.poolBadge' | t }}</span>
+                }
+              </span>
+            }
+          </span>
+          @if (d.revocable) {
+            <app-button variant="danger" size="sm" [loading]="busy()" (click)="revoke(d)">
+              {{ 'delegation.card.revoke' | t }}
+            </app-button>
+          }
+        </li>
+      } @else if (canCreate()) {
+        <li class="dc__row">
+          <span class="dc__text">
+            <span>{{ 'delegation.card.lead' | t }}</span>
+            @if (c.deadline && !c.deadlinePassed) {
+              <span class="dc__sub">{{ 'delegation.card.deadline' | t: { date: (c.deadline | ldate: 'short') } }}</span>
+            }
+          </span>
+          <app-button variant="tonal" size="sm" (click)="openDialog()">
+            {{ 'delegation.card.setup' | t }}
+          </app-button>
+        </li>
+      } @else if (c.canDelegate && c.deadlinePassed && !c.meetingStarted) {
+        <li class="dc__row dc__muted">{{ 'delegation.card.deadlinePassed' | t }}</li>
+      }
+      @for (d of c.incoming; track d.id) {
+        <li class="dc__row">
+          <app-avatar [name]="d.delegatorName || '—'" size="sm" [decorative]="true" />
+          <span class="dc__text">
+            <span>{{ 'delegation.card.incoming' | t: { name: d.delegatorName || '—' } }}</span>
+            @if (d.delegateVoting) {
+              <span class="dc__sub">{{ 'delegation.card.votingBadge' | t }}</span>
+            }
+          </span>
+        </li>
+      }
+    </ul>
+  }
+</ng-template>
+
+@if (visible()) {
   <app-dialog
     [open]="dialogOpen()"
     [title]="'delegation.dialog.title' | t"
@@ -100,10 +115,10 @@
       }
     }
     <div dialog-footer class="flex gap-3">
-      <app-button size="sm" variant="ghost" (click)="dialogOpen.set(false)">
+      <app-button size="sm" variant="text" (click)="dialogOpen.set(false)">
         {{ 'delegation.dialog.cancel' | t }}
       </app-button>
-      <app-button size="sm" [disabled]="!delegateId()" [loading]="busy()" (click)="create()">
+      <app-button size="sm" variant="fill" [disabled]="!delegateId()" [loading]="busy()" (click)="create()">
         {{ 'delegation.dialog.submit' | t }}
       </app-button>
     </div>

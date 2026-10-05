@@ -17,6 +17,7 @@ interface Inputs {
   deleting: string | null;
   locked: boolean;
   canInsert: boolean;
+  inProtocol: boolean;
   otherOpen: boolean;
 }
 
@@ -36,6 +37,7 @@ async function setup(over: Partial<Inputs> = {}) {
       deleting: null,
       locked: false,
       canInsert: false,
+      inProtocol: false,
       otherOpen: false,
       ...over,
     },
@@ -160,10 +162,16 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('Angenommen')).toBeInTheDocument();
       expect(screen.getByText(/beendet \d\d:02/)).toBeInTheDocument();
       expect(screen.getByText('Enthaltung')).toBeInTheDocument();
-      await userEvent.click(screen.getByRole('button', { name: 'Ergebnis ins Protokoll übernehmen' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Ins Protokoll übernehmen' }));
       expect(on.insertResult).toHaveBeenCalledWith(closed);
       // A closed vote is part of the record (409 `vote_not_deletable`).
       expect(screen.queryByRole('button', { name: 'Beschlussfrage löschen' })).toBeNull();
+    });
+
+    it('says "Im Protokoll" once the text holds the result, and offers no insert then', async () => {
+      await setup({ vote: closed, canInsert: true, inProtocol: true });
+      expect(screen.getByText('Im Protokoll')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeNull();
     });
 
     it('names a rejection, also a tie (O18), and a missed quorum', async () => {
@@ -174,7 +182,7 @@ describe('VoteCardComponent', () => {
     it('names the missed quorum', async () => {
       await setup({ vote: vote({ status: 'closed', result: 'rejected', failedReason: 'quorum' }) });
       expect(screen.getByText('Quorum nicht erreicht')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Ergebnis ins Protokoll übernehmen' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeNull();
     });
   });
 

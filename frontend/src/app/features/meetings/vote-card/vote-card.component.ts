@@ -3,7 +3,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { MeetingStatus, MeetingVote, Uuid } from '@core/api/models';
-import { ButtonComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { meetingVoteStatus, voteResultStatus, type StatusView } from '@shared/status-kind.util';
@@ -21,13 +21,14 @@ import { countEntries, voteMetaLine, voteOptionLabel, voteOptionsFor } from '../
  * deletes a planned or cancelled one while the meeting is planned or live (O24). Only one
  * vote of the meeting is open at a time, so "Abstimmung öffnen" waits for it. A voter
  * who did not vote yet gets the options; a ballot never changes once it is cast (O11).
- * A closed vote offers to put its result into the text of the item.
+ * A closed vote offers to put its result into the text of the item ("Ins Protokoll
+ * übernehmen"), and says "Im Protokoll" once the text holds it.
  */
 @Component({
   selector: 'app-vote-card',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ButtonComponent, SegBarComponent, StatusTextComponent],
+  imports: [TranslatePipe, ButtonComponent, IconComponent, SegBarComponent, StatusTextComponent],
   templateUrl: './vote-card.component.html',
   styleUrl: './vote-card.component.scss',
 })
@@ -47,8 +48,10 @@ export class VoteCardComponent {
   readonly deleting = input<Uuid | null>(null);
   /** The protocol is final or renders. */
   readonly locked = input(false);
-  /** Offer "Ergebnis ins Protokoll übernehmen": the result is not in the text yet. */
+  /** Offer "Ins Protokoll übernehmen": the result is not in the text yet. */
   readonly canInsert = input(false);
+  /** The result is in the text of the item: the card says "Im Protokoll". */
+  readonly inProtocol = input(false);
   /**
    * A vote of the meeting is open, on this item or on another one. A planned vote then
    * waits: the reconnect state, the beamer and the dock follow only one open vote.

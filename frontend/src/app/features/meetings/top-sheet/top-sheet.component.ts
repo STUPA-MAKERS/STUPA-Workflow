@@ -19,6 +19,9 @@ import {
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import type { StatusKind } from '@shared/status-kind.util';
 import { resolveI18n } from '../meetings-display.util';
+import { meetingKeeperLine } from '../keepers.util';
+import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
+import { voteResultResolver } from '../vote-result/vote-result';
 
 /** The autosave state of the text of the open item. */
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -41,15 +44,30 @@ const TOOLS: readonly FormatTool[] = [
  * The sheet of the open agenda item: "TOP 3 · Antrag", the title, "Antrag öffnen", the
  * format bar with the save state, and the Markdown editor of the text.
  *
- * Only the minute-taker types (`editable`); everybody else with write access reads the
- * same sheet, and its foot says who keeps the minutes. The foot also carries the state of
- * the protocol and its PDF links.
+ * In a live meeting only the minute-taker types (`editable`); everybody else with write
+ * access reads the same sheet, and its foot says who keeps the minutes and the state of
+ * the protocol.
+ *
+ * A closed meeting (boards Sitzung-Protokoll-Entwurf, Sitzung-Geschlossen): the protocol
+ * bar on top (draft and "Finalisieren & versenden", or final and the PDF links) and the
+ * keeper line below the title, "Protokoll: Lara Leitung (TOP 1–3), Uli Übernahme (ab TOP 3,
+ * 18:55)". The text stays editable for every writer while the protocol is a draft (O22).
+ *
+ * A vote result in the text shows as a card with "Beschluss · 18:52 · Einfache Mehrheit",
+ * the counts and the result (a tie is "Abgelehnt", O18), from the votes of this meeting.
  */
 @Component({
   selector: 'app-top-sheet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslatePipe, IconComponent, MarkdownEditorComponent, StatusTextComponent],
+  imports: [
+    RouterLink,
+    TranslatePipe,
+    IconComponent,
+    MarkdownEditorComponent,
+    ProtocolBarComponent,
+    StatusTextComponent,
+  ],
   templateUrl: './top-sheet.component.html',
   styleUrl: './top-sheet.component.scss',
 })
@@ -74,8 +92,12 @@ export class TopSheetComponent {
    * outside the editor, like a vote result, raises this number so the new text shows.
    */
   readonly revision = input(0);
+  /** The finalize runs. */
+  readonly finalizing = input(false);
 
   readonly bodyChange = output<{ itemId: Uuid; body: string }>();
+  /** "Finalisieren & versenden" in the protocol bar of a closed meeting. */
+  readonly finalize = output<void>();
 
   protected readonly tools = TOOLS;
 
@@ -90,20 +112,28 @@ export class TopSheetComponent {
     resolveI18n(this.top()?.stateLabel, this.i18n.locale()),
   );
 
+  /** The keeper line of a closed meeting: every minute-taker with the TOPs they wrote. */
+  protected readonly keepers = computed(() =>
+    meetingKeeperLine(
+      this.meeting(),
+      (key, params) => this.i18n.translate(key, params),
+      this.i18n.locale(),
+    ),
+  );
+
+  /** The vote cards of the text read the closed votes of this meeting. */
+  protected readonly voteInfo = computed(() =>
+    voteResultResolver(
+      this.meeting().votes,
+      (key, params) => this.i18n.translate(key, params),
+      this.i18n.locale(),
+    ),
+  );
+
   /** The state of the protocol as status text. */
   protected protocolState(p: Protocol): { kind: StatusKind; key: TranslationKey } {
     if (p.isFinal) return { kind: 'accent', key: 'meetings.protocol.final' };
     if (p.status === 'rendering') return { kind: 'warn', key: 'meetings.protocol.rendering' };
     return { kind: 'neutral', key: 'meetings.protocol.draft' };
-  }
-
-  /**
-   * Why a closed meeting shows no finalize to this person: the right is missing. Every
-   * other state the status text and the header already say. `null` when nothing to say.
-   */
-  protected protocolHint(p: Protocol): TranslationKey | null {
-    const m = this.meeting();
-    if (p.isFinal || p.status === 'rendering' || m.status !== 'closed') return null;
-    return m.canWrite && !m.canFinalize ? 'meetings.protocol.finalizeNeedsRight' : null;
   }
 }
