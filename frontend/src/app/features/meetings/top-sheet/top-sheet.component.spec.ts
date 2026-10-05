@@ -216,6 +216,26 @@ describe('TopSheetComponent', () => {
       expect(screen.queryByText('Jetzt')).toBeNull();
     });
 
+    it('shows the new text of the same item after a read of the agenda', async () => {
+      const { fixture, container } = await setup({ follow: true, protocol: null, editable: false, canEdit: false, meeting: member() });
+      expect(container.querySelector('.ProseMirror')?.textContent).toContain('Eröffnet.');
+      fixture.componentRef.setInput('top', { ...AGENDA[0], body: 'Eröffnet. Die Sitzung ist beschlussfähig.' });
+      fixture.detectChanges();
+      expect(container.querySelector('.ProseMirror')?.textContent).toContain('Die Sitzung ist beschlussfähig.');
+    });
+
+    it('keeps the document of the minute-taker while the text changes', async () => {
+      const view = await setup();
+      const editor = editorOf(view);
+      const key = editor.docKey();
+      view.fixture.componentRef.setInput('top', { ...AGENDA[0], body: 'Eröffnet und getippt.' });
+      view.fixture.detectChanges();
+      expect(editor.docKey()).toBe(key);
+      view.fixture.componentRef.setInput('revision', 1);
+      view.fixture.detectChanges();
+      expect(editor.docKey()).not.toBe(key);
+    });
+
     it('names no keeper when nobody keeps the minutes', async () => {
       await setup({ follow: true, protocol: null, meeting: member({ protokollantName: null }) });
       expect(screen.queryByText(/führt das Protokoll/)).toBeNull();

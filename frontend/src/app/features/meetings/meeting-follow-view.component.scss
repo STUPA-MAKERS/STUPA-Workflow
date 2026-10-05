@@ -75,6 +75,42 @@ app-button ::ng-deep .btn__label > app-icon:first-child {
 }
 
 /* ------------------------------------------------------------------ body */
+/* Board Schmal-Teilnahme: the vote card as a strip between the header and the body. */
+.fv__strip {
+  flex: none;
+  margin: 0 var(--space-3) var(--space-3);
+}
+
+/* Every inner scroll area fades an end only while more content lies past it
+   (`appScrollFade` sets the classes). */
+.fv__fade {
+  --fv-fade: var(--space-5);
+}
+.fv__fade.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--fv-fade));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--fv-fade));
+}
+.fv__fade.is-fade-end {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--fv-fade));
+  mask-image: linear-gradient(to top, transparent, #000 var(--fv-fade));
+}
+.fv__fade.is-fade-start.is-fade-end {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--fv-fade),
+    #000 calc(100% - var(--fv-fade)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--fv-fade),
+    #000 calc(100% - var(--fv-fade)),
+    transparent
+  );
+}
+
 .fv__body {
   display: flex;
   flex: 1 1 auto;
@@ -102,6 +138,32 @@ app-button ::ng-deep .btn__label > app-icon:first-child {
 }
 .fv__side:empty {
   display: none;
+}
+
+/* The earlier results of the item, and the votes without an item. */
+.fv__votes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.fv__votes .fv__cap {
+  padding: 0 var(--space-2);
+}
+/* The text button starts its label at the edge of the content (in a box or not). */
+.fv__roster {
+  align-self: flex-start;
+  margin-inline-start: calc(-1 * var(--space-3));
+}
+.fv__side > .fv__roster,
+.fv__phone > .fv__roster {
+  margin-inline-start: 0;
+}
+/* The attendance sheet of the dock: the own record, then the roster. */
+.fv__sheetStack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
 }
 
 /* Wide: agenda | sheet | side column (340px), each scrolls inside itself. */
@@ -219,6 +281,15 @@ app-button ::ng-deep .btn__label > app-icon:first-child {
 }
 .fv__spacer {
   flex: 1 1 auto;
+}
+/* Board Schmal-Teilnahme: the delegation leads the dock of a narrow screen. */
+.fv__dockDeleg {
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.fv__dockDeleg:empty {
+  display: none;
 }
 .fv__vr {
   flex: none;

@@ -80,6 +80,23 @@ describe('ParticipantAttendanceComponent', () => {
     expect(change).not.toHaveBeenCalled();
   });
 
+  it('keeps the typed reason when a live update brings the same record again', async () => {
+    const { fixture } = await setup(me({ status: 'excused', source: 'self', note: 'Prüfung' }));
+    const field = screen.getByLabelText('Grund (optional)');
+    await waitFor(() => expect(field).toHaveValue('Prüfung'));
+    await userEvent.clear(field);
+    await userEvent.type(field, 'Klausur');
+    // The roster arrives again over the live channel: a new object, the same reason.
+    fixture.componentRef.setInput('member', me({ status: 'excused', source: 'self', note: 'Prüfung' }));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(field).toHaveValue('Klausur');
+    // A changed reason from the server replaces the draft.
+    fixture.componentRef.setInput('member', me({ status: 'excused', source: 'self', note: 'Urlaub' }));
+    fixture.detectChanges();
+    await waitFor(() => expect(field).toHaveValue('Urlaub'));
+  });
+
   it('removes the reason when the field is emptied', async () => {
     const { change } = await setup(me({ status: 'absent', source: 'self', note: 'Krank' }));
     expect(screen.getByRole('radio', { name: 'Abwesend' })).toHaveAttribute('aria-checked', 'true');

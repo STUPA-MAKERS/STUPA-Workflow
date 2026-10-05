@@ -40,7 +40,8 @@
     </div>
   }
 
-  @if (wide() && m.status !== 'closed') {
+  <!-- The beamer route and its stream need session.manage in the gremium (canManage). -->
+  @if (wide() && m.status !== 'closed' && m.canManage) {
     <app-button class="mp__beamer" variant="outlined" (click)="toggleBeamer.emit()">
       <app-icon name="monitor" [size]="18" />
       {{ 'meetings.beamer.enter' | t }}

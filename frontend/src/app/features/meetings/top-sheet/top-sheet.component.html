@@ -48,7 +48,7 @@
       <div class="ts__rule"></div>
       <app-markdown-editor
         class="ts__editor"
-        [docKey]="t.id + ':' + revision()"
+        [docKey]="docKey()"
         [voteInfo]="voteInfo()"
         [value]="t.body ?? ''"
         [disabled]="true"
@@ -91,7 +91,7 @@
       <app-markdown-editor
         #ed
         class="ts__editor"
-        [docKey]="t.id + ':' + revision()"
+        [docKey]="docKey()"
         [voteInfo]="voteInfo()"
         [value]="t.body ?? ''"
         [disabled]="!editable()"

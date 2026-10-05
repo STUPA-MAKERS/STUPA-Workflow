@@ -13,6 +13,7 @@ interface SetupOpts {
   caster?: BallotCaster;
   layout?: 'page' | 'phone';
   compact?: boolean;
+  columns?: boolean;
 }
 
 async function setup(opts: SetupOpts = {}) {
@@ -30,6 +31,7 @@ async function setup(opts: SetupOpts = {}) {
       caster,
       layout: opts.layout ?? 'page',
       compact: opts.compact ?? false,
+      columns: opts.columns ?? false,
     },
     on: { castDone, castFailed },
   });
@@ -257,6 +259,21 @@ describe('BallotComponent', () => {
   it('has no a11y violations', async () => {
     const { container } = await setup({ proxyName: 'Jonas Weber' });
     expect(await runAxe(container)).toHaveNoViolations();
+  });
+
+  it('puts the rows side by side and shows the confirm only after a pick (columns)', async () => {
+    const { fixture, caster } = await setup({ compact: true, columns: true, proxyName: 'Jonas Weber' });
+    const user = userEvent.setup();
+    expect(fixture.nativeElement).toHaveClass('ballot--columns');
+    expect(screen.queryByRole('button', { name: /abgeben/ })).toBeNull();
+    await user.click(choice('Ja'));
+    await user.click(confirmButton());
+    expect(caster).toHaveBeenCalledWith('yes', false);
+    // The own row is cast; the represented row has no pick yet: no confirm.
+    expect(screen.queryByRole('button', { name: /abgeben/ })).toBeNull();
+    const proxy = screen.getByRole('group', { name: 'Als Vertretung für Jonas Weber' });
+    await user.click(within(proxy).getByRole('button', { name: 'Nein' }));
+    expect(confirmButton()).toHaveTextContent('Für Jonas Weber abgeben: Nein');
   });
 
   it('shows the small ballot of a side column: a row of buttons with a name (compact)', async () => {

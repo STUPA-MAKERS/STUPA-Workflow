@@ -79,3 +79,15 @@
 .dc--box .dc__person + .dc__person {
   margin-top: var(--space-1);
 }
+
+/* The dock of the participant view on a narrow screen (board Schmal-Teilnahme): the
+   persons in one line, each name cut with an ellipsis. */
+.dc--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-5);
+  min-width: 0;
+}
+.dc--inline .dc__person {
+  flex: 0 1 auto;
+}

@@ -268,7 +268,8 @@ export class MeetingPageComponent {
     if (m.canManage) main.push({ id: 'settings', label: t('meetings.settings.title'), icon: 'edit' });
     main.push({ id: 'attendance', label: t('meetings.page.recordAttendance'), icon: 'users' });
     // The beamer follows a running meeting; a closed meeting has nothing to show there.
-    if (!this.wide() && m.status !== 'closed') {
+    // The beamer route and its stream need session.manage in the gremium (`canManage`).
+    if (!this.wide() && m.status !== 'closed' && m.canManage) {
       main.push({ id: 'beamer', label: t('meetings.beamer.enter'), icon: 'monitor' });
     }
     const sections: RowMenuSection[] = [{ items: main }];

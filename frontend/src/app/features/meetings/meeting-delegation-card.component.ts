@@ -31,6 +31,9 @@ export type DelegationCardChange = { kind: 'created' } | { kind: 'revoked'; dele
  * - `variant="section"`: a section of the attendance sheet, rows on surface 3.
  * - `variant="box"`: a box of the side column of the participant view (boards
  *   Teilnahme-Vorher and Teilnahme-Live).
+ * - `variant="inline"`: only the own delegation and the delegations directed at me, in
+ *   one line, for the dock of the participant view on a narrow screen (board
+ *   Schmal-Teilnahme). It shows nothing when no delegation exists.
  *
  * It shows the own outgoing delegation, which stays revocable until the meeting starts,
  * the setup with its deadline ("Einrichtbar bis Di., 13.10.2026, 17:00"), and the
@@ -60,7 +63,7 @@ export class MeetingDelegationCardComponent {
   private readonly toast = inject(ToastService);
 
   readonly meetingId = input.required<Uuid>();
-  readonly variant = input<'section' | 'box'>('section');
+  readonly variant = input<'section' | 'box' | 'inline'>('section');
   /** The line below the title of the dialog: the meeting and its date. */
   readonly subtitle = input('');
   /** The own delegation changed. The attendance sheet then loads its delegations again. */

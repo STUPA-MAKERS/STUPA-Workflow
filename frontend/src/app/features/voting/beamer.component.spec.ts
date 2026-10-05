@@ -227,6 +227,27 @@ describe('BeamerComponent', () => {
     expect(screen.getByText('Einfache Mehrheit · Quorum nicht erreicht · 1 Stimme')).toBeInTheDocument();
   });
 
+  it('ignores a read that arrives after the read of a newer vote', async () => {
+    const { push, api, fixture } = await setup();
+    const reads: { id: string; read: Subject<Vote> }[] = [];
+    api.getVote.mockImplementation((id: string) => {
+      const read = new Subject<Vote>();
+      reads.push({ id, read });
+      return read;
+    });
+    push(OPEN);
+    // The room closes v1 and opens v2 at once.
+    push({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: { yes: 3 } });
+    push({ ...OPEN, voteId: 'v2' } as ServerMessage);
+    const answer = (id: string, v: Vote) =>
+      reads.filter((r) => r.id === id).forEach((r) => r.read.next(v));
+    // The read of v2 comes first, the reads of v1 after it.
+    answer('v2', vote({ id: 'v2', question: 'Wird der Nachtrag beschlossen?' }));
+    answer('v1', vote({ id: 'v1' }));
+    fixture.detectChanges();
+    expect(screen.getByRole('heading', { name: 'Wird der Nachtrag beschlossen?' })).toBeInTheDocument();
+  });
+
   it('goes idle when the vote is cancelled', async () => {
     const { push } = await setup();
     push(OPEN);

@@ -89,6 +89,24 @@ function setup(opts: { votes?: Vote[]; status?: VoteDelegationStatus | Error } =
 }
 
 describe('ParticipantVoteService', () => {
+  it('drops a read that arrives after the read of a newer vote', () => {
+    const { svc, api, set } = setup();
+    const reads = new Map<string, Subject<Vote>>();
+    api.getVote.mockImplementation((id: string) => {
+      const read = new Subject<Vote>();
+      reads.set(id, read);
+      return read;
+    });
+    set(row({ id: 'v1' }));
+    // The room closes v1 and opens v2 at once: the read of v1 comes last.
+    set(row({ id: 'v2', question: 'Zweite Frage?' }));
+    reads.get('v2')!.next(vote({ id: 'v2', question: 'Zweite Frage?' }));
+    reads.get('v1')!.next(vote({ id: 'v1' }));
+    TestBed.tick();
+    expect(svc.vote()?.id).toBe('v2');
+    expect(svc.vote()?.question).toBe('Zweite Frage?');
+  });
+
   it('reads the vote and the delegation state once per id and status', () => {
     const { svc, api, delegations, set } = setup();
     set(row());

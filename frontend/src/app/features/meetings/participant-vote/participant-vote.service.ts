@@ -142,6 +142,8 @@ export class ParticipantVoteService {
   private load(id: string): void {
     this.api.getVote(id, { quiet: true }).subscribe({
       next: (vote) => {
+        // A read can arrive after the read of a newer vote: keep only the vote of the row.
+        if (vote.id !== this.row()?.id) return;
         const isNew = vote.id !== this.loaded()?.id;
         this.loaded.set(vote);
         if (!isNew) return;

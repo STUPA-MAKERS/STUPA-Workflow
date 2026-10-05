@@ -57,6 +57,7 @@
     }
 
     <app-participant-vote />
+    <ng-container [ngTemplateOutlet]="votesTpl" />
 
     @if (top) {
       <section class="fv__excerpt" [attr.aria-label]="excerptCap()">
@@ -93,18 +94,25 @@
         [saving]="savingAttendance()"
         [delegated]="delegated()"
         (change)="reportAttendance($event)"
-      />
+      >
+        <ng-container [ngTemplateOutlet]="rosterButtonTpl" />
+      </app-participant-attendance>
+    } @else {
+      <ng-container [ngTemplateOutlet]="rosterButtonTpl" />
     }
-    <ng-container [ngTemplateOutlet]="delegationTpl" />
+    <ng-container [ngTemplateOutlet]="delegationTpl" [ngTemplateOutletContext]="{ variant: 'box' }" />
   </div>
 } @else {
-  <div class="fv__body" [class.fv__body--wide]="wide()">
+  <!-- Board Schmal-Teilnahme: below the wide layout the vote card is a strip above the
+       text, outside the scroll area, so it stays in view. -->
+  @if (!wide() && votes.vote()) {
+    <app-participant-vote class="fv__strip" layout="strip" [position]="votePosition()" />
+  }
+  <div class="fv__body fv__fade" [class.fv__body--wide]="wide()" appScrollFade="y">
     @if (wide()) {
-      <section class="fv__agenda" [attr.aria-label]="'meetings.agenda.title' | t">
+      <section class="fv__agenda fv__fade" appScrollFade="y" [attr.aria-label]="'meetings.agenda.title' | t">
         <ng-container [ngTemplateOutlet]="agendaTpl" />
       </section>
-    } @else {
-      <app-participant-vote class="fv__voteTop" />
     }
 
     <div class="fv__main">
@@ -127,25 +135,38 @@
       }
     </div>
 
-    <aside class="fv__side" [attr.aria-label]="'participant.side' | t">
-      @if (m.status === 'planned' && me(); as row) {
-        <app-participant-attendance
-          [member]="row"
-          [meetingStatus]="m.status"
-          [saving]="savingAttendance()"
-          [delegated]="delegated()"
-          (change)="reportAttendance($event)"
-        />
+    <aside class="fv__side fv__fade" appScrollFade="y" [attr.aria-label]="'participant.side' | t">
+      @if (m.status === 'planned') {
+        @if (me(); as row) {
+          <app-participant-attendance
+            [member]="row"
+            [meetingStatus]="m.status"
+            [saving]="savingAttendance()"
+            [delegated]="delegated()"
+            (change)="reportAttendance($event)"
+          >
+            <ng-container [ngTemplateOutlet]="rosterButtonTpl" />
+          </app-participant-attendance>
+        } @else {
+          <ng-container [ngTemplateOutlet]="rosterButtonTpl" />
+        }
       }
       @if (wide()) {
         <app-participant-vote />
       }
-      <ng-container [ngTemplateOutlet]="delegationTpl" />
+      <ng-container [ngTemplateOutlet]="votesTpl" />
+      <!-- Below the wide layout the delegation of a running meeting sits in the dock. -->
+      @if (wide() || m.status === 'planned') {
+        <ng-container [ngTemplateOutlet]="delegationTpl" [ngTemplateOutletContext]="{ variant: 'box' }" />
+      }
     </aside>
   </div>
 
   @if (m.status !== 'planned') {
-    <footer class="fv__dock" [attr.aria-label]="'participant.dock.label' | t">
+    <footer class="fv__dock" [class.fv__dock--narrow]="!wide()" [attr.aria-label]="'participant.dock.label' | t">
+      @if (!wide()) {
+        <ng-container [ngTemplateOutlet]="delegationTpl" [ngTemplateOutletContext]="{ variant: 'inline' }" />
+      }
       @if (m.status === 'closed') {
         <span class="fv__dockState">
           <span class="fv__muted">{{ closedLine() }}</span>
@@ -154,7 +175,7 @@
       } @else if (nowElsewhere(); as now) {
         <span class="fv__dockNow ell" [title]="now">{{ 'meetings.dock.nowRunning' | t: { top: now } }}</span>
         <app-button size="sm" variant="tonal" (click)="backToNow()">{{ 'meetings.dock.backToNow' | t }}</app-button>
-      } @else if (top) {
+      } @else if (top && (wide() || !dockDelegation())) {
         <span class="fv__dockTop">
           <app-icon name="list" [size]="18" />
           <span class="ell" [title]="top.title ?? ''">
@@ -166,14 +187,15 @@
 
       <span class="fv__spacer"></span>
 
-      @if (ownBallot(); as own) {
+      <!-- Below the wide layout the strip above the text shows the ballots. -->
+      @if (wide() && ownBallot(); as own) {
         <span class="fv__dockItem" [attr.data-kind]="own.kind">
           <app-icon name="vote" [size]="18" />
           <span>{{ 'meetings.dock.yourVote' | t }}: <strong>{{ own.text }}</strong></span>
         </span>
         <span class="fv__vr" aria-hidden="true"></span>
       }
-      @if (proxyBallot(); as proxy) {
+      @if (wide() && proxyBallot(); as proxy) {
         <span class="fv__dockItem" [attr.data-kind]="proxy.kind">
           <app-icon name="repeat" [size]="18" />
           <span>{{ proxy.key | t }}</span>
@@ -192,17 +214,55 @@
 
     <app-side-sheet side="end" [heading]="'participant.attendance.title' | t" [(open)]="attendanceOpen">
       @if (attendanceOpen() && me(); as row) {
-        <app-participant-attendance
-          [member]="row"
-          [meetingStatus]="m.status"
-          [saving]="savingAttendance()"
-          [delegated]="delegated()"
-          (change)="reportAttendance($event)"
-        />
+        <div class="fv__sheetStack">
+          <app-participant-attendance
+            [member]="row"
+            [meetingStatus]="m.status"
+            [saving]="savingAttendance()"
+            [delegated]="delegated()"
+            (change)="reportAttendance($event)"
+          />
+          <app-participant-roster [rows]="attendance()" [protokollantId]="m.protokollantId" />
+        </div>
       }
     </app-side-sheet>
   }
 }
+
+<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'participant.roster.all' | t" [(open)]="rosterOpen">
+  @if (rosterOpen()) {
+    <app-participant-roster [rows]="attendance()" [protokollantId]="m.protokollantId" />
+  }
+</app-side-sheet>
+
+<ng-template #rosterButtonTpl>
+  @if (attendance().length) {
+    <app-button class="fv__roster" variant="text" size="sm" (click)="rosterOpen.set(true)">
+      <app-icon name="users" [size]="18" />
+      {{ 'participant.roster.show' | t }}
+    </app-button>
+  }
+</ng-template>
+
+<!-- The earlier results of the shown item, and the votes without an agenda item. -->
+<ng-template #votesTpl>
+  @if (moreVotes().length) {
+    <section class="fv__votes" [attr.aria-label]="'participant.votes.more' | t">
+      <h2 class="fv__cap cap">{{ 'participant.votes.more' | t }}</h2>
+      @for (v of moreVotes(); track v.id) {
+        <app-vote-card [vote]="v" [meetingStatus]="m.status" />
+      }
+    </section>
+  }
+  @if (looseVotes().length) {
+    <section class="fv__votes" [attr.aria-label]="'participant.votes.loose' | t">
+      <h2 class="fv__cap cap">{{ 'participant.votes.loose' | t }}</h2>
+      @for (v of looseVotes(); track v.id) {
+        <app-vote-card [vote]="v" [meetingStatus]="m.status" />
+      }
+    </section>
+  }
+</ng-template>
 
 <ng-template #startTpl>
   <span class="fv__cap cap">{{ 'participant.start.cap' | t }}</span>
@@ -214,9 +274,10 @@
   </a>
 </ng-template>
 
-<ng-template #delegationTpl>
+<ng-template #delegationTpl let-variant="variant">
   <app-meeting-delegation-card
-    variant="box"
+    [class.fv__dockDeleg]="variant === 'inline'"
+    [variant]="variant"
     [meetingId]="m.id"
     [subtitle]="dialogLine()"
     (contextChange)="delegationContext.set($event)"

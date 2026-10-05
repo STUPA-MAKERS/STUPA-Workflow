@@ -42,6 +42,7 @@ import { NO_CONTEXT, type VoteContext } from './vote-context';
   host: {
     '[class.vpn--phone]': "layout() === 'phone'",
     '[class.vpn--card]': "layout() === 'card'",
+    '[class.vpn--strip]': "layout() === 'strip'",
   },
   templateUrl: './vote-panel.component.html',
   styleUrl: './vote-panel.component.scss',
@@ -56,8 +57,12 @@ export class VotePanelComponent {
   readonly proxyName = input<string | null>(null);
   readonly proxyCast = input(false);
   readonly caster = input.required<BallotCaster>();
-  /** `card`: the small card of a side column (the participant view of a meeting). */
-  readonly layout = input<'page' | 'phone' | 'card'>('page');
+  /**
+   * `card`: the small card of a side column (the participant view of a meeting).
+   * `strip`: the card above the text on a narrow screen (board Schmal-Teilnahme): the
+   * caption with the TOP and the turnout "14 von 19", the rows side by side.
+   */
+  readonly layout = input<'page' | 'phone' | 'card' | 'strip'>('page');
 
   /** Why the person cannot vote (a warning note), or `null`. */
   readonly notice = input<string | null>(null);
@@ -73,11 +78,19 @@ export class VotePanelComponent {
     if (status === 'closed') return 'meetings.vote.card.closed';
     return this.status().key;
   });
+  /** The caption of the strip: "Abstimmung offen · TOP 3". */
+  protected readonly stripCap = computed(() => {
+    const cap = this.i18n.translate(this.cardCap());
+    const n = this.context().position;
+    return n === null ? cap : `${cap} · ${this.i18n.translate('meetings.agenda.top', { n })}`;
+  });
   /** The card keeps its confirm button inside the card, also on a phone. */
   protected readonly ballotLayout = computed<'page' | 'phone'>(() =>
     this.layout() === 'phone' ? 'phone' : 'page',
   );
   protected readonly isOpen = computed(() => this.vote().status === 'open');
+  /** The card and the strip carry the small ballot. */
+  protected readonly compact = computed(() => this.layout() === 'card' || this.layout() === 'strip');
   protected readonly secret = computed(() => this.vote().secret || !!this.vote().config.secret);
   protected readonly options = computed(() => this.vote().config.options ?? []);
 
@@ -123,6 +136,19 @@ export class VotePanelComponent {
     const t = this.vote().tally;
     return this.basis() === 'present' ? (t.present ?? 0) : t.eligible;
   });
+
+  /** "14 von 19 Anwesenden haben abgestimmt": the long form of the turnout of the strip. */
+  protected readonly turnoutLabel = computed(() =>
+    this.i18n.translate('meetings.vote.progress', {
+      voted: this.vote().tally.voted ?? 0,
+      present: this.turnoutTotal(),
+    }),
+  );
+
+  /** The fixed line while the counts are hidden (the strip has no progress block). */
+  protected readonly hiddenKey = computed<TranslationKey>(() =>
+    this.secret() ? 'meetings.vote.hiddenSecret' : 'meetings.vote.progressHidden',
+  );
 
   /** The ballot shows while the vote is open and the person holds a ballot. */
   protected readonly showBallot = computed(

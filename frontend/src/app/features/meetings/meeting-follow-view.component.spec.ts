@@ -6,7 +6,7 @@ import {
 import { provideRouter } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import type { MeetingDelegationContext } from '@core/api/delegations.service';
+import type { Delegation, MeetingDelegationContext } from '@core/api/delegations.service';
 import type { AgendaItem, Attendance, Meeting, Vote } from '@core/api/models';
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { AGENDA, DELEGATION_CONTEXT, item, matchMediaQueries, meeting, vote } from '../../../testing/meeting-fixtures';
@@ -41,6 +41,19 @@ const ME: Attendance = {
   note: null,
   isSelf: true,
 };
+
+/** A delegation of the meeting, from Jonas Weber to the member. */
+const INCOMING: Delegation = {
+  id: 'd-2', meetingId: 'm-1', meetingTitle: null, meetingDate: null, gremiumId: 'g-1', gremiumName: null,
+  delegatorId: 'pr-4', delegatorName: 'Jonas Weber', delegateId: 'pr-1', delegateName: 'Paul Neumann',
+  delegateVoting: true, viaPool: false, createdAt: '2026-10-01T00:00:00Z', revocable: false, direction: 'incoming',
+};
+
+/** Two other members of the roster: the minute-taker and an absent member. */
+const OTHERS: Attendance[] = [
+  { principalId: 'pr-9', displayName: 'Mara Keller', email: null, status: 'present', source: 'lead', note: null, isSelf: false },
+  { principalId: 'pr-3', displayName: 'Tom Brandt', email: null, status: 'absent', source: 'lead', note: null, isSelf: false },
+];
 
 function rest(over: Partial<Vote> = {}): Vote {
   return {
@@ -170,6 +183,18 @@ describe('MeetingFollowViewComponent', () => {
       expect(screen.getByRole('radio', { name: 'Anwesend' })).toBeDisabled();
     });
 
+    it('shows the attendance of all members before the start', async () => {
+      const { context } = await setup({ meeting: planned(), attendance: [ME, ...OTHERS] });
+      context();
+      await userEvent.click(screen.getByRole('button', { name: 'Alle Mitglieder anzeigen' }));
+      const sheet = screen.getByRole('dialog', { name: 'Alle Mitglieder' });
+      const rows = within(sheet).getAllByRole('listitem');
+      expect(rows).toHaveLength(3);
+      expect(rows[0]).toHaveTextContent('Paul Neumann (du)');
+      expect(rows[0]).toHaveTextContent('Offen');
+      expect(rows[1]).toHaveTextContent('Protokollführung');
+    });
+
     it('opens an item from the agenda and closes it again with a second click', async () => {
       const { context } = await setup({ meeting: planned() });
       context();
@@ -268,6 +293,51 @@ describe('MeetingFollowViewComponent', () => {
       expect(screen.queryByText(/Deine Stimme:/)).toBeNull();
     });
 
+    it('shows the new text of the item of the room after a read of the agenda', async () => {
+      const { context, fixture, container } = await setup();
+      context();
+      const text = () => container.querySelector('app-top-sheet .ProseMirror')?.textContent ?? '';
+      expect(text()).toContain('Zwischenstand.');
+      // The same item with a new text, as the reload after a meeting_state gives it.
+      fixture.componentRef.setInput(
+        'agenda',
+        AGENDA.map((a) => (a.id === 't-2' ? { ...a, body: 'Zwischenstand. Der Haushalt ist ausgeglichen.' } : a)),
+      );
+      fixture.detectChanges();
+      expect(text()).toContain('Der Haushalt ist ausgeglichen.');
+    });
+
+    it('lists the earlier results of the shown item and the votes without an item', async () => {
+      const first = vote({ id: 'v-7', agendaItemId: 't-2', status: 'closed', result: 'rejected', question: 'Erste Lesung?' });
+      const last = vote({ id: 'v-9', agendaItemId: 't-2', status: 'closed', result: 'passed', question: 'Zweite Lesung?' });
+      const loose = vote({ id: 'v-5', agendaItemId: null, status: 'closed', result: 'passed', question: 'Antrag zur Geschäftsordnung?' });
+      const other = vote({ id: 'v-3', agendaItemId: 't-1', status: 'closed', result: 'passed', question: 'Begrüßung?' });
+      const { context, voteReads } = await setup({ meeting: member({ votes: [other, first, loose, last] }) });
+      context();
+      voteReads(rest({ id: 'v-9', status: 'closed', result: 'passed', question: 'Zweite Lesung?' }));
+      // The card shows the newest result; the list holds the earlier one of the item.
+      const more = screen.getByRole('region', { name: 'Weitere Ergebnisse zu diesem TOP' });
+      expect(within(more).getByRole('heading', { name: 'Erste Lesung?' })).toBeInTheDocument();
+      expect(within(more).getByText('Abgelehnt')).toBeInTheDocument();
+      expect(within(more).queryByText('Zweite Lesung?')).toBeNull();
+      expect(within(more).queryByText('Begrüßung?')).toBeNull();
+      const looseBox = screen.getByRole('region', { name: 'Abstimmungen ohne TOP' });
+      expect(within(looseBox).getByRole('heading', { name: 'Antrag zur Geschäftsordnung?' })).toBeInTheDocument();
+    });
+
+    it('lists the attendance of all members in the attendance sheet', async () => {
+      const { context } = await setup({ attendance: [{ ...ME, status: 'present', source: 'self' }, ...OTHERS] });
+      context();
+      await userEvent.click(screen.getByRole('button', { name: 'Deine Anwesenheit: Anwesend' }));
+      const sheet = screen.getByRole('dialog', { name: 'Deine Anwesenheit' });
+      const roster = within(sheet).getByRole('region', { name: 'Anwesenheit · 2 von 3 anwesend' });
+      const rows = within(roster).getAllByRole('listitem');
+      expect(rows[1]).toHaveTextContent('Mara Keller');
+      expect(rows[1]).toHaveTextContent('Protokollführung');
+      // A member sees an absence as "Abwesend" (Z2), never a reason.
+      expect(rows[2]).toHaveTextContent('Abwesend');
+    });
+
     it('opens the attendance from the dock', async () => {
       const { context, attendanceChange } = await setup({ attendance: [{ ...ME, status: 'present', source: 'self' }] });
       context();
@@ -338,11 +408,41 @@ describe('MeetingFollowViewComponent', () => {
       context();
       voteReads(rest());
       expect(screen.queryByRole('region', { name: 'Tagesordnung' })).toBeNull();
-      expect(screen.getByText('Abstimmung offen')).toBeInTheDocument();
+      expect(screen.getByText('Abstimmung offen · TOP 2')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: /Tagesordnung/ }));
       const sheet = screen.getByRole('dialog', { name: 'Tagesordnung' });
       await userEvent.click(within(sheet).getByRole('button', { name: /Antrag Kulturfestival/ }));
       expect(screen.getByRole('heading', { level: 1, name: 'Antrag Kulturfestival' })).toBeInTheDocument();
+    });
+
+    it('keeps the vote strip out of the scroll area and puts the delegation into the dock', async () => {
+      const open = vote({ id: 'v-1', agendaItemId: 't-2', voted: 14, present: 19 });
+      const { context, voteReads, container } = await setup({
+        meeting: member({ votes: [open] }),
+        media: [MEDIA.narrow, MEDIA.notPhone, MEDIA.belowWide],
+      });
+      context({ allowVoteDelegation: true, incoming: [INCOMING] });
+      voteReads(rest(), { blocked: false, delegatedToName: null, exercising: true, delegatedByName: 'Jonas Weber' });
+      const strip = container.querySelector<HTMLElement>('app-participant-vote.fv__strip');
+      expect(strip).not.toBeNull();
+      expect(strip!.closest('.fv__body')).toBeNull();
+      expect(within(strip!).getByText('Abstimmung offen · TOP 2')).toBeInTheDocument();
+      expect(within(strip!).getByLabelText('14 von 19 Anwesenden haben abgestimmt')).toHaveTextContent('14 von 19');
+      // The two rows stand side by side.
+      expect(strip!.querySelector('app-ballot')).toHaveClass('ballot--columns');
+      const dock = screen.getByRole('contentinfo', { name: 'Stand der Sitzung' });
+      expect(within(dock).getByText('Du vertrittst Jonas Weber in dieser Sitzung.')).toBeInTheDocument();
+      // The strip carries the ballots and the sheet the item: the dock repeats neither.
+      expect(within(dock).queryByText(/Deine Stimme/)).toBeNull();
+      expect(within(dock).queryByText(/von 3 · Bericht des Finanzreferats/)).toBeNull();
+      expect(screen.queryByRole('region', { name: 'Vertretung' })).toBeNull();
+    });
+
+    it('names the item in the dock of a narrow screen without a delegation', async () => {
+      const { context } = await setup({ media: [MEDIA.narrow, MEDIA.notPhone, MEDIA.belowWide] });
+      context();
+      const dock = screen.getByRole('contentinfo', { name: 'Stand der Sitzung' });
+      expect(within(dock).getByText(/von 3 · Bericht des Finanzreferats/)).toBeInTheDocument();
     });
   });
 

@@ -98,7 +98,7 @@
   </section>
 }
 
-@if (target() !== null) {
+@if (showBar()) {
   @if (layout() === 'phone') {
     <div class="ballot__spacer" aria-hidden="true" [style.height.px]="barHeight()"></div>
   }
@@ -110,7 +110,7 @@
     <app-button
       variant="fill"
       [size]="compact() ? 'md' : 'lg'"
-      [block]="true"
+      [block]="!columns()"
       [disabled]="!canConfirm()"
       [loading]="busy"
       (click)="confirm()"

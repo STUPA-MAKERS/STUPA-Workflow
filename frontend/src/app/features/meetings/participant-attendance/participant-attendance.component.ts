@@ -35,6 +35,8 @@ export interface OwnAttendanceChange {
  * did not set the record (O15). The record of the lead, and every record of a closed
  * meeting, shows as text. A member with an active delegation of the meeting cannot
  * report "Anwesend" (O23): the option is off and the reason stands below it.
+ *
+ * Projected content goes at the end of the box.
  */
 @Component({
   selector: 'app-participant-attendance',
@@ -60,8 +62,13 @@ export class ParticipantAttendanceComponent {
   /** The reason as the member types it. */
   protected readonly draft = signal('');
 
+  /** The stored reason, as a value: a new roster object with the same reason is no change. */
+  private readonly storedNote = computed(() => this.member().note ?? '');
+
   constructor() {
-    effect(() => this.draft.set(this.member().note ?? ''));
+    // Take over the stored reason only when it changes. A live update of the roster
+    // must not drop what the member types.
+    effect(() => this.draft.set(this.storedNote()));
   }
 
   /** The lead set the record (O15), or the meeting is over: text only. */
@@ -103,7 +110,7 @@ export class ParticipantAttendanceComponent {
    *  empty field removes the reason. */
   protected saveNote(): void {
     const note = this.draft().trim();
-    if (this.saving() || note === (this.member().note ?? '')) return;
+    if (this.saving() || note === this.storedNote()) return;
     this.change.emit({ status: 'excused', note: note || null });
   }
 }

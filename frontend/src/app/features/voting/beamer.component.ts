@@ -209,7 +209,11 @@ export class BeamerComponent implements OnDestroy {
     if (!force && id === this.requested) return;
     this.requested = id;
     this.api.getVote(id, { quiet: true }).subscribe({
-      next: (v) => this.loaded.set(v),
+      // A read can arrive after the read of a newer vote (a vote closes and the room
+      // opens the next one at once). Keep only the vote that the screen shows now.
+      next: (v) => {
+        if (v.id === this.targetId()) this.loaded.set(v);
+      },
       error: () => {},
     });
   }

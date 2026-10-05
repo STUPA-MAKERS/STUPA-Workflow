@@ -115,6 +115,18 @@ export class TopSheetComponent {
     return `${this.i18n.translate('meetings.agenda.top', { n: this.topIndex() + 1 })} · ${this.i18n.translate(kind)}`;
   }
 
+  /**
+   * The document key of the editor. The minute-taker's editor keeps its key while they
+   * type, and only an insert from outside raises `revision`. The participant view
+   * (`follow`) has no input of its own: the text that the room writes reaches it with
+   * each read of the agenda, so its key changes with the text.
+   */
+  protected readonly docKey = computed(() => {
+    const t = this.top();
+    if (!t) return '';
+    return this.follow() ? `${t.id}:${textHash(t.body ?? '')}` : `${t.id}:${this.revision()}`;
+  });
+
   /** The item is the one that the room handles now (participant view, live meeting). */
   protected readonly isNow = computed(() => {
     const m = this.meeting();
@@ -150,4 +162,14 @@ export class TopSheetComponent {
     if (p.status === 'rendering') return { kind: 'warn', key: 'meetings.protocol.rendering' };
     return { kind: 'neutral', key: 'meetings.protocol.draft' };
   }
+}
+
+/** A short hash of a text (FNV-1a, 32 bit), so that a document key changes with it. */
+function textHash(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `${text.length}.${(hash >>> 0).toString(36)}`;
 }

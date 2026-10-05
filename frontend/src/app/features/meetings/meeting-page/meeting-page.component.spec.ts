@@ -220,6 +220,13 @@ describe('MeetingPageComponent', () => {
       const menu = await openMenu();
       expect(within(menu).queryByRole('menuitem', { name: 'Sitzung bearbeiten' })).toBeNull();
       expect(within(menu).queryByRole('menuitem', { name: 'Sitzung löschen' })).toBeNull();
+      // The beamer route needs session.manage: a minute-taker without it gets no beamer.
+      expect(within(menu).queryByRole('menuitem', { name: 'Beamer-Ansicht' })).toBeNull();
+    });
+
+    it('shows no beamer button on a wide screen without the manage right', async () => {
+      await setup({ meeting: meeting({ canManage: false }) }, [MEDIA.wide]);
+      expect(screen.queryByRole('button', { name: 'Beamer-Ansicht' })).toBeNull();
     });
 
     it('keeps the beamer in the header on a wide screen', async () => {

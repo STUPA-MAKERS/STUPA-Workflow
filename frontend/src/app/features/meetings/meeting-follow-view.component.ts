@@ -16,6 +16,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { type StatusKind, type StatusView, meetingStatus } from '@shared/status-kind.util';
+import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
@@ -33,9 +34,11 @@ import {
   type OwnAttendanceChange,
   ParticipantAttendanceComponent,
 } from './participant-attendance/participant-attendance.component';
+import { ParticipantRosterComponent } from './participant-roster/participant-roster.component';
 import { ParticipantVoteComponent } from './participant-vote/participant-vote.component';
 import { ParticipantVoteService } from './participant-vote/participant-vote.service';
 import { TopSheetComponent } from './top-sheet/top-sheet.component';
+import { VoteCardComponent } from './vote-card/vote-card.component';
 
 /** The length of the protocol excerpt on a phone, in characters. */
 const EXCERPT_LENGTH = 160;
@@ -54,10 +57,15 @@ const EXCERPT_LENGTH = 160;
  *   ballot, the represented ballot and the attendance (it opens a sheet).
  * - Closed: the agenda, the texts and the results, the attendance as text.
  *
+ * Below the vote card stand the earlier results of the shown item and the votes without
+ * an agenda item. The attendance of all members (read only) is in the attendance sheet
+ * of the dock, and behind "Alle Mitglieder anzeigen" before the start and on a phone.
+ *
  * The view follows the room: until the member opens another item, the sheet shows the
- * item that the room handles. Below the wide layout the agenda opens as a sheet; on a
- * phone the page shows the item, the vote card, a protocol excerpt with "Ganzen TOP
- * lesen", then the attendance and the delegation.
+ * item that the room handles. Below the wide layout the agenda opens as a sheet, the
+ * vote card is a strip above the text (board Schmal-Teilnahme) and the delegation sits
+ * in the dock. On a phone the page shows the item, the vote card, a protocol excerpt
+ * with "Ganzen TOP lesen", then the attendance and the delegation.
  */
 @Component({
   selector: 'app-meeting-follow-view',
@@ -68,6 +76,7 @@ const EXCERPT_LENGTH = 160;
     NgTemplateOutlet,
     RouterLink,
     TranslatePipe,
+    ScrollFadeDirective,
     ButtonComponent,
     IconComponent,
     StatusTextComponent,
@@ -76,6 +85,8 @@ const EXCERPT_LENGTH = 160;
     TopSheetComponent,
     ParticipantAttendanceComponent,
     ParticipantVoteComponent,
+    ParticipantRosterComponent,
+    VoteCardComponent,
     MeetingDelegationCardComponent,
   ],
   templateUrl: './meeting-follow-view.component.html',
@@ -101,6 +112,8 @@ export class MeetingFollowViewComponent {
   protected readonly selectedId = signal<Uuid | null>(null);
   protected readonly agendaOpen = signal(false);
   protected readonly attendanceOpen = signal(false);
+  /** The sheet with the attendance of all members. */
+  protected readonly rosterOpen = signal(false);
   /** The phone shows the whole text of the item instead of the excerpt. */
   protected readonly fullText = signal(false);
   /** The delegation context of the meeting, as the delegation card loaded it. */
@@ -163,6 +176,43 @@ export class MeetingFollowViewComponent {
     if (!top) return null;
     const closed = votes.filter((v) => v.status === 'closed' && v.agendaItemId === top.id);
     return closed.length ? closed[closed.length - 1] : null;
+  });
+
+  /** "TOP 3" of the vote of the card: the 1-based number of its agenda item, or `null`. */
+  protected readonly votePosition = computed<number | null>(() => {
+    const itemId = this.voteRow()?.agendaItemId;
+    if (!itemId) return null;
+    const index = this.agenda().findIndex((a) => a.id === itemId);
+    return index >= 0 ? index + 1 : null;
+  });
+
+  /** The other closed votes of the shown item, oldest first. The card shows the newest. */
+  protected readonly moreVotes = computed<MeetingVote[]>(() => {
+    const top = this.shownTop();
+    const card = this.voteRow()?.id;
+    if (!top) return [];
+    return this.meeting().votes.filter(
+      (v) => v.status === 'closed' && v.agendaItemId === top.id && v.id !== card,
+    );
+  });
+
+  /** The closed votes without an agenda item (or of an item that left the agenda). */
+  protected readonly looseVotes = computed<MeetingVote[]>(() => {
+    const ids = new Set(this.agenda().map((a) => a.id));
+    const card = this.voteRow()?.id;
+    return this.meeting().votes.filter(
+      (v) =>
+        v.status === 'closed' && v.id !== card && (!v.agendaItemId || !ids.has(v.agendaItemId)),
+    );
+  });
+
+  /**
+   * A delegation of the meeting to show in the dock of a narrow screen: the own one or
+   * one directed at the member (board Schmal-Teilnahme).
+   */
+  protected readonly dockDelegation = computed(() => {
+    const c = this.delegationContext();
+    return !!c?.allowVoteDelegation && (!!c.myDelegation || c.incoming.length > 0);
   });
 
   /** The own row of the roster, or `null` (an external substitute has none). */

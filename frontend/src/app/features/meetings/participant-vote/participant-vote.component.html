@@ -1,6 +1,7 @@
 @if (state.vote(); as v) {
   <app-vote-panel
-    layout="card"
+    [layout]="layout()"
+    [context]="context()"
     [vote]="v"
     [own]="state.own()"
     [proxyName]="state.proxyName()"

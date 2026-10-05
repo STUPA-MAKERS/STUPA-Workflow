@@ -1,5 +1,19 @@
 @if (visible() && hasRows()) {
-  @if (variant() === 'box') {
+  @if (variant() === 'inline') {
+    <!-- The dock of the participant view on a narrow screen: only the persons. -->
+    @if (ctx(); as c) {
+      @if (c.myDelegation || c.incoming.length) {
+        <div class="dc dc--inline" role="group" [attr.aria-label]="'delegation.card.title' | t">
+          @if (c.myDelegation; as d) {
+            <ng-container [ngTemplateOutlet]="outgoing" [ngTemplateOutletContext]="{ $implicit: d }" />
+          }
+          @for (d of c.incoming; track d.id) {
+            <ng-container [ngTemplateOutlet]="incoming" [ngTemplateOutletContext]="{ $implicit: d }" />
+          }
+        </div>
+      }
+    }
+  } @else if (variant() === 'box') {
     <!-- The participant view: a box of the side column. -->
     <section class="dc dc--box" [attr.aria-label]="'delegation.card.title' | t">
       <h2 class="dc__cap cap">{{ 'delegation.card.title' | t }}</h2>
@@ -75,7 +89,7 @@
   <div class="dc__person">
     <app-avatar [name]="d.delegateName || '—'" size="sm" [decorative]="true" />
     <span class="dc__text">
-      <span class="dc__strong">{{ 'delegation.card.outgoing' | t: { name: d.delegateName || '—' } }}</span>
+      <span class="dc__strong" [class.ell]="variant() === 'inline'" [title]="'delegation.card.outgoing' | t: { name: d.delegateName || '—' }">{{ 'delegation.card.outgoing' | t: { name: d.delegateName || '—' } }}</span>
       @if (d.delegateVoting || d.viaPool) {
         <span class="dc__sub">
           @if (d.delegateVoting) {
@@ -99,7 +113,7 @@
   <div class="dc__person">
     <app-avatar [name]="d.delegatorName || '—'" size="sm" [decorative]="true" />
     <span class="dc__text">
-      <span class="dc__strong">{{ 'delegation.card.incoming' | t: { name: d.delegatorName || '—' } }}</span>
+      <span class="dc__strong" [class.ell]="variant() === 'inline'" [title]="'delegation.card.incoming' | t: { name: d.delegatorName || '—' }">{{ 'delegation.card.incoming' | t: { name: d.delegatorName || '—' } }}</span>
       @if (d.delegateVoting) {
         <span class="dc__sub">{{ 'participant.delegation.withVoting' | t }}</span>
       }
