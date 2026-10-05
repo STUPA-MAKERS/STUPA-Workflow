@@ -237,3 +237,34 @@ export function groupsToFields(groups: QuestionGroup[]): FormFieldDef[] {
   });
   return out;
 }
+
+/** The place of a question: the index of its group and its index in the group. */
+export interface QuestionPos {
+  gi: number;
+  qi: number;
+}
+
+/**
+ * Move a question to another place, also into another group (drag and drop in the
+ * outline of the form editor).
+ *
+ * `to.qi` is an index of the target group after the question left its old place. A drop
+ * on a row therefore puts a question from above BELOW that row and a question from below
+ * ABOVE it. An index past the end appends the question. The function does not change its
+ * input. It returns the new groups and the new place of the question, or `null` when
+ * `from` names no question or `to` names no group.
+ */
+export function moveQuestionTo(
+  groups: readonly QuestionGroup[],
+  from: QuestionPos,
+  to: QuestionPos,
+): { groups: QuestionGroup[]; pos: QuestionPos } | null {
+  const source = groups[from.gi];
+  if (!source || from.qi < 0 || from.qi >= source.fields.length || !groups[to.gi]) return null;
+  const next = groups.map((g) => ({ ...g, fields: [...g.fields] }));
+  const [moved] = next[from.gi].fields.splice(from.qi, 1);
+  const target = next[to.gi].fields;
+  const qi = Math.max(0, Math.min(to.qi, target.length));
+  target.splice(qi, 0, moved);
+  return { groups: next, pos: { gi: to.gi, qi } };
+}

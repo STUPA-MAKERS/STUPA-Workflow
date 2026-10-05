@@ -18,7 +18,9 @@ test.use({ storageState: ADMIN_STATE });
  * types, and the editor sits at `/admin/forms/{typeId}`. It was renamed from
  * form-builder to form-editor, fields became questions grouped in sections, the save
  * control is "Speichern", and the `[data-testid="form-json"]` mirror no longer
- * exists. The key and label inputs kept their labels.
+ * exists. The key and label inputs kept their labels. Since the redesign (FE12b) the
+ * questions are listed in an outline, and the card of the selected question holds the
+ * fields.
  */
 test('@gating Admin Form-Editor: Frage hinzufügen → Form-Version persistiert', async ({ page }) => {
   const art = readArtifacts();
@@ -32,15 +34,19 @@ test('@gating Admin Form-Editor: Frage hinzufügen → Form-Version persistiert'
   // actionable, not for one more to appear. Filling too early wrote the key into the
   // previous question, so the new one kept an empty key, `formValid()` stayed false, and
   // the save button never enabled — a 60s wait that reads as a timeout, not as a race.
-  const group = page.locator('.fe__group').first();
-  const questions = group.locator('.fe__list > li');
-  const before = await questions.count();
+  // The outline (left column) lists the questions of every group; "Frage hinzufügen"
+  // under a group opens the menu of the question types.
+  const outline = page.getByRole('navigation', { name: 'Fragen des Formulars' });
+  const rows = outline.locator('.fe__list').first().locator(':scope > li');
+  const before = await rows.count();
 
-  await group.getByRole('button', { name: /Frage hinzufügen/ }).click();
+  await outline.getByRole('button', { name: /Frage hinzufügen/ }).first().click();
   await page.getByRole('menuitem').first().click();
-  await expect(questions).toHaveCount(before + 1);
+  await expect(rows).toHaveCount(before + 1);
 
-  const question = questions.last();
+  // The new question is selected: its card in the middle column has the accent outline.
+  const question = page.locator('article.fe__card--sel');
+  await expect(question).toHaveAttribute('data-q', `0:${before}`);
   const key = `e2e_frage_${Date.now()}`;
   await question.getByRole('textbox', { name: 'Schlüssel' }).fill(key);
   await question.getByRole('textbox', { name: 'Bezeichnung (DE)' }).fill('E2E Frage');
