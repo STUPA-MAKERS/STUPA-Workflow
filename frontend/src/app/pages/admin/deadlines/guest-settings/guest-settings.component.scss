@@ -1,0 +1,86 @@
+:host {
+  display: block;
+}
+
+.gs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  container-type: inline-size;
+}
+
+.gs__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-inline: var(--space-1);
+}
+.gs__text {
+  min-width: 0;
+}
+.gs__title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  line-height: var(--lh-h3);
+  font-weight: var(--fw-semibold);
+}
+.gs__sub {
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+/* Two fields side by side; one column in a narrow sheet. */
+.gs__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+@container (max-width: 40rem) {
+  .gs__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.gs__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* The unit sits at the end of the field box, on the line of the value. */
+.gs__unitBox {
+  position: relative;
+  min-width: 0;
+}
+.gs__unitBox app-input ::ng-deep input {
+  padding-inline-end: 5rem;
+}
+.gs__unit {
+  position: absolute;
+  inset-inline-end: var(--space-4);
+  top: 1.5rem;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+/* The lifetime: the select, and beside it the days once "Begrenzt" is set. */
+.gs__link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+}
+.gs__link--days {
+  grid-template-columns: minmax(0, 1fr) minmax(8rem, 10rem);
+}
+
+.gs__hint {
+  margin: 0;
+  padding-inline: var(--space-1);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}

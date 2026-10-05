@@ -40,9 +40,11 @@ export class BreadcrumbsComponent {
   private readonly all = signal<Crumb[]>([]);
 
   /**
-   * The crumbs to show. A parent that the frame around the page shows already (the
-   * admin navigation shows "Verwaltung") is left out. A label that the page gives for
-   * its own URL replaces the label of the current crumb.
+   * The crumbs to show. A parent that the frame around the page shows already is left
+   * out: the root of the frame and every page below it (the admin navigation shows
+   * "Verwaltung" and marks "Gremien" on a gremium sub-page), so every page in the frame
+   * starts its title at the same place. A label that the page gives for its own URL
+   * replaces the label of the current crumb.
    */
   readonly crumbs = computed<Crumb[]>(() => {
     const root = this.frame.crumbRoot();
@@ -52,7 +54,9 @@ export class BreadcrumbsComponent {
     if (own && last && own.url === last.url) {
       list = [...list.slice(0, -1), { ...last, label: own.label }];
     }
-    return root ? list.filter((c, i) => i === list.length - 1 || c.url !== `/${root}`) : list;
+    if (!root) return list;
+    const inFrame = (url: string): boolean => url === `/${root}` || url.startsWith(`/${root}/`);
+    return list.filter((c, i) => i === list.length - 1 || !inFrame(c.url));
   });
 
   /** Path to i18n title key, taken from the route config to resolve parents. */

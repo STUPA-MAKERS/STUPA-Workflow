@@ -1,45 +1,55 @@
-<app-card [heading]="'admin.config.history.title' | t" [headingLevel]="2">
+<section class="vh" aria-labelledby="vh-title">
+  <h2 class="sec vh__title" id="vh-title">{{ 'admin.config.history.title' | t }}</h2>
   @if (loading()) {
-    <app-skeleton variant="rows" [count]="4" [label]="'common.loading' | t" />
+    <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
   } @else if (revisions().length === 0) {
-    <p class="text-muted">{{ 'admin.config.history.empty' | t }}</p>
+    <p class="vh__empty">{{ 'admin.config.history.empty' | t }}</p>
   } @else {
-    <ol class="vh">
+    <ol class="rowgroup vh__list">
       @for (rev of revisions(); track rev.id) {
         <li class="vh__item">
-          <div class="vh__head">
-            <strong>{{ 'admin.config.history.version' | t: { version: rev.version } }}</strong>
-            @if (rev.isCurrent) {
-              <app-badge variant="success">{{ 'admin.config.history.current' | t }}</app-badge>
-            }
-            <time class="text-muted" [attr.datetime]="rev.at">{{ rev.at | ldate: 'short' }}</time>
-            <span class="text-muted">{{ actor(rev) }}</span>
-          </div>
-          <div class="vh__actions">
-            <app-button variant="ghost" size="sm" (click)="toggleDiff(rev)">
-              <app-icon
-                [name]="openDiffId() === rev.id ? 'chevron-up' : 'chevron-down'"
-                [size]="12"
-              />
-              {{ 'admin.config.history.viewDiff' | t }}
-            </app-button>
-            @if (!rev.isCurrent) {
-              <app-button
-                variant="secondary"
-                size="sm"
-                [disabled]="restoring()"
-                (click)="askRestore(rev)"
+          <div class="vh__row">
+            <span class="vh__head">
+              <strong class="vh__version">{{ 'admin.config.history.version' | t: { version: rev.version } }}</strong>
+              @if (rev.isCurrent) {
+                <app-status-text kind="accent">{{ 'admin.config.history.current' | t }}</app-status-text>
+              }
+            </span>
+            <span class="vh__meta">
+              <time class="mono" [attr.datetime]="rev.at">{{ rev.at | ldate: 'short' }}</time>
+              <span aria-hidden="true">·</span>
+              <span class="vh__actor ell" [title]="actor(rev)">{{ actor(rev) }}</span>
+            </span>
+            <span class="vh__actions">
+              <button
+                type="button"
+                class="vh__toggle"
+                [attr.aria-expanded]="openDiffId() === rev.id"
+                [attr.aria-controls]="'vh-diff-' + rev.id"
+                (click)="toggleDiff(rev)"
               >
-                {{ 'admin.config.history.restore' | t }}
-              </app-button>
-            }
+                {{ 'admin.config.history.viewDiff' | t }}
+                <app-icon [name]="openDiffId() === rev.id ? 'chevron-up' : 'chevron-down'" [size]="14" />
+              </button>
+              @if (!rev.isCurrent) {
+                <app-button
+                  variant="tonal"
+                  size="sm"
+                  [disabled]="restoring()"
+                  [ariaLabel]="('admin.config.history.restore' | t) + ': ' + ('admin.config.history.version' | t: { version: rev.version })"
+                  (click)="askRestore(rev)"
+                >
+                  {{ 'admin.config.history.restore' | t }}
+                </app-button>
+              }
+            </span>
           </div>
           @if (openDiffId() === rev.id) {
-            <div class="vh__diff">
+            <div class="vh__diff" [id]="'vh-diff-' + rev.id">
               @if (diff(); as d) {
                 <app-config-diff [diff]="d.diff" />
               } @else {
-                <p class="text-muted">{{ 'common.loading' | t }}</p>
+                <p class="vh__empty">{{ 'common.loading' | t }}</p>
               }
             </div>
           }
@@ -47,23 +57,19 @@
       }
     </ol>
   }
-</app-card>
+</section>
 
 <app-dialog
   [open]="!!confirmRestore()"
   [title]="'admin.config.restore.title' | t"
-  [closeLabel]="'admin.gremien.cancel' | t"
+  [closeLabel]="'action.cancel' | t"
   (closed)="confirmRestore.set(null)"
 >
   @if (confirmRestore(); as rev) {
-    <p>{{ 'admin.config.restore.confirm' | t: { version: rev.version } }}</p>
-    <div class="flex gap-2 justify-end mt-4">
-      <app-button size="sm" variant="ghost" (click)="confirmRestore.set(null)">
-        {{ 'admin.gremien.cancel' | t }}
-      </app-button>
-      <app-button size="sm" variant="primary" (click)="doRestore()">
-        {{ 'admin.config.history.restore' | t }}
-      </app-button>
-    </div>
+    <p class="vh__confirm">{{ 'admin.config.restore.confirm' | t: { version: rev.version } }}</p>
   }
+  <div dialog-footer class="vh__foot">
+    <app-button variant="text" (click)="confirmRestore.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="fill" (click)="doRestore()">{{ 'admin.config.history.restore' | t }}</app-button>
+  </div>
 </app-dialog>

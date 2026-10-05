@@ -1,49 +1,66 @@
-@if (draft(); as d) {
-  <section class="flex flex-col gap-5">
-    <app-page-header [flush]="true" [title]="'admin.brand.title' | t">
-      <div actions class="inline-flex gap-2">
-        <span class="py-1 px-3 rounded-full text-xs font-semibold bg-surface-sunken text-muted">{{ 'admin.brand.version' | t: { n: version() } }}</span>
-        @if (hasDraftChanges()) {
-          <span class="py-1 px-3 rounded-full text-xs font-semibold bg-surface-sunken text-muted bg-warning-subtle text-warning">{{ 'admin.brand.draftDirty' | t }}</span>
+<section class="br">
+  <app-page-header [flush]="true" [title]="'admin.brand.title' | t" [subtitle]="'admin.brand.desc' | t">
+    @if (draft()) {
+      <ng-container ngProjectAs="[actions]">
+        <app-button variant="tonal" [disabled]="linkErrors().length > 0" (click)="saveDraft()">{{ 'admin.brand.saveDraft' | t }}</app-button>
+        <!-- A phone keeps one action in the header; the activate goes into the menu. -->
+        @if (phone()) {
+          <app-row-menu [label]="'admin.brand.moreActions' | t" [sections]="phoneMenu()" (selected)="activate()" />
+        } @else {
+          <app-button variant="fill" [disabled]="!canActivate()" (click)="activate()">
+            <app-icon name="check" [size]="18" /> {{ 'admin.brand.activate' | t }}
+          </app-button>
         }
-      </div>
-    </app-page-header>
+      </ng-container>
+    }
+  </app-page-header>
 
-    <p class="br__desc">{{ 'admin.brand.desc' | t }}</p>
+  @if (draft(); as d) {
+    <div class="br__meta">
+      <p class="br__state">
+        <span class="mono">{{ 'admin.brand.version' | t: { n: version() } }}</span>
+        @if (hasDraftChanges()) {
+          <span class="br__dot" aria-hidden="true">·</span>
+          <span class="br__dirty">{{ 'admin.brand.draftDirty' | t }}</span>
+        }
+      </p>
+      <span class="br__lang">
+        <span class="br__langLabel" id="br-lang">{{ 'admin.brand.textLang' | t }}</span>
+        <app-segmented [options]="langOptions" [value]="lang()" (valueChange)="setLang($event)" [ariaLabel]="'admin.brand.textLang' | t" />
+      </span>
+    </div>
 
     @if (linkErrors().length > 0) {
-      <p class="br__alert" role="alert">
-        {{ 'admin.brand.badUrl' | t }} ({{ linkErrors().join(', ') }})
-      </p>
+      <app-note kind="error" icon="alert" role="alert">{{ 'admin.brand.badUrl' | t }} ({{ linkErrors().join(', ') }})</app-note>
     }
 
     <div class="br__cols">
-      <div class="flex flex-col gap-4">
+      <div class="br__col">
         <!-- The app name comes from the config. An empty value falls back to the i18n default. -->
-        <fieldset class="br__group">
-          <legend>{{ 'admin.brand.appName.group' | t }}</legend>
-          <p class="text-xs text-muted">{{ 'admin.brand.appName.hint' | t }}</p>
-          <div class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.brand.appName.full' | t }}
-            <input
-              [attr.aria-label]="'admin.brand.appName.full' | t"
-              [(ngModel)]="d.appName"
-              (ngModelChange)="reemit()"
+        <section class="br__sec" aria-labelledby="br-name">
+          <h2 class="sec br__secTitle" id="br-name">{{ 'admin.brand.appName.group' | t }}</h2>
+          <div class="br__nameRow">
+            <app-input
+              [label]="'admin.brand.appName.full' | t"
               placeholder="STUPA Antragsplattform"
+              [ngModel]="d.appName ?? ''"
+              (ngModelChange)="setAppName('appName', $event)"
+              name="appName"
             />
-          </div>
-          <div class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.brand.appName.short' | t }}
-            <input
-              [attr.aria-label]="'admin.brand.appName.short' | t"
-              [(ngModel)]="d.appShortName"
-              (ngModelChange)="reemit()"
+            <app-input
+              [label]="'admin.brand.appName.short' | t"
               placeholder="StuPa"
+              [ngModel]="d.appShortName ?? ''"
+              (ngModelChange)="setAppName('appShortName', $event)"
+              name="appShortName"
             />
           </div>
-        </fieldset>
+          <p class="br__hint">{{ 'admin.brand.appName.hint' | t }}</p>
+        </section>
 
         <!-- Gravatar images of the avatars, through the API proxy. Off = initials only. -->
-        <fieldset class="br__group">
-          <legend>{{ 'admin.brand.avatars.group' | t }}</legend>
+        <section class="br__sec" aria-labelledby="br-avatars">
+          <h2 class="sec br__secTitle" id="br-avatars">{{ 'admin.brand.avatars.group' | t }}</h2>
           <app-switch
             name="gravatarEnabled"
             [hint]="'admin.brand.avatars.hint' | t"
@@ -51,179 +68,187 @@
             (ngModelChange)="setGravatar($event)"
             >{{ 'admin.brand.avatars.gravatar' | t }}</app-switch
           >
-        </fieldset>
+        </section>
 
-        <fieldset class="br__group">
-          <legend>{{ 'admin.brand.logos' | t }}</legend>
-          <p class="text-xs text-muted">{{ 'admin.brand.logoHint' | t: { mb: maxMb } }}</p>
-          @for (slot of logoSlots; track slot) {
-            <div class="br__logo">
-              <span class="br__logo-name">{{ slotLabel(slot) }}</span>
-              @if (d.logos[slot]; as asset) {
-                <img class="br__logo-prev" [src]="asset.url" [alt]="slotLabel(slot)" />
-                <span class="text-xs text-muted">{{ asset.filename }}</span>
-                <app-button variant="ghost" size="sm" (click)="removeLogo(slot)">{{ 'admin.common.remove' | t }}</app-button>
-              } @else {
-                <span class="text-sm text-muted">{{ 'admin.brand.dropHere' | t }}</span>
-              }
-              <input
-                #logo
-                type="file"
-                [accept]="accept"
-                [attr.aria-label]="slotLabel(slot)"
-                (change)="onLogoSelected(slot, logo)"
-              />
-            </div>
-          }
-        </fieldset>
-
-        <fieldset class="br__group">
-          <legend>{{ 'admin.brand.footer' | t }}</legend>
-          @for (col of d.footerColumns; track $index; let ci = $index) {
-            <div class="border border-solid border-line rounded-md p-3 flex flex-col gap-2">
-              <div class="br__col-head">
+        <section class="br__sec" aria-labelledby="br-logos">
+          <h2 class="sec br__secTitle" id="br-logos">{{ 'admin.brand.logos' | t }}</h2>
+          <ul class="rowgroup br__logos">
+            @for (slot of logoSlots; track slot) {
+              <li
+                class="br__logo"
+                [class.br__logo--drop]="dropSlot() === slot"
+                (dragover)="onDragOver(slot, $event)"
+                (dragleave)="onDragLeave()"
+                (drop)="onDrop(slot, $event)"
+              >
                 <input
-                  class="font-semibold"
-                  [attr.aria-label]="'admin.common.labelDe' | t"
-                  [(ngModel)]="col.label['de']"
-                  (ngModelChange)="reemit()"
-                  placeholder="DE"
+                  #logo
+                  class="br__file"
+                  type="file"
+                  [accept]="accept"
+                  tabindex="-1"
+                  aria-hidden="true"
+                  (change)="onLogoSelected(slot, logo)"
                 />
-                <input
-                  [attr.aria-label]="'admin.common.labelEn' | t"
-                  [(ngModel)]="col.label['en']"
-                  (ngModelChange)="reemit()"
-                  placeholder="EN"
-                />
-                <app-button variant="secondary" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.moveUp' | t" (click)="moveColumn(ci, -1)">↑</app-button>
-                <app-button variant="secondary" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.moveDown' | t" (click)="moveColumn(ci, 1)">↓</app-button>
-                <app-button variant="danger" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeColumn(ci)">✕</app-button>
-              </div>
-              @for (link of col.links; track $index; let li = $index) {
-                <div class="br__link">
-                  <input [attr.aria-label]="'admin.common.labelDe' | t" [(ngModel)]="link.label['de']" (ngModelChange)="reemit()" placeholder="DE" />
-                  <input [attr.aria-label]="'admin.common.labelEn' | t" [(ngModel)]="link.label['en']" (ngModelChange)="reemit()" placeholder="EN" />
-                  <input [attr.aria-label]="'admin.brand.url' | t" [(ngModel)]="link.url" (ngModelChange)="reemit()" placeholder="https://" />
-                  <app-button variant="danger" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeLink(col, li)">✕</app-button>
-                </div>
-              }
-              <app-button class="self-start" variant="ghost" size="sm" (click)="addLink(col)">+ {{ 'admin.brand.addLink' | t }}</app-button>
-            </div>
-          }
-          <app-button variant="ghost" size="sm" (click)="addColumn()">{{ 'admin.brand.addColumn' | t }}</app-button>
-        </fieldset>
+                @if (d.logos[slot]; as asset) {
+                  <span class="br__thumb"><img [src]="asset.url" alt="" /></span>
+                  <span class="br__logoText">
+                    <span class="br__logoName">{{ slotLabel(slot) }}</span>
+                    <span class="br__logoFile mono">{{ asset.filename }} · {{ size(asset.size) }}</span>
+                  </span>
+                  <app-button
+                    variant="text"
+                    size="sm"
+                    [iconOnly]="true"
+                    [ariaLabel]="('admin.brand.replaceLogo' | t) + ': ' + slotLabel(slot)"
+                    [title]="'admin.brand.replaceLogo' | t"
+                    (click)="logo.click()"
+                    ><app-icon name="upload"
+                  /></app-button>
+                  <app-button
+                    variant="text"
+                    size="sm"
+                    [iconOnly]="true"
+                    [ariaLabel]="('admin.brand.removeLogo' | t) + ': ' + slotLabel(slot)"
+                    [title]="'admin.brand.removeLogo' | t"
+                    (click)="removeLogo(slot)"
+                    ><app-icon name="trash"
+                  /></app-button>
+                } @else {
+                  <span class="br__thumb br__thumb--empty" aria-hidden="true"><app-icon name="upload" [size]="18" /></span>
+                  <span class="br__logoText">
+                    <span class="br__logoName">{{ slotLabel(slot) }}</span>
+                    <span class="br__logoHint">{{ 'admin.brand.dropHere' | t }} · {{ 'admin.brand.logoHint' | t: { mb: maxMb } }}</span>
+                  </span>
+                  <app-button variant="outlined" size="sm" [ariaLabel]="('admin.brand.pick' | t) + ': ' + slotLabel(slot)" (click)="logo.click()">{{
+                    'admin.brand.pick' | t
+                  }}</app-button>
+                }
+              </li>
+            }
+          </ul>
+        </section>
 
-        <fieldset class="br__group">
-          <legend>{{ 'admin.brand.copyright' | t }}</legend>
-          <div class="br__link">
-            <input [attr.aria-label]="('admin.brand.copyright' | t) + ' (DE)'" [(ngModel)]="d.copyright['de']" (ngModelChange)="reemit()" placeholder="DE" />
-            <input [attr.aria-label]="('admin.brand.copyright' | t) + ' (EN)'" [(ngModel)]="d.copyright['en']" (ngModelChange)="reemit()" placeholder="EN" />
-          </div>
-          <h2 class="text-sm font-semibold mt-2">{{ 'admin.brand.legal' | t }}</h2>
-          @for (link of d.legalLinks; track $index; let li = $index) {
-            <div class="br__link">
-              <input [attr.aria-label]="'admin.common.labelDe' | t" [(ngModel)]="link.label['de']" (ngModelChange)="reemit()" placeholder="DE" />
-              <input [attr.aria-label]="'admin.common.labelEn' | t" [(ngModel)]="link.label['en']" (ngModelChange)="reemit()" placeholder="EN" />
-              <input [attr.aria-label]="'admin.brand.url' | t" [(ngModel)]="link.url" (ngModelChange)="reemit()" placeholder="https://" />
-              <app-button variant="danger" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" (click)="removeLegalLink(li)">✕</app-button>
-            </div>
+        <section class="br__sec" aria-labelledby="br-texts">
+          <h2 class="sec br__secTitle" id="br-texts">{{ 'admin.brand.texts' | t }}</h2>
+          @for (key of freetexts; track key) {
+            <label class="br__area">
+              <span class="br__areaLabel">{{ withLang(freetextLabel(key)) }}</span>
+              <textarea
+                class="br__areaInput"
+                [rows]="key === 'applyInfo' ? 3 : 2"
+                [ngModel]="freetext(d, key)[lang()]"
+                (ngModelChange)="setText(freetext(d, key), $event)"
+                [name]="'text-' + key"
+              ></textarea>
+            </label>
           }
-          <app-button class="self-start" variant="ghost" size="sm" (click)="addLegalLink()">+ {{ 'admin.brand.addLink' | t }}</app-button>
-        </fieldset>
-
-        <fieldset class="br__group">
-          <legend>{{ 'admin.brand.texts' | t }}</legend>
-          <div class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.brand.text.loginHint' | t }}
-            <div class="br__bi">
-              <textarea rows="2" [attr.aria-label]="('admin.brand.text.loginHint' | t) + ' (DE)'" [(ngModel)]="d.freetexts.loginHint['de']" (ngModelChange)="reemit()" placeholder="DE"></textarea>
-              <textarea rows="2" [attr.aria-label]="('admin.brand.text.loginHint' | t) + ' (EN)'" [(ngModel)]="d.freetexts.loginHint['en']" (ngModelChange)="reemit()" placeholder="EN"></textarea>
-            </div>
-          </div>
-          <div class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.brand.text.welcome' | t }}
-            <div class="br__bi">
-              <textarea rows="2" [attr.aria-label]="('admin.brand.text.welcome' | t) + ' (DE)'" [(ngModel)]="d.freetexts.welcome['de']" (ngModelChange)="reemit()" placeholder="DE"></textarea>
-              <textarea rows="2" [attr.aria-label]="('admin.brand.text.welcome' | t) + ' (EN)'" [(ngModel)]="d.freetexts.welcome['en']" (ngModelChange)="reemit()" placeholder="EN"></textarea>
-            </div>
-          </div>
-          <div class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.brand.text.support' | t }}
-            <div class="br__bi">
-              <textarea rows="2" [attr.aria-label]="('admin.brand.text.support' | t) + ' (DE)'" [(ngModel)]="d.freetexts.support['de']" (ngModelChange)="reemit()" placeholder="DE"></textarea>
-              <textarea rows="2" [attr.aria-label]="('admin.brand.text.support' | t) + ' (EN)'" [(ngModel)]="d.freetexts.support['en']" (ngModelChange)="reemit()" placeholder="EN"></textarea>
-            </div>
-          </div>
-          <div class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.brand.text.emailFooter' | t }}
-            <div class="br__bi">
-              <textarea rows="2" [attr.aria-label]="('admin.brand.text.emailFooter' | t) + ' (DE)'" [(ngModel)]="d.freetexts.emailFooter['de']" (ngModelChange)="reemit()" placeholder="DE"></textarea>
-              <textarea rows="2" [attr.aria-label]="('admin.brand.text.emailFooter' | t) + ' (EN)'" [(ngModel)]="d.freetexts.emailFooter['en']" (ngModelChange)="reemit()" placeholder="EN"></textarea>
-            </div>
-          </div>
-          <!-- Info text below the application selection. Markdown works here. -->
-          <div class="flex flex-col gap-1 text-sm font-medium">{{ 'admin.brand.text.applyInfo' | t }}
-            <div class="br__bi">
-              <textarea rows="4" [attr.aria-label]="('admin.brand.text.applyInfo' | t) + ' (DE)'" [(ngModel)]="applyInfo(d)['de']" (ngModelChange)="reemit()" placeholder="DE (Markdown)"></textarea>
-              <textarea rows="4" [attr.aria-label]="('admin.brand.text.applyInfo' | t) + ' (EN)'" [(ngModel)]="applyInfo(d)['en']" (ngModelChange)="reemit()" placeholder="EN (Markdown)"></textarea>
-            </div>
-          </div>
-        </fieldset>
+        </section>
       </div>
 
-      <aside class="br__preview" aria-label="{{ 'admin.common.preview' | t }}">
-        <h2 class="br__preview-h">{{ 'admin.common.preview' | t }}</h2>
-
-        <div class="flex items-center gap-3 pb-3 border-0 border-b border-solid border-line" data-testid="preview-header">
-          @if (d.logos.imagemark; as im) {
-            <img class="br__pv-logo" [src]="im.url" alt="" aria-hidden="true" />
-          }
-          @if (d.logos.wordmark; as wm) {
-            <img class="br__pv-word" [src]="wm.url" alt="" aria-hidden="true" />
-          } @else if (text(d.copyright)) {
-            <strong>{{ text(d.copyright) }}</strong>
-          } @else {
-            <strong class="br__pv-ph">{{ 'admin.brand.logo.wordmark' | t }}</strong>
-          }
-        </div>
-
-        @if (text(d.freetexts.welcome); as w) {
-          <p class="text-base" data-testid="preview-welcome">{{ w }}</p>
-        } @else {
-          <p class="br__pv-ph text-base" data-testid="preview-welcome">{{ 'admin.brand.text.welcome' | t }}</p>
-        }
-        @if (text(d.freetexts.support); as s) {
-          <p class="text-sm text-muted" data-testid="preview-support">{{ s }}</p>
-        } @else {
-          <p class="br__pv-ph text-sm text-muted" data-testid="preview-support">{{ 'admin.brand.text.support' | t }}</p>
-        }
-
-        <footer class="flex flex-wrap gap-4 pt-3 border-0 border-t border-solid border-line text-sm" data-testid="preview-footer">
-          @for (col of d.footerColumns; track $index) {
-            <div class="br__pv-col">
-              <strong>{{ text(col.label) }}</strong>
-              @for (link of col.links; track $index) {
-                <a [href]="link.url">{{ text(link.label) }}</a>
+      <div class="br__col">
+        <section class="br__sec" aria-labelledby="br-footer">
+          <header class="br__secHead">
+            <h2 class="sec br__secTitle" id="br-footer">{{ 'admin.brand.footer' | t }}</h2>
+            <app-button variant="text" size="sm" (click)="addColumn()"><app-icon name="plus" [size]="16" /> {{ 'admin.brand.addColumn' | t }}</app-button>
+          </header>
+          @for (col of d.footerColumns; track $index; let ci = $index; let last = $last) {
+            <article class="br__column" [attr.aria-label]="'admin.brand.column' | t: { n: ci + 1 }">
+              <header class="br__columnHead">
+                <span class="cap">{{ 'admin.brand.column' | t: { n: ci + 1 } }}</span>
+                <span class="br__columnActions">
+                  <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="ci === 0" [ariaLabel]="('admin.common.moveUp' | t) + ': ' + ('admin.brand.column' | t: { n: ci + 1 })" (click)="moveColumn(ci, -1)"><app-icon name="chevron-up" /></app-button>
+                  <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="last" [ariaLabel]="('admin.common.moveDown' | t) + ': ' + ('admin.brand.column' | t: { n: ci + 1 })" (click)="moveColumn(ci, 1)"><app-icon name="chevron-down" /></app-button>
+                  <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.brand.removeColumn' | t) + ': ' + ('admin.brand.column' | t: { n: ci + 1 })" (click)="removeColumn(ci)"><app-icon name="trash" /></app-button>
+                </span>
+              </header>
+              <div class="br__pair">
+                <app-input [label]="'admin.brand.columnHeading' | t: { lang: 'DE' }" [ngModel]="col.label['de']" (ngModelChange)="setColumnLabel(col, 'de', $event)" [name]="'col-' + ci + '-de'" />
+                <app-input [label]="'admin.brand.columnHeading' | t: { lang: 'EN' }" [ngModel]="col.label['en']" (ngModelChange)="setColumnLabel(col, 'en', $event)" [name]="'col-' + ci + '-en'" />
+              </div>
+              @if (col.links.length) {
+                <ul class="rowgroup br__links">
+                  @for (link of col.links; track $index; let li = $index) {
+                    <li class="br__link">
+                      <input
+                        class="br__linkLabel"
+                        [attr.aria-label]="withLang('admin.brand.linkLabel' | t)"
+                        [placeholder]="'admin.brand.linkLabel' | t"
+                        [ngModel]="link.label[lang()]"
+                        (ngModelChange)="setText(link.label, $event)"
+                        [name]="'col-' + ci + '-link-' + li"
+                      />
+                      <input
+                        class="br__linkUrl mono"
+                        [class.br__linkUrl--bad]="isBadUrl(link.url)"
+                        [attr.aria-invalid]="isBadUrl(link.url) ? 'true' : null"
+                        [attr.aria-label]="'admin.brand.url' | t"
+                        placeholder="https://"
+                        [ngModel]="link.url"
+                        (ngModelChange)="setUrl(link, $event)"
+                        [name]="'col-' + ci + '-url-' + li"
+                      />
+                      <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.brand.removeLink' | t) + ': ' + (link.label[lang()] || link.url)" (click)="removeLink(col, li)"><app-icon name="trash" /></app-button>
+                    </li>
+                  }
+                </ul>
               }
-            </div>
+              <app-button class="br__add" variant="text" size="sm" (click)="addLink(col)"><app-icon name="plus" [size]="16" /> {{ 'admin.brand.addLink' | t }}</app-button>
+            </article>
+          } @empty {
+            <p class="br__hint">{{ 'admin.brand.noColumns' | t }}</p>
           }
-          <p class="br__pv-copy">{{ text(d.copyright) }}</p>
+        </section>
+
+        <section class="br__sec" aria-labelledby="br-copy">
+          <h2 class="sr-only" id="br-copy">{{ 'admin.brand.copyright' | t }}</h2>
+          <app-input
+            [label]="withLang('admin.brand.copyright' | t)"
+            [hint]="'admin.brand.copyrightHint' | t"
+            [ngModel]="d.copyright[lang()]"
+            (ngModelChange)="setText(d.copyright, $event)"
+            name="copyright"
+          />
+        </section>
+
+        <section class="br__sec" aria-labelledby="br-legal">
+          <header class="br__secHead">
+            <h2 class="sec br__secTitle" id="br-legal">{{ 'admin.brand.legal' | t }}</h2>
+            <app-button variant="text" size="sm" (click)="addLegalLink()"><app-icon name="plus" [size]="16" /> {{ 'admin.brand.addLink' | t }}</app-button>
+          </header>
           @if (d.legalLinks.length) {
-            <nav class="br__pv-legal" data-testid="preview-legal" [attr.aria-label]="'admin.brand.legal' | t">
-              @for (link of d.legalLinks; track $index) {
-                <a [href]="link.url">{{ text(link.label) }}</a>
+            <ul class="rowgroup br__links">
+              @for (link of d.legalLinks; track $index; let li = $index) {
+                <li class="br__link">
+                  <input
+                    class="br__linkLabel"
+                    [attr.aria-label]="withLang('admin.brand.linkLabel' | t)"
+                    [placeholder]="'admin.brand.linkLabel' | t"
+                    [ngModel]="link.label[lang()]"
+                    (ngModelChange)="setText(link.label, $event)"
+                    [name]="'legal-' + li"
+                  />
+                  <input
+                    class="br__linkUrl mono"
+                    [class.br__linkUrl--bad]="isBadUrl(link.url)"
+                    [attr.aria-invalid]="isBadUrl(link.url) ? 'true' : null"
+                    [attr.aria-label]="'admin.brand.url' | t"
+                    placeholder="https://"
+                    [ngModel]="link.url"
+                    (ngModelChange)="setUrl(link, $event)"
+                    [name]="'legal-url-' + li"
+                  />
+                  <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.brand.removeLink' | t) + ': ' + (link.label[lang()] || link.url)" (click)="removeLegalLink(li)"><app-icon name="trash" /></app-button>
+                </li>
               }
-            </nav>
+            </ul>
+          } @else {
+            <p class="br__hint">{{ 'admin.brand.noLegal' | t }}</p>
           }
-        </footer>
-      </aside>
+        </section>
+      </div>
     </div>
 
-    <footer class="flex justify-end gap-3">
-      <app-button size="sm" variant="secondary" [disabled]="linkErrors().length > 0" (click)="saveDraft()">{{ 'admin.brand.saveDraft' | t }}</app-button>
-      <app-button size="sm" [disabled]="!hasDraftChanges() || linkErrors().length > 0" (click)="activate()">{{ 'admin.brand.activate' | t }}</app-button>
-    </footer>
-
-    <app-version-history
-      entityType="site_config"
-      entityId="global"
-      (restored)="loadConfig()"
-    />
-  </section>
-}
+    <app-version-history entityType="site_config" entityId="global" (restored)="loadConfig()" />
+  }
+</section>

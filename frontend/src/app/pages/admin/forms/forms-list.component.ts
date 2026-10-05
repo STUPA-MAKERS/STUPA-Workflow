@@ -6,9 +6,8 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { I18nMap, Uuid } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { NoteComponent, PageHeaderComponent, StatusTextComponent } from '@shared/ui';
 import {
-  BadgeComponent,
   ButtonComponent,
   CellDirective,
   CheckboxComponent,
@@ -35,12 +34,13 @@ function emptyForm(): NewForm {
 }
 
 /**
- * Overview of the forms and application types, in Nextcloud-Forms style.
+ * Overview of the forms and application types (board Admin-Formulare).
  *
- * The table lists all application types. A dialog creates a new one. The dialog asks for
- * the title in DE and EN, the responsible Gremium, and the budget flag. The key comes from
- * the DE title automatically. The edit icon opens the subpage of the form
- * (`/admin/forms/:id`). The user maintains the questions there.
+ * The table lists all application types: the name, the Gremium, "Mit Budget" or
+ * "Ohne Budget", the status as text (Aktiv while a form version is active, else Entwurf)
+ * and the number of the active form version. A dialog creates a new type. It asks for the
+ * title in DE and EN and the budget flag. The key comes from the DE title automatically.
+ * The name and the edit icon open the subpage of the form (`/admin/forms/:id`).
  */
 @Component({
   selector: 'app-forms-list',
@@ -51,14 +51,15 @@ function emptyForm(): NewForm {
     RouterLink,
     TranslatePipe,
     ButtonComponent,
-    BadgeComponent,
     CheckboxComponent,
     DialogComponent,
     DataTableComponent,
     CellDirective,
     IconComponent,
     InputComponent,
+    NoteComponent,
     PageHeaderComponent,
+    StatusTextComponent,
   ],
   templateUrl: './forms-list.component.html',
   styleUrl: './forms-list.component.scss',
@@ -119,11 +120,18 @@ export class FormsListComponent {
   }
 
   protected readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'name', label: this.i18n.translate('admin.forms.col.name') },
+    { key: 'name', label: this.i18n.translate('admin.forms.col.name'), card: 'title' },
     { key: 'gremium', label: this.i18n.translate('admin.forms.col.gremium') },
-    { key: 'budget', label: this.i18n.translate('admin.forms.col.budget') },
-    { key: 'status', label: this.i18n.translate('admin.forms.col.status') },
-    { key: 'actions', label: this.i18n.translate('admin.forms.edit'), align: 'end' },
+    { key: 'budget', label: this.i18n.translate('admin.forms.col.budget'), width: '8rem' },
+    { key: 'status', label: this.i18n.translate('admin.forms.col.status'), width: '7rem' },
+    { key: 'version', label: this.i18n.translate('admin.forms.col.version'), width: '5rem' },
+    {
+      key: 'actions',
+      label: this.i18n.translate('admin.common.actions'),
+      align: 'end',
+      width: '6rem',
+      card: 'actions',
+    },
   ]);
   protected readonly rowId = (t: unknown): string => (t as ApplicationTypeFull).id;
 
@@ -131,6 +139,11 @@ export class FormsListComponent {
 
   protected name(t: ApplicationTypeFull): string {
     return resolveI18n(t.name, this.i18n.locale()) || this.i18n.translate('admin.forms.untitled');
+  }
+
+  /** "v7" for the active form version, a dash while the type is a draft. */
+  protected versionLabel(t: ApplicationTypeFull): string {
+    return t.activeFormVersion ? `v${t.activeFormVersion}` : '–';
   }
 
   protected gremiumName(id?: Uuid | null): string {

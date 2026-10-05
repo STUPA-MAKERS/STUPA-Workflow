@@ -3,7 +3,8 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { of, throwError } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
-import { ToastService } from '@stupa-makers/ui-kit';
+import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
+import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { MailTemplatesComponent } from './mail-templates.component';
 
 const TPL = {
@@ -43,8 +44,12 @@ describe('MailTemplatesComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('lists templates and auto-selects the first with its subject', async () => {
-    await setup();
-    expect(await screen.findByRole('button', { name: /magic_link/ })).toBeInTheDocument();
+    const { view } = await setup();
+    const fixture = view.fixture;
+    expect(await screen.findByRole('button', { name: /Anmelde-Link/ })).toHaveAttribute('aria-current', 'true');
+    // ngModel writes the subject into the field after a tick.
+    await fixture.whenStable();
+    fixture.detectChanges();
     expect(screen.getByDisplayValue('Anmeldung')).toBeInTheDocument();
     // The placeholder reference lists the "name" token.
     expect(screen.getByText(/name/)).toBeInTheDocument();
@@ -250,5 +255,50 @@ describe('MailTemplatesComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = view.fixture.componentInstance as any;
     expect(c.keyLabel('totally_unknown_key')).toBe('totally_unknown_key');
+  });
+
+  it('switches the language of the fields and marks an override', async () => {
+    const override = { ...TPL, key: 'status_update', source: 'override', bodyHtmlI18n: { de: '<p>Hi</p>' } };
+    const api = {
+      ...setupApi(),
+      listMailTemplates: jest.fn(() => of([TPL, override])),
+      previewMailPayload: jest.fn(() => of({ subject: 'S', text: 'T', html: '<p>Hi</p>', lang: 'en' })),
+    };
+    const { view } = await setup(api);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = view.fixture.componentInstance as any;
+    // A builtin template has no reset.
+    expect(screen.queryByRole('button', { name: 'Auf Standard zurücksetzen' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Status-Änderung/ }));
+    expect(screen.getAllByText('angepasst')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Auf Standard zurücksetzen' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
+    expect(c.lang()).toBe('en');
+    await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));
+    expect(api.previewMailPayload).toHaveBeenCalledWith(expect.objectContaining({ lang: 'en' }));
+    expect(screen.getByText('Vorschau (EN)')).toBeInTheDocument();
+    expect(view.container.querySelector('.mt__previewHtml')?.innerHTML).toContain('Hi');
+    c.setLang('de');
+    expect(c.lang()).toBe('de');
+    c.setLang(null);
+    expect(c.lang()).toBe('de');
+  });
+
+  describe('on a phone', () => {
+    let restore: () => void;
+    beforeEach(() => (restore = matchMediaQueries(MEDIA.phone)));
+    afterEach(() => restore());
+
+    it('picks the template with a chip instead of the list', async () => {
+      const { view } = await setup({ ...setupApi(), listMailTemplates: jest.fn(() => of([TPL, { ...TPL, key: 'task_new' }])) });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = view.fixture.componentInstance as any;
+      expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+      expect(c.templateOptions()).toEqual([
+        { value: 'magic_link', label: 'Anmelde-Link' },
+        { value: 'task_new', label: 'Neue Aufgabe' },
+      ]);
+      expect(screen.getByRole('button', { name: /Vorlage/ })).toBeInTheDocument();
+    });
   });
 });

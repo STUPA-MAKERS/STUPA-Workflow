@@ -1,16 +1,91 @@
-:host { display: flex; flex-direction: column; gap: var(--space-5); }
-.dl__mono { font-family: var(--font-mono, monospace); font-size: var(--fs-xs); }
-.field__control {
-  height: var(--control-height);
-  padding: 0 var(--space-4);
-  background: var(--color-surface-sunken);
-  color: var(--color-text);
-  border: 0;
-  border-radius: var(--radius-field);
-  font-size: var(--fs-md);
+:host {
+  display: block;
 }
-/* The filled field of the ui-kit: no edge; focus draws a 2px accent line inside. */
-.field__control:focus-visible {
-  outline: none;
-  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+
+.dl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.dl__name {
+  display: block;
+  font-weight: var(--fw-semibold);
+}
+/* The key, the kind and the deadline stay on one line; the name wraps. */
+.dl__key {
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.dl__muted {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+.dl__value {
+  white-space: nowrap;
+}
+.dl__actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.dl__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.dl__keyField ::ng-deep input {
+  font-family: var(--font-mono);
+}
+
+.dl__dates {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.dl__legend {
+  padding: 0;
+  font-weight: var(--fw-semibold);
+}
+.dl__date {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.dl__dateField {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.dl__addDate {
+  align-self: flex-start;
+}
+
+/* The time is short; the time zone takes the rest of the line. */
+.dl__time {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.dl__hint {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.dl__confirm {
+  margin: 0;
+}
+
+.dl__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }

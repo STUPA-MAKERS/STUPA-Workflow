@@ -4,21 +4,20 @@ import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
+import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
   ButtonComponent,
-  CellDirective,
-  type ColumnDef,
-  DataTableComponent,
   DialogComponent,
   IconComponent,
   InputComponent,
-  RowDetailDirective,
   SelectComponent,
   type SelectOption,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
+import { formatBytes } from '../admin-health/admin-health.util';
 import {
   CD_BASE_VARIANTS,
   CD_LOGO_ACCEPT,
@@ -64,13 +63,16 @@ function errorStatus(err: unknown): number {
 }
 
 /**
- * Corporate-design variants: the logo sets a Gremium renders its documents with.
+ * Corporate-design variants (board Admin-Dokument-Varianten): the logo sets a Gremium
+ * renders its documents with.
  *
  * A variant carries no color and no font. It only holds an ordered list of logos per
- * slot (title page, page footer) on top of a base variant. A logo is either a
- * name that the render service ships or a file an admin uploaded. Create, edit and "add a logo" all
- * run in a dialog. The key is a slug that the name generates, and it is immutable after
- * the create, because the renderer refers to it.
+ * slot (title page, page footer) on top of a base variant. A logo is either a name that
+ * the render service ships or a file an admin uploaded. One card per variant names its
+ * key, its base and the gremien that use it (from the gremium master data); "Logos
+ * anzeigen" opens its logo rows (move, download, remove). Create, edit and "add a logo"
+ * all run in a dialog. The key is a slug that the name generates, and it is immutable
+ * after the create, because the renderer refers to it.
  */
 @Component({
   selector: 'app-admin-cd-variants',
@@ -80,13 +82,12 @@ function errorStatus(err: unknown): number {
     FormsModule,
     TranslatePipe,
     ButtonComponent,
-    CellDirective,
-    DataTableComponent,
     DialogComponent,
     IconComponent,
     InputComponent,
-    RowDetailDirective,
+    NoteComponent,
     SelectComponent,
+    SkeletonComponent,
     PageHeaderComponent,
   ],
   templateUrl: './cd-variants.component.html',
@@ -135,24 +136,28 @@ export class AdminCdVariantsComponent {
     { value: 'vendored', label: this.i18n.translate('admin.cdVariants.sourceVendored') },
   ]);
 
-  readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'name', label: this.i18n.translate('admin.cdVariants.col.name') },
-    { key: 'key', label: this.i18n.translate('admin.common.key') },
-    { key: 'baseVariant', label: this.i18n.translate('admin.cdVariants.col.base') },
-    { key: 'logos', label: this.i18n.translate('admin.cdVariants.col.logos') },
-    {
-      key: 'actions',
-      label: this.i18n.translate('admin.common.actions'),
-      align: 'end',
-      width: '10rem',
-    },
-  ]);
+  readonly slotOptions = computed<SelectOption[]>(() =>
+    this.slots.map((s) => ({ value: s, label: this.slotLabel(s) })),
+  );
 
-  readonly rowId = (v: unknown): string => (v as CdVariant).id;
-  readonly rowExpanded = (v: unknown): boolean => this.expandedId() === (v as CdVariant).id;
+  /** Gremium names per variant id, from the gremium master data. */
+  private readonly usedBy = signal<ReadonlyMap<string, string[]>>(new Map());
 
   constructor() {
     this.reload();
+    // The master data names the variant of each gremium. A failed read leaves the
+    // "genutzt von" part out.
+    this.api.listGremienOptions().subscribe({
+      next: (gremien) => {
+        const map = new Map<string, string[]>();
+        for (const g of gremien) {
+          if (!g.cdVariantId) continue;
+          map.set(g.cdVariantId, [...(map.get(g.cdVariantId) ?? []), g.name]);
+        }
+        this.usedBy.set(map);
+      },
+      error: () => this.usedBy.set(new Map()),
+    });
   }
 
   // --- reading -------------------------------------------------------------
@@ -164,6 +169,8 @@ export class AdminCdVariantsComponent {
       next: (list) => {
         this.variants.set(list);
         this.loading.set(false);
+        // The first variant starts open, so its logos show at once.
+        if (this.expandedId() === null && list.length) this.expandedId.set(list[0].id);
       },
       error: () => {
         this.loadError.set(true);
@@ -190,11 +197,20 @@ export class AdminCdVariantsComponent {
     return logo.vendoredName ?? logo.fileName ?? '—';
   }
 
-  /** Per-slot counts for the collapsed row, e.g. "Titelseite 2 · Fußzeile 1". */
-  logoSummary(variant: CdVariant): string {
-    return this.slots
-      .map((s) => `${this.slotLabel(s)} ${this.logosOf(variant, s).length}`)
-      .join(' · ');
+  /** "Basis: Protokoll · genutzt von StuPa, AStA" for the card of a variant. */
+  usage(variant: CdVariant): string {
+    const base = this.i18n.translate('admin.cdVariants.baseLine', { base: this.baseLabel(variant.baseVariant) });
+    const names = this.usedBy().get(variant.id) ?? [];
+    const used = names.length
+      ? this.i18n.translate('admin.cdVariants.usedBy', { names: names.join(', ') })
+      : this.i18n.translate('admin.cdVariants.unused');
+    return `${base} · ${used}`;
+  }
+
+  /** "Dateiname · 3 KB" of an upload, the name of a shipped logo. */
+  logoDetail(logo: CdVariantLogo): string {
+    if (logo.vendoredName) return logo.vendoredName;
+    return logo.size != null ? `${logo.fileName ?? '—'} · ${formatBytes(logo.size, this.i18n)}` : (logo.fileName ?? '—');
   }
 
   /** Download URL of an uploaded logo. The server always answers `attachment`. */
@@ -323,7 +339,7 @@ export class AdminCdVariantsComponent {
 
   // --- logos ---------------------------------------------------------------
 
-  openLogoDialog(variantId: Uuid, slot: CdLogoSlot): void {
+  openLogoDialog(variantId: Uuid, slot: CdLogoSlot = 'title'): void {
     this.logoError.set(null);
     this.logoDraft.set({
       variantId,

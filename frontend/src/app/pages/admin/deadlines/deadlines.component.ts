@@ -15,10 +15,25 @@ import {
   InputComponent,
   type SelectOption,
   SelectComponent,
+  TimeInputComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { DeadlineKind, DeadlinePolicy } from '../admin.models';
+import { GuestSettingsComponent } from './guest-settings/guest-settings.component';
+
+/** The text of the "Frist" cell, with a tooltip and the muted look for a past schedule. */
+export interface DeadlineValue {
+  text: string;
+  title: string;
+  muted: boolean;
+}
+
+/** Today as `YYYY-MM-DD` in local time, for the comparison with the recurring dates. */
+function localToday(now: Date): string {
+  const p = (n: number): string => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
+}
 
 const KINDS: DeadlineKind[] = [
   'absolute',
@@ -71,7 +86,8 @@ function emptyDraft(): PolicyDraft {
 }
 
 /**
- * Deadline registry: named deadline policies that the flow references by `key`.
+ * Deadline registry (boards Admin-Fristen, Admin-Fristen-Dialog): the named deadline
+ * policies that the flow references by `key`.
  *
  * `absolute` carries a date. An admin can edit that date per semester without a change
  * to the flow. The relative kinds derive the deadline from the submission date or the
@@ -79,6 +95,9 @@ function emptyDraft(): PolicyDraft {
  * earliest date that is still ahead. `atTime` and `timezone` pin the wall-clock time and
  * stay correct over a DST switch. The dialog creates, updates and deletes policies
  * through the admin API.
+ *
+ * Below the table, `app-guest-settings` holds the settings for applications without an
+ * account (Z1): the discard window and the lifetime of the personal link.
  */
 @Component({
   selector: 'app-admin-deadlines',
@@ -95,7 +114,9 @@ function emptyDraft(): PolicyDraft {
     IconComponent,
     InputComponent,
     SelectComponent,
+    TimeInputComponent,
     PageHeaderComponent,
+    GuestSettingsComponent,
   ],
   templateUrl: './deadlines.component.html',
   styleUrl: './deadlines.component.scss',
@@ -123,12 +144,19 @@ export class AdminDeadlinesComponent {
   protected readonly timezoneOptions: SelectOption[] = buildTimezoneOptions();
 
   protected readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'label', label: this.i18n.translate('admin.deadlines.col.name') },
+    { key: 'label', label: this.i18n.translate('admin.deadlines.col.name'), card: 'title' },
     { key: 'key', label: this.i18n.translate('admin.common.key') },
     { key: 'kind', label: this.i18n.translate('admin.deadlines.col.kind') },
     { key: 'value', label: this.i18n.translate('admin.deadlines.col.value') },
-    { key: 'actions', label: this.i18n.translate('admin.common.actions'), align: 'end', width: '7rem' },
+    {
+      key: 'actions',
+      label: this.i18n.translate('admin.common.actions'),
+      align: 'end',
+      width: '6rem',
+      card: 'actions',
+    },
   ]);
+  protected readonly rowId = (r: unknown): string => (r as DeadlinePolicy).id;
 
   constructor() {
     this.api.listDeadlinePolicies().subscribe({
@@ -149,21 +177,45 @@ export class AdminDeadlinesComponent {
     return this.i18n.translate(`admin.deadlines.kind.${kind}` as TranslationKey);
   }
 
-  /** Display the concrete deadline source: a date, "+ X days", or a date count. */
-  protected valueOf(p: DeadlinePolicy): string {
-    const base = this.baseValue(p);
-    return p.atTime ? `${base} · ${p.atTime}` : base;
+  /**
+   * The concrete deadline: "14 Tage", the date of an absolute deadline, or the next date of
+   * a recurring one ("13.10.2026"), each with " · 18:00" when a time is set. The tooltip
+   * names the time zone and, for a recurring deadline, the number of dates. A recurring
+   * deadline without a date ahead reads "Kein Termin mehr" in muted text.
+   */
+  protected valueOf(p: DeadlinePolicy, now: Date = new Date()): DeadlineValue {
+    const time = p.atTime ? ` · ${p.atTime}` : '';
+    const zone = p.atTime && p.timezone ? p.timezone : '';
+    if (p.kind === 'recurring') {
+      const dates = [...(p.dates ?? [])].sort();
+      const count =
+        dates.length === 1
+          ? this.i18n.translate('admin.deadlines.dateCountOne')
+          : this.i18n.translate('admin.deadlines.dateCount', { n: dates.length });
+      const next = dates.find((d) => d >= localToday(now));
+      if (!next) {
+        return { text: this.i18n.translate('admin.deadlines.noNextDate'), title: count, muted: true };
+      }
+      return { text: this.dateText(`${next}T12:00:00`) + time, title: [count, zone].filter(Boolean).join(' · '), muted: false };
+    }
+    if (p.kind === 'absolute') {
+      const text = p.absoluteAt ? this.dateText(p.absoluteAt) + time : '—';
+      return { text, title: zone, muted: !p.absoluteAt };
+    }
+    if (p.offsetDays == null) return { text: '—', title: '', muted: true };
+    return {
+      text: this.i18n.translate('admin.deadlines.daysValue', { n: p.offsetDays }) + time,
+      title: zone,
+      muted: false,
+    };
   }
 
-  private baseValue(p: DeadlinePolicy): string {
-    if (p.kind === 'absolute') {
-      return p.absoluteAt ? new Date(p.absoluteAt).toLocaleDateString(this.i18n.formatLocale()) : '—';
-    }
-    if (p.kind === 'recurring') {
-      const n = p.dates?.length ?? 0;
-      return `${n} ${this.i18n.translate('admin.deadlines.dates')}`;
-    }
-    return p.offsetDays != null ? `+ ${p.offsetDays} ${this.i18n.translate('admin.deadlines.days')}` : '—';
+  private dateText(iso: string): string {
+    return new Date(iso).toLocaleDateString(this.i18n.formatLocale(), {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
   }
 
   protected openAdd(): void {
@@ -194,6 +246,12 @@ export class AdminDeadlinesComponent {
 
   protected patch<K extends keyof PolicyDraft>(key: K, value: PolicyDraft[K]): void {
     this.draft.update((d) => (d ? { ...d, [key]: value } : d));
+  }
+
+  /** The number field gives a string; an empty field means "no offset yet". */
+  protected patchOffset(value: string | number | null): void {
+    const text = String(value ?? '').trim();
+    this.patch('offsetDays', text === '' ? null : Number(text));
   }
 
   protected addDate(): void {

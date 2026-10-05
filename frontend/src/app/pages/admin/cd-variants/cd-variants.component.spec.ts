@@ -63,6 +63,13 @@ function makeApi(over: Partial<Record<string, unknown>> = {}) {
     ),
     deleteCdVariantLogo: jest.fn(() => of(void 0)),
     cdVariantLogoFileUrl: jest.fn((id: string) => `/api/admin/cd-variant-logos/${id}/file`),
+    listGremienOptions: jest.fn(() =>
+      of([
+        { id: 'g-1', name: 'Studierendenparlament', cdVariantId: 'cd-1' },
+        { id: 'g-2', name: 'Fachschaftenrat', cdVariantId: 'cd-1' },
+        { id: 'g-3', name: 'AStA', cdVariantId: null },
+      ]),
+    ),
     ...over,
   };
 }
@@ -85,19 +92,43 @@ describe('AdminCdVariantsComponent', () => {
 
   // --- list ---------------------------------------------------------------
 
-  it('lists the variants with name, key, base variant and a logo summary', async () => {
+  it('lists the variants with name, key, base and the gremien that use them', async () => {
     const { c } = await setup();
     expect(await screen.findByText('StuPa')).toBeInTheDocument();
     expect(screen.getByText('stupa')).toBeInTheDocument();
-    expect(screen.getByText('Protokoll')).toBeInTheDocument();
-    expect(screen.getByText('Titelseite 2 · Fußzeile 1')).toBeInTheDocument();
+    expect(screen.getByText('Basis: Protokoll · genutzt von Studierendenparlament, Fachschaftenrat')).toBeInTheDocument();
     expect(c.loading()).toBe(false);
     expect(c.loadError()).toBe(false);
+    // The first variant starts open.
+    expect(c.isExpanded('cd-1')).toBe(true);
+    expect(screen.getByRole('button', { name: /^Logos ausblenden/ })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('names a variant that no gremium uses', async () => {
+    const other: CdVariant = { ...VARIANT, id: 'cd-2', key: 'bericht', name: 'Bericht', baseVariant: 'report', logos: [] };
+    const { c } = await setup(makeApi({ listCdVariants: jest.fn(() => of([VARIANT, other])) }));
+    expect(c.usage(other)).toBe('Basis: Bericht · von keinem Gremium genutzt');
+  });
+
+  it('leaves the gremien out after a failed master-data read', async () => {
+    const { c } = await setup(
+      makeApi({ listGremienOptions: jest.fn(() => throwError(() => new Error('403'))) }),
+    );
+    expect(c.usage(VARIANT)).toBe('Basis: Protokoll · von keinem Gremium genutzt');
+  });
+
+  it('describes a logo: the shipped name, else the file with its size', async () => {
+    const { c } = await setup();
+    expect(c.logoDetail(TITLE_LOGO)).toBe('HSRT');
+    expect(c.logoDetail(TITLE_UPLOAD)).toBe('wappen.png · 1,2 KB');
+    expect(c.logoDetail({ ...TITLE_UPLOAD, size: null })).toBe('wappen.png');
+    expect(c.logoDetail({ ...TITLE_UPLOAD, size: 10, fileName: null })).toBe('— · 10 B');
+    expect(c.logoDetail({ ...TITLE_UPLOAD, size: undefined, fileName: undefined })).toBe('—');
   });
 
   it('shows the empty state without variants', async () => {
     await setup(makeApi({ listCdVariants: jest.fn(() => of([])) }));
-    expect(await screen.findByText('Noch keine CD-Varianten angelegt.')).toBeInTheDocument();
+    expect(await screen.findByText('Noch keine Dokument-Varianten angelegt.')).toBeInTheDocument();
   });
 
   it('shows an error when the list request fails', async () => {
@@ -120,24 +151,34 @@ describe('AdminCdVariantsComponent', () => {
     expect(c.fileUrl(TITLE_UPLOAD)).toBe('/api/admin/cd-variant-logos/l-2/file');
   });
 
-  it('expands and collapses the logo detail of a row', async () => {
+  it('collapses and expands the logo rows of a variant', async () => {
     const { c } = await setup();
-    expect(c.isExpanded('cd-1')).toBe(false);
-    await userEvent.click(screen.getByRole('button', { name: 'Logos anzeigen' }));
-    expect(c.isExpanded('cd-1')).toBe(true);
     expect(screen.getByText('HSRT')).toBeInTheDocument();
-    expect(screen.getByText('wappen.png')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Logos anzeigen' }));
+    expect(screen.getByText('wappen.png · 1,2 KB')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Logos ausblenden/ }));
     expect(c.isExpanded('cd-1')).toBe(false);
+    expect(screen.queryByText('HSRT')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Logos anzeigen/ }));
+    expect(c.isExpanded('cd-1')).toBe(true);
+    // Only an upload has a download link.
+    expect(screen.getAllByRole('link', { name: /^Datei herunterladen/ })).toHaveLength(1);
   });
 
-  it('shows a per-slot empty text when a slot has no logo', async () => {
-    const { c } = await setup(
-      makeApi({ listCdVariants: jest.fn(() => of([{ ...VARIANT, logos: [] }])) }),
-    );
-    c.toggle('cd-1');
-    await screen.findAllByText('Noch keine Logos.');
-    expect(screen.getAllByText('Noch keine Logos.')).toHaveLength(2);
+  it('adds a logo from the card into the slot that the dialog picks', async () => {
+    const { c, api, fixture } = await setup();
+    await userEvent.click(screen.getByRole('button', { name: 'Logo hinzufügen' }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(c.logoDraft()).toMatchObject({ variantId: 'cd-1', slot: 'title', source: 'upload' });
+    await userEvent.selectOptions(screen.getByLabelText('Position'), 'footer');
+    await userEvent.selectOptions(screen.getByLabelText('Quelle'), 'vendored');
+    c.saveLogo();
+    expect(api.addCdVariantVendoredLogo).toHaveBeenCalledWith('cd-1', 'footer', 'HSRT');
+  });
+
+  it('shows an empty text for a variant without logos', async () => {
+    await setup(makeApi({ listCdVariants: jest.fn(() => of([{ ...VARIANT, logos: [] }])) }));
+    expect(await screen.findByText('Noch keine Logos.')).toBeInTheDocument();
   });
 
   // --- create / edit ------------------------------------------------------
@@ -204,7 +245,7 @@ describe('AdminCdVariantsComponent', () => {
 
   it('edits a variant: the key stays read-only and only name/base go out', async () => {
     const { api, c, fixture } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten: StuPa' }));
     expect(c.editingId()).toBe('cd-1');
     // The key is immutable: a changed key answers 409, so the field stays locked.
     await fixture.whenStable();

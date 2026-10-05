@@ -1,339 +1,529 @@
-<app-page-header [title]="'budget.tree.title' | t" [rail]="true" [flush]="true">
-  <div actions class="bt__head-actions">
-    <app-button size="sm" (click)="openTop()">{{ 'budget.tree.createTop' | t }}</app-button>
-    <app-button size="sm" variant="secondary" [disabled]="!selectedTopId()" (click)="openFy()">
-      {{ 'budget.tree.fyTitle' | t }}
-    </app-button>
-    <app-button size="sm" variant="secondary" [disabled]="!selectedTopId()" (click)="openStichtag()">
-      {{ 'budget.tree.stichtagTitle' | t }}
-    </app-button>
-    <app-button size="sm" variant="secondary" [disabled]="!selectedTopId()" (click)="openStateConfig()">
-      {{ 'budget.tree.stateConfig' | t }}
-    </app-button>
-  </div>
-</app-page-header>
+<section class="bt">
+  <app-page-header [flush]="true" [title]="'budget.tree.title' | t" [subtitle]="'budget.tree.subtitle' | t">
+    @if (phone()) {
+      <ng-container ngProjectAs="[actions]">
+        <app-button variant="fill" (click)="openTop()">
+          <app-icon name="plus" [size]="18" /> {{ 'budget.tree.createTopShort' | t }}
+        </app-button>
+        <app-row-menu [label]="'budget.tree.moreActions' | t" [sections]="headerMenu()" (selected)="onHeaderMenu($event)" />
+      </ng-container>
+    }
+  </app-page-header>
 
-@if (loadError()) {
-  <p class="bt__status bt__status--error" role="alert">{{ 'budget.tree.error' | t }}</p>
-} @else if (!tree().length) {
-  <p class="bt__status">{{ 'budget.tree.empty' | t }}</p>
-} @else {
-  <div class="bt__layout">
-    <aside class="bt__nav">
-      <app-budget-year-tree
-        [tops]="tops()"
-        [fiscalYears]="fiscalYearsByBudget()"
-        [selectedBudgetId]="selectedTopId()"
-        [selectedFyId]="selectedFyId()"
-        (budgetPicked)="selectTop($event)"
-        (yearPicked)="onYearPicked($event)"
-      />
-    </aside>
-
-    <!-- Not a `<main>`: the shell already wraps the routed page in one, and a main
-         landmark inside a main landmark is invalid HTML that gives a screen reader two
-         "main" regions with no way to tell which is the page. -->
-    <div class="bt__main">
-      @if (selectedTopId()) {
-        <app-data-table
-          [loading]="loading()"
-          [loadingText]="'budget.tree.loading' | t"
-          [columns]="columns()" [rows]="rows()" [rowKey]="rowId" [isExpanded]="childExpanded">
-          <ng-template appCell="node" let-row>
-            <span class="bt__node" [style.paddingLeft.rem]="$any(row).depth * 1.5">
-              <span class="bt__path">{{ $any(row).node.pathKey | simplifyPath }}</span>
-              <span class="bt__name">{{ $any(row).node.name }}</span>
-            </span>
-          </ng-template>
-          <ng-template appCell="allocated" let-row>{{ alloc($any(row).node) ? money(alloc($any(row).node)!.allocated, $any(row).node.currency) : '—' }}</ng-template>
-          <ng-template appCell="committed" let-row>{{ alloc($any(row).node) ? money(alloc($any(row).node)!.committed, $any(row).node.currency) : '—' }}</ng-template>
-          <ng-template appCell="available" let-row>
-            @if (alloc($any(row).node); as a) {
-              <span [class.bt__neg]="(+a.available) < 0">{{ money(a.available, $any(row).node.currency) }}</span>
-            } @else { — }
-          </ng-template>
-          <ng-template appCell="color" let-row>
-            <input
-              type="color"
-              class="bt__color"
-              [value]="$any(row).node.color || '#6b7280'"
-              (change)="saveColor($any(row).node, $any($event.target).value)"
-              [attr.aria-label]="'budget.tree.col.color' | t"
-            />
-          </ng-template>
-          <ng-template appCell="actions" let-row>
-            <span class="bt__col-actions">
-              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'budget.tree.editNode' | t" (click)="openEditNode($any(row).node)"><app-icon name="edit" /></app-button>
-              <app-button variant="ghost" size="sm" [iconOnly]="true" [disabled]="!selectedFyId()" [ariaLabel]="'budget.tree.setLimit' | t" (click)="openLimit($any(row).node)"><app-icon name="euro" /></app-button>
-              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'budget.tree.addChild' | t" (click)="startAddChild($any(row).node)"><app-icon name="add" /></app-button>
-              <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'budget.tree.delete' | t" (click)="deleteNode($any(row).node)"><app-icon name="delete" /></app-button>
-            </span>
-          </ng-template>
-
-          <ng-template appRowDetail let-row>
-            <div class="bt__child-form">
-              <span class="bt__child-hint">{{ 'budget.tree.addChildUnder' | t }}: {{ $any(row).node.pathKey | simplifyPath }}</span>
-              <label class="bt__lbl">{{ 'budget.tree.key' | t }}
-                <input [ngModel]="childDraft().key" (ngModelChange)="patchChild('key', $event)" [name]="'ck-' + $any(row).node.id" [placeholder]="'budget.tree.keyChildPlaceholder' | t" /></label>
-              <label class="bt__lbl">{{ 'budget.tree.name' | t }}
-                <input [ngModel]="childDraft().name" (ngModelChange)="patchChild('name', $event)" [name]="'cn-' + $any(row).node.id" /></label>
-              <app-button size="sm" [disabled]="!childDraft().key.trim() || !childDraft().name.trim()" (click)="addChild($any(row).node)">{{ 'budget.tree.add' | t }}</app-button>
-              <app-button variant="ghost" size="sm" (click)="cancelAddChild()">{{ 'budget.tree.cancel' | t }}</app-button>
-            </div>
-          </ng-template>
-        </app-data-table>
-      } @else {
-        <p class="text-muted p-6">{{ 'budget.tree.pickHint' | t }}</p>
-      }
+  @if (!phone()) {
+    <div class="bt__toolbar" role="toolbar" [attr.aria-label]="'budget.tree.toolbar' | t">
+      <app-button variant="tonal" [disabled]="!selectedTopId()" (click)="openStateConfig()">
+        {{ 'budget.tree.stateConfig' | t }}
+      </app-button>
+      <app-button variant="tonal" [disabled]="!selectedTopId()" (click)="openStichtag()">
+        {{ 'budget.tree.stichtagTitle' | t }}
+      </app-button>
+      <app-button variant="tonal" [disabled]="!selectedTopId()" (click)="openFy()">
+        <app-icon name="cal" [size]="16" /> {{ 'budget.tree.fyTitle' | t }}
+      </app-button>
+      <app-button variant="fill" (click)="openTop()">
+        <app-icon name="plus" [size]="18" /> {{ 'budget.tree.createTop' | t }}
+      </app-button>
     </div>
-  </div>
-}
+  }
 
-<!-- Set the limit (allocation) of one cost center. One dialog per row. -->
+  @if (loadError()) {
+    <app-note kind="error" icon="alert" role="alert">{{ 'budget.tree.error' | t }}</app-note>
+  } @else if (!loading() && !tree().length) {
+    <p class="bt__empty empty-state">{{ 'budget.tree.empty' | t }}</p>
+  } @else {
+    @if (tops().length) {
+      <div class="bt__pickers">
+        <app-filter-select
+          size="md"
+          icon="pie"
+          [label]="'budget.tree.topLabel' | t"
+          [options]="topOptions()"
+          [value]="selectedTopId()"
+          (valueChange)="selectTop($event)"
+          [text]="topChipText()"
+        />
+        @if (fyOptions().length) {
+          <div class="bt__years">
+            <app-segmented
+              [options]="fyOptions()"
+              [value]="selectedFyId()"
+              (valueChange)="selectFy($event)"
+              [ariaLabel]="'budget.tree.fyLabel' | t"
+            />
+          </div>
+        } @else {
+          <span class="bt__noFy">{{ 'budget.tree.noFy' | t }}</span>
+        }
+      </div>
+    }
+
+    <app-data-table
+      class="bt__table"
+      surface="rowgroup"
+      [loading]="loading()"
+      [loadingText]="'budget.tree.loading' | t"
+      [columns]="columns()"
+      [rows]="rows()"
+      [rowKey]="rowId"
+      [isExpanded]="childExpanded"
+      [emptyText]="'budget.tree.pickHint' | t"
+    >
+      <ng-template appCell="node" let-row>
+        @let n = $any(row).node;
+        <span class="bt__node" [style.--bt-depth]="$any(row).depth">
+          @if ($any(row).hasChildren) {
+            <button
+              type="button"
+              class="bt__fold"
+              [attr.aria-expanded]="!isCollapsed(n.id)"
+              [attr.aria-label]="('budget.tree.fold' | t) + ': ' + n.name"
+              (click)="toggleCollapse(n.id)"
+            >
+              <app-icon [name]="isCollapsed(n.id) ? 'chevron-right' : 'chevron-down'" [size]="16" />
+            </button>
+          } @else {
+            <span class="bt__foldGap" aria-hidden="true"></span>
+          }
+          <span class="bt__nodeText">
+            <span class="bt__name ell" [class.bt__name--inactive]="!n.active" [title]="n.name">{{ n.name }}</span>
+            <span class="bt__path mono">
+              {{ n.pathKey }}
+              @if (!n.active) {
+                · {{ 'budget.tree.inactive' | t }}
+              }
+            </span>
+          </span>
+        </span>
+      </ng-template>
+      <ng-template appCell="allocated" let-row><span class="bt__num mono">{{ amount($any(row).node, 'allocated') }}</span></ng-template>
+      <ng-template appCell="bound" let-row><span class="bt__num mono">{{ amount($any(row).node, 'bound') }}</span></ng-template>
+      <ng-template appCell="expended" let-row><span class="bt__num mono">{{ amount($any(row).node, 'expended') }}</span></ng-template>
+      <ng-template appCell="income" let-row><span class="bt__num mono">{{ amount($any(row).node, 'income') }}</span></ng-template>
+      <ng-template appCell="available" let-row>
+        <span
+          class="bt__num bt__avail mono"
+          [class.bt__neg]="isNegative($any(row).node)"
+          [title]="availableTitle($any(row).node)"
+          >{{ amount($any(row).node, 'available') }}</span
+        >
+      </ng-template>
+      <ng-template appCell="color" let-row>
+        @let sw = swatch($any(row).node);
+        <span
+          class="bt__swatch"
+          [class.bt__swatch--inherited]="sw.kind === 'inherited'"
+          [class.bt__swatch--none]="sw.kind === 'none'"
+          [style.background]="sw.color"
+          role="img"
+          [attr.aria-label]="swatchLabel(sw)"
+          [title]="swatchLabel(sw)"
+        ></span>
+      </ng-template>
+      <ng-template appCell="actions" let-row>
+        @let n = $any(row).node;
+        @if (phone()) {
+          <app-row-menu
+            [label]="('budget.tree.rowActions' | t) + ': ' + n.name"
+            [sections]="rowMenu()"
+            (selected)="onRowMenu(n, $event)"
+          />
+        } @else {
+          <span class="bt__actions">
+            <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('budget.tree.editNode' | t) + ': ' + n.name" [title]="'budget.tree.editNode' | t" (click)="openEditNode(n)"><app-icon name="edit" /></app-button>
+            <app-button
+              variant="text"
+              size="sm"
+              [iconOnly]="true"
+              [disabled]="!selectedFyId()"
+              [ariaLabel]="('budget.tree.setLimit' | t) + ': ' + n.name"
+              [title]="(selectedFyId() ? 'budget.tree.setLimit' : 'budget.tree.noFy') | t"
+              (click)="openLimit(n)"
+              ><app-icon name="euro"
+            /></app-button>
+            <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('budget.tree.addChild' | t) + ': ' + n.name" [title]="'budget.tree.addChild' | t" (click)="startAddChild(n)"><app-icon name="plus" /></app-button>
+            <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('budget.tree.delete' | t) + ': ' + n.name" [title]="'budget.tree.delete' | t" (click)="askDeleteNode(n)"><app-icon name="trash" /></app-button>
+          </span>
+        }
+      </ng-template>
+
+      <ng-template appRowDetail>
+        @if (childParent(); as parent) {
+          <form class="bt__child" (submit)="$event.preventDefault(); addChild(parent)">
+            <span class="bt__childUnder">{{ 'budget.tree.addChildUnder' | t: { path: parent.pathKey } }}</span>
+            <app-input
+              class="bt__childKey"
+              [label]="'budget.tree.key' | t"
+              [ngModel]="childDraft().key"
+              (ngModelChange)="patchChild('key', $event)"
+              name="childKey"
+            />
+            <app-input
+              class="bt__childName"
+              [label]="'budget.tree.name' | t"
+              [ngModel]="childDraft().name"
+              (ngModelChange)="patchChild('name', $event)"
+              name="childName"
+            />
+            <span class="bt__childActions">
+              <app-button type="submit" variant="fill" size="sm" [disabled]="!childDraft().key.trim() || !childDraft().name.trim()">
+                {{ 'budget.tree.add' | t }}
+              </app-button>
+              <app-button variant="text" size="sm" (click)="cancelAddChild()">{{ 'budget.tree.cancel' | t }}</app-button>
+            </span>
+          </form>
+        }
+      </ng-template>
+    </app-data-table>
+  }
+</section>
+
+<!-- Set the allocation of one cost centre for the selected fiscal year. -->
 <app-dialog
   [open]="!!limitNode()"
   [title]="'budget.tree.limitTitle' | t"
+  [subtitle]="limitNode() ? limitNode()!.pathKey + ' · ' + limitNode()!.name : ''"
   [closeLabel]="'budget.tree.cancel' | t"
   (closed)="closeLimit()"
 >
-  @if (limitNode(); as node) {
-    <div class="flex flex-col gap-3">
-      <p class="text-muted">{{ node.pathKey | simplifyPath }} – {{ node.name }}</p>
-      <label class="bt__lbl">{{ 'budget.tree.limitFor' | t }}
-        <app-currency-input name="limit" [ngModel]="limitValue()" (ngModelChange)="limitValue.set($event)" [ariaLabel]="'budget.tree.limitFor' | t" /></label>
-    </div>
+  @if (limitNode()) {
+    <form class="bt__form" (submit)="$event.preventDefault(); saveLimit()">
+      <app-currency-input
+        name="limit"
+        [label]="'budget.tree.limitFor' | t: { year: selectedFyLabel() }"
+        [ngModel]="limitValue()"
+        (ngModelChange)="limitValue.set($event)"
+      />
+    </form>
   }
-  <div dialog-footer class="flex gap-3">
-    <app-button size="sm" variant="ghost" (click)="closeLimit()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button size="sm" [disabled]="!limitValue().trim()" (click)="saveLimit()">{{ 'budget.tree.setLimit' | t }}</app-button>
+  <div dialog-footer class="bt__foot">
+    <app-button variant="text" (click)="closeLimit()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="fill" [disabled]="!limitValue().trim()" (click)="saveLimit()">{{ 'budget.tree.setLimit' | t }}</app-button>
   </div>
 </app-dialog>
 
+<!-- Every setting of one cost centre. -->
 <app-dialog
   [open]="!!editNode()"
   [title]="'budget.tree.editNode' | t"
+  [subtitle]="editNode()?.pathKey ?? ''"
   [closeLabel]="'budget.tree.cancel' | t"
   (closed)="closeEditNode()"
 >
-  @if (editNode(); as node) {
-    <form id="bt-edit-form" class="bt__form bt__form--dialog" (submit)="$event.preventDefault(); saveEditNode()">
-      <p class="text-muted bt__form-full">{{ node.pathKey | simplifyPath }}</p>
-      <label class="bt__lbl">{{ 'budget.tree.key' | t }}
-        <input [ngModel]="editKey()" (ngModelChange)="editKey.set($event)" name="editKey" /></label>
-      <label class="bt__lbl">{{ 'budget.tree.name' | t }}
-        <input [ngModel]="editName()" (ngModelChange)="editName.set($event)" name="editName" /></label>
-      <label class="flex items-center gap-2 bt__form-full">
-        <input type="checkbox" [checked]="editHidden()" (change)="editHidden.set($any($event.target).checked)" />
-        <span>{{ 'budget.tree.hiddenInBudget' | t }}</span>
-      </label>
-      <p class="text-muted m-0 text-xs bt__form-full">{{ 'budget.tree.hiddenInBudgetHint' | t }}</p>
+  @if (editNode()) {
+    <form id="bt-edit-form" class="bt__form" (submit)="$event.preventDefault(); saveEditNode()">
+      <div class="bt__pair">
+        <app-input
+          class="bt__keyField"
+          [label]="'budget.tree.key' | t"
+          [ngModel]="editKey()"
+          (ngModelChange)="editKey.set($event)"
+          name="editKey"
+        />
+        <app-input [label]="'budget.tree.name' | t" [ngModel]="editName()" (ngModelChange)="editName.set($event)" name="editName" />
+      </div>
+      <p class="bt__hint">{{ 'budget.tree.editNodeHint' | t }}</p>
+
+      <fieldset class="bt__colors">
+        <legend class="bt__legend">{{ 'budget.tree.col.color' | t }}</legend>
+        <div class="bt__colorRow">
+          @for (c of palette; track c) {
+            <button
+              type="button"
+              class="bt__colorPick"
+              [class.bt__colorPick--on]="editColor() === c"
+              [style.background]="c"
+              [attr.aria-pressed]="editColor() === c"
+              [attr.aria-label]="'budget.tree.colorPick' | t: { color: c }"
+              [title]="c"
+              (click)="pickColor(c)"
+            ></button>
+          }
+          <input
+            class="bt__colorNative"
+            type="color"
+            [value]="editColor() || '#72a384'"
+            [attr.aria-label]="'budget.tree.colorCustom' | t"
+            [title]="'budget.tree.colorCustom' | t"
+            (input)="pickColor($any($event.target).value)"
+          />
+          <app-input
+            class="bt__hex"
+            [ariaLabel]="'budget.tree.colorHex' | t"
+            placeholder="#rrggbb"
+            [error]="editColorInvalid() ? ('budget.tree.colorInvalid' | t) : ''"
+            [ngModel]="editColor()"
+            (ngModelChange)="editColor.set($event.trim())"
+            name="editColor"
+          />
+          @if (editColor()) {
+            <app-button variant="text" size="sm" (click)="clearColor()">{{ 'budget.tree.colorClear' | t }}</app-button>
+          }
+        </div>
+        <p class="bt__hint">{{ 'budget.tree.colorHint' | t }}</p>
+      </fieldset>
+
+      <div class="bt__rule" aria-hidden="true"></div>
+
+      <app-switch [checked]="editActive()" (checkedChange)="editActive.set($event)" [hint]="'budget.tree.activeHint' | t">
+        {{ 'budget.tree.active' | t }}
+      </app-switch>
+      <app-checkbox
+        [ngModel]="editHidden()"
+        (ngModelChange)="editHidden.set($event)"
+        [hint]="'budget.tree.hiddenInBudgetHint' | t"
+        name="editHidden"
+        >{{ 'budget.tree.hiddenInBudget' | t }}</app-checkbox
+      >
       <!-- Visibility Gremium: its members see this subtree in the budget tab as a
            root. They need no global budget.* permissions. -->
-      <div class="bt__form-full">
-        <app-select
-          name="editViewGremium"
-          [label]="'budget.tree.viewGremium' | t"
-          [placeholder]="'budget.tree.viewGremiumNone' | t"
-          [options]="gremiumOptions()"
-          [ngModel]="editViewGremium()"
-          (ngModelChange)="editViewGremium.set($event)"
-        />
-        <p class="text-muted m-0 text-xs">{{ 'budget.tree.viewGremiumHint' | t }}</p>
-      </div>
-      <p class="text-muted bt__form-full">{{ 'budget.tree.editNodeHint' | t }}</p>
+      <app-select
+        name="editViewGremium"
+        [label]="'budget.tree.viewGremium' | t"
+        [placeholder]="'budget.tree.viewGremiumNone' | t"
+        [hint]="'budget.tree.viewGremiumHint' | t"
+        [options]="gremiumOptions()"
+        [ngModel]="editViewGremium()"
+        (ngModelChange)="editViewGremium.set($event)"
+      />
     </form>
   }
-  <div dialog-footer class="flex gap-3">
-    <app-button size="sm" variant="ghost" (click)="closeEditNode()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button size="sm" [disabled]="!editKey().trim() || !editName().trim()" (click)="saveEditNode()">{{ 'budget.tree.save' | t }}</app-button>
+  <div dialog-footer class="bt__foot">
+    <app-button variant="text" (click)="closeEditNode()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="fill" [disabled]="!editKey().trim() || !editName().trim() || editColorInvalid()" (click)="saveEditNode()">{{
+      'budget.tree.save' | t
+    }}</app-button>
   </div>
 </app-dialog>
 
-<!-- Create a top budget. The header button opens this dialog. -->
+<!-- Delete a cost centre. A node with sub cost centres or allocations gives 409. -->
 <app-dialog
-  [open]="topOpen()"
-  [title]="'budget.tree.createTop' | t"
+  [open]="!!nodeDelete()"
+  [title]="'budget.tree.deleteTitle' | t"
   [closeLabel]="'budget.tree.cancel' | t"
-  (closed)="closeTop()"
+  (closed)="closeDeleteNode()"
 >
-  <form id="bt-top-form" class="bt__form bt__form--dialog" (submit)="createTop($event)">
-    <label class="bt__lbl">{{ 'budget.tree.key' | t }}
-      <input [ngModel]="newTop().key" (ngModelChange)="patchTop('key', $event)" name="topKey" [placeholder]="'budget.tree.keyTopPlaceholder' | t" /></label>
-    <label class="bt__lbl">{{ 'budget.tree.name' | t }}
-      <input [ngModel]="newTop().name" (ngModelChange)="patchTop('name', $event)" name="topName" /></label>
-    <span class="bt__lbl bt__form-full">{{ 'budget.tree.stichtag' | t }}</span>
-    <label class="bt__lbl bt__lbl--inline">{{ 'budget.tree.day' | t }}
-      <input type="number" min="1" max="31" class="bt__num" [ngModel]="newTop().fiscalStartDay"
-             (ngModelChange)="patchTopStichtag('fiscalStartDay', $event)" name="topStDay" /></label>
-    <label class="bt__lbl bt__lbl--inline">{{ 'budget.tree.month' | t }}
-      <input type="number" min="1" max="12" class="bt__num" [ngModel]="newTop().fiscalStartMonth"
-             (ngModelChange)="patchTopStichtag('fiscalStartMonth', $event)" name="topStMonth" /></label>
-    <p class="text-muted bt__form-full">{{ 'budget.tree.stichtagHint' | t }}</p>
-  </form>
-  <div dialog-footer class="flex gap-3">
-    <app-button size="sm" variant="ghost" (click)="closeTop()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button size="sm" [disabled]="!newTop().key.trim() || !newTop().name.trim()" (click)="createTop($event)">{{ 'budget.tree.add' | t }}</app-button>
+  @if (nodeDelete(); as node) {
+    <p class="bt__confirm">{{ 'budget.tree.deleteConfirm' | t: { name: node.name, path: node.pathKey } }}</p>
+  }
+  @if (nodeDeleteBlocked()) {
+    <app-note kind="error" icon="alert" role="alert">{{ 'budget.tree.deleteBlocked' | t }}</app-note>
+  }
+  <div dialog-footer class="bt__foot">
+    <app-button variant="text" (click)="closeDeleteNode()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="danger" [disabled]="nodeDeleteBlocked()" (click)="deleteNode()">{{ 'budget.tree.delete' | t }}</app-button>
   </div>
 </app-dialog>
 
-<!-- Manage the fiscal years of the selected budget: create one, and correct or remove an
-     existing one. The header button opens this dialog. -->
+<!-- Create a top budget. -->
+<app-dialog [open]="topOpen()" [title]="'budget.tree.createTop' | t" [closeLabel]="'budget.tree.cancel' | t" (closed)="closeTop()">
+  <form id="bt-top-form" class="bt__form" (submit)="createTop($event)">
+    <div class="bt__pair">
+      <app-input
+        class="bt__keyField"
+        [label]="'budget.tree.key' | t"
+        [placeholder]="'budget.tree.keyTopPlaceholder' | t"
+        [ngModel]="newTop().key"
+        (ngModelChange)="patchTop('key', $event)"
+        name="topKey"
+      />
+      <app-input [label]="'budget.tree.name' | t" [ngModel]="newTop().name" (ngModelChange)="patchTop('name', $event)" name="topName" />
+    </div>
+    <div class="bt__pair bt__pair--even">
+      <app-input
+        type="number"
+        [label]="'budget.tree.day' | t"
+        [ngModel]="newTop().fiscalStartDay"
+        (ngModelChange)="patchTopStichtag('fiscalStartDay', $event)"
+        name="topStDay"
+      />
+      <app-input
+        type="number"
+        [label]="'budget.tree.month' | t"
+        [ngModel]="newTop().fiscalStartMonth"
+        (ngModelChange)="patchTopStichtag('fiscalStartMonth', $event)"
+        name="topStMonth"
+      />
+    </div>
+    <p class="bt__hint">{{ 'budget.tree.stichtagHint' | t }}</p>
+  </form>
+  <div dialog-footer class="bt__foot">
+    <app-button variant="text" (click)="closeTop()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="fill" [disabled]="!newTop().key.trim() || !newTop().name.trim()" (click)="createTop($event)">{{
+      'budget.tree.add' | t
+    }}</app-button>
+  </div>
+</app-dialog>
+
+<!-- Create a fiscal year of the selected budget; the list corrects or removes one. -->
 <app-dialog
   [open]="fyOpen()"
   [title]="'budget.tree.fyTitle' | t"
+  [subtitle]="selectedTopLabel()"
   [closeLabel]="'budget.tree.cancel' | t"
   (closed)="closeFy()"
 >
-  <form id="bt-fy-form" class="bt__form bt__form--dialog" (submit)="createFiscalYear($event)">
-    <p class="text-muted bt__form-full">{{ 'budget.tree.fyTop' | t }}: <strong>{{ selectedTopLabel() }}</strong></p>
-    <label class="bt__lbl">{{ 'budget.tree.fyYear' | t }}
-      <input type="number" min="1900" max="2200" [ngModel]="newFy().year" (ngModelChange)="patchFyYear($event)" name="fyYear" /></label>
-    <p class="text-muted bt__form-full">{{ 'budget.tree.fyYearHint' | t }}</p>
+  <form id="bt-fy-form" class="bt__form" (submit)="createFiscalYear($event)">
+    <app-input
+      type="number"
+      [label]="'budget.tree.fyYear' | t"
+      [hint]="'budget.tree.fyYearHint' | t"
+      [ngModel]="newFy().year"
+      (ngModelChange)="patchFyYear($event)"
+      name="fyYear"
+    />
   </form>
 
-  <section class="bt__fy-manage" [attr.aria-label]="'budget.tree.fyExisting' | t">
-    <h3 class="bt__fy-head">{{ 'budget.tree.fyExisting' | t }}</h3>
+  <section class="bt__fyManage" [attr.aria-label]="'budget.tree.fyExisting' | t">
+    <h3 class="sec">{{ 'budget.tree.fyExisting' | t }}</h3>
     <app-data-table
+      surface="rowgroup"
       [columns]="fyColumns()"
       [rows]="fiscalYears()"
       [rowKey]="fyRowId"
       [emptyText]="'budget.tree.fyEmpty' | t"
     >
-      <ng-template appCell="display" let-fy>{{ $any(fy).display }}</ng-template>
+      <ng-template appCell="display" let-fy><span class="bt__fyName">{{ $any(fy).display }}</span></ng-template>
       <ng-template appCell="active" let-fy>
-        @if ($any(fy).active) {
-          <span class="bt__yes" aria-label="✓">✓</span>
-        } @else {
-          <span class="bt__no" aria-label="✗">✗</span>
-        }
+        <span [class.bt__muted]="!$any(fy).active">{{ ($any(fy).active ? 'budget.tree.fyActive' : 'budget.tree.fyInactive') | t }}</span>
       </ng-template>
       <ng-template appCell="actions" let-fy>
-        <span class="bt__col-actions">
-          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'budget.tree.fyEdit' | t" (click)="openFyEdit($any(fy))"><app-icon name="edit" /></app-button>
-          <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'budget.tree.fyDelete' | t" (click)="askFyDelete($any(fy))"><app-icon name="delete" /></app-button>
+        <span class="bt__actions">
+          <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('budget.tree.fyEdit' | t) + ': ' + $any(fy).display" (click)="openFyEdit($any(fy))"><app-icon name="edit" /></app-button>
+          <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('budget.tree.fyDelete' | t) + ': ' + $any(fy).display" (click)="askFyDelete($any(fy))"><app-icon name="trash" /></app-button>
         </span>
       </ng-template>
     </app-data-table>
   </section>
 
-  <div dialog-footer class="flex gap-3">
-    <app-button size="sm" variant="ghost" (click)="closeFy()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button size="sm" [disabled]="!newFy().year" (click)="createFiscalYear($event)">{{ 'budget.tree.add' | t }}</app-button>
+  <div dialog-footer class="bt__foot">
+    <app-button variant="text" (click)="closeFy()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="fill" [disabled]="!newFy().year" (click)="createFiscalYear($event)">{{ 'budget.tree.add' | t }}</app-button>
   </div>
 </app-dialog>
 
 <!-- Correct a fiscal year. Only the year and the active flag change. The server derives
      the start and the end date again from the budget cutoff. -->
-<app-dialog
-  [open]="!!fyEdit()"
-  [title]="'budget.tree.fyEdit' | t"
-  [closeLabel]="'budget.tree.cancel' | t"
-  (closed)="closeFyEdit()"
->
-  @if (fyEdit(); as fy) {
-    <form id="bt-fy-edit-form" class="bt__form bt__form--dialog" (submit)="$event.preventDefault(); saveFyEdit()">
-      <p class="text-muted bt__form-full">{{ 'budget.tree.fyTop' | t }}: <strong>{{ selectedTopLabel() }}</strong></p>
-      <label class="bt__lbl">{{ 'budget.tree.fyYear' | t }}
-        <input type="number" min="1900" max="2200" [ngModel]="fyEditYear()" (ngModelChange)="patchFyEditYear($event)" name="fyEditYear" /></label>
-      <label class="flex items-center gap-2 bt__form-full">
-        <input type="checkbox" [checked]="fyEditActive()" (change)="fyEditActive.set($any($event.target).checked)" />
-        <span>{{ 'budget.tree.fyActive' | t }}</span>
-      </label>
-      <p class="text-muted bt__form-full">{{ 'budget.tree.fyEditHint' | t }}</p>
+<app-dialog [open]="!!fyEdit()" [title]="'budget.tree.fyEdit' | t" [subtitle]="selectedTopLabel()" [closeLabel]="'budget.tree.cancel' | t" (closed)="closeFyEdit()">
+  @if (fyEdit()) {
+    <form id="bt-fy-edit-form" class="bt__form" (submit)="$event.preventDefault(); saveFyEdit()">
+      <app-input type="number" [label]="'budget.tree.fyYear' | t" [ngModel]="fyEditYear()" (ngModelChange)="patchFyEditYear($event)" name="fyEditYear" />
+      <app-switch [checked]="fyEditActive()" (checkedChange)="fyEditActive.set($event)" [hint]="'budget.tree.fyEditHint' | t">
+        {{ 'budget.tree.fyActive' | t }}
+      </app-switch>
     </form>
   }
-  <div dialog-footer class="flex gap-3">
-    <app-button size="sm" variant="ghost" (click)="closeFyEdit()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button size="sm" [disabled]="!fyEditYear()" (click)="saveFyEdit()">{{ 'budget.tree.save' | t }}</app-button>
+  <div dialog-footer class="bt__foot">
+    <app-button variant="text" (click)="closeFyEdit()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="fill" [disabled]="!fyEditYear()" (click)="saveFyEdit()">{{ 'budget.tree.save' | t }}</app-button>
   </div>
 </app-dialog>
 
 <!-- Delete a fiscal year. The server refuses with 409 while bookings, allocations or
      applications still hang on the year. That reason stays visible in the dialog. -->
-<app-dialog
-  [open]="!!fyDelete()"
-  [title]="'budget.tree.fyDeleteTitle' | t"
-  [closeLabel]="'budget.tree.cancel' | t"
-  (closed)="closeFyDelete()"
->
+<app-dialog [open]="!!fyDelete()" [title]="'budget.tree.fyDeleteTitle' | t" [closeLabel]="'budget.tree.cancel' | t" (closed)="closeFyDelete()">
   @if (fyDelete(); as fy) {
-    <p>{{ 'budget.tree.fyDeleteConfirm' | t: { year: fy.display } }}</p>
+    <p class="bt__confirm">{{ 'budget.tree.fyDeleteConfirm' | t: { year: fy.display } }}</p>
   }
   @if (fyDeleteBlocked(); as reason) {
-    <p class="bt__status--error" role="alert">{{ reason }}</p>
+    <app-note kind="error" icon="alert" role="alert">{{ reason }}</app-note>
   }
-  <div dialog-footer class="flex gap-3">
-    <app-button size="sm" variant="ghost" (click)="closeFyDelete()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button size="sm" variant="danger" (click)="doFyDelete()">{{ 'budget.tree.fyDelete' | t }}</app-button>
+  <div dialog-footer class="bt__foot">
+    <app-button variant="text" (click)="closeFyDelete()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="danger" [disabled]="!!fyDeleteBlocked()" (click)="doFyDelete()">{{ 'budget.tree.fyDelete' | t }}</app-button>
   </div>
 </app-dialog>
 
-<!-- Set the fiscal-year cutoff of the selected budget. The header button opens this dialog. -->
+<!-- Set the fiscal-year cutoff of the selected budget. A field saves on change. -->
 <app-dialog
   [open]="stichtagOpen()"
   [title]="'budget.tree.stichtagTitle' | t"
+  [subtitle]="selectedTopLabel()"
   [closeLabel]="'budget.tree.cancel' | t"
   (closed)="closeStichtag()"
 >
-  <form id="bt-stichtag-form" class="bt__form bt__form--dialog" (submit)="$event.preventDefault()">
-    <p class="text-muted bt__form-full">{{ 'budget.tree.fyTop' | t }}: <strong>{{ selectedTopLabel() }}</strong></p>
-    <label class="bt__lbl">{{ 'budget.tree.day' | t }}
-      <input type="number" min="1" max="31" [ngModel]="selectedTop()?.fiscalStartDay" name="stDay"
-             (change)="saveStichtag('fiscalStartDay', $any($event.target).value)" /></label>
-    <label class="bt__lbl">{{ 'budget.tree.month' | t }}
-      <input type="number" min="1" max="12" [ngModel]="selectedTop()?.fiscalStartMonth" name="stMonth"
-             (change)="saveStichtag('fiscalStartMonth', $any($event.target).value)" /></label>
-    <p class="text-muted bt__form-full">{{ 'budget.tree.stichtagHint' | t }}</p>
-    @if (fiscalYears().length) {
-      <ul class="bt__fy-list bt__form-full">
-        @for (fy of fiscalYears(); track fy.id) {
-          <li><strong>{{ fy.display }}</strong>
-            @if (!fy.active) { <span class="text-muted">({{ 'budget.tree.fyInactive' | t }})</span> }
-          </li>
-        }
-      </ul>
-    } @else {
-      <p class="text-muted bt__form-full">{{ 'budget.tree.fyEmpty' | t }}</p>
-    }
+  <form id="bt-stichtag-form" class="bt__form" (submit)="$event.preventDefault()">
+    <div class="bt__pair bt__pair--even">
+      <label class="bt__numField">
+        <span class="bt__numLabel">{{ 'budget.tree.day' | t }}</span>
+        <input
+          class="bt__numInput"
+          type="number"
+          min="1"
+          max="28"
+          [value]="selectedTop()?.fiscalStartDay"
+          name="stDay"
+          (change)="saveStichtag('fiscalStartDay', $any($event.target).value)"
+        />
+      </label>
+      <label class="bt__numField">
+        <span class="bt__numLabel">{{ 'budget.tree.month' | t }}</span>
+        <input
+          class="bt__numInput"
+          type="number"
+          min="1"
+          max="12"
+          [value]="selectedTop()?.fiscalStartMonth"
+          name="stMonth"
+          (change)="saveStichtag('fiscalStartMonth', $any($event.target).value)"
+        />
+      </label>
+    </div>
+    <p class="bt__hint">{{ 'budget.tree.stichtagHint' | t }}</p>
   </form>
-  <div dialog-footer class="flex gap-3">
-    <app-button size="sm" (click)="closeStichtag()">{{ 'budget.tree.done' | t }}</app-button>
+  <div dialog-footer class="bt__foot">
+    <app-button variant="fill" (click)="closeStichtag()">{{ 'budget.tree.done' | t }}</app-button>
   </div>
 </app-dialog>
 
-<!-- Accepted and denied flow states of the selected budget. -->
+<!-- Accepted and denied flow states of the selected budget. A box saves at once. -->
 <app-dialog
   [open]="stateConfigOpen()"
   [title]="'budget.tree.stateConfig' | t"
+  [subtitle]="selectedTopLabel()"
   [closeLabel]="'budget.tree.cancel' | t"
   (closed)="closeStateConfig()"
 >
-  <div class="bt__form--dialog">
-    <p class="text-muted">{{ 'budget.tree.stateConfigHint' | t }}</p>
-    @if (stateOptions().length) {
-      <table class="bt__states">
-        <thead>
+  <p class="bt__hint">{{ 'budget.tree.stateConfigHint' | t }}</p>
+  @if (stateOptions().length) {
+    <table class="bt__states">
+      <thead>
+        <tr>
+          <th scope="col" class="cap">{{ 'budget.tree.stateCol' | t }}</th>
+          <th scope="col" class="cap">{{ 'budget.tree.accepted' | t }}</th>
+          <th scope="col" class="cap">{{ 'budget.tree.denied' | t }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (s of stateOptions(); track s.value) {
           <tr>
-            <th>{{ 'budget.tree.stateCol' | t }}</th>
-            <th>{{ 'budget.tree.accepted' | t }}</th>
-            <th>{{ 'budget.tree.denied' | t }}</th>
+            <th scope="row">{{ s.label }}</th>
+            <td>
+              <input
+                type="checkbox"
+                class="bt__box"
+                [checked]="isAccepted(s.value)"
+                (change)="toggleState('accepted', s.value)"
+                [attr.aria-label]="('budget.tree.accepted' | t) + ': ' + s.label"
+              />
+            </td>
+            <td>
+              <input
+                type="checkbox"
+                class="bt__box"
+                [checked]="isDenied(s.value)"
+                (change)="toggleState('denied', s.value)"
+                [attr.aria-label]="('budget.tree.denied' | t) + ': ' + s.label"
+              />
+            </td>
           </tr>
-        </thead>
-        <tbody>
-          @for (s of stateOptions(); track s.value) {
-            <tr>
-              <td>{{ s.label }}</td>
-              <td><input type="checkbox" [checked]="isAccepted(s.value)" (change)="toggleState('accepted', s.value)" [attr.aria-label]="'budget.tree.accepted' | t" /></td>
-              <td><input type="checkbox" [checked]="isDenied(s.value)" (change)="toggleState('denied', s.value)" [attr.aria-label]="'budget.tree.denied' | t" /></td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    } @else {
-      <p class="text-muted">{{ 'budget.tree.noStates' | t }}</p>
-    }
-  </div>
-  <div dialog-footer class="flex gap-3">
-    <app-button size="sm" (click)="closeStateConfig()">{{ 'budget.tree.done' | t }}</app-button>
+        }
+      </tbody>
+    </table>
+  } @else {
+    <p class="bt__muted">{{ 'budget.tree.noStates' | t }}</p>
+  }
+  <div dialog-footer class="bt__foot">
+    <app-button variant="fill" (click)="closeStateConfig()">{{ 'budget.tree.done' | t }}</app-button>
   </div>
 </app-dialog>

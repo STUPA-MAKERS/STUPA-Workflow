@@ -17,7 +17,8 @@ export class PageFrameService {
   /**
    * A parent path that a frame around the page already shows, for example `admin`
    * while the admin navigation stands beside the page. The breadcrumbs leave this
-   * parent out. The frame sets it and must clear it when it goes away.
+   * parent and every parent below it out. The frame sets it and must clear it when it
+   * goes away.
    */
   readonly crumbRoot = signal<string | null>(null);
 

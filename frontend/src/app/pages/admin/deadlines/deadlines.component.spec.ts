@@ -40,17 +40,17 @@ describe('AdminDeadlinesComponent', () => {
     await setup();
     expect(screen.getByText('Semesterfrist')).toBeInTheDocument();
     expect(screen.getByText('edit_window')).toBeInTheDocument();
-    expect(screen.getByText('+ 7 Tage')).toBeInTheDocument();
+    expect(screen.getByText('7 Tage')).toBeInTheDocument();
+    expect(screen.getByText('Letzte Änderung + X Tage')).toBeInTheDocument();
   });
 
   it('creates a relative policy via the dialog', async () => {
-    const { api, container } = await setup();
+    const { api } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Frist hinzufügen' }));
-    const q = (sel: string) => container.querySelector<HTMLElement>(sel)!;
     // A key, a relative kind and an offset enable the save.
     await userEvent.type(screen.getByLabelText('Schlüssel'), 'mahnung');
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Art' }), 'relative_submitted');
-    await userEvent.type(q('input[name="offsetDays"]'), '14');
+    await userEvent.type(screen.getByLabelText('Frist in Tagen'), '14');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(api.createDeadlinePolicy).toHaveBeenCalledWith(
       expect.objectContaining({ key: 'mahnung', kind: 'relative_submitted', offsetDays: 14, absoluteAt: null }),
@@ -61,15 +61,15 @@ describe('AdminDeadlinesComponent', () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    expect(c.valueOf(POLICIES[0])).toBe(new Date('2026-07-01T00:00:00Z').toLocaleDateString('de-DE'));
+    expect(c.valueOf(POLICIES[0])).toEqual({ text: '01.07.2026', title: '', muted: false });
   });
 
   it('valueOf shows an em-dash for missing absolute date / offset', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    expect(c.valueOf({ kind: 'absolute', absoluteAt: null } as DeadlinePolicy)).toBe('—');
-    expect(c.valueOf({ kind: 'relative_changed', offsetDays: null } as DeadlinePolicy)).toBe('—');
+    expect(c.valueOf({ kind: 'absolute', absoluteAt: null } as DeadlinePolicy)).toEqual({ text: '—', title: '', muted: true });
+    expect(c.valueOf({ kind: 'relative_changed', offsetDays: null } as DeadlinePolicy)).toEqual({ text: '—', title: '', muted: true });
   });
 
   it('label resolves locale, then de, then key; null policy → empty', async () => {
@@ -246,11 +246,46 @@ describe('AdminDeadlinesComponent', () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    expect(c.valueOf({ kind: 'recurring', dates: ['2026-06-01', '2026-07-01'] } as DeadlinePolicy)).toBe('2 Termine');
-    expect(c.valueOf({ kind: 'recurring', dates: null } as DeadlinePolicy)).toBe('0 Termine');
+    const now = new Date(2026, 5, 15);
+    // The next date ahead of today, with the time; the tooltip counts the dates.
     expect(
-      c.valueOf({ kind: 'relative_changed', offsetDays: 7, atTime: '23:59' } as DeadlinePolicy),
-    ).toBe('+ 7 Tage · 23:59');
+      c.valueOf(
+        { kind: 'recurring', dates: ['2026-07-01', '2026-06-01'], atTime: '18:00', timezone: 'Europe/Berlin' } as DeadlinePolicy,
+        now,
+      ),
+    ).toEqual({ text: '01.07.2026 · 18:00', title: '2 Termine · Europe/Berlin', muted: false });
+    // Today still counts as ahead.
+    expect(c.valueOf({ kind: 'recurring', dates: ['2026-06-15'] } as DeadlinePolicy, now).text).toBe('15.06.2026');
+    // No date ahead: a muted "Kein Termin mehr".
+    expect(c.valueOf({ kind: 'recurring', dates: ['2026-06-01'] } as DeadlinePolicy, now)).toEqual({
+      text: 'Kein Termin mehr',
+      title: '1 Termin',
+      muted: true,
+    });
+    expect(c.valueOf({ kind: 'recurring', dates: null } as DeadlinePolicy, now).title).toBe('0 Termine');
+    expect(
+      c.valueOf({ kind: 'relative_changed', offsetDays: 7, atTime: '23:59', timezone: 'Europe/Berlin' } as DeadlinePolicy),
+    ).toEqual({ text: '7 Tage · 23:59', title: 'Europe/Berlin', muted: false });
+    expect(c.valueOf({ kind: 'relative_submitted', offsetDays: 3 } as DeadlinePolicy).text).toBe('3 Tage');
+  });
+
+  it('patchOffset turns the field text into a number, an empty field into null', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.openAdd();
+    c.patchOffset('12');
+    expect(c.draft().offsetDays).toBe(12);
+    c.patchOffset(' ');
+    expect(c.draft().offsetDays).toBeNull();
+    c.patchOffset(null);
+    expect(c.draft().offsetDays).toBeNull();
+  });
+
+  it('names each row in its action buttons and shows the guest settings with the right', async () => {
+    await setup();
+    expect(screen.getByRole('button', { name: 'Bearbeiten: Semesterfrist' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Entfernen: Bearbeitung' })).toBeInTheDocument();
   });
 
   it('canSave for recurring needs at least one non-empty date', async () => {

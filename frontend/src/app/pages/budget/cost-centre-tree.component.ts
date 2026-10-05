@@ -5,10 +5,9 @@ import type { BudgetTreeNode } from './budget-tree.api';
 import { nodeColors, paletteColor } from './budget-color.util';
 
 /**
- * Reusable cost-centre tree picker. It looks like the budget-to-year tree
- * (`app-budget-year-tree`): colour swatches at the roots and at every node with its own
- * colour, dotted connector lines in the colour of the branch, and the selection surface
- * of the design system. It recurses over the whole hierarchy. An optional "all" node with
+ * Reusable cost-centre tree picker: colour swatches at the roots and at every node with
+ * its own colour, dotted connector lines in the colour of the branch, and the selection
+ * surface of the design system. It recurses over the whole hierarchy. An optional "all" node with
  * the value ``''`` sits at the top.
  */
 @Component({

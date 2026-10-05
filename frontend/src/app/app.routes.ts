@@ -279,8 +279,8 @@ export const routes: Routes = [
         children: [
           {
             path: 'cost-centres',
-            // `adminNav: 'xl'`: the tree and the table fit beside the admin navigation from
-            // 1440 px on. Below that the page takes the full width.
+            // `adminNav: 'xl'`: the cost-centre table with its eight columns fits beside
+            // the admin navigation from 1440 px on. Below that the page takes the full width.
             data: {
               title: 'budget.tree.title',
               permission: 'budget.structure',

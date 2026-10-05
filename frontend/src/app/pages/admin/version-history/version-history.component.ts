@@ -11,9 +11,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
-  BadgeComponent,
   ButtonComponent,
-  CardComponent,
   ConfigDiffComponent,
   DialogComponent,
   IconComponent,
@@ -22,6 +20,7 @@ import {
 import { AdminApiService } from '../admin-api.service';
 import type { ConfigRevision, ConfigRevisionDiff } from '../admin.models';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 
 /**
  * Version sidebar for the immutable config snapshots of an entity.
@@ -36,12 +35,12 @@ import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
   selector: 'app-version-history',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SkeletonComponent, 
+  imports: [
+    SkeletonComponent,
+    StatusTextComponent,
     TranslatePipe,
     LocalizedDatePipe,
-    BadgeComponent,
     ButtonComponent,
-    CardComponent,
     ConfigDiffComponent,
     DialogComponent,
     IconComponent,
@@ -132,7 +131,9 @@ export class VersionHistoryComponent {
     });
   }
 
+  /** The name of the person; never the raw id. A missing person reads "System". */
   protected actor(rev: ConfigRevision): string {
-    return rev.createdByName ?? rev.createdBy ?? this.i18n.translate('admin.audit.system');
+    if (rev.createdByName) return rev.createdByName;
+    return this.i18n.translate(rev.createdBy ? 'admin.config.history.unknownActor' : 'admin.audit.system');
   }
 }

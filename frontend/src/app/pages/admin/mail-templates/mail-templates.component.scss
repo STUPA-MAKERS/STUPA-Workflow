@@ -1,18 +1,43 @@
 :host {
+  display: block;
+}
+
+.mt {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+  container-type: inline-size;
 }
+
+/* The template list beside the editor; one column in a narrow sheet. */
 .mt__layout {
   display: grid;
-  grid-template-columns: minmax(10rem, 14rem) 1fr;
+  grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
   gap: var(--space-5);
   align-items: start;
 }
+@container (max-width: 44rem) {
+  .mt__layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.mt__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 /* Beside the admin navigation the page sits in the sheet of the admin frame, which is a
    window of fixed height. The page takes the free height of the sheet, and the list and
    the editor each scroll inside themselves. */
 :host-context(.af--split) {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+}
+:host-context(.af--split) .mt {
   flex: 1 1 0;
   min-height: 0;
 }
@@ -22,96 +47,173 @@
   align-items: stretch;
   min-height: 0;
 }
-:host-context(.af--split) .mt__layout > nav,
+:host-context(.af--split) .mt__list,
 :host-context(.af--split) .mt__editor {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-@media (max-width: 48rem) {
-  .mt__layout {
-    grid-template-columns: 1fr;
-  }
-}
-.mt__listItem {
+.mt__item {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
-  text-align: start;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 2.75rem;
   padding: var(--space-2) var(--space-3);
-  background: transparent;
-  border: var(--border-width) solid transparent;
-  border-radius: var(--radius-md);
-  cursor: pointer;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: none;
   color: var(--color-text);
   font: inherit;
+  font-weight: var(--fw-medium);
+  text-align: start;
+  cursor: pointer;
 }
-.mt__listKey {
-  font-family: var(--font-mono, monospace);
-  font-size: var(--fs-xs);
+.mt__item:hover {
+  background: var(--color-surface-2);
+}
+.mt__item:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.mt__item--on,
+.mt__item--on:hover {
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.mt__itemLabel {
+  min-width: 0;
+}
+.mt__custom {
+  flex: none;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--color-accent-text);
+}
+.mt__item--on .mt__custom {
+  color: inherit;
+}
+.mt__empty {
+  margin: 0;
+  font-size: var(--fs-sm);
   color: var(--color-text-muted);
 }
-.mt__listItem:hover {
-  background: var(--color-surface-sunken);
-}
-.mt__listItem--sel {
-  background: var(--color-surface-sunken);
-  border-color: var(--color-border);
-  font-weight: var(--fw-semibold);
-}
+
 .mt__editor {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   min-width: 0;
 }
-.mt__tab {
-  padding: var(--space-1) var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  cursor: pointer;
-  font: inherit;
+.mt__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.mt__title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+}
+.mt__headEnd {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.mt__mono ::ng-deep input {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+}
+
+/* A text area as the filled field of the kit, with the label inside. */
+.mt__area {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-field);
+  background: var(--color-surface-sunken);
+}
+.mt__area:focus-within {
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+}
+.mt__areaLabel {
+  font-size: var(--fs-xs);
   color: var(--color-text-muted);
 }
-/* The selected language takes the selection colour, as the kit segmented control. */
-.mt__tab--sel {
-  background: var(--color-selected);
-  color: var(--color-on-selected);
-  border-color: transparent;
-}
-.mt__control {
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+.mt__areaInput {
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--color-text);
-  font: inherit;
-  width: 100%;
-  box-sizing: border-box;
-}
-.mt__area {
-  resize: vertical;
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  resize: vertical;
+}
+.mt__areaInput:focus {
+  outline: none;
+}
+
+.mt__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.mt__cap {
+  margin: 0;
+}
+.mt__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 .mt__chip {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
   font-size: var(--fs-xs);
-  padding: 2px var(--space-2);
-  background: var(--color-surface-sunken);
-  border-radius: var(--radius-sm);
-  cursor: help;
 }
-.mt__previewH {
-  margin: 0 0 var(--space-2);
-  font-size: var(--fs-md);
+
+.mt__preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
 }
 .mt__previewSubj {
-  margin: 0 0 var(--space-2);
+  margin: 0;
+  font-weight: var(--fw-semibold);
 }
 .mt__previewText {
-  white-space: pre-wrap;
-  font-family: var(--font-mono, monospace);
-  font-size: var(--fs-sm);
   margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.mt__previewHtml {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  overflow-wrap: anywhere;
+}
+
+.mt__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.mt__actionsEnd {
+  display: inline-flex;
+  gap: var(--space-2);
+  margin-inline-start: auto;
 }
