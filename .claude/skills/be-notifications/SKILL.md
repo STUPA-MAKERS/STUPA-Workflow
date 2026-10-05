@@ -22,6 +22,7 @@ description: Email notifications backend — Jinja2 SandboxedEnvironment mail te
 - `auto.py` — `AutoMailer` background best-effort mails: meeting created, delegation granted/revoked. The role mails (`role_assigned`/`role_revoked`) are gone: since the OIDC-only memberships no route assigns a role, so nothing sent them (F10).
 - `comments.py` — `send_comment_notifications` (applicant↔team, #4-1). The mail to the applicant names the Gremium of the application as the author, never the member (A12, O16). Only the team mail uses the display name.
 - `privacy.py` — GDPR erasure mails (requested/executed/rejected).
+- `captured.py` — `notify_application_captured`: the mail `application_captured` to the applicant of an application captured on their behalf (#11). An account gets the normal link `/applications/{id}`, a guest a magic link through `auth.service.request_magic_link`. Idempotency key = the application. Its kind is not in `NOTIFICATION_KINDS`, so nobody can switch it off (like `magic_link`).
 - `models.py` — SQLAlchemy tables. `router.py`/`schemas.py` — API + camelCase DTOs.
 
 **Domain / data model:**
@@ -31,7 +32,7 @@ description: Email notifications backend — Jinja2 SandboxedEnvironment mail te
 - `task_reminder_log` (`TaskReminderLog`): PK `application_id`, `status_event_id` (binds the reminder to a state stay, a state change restarts the count), `reminded_at`.
 - `NOTIFICATION_KINDS`: status_update, comment, task, task_reminder, meeting, delegation, protocol, deadline, privacy. The kinds `vote` and `role_change` are removed, because no code sent them (F10). Migration `1a9feecb23a5` deleted their stored preferences and the `role_assigned`/`role_revoked` overrides. A save of them gives 422.
 - Recipient spec kinds: `group` (oidc_groups), `role` (active RoleAssignment), `gremium` (active members), `applicant` (non-anonymized applicant email), `email` (literal), `permission` (holders of a permission, admin role always counts).
-- Mail template keys (catalog): status_update, task_new, task_reminder, deadline_approaching, comment_applicant, comment_team, meeting_created, delegation_granted, delegation_revoked, magic_link, erasure_requested, erasure_executed, erasure_rejected.
+- Mail template keys (catalog): status_update, task_new, task_reminder, deadline_approaching, comment_applicant, comment_team, meeting_created, delegation_granted, delegation_revoked, magic_link, application_captured, erasure_requested, erasure_executed, erasure_rejected.
 
 **API surface:**
 - `GET /api/notifications/preferences` — own effective switches (full catalog, default on). Any logged-in principal.

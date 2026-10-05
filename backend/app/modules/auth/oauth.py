@@ -46,7 +46,9 @@ SCOPES: dict[str, frozenset[str]] = {
             "meeting.view_all",
         }
     ),
-    "applications:write": frozenset({"application.transition", "application.manage"}),
+    "applications:write": frozenset(
+        {"application.transition", "application.manage", "application.create_on_behalf"}
+    ),
     "votes:write": frozenset({"vote.manage"}),
     "budget:write": frozenset({"budget.structure", "budget.book"}),
     "meetings:write": frozenset({"session.manage", "protocol.write", "protocol.finalize"}),

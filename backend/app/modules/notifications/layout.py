@@ -24,6 +24,12 @@ _REASONS: dict[str, dict[str, str]] = {
         "en": "You are receiving this email because an access link was "
         "requested for your address.",
     },
+    "application_captured": {
+        "de": "Sie erhalten diese E-Mail, weil für Sie ein Antrag auf der "
+        "Antragsplattform erfasst wurde.",
+        "en": "You are receiving this email because an application was entered "
+        "for you on the application platform.",
+    },
     "status_update": {
         "de": "Sie erhalten diese E-Mail, weil sich der Status eines Antrags "
         "geändert hat, der Sie betrifft.",

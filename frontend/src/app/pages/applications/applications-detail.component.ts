@@ -32,6 +32,7 @@ import type {
 } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { actorLabel } from '@shared/actor-label.util';
+import { localToday } from './capture/application-capture.component';
 import { toFormlySections } from '@shared/forms/formly-mapper';
 import { formatAnswer, formatEuro, formatFieldValue } from '@shared/forms/answer-format';
 import {
@@ -528,10 +529,15 @@ export class ApplicationsDetailComponent {
       this.i18n.translate(key, params);
     const events = [...this.timeline()].sort((a, b) => a.at.localeCompare(b.at));
     const versions = this.versions();
+    const capture = this.app()?.capture ?? null;
     const entries: HistoryEntry[] = events.map((e, i) => {
       const lines: string[] = [];
       if (i === 0 && versions.some((v) => v.version === 1)) {
         lines.push(t('applications.history.version', { version: 1 }));
+      }
+      if (i === 0 && capture) {
+        lines.push(t('applications.history.captured'));
+        if (capture.intake) lines.push(t('applications.history.intake', { intake: capture.intake }));
       }
       if (e.transitionLabel) {
         lines.push(t('applications.history.transition', { label: e.transitionLabel }));
@@ -585,6 +591,29 @@ export class ApplicationsDetailComponent {
     const type = this.types().find((t) => t.id === app.typeId)?.name;
     const version = this.i18n.translate('applications.detail.version', { version: app.version });
     return type ? `${type} · ${version}` : version;
+  });
+
+  /**
+   * #11: the note of a captured application, as parts of one line: "Erfasst von <Name>
+   * am <Datum>", "eingegangen am <Datum>" when the received date differs from the
+   * capture day, and the free-text "Eingang". Null for an own submission.
+   */
+  readonly captureParts = computed<string[] | null>(() => {
+    const cap = this.app()?.capture;
+    if (!cap) return null;
+    const t = (key: TranslationKey, params?: Record<string, string | number>) =>
+      this.i18n.translate(key, params);
+    const day = (d: Date) =>
+      new Intl.DateTimeFormat(this.i18n.formatLocale(), { dateStyle: 'medium' }).format(d);
+    const captured = new Date(cap.capturedAt);
+    const name = this.actor(cap.capturedBy, null) ?? t('actor.deleted');
+    const parts = [t('applications.capture.note', { name, date: day(captured) })];
+    if (cap.receivedOn && cap.receivedOn !== localToday(captured)) {
+      const [y, m, d] = cap.receivedOn.split('-').map(Number);
+      parts.push(t('applications.capture.noteReceived', { date: day(new Date(y, m - 1, d)) }));
+    }
+    if (cap.intake) parts.push(cap.intake);
+    return parts;
   });
 
   /** The name of the gremium of the application, or null when it is not known here. */

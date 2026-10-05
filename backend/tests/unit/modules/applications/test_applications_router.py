@@ -129,7 +129,10 @@ class _FakeService:
         requester_can_manage=False,
         allow_unconfirmed=True,
         strip_pii_fields=False,
+        applicant_view=False,
+        magic_link_view=False,
     ):
+        self.last_applicant_view = applicant_view
         self.last_include_pii = include_pii
         self.last_strip_pii_fields = strip_pii_fields
         self.last_allow_unconfirmed = allow_unconfirmed

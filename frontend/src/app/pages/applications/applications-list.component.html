@@ -1,5 +1,5 @@
 <div class="apps" [class.apps--split]="split()">
-  <app-list-detail [detailOpen]="selectedId() !== null" (back)="closeDetail()">
+  <app-list-detail [detailOpen]="selectedId() !== null || captureInPane()" (back)="onBack()">
     <section list class="ld-pane" aria-labelledby="apps-title">
       <app-page-header [pane]="true" titleId="apps-title" [title]="'applications.list.title' | t">
         <ng-container ngProjectAs="[actions]">
@@ -11,6 +11,20 @@
               (selected)="onHeaderMenu($event)"
             />
           } @else {
+            <!-- #11: capture an application on behalf of another person. -->
+            @if (canCapture()) {
+              <app-button
+                variant="tonal"
+                size="sm"
+                data-testid="apps-capture"
+                [disabled]="capturing()"
+                (click)="openCapture()"
+              >
+                <span class="apps__btn"
+                  ><app-icon name="add" [size]="16" />{{ 'applications.capture.title' | t }}</span
+                >
+              </app-button>
+            }
             <!-- The export has no `mine` filter: hide it while `mine` is set, so that it
                  never exports more rows than the list shows. -->
             @if (exportShown()) {
@@ -237,11 +251,40 @@
       </a>
     </section>
 
-    <div detail class="apps__detail">
+    <!-- While "Antrag erfassen" is open, the form replaces the routed detail (side by
+         side and one pane at a time); on a phone it opens as a bottom sheet. -->
+    <div detail class="apps__detail" [class.apps__detail--capture]="captureInPane()">
+      @if (captureInPane()) {
+        <app-application-capture
+          [layout]="split() ? 'pane' : 'page'"
+          [types]="types()"
+          (closed)="closeCapture()"
+          (created)="onCaptured($event)"
+        />
+      }
       <router-outlet />
     </div>
   </app-list-detail>
 </div>
+
+@if (phone()) {
+  <app-side-sheet
+    side="bottom"
+    [contentScrolls]="true"
+    [heading]="'applications.capture.title' | t"
+    [open]="capturing()"
+    (openChange)="$event ? null : closeCapture()"
+  >
+    @if (capturing()) {
+      <app-application-capture
+        layout="sheet"
+        [types]="types()"
+        (closed)="closeCapture()"
+        (created)="onCaptured($event)"
+      />
+    }
+  </app-side-sheet>
+}
 
 <!-- Cost centre: the tree of the budget tab, with "Alle" on top. -->
 <app-side-sheet

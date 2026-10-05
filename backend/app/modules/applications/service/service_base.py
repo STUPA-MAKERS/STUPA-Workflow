@@ -21,7 +21,13 @@ from app.modules.applications.models import (
     StatusEvent,
     SubmissionVersion,
 )
-from app.modules.applications.schemas import ActorOut, ApplicantOut, ApplicationOut, StateOut
+from app.modules.applications.schemas import (
+    ActorOut,
+    ApplicantOut,
+    ApplicationOut,
+    CaptureOut,
+    StateOut,
+)
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.validation import extract_promoted
 from app.shared.config_schemas import FormFieldDef
@@ -345,12 +351,17 @@ class ApplicationsServiceBase:
         can_edit: bool = False,
         is_owner: bool = False,
         strip_pii_fields: bool = False,
+        applicant_view: bool = False,
+        magic_link_view: bool = False,
     ) -> ApplicationOut:
         """Serialize one application.
 
         ``include_pii`` adds the applicant block (email, name). ``strip_pii_fields``
         removes the ``isPII`` form fields from ``data`` (O21) and lists their keys in
         ``hiddenKeys``, so the client can tell a removed field from an empty one.
+
+        ``applicant_view`` and ``magic_link_view`` resolve the capturing person of a
+        capture (#11) like a timeline actor: the applicant sees the Gremium.
         """
         state = await self._get_state(app.current_state_id)
         version = await self._current_version(app.id)
@@ -390,6 +401,28 @@ class ApplicationsServiceBase:
             archivedAt=app.archived_at,
             stateSince=since,
             hiddenKeys=sorted(hidden),
+            capture=await self._capture_out(
+                app, applicant_view=applicant_view, magic_link_view=magic_link_view
+            ),
+        )
+
+    async def _capture_out(
+        self, app: Application, *, applicant_view: bool, magic_link_view: bool
+    ) -> CaptureOut | None:
+        """Return the capture block of an application, or None without a capture."""
+        if app.captured_by is None:
+            return None
+        actors = await self._resolve_actors(
+            app,
+            [app.captured_by],
+            applicant_view=applicant_view,
+            magic_link_view=magic_link_view,
+        )
+        return CaptureOut(
+            capturedBy=actors.get(app.captured_by),
+            capturedAt=app.created_at,
+            receivedOn=app.received_on,
+            intake=app.capture_intake,
         )
 
     async def _author_refs(self, subs: set[str]) -> dict[str, tuple[str, UUID]]:

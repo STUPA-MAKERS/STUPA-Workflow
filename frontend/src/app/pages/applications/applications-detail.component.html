@@ -121,6 +121,18 @@
           </span>
         </p>
 
+        @if (captureParts(); as parts) {
+          <!-- #11: a subtle note for an application that a member captured on behalf of
+               the applicant. The dots sit between the parts only (as in the line above). -->
+          <p class="ad__line ad__seps ad__capture" data-testid="ad-capture">
+            <span class="ad__parts">
+              @for (part of parts; track $index) {
+                <span class="ad__part">{{ part }}</span>
+              }
+            </span>
+          </p>
+        }
+
         @if (canTransition() && transitions().length) {
           <div class="ad__transitions" role="group" [attr.aria-label]="'applications.transitions.title' | t">
             @for (t of transitions(); track t.id) {

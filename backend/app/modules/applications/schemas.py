@@ -8,12 +8,12 @@ applicant.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from app.modules.applications.diff import DataDiff
 from app.shared.altcha import AltchaSolutionStr
@@ -63,6 +63,61 @@ class ApplicationCreate(_CamelModel):
     draft_token: str | None = Field(
         default=None, alias="draftToken", min_length=1, max_length=128
     )
+
+
+class OnBehalfCreate(_CamelModel):
+    """Capture an application on behalf of an applicant (#11).
+
+    The applicant is EITHER an existing account (``applicantPrincipalId``) OR a guest
+    with ``applicantName`` and ``applicantEmail``. The schema rejects a mix and a
+    missing applicant with 422. ``data`` goes through the same validation as a normal
+    submission. ``receivedOn`` defaults to the day of the capture in the local
+    timezone; a date in the future answers 422. ``intake`` is the free-text intake
+    channel ("Eingang"), for example "per PDF".
+
+    ``attachmentIds`` and ``draftToken`` bind draft uploads, as on
+    ``POST /applications``.
+    """
+
+    type_id: UUID = Field(alias="typeId")
+    data: dict[str, Any]
+    applicant_principal_id: UUID | None = Field(default=None, alias="applicantPrincipalId")
+    applicant_email: EmailStr | None = Field(default=None, alias="applicantEmail")
+    applicant_name: str | None = Field(
+        default=None, alias="applicantName", min_length=1, max_length=256
+    )
+    received_on: date | None = Field(default=None, alias="receivedOn")
+    intake: str | None = Field(default=None, max_length=500)
+    lang: Lang = DEFAULT_LANG
+    attachment_ids: list[UUID] = Field(
+        default_factory=list, alias="attachmentIds", max_length=100
+    )
+    draft_token: str | None = Field(
+        default=None, alias="draftToken", min_length=1, max_length=128
+    )
+
+    @model_validator(mode="after")
+    def _one_applicant(self) -> OnBehalfCreate:
+        guest = self.applicant_email is not None or self.applicant_name is not None
+        if self.applicant_principal_id is not None and guest:
+            raise ValueError(
+                "Give either applicantPrincipalId or applicantName and applicantEmail."
+            )
+        if self.applicant_principal_id is None and (
+            self.applicant_email is None or not (self.applicant_name or "").strip()
+        ):
+            raise ValueError(
+                "A guest applicant needs applicantName and applicantEmail."
+            )
+        return self
+
+
+class ApplicantCandidateOut(_CamelModel):
+    """One account that the capture dialog offers as the applicant."""
+
+    id: UUID
+    display_name: str | None = Field(default=None, alias="displayName")
+    email: str | None = None
 
 
 class ApplicationCreated(_CamelModel):
@@ -122,6 +177,8 @@ class ApplicationOut(_CamelModel):
     # fields, because a patch keeps their stored values. A missing key in ``data``
     # alone does not tell "removed" from "never answered".
     hidden_keys: list[str] = Field(default_factory=list, alias="hiddenKeys")
+    # Set when a person captured the application on behalf of the applicant (#11).
+    capture: CaptureOut | None = None
 
 
 class ApplicationPatch(_CamelModel):
@@ -176,6 +233,19 @@ class ActorOut(_CamelModel):
         if self.kind in ("applicant", "system"):
             return raw
         return None
+
+
+class CaptureOut(_CamelModel):
+    """How an application captured on behalf of the applicant came in (#11).
+
+    ``capturedBy`` follows the actor rules of the timeline: the applicant view shows
+    the Gremium instead of the member (A12, O16).
+    """
+
+    captured_by: ActorOut | None = Field(default=None, alias="capturedBy")
+    captured_at: datetime = Field(alias="capturedAt")
+    received_on: date | None = Field(default=None, alias="receivedOn")
+    intake: str | None = None
 
 
 class TimelineEventOut(_CamelModel):
@@ -293,3 +363,8 @@ class CommentOut(_CamelModel):
     # True when the requesting viewer wrote the comment. The frontend aligns the
     # chat bubble by this flag.
     is_own: bool = Field(default=False, alias="isOwn")
+
+
+# ``ApplicationOut`` names ``CaptureOut``, which this module defines later, after
+# ``ActorOut``.
+ApplicationOut.model_rebuild()

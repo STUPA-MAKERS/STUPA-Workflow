@@ -1,0 +1,64 @@
+// "Antrag erfassen" (#11) takes the form sheet of the finance pages ("Buchung
+// hinzufügen"): head, scrolling body of sections, foot.
+@use '../../budget/finance-form';
+
+.cap__pickedText {
+  flex: 1 1 auto;
+  min-width: 0;
+  // A name or an e-mail is a copyable value: it wraps, it never ends in an ellipsis.
+  overflow-wrap: anywhere;
+}
+.ff__picked app-icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+.cap__option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cap__optionName {
+  overflow-wrap: anywhere;
+}
+.cap__optionMail {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  overflow-wrap: anywhere;
+}
+
+.cap__noHit {
+  display: inline;
+}
+.cap__link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.cap__link:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+// The answers span the whole body below the two sections.
+.cap__answers {
+  margin-top: var(--space-5);
+}
+.cap__files {
+  display: block;
+  margin-top: var(--space-4);
+}
+.cap__pickType {
+  margin-top: var(--space-5);
+}
+.cap__loading {
+  display: block;
+  margin-top: var(--space-5);
+}

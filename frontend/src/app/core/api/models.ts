@@ -209,6 +209,48 @@ export interface ApplicationOutWire {
    * Empty for a reader with the PII right.
    */
   hiddenKeys?: string[];
+  /** Set when a person captured the application on behalf of the applicant (#11). */
+  capture?: ApplicationCapture | null;
+}
+
+/**
+ * `CaptureOut`. How an application captured on behalf of the applicant came in (#11).
+ * `capturedBy` follows the actor rules of the timeline: the applicant view names the
+ * Gremium instead of the member.
+ */
+export interface ApplicationCapture {
+  capturedBy: ActorInfo | null;
+  capturedAt: IsoDateTime;
+  /** The date on which the application came in (`YYYY-MM-DD`). */
+  receivedOn: string | null;
+  /** The free-text intake channel ("Eingang"), for example "per PDF". */
+  intake: string | null;
+}
+
+/** `ApplicantCandidateOut`. An account that the capture dialog offers as applicant. */
+export interface ApplicantCandidate {
+  id: Uuid;
+  displayName: string | null;
+  email: string | null;
+}
+
+/**
+ * `OnBehalfCreate`. The body of `POST /applications/on-behalf` (#11). The applicant is
+ * EITHER an account (`applicantPrincipalId`) OR a guest (`applicantName` and
+ * `applicantEmail`).
+ */
+export interface OnBehalfApplication {
+  typeId: Uuid;
+  data: Record<string, unknown>;
+  applicantPrincipalId?: Uuid | null;
+  applicantName?: string | null;
+  applicantEmail?: string | null;
+  /** `YYYY-MM-DD`; the server defaults to today. */
+  receivedOn?: string | null;
+  intake?: string | null;
+  lang: Lang;
+  attachmentIds?: Uuid[];
+  draftToken?: string | null;
 }
 
 /** `ApplicationListItem`. A list entry without `data` and without `applicant`. */
@@ -555,6 +597,8 @@ export interface Application {
    * answered, and the field stays editable.
    */
   hiddenKeys?: string[];
+  /** Set when a person captured the application on behalf of the applicant (#11). */
+  capture?: ApplicationCapture | null;
 }
 
 /**

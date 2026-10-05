@@ -8,13 +8,14 @@ foreign-key CASCADE fires only on a real application delete.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
     CHAR,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -91,6 +92,20 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     # OIDC ``sub`` of whoever archived it. NOT a foreign key: a principal can be removed
     # and the record of who archived must survive that, the same way ``created_by`` does.
     archived_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Captured on behalf of the applicant (#11). A person with
+    # ``application.create_on_behalf`` entered an application that reached the
+    # platform another way, for example as a PDF or a mail. ``captured_by`` is the OIDC
+    # ``sub`` of that person. It is NOT the owner: ``created_by`` names the applicant
+    # account, or stays None for a guest applicant. Like ``created_by`` it is no foreign
+    # key, so the record survives the removal of the account. All three columns stay
+    # None for an application that the applicant submitted.
+    captured_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The free-text intake channel ("Eingang"), for example "per PDF" or "per Mail".
+    capture_intake: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The date on which the application reached the Gremium. The capturing person sets
+    # it (default: the day of the capture). It is information only: the flow deadlines
+    # still count from ``created_at``.
+    received_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     __table_args__ = (
         Index(

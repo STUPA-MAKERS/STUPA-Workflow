@@ -68,6 +68,12 @@
   font-size: var(--fs-md);
   min-width: 0;
 }
+/* #11: the capture note is quieter than the status line above it. */
+.ad__capture {
+  --ad-sep: 20px;
+  margin-top: var(--space-1);
+  font-size: var(--fs-small);
+}
 /* Items with a dot between two of them, also after a wrap (DECISIONS: never a dot at a
    line start or a line end).
 
@@ -467,4 +473,9 @@
   .ad__editHint {
     display: none;
   }
+}
+/* A long intake note wraps inside its part instead of running out of the sheet. */
+.ad__capture .ad__part {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }

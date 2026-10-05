@@ -105,6 +105,58 @@ async def create_application(
 
 
 @group.tool
+async def search_on_behalf_applicants(q: str) -> list[dict[str, Any]]:
+    """Search the accounts that can be the applicant of `create_application_on_behalf`.
+
+    The search matches the name and the e-mail of the active accounts. It needs at
+    least two characters and returns at most 20 accounts (`id`, `displayName`,
+    `email`). It needs the permission `application.create_on_behalf`.
+    """
+    return await api().get("/applications/on-behalf/applicants", params=params(q=q))
+
+
+@group.tool
+async def create_application_on_behalf(
+    type_id: str,
+    data: dict[str, Any],
+    applicant_principal_id: str | None = None,
+    applicant_name: str | None = None,
+    applicant_email: str | None = None,
+    received_on: str | None = None,
+    intake: str | None = None,
+    lang: str | None = None,
+) -> dict:
+    """Capture and submit an application on behalf of an applicant.
+
+    Use this for an application that reached the Gremium another way, for example as
+    a PDF or a mail. The application belongs to the applicant, as if the applicant had
+    submitted it, and enters the normal flow at once. You show only in the history and
+    in the audit log. The applicant gets a mail with a link (an account: the normal
+    link; a guest: a personal access link). It needs the permission
+    `application.create_on_behalf`.
+
+    Args:
+        data: The form-field values. The server validates them against the effective
+            form of the type, as for a normal submission (`get_effective_form`).
+        applicant_principal_id: The id of an applicant account
+            (`search_on_behalf_applicants`). Give EITHER this OR a guest.
+        applicant_name: The name of a guest applicant without an account.
+        applicant_email: The e-mail of a guest applicant without an account.
+        received_on: The date on which the application came in (`YYYY-MM-DD`). The
+            default is today. A date in the future gives 422.
+        intake: How the application came in, for example "per PDF" (max. 500 chars).
+    """
+    return await api().post(
+        "/applications/on-behalf",
+        json=params(
+            typeId=type_id, data=data, applicantPrincipalId=applicant_principal_id,
+            applicantName=applicant_name, applicantEmail=applicant_email,
+            receivedOn=received_on, intake=intake, lang=lang,
+        ),
+    )
+
+
+@group.tool
 async def update_application(application_id: str, data: dict[str, Any]) -> dict:
     """Patch the form data of an application.
 

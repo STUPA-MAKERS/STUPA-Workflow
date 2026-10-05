@@ -983,6 +983,54 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.amount(app('10', null))).toContain('10,00');
   });
 
+  it('#11: notes a capture under the status line and in the history', async () => {
+    const { http, detectChanges, cmp } = await setup();
+    http.expectOne(url('')).flush({
+      ...appWire(),
+      capture: {
+        capturedBy: { kind: 'principal', displayName: 'Clara Clerk' },
+        capturedAt: '2026-06-05T10:00:00Z',
+        receivedOn: '2026-06-01',
+        intake: 'per PDF',
+      },
+    });
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush([]);
+    http.expectOne(url('/timeline')).flush([
+      { fromStateId: null, toStateId: 's1', toState: SUBMITTED, actor: 'Clara Clerk', at: '2026-06-05T10:00:00Z' },
+    ]);
+    flushForm(http);
+    detectChanges();
+    expect(cmp.captureParts()).toEqual([
+      'Erfasst von Clara Clerk am 05.06.2026',
+      'eingegangen am 01.06.2026',
+      'per PDF',
+    ]);
+    expect(screen.getByTestId('ad-capture').textContent).toContain('per PDF');
+    expect(cmp.historyEntries()[0].body).toBe(
+      'Version 1\nIm Auftrag der antragstellenden Person erfasst\nEingang: per PDF',
+    );
+    flushAttachments(http);
+
+    // The same day and no intake: only the first part. An unknown account stays nameless.
+    cmp.app.update((a) =>
+      a
+        ? {
+            ...a,
+            capture: { capturedBy: null, capturedAt: '2026-06-05T10:00:00Z', receivedOn: '2026-06-05', intake: null },
+          }
+        : a,
+    );
+    expect(cmp.captureParts()).toEqual(['Erfasst von Ehemaliges Konto am 05.06.2026']);
+    expect(cmp.historyEntries()[0].body).toBe('Version 1\nIm Auftrag der antragstellenden Person erfasst');
+    cmp.app.update((a) => (a ? { ...a, capture: { ...a.capture!, receivedOn: null } } : a));
+    expect(cmp.captureParts()).toHaveLength(1);
+    // An own submission has no note.
+    cmp.app.update((a) => (a ? { ...a, capture: null } : a));
+    expect(cmp.captureParts()).toBeNull();
+    http.verify();
+  });
+
   it('builds the history from the status changes and the versions (A3)', async () => {
     const { http, detectChanges, cmp, container } = await setup();
     http.expectOne(url('')).flush(appWire());

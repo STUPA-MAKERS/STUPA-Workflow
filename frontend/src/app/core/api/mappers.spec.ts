@@ -109,7 +109,18 @@ describe('mapApplication', () => {
       archivedAt: null,
       stateSince: null,
       hiddenKeys: [],
+      capture: null,
     });
+  });
+
+  it('passes the capture block through (#11)', () => {
+    const capture = {
+      capturedBy: { kind: 'gremium' as const, displayName: 'StuPa' },
+      capturedAt: '2026-10-05T10:00:00Z',
+      receivedOn: '2026-10-01',
+      intake: 'per PDF',
+    };
+    expect(mapApplication({ ...wire, capture }, 'de').capture).toEqual(capture);
   });
 
   it('passes hiddenKeys through (O21)', () => {

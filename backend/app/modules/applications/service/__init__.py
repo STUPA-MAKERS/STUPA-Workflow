@@ -6,6 +6,8 @@ Layout of the package:
     Shared constructor, lookup and serialization helpers, and pure field helpers.
 ``create``
     Creation: effective-form validation, v1, initial state and status event.
+``on_behalf``
+    Capture on behalf of an applicant (#11) and the applicant search of the dialog.
 ``edits``
     Versioned data edits with a diff, version history and deletion.
 ``reads``

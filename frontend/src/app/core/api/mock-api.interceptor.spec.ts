@@ -454,6 +454,50 @@ describe('mockApiInterceptor', () => {
         expect((await get<{ total: number }>('/api/applications', params)).total).toBe(16);
       });
 
+      it('#11: searches the accounts and captures a new row on top', async () => {
+        let params = new HttpParams().set('q', 'AN');
+        const hits = await get<{ displayName: string }[]>('/api/applications/on-behalf/applicants', params);
+        expect(hits.map((h) => h.displayName)).toEqual(['Anna Antrag', 'Anton Albers']);
+        params = new HttpParams();
+        expect(await get<unknown[]>('/api/applications/on-behalf/applicants', params)).toHaveLength(3);
+
+        const created = await firstValueFrom(
+          http.post<{ applicationId: string }>('/api/applications/on-behalf', {
+            typeId: '11111111-1111-1111-1111-111111111111',
+            data: { title: 'Papierantrag' },
+            applicantName: 'Gisela',
+            applicantEmail: 'g@example.org',
+            receivedOn: '2026-10-01',
+            intake: 'per Mail',
+            lang: 'de',
+          }),
+        );
+        const detail = await get<{ capture: { receivedOn: string; intake: string } }>(
+          `/api/applications/${created.applicationId}`,
+        );
+        expect(detail.capture).toMatchObject({ receivedOn: '2026-10-01', intake: 'per Mail' });
+        const page = await get<{ items: Row[] }>('/api/applications');
+        expect(page.items[0].title).toBe('Papierantrag');
+
+        const bare = await firstValueFrom(
+          http.post<{ applicationId: string }>('/api/applications/on-behalf', {
+            typeId: '11111111-1111-1111-1111-111111111111',
+            data: { title: 'Ohne Datum' },
+            applicantPrincipalId: 'p1000000-0000-0000-0000-000000000001',
+            lang: 'de',
+          }),
+        );
+        const plain = await get<{ capture: { receivedOn: string | null; intake: string | null } }>(
+          `/api/applications/${bare.applicationId}`,
+        );
+        expect(plain.capture).toMatchObject({ receivedOn: null, intake: null });
+        // An own submission carries no capture; the demo row 2 was captured per PDF.
+        expect((await get<{ capture: unknown }>(`/api/applications/${first}`)).capture).toBeNull();
+        expect((await get<{ capture: { intake: string } }>(`/api/applications/${second}`)).capture.intake).toBe(
+          'per PDF',
+        );
+      });
+
       it('sorts by amount and by date in both directions and pages', async () => {
         let params = new HttpParams().set('sort', 'amount').set('order', 'desc');
         let page = await get<{ items: Row[] }>('/api/applications', params);

@@ -183,6 +183,10 @@ def _app(**over: Any) -> _Obj:
         # Not archived by default, which is the state nearly every test wants.
         "archived_at": None,
         "archived_by": None,
+        # Not captured on behalf of the applicant (#11).
+        "captured_by": None,
+        "capture_intake": None,
+        "received_on": None,
     }
     base.update(over)
     return _Obj(**base)
@@ -294,6 +298,46 @@ async def test_get_with_pii_owner_and_applicant() -> None:
     assert out.applicant.email == "a@b.de"
     assert out.version == 0  # scalar() default None → 0
     assert out.state_since == app.created_at  # no status event → creation time
+
+
+async def test_get_carries_the_capture_block() -> None:
+    # #11: a captured application names the capturing person, or the Gremium in the
+    # applicant view.
+    state = _state()
+    app = _app(
+        created_by="anna",
+        current_state_id=state.id,
+        captured_by="clerk",
+        capture_intake="per PDF",
+        received_on=date(2026, 10, 1),
+    )
+    clerk_id = uuid4()
+    session = _Session(
+        get_results=[app, state],
+        # stateSince, state colours, then the name of the capturing person.
+        execute_results=[[], [("draft", "#zzz")], [("clerk", "Clara", "c@x.de", clerk_id)]],
+    )
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    out = await svc.get(app.id, include_pii=False, requester_sub="admin")
+    assert out.capture is not None
+    assert out.capture.captured_by is not None
+    assert out.capture.captured_by.kind == "principal"
+    assert out.capture.captured_by.display_name == "Clara"
+    assert out.capture.received_on == date(2026, 10, 1)
+    assert out.capture.intake == "per PDF"
+    assert out.capture.captured_at == NOW
+
+    session = _Session(
+        get_results=[app, state],
+        execute_results=[[], [("draft", "#zzz")]],
+        # The Gremium name of the applicant view.
+        scalar_results=[None, "StuPa"],
+    )
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    out = await svc.get(app.id, include_pii=False, requester_sub="anna", applicant_view=True)
+    assert out.capture is not None
+    assert out.capture.captured_by is not None
+    assert out.capture.captured_by.kind == "gremium"
 
 
 async def test_get_without_pii_and_can_manage() -> None:

@@ -11,6 +11,7 @@ import { delay, mergeMap } from 'rxjs/operators';
 import { USE_MOCK_API } from './api.config';
 import type { Delegation } from './delegations.service';
 import type {
+  OnBehalfApplication,
   ApplicationCreatedWire,
   ApplicationListItemWire,
   ApplicationOutWire,
@@ -72,6 +73,8 @@ const MOCK_PRINCIPAL: Principal = {
     'application.archive',
     'application.delete',
     'application.force_status',
+    // #11: "Antrag erfassen" on the applications page.
+    'application.create_on_behalf',
     'admin.site',
     'admin.gremien',
     'admin.types',
@@ -1439,6 +1442,18 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         if (!reply) return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
         return ok(reply.body, reply.status);
       }),
+    );
+  }
+
+  // #11: the applicant search and the capture of "Antrag erfassen".
+  if (req.method === 'GET' && p.endsWith('/applications/on-behalf/applicants')) {
+    return from(import('./mock-applications')).pipe(
+      mergeMap((m) => ok(m.mockApplicantSearch(req.params.get('q') ?? ''))),
+    );
+  }
+  if (req.method === 'POST' && p.endsWith('/applications/on-behalf')) {
+    return from(import('./mock-applications')).pipe(
+      mergeMap((m) => ok(m.mockCapture(req.body as OnBehalfApplication), 201)),
     );
   }
 

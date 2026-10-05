@@ -42,11 +42,15 @@ class ReadOps(ApplicationsServiceBase):
         requester_can_manage: bool = False,
         allow_unconfirmed: bool = True,
         strip_pii_fields: bool = False,
+        applicant_view: bool = False,
+        magic_link_view: bool = False,
     ) -> ApplicationOut:
         """Read one application.
 
         ``include_pii`` adds the applicant block. ``strip_pii_fields`` removes the
         ``isPII`` form fields from ``data`` for a reader without the PII right (O21).
+        ``applicant_view`` and ``magic_link_view`` follow `timeline`: the capture
+        block (#11) then names the Gremium instead of the capturing member.
         """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         is_owner = requester_sub is not None and app.created_by == requester_sub
@@ -57,6 +61,8 @@ class ReadOps(ApplicationsServiceBase):
             can_edit=can_edit,
             is_owner=is_owner,
             strip_pii_fields=strip_pii_fields,
+            applicant_view=applicant_view,
+            magic_link_view=magic_link_view,
         )
 
     async def timeline(
