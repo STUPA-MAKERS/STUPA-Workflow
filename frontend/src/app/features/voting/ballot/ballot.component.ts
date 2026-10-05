@@ -66,6 +66,8 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  * - A secret vote never shows the choice after the cast, only that the ballot is in.
  * - The button is off while a cast runs, so a double click sends one ballot.
  * - A 409 `already_voted` (another tab, the meeting page) locks the row as well.
+ * - `compact` gives the small ballot of a side column: buttons in one row.
+ * - `columns` puts the rows side by side (the strip of a narrow screen).
  * - `layout="phone"` pins the button bar to the bottom of the screen (board
  *   Telefon-Abstimmen) and always names the rows.
  *
@@ -80,6 +82,8 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
   host: {
     class: 'ballot',
     '[class.ballot--phone]': "layout() === 'phone'",
+    '[class.ballot--compact]': 'compact()',
+    '[class.ballot--columns]': 'columns()',
   },
   templateUrl: './ballot.component.html',
   styleUrl: './ballot.component.scss',
@@ -101,6 +105,16 @@ export class BallotComponent {
   readonly proxyCast = input(false);
   readonly caster = input.required<BallotCaster>();
   readonly layout = input<'page' | 'phone'>('page');
+  /**
+   * The small ballot of a side column (the participant view): the own options are a
+   * row of buttons like the represented ones, and the rows always carry their name.
+   */
+  readonly compact = input(false);
+  /**
+   * The ballot of a narrow strip (board Schmal-Teilnahme): the own row and the
+   * represented row side by side, the confirm bar in one line below them.
+   */
+  readonly columns = input(false);
 
   readonly castDone = output<BallotCast>();
   readonly castFailed = output<BallotFailure>();
@@ -126,7 +140,9 @@ export class BallotComponent {
 
   /** Name the rows when a proxy row exists, and always on a phone (board). A lone own
    *  row needs no name. */
-  protected readonly named = computed(() => this.layout() === 'phone' || this.proxyState() !== null);
+  protected readonly named = computed(
+    () => this.layout() === 'phone' || this.compact() || this.proxyState() !== null,
+  );
 
   /** The row the button acts on now, or `null` when every row is cast. */
   protected readonly target = computed<BallotRow | null>(() => {
@@ -153,6 +169,16 @@ export class BallotComponent {
     return choice
       ? this.i18n.translate('voting.ballot.confirm', { choice: this.label(choice) })
       : this.i18n.translate('voting.ballot.confirmEmpty');
+  });
+
+  /**
+   * The confirm bar shows while a row is open. The strip (`columns`) shows it only once
+   * the person picked an option, so the strip stays low (board Schmal-Teilnahme).
+   */
+  protected readonly showBar = computed(() => {
+    const row = this.target();
+    if (row === null) return false;
+    return !this.columns() || this.picked()[row] !== null || this.pending() !== null;
   });
 
   protected readonly canConfirm = computed(() => {

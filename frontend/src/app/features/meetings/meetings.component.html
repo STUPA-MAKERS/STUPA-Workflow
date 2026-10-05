@@ -1,31 +1,8 @@
-<!-- The list carries its own header, and so does the session page of the minute-taker.
-     Without read access the list does not show, so this header titles the notice. -->
-@if (showForbidden() || (detailMode() && (!meeting() || beamerMode() || isFollower()))) {
+<!-- The list, the session page and the participant view carry their own header. Without
+     read access the list does not show, and a meeting that does not load has no page:
+     this header titles the notice. -->
+@if (showForbidden() || (detailMode() && !meeting())) {
 <app-page-header [title]="'meetings.title' | t" [rail]="true" [flush]="true" />
-}
-
-<!-- The session page of the minute-taker carries its own header, so the meta line shows
-     for the beamer and the follow view only. -->
-@if (meeting(); as m) {
-  @if (beamerMode() || isFollower()) {
-  <div class="mtg__meta">
-    <span class="font-semibold">{{ m.title }}</span>
-    @if (m.date) {
-      <app-badge variant="neutral">{{ m.date | ldate: 'mediumDate' }}{{ timeSuffix(m.startTime) }}</app-badge>
-    }
-    <app-badge [variant]="statusVariant(m.status)">
-      {{ statusKey(m.status) | t }}
-    </app-badge>
-    <app-button
-      variant="ghost"
-      size="sm"
-      class="mtg__beamerToggle"
-      (click)="beamerMode.set(!beamerMode())"
-    >
-      {{ (beamerMode() ? 'meetings.beamer.exit' : 'meetings.beamer.enter') | t }}
-    </app-button>
-  </div>
-  }
 }
 
 @if (showForbidden()) {
@@ -43,25 +20,17 @@
 } @else if (error()) {
   <p class="mtg__status mtg__status--error" role="alert">{{ 'meetings.error' | t }}</p>
 } @else if (meeting(); as m) {
-  @if (beamerMode()) {
-    <app-meeting-beamer [vote]="beamerVote()" [top]="currentTop()" [topIndex]="currentTopIndex()" />
-  }
-
-  <!-- Member: live follow view (read the protocol, cast on open votes). -->
-  @if (isFollower() && !beamerMode()) {
+  @if (isFollower()) {
+    <!-- A member without write or manage right: the participant view. -->
     <app-meeting-follow-view
       [meeting]="m"
       [agenda]="agenda()"
       [attendance]="attendance()"
       [savingAttendance]="savingAttendance()"
-      [casting]="casting()"
-      [choices]="myChoices()"
-      (castVote)="cast($event.voteId, $event.choice)"
+      (back)="goBack()"
       (attendanceChange)="setAttendance($event.member, $event.status, $event.note)"
     />
-  }
-
-  @if (!beamerMode() && !isFollower()) {
+  } @else {
   <!-- Minute-taker and meeting lead: agenda, sheet, votes and the dock. -->
   <app-meeting-page
     [meeting]="m"
@@ -99,7 +68,7 @@
     (pickHandover)="askHandover($event)"
     (cancelHandover)="cancelHandover(m)"
     (deleteMeeting)="askDeleteMeeting(m)"
-    (toggleBeamer)="beamerMode.set(true)"
+    (toggleBeamer)="openBeamer(m)"
     (attendanceChange)="setAttendance($event.member, $event.status, $event.note)"
     (attendanceReset)="resetAttendance($event)"
     (attendanceConflictResolved)="clearAttendanceConflict($event)"
@@ -207,7 +176,7 @@
     (closed)="dialogs.closeOpen.set(false)"
     (meetingClosed)="dialogs.meetingClosed($event)"
   />
-  } <!-- /@if (!beamerMode() && !isFollower()) -->
+  } <!-- /@if (isFollower()) -->
 } @else if (!detailMode()) {
   <!-- The list. Plain Gremium members also see their meetings, filtered on the server. -->
   <app-meetings-list />

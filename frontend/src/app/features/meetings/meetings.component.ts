@@ -6,7 +6,6 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -34,7 +33,6 @@ import { CloseMeetingDialogComponent } from './close-meeting-dialog/close-meetin
 import { DeleteMeetingDialogComponent } from './delete-meeting-dialog/delete-meeting-dialog.component';
 import { HandoverDialogComponent } from './handover-dialog/handover-dialog.component';
 import { MeetingAgendaService } from './meeting-agenda.service';
-import { MeetingBeamerComponent } from './meeting-beamer.component';
 import { MeetingDialogsService } from './meeting-dialogs.service';
 import { MeetingFollowViewComponent } from './meeting-follow-view.component';
 import { MeetingPageComponent } from './meeting-page/meeting-page.component';
@@ -45,9 +43,6 @@ import { MeetingsTimelineService } from './meetings-timeline.service';
 import { VoteOpenDialogComponent } from './vote-open-dialog/vote-open-dialog.component';
 import {
   countEntries,
-  meetingStatusKey,
-  meetingStatusVariant,
-  meetingTimeSuffix,
   voteOptionLabel,
   voteOptionsFor,
   voteResultKey,
@@ -59,7 +54,7 @@ import {
 /**
  * Meetings page: the list (`/meetings`, `MeetingsListComponent`) and the meeting
  * page (`/meetings/:id`). The meeting page is the session page for the minute-taker
- * and the lead, the follow view for a member, and the beamer. This component wires
+ * and the lead, and the participant view for a member. This component wires
  * the component-scoped services and the meeting dialogs; its public surface also
  * drives the specs.
  */
@@ -79,9 +74,7 @@ import {
     ButtonComponent,
     CardComponent,
     IconComponent,
-    LocalizedDatePipe,
     PageHeaderComponent,
-    MeetingBeamerComponent,
     MeetingPageComponent,
     MeetingFollowViewComponent,
     MeetingsListComponent,
@@ -108,8 +101,6 @@ export class MeetingsComponent {
 
   /** Detail route (`/meetings/:id`) vs. list (`/meetings`). */
   readonly detailMode = signal(false);
-  /** Beamer display (only current question + live result, no dialogs). */
-  readonly beamerMode = signal(false);
 
   readonly loading = this.session.loading;
   readonly error = this.session.error;
@@ -125,9 +116,6 @@ export class MeetingsComponent {
   readonly deletingVote = this.session.deletingVote;
   protected readonly myChoices = this.session.myChoices;
   readonly looseVotes = this.session.looseVotes;
-  readonly beamerVote = this.session.beamerVote;
-  readonly currentTop = this.session.currentTop;
-  readonly currentTopIndex = this.session.currentTopIndex;
 
   readonly canManage = this.session.canManage;
   readonly canWrite = this.session.canWrite;
@@ -172,6 +160,15 @@ export class MeetingsComponent {
   /** Back from the meeting page to the list. */
   goBack(): void {
     void this.router.navigate(['/meetings']);
+  }
+
+  /**
+   * "Beamer-Ansicht": the screen for the projector, in a new tab, so the session page
+   * stays open (`/voting/beamer/:id`, no chrome).
+   */
+  openBeamer(m: Meeting): void {
+    const url = this.router.serializeUrl(this.router.createUrlTree(['/voting/beamer', m.id]));
+    window.open(url, '_blank', 'noopener');
   }
 
   openSettings(m: Meeting): void {
@@ -353,19 +350,6 @@ export class MeetingsComponent {
   // The display helpers below are pure, see meetings-display.util.
   voteOptionLabel(opt: string): string {
     return voteOptionLabel(opt, (key) => this.i18n.translate(key));
-  }
-
-  /** `", 18:00"` behind the meeting date, or nothing. See meetings-display.util. */
-  timeSuffix(startTime: string | null | undefined): string {
-    return meetingTimeSuffix(startTime);
-  }
-
-  statusVariant(status: Meeting['status']): BadgeVariant {
-    return meetingStatusVariant(status);
-  }
-
-  statusKey(status: Meeting['status']): TranslationKey {
-    return meetingStatusKey(status);
   }
 
   voteVariant(status: MeetingVote['status']): BadgeVariant {

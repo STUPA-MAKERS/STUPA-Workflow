@@ -53,6 +53,8 @@ const TOOLS: readonly FormatTool[] = [
  * keeper line below the title, "Protokoll: Lara Leitung (TOP 1–3), Uli Übernahme (ab TOP 3,
  * 18:55)". The text stays editable for every writer while the protocol is a draft (O22).
  *
+ * The participant view (`follow`) reads the same sheet without a protocol of its own.
+ *
  * A vote result in the text shows as a card with "Beschluss · 18:52 · Einfache Mehrheit",
  * the counts and the result (a tie is "Abgelehnt", O18), from the votes of this meeting.
  */
@@ -94,6 +96,12 @@ export class TopSheetComponent {
   readonly revision = input(0);
   /** The finalize runs. */
   readonly finalizing = input(false);
+  /**
+   * The participant view (boards Teilnahme-Live, Schmal-Teilnahme): read only, "Jetzt"
+   * before the item that the room handles, the line "Mara Keller führt das Protokoll"
+   * below the title, and the text without a protocol of the viewer.
+   */
+  readonly follow = input(false);
 
   readonly bodyChange = output<{ itemId: Uuid; body: string }>();
   /** "Finalisieren & versenden" in the protocol bar of a closed meeting. */
@@ -106,6 +114,24 @@ export class TopSheetComponent {
     const kind = t.applicationId ? 'meetings.agenda.kindApplication' : 'meetings.agenda.kindFreetext';
     return `${this.i18n.translate('meetings.agenda.top', { n: this.topIndex() + 1 })} · ${this.i18n.translate(kind)}`;
   }
+
+  /**
+   * The document key of the editor. The minute-taker's editor keeps its key while they
+   * type, and only an insert from outside raises `revision`. The participant view
+   * (`follow`) has no input of its own: the text that the room writes reaches it with
+   * each read of the agenda, so its key changes with the text.
+   */
+  protected readonly docKey = computed(() => {
+    const t = this.top();
+    if (!t) return '';
+    return this.follow() ? `${t.id}:${textHash(t.body ?? '')}` : `${t.id}:${this.revision()}`;
+  });
+
+  /** The item is the one that the room handles now (participant view, live meeting). */
+  protected readonly isNow = computed(() => {
+    const m = this.meeting();
+    return this.follow() && m.status === 'live' && !!m.currentAgendaItemId && this.top()?.id === m.currentAgendaItemId;
+  });
 
   /** The state of the application of the item, in the language of the page. */
   protected readonly stateLabel = computed(() =>
@@ -136,4 +162,14 @@ export class TopSheetComponent {
     if (p.status === 'rendering') return { kind: 'warn', key: 'meetings.protocol.rendering' };
     return { kind: 'neutral', key: 'meetings.protocol.draft' };
   }
+}
+
+/** A short hash of a text (FNV-1a, 32 bit), so that a document key changes with it. */
+function textHash(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `${text.length}.${(hash >>> 0).toString(36)}`;
 }

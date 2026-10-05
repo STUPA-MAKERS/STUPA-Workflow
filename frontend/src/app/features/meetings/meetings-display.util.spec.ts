@@ -14,12 +14,13 @@ import {
   errorDetail,
   liveOpenedVote,
   longDate,
+  meetingLine,
+  weekdayDate,
   meetingStatusKey,
   meetingTimeSuffix,
   meetingStatusVariant,
   memberAttendanceBadgeVariant,
   memberAttendanceKey,
-  pickBeamerVote,
   resolveI18n,
   shortTime,
   voteOptionLabel,
@@ -148,13 +149,12 @@ describe('meetings-display.util', () => {
     );
   });
 
-  it('picks the beamer vote: open first, else last closed, else null', () => {
-    const open = VOTE({ id: 'open', status: 'open' });
-    const c1 = VOTE({ id: 'c1', status: 'closed' });
-    const c2 = VOTE({ id: 'c2', status: 'closed' });
-    expect(pickBeamerVote([c1, open, c2])?.id).toBe('open');
-    expect(pickBeamerVote([c1, c2])?.id).toBe('c2');
-    expect(pickBeamerVote([VOTE()])).toBeNull();
+  it('formats a meeting date with a short weekday and names the meeting with it', () => {
+    expect(weekdayDate('2026-10-13', 'de-DE')).toBe('Di., 13.10.2026');
+    expect(weekdayDate('kein Datum', 'de-DE')).toBe('kein Datum');
+    const m = { title: '35. Sitzung', date: '2026-10-13' } as Parameters<typeof meetingLine>[0];
+    expect(meetingLine(m, 'de-DE')).toBe('35. Sitzung · Di., 13.10.2026');
+    expect(meetingLine({ ...m, date: null }, 'de-DE')).toBe('35. Sitzung');
   });
 
   it('formats long dates per locale and passes invalid input through', () => {

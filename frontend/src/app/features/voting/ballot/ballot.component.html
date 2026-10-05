@@ -7,26 +7,47 @@
     @if (named()) {
       <h2 class="sec ballot__name">{{ 'voting.ballot.own' | t }}</h2>
     }
-    <div class="ballot__choices" role="group" [attr.aria-label]="'voting.ballot.own' | t">
-      @for (opt of options(); track opt) {
-        @let on = isOn('own', opt);
-        <button
-          type="button"
-          class="choice"
-          [class.choice--on]="on"
-          [attr.aria-pressed]="on"
-          [disabled]="own.cast || busy"
-          (click)="pick('own', opt)"
-        >
-          <span class="choice__mark" aria-hidden="true">
+    @if (compact()) {
+      <div class="ballot__proxy" role="group" [attr.aria-label]="'voting.ballot.own' | t">
+        @for (opt of options(); track opt) {
+          @let on = isOn('own', opt);
+          <button
+            type="button"
+            class="pchoice"
+            [class.pchoice--on]="on"
+            [attr.aria-pressed]="on"
+            [disabled]="own.cast || busy"
+            (click)="pick('own', opt)"
+          >
             @if (on) {
-              <app-icon name="check" [size]="18" />
+              <app-icon name="check" [size]="15" />
             }
-          </span>
-          <span class="choice__label">{{ label(opt) }}</span>
-        </button>
-      }
-    </div>
+            {{ label(opt) }}
+          </button>
+        }
+      </div>
+    } @else {
+      <div class="ballot__choices" role="group" [attr.aria-label]="'voting.ballot.own' | t">
+        @for (opt of options(); track opt) {
+          @let on = isOn('own', opt);
+          <button
+            type="button"
+            class="choice"
+            [class.choice--on]="on"
+            [attr.aria-pressed]="on"
+            [disabled]="own.cast || busy"
+            (click)="pick('own', opt)"
+          >
+            <span class="choice__mark" aria-hidden="true">
+              @if (on) {
+                <app-icon name="check" [size]="18" />
+              }
+            </span>
+            <span class="choice__label">{{ label(opt) }}</span>
+          </button>
+        }
+      </div>
+    }
     @if (own.cast) {
       @let choice = castChoice('own');
       <div class="ballot__done" role="status">
@@ -77,7 +98,7 @@
   </section>
 }
 
-@if (target() !== null) {
+@if (showBar()) {
   @if (layout() === 'phone') {
     <div class="ballot__spacer" aria-hidden="true" [style.height.px]="barHeight()"></div>
   }
@@ -88,8 +109,8 @@
     </p>
     <app-button
       variant="fill"
-      size="lg"
-      [block]="true"
+      [size]="compact() ? 'md' : 'lg'"
+      [block]="!columns()"
       [disabled]="!canConfirm()"
       [loading]="busy"
       (click)="confirm()"

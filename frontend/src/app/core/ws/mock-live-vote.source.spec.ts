@@ -22,13 +22,28 @@ describe('MockLiveVoteSource', () => {
     ch.close();
   });
 
-  it('increments the chosen option on a cast frame', () => {
+  it('counts a cast frame and hides the counts until every present member voted', () => {
     const ch = source.connectMeeting('m-1');
     const { sink, push } = collect();
     ch.messages$.subscribe(push);
     ch.send({ type: 'cast', voteId: 'vote-demo', choice: 'no' });
     const tally = sink.find((m) => m.type === 'vote_tally') as VoteTallyMsg;
-    expect(tally.counts['no']).toBe(3); // 2 → 3
+    expect(tally.cast).toBe(9); // 8 → 9
+    expect(tally.present).toBe(12);
+    expect(tally.revealed).toBe(false);
+    expect(tally.counts).toEqual({});
+    expect(tally.leading).toBeNull();
+    ch.close();
+  });
+
+  it('lets a screenshot script push a frame through the dev hook', () => {
+    const ch = source.connectMeeting('m-1', true);
+    const { sink, push } = collect();
+    ch.messages$.subscribe(push);
+    const hook = (globalThis as { __stupaMockLive?: { push(msg: ServerMessage): void } })
+      .__stupaMockLive;
+    hook?.push({ type: 'vote_cancelled', voteId: 'vote-demo' });
+    expect(sink).toEqual([{ type: 'vote_cancelled', voteId: 'vote-demo' }]);
     ch.close();
   });
 
@@ -66,6 +81,9 @@ describe('MockLiveVoteSource', () => {
     ch.send({ type: 'cast', voteId: 'vote-demo', choice: 'no' });
     ch.send({ type: 'cast', voteId: 'vote-demo', choice: 'no' });
     const tally = sink.filter((m) => m.type === 'vote_tally').pop() as VoteTallyMsg;
+    // 8 + 4 = 12 ballots: every present member voted, so the counts show.
+    expect(tally.revealed).toBe(true);
+    expect(tally.counts['no']).toBe(6);
     expect(tally.leading).toBe('no'); // 2+4 = 6 > yes 5
     ch.close();
   });

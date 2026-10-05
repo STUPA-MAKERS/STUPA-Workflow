@@ -34,6 +34,7 @@ import {
   type DelegationCardChange,
   MeetingDelegationCardComponent,
 } from '../meeting-delegation-card.component';
+import { meetingLine } from '../meetings-display.util';
 
 /** One attendance change. `note` is the reason of an excuse; omitted keeps the stored one. */
 export interface AttendanceChange {
@@ -189,6 +190,10 @@ export class AttendanceSheetComponent {
   /** The lead sets every row. A closed meeting freezes the attendance. */
   protected readonly lead = computed(() => this.meeting().canControl);
   protected readonly locked = computed(() => this.meeting().status === 'closed');
+  /** The line below the title of the delegation dialog. */
+  protected readonly meetingLine = computed(() =>
+    meetingLine(this.meeting(), this.i18n.formatLocale()),
+  );
 
   /** The counts per state. A member who does not lead reads one "abwesend" count (Z2). */
   protected readonly counts = computed(() => {

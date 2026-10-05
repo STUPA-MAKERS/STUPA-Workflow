@@ -38,6 +38,29 @@ describe('ThemeService', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
   });
 
+  it('gives a page default to the system mode while the page shows, without persisting it', () => {
+    const svc = service();
+    svc.init();
+    svc.setPageDefault('dark');
+    expect(svc.resolved()).toBe('dark');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+    expect(localStorage.getItem('ap.theme')).toBeNull();
+    // An OS change does not override the page default.
+    changeHandler?.({ matches: false } as MediaQueryListEvent);
+    expect(svc.resolved()).toBe('dark');
+    svc.setPageDefault(null);
+    expect(svc.resolved()).toBe('light');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+  });
+
+  it('keeps an explicit choice over a page default', () => {
+    localStorage.setItem('ap.theme', 'light');
+    const svc = service();
+    svc.init();
+    svc.setPageDefault('dark');
+    expect(svc.resolved()).toBe('light');
+  });
+
   it('toggles to an explicit theme and persists it', () => {
     const svc = service();
     svc.init();

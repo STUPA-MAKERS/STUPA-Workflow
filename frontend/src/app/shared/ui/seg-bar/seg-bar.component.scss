@@ -11,6 +11,11 @@
 :host(.bar--fat) {
   height: 10px;
 }
+/* The beamer: read across a room. */
+:host(.bar--xl) {
+  gap: 6px;
+  height: 20px;
+}
 
 /* The parts keep their share; the gaps come out of the grey rest, or out of the parts
    when there is no rest. */
@@ -26,6 +31,10 @@
 }
 :host(.bar--fat) .bar__seg {
   border-radius: 5px;
+}
+:host(.bar--xl) .bar__seg,
+:host(.bar--xl) .bar__rest {
+  border-radius: 10px;
 }
 
 .bar__seg--filled {

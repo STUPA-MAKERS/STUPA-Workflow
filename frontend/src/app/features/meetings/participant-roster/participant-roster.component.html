@@ -1,0 +1,28 @@
+<section class="pr" [attr.aria-labelledby]="capId">
+  <h2 class="pr__cap cap" [id]="capId">
+    {{ 'participant.roster.title' | t }} · {{ 'participant.roster.present' | t: { n: present(), m: rows().length } }}
+  </h2>
+  @if (view().length) {
+    <ul class="pr__rows rowgroup rowgroup--bg3">
+      @for (r of view(); track r.id) {
+        <li class="pr__row">
+          <app-avatar [name]="r.name" size="sm" [accent]="r.self" [decorative]="true" />
+          <span class="pr__text">
+            <span class="pr__name ell" [title]="r.name">
+              {{ r.name }}
+              @if (r.self) {
+                <span class="pr__muted">{{ 'meetings.attendance.you' | t }}</span>
+              }
+            </span>
+            @if (r.keeper) {
+              <span class="pr__sub">{{ 'meetings.protokollant.label' | t }}</span>
+            }
+          </span>
+          <app-status-text class="pr__state" [kind]="r.kind">{{ r.key | t }}</app-status-text>
+        </li>
+      }
+    </ul>
+  } @else {
+    <p class="pr__muted">{{ 'meetings.attendance.empty' | t }}</p>
+  }
+</section>

@@ -15,7 +15,7 @@
         <span class="bars__pct mono">{{ row.pct }} %</span>
       </div>
       <app-seg-bar
-        [size]="variant() === 'beamer' ? 'fat' : 'normal'"
+        [size]="variant() === 'beamer' ? 'xl' : 'normal'"
         [segments]="[{ value: row.count, tone: row.tone }]"
         [total]="cast()"
         [label]="rowLabel(row)"

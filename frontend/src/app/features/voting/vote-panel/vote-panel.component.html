@@ -4,6 +4,21 @@
 @if (layout() === 'phone') {
   <app-status-text class="vpn__cap" [kind]="s.kind">{{ s.key | t }} · {{ rules() }}</app-status-text>
   <h1 class="vpn__q vpn__q--phone">{{ question() }}</h1>
+} @else if (layout() === 'strip') {
+  <div class="vpn__head">
+    <app-status-text class="vpn__cap" [kind]="s.kind">{{ stripCap() }}</app-status-text>
+    @if (isOpen()) {
+      <span class="vpn__turnout mono" [title]="turnoutLabel()" [attr.aria-label]="turnoutLabel()">
+        {{ 'meetings.dock.of' | t: { n: v.tally.voted ?? 0, m: turnoutTotal() } }}
+      </span>
+    }
+  </div>
+  <h3 class="vpn__q vpn__q--card">{{ question() }}</h3>
+  <p class="vpn__rules vpn__rules--card">{{ rules() }}</p>
+} @else if (layout() === 'card') {
+  <app-status-text class="vpn__cap" [kind]="s.kind">{{ cardCap() | t }}</app-status-text>
+  <h3 class="vpn__q vpn__q--card">{{ question() }}</h3>
+  <p class="vpn__rules vpn__rules--card">{{ rules() }}</p>
 } @else {
   <p class="vpn__meta">
     <app-status-text [kind]="s.kind">{{ s.key | t }}</app-status-text>
@@ -42,13 +57,17 @@
     [proxyName]="proxyName()"
     [proxyCast]="proxyCast()"
     [caster]="caster()"
-    [layout]="layout()"
+    [layout]="ballotLayout()"
+    [compact]="compact()"
+    [columns]="layout() === 'strip'"
     (castDone)="castDone.emit($event)"
     (castFailed)="castFailed.emit($event)"
   />
 }
 
-@if (layout() === 'page' && isOpen()) {
+@if (layout() === 'strip' && isOpen() && !showBars()) {
+  <p class="vpn__summary">{{ hiddenKey() | t }}</p>
+} @else if (layout() !== 'phone' && layout() !== 'strip' && isOpen()) {
   <hr class="vpn__hr" />
   <app-vote-progress
     [voted]="v.tally.voted ?? 0"

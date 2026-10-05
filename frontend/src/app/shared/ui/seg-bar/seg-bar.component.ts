@@ -16,8 +16,8 @@ export interface Seg {
   tone: SegTone;
 }
 
-/** The height of the bar: 4px, 6px or 10px. */
-export type SegBarSize = 'thin' | 'normal' | 'fat';
+/** The height of the bar: 4px, 6px, 10px, or 20px for the beamer. */
+export type SegBarSize = 'thin' | 'normal' | 'fat' | 'xl';
 
 /**
  * A bar of shares: budget spent and reserved, votes for and against, progress through an

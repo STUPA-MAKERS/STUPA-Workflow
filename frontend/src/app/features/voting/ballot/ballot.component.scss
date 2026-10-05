@@ -177,6 +177,70 @@
   }
 }
 
+/* Compact (the side column of the participant view, board Teilnahme-Live): the own
+   row is a row of buttons like the represented one, the row names are small muted
+   text, and the thanks line starts at the edge like the rows. A button keeps its label
+   whole (20px each side, as the board) and takes a share of the free width; a row
+   that does not fit wraps. */
+:host(.ballot--compact) {
+  gap: var(--space-4);
+
+  .ballot__row {
+    gap: var(--space-2);
+  }
+  .ballot__name {
+    padding: 0;
+    font-size: var(--fs-small);
+    line-height: 1.125rem;
+    font-weight: var(--fw-regular);
+    color: var(--color-text-muted);
+  }
+  .ballot__proxy {
+    flex-wrap: wrap;
+  }
+  .pchoice {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: auto;
+    padding: 0 20px;
+    overflow: visible;
+  }
+  .ballot__done {
+    align-items: flex-start;
+    text-align: start;
+  }
+  .ballot__lock {
+    justify-content: flex-start;
+  }
+  .ballot__bar .ballot__lock {
+    justify-content: center;
+  }
+}
+
+/* Columns (the strip of a narrow screen, board Schmal-Teilnahme): two rows side by
+   side, and below them one line with the fixed text and a button of its own width. */
+:host(.ballot--columns) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+
+  .ballot__row {
+    gap: 6px;
+  }
+  .ballot__bar {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-4);
+  }
+  .ballot__bar .ballot__lock {
+    justify-content: flex-start;
+  }
+}
+
 /* The spacer keeps the last row clear of the fixed bar. The flex gap already adds one
    gap above it. */
 .ballot__spacer {

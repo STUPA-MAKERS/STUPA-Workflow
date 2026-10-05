@@ -1,0 +1,42 @@
+@let m = member();
+
+<section class="pa" [attr.aria-labelledby]="capId">
+  <h2 class="pa__cap cap" [id]="capId">{{ 'participant.attendance.title' | t }}</h2>
+
+  @if (locked()) {
+    <p class="pa__state">
+      <app-status-text [kind]="statusText().kind">{{ statusText().key | t }}</app-status-text>
+      @if (m.source === 'lead') {
+        <span class="pa__muted">{{ 'meetings.attendance.bySession' | t }}</span>
+      }
+    </p>
+    @if (m.note && value() === 'excused') {
+      <p class="pa__muted">{{ m.note }}</p>
+    }
+  } @else {
+    <app-segmented
+      class="pa__seg"
+      [ariaLabel]="'participant.attendance.title' | t"
+      [options]="options()"
+      [value]="value()"
+      [disabled]="saving()"
+      (valueChange)="pick($event)"
+    />
+    @if (delegated() && value() !== 'present') {
+      <p class="pa__muted">{{ 'participant.attendance.delegated' | t }}</p>
+    }
+    @if (value() === 'excused') {
+      <app-input
+        class="pa__note"
+        [label]="'meetings.attendance.notePlaceholder' | t"
+        [hint]="'participant.attendance.noteHint' | t"
+        [ngModel]="draft()"
+        (ngModelChange)="draft.set($event)"
+        (focusout)="saveNote()"
+        (keydown.enter)="saveNote()"
+      />
+    }
+  }
+  <!-- A link of the page, for example "Alle Mitglieder anzeigen". -->
+  <ng-content />
+</section>
