@@ -67,6 +67,19 @@ function navMode(root: ActivatedRouteSnapshot): AdminNavMode {
   return v === false ? 'never' : v === 'xl' ? 'xl' : 'always';
 }
 
+/**
+ * The `data.adminPane` flag of the deepest active route: the page has columns that
+ * scroll on their own (the form editor, the flow editor). Wide, the frame then passes
+ * the free height of the window down to the page, and the page does not scroll as a
+ * whole. Only a page without the navigation column (`adminNav: false`) uses it; beside
+ * the navigation the page sheet is the scroll container.
+ */
+function paneRoute(root: ActivatedRouteSnapshot): boolean {
+  let r: ActivatedRouteSnapshot = root;
+  while (r.firstChild) r = r.firstChild;
+  return r.data['adminPane'] === true;
+}
+
 /** From this width on, a page with `adminNav: 'xl'` fits beside the navigation. */
 const XL = '(min-width: 1440px)';
 
@@ -100,6 +113,9 @@ const sheetScroll = new Map<number, number>();
  * - A route with `data: { adminNav: false }` (the flow editor, the form editor) fills
  *   the width at every size, the same as the narrow mode. A route with
  *   `data: { adminNav: 'xl' }` (the cost centres) does so below 1440 px.
+ * - A full-width route with `data: { adminPane: true }` (the two editors) is a pane
+ *   page from wide on: the frame fills the window and the page gets the free height,
+ *   so its columns scroll inside themselves.
  * - The "Zustand" tiles stay while the search hides them, so a cleared search does not
  *   load them again.
  * - The entries of the column scroll on their own. After each navigation the column
@@ -120,7 +136,7 @@ const sheetScroll = new Map<number, number>();
     ScrollFadeDirective,
     AdminHealthComponent,
   ],
-  host: { '[class.pane-page]': 'split()' },
+  host: { '[class.pane-page]': 'split() || fullPane()' },
   templateUrl: './admin-frame.component.html',
   styleUrl: './admin-frame.component.scss',
 })
@@ -154,6 +170,14 @@ export class AdminFrameComponent {
     const mode = this.navMode();
     return mode === 'never' || (mode === 'xl' && !this.xl());
   });
+
+  /** The `data.adminPane` flag of the active page. */
+  private readonly paneRoute = signal(paneRoute(this.router.routerState.snapshot.root));
+
+  /** Wide, a full-width page with columns of its own takes the free height. */
+  readonly fullPane = computed(
+    () => this.wide() && this.fullWidth() && !this.home() && this.paneRoute(),
+  );
 
   /** The text of "Einstellungen durchsuchen". */
   readonly query = signal('');
@@ -204,6 +228,7 @@ export class AdminFrameComponent {
         this.lastId = e.id;
         this.home.set(pathOf(e.urlAfterRedirects) === HOME);
         this.navMode.set(navMode(this.router.routerState.snapshot.root));
+        this.paneRoute.set(paneRoute(this.router.routerState.snapshot.root));
         const top = this.restoreId === null ? 0 : (sheetScroll.get(this.restoreId) ?? 0);
         afterNextRender(
           () => {
@@ -218,7 +243,7 @@ export class AdminFrameComponent {
 
     // Beside the navigation the frame is a pane page: it fills the window, without the
     // bottom padding of a page that scrolls.
-    effect(() => this.pageFrame.fill.set(this.split()));
+    effect(() => this.pageFrame.fill.set(this.split() || this.fullPane()));
     inject(DestroyRef).onDestroy(() => this.pageFrame.fill.set(false));
 
     // The navigation shows "Verwaltung" beside the page, so the breadcrumbs leave it out.

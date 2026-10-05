@@ -57,6 +57,11 @@ export class VersionHistoryComponent {
   readonly entityId = input.required<string>();
   /** Emits after a successful restore. The editor then reloads its state. */
   readonly restored = output<void>();
+  /**
+   * Emits the number of the current version after each load, or `null` when no version
+   * is current. The flow editor shows it under its title ("Version 12 aktiv").
+   */
+  readonly current = output<number | null>();
 
   protected readonly revisions = signal<ConfigRevision[]>([]);
   protected readonly loading = signal(false);
@@ -85,6 +90,7 @@ export class VersionHistoryComponent {
       next: (rows) => {
         this.revisions.set(rows);
         this.loading.set(false);
+        this.current.emit(rows.find((r) => r.isCurrent)?.version ?? null);
       },
       error: () => {
         this.revisions.set([]);

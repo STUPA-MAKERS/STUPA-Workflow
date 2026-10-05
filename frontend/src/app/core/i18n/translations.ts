@@ -1955,7 +1955,7 @@ export const de = {
   'admin.flow.group.dissolveHint':
     'Auflösen entfernt nur die visuelle Klammer — der Inhalt wandert eine Ebene nach oben.',
   'admin.flow.group.multiHint':
-    'Shift-Klick wählt mehrere Schritte/Gruppen aus; „Gruppieren“ in der Werkzeugleiste fasst sie zusammen. Klick auf eine Gruppe öffnet ihren Inhalt.',
+    'Shift-Klick wählt mehrere Schritte; „Gruppieren“ fasst sie zusammen. Ein Klick auf eine Gruppe öffnet sie.',
   'admin.flow.guardHint.budgetIs': 'ID der Kostenstelle (Budget-Baum).',
   'admin.flow.guardHint.hasField': 'Feld-Schlüssel, z. B. „iban".',
   'admin.flow.compareField': 'Feld',
@@ -1993,6 +1993,22 @@ export const de = {
   'admin.flow.save': 'Speichern',
   'admin.flow.preset.simple': 'Einfach: Entwurf → Eingereicht → Entschieden',
   'admin.flow.preset.vote': 'Mit Abstimmung: Entwurf → Prüfung → Abstimmung → Entschieden',
+  // Flow editor (FE12b): header, toolbar, legend, colours, guard builder, versions.
+  'admin.flow.versions': 'Versionen',
+  'admin.flow.versionsClose': 'Zurück zur Bearbeitung',
+  'admin.flow.versionActive': 'Version {n} aktiv',
+  'admin.flow.errorCount': '{n} Fehler',
+  'admin.flow.toolbar': 'Werkzeuge des Diagramms',
+  'admin.flow.zoomValue': '{n} %',
+  'admin.flow.legendAutomatic': 'Automatisch',
+  'admin.flow.colorNone': 'Keine Farbe',
+  'admin.flow.colorCustom': 'Eigene Farbe',
+  'admin.flow.colorPreset': 'Farbe {c}',
+  'admin.flow.guardRemove': 'Bedingung entfernen',
+  'admin.flow.guardDesc.and': 'alle Bedingungen erfüllt',
+  'admin.flow.guardDesc.or': 'mindestens eine Bedingung erfüllt',
+  'admin.flow.guardDesc.not': 'die Bedingung ist nicht erfüllt',
+  'admin.flow.addActionPh': 'Aktion wählen …',
 
   'admin.brand.title': 'Branding & Texte',
   'admin.brand.desc':
@@ -2620,7 +2636,7 @@ export const de = {
   'admin.forms.duplicate': 'Duplizieren',
 
   // Question groups. One group container is one wizard step.
-  'admin.form.groupStep': 'Schritt {n}',
+  'admin.form.groupStep': 'Abschnitt {n}',
   'admin.form.groupTitleDe': 'Gruppen-Titel (DE)',
   'admin.form.groupTitleEn': 'Gruppen-Titel (EN)',
   'admin.form.groupTitlePlaceholder': 'Titel des Schritts …',
@@ -2630,6 +2646,12 @@ export const de = {
   'admin.form.moveGroupUp': 'Gruppe nach oben',
   'admin.form.moveGroupDown': 'Gruppe nach unten',
   'admin.form.dragGroup': 'Gruppe zum Umsortieren ziehen',
+  // Form editor (FE12b): outline, type menu, settings card.
+  'admin.form.outline': 'Fragen des Formulars',
+  'admin.form.groupMenu': 'Aktionen für Abschnitt {n}',
+  'admin.form.typeMenu': 'Fragetyp wählen',
+  'admin.form.formCard': 'Formular',
+  'admin.form.visibleIfEmpty': 'leer: immer sichtbar',
 
   'budget.loading': 'Statistik wird geladen …',
   'budget.error': 'Die Budget-Statistik konnte nicht geladen werden.',
@@ -4871,7 +4893,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.group.dissolveHint':
     'Dissolving only removes the visual bracket — its content moves one level up.',
   'admin.flow.group.multiHint':
-    'Shift-click selects multiple steps/groups; “Group” in the toolbar bundles them. Clicking a group opens its content.',
+    'Shift-click selects several steps; “Group” bundles them. A click on a group opens it.',
   'admin.flow.guardHint.budgetIs': 'Cost-centre id (budget tree).',
   'admin.flow.guardHint.hasField': 'Field key, e.g. "iban".',
   'admin.flow.compareField': 'Field',
@@ -4906,6 +4928,22 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.save': 'Save',
   'admin.flow.preset.simple': 'Simple: Draft → Submitted → Decided',
   'admin.flow.preset.vote': 'With vote: Draft → Review → Vote → Decided',
+  // Flow editor (FE12b): header, toolbar, legend, colours, guard builder, versions.
+  'admin.flow.versions': 'Versions',
+  'admin.flow.versionsClose': 'Back to editing',
+  'admin.flow.versionActive': 'version {n} active',
+  'admin.flow.errorCount': '{n} errors',
+  'admin.flow.toolbar': 'Diagram tools',
+  'admin.flow.zoomValue': '{n} %',
+  'admin.flow.legendAutomatic': 'Automatic',
+  'admin.flow.colorNone': 'No colour',
+  'admin.flow.colorCustom': 'Custom colour',
+  'admin.flow.colorPreset': 'Colour {c}',
+  'admin.flow.guardRemove': 'Remove condition',
+  'admin.flow.guardDesc.and': 'all conditions hold',
+  'admin.flow.guardDesc.or': 'at least one condition holds',
+  'admin.flow.guardDesc.not': 'the condition does not hold',
+  'admin.flow.addActionPh': 'Choose an action …',
 
   'admin.brand.title': 'Branding & texts',
   'admin.brand.desc':
@@ -5526,7 +5564,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.forms.duplicate': 'Duplicate',
 
   // Question groups. One group container is one wizard step.
-  'admin.form.groupStep': 'Step {n}',
+  'admin.form.groupStep': 'Section {n}',
   'admin.form.groupTitleDe': 'Group title (DE)',
   'admin.form.groupTitleEn': 'Group title (EN)',
   'admin.form.groupTitlePlaceholder': 'Step title …',
@@ -5536,6 +5574,12 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.form.moveGroupUp': 'Move group up',
   'admin.form.moveGroupDown': 'Move group down',
   'admin.form.dragGroup': 'Drag group to reorder',
+  // Form editor (FE12b): outline, type menu, settings card.
+  'admin.form.outline': 'Questions of the form',
+  'admin.form.groupMenu': 'Actions for section {n}',
+  'admin.form.typeMenu': 'Choose a question type',
+  'admin.form.formCard': 'Form',
+  'admin.form.visibleIfEmpty': 'empty: always visible',
 
   'budget.loading': 'Loading statistics …',
   'budget.error': 'The budget statistics could not be loaded.',

@@ -80,6 +80,7 @@ import {
   MOCK_CD_VARIANTS,
   MOCK_DEADLINE_POLICIES,
   MOCK_ERASURES,
+  MOCK_FLOW,
   MOCK_FORM_DRAFTS,
   MOCK_FORMS,
   MOCK_GREMIEN,
@@ -135,6 +136,7 @@ export class AdminApiService {
     gremien: structuredCopy(MOCK_GREMIEN),
     appTypes: structuredCopy(MOCK_APP_TYPES),
     formDrafts: structuredCopy(MOCK_FORM_DRAFTS) as Record<string, FormDraft>,
+    flow: structuredCopy(MOCK_FLOW) as FlowGraph,
     gremiumRoles: structuredCopy(MOCK_GREMIUM_ROLES),
     groupMappings: structuredCopy(MOCK_GROUP_MAPPINGS),
     membershipMappings: structuredCopy(MOCK_GREMIUM_MEMBERSHIP_MAPPINGS),
@@ -781,13 +783,16 @@ export class AdminApiService {
 
   /** Load the active global flow — `null` if none exists yet. */
   getGlobalFlow(): Observable<FlowGraph | null> {
-    if (this.mock) return of(null);
+    if (this.mock) return of(structuredCopy(this.store.flow));
     return this.http.get<FlowGraph | null>(`${this.base}/admin/flow-versions/global`);
   }
 
   /** Create the global flow as a new version. */
   createGlobalFlowVersion(graph: FlowGraph): Observable<{ id: Uuid }> {
-    if (this.mock) return of({ id: `gflow-${graph.states.length}` });
+    if (this.mock) {
+      this.store.flow = structuredCopy(graph);
+      return of({ id: `gflow-${graph.states.length}` });
+    }
     return this.http.post<{ id: Uuid }>(`${this.base}/admin/flow-versions/global`, { graph });
   }
 
