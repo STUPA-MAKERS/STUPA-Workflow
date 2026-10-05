@@ -93,7 +93,7 @@ describe('CreateMeetingDialogComponent', () => {
     const keeper = screen.getByLabelText('Protokollführung');
     const names = within(keeper).getAllByRole('option').map((o) => o.textContent?.trim());
     // Tom has no protocol.write; the fallbacks are the e-mail and the id.
-    expect(names).toEqual(['— niemand —', 'Mara Keller', 'lea@x.de', 'p-4']);
+    expect(names).toEqual(['— niemand —', 'Mara Keller', 'lea@x.de', 'Ohne Namen']);
   });
 
   it('creates the meeting, closes and opens its page', async () => {

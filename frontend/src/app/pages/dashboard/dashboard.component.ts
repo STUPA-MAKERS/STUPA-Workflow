@@ -128,7 +128,8 @@ export class DashboardComponent {
   );
   private readonly typeName = computed(() => {
     const map = new Map(this.types().map((t) => [t.id, t.name]));
-    return (id: Uuid): string => map.get(id) ?? id;
+    // No raw id as a fallback: the types load late or can fail.
+    return (id: Uuid): string => map.get(id) ?? '';
   });
 
   private readonly meetings = toSignal(
@@ -292,12 +293,16 @@ export class DashboardComponent {
   }
 
   titleOf(item: ApplicationListItem): string {
-    return item.title?.trim() || this.typeName()(item.typeId);
+    return (
+      item.title?.trim() ||
+      this.typeName()(item.typeId) ||
+      this.i18n.translate('applications.list.untitled')
+    );
   }
 
   /** The type in the sub line, only when the title is not already the type. */
   typeOf(item: ApplicationListItem): string | null {
-    return item.title?.trim() ? this.name(item) : null;
+    return item.title?.trim() ? this.name(item) || null : null;
   }
 
   /** The date of an own application: the last status change, else the last change. */

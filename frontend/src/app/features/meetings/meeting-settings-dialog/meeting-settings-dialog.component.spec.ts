@@ -66,7 +66,7 @@ describe('MeetingSettingsDialogComponent', () => {
       'Mara Keller',
       'Tom Brandt',
       'lea@x.de',
-      'p-4',
+      'Ohne Namen',
     ]);
     expect(keeper.value).toBe('p-2');
   });
