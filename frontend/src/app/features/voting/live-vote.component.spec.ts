@@ -397,6 +397,51 @@ describe('LiveVoteComponent', () => {
     expect(toast.error).toHaveBeenCalledWith(message);
   });
 
+  it('hides the own row on a 403 although canCast stays true, and reads the state again', async () => {
+    const { emit, toast, getVote, voteStatus } = await setup({ castError: { status: 403 } });
+    emit(OPENED);
+    getVote.mockClear();
+    voteStatus.mockClear();
+    voteStatus.mockReturnValue(of({ ...NO_DELEGATION, blocked: true, delegatedToName: 'Mara Keller' }));
+    await userEvent.click(own().getByRole('button', { name: 'Ja' }));
+    await userEvent.click(confirmButton());
+    expect(toast.error).toHaveBeenCalledWith('Du bist für diese Abstimmung nicht stimmberechtigt.');
+    expect(getVote).toHaveBeenCalledWith('v1', { quiet: true });
+    expect(voteStatus).toHaveBeenCalledWith('v1');
+    expect(screen.queryByRole('group', { name: 'Deine Stimme' })).not.toBeInTheDocument();
+    expect(screen.getByText(/Mara Keller/)).toBeInTheDocument();
+  });
+
+  it('hides only the represented row on a 403 from a represented cast', async () => {
+    const { emit, voteStatus } = await setup({
+      castError: { status: 403 },
+      delegation: { ...NO_DELEGATION, exercising: true, delegatedByName: 'Jonas Weber' },
+    });
+    emit(OPENED);
+    voteStatus.mockClear();
+    const proxy = within(screen.getByRole('group', { name: 'Als Vertretung für Jonas Weber' }));
+    await userEvent.click(proxy.getByRole('button', { name: 'Nein' }));
+    await userEvent.click(confirmButton());
+    expect(voteStatus).toHaveBeenCalledWith('v1');
+    expect(
+      screen.queryByRole('group', { name: 'Als Vertretung für Jonas Weber' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Deine Stimme' })).toBeInTheDocument();
+  });
+
+  it('offers the rows again for the next vote after a 403', async () => {
+    const { emit } = await setup({
+      castError: { status: 403 },
+      votes: [vote(), vote(), vote({ id: 'v2' })],
+    });
+    emit(OPENED);
+    await userEvent.click(own().getByRole('button', { name: 'Ja' }));
+    await userEvent.click(confirmButton());
+    expect(screen.queryByRole('group', { name: 'Deine Stimme' })).not.toBeInTheDocument();
+    emit({ ...OPENED, voteId: 'v2' });
+    expect(screen.getByRole('group', { name: 'Deine Stimme' })).toBeInTheDocument();
+  });
+
   it('shows a reconnecting line when the socket drops', async () => {
     const { channel, fixture } = await setup();
     channel().subject.complete();

@@ -164,6 +164,48 @@ describe('VotePanelComponent', () => {
     expect(screen.queryByText(/Anwesenden haben abgestimmt/)).not.toBeInTheDocument();
   });
 
+  describe('closed vote summary', () => {
+    const closed = (tally: Partial<Vote['tally']>, extra: Partial<Vote> = {}) =>
+      vote({
+        status: 'closed',
+        result: 'passed',
+        quorum: { type: 'count', value: 10 },
+        tally: { counts: { yes: 12, no: 6, abstain: 2 }, eligible: 20, voted: 20, present: 0, revealed: true, quorumMet: true, leading: 'yes', ...tally },
+        ...extra,
+      });
+
+    it('names the ballots and the quorum state below the result', async () => {
+      await setup({ vote: closed({}) });
+      expect(screen.getByText('20 von 20 Stimmen · Quorum: erreicht')).toBeInTheDocument();
+    });
+
+    it('names a missed quorum of a vote that failed on majority', async () => {
+      await setup({
+        vote: closed({ voted: undefined, quorumMet: false, failedReason: 'majority' }, { result: 'failed' }),
+      });
+      // Without `voted`, the sum of the counts is the number of ballots.
+      expect(screen.getByText('20 von 20 Stimmen · Quorum: nicht erreicht')).toBeInTheDocument();
+    });
+
+    it('does not repeat the quorum when the result already names it', async () => {
+      await setup({
+        vote: closed({ voted: 5, quorumMet: false, failedReason: 'quorum' }, { result: 'failed' }),
+      });
+      expect(screen.getByText('5 von 20 Stimmen')).toBeInTheDocument();
+      expect(screen.queryByText(/Quorum: /)).not.toBeInTheDocument();
+    });
+
+    it('names only the ballots of a vote without a quorum', async () => {
+      await setup({ vote: closed({}, { quorum: null }) });
+      expect(screen.getByText('20 von 20 Stimmen')).toBeInTheDocument();
+    });
+
+    it('shows no summary while the vote is open', async () => {
+      await setup();
+      expect(screen.queryByText(/ von 19 Stimmen/)).not.toBeInTheDocument();
+    });
+  });
+
   it('shows the warning note instead of a ballot', async () => {
     await setup({ own: null, notice: 'Du bist für diese Abstimmung nicht stimmberechtigt.' });
     expect(screen.getByText('Du bist für diese Abstimmung nicht stimmberechtigt.')).toBeInTheDocument();

@@ -115,6 +115,24 @@ export class VotePanelComponent {
     () => this.isOpen() && (this.own() !== null || !!this.proxyName()),
   );
 
+  /**
+   * The line below the result of a closed vote: "20 von 20 Stimmen · Quorum: erreicht".
+   * The quorum part shows only for a vote with a quorum, and not when the result line
+   * already says "Quorum nicht erreicht".
+   */
+  protected readonly closedSummary = computed<string | null>(() => {
+    const v = this.vote();
+    if (v.status !== 'closed') return null;
+    const t = v.tally;
+    const cast = t.voted ?? Object.values(t.counts).reduce((sum, n) => sum + n, 0);
+    const parts = [this.i18n.translate('voting.beamer.votesOf', { cast, eligible: t.eligible })];
+    if ((v.quorum ?? v.config.quorum) && t.failedReason !== 'quorum') {
+      const state = this.i18n.translate(t.quorumMet ? 'vote.tally.quorumMet' : 'vote.tally.quorumMissed');
+      parts.push(`${this.i18n.translate('vote.tally.quorum')}: ${state}`);
+    }
+    return parts.join(' · ');
+  });
+
   /** Counts show after the close, or while open once the server revealed them. */
   protected readonly showBars = computed(() => {
     const v = this.vote();

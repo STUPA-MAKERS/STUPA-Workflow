@@ -214,15 +214,31 @@ describe('VoteCastComponent', () => {
     expect(screen.queryByRole('group', { name: 'Deine Stimme' })).not.toBeInTheDocument();
   });
 
-  it('keeps the own row on a 403 from a represented cast', async () => {
-    await setup({
+  it('hides only the represented row on a 403 from a represented cast and reads the state again', async () => {
+    const { getVote, voteStatus, toast } = await setup({
       castError: { status: 403 },
       delegation: { ...NO_DELEGATION, exercising: true, delegatedByName: 'Jonas Weber' },
     });
+    getVote.mockClear();
+    voteStatus.mockClear();
     const proxy = within(screen.getByRole('group', { name: 'Als Vertretung für Jonas Weber' }));
     await userEvent.click(proxy.getByRole('button', { name: 'Nein' }));
     await userEvent.click(confirmButton());
+    expect(toast.error).toHaveBeenCalledWith('Du bist für diese Abstimmung nicht stimmberechtigt.');
     expect(screen.getByRole('group', { name: 'Deine Stimme' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('group', { name: 'Als Vertretung für Jonas Weber' }),
+    ).not.toBeInTheDocument();
+    expect(getVote).toHaveBeenCalledWith('v1', { quiet: true });
+    expect(voteStatus).toHaveBeenCalledWith('v1');
+  });
+
+  it('explains a voting right handed over after the load, on a 403 from an own cast', async () => {
+    const { voteStatus } = await setup({ castError: { status: 403 } });
+    voteStatus.mockReturnValue(of({ ...NO_DELEGATION, blocked: true, delegatedToName: 'Mara Keller' }));
+    await castOwn();
+    expect(screen.getByText(/Mara Keller/)).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Deine Stimme' })).not.toBeInTheDocument();
   });
 
   it('shows the problem detail of another failure, or a generic text', async () => {

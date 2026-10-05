@@ -48,6 +48,13 @@
   overflow-wrap: anywhere;
 }
 
+.vpn__summary {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+}
+
 .vpn__hr {
   flex: none;
   height: 1px;

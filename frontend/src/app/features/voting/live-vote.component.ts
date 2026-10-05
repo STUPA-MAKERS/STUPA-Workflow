@@ -50,7 +50,9 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  * `canCast`, the own ballot and the represented ballot. A ballot goes over REST
  * (`POST /votes/{id}/ballot`), which answers each ballot for itself. A ballot never
  * changes (O11). The own row stays away when the meeting says `canVote: false`, when the
- * server sends `not_eligible`, or when the person handed the voting right over.
+ * server sends `not_eligible`, or when the person handed the voting right over. A 403 on
+ * a cast removes the refused row (own or represented) for this vote, and the page reads
+ * the vote and the delegation state again.
  */
 @Component({
   selector: 'app-live-vote',
@@ -90,6 +92,10 @@ export class LiveVoteComponent implements OnDestroy {
   /** The shown vote as `GET /votes/{id}` gave it. */
   private readonly loaded = signal<Vote | null>(null);
   readonly delegation = signal<VoteDelegationStatus | null>(null);
+  /** The server refused the own ballot of the shown vote (403). */
+  private readonly notEligible = signal(false);
+  /** The server refused the represented ballot of the shown vote (403). */
+  private readonly proxyRefused = signal(false);
   /** The vote id of the last load, so that one vote is asked for once. */
   private requested: string | null = null;
 
@@ -118,14 +124,15 @@ export class LiveVoteComponent implements OnDestroy {
 
   readonly own = computed<MyBallot | null>(() => {
     const vote = this.loaded();
-    if (!vote || vote.canCast !== true) return null;
+    if (!vote || vote.canCast !== true || this.notEligible()) return null;
     if (this.meeting()?.canVote === false || this.errorCode() === 'not_eligible') return null;
     if (this.delegation()?.blocked) return null;
     return vote.myBallot ?? NOT_CAST;
   });
   readonly proxyName = computed(() => {
     const d = this.delegation();
-    return d?.exercising ? d.delegatedByName || '?' : null;
+    if (this.proxyRefused() || !d?.exercising) return null;
+    return d.delegatedByName || '?';
   });
   readonly proxyCast = computed(() => this.loaded()?.representedCast === true);
 
@@ -223,8 +230,14 @@ export class LiveVoteComponent implements OnDestroy {
   onCastFailed(failure: BallotFailure): void {
     const { error } = failure;
     if (error.status === 403) {
+      // `canCast` can stay true when the voting right moved after the load, so hide the
+      // refused row here. Then read the vote and the delegation state again.
+      if (failure.asDelegation) this.proxyRefused.set(true);
+      else this.notEligible.set(true);
       this.toast.error(this.i18n.translate('voting.cast.notEligible'));
       this.reload();
+      const id = this.loaded()?.id;
+      if (id) this.loadDelegation(id);
       return;
     }
     if (error.status === 409) {
@@ -285,13 +298,22 @@ export class LiveVoteComponent implements OnDestroy {
         this.loaded.set(vote);
         if (!isNew) return;
         this.delegation.set(null);
-        this.delegations.voteStatus(id).subscribe({
-          next: (status) => this.delegation.set(status),
-          error: () => {},
-        });
+        this.notEligible.set(false);
+        this.proxyRefused.set(false);
+        this.loadDelegation(id);
         loadVoteContext(this.api, vote.meetingId, vote.agendaItemId).subscribe((ctx) =>
           this.context.set(ctx),
         );
+      },
+      error: () => {},
+    });
+  }
+
+  /** Read the delegation state of a vote: a handed-over right, or a represented member. */
+  private loadDelegation(id: string): void {
+    this.delegations.voteStatus(id).subscribe({
+      next: (status) => {
+        if (this.loaded()?.id === id) this.delegation.set(status);
       },
       error: () => {},
     });

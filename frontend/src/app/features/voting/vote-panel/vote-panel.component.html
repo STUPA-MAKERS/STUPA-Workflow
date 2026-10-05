@@ -67,3 +67,7 @@
     [failedReason]="v.tally.failedReason"
   />
 }
+
+@if (closedSummary(); as line) {
+  <p class="vpn__summary">{{ line }}</p>
+}

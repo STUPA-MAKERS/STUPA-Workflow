@@ -41,6 +41,8 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  *
  * - The server flags decide the controls: `canCast` gives the own ballot, `canManage`
  *   the delete. A 403 on the load or on an own cast marks the person as not eligible.
+ *   A 403 on a represented cast removes the row "Als Vertretung für <name>". After a
+ *   refused cast the page reads the vote and the delegation state again.
  * - A ballot never changes after the cast (O11). `myBallot` and `representedCast` of
  *   the server restore the lock on a reload; a 409 `already_voted` locks it too.
  * - The delegation state explains a voting right that the person handed over, or it
@@ -87,6 +89,8 @@ export class VoteCastComponent {
   readonly notEligible = signal(false);
   /** Delegation state: the person handed the voting right over, or acts as a proxy. */
   readonly delegation = signal<VoteDelegationStatus | null>(null);
+  /** The server refused the represented ballot (403), so the proxy row goes away. */
+  readonly proxyRefused = signal(false);
 
   // Delete a standalone vote. The route accepts it only while the vote is a draft with
   // no ballots, and it refuses a meeting-bound vote: that one goes through its meeting.
@@ -106,7 +110,8 @@ export class VoteCastComponent {
   /** The member the person represents in this vote, or `null`. */
   readonly proxyName = computed(() => {
     const d = this.delegation();
-    return d?.exercising ? d.delegatedByName || '?' : null;
+    if (this.proxyRefused() || !d?.exercising) return null;
+    return d.delegatedByName || '?';
   });
   readonly proxyCast = computed(() => this.vote()?.representedCast === true);
 
@@ -178,16 +183,7 @@ export class VoteCastComponent {
       this.phase.set('error');
       return;
     }
-    // The delegation status explains a handed-over voting right, or it unlocks the
-    // proxy row. `exercising` does not free the own ballot: an external substitute casts
-    // the represented ballot only.
-    this.delegations.voteStatus(id).subscribe({
-      next: (status) => {
-        this.delegation.set(status);
-        if (status.blocked) this.notEligible.set(true);
-      },
-      error: () => {},
-    });
+    this.loadDelegation(id);
     this.api.getVote(id).subscribe({
       next: (vote) => {
         this.vote.set(vote);
@@ -227,8 +223,15 @@ export class VoteCastComponent {
   onCastFailed(failure: BallotFailure): void {
     const { error } = failure;
     if (error.status === 403) {
-      if (!failure.asDelegation) this.notEligible.set(true);
+      // The server refused this row. Hide it, so that the person cannot send the same
+      // ballot into the same 403, and read the state again: the voting right can have
+      // moved after the page loaded.
+      if (failure.asDelegation) this.proxyRefused.set(true);
+      else this.notEligible.set(true);
       this.toast.error(this.i18n.translate('voting.cast.notEligible'));
+      this.reload();
+      const id = this.vote()?.id;
+      if (id) this.loadDelegation(id);
       return;
     }
     if (error.status === 409) {
@@ -280,6 +283,21 @@ export class VoteCastComponent {
           ),
         );
       },
+    });
+  }
+
+  /**
+   * Read the delegation status. It explains a handed-over voting right, or it unlocks
+   * the proxy row. `exercising` does not free the own ballot: an external substitute
+   * casts the represented ballot only.
+   */
+  private loadDelegation(id: string): void {
+    this.delegations.voteStatus(id).subscribe({
+      next: (status) => {
+        this.delegation.set(status);
+        if (status.blocked) this.notEligible.set(true);
+      },
+      error: () => {},
     });
   }
 
