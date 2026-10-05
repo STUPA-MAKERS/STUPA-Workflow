@@ -513,6 +513,19 @@ describe('AdminApiService — real mode (contract)', () => {
     http.expectOne('/api/admin/audit/actors').flush([]);
   });
 
+  it('wires the audit chain checks', () => {
+    s.latestAuditVerification().subscribe();
+    http.expectOne('/api/admin/audit/verify/latest').flush(null);
+    s.runAuditVerification().subscribe();
+    const run = http.expectOne('/api/admin/audit/verify');
+    expect(run.request.method).toBe('POST');
+    run.flush({});
+    s.verifyAuditChain().subscribe();
+    const live = http.expectOne('/api/admin/audit/verify');
+    expect(live.request.method).toBe('GET');
+    live.flush({ valid: true, checked: 1, brokenAt: null, reason: null });
+  });
+
   it('GETs/PUTs notification settings', () => {
     s.getNotificationSettings().subscribe();
     http.expectOne('/api/admin/notification-settings').flush({ taskReminderEnabled: true, taskReminderAfterDays: 5, taskReminderRepeatDays: 7 });
@@ -676,17 +689,21 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
   it('pages, filters and revokes OAuth grants in the mock store', async () => {
     const s = svc();
     const all = await firstValueFrom(s.listOAuthGrants());
-    expect(all.total).toBe(2);
+    expect(all.total).toBe(3);
     expect(all.items[0].principalName).toBe('Alex Admin');
-    // The second stub carries no owner name and no expiry.
+    // The second stub carries no owner name. Every stub has real scope keys and an expiry.
     expect(all.items[1].principalName).toBeNull();
-    expect(all.items[1].accessExpiresAt).toBeNull();
+    const known = new Set(['read', 'applications:write', 'votes:write', 'meetings:write', 'budget:write', 'forms:write', 'flows:write', 'admin:write']);
+    for (const g of all.items) {
+      expect(g.scope.split(' ').every((x) => known.has(x))).toBe(true);
+      expect(g.accessExpiresAt).not.toBeNull();
+    }
 
     // Paging slices the store.
     const secondPage = await firstValueFrom(s.listOAuthGrants({ limit: 1, offset: 1 }));
     expect(secondPage.items).toHaveLength(1);
     expect(secondPage.offset).toBe(1);
-    expect(secondPage.total).toBe(2);
+    expect(secondPage.total).toBe(3);
 
     // The owner filter narrows the list.
     const mine = await firstValueFrom(s.listOAuthGrants({ principalId: 'p-1' }));
@@ -695,7 +712,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     await firstValueFrom(s.revokeOAuthGrant('grant-1'));
     const after = await firstValueFrom(s.listOAuthGrants());
     expect(after.items.some((g) => g.id === 'grant-1')).toBe(false);
-    expect(after.total).toBe(1);
+    expect(after.total).toBe(2);
   });
 
   it('deletes a gremium and returns empty mail recipients', async () => {
@@ -952,10 +969,64 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect((await firstValueFrom(s.listRoleMappings())).length).toBe(1);
   });
 
-  it('returns empty audit page/actors in mock mode', async () => {
+  it('pages and filters the mock audit log', async () => {
     const s = svc();
-    expect(await firstValueFrom(s.listAuditLog())).toEqual({ items: [], nextCursor: null, hasMore: false });
-    expect(await firstValueFrom(s.listAuditActors())).toEqual([]);
+    const all = await firstValueFrom(s.listAuditLog());
+    expect(all.items.length).toBeGreaterThan(3);
+    expect(all.hasMore).toBe(false);
+    expect(all.nextCursor).toBeNull();
+    // Newest first, keyset paging on the id.
+    const first = await firstValueFrom(s.listAuditLog({ limit: 2 }));
+    expect(first.items).toHaveLength(2);
+    expect(first.hasMore).toBe(true);
+    expect(first.nextCursor).toBe(first.items[1].id);
+    const next = await firstValueFrom(s.listAuditLog({ limit: 2, before: first.nextCursor! }));
+    expect(next.items.every((e) => e.id < first.nextCursor!)).toBe(true);
+    // Action and actor filter.
+    const byAction = await firstValueFrom(s.listAuditLog({ action: 'role_change' }));
+    expect(byAction.items.map((e) => e.action)).toEqual(['role_change']);
+    const byActor = await firstValueFrom(s.listAuditLog({ actor: 'kc|kim.kasse' }));
+    expect(byActor.items.every((e) => e.actor === 'kc|kim.kasse')).toBe(true);
+    expect((await firstValueFrom(s.listAuditActors())).length).toBeGreaterThan(0);
+  });
+
+  it('reverts a mock audit entry once and answers for an unknown id', async () => {
+    const s = svc();
+    const res = await firstValueFrom(s.revertAuditEntry(7));
+    expect(res).toEqual({ revertedAuditId: 7, entityType: 'flow', entityId: 'global' });
+    const entry = (await firstValueFrom(s.listAuditLog())).items.find((e) => e.id === 7);
+    expect(entry?.revertable).toBe(false);
+    expect(await firstValueFrom(s.revertAuditEntry(999))).toEqual({
+      revertedAuditId: 999,
+      entityType: '',
+      entityId: '',
+    });
+  });
+
+  it('serves the chain checks and a config diff in mock mode', async () => {
+    const s = svc();
+    const latest = await firstValueFrom(s.latestAuditVerification());
+    expect(latest?.valid).toBe(true);
+    expect(latest?.trigger).toBe('cron');
+    const run = await firstValueFrom(s.runAuditVerification());
+    expect(run.trigger).toBe('manual');
+    // The manual check is the newest stored one now.
+    expect((await firstValueFrom(s.latestAuditVerification()))?.id).toBe(run.id);
+    const live = await firstValueFrom(s.verifyAuditChain());
+    expect(live.valid).toBe(true);
+    const diff = await firstValueFrom(s.getConfigRevisionDiff('rev-12'));
+    expect(diff.diff?.changed.length).toBe(2);
+    expect(diff.entityType).toBe('flow');
+    const none = await firstValueFrom(s.getConfigRevisionDiff('rev-x'));
+    expect(none.diff).toBeNull();
+  });
+
+  it('counts the members and roles of each mock gremium', async () => {
+    const s = svc();
+    const gremien = await firstValueFrom(s.listGremien());
+    const stupa = gremien.find((g) => g.id === MOCK_GREMIUM_STUPA_ID);
+    expect(stupa?.memberCount).toBe(2);
+    expect(stupa?.roleCount).toBe(3);
   });
 
   it('returns default notification settings in mock mode', async () => {
@@ -969,8 +1040,8 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
 
   it('manages erasures and privacy settings in the mock store (DSGVO)', async () => {
     const s = svc();
-    expect(await firstValueFrom(s.listErasures())).toEqual([]);
-    expect(await firstValueFrom(s.listErasures('open'))).toEqual([]);
+    expect((await firstValueFrom(s.listErasures())).length).toBe(4);
+    expect((await firstValueFrom(s.listErasures('open'))).map((r) => r.id)).toEqual(['e-1', 'e-2']);
 
     // Execute or reject on an unknown id gives a synthesized {id} fallback and no crash.
     const exec = await firstValueFrom(s.executeErasure('e-x'));
@@ -997,6 +1068,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const s = svc();
     // Seed the private store directly to reach the status-filter branch.
     const store = (s as unknown as { store: { erasures: { id: string; status: string }[] } }).store;
+    store.erasures.length = 0;
     store.erasures.push(
       { id: 'e-open', status: 'open' } as never,
       { id: 'e-done', status: 'executed' } as never,

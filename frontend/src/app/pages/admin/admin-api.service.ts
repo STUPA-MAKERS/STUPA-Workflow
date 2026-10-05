@@ -23,7 +23,10 @@ import {
   type ApplicationTypeFull,
   type ApplicationTypeUpdateBody,
   type AuditActor,
+  type AuditEntry,
+  type AuditChainCheck,
   type AuditRevertResult,
+  type AuditVerification,
   type ConfigRevision,
   type ConfigRevisionDiff,
   type ConfigRevisionDiffWire,
@@ -68,8 +71,12 @@ import {
 } from './admin.models';
 import {
   MOCK_APP_TYPES,
+  MOCK_AUDIT_ACTORS,
+  MOCK_AUDIT_ENTRIES,
+  MOCK_AUDIT_VERIFICATION,
   MOCK_BACKUPS,
   MOCK_BRANDING,
+  MOCK_ERASURES,
   MOCK_FORM_DRAFTS,
   MOCK_FORMS,
   MOCK_GREMIEN,
@@ -123,7 +130,9 @@ export class AdminApiService {
     membershipMappings: structuredCopy(MOCK_GREMIUM_MEMBERSHIP_MAPPINGS),
     roleMappings: structuredCopy(MOCK_GREMIUM_ROLE_MAPPINGS),
     deadlinePolicies: [] as DeadlinePolicy[],
-    erasures: [] as ErasureRequest[],
+    erasures: structuredCopy(MOCK_ERASURES) as ErasureRequest[],
+    audit: structuredCopy(MOCK_AUDIT_ENTRIES) as AuditEntry[],
+    auditVerification: structuredCopy(MOCK_AUDIT_VERIFICATION) as AuditVerification | null,
     backups: [...MOCK_BACKUPS] as Backup[],
     privacySettings: <PrivacySettings>{ defaultRetentionMonths: 24 },
     webhooks: structuredCopy(MOCK_WEBHOOKS),
@@ -145,7 +154,18 @@ export class AdminApiService {
 
   /** `quiet` = the gremien page shows its own loading indicator (no overlay). */
   listGremien(opts: { quiet?: boolean } = {}): Observable<Gremium[]> {
-    if (this.mock) return of(structuredCopy(this.store.gremien));
+    if (this.mock) {
+      // The admin list counts the members and the roles of each gremium.
+      return of(
+        structuredCopy(this.store.gremien).map((g) => ({
+          ...g,
+          memberCount: new Set(
+            MOCK_GREMIUM_MEMBERSHIPS.filter((m) => m.gremiumId === g.id).map((m) => m.principalId),
+          ).size,
+          roleCount: this.store.gremiumRoles.filter((r) => r.gremiumId === g.id).length,
+        })),
+      );
+    }
     return this.http.get<Gremium[]>(`${this.base}/admin/gremien`, {
       context: opts.quiet ? skipLoading() : undefined,
     });
@@ -837,7 +857,21 @@ export class AdminApiService {
     } = {},
   ): Observable<AuditPage> {
     const limit = opts.limit ?? 50;
-    if (this.mock) return of({ items: [], nextCursor: null, hasMore: false });
+    if (this.mock) {
+      const items = this.store.audit.filter(
+        (e) =>
+          (!opts.action || e.action === opts.action) &&
+          (!opts.actor || e.actor === opts.actor) &&
+          (opts.before == null || e.id < opts.before),
+      );
+      const page = items.slice(0, limit);
+      const hasMore = items.length > limit;
+      return of({
+        items: structuredCopy(page),
+        nextCursor: hasMore ? page[page.length - 1].id : null,
+        hasMore,
+      });
+    }
     let params = new HttpParams().set('limit', String(limit));
     if (opts.before != null) params = params.set('before', String(opts.before));
     if (opts.action) params = params.set('action', opts.action);
@@ -852,7 +886,7 @@ export class AdminApiService {
 
   /** Distinct audit-log actors (for the actor filter). */
   listAuditActors(): Observable<AuditActor[]> {
-    if (this.mock) return of([]);
+    if (this.mock) return of(structuredCopy(MOCK_AUDIT_ACTORS));
     return this.http.get<AuditActor[]>(`${this.base}/admin/audit/actors`);
   }
 
@@ -860,10 +894,67 @@ export class AdminApiService {
    *  Status 409 = a newer state exists or the change is not revertible.
    *  Status 404 = the entry or the revision is missing. */
   revertAuditEntry(entryId: number): Observable<AuditRevertResult> {
+    if (this.mock) {
+      const entry = this.store.audit.find((e) => e.id === entryId);
+      if (entry) entry.revertable = false;
+      return of({
+        revertedAuditId: entryId,
+        entityType: entry?.targetType ?? '',
+        entityId: entry?.targetId ?? '',
+      });
+    }
     return this.http.post<AuditRevertResult>(
       `${this.base}/admin/audit/${entryId}/revert`,
       {},
     );
+  }
+
+  /**
+   * The newest stored check of the audit chain — GET /admin/audit/verify/latest
+   * (P `audit.read`). `null` before the first check. A cheap read for the tiles.
+   */
+  latestAuditVerification(): Observable<AuditVerification | null> {
+    if (this.mock) return of(structuredCopy(this.store.auditVerification));
+    return this.http.get<AuditVerification | null>(`${this.base}/admin/audit/verify/latest`, {
+      context: skipLoading(),
+    });
+  }
+
+  /**
+   * Check the whole chain now and store the result — POST /admin/audit/verify
+   * (P `audit.verify`). 409 while another check runs, 429 inside the cooldown.
+   */
+  runAuditVerification(): Observable<AuditVerification> {
+    if (this.mock) {
+      const now = new Date().toISOString();
+      const row: AuditVerification = {
+        id: `av-${Date.now()}`,
+        startedAt: now,
+        finishedAt: now,
+        valid: true,
+        checked: this.store.audit.length,
+        brokenAt: null,
+        reason: null,
+        trigger: 'manual',
+        triggeredBy: null,
+      };
+      this.store.auditVerification = row;
+      return of(structuredCopy(row));
+    }
+    return this.http.post<AuditVerification>(`${this.base}/admin/audit/verify`, {});
+  }
+
+  /**
+   * Check the whole chain live, without a stored result — GET /admin/audit/verify
+   * (P `audit.verify`). The tiles use it only while no stored check exists.
+   */
+  verifyAuditChain(): Observable<AuditChainCheck> {
+    if (this.mock) {
+      return of({ valid: true, checked: this.store.audit.length, brokenAt: null, reason: null });
+    }
+    return this.http.get<AuditChainCheck>(`${this.base}/admin/audit/verify`, {
+      context: skipLoading(),
+    });
   }
 
   /** Snapshots of a config entity (newest first) — version sidebar. */
@@ -884,13 +975,25 @@ export class AdminApiService {
   /** Field diff of a snapshot against its predecessor (wire → array form). */
   getConfigRevisionDiff(id: Uuid): Observable<ConfigRevisionDiff> {
     if (this.mock) {
+      // The mock flow change of the audit log (revision `rev-12`) has a small diff.
+      const diff: ConfigRevisionDiff['diff'] =
+        id === 'rev-12'
+          ? {
+              added: [],
+              removed: [],
+              changed: [
+                { key: 'transitions[3].label', old: 'Zurückstellen', new: 'Nachforderung stellen' },
+                { key: 'transitions[3].color', old: 'neutral', new: 'warning' },
+              ],
+            }
+          : null;
       return of({
         id,
-        entityType: '',
-        entityId: '',
-        version: 0,
-        prevVersion: null,
-        diff: null,
+        entityType: id === 'rev-12' ? 'flow' : '',
+        entityId: id === 'rev-12' ? 'global' : '',
+        version: id === 'rev-12' ? 12 : 0,
+        prevVersion: id === 'rev-12' ? 11 : null,
+        diff,
       });
     }
     return this.http
@@ -1170,8 +1273,8 @@ function structuredCopy<T>(value: T): T {
 }
 
 /**
- * Agent-token stubs for mock mode. The second row has no owner name and no expiry, so
- * the placeholder and the "never expires" rendering are visible without a backend.
+ * Agent-token stubs for mock mode, with the real scope keys. The second row has no owner
+ * name, so the placeholder is visible without a backend.
  */
 const MOCK_OAUTH_GRANTS: OAuthGrantAdmin[] = [
   {
@@ -1180,10 +1283,10 @@ const MOCK_OAUTH_GRANTS: OAuthGrantAdmin[] = [
     principalName: 'Alex Admin',
     principalEmail: 'alex@stupa.example',
     clientId: 'antragsplattform-mcp',
-    scope: 'mcp:read mcp:write',
+    scope: 'read meetings:write votes:write',
     createdAt: '2026-06-01T10:00:00+00:00',
-    accessExpiresAt: '2026-09-01T10:00:00+00:00',
-    refreshExpiresAt: '2026-12-01T10:00:00+00:00',
+    accessExpiresAt: '2026-06-02T10:00:00+00:00',
+    refreshExpiresAt: '2026-07-01T10:00:00+00:00',
   },
   {
     id: 'grant-2',
@@ -1191,10 +1294,21 @@ const MOCK_OAUTH_GRANTS: OAuthGrantAdmin[] = [
     principalName: null,
     principalEmail: null,
     clientId: 'antragsplattform-mcp',
-    scope: 'mcp:read',
+    scope: 'read',
     createdAt: '2026-05-02T08:30:00+00:00',
-    accessExpiresAt: null,
-    refreshExpiresAt: null,
+    accessExpiresAt: '2026-05-02T16:30:00+00:00',
+    refreshExpiresAt: '2026-06-01T08:30:00+00:00',
+  },
+  {
+    id: 'grant-3',
+    principalId: 'p-4',
+    principalName: 'Kim Kasse',
+    principalEmail: 'kim@stupa.example',
+    clientId: 'antragsplattform-mcp',
+    scope: 'read applications:write budget:write forms:write flows:write',
+    createdAt: '2026-04-20T13:31:00+00:00',
+    accessExpiresAt: '2026-05-20T13:31:00+00:00',
+    refreshExpiresAt: '2026-07-19T13:31:00+00:00',
   },
 ];
 

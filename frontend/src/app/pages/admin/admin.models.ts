@@ -188,6 +188,10 @@ export interface Gremium {
   delegationAllowExternal?: boolean;
   /** Default quorum as a percent of eligible voters who must attend. null = none. */
   quorumPercent?: number | null;
+  /** Number of members. Only the admin list (`GET /admin/gremien`) gives it. */
+  memberCount?: number;
+  /** Number of gremium roles, the forced roles included. Admin list only. */
+  roleCount?: number;
 }
 
 /** Body for `POST /admin/gremien` (`GremiumCreate`). */
@@ -605,9 +609,9 @@ export interface OAuthGrantAdmin {
   clientId: string;
   scope: string;
   createdAt: string;
-  /** `null` means the access token never expires. Only a revoke ends it. */
+  /** The server caps every lifetime, so a value is normal. The page shows `null` as a dash. */
   accessExpiresAt: string | null;
-  /** `null` means the refresh token never expires. Only a revoke ends it. */
+  /** The server caps every lifetime, so a value is normal. The page shows `null` as a dash. */
   refreshExpiresAt: string | null;
 }
 
@@ -692,6 +696,38 @@ export interface AuditEntry {
   revertable?: boolean;
   hash: string;
   prevHash: string | null;
+}
+
+/** What started a stored chain check: the nightly job, a person, or a restore. */
+export type AuditVerificationTrigger = 'cron' | 'manual' | 'restore';
+
+/** Why a chain check failed. */
+export type AuditChainBreak = 'prev_hash_mismatch' | 'hash_mismatch';
+
+/**
+ * A stored check of the audit hash chain (`GET /admin/audit/verify/latest`,
+ * `POST /admin/audit/verify`). `brokenAt` and `reason` name the first break when
+ * `valid` is false.
+ */
+export interface AuditVerification {
+  id: Uuid;
+  startedAt: string;
+  finishedAt: string | null;
+  valid: boolean;
+  /** Number of entries the check read. */
+  checked: number;
+  brokenAt: number | null;
+  reason: AuditChainBreak | null;
+  trigger: AuditVerificationTrigger;
+  triggeredBy: string | null;
+}
+
+/** A live check of the chain that the server does not store (`GET /admin/audit/verify`). */
+export interface AuditChainCheck {
+  valid: boolean;
+  checked: number;
+  brokenAt: number | null;
+  reason: string | null;
 }
 
 /** Cursor-paged audit response (keyset on `id`, newest first). */

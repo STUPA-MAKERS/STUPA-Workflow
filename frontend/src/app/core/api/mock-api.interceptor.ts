@@ -76,6 +76,18 @@ const MOCK_PRINCIPAL: Principal = {
     'form.configure',
     'flow.configure',
     'webhook.manage',
+    // The other admin pages of the admin frame: people and rights, gremien, the
+    // security and data pages.
+    'admin.users',
+    'admin.gremium_roles',
+    'admin.cd_variants',
+    'admin.delegations',
+    'admin.deadlines',
+    'audit.read',
+    'audit.verify',
+    'audit.revert',
+    'privacy.manage',
+    'backup.manage',
     // `budget.view`, `budget.structure`, `budget.book` and `budget.export` drive the
     // budget page and its export.
     'budget.view',
