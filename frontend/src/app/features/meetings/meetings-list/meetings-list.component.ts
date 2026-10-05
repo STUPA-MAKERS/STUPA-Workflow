@@ -45,6 +45,7 @@ import {
 } from '../meetings-overview.util';
 import { MeetingsTimelineService } from '../meetings-timeline.service';
 import { MeetingsViewSwitchComponent } from '../meetings-view-switch/meetings-view-switch.component';
+import { beamerUrl } from '../../voting/beamer-link.util';
 
 /**
  * The list view of the meeting overview (`/meetings`, board Sitzungen, variant A): a
@@ -240,7 +241,7 @@ export class MeetingsListComponent {
 
   /** "Beamer-Ansicht" in a new tab, so the overview stays. */
   beamer(m: Meeting): void {
-    const url = this.router.serializeUrl(this.router.createUrlTree(['/voting/beamer', m.id]));
+    const url = this.router.serializeUrl(beamerUrl(this.router, m.id));
     window.open(url, '_blank', 'noopener');
   }
 

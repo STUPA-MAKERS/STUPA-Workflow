@@ -194,7 +194,11 @@ describe('MeetingsCalendarComponent', () => {
     expect(view.router.url).toBe('/meetings/m-34');
     const open = jest.spyOn(window, 'open').mockImplementation(() => null);
     await userEvent.click(within(card).getByRole('button', { name: /Beamer/ }));
-    expect(open).toHaveBeenCalledWith('/voting/beamer/m-34', '_blank', 'noopener');
+    expect(open).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/voting\/beamer\/m-34\?from=/),
+      '_blank',
+      'noopener',
+    );
     open.mockRestore();
     const menu = async () => {
       await userEvent.click(within(card).getByRole('button', { name: /Weitere Aktionen/ }));

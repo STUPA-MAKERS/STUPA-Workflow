@@ -395,7 +395,11 @@ describe('MeetingsListComponent', () => {
       expect(view.dialogs.deleteMeeting()?.id).toBe('m-35');
       const open = jest.spyOn(window, 'open').mockImplementation(() => null);
       await userEvent.click(screen.getByRole('button', { name: /Beamer-Ansicht/ }));
-      expect(open).toHaveBeenCalledWith('/voting/beamer/m-35', '_blank', 'noopener');
+      expect(open).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/voting\/beamer\/m-35\?from=/),
+        '_blank',
+        'noopener',
+      );
       open.mockRestore();
     });
 

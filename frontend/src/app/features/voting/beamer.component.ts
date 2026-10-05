@@ -8,7 +8,7 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink, type UrlTree } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import type { AgendaItem, Meeting, Vote, VoteResult } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -16,7 +16,12 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ThemeService } from '@core/theme/theme.service';
 import { LiveVoteService, type LiveVoteSession } from '@core/ws/live-vote.service';
 import type { VoteClosedMsg } from '@core/ws/ws-messages';
+import { IconComponent } from '@stupa-makers/ui-kit';
 import { type BeamerVote, MeetingBeamerComponent } from '../meetings/meeting-beamer.component';
+import { BEAMER_FROM_PARAM, beamerOrigin } from './beamer-link.util';
+
+/** The exit control hides when the pointer rests this long (ms). */
+export const BEAMER_IDLE_MS = 2500;
 
 /**
  * The beamer page (`/voting/beamer/:id`, route data `chrome: false`): the screen for the
@@ -29,14 +34,20 @@ import { type BeamerVote, MeetingBeamerComponent } from '../meetings/meeting-bea
  * meeting reads. A result stays on the screen while the room stays on its agenda item.
  *
  * The page is dark unless the person chose a theme (`ThemeService.setPageDefault`). The
- * link back is invisible until a pointer or the keyboard reaches it, so the projector
- * shows no control, but the page is never a trap.
+ * page is never a trap: Escape leaves it, and a pointer movement shows an exit control
+ * that hides again after `BEAMER_IDLE_MS` without movement, so the projector shows no
+ * control while nobody touches the mouse. Leaving goes back to the page that opened the
+ * beamer (`?from=`, see `beamerUrl`) and ends a fullscreen mode.
  */
 @Component({
   selector: 'app-beamer',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslatePipe, MeetingBeamerComponent],
+  imports: [RouterLink, TranslatePipe, IconComponent, MeetingBeamerComponent],
+  host: {
+    '(document:keydown.escape)': 'exit()',
+    '(document:pointermove)': 'wake()',
+  },
   templateUrl: './beamer.component.html',
   styleUrl: './beamer.component.scss',
 })
@@ -45,11 +56,18 @@ export class BeamerComponent implements OnDestroy {
   private readonly i18n = inject(I18nService);
   private readonly live = inject(LiveVoteService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly theme = inject(ThemeService);
 
   private readonly session: LiveVoteSession;
-  /** The meeting page, or the voting overview without a meeting. */
-  readonly backLink: string;
+  /**
+   * Where "leave" goes: the page that opened the beamer, else the meeting page, else
+   * the voting overview without a meeting.
+   */
+  readonly backLink: UrlTree;
+  /** The exit control shows: the pointer moved within the last `BEAMER_IDLE_MS`. */
+  readonly controlsVisible = signal(false);
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly meeting = signal<Meeting | null>(null);
   readonly agenda = signal<AgendaItem[]>([]);
@@ -113,7 +131,9 @@ export class BeamerComponent implements OnDestroy {
   constructor() {
     const routeId = this.route.snapshot.paramMap.get('id');
     const meetingId = routeId ?? 'demo';
-    this.backLink = routeId ? `/meetings/${routeId}` : '/voting';
+    const fallback = routeId ? `/meetings/${routeId}` : '/voting';
+    const from = beamerOrigin(this.route.snapshot.queryParamMap.get(BEAMER_FROM_PARAM));
+    this.backLink = this.router.parseUrl(from ?? fallback);
     this.theme.setPageDefault('dark');
     this.session = this.live.open(meetingId, { beamer: true });
     if (routeId) this.loadMeeting(routeId);
@@ -145,6 +165,27 @@ export class BeamerComponent implements OnDestroy {
         if (closed && closed.voteId === this.loaded()?.id) this.load(closed.voteId, true);
       });
     });
+  }
+
+  /** A pointer movement: show the exit control, and hide it again after a rest. */
+  wake(): void {
+    this.controlsVisible.set(true);
+    if (this.idleTimer !== null) clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      this.controlsVisible.set(false);
+    }, BEAMER_IDLE_MS);
+  }
+
+  /** Escape: leave the beamer for the page that opened it. */
+  exit(): void {
+    this.leaveFullscreen();
+    void this.router.navigateByUrl(this.backLink);
+  }
+
+  /** End a fullscreen mode of the page (the link navigates by itself). */
+  leaveFullscreen(): void {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
   }
 
   /** An open vote: the turnout of the stream, the counts only once the server shows them. */
@@ -190,6 +231,7 @@ export class BeamerComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    if (this.idleTimer !== null) clearTimeout(this.idleTimer);
     this.session.close();
     this.theme.setPageDefault(null);
   }

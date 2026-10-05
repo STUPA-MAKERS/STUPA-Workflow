@@ -56,6 +56,7 @@ import {
 } from '../meetings-overview.util';
 import { MeetingsTimelineService } from '../meetings-timeline.service';
 import { MeetingsViewSwitchComponent } from '../meetings-view-switch/meetings-view-switch.component';
+import { beamerUrl } from '../../voting/beamer-link.util';
 
 /** A cell shows this many meetings; the rest is "+n" and shows in the side panel. */
 export const CELL_ENTRIES = 2;
@@ -264,7 +265,7 @@ export class MeetingsCalendarComponent {
   }
 
   beamer(m: Meeting): void {
-    const url = this.router.serializeUrl(this.router.createUrlTree(['/voting/beamer', m.id]));
+    const url = this.router.serializeUrl(beamerUrl(this.router, m.id));
     window.open(url, '_blank', 'noopener');
   }
 
