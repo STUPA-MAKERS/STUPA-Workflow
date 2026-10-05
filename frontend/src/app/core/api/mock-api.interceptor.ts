@@ -24,6 +24,7 @@ import type {
   MagicLinkVerifyResult,
   MeetingOutWire,
   MeetingPageWire,
+  MyBallot,
   Page,
   PublicSiteConfig,
   Principal,
@@ -186,6 +187,15 @@ function mockVote(id: string): Vote {
     tally: { ...MOCK_VOTE.tally, voted: (MOCK_VOTE.tally.voted ?? 0) + extra },
   };
 }
+
+/** The own ballot of this mock session in one vote, for the vote list. */
+function mockOwnBallot(id: string): MyBallot | null {
+  const own = MOCK_BALLOTS.get(id)?.own;
+  return own ? { cast: true, choice: own } : null;
+}
+
+/** The standalone demo votes of `mock-votes.ts` (id prefix `b0000000-`). */
+const DEMO_VOTE_PATH = /\/votes\/b0000000-[^/]+$/;
 
 /** POST /votes/{id}/ballot: a ballot never changes, so a second one is a 409. */
 function mockBallot(id: string, body: unknown, url: string): Observable<never> | BallotResult {
@@ -1267,6 +1277,24 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
             : m.closedMeetingWrite(closedId, req.method, p, req.body);
         if (body === undefined) return mockProblem(409, 'meeting_closed', req.url);
         return ok(body);
+      }),
+    );
+  }
+
+  // The vote list and the standalone demo votes. The data loads on first use.
+  if (req.method === 'GET' && (/(^|\/)api\/votes$/.test(p) || DEMO_VOTE_PATH.test(p))) {
+    return from(import('./mock-votes')).pipe(
+      mergeMap((m) => {
+        if (DEMO_VOTE_PATH.test(p)) {
+          const id = p.split('/').pop() ?? '';
+          const found = m.demoVote(id, mockOwnBallot(id));
+          if (!found) return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
+          return ok(found);
+        }
+        const params = new URLSearchParams(req.params.toString());
+        return ok(
+          m.mockVoteList(params, mockVote(MOCK_VOTE.id), mockVote('a0000000-0000-0000-0000-000000000101'), mockOwnBallot),
+        );
       }),
     );
   }

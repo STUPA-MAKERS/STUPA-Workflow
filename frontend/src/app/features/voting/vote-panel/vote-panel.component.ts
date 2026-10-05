@@ -43,6 +43,7 @@ import { NO_CONTEXT, type VoteContext } from './vote-context';
     '[class.vpn--phone]': "layout() === 'phone'",
     '[class.vpn--card]': "layout() === 'card'",
     '[class.vpn--strip]': "layout() === 'strip'",
+    '[class.vpn--flat]': 'flat()',
   },
   templateUrl: './vote-panel.component.html',
   styleUrl: './vote-panel.component.scss',
@@ -63,6 +64,12 @@ export class VotePanelComponent {
    * caption with the TOP and the turnout "14 von 19", the rows side by side.
    */
   readonly layout = input<'page' | 'phone' | 'card' | 'strip'>('page');
+
+  /**
+   * No box of its own: the panel sits on a sheet that is already the box (the detail
+   * pane of the page "Abstimmungen" beside the list).
+   */
+  readonly flat = input(false);
 
   /** Why the person cannot vote (a warning note), or `null`. */
   readonly notice = input<string | null>(null);

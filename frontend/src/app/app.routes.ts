@@ -139,16 +139,8 @@ export const routes: Routes = [
         ],
       },
       {
-        path: 'voting',
-        // Voting rights are GREMIUM rights. No global permission grants them, so the
-        // gate goes through `gremiumPermission` (any gremium, or the admin role).
-        data: { title: 'nav.voting', gremiumPermission: VOTING_GREMIUM_PERMISSIONS },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./features/voting/live-vote.component').then((m) => m.LiveVoteComponent),
-      },
-      {
-        // Read-only beamer view for the projector. Declared before `vote/:id`.
+        // Read-only beamer view for the projector. Declared before `voting`, whose child
+        // `:id` would match `beamer` too.
         path: 'voting/beamer',
         // The beamer WebSocket needs `session.manage` in the gremium of the meeting.
         // `chrome: false`: the projector shows the page without rail, bars or footer.
@@ -164,26 +156,47 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/voting/beamer.component').then((m) => m.BeamerComponent),
       },
+      // The former paths of one vote and of the live page of a meeting. The list page
+      // follows the running meetings itself and opens a vote that opens.
+      { path: 'voting/vote/:id', redirectTo: 'voting/:id' },
+      { path: 'voting/meeting/:id', redirectTo: 'voting' },
       {
-        path: 'voting/meeting/:id',
-        data: { title: 'nav.voting', gremiumPermission: VOTING_GREMIUM_PERMISSIONS },
-        canActivate: [authGuard],
+        path: 'voting',
+        // The list of the votes beside the open vote, like the applications and the
+        // tasks: the list stays while the vote of `:id` loads in its outlet.
+        //
+        // Voting rights are GREMIUM rights. No global permission grants them, so the
+        // gate goes through `gremiumPermission` (any gremium, or the admin role). The
+        // guard runs per child (`canActivateChild`), because `:id` admits more people
+        // than the list: see there.
+        data: { title: 'nav.voting', gremiumPermission: VOTING_GREMIUM_PERMISSIONS, wide: true },
+        canActivateChild: [authGuard],
         loadComponent: () =>
-          import('./features/voting/live-vote.component').then((m) => m.LiveVoteComponent),
-      },
-      {
-        path: 'voting/vote/:id',
-        // A delegation recipient can reach the ballot without vote.cast, and a reader
-        // with `application.read` can view a standalone vote. The server decides the
-        // rights and reports them as `canCast` and `canManage` on the vote.
-        data: {
-          title: 'voting.cast.heading',
-          gremiumPermission: VOTING_GREMIUM_PERMISSIONS,
-          allowAuthenticated: true,
-        },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./features/voting/vote-cast.component').then((m) => m.VoteCastComponent),
+          import('./features/voting/voting-page/voting.component').then((m) => m.VotingComponent),
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./features/voting/voting-page/voting-none.component').then(
+                (m) => m.VotingNoneComponent,
+              ),
+          },
+          {
+            path: ':id',
+            // A delegation recipient can reach the ballot without vote.cast, and a reader
+            // with `application.read` can view a standalone vote. The server decides the
+            // rights and reports them as `canCast` and `canManage` on the vote; the list
+            // beside it shows what the server lets the person read.
+            data: {
+              title: 'voting.cast.heading',
+              parent: ['voting'],
+              gremiumPermission: VOTING_GREMIUM_PERMISSIONS,
+              allowAuthenticated: true,
+            },
+            loadComponent: () =>
+              import('./features/voting/vote-cast.component').then((m) => m.VoteCastComponent),
+          },
+        ],
       },
       {
         path: 'meetings',

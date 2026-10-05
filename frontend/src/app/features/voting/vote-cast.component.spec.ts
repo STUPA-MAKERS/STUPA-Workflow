@@ -1,15 +1,38 @@
-import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { signal } from '@angular/core';
+import { ActivatedRoute, type ParamMap, Router, convertToParamMap, provideRouter } from '@angular/router';
+import { BehaviorSubject, Subject, of, throwError } from 'rxjs';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
 import { DelegationsApiService, type VoteDelegationStatus } from '@core/api/delegations.service';
 import { AuthService } from '@core/auth/auth.service';
 import type { Vote } from '@core/api/models';
+import { LiveVoteService, type ConnectionState } from '@core/ws/live-vote.service';
+import type { VoteClosedMsg, VoteOpenedMsg, VoteTallyMsg } from '@core/ws/ws-messages';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../testing/meeting-fixtures';
 import { VoteCastComponent } from './vote-cast.component';
+import { VotingPageService } from './voting-page/voting-page.service';
 import { RailStatusService } from '../../layout/rail-status.service';
+
+/** A live-vote channel as signals, driven by the test. */
+function fakeSession() {
+  return {
+    connection: signal<ConnectionState>('open'),
+    openVote: signal<VoteOpenedMsg | null>(null),
+    tally: signal<VoteTallyMsg | null>(null),
+    result: signal<VoteClosedMsg | null>(null),
+    close: jest.fn(),
+  };
+}
+type FakeSession = ReturnType<typeof fakeSession>;
+
+const opened = (voteId: string): VoteOpenedMsg => ({
+  type: 'vote_opened',
+  voteId,
+  options: ['yes', 'no', 'abstain'],
+  closesAt: null,
+});
 
 function vote(overrides: Partial<Vote> = {}): Vote {
   return {
@@ -57,6 +80,8 @@ async function setup(opts: {
   /** Gremium rights of the caller (`session.manage` gives the beamer). */
   sessionManage?: boolean;
   meetingError?: boolean;
+  /** The list page around the pane: `split` side by side. */
+  page?: { split: boolean };
 } = {}) {
   // The server sets the capability flags of the caller on GET /votes/{id}.
   const served: Vote = {
@@ -76,7 +101,7 @@ async function setup(opts: {
   const getMeeting = jest.fn(() =>
     opts.meetingError
       ? throwError(() => ({ status: 403 }))
-      : of({ id: 'm1', title: '34. Sitzung', gremiumId: 'g1' }),
+      : of({ id: 'm1', title: '34. Sitzung', gremiumId: 'g1', gremiumName: 'StuPa' }),
   );
   const listAgenda = jest.fn(() =>
     of([
@@ -97,6 +122,27 @@ async function setup(opts: {
   const railStatus = { refresh: jest.fn() };
 
   const id = opts.routeId === undefined ? 'v1' : opts.routeId;
+  const params = new BehaviorSubject<ParamMap>(convertToParamMap(id === null ? {} : { id }));
+  const sessions: FakeSession[] = [];
+  const live = {
+    open: jest.fn(() => {
+      const session = fakeSession();
+      sessions.push(session);
+      return session;
+    }),
+  };
+  const page = opts.page
+    ? {
+        split: signal(opts.page.split),
+        gremiumNames: signal(new Map([['v1', 'Haushaltsausschuss']])),
+        notify: jest.fn(),
+        follow: jest.fn(() => {
+          const session = fakeSession();
+          sessions.push(session);
+          return session;
+        }),
+      }
+    : null;
   const r = await render(VoteCastComponent, {
     providers: [
       // The delete navigates away, so both target routes must resolve.
@@ -111,13 +157,26 @@ async function setup(opts: {
       { provide: DelegationsApiService, useValue: { voteStatus } },
       { provide: ToastService, useValue: toast },
       { provide: RailStatusService, useValue: railStatus },
-      {
-        provide: ActivatedRoute,
-        useValue: { snapshot: { paramMap: convertToParamMap(id === null ? {} : { id }) } },
-      },
+      { provide: LiveVoteService, useValue: live },
+      ...(page ? [{ provide: VotingPageService, useValue: page }] : []),
+      { provide: ActivatedRoute, useValue: { paramMap: params } },
     ],
   });
-  return { ...r, getVote, castBallot, deleteVote, getMeeting, voteStatus, toast, railStatus, auth };
+  return {
+    ...r,
+    getVote,
+    castBallot,
+    deleteVote,
+    getMeeting,
+    voteStatus,
+    toast,
+    railStatus,
+    auth,
+    params,
+    sessions,
+    live,
+    page,
+  };
 }
 
 /** Conflict answer with its machine code. */
@@ -136,7 +195,7 @@ async function castOwn(choice = 'Ja'): Promise<void> {
 describe('VoteCastComponent', () => {
   it('shows the vote as a card with meeting, item and rule (board Arbeit-Abstimmungen)', async () => {
     const { getMeeting } = await setup();
-    expect(screen.getByRole('heading', { level: 1, name: 'Abstimmungen' })).toBeInTheDocument();
+    expect(screen.getByRole('article', { name: 'Abstimmung' })).toBeInTheDocument();
     expect(screen.getByText('Offen')).toBeInTheDocument();
     expect(screen.getByText('34. Sitzung · TOP 3')).toBeInTheDocument();
     expect(screen.getByText('Zweidrittelmehrheit')).toBeInTheDocument();
@@ -177,8 +236,10 @@ describe('VoteCastComponent', () => {
 
   it('treats a 403 on load as not eligible', async () => {
     await setup({ getError: { status: 403 } });
-    expect(screen.getByRole('alert')).toHaveTextContent('Du bist für diese Abstimmung nicht stimmberechtigt.');
-    expect(screen.getByRole('link', { name: 'Zu den Abstimmungen' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Du bist für diese Abstimmung nicht stimmberechtigt.' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Zu den Abstimmungen' })).toHaveAttribute('href', '/voting');
   });
 
   it('shows an error box when the vote cannot be loaded', async () => {
@@ -354,22 +415,12 @@ describe('VoteCastComponent', () => {
     beforeEach(() => (restore = matchMediaQueries(MEDIA.phone)));
     afterEach(() => restore());
 
-    it('shows the phone header with the way back to the meeting', async () => {
+    it('shows the phone header with the way back to the list', async () => {
       await setup();
-      expect(screen.getByRole('link', { name: 'Zurück' })).toHaveAttribute('href', '/meetings/m1');
-      expect(screen.getByText('TOP 3 · 34. Sitzung')).toBeInTheDocument();
-      expect(screen.queryByRole('heading', { name: 'Abstimmungen' })).not.toBeInTheDocument();
-      expect(document.querySelector('app-ballot')).toHaveClass('ballot--phone');
-    });
-
-    it('leads back to the application of a standalone vote', async () => {
-      await setup({ vote: vote({ meetingId: null }) });
-      expect(screen.getByRole('link', { name: 'Zurück' })).toHaveAttribute('href', '/applications/a1');
-    });
-
-    it('leads back to the overview without both', async () => {
-      await setup({ vote: vote({ meetingId: null, applicationId: null }) });
       expect(screen.getByRole('link', { name: 'Zurück' })).toHaveAttribute('href', '/voting');
+      expect(screen.getByText('TOP 3 · 34. Sitzung')).toBeInTheDocument();
+      expect(document.querySelector('.vc__bar')).toBeNull();
+      expect(document.querySelector('app-ballot')).toHaveClass('ballot--phone');
     });
 
     it('names only the meeting when the item is unknown', async () => {
@@ -392,13 +443,25 @@ describe('VoteCastComponent', () => {
   });
 
   describe('delete', () => {
-    it('deletes a draft standalone vote after the confirmation', async () => {
-      const { deleteVote, toast } = await setup({ vote: draftVote(), canManage: true });
-      await userEvent.click(screen.getAllByRole('button', { name: 'Abstimmung löschen' })[0]);
-      const buttons = screen.getAllByRole('button', { name: 'Abstimmung löschen' });
-      await userEvent.click(buttons[buttons.length - 1]);
+    async function openDelete(): Promise<void> {
+      await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Abstimmung löschen' }));
+    }
+
+    it('deletes a draft standalone vote after the confirmation and goes back to the list', async () => {
+      const { deleteVote, toast, fixture, page } = await setup({
+        vote: draftVote(),
+        canManage: true,
+        page: { split: true },
+      });
+      const router = fixture.debugElement.injector.get(Router);
+      const navigate = jest.spyOn(router, 'navigate');
+      await openDelete();
+      await userEvent.click(screen.getByRole('button', { name: 'Abstimmung löschen' }));
       expect(deleteVote).toHaveBeenCalledWith('v1');
       expect(toast.success).toHaveBeenCalledWith('Abstimmung gelöscht.');
+      expect(page?.notify).toHaveBeenCalledWith({ id: 'v1', kind: 'deleted' });
+      expect(navigate).toHaveBeenCalledWith(['/voting'], { queryParamsHandling: 'preserve' });
     });
 
     it('falls back to the vote overview when the vote carries no application', async () => {
@@ -412,17 +475,17 @@ describe('VoteCastComponent', () => {
 
     it('offers no delete without the server flag canManage', async () => {
       await setup({ vote: draftVote(), canManage: false });
-      expect(screen.queryByRole('button', { name: 'Abstimmung löschen' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).not.toBeInTheDocument();
     });
 
     it('offers no delete for a vote that already opened', async () => {
       await setup({ vote: vote({ meetingId: null }), canManage: true });
-      expect(screen.queryByRole('button', { name: 'Abstimmung löschen' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).not.toBeInTheDocument();
     });
 
     it('offers no delete for a meeting-bound draft', async () => {
       await setup({ vote: draftVote({ meetingId: 'm1' }), canManage: true });
-      expect(screen.queryByRole('button', { name: 'Abstimmung löschen' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Weitere Aktionen' })).not.toBeInTheDocument();
     });
 
     it.each([
@@ -476,9 +539,278 @@ describe('VoteCastComponent', () => {
 
     it('cancels the confirmation', async () => {
       const { deleteVote } = await setup({ vote: draftVote(), canManage: true });
-      await userEvent.click(screen.getAllByRole('button', { name: 'Abstimmung löschen' })[0]);
+      await openDelete();
       await userEvent.click(screen.getAllByRole('button', { name: 'Abbrechen' })[0]);
       expect(deleteVote).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('in the list page', () => {
+    it('is a sheet beside the list, with a flat panel', async () => {
+      await setup({ page: { split: true } });
+      expect(document.querySelector('.vc')).toHaveClass('vc--sheet');
+      expect(document.querySelector('app-vote-panel')).toHaveClass('vpn--flat');
+    });
+
+    it('keeps the card one pane at a time', async () => {
+      await setup({ page: { split: false } });
+      expect(document.querySelector('.vc')).not.toHaveClass('vc--sheet');
+      expect(document.querySelector('app-vote-panel')).not.toHaveClass('vpn--flat');
+    });
+
+    it('names the gremium of the meeting in the bar', async () => {
+      await setup({ page: { split: true } });
+      expect(document.querySelector('.vc__meta')).toHaveTextContent('StuPa');
+    });
+
+    it('names the gremium of the list row for a vote without a meeting', async () => {
+      await setup({ page: { split: true }, vote: vote({ meetingId: null }) });
+      expect(document.querySelector('.vc__meta')).toHaveTextContent('Haushaltsausschuss');
+    });
+
+    it('leaves the bar line empty without a gremium', async () => {
+      await setup({ page: { split: true }, vote: vote({ id: 'v9', meetingId: null }) });
+      expect(document.querySelector('.vc__meta')).toHaveTextContent('');
+    });
+
+    it('tells the list about a cast and stays on the vote', async () => {
+      const { page, fixture } = await setup({ page: { split: true } });
+      const router = fixture.debugElement.injector.get(Router);
+      const navigate = jest.spyOn(router, 'navigate');
+      await castOwn();
+      expect(page?.notify).toHaveBeenCalledWith({ id: 'v1', kind: 'cast' });
+      expect(navigate).not.toHaveBeenCalled();
+      expect(screen.getByText('Danke! Deine Stimme: Ja')).toBeInTheDocument();
+    });
+
+    it('shares the live channel of the page for its meeting', async () => {
+      const { page, live } = await setup({ page: { split: true } });
+      expect(page?.follow).toHaveBeenCalledWith('m1');
+      expect(live.open).not.toHaveBeenCalled();
+    });
+
+    it('loads the next vote when the route moves on, and drops a late answer', async () => {
+      const { params, getVote, getMeeting, fixture } = await setup();
+      const slow = new Subject<Vote>();
+      const slowMeeting = new Subject<never>();
+      getVote.mockImplementation(((id: string) =>
+        id === 'v2' ? slow : of(vote({ id: 'v3', question: 'Dritte Frage?' }))) as never);
+      params.next(convertToParamMap({ id: 'v2' }));
+      fixture.detectChanges();
+      expect(screen.getByRole('status')).toHaveTextContent('Abstimmung wird geladen …');
+      getMeeting.mockReturnValueOnce(slowMeeting as never);
+      params.next(convertToParamMap({ id: 'v3' }));
+      fixture.detectChanges();
+      slow.next(vote({ id: 'v2', question: 'Späte Frage?' }));
+      fixture.detectChanges();
+      expect(screen.getByRole('heading', { name: 'Dritte Frage?' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Späte Frage?' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('without a vote', () => {
+    it('sends nothing and reads nothing again', async () => {
+      const { fixture, getVote, voteStatus, castBallot, page } = await setup({
+        getError: { status: 403 },
+        page: { split: false },
+      });
+      getVote.mockClear();
+      voteStatus.mockClear();
+      const cmp = fixture.componentInstance;
+      cmp.onCastDone();
+      cmp.onCastFailed({ asDelegation: false, alreadyVoted: false, error: { status: 403 } } as never);
+      cmp.caster('yes', false).subscribe();
+      expect(castBallot).toHaveBeenCalledWith('', 'yes', false);
+      expect(getVote).not.toHaveBeenCalled();
+      expect(voteStatus).not.toHaveBeenCalled();
+      expect(page?.notify).not.toHaveBeenCalled();
+    });
+
+    it('drops the late answers of the vote it left', async () => {
+      const ctx = new Subject<never>();
+      const meeting = new Subject<{ id: string; title: string }>();
+      const status = new Subject<VoteDelegationStatus>();
+      const failing = new Subject<Vote>();
+      const reloadSlow = new Subject<Vote>();
+      const { params, getVote, getMeeting, voteStatus, fixture } = await setup();
+      // A reload of v1 that answers after the move to v2.
+      getVote.mockReturnValueOnce(reloadSlow as never);
+      fixture.componentInstance.onCastDone();
+      // v2: its read fails late, its context and its delegation answer late.
+      getVote.mockReturnValueOnce(failing as never);
+      getMeeting.mockReturnValueOnce(meeting as never);
+      voteStatus.mockReturnValueOnce(status as never);
+      params.next(convertToParamMap({ id: 'v2' }));
+      fixture.detectChanges();
+      // v3 is shown at once.
+      getVote.mockReturnValue(of(vote({ id: 'v3', question: 'Dritte Frage?' })) as never);
+      getMeeting.mockReturnValue(ctx as never);
+      params.next(convertToParamMap({ id: 'v3' }));
+      fixture.detectChanges();
+      reloadSlow.next(vote({ question: 'Alte Frage?' }));
+      failing.error({ status: 500 });
+      status.next({ ...NO_DELEGATION, blocked: true, delegatedToName: 'Mara Keller' });
+      fixture.detectChanges();
+      expect(screen.getByRole('heading', { name: 'Dritte Frage?' })).toBeInTheDocument();
+      expect(screen.queryByText(/Mara Keller/)).not.toBeInTheDocument();
+      expect(screen.queryByText('Abstimmung nicht verfügbar')).not.toBeInTheDocument();
+    });
+
+    it('drops the late context of the vote it left', async () => {
+      const meeting = new Subject<{ id: string; title: string; gremiumId: string }>();
+      const { params, getVote, getMeeting, fixture } = await setup();
+      getMeeting.mockReturnValueOnce(meeting as never);
+      getVote.mockReturnValueOnce(of(vote({ id: 'v2' })) as never);
+      params.next(convertToParamMap({ id: 'v2' }));
+      fixture.detectChanges();
+      getVote.mockReturnValue(of(vote({ id: 'v3', meetingId: null })) as never);
+      params.next(convertToParamMap({ id: 'v3' }));
+      fixture.detectChanges();
+      meeting.next({ id: 'm1', title: 'Späte Sitzung', gremiumId: 'g1' });
+      meeting.complete();
+      fixture.detectChanges();
+      expect(screen.queryByText(/Späte Sitzung/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('live', () => {
+    it('follows the meeting of an open vote and shows the turnout of the socket', async () => {
+      const { live, sessions, fixture } = await setup();
+      expect(live.open).toHaveBeenCalledWith('m1');
+      sessions[0].tally.set({
+        type: 'vote_tally',
+        voteId: 'v1',
+        counts: {},
+        eligible: 12,
+        quorumMet: true,
+        leading: null,
+        cast: 9,
+        present: 12,
+        revealed: false,
+      });
+      fixture.detectChanges();
+      expect(screen.getByText('9 von 12 Anwesenden haben abgestimmt')).toBeInTheDocument();
+    });
+
+    it('shows the counts the socket revealed', async () => {
+      const { sessions, fixture } = await setup();
+      sessions[0].tally.set({
+        type: 'vote_tally',
+        voteId: 'v1',
+        counts: { yes: 8, no: 3, abstain: 1 },
+        eligible: 12,
+        quorumMet: true,
+        leading: 'yes',
+        revealed: true,
+      });
+      fixture.detectChanges();
+      expect(screen.getByText('5 von 12 Anwesenden haben abgestimmt')).toBeInTheDocument();
+      expect(document.querySelector('app-vote-bars')).toBeInTheDocument();
+    });
+
+    it('ignores the turnout of another vote', async () => {
+      const { sessions, fixture } = await setup();
+      sessions[0].tally.set({
+        type: 'vote_tally',
+        voteId: 'other',
+        counts: {},
+        eligible: 12,
+        quorumMet: true,
+        leading: null,
+        cast: 11,
+      });
+      fixture.detectChanges();
+      expect(screen.getByText('5 von 12 Anwesenden haben abgestimmt')).toBeInTheDocument();
+    });
+
+    it('reads the vote again on its close', async () => {
+      const { sessions, getVote, fixture } = await setup();
+      getVote.mockClear();
+      sessions[0].result.set({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: {} });
+      fixture.detectChanges();
+      expect(getVote).toHaveBeenCalledWith('v1', { quiet: true });
+    });
+
+    it('reads the vote again when it was cancelled', async () => {
+      const { sessions, getVote, fixture } = await setup();
+      sessions[0].openVote.set(opened('v1'));
+      fixture.detectChanges();
+      getVote.mockClear();
+      sessions[0].openVote.set(null);
+      fixture.detectChanges();
+      expect(getVote).toHaveBeenCalledWith('v1', { quiet: true });
+    });
+
+    it('reads a draft again when it opens', async () => {
+      const { sessions, getVote, fixture } = await setup({ vote: draftVote({ meetingId: 'm1' }) });
+      getVote.mockClear();
+      sessions[0].openVote.set(opened('other'));
+      fixture.detectChanges();
+      expect(getVote).not.toHaveBeenCalled();
+      sessions[0].openVote.set(opened('v1'));
+      fixture.detectChanges();
+      expect(getVote).toHaveBeenCalledWith('v1', { quiet: true });
+    });
+
+    it('keeps the turnout hidden while neither the socket nor the read revealed it', async () => {
+      const hidden = await setup();
+      hidden.sessions[0].tally.set({
+        type: 'vote_tally',
+        voteId: 'v1',
+        counts: { yes: 1 },
+        eligible: 12,
+        quorumMet: true,
+        leading: null,
+        cast: 6,
+      });
+      hidden.fixture.detectChanges();
+      expect(screen.getByText('6 von 12 Anwesenden haben abgestimmt')).toBeInTheDocument();
+      expect(document.querySelector('app-vote-bars')).toBeNull();
+    });
+
+    it('shows the counts when an old read has no reveal flag', async () => {
+      const { sessions, fixture } = await setup({
+        vote: vote({ tally: { counts: {}, eligible: 12, voted: 5, quorumMet: true, leading: null } }),
+      });
+      sessions[0].tally.set({
+        type: 'vote_tally',
+        voteId: 'v1',
+        counts: { yes: 4, no: 1 },
+        eligible: 12,
+        quorumMet: true,
+        leading: 'yes',
+      });
+      fixture.detectChanges();
+      expect(document.querySelector('app-vote-bars')).toBeInTheDocument();
+    });
+
+    it('shows a lost connection', async () => {
+      const { sessions, fixture } = await setup();
+      sessions[0].connection.set('reconnecting');
+      fixture.detectChanges();
+      expect(screen.getByText('Verbindung verloren – verbinde neu …')).toBeInTheDocument();
+    });
+
+    it('does not follow a closed vote', async () => {
+      const { live } = await setup({ vote: vote({ status: 'closed', result: 'passed' }) });
+      expect(live.open).not.toHaveBeenCalled();
+    });
+
+    it('does not follow a vote without a meeting', async () => {
+      const { live } = await setup({ vote: vote({ meetingId: null }) });
+      expect(live.open).not.toHaveBeenCalled();
+    });
+
+    it('closes its own channel on a new meeting and on destroy', async () => {
+      const { params, sessions, getVote, fixture } = await setup();
+      getVote.mockReturnValue(of(vote({ id: 'v2', meetingId: 'm2' })));
+      params.next(convertToParamMap({ id: 'v2' }));
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(sessions).toHaveLength(2);
+      expect(sessions[0].close).toHaveBeenCalled();
+      fixture.destroy();
+      expect(sessions[1].close).toHaveBeenCalled();
     });
   });
 });

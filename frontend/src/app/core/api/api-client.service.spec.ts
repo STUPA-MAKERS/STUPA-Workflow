@@ -393,6 +393,30 @@ describe('ApiClient', () => {
     });
   });
 
+  it('GETs the vote list from /votes with repeated status and the filters', (done) => {
+    api
+      .listVotes({ status: ['closed', 'cancelled'], gremiumId: 'g1', q: 'Haus', limit: 30, offset: 60 })
+      .subscribe((page) => {
+        expect(page.total).toBe(0);
+        done();
+      });
+    const req = http.expectOne((r) => r.url === '/api/votes');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.getAll('status')).toEqual(['closed', 'cancelled']);
+    expect(req.request.params.get('gremiumId')).toBe('g1');
+    expect(req.request.params.get('q')).toBe('Haus');
+    expect(req.request.params.get('limit')).toBe('30');
+    expect(req.request.params.get('offset')).toBe('60');
+    req.flush({ items: [], total: 0, limit: 30, offset: 60 });
+  });
+
+  it('GETs the vote list without any filter', () => {
+    api.listVotes().subscribe();
+    const req = http.expectOne((r) => r.url === '/api/votes');
+    expect(req.request.params.keys()).toEqual([]);
+    req.flush({ items: [], total: 0, limit: 50, offset: 0 });
+  });
+
   it('POSTs a ballot choice to /votes/{id}/ballot', (done) => {
     api.castBallot('v1', 'yes').subscribe((res) => {
       expect(res.status).toBe('cast');

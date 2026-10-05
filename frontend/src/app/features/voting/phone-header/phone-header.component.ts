@@ -18,4 +18,6 @@ import { IconComponent } from '@stupa-makers/ui-kit';
 export class VotePhoneHeaderComponent {
   readonly back = input.required<string | readonly string[]>();
   readonly subtitle = input<string | null>(null);
+  /** The way back keeps the query params (the filters of the list). */
+  readonly keepQuery = input(false);
 }

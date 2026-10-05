@@ -43,6 +43,23 @@ class FocusHostComponent {
   readonly open = signal<string | null>(null);
 }
 
+/** A detail with its own way back: the layout shows no "Zur Liste". */
+@Component({
+  standalone: true,
+  imports: [ListDetailLayoutComponent],
+  template: `
+    <app-list-detail [detailOpen]="open() !== null" [backButton]="false" (back)="open.set(null)">
+      <ul list aria-label="Abstimmungen">
+        <li><button type="button" (click)="open.set('Lastenrad')">Lastenrad</button></li>
+      </ul>
+      <article detail aria-label="Detail">{{ open() }}</article>
+    </app-list-detail>
+  `,
+})
+class OwnBackHostComponent {
+  readonly open = signal<string | null>(null);
+}
+
 /** Drives the ResizeObserver of the layout: the last observer created gets the width. */
 let resize: ((width: number) => void) | null = null;
 let disconnects = 0;
@@ -195,6 +212,15 @@ describe('ListDetailLayoutComponent', () => {
       await view.fixture.whenStable();
       expect(view.fixture.componentInstance.open()).toBeNull();
       expect(row).toHaveFocus();
+    });
+
+    it('without "Zur Liste" moves the focus to the detail pane', async () => {
+      viewport(390);
+      const view = await render(OwnBackHostComponent);
+      await userEvent.setup().click(screen.getByRole('button', { name: 'Lastenrad' }));
+      await view.fixture.whenStable();
+      expect(screen.queryByRole('button', { name: 'Zur Liste' })).not.toBeInTheDocument();
+      expect(view.container.querySelector('.ld__detail')).toHaveFocus();
     });
 
     it('opens from the keyboard and returns to the same row', async () => {

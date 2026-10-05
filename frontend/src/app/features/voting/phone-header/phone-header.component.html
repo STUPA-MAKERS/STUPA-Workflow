@@ -1,4 +1,7 @@
-<a class="ph__back" [routerLink]="back()" [attr.aria-label]="'voting.cast.back' | t" [title]="'voting.cast.back' | t">
+<a
+  class="ph__back"
+  [routerLink]="back()"
+  [queryParamsHandling]="keepQuery() ? 'preserve' : ''" [attr.aria-label]="'voting.cast.back' | t" [title]="'voting.cast.back' | t">
   <app-icon name="back" [size]="21" />
 </a>
 <div class="ph__text">

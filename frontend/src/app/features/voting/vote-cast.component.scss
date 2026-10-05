@@ -1,43 +1,83 @@
-/* Board Arbeit-Abstimmungen: one centred column of at most 860px. */
-.vote {
+/* The detail pane of the page "Abstimmungen". Side by side the vote sits on a sheet
+   (surface 1, large radius) that fills the pane, as the open application does. One pane
+   at a time it sits on the page, and the panel keeps its card (board
+   Arbeit-Abstimmungen). */
+:host {
   display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vc {
+  display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--space-4);
-  width: 100%;
-  max-width: 860px;
-  margin: 0 auto;
+  min-width: 0;
 }
-
-.vote__status,
-.vote__muted {
-  margin: 0;
-  color: var(--color-text-muted);
-}
-
-.vote__box {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: 28px 32px;
-  border-radius: var(--radius-xl);
+.vc--sheet {
+  gap: var(--space-2);
+  padding: 0 var(--space-6) var(--space-6);
+  border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
 }
-.vote__boxTitle {
-  margin: 0;
-  font-size: var(--fs-h2);
-  font-weight: var(--fw-semibold);
+.vc--busy {
+  gap: var(--space-3);
 }
-.vote__link {
-  align-self: flex-start;
+.vc--busy.vc--sheet {
+  padding-top: var(--space-6);
+}
+.vc__skelMeta {
+  width: 30%;
+}
+.vc__skelTitle {
+  width: 60%;
+  height: 2rem;
+}
+.vc--center {
+  align-items: center;
+  justify-content: center;
+}
+
+/* The bar on top of the sheet: the gremium, the beamer and the menu. The same height as
+   the bar of the open application. */
+.vc__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 60px;
+}
+.vc--sheet .vc__bar {
+  margin-inline-end: calc(-1 * var(--space-3));
+}
+.vc__meta {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.vc__line {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+}
+.vc__line--warn {
+  color: var(--color-warning);
+}
+
+.vc__link {
   color: var(--color-accent-text);
   font-weight: var(--fw-semibold);
   text-decoration: none;
 }
-.vote__link:hover {
+.vc__link:hover {
   text-decoration: underline;
 }
 
 /* Board Telefon-Abstimmen: the phone header sits closer to the panel. */
-.vote--phone {
+.vc--phone {
   gap: var(--space-2);
 }

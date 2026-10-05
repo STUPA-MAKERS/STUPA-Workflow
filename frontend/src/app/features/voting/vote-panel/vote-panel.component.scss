@@ -63,6 +63,13 @@
   background: var(--color-border);
 }
 
+/* On a sheet that is already the box: no box of its own. */
+:host(.vpn--flat) {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+}
+
 /* Board Telefon-Abstimmen: no box, a capital status line above the question. */
 :host(.vpn--phone) {
   gap: var(--space-5);
@@ -133,7 +140,7 @@
 }
 
 @media (max-width: 40rem) {
-  :host(:not(.vpn--phone):not(.vpn--card)) {
+  :host(:not(.vpn--phone):not(.vpn--card):not(.vpn--flat)) {
     padding: var(--space-5);
   }
 }

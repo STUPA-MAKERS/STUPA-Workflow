@@ -944,6 +944,47 @@ export interface Vote {
   canCast?: boolean;
 }
 
+/**
+ * One row of the vote list (`GET /votes`, `VoteListItem`). The row carries no tally;
+ * `GET /votes/{id}` reads it. `myBallot` and `canCast` are the own ballot state of the
+ * caller: a secret vote gives only `cast`, never the choice. `meetingTitle` and
+ * `agendaPosition` (the number of the agenda item, "TOP 3") are `null` for a vote
+ * without a meeting. `gremiumName` is `null` when the vote names no gremium.
+ */
+export interface VoteListItem {
+  id: Uuid;
+  question: string | null;
+  status: VoteStatus;
+  result: VoteResult | null;
+  secret: boolean;
+  applicationId: Uuid | null;
+  meetingId: Uuid | null;
+  meetingTitle: string | null;
+  agendaItemId: Uuid | null;
+  agendaPosition: number | null;
+  gremiumId: Uuid | null;
+  gremiumName: string | null;
+  createdAt: IsoDateTime;
+  openedAt: IsoDateTime | null;
+  closedAt: IsoDateTime | null;
+  /** The planned end of the cast window, not the real end. */
+  closesAt: IsoDateTime | null;
+  canCast: boolean;
+  myBallot: MyBallot;
+}
+
+/**
+ * The filters of `GET /votes`. `status` repeats; without it the server leaves out the
+ * drafts. `q` searches the question and the meeting title.
+ */
+export interface VoteListQuery {
+  status?: VoteStatus[];
+  gremiumId?: Uuid;
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
+
 /** Response to an accepted ballot. POST /api/votes/{id}/ballot. A ballot never
  *  changes after the cast: a second cast gives 409 `already_voted`. */
 export interface BallotResult {

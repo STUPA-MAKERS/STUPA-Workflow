@@ -76,6 +76,11 @@ export class ListDetailLayoutComponent {
 
   /** A row is open, so the narrow layout shows the detail. */
   readonly detailOpen = input(false);
+  /**
+   * Show "Zur Liste" above the detail in the one-view layout. A detail with its own way
+   * back (the phone header of a vote) turns it off; the focus then goes to the detail.
+   */
+  readonly backButton = input(true);
   /** The content width from which the panes sit side by side. */
   readonly splitMin = input(LIST_DETAIL_SPLIT_MIN);
 
@@ -89,7 +94,7 @@ export class ListDetailLayoutComponent {
 
   private readonly listPane = viewChild.required<ElementRef<HTMLElement>>('listPane');
   private readonly detailPane = viewChild.required<ElementRef<HTMLElement>>('detailPane');
-  private readonly backButton = viewChild<ElementRef<HTMLButtonElement>>('backButton');
+  private readonly backControl = viewChild<ElementRef<HTMLButtonElement>>('backButton');
   /** The element in the list that had the focus when the detail opened. */
   private returnFocus: HTMLElement | null = null;
 
@@ -148,7 +153,9 @@ export class ListDetailLayoutComponent {
           afterNextRender(
             () => {
               if (this.returnFocus !== null || focusIsLost(null)) {
-                this.backButton()?.nativeElement.focus();
+                const back = this.backControl()?.nativeElement;
+                if (back) back.focus();
+                else this.detailPane().nativeElement.focus();
               }
             },
             { injector },
