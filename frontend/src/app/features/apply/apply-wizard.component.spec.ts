@@ -1,5 +1,5 @@
 import { computed, signal } from '@angular/core';
-import { Router, provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -125,6 +125,8 @@ interface SetupOpts {
   types?: () => ReturnType<ApiClient['applicationTypes']>;
   effectiveForm?: () => ReturnType<ApiClient['effectiveForm']>;
   freetexts?: Record<string, Record<string, string>>;
+  /** The query params of the route, for example `{ type: 't1' }`. */
+  query?: Record<string, string>;
 }
 
 async function setup(opts: SetupOpts = {}) {
@@ -149,6 +151,9 @@ async function setup(opts: SetupOpts = {}) {
       { provide: ApiClient, useValue: api },
       { provide: BrandingService, useValue: branding },
       { provide: ToastService, useValue: toast },
+      ...(opts.query
+        ? [{ provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(opts.query) } } }]
+        : []),
     ],
     componentProviders: [{ provide: DraftAttachmentsService, useValue: drafts }],
   });
@@ -581,6 +586,17 @@ describe('ApplyWizardComponent', () => {
     sessionStorage.setItem(`${DRAFT_PREFIX}t1`, JSON.stringify({ v: 1, model: { title: 'X' }, step: 'review' }));
     const s = await setup({ form: PLAIN, loggedIn: true });
     await waitFor(() => expect(s.comp.currentStep()).toBe('review'));
+  });
+
+  it('picks the type a link names (`?type=`), before the type of the last autosave', async () => {
+    sessionStorage.setItem(DRAFT_LAST_TYPE, 'unknown');
+    const s = await setup({ query: { type: 't1' } });
+    await waitFor(() => expect(s.comp.typeId()).toBe('t1'));
+  });
+
+  it('ignores a type in the link that is not active', async () => {
+    const s = await setup({ query: { type: 't2' } });
+    expect(s.comp.typeId()).toBeNull();
   });
 
   it('ignores a broken autosave and an unknown last type', async () => {

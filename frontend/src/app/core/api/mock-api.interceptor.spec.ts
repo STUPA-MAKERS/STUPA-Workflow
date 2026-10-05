@@ -80,6 +80,25 @@ describe('mockApiInterceptor', () => {
     expect(form.sections[2].fields.some((f) => f.isPII)).toBe(true);
   });
 
+  it('plays a new person without gremium, tasks, applications, votes and meetings', async () => {
+    const { api } = setup(true);
+    localStorage.setItem('mockNewUser', '1');
+    try {
+      const me = await firstValueFrom(api.me());
+      expect(me.gremien).toEqual([]);
+      expect(await firstValueFrom(api.listTasks())).toEqual([]);
+      expect((await firstValueFrom(api.listApplications({ mine: true }))).total).toBe(0);
+      expect((await firstValueFrom(api.listVotes())).total).toBe(0);
+      const timeline = await firstValueFrom(api.listMeetingsTimeline({ direction: 'upcoming' }));
+      expect(timeline.items).toEqual([]);
+      expect(await firstValueFrom(TestBed.inject(HttpClient).get('/api/delegations'))).toEqual([]);
+      // Every other request keeps the demo data.
+      expect((await firstValueFrom(api.applicationTypes())).length).toBeGreaterThan(0);
+    } finally {
+      localStorage.removeItem('mockNewUser');
+    }
+  });
+
   it('plays a visitor without a session when mockAnonymous is set', async () => {
     const { api } = setup(true);
     localStorage.setItem('mockAnonymous', '1');

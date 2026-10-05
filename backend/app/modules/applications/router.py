@@ -262,7 +262,7 @@ async def list_applications(
     amount_max: Annotated[Decimal | None, Query(alias="amountMax", ge=0)] = None,
     created_from: Annotated[date | None, Query(alias="createdFrom")] = None,
     created_to: Annotated[date | None, Query(alias="createdTo")] = None,
-    sort: Annotated[Literal["createdAt", "amount"], Query()] = "createdAt",
+    sort: Annotated[Literal["createdAt", "amount", "stateSince"], Query()] = "createdAt",
     order: Annotated[Literal["asc", "desc"], Query()] = "desc",
     # "My applications" forces the owner filter even for a principal that holds
     # application.read. Without it, that principal would see every application.
@@ -282,7 +282,9 @@ async def list_applications(
     boolean can only answer one of them.
 
     ``state`` can repeat (A4): ``?state=a&state=b`` lists the applications in state
-    ``a`` or ``b``. Each item carries ``stateSince`` (A9).
+    ``a`` or ``b``. Each item carries ``stateSince`` (A9). ``sort=stateSince`` sorts by
+    that time, so a list that shows the date of the last status change is in the order
+    of that date.
     """
     # `Principal.has` is the single RBAC chokepoint: it grants every right to the admin
     # role AND applies the OAuth scope cap. Reading `principal.roles` directly would skip
@@ -332,7 +334,7 @@ async def export_applications_xlsx(
     amount_max: Annotated[Decimal | None, Query(alias="amountMax", ge=0)] = None,
     created_from: Annotated[date | None, Query(alias="createdFrom")] = None,
     created_to: Annotated[date | None, Query(alias="createdTo")] = None,
-    sort: Annotated[Literal["createdAt", "amount"], Query()] = "createdAt",
+    sort: Annotated[Literal["createdAt", "amount", "stateSince"], Query()] = "createdAt",
     order: Annotated[Literal["asc", "desc"], Query()] = "desc",
     # As in the list: archived applications stay out by default. The export of a list
     # that shows them must hold them too.

@@ -1184,6 +1184,39 @@ function mockAnonymous(): boolean {
   }
 }
 
+/**
+ * The mock plays a person who just signed in for the first time
+ * (`localStorage['mockNewUser'] = '1'`): no gremium, no task, no own application, no
+ * vote, no meeting. For the empty states of the start page.
+ */
+function mockNewUser(): boolean {
+  try {
+    return localStorage.getItem('mockNewUser') === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** The session of the new person: the global role "Mitglied" and nothing else. */
+const MOCK_NEW_USER: Principal = {
+  sub: '00000000-0000-0000-0000-000000000099',
+  display_name: 'Jana Roth',
+  email: 'jana.roth@stupa.example',
+  roles: ['member'],
+  permissions: ['application.read'],
+  groups: [],
+  gremien: [],
+};
+
+/** The answers of the start page for the new person, or undefined for other requests. */
+export function mockNewUserGet(p: string): unknown {
+  if (p.endsWith('/auth/me')) return MOCK_NEW_USER;
+  if (p.endsWith('/applications/tasks') || p.endsWith('/delegations')) return [];
+  if (/(^|\/)api\/(applications|votes)$/.test(p)) return { items: [], total: 0, limit: 25, offset: 0 };
+  if (p.endsWith('/meetings/timeline')) return { items: [], nextCursor: null };
+  return undefined;
+}
+
 let MOCK_DRAFT_SEQ = 0;
 
 /** The answer to a draft upload: a new id, the name and size of the sent file. */
@@ -1219,6 +1252,11 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   const p = path(req.url);
   const ok = <T>(body: T, status = 200): Observable<HttpEvent<unknown>> =>
     of(new HttpResponse({ status, body })).pipe(delay(120));
+
+  if (req.method === 'GET' && mockNewUser()) {
+    const body = mockNewUserGet(p);
+    if (body !== undefined) return ok(body);
+  }
 
   const substitutes = mockSubstitutes(req, p);
   if (substitutes) return substitutes;

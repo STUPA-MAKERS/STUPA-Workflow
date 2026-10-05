@@ -15,7 +15,7 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
@@ -152,6 +152,7 @@ export class ApplyWizardComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly drafts = inject(DraftAttachmentsService);
   protected readonly phone = mediaQuerySignal(MEDIA.phone);
@@ -322,9 +323,13 @@ export class ApplyWizardComponent {
       next: (t) => {
         const active = t.filter((x) => x.active);
         this.types.set(active);
-        // Pick up the type of the last autosave on this device.
-        const last = readStorage(DRAFT_LAST_TYPE);
-        if (last && active.some((x) => x.id === last)) this.selectType(last);
+        // A link that names a type (`/apply?type=…`, the start page) picks it. Else pick
+        // up the type of the last autosave on this device.
+        const wanted = [
+          this.route.snapshot.queryParamMap.get('type'),
+          readStorage(DRAFT_LAST_TYPE),
+        ].find((id) => !!id && active.some((x) => x.id === id));
+        if (wanted) this.selectType(wanted);
       },
       error: () => this.toast.error(this.i18n.translate('apply.error.typesLoad')),
     });

@@ -104,3 +104,42 @@ async def test_state_since_in_list_detail_and_tasks(
     by_id = {t.id: t.state_since for t in tasks}
     assert by_id[moved] == _REVIEWED
     assert by_id[fresh] == _CREATED
+
+
+async def test_list_sorts_by_state_since(
+    migrated: tuple[str, str],
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`sort=stateSince` orders by the last status change, not by the creation time.
+
+    "Bewegt" is the older application, but its status changed last. The creation order
+    and the order of the last status change are so opposite.
+    """
+    seed = await seed_read_world(maker)
+    moved = await create_app(maker, seed, actor=seed.owner_sub, title="Bewegt")
+    fresh = await create_app(maker, seed, actor=seed.owner_sub, title="Neu")
+    await fire(maker, moved, seed.to_review_id, staff(seed))
+    await _pin_times(maker, moved, seed.pruefung_id)
+    await _pin_times(maker, fresh, seed.pruefung_id)
+    later = datetime(2026, 9, 10, 8, 0, tzinfo=UTC)
+    async with maker() as session:
+        await session.execute(
+            update(StatusEvent).where(StatusEvent.application_id == fresh).values(at=later)
+        )
+        await session.execute(
+            update(Application).where(Application.id == fresh).values(created_at=later)
+        )
+        await session.commit()
+
+    api = build_read_api(migrated[1], monkeypatch)
+    as_principal(api, Principal(sub="reader", permissions={"application.read"}))
+
+    def ids(query: str) -> list[str]:
+        page = get_json(api, f"/api/applications?{query}")
+        assert isinstance(page, dict)
+        return [i["id"] for i in page["items"]]
+
+    assert ids("sort=createdAt&order=desc") == [str(fresh), str(moved)]
+    assert ids("sort=stateSince&order=desc") == [str(moved), str(fresh)]
+    assert ids("sort=stateSince&order=asc") == [str(fresh), str(moved)]

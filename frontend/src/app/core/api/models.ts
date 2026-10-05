@@ -148,7 +148,9 @@ export interface ApplicationListQuery {
   amountMax?: number;
   createdFrom?: string;
   createdTo?: string;
-  sort?: 'createdAt' | 'amount';
+  /** `stateSince`: the time of the last status change, the date a row of "Meine Anträge"
+   *  shows. */
+  sort?: 'createdAt' | 'amount' | 'stateSince';
   order?: 'asc' | 'desc';
   /** Own applications only. It forces the owner filter even with `application.read`. */
   mine?: boolean;
