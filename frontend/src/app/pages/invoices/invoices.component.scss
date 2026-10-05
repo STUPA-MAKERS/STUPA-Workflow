@@ -26,48 +26,10 @@
   flex: 1 1 0;
   min-height: 0;
 }
-.inv > app-list-detail {
-  --ld-list-width: 440px;
-}
 
 /* ------------------------------------------------------------------ list pane */
-.inv__pane {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
-}
-.inv--split .inv__pane {
-  height: 100%;
-  min-height: 0;
-}
-
-.inv__head {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: var(--control-height);
-  padding-inline: var(--space-4) 0;
-}
-.inv__title {
-  flex: 1 1 auto;
-  min-width: 0;
-  margin: 0;
-  font-size: var(--fs-d2);
-  line-height: var(--lh-d2);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-tight);
-}
-
-.inv__filters {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
-}
+/* The column, its header and the search bar are the shared list geometry: `.ld-pane`
+   (styles.scss) and `app-page-header` with `pane`. */
 .inv__chips {
   display: flex;
   flex-wrap: wrap;
@@ -426,9 +388,6 @@
       #000 calc(100% - var(--inv-chip-fade)),
       transparent
     );
-  }
-  .inv__head {
-    padding-inline-start: var(--space-1);
   }
   .inv__month {
     padding-inline: var(--space-1);

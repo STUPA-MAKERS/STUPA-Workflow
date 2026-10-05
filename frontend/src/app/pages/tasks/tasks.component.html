@@ -1,12 +1,12 @@
 <div class="tasks" [class.tasks--split]="split()">
   <app-list-detail [detailOpen]="selectedId() !== null" (back)="closeDetail()">
-    <section list class="tasks__pane" aria-labelledby="tasks-title">
-      <header class="tasks__head">
-        <h1 id="tasks-title" class="tasks__title">{{ 'tasks.title' | t }}</h1>
-        @if (!loading() && !error()) {
-          <span class="tasks__meta">{{ 'tasks.count' | t: { n: tasks().length } }}</span>
-        }
-      </header>
+    <section list class="ld-pane" aria-labelledby="tasks-title">
+      <app-page-header
+        [pane]="true"
+        titleId="tasks-title"
+        [title]="'tasks.title' | t"
+        [meta]="!loading() && !error() ? ('tasks.count' | t: { n: tasks().length }) : null"
+      />
 
       <div class="tasks__scroll" appScrollFade="y">
         @if (error()) {

@@ -1,20 +1,20 @@
 <div class="af" [class.af--split]="split()" [class.af--home]="home()" [class.af--pane]="fullPane()">
   @if (showNav()) {
-    <nav class="af__nav" [attr.aria-label]="'admin.frame.navLabel' | t">
-      <div class="af__navHead">
-        <!-- On the home page the navigation is the page, so its title is the h1. Beside an
-             admin page the page has its own h1. -->
-        @if (home()) {
-          <h1 class="af__title">{{ 'admin.home.title' | t }}</h1>
-        } @else {
-          <p class="af__title">{{ 'admin.home.title' | t }}</p>
-        }
-      </div>
+    <nav class="ld-pane af__nav" [attr.aria-label]="'admin.frame.navLabel' | t">
+      <!-- The header of every list column. On the home page the navigation is the page,
+           so its title is the h1. Beside an admin page the page has its own h1. -->
+      <app-page-header
+        [pane]="true"
+        [title]="'admin.home.title' | t"
+        [titleTag]="home() ? 'h1' : 'p'"
+      />
       <!-- The search never scrolls away: in one column it sticks to the top of the page;
            beside the page the column keeps it and only the entries scroll. -->
-      <app-sticky-bar class="af__search">
+      <app-sticky-bar class="ld-pane__filters af__search">
+        <!-- The large search of every list column beside a sheet; one column keeps the
+             compact field. -->
         <app-search-pill
-          size="md"
+          [size]="split() ? 'lg' : 'md'"
           [clearable]="true"
           [placeholder]="'admin.frame.search' | t"
           [value]="query()"

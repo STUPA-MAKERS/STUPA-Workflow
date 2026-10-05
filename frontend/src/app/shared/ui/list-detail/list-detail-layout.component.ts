@@ -46,8 +46,8 @@ export const LIST_DETAIL_SPLIT_MIN = BREAKPOINTS.wideMin - NAV_RAIL_WIDTH - 2 * 
  * A list with a detail sheet beside it, as on the applications page.
  *
  * Wide (a wide viewport and content of {@link LIST_DETAIL_SPLIT_MIN} or more): the list on
- * the left at a fixed width (`--ld-list-width`, default 440px), the detail sheet fills the
- * rest. Otherwise one view at a time. The list shows until `detailOpen` is set; then the
+ * the left at the one list width of the app (`--ld-list-width` in styles.scss), the detail
+ * sheet fills the rest. Otherwise one view at a time. The list shows until `detailOpen` is set; then the
  * detail shows with a "Zur Liste" control above it that emits `back`. The list stays in the
  * DOM while hidden, so it keeps its scroll position.
  *

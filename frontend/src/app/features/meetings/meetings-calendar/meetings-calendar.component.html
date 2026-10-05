@@ -1,15 +1,15 @@
 <div class="cal">
-  <header class="cal__head">
-    <h1 class="cal__title">{{ 'meetings.title' | t }}</h1>
-    <app-meetings-view-switch value="calendar" (valueChange)="viewChange.emit($event)" />
-    <span class="cal__spacer"></span>
+  <!-- The same header as the list view: the title, the switch and the actions do not
+       move when the view changes. -->
+  <app-page-header [pane]="true" [title]="'meetings.title' | t">
+    <app-meetings-view-switch heading value="calendar" (valueChange)="viewChange.emit($event)" />
     @if (canCreate()) {
-      <app-button variant="fill" (click)="create.emit()">
+      <app-button actions variant="fill" (click)="create.emit()">
         <app-icon name="plus" [size]="17" />
         {{ 'meetings.list.new' | t }}
       </app-button>
     }
-  </header>
+  </app-page-header>
 
   <div class="cal__tools" role="toolbar" [attr.aria-label]="'meetings.overview.toolbar' | t">
     <div class="cal__nav">

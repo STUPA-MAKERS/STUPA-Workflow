@@ -28,6 +28,7 @@ import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { ApplicationsPageService } from '../applications/applications-page.service';
 import { groupByMonth, type MonthGroup } from '../applications/applications.util';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 const DAY_MS = 86_400_000;
 
@@ -66,6 +67,7 @@ interface TaskRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PageHeaderComponent,
     RouterOutlet,
     TranslatePipe,
     IconComponent,

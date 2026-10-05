@@ -1,3 +1,5 @@
+@use 'breakpoints' as bp;
+
 :host {
   display: block;
   width: 100%;
@@ -95,4 +97,53 @@
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+}
+
+/* ------------------------------------------------------------------ pane
+
+   The header of a list column (`pane`): the applications, the tasks, the votes, the
+   meetings, the bookings, the invoices, the budget tree and the Verwaltung navigation.
+   This block is the ONLY place that sets its geometry, so the title starts at the same
+   x and y, with the same size, on every such page, and the actions end on the edge of
+   the column. A page does not style its list header itself (see
+   list-geometry.contract.spec.ts).
+
+   - One line at the height of a control: the title at the start, the actions at the end.
+     Nothing wraps; the title shrinks first.
+   - The title is inset from the column edge like the rows below it. `--ph-inset` changes
+     the inset only where the column is no column (the Verwaltung home page in one column).
+   - The title keeps the d2 size on a phone too: the list is the page there. */
+:host(.ph--pane) {
+  flex: none;
+  margin-bottom: 0;
+}
+:host(.ph--pane) .ph__bar {
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+  min-height: var(--control-height);
+  padding-inline: var(--ph-inset, var(--space-4)) 0;
+}
+:host(.ph--pane) .ph__text {
+  flex: 1 1 0;
+}
+/* A control in the `heading` slot (the "Liste | Kalender" switch) sits on the centre
+   line of the title, as the actions do. */
+:host(.ph--pane) .ph__heading {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+:host(.ph--pane) .ph__title {
+  min-width: 0;
+  font-size: var(--fs-d2);
+  line-height: var(--lh-d2);
+}
+:host(.ph--pane) .ph__actions {
+  flex: none;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+}
+@include bp.phone {
+  :host(.ph--pane) .ph__bar {
+    padding-inline-start: var(--ph-inset, var(--space-1));
+  }
 }

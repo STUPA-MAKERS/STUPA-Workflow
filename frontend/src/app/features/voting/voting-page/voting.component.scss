@@ -30,58 +30,13 @@
   flex: 1 1 0;
   min-height: 0;
 }
-.vl > app-list-detail {
-  --ld-list-width: 440px;
-}
 
 /* ------------------------------------------------------------------ list pane */
-.vl__pane {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
-}
 .vl:not(.vl--split) .vl__pane {
   flex: 1 0 auto;
 }
-.vl--split .vl__pane {
-  height: 100%;
-  min-height: 0;
-}
-
-/* The title and the number of open votes on one baseline (as on the tasks page). */
-.vl__head {
-  display: flex;
-  flex: none;
-  align-items: baseline;
-  gap: var(--space-3);
-  min-height: var(--control-height);
-  padding-inline: var(--space-4) 0;
-}
-.vl__title {
-  min-width: 0;
-  margin: 0;
-  font-size: var(--fs-d2);
-  line-height: var(--lh-d2);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-tight);
-}
-.vl__meta {
-  flex: none;
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  white-space: nowrap;
-}
-
-/* The search and the chips stay in place while the rows scroll. */
-.vl__filters {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
-}
+/* The column, its header and the search bar are the shared list geometry: `.ld-pane`
+   (styles.scss) and `app-page-header` with `pane`. */
 .vl__chips {
   display: flex;
   flex-wrap: wrap;
@@ -271,9 +226,6 @@
       #000 calc(100% - var(--vl-chip-fade)),
       transparent
     );
-  }
-  .vl__head {
-    padding-inline-start: var(--space-1);
   }
   .vl__month {
     padding-inline: var(--space-1);

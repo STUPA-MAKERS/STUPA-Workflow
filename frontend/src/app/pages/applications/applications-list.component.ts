@@ -45,6 +45,7 @@ import {
 import {
   FilterSelectComponent,
   ListDetailLayoutComponent,
+  PageHeaderComponent,
   ListItemComponent,
   RowMenuComponent,
   SearchPillComponent,
@@ -138,6 +139,7 @@ type FilterSheet = 'budget' | 'more' | null;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PageHeaderComponent,
     FormsModule,
     RouterLink,
     RouterOutlet,

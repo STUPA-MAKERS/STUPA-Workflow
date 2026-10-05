@@ -1,8 +1,9 @@
 @use 'surface';
 
-/* The host fills the height its parent gives it; each pane scrolls on its own. */
+/* The host fills the height its parent gives it; each pane scrolls on its own. The width
+   of the list (`--ld-list-width`) and the gap (`--ld-gap`) are global tokens in
+   styles.scss: every list column of the app has the same width. */
 :host {
-  --ld-list-width: 440px;
   display: flex;
   min-width: 0;
   min-height: 0;
@@ -22,7 +23,7 @@
 
 /* Wide: the list at a fixed width, the detail sheet fills the rest. */
 :host(.ld--split) {
-  gap: var(--space-3);
+  gap: var(--ld-gap);
 }
 :host(.ld--split) .ld__list {
   flex: none;

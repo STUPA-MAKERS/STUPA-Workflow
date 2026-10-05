@@ -11,29 +11,30 @@
 >
   <input #fileInput type="file" accept="application/pdf,.pdf" hidden (change)="onFilePicked($event)" />
   <app-list-detail [detailOpen]="detailOpen()" (back)="closeDetail()">
-    <section list class="inv__pane" aria-labelledby="inv-title">
-      <header class="inv__head">
-        <h1 id="inv-title" class="inv__title">{{ 'invoices.title' | t }}</h1>
-        @if (canManage()) {
-          @if (phone()) {
-            <app-button size="sm" data-testid="inv-add" (click)="openCreate()">
-              <span class="inv__btn"><app-icon name="add" [size]="16" />{{ 'invoices.addShort' | t }}</span>
-            </app-button>
-            <app-row-menu [label]="'invoices.moreActions' | t" [sections]="phoneMenu()" (selected)="onHeaderMenu($event)" />
-          } @else {
-            <app-button
-              variant="text"
-              [iconOnly]="true"
-              [loading]="importing()"
-              [ariaLabel]="'invoices.import' | t"
-              [title]="'invoices.import' | t"
-              (click)="fileInput.click()"
-            ><app-icon name="upload" [size]="21" /></app-button>
+    <section list class="ld-pane" aria-labelledby="inv-title">
+      <app-page-header [pane]="true" titleId="inv-title" [title]="'invoices.title' | t">
+        <ng-container ngProjectAs="[actions]">
+          @if (canManage()) {
+            @if (phone()) {
+              <app-button size="sm" data-testid="inv-add" (click)="openCreate()">
+                <span class="inv__btn"><app-icon name="add" [size]="16" />{{ 'invoices.addShort' | t }}</span>
+              </app-button>
+              <app-row-menu [label]="'invoices.moreActions' | t" [sections]="phoneMenu()" (selected)="onHeaderMenu($event)" />
+            } @else {
+              <app-button
+                variant="text"
+                [iconOnly]="true"
+                [loading]="importing()"
+                [ariaLabel]="'invoices.import' | t"
+                [title]="'invoices.import' | t"
+                (click)="fileInput.click()"
+              ><app-icon name="upload" [size]="21" /></app-button>
+            }
           }
-        }
-      </header>
+        </ng-container>
+      </app-page-header>
 
-      <app-sticky-bar class="inv__filters">
+      <app-sticky-bar class="ld-pane__filters">
         <app-search-pill
           [placeholder]="'invoices.search' | t"
           [label]="'invoices.searchLabel' | t"

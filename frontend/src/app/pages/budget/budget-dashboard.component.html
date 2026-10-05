@@ -45,8 +45,8 @@
 } @else {
   <div class="bd" [class.bd--wide]="wide()">
     @if (wide()) {
-      <section class="bd__pane" [attr.aria-label]="'budget.dash.tree' | t">
-        <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
+      <section class="ld-pane ld-pane--fill bd__pane" [attr.aria-label]="'budget.dash.tree' | t">
+        <app-page-header [pane]="true" [title]="'nav.budget' | t" />
         <ng-container *ngTemplateOutlet="treePane" />
       </section>
     } @else {
@@ -262,8 +262,10 @@
        end where more rows are. -->
   <ng-template #treePane>
     <div class="bd__paneBody" [class.bd__paneBody--side]="!wide()">
-      <!-- Below the wide layout the year and the overview chips sit on the page, beside
-           the path chip, so the sheet holds only the search and the tree. -->
+      <!-- Wide: the search and then the chips under the title, as in every list column.
+           Below the wide layout the year and the overview chips sit on the page, beside
+           the path chip, so the side sheet holds only the search and the tree. -->
+      <app-search-pill [size]="wide() ? 'lg' : 'md'" [placeholder]="'budget.dash.search' | t" [(value)]="query" />
       @if (wide()) {
         <div class="bd__chips">
           <ng-container *ngTemplateOutlet="yearChip" />
@@ -272,7 +274,6 @@
           </button>
         </div>
       }
-      <app-search-pill size="md" [placeholder]="'budget.dash.search' | t" [(value)]="query" />
       <nav
         class="bd__tree"
         appScrollFade="y"

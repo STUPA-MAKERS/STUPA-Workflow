@@ -26,56 +26,16 @@
   flex: 1 1 0;
   min-height: 0;
 }
-.mtl > app-list-detail {
-  --ld-list-width: 440px;
-}
 
 /* ------------------------------------------------------------------ list pane */
-.mtl__pane {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
-}
-.mtl--split .mtl__pane {
-  height: 100%;
-  min-height: 0;
-}
+/* The column, its header and the search bar are the shared list geometry: `.ld-pane`
+   (styles.scss) and `app-page-header` with `pane`. */
 
-/* The title, the view switch and the calendar subscription on one centred line. */
-.mtl__head {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--control-height);
-  padding-inline: var(--space-4) 0;
-}
-.mtl__title {
-  flex: none;
-  min-width: 0;
-  margin: 0;
-  font-size: var(--fs-d2);
-  line-height: var(--lh-d2);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-tight);
-}
-.mtl__spacer {
-  flex: 1 1 auto;
-}
 /* The gap between the icon and the text of a header button; an icon button has none. */
-.mtl__head app-button ::ng-deep .btn:not(.btn--icon) app-icon {
+app-page-header app-button ::ng-deep .btn:not(.btn--icon) app-icon {
   margin-inline-end: 4px;
 }
 
-.mtl__filters {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
-}
 .mtl__chips {
   display: flex;
   flex-wrap: wrap;
@@ -233,13 +193,6 @@
 }
 
 @include bp.phone {
-  .mtl__head {
-    gap: var(--space-1);
-    padding-inline-start: var(--space-1);
-  }
-  .mtl__title {
-    flex: 1 1 auto;
-  }
   .mtl__month {
     padding-inline: var(--space-1);
   }

@@ -1,9 +1,16 @@
-<app-breadcrumbs />
+<!-- A list column has no breadcrumbs: its page is the root of the area. -->
+@if (!pane()) {
+  <app-breadcrumbs />
+}
 
 <div class="ph__bar">
   <div class="ph__text">
     <div class="ph__heading">
-      <h1 class="ph__title">{{ title() }}</h1>
+      @if (titleTag() === 'p') {
+        <p class="ph__title" [attr.id]="titleId()">{{ title() }}</p>
+      } @else {
+        <h1 class="ph__title" [attr.id]="titleId()">{{ title() }}</h1>
+      }
       @if (meta()) {
         <span class="ph__meta">{{ meta() }}</span>
       }
