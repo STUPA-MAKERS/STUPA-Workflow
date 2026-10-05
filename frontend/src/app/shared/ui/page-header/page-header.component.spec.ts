@@ -50,4 +50,16 @@ describe('PageHeaderComponent', () => {
     expect(host.classList.contains('ph--rail')).toBe(true);
     expect(host.classList.contains('ph--flush')).toBe(true);
   });
+
+  it('shows the meta text in the title block, not in the actions slot', async () => {
+    const host = await setup({ meta: '8 offen' });
+    const meta = host.querySelector('.ph__heading .ph__meta');
+    expect(meta?.textContent).toBe('8 offen');
+    expect(host.querySelector('.ph__actions .ph__meta')).toBeNull();
+  });
+
+  it('renders no meta element without a meta text', async () => {
+    const host = await setup();
+    expect(host.querySelector('.ph__meta')).toBeNull();
+  });
 });

@@ -5,14 +5,6 @@
   flex-direction: column;
 }
 
-/* "8 offen": a count beside the title, not a control. */
-.tasks__count {
-  align-self: flex-start;
-  margin-top: var(--space-2);
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
-
 /* The title gives no width to its column (width 0) and fills the cell (min-width 100%),
    so a long title takes the width that is left and ends in an ellipsis. It never makes
    the table wider than the page. */

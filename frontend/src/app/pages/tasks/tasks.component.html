@@ -1,8 +1,8 @@
-<app-page-header [title]="'tasks.title' | t" [subtitle]="'tasks.subtitle' | t">
-  @if (!loading() && !error()) {
-    <span actions class="tasks__count">{{ 'tasks.count' | t: { n: tasks().length } }}</span>
-  }
-</app-page-header>
+<app-page-header
+  [title]="'tasks.title' | t"
+  [subtitle]="'tasks.subtitle' | t"
+  [meta]="loading() || error() ? null : ('tasks.count' | t: { n: tasks().length })"
+/>
 
 @if (error()) {
   <p class="tasks__error" role="alert">{{ 'tasks.error' | t }}</p>

@@ -2,7 +2,12 @@
 
 <div class="ph__bar">
   <div class="ph__text">
-    <h1 class="ph__title">{{ title() }}</h1>
+    <div class="ph__heading">
+      <h1 class="ph__title">{{ title() }}</h1>
+      @if (meta()) {
+        <span class="ph__meta">{{ meta() }}</span>
+      }
+    </div>
     @if (subtitle()) {
       <p class="ph__subtitle">{{ subtitle() }}</p>
     }

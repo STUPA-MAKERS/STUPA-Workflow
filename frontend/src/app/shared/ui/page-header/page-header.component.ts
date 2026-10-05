@@ -32,6 +32,15 @@ export class PageHeaderComponent {
   readonly subtitle = input<string | null>(null);
 
   /**
+   * A short fact about the page, such as a count ("8 offen").
+   *
+   * The header shows it as muted text on the baseline of the title. Do not put such a
+   * text into the `actions` slot: on a phone the slot moves next to or under the title
+   * and the text then floats away from the title it belongs to.
+   */
+  readonly meta = input<string | null>(null);
+
+  /**
    * Drop the header's own bottom margin.
    *
    * Set it when the surrounding layout already spaces its children — a flex column
