@@ -1,0 +1,64 @@
+@for (block of blocks(); track block.key) {
+  <section class="av__sec" [attr.aria-label]="block.label">
+    <h3 class="sec av__title">{{ block.label }}</h3>
+    @for (chunk of block.chunks; track chunk.key) {
+      @if (chunk.kind === 'positions') {
+        <app-positions-view [label]="chunk.label" [value]="chunk.value" [surface]="surface()" />
+      } @else {
+        <app-field-group [surface]="surface()">
+          @for (row of chunk.rows; track $index) {
+            @switch (row.kind) {
+              @case ('grid') {
+                <div class="av__grid">
+                  @for (cell of row.cells; track cell.key) {
+                    <app-field-row [label]="cell.label" [mono]="cell.mono" [attr.data-key]="cell.key">
+                      {{ cell.value }}
+                    </app-field-row>
+                  }
+                </div>
+              }
+              @case ('text') {
+                <app-field-row [label]="row.cell.label" [attr.data-key]="row.cell.key">
+                  @if (row.markdown) {
+                    <app-markdown-view [src]="row.cell.value" />
+                  } @else {
+                    {{ row.cell.value }}
+                  }
+                </app-field-row>
+              }
+              @case ('table') {
+                <div class="av__table" [attr.data-key]="row.key">
+                  <span class="av__tableLabel">{{ row.label }}</span>
+                  <div class="av__tableScroll">
+                    <table>
+                      <thead>
+                        <tr>
+                          @for (c of row.columns; track c) {
+                            <th scope="col">{{ c }}</th>
+                          }
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (r of row.rows; track $index) {
+                          <tr>
+                            @for (v of r; track $index) {
+                              <td>{{ v }}</td>
+                            }
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              }
+            }
+          }
+        </app-field-group>
+      }
+    }
+  </section>
+} @empty {
+  @if (emptyText()) {
+    <p class="av__none">{{ emptyText() }}</p>
+  }
+}

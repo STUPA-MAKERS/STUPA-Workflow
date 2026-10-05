@@ -4,10 +4,15 @@ import type {
   ApplicationOutWire,
   ApplicationShareLink,
   AttachmentOutWire,
+  EffectiveForm,
+  MeetingOutWire,
   Page,
+  ProblemDetail,
   StateOutWire,
+  TimelineEventOutWire,
   TransitionOutWire,
   TransitionResult,
+  VersionOutWire,
 } from './models';
 
 /**
@@ -18,6 +23,12 @@ import type {
  * one archived, so the list shows its month groups, its status texts and its filters. The
  * state changes when a transition fires, and archive and delete act on the rows, so the
  * row menu and the detail header can be tried out.
+ *
+ * The detail (FE4b) gets a form with three sections (Vorhaben, Kosten, Kontakt), cost
+ * positions with offers (one without comparison offers), a history of status changes
+ * and versions, and an edit that makes a new version. A position without any offer
+ * gives the 422 of the server. Three planned meetings of the Gremium serve the agenda
+ * dialog; a fire with `meetingId` checks that the meeting is one of them.
  */
 
 /** The id prefix of the demo rows. The interceptor sends these paths here. */
@@ -63,6 +74,12 @@ interface DemoApp {
   amount: number | null;
   created: string;
   archived?: string;
+  /** The answers after an edit. Until then `answers(d)` builds them. */
+  data?: Record<string, unknown>;
+  /** The versions after the first edit of this session. */
+  versions?: VersionOutWire[];
+  /** Status changes fired in this session. */
+  events?: TimelineEventOutWire[];
 }
 
 const DEMO: DemoApp[] = [
@@ -111,14 +128,8 @@ function detail(d: DemoApp): ApplicationOutWire {
     ...listItem(d),
     budgetId: BUDGET,
     fiscalYearId: FISCAL_YEAR,
-    data: {
-      title: d.title,
-      description:
-        'Ein Wochenende zum Kennenlernen mit Workshops, Wanderung und gemeinsamem Kochen.\n\nDer Antrag deckt die Unterkunft und die Busfahrt.',
-      category: 'event',
-      amount: d.amount,
-    },
-    version: d.n % 3 === 0 ? 1 : 2,
+    data: answers(d),
+    version: versionsOf(d).length,
     lang: 'de',
     applicant: { name: 'Erika Beispiel', email: 'erika.beispiel@example.org', anonymized: false },
     canEdit: true,
@@ -186,7 +197,8 @@ const ATTACHMENTS: AttachmentOutWire[] = [
   { id: 'att10000-0000-0000-0000-000000000003', filename: 'Programm_Wochenende.png', mime: 'image/png', size: 127_000, scanned: false, is_comparison_offer: false },
 ];
 
-const DETAIL_PATH = /\/applications\/(a1000000-[^/]+)(?:\/(transitions|attachments|shares|flow-states))?$/;
+const DETAIL_PATH =
+  /\/applications\/(a1000000-[^/]+)(?:\/(transitions|attachments|shares|flow-states|form|timeline|versions))?$/;
 
 /** GET of a demo path. `undefined`: not a path of this module. */
 export function mockApplicationsGet(p: string, params: HttpParams): unknown {
@@ -203,6 +215,12 @@ export function mockApplicationsGet(p: string, params: HttpParams): unknown {
       return [] satisfies ApplicationShareLink[];
     case 'flow-states':
       return Object.values(STATES);
+    case 'form':
+      return DEMO_FORM;
+    case 'timeline':
+      return timelineOf(d);
+    case 'versions':
+      return versionsOf(d);
     default:
       return detail(d);
   }
@@ -220,7 +238,23 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
     return null;
   }
   if (method === 'PATCH' && !m[2]) {
-    const title = (body as { data?: { title?: unknown } } | null)?.data?.title;
+    const data = (body as { data?: Record<string, unknown> } | null)?.data ?? {};
+    const errors = positionErrors(data['costs']);
+    if (errors.length) return { status: 422, problem: problem422(errors) } satisfies MockFailure;
+    const before = answers(d);
+    const versions = versionsOf(d);
+    d.data = { ...data };
+    d.versions = [
+      ...versions,
+      {
+        version: versions.length + 1,
+        data: d.data,
+        diff: diffOf(before, d.data),
+        changedBy: 'Demo Mitglied',
+        at: new Date().toISOString(),
+      },
+    ];
+    const title = data['title'];
     if (typeof title === 'string' && title.trim()) d.title = title.trim();
     return detail(d);
   }
@@ -229,9 +263,33 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
     return detail(d);
   }
   if (method === 'POST' && m[2] === 'transition') {
-    const id = (body as { transitionId?: string } | null)?.transitionId;
-    const t = FLOW[d.state].find((x) => x.id === id);
-    if (t) d.state = t.to;
+    const req = (body as { transitionId?: string; meetingId?: string | null; note?: string | null } | null) ?? {};
+    const t = FLOW[d.state].find((x) => x.id === req.transitionId);
+    if (req.meetingId && !agendaMeetings().some((mt) => mt.id === req.meetingId)) {
+      return {
+        status: 422,
+        problem: {
+          ...problem422([{ field: 'meetingId', msg: 'The meeting is not planned.' }]),
+          code: 'agenda_meeting_invalid',
+        },
+      } satisfies MockFailure;
+    }
+    if (t) {
+      const meeting = agendaMeetings().find((mt) => mt.id === req.meetingId);
+      d.events = [
+        ...(d.events ?? []),
+        {
+          fromStateId: STATES[d.state].id,
+          toStateId: STATES[t.to].id,
+          toState: STATES[t.to],
+          transitionLabel: { de: t.de, en: t.en },
+          actor: 'Demo Mitglied',
+          at: new Date().toISOString(),
+          note: [meeting?.title, req.note].filter(Boolean).join(' · ') || null,
+        },
+      ];
+      d.state = t.to;
+    }
     const result: TransitionResult = {
       newStateId: STATES[d.state].id,
       statusEventId: 'e1000000-0000-0000-0000-000000000001',
@@ -251,4 +309,253 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
 /** Back to the start rows (tests). */
 export function resetMockApplications(): void {
   rows = DEMO.map((d) => ({ ...d }));
+}
+
+/** A refused write: the interceptor answers with this status and problem. */
+export interface MockFailure {
+  status: number;
+  problem: ProblemDetail;
+}
+
+/** True for a refused write of this module. */
+export function isMockFailure(body: unknown): body is MockFailure {
+  return typeof body === 'object' && body !== null && 'problem' in body && 'status' in body;
+}
+
+function problem422(errors: { field: string; msg: string }[]): ProblemDetail {
+  return {
+    type: 'about:blank',
+    title: 'Unprocessable Entity',
+    status: 422,
+    code: 'validation_error',
+    detail: 'Invalid application data.',
+    errors,
+  };
+}
+
+// --------------------------------------------------------------------- the form
+
+const OPTIONS_CATEGORY = [
+  { value: 'event', label: { de: 'Veranstaltung', en: 'Event' } },
+  { value: 'firstyear', label: { de: 'Erstsemester', en: 'First year' } },
+  { value: 'culture', label: { de: 'Kultur', en: 'Culture' } },
+];
+
+/** The form of the demo applications: three sections, as on the boards. */
+const DEMO_FORM: EffectiveForm = {
+  applicationTypeId: TYPE_FUND,
+  formVersionId: 'f0000000-0000-0000-0000-0000000000f1',
+  hasBudget: true,
+  sections: [
+    {
+      key: 'plan',
+      label: { de: 'Vorhaben', en: 'Project' },
+      fields: [
+        { key: 'title', type: 'text', label: { de: 'Titel', en: 'Title' }, required: true },
+        { key: 'description', type: 'textarea', label: { de: 'Beschreibung', en: 'Description' }, required: true },
+        { key: 'event_date', type: 'date', label: { de: 'Veranstaltungsdatum', en: 'Event date' } },
+        { key: 'participants', type: 'number', label: { de: 'Erwartete Teilnehmende', en: 'Expected participants' } },
+        {
+          key: 'gremium',
+          type: 'gremium_select',
+          label: { de: 'Zuständiges Gremium', en: 'Responsible committee' },
+          options: [{ value: GREMIUM, label: { de: 'Studierendenparlament', en: 'Studierendenparlament' } }],
+        },
+        { key: 'category', type: 'multiselect', label: { de: 'Kategorie', en: 'Category' }, options: OPTIONS_CATEGORY },
+        { key: 'needs_room', type: 'checkbox', label: { de: 'Raum der Hochschule nötig', en: 'Needs a university room' } },
+        {
+          key: 'room',
+          type: 'text',
+          label: { de: 'Raum', en: 'Room' },
+          visibleIf: { '==': [{ var: 'needs_room' }, true] },
+        },
+      ],
+    },
+    {
+      key: 'costs_section',
+      label: { de: 'Kosten', en: 'Costs' },
+      fields: [
+        { key: 'costs', type: 'positions', label: { de: 'Kostenaufstellung', en: 'Cost breakdown' }, required: true, validation: { minOffers: 2 } },
+        { key: 'entry_fee', type: 'currency', label: { de: 'Eintritt je Person', en: 'Entry fee per person' } },
+        {
+          key: 'income',
+          type: 'computed',
+          label: { de: 'Einnahmen aus Eintritt', en: 'Income from entry fees' },
+          compute: { '*': [{ var: 'entry_fee' }, { var: 'participants' }] },
+        },
+      ],
+    },
+    {
+      key: 'contact',
+      label: { de: 'Kontakt', en: 'Contact' },
+      fields: [
+        { key: 'payout_note', type: 'markdown', label: { de: 'Hinweis', en: 'Note' }, help: { de: 'Die Auszahlung geht an dieses Konto.', en: 'The payout goes to this account.' } },
+        { key: 'iban', type: 'iban', label: { de: 'IBAN für die Auszahlung', en: 'IBAN for the payout' }, isPII: true },
+      ],
+    },
+  ],
+};
+
+/** The cost positions of a demo amount: three positions, the last without offers. */
+function positionsFor(amount: number): Record<string, unknown>[] {
+  const a = Math.round(amount * 45) / 100;
+  const b = Math.round(amount * 35) / 100;
+  const c = Math.round((amount - a - b) * 100) / 100;
+  return [
+    {
+      label: 'Raummiete inkl. Reinigung',
+      offers: [
+        { label: 'Studierendenwerk', value: a, preferred: true },
+        { label: 'Stadthalle', value: Math.round(a * 118) / 100, preferred: false },
+        { label: 'Gemeindezentrum Nord', value: Math.round(a * 131) / 100, preferred: false },
+      ],
+    },
+    {
+      label: 'Verpflegung',
+      offers: [
+        { label: 'Mensa-Catering', value: b, preferred: true },
+        // A supplier named by the URL of its offer: the view links it and wraps it.
+        { label: 'https://www.baeckerei-am-campus.example/catering/angebote/sommerfest-2026',
+          value: Math.round(b * 109) / 100, preferred: false },
+      ],
+    },
+    {
+      label: 'Technik und Ton',
+      noOffers: true,
+      noOffersReason: 'Rahmenvertrag mit dem Technik-Team der Hochschule; andere Anbieter dürfen die Anlage nicht bedienen.',
+      offers: [{ label: 'Technik-Team der Hochschule', value: c, preferred: true }],
+    },
+  ];
+}
+
+/** The answers of a demo application as the server stores them. */
+function answers(d: DemoApp): Record<string, unknown> {
+  if (d.data) return d.data;
+  return {
+    title: d.title,
+    description:
+      'Ein Abend zum Kennenlernen mit **Workshops**, Musik und Verpflegung.\n\nDer Antrag deckt Raum, Verpflegung und Technik.',
+    event_date: '2026-10-16',
+    participants: 120,
+    gremium: GREMIUM,
+    category: ['event', 'firstyear'],
+    needs_room: false,
+    ...(d.amount === null ? {} : { costs: positionsFor(d.amount) }),
+    entry_fee: 3,
+    iban: 'DE89 3704 0044 0532 0130 00',
+  };
+}
+
+/** The versions: one, or two when the applicant changed the participants once. */
+function versionsOf(d: DemoApp): VersionOutWire[] {
+  if (d.versions) return d.versions;
+  const first: VersionOutWire = {
+    version: 1,
+    data: { ...answers(d), participants: 100 },
+    diff: null,
+    changedBy: 'applicant',
+    at: d.created,
+  };
+  if (d.n % 3 === 0) return [first];
+  return [
+    first,
+    {
+      version: 2,
+      data: answers(d),
+      diff: { added: {}, removed: {}, changed: { participants: { old: 100, new: 120 } } },
+      changedBy: 'applicant',
+      at: new Date(new Date(d.created).getTime() + 26 * 3600_000).toISOString(),
+    },
+  ];
+}
+
+/** The way of a state through the demo flow, from the submission on. */
+const PATH: Record<StateKey, StateKey[]> = {
+  submitted: ['submitted'],
+  review: ['submitted', 'review'],
+  agenda: ['submitted', 'review', 'agenda'],
+  approved: ['submitted', 'review', 'agenda', 'approved'],
+  rejected: ['submitted', 'rejected'],
+};
+
+/** The status changes: the submission, the way to the start state, then this session. */
+function timelineOf(d: DemoApp): TimelineEventOutWire[] {
+  const start = (d.events ?? []).length ? PATH[stateBefore(d)] : PATH[d.state];
+  const base = new Date(d.created).getTime();
+  const events: TimelineEventOutWire[] = start.map((key, i) => {
+    const prev = i ? start[i - 1] : null;
+    const t = prev ? FLOW[prev].find((x) => x.to === key) : undefined;
+    return {
+      fromStateId: prev ? STATES[prev].id : null,
+      toStateId: STATES[key].id,
+      toState: STATES[key],
+      transitionLabel: t ? { de: t.de, en: t.en } : key === 'approved' ? { de: 'Bewilligen', en: 'Approve' } : null,
+      actor: i ? 'Mara Keller' : 'Erika Beispiel',
+      at: new Date(base + i * 2 * 86_400_000 + 3_600_000).toISOString(),
+      note: null,
+    };
+  });
+  return [...events, ...(d.events ?? [])];
+}
+
+/** The state before the first transition of this session. */
+function stateBefore(d: DemoApp): StateKey {
+  const first = d.events?.[0]?.fromStateId;
+  return (Object.keys(STATES) as StateKey[]).find((k) => STATES[k].id === first) ?? d.state;
+}
+
+/** The changed keys between two answer sets, as the server's diff. */
+function diffOf(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+): NonNullable<VersionOutWire['diff']> {
+  const diff: NonNullable<VersionOutWire['diff']> = { added: {}, removed: {}, changed: {} };
+  for (const [k, v] of Object.entries(after)) {
+    if (!(k in before)) diff.added[k] = v;
+    else if (JSON.stringify(before[k]) !== JSON.stringify(v)) diff.changed[k] = { old: before[k], new: v };
+  }
+  for (const [k, v] of Object.entries(before)) if (!(k in after)) diff.removed[k] = v;
+  return diff;
+}
+
+/** The server's rule for a position without comparison offers: still one offer (D12). */
+function positionErrors(raw: unknown): { field: string; msg: string }[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((p: { noOffers?: boolean; offers?: unknown[] }, i) =>
+    p?.noOffers === true && (!Array.isArray(p.offers) || p.offers.length < 1)
+      ? [{ field: `costs[${i}]`, msg: 'needs at least 1 comparison offer(s)' }]
+      : [],
+  );
+}
+
+// --------------------------------------------------------------------- meetings
+
+/** A local `YYYY-MM-DD`, `days` away from today. */
+function dayFromToday(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** The planned meetings of the demo Gremium, for the agenda dialog. */
+export function agendaMeetings(): MeetingOutWire[] {
+  const meeting = (n: number, title: string, days: number, items: number): MeetingOutWire => ({
+    id: `d1000000-0000-0000-0000-00000000000${n}`,
+    title,
+    date: dayFromToday(days),
+    startTime: '18:00:00',
+    endTime: '21:00:00',
+    status: 'planned',
+    gremiumId: GREMIUM,
+    gremiumName: 'Studierendenparlament',
+    agendaItemCount: items,
+    votes: [],
+    createdAt: '2026-09-01T10:00:00Z',
+  });
+  return [
+    meeting(1, '34. Sitzung des Studierendenparlaments', 6, 7),
+    meeting(2, '35. Sitzung des Studierendenparlaments', 20, 6),
+    meeting(3, 'Sondersitzung des Studierendenparlaments', 27, 1),
+  ];
 }

@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { render, screen, within } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
 import { I18nService } from '@core/i18n/i18n.service';
 import { runAxe } from '../../../../testing/a11y';
 import { HistoryComponent, type HistoryEntry } from './history.component';
@@ -136,6 +137,112 @@ describe('HistoryComponent', () => {
     ]);
     expect(within(lists[1]).getByText('Du').tagName).toBe('SPAN');
     expect(lists[1].querySelector('time')).toBeNull();
+  });
+
+  it('lists the changed fields of an event with the old and the new value', async () => {
+    const { container } = await render(HistoryComponent, {
+      inputs: {
+        entries: [
+          {
+            at: at(YEAR, 9, 27, 21, 5),
+            icon: 'edit',
+            title: 'Version 2',
+            body: 'Zeile 1\nZeile 2',
+            changes: [
+              { kind: 'warn', tag: 'Geändert', label: 'Teilnehmende', old: '300', new: '350' },
+              { kind: 'warn', tag: 'Geändert', label: 'Kostenaufstellung' },
+              { kind: 'accent', tag: 'Hinzugefügt', label: 'Raum', new: 'R 101' },
+              { kind: 'error', tag: 'Entfernt', label: 'Notiz', old: 'alt' },
+            ],
+          },
+        ],
+      },
+    });
+    const items = [...container.querySelectorAll('.hist__changes li')];
+    expect(items).toHaveLength(4);
+    expect(items[0].querySelector('app-status-text')).toHaveClass('st--warn');
+    expect(items[0].querySelector('del')?.textContent).toBe('300');
+    expect(items[0].querySelector('ins')?.textContent).toBe('350');
+    expect(items[0].querySelector('.hist__arrow')).not.toBeNull();
+    // A field without a short value shows only its name.
+    expect(items[1].querySelector('del, ins')).toBeNull();
+    expect(items[1].textContent).not.toContain(':');
+    expect(items[2].querySelector('del')).toBeNull();
+    expect(items[2].querySelector('.hist__arrow')).toBeNull();
+    expect(items[3].querySelector('ins')).toBeNull();
+    expect(items[3].querySelector('app-status-text')).toHaveClass('st--error');
+    expect(container.querySelector('.hist__body')?.textContent).toBe('Zeile 1\nZeile 2');
+    expect(await runAxe(container)).toHaveNoViolations();
+  });
+
+  it('opens the long values of a change below its line, each change on its own', async () => {
+    const { container, fixture } = await render(HistoryComponent, {
+      inputs: {
+        entries: [
+          {
+            at: at(YEAR, 9, 27, 21, 5),
+            icon: 'edit',
+            title: 'Version 2',
+            changes: [
+              {
+                kind: 'warn',
+                tag: 'Geändert',
+                label: 'Beschreibung',
+                old: null,
+                new: null,
+                detail: { old: 'Zeile 1\n\n   – Zeile 2', new: 'Zeile 1\n\tZeile 3' },
+              },
+              { kind: 'accent', tag: 'Hinzugefügt', label: 'Notiz', detail: { old: null, new: 'Neu' } },
+              { kind: 'warn', tag: 'Geändert', label: 'Raum', old: 'A', new: 'B' },
+            ],
+          },
+        ],
+      },
+    });
+    const items = () => [...container.querySelectorAll<HTMLElement>('.hist__changes > li')];
+    // Closed: a button per change with long values, no values, no colon.
+    const buttons = screen.getAllByRole('button', { name: 'Werte anzeigen' });
+    expect(buttons).toHaveLength(2);
+    expect(items()[0].querySelector('del, ins')).toBeNull();
+    expect(items()[0].textContent).not.toContain(':');
+    expect(items()[2].querySelector('button')).toBeNull();
+
+    await userEvent.click(buttons[0]);
+    fixture.detectChanges();
+    const open = screen.getByRole('button', { name: 'Werte ausblenden' });
+    expect(open).toHaveAttribute('aria-expanded', 'true');
+    const block = container.querySelector(`#${open.getAttribute('aria-controls')}`);
+    // One element per line; the leading spaces become the indent, a tab counts four.
+    const lines = (sel: string) =>
+      [...(block?.querySelectorAll<HTMLElement>(`${sel} .hist__line`) ?? [])].map((l) => [
+        l.textContent,
+        l.style.paddingInlineStart,
+      ]);
+    expect(lines('del.hist__block')).toEqual([
+      ['Zeile 1', '0ch'],
+      ['', '0ch'],
+      ['– Zeile 2', '3ch'],
+    ]);
+    expect(lines('ins.hist__block')).toEqual([
+      ['Zeile 1', '0ch'],
+      ['Zeile 3', '4ch'],
+    ]);
+    expect(block?.textContent).toContain('Vorher');
+    expect(block?.textContent).toContain('Nachher');
+    // The second change stays closed; it has only the new side.
+    expect(items()[1].querySelector('.hist__values')).toBeNull();
+    await userEvent.click(within(items()[1]).getByRole('button'));
+    fixture.detectChanges();
+    const added = items()[1].querySelector('.hist__values');
+    expect(added?.querySelector('del')).toBeNull();
+    expect(added?.querySelector('ins')?.textContent?.trim()).toBe('Neu');
+    expect(added?.textContent).not.toContain('Vorher');
+    expect(await runAxe(container)).toHaveNoViolations();
+
+    await userEvent.click(open);
+    fixture.detectChanges();
+    expect(items()[0].querySelector('.hist__values')).toBeNull();
+    expect(within(items()[0]).getByRole('button')).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('draws nothing for no entries', async () => {

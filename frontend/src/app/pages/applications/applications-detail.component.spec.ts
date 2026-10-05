@@ -14,11 +14,11 @@ import { TestBed } from '@angular/core/testing';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ToastService } from '@stupa-makers/ui-kit';
+import { provideFormly } from '@shared/formly/formly.providers';
 import type {
   Application,
   ApplicationComment,
   ApplicationOutWire,
-  ApplicationVersion,
   CommentOutWire,
   FormFieldDef,
   StateOutWire,
@@ -99,6 +99,7 @@ async function setup(
       provideRouter([]),
       provideHttpClient(),
       provideHttpClientTesting(),
+      provideFormly(),
       { provide: USE_MOCK_API, useValue: false },
       { provide: AuthService, useValue: fakeAuth(permissions, roles) },
       // The real service polls; the page only asks it to refresh.
@@ -170,7 +171,7 @@ function flushAll(http: HttpTestingController, id = 'app-1', form = true) {
 // The attachments panel loads the attachments on render. An empty answer is fine.
 function flushAttachments(http: HttpTestingController) {
   flushTypes(http);
-  for (const req of http.match((r) => r.method === 'GET' && /\/attachments$/.test(r.url))) {
+  for (const req of http.match((r) => r.method === 'GET' && /\/(attachments|timeline)$/.test(r.url))) {
     req.flush([]);
   }
   // A manager also loads the cost-centre tree. An empty answer is fine.
@@ -403,8 +404,9 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
 
     // A field the active form version dropped keeps the stored text. No crash and no
-    // "Invalid Date".
-    expect(screen.getByText('{"from":"2026-05-01","to":"2026-05-02"}')).toBeInTheDocument();
+    // "Invalid Date". A dropped object (the old range) shows only its name.
+    expect(screen.getByText(/legacyRange/)).toBeInTheDocument();
+    expect(screen.queryAllByText(/\{"from"/)).toHaveLength(0);
     expect(screen.getByText('alt')).toBeInTheDocument();
     expect(screen.getByText('neu')).toBeInTheDocument();
     expect(screen.queryAllByText(/Invalid Date/)).toHaveLength(0);
@@ -900,11 +902,12 @@ describe('ApplicationsDetailComponent', () => {
     fields: FormFieldDef[],
     data: Record<string, unknown>,
     extra: Partial<ApplicationOutWire> = {},
+    versions: VersionOutWire[] = VERSIONS,
   ): Promise<Awaited<ReturnType<typeof setup>>> {
     return (async () => {
       const ctx = await setup();
       ctx.http.expectOne(url('')).flush({ ...appWire(), data, ...extra });
-      ctx.http.expectOne(url('/versions')).flush(VERSIONS);
+      ctx.http.expectOne(url('/versions')).flush(versions);
       ctx.http.expectOne(url('/comments')).flush(COMMENTS);
       for (const req of ctx.http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
         req.flush([]);
@@ -919,240 +922,53 @@ describe('ApplicationsDetailComponent', () => {
     })();
   }
 
-  it('formats checkbox / select / multiselect / currency / dash values', async () => {
+  it('shows the answers by section, the cost positions in their own block', async () => {
     const fields: FormFieldDef[] = [
+      { key: 'title', type: 'text', label: { de: 'Titel' } },
       { key: 'agree', type: 'checkbox', label: { de: 'Zustimmung' } },
-      {
-        key: 'cat',
-        type: 'select',
-        label: { de: 'Kategorie' },
-        options: [{ value: 'a', label: { de: 'Kultur' } }],
-      },
-      {
-        key: 'tags',
-        type: 'multiselect',
-        label: { de: 'Tags' },
-        options: [{ value: 'x', label: { de: 'X-Label' } }],
-      },
       { key: 'budget', type: 'currency', label: { de: 'Budget' } },
       { key: 'empty', type: 'text', label: { de: 'Leer' } },
-      { key: 'desc', type: 'markdown', label: { de: 'Beschreibung' } },
+      { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } },
     ];
     const data = {
+      title: 'Förderung Fest',
       agree: true,
-      cat: 'a',
-      tags: ['x', 'y'],
       budget: 1234.5,
       empty: '',
-      desc: '# ignored',
+      kosten: [{ label: 'Bühne', offers: [{ label: 'A', value: 100, preferred: true }] }],
+      legacy: 'alt',
     };
-    const { cmp } = await setupWithFields(fields, data);
-    const app = cmp.app() as Application;
-    const byKey = new Map(cmp.dataEntries(app).map((e) => [e.key, e.value]));
-    expect(byKey.get('agree')).toBe('Ja');
-    expect(byKey.get('cat')).toBe('Kultur');
-    // An unknown multiselect option falls back to the raw value.
-    expect(byKey.get('tags')).toBe('X-Label, y');
-    expect(byKey.get('budget')).toContain('1.234,50');
-    expect(byKey.get('empty')).toBe('—');
-    // A markdown field is display-only, so the rows exclude it.
-    expect(byKey.has('desc')).toBe(false);
+    const { http, container } = await setupWithFields(fields, data);
+    flushAttachments(http);
+    const answers = container.querySelector('app-answer-view') as HTMLElement;
+    expect(within(answers).getByRole('heading', { name: 'Antrag' })).toBeInTheDocument();
+    expect(within(answers).getByText('Zustimmung')).toBeInTheDocument();
+    expect(within(answers).getByText('Ja')).toBeInTheDocument();
+    expect(answers.textContent).toContain('1.234,50');
+    // The title is the heading of the sheet, an empty answer does not show.
+    expect(within(answers).queryByText('Titel')).not.toBeInTheDocument();
+    expect(within(answers).queryByText('Leer')).not.toBeInTheDocument();
+    expect(within(answers).getByText('Kostenaufstellung')).toBeInTheDocument();
+    expect(within(answers).getByText('Bühne')).toBeInTheDocument();
+    // An answer without a field comes last, as text.
+    expect(within(answers).getByRole('heading', { name: 'Weitere Angaben' })).toBeInTheDocument();
+    http.verify();
   });
 
-  it('renders a date and a daterange readably, not as a raw ISO day or raw JSON', async () => {
-    const fields: FormFieldDef[] = [
-      { key: 'eventDate', type: 'date', label: { de: 'Veranstaltungsdatum' } },
-      { key: 'period', type: 'daterange', label: { de: 'Zeitraum' } },
-      { key: 'halfOpen', type: 'daterange', label: { de: 'Ab' } },
-      { key: 'brokenDate', type: 'date', label: { de: 'Kaputt' } },
-      { key: 'brokenRange', type: 'daterange', label: { de: 'Kaputter Zeitraum' } },
-      { key: 'rangeText', type: 'daterange', label: { de: 'Zeitraum als Text' } },
-    ];
-    const data = {
-      eventDate: '2026-07-01',
-      period: { from: '2026-07-01', to: '2026-07-02' },
-      halfOpen: { from: '2026-07-01' },
-      brokenDate: 'irgendwann',
-      brokenRange: {},
-      rangeText: 'im Sommer',
-    };
-    const { cmp, container } = await setupWithFields(fields, data);
-    const byKey = new Map(cmp.dataEntries(cmp.app() as Application).map((e) => [e.key, e.value]));
-    expect(byKey.get('eventDate')).toBe('01.07.2026');
-    expect(byKey.get('period')).toBe('01.07.2026 \u2013 02.07.2026');
-    // A half-filled range shows the half it has.
-    expect(byKey.get('halfOpen')).toBe('01.07.2026');
-    // An unparsable answer keeps its text rather than reading "Invalid Date".
-    expect(byKey.get('brokenDate')).toBe('irgendwann');
-    expect(byKey.get('brokenRange')).toBe('\u2014');
-    expect(byKey.get('rangeText')).toBe('im Sommer');
-    // The screen a committee member reads shows neither raw JSON nor a raw ISO day.
-    const text = container.textContent ?? '';
-    expect(text).not.toContain('{"from"');
-    expect(text).not.toContain('{"to"');
-    expect(text).not.toContain('2026-07-01');
-    expect(screen.getByText('01.07.2026 \u2013 02.07.2026')).toBeTruthy();
-  });
-
-  it('handles unknown select option and non-finite currency and false checkbox', async () => {
-    const fields: FormFieldDef[] = [
-      {
-        key: 'cat',
-        type: 'select',
-        label: { de: 'Kategorie' },
-        options: [{ value: 'a', label: { de: 'Kultur' } }],
-      },
-      { key: 'budget', type: 'currency', label: { de: 'Budget' } },
-      { key: 'agree', type: 'checkbox', label: { de: 'Zustimmung' } },
-    ];
-    const data = { cat: 'zzz', budget: 'not-a-number', agree: false };
-    const { cmp } = await setupWithFields(fields, data);
-    const app = cmp.app() as Application;
-    const byKey = new Map(cmp.dataEntries(app).map((e) => [e.key, e.value]));
-    expect(byKey.get('cat')).toBe('zzz');
-    expect(byKey.get('budget')).toBe('not-a-number');
-    expect(byKey.get('agree')).toBe('Nein');
-  });
-
-  it('resolves gremium_select/budget_select answers to their option labels', async () => {
-    const fields: FormFieldDef[] = [
-      {
-        key: 'gremium',
-        type: 'gremium_select',
-        label: { de: 'Fachschaft / Referat' },
-        options: [{ value: 'c1cee422-4627-5387-bff7-6355a30170bc', label: { de: 'Fachschaft TEX' } }],
-      },
-      {
-        key: 'kst',
-        type: 'budget_select',
-        label: { de: 'Kostenstelle' },
-        options: [{ value: 'b-1', label: { de: 'AStA (STUPA.ASTA)' } }],
-      },
-    ];
-    const data = { gremium: 'c1cee422-4627-5387-bff7-6355a30170bc', kst: 'unknown-id' };
-    const { cmp } = await setupWithFields(fields, data);
-    const byKey = new Map(cmp.dataEntries(cmp.app() as Application).map((e) => [e.key, e.value]));
-    expect(byKey.get('gremium')).toBe('Fachschaft TEX');
-    // An unknown option, for example a deleted budget, falls back to the raw value.
-    expect(byKey.get('kst')).toBe('unknown-id');
-  });
-
-  it('renders raw data rows for keys without a field definition (excluding title)', async () => {
-    const { cmp } = await setupWithFields(
-      [{ key: 'known', type: 'text', label: { de: 'Bekannt' } }],
-      { title: 'Hidden', known: 'v', extra: { a: 1 } },
-    );
-    const app = cmp.app() as Application;
-    const rows = cmp.dataEntries(app);
-    const keys = rows.map((r) => r.key);
-    expect(keys).not.toContain('title');
-    expect(keys).toContain('extra');
-    const extra = rows.find((r) => r.key === 'extra');
-    expect(extra?.label).toBe('extra');
-    expect(extra?.value).toBe('{"a":1}');
-  });
-
-  it('renders the positions block with preferred-offer totals', async () => {
-    const fields: FormFieldDef[] = [
-      { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } },
-    ];
-    const data = {
-      kosten: [
-        {
-          label: 'Bühne',
-          offers: [
-            { label: 'Anbieter A', value: 100, preferred: true },
-            { label: 'Anbieter B', value: 120, preferred: false },
-          ],
-        },
-        { offers: 'nope' }, // A missing label falls back to '' through the ?? branch.
-      ],
-    };
-    const { cmp } = await setupWithFields(fields, data);
-    const app = cmp.app() as Application;
-
-    // dataEntries holds no positions.
-    expect(cmp.dataEntries(app).some((e) => e.key === 'kosten')).toBe(false);
-
-    const blocks = cmp.positionEntries(app);
-    expect(blocks).toHaveLength(1);
-    expect(blocks[0].positions).toHaveLength(2);
-    // A bad offers value normalizes to [].
-    expect(blocks[0].positions[1].offers).toEqual([]);
-    expect(blocks[0].positions[1].label).toBe('');
-
-    expect(cmp.positionValue(blocks[0].positions[0])).toBe(100);
-    // A position without a preferred offer counts as 0.
-    expect(cmp.positionValue(blocks[0].positions[1])).toBe(0);
-    expect(cmp.positionsTotal(blocks[0].positions)).toBe(100);
-    expect(cmp.money(100)).toContain('100,00');
-    expect(cmp.money(null)).toContain('0,00');
-    expect(cmp.money(NaN)).toContain('0,00');
-  });
-
-  it('maps the comparison-offer opt-out (noOffers + reason) into the positions block', async () => {
-    const fields: FormFieldDef[] = [
-      { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } },
-    ];
-    const data = {
-      kosten: [
-        {
-          label: 'Spezialteil',
-          offers: [{ label: 'Einziger Anbieter', value: 99, preferred: true }],
-          noOffers: true,
-          noOffersReason: 'Einziger Anbieter in der Region.',
-        },
-        { label: 'Normal', offers: [{ label: 'A', value: 1, preferred: true }] },
-      ],
-    };
-    const { cmp } = await setupWithFields(fields, data);
-    const [block] = cmp.positionEntries(cmp.app() as Application);
-    expect(block.positions[0].noOffers).toBe(true);
-    expect(block.positions[0].noOffersReason).toBe('Einziger Anbieter in der Region.');
-    expect(block.positions[1].noOffers).toBe(false);
-    expect(block.positions[1].noOffersReason).toBe('');
-  });
-
-  it('skips positions blocks when the value is not an array', async () => {
-    const fields: FormFieldDef[] = [
-      { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } },
-    ];
-    const { cmp } = await setupWithFields(fields, { kosten: 'broken' });
-    expect(cmp.positionEntries(cmp.app() as Application)).toEqual([]);
-  });
-
-  it('formatByField summarises a positions value (count × total) and dashes non-arrays', async () => {
-    const { cmp } = await setup();
-    const field: FormFieldDef = { key: 'kosten', type: 'positions', label: { de: 'Kosten' } };
-    const fmt = (
-      cmp as unknown as { formatByField: (f: FormFieldDef, v: unknown) => string }
-    ).formatByField.bind(cmp);
-    const summary = fmt(field, [
-      { offers: [{ value: 100, preferred: true }, { value: 80, preferred: false }] },
-      { offers: [{ value: 50, preferred: true }] },
-      { offers: [{ value: 10, preferred: false }] }, // No preferred offer counts as 0.
-      {}, // Missing offers count as 0.
-    ]);
-    expect(summary).toMatch(/^4 ×/);
-    expect(summary).toContain('150,00');
-    // A positions value that is no array falls back to a dash.
-    expect(fmt(field, 'nope')).toBe('—');
-  });
-
-  it('summarises positions compactly in a non-positions data row context', async () => {
-    // A positions value inside dataEntries runs through formatByField and then
-    // through formatPositions. This test drives the public formatter contract with a
-    // select that holds an array value and that the code handles as a multiselect.
-    // The positionEntries test above covers the positions summary. Here the check
-    // covers the edge case of an empty array over the dash branch.
-    const fields: FormFieldDef[] = [
-      { key: 'multi', type: 'multiselect', label: { de: 'Multi' } },
-    ];
-    const { cmp } = await setupWithFields(fields, { multi: 'not-array' });
-    const app = cmp.app() as Application;
-    const row = cmp.dataEntries(app).find((e) => e.key === 'multi');
-    // A multiselect value that is no array falls through to formatFieldValue.
-    expect(row?.value).toBe('not-array');
+  it('waits for the form before it shows the answers', async () => {
+    const { http, detectChanges, container } = await setup();
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush(COMMENTS);
+    detectChanges();
+    // No raw keys flash while the form is on its way.
+    expect(container.querySelector('app-answer-view')).toBeNull();
+    expect(container.querySelector('.ad .skel--panel')).not.toBeNull();
+    flushForm(http);
+    detectChanges();
+    expect(container.querySelector('app-answer-view')).not.toBeNull();
+    flushAttachments(http);
+    http.verify();
   });
 
   it('formats the requested amount, falling back for null / non-numeric', async () => {
@@ -1167,17 +983,201 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.amount(app('10', null))).toContain('10,00');
   });
 
-  it('isEmptyDiff is false for a null diff and true for an all-empty diff', async () => {
-    const { cmp } = await setup();
-    expect(cmp.isEmptyDiff({ diff: null } as ApplicationVersion)).toBe(false);
-    expect(
-      cmp.isEmptyDiff({ diff: { added: [], removed: [], changed: [] } } as ApplicationVersion),
-    ).toBe(true);
-    expect(
-      cmp.isEmptyDiff({
-        diff: { added: [{ key: 'a', value: 1 }], removed: [], changed: [] },
-      } as ApplicationVersion),
-    ).toBe(false);
+  it('builds the history from the status changes and the versions (A3)', async () => {
+    const { http, detectChanges, cmp, container } = await setup();
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush([]);
+    http.expectOne(url('/timeline')).flush([
+      { fromStateId: null, toStateId: 's1', toState: SUBMITTED, actor: 'Mia', at: '2026-06-05T10:00:00Z' },
+      {
+        fromStateId: 's1',
+        toStateId: 's2',
+        toState: { ...SUBMITTED, id: 's2', label: { de: 'In Prüfung' }, color: '#e8a33d' },
+        transitionLabel: { de: 'Prüfung beginnen' },
+        actor: 'Mara',
+        at: '2026-06-06T09:00:00Z',
+        note: 'Bitte Angebote nachreichen.',
+      },
+    ]);
+    flushForm(http);
+    detectChanges();
+
+    const entries = cmp.historyEntries();
+    expect(entries.map((e) => e.title)).toEqual(['Eingereicht', 'In Prüfung', 'Version 2']);
+    // The submission carries version 1; the transition and the note follow the state.
+    expect(entries[0].body).toBe('Version 1');
+    expect(entries[0].icon).toBe('send');
+    expect(entries[1].body).toBe('Übergang „Prüfung beginnen“\nBitte Angebote nachreichen.');
+    expect(entries[1].kind).toBe('warn');
+    expect(entries[2].changes?.[0]).toMatchObject({ tag: 'Geändert', label: 'title', old: 'Fest', new: 'Förderung Fest' });
+    // The tab counts the entries; the history renders them by day.
+    expect(cmp.tabs().find((t) => t.id === 'history')?.count).toBe(3);
+    expect(container.querySelector('#ad-history app-history')).not.toBeNull();
+    flushAttachments(http);
+    http.verify();
+  });
+
+  it('falls back to the label of an event without a state and to no body', async () => {
+    const { http, detectChanges, cmp } = await setup();
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush([]);
+    http.expectOne(url('/comments')).flush([]);
+    http.expectOne(url('/timeline')).flush([
+      { fromStateId: null, toStateId: 's9', toState: null, actor: null, at: '2026-06-05T10:00:00Z' },
+    ]);
+    flushForm(http);
+    detectChanges();
+    const [entry] = cmp.historyEntries();
+    expect(entry.title).toBe('');
+    expect(entry.body).toBeNull();
+    expect(entry.kind).toBe('neutral');
+    flushAttachments(http);
+    http.verify();
+  });
+
+  it('shows version 1 as an entry of its own without status changes', async () => {
+    const { http, detectChanges, cmp } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    const entries = cmp.historyEntries();
+    expect(entries.map((e) => e.title)).toEqual(['Version 1', 'Version 2']);
+    expect(entries[0].body).toBe('Erste Fassung');
+    expect(entries[0].actor).toBe('Mia');
+    http.verify();
+  });
+
+  it('keeps a long or complex value of the diff out of the line and in a block', async () => {
+    const fields: FormFieldDef[] = [
+      { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } },
+      { key: 'text', type: 'textarea', label: { de: 'Beschreibung' } },
+      { key: 'tbl', type: 'table', label: { de: 'Tabelle' } },
+      { key: 'agree', type: 'checkbox', label: { de: 'Zustimmung' } },
+    ];
+    const { http, cmp } = await setupWithFields(fields, {});
+    flushAttachments(http);
+    const positions = [
+      {
+        label: 'Raummiete',
+        offers: [
+          { label: 'Studierendenwerk', value: 177.75, preferred: true },
+          { label: 'Hotel', value: 200, preferred: false },
+        ],
+      },
+      { label: '', noOffers: true, noOffersReason: 'Einziger Anbieter', offers: [{ label: 'Mensa', value: 20, preferred: true }] },
+    ];
+    // Cost positions: the summary on the line, every position and offer in the block.
+    expect(cmp.fmt(positions, 'kosten')).toBe('2 Kostenpositionen · 197,75\u00a0€');
+    expect(cmp.fmt([positions[0]], 'kosten')).toBe('1 Kostenposition · 177,75\u00a0€');
+    expect(cmp.fmt([], 'kosten')).toBe('—');
+    expect(cmp.fmtBlock(positions, 'kosten')).toBe(
+      [
+        'Raummiete · 177,75\u00a0€',
+        '   – Studierendenwerk · 177,75\u00a0€ · bevorzugt',
+        '   – Hotel · 200,00\u00a0€',
+        'Position ohne Namen · 20,00\u00a0€',
+        '   ohne Vergleichsangebote: Einziger Anbieter',
+        '   – Mensa · 20,00\u00a0€ · bevorzugt',
+      ].join('\n'),
+    );
+    expect(cmp.fmtBlock(null, 'kosten')).toBe('—');
+    // A long text: only the field name on the line, the whole text in the block.
+    expect(cmp.fmt('lang', 'text')).toBeNull();
+    expect(cmp.fmtBlock('Zeile 1\nZeile 2', 'text')).toBe('Zeile 1\nZeile 2');
+    expect(cmp.fmtBlock('  ', 'text')).toBe('—');
+    // A table: one line per row.
+    expect(cmp.fmt([{ a: 1 }], 'tbl')).toBeNull();
+    expect(cmp.fmtBlock([{ a: 1, b: 'x' }, 'frei', { c: { d: 2 } }], 'tbl')).toBe(
+      'a: 1 · b: x\nfrei\nc: {"d":2}',
+    );
+    expect(cmp.fmtBlock(null, 'tbl')).toBe('—');
+    // A short field: on the line, no block.
+    expect(cmp.fmt(false, 'agree')).toBe('Nein');
+    expect(cmp.fmt(null, 'agree')).toBe('—');
+    expect(cmp.fmtBlock(false, 'agree')).toBeNull();
+    // A key without a field: a scalar stays text, an object goes into the block.
+    expect(cmp.fmt('alt', 'gone')).toBe('alt');
+    expect(cmp.fmtBlock('alt', 'gone')).toBeNull();
+    expect(cmp.fmt({ a: 1 }, 'gone')).toBeNull();
+    expect(cmp.fmtBlock({ a: 1, b: [2] }, 'gone')).toBe('a: 1\nb: [2]');
+    expect(cmp.fmt('ohne', undefined)).toBe('ohne');
+    http.verify();
+  });
+
+  it('opens the old and the new text of a changed long text below its line', async () => {
+    const fields: FormFieldDef[] = [{ key: 'title', type: 'textarea', label: { de: 'Beschreibung' } }];
+    const { http, cmp, detectChanges, container } = await setupWithFields(fields, {});
+    flushAttachments(http);
+    const version2 = cmp.historyEntries().find((e) => e.title === 'Version 2');
+    expect(version2?.changes?.[0]).toMatchObject({
+      label: 'Beschreibung',
+      old: null,
+      new: null,
+      detail: { old: 'Fest', new: 'Förderung Fest' },
+    });
+    const more = screen.getByRole('button', { name: 'Werte anzeigen' });
+    expect(more).toHaveAttribute('aria-expanded', 'false');
+    expect(more).not.toHaveAttribute('aria-controls');
+    await userEvent.click(more);
+    detectChanges();
+    const less = screen.getByRole('button', { name: 'Werte ausblenden' });
+    expect(less).toHaveAttribute('aria-expanded', 'true');
+    const values = container.querySelector(`#${less.getAttribute('aria-controls')}`);
+    expect(values?.querySelector('del')?.textContent?.trim()).toBe('Fest');
+    expect(values?.querySelector('ins')?.textContent?.trim()).toBe('Förderung Fest');
+    expect(values).toHaveTextContent('Vorher');
+    expect(values).toHaveTextContent('Nachher');
+    http.verify();
+  });
+
+  it('leaves out a summary that did not change and keeps the blocks', async () => {
+    const fields: FormFieldDef[] = [{ key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } }];
+    const offer = (label: string) => [
+      { label: 'Raum', offers: [{ label, value: 10, preferred: true }] },
+    ];
+    const { http, cmp } = await setupWithFields(fields, {}, {}, [
+      VERSIONS[0],
+      {
+        ...VERSIONS[1],
+        diff: {
+          added: { kosten: offer('Neu') },
+          removed: {},
+          changed: { kosten: { old: offer('A'), new: offer('B') } },
+        },
+      },
+    ]);
+    flushAttachments(http);
+    const changes = cmp.historyEntries().find((e) => e.title === 'Version 2')?.changes ?? [];
+    // Only an offer text changed: the totals are the same, so only the blocks differ.
+    expect(changes[0]).toMatchObject({ old: null, new: null });
+    expect(changes[0].detail?.old).toContain('– A · 10,00');
+    expect(changes[0].detail?.new).toContain('– B · 10,00');
+    // An added field keeps its summary and has only the new block.
+    expect(changes[1]).toMatchObject({ new: '1 Kostenposition · 10,00\u00a0€' });
+    expect(changes[1].detail?.old).toBeNull();
+    http.verify();
+  });
+
+  it('names the applicant as the author of a version', async () => {
+    const { http, detectChanges, cmp } = await setup();
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush([
+      { ...VERSIONS[0], changedBy: 'applicant' },
+      { ...VERSIONS[1], changedBy: null, diff: { added: { a: 'neu' }, removed: { b: 'alt' }, changed: {} } },
+    ]);
+    http.expectOne(url('/comments')).flush([]);
+    flushForm(http);
+    detectChanges();
+    flushAttachments(http);
+    const [first, second] = cmp.historyEntries();
+    expect(first.actor).toBe('Antragsteller:in');
+    expect(second.actor).toBeNull();
+    expect(second.changes?.map((c) => [c.tag, c.kind])).toEqual([
+      ['Hinzugefügt', 'accent'],
+      ['Entfernt', 'error'],
+    ]);
+    http.verify();
   });
 
   it('derives the author name', async () => {
@@ -1231,10 +1231,10 @@ describe('ApplicationsDetailComponent', () => {
     cmp.saveEdit();
     const patch = http.expectOne((r) => r.method === 'PATCH' && r.url === '/api/applications/app-1');
     expect(patch.request.body).toEqual({ data: { title: 'Neu' } });
-    patch.flush({ ...appWire(), data: { title: 'Neu' } });
+    patch.flush({ ...appWire(), version: 3, data: { title: 'Neu' } });
     expect(cmp.savingEdit()).toBe(false);
     expect(cmp.editing()).toBe(false);
-    expect(success).toHaveBeenCalled();
+    expect(success).toHaveBeenCalledWith('Gespeichert. Version 3 angelegt.');
 
     // The save triggers a refresh.
     http.expectOne(url('')).flush(appWire());
@@ -1309,14 +1309,22 @@ describe('ApplicationsDetailComponent', () => {
   });
 
   it('does not save while the edit form is invalid or already saving', async () => {
-    const { http, detectChanges, cmp } = await setup();
+    const { http, detectChanges, cmp, toast } = await setup();
     flushAll(http);
     detectChanges();
     flushAttachments(http);
+    const error = jest.spyOn(toast, 'error');
+    jest.useFakeTimers();
 
     jest.spyOn(cmp.editForm, 'invalid', 'get').mockReturnValue(true);
+    const touched = jest.spyOn(cmp.editForm, 'markAllAsTouched');
     cmp.saveEdit();
     expect(cmp.savingEdit()).toBe(false);
+    // The fields show their errors, and the toast says why nothing happened.
+    expect(touched).toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith('Prüfe die markierten Felder.');
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
 
     jest.spyOn(cmp.editForm, 'invalid', 'get').mockReturnValue(false);
     cmp.savingEdit.set(true);
@@ -1341,6 +1349,113 @@ describe('ApplicationsDetailComponent', () => {
       .flush({ title: 'e' }, { status, statusText: 'x' });
     expect(error).toHaveBeenCalledWith(message);
     expect(cmp.savingEdit()).toBe(false);
+    http.verify();
+  });
+
+  it('shows a 422 of the server on the cost position it names (D12)', async () => {
+    const fields: FormFieldDef[] = [
+      { key: 'title', type: 'text', label: { de: 'Titel' } },
+      { key: 'kosten', type: 'positions', label: { de: 'Kostenaufstellung' } },
+    ];
+    const kosten = [
+      { label: 'A', offers: [{ label: 'X', value: 10, preferred: true }, { label: 'Y', value: 12, preferred: false }, { label: 'Z', value: 13, preferred: false }] },
+      { label: 'B', noOffers: true, noOffersReason: 'Einziger Anbieter', offers: [{ label: 'Q', value: 5, preferred: true }] },
+    ];
+    const { http, detectChanges, cmp, toast } = await setupWithFields(fields, { title: 'Fest', kosten });
+    flushAttachments(http);
+    const error = jest.spyOn(toast, 'error');
+    cmp.startEdit(cmp.app() as Application);
+    detectChanges();
+    await new Promise((r) => setTimeout(r));
+    detectChanges();
+    expect(screen.getByText(/Speichern legt Version 3 an/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Speichern/ }));
+    http
+      .expectOne((r) => r.method === 'PATCH' && r.url === '/api/applications/app-1')
+      .flush(
+        {
+          type: 'about:blank',
+          title: 'Unprocessable',
+          status: 422,
+          code: 'validation_error',
+          errors: [{ field: 'kosten[1]', msg: 'needs at least 1 comparison offer(s)' }],
+        },
+        { status: 422, statusText: 'Unprocessable' },
+      );
+    detectChanges();
+    expect(error).toHaveBeenCalledWith('Prüfe die markierten Felder.');
+    expect(cmp.editing()).toBe(true);
+    // The position opens and names the rule of the server.
+    expect(
+      screen.getByText(
+        'Diese Position braucht mehr Angebote. Ohne Vergleichsangebote: ein Angebot und eine Begründung.',
+      ),
+    ).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r));
+    http.verify();
+  });
+
+  it('falls back to the save toast for a 422 without a known field', async () => {
+    const { http, detectChanges, cmp, toast } = await setupWithFields(
+      [{ key: 'title', type: 'text', label: { de: 'Titel' } }],
+      { title: 'Fest' },
+    );
+    flushAttachments(http);
+    const error = jest.spyOn(toast, 'error');
+    cmp.startEdit(cmp.app() as Application);
+    detectChanges();
+    cmp.saveEdit();
+    http
+      .expectOne((r) => r.method === 'PATCH')
+      .flush(
+        { status: 422, code: 'validation_error', errors: [{ field: 'nope', msg: 'x' }] },
+        { status: 422, statusText: 'Unprocessable' },
+      );
+    expect(error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
+    http.verify();
+  });
+
+  it('opens the agenda dialog for a transition onto the agenda (A1)', async () => {
+    const { http, detectChanges, cmp } = await setup([
+      'application.read',
+      'application.transition',
+    ]);
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush([]);
+    http.expectOne(url('/transitions')).flush([
+      {
+        id: 'tr-a',
+        fromStateId: 's1',
+        toStateId: 's2',
+        label: { de: 'Auf Tagesordnung setzen' },
+        color: null,
+        addsToAgenda: true,
+        agendaGremiumId: 'g1',
+      },
+    ]);
+    flushForm(http);
+    detectChanges();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Auf Tagesordnung setzen' }));
+    // No fire yet: the dialog asks for the meeting first.
+    http.expectNone((r) => r.url === '/api/applications/app-1/transition');
+    expect(cmp.agendaOpen()).toBe(true);
+    expect(cmp.agendaTransition()?.id).toBe('tr-a');
+    http
+      .expectOne((r) => r.url === '/api/meetings' && r.params.get('gremiumId') === 'g1')
+      .flush([]);
+    detectChanges();
+    expect(screen.getByText(/Keine geplante Sitzung sichtbar/)).toBeInTheDocument();
+
+    // The dialog fired: the detail loads the application again.
+    cmp.onAgendaDone();
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush([]);
+    http.expectOne(url('/transitions')).flush([]);
+    flushAttachments(http);
     http.verify();
   });
 

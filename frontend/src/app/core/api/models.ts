@@ -327,7 +327,8 @@ export interface TransitionOutWire {
   label: I18nMap;
   /** Optional color for the decision button. */
   color?: string | null;
-  /** The transition carries an `addToNextSession` action (A1). */
+  /** The transition carries an `addToNextSession` action into a vote state (A1), so a
+   *  fire takes a `meetingId`. */
   addsToAgenda?: boolean;
   /** The gremium whose planned meetings the agenda dialog offers (A1). */
   agendaGremiumId?: Uuid | null;
@@ -418,6 +419,14 @@ export interface CommentCreateBody {
 export interface TransitionRequestBody {
   transitionId: Uuid;
   note?: string | null;
+  /**
+   * The meeting whose agenda gets the application (A1). Only for a transition with
+   * `addsToAgenda`; the meeting must be planned and belong to `agendaGremiumId`, else
+   * the server answers 422 `agenda_meeting_invalid`.
+   */
+  meetingId?: Uuid | null;
+  /** The new agenda item is not public (NÖ). Only with `meetingId`. */
+  nonPublic?: boolean;
 }
 
 /** `POST /applications/{id}/force-status`. A privileged direct status override.
@@ -581,8 +590,11 @@ export interface Transition {
   /** Optional color for the decision button. `null` selects the default. */
   color: string | null;
   /**
-   * The transition puts the application on the agenda of a meeting (A1). The agenda
-   * dialog (meeting choice) needs the meeting list; the row menu opens the detail instead.
+   * The transition puts the application on the agenda of a meeting and leads into a
+   * vote state (A1), so the server takes a chosen meeting. The detail and the row menu
+   * open the agenda dialog for it, which asks for the meeting. A transition whose
+   * action leads into a normal state is `false` here and fires as a plain transition;
+   * the server action then picks the next planned meeting.
    */
   addsToAgenda: boolean;
   /** The gremium whose planned meetings the agenda dialog offers, or null. */

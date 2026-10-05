@@ -1,5 +1,5 @@
 import type { FormlyFieldConfig } from '@ngx-formly/core';
-import type { FieldType, FormFieldDef, Lang } from '@core/api/models';
+import type { FieldType, FormFieldDef, FormSection, Lang } from '@core/api/models';
 import { evalJsonLogic, isFieldVisible, JsonLogicError } from './jsonlogic';
 import { resolveI18n } from './i18n-text';
 
@@ -65,6 +65,62 @@ export function toFormlyFields(
       ? sectionHeading(f, lang)
       : mapField(f, lang, extraContext),
   );
+}
+
+/** Field types that take the full width of the edit grid; the rest take one half. A
+ *  `multiselect` takes one half there: the edit form shows it as a dropdown. */
+const FULL_WIDTH_TYPES: ReadonlySet<FieldType> = new Set<FieldType>([
+  'textarea',
+  'daterange',
+  'markdown',
+  'table',
+  'positions',
+]);
+
+/** Options of `toFormlySections`. */
+export interface FormlySectionOptions {
+  /** Keys the form leaves out, for example the PII fields the server held back (O21). */
+  omitKeys?: readonly string[];
+}
+
+/**
+ * Translate the sections of an effective form into one Formly group for the edit
+ * form of the detail (board Anträge-Bearbeiten).
+ *
+ * The `title` field comes first over the full width. Each section then starts with its
+ * heading; short fields take half a row (class `fe-half`), long ones the full row
+ * (`fe-full`). The group carries the class `fe-grid`; the page lays it out as a grid of
+ * two columns. Everything else is as in `toFormlyFields`.
+ */
+export function toFormlySections(
+  sections: readonly FormSection[],
+  lang: Lang | string,
+  extraContext: Record<string, unknown> = {},
+  options: FormlySectionOptions = {},
+): FormlyFieldConfig[] {
+  const omit = new Set(options.omitKeys ?? []);
+  const keep = (f: FormFieldDef) => !omit.has(f.key) && f.type !== 'section';
+  const all = sections.flatMap((s) => s.fields);
+  const title = all.find((f) => f.key === 'title' && keep(f));
+  const group: FormlyFieldConfig[] = [];
+  if (title) group.push({ ...mapField(title, lang, extraContext), className: 'fe-full' });
+  for (const section of sections) {
+    const fields = section.fields.filter((f) => keep(f) && f !== title);
+    if (!fields.length) continue;
+    group.push({
+      type: 'display',
+      className: 'fe-full fe-heading',
+      props: { heading: true, label: resolveI18n(section.label, lang) },
+    });
+    for (const f of fields) {
+      const mapped = mapField(f, lang, extraContext);
+      // The edit form shows several choices as a dropdown (board Anträge-Bearbeiten), not
+      // as the checkbox list of the wizard.
+      if (f.type === 'multiselect') mapped.type = 'multiselect';
+      group.push({ ...mapped, className: FULL_WIDTH_TYPES.has(f.type) ? 'fe-full' : 'fe-half' });
+    }
+  }
+  return [{ fieldGroupClassName: 'fe-grid', fieldGroup: group }];
 }
 
 /** Section marker → non-editable heading (Formly `display`, `heading`). */

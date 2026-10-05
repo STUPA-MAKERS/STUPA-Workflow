@@ -771,7 +771,10 @@ function mockSearch(q: string): SearchResults {
 
 /** The paths of the demo applications in `mock-applications.ts` (id prefix `a1000000-`). */
 const DEMO_APPLICATION_PATH =
-  /\/applications\/a1000000-[^/]+(\/(transitions|attachments|shares|flow-states|transition|archive|force-status))?$/;
+  /\/applications\/a1000000-[^/]+(\/(transitions|attachments|shares|flow-states|form|timeline|versions|transition|archive|force-status))?$/;
+
+/** The Gremium of the demo applications; its planned meetings serve the agenda dialog. */
+const DEMO_GREMIUM = 'g0000000-0000-0000-0000-000000000001';
 
 /** The budget routes the demo data in `mock-budget.ts` answers. */
 const BUDGET_MOCK_PATH = /\/budgets(\/[^/]+\/(fiscal-years|applications))?$/;
@@ -826,9 +829,22 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         if (body === undefined) {
           return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
         }
+        if (m.isMockFailure(body)) {
+          return throwError(
+            () => new HttpErrorResponse({ status: body.status, error: body.problem, url: req.url }),
+          );
+        }
         return ok(body, req.method === 'DELETE' ? 204 : 200);
       }),
     );
+  }
+  // The agenda dialog of a demo application asks for the meetings of its Gremium.
+  if (
+    req.method === 'GET' &&
+    p.endsWith('/meetings') &&
+    req.params.get('gremiumId') === DEMO_GREMIUM
+  ) {
+    return from(import('./mock-applications')).pipe(mergeMap((m) => ok(m.agendaMeetings())));
   }
 
   if (req.method === 'GET') {

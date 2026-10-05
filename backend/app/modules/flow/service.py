@@ -118,8 +118,17 @@ def agenda_gremium_id(actions: Any) -> UUID | None:
     return None
 
 
-def _transition_out(t: Transition) -> TransitionOut:
-    gremium_id = agenda_gremium_id(t.actions)
+def _transition_out(t: Transition, vote_state_ids: set[UUID]) -> TransitionOut:
+    """Map a transition to its API shape.
+
+    `addsToAgenda` and `agendaGremiumId` are set only when the transition carries an
+    `addToNextSession` action and its target is a vote state. Only then does a fire
+    accept a `meetingId` (see `_check_agenda_meeting`), so the UI asks for a meeting
+    only when the server can take one. A transition with the action into a normal
+    state fires without a meeting, and the action picks the next planned meeting after
+    the commit.
+    """
+    gremium_id = agenda_gremium_id(t.actions) if t.to_state_id in vote_state_ids else None
     return TransitionOut(
         id=t.id,
         fromStateId=t.from_state_id,
@@ -209,6 +218,22 @@ class FlowService:
         return (
             await self.session.execute(select(State).where(State.id == state_id))
         ).scalar_one_or_none()
+
+    async def _vote_state_ids(self, transitions: list[Transition]) -> set[UUID]:
+        """Return the vote states among the targets of the agenda transitions.
+
+        Only a transition with an `addToNextSession` action needs the kind of its
+        target. Without such a transition the method does not query.
+        """
+        targets = {
+            t.to_state_id for t in transitions if agenda_gremium_id(t.actions) is not None
+        }
+        if not targets:
+            return set()
+        rows = await self.session.execute(
+            select(State.id).where(State.id.in_(targets), State.kind == "vote")
+        )
+        return set(rows.scalars().all())
 
     async def _outgoing(self, app: Application) -> list[Transition]:
         return list(
@@ -380,11 +405,13 @@ class FlowService:
         ctx = await flow_context.build_context(
             self.session, app, principal, manual=True, deadline_passed=deadline_passed
         )
-        return [
-            _transition_out(t)
+        visible = [
+            t
             for t in await self._outgoing(app)
             if not t.automatic and not t.branch and eval_guard(t.guard, ctx)
         ]
+        vote_ids = await self._vote_state_ids(visible)
+        return [_transition_out(t, vote_ids) for t in visible]
 
     _APPLICANT = Principal(sub="applicant", roles=[], permissions=set())
 
@@ -403,14 +430,16 @@ class FlowService:
         ctx = await flow_context.build_context(
             self.session, app, self._APPLICANT, manual=True, as_applicant=True
         )
-        return [
-            _transition_out(t)
+        visible = [
+            t
             for t in await self._outgoing(app)
             if not t.automatic
             and not t.branch
             and guard_requires_applicant(t.guard)
             and eval_guard(t.guard, ctx)
         ]
+        vote_ids = await self._vote_state_ids(visible)
+        return [_transition_out(t, vote_ids) for t in visible]
 
     async def fire_as_applicant(
         self,

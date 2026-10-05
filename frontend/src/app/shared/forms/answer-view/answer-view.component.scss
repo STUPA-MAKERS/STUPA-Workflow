@@ -1,0 +1,80 @@
+/* The grid follows the width of the view, not of the window: the detail sheet is
+   narrower than the viewport beside the list. */
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.av__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.av__title {
+  margin: 0;
+  padding: 0 var(--space-1);
+}
+
+/* Two short fields side by side, as on the boards. Inside the row the cells have no
+   surface of their own. The cells align at the top, so both labels stay on one line
+   when one value wraps. */
+.av__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  padding-block: 4px;
+}
+.av__grid app-field-row {
+  align-items: flex-start;
+  min-height: 3.125rem;
+  padding-block: 6px;
+}
+@container (max-width: 22rem) {
+  .av__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.av__table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px var(--space-4);
+}
+.av__tableLabel {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: var(--fw-medium);
+  color: var(--color-text-subtle);
+}
+.av__tableScroll {
+  overflow-x: auto;
+}
+.av__table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-small);
+}
+.av__table th,
+.av__table td {
+  padding: 6px var(--space-2) 6px 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+  text-align: start;
+  vertical-align: top;
+}
+.av__table th {
+  color: var(--color-text-muted);
+  font-weight: var(--fw-medium);
+}
+
+.av__none {
+  margin: 0;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}

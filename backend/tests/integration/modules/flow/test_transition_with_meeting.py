@@ -1,10 +1,10 @@
 """A1: a manual transition picks the meeting for its agenda item (real Postgres).
 
 `GET /applications/{id}/transitions` flags the transitions with `addToNextSession`
-(`addsToAgenda`, `agendaGremiumId`). `fire(..., meeting_id=...)` checks the meeting
-before the state change and adds the agenda item in the same transaction. A refused
-meeting gives 422, a failed guard gives 409, and in both cases nothing changes: no
-state change, no status event, no agenda item.
+into a vote state (`addsToAgenda`, `agendaGremiumId`). `fire(..., meeting_id=...)`
+checks the meeting before the state change and adds the agenda item in the same
+transaction. A refused meeting gives 422, a failed guard gives 409, and in both cases
+nothing changes: no state change, no status event, no agenda item.
 """
 
 from __future__ import annotations
@@ -85,6 +85,9 @@ async def test_transitions_flag_the_agenda_action(session: AsyncSession) -> None
     assert out[flow.to_vote.id].agenda_gremium_id == flow.gremium.id
     assert out[flow.plain.id].adds_to_agenda is False
     assert out[flow.plain.id].agenda_gremium_id is None
+    # The action into a normal state takes no meeting: the UI fires it without one.
+    assert out[flow.to_done.id].adds_to_agenda is False
+    assert out[flow.to_done.id].agenda_gremium_id is None
     body = out[flow.to_vote.id].model_dump(by_alias=True)
     assert body["addsToAgenda"] is True
     assert body["agendaGremiumId"] == flow.gremium.id

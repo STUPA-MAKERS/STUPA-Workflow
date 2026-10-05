@@ -1,0 +1,179 @@
+<fieldset class="pos">
+  <!-- The legend must be the first child of the fieldset. Legend and sum float, so the
+       sum sits at the end of the legend line. -->
+  <legend class="pos__legend">
+    {{ props.label }}
+    @if (props.required) {
+      <span class="pos__req" aria-hidden="true">*</span>
+    }
+  </legend>
+  <span class="pos__sum">
+    {{ t('forms.positions.sum') }} <span class="mono">{{ fmt(total()) }}</span>
+  </span>
+  <div class="pos__inner">
+  @if (props.description) {
+    <p class="pos__hint">{{ props.description }}</p>
+  }
+
+  @for (p of positions; track $index; let pi = $index) {
+    <div class="pos__card" [class.pos__card--open]="isOpen(pi)" [attr.data-index]="pi">
+      @if (!isOpen(pi)) {
+        <!-- Collapsed: the whole row opens the position. -->
+        <div class="pos__row">
+          <button
+            type="button"
+            class="pos__summary"
+            [attr.aria-expanded]="false"
+            (click)="toggleOpen(pi)"
+          >
+            <app-icon class="pos__chev" name="down" [size]="18" />
+            <span class="pos__sumText">
+              <span class="pos__sumName">{{ p.label || t('forms.positions.untitled') }}</span>
+              <span class="pos__sumSub">{{ summary(p) }}</span>
+            </span>
+            <span class="mono pos__sumValue">{{ fmt(positionValue(p)) }}</span>
+          </button>
+          <button
+            type="button"
+            class="pos__icon"
+            (click)="removePosition(pi)"
+            [attr.aria-label]="t('forms.positions.removePosition')"
+          >
+            <app-icon name="trash" [size]="18" />
+          </button>
+        </div>
+        @if (cardError(p, pi); as msg) {
+          <p class="pos__error" role="alert">{{ msg }}</p>
+        }
+      } @else {
+        <div class="pos__row pos__row--top">
+          <button
+            type="button"
+            class="pos__icon pos__toggle"
+            [attr.aria-expanded]="true"
+            [attr.aria-controls]="cardId(pi)"
+            [attr.aria-label]="t('forms.positions.collapse')"
+            (click)="toggleOpen(pi)"
+          >
+            <app-icon class="pos__chev pos__chev--open" name="down" [size]="18" />
+          </button>
+          <label class="pf pos__grow" [class.pf--invalid]="titleInvalid(p)">
+            <span class="pf__label">{{ t('forms.positions.position') }}</span>
+            <input
+              class="pf__control"
+              [value]="p.label"
+              [attr.aria-invalid]="titleInvalid(p) ? 'true' : null"
+              (input)="setPositionLabel(pi, $any($event.target).value)"
+            />
+          </label>
+          <button
+            type="button"
+            class="pos__icon"
+            (click)="removePosition(pi)"
+            [attr.aria-label]="t('forms.positions.removePosition')"
+          >
+            <app-icon name="trash" [size]="18" />
+          </button>
+        </div>
+
+        <div class="pos__body" [id]="cardId(pi)">
+          @if (allowNoOffers) {
+            <app-switch
+              class="pos__switch"
+              [checked]="p.noOffers === true"
+              (checkedChange)="setNoOffers(pi, $event)"
+            ><span class="pos__switchLabel">{{ t('apply.positions.noOffers') }}</span></app-switch>
+          }
+          @if (!p.noOffers) {
+            <p class="pos__lead">{{ t('forms.positions.offersLead') }}</p>
+          }
+
+          <div class="pos__offers" role="radiogroup" [attr.aria-label]="t('forms.positions.offers')">
+            @for (o of p.offers; track $index; let oi = $index) {
+              <div class="pos__offer" [class.pos__offer--single]="p.noOffers">
+                @if (!p.noOffers) {
+                  <input
+                    type="radio"
+                    class="pos__radio"
+                    [name]="radioName(pi)"
+                    [checked]="o.preferred"
+                    (change)="setPreferred(pi, oi)"
+                    [attr.aria-label]="radioLabel(o, oi)"
+                  />
+                }
+                <label class="pf pos__grow" [class.pf--invalid]="offerLabelInvalid(o)">
+                  <span class="pf__label">{{ t('forms.positions.provider') }}</span>
+                  <input
+                    class="pf__control"
+                    [value]="o.label"
+                    [attr.aria-invalid]="offerLabelInvalid(o) ? 'true' : null"
+                    (input)="setOfferLabel(pi, oi, $any($event.target).value)"
+                  />
+                </label>
+                <label class="pf pos__money" [class.pf--invalid]="offerValueInvalid(o)">
+                  <span class="pf__label">{{ t('forms.positions.amount') }}</span>
+                  <input
+                    class="pf__control mono"
+                    type="text"
+                    inputmode="decimal"
+                    [value]="offerValueText(pi, oi)"
+                    [attr.aria-invalid]="offerValueInvalid(o) ? 'true' : null"
+                    (focus)="beginEditValue(pi, oi)"
+                    (blur)="endEditValue()"
+                    (input)="setOfferValue(pi, oi, $any($event.target).value)"
+                  />
+                  <span class="pf__suffix" aria-hidden="true">€</span>
+                </label>
+                @if (!p.noOffers) {
+                  <button
+                    type="button"
+                    class="pos__icon"
+                    (click)="removeOffer(pi, oi)"
+                    [disabled]="p.offers.length <= requiredOffers(p)"
+                    [attr.title]="p.offers.length <= requiredOffers(p) ? t('apply.positions.minOffersHint') : null"
+                    [attr.aria-label]="t('forms.positions.removeOffer')"
+                  >
+                    <app-icon name="trash" [size]="18" />
+                  </button>
+                }
+              </div>
+            }
+          </div>
+
+          @if (!p.noOffers) {
+            <button type="button" class="pos__link" (click)="addOffer(pi)">
+              <app-icon name="plus" [size]="16" />
+              {{ t('apply.positions.addOffer') }}
+            </button>
+          } @else {
+            <label class="pf pf--area" [class.pf--invalid]="reasonInvalid(p)">
+              <span class="pf__label">{{ t('apply.positions.noOffersReason') }}</span>
+              <textarea
+                class="pf__control"
+                rows="2"
+                [value]="p.noOffersReason ?? ''"
+                [attr.aria-invalid]="reasonInvalid(p) ? 'true' : null"
+                (input)="setNoOffersReason(pi, $any($event.target).value)"
+              ></textarea>
+            </label>
+          }
+          @if (cardError(p, pi); as msg) {
+            <p class="pos__error" role="alert">{{ msg }}</p>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <app-button class="pos__add" variant="tonal" (click)="addPosition()">
+    <app-icon name="plus" [size]="16" />
+    {{ t('apply.positions.add') }}
+  </app-button>
+  @if (showError && positions.length < minPositions) {
+    <p class="pos__error" role="alert">{{ t('apply.positions.errMinPositions') }}</p>
+  }
+  @if (serverError(-1); as msg) {
+    <p class="pos__error" role="alert">{{ msg }}</p>
+  }
+  </div>
+</fieldset>

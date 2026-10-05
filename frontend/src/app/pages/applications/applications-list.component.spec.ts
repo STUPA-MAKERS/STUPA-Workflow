@@ -966,12 +966,28 @@ describe('ApplicationsListComponent', () => {
       http.expectOne(LIST).flush(page(ROWS));
     });
 
-    it('opens the detail for a transition that puts the application on an agenda', async () => {
-      const { http, harness, router } = await start();
-      await openRowMenu(http, 'Zuschuss Kennenlernwochenende', [AGENDA], () => harness.detectChanges());
+    it('opens the agenda dialog for a transition onto the agenda and reloads after it', async () => {
+      const { http, harness, router, cmp } = await start();
+      await openRowMenu(http, 'Zuschuss Kennenlernwochenende', [{ ...AGENDA, agendaGremiumId: 'g1' }], () =>
+        harness.detectChanges(),
+      );
       await userEvent.click(screen.getByRole('menuitem', { name: 'Auf Tagesordnung setzen' }));
-      await harness.fixture.whenStable();
-      expect(router.url).toBe('/applications/app-1');
+      harness.detectChanges();
+      // The row stays where it is: the dialog asks for the meeting, nothing fires yet.
+      expect(router.url).not.toBe('/applications/app-1');
+      expect(cmp.agendaOpen()).toBe(true);
+      expect(cmp.agendaFor()?.item.id).toBe('app-1');
+      http.expectNone((r) => r.url === '/api/applications/app-1/transition');
+      http.expectOne((r) => r.url === '/api/meetings' && r.params.get('gremiumId') === 'g1').flush([]);
+      harness.detectChanges();
+      expect(screen.getByRole('dialog', { name: /Auf Tagesordnung setzen/ })).toBeInTheDocument();
+
+      // The dialog fired: the list loads its rows again.
+      cmp.onAgendaDone();
+      http.expectOne(LIST).flush(page(ROWS));
+      cmp.agendaFor.set(null);
+      cmp.onAgendaDone();
+      http.verify();
     });
 
     it('opens the row through "Öffnen"', async () => {
