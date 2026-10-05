@@ -112,6 +112,11 @@ export class GremiumDialogComponent {
   /** The saved gremium, after the base data and the recipients. */
   /** `recipients` is `null` when the dialog did not save them (their read failed). */
   readonly saved = output<{ gremium: Gremium; created: boolean; recipients: string[] | null }>();
+  /**
+   * The server saved the base data, but the PUT of the recipients failed and the dialog
+   * stays open. The page reloads its list, so a cancel does not lose the saved change.
+   */
+  readonly baseSaved = output<{ gremium: Gremium; created: boolean }>();
 
   protected readonly form = signal<GremiumForm>(emptyGremiumForm());
   protected readonly saving = signal(false);
@@ -260,10 +265,12 @@ export class GremiumDialogComponent {
         this.saved.emit({ gremium: saved, created, recipients: r.recipients });
       },
       // The base data is saved. Only the recipients failed, mostly an invalid address.
-      error: (err: { status?: number }) =>
+      error: (err: { status?: number }) => {
         this.fail(
           err.status === 422 ? 'admin.gremien.recipientsInvalid' : 'admin.gremien.recipientsFailed',
-        ),
+        );
+        this.baseSaved.emit({ gremium: saved, created });
+      },
     });
   }
 

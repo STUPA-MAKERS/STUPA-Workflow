@@ -167,12 +167,17 @@ describe('GremiumDialogComponent', () => {
         .mockReturnValueOnce(throwError(() => ({ status: 500 })))
         .mockReturnValue(of({ recipients: ['ok@x.de'] })),
     });
-    const { saved } = await setup(null, api);
+    const { saved, fixture } = await setup(null, api);
+    const baseSaved = jest.fn();
+    fixture.componentInstance.baseSaved.subscribe(baseSaved);
     await userEvent.type(screen.getByRole('textbox', { name: /Name/ }), 'Neu');
     await userEvent.click(save());
     expect(within(dialog()).getByRole('alert')).toHaveTextContent(
       /eine Empfänger-Adresse ist ungültig/,
     );
+    // The page learns that the base data is saved, but the dialog stays open.
+    expect(baseSaved).toHaveBeenCalledWith(expect.objectContaining({ created: true }));
+    expect(saved).not.toHaveBeenCalled();
     await userEvent.click(save());
     expect(within(dialog()).getByRole('alert')).toHaveTextContent(/die Protokoll-Empfänger nicht/);
     await userEvent.click(save());

@@ -219,6 +219,19 @@ export class AdminGremienComponent {
     this.reload(false);
   }
 
+  /**
+   * The dialog saved the base data, but not the recipients, and stays open. The list
+   * reloads at once, so the row is correct also when the admin cancels the dialog.
+   */
+  protected onBaseSaved(event: { gremium: Gremium; created: boolean }): void {
+    if (event.created && !this.isOpen(event.gremium)) {
+      this.expanded.update((s) => new Set(s).add(event.gremium.id));
+      // The recipients of the new gremium are not saved: read what the server has.
+      this.loadRecipients(event.gremium.id);
+    }
+    this.reload(false);
+  }
+
   /** A role was added or deleted in the matrix: the count of the row follows. */
   protected onRoleCount(g: Gremium, count: number): void {
     this.gremien.update((list) =>

@@ -213,6 +213,53 @@ describe('AdminGremienComponent', () => {
     expect(screen.getByRole('button', { name: /^Neu/ })).toHaveAttribute('aria-expanded', 'true');
   });
 
+  it('shows a new gremium after its recipients failed and the dialog was cancelled', async () => {
+    const api = makeApi({
+      setGremiumMailRecipients: jest.fn(() => throwError(() => ({ status: 422 }))),
+    });
+    const { toast } = await setup({ api });
+    await userEvent.click(screen.getByRole('button', { name: /Gremium anlegen/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Gremium anlegen' });
+    await userEvent.type(within(dialog).getByRole('textbox', { name: /Name/ }), 'Neu');
+    api.listGremien.mockReturnValue(
+      of([...clone(GREMIEN), { ...clone(GREMIEN[1]), id: 'g-new', name: 'Neu', slug: 'neu' }]),
+    );
+    await userEvent.click(within(dialog).getByText('Anlegen'));
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(
+      /eine Empfänger-Adresse ist ungültig/,
+    );
+    await userEvent.click(within(dialog).getByText('Abbrechen'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /^Neu/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(api.getGremiumMailRecipients).toHaveBeenCalledWith('g-new');
+  });
+
+  it('shows the edited values after the recipients failed and the dialog was cancelled', async () => {
+    const api = makeApi({
+      setGremiumMailRecipients: jest.fn(() => throwError(() => ({ status: 422 }))),
+    });
+    await setup({ api });
+    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten: AStA' }));
+    const dialog = screen.getByRole('dialog', { name: 'Gremium bearbeiten' });
+    const name = within(dialog).getByRole('textbox', { name: /Name/ });
+    await waitFor(() => expect(name).toHaveValue('AStA'));
+    await userEvent.clear(name);
+    await userEvent.type(name, 'AStA neu');
+    api.listGremien.mockReturnValue(
+      of(clone(GREMIEN).map((g) => (g.id === 'g-2' ? { ...g, name: 'AStA neu' } : g))),
+    );
+    await userEvent.click(within(dialog).getByText('Speichern'));
+    expect(api.updateGremium).toHaveBeenCalledWith(
+      'g-2',
+      expect.objectContaining({ name: 'AStA neu' }),
+    );
+    await userEvent.click(within(dialog).getByText('Abbrechen'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('button', { name: /^AStA neu/ })).toBeInTheDocument();
+    expect(api.listGremien).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps the shown recipients when the dialog did not save them', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
