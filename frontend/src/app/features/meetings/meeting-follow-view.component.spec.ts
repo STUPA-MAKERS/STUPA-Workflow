@@ -360,11 +360,25 @@ describe('MeetingFollowViewComponent', () => {
       expect(screen.queryByRole('button', { name: /Deine Anwesenheit/ })).toBeNull();
     });
 
-    it('shows nothing of the item while the room has none', async () => {
+    it('says that the meeting runs while the room has no item yet', async () => {
       const { context } = await setup({ meeting: member({ currentAgendaItemId: null }) });
       context();
-      expect(screen.getByText('Kalender abonnieren')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: 'Die Sitzung läuft · noch kein TOP aufgerufen' })).toBeInTheDocument();
+      expect(screen.getByText(/Bis dahin kannst du die Tagesordnung lesen\.$/)).toBeInTheDocument();
+      // Not the start of a planned meeting.
+      expect(screen.queryByText(/Die Sitzung beginnt/)).toBeNull();
+      expect(screen.queryByText('Kalender abonnieren')).toBeNull();
       expect(screen.queryByText(/von 3 ·/)).toBeNull();
+      // The wide layout shows the agenda beside it, so no extra button.
+      expect(screen.queryByRole('button', { name: 'Tagesordnung öffnen' })).toBeNull();
+    });
+
+    it('says that the agenda is empty while the room has no item and no agenda', async () => {
+      const { context } = await setup({ meeting: member({ currentAgendaItemId: null }), agenda: [] });
+      context();
+      expect(screen.getByRole('heading', { level: 2, name: 'Die Sitzung läuft · noch kein TOP aufgerufen' })).toBeInTheDocument();
+      expect(screen.getByText(/Die Tagesordnung hat noch keinen TOP\.$/)).toBeInTheDocument();
+      expect(screen.queryByText('Kalender abonnieren')).toBeNull();
     });
   });
 
@@ -394,10 +408,13 @@ describe('MeetingFollowViewComponent', () => {
       expect(within(dock).getByText('1 TOP')).toBeInTheDocument();
     });
 
-    it('shows the start of an empty closed agenda as nothing to read', async () => {
+    it('says that a closed meeting had no items when its agenda is empty', async () => {
       const { context } = await setup({ meeting: member({ status: 'closed' }), agenda: [] });
       context();
       expect(screen.getByText('0 TOPs')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 2, name: 'Diese Sitzung hatte keine TOPs.' })).toBeInTheDocument();
+      expect(screen.queryByText(/Die Sitzung beginnt/)).toBeNull();
+      expect(screen.queryByText('Kalender abonnieren')).toBeNull();
     });
   });
 
@@ -500,6 +517,19 @@ describe('MeetingFollowViewComponent', () => {
       expect(screen.queryByText('Jetzt')).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: 'Zurück zu Jetzt' }));
       expect(screen.getByText('Jetzt')).toBeInTheDocument();
+    });
+
+    it('says that the meeting runs while the room has no item yet, and opens the agenda', async () => {
+      const { context } = await setup({ meeting: member({ currentAgendaItemId: null }), media: PHONE });
+      context();
+      expect(screen.getByRole('heading', { level: 2, name: 'Die Sitzung läuft · noch kein TOP aufgerufen' })).toBeInTheDocument();
+      expect(screen.queryByText('Kalender abonnieren')).toBeNull();
+      expect(screen.queryByText(/TOP \d von/)).toBeNull();
+      const open = screen.getAllByRole('button', { name: 'Tagesordnung öffnen' });
+      // The icon button of the header and the button below the line.
+      expect(open).toHaveLength(2);
+      await userEvent.click(open[1]);
+      expect(screen.getByRole('dialog', { name: 'Tagesordnung' })).toBeInTheDocument();
     });
 
     it('shows the start of a planned meeting', async () => {

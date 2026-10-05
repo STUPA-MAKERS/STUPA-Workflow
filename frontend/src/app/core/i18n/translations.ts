@@ -2316,6 +2316,12 @@ export const de = {
   'participant.start.lead':
     'Sobald die Sitzungsführung eröffnet, folgst du der Sitzung hier live und stimmst bei offenen Fragen ab.',
   'participant.start.calendar': 'Kalender abonnieren',
+  'participant.wait.live': 'Die Sitzung läuft · noch kein TOP aufgerufen',
+  'participant.wait.liveLead':
+    'Sobald die Sitzungsführung einen TOP aufruft, folgst du ihm hier. Bis dahin kannst du die Tagesordnung lesen.',
+  'participant.wait.liveEmpty':
+    'Sobald die Sitzungsführung einen TOP aufruft, folgst du ihm hier. Die Tagesordnung hat noch keinen TOP.',
+  'participant.wait.closedEmpty': 'Diese Sitzung hatte keine TOPs.',
   'participant.top.keeper': '{name} führt das Protokoll',
   'participant.top.empty': 'Noch kein Text zu diesem TOP.',
   'participant.top.protocol': 'Protokoll',
@@ -4913,6 +4919,12 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'participant.start.lead':
     'When the chair opens the meeting, you follow it here live and vote on open questions.',
   'participant.start.calendar': 'Subscribe to calendar',
+  'participant.wait.live': 'The meeting is running · no item called yet',
+  'participant.wait.liveLead':
+    'When the chair calls an item, you follow it here. Until then you can read the agenda.',
+  'participant.wait.liveEmpty':
+    'When the chair calls an item, you follow it here. The agenda has no items yet.',
+  'participant.wait.closedEmpty': 'This meeting had no agenda items.',
   'participant.top.keeper': '{name} keeps the minutes',
   'participant.top.empty': 'No text for this item yet.',
   'participant.top.protocol': 'Minutes',

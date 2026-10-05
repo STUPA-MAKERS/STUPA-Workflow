@@ -54,6 +54,8 @@
       </div>
     } @else if (m.status === 'planned') {
       <ng-container [ngTemplateOutlet]="startTpl" />
+    } @else {
+      <ng-container [ngTemplateOutlet]="waitTpl" />
     }
 
     <app-participant-vote />
@@ -130,7 +132,7 @@
         />
       } @else {
         <article class="fv__start">
-          <ng-container [ngTemplateOutlet]="startTpl" />
+          <ng-container [ngTemplateOutlet]="m.status === 'planned' ? startTpl : waitTpl" />
         </article>
       }
     </div>
@@ -272,6 +274,23 @@
     <app-icon name="cal" [size]="17" />
     {{ 'participant.start.calendar' | t }}
   </a>
+</ng-template>
+
+<!-- A running meeting before the lead calls an item, or a closed meeting without items. -->
+<ng-template #waitTpl>
+  @if (m.status === 'live') {
+    <span class="fv__cap cap">{{ 'participant.start.cap' | t }}</span>
+    <h2 class="fv__startTitle">{{ 'participant.wait.live' | t }}</h2>
+    <p class="fv__muted">{{ (agenda().length ? 'participant.wait.liveLead' : 'participant.wait.liveEmpty') | t }}</p>
+    @if (!wide() && agenda().length) {
+      <app-button variant="tonal" size="sm" (click)="agendaOpen.set(true)">
+        <app-icon name="list" [size]="18" />
+        {{ 'meetings.dock.agenda' | t }}
+      </app-button>
+    }
+  } @else {
+    <h2 class="fv__startTitle">{{ 'participant.wait.closedEmpty' | t }}</h2>
+  }
 </ng-template>
 
 <ng-template #delegationTpl let-variant="variant">
