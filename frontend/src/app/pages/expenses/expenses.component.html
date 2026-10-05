@@ -5,95 +5,9 @@
   <header class="exp__head">
     <h1 class="exp__title">{{ 'expenses.title' | t }}</h1>
 
-    <div class="exp__tools">
-      <app-search-pill
-        class="exp__search"
-        size="md"
-        [placeholder]="'expenses.search' | t"
-        [value]="q()"
-        (valueChange)="onSearch($event)"
-      />
-      <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
-        <!-- `group`: three controls, not one. A plain field wraps its content in a label,
-             which would bind to the first button and take its name away. -->
-        <app-filter-field [label]="'expenses.filter.kind' | t" [group]="true">
-          <div class="exp__kinds">
-            <app-button
-              [variant]="kind() === '' ? 'primary' : 'ghost'"
-              size="sm"
-              [ariaPressed]="kind() === ''"
-              (click)="setKind('')"
-              >{{ 'expenses.filter.all' | t }}</app-button
-            >
-            <app-button
-              [variant]="kind() === 'expense' ? 'primary' : 'ghost'"
-              size="sm"
-              [ariaPressed]="kind() === 'expense'"
-              (click)="setKind('expense')"
-              >{{ 'expenses.kind.expense' | t }}</app-button
-            >
-            <app-button
-              [variant]="kind() === 'income' ? 'primary' : 'ghost'"
-              size="sm"
-              [ariaPressed]="kind() === 'income'"
-              (click)="setKind('income')"
-              >{{ 'expenses.kind.income' | t }}</app-button
-            >
-          </div>
-        </app-filter-field>
-        <app-filter-field [label]="'expenses.filter.amountRange' | t">
-          <app-filter-range>
-            <app-currency-input
-              start
-              [placeholder]="'expenses.filter.amountMin' | t"
-              [ariaLabel]="'expenses.filter.amountMin' | t"
-              [ngModel]="amountMin()"
-              (ngModelChange)="onAmountFilter('min', $event)"
-            />
-            <app-currency-input
-              end
-              [placeholder]="'expenses.filter.amountMax' | t"
-              [ariaLabel]="'expenses.filter.amountMax' | t"
-              [ngModel]="amountMax()"
-              (ngModelChange)="onAmountFilter('max', $event)"
-            />
-          </app-filter-range>
-        </app-filter-field>
-        <app-filter-field [label]="'expenses.filter.dateRange' | t">
-          <app-filter-range>
-            <app-datepicker
-              start
-              [ariaLabel]="'expenses.filter.dateFrom' | t"
-              [ngModel]="createdFrom()"
-              (ngModelChange)="onDateFilter('from', $event)"
-            />
-            <app-datepicker
-              end
-              [ariaLabel]="'expenses.filter.dateTo' | t"
-              [ngModel]="createdTo()"
-              (ngModelChange)="onDateFilter('to', $event)"
-            />
-          </app-filter-range>
-        </app-filter-field>
-      </app-filter-bar>
-      @if (canExport() && !phone()) {
-        <app-button
-          class="exp__export"
-          variant="outlined"
-          size="sm"
-          [ariaLabel]="'expenses.export' | t"
-          [title]="'expenses.export' | t"
-          [loading]="exporting()"
-          (click)="onExport()"
-        >
-          <span class="exp__btn"
-            ><app-icon name="download" [size]="16" /><span class="exp__btnText">{{
-              'expenses.export' | t
-            }}</span></span
-          >
-        </app-button>
-      }
-    </div>
+    @if (wide()) {
+      <ng-container *ngTemplateOutlet="tools" />
+    }
 
     <div class="exp__actions">
       @if (canManage()) {
@@ -122,6 +36,16 @@
     </div>
   </header>
 
+  <!-- Below the wide layout the page scrolls: the search, the filter, the cost-centre
+       chip and the views stick to the top, the title row scrolls away. Wide, the page
+       does not scroll and only the list below them scrolls. -->
+  @if (!wide()) {
+    <app-sticky-bar class="exp__sticky">
+      <ng-container *ngTemplateOutlet="tools" />
+      <ng-container *ngTemplateOutlet="bar" />
+    </app-sticky-bar>
+  }
+
   <div class="exp__body">
     @if (wide()) {
       <aside class="exp__pane" [attr.aria-label]="'expenses.filter.costCentre' | t">
@@ -133,45 +57,9 @@
     }
 
     <section class="exp__main" [attr.aria-label]="'expenses.title' | t">
-      <div class="exp__bar">
-        @if (!wide()) {
-          <button
-            type="button"
-            class="exp__ccChip"
-            [class.exp__ccChip--on]="!!budgetId()"
-            aria-haspopup="dialog"
-            [attr.aria-expanded]="pickerOpen()"
-            [attr.aria-label]="('expenses.filter.costCentre' | t) + ': ' + costCentreName()"
-            [title]="costCentreName()"
-            (click)="pickerOpen.set(true)"
-          >
-            @if (costCentreColor(); as c) {
-              <span class="exp__swatch" aria-hidden="true" [style.background]="c"></span>
-            } @else {
-              <app-icon name="pie" [size]="15" />
-            }
-            <span class="ell">{{ costCentreName() }}</span>
-            <app-icon name="chevron-down" [size]="15" />
-          </button>
-        }
-        <!-- The transfer list needs `budget.book`: a reader without it gets no tabs. -->
-        @if (canManage()) {
-          <app-segmented
-            class="exp__tabs"
-            [ariaLabel]="'expenses.views' | t"
-            [options]="tabOptions()"
-            [value]="tab()"
-            (valueChange)="setTab($any($event))"
-          />
-        }
-        @if (tab() === 'transfers' ? transferTotal() > 0 : total() > 0) {
-          <span class="exp__count" role="status">{{
-            tab() === 'transfers'
-              ? ('expenses.count' | t: { count: transferItems().length, total: transferTotal() })
-              : ('expenses.count' | t: { count: items().length, total: total() })
-          }}</span>
-        }
-      </div>
+      @if (wide()) {
+        <ng-container *ngTemplateOutlet="bar" />
+      }
 
       <div
         #scroller
@@ -228,6 +116,140 @@
     </section>
   </div>
 </div>
+
+<ng-template #tools>
+  <div class="exp__tools">
+    <app-search-pill
+      class="exp__search"
+      size="md"
+      [placeholder]="'expenses.search' | t"
+      [value]="q()"
+      (valueChange)="onSearch($event)"
+    />
+    <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
+      <!-- `group`: three controls, not one. A plain field wraps its content in a label,
+           which would bind to the first button and take its name away. -->
+      <app-filter-field [label]="'expenses.filter.kind' | t" [group]="true">
+        <div class="exp__kinds">
+          <app-button
+            [variant]="kind() === '' ? 'primary' : 'ghost'"
+            size="sm"
+            [ariaPressed]="kind() === ''"
+            (click)="setKind('')"
+            >{{ 'expenses.filter.all' | t }}</app-button
+          >
+          <app-button
+            [variant]="kind() === 'expense' ? 'primary' : 'ghost'"
+            size="sm"
+            [ariaPressed]="kind() === 'expense'"
+            (click)="setKind('expense')"
+            >{{ 'expenses.kind.expense' | t }}</app-button
+          >
+          <app-button
+            [variant]="kind() === 'income' ? 'primary' : 'ghost'"
+            size="sm"
+            [ariaPressed]="kind() === 'income'"
+            (click)="setKind('income')"
+            >{{ 'expenses.kind.income' | t }}</app-button
+          >
+        </div>
+      </app-filter-field>
+      <app-filter-field [label]="'expenses.filter.amountRange' | t">
+        <app-filter-range>
+          <app-currency-input
+            start
+            [placeholder]="'expenses.filter.amountMin' | t"
+            [ariaLabel]="'expenses.filter.amountMin' | t"
+            [ngModel]="amountMin()"
+            (ngModelChange)="onAmountFilter('min', $event)"
+          />
+          <app-currency-input
+            end
+            [placeholder]="'expenses.filter.amountMax' | t"
+            [ariaLabel]="'expenses.filter.amountMax' | t"
+            [ngModel]="amountMax()"
+            (ngModelChange)="onAmountFilter('max', $event)"
+          />
+        </app-filter-range>
+      </app-filter-field>
+      <app-filter-field [label]="'expenses.filter.dateRange' | t">
+        <app-filter-range>
+          <app-datepicker
+            start
+            [ariaLabel]="'expenses.filter.dateFrom' | t"
+            [ngModel]="createdFrom()"
+            (ngModelChange)="onDateFilter('from', $event)"
+          />
+          <app-datepicker
+            end
+            [ariaLabel]="'expenses.filter.dateTo' | t"
+            [ngModel]="createdTo()"
+            (ngModelChange)="onDateFilter('to', $event)"
+          />
+        </app-filter-range>
+      </app-filter-field>
+    </app-filter-bar>
+    @if (canExport() && !phone()) {
+      <app-button
+        class="exp__export"
+        variant="outlined"
+        size="sm"
+        [ariaLabel]="'expenses.export' | t"
+        [title]="'expenses.export' | t"
+        [loading]="exporting()"
+        (click)="onExport()"
+      >
+        <span class="exp__btn"
+          ><app-icon name="download" [size]="16" /><span class="exp__btnText">{{
+            'expenses.export' | t
+          }}</span></span
+        >
+      </app-button>
+    }
+  </div>
+</ng-template>
+
+<ng-template #bar>
+  <div class="exp__bar">
+    @if (!wide()) {
+      <button
+        type="button"
+        class="exp__ccChip"
+        [class.exp__ccChip--on]="!!budgetId()"
+        aria-haspopup="dialog"
+        [attr.aria-expanded]="pickerOpen()"
+        [attr.aria-label]="('expenses.filter.costCentre' | t) + ': ' + costCentreName()"
+        [title]="costCentreName()"
+        (click)="pickerOpen.set(true)"
+      >
+        @if (costCentreColor(); as c) {
+          <span class="exp__swatch" aria-hidden="true" [style.background]="c"></span>
+        } @else {
+          <app-icon name="pie" [size]="15" />
+        }
+        <span class="ell">{{ costCentreName() }}</span>
+        <app-icon name="chevron-down" [size]="15" />
+      </button>
+    }
+    <!-- The transfer list needs `budget.book`: a reader without it gets no tabs. -->
+    @if (canManage()) {
+      <app-segmented
+        class="exp__tabs"
+        [ariaLabel]="'expenses.views' | t"
+        [options]="tabOptions()"
+        [value]="tab()"
+        (valueChange)="setTab($any($event))"
+      />
+    }
+    @if (tab() === 'transfers' ? transferTotal() > 0 : total() > 0) {
+      <span class="exp__count" role="status">{{
+        tab() === 'transfers'
+          ? ('expenses.count' | t: { count: transferItems().length, total: transferTotal() })
+          : ('expenses.count' | t: { count: items().length, total: total() })
+      }}</span>
+    }
+  </div>
+</ng-template>
 
 <ng-template #tree>
   <app-cost-centre-tree

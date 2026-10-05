@@ -59,6 +59,9 @@
   flex-direction: column;
   width: 100%;
   padding-block: var(--main-pad-top) var(--main-pad-bottom);
+  /* The gap that a pane page (`.pane-page`, see styles.scss) keeps below itself. Above
+     the footer it is 0: the top padding of the footer is the gap. */
+  --pane-foot-gap: 0px;
 }
 /* Full width for route data `wide`: content with two sidebars, for example budget. */
 .main--wide {
@@ -101,6 +104,7 @@
    a small gap at the bottom, so the page ends just above the viewport edge. */
 .frame--rail .main.main--fill {
   --main-pad-bottom: var(--space-3);
+  --pane-foot-gap: var(--main-pad-bottom);
 }
 
 /* Beamer: nothing but the page. */
@@ -134,6 +138,8 @@
   }
   .frame--rail .main {
     --main-pad-bottom: calc(var(--space-8) + env(safe-area-inset-bottom));
+    /* No footer: a pane page keeps a small gap and the safe area clear of the edge. */
+    --pane-foot-gap: calc(var(--space-4) + env(safe-area-inset-bottom));
   }
 }
 .frame--public .frame__footer {

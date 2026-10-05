@@ -42,5 +42,6 @@ export { SideSheetComponent } from './side-sheet/side-sheet.component';
 export type { SheetSide } from './side-sheet/side-sheet.component';
 export { SkeletonComponent } from './skeleton/skeleton.component';
 export type { SkeletonVariant } from './skeleton/skeleton.component';
+export { StickyBarComponent } from './sticky-bar/sticky-bar.component';
 export { StatusTextComponent } from './status-text/status-text.component';
 export * from '../status-kind.util';

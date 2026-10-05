@@ -15,12 +15,10 @@
 
 /* ------------------------------------------------------------------ title row
    Wide: title and lead line, then search and filter, then the two actions. Below the
-   wide layout the tools take a line of their own. */
+   wide layout the tools take a line of their own: a sticky bar below the title row. */
 .inv__head {
   display: grid;
-  grid-template-areas:
-    'titles actions'
-    'tools tools';
+  grid-template-areas: 'titles actions';
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-4) var(--space-3);

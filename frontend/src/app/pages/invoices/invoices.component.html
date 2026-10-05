@@ -7,131 +7,55 @@
   (dragleave)="onDragLeave($event)"
   (drop)="onDrop($event)"
 >
-  <header class="inv__head">
-    <div class="inv__titles">
-      <h1 class="inv__title">{{ 'invoices.title' | t }}</h1>
-      <p class="inv__subtitle">{{ 'invoices.subtitle' | t }}</p>
-    </div>
-    <div class="inv__tools">
-      <app-search-pill
-        class="inv__search"
-        size="md"
-        [placeholder]="'invoices.search' | t"
-        [value]="q()"
-        (valueChange)="onSearch($event)"
-      />
-      <!-- These filters drive the server query. -->
-      <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
-        <!-- `group`: three controls, not one. A plain field wraps its content in a
-             label, which would bind to the first button and take its name away. -->
-        <app-filter-field [label]="'invoices.filter.status' | t" [group]="true">
-          <div class="inv__statuses">
-            <app-button
-              [variant]="statusFilter() === '' ? 'primary' : 'ghost'"
-              size="sm"
-              [ariaPressed]="statusFilter() === ''"
-              (click)="setStatus('')"
-              >{{ 'invoices.filter.all' | t }}</app-button
-            >
-            <app-button
-              [variant]="statusFilter() === 'open' ? 'primary' : 'ghost'"
-              size="sm"
-              [ariaPressed]="statusFilter() === 'open'"
-              (click)="setStatus('open')"
-              >{{ 'invoices.status.open' | t }}</app-button
-            >
-            <app-button
-              [variant]="statusFilter() === 'paid' ? 'primary' : 'ghost'"
-              size="sm"
-              [ariaPressed]="statusFilter() === 'paid'"
-              (click)="setStatus('paid')"
-              >{{ 'invoices.status.paid' | t }}</app-button
-            >
-          </div>
-        </app-filter-field>
-        <app-filter-field [label]="'invoices.filter.grossRange' | t">
-          <app-filter-range>
-            <app-currency-input
-              start
-              [placeholder]="'invoices.filter.amountMin' | t"
-              [ariaLabel]="'invoices.filter.amountMin' | t"
-              [ngModel]="grossMin()"
-              (ngModelChange)="onGrossFilter('min', $event)"
-            />
-            <app-currency-input
-              end
-              [placeholder]="'invoices.filter.amountMax' | t"
-              [ariaLabel]="'invoices.filter.amountMax' | t"
-              [ngModel]="grossMax()"
-              (ngModelChange)="onGrossFilter('max', $event)"
-            />
-          </app-filter-range>
-        </app-filter-field>
-        <app-filter-field [label]="'invoices.filter.issueRange' | t">
-          <app-filter-range>
-            <app-datepicker
-              start
-              [ariaLabel]="'invoices.filter.issueFrom' | t"
-              [ngModel]="issueFrom()"
-              (ngModelChange)="onDateFilter('issueFrom', $event)"
-            />
-            <app-datepicker
-              end
-              [ariaLabel]="'invoices.filter.issueTo' | t"
-              [ngModel]="issueTo()"
-              (ngModelChange)="onDateFilter('issueTo', $event)"
-            />
-          </app-filter-range>
-        </app-filter-field>
-        <app-filter-field [label]="'invoices.filter.dueRange' | t">
-          <app-filter-range>
-            <app-datepicker
-              start
-              [ariaLabel]="'invoices.filter.dueFrom' | t"
-              [ngModel]="dueFrom()"
-              (ngModelChange)="onDateFilter('dueFrom', $event)"
-            />
-            <app-datepicker
-              end
-              [ariaLabel]="'invoices.filter.dueTo' | t"
-              [ngModel]="dueTo()"
-              (ngModelChange)="onDateFilter('dueTo', $event)"
-            />
-          </app-filter-range>
-        </app-filter-field>
-      </app-filter-bar>
-    </div>
-    @if (canManage()) {
-      <div class="inv__actions">
-        <input
-          #fileInput
-          type="file"
-          accept="application/pdf,.pdf"
-          hidden
-          (change)="onFilePicked($event)"
-        />
-        @if (!phone()) {
-          <app-button variant="tonal" size="sm" [loading]="importing()" (click)="fileInput.click()">
-            <span class="inv__btn"><app-icon name="upload" [size]="16" />{{ 'invoices.import' | t }}</span>
-          </app-button>
-        }
-        <app-button size="sm" data-testid="inv-add" (click)="openCreate()">
-          <span class="inv__btn"
-            ><app-icon name="add" [size]="16" />{{
-              (phone() ? 'invoices.addShort' : 'invoices.add') | t
-            }}</span
-          >
-        </app-button>
-        @if (phone()) {
-          <app-row-menu
-            [label]="'expenses.moreActions' | t"
-            [sections]="phoneMenu()"
-            (selected)="fileInput.click()"
-          />
-        }
+  <!-- The search and the filter never scroll away. Wide: they sit in the title row, so
+       the whole row sticks. Narrower: the title row scrolls, the search row below it
+       sticks. -->
+  <app-sticky-bar [sticky]="wide()">
+    <header class="inv__head">
+      <div class="inv__titles">
+        <h1 class="inv__title">{{ 'invoices.title' | t }}</h1>
+        <p class="inv__subtitle">{{ 'invoices.subtitle' | t }}</p>
       </div>
-    }
-  </header>
+      @if (wide()) {
+        <ng-container *ngTemplateOutlet="tools" />
+      }
+      @if (canManage()) {
+        <div class="inv__actions">
+          <input
+            #fileInput
+            type="file"
+            accept="application/pdf,.pdf"
+            hidden
+            (change)="onFilePicked($event)"
+          />
+          @if (!phone()) {
+            <app-button variant="tonal" size="sm" [loading]="importing()" (click)="fileInput.click()">
+              <span class="inv__btn"><app-icon name="upload" [size]="16" />{{ 'invoices.import' | t }}</span>
+            </app-button>
+          }
+          <app-button size="sm" data-testid="inv-add" (click)="openCreate()">
+            <span class="inv__btn"
+              ><app-icon name="add" [size]="16" />{{
+                (phone() ? 'invoices.addShort' : 'invoices.add') | t
+              }}</span
+            >
+          </app-button>
+          @if (phone()) {
+            <app-row-menu
+              [label]="'expenses.moreActions' | t"
+              [sections]="phoneMenu()"
+              (selected)="fileInput.click()"
+            />
+          }
+        </div>
+      }
+    </header>
+  </app-sticky-bar>
+  @if (!wide()) {
+    <app-sticky-bar>
+      <ng-container *ngTemplateOutlet="tools" />
+    </app-sticky-bar>
+  }
 
   <!-- A phone has no drag and drop: the import sits in the menu of the title row. -->
   @if (canManage() && !phone()) {
@@ -305,3 +229,95 @@
     }}</app-button>
   </div>
 </app-dialog>
+
+<ng-template #tools>
+    <div class="inv__tools">
+      <app-search-pill
+        class="inv__search"
+        size="md"
+        [placeholder]="'invoices.search' | t"
+        [value]="q()"
+        (valueChange)="onSearch($event)"
+      />
+      <!-- These filters drive the server query. -->
+      <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
+        <!-- `group`: three controls, not one. A plain field wraps its content in a
+             label, which would bind to the first button and take its name away. -->
+        <app-filter-field [label]="'invoices.filter.status' | t" [group]="true">
+          <div class="inv__statuses">
+            <app-button
+              [variant]="statusFilter() === '' ? 'primary' : 'ghost'"
+              size="sm"
+              [ariaPressed]="statusFilter() === ''"
+              (click)="setStatus('')"
+              >{{ 'invoices.filter.all' | t }}</app-button
+            >
+            <app-button
+              [variant]="statusFilter() === 'open' ? 'primary' : 'ghost'"
+              size="sm"
+              [ariaPressed]="statusFilter() === 'open'"
+              (click)="setStatus('open')"
+              >{{ 'invoices.status.open' | t }}</app-button
+            >
+            <app-button
+              [variant]="statusFilter() === 'paid' ? 'primary' : 'ghost'"
+              size="sm"
+              [ariaPressed]="statusFilter() === 'paid'"
+              (click)="setStatus('paid')"
+              >{{ 'invoices.status.paid' | t }}</app-button
+            >
+          </div>
+        </app-filter-field>
+        <app-filter-field [label]="'invoices.filter.grossRange' | t">
+          <app-filter-range>
+            <app-currency-input
+              start
+              [placeholder]="'invoices.filter.amountMin' | t"
+              [ariaLabel]="'invoices.filter.amountMin' | t"
+              [ngModel]="grossMin()"
+              (ngModelChange)="onGrossFilter('min', $event)"
+            />
+            <app-currency-input
+              end
+              [placeholder]="'invoices.filter.amountMax' | t"
+              [ariaLabel]="'invoices.filter.amountMax' | t"
+              [ngModel]="grossMax()"
+              (ngModelChange)="onGrossFilter('max', $event)"
+            />
+          </app-filter-range>
+        </app-filter-field>
+        <app-filter-field [label]="'invoices.filter.issueRange' | t">
+          <app-filter-range>
+            <app-datepicker
+              start
+              [ariaLabel]="'invoices.filter.issueFrom' | t"
+              [ngModel]="issueFrom()"
+              (ngModelChange)="onDateFilter('issueFrom', $event)"
+            />
+            <app-datepicker
+              end
+              [ariaLabel]="'invoices.filter.issueTo' | t"
+              [ngModel]="issueTo()"
+              (ngModelChange)="onDateFilter('issueTo', $event)"
+            />
+          </app-filter-range>
+        </app-filter-field>
+        <app-filter-field [label]="'invoices.filter.dueRange' | t">
+          <app-filter-range>
+            <app-datepicker
+              start
+              [ariaLabel]="'invoices.filter.dueFrom' | t"
+              [ngModel]="dueFrom()"
+              (ngModelChange)="onDateFilter('dueFrom', $event)"
+            />
+            <app-datepicker
+              end
+              [ariaLabel]="'invoices.filter.dueTo' | t"
+              [ngModel]="dueTo()"
+              (ngModelChange)="onDateFilter('dueTo', $event)"
+            />
+          </app-filter-range>
+        </app-filter-field>
+      </app-filter-bar>
+    </div>
+</ng-template>

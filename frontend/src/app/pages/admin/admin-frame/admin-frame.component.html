@@ -9,13 +9,17 @@
         } @else {
           <p class="af__title">{{ 'admin.home.title' | t }}</p>
         }
+      </div>
+      <!-- The search never scrolls away: in one column it sticks to the top of the page;
+           beside the page the column keeps it and only the entries scroll. -->
+      <app-sticky-bar class="af__search">
         <app-search-pill
           size="md"
           [placeholder]="'admin.frame.search' | t"
           [value]="query()"
           (valueChange)="query.set($event)"
         />
-      </div>
+      </app-sticky-bar>
 
       <div #navBody class="af__navBody" appScrollFade="y">
         <!-- A class hides the tiles during a search. They are not destroyed, so a cleared

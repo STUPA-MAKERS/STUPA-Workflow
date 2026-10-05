@@ -42,6 +42,7 @@ import {
   type RowMenuItem,
   type RowMenuSection,
   SearchPillComponent,
+  StickyBarComponent,
   SelectionBarComponent,
   SideSheetComponent,
   StatusTextComponent,
@@ -93,6 +94,8 @@ export type ExpensesTab = 'bookings' | 'transfers';
  */
 @Component({
   selector: 'app-expenses',
+  // A pane page (styles.scss): the panes fill the free height and scroll by themselves.
+  host: { '[class.pane-page]': 'wide()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
@@ -115,6 +118,7 @@ export type ExpensesTab = 'bookings' | 'transfers';
     RowMenuComponent,
     ScrollFadeDirective,
     SearchPillComponent,
+    StickyBarComponent,
     SegmentedComponent,
     SelectComponent,
     SelectionBarComponent,

@@ -27,6 +27,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
+import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
 import { IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { PageFrameService } from '../../../layout/page-frame.service';
@@ -103,6 +104,7 @@ const XL = '(min-width: 1440px)';
     TranslatePipe,
     IconComponent,
     SearchPillComponent,
+    StickyBarComponent,
     ScrollFadeDirective,
     AdminHealthComponent,
   ],

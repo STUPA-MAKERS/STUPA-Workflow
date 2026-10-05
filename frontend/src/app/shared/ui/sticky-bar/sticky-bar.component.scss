@@ -1,0 +1,55 @@
+/* Sticky at the top of the viewport, below the shell header and the safe area. The block
+   padding gives the field a small gap to the viewport edge while it is stuck; the same
+   negative margin keeps the bar at its place in the flow. */
+:host {
+  --stb-pad: var(--space-2);
+  --stb-fade: var(--space-4);
+  position: sticky;
+  top: calc(var(--layout-header-height, 0px) + env(safe-area-inset-top, 0px));
+  /* Above the rows, below the floating action button and the phone bar (`--z-sticky`). */
+  z-index: calc(var(--z-sticky) - 1);
+  display: block;
+  min-width: 0;
+  margin-block: calc(-1 * var(--stb-pad));
+  padding-block: var(--stb-pad);
+  /* Opaque: the rows that scroll under the bar do not show through. A page that puts the
+     bar on a sheet sets `--stb-bg` to the surface of the sheet. */
+  background: var(--stb-bg, var(--color-bg));
+}
+
+/* While a popup of a control in the bar is open, the bar goes up to the dialog layer.
+   A sticky element is a stacking context, so a popup inside it can never be higher than
+   the bar itself. */
+:host(:has([aria-expanded='true'])) {
+  z-index: var(--z-dialog);
+}
+
+/* The fade below the bar: only while rows scroll under it. */
+:host::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  top: 100%;
+  height: var(--stb-fade);
+  background: linear-gradient(to bottom, var(--stb-bg, var(--color-bg)), transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--ease-standard);
+}
+:host(.stb--stuck)::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :host::after {
+    transition: none;
+  }
+}
+
+/* Turned off: the content stays in the flow as if the bar were not there. */
+:host(.stb--off) {
+  display: contents;
+}
+:host(.stb--off)::after {
+  display: none;
+}

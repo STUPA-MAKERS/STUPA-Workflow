@@ -33,7 +33,9 @@
         }
       </header>
 
-      <div class="apps__filters">
+      <!-- The search and the chips never scroll away: one pane at a time they stick to the
+           top of the viewport; side by side only the rows below them scroll. -->
+      <app-sticky-bar class="apps__filters">
         <app-search-pill
           [placeholder]="searchPlaceholder()"
           [label]="'applications.list.searchLabel' | t"
@@ -139,7 +141,7 @@
             </app-button>
           }
         </div>
-      </div>
+      </app-sticky-bar>
 
       <div class="apps__scroll" appScrollFade="y">
         @if (error()) {

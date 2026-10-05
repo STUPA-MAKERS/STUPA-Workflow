@@ -36,8 +36,9 @@
   flex: 1 1 0;
 }
 /* One pane at a time the page scrolls, not the pane. A pane that is a scroll container
-   would hold a sticky bar of the detail (the edit bar of an application) in place of
-   the page, and the bar would scroll away with it. */
+   would hold a sticky bar (the search of the list, the edit bar of an application) in
+   place of the page, and the bar would scroll away with it. */
+:host(.ld--collapsed) .ld__list,
 :host(.ld--collapsed) .ld__detail {
   overflow: visible;
 }

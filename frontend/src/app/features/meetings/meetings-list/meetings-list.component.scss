@@ -128,11 +128,10 @@
     flex: 1 1 100%;
     width: auto;
   }
-  /* The filter and "Neue Sitzung" share the row below the search. */
+  /* The filter takes the row below the search. */
   .mtl__chip {
-    flex: 1 1 0;
     min-width: 0;
-    max-width: none;
+    max-width: 100%;
   }
   /* The row actions move into the meeting page; the chevron stays. */
   .mtl__trail app-button {

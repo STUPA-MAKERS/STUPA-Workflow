@@ -79,6 +79,29 @@
   }
 }
 
+// A pane page: the page does not scroll as a page. It fills the free height of the main
+// column of the shell, and its panes scroll inside themselves (budget, bookings and the
+// applications list beside the detail). The page host gets the class, for example with
+// `host: { '[class.pane-page]': 'wide()' }`.
+//
+// - `flex: 1 1 0` takes the free height of `.main` (a flex column above the footer). A
+//   basis of 0 keeps the rows from pushing the page taller than the viewport.
+// - The bottom padding of `.main` is for a page that scrolls. A pane page pulls it back
+//   and keeps only `--pane-foot-gap`, which the shell sets: 0 above the footer (the top
+//   padding of the footer is the gap), a small gap where the footer is left out.
+// - A dialog or a side sheet of the page is an overlay. Closed, it is empty, but as a
+//   flex item it would still take the gap of the host. `display: contents` gives it no
+//   box of its own.
+.pane-page {
+  flex: 1 1 0;
+  min-height: 0;
+  margin-bottom: calc(var(--pane-foot-gap, 0px) - var(--main-pad-bottom, 0px));
+}
+.pane-page > app-dialog,
+.pane-page > app-side-sheet {
+  display: contents;
+}
+
 // Mobile: the page itself must NEVER scroll horizontally. An element that overflows,
 // such as a long link or a wide table cell, may only scroll inside its own overflow
 // container. `clip` instead of `hidden`: it makes no new scroll container, so

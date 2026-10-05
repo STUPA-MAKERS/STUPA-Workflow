@@ -128,6 +128,8 @@ export const APPS_SHOWN = 5;
  */
 @Component({
   selector: 'app-budget-dashboard',
+  // A pane page (styles.scss): the panes fill the free height and scroll by themselves.
+  host: { '[class.pane-page]': 'wide()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [

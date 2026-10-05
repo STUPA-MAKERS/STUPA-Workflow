@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -40,6 +41,7 @@ import {
   type RowMenuItem,
   type RowMenuSection,
   SearchPillComponent,
+  StickyBarComponent,
   StatusTextComponent,
   invoiceStatus,
 } from '@shared/ui';
@@ -85,6 +87,7 @@ export type ImportNotice = 'parsed' | 'manual' | null;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NgTemplateOutlet,
     ButtonComponent,
     CellDirective,
     CurrencyInputComponent,
@@ -101,6 +104,7 @@ export type ImportNotice = 'parsed' | 'manual' | null;
     LocalizedDatePipe,
     RowMenuComponent,
     SearchPillComponent,
+    StickyBarComponent,
     StatusTextComponent,
     TranslatePipe,
   ],
@@ -119,6 +123,8 @@ export class InvoicesComponent implements OnDestroy, InvoiceDialogHost {
 
   /** < 768px: one primary action in the title row, the rest in a menu. */
   readonly phone = mediaQuerySignal(MEDIA.phone);
+  /** >= 1200px: the search sits in the title row, and the whole row sticks. */
+  readonly wide = mediaQuerySignal(MEDIA.wide);
   private readonly fullColumns = mediaQuerySignal(COLUMNS_FULL_MEDIA);
   private readonly tightColumns = mediaQuerySignal(COLUMNS_TIGHT_MEDIA);
   /** Which table columns fit the viewport. */

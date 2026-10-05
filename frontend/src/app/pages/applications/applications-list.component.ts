@@ -48,6 +48,7 @@ import {
   ListItemComponent,
   RowMenuComponent,
   SearchPillComponent,
+  StickyBarComponent,
   SideSheetComponent,
   SkeletonComponent,
   StatusTextComponent,
@@ -132,6 +133,8 @@ type FilterSheet = 'budget' | 'more' | null;
  */
 @Component({
   selector: 'app-applications-list',
+  // A pane page (styles.scss): the panes fill the free height and scroll by themselves.
+  host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
@@ -149,6 +152,7 @@ type FilterSheet = 'budget' | 'more' | null;
     ListItemComponent,
     RowMenuComponent,
     SearchPillComponent,
+    StickyBarComponent,
     SideSheetComponent,
     SkeletonComponent,
     StatusTextComponent,
