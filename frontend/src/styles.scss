@@ -201,8 +201,13 @@ td:first-child > .skel--bar {
   min-width: 0;
 }
 .fe-form .fe-grid > formly-field {
-  display: block;
   min-width: 0;
+}
+// A field that `visibleIf` hides keeps its `formly-field` host, but Formly removes its
+// content. The empty host takes no cell, so the next field moves up and the grid has
+// no holes. A grid item is a block box anyway, so no other rule sets `display`.
+.fe-form .fe-grid > formly-field:empty {
+  display: none;
 }
 .fe-form .fe-grid > .fe-full {
   grid-column: 1 / -1;
