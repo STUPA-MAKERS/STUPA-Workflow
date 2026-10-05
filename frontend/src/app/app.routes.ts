@@ -268,9 +268,11 @@ export const routes: Routes = [
       {
         // The admin frame (board Verwaltung): the admin navigation beside every admin
         // page. The frame itself needs only a session; each page below keeps its own
-        // permission gate. `wide`: the navigation and the page fill the width.
+        // permission gate. `wide`: the navigation and the page fill the width. `frame`:
+        // the route data sets the mode of the frame, so a query parameter `?frame=` cannot
+        // change it (route data wins over query parameters in the input binding).
         path: 'admin',
-        data: { wide: true },
+        data: { wide: true, frame: 'admin' },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/admin/admin-frame/admin-frame.component').then(
@@ -517,29 +519,51 @@ export const routes: Routes = [
           import('./pages/account/consent.component').then((m) => m.OAuthConsentComponent),
       },
       {
-        // API access: manage your own OAuth grants and download the MCP package.
-        path: 'account/grants',
-        data: { title: 'account.grants.title' },
+        // The account area: the same frame as the administration, in account mode (the
+        // navigation "Konto" beside the page, see `FRAME_MODES`). The frame needs only a
+        // session. `wide`: the navigation and the page fill the width.
+        path: 'account',
+        data: { wide: true, frame: 'account' },
         canActivate: [authGuard],
         loadComponent: () =>
-          import('./pages/account/grants.component').then((m) => m.AccountGrantsComponent),
-      },
-      {
-        // Your own mail switches. Each switch is an opt-out.
-        path: 'account/notifications',
-        data: { title: 'account.notifications.title' },
-        canActivate: [authGuard],
-        loadComponent: () =>
-          import('./pages/account/notifications.component').then(
-            (m) => m.AccountNotificationsComponent,
+          import('./pages/admin/admin-frame/admin-frame.component').then(
+            (m) => m.AdminFrameComponent,
           ),
-      },
-      {
-        // The calendar subscription is a popover of the meetings page now. Old links and
-        // bookmarks of the former account page land there.
-        path: 'account/calendar',
-        redirectTo: '/meetings',
-        pathMatch: 'full',
+        children: [
+          {
+            // Wide: the empty sheet beside the navigation. Below wide: the navigation only.
+            path: '',
+            pathMatch: 'full',
+            data: { title: 'account.frame.title' },
+            loadComponent: () =>
+              import('./pages/account/account-none.component').then(
+                (m) => m.AccountNoneComponent,
+              ),
+          },
+          {
+            // Your own mail switches. Each switch is an opt-out.
+            path: 'notifications',
+            data: { title: 'account.notifications.title' },
+            loadComponent: () =>
+              import('./pages/account/notifications.component').then(
+                (m) => m.AccountNotificationsComponent,
+              ),
+          },
+          {
+            // API access: manage your own OAuth grants and download the MCP package.
+            path: 'grants',
+            data: { title: 'account.grants.title' },
+            loadComponent: () =>
+              import('./pages/account/grants.component').then((m) => m.AccountGrantsComponent),
+          },
+          {
+            // The calendar subscription is a popover of the meetings page now. Old links
+            // and bookmarks of the former account page land there.
+            path: 'calendar',
+            redirectTo: '/meetings',
+            pathMatch: 'full',
+          },
+        ],
       },
       {
         path: 'forbidden',

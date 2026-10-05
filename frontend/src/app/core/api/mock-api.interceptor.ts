@@ -99,6 +99,8 @@ const MOCK_PRINCIPAL: Principal = {
     'budget.structure',
     'budget.book',
     'budget.export',
+    // "API-Zugang" in the account menu and the account navigation, and the MCP setup.
+    'mcp.use',
   ],
   groups: [],
   gremien: [
@@ -1400,6 +1402,10 @@ function mockDraftUpload(body: unknown): DraftAttachmentOutWire {
   };
 }
 
+/** The paths of the account pages and the consent page (`mock-account.ts`). */
+const MOCK_ACCOUNT_PATH =
+  /(^|\/)api\/(notifications\/preferences|oauth\/grants(\/[^/]+)?|oauth\/consent(-request)?|mcp\/(config|package))$/;
+
 function path(url: string): string {
   return url.split('?')[0];
 }
@@ -1424,6 +1430,17 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
 
   const substitutes = mockSubstitutes(req, p);
   if (substitutes) return substitutes;
+
+  // The account pages and the consent page. The data loads on first use.
+  if (MOCK_ACCOUNT_PATH.test(p)) {
+    return from(import('./mock-account')).pipe(
+      mergeMap((m) => {
+        const reply = m.mockAccount(req.method, p, req.body);
+        if (!reply) return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
+        return ok(reply.body, reply.status);
+      }),
+    );
+  }
 
   // The demo applications of the list page and their detail paths. The demo data loads
   // on first use, so it stays out of the initial bundle.

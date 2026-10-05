@@ -1,50 +1,62 @@
-<div class="af" [class.af--split]="split()" [class.af--home]="home()" [class.af--pane]="fullPane()">
+<div
+  class="af"
+  [class.af--split]="split()"
+  [class.af--home]="home()"
+  [class.af--pane]="fullPane()"
+  [class.af--account]="frame() === 'account'"
+>
   @if (showNav()) {
-    <nav class="ld-pane af__nav" [attr.aria-label]="'admin.frame.navLabel' | t">
+    <nav class="ld-pane af__nav" [attr.aria-label]="mode().navLabel | t">
       <!-- The header of every list column. On the home page the navigation is the page,
-           so its title is the h1. Beside an admin page the page has its own h1. -->
+           so its title is the h1. Beside a page the page has its own h1. -->
       <app-page-header
         [pane]="true"
-        [title]="'admin.home.title' | t"
+        [title]="mode().title | t"
         [titleTag]="home() ? 'h1' : 'p'"
       />
       <!-- The search never scrolls away: in one column it sticks to the top of the page;
            beside the page the column keeps it and only the entries scroll. -->
-      <app-sticky-bar class="ld-pane__filters af__search">
-        <!-- The large search of every list column beside a sheet; one column keeps the
-             compact field. -->
-        <app-search-pill
-          [size]="split() ? 'lg' : 'md'"
-          [clearable]="true"
-          [placeholder]="'admin.frame.search' | t"
-          [value]="query()"
-          (valueChange)="query.set($event)"
-        />
-      </app-sticky-bar>
+      @if (mode().search) {
+        <app-sticky-bar class="ld-pane__filters af__search">
+          <!-- The large search of every list column beside a sheet; one column keeps the
+               compact field. -->
+          <app-search-pill
+            [size]="split() ? 'lg' : 'md'"
+            [clearable]="true"
+            [placeholder]="'admin.frame.search' | t"
+            [value]="query()"
+            (valueChange)="query.set($event)"
+          />
+        </app-sticky-bar>
+      }
 
       <div #navBody class="af__navBody" appScrollFade="y">
         <!-- "Zustand" stays in the column on every admin page, not only on the home page.
              The navigation shows below wide only on the home page, so the one-column
              layout shows the tiles there only. A class hides the tiles during a search.
              They are not destroyed, so a cleared search does not load them again. -->
-        <app-admin-health [class.af__hidden]="!!query()" />
+        @if (mode().health) {
+          <app-admin-health [class.af__hidden]="!!query()" />
+        }
 
         @for (g of groups(); track g.key) {
-          <section class="af__group" [attr.aria-labelledby]="'af-group-' + g.key">
-            <h2 class="sec af__groupTitle" [id]="'af-group-' + g.key">{{ g.title | t }}</h2>
+          <section class="af__group" [attr.aria-labelledby]="g.title ? 'af-group-' + g.key : null">
+            @if (g.title) {
+              <h2 class="sec af__groupTitle" [id]="'af-group-' + g.key">{{ g.title | t }}</h2>
+            }
             <ul class="af__list">
               @for (p of g.pages; track p.link) {
                 <li>
                   <a
                     class="af__item"
-                    [routerLink]="path(p)"
+                    [routerLink]="linkOf(p)"
                     routerLinkActive="af__item--on"
                     ariaCurrentWhenActive="page"
                   >
                     <app-icon class="af__icon" [name]="p.icon" [size]="20" />
                     <span class="af__itemText">
                       <span class="af__itemTitle ell" [title]="p.title | t">{{ p.title | t }}</span>
-                      @if (home() && !split()) {
+                      @if (navOnly()) {
                         <span class="af__itemDesc">{{ p.desc | t }}</span>
                       }
                     </span>
@@ -64,8 +76,14 @@
        clips, the body in it scrolls, so the corners clip what scrolls. -->
   <!-- One column on the home page: the navigation is the page, the empty sheet does not
        show. -->
-  <div class="af__page" [class.af__hidden]="home() && !split()">
+  <div class="af__page" [class.af__hidden]="navOnly()">
     <div #page class="af__pageBody" appScrollFade="y">
+      @if (showBack()) {
+        <a class="af__back" [routerLink]="mode().home">
+          <app-icon name="left" [size]="16" />
+          {{ 'ui.listDetail.back' | t }}
+        </a>
+      }
       <router-outlet />
     </div>
   </div>

@@ -164,6 +164,30 @@
 .af__page {
   min-width: 0;
 }
+
+/* "Zur Liste" above an account page below wide: back to the navigation. The same look
+   as the control of the list/detail layout. */
+.af__back {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--control-height-sm);
+  margin: 0 0 var(--space-2) calc(-1 * var(--space-2));
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  color: var(--color-accent-text);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+.af__back:hover {
+  background: var(--color-selected);
+}
+.af__back:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
 /* Without the sheet the page sits on the page background: the rows of a row-group
    table (`surface="rowgroup"`) take that colour between them. */
 .af:not(.af--split) .af__page {

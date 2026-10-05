@@ -8,6 +8,7 @@ import {
   computed,
   effect,
   inject,
+  input,
   signal,
   viewChild,
 } from '@angular/core';
@@ -32,18 +33,15 @@ import { IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { AdminHealthComponent } from '../admin-health/admin-health.component';
-import { ADMIN_GROUPS, ADMIN_PAGES, type AdminGroupKey, type AdminPage } from './admin-pages';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { FRAME_MODES, type FrameModeKey, type FramePage } from './frame-modes';
 
 /** One group of the navigation with the pages the principal may open. */
 interface NavGroup {
-  key: AdminGroupKey;
-  title: TranslationKey;
-  pages: readonly AdminPage[];
+  key: string;
+  title: TranslationKey | null;
+  pages: readonly FramePage[];
 }
-
-/** The path of the admin home page. */
-const HOME = '/admin';
 
 /** The path of a URL without the query string and the fragment. */
 function pathOf(url: string): string {
@@ -95,7 +93,8 @@ const sheetScroll = new Map<number, number>();
 
 /**
  * The frame of the admin area (board Verwaltung): the admin navigation beside every
- * admin page.
+ * admin page. The account area (`/account/*`) uses the same frame in its own mode, see
+ * "Account mode" below.
  *
  * - The navigation: the title "Verwaltung", "Einstellungen durchsuchen" (filters the
  *   entries by title and description, in the browser), and the groups of `ADMIN_GROUPS`.
@@ -123,6 +122,12 @@ const sheetScroll = new Map<number, number>();
  *   load them again.
  * - The entries of the column scroll on their own. After each navigation the column
  *   scrolls the active entry into view; the window does not move.
+ *
+ * Account mode (route data `frame: 'account'`, see `FRAME_MODES`): the navigation
+ * "Konto" lists the account pages (`ACCOUNT_PAGES`), without the search and without the
+ * tiles. Wide, `/account` shows an empty sheet beside the navigation. Below wide,
+ * `/account` shows the navigation alone, and an account page shows "Zur Liste" above
+ * it, which leads back to the navigation.
  */
 @Component({
   selector: 'app-admin-frame',
@@ -157,11 +162,25 @@ export class AdminFrameComponent {
   /** The scrolling part of the navigation column (absent while the navigation is hidden). */
   private readonly navBody = viewChild<ElementRef<HTMLElement>>('navBody');
 
+  /**
+   * The area of the frame. The route sets it with `data: { frame: 'admin' }` or
+   * `data: { frame: 'account' }` (bound as an input). Both routes set it, because the
+   * input binding also reads query parameters, and only route data wins over them. An
+   * unknown or absent value gives the admin frame.
+   */
+  readonly frame = input<FrameModeKey>('admin');
+
+  /** The settings of the area. */
+  readonly mode = computed(() => FRAME_MODES[this.frame()] ?? FRAME_MODES.admin);
+
   /** The viewport is wide: the navigation is a column beside the page. */
   readonly wide = mediaQuerySignal(MEDIA.wide);
 
-  /** The admin home page is open. */
-  readonly home = signal(pathOf(this.router.url) === HOME);
+  /** The path of the open page, without the query string and the fragment. */
+  private readonly path = signal(pathOf(this.router.url));
+
+  /** The home page of the area is open. */
+  readonly home = computed(() => this.path() === this.mode().home);
 
   /** The viewport is wide enough for a page with `adminNav: 'xl'` beside the navigation. */
   private readonly xl = mediaQuerySignal(XL);
@@ -196,19 +215,31 @@ export class AdminFrameComponent {
   /** The navigation shows: always on the home page, else only as the column. */
   readonly showNav = computed(() => this.home() || (this.wide() && !this.fullWidth()));
 
+  /**
+   * One column on the home page: the navigation is the page, with a description under
+   * each entry, and the empty sheet does not show.
+   */
+  readonly navOnly = computed(() => this.home() && !this.split());
+
+  /** Below wide an account page shows "Zur Liste", which leads back to the navigation. */
+  readonly showBack = computed(() => this.mode().backLink && !this.home() && !this.showNav());
+
   /** The groups with the pages the principal may open and the search finds. */
   readonly groups = computed<NavGroup[]>(() => {
+    const { groups, pages } = this.mode();
     const q = this.query().trim().toLocaleLowerCase();
-    const hit = (p: AdminPage): boolean =>
+    const hit = (p: FramePage): boolean =>
       !q ||
       this.i18n.translate(p.title).toLocaleLowerCase().includes(q) ||
       this.i18n.translate(p.desc).toLocaleLowerCase().includes(q);
-    return ADMIN_GROUPS.map((g) => ({
-      ...g,
-      pages: ADMIN_PAGES.filter(
-        (p) => p.group === g.key && this.auth.canAny(...p.permissions) && hit(p),
-      ),
-    })).filter((g) => g.pages.length > 0);
+    const allowed = (p: FramePage): boolean =>
+      p.permissions.length === 0 || this.auth.canAny(...p.permissions);
+    return groups
+      .map((g) => ({
+        ...g,
+        pages: pages.filter((p) => p.group === g.key && allowed(p) && hit(p)),
+      }))
+      .filter((g) => g.pages.length > 0);
   });
 
   /** The id of the navigation that shows the current page (see {@link sheetScroll}). */
@@ -224,7 +255,7 @@ export class AdminFrameComponent {
         this.restoreId = e.navigationTrigger === 'popstate' ? (e.restoredState?.navigationId ?? null) : null;
       } else if (e instanceof NavigationEnd) {
         this.lastId = e.id;
-        this.home.set(pathOf(e.urlAfterRedirects) === HOME);
+        this.path.set(pathOf(e.urlAfterRedirects));
         this.navMode.set(navMode(this.router.routerState.snapshot.root));
         this.paneRoute.set(paneRoute(this.router.routerState.snapshot.root));
         const top = this.restoreId === null ? 0 : (sheetScroll.get(this.restoreId) ?? 0);
@@ -245,7 +276,9 @@ export class AdminFrameComponent {
     inject(DestroyRef).onDestroy(() => this.pageFrame.fill.set(false));
 
     // The navigation shows "Verwaltung" beside the page, so the breadcrumbs leave it out.
-    effect(() => this.pageFrame.crumbRoot.set(this.split() ? 'admin' : null));
+    effect(() =>
+      this.pageFrame.crumbRoot.set(this.split() ? this.mode().home.replace(/^\//, '') : null),
+    );
     inject(DestroyRef).onDestroy(() => this.pageFrame.crumbRoot.set(null));
   }
 
@@ -283,7 +316,7 @@ export class AdminFrameComponent {
   }
 
   /** The full path of an entry. */
-  protected path(page: AdminPage): string {
-    return `${HOME}/${page.link}`;
+  protected linkOf(page: FramePage): string {
+    return `${this.mode().home}/${page.link}`;
   }
 }
