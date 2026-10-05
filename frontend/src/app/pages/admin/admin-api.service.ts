@@ -31,6 +31,7 @@ import {
   type ConfigRevisionDiff,
   type ConfigRevisionDiffWire,
   type NotificationSettings,
+  type GuestSettings,
   type AuditPage,
   type Branding,
   type CdLogoSlot,
@@ -76,6 +77,8 @@ import {
   MOCK_AUDIT_VERIFICATION,
   MOCK_BACKUPS,
   MOCK_BRANDING,
+  MOCK_CD_VARIANTS,
+  MOCK_DEADLINE_POLICIES,
   MOCK_ERASURES,
   MOCK_FORM_DRAFTS,
   MOCK_FORMS,
@@ -87,9 +90,13 @@ import {
   MOCK_GREMIUM_ROLES,
   MOCK_GREMIUM_STUPA_ID,
   MOCK_GROUP_MAPPINGS,
+  MOCK_GUEST_SETTINGS,
+  MOCK_MAIL_TEMPLATES,
   MOCK_PERMISSIONS,
   MOCK_PRINCIPALS,
   MOCK_ROLES,
+  MOCK_SITE_REVISIONS,
+  MOCK_WEBHOOK_STATUS,
   MOCK_WEBHOOKS,
 } from './admin.mock';
 
@@ -110,6 +117,7 @@ interface ApplicationTypeOutWire {
   hasBudget?: boolean;
   retentionMonths?: number | null;
   activeFormVersionId?: Uuid | null;
+  activeFormVersion?: number | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -132,7 +140,10 @@ export class AdminApiService {
     membershipMappings: structuredCopy(MOCK_GREMIUM_MEMBERSHIP_MAPPINGS),
     roleMappings: structuredCopy(MOCK_GREMIUM_ROLE_MAPPINGS),
     mailRecipients: structuredCopy(MOCK_GREMIUM_MAIL_RECIPIENTS),
-    deadlinePolicies: [] as DeadlinePolicy[],
+    deadlinePolicies: structuredCopy(MOCK_DEADLINE_POLICIES) as DeadlinePolicy[],
+    guestSettings: structuredCopy(MOCK_GUEST_SETTINGS) as GuestSettings,
+    cdVariants: structuredCopy(MOCK_CD_VARIANTS) as CdVariant[],
+    mailTemplates: structuredCopy(MOCK_MAIL_TEMPLATES) as MailTemplate[],
     erasures: structuredCopy(MOCK_ERASURES) as ErasureRequest[],
     audit: structuredCopy(MOCK_AUDIT_ENTRIES) as AuditEntry[],
     auditVerification: structuredCopy(MOCK_AUDIT_VERIFICATION) as AuditVerification | null,
@@ -248,6 +259,7 @@ export class AdminApiService {
 
   /** GET /admin/cd-variants — the variants with their title and footer logos. */
   listCdVariants(): Observable<CdVariant[]> {
+    if (this.mock) return of(structuredCopy(this.store.cdVariants));
     return this.http.get<CdVariant[]>(`${this.base}/admin/cd-variants`, {
       context: skipLoading(),
     });
@@ -420,20 +432,54 @@ export class AdminApiService {
   }
 
   listMailTemplates(): Observable<MailTemplate[]> {
+    if (this.mock) return of(structuredCopy(this.store.mailTemplates));
     return this.http.get<MailTemplate[]>(`${this.base}/admin/mail-templates`);
   }
   /** Create/update an override by key — also for builtin defaults. */
   upsertMailTemplate(body: MailTemplateUpsertBody): Observable<MailTemplate> {
+    if (this.mock) {
+      const cur = this.store.mailTemplates.find((t) => t.key === body.key);
+      const saved: MailTemplate = {
+        id: cur?.id ?? `mt-${body.key}`,
+        key: body.key,
+        subjectI18n: { ...body.subjectI18n },
+        bodyI18n: { ...body.bodyI18n },
+        bodyHtmlI18n: { ...body.bodyHtmlI18n },
+        placeholders: { ...(cur?.placeholders ?? {}) },
+        source: 'override',
+      };
+      this.store.mailTemplates = this.store.mailTemplates.map((t) => (t.key === body.key ? saved : t));
+      return of(structuredCopy(saved));
+    }
     return this.http.put<MailTemplate>(`${this.base}/admin/mail-templates`, body);
   }
   /** Delete an override → restore the builtin default. */
   resetMailTemplate(key: string): Observable<MailTemplate> {
+    if (this.mock) {
+      // The seed stands in for the builtin catalogue.
+      const builtin = MOCK_MAIL_TEMPLATES.find((t) => t.key === key) ?? MOCK_MAIL_TEMPLATES[0];
+      const reset: MailTemplate = { ...structuredCopy(builtin), id: null, source: 'builtin' };
+      this.store.mailTemplates = this.store.mailTemplates.map((t) => (t.key === key ? reset : t));
+      return of(structuredCopy(reset));
+    }
     return this.http.delete<MailTemplate>(
       `${this.base}/admin/mail-templates/by-key/${encodeURIComponent(key)}`,
     );
   }
   /** Preview from the editor draft (no id). */
   previewMailPayload(body: MailPreviewPayload): Observable<MailPreview> {
+    if (this.mock) {
+      // The mock fills `{{ name }}` from the context; the server renders Jinja2.
+      const fill = (text: string | undefined): string =>
+        (text ?? '').replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k: string) => String(body.context[k] ?? ''));
+      const html = fill(body.bodyHtmlI18n[body.lang]);
+      return of({
+        subject: fill(body.subjectI18n[body.lang]),
+        text: fill(body.bodyI18n[body.lang]),
+        html: html || null,
+        lang: body.lang,
+      });
+    }
     return this.http.post<MailPreview>(`${this.base}/admin/mail-templates/preview`, body);
   }
 
@@ -609,6 +655,7 @@ export class AdminApiService {
             hasBudget: t.hasBudget ?? false,
             retentionMonths: t.retentionMonths ?? null,
             activeFormVersionId: t.activeFormVersionId ?? null,
+            activeFormVersion: t.activeFormVersion ?? null,
           })),
         ),
       );
@@ -768,7 +815,7 @@ export class AdminApiService {
   /** Latest delivery state per webhook. Needs P(`webhook.manage`). The overlay stays
    *  off, because the call only decorates the list. */
   listWebhookDeliveryStatus(): Observable<WebhookDeliveryStatus[]> {
-    if (this.mock) return of([]);
+    if (this.mock) return of(structuredCopy(MOCK_WEBHOOK_STATUS));
     return this.http.get<WebhookDeliveryStatus[]>(
       `${this.base}/admin/webhooks/delivery-status`,
       { context: skipLoading() },
@@ -985,7 +1032,13 @@ export class AdminApiService {
     entityType: string,
     entityId: string,
   ): Observable<ConfigRevision[]> {
-    if (this.mock) return of([]);
+    if (this.mock) {
+      return of(
+        structuredCopy(
+          MOCK_SITE_REVISIONS.filter((r) => r.entityType === entityType && r.entityId === entityId),
+        ),
+      );
+    }
     const params = new HttpParams()
       .set('entityType', entityType)
       .set('entityId', entityId);
@@ -1047,10 +1100,36 @@ export class AdminApiService {
   putNotificationSettings(
     settings: Partial<NotificationSettings>,
   ): Observable<NotificationSettings> {
+    if (this.mock) {
+      return of({
+        taskReminderEnabled: true,
+        taskReminderAfterDays: 5,
+        taskReminderRepeatDays: 7,
+        ...settings,
+      });
+    }
     return this.http.put<NotificationSettings>(
       `${this.base}/admin/notification-settings`,
       settings,
     );
+  }
+
+  // Guest applications (Z1). Both routes need P(admin.deadlines).
+  /** GET /admin/guest-settings — the confirm window and the link lifetime. */
+  getGuestSettings(): Observable<GuestSettings> {
+    if (this.mock) return of(structuredCopy(this.store.guestSettings));
+    return this.http.get<GuestSettings>(`${this.base}/admin/guest-settings`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** PUT /admin/guest-settings — replaces both values; `linkTtlDays: null` = no expiry. */
+  putGuestSettings(body: Pick<GuestSettings, 'confirmTtlHours' | 'linkTtlDays'>): Observable<GuestSettings> {
+    if (this.mock) {
+      this.store.guestSettings = { ...this.store.guestSettings, ...body };
+      return of(structuredCopy(this.store.guestSettings));
+    }
+    return this.http.put<GuestSettings>(`${this.base}/admin/guest-settings`, body);
   }
 
   // Every DSGVO/privacy endpoint below needs P(privacy.manage).

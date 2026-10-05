@@ -125,6 +125,8 @@ export const MOCK_BUDGET_TREE: BudgetTreeNode[] = [build(SPEC, null)];
 const MOCK_FISCAL_YEARS: FiscalYear[] = [
   { id: FY_CURRENT, budgetId: ROOT, year: 2026, display: '2026', startDate: '2026-01-01', endDate: '2026-12-31', active: true },
   { id: FY_PREVIOUS, budgetId: ROOT, year: 2025, display: '2025', startDate: '2025-01-01', endDate: '2025-12-31', active: true },
+  // A closed year: the admin cost-centre page marks it "inaktiv".
+  { id: 'f1000000-0000-0000-0000-000000000003', budgetId: ROOT, year: 2024, display: '2024', startDate: '2024-01-01', endDate: '2024-12-31', active: false },
 ];
 
 /** GET /budgets/{id}/fiscal-years: the years of the top budget above the node. */

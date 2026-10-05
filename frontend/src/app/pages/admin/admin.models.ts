@@ -429,6 +429,8 @@ export interface ApplicationTypeFull {
   /** DSGVO retention in months. null = the global default. */
   retentionMonths?: number | null;
   activeFormVersionId?: Uuid | null;
+  /** Number of the active form version (`v7`). `null` while no version is active. */
+  activeFormVersion?: number | null;
 }
 
 /** Body for `POST /admin/application-types` — create an application type/form. */
@@ -836,6 +838,24 @@ export interface NotificationSettings {
   /** Then again every N days. 0 = only once per state visit. */
   taskReminderRepeatDays: number;
 }
+
+/**
+ * Settings for applications without an account (Z1, P admin.deadlines):
+ * `GET/PUT /admin/guest-settings`.
+ */
+export interface GuestSettings {
+  /** Hours until the platform discards an unconfirmed guest application (1 to 720). */
+  confirmTtlHours: number;
+  /** Lifetime of a new personal link in days (1 to 3650). `null` = no expiry. */
+  linkTtlDays: number | null;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+}
+
+/** Upper bound of {@link GuestSettings.confirmTtlHours} (`MAX_CONFIRM_TTL_HOURS`). */
+export const MAX_CONFIRM_TTL_HOURS = 720;
+/** Upper bound of {@link GuestSettings.linkTtlDays} (`MAX_LINK_TTL_DAYS`). */
+export const MAX_LINK_TTL_DAYS = 3650;
 
 /** DSGVO erasure request (queue, P privacy.manage). */
 export type ErasureSubjectType = 'applicant' | 'principal';

@@ -363,7 +363,7 @@ describe('mockApiInterceptor', () => {
 
     it('GET /budgets/{id}/fiscal-years → the years of the demo budget', async () => {
       const fys = await get<{ year: number }[]>('/api/budgets/x/fiscal-years');
-      expect(fys.map((f) => f.year)).toEqual([2026, 2025]);
+      expect(fys.map((f) => f.year)).toEqual([2026, 2025, 2024]);
     });
 
     it('GET /budgets/{id}/applications → the subtree, filtered by year', async () => {
