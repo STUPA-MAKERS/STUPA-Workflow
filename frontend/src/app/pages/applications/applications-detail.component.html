@@ -425,7 +425,7 @@
   (closed)="budgetDialogOpen.set(false)"
 >
   <p class="ad__dlgLead">{{ 'applications.budget.lead' | t }}</p>
-  <div class="ad__ccTree">
+  <div class="ad__ccTree" appScrollFade="y">
     <app-cost-centre-tree
       [nodes]="budgetTree()"
       [selectedId]="budgetChoice()"

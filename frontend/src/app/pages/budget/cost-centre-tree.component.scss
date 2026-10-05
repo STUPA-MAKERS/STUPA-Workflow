@@ -1,24 +1,9 @@
-/* Constrain the host here. Do not rely on the sidebar container. Without a display
-   value the host is inline, and tall content escapes the overflow:auto of the parent.
-   Block plus 75vh plus an internal scroll keeps the tree floating and not too tall. */
+/* The tree has no height and no scroll of its own. The container that holds it (a sheet
+   body, a dialog body or a pane) scrolls it and fades an end only when more rows are
+   past it. A fixed height here does not agree with the height that the container has
+   free, and leaves an empty band below the list or a second scroll bar. */
 :host {
   display: block;
-  max-height: 75vh;
-  overflow-y: auto;
-  // The inner padding equals the fade height. The first and the last item start
-  // BELOW the fade, so the fade does not hide them at rest. The edge fades only
-  // during a scroll.
-  padding-block: var(--space-5);
-  // Fade the top and the bottom into the background, like the meeting timeline.
-  --fade: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--space-5),
-    #000 calc(100% - var(--space-5)),
-    transparent
-  );
-  -webkit-mask-image: var(--fade);
-  mask-image: var(--fade);
 }
 .cct__node {
   display: inline-flex;

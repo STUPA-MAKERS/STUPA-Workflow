@@ -38,6 +38,7 @@ import {
   positionsTotal,
 } from '@shared/forms/positions';
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
+import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.component';
 import {
   AvatarComponent,
@@ -136,6 +137,7 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
     SelectComponent,
     TabsComponent,
     CostCentreTreeComponent,
+    ScrollFadeDirective,
     AttachmentsPanelComponent,
     AnswerViewComponent,
     HistoryComponent,

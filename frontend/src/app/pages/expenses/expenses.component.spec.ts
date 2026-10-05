@@ -186,7 +186,7 @@ describe('ExpensesComponent (rendered)', () => {
     expect(screen.getByRole('button', { name: 'Weitere Aktionen' })).toBeInTheDocument();
     (container.querySelector('.exp__ccChip') as HTMLButtonElement).click();
     fixture.detectChanges();
-    expect(container.querySelector('app-dialog app-cost-centre-tree')).not.toBeNull();
+    expect(container.querySelector('.ss--bottom app-cost-centre-tree')).not.toBeNull();
   });
 
   it('hides add/edit controls for a viewer without budget.book', async () => {

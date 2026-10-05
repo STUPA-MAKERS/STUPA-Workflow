@@ -239,23 +239,16 @@
   />
 </ng-template>
 
-<!-- The cost-centre picker below the wide layout: a side sheet beside the list, a
-     bottom sheet (the kit dialog) on a phone. -->
+<!-- The cost-centre picker below the wide layout: the shared side sheet, from the start
+     beside the list or from the bottom on a phone (the same sheet as on "Anträge"). -->
 @if (!wide()) {
-  @if (phone()) {
-    <app-dialog
-      [open]="pickerOpen()"
-      [title]="'expenses.filter.costCentre' | t"
-      [closeLabel]="'action.close' | t"
-      (closed)="pickerOpen.set(false)"
-    >
-      <ng-container *ngTemplateOutlet="tree" />
-    </app-dialog>
-  } @else {
-    <app-side-sheet side="start" [heading]="'expenses.filter.costCentre' | t" [(open)]="pickerOpen">
-      <ng-container *ngTemplateOutlet="tree" />
-    </app-side-sheet>
-  }
+  <app-side-sheet
+    [side]="phone() ? 'bottom' : 'start'"
+    [heading]="'expenses.filter.costCentre' | t"
+    [(open)]="pickerOpen"
+  >
+    <ng-container *ngTemplateOutlet="tree" />
+  </app-side-sheet>
 }
 
 <!-- On a phone the three actions are icon buttons: with their labels they do not fit the
