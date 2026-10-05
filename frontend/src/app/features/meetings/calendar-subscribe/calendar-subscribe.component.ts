@@ -4,7 +4,7 @@ import {
   DestroyRef,
   ElementRef,
   NgZone,
-  effect,
+  afterRenderEffect,
   inject,
   signal,
   untracked,
@@ -43,6 +43,13 @@ let nextId = 0;
  * and a pointer down outside close it, and the focus goes back to the anchor. A resize
  * across the phone limit while it is open swaps the popover and the sheet, and puts the
  * new one into the top layer.
+ *
+ * The popover never paints in a wrong place. Right after the render that creates it
+ * (`afterRenderEffect`, before the browser paints) it enters the top layer, the frame
+ * measures it and writes its place, and only then the class `cs--placed` makes it
+ * visible. Until then CSS keeps it hidden, also outside the top layer. A
+ * `ResizeObserver` on the popover, the anchor and the page places it again when the
+ * layout changes (the feed loads, the calendar grid renders).
  *
  * A failed read says "could not be loaded" and offers a new read. A failed create of
  * the link says "could not be created" (`rotateError`); the URL that shows stays valid.
@@ -86,7 +93,9 @@ export class CalendarSubscribeComponent {
   private readonly pop = viewChild<ElementRef<HTMLElement>>('pop');
   private readonly layer = viewChild<ElementRef<HTMLElement>>('layer');
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
-  private timer: ReturnType<typeof setTimeout> | null = null;
+  /** The element that is in the top layer now (popover or sheet), else null. */
+  private shownEl: HTMLElement | null = null;
+  private observer: ResizeObserver | null = null;
   private copiedTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly zone = inject(NgZone);
 
@@ -109,18 +118,18 @@ export class CalendarSubscribeComponent {
       document.removeEventListener('pointerdown', onPointer, true);
       window.removeEventListener('resize', onResize);
       window.removeEventListener('scroll', onResize, true);
-      if (this.timer !== null) clearTimeout(this.timer);
+      this.unobserve();
       this.clearCopied();
     });
 
-    // The popover and the sheet are two elements: a resize across the phone limit while
-    // the component is open renders the other one, which must enter the top layer too.
-    let wasPhone = untracked(() => this.phone());
-    effect(() => {
+    // After each render that changes the open state, the mode (a resize across the phone
+    // limit renders the other element) or the element itself: put the new element into
+    // the top layer, and place the popover before the browser paints it.
+    afterRenderEffect(() => {
+      const open = this.isOpen();
       const phone = this.phone();
-      if (phone === wasPhone) return;
-      wasPhone = phone;
-      if (untracked(() => this.isOpen())) this.later(() => this.reveal());
+      const el = (phone ? this.layer() : this.pop())?.nativeElement ?? null;
+      untracked(() => this.reveal(open, phone, el));
     });
   }
 
@@ -138,19 +147,43 @@ export class CalendarSubscribeComponent {
     this.rotateError.set(false);
     this.isOpen.set(true);
     if (!this.loaded) this.load();
-    this.later(() => this.reveal());
   }
 
-  /** Put the sheet (phone) or the popover into the top layer; the popover gets the focus. */
-  private reveal(): void {
-    if (this.phone()) {
-      showPopover(this.layer()?.nativeElement);
+  /**
+   * Put the sheet (phone) or the popover into the top layer, once per element. The
+   * popover is placed before it shows (`cs--placed`), then it gets the focus.
+   */
+  private reveal(open: boolean, phone: boolean, el: HTMLElement | null): void {
+    if (!open || !el) {
+      this.shownEl = null;
+      this.unobserve();
       return;
     }
-    const pop = this.pop()?.nativeElement;
-    showPopover(pop);
+    if (el === this.shownEl) return;
+    this.shownEl = el;
+    this.unobserve();
+    showPopover(el);
+    if (phone) return;
     this.place();
-    pop?.focus();
+    el.classList.add('cs--placed');
+    el.focus();
+    this.observe(el);
+  }
+
+  /** Place the popover again when its size, the anchor or the page layout changes. */
+  private observe(el: HTMLElement): void {
+    if (typeof ResizeObserver !== 'function') return;
+    this.observer = new ResizeObserver(() => {
+      if (this.isOpen() && !this.phone()) this.place();
+    });
+    this.observer.observe(el);
+    if (this.anchor) this.observer.observe(this.anchor);
+    this.observer.observe(document.body);
+  }
+
+  private unobserve(): void {
+    this.observer?.disconnect();
+    this.observer = null;
   }
 
   /** Close; `returnFocus` puts the focus back on the anchor. */
@@ -249,7 +282,11 @@ export class CalendarSubscribeComponent {
     this.copied.set(false);
   }
 
-  /** Under the anchor, aligned to its end, inside the viewport. */
+  /**
+   * Under the anchor, aligned to its end, inside the viewport. The place goes straight
+   * to the element (no template binding, which would wait for the next change detection
+   * and start at 0/0); `position` keeps a copy.
+   */
   private place(): void {
     const pop = this.pop()?.nativeElement;
     if (!pop) return;
@@ -263,15 +300,9 @@ export class CalendarSubscribeComponent {
     if (top + box.height > window.innerHeight - EDGE && rect.top - GAP - box.height >= EDGE) {
       top = rect.top - GAP - box.height;
     }
+    pop.style.top = `${top}px`;
+    pop.style.left = `${left}px`;
     this.position.set({ top, left });
-  }
-
-  private later(fn: () => void): void {
-    if (this.timer !== null) clearTimeout(this.timer);
-    this.timer = setTimeout(() => {
-      this.timer = null;
-      fn();
-    });
   }
 }
 

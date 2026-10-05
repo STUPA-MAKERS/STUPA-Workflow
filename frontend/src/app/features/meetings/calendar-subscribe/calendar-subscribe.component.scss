@@ -28,6 +28,17 @@
 .cs--pop:focus {
   outline: none;
 }
+/* The popover shows only once it is placed (the frame adds `cs--placed` right after it
+   wrote the place), so no frame paints it at the corner of the viewport. Outside the top
+   layer it does not render at all: `.cs` sets a display, which would else override the
+   hidden state of a closed popover. Browsers without the popover API drop the second
+   rule (unknown selector). */
+.cs--pop:not(.cs--placed) {
+  visibility: hidden;
+}
+.cs--pop:not(:popover-open) {
+  display: none;
+}
 
 /* Phone: the top-layer box of the bottom sheet has no box of its own. */
 .cs__layer {

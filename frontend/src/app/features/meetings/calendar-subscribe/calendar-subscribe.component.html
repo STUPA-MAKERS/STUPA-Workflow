@@ -67,8 +67,6 @@
       role="dialog"
       tabindex="-1"
       [attr.aria-labelledby]="headingId"
-      [style.top.px]="position().top"
-      [style.left.px]="position().left"
       (keydown)="onKey($event)"
     >
       <h2 class="cs__title" [id]="headingId">{{ 'account.calendar.title' | t }}</h2>
