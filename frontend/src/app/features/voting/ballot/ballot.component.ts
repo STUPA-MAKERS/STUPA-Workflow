@@ -66,6 +66,7 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  * - A secret vote never shows the choice after the cast, only that the ballot is in.
  * - The button is off while a cast runs, so a double click sends one ballot.
  * - A 409 `already_voted` (another tab, the meeting page) locks the row as well.
+ * - `compact` gives the small ballot of a side column: buttons in one row.
  * - `layout="phone"` pins the button bar to the bottom of the screen (board
  *   Telefon-Abstimmen) and always names the rows.
  *
@@ -80,6 +81,7 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
   host: {
     class: 'ballot',
     '[class.ballot--phone]': "layout() === 'phone'",
+    '[class.ballot--compact]': 'compact()',
   },
   templateUrl: './ballot.component.html',
   styleUrl: './ballot.component.scss',
@@ -101,6 +103,11 @@ export class BallotComponent {
   readonly proxyCast = input(false);
   readonly caster = input.required<BallotCaster>();
   readonly layout = input<'page' | 'phone'>('page');
+  /**
+   * The small ballot of a side column (the participant view): the own options are a
+   * row of buttons like the represented ones, and the rows always carry their name.
+   */
+  readonly compact = input(false);
 
   readonly castDone = output<BallotCast>();
   readonly castFailed = output<BallotFailure>();
@@ -126,7 +133,9 @@ export class BallotComponent {
 
   /** Name the rows when a proxy row exists, and always on a phone (board). A lone own
    *  row needs no name. */
-  protected readonly named = computed(() => this.layout() === 'phone' || this.proxyState() !== null);
+  protected readonly named = computed(
+    () => this.layout() === 'phone' || this.compact() || this.proxyState() !== null,
+  );
 
   /** The row the button acts on now, or `null` when every row is cast. */
   protected readonly target = computed<BallotRow | null>(() => {

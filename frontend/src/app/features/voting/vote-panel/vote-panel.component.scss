@@ -84,8 +84,26 @@
   letter-spacing: 0;
 }
 
+/* The card of a side column (board Teilnahme-Live): 20px padding, a 14px rhythm. */
+:host(.vpn--card) {
+  gap: 14px;
+  padding: var(--space-5);
+}
+.vpn__q--card {
+  margin-top: -6px;
+  font-size: var(--fs-h3);
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+.vpn__rules--card {
+  margin: -6px 0 0;
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+}
+
 @media (max-width: 40rem) {
-  :host(:not(.vpn--phone)) {
+  :host(:not(.vpn--phone):not(.vpn--card)) {
     padding: var(--space-5);
   }
 }

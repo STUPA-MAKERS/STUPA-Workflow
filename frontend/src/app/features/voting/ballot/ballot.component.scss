@@ -177,6 +177,33 @@
   }
 }
 
+/* Compact (the side column of the participant view): the own row is a row of
+   buttons, and the thanks line starts at the edge like the rows. */
+:host(.ballot--compact) {
+  gap: var(--space-4);
+
+  .ballot__row {
+    gap: var(--space-2);
+  }
+  .pchoice {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 var(--space-2);
+  }
+  .ballot__done {
+    align-items: flex-start;
+    text-align: start;
+  }
+  .ballot__lock {
+    justify-content: flex-start;
+  }
+  .ballot__bar .ballot__lock {
+    justify-content: center;
+  }
+}
+
 /* The spacer keeps the last row clear of the fixed bar. The flex gap already adds one
    gap above it. */
 .ballot__spacer {

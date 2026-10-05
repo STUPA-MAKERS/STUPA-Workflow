@@ -85,4 +85,11 @@ describe('LocalizedDatePipe', () => {
     // The mediumDate preset drops the time separator.
     expect(pipe.transform(v, 'mediumDate')).not.toContain(':');
   });
+
+  it('formats the weekday presets of the meeting pages', () => {
+    const pipe = pipeFor('de');
+    const v = new Date(2026, 9, 13, 17, 0);
+    expect(pipe.transform(v, 'weekdayDate')).toBe('Di., 13.10.2026');
+    expect(pipe.transform(v, 'weekdayShort')).toBe('Di., 13.10.2026, 17:00');
+  });
 });

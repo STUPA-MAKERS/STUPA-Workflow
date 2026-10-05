@@ -12,6 +12,7 @@ interface SetupOpts {
   secret?: boolean;
   caster?: BallotCaster;
   layout?: 'page' | 'phone';
+  compact?: boolean;
 }
 
 async function setup(opts: SetupOpts = {}) {
@@ -28,6 +29,7 @@ async function setup(opts: SetupOpts = {}) {
       secret: opts.secret ?? false,
       caster,
       layout: opts.layout ?? 'page',
+      compact: opts.compact ?? false,
     },
     on: { castDone, castFailed },
   });
@@ -255,5 +257,18 @@ describe('BallotComponent', () => {
   it('has no a11y violations', async () => {
     const { container } = await setup({ proxyName: 'Jonas Weber' });
     expect(await runAxe(container)).toHaveNoViolations();
+  });
+
+  it('shows the small ballot of a side column: a row of buttons with a name (compact)', async () => {
+    const { fixture, caster } = await setup({ compact: true });
+    expect(fixture.nativeElement).toHaveClass('ballot--compact');
+    expect(screen.getByRole('heading', { name: 'Deine Stimme' })).toBeInTheDocument();
+    const yes = choice('Ja');
+    expect(yes).toHaveClass('pchoice');
+    await userEvent.click(yes);
+    expect(yes).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(confirmButton());
+    expect(caster).toHaveBeenCalledWith('yes', false);
+    expect(screen.getByText('Danke! Deine Stimme: Ja')).toBeInTheDocument();
   });
 });

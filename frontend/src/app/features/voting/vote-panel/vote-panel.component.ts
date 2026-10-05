@@ -22,8 +22,8 @@ import { NO_CONTEXT, type VoteContext } from './vote-context';
  * Telefon-Abstimmen): the status, "<Sitzung> · TOP 3 · Einfache Mehrheit", the question,
  * the ballot, the turnout and, once the server shows them, the counts with the result.
  *
- * The vote page and the live page both use it; they load the data and send the
- * ballots. A vote without a meeting shows a link to its application instead of the
+ * The vote page, the live page and the participant view of a meeting (`layout="card"`)
+ * use it; they load the data and send the ballots. A vote without a meeting shows a link to its application instead of the
  * meeting line, and counts its turnout against the eligible voters.
  */
 @Component({
@@ -41,6 +41,7 @@ import { NO_CONTEXT, type VoteContext } from './vote-context';
   ],
   host: {
     '[class.vpn--phone]': "layout() === 'phone'",
+    '[class.vpn--card]': "layout() === 'card'",
   },
   templateUrl: './vote-panel.component.html',
   styleUrl: './vote-panel.component.scss',
@@ -55,7 +56,9 @@ export class VotePanelComponent {
   readonly proxyName = input<string | null>(null);
   readonly proxyCast = input(false);
   readonly caster = input.required<BallotCaster>();
-  readonly layout = input<'page' | 'phone'>('page');
+  /** `card`: the small card of a side column (the participant view of a meeting). */
+  readonly layout = input<'page' | 'phone' | 'card'>('page');
+
   /** Why the person cannot vote (a warning note), or `null`. */
   readonly notice = input<string | null>(null);
 
@@ -63,6 +66,17 @@ export class VotePanelComponent {
   readonly castFailed = output<BallotFailure>();
 
   protected readonly status = computed<StatusView>(() => meetingVoteStatus(this.vote().status));
+  /** The caption of the card: "Abstimmung offen", "Abstimmung geschlossen". */
+  protected readonly cardCap = computed<TranslationKey>(() => {
+    const status = this.vote().status;
+    if (status === 'open') return 'meetings.vote.card.open';
+    if (status === 'closed') return 'meetings.vote.card.closed';
+    return this.status().key;
+  });
+  /** The card keeps its confirm button inside the card, also on a phone. */
+  protected readonly ballotLayout = computed<'page' | 'phone'>(() =>
+    this.layout() === 'phone' ? 'phone' : 'page',
+  );
   protected readonly isOpen = computed(() => this.vote().status === 'open');
   protected readonly secret = computed(() => this.vote().secret || !!this.vote().config.secret);
   protected readonly options = computed(() => this.vote().config.options ?? []);

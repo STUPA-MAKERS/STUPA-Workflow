@@ -27,13 +27,15 @@ export class ThemeService {
   private readonly media = window.matchMedia('(prefers-color-scheme: dark)');
   private readonly _preference = signal<ThemePreference>(this.readStored());
   private readonly _systemDark = signal<boolean>(this.media.matches);
+  /** The theme of a page that sets its own default (the beamer), or `null`. */
+  private readonly _pageDefault = signal<ResolvedTheme | null>(null);
 
   readonly preference = this._preference.asReadonly();
 
   /** The theme that is in effect (`light` or `dark`). */
   readonly resolved = computed<ResolvedTheme>(() => {
     const pref = this._preference();
-    if (pref === 'system') return this._systemDark() ? 'dark' : 'light';
+    if (pref === 'system') return this._pageDefault() ?? (this._systemDark() ? 'dark' : 'light');
     return pref;
   });
 
@@ -46,6 +48,17 @@ export class ThemeService {
   setPreference(pref: ThemePreference): void {
     this._preference.set(pref);
     this.persist(pref);
+    this.apply();
+  }
+
+  /**
+   * Set the theme that `system` gives while one page shows, for example dark for the
+   * beamer. An explicit choice of the person (`light` or `dark`) still wins. The page
+   * calls it again with `null` when it goes, and the OS theme applies again. The
+   * service does not persist this value.
+   */
+  setPageDefault(theme: ResolvedTheme | null): void {
+    this._pageDefault.set(theme);
     this.apply();
   }
 

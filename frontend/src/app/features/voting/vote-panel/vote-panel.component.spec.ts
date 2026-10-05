@@ -38,7 +38,7 @@ async function setup(inputs: {
   own?: MyBallot | null;
   proxyName?: string | null;
   notice?: string | null;
-  layout?: 'page' | 'phone';
+  layout?: 'page' | 'phone' | 'card';
 } = {}) {
   const caster = jest.fn(() => of({ status: 'cast' }));
   const castDone = jest.fn();
@@ -232,5 +232,25 @@ describe('VotePanelComponent', () => {
   it('has no a11y violations', async () => {
     const { container } = await setup({ proxyName: 'Jonas Weber' });
     expect(await runAxe(container)).toHaveNoViolations();
+  });
+
+  it('shows the card of a side column: caption, question, rules and the small ballot', async () => {
+    const { fixture } = await setup({ layout: 'card' });
+    expect(screen.getByText('Abstimmung offen')).toHaveClass('st--accent');
+    expect(screen.getByRole('heading', { level: 3 })).toBeInTheDocument();
+    expect(fixture.nativeElement).toHaveClass('vpn--card');
+    expect(document.querySelector('app-ballot')).toHaveClass('ballot--compact');
+    expect(document.querySelector('app-ballot')).not.toHaveClass('ballot--phone');
+    expect(document.querySelector('app-vote-progress')).not.toBeNull();
+  });
+
+  it('names a closed or cancelled card', async () => {
+    const { fixture } = await setup({ layout: 'card' });
+    fixture.componentRef.setInput('vote', vote({ status: 'closed', result: 'passed' }));
+    fixture.detectChanges();
+    expect(screen.getByText('Abstimmung geschlossen')).toBeInTheDocument();
+    fixture.componentRef.setInput('vote', vote({ status: 'cancelled' }));
+    fixture.detectChanges();
+    expect(screen.getByText('Abgebrochen')).toBeInTheDocument();
   });
 });
