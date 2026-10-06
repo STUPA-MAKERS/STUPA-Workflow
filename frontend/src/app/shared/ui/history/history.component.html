@@ -22,6 +22,9 @@
               @if (e.body) {
                 <span class="hist__body">{{ e.body }}</span>
               }
+              @if (e.link; as link) {
+                <a class="hist__link" [routerLink]="link.route">{{ link.label }}</a>
+              }
               @if (e.changes?.length) {
                 <ul class="hist__changes">
                   @for (c of e.changes; track $index; let ci = $index) {

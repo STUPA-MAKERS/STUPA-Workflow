@@ -114,6 +114,18 @@
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }
+.hist__link {
+  align-self: flex-start;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  font-weight: var(--fw-semibold);
+  color: var(--color-accent-text);
+}
+.hist__link:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
 .hist__more:hover {
   background: var(--color-selected);
 }

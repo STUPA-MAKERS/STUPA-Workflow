@@ -103,6 +103,10 @@ class ReadOps(ApplicationsServiceBase):
         for ev, label in rows:
             to_state = await self._get_state(ev.to_state_id)
             info = actors.get(ev.actor) if ev.actor else None
+            # A vote close writes the note ``vote:<result>`` and the vote id. A meeting
+            # delete deletes the vote and clears the id: the event stays, the vote is
+            # gone (the application keeps its status).
+            from_vote = (ev.note or "").startswith("vote:")
             out.append(
                 TimelineEventOut(
                     fromStateId=ev.from_state_id,
@@ -113,6 +117,8 @@ class ReadOps(ApplicationsServiceBase):
                     actorInfo=info,
                     at=ev.at,
                     note=ev.note,
+                    voteId=None if applicant_view else ev.vote_id,
+                    voteDeleted=from_vote and ev.vote_id is None,
                 )
             )
         return out

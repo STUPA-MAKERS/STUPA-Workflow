@@ -240,6 +240,7 @@ export class StatusTimelineComponent {
         lines.push(t('applications.history.transition', { label: e.transitionLabel }));
       }
       if (e.note) lines.push(this.noteText(e.note));
+      if (e.voteDeleted) lines.push(t('applications.history.voteDeleted'));
       return {
         at: e.at,
         icon: i === 0 ? 'send' : 'flow',

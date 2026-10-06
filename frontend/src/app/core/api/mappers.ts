@@ -133,6 +133,8 @@ export function mapTimelineEvent(wire: TimelineEventOutWire, lang: string): Time
     actorInfo: wire.actorInfo ?? null,
     at: wire.at,
     note: wire.note ?? null,
+    voteId: wire.voteId ?? null,
+    voteDeleted: wire.voteDeleted ?? false,
   };
 }
 

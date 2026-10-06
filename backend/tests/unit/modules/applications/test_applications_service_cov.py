@@ -829,10 +829,12 @@ async def test_timeline_resolves_actor_names_and_states() -> None:
     app = _app()
     to_state = _state(key="approved")
     ev1 = _Obj(
-        from_state_id=None, to_state_id=to_state.id, actor="sub-1", at=NOW, note="hi"
+        from_state_id=None, to_state_id=to_state.id, actor="sub-1", at=NOW, note="hi",
+        vote_id=None,
     )
     ev2 = _Obj(
-        from_state_id=to_state.id, to_state_id=to_state.id, actor=None, at=NOW, note=None
+        from_state_id=to_state.id, to_state_id=to_state.id, actor=None, at=NOW, note=None,
+        vote_id=None,
     )
     session = _Session(
         get_results=[app, to_state, to_state],
@@ -852,17 +854,49 @@ async def test_timeline_resolves_actor_names_and_states() -> None:
     assert out[1].transition_label is None  # creation or revert
 
 
+async def test_timeline_links_the_vote_or_names_it_as_deleted() -> None:
+    """A branch event carries its vote; a deleted vote (with its meeting) is named."""
+    app = _app()
+    to_state = _state(key="approved")
+    vote_id = uuid4()
+    linked = _Obj(
+        from_state_id=None, to_state_id=to_state.id, actor=None, at=NOW,
+        note="vote:passed", vote_id=vote_id,
+    )
+    deleted = _Obj(
+        from_state_id=None, to_state_id=to_state.id, actor=None, at=NOW,
+        note="vote:rejected", vote_id=None,
+    )
+    session = _Session(
+        get_results=[app, to_state, to_state, app, to_state, to_state],
+        execute_results=[
+            [(linked, None), (deleted, None)],
+            [("approved", "#0f0")],
+            [(linked, None), (deleted, None)],
+        ],
+    )
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    out = await svc.timeline(app.id)
+    assert [(e.vote_id, e.vote_deleted) for e in out] == [(vote_id, False), (None, True)]
+    # The applicant cannot open the vote: no link, but the deleted note stays.
+    view = await svc.timeline(app.id, applicant_view=True)
+    assert [(e.vote_id, e.vote_deleted) for e in view] == [(None, False), (None, True)]
+
+
 async def test_timeline_applicant_view_names_the_gremium() -> None:
     app = _app(created_by="owner-sub")
     to_state = _state(key="approved")
     member = _Obj(
-        from_state_id=None, to_state_id=to_state.id, actor="sub-1", at=NOW, note=None
+        from_state_id=None, to_state_id=to_state.id, actor="sub-1", at=NOW, note=None,
+        vote_id=None,
     )
     own = _Obj(
-        from_state_id=None, to_state_id=to_state.id, actor="owner-sub", at=NOW, note=None
+        from_state_id=None, to_state_id=to_state.id, actor="owner-sub", at=NOW, note=None,
+        vote_id=None,
     )
     magic = _Obj(
-        from_state_id=None, to_state_id=to_state.id, actor="applicant", at=NOW, note=None
+        from_state_id=None, to_state_id=to_state.id, actor="applicant", at=NOW, note=None,
+        vote_id=None,
     )
     session = _Session(
         get_results=[app, to_state, to_state, to_state],

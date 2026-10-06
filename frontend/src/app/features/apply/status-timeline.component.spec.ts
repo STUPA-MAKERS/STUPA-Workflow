@@ -228,6 +228,26 @@ describe('StatusTimelineComponent', () => {
     expect(comp.historyEntries().map((e) => e.title)).toEqual(['Version 1 gespeichert']);
   });
 
+  it('names a vote that went with its meeting', async () => {
+    const { comp } = await setup(fakeApi({ timeline: () => of([]), versions: () => of([]) }));
+    await screen.findByRole('heading', { level: 1 });
+    comp.timeline.set([
+      {
+        toStateId: 's9',
+        toState: null,
+        label: 'Genehmigt',
+        actor: null,
+        at: '2026-06-05T10:00:00Z',
+        note: 'vote:passed',
+        voteId: null,
+        voteDeleted: true,
+      },
+    ]);
+    expect(comp.historyEntries()[0].body).toBe(
+      'Abstimmungsergebnis: Angenommen\nAbstimmung gelöscht (mit Sitzung)',
+    );
+  });
+
   it('translates vote notes and keeps other notes', async () => {
     const { comp } = await setup(fakeApi());
     expect(comp.noteText('vote:passed')).toBe('Abstimmungsergebnis: Angenommen');

@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -81,6 +82,23 @@ describe('HistoryComponent', () => {
     const meta = screen.getByText('Studierendenparlament · 09:40');
     expect(meta.tagName).toBe('TIME');
     expect(meta).toHaveAttribute('datetime', ENTRIES[1].at);
+  });
+
+  it('shows the link of an entry, for example to the vote', async () => {
+    await render(HistoryComponent, {
+      inputs: {
+        entries: [
+          {
+            at: at(YEAR, 3, 2, 8, 5),
+            icon: 'flow',
+            title: 'Genehmigt',
+            link: { label: 'Zur Abstimmung', route: ['/voting', 'v1'] },
+          },
+        ],
+      },
+      providers: [provideRouter([])],
+    });
+    expect(screen.getByRole('link', { name: 'Zur Abstimmung' })).toHaveAttribute('href', '/voting/v1');
   });
 
   it('shows only the time when there is no actor', async () => {
