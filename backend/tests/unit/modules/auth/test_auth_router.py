@@ -159,6 +159,43 @@ def test_callback_oidc_error_returns_400(
     assert resp.status_code == 400
 
 
+def test_callback_merged_account_redirects_to_the_start_page(
+    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A login with the sub of a merged account lands on the start page with a reason."""
+    from app.modules.auth import sessions
+    from app.shared.errors import ForbiddenError
+
+    async def _merged(*a: object, **k: object) -> tuple[str, object]:
+        raise ForbiddenError("merged", code="account_merged")
+
+    monkeypatch.setattr(router_mod.service, "oidc_callback", _merged)
+    tx = sessions.issue_oidc_tx(ENABLED.session_secret, "st", "v", "n")
+    enabled_client.cookies.set(ENABLED.oidc_tx_cookie_name, tx)
+    resp = enabled_client.get("/api/auth/callback?code=c&state=st", follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"].endswith("/?loginError=account_merged")
+    # No session cookie; the OIDC transaction ends.
+    assert ENABLED.session_cookie_name not in resp.headers.get("set-cookie", "").split("=")[0]
+    assert f"{ENABLED.oidc_tx_cookie_name}=" in resp.headers.get("set-cookie", "")
+
+
+def test_callback_other_forbidden_stays_403(
+    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.modules.auth import sessions
+    from app.shared.errors import ForbiddenError
+
+    async def _off(*a: object, **k: object) -> tuple[str, object]:
+        raise ForbiddenError("Account is deactivated.")
+
+    monkeypatch.setattr(router_mod.service, "oidc_callback", _off)
+    tx = sessions.issue_oidc_tx(ENABLED.session_secret, "st", "v", "n")
+    enabled_client.cookies.set(ENABLED.oidc_tx_cookie_name, tx)
+    resp = enabled_client.get("/api/auth/callback?code=c&state=st")
+    assert resp.status_code == 403
+
+
 def test_callback_idp_unavailable_returns_503(
     enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

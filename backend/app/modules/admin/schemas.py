@@ -9,6 +9,7 @@ definitions come from the ``config_schemas`` models. The branding model is
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -432,6 +433,122 @@ class PrincipalOut(_CamelModel):
     assignments: list[RoleAssignmentOut]
     # The OIDC groups as of the last login. They drive the group mappings.
     oidc_groups: list[str] = Field(default_factory=list, serialization_alias="oidcGroups")
+    # Account merge: set when an admin merged this (old) account into another one.
+    # The account is then a locked reference and shows "merged into <name>".
+    merged_into_id: UUID | None = Field(default=None, serialization_alias="mergedIntoId")
+    merged_into_name: str | None = Field(default=None, serialization_alias="mergedIntoName")
+    merged_at: str | None = Field(default=None, serialization_alias="mergedAt")
+
+
+# Account merge (``admin/principal_merge.py``). The areas of the preview and the result,
+# in display order. Each area counts the rows that the merge rewrites to the new account,
+# the duplicate rows that it combines (drops, because the new account has the same row),
+# and the rows that it removes (sessions, tokens, derived memberships, the feed token).
+MergeArea = Literal[
+    "applications",
+    "versions",
+    "timeline",
+    "comments",
+    "votes",
+    "delegations",
+    "substitutes",
+    "attendance",
+    "meetings",
+    "budget",
+    "config",
+    "notifications",
+    "roles",
+    "privacy",
+    "backups",
+    "sessions",
+    "memberships",
+    "calendar",
+]
+
+# A real conflict blocks the merge. Each kind names a rule that the merged data would
+# break:
+# - ``ballot_same_vote``: both accounts voted in the same vote (open or secret).
+# - ``delegation_same_meeting``: both accounts delegated their seat in the same meeting.
+# - ``delegation_vote_twice``: both accounts received a vote transfer in the same meeting.
+# - ``delegation_chain``: one account delegated to the other, or is delegator while the
+#   other is delegate, in the same meeting.
+# - ``attendance_differs``: both accounts have a different attendance in the same meeting.
+# - ``erasure_open``: an erasure request for one of the accounts is still open.
+MergeConflictKind = Literal[
+    "ballot_same_vote",
+    "delegation_same_meeting",
+    "delegation_vote_twice",
+    "delegation_chain",
+    "attendance_differs",
+    "erasure_open",
+]
+
+
+class PrincipalMergeIn(_CamelModel):
+    """Body of ``POST /admin/principals/{id}/merge``: the account that stays."""
+
+    target_id: UUID = Field(alias="targetId")
+
+
+class MergePrincipalOut(_CamelModel):
+    """One side of a merge: the old account (source) or the account that stays."""
+
+    id: UUID
+    display_name: str | None = Field(serialization_alias="displayName")
+    email: str | None
+    last_login: str | None = Field(serialization_alias="lastLogin")
+
+
+class MergeAreaOut(_CamelModel):
+    """The counts of one area of a merge."""
+
+    area: MergeArea
+    rewritten: int = 0
+    combined: int = 0
+    removed: int = 0
+
+
+class MergeConflictOut(_CamelModel):
+    """One real conflict. ``label`` names the vote or the meeting, never an id."""
+
+    kind: MergeConflictKind
+    label: str | None = None
+
+
+class MergePermissionOut(_CamelModel):
+    """A right of the old account that the target lacks.
+
+    ``key`` is a permission key, or ``admin`` for the admin role (every right).
+    ``gremium`` names the gremium of a gremium permission, else null.
+    """
+
+    key: str
+    gremium: str | None = None
+
+
+class MergePreviewOut(_CamelModel):
+    """``GET /admin/principals/{id}/merge-preview``: what a merge would do."""
+
+    source: MergePrincipalOut
+    target: MergePrincipalOut
+    areas: list[MergeAreaOut]
+    conflicts: list[MergeConflictOut]
+    # The rights of the old account that the target lacks. The merge moves no right,
+    # but it moves ownership, so these block it unless the admin holds them all.
+    extra_permissions: list[MergePermissionOut] = Field(
+        default_factory=list, serialization_alias="extraPermissions"
+    )
+    actor_holds_extra: bool = Field(default=True, serialization_alias="actorHoldsExtra")
+    can_merge: bool = Field(serialization_alias="canMerge")
+
+
+class MergeResultOut(_CamelModel):
+    """``POST /admin/principals/{id}/merge``: what the merge did."""
+
+    source: MergePrincipalOut
+    target: MergePrincipalOut
+    areas: list[MergeAreaOut]
+    merged_at: str = Field(serialization_alias="mergedAt")
 
 
 class PrincipalUpdate(_CamelModel):

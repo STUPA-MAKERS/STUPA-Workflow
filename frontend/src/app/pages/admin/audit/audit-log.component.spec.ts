@@ -172,6 +172,7 @@ const BACKEND_AUDIT_ACTIONS = [
   'erasure_executed',
   'erasure_rejected',
   'principal_erased',
+  'principal_merge',
   'retention_anonymize',
   'budget_node_create',
   'budget_node_update',

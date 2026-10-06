@@ -87,6 +87,7 @@ const MOCK_PRINCIPAL: Principal = {
     // The other admin pages of the admin frame: people and rights, gremien, the
     // security and data pages.
     'admin.users',
+    'admin.users.merge',
     'admin.gremium_roles',
     'admin.cd_variants',
     'admin.delegations',

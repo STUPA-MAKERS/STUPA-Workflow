@@ -46,6 +46,7 @@ from app.shared.antiabuse import (
 )
 from app.shared.errors import (
     BadRequestError,
+    ForbiddenError,
     NotFoundError,
     ProblemDetail,
     ServiceUnavailableError,
@@ -141,6 +142,17 @@ async def callback(
         raise ServiceUnavailableError("The identity provider is unavailable.") from exc
     except OidcError as exc:
         raise BadRequestError("OIDC login failed.") from exc
+    except ForbiddenError as exc:
+        if exc.code != "account_merged":
+            raise
+        # A login with the sub of a merged (old) account: the browser lands on the
+        # start page, which says what happened, instead of a raw 403. Nothing is
+        # committed, and the OIDC transaction ends.
+        await db.rollback()
+        dest = settings.public_base_url.rstrip("/") + "/?loginError=account_merged"
+        refused = RedirectResponse(dest, status_code=status.HTTP_303_SEE_OTHER)
+        refused.delete_cookie(settings.oidc_tx_cookie_name, path="/")
+        return refused
     # Persist the principal and the auth_session row. `get_session` never commits.
     # Without this commit the request close rolls both rows back.
     await db.commit()

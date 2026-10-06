@@ -62,6 +62,7 @@ from app.shared.errors import (
     UnsupportedMediaTypeError,
     ValidationProblem,
 )
+from tests._support.identity_rows import sub_ref
 
 
 class _R:
@@ -433,7 +434,7 @@ async def test_book_expense_standalone_with_actor() -> None:
         result(node),                 # _get_node for payload.budget_id
         result(top),                  # _top_level
         result(fy),                   # _fiscal_years_of
-        result(("u-1", "Alice", "a@x")),  # _actor_names
+        result(sub_ref("u-1", "Alice", "a@x")),  # _actor_names
     )
     svc = BudgetTreeService(sess)
     payload = ExpenseCreate(amount=Decimal("42.00"), description="Rechnung", budgetId=node.id)
@@ -581,7 +582,7 @@ async def test_update_expense_all_fields_with_app() -> None:
     sess = fake_session(
         result(),                         # _child_counts (#subbookings), no children
         result(node),                     # _get_node for expense.budget_id after commit
-        result(("u-1", None, "bob@x")),   # _actor_names: display_name None gives email
+        result(sub_ref("u-1", None, "bob@x")),   # _actor_names: display_name None gives email
         gets=[expense, inv, app],
     )
     svc = BudgetTreeService(sess)
@@ -725,7 +726,7 @@ async def test_list_expenses_compat_delegates() -> None:
         result(node),
         result(3),                                          # count
         result((e, "VS", {"title": "AppT"}, "INV-1")),  # rows
-        result(("u-1", "Carol", None)),                     # _actor_names
+        result(sub_ref("u-1", "Carol", None)),                     # _actor_names
     )
     svc = BudgetTreeService(sess)
     out = await svc.list_expenses(node.id)
@@ -1362,8 +1363,8 @@ async def test_actor_names_empty_set() -> None:
 async def test_actor_names_filters_blank_and_resolves() -> None:
     p1 = PrincipalRow(sub="a", display_name="Anna", email=None)
     p2 = PrincipalRow(sub="b", display_name=None, email="b@x")
-    sess = fake_session(result((p1.sub, p1.display_name, p1.email),
-                               (p2.sub, p2.display_name, p2.email)))
+    sess = fake_session(result(sub_ref(p1.sub, p1.display_name, p1.email),
+                               sub_ref(p2.sub, p2.display_name, p2.email)))
     svc = BudgetTreeService(sess)
     out = await svc._actor_names({"a", "b", ""})
     assert out == {"a": "Anna", "b": "b@x"}
@@ -1371,10 +1372,18 @@ async def test_actor_names_filters_blank_and_resolves() -> None:
 
 async def test_actor_names_fallback_to_sub() -> None:
     # A display_name of None and an email of None fall back to the sub.
-    sess = fake_session(result(("c", None, None)))
+    sess = fake_session(result(sub_ref("c", None, None)))
     svc = BudgetTreeService(sess)
     out = await svc._actor_names({"c"})
     assert out == {"c": "c"}
+
+
+async def test_actor_names_follow_a_merge() -> None:
+    # A merged account shows the name of the account it was merged into.
+    target = uuid.uuid4()
+    sess = fake_session(result(sub_ref("old", "Alt", None, merged=(target, "Neu", None))))
+    svc = BudgetTreeService(sess)
+    assert await svc._actor_names({"old"}) == {"old": "Neu"}
 
 
 async def test_get_tree_accepted_remaining_nonpositive_skipped() -> None:
@@ -1702,7 +1711,7 @@ async def test_list_sub_expenses_ok() -> None:
     child.parent_expense_id = parent.id
     sess = fake_session(
         result((child, "VS-1")),        # children joined with Budget
-        result(("u-1", "Bob", None)),   # _actor_names
+        result(sub_ref("u-1", "Bob", None)),   # _actor_names
         gets=[parent],
     )
     svc = BudgetTreeService(sess)
@@ -1940,7 +1949,7 @@ async def test_get_transfer_joins_both_legs() -> None:
     sess = fake_session(
         result(out, income),  # _legs
         result((out.budget_id, "VS-1"), (income.budget_id, "VS-2")),  # _path_keys
-        result(("u", "Uwe", None)),  # _actor_names
+        result(sub_ref("u", "Uwe", None)),  # _actor_names
     )
     row = await BudgetTreeService(sess).get_transfer(tid)
     assert row.transfer_id == tid
@@ -1992,7 +2001,7 @@ async def test_list_transfers_all_filters_and_search() -> None:
         result(out),
         result(income),
         result((out.budget_id, "VS-1"), (income.budget_id, "VS-2")),
-        result(("u", "Uwe", None)),
+        result(sub_ref("u", "Uwe", None)),
     )
     page = await BudgetTreeService(sess).list_transfers_paged(
         transfer_id=tid,
@@ -2047,7 +2056,7 @@ async def test_update_transfer_patches_both_legs() -> None:
     sess = fake_session(
         result(out, income),  # _legs
         result((out.budget_id, "VS-1"), (income.budget_id, "VS-2")),  # path keys
-        result(("u", "Uwe", None)),  # actor names
+        result(sub_ref("u", "Uwe", None)),  # actor names
     )
     row = await BudgetTreeService(sess, actor="u").update_transfer(
         tid,

@@ -255,6 +255,14 @@
     transparent
   );
 }
+/* A mask makes the body the containing block of every `position: fixed` element in it.
+   An open dialog or side sheet of the page would then cover only the sheet and be cut by
+   its round corners (the merge dialog of the users list, a long list with the end fade).
+   While an overlay of the page is open, the body has no fade. The state wins over every
+   fade rule above, whatever their specificity. */
+.af--split .af__pageBody:has(.dialog__backdrop, .ss__scrim) {
+  mask-image: none !important;
+}
 
 /* Wide, a full-width page with columns of its own (`adminPane`): the frame passes the
    free height down, and the page scrolls only inside its columns. */

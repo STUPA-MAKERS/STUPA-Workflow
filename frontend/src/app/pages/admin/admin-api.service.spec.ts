@@ -8,7 +8,7 @@ import { SKIP_LOADING } from '@core/loading/loading.interceptor';
 import type { FormFieldDef } from '@core/api/models';
 import { AdminApiService } from './admin-api.service';
 import { MOCK_GREMIUM_STUPA_ID } from './admin.mock';
-import type { Branding, WebhookConfig } from './admin.models';
+import type { AdminPrincipal, Branding, WebhookConfig } from './admin.models';
 
 describe('AdminApiService — mock mode', () => {
   function svc(): AdminApiService {
@@ -615,6 +615,17 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(cr.request.method).toBe('POST');
     cr.flush({ id: 'r-new', key: 'k', label: { de: 'K' }, permissions: ['x'] });
 
+    s.previewPrincipalMerge('p-old', 'p-new').subscribe();
+    const pv = http.expectOne('/api/admin/principals/p-old/merge-preview?targetId=p-new');
+    expect(pv.request.method).toBe('GET');
+    pv.flush({});
+
+    s.mergePrincipal('p-old', 'p-new').subscribe();
+    const mg = http.expectOne('/api/admin/principals/p-old/merge');
+    expect(mg.request.method).toBe('POST');
+    expect(mg.request.body).toEqual({ targetId: 'p-new' });
+    mg.flush({});
+
     s.setPrincipalActive('p-9', false).subscribe();
     const sp = http.expectOne('/api/admin/principals/p-9');
     expect(sp.request.method).toBe('PATCH');
@@ -804,6 +815,43 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     // An unknown id returns store[0] and does not crash.
     const fallback = await firstValueFrom(s.setPrincipalActive('nope', true));
     expect(fallback.id).toBe(all[0].id);
+  });
+
+  it('previews and merges accounts in mock mode', async () => {
+    const s = svc();
+    // The Keycloak account of Robin into Alex Admin conflicts.
+    const blocked = await firstValueFrom(s.previewPrincipalMerge('p-old-1', 'p-1'));
+    expect(blocked.canMerge).toBe(false);
+    expect(blocked.conflicts.map((c) => c.kind)).toContain('ballot_same_vote');
+    const err = await firstValueFrom(s.mergePrincipal('p-old-1', 'p-1')).catch((e) => e);
+    expect(err.status).toBe(409);
+    expect(err.error.code).toBe('merge_conflict');
+    expect(err.error.errors).toContainEqual({ field: 'erasure_open', msg: '' });
+    // Into Robin Mitglied it merges, and the list then marks the old account.
+    const clean = await firstValueFrom(s.previewPrincipalMerge('p-old-1', 'p-2'));
+    expect(clean.canMerge).toBe(true);
+    expect(clean.areas.find((a) => a.area === 'votes')?.rewritten).toBe(9);
+    expect(clean.areas.find((a) => a.area === 'backups')?.rewritten).toBe(0);
+    const done = await firstValueFrom(s.mergePrincipal('p-old-1', 'p-2'));
+    expect(done.mergedAt).toBeTruthy();
+    expect(done.target.displayName).toBe('Robin Mitglied');
+    const old = (await firstValueFrom(s.listPrincipals())).find((p) => p.id === 'p-old-1')!;
+    expect(old.mergedIntoId).toBe('p-2');
+    expect(old.mergedIntoName).toBe('Robin Mitglied');
+    expect(old.active).toBe(false);
+    // Unknown accounts give 404.
+    const missing = await firstValueFrom(s.previewPrincipalMerge('nope', 'p-2')).catch((e) => e);
+    expect(missing.status).toBe(404);
+    const missing2 = await firstValueFrom(s.mergePrincipal('p-2', 'nope')).catch((e) => e);
+    expect(missing2.status).toBe(404);
+  });
+
+  it('mock preview copes with accounts without a name or a login', async () => {
+    const s = svc();
+    const store = (s as unknown as { store: { principals: AdminPrincipal[] } }).store;
+    store.principals.push({ id: 'p-bare', sub: 'x', assignments: [], oidcGroups: [] });
+    const p = await firstValueFrom(s.previewPrincipalMerge('p-bare', 'p-2'));
+    expect(p.source).toEqual({ id: 'p-bare', displayName: null, email: null, lastLogin: null });
   });
 
   it('returns an empty principal list when search matches nothing', async () => {

@@ -72,6 +72,8 @@ export const AUDIT_ACTIONS = [
   'erasure_executed',
   'erasure_rejected',
   'principal_erased',
+  // Account merge: an old principal merged into a new one.
+  'principal_merge',
   'retention_anonymize',
   'webhook_config',
   // attachment_upload (F12) covers the application upload and the draft upload of the

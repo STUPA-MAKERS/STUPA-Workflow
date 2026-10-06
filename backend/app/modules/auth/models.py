@@ -7,6 +7,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -43,12 +44,27 @@ class Principal(UUIDPkMixin, Base):
     # in plaintext. The sensitivity is low: it exposes only the titles and times of the
     # meetings of the own Gremien. A rotation revokes the old URL.
     calendar_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Account merge: an admin merged this (old) principal into another one. The row
+    # stays as a locked reference: it cannot log in, and every display of its `sub`
+    # or id shows the name of `merged_into`. The audit log keeps the old `sub`.
+    # A merged principal is never the target of a merge, so the chain has one step.
+    merged_into: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("principal.id", ondelete="RESTRICT"), nullable=True
+    )
+    merged_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     __table_args__ = (
         # A unique index on purpose, not a constraint. The migration can then create and
         # drop it idempotently with CREATE/DROP INDEX IF [NOT] EXISTS. Postgres allows
         # more than one NULL under a unique index.
         Index("uq_principal_calendar_token", "calendar_token", unique=True),
+        Index("ix_principal_merged_into", "merged_into"),
+        CheckConstraint("merged_into IS NULL OR merged_into <> id", name="not_self_merged"),
+        CheckConstraint(
+            "(merged_into IS NULL) = (merged_at IS NULL)", name="merged_at_set"
+        ),
     )
 
 

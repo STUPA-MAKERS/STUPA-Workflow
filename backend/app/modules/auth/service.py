@@ -235,10 +235,23 @@ async def verify_magic_link(
 
 
 async def upsert_principal(db: AsyncSession, claims: oidc.OidcClaims) -> PrincipalRow:
-    """Create or update a principal by the OIDC `sub` (identity and group cache)."""
+    """Create or update a principal by the OIDC `sub` (identity and group cache).
+
+    Raises:
+        ForbiddenError: The `sub` belongs to a principal that an admin merged into
+            another one (code `account_merged`). The login fails closed and changes
+            nothing: the old row stays a locked reference. It does not log in as the
+            new principal either, because only the IdP `sub` of the new principal
+            proves that identity.
+    """
     row = (
         await db.execute(select(PrincipalRow).where(PrincipalRow.sub == claims.sub))
     ).scalar_one_or_none()
+    if row is not None and row.merged_into is not None:
+        raise ForbiddenError(
+            "This account was merged into another account. Log in with that account.",
+            code="account_merged",
+        )
     if row is None:
         row = PrincipalRow(sub=claims.sub)
         db.add(row)

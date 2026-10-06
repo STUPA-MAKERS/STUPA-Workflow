@@ -35,7 +35,7 @@ from uuid import UUID
 
 from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth import rbac, sessions
@@ -170,6 +170,20 @@ async def resolve_ws_principal(
     return await rbac.resolve_principal(db, row, now)
 
 
+async def account_can_act(db: AsyncSession, sub: str) -> bool:
+    """Tell whether the account of ``sub`` is still active and not merged."""
+    count = await db.scalar(
+        select(func.count())
+        .select_from(PrincipalRow)
+        .where(
+            PrincipalRow.sub == sub,
+            PrincipalRow.active.is_not(False),
+            PrincipalRow.merged_into.is_(None),
+        )
+    )
+    return bool(count)
+
+
 class LiveVoteConnection:
     """One WebSocket session, voter or beamer, on the `meeting:{id}` channel."""
 
@@ -279,6 +293,13 @@ class LiveVoteConnection:
         async with self.locker.acquire(lock_key) as acquired:
             if not acquired:
                 await self._send_error("locked")
+                return
+            # The socket resolved the principal at the handshake. Since then an admin
+            # may have deactivated the account or merged it into another one, whose
+            # ballots now carry this vote. Check the row again before every cast, so an
+            # open socket cannot vote for a locked account (or vote twice for a person).
+            if not await account_can_act(self.voting.session, self.principal.sub):
+                await self._send_error("account_inactive")
                 return
             try:
                 await self.voting.cast(

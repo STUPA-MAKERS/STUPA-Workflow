@@ -512,22 +512,13 @@ class AuditService:
         """Resolve each ``sub`` to a display name.
 
         The lookup prefers ``display_name`` and falls back to ``email``. It reads the
-        ``principal`` table in one batch. An unknown sub and a None sub are absent
-        from the map.
+        ``principal`` table in one batch. A ``sub`` of a merged account gives the
+        name of the account it was merged into: the log keeps the old ``sub``. An
+        unknown sub and a None sub are absent from the map.
         """
-        from app.modules.auth.models import Principal
+        from app.modules.auth.identity import refs_by_sub
 
-        wanted = {s for s in subs if s}
-        if not wanted:
-            return {}
-        rows = (
-            await self.session.execute(
-                select(Principal.sub, Principal.display_name, Principal.email).where(
-                    Principal.sub.in_(wanted)
-                )
-            )
-        ).all()
-        return {sub: (display_name or email) for sub, display_name, email in rows}
+        return {sub: ref.name for sub, ref in (await refs_by_sub(self.session, subs)).items()}
 
     async def resolve_target_labels(
         self, targets: Sequence[tuple[str | None, str | None]]
@@ -622,17 +613,13 @@ class AuditService:
                 if label := i18n_label(name_i18n) or key:
                     labels[("role", str(row_id))] = label
         if ids := by_type.get("principal"):
-            from app.modules.auth.models import Principal
+            from app.modules.auth.identity import refs_by_id
 
-            rows = (
-                await self.session.execute(
-                    select(
-                        Principal.id, Principal.display_name, Principal.email
-                    ).where(Principal.id.in_(ids))
-                )
-            ).all()
-            for row_id, display_name, email in rows:
-                if label := display_name or email:
+            # A target names the account itself: the merge entry names the old
+            # account. Only an account without a name of its own shows the name of
+            # the account it was merged into.
+            for row_id, ref in (await refs_by_id(self.session, ids)).items():
+                if label := ref.label:
                     labels[("principal", str(row_id))] = label
         if ids := by_type.get("webhook"):
             from app.modules.admin.models import Webhook
@@ -712,7 +699,8 @@ class AuditService:
 
         from app.modules.admin.models import ApplicationType, Gremium, Webhook
         from app.modules.applications.models import Application
-        from app.modules.auth.models import Principal, Role
+        from app.modules.auth.identity import refs_by_id
+        from app.modules.auth.models import Role
         from app.modules.budget.tree_models import Budget, FiscalYear
         from app.modules.files.models import Attachment
         from app.modules.livevote.models import Meeting
@@ -743,14 +731,9 @@ class AuditService:
 
         # Multi-column and derived labels. The order does not matter, because ``fill``
         # never overwrites an entry.
-        for row_id, display_name, email in (
-            await self.session.execute(
-                select(Principal.id, Principal.display_name, Principal.email).where(
-                    Principal.id.in_(candidates)
-                )
-            )
-        ).all():
-            if (label := display_name or email) and str(row_id) not in labels:
+        # An id names the account itself (``sourceId`` of a merge names the old one).
+        for row_id, ref in (await refs_by_id(self.session, candidates)).items():
+            if (label := ref.label) and str(row_id) not in labels:
                 labels[str(row_id)] = label
         for row_id, name_i18n, key in (
             await self.session.execute(

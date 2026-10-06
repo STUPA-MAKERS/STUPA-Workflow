@@ -398,6 +398,104 @@ export interface AdminPrincipal {
   assignments: RoleAssignment[];
   /** The OIDC groups as of the last login. The group mappings read them. */
   oidcGroups: string[];
+  /**
+   * Account merge: set when an admin merged this (old) account into another one. The
+   * account is then a locked reference: "zusammengeführt in <name>", no actions.
+   */
+  mergedIntoId?: Uuid | null;
+  mergedIntoName?: string | null;
+  mergedAt?: string | null;
+}
+
+/**
+ * The areas of an account merge, in display order. Each one counts the rows that the
+ * merge rewrites to the new account, the duplicates it combines, and the rows it removes.
+ * Mirrors `MergeArea` in `backend/app/modules/admin/schemas.py`.
+ */
+export const MERGE_AREAS = [
+  'applications',
+  'versions',
+  'timeline',
+  'comments',
+  'votes',
+  'delegations',
+  'substitutes',
+  'attendance',
+  'meetings',
+  'budget',
+  'config',
+  'notifications',
+  'roles',
+  'privacy',
+  'backups',
+  'sessions',
+  'memberships',
+  'calendar',
+] as const;
+export type MergeArea = (typeof MERGE_AREAS)[number];
+
+/** A real conflict that blocks a merge. Mirrors `MergeConflictKind` in the backend. */
+export type MergeConflictKind =
+  | 'ballot_same_vote'
+  | 'delegation_same_meeting'
+  | 'delegation_vote_twice'
+  | 'delegation_chain'
+  | 'attendance_differs'
+  | 'erasure_open';
+
+export interface MergeAreaCount {
+  area: MergeArea;
+  rewritten: number;
+  combined: number;
+  removed: number;
+}
+
+export interface MergeConflict {
+  kind: MergeConflictKind;
+  /** The vote or the meeting, never an id. Null when the kind names no object. */
+  label: string | null;
+}
+
+/** One side of a merge: the old account (source) or the account that stays (target). */
+export interface MergePrincipal {
+  id: Uuid;
+  displayName: string | null;
+  email: string | null;
+  lastLogin: string | null;
+}
+
+/**
+ * A right of the old account that the target lacks. `key` is a permission key, or
+ * `admin` for the admin role (every right); `gremium` names the gremium of a gremium
+ * right.
+ */
+export interface MergePermission {
+  key: string;
+  gremium?: string | null;
+}
+
+/** GET /admin/principals/{id}/merge-preview?targetId= */
+export interface MergePreview {
+  source: MergePrincipal;
+  target: MergePrincipal;
+  areas: MergeAreaCount[];
+  conflicts: MergeConflict[];
+  /**
+   * The rights of the old account that the target lacks. The merge moves no right, but
+   * it moves ownership, so they block it unless the admin holds them all
+   * (`actorHoldsExtra`).
+   */
+  extraPermissions?: MergePermission[];
+  actorHoldsExtra?: boolean;
+  canMerge: boolean;
+}
+
+/** POST /admin/principals/{id}/merge */
+export interface MergeResult {
+  source: MergePrincipal;
+  target: MergePrincipal;
+  areas: MergeAreaCount[];
+  mergedAt: string;
 }
 
 export interface ApplicationTypeAdmin {

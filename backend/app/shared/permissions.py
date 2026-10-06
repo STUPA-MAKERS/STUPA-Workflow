@@ -82,6 +82,10 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "admin.roles",
     # /admin/users: activate or deactivate a user and manage role assignments.
     "admin.users",
+    # /admin/users: merge an old account (for example a Keycloak-era `sub`) into a new
+    # one. It rewrites the references of the old account and locks it. Only the admin
+    # role has it by default. No OAuth scope carries it, so an agent token never merges.
+    "admin.users.merge",
     # /admin/group-mappings: map an IdP group to a role.
     "admin.group_mappings",
     # /admin/gremien/:id/roles: Gremium role definitions.
