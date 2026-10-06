@@ -93,17 +93,7 @@
            cost centre is its kicker, the actions sit at its end on the same axis. -->
       @if (wide()) {
         <app-sheet-bar class="bd__bar">
-          <nav appSheetBarKicker class="bd__crumbs" [attr.aria-label]="'budget.breadcrumbs' | t">
-            @for (node of breadcrumbs(); track node.id; let last = $last) {
-              @if (last) {
-                <span class="bd__crumb bd__crumb--current ell" aria-current="page" [title]="node.name">{{ node.name }}</span>
-                <span class="bd__key mono">{{ node.pathKey | simplifyPath }}</span>
-              } @else {
-                <button type="button" class="bd__crumb ell" [title]="node.name" (click)="selectKs(node.id)">{{ node.name }}</button>
-                <app-icon class="bd__crumbSep" name="chevron-right" [size]="13" />
-              }
-            }
-          </nav>
+          <app-budget-crumbs appSheetBarKicker [nodes]="breadcrumbs()" (pick)="selectKs($event)" />
           <ng-container *ngTemplateOutlet="actions" />
         </app-sheet-bar>
       }

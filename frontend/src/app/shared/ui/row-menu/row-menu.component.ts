@@ -81,6 +81,16 @@ export class RowMenuComponent {
   readonly icon = input<IconName>('more');
   /** The items are still loading (see `opened`). */
   readonly loading = input(false);
+  /**
+   * Show this text in the button instead of the icon, for example the "…" of a
+   * breadcrumb that holds the hidden levels. The button then has the height of a line.
+   */
+  readonly text = input<string | null>(null);
+  /**
+   * The edge of the button that the menu lines up with: `end` (default) for a menu at
+   * the end of a row, `start` for a button at the start of a line (a breadcrumb).
+   */
+  readonly align = input<'start' | 'end'>('end');
 
   /** The menu opened. Fires once per opening, so it can load the items. */
   readonly opened = output<void>();
@@ -100,7 +110,11 @@ export class RowMenuComponent {
     return `${this.menuId}-s${section}-${item}`;
   }
   protected readonly open = signal(false);
-  protected readonly position = signal({ top: 0, right: 0 });
+  protected readonly position = signal<{ top: number; left: number | null; right: number | null }>({
+    top: 0,
+    left: null,
+    right: 0,
+  });
 
   /** Sections that hold at least one item. */
   protected readonly visibleSections = computed(() =>
@@ -244,13 +258,15 @@ export class RowMenuComponent {
     }
   }
 
-  /** Open upwards when the menu does not fit below the trigger. */
+  /** Below the trigger, at its start or its end edge (see `align`). */
   private placeBelow(): void {
     const rect = this.trigger().nativeElement.getBoundingClientRect();
-    this.position.set({
-      top: rect.bottom + GAP,
-      right: Math.max(EDGE, window.innerWidth - rect.right),
-    });
+    const top = rect.bottom + GAP;
+    this.position.set(
+      this.align() === 'start'
+        ? { top, left: Math.max(EDGE, rect.left), right: null }
+        : { top, left: null, right: Math.max(EDGE, window.innerWidth - rect.right) },
+    );
   }
 
   /**

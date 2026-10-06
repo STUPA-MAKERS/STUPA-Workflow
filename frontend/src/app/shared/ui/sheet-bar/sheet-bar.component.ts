@@ -11,7 +11,6 @@ import { ChangeDetectionStrategy, Component, Directive, contentChild, input } fr
 })
 export class SheetBarKickerDirective {}
 
-
 /**
  * The top bar of a detail sheet: the kicker (the context line above the title) and the
  * header actions of the sheet.

@@ -1,0 +1,49 @@
+@let key = (nodes().at(-1)?.pathKey ?? '') | simplifyPath;
+<nav #nav class="bd__crumbs" [attr.aria-label]="'budget.breadcrumbs' | t">
+  @for (item of items(); track item.kind === 'more' ? 'more' : item.node.id) {
+    @if (item.kind === 'more') {
+      <app-row-menu
+        class="bd__more"
+        text="…"
+        align="start"
+        [label]="'budget.crumbs.more' | t"
+        [sections]="menuSections(item.nodes)"
+        (selected)="pick.emit($event.id)"
+      />
+      <app-icon class="bd__crumbSep" name="chevron-right" [size]="13" />
+    } @else if (item.current) {
+      <span
+        class="bd__crumb bd__crumb--current ell"
+        [class.bd__crumb--tight]="fit().squeeze === 'name'"
+        [style.--crumb-w]="crumbWidth(item.index)"
+        aria-current="page"
+        [title]="item.node.name"
+        >{{ item.node.name }}</span
+      >
+      @if (fit().squeeze !== 'name') {
+        <span class="bd__key mono ell" [class.bd__key--tight]="fit().squeeze === 'key'" [title]="key">{{ key }}</span>
+      }
+    } @else {
+      <button
+        type="button"
+        class="bd__crumb ell"
+        [style.--crumb-w]="crumbWidth(item.index)"
+        [title]="item.node.name"
+        (click)="pick.emit(item.node.id)"
+      >
+        {{ item.node.name }}
+      </button>
+      <app-icon class="bd__crumbSep" name="chevron-right" [size]="13" />
+    }
+  }
+  <!-- The natural widths, for the fit. The names are drawn from an attribute, so neither
+       a screen reader nor a text search finds them twice. -->
+  <span #measure class="bd__measure" aria-hidden="true">
+    @for (node of nodes(); track node.id; let last = $last) {
+      <span data-crumb [class.bd__measureParent]="!last" [attr.data-text]="node.name"></span>
+    }
+    <span data-key class="bd__measureKey mono" [attr.data-text]="key"></span>
+    <span data-min class="bd__measureMin"></span>
+    <span data-more class="bd__measureMore" data-text="…"></span>
+  </span>
+</nav>

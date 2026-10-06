@@ -1,0 +1,97 @@
+/* The trail fills the kicker of the sheet bar and shortens inside it; it never wraps. */
+:host {
+  /* A parent keeps about eight characters; a very long one ends at the maximum. */
+  --crumb-min: 4.5rem;
+  --crumb-max: 20rem;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.bd__crumbs {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.bd__crumb {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+/* A parent: from its natural width down to the minimum (or its own width, when that is
+   less). The fit hides the parents that would need to go below it. */
+button.bd__crumb {
+  min-width: min(var(--crumb-w, 0px), var(--crumb-min));
+  max-width: var(--crumb-max);
+  cursor: pointer;
+}
+button.bd__crumb:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+/* The current cost centre keeps its full name while it fits. */
+.bd__crumb--current {
+  flex-shrink: 0;
+  cursor: default;
+}
+/* Too narrow even for "… › current": the key shortens first (about eight characters);
+   in a narrower bar the key goes and the name shortens. */
+.bd__crumb--tight {
+  flex-shrink: 1;
+  min-width: min(var(--crumb-w, 0px), var(--crumb-min));
+}
+.bd__crumbSep {
+  flex: none;
+}
+.bd__more {
+  flex: none;
+}
+.bd__key {
+  flex: none;
+  margin-inline-start: var(--space-2);
+}
+.bd__key--tight {
+  flex: 0 1 auto;
+  min-width: var(--crumb-min);
+}
+
+/* The hidden copy for the widths: out of the flow, not painted. */
+.bd__measure {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  display: flex;
+  visibility: hidden;
+  pointer-events: none;
+}
+.bd__measure > span {
+  flex: none;
+}
+.bd__measure > [data-text]::before {
+  content: attr(data-text);
+}
+.bd__measureParent {
+  max-width: var(--crumb-max);
+  overflow: hidden;
+}
+.bd__measureKey {
+  padding-inline-start: var(--space-2);
+}
+.bd__measureMin {
+  width: var(--crumb-min);
+}
+/* As the "…" button of the row menu (`rm__trigger--text`). */
+.bd__measureMore {
+  min-width: 1.75rem;
+  padding: 0 var(--space-2);
+}

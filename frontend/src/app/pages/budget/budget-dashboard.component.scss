@@ -335,43 +335,9 @@ button.tn__chev:hover:not(:disabled) {
   flex-wrap: nowrap;
   margin-inline-start: var(--space-3);
 }
-/* The title sits 10px below the bar, as on the other detail sheets. */
+/* The title sits a small step below the bar, as on the other detail sheets. */
 .bd--wide .bd__sheetBody {
-  padding-top: 10px;
-}
-/* The breadcrumb takes the font and colour of the kicker from the bar. */
-.bd__crumbs {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-width: 0;
-}
-.bd__crumb {
-  min-width: 0;
-  max-width: 14rem;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-button.bd__crumb:hover {
-  color: var(--color-text);
-  text-decoration: underline;
-}
-/* In a narrow bar the parents shorten first; the current cost centre keeps its name up
-   to the maximum width. */
-.bd__crumb--current {
-  flex-shrink: 0;
-  cursor: default;
-}
-.bd__crumbSep {
-  flex: none;
-}
-.bd__key {
-  flex: none;
-  margin-inline-start: var(--space-2);
+  padding-top: var(--space-2);
 }
 /* The title is a child of the scrolling flex column. It clips its text (ellipsis), so
    without `flex: none` the column would shrink it to zero height. */

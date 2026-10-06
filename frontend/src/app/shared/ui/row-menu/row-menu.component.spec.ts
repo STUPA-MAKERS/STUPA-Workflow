@@ -428,6 +428,38 @@ describe('RowMenuComponent', () => {
     expect(trigger.querySelector('[data-icon="tune"]')).toBeTruthy();
   });
 
+  it('shows a text instead of the icon and opens at the start edge of its button', async () => {
+    const user = userEvent.setup();
+    await render(RowMenuComponent, {
+      inputs: { label: 'Weitere Ebenen', text: '…', align: 'start', sections: SECTIONS },
+    });
+    const trigger = screen.getByRole('button', { name: 'Weitere Ebenen' });
+    expect(trigger.classList).toContain('rm__trigger--text');
+    expect(trigger.textContent?.trim()).toBe('…');
+    expect(trigger.querySelector('app-icon')).toBeNull();
+    jest.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({
+      top: 100, bottom: 128, left: 300, right: 328, width: 28, height: 28, x: 300, y: 100,
+      toJSON: () => ({}),
+    });
+    await user.click(trigger);
+    const menu = screen.getByRole('menu');
+    expect(menu.style.top).toBe('132px');
+    expect(menu.style.left).toBe('300px');
+    expect(menu.style.right).toBe('');
+  });
+
+  it('keeps a start-aligned menu off the left edge of the viewport', async () => {
+    const user = userEvent.setup();
+    await render(RowMenuComponent, { inputs: { text: '…', align: 'start', sections: SECTIONS } });
+    const trigger = screen.getByRole('button', { name: 'Weitere Aktionen' });
+    jest.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({
+      top: 0, bottom: 28, left: 2, right: 30, width: 28, height: 28, x: 2, y: 0,
+      toJSON: () => ({}),
+    });
+    await user.click(trigger);
+    expect(screen.getByRole('menu').style.left).toBe('8px');
+  });
+
   it('has no a11y violations, closed or open', async () => {
     const { trigger, user, view } = await setup();
     expect(await runAxe(view.container)).toHaveNoViolations();
