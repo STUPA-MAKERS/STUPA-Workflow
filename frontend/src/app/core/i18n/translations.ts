@@ -2840,6 +2840,7 @@ export const de = {
   'admin.users.moreActions': 'Weitere Aktionen',
   'admin.users.merge.action': 'Mit anderem Konto zusammenführen',
   'admin.users.erase.action': 'Konto löschen (DSGVO)',
+  'admin.users.erase.notSelf': 'Dein eigenes Konto kannst du nicht löschen. Bitte eine andere Administratorin oder einen anderen Administrator darum.',
   'admin.users.merge.notSelf':
     'Dein eigenes Konto kannst du nicht in ein anderes Konto zusammenführen.',
   'admin.users.merge.title': 'Mit anderem Konto zusammenführen',
@@ -6092,6 +6093,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.users.moreActions': 'More actions',
   'admin.users.merge.action': 'Merge into another account',
   'admin.users.erase.action': 'Erase account (GDPR)',
+  'admin.users.erase.notSelf': 'You cannot erase your own account. Ask another administrator.',
   'admin.users.merge.notSelf': 'You cannot merge your own account into another account.',
   'admin.users.merge.title': 'Merge into another account',
   'admin.users.merge.subtitle': 'Old account: {name}',

@@ -353,7 +353,8 @@ jobs:
 
   # The MCP server (mcp/) is a separate package with its own tests. Before D2 no job
   # ran them, so a wrong API path in a tool reached development unseen. This job runs
-  # in the same flat fan-out as the others, and a red result blocks the pull request.
+  # in the same flat fan-out as the others. It is meant as a required check: a red
+  # result blocks a pull request only when the branch protection lists the job.
   mcp:
     runs-on: ubuntu-latest
     defaults:

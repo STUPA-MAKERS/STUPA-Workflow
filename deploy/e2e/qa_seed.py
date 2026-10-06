@@ -65,7 +65,7 @@ PEOPLE: list[tuple[str, str, str, str | None, str | None, str | None]] = [
     ("qa-admin", "admin@qa.test", "Alina Admin", "admin", "stupa", "vorstand"),
     ("qa-manager", "manager@qa.test", "Mara Manager", "manager", "stupa", "manager"),
     ("qa-finance", "finance@qa.test", "Fabio Finanzen", "finance", "asta", "member"),
-    ("qa-protocol", "protocol@qa.test", "Pia Protokoll", "protocol", "stupa", "protokoll"),
+    ("qa-protocol", "protocol@qa.test", "Pia Protokoll", "protocol", "stupa", "member"),
     ("qa-member", "member@qa.test", "Mika Mitglied", "member", "stupa", "member"),
     # No global role and no membership: the "signed in but entitled to nothing" case,
     # which is what every RBAC gate has to hold against.
@@ -81,12 +81,25 @@ def _role_group(role_key: str) -> str:
 # The Gremium role that a member without a role mapping gets.
 DEFAULT_GREMIUM_ROLE = "member"
 
-# Custom Gremium roles that the seed creates in each Gremium of `PEOPLE` that uses them
-# (D4). The forced roles (vorstand, manager, member) exist already. `protokoll` is the
+# Custom Gremium roles that the seed creates in each Gremium that uses them (D4). The
+# forced roles (vorstand, manager, member) exist already. `protokoll` is the
 # minute-taker: it can be assigned as keeper and write the minutes. The membership itself
 # gives the read access to the meetings of the Gremium, so the role needs no read key.
+#
+# The sync keeps ONE role per (person, Gremium): the role with more permissions wins,
+# then the lower key. `protokoll` therefore also holds `vote.cast`. Then it wins over
+# `member` (one permission), and the person keeps the vote of a member.
 SEED_GREMIUM_ROLES: dict[str, tuple[dict[str, str], list[str]]] = {
-    "protokoll": ({"de": "Protokoll", "en": "Minute-taker"}, ["protocol.write"]),
+    "protokoll": (
+        {"de": "Protokoll", "en": "Minute-taker"},
+        ["vote.cast", "protocol.write"],
+    ),
+}
+
+# Gremium roles IN ADDITION to the role in `PEOPLE` (sub -> [(gremium, role)]). D4:
+# qa-protocol stays a `member` of the StuPa and also gets the group of `protokoll`.
+EXTRA_GREMIUM_ROLES: dict[str, list[tuple[str, str]]] = {
+    "qa-protocol": [("stupa", "protokoll")],
 }
 
 
@@ -101,9 +114,12 @@ def _gremium_role_group(gremium_key: str, gremium_role_key: str) -> str:
 
 
 def _groups_of(
-    role_key: str | None, gremium_key: str | None, gremium_role_key: str | None
+    role_key: str | None,
+    gremium_key: str | None,
+    gremium_role_key: str | None,
+    extra: list[tuple[str, str]] | None = None,
 ) -> list[str]:
-    """Return the OIDC groups of one person in `PEOPLE`."""
+    """Return the OIDC groups of one person in `PEOPLE`, plus its extra Gremium roles."""
     groups: list[str] = []
     if role_key is not None:
         groups.append(_role_group(role_key))
@@ -112,6 +128,10 @@ def _groups_of(
         role = gremium_role_key or DEFAULT_GREMIUM_ROLE
         if role != DEFAULT_GREMIUM_ROLE:
             groups.append(_gremium_role_group(gremium_key, role))
+    for extra_gremium, extra_role in extra or []:
+        group = _gremium_role_group(extra_gremium, extra_role)
+        if group not in groups:
+            groups.append(group)
     return groups
 
 
@@ -136,6 +156,7 @@ GREMIUM_ROLE_MAPPINGS = sorted(
         and gremium_role_key is not None
         and gremium_role_key != DEFAULT_GREMIUM_ROLE
     }
+    | {pair for pairs in EXTRA_GREMIUM_ROLES.values() for pair in pairs}
 )
 
 
@@ -276,7 +297,9 @@ async def main() -> None:
         for sub, email, name, role_key, gremium_key, gremium_role_key in PEOPLE:
             principal = await _ensure_principal(session, sub, email, name)
             # The group cache that an OIDC login would fill.
-            principal.oidc_groups = _groups_of(role_key, gremium_key, gremium_role_key)
+            principal.oidc_groups = _groups_of(
+                role_key, gremium_key, gremium_role_key, EXTRA_GREMIUM_ROLES.get(sub)
+            )
             await _drop_manual_assignments(session, principal.id)
 
             label = sub.removeprefix("qa-")

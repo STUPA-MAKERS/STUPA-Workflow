@@ -60,10 +60,26 @@ class PrincipalService:
 
         Raises:
             NotFoundError: No principal has this id.
+            ConflictError: The actor is the principal itself (`erase_self`), or the
+                principal is merged into another account (`erase_merged`).
         """
         principal = await self.session.get(Principal, principal_id)
         if principal is None:
             raise NotFoundError(f"principal {principal_id} not found")
+        # An admin who erases the own account locks out the session that does it and
+        # can leave the platform without an admin. Another admin must do it.
+        if principal.sub == actor:
+            raise ConflictError(
+                "You cannot erase your own account. Ask another administrator.",
+                code="erase_self",
+            )
+        # A merged account is a locked reference: its rows point to the account that
+        # stays. Erase that account instead.
+        if principal.merged_into is not None:
+            raise ConflictError(
+                "The account is merged into another account. Erase that account instead.",
+                code="erase_merged",
+            )
         principal.email = None
         principal.display_name = None
         principal.calendar_token = None

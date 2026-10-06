@@ -195,6 +195,8 @@ export class UsersComponent {
         label: this.i18n.translate('admin.users.erase.action'),
         icon: 'trash',
         danger: true,
+        // The server refuses it too (409 `erase_self`).
+        disabledReason: this.isSelf(p) ? this.i18n.translate('admin.users.erase.notSelf') : null,
       });
     }
     return [{ items }];

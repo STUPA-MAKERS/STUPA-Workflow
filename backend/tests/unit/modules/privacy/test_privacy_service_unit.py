@@ -82,6 +82,31 @@ async def test_principal_erase_unknown_raises_not_found() -> None:
         await PrincipalService(db).erase(uuid4(), actor="admin")
 
 
+async def test_principal_erase_refuses_the_own_account() -> None:
+    """An admin cannot erase the own account (409 `erase_self`); nothing changes."""
+    principal = _principal(sub="admin")
+    db = fake_session(gets=[principal])
+    with pytest.raises(ConflictError) as exc:
+        await PrincipalService(db).erase(principal.id, actor="admin")
+    assert exc.value.code == "erase_self"
+    assert principal.email == "user@example.org"
+    assert principal.active is True
+    assert db.added == []
+    assert db.committed == 0
+
+
+async def test_principal_erase_refuses_a_merged_account() -> None:
+    """A merged account is a locked reference (409 `erase_merged`); nothing changes."""
+    principal = _principal(merged_into=uuid4())
+    db = fake_session(gets=[principal])
+    with pytest.raises(ConflictError) as exc:
+        await PrincipalService(db).erase(principal.id, actor="admin")
+    assert exc.value.code == "erase_merged"
+    assert principal.email == "user@example.org"
+    assert db.added == []
+    assert db.committed == 0
+
+
 async def test_principal_erase_commit_false_flushes_only() -> None:
     principal = _principal()
     db = fake_session(gets=[principal])

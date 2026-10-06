@@ -85,7 +85,7 @@
           <div class="pv__person">
             <app-avatar size="sm" [name]="personName(p)" [principalId]="p.id" [decorative]="true" />
             <span class="pv__personWho">
-              <span class="pv__personName" [title]="personName(p) === p.sub ? '' : p.sub">{{ personName(p) }}</span>
+              <span class="pv__personName" [attr.title]="p.displayName || p.email ? null : p.sub">{{ personName(p) }}</span>
               @if (p.email) {
                 <span class="pv__mail mono pv__muted">{{ p.email }}</span>
               }

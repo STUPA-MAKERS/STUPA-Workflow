@@ -281,6 +281,34 @@ async def test_erase_principal_endpoint_nulls_pii_204(
     assert principal.sub == original_sub  # the pseudonym stays
 
 
+async def test_erase_principal_refuses_self_and_merged_409(
+    app: FastAPI, client: TestClient, session: AsyncSession
+) -> None:
+    """The own account and a merged account cannot be erased; both rows stay as they are."""
+    own = await _seed_principal(session, email="dpo@example.org")
+    own.sub = "dpo"  # the sub of the caller in `_as`
+    target = await _seed_principal(session, email="stays@example.org")
+    merged = await _seed_principal(session, email="old@example.org")
+    merged.merged_into = target.id
+    merged.merged_at = datetime.now(UTC)
+    merged.active = False
+    await session.commit()
+
+    _as_dpo(app)
+    r = client.post(f"/api/admin/privacy/principals/{own.id}/erase")
+    assert r.status_code == 409
+    assert r.headers["content-type"].startswith("application/problem+json")
+    assert r.json()["code"] == "erase_self"
+    r = client.post(f"/api/admin/privacy/principals/{merged.id}/erase")
+    assert r.status_code == 409
+    assert r.json()["code"] == "erase_merged"
+
+    await session.refresh(own)
+    await session.refresh(merged)
+    assert own.email == "dpo@example.org"
+    assert merged.email == "old@example.org"
+
+
 async def test_settings_get_put_and_validation(
     app: FastAPI, client: TestClient, session: AsyncSession
 ) -> None:

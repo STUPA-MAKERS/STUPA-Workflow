@@ -140,12 +140,8 @@ PRs go to `development`. Each merge to `development` deploys the dev site. A rel
 | `feat/*`, `fix/*`, `chore/*`, `docs/*` | short-lived branches off `development` | merge by PR (squash) into `development`, delete after the merge |
 | `hotfix/*` | urgent production fix off the running release tag | PR → `main`, then a new patch tag |
 
-**Releases.** Production runs on a **tag**, not on the HEAD of `main`. Versions follow
-SemVer: `vMAJOR.MINOR.PATCH`. CI then builds the images, marks them with the tag and
-deploys them. This keeps the production state reproducible at any time. A rollback is a
-re-deploy of the previous tag.
-
-To make a release (D12):
+**Releases.** Production runs on a **tag**, not on the HEAD of `main`. To make a
+release (D12):
 
 1. Open a pull request from `development` to `main`.
 2. Make sure that CI is green, then merge the pull request.
@@ -160,6 +156,10 @@ To make a release (D12):
    git push origin v1.2.0
    gh release create v1.2.0 --title "v1.2.0" --notes-file release-notes.md
    ```
+
+Versions follow SemVer: `vMAJOR.MINOR.PATCH`. After the tag, CI builds the images, marks
+them with the tag and deploys them. This keeps the production state reproducible at any
+time. A rollback is a re-deploy of the previous tag.
 
 ```
 feat/x ──PR──▶ development ──PR──▶ main ──tag v1.2.0──▶ Build+Deploy

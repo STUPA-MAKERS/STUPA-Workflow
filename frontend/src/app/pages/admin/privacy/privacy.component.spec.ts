@@ -286,6 +286,17 @@ describe('PrivacyComponent', () => {
     jest.useRealTimers();
   });
 
+  it('shows the sub as a tooltip only for a nameless person (D7)', async () => {
+    const { fixture } = await setup();
+    const cmp = fixture.componentInstance as unknown as { pickPerson: (p: AdminPrincipal) => void };
+    cmp.pickPerson(ANNA);
+    fixture.detectChanges();
+    expect(screen.getByText('Anna Alt')).not.toHaveAttribute('title');
+    cmp.pickPerson(NAMELESS);
+    fixture.detectChanges();
+    expect(screen.getByText('Ohne Namen')).toHaveAttribute('title', 'kc|nameless');
+  });
+
   it('can change the picked person', async () => {
     const { fixture } = await setup();
     const cmp = fixture.componentInstance as unknown as {

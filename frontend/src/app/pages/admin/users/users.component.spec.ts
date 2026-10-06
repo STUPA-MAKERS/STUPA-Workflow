@@ -397,11 +397,20 @@ describe('UsersComponent', () => {
       expect(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })).toHaveLength(2);
       const items = inst.menuFor(PRINCIPALS[1])[0].items;
       expect(items.map((i: { id: string }) => i.id)).toEqual(['erase']);
-      expect(items[0]).toMatchObject({ label: 'Konto löschen (DSGVO)', danger: true });
+      expect(items[0]).toMatchObject({ label: 'Konto löschen (DSGVO)', danger: true, disabledReason: null });
       const router = fixture.debugElement.injector.get(Router);
       const nav = jest.spyOn(router, 'navigate').mockResolvedValue(true);
       inst.onMenu(items[0], PRINCIPALS[1]);
       expect(nav).toHaveBeenCalledWith(['/admin/privacy'], { queryParams: { person: 'kc|sam' } });
+    });
+
+    it('the own account cannot be erased: the action has a reason', async () => {
+      const { inst } = await setup(makeApi(), makeAuth('kc|alex', true, false, true));
+      const own = inst.menuFor(PRINCIPALS[0])[0].items[0];
+      expect(own.id).toBe('erase');
+      expect(own.disabledReason).toBe(
+        'Dein eigenes Konto kannst du nicht löschen. Bitte eine andere Administratorin oder einen anderen Administrator darum.',
+      );
     });
 
     it('with both permissions the menu holds merge and erase', async () => {
