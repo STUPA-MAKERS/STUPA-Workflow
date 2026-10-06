@@ -87,6 +87,7 @@ import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dial
 import { mediaQuerySignal } from '../../layout/media-query';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { provideFormly } from '@shared/formly/formly.providers';
 
 /** Field types whose old and new value do not fit on one line of the history. The
  *  history opens them as blocks below the change ("Werte anzeigen"). */
@@ -150,6 +151,9 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
     ForceStatusDialogComponent,
     AgendaDialogComponent,
   ],
+  // The field types of the form (`provideFormly`) come with the component, so Formly is not
+  // part of the initial bundle.
+  providers: [provideFormly()],
   templateUrl: './applications-detail.component.html',
   styleUrl: './applications-detail.component.scss',
 })

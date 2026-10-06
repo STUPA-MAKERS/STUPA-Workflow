@@ -37,7 +37,7 @@ export class SheetBarKickerDirective {}
  *
  * ```html
  * <app-sheet-bar>
- *   <nav appSheetBarKicker aria-label="…">…</nav>
+ *   <app-budget-crumbs appSheetBarKicker [nodes]="path()" (pick)="select($event)" />
  *   <app-button …>…</app-button>
  * </app-sheet-bar>
  * ```

@@ -46,6 +46,7 @@ import { ButtonComponent, DialogComponent, IconComponent, MEDIA, ToastService } 
 import { AttachmentsPanelComponent } from '../../pages/applications/attachments-panel.component';
 import { applicationTitle, transitionLooks } from '../../pages/applications/applications.util';
 import { shortRef } from './apply.util';
+import { provideFormly } from '@shared/formly/formly.providers';
 
 type Phase = 'loading' | 'expired' | 'error' | 'ready';
 
@@ -98,6 +99,9 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
     AttachmentsPanelComponent,
     TranslatePipe,
   ],
+  // The field types of the form (`provideFormly`) come with the component, so Formly is not
+  // part of the initial bundle.
+  providers: [provideFormly()],
   templateUrl: './status-timeline.component.html',
   styleUrl: './status-timeline.component.scss',
 })

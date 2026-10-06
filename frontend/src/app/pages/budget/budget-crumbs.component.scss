@@ -1,13 +1,19 @@
 /* The trail fills the kicker of the sheet bar and shortens inside it; it never wraps. */
 :host {
-  /* A parent keeps about eight characters; a very long one ends at the maximum. */
+  /* A shortened crumb or key keeps about eight characters; a long parent ends at the
+     maximum. */
   --crumb-min: 4.5rem;
   --crumb-max: 20rem;
+  /* The room around the trail where the hover surface and the focus ring of a crumb
+     still show. The trail clips its items, but only outside this room. */
+  --crumb-bleed: var(--space-2);
   display: flex;
   flex: 1 1 auto;
   min-width: 0;
 }
 
+/* The padding gives the room of `--crumb-bleed`, the negative margin takes it back, so
+   the items stay on the edge of the kicker. The fit subtracts the padding. */
 .bd__crumbs {
   position: relative;
   display: flex;
@@ -15,12 +21,14 @@
   align-items: center;
   gap: var(--space-1);
   min-width: 0;
+  margin: calc(-1 * var(--crumb-bleed));
+  padding: var(--crumb-bleed);
   overflow: hidden;
   white-space: nowrap;
 }
 
 .bd__crumb {
-  flex: 0 1 auto;
+  flex: none;
   min-width: 0;
   padding: 0;
   border: 0;
@@ -28,10 +36,8 @@
   color: inherit;
   font: inherit;
 }
-/* A parent: from its natural width down to the minimum (or its own width, when that is
-   less). The fit hides the parents that would need to go below it. */
+/* A parent keeps its full name (up to the maximum) while the trail fits. */
 button.bd__crumb {
-  min-width: min(var(--crumb-w, 0px), var(--crumb-min));
   max-width: var(--crumb-max);
   cursor: pointer;
 }
@@ -39,15 +45,19 @@ button.bd__crumb:hover {
   color: var(--color-text);
   text-decoration: underline;
 }
-/* The current cost centre keeps its full name while it fits. */
+/* Step 4 of the fit: the parents shorten, from their natural width down to the minimum
+   (or their own width, when that is less). */
+.bd__crumbs--parents button.bd__crumb {
+  flex: 0 1 auto;
+  min-width: min(var(--crumb-w, 0px), var(--crumb-min));
+}
+/* The current cost centre: it takes the focus after a pick, but it is no control. */
 .bd__crumb--current {
-  flex-shrink: 0;
   cursor: default;
 }
-/* Too narrow even for "… › current": the key shortens first (about eight characters);
-   in a narrower bar the key goes and the name shortens. */
+/* Step 6: the current name shortens too, as the last item. */
 .bd__crumb--tight {
-  flex-shrink: 1;
+  flex: 0 1 auto;
   min-width: min(var(--crumb-w, 0px), var(--crumb-min));
 }
 .bd__crumbSep {
@@ -56,13 +66,36 @@ button.bd__crumb:hover {
 .bd__more {
   flex: none;
 }
+/* The "…" as the first item: its text, not its padding, lines up with the title. */
+.bd__more--lead {
+  margin-inline-start: calc(-1 * var(--row-menu-text-pad));
+}
+
+/* The key shortens at its START ("…200-230-2"), so the levels nearest to the current
+   cost centre stay visible. The box runs right to left, so the ellipsis and the cut are
+   at the left; the text inside keeps its own order. The gap is a physical margin, as the
+   box itself is right to left. */
 .bd__key {
   flex: none;
-  margin-inline-start: var(--space-2);
+  margin-left: var(--space-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+}
+.bd__keyText {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 .bd__key--tight {
   flex: 0 1 auto;
-  min-width: var(--crumb-min);
+  min-width: min(var(--key-w, 0px), var(--crumb-min));
+}
+/* From step 4 on the key stays at its minimum, so the crumbs that give way after it get
+   the free width. */
+.bd__key--min {
+  flex: none;
+  width: min(var(--key-w, 0px), var(--crumb-min));
 }
 
 /* The hidden copy for the widths: out of the flow, not painted. */
@@ -90,8 +123,8 @@ button.bd__crumb:hover {
 .bd__measureMin {
   width: var(--crumb-min);
 }
-/* As the "…" button of the row menu (`rm__trigger--text`). */
+/* As the "…" button of the row menu (`rm__trigger--text`): the same tokens. */
 .bd__measureMore {
-  min-width: 1.75rem;
-  padding: 0 var(--space-2);
+  min-width: var(--row-menu-text-min);
+  padding: 0 var(--row-menu-text-pad);
 }

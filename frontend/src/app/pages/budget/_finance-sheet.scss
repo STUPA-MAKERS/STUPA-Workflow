@@ -29,7 +29,7 @@
 .fd__head {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--sheet-head-gap);
   padding-bottom: 22px;
   border-bottom: var(--border-width) solid var(--color-border);
 }

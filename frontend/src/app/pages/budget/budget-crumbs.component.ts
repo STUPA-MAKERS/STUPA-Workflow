@@ -20,10 +20,11 @@ import { RowMenuComponent, type RowMenuSection } from '@shared/ui';
 import type { BudgetTreeNode } from './budget-tree.api';
 
 /**
- * What gives way when even "… › current" with the key is too wide: `key` shortens the
- * key (to about eight characters), `name` drops the key and shortens the current name.
+ * What gives way when the trail does not fit at full width, in this order: `key` shortens
+ * the key at its start ("…200-230-2"), `parents` also shortens the visible parents, and
+ * `name` also shortens the current name. Each one goes down to about eight characters.
  */
-export type CrumbSqueeze = 'none' | 'key' | 'name';
+export type CrumbSqueeze = 'none' | 'key' | 'parents' | 'name';
 
 /** How the breadcrumb fits its bar: the parents it hides, and what else gives way. */
 export interface CrumbFit {
@@ -44,7 +45,7 @@ export interface CrumbMetrics {
   available: number;
   /** The key of the current cost centre, with the space before it. */
   key: number;
-  /** A parent (and a shortened key or current name) keeps at least this width. */
+  /** A shortened crumb or key keeps at least this width. */
   min: number;
   /** A separator with the gaps on both sides of it. */
   sep: number;
@@ -53,26 +54,43 @@ export interface CrumbMetrics {
 }
 
 /**
- * Picks the fewest parents to hide so that each visible parent keeps at least `min` and
- * the current crumb and its key their full width. A parent shows from its natural width
- * down to `min`, so a parent is cut short but stays readable; the levels that do not fit
- * at all go into the "…" menu. Only when "… › current" does not fit either, the key and
- * then the current name give way.
+ * Fits the trail into its bar. The steps, each one only when the one before does not fit:
+ *
+ * 1. The whole path at full width.
+ * 2. The first level, the direct parent and the current crumb at full width; the levels
+ *    between them go into the "…" menu.
+ * 3. As 2, and the key shortens at its start.
+ * 4. As 3, and the first level and the direct parent shorten.
+ * 5. Only "… › current": all parents go into the menu, the key at full width, then short.
+ * 6. As 5, and the current name shortens too.
+ *
+ * So the current name gives way last. A shortened crumb or key keeps at least `min`, or
+ * its own width when that is less.
  */
 export function fitCrumbs(m: CrumbMetrics): CrumbFit {
   const parents = m.widths.length - 1;
   if (parents < 0) return { hidden: 0, squeeze: 'none' };
+  const short = (w: number) => Math.min(w, m.min);
   const current = m.widths[parents];
-  const need = (hidden: number): number => {
-    let total = current + (hidden > 0 ? m.more + m.sep : 0);
-    for (const i of visibleParents(parents, hidden)) total += Math.min(m.widths[i], m.min) + m.sep;
+  const need = (hidden: number, squeeze: CrumbSqueeze): number => {
+    let total = squeeze === 'name' ? short(current) : current;
+    total += squeeze === 'none' ? m.key : short(m.key);
+    if (hidden > 0) total += m.more + m.sep;
+    const shortParents = squeeze === 'parents' || squeeze === 'name';
+    for (const i of visibleParents(parents, hidden)) total += (shortParents ? short(m.widths[i]) : m.widths[i]) + m.sep;
     return total;
   };
-  for (let hidden = 0; hidden <= parents; hidden++) {
-    if (need(hidden) + m.key <= m.available) return { hidden, squeeze: 'none' };
-  }
-  const squeeze = need(parents) + Math.min(m.key, m.min) <= m.available ? 'key' : 'name';
-  return { hidden: parents, squeeze };
+  // The levels between the first one and the direct parent.
+  const between = Math.max(0, parents - 2);
+  const steps: CrumbFit[] = [
+    { hidden: 0, squeeze: 'none' },
+    { hidden: between, squeeze: 'none' },
+    { hidden: between, squeeze: 'key' },
+    { hidden: between, squeeze: 'parents' },
+    { hidden: parents, squeeze: 'none' },
+    { hidden: parents, squeeze: 'key' },
+  ];
+  return steps.find((s) => need(s.hidden, s.squeeze) <= m.available) ?? { hidden: parents, squeeze: 'name' };
 }
 
 /** The indices of the parents that stay visible (see `CrumbFit.hidden`). */
@@ -88,19 +106,26 @@ type Item =
   | { kind: 'node'; node: BudgetTreeNode; index: number; current: boolean }
   | { kind: 'more'; nodes: BudgetTreeNode[] };
 
-/** px of a separator icon. The gaps beside it come from the flex gap of the trail. */
+/**
+ * px of a separator icon. The template draws the icons at this size and the fit counts
+ * it, so the two cannot differ. The gaps beside it come from the flex gap of the trail.
+ */
 const SEP_ICON = 13;
 
 /**
  * The cost-centre breadcrumb in the bar of the budget sheet: root › … › current, the key
  * of the current cost centre at the end.
  *
- * It never wraps and never makes the bar taller. A parent shortens with an ellipsis, but
- * not below `--crumb-min` (about eight characters); when the parents do not fit at that
- * width, the levels after the root go into a "…" menu, nearest to the root first. The
- * current cost centre and its key keep their full width while they fit; else the key
- * shortens, and in a very narrow bar the key goes and the name shortens. Every shortened
- * crumb has its full name as a tooltip.
+ * It never wraps and never makes the bar taller. When the whole path does not fit, the
+ * first level, the direct parent and the current cost centre stay at full width and the
+ * levels between them go into a "…" menu. Only when that does not fit either, the key
+ * shortens at its start ("…200-230-2"), then the first level and the parent, then all
+ * parents go into the menu, and at last the current name shortens (see `fitCrumbs`).
+ * Nothing shortens below `--crumb-min` (about eight characters). Every shortened crumb
+ * and the key have their full text as a tooltip.
+ *
+ * After a pick (a parent or an entry of the "…" menu) the focus moves to the current
+ * crumb of the new path, because the control that had it is gone.
  *
  * The widths come from a hidden copy of the names. A new path, a new width of the bar or
  * of the copy (`ResizeObserver`, for example when the web font arrives) fits the trail
@@ -123,10 +148,16 @@ export class BudgetCrumbsComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly nav = viewChild.required<ElementRef<HTMLElement>>('nav');
   private readonly measure = viewChild.required<ElementRef<HTMLElement>>('measure');
+  private readonly current = viewChild<ElementRef<HTMLElement>>('current');
 
   protected readonly fit = signal<CrumbFit>({ hidden: 0, squeeze: 'none' });
+  protected readonly sepIcon = SEP_ICON;
+  /** The picked cost centre: its crumb takes the focus once the new path is drawn. */
+  private focusId: string | null = null;
   /** The natural width of each crumb, for its minimum width (see `--crumb-w`). */
   protected readonly widths = signal<readonly number[]>([]);
+  /** The natural width of the key, for its minimum width (see `--key-w`). */
+  protected readonly keyWidth = signal<string | null>(null);
 
   protected readonly items = computed<Item[]>(() => {
     const nodes = this.nodes();
@@ -149,8 +180,21 @@ export class BudgetCrumbsComponent {
   constructor() {
     // A new path: fit it after it is drawn.
     afterRenderEffect(() => {
-      this.nodes();
-      untracked(() => this.refit());
+      const current = this.nodes().at(-1)?.id;
+      untracked(() => {
+        // A path that does not end at the picked cost centre ends the pending focus.
+        if (this.focusId !== null && current !== this.focusId) this.focusId = null;
+        this.refit();
+      });
+    });
+    // After a pick: the current crumb of the new path takes the focus. The query changes
+    // only when the new crumb is drawn, so the crumb of the old path never gets it.
+    afterRenderEffect(() => {
+      const el = this.current()?.nativeElement;
+      if (el && this.focusId !== null && el.dataset['node'] === this.focusId) {
+        this.focusId = null;
+        el.focus();
+      }
     });
     // A new width of the bar, or new widths of the names (the web font arrives after the
     // first fit, and the hidden copy then changes its size).
@@ -161,6 +205,12 @@ export class BudgetCrumbsComponent {
       observer.observe(this.measure().nativeElement);
       this.destroyRef.onDestroy(() => observer.disconnect());
     });
+  }
+
+  /** A parent was chosen: tell the page, and keep the focus in the trail. */
+  protected choose(id: string): void {
+    this.focusId = id;
+    this.pick.emit(id);
   }
 
   /** The natural width of a crumb as a CSS length, once it is measured. */
@@ -184,14 +234,19 @@ export class BudgetCrumbsComponent {
     const box = this.measure().nativeElement;
     const width = (el: Element | null) => (el ? (el as HTMLElement).getBoundingClientRect().width : 0);
     const widths = Array.from(box.querySelectorAll('[data-crumb]'), (el) => Math.ceil(width(el)));
-    const gap = parseFloat(getComputedStyle(nav).columnGap) || 0;
+    const style = getComputedStyle(nav);
+    const gap = parseFloat(style.columnGap) || 0;
+    // The padding is the room for hover and focus (`--crumb-bleed`), not for the items.
+    const padding = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+    // The copy of the key holds the space before it as padding.
+    const key = Math.ceil(width(box.querySelector('[data-key]')));
     this.widths.set(widths);
+    this.keyWidth.set(`${key}px`);
     this.fit.set(
       fitCrumbs({
         widths,
-        available: nav.clientWidth,
-        // The copy of the key holds the space before it as padding.
-        key: Math.ceil(width(box.querySelector('[data-key]'))) + gap,
+        available: nav.clientWidth - padding,
+        key: key + gap,
         min: Math.ceil(width(box.querySelector('[data-min]'))),
         sep: SEP_ICON + 2 * gap,
         more: Math.ceil(width(box.querySelector('[data-more]'))),

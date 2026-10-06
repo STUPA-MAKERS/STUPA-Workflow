@@ -16,13 +16,14 @@
   cursor: pointer;
 }
 /* A text button (`text`), for example the "…" of a breadcrumb: the height of a line,
-   the width of its text. */
+   the width of its text. The size comes from global tokens, because the budget
+   breadcrumb counts the same width before it draws the button. */
 .rm__trigger--text {
   width: auto;
   height: auto;
-  min-width: 1.75rem;
-  min-height: 1.75rem;
-  padding: 0 var(--space-2);
+  min-width: var(--row-menu-text-min);
+  min-height: var(--row-menu-text-min);
+  padding: 0 var(--row-menu-text-pad);
   border-radius: var(--radius-md);
   font: inherit;
   line-height: inherit;
