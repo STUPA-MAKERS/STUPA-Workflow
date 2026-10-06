@@ -189,7 +189,7 @@ async def test_preview_counts_every_area() -> None:
     assert [c.kind for c in out.conflicts] == ["erasure_open", "erasure_open"]
     areas = {a.area: a for a in out.areas}
     assert list(areas) == list(AREAS)
-    assert areas["applications"].rewritten == 2 * 3
+    assert areas["applications"].rewritten == 2 * 4
     # Notifications: two duplicates of two rows, so nothing is left to rewrite.
     assert areas["notifications"].combined == 2
     assert areas["notifications"].rewritten == 0

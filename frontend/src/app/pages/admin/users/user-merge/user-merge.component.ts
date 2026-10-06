@@ -54,6 +54,7 @@ export const MERGE_ERROR_CODES = [
   'principal_erased',
   'merge_target_inactive',
   'merge_retry',
+  'merge_same_principal',
 ] as const;
 export type MergeErrorCode = (typeof MERGE_ERROR_CODES)[number];
 

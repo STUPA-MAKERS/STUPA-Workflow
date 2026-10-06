@@ -23,7 +23,7 @@ The downgrade removes the permission rows, the constraints and the columns. It
 cannot restore the rewritten references of a merge that already ran.
 
 Revision ID: 3858ad137185
-Revises: 373c9fe9cafb
+Revises: b6a6464a36b9
 Create Date: 2026-10-05 23:07:49.833816
 """
 
@@ -34,7 +34,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "3858ad137185"
-down_revision: str | None = "373c9fe9cafb"
+down_revision: str | None = "b6a6464a36b9"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

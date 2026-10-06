@@ -262,6 +262,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
         app = await session.get(Application, app_id)
         assert app is not None
         app.archived_by = old.sub
+        app.captured_by = old.sub
         session.add(
             ApplicationShare(
                 application_id=app_id,

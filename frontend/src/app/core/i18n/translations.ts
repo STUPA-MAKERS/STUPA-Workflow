@@ -2938,6 +2938,8 @@ export const de = {
     'Das gewählte Konto ist deaktiviert. Aktiviere es zuerst oder wähle ein anderes Konto.',
   'admin.users.merge.error.merge_retry':
     'Gleichzeitig hat sich etwas an den Daten geändert. Versuche es noch einmal.',
+  'admin.users.merge.error.merge_same_principal':
+    'Ein Konto lässt sich nicht in sich selbst zusammenführen.',
   'home.loginError.account_merged':
     'Dieses Konto wurde zusammengeführt und ist gesperrt. Melde dich mit deinem aktuellen Konto an.',
   'admin.roles.loading': 'Rollen werden geladen …',
@@ -6030,6 +6032,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.users.merge.error.merge_target_inactive':
     'The selected account is deactivated. Activate it first or select another account.',
   'admin.users.merge.error.merge_retry': 'The data changed at the same time. Try again.',
+  'admin.users.merge.error.merge_same_principal': 'An account cannot be merged into itself.',
   'home.loginError.account_merged':
     'This account was merged and is locked. Log in with your current account.',
   'admin.roles.loading': 'Loading roles …',

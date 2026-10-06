@@ -13,7 +13,7 @@ target):
 What the merge does with each reference:
 
 - It rewrites every column that stores the ``sub`` or the id of the source to the target.
-  That covers applications (creator, archiver, share links), versions, the timeline,
+  That covers applications (creator, archiver, capturer, share links), versions, the timeline,
   comments, ballots and the voted markers of secret votes, delegations, the substitute
   pool, attendance, meetings (creator, minute-taker, keeper periods), protocols, budget
   bookings and invoices, config versions, role assignments, privacy requests, backups
@@ -156,6 +156,8 @@ AREAS: tuple[MergeArea, ...] = (
 SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("applications", Application.created_by),
     ("applications", Application.archived_by),
+    # The person who captured an application on behalf of an applicant (#11).
+    ("applications", Application.captured_by),
     ("applications", ApplicationShare.created_by),
     ("versions", SubmissionVersion.changed_by),
     ("timeline", StatusEvent.actor),

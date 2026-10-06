@@ -74,6 +74,10 @@ class _FakeSession:
     async def rollback(self) -> None:
         return None
 
+    async def scalar(self, _stmt: object) -> int:
+        # The cast re-reads the account (active, not merged): one live row.
+        return 1
+
 
 class _FakeMeetingService:
     def __init__(self, meeting: MeetingOut | None, open_vote: object = None) -> None:

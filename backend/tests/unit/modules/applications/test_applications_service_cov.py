@@ -316,7 +316,12 @@ async def test_get_carries_the_capture_block() -> None:
     session = _Session(
         get_results=[app, state],
         # stateSince, state colours, then the name of the capturing person.
-        execute_results=[[], [("draft", "#zzz")], [("clerk", "Clara", "c@x.de", clerk_id)]],
+        # A row of `refs_by_sub`: sub, id, name, email, then the merge target (none).
+        execute_results=[
+            [],
+            [("draft", "#zzz")],
+            [("clerk", clerk_id, "Clara", "c@x.de", None, None, None)],
+        ],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.get(app.id, include_pii=False, requester_sub="admin")
