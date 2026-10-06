@@ -35,6 +35,10 @@
   line-height: 1.45;
   overflow-wrap: anywhere;
   word-break: break-all;
+}
+/* Only the link itself selects as one unit. On `.sld__url` the selection would also take
+   the sr-only label into the copied text. */
+.sld__url code {
   user-select: all;
 }
 

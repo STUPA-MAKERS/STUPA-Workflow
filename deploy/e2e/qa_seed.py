@@ -65,7 +65,7 @@ PEOPLE: list[tuple[str, str, str, str | None, str | None, str | None]] = [
     ("qa-admin", "admin@qa.test", "Alina Admin", "admin", "stupa", "vorstand"),
     ("qa-manager", "manager@qa.test", "Mara Manager", "manager", "stupa", "manager"),
     ("qa-finance", "finance@qa.test", "Fabio Finanzen", "finance", "asta", "member"),
-    ("qa-protocol", "protocol@qa.test", "Pia Protokoll", "protocol", "stupa", "member"),
+    ("qa-protocol", "protocol@qa.test", "Pia Protokoll", "protocol", "stupa", "protokoll"),
     ("qa-member", "member@qa.test", "Mika Mitglied", "member", "stupa", "member"),
     # No global role and no membership: the "signed in but entitled to nothing" case,
     # which is what every RBAC gate has to hold against.
@@ -80,6 +80,14 @@ def _role_group(role_key: str) -> str:
 
 # The Gremium role that a member without a role mapping gets.
 DEFAULT_GREMIUM_ROLE = "member"
+
+# Custom Gremium roles that the seed creates in each Gremium of `PEOPLE` that uses them
+# (D4). The forced roles (vorstand, manager, member) exist already. `protokoll` is the
+# minute-taker: it can be assigned as keeper and write the minutes. The membership itself
+# gives the read access to the meetings of the Gremium, so the role needs no read key.
+SEED_GREMIUM_ROLES: dict[str, tuple[dict[str, str], list[str]]] = {
+    "protokoll": ({"de": "Protokoll", "en": "Minute-taker"}, ["protocol.write"]),
+}
 
 
 def _membership_group(gremium_key: str) -> str:
@@ -149,6 +157,27 @@ async def _gremium_role(session, gremium_id: uuid.UUID, key: str) -> uuid.UUID |
             )
         )
     ).scalar_one_or_none()
+
+
+async def _ensure_seed_gremium_roles(session, gremien: dict[str, uuid.UUID]) -> None:
+    """Create the custom Gremium roles of `SEED_GREMIUM_ROLES` where `PEOPLE` uses them."""
+    for gremium_key, gremium_role_key in GREMIUM_ROLE_MAPPINGS:
+        spec = SEED_GREMIUM_ROLES.get(gremium_role_key)
+        gid = gremien.get(gremium_key)
+        if spec is None or gid is None:
+            continue
+        if await _gremium_role(session, gid, gremium_role_key) is not None:
+            continue
+        name_i18n, permissions = spec
+        session.add(
+            GremiumRole(
+                gremium_id=gid,
+                key=gremium_role_key,
+                name_i18n=name_i18n,
+                permissions=list(permissions),
+            )
+        )
+    await session.flush()
 
 
 async def _ensure_principal(session, sub: str, email: str, name: str) -> Principal:
@@ -241,6 +270,7 @@ async def main() -> None:
         gremien = await _gremien_by_key(session)
         await _ensure_group_mappings(session, roles)
         await _ensure_gremium_membership_mappings(session, gremien)
+        await _ensure_seed_gremium_roles(session, gremien)
         await _ensure_gremium_role_mappings(session, gremien)
 
         for sub, email, name, role_key, gremium_key, gremium_role_key in PEOPLE:

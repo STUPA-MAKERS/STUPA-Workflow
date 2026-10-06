@@ -22,6 +22,8 @@ from app.modules.admin.membership_sync import sync_principal_memberships
 from app.modules.applications.guest_settings import load_guest_settings
 from app.modules.applications.models import Applicant as ApplicantRow
 from app.modules.applications.models import Application, MagicLink
+from app.modules.audit.actions import AuditAction
+from app.modules.audit.service import record as audit_record
 from app.modules.auth import oidc, sessions, tokens
 from app.modules.auth.bootstrap import (
     ensure_admin_for_principal,
@@ -298,5 +300,17 @@ async def oidc_callback(
         expires_at=_now() + timedelta(hours=settings.session_ttl_hours),
         refresh_token=token_set.get("refresh_token"),
         id_token=token_set.get("id_token"),
+    )
+    # D3: one LOGIN entry per successful OIDC login, in the same transaction as the
+    # session. The actor is the principal. ``data`` names only the method: no IP
+    # address, no user agent, no e-mail. A magic-link redeem is not a LOGIN: it opens
+    # an applicant session for one application, not a principal account.
+    await audit_record(
+        db,
+        actor=row.sub,
+        action=AuditAction.LOGIN,
+        target_type="principal",
+        target_id=str(row.id),
+        data={"method": "oidc"},
     )
     return cookie, row

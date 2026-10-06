@@ -54,46 +54,6 @@
 
 /* A chip: globe, code, chevron. The native select keeps the keyboard and the
    platform picker; the icons sit over it and let the clicks through. */
-.pub__lang {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  flex: none;
-}
-.pub__langSelect {
-  appearance: none;
-  -webkit-appearance: none;
-  height: 32px;
-  padding: 0 32px 0 34px;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-1);
-  color: var(--color-text);
-  font: inherit;
-  font-size: 13px;
-  font-weight: var(--fw-semibold);
-  cursor: pointer;
-}
-.pub__langSelect:hover {
-  border-color: var(--color-border-strong);
-}
-.pub__langSelect:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-.pub__langIcon,
-.pub__langChevron {
-  position: absolute;
-  color: var(--color-text-muted);
-  pointer-events: none;
-}
-.pub__langIcon {
-  left: 12px;
-}
-.pub__langChevron {
-  right: 10px;
-}
-
 .pub__icon {
   display: grid;
   flex: none;

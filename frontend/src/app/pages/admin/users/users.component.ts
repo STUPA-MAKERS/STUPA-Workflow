@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -61,6 +61,7 @@ export class UsersComponent {
   private readonly i18n = inject(I18nService);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly capitalize = new CapitalizePipe();
 
   /** OIDC `sub` of the logged-in user. The view uses it to block self-deactivation. */
@@ -91,6 +92,10 @@ export class UsersComponent {
 
   /** "Mit anderem Konto zusammenführen" needs its own permission (admin only by default). */
   protected readonly canMerge = computed(() => this.auth.can('admin.users.merge'));
+  /** "Konto löschen (DSGVO)" leads to the privacy page and needs its permission (D1). */
+  protected readonly canErase = computed(() => this.auth.can('privacy.manage'));
+  /** A row has a ⋮ menu when at least one of its actions is allowed. */
+  protected readonly hasMenu = computed(() => this.canMerge() || this.canErase());
   /** The old account of the open merge dialog. Null: the dialog is closed. */
   protected readonly mergeSource = signal<AdminPrincipal | null>(null);
 
@@ -157,8 +162,14 @@ export class UsersComponent {
       .join(', ');
   }
 
+  /** The name of an account. Without a name and an e-mail: "Ohne Namen" (D7), never the `sub`. */
   protected userLabel(p: AdminPrincipal): string {
-    return p.displayName || p.email || p.sub;
+    return p.displayName || p.email || this.i18n.translate('common.unnamed');
+  }
+
+  /** The tooltip of the name: the `sub` of a nameless account, for the admin detail (D7). */
+  protected userTitle(p: AdminPrincipal): string {
+    return p.displayName || p.email ? this.userLabel(p) : p.sub;
   }
 
   /** The account of the logged-in user. The view blocks a deactivation of it. */
@@ -168,23 +179,31 @@ export class UsersComponent {
 
   /** The row menu of an account that is not merged. */
   protected menuFor(p: AdminPrincipal): RowMenuSection[] {
-    return [
-      {
-        items: [
-          {
-            id: 'merge',
-            label: this.i18n.translate('admin.users.merge.action'),
-            icon: 'users',
-            danger: true,
-            disabledReason: this.isSelf(p) ? this.i18n.translate('admin.users.merge.notSelf') : null,
-          },
-        ],
-      },
-    ];
+    const items: RowMenuItem[] = [];
+    if (this.canMerge()) {
+      items.push({
+        id: 'merge',
+        label: this.i18n.translate('admin.users.merge.action'),
+        icon: 'users',
+        danger: true,
+        disabledReason: this.isSelf(p) ? this.i18n.translate('admin.users.merge.notSelf') : null,
+      });
+    }
+    if (this.canErase()) {
+      items.push({
+        id: 'erase',
+        label: this.i18n.translate('admin.users.erase.action'),
+        icon: 'trash',
+        danger: true,
+      });
+    }
+    return [{ items }];
   }
 
   protected onMenu(item: RowMenuItem, p: AdminPrincipal): void {
     if (item.id === 'merge') this.mergeSource.set(p);
+    // The privacy page holds the one erasure path with its confirmation (D1).
+    if (item.id === 'erase') void this.router.navigate(['/admin/privacy'], { queryParams: { person: p.sub } });
   }
 
   /** The merge ran: the old account is now a reference. Reload the list. */

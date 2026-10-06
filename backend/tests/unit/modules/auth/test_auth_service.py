@@ -304,5 +304,11 @@ async def test_oidc_callback_happy(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     assert cookie  # a signed sid cookie
     assert row.sub == "s1"
-    # One principal insert plus one AuthSession insert.
-    assert len(db.added) == 2
+    # One principal insert, one AuthSession insert and one LOGIN audit entry (D3).
+    assert len(db.added) == 3
+    entry = db.added[-1]
+    assert entry.action == "login"
+    assert entry.actor == "s1"
+    assert entry.target_type == "principal"
+    # No IP address, no user agent, no e-mail: only the method.
+    assert entry.data == {"method": "oidc"}

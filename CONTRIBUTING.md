@@ -50,15 +50,15 @@ npx playwright test             # E2E against the compose stack
 - Frontend: statements **98 %**, branches **96 %**, functions **98 %**, lines **99 %** —
   `jest.config` `coverageThreshold`.
 - **100 % branch** for the critical modules (`auth`, `voting`, `flow`, `budget`,
-  `webhooks`, `audit`) — a separate gate through `scripts/coverage_critical.py`. It
-  applies as soon as the module exists.
+  `webhooks`, `audit`, `backup`) — a separate gate through `scripts/coverage_critical.py`.
+  It applies as soon as the module exists.
 
 ## CI stages (`.github/workflows/ci.yml`)
 
 The jobs start in parallel, as a flat fan-out, not one after another. The required jobs
 are `be-lint`, `be-typecheck`, `be-unit`, `be-integration`, `be-contract` (Schemathesis),
-`fe-unit`, `coverage-gate`, `image-build-smoke` (main pushes only), `typst` and
-`compose`. `e2e` (Playwright against the compose stack), `restore-smoke` and
+`fe-unit`, `coverage-gate`, `image-build-smoke` (main pushes only), `typst`, `mcp`
+(ruff and pytest of the MCP server) and `compose`. `e2e` (Playwright against the compose stack), `restore-smoke` and
 `real-stack-smoke` stay opt-in. A label, a manual run or a repo variable starts them. A
 red pull request stays blocked.
 

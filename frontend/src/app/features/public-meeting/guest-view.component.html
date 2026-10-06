@@ -92,7 +92,7 @@
     @if (tab() === 'agenda') {
       <ol class="gv__agenda">
         @for (row of rows(); track row.item.id) {
-          <li class="gv__item" [class.gv__item--now]="row.now" [class.gv__item--done]="row.done">
+          <li class="gv__item" [class.gv__item--now]="row.now" [class.gv__item--done]="row.done" [attr.aria-current]="row.now ? 'step' : null">
             <span class="gv__badge" [class.gv__badge--now]="row.now" [class.gv__badge--done]="row.done && !row.item.nonPublic">
               @if (row.item.nonPublic) {
                 <app-icon name="lock" [size]="15" />
@@ -104,7 +104,9 @@
             </span>
             <span class="gv__itemText">
               <span class="gv__itemTitle ell" [title]="row.item.title ?? ''">{{ row.item.title || ('meetings.agenda.untitled' | t) }}</span>
-              <span class="gv__itemSub ell">{{ row.sub }}</span>
+              @if (row.sub) {
+                <span class="gv__itemSub ell">{{ row.sub }}</span>
+              }
             </span>
           </li>
         }

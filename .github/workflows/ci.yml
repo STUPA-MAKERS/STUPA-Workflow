@@ -351,6 +351,27 @@ jobs:
         # checks against the pytex geometry.
         run: pytest
 
+  # The MCP server (mcp/) is a separate package with its own tests. Before D2 no job
+  # ran them, so a wrong API path in a tool reached development unseen. This job runs
+  # in the same flat fan-out as the others, and a red result blocks the pull request.
+  mcp:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: mcp/pyproject.toml
+      - run: pip install -e '.[dev]'
+      - name: Ruff lint
+        run: ruff check .
+      - name: Pytest
+        run: pytest -q
+
   compose:
     runs-on: ubuntu-latest
     steps:

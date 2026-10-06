@@ -342,3 +342,76 @@ def test_delete_refuses_a_pinned_backup(
 def test_delete_returns_404_for_an_unknown_backup(app: FastAPI, client: TestClient) -> None:
     _principal(app, "backup.manage")
     assert client.delete(f"/api/admin/backups/{MISSING_ID}").status_code == 404
+
+
+# ------------------------------------------------------------- coverage of the wiring
+
+
+class _FakePool:
+    """Stands in for the arq pool. Records the jobs the routes put in."""
+
+    def __init__(self) -> None:
+        self.jobs: list[tuple[str, tuple[object, ...]]] = []
+
+    async def enqueue_job(self, name: str, *args: object, **_kw: object) -> object:
+        self.jobs.append((name, args))
+        return object()
+
+
+def test_the_service_dependency_builds_both_storages() -> None:
+    """Without a MinIO endpoint both storages are off, and the service says so."""
+    settings = _settings(minio_endpoint=None)
+    built = get_backup_service(_FakeSession(), settings)  # type: ignore[arg-type]
+    assert built.settings is settings
+    assert built.attachments is None
+    assert built.archives is None
+
+
+def test_create_enqueues_the_build_when_a_job_queue_exists(
+    app: FastAPI, client: TestClient
+) -> None:
+    pool = _FakePool()
+    app.state.arq_pool = pool
+    _principal(app, "backup.manage")
+    assert client.post("/api/admin/backups", json={}).status_code == 202
+    assert [name for name, _ in pool.jobs] == ["create_backup"]
+
+
+def test_patch_without_fields_changes_nothing(
+    app: FastAPI, client: TestClient, service: _FakeService
+) -> None:
+    service.row = _row(status="done", storage_key="k", note="keep", pinned=True)
+    _principal(app, "backup.manage")
+    response = client.patch(f"/api/admin/backups/{BACKUP_ID}", json={})
+    assert response.status_code == 200
+    assert service.row.note == "keep"
+    assert service.row.pinned is True
+
+
+def test_export_answers_503_when_the_archive_cannot_be_read(
+    app: FastAPI, client: TestClient, service: _FakeService
+) -> None:
+    """A finished row without a stored object is a storage fault, not a missing row."""
+    service.row = _row(status="done", storage_key=None)
+    _principal(app, "backup.manage")
+    assert client.get(f"/api/admin/backups/{BACKUP_ID}/export").status_code == 503
+
+
+def test_export_sends_the_length_when_the_size_is_known(
+    app: FastAPI, client: TestClient, service: _FakeService
+) -> None:
+    service.row = _row(status="done", storage_key="k", size_bytes=6)
+    _principal(app, "backup.manage")
+    response = client.get(f"/api/admin/backups/{BACKUP_ID}/export")
+    assert response.status_code == 200
+    assert response.headers["content-length"] == "6"
+
+
+def test_restore_enqueues_the_job_with_the_actor(app: FastAPI, client: TestClient) -> None:
+    pool = _FakePool()
+    app.state.arq_pool = pool
+    _principal(app, "backup.manage")
+    response = client.post(f"/api/admin/backups/{BACKUP_ID}/restore", json={"confirm": "RESTORE"})
+    assert response.status_code == 202
+    assert response.json()["status"] == "running"
+    assert pool.jobs == [("restore_backup", (str(BACKUP_ID), "admin-sub"))]

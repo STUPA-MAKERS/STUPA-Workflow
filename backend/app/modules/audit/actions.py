@@ -13,6 +13,11 @@ from enum import StrEnum
 class AuditAction(StrEnum):
     """Stable ``audit_entry.action`` keys."""
 
+    # A successful OIDC login of a principal (D3). The actor is the principal, the
+    # target is its ``principal`` row. ``data`` holds only ``{"method": "oidc"}``:
+    # never an IP address, a user agent or an e-mail. A refused login writes nothing.
+    # A magic-link redeem is not a login: it opens an applicant session for one
+    # application and has no principal.
     LOGIN = "login"
     STATUS_CHANGE = "status_change"
     VOTE_CAST = "vote_cast"
@@ -131,11 +136,9 @@ class AuditAction(StrEnum):
     GUEST_REMOVED = "guest_removed"
     GUEST_RENAMED = "guest_renamed"
     GUEST_ADMIT_ALL = "guest_admit_all"
-    # GDPR/PII: access (Art. 15), erasure/anonymization (Art. 17), retention
+    # GDPR/PII: export (Art. 15), erasure/anonymization (Art. 17), retention
     # (Art. 5(1)(e)) plus the erasure-request queue. ``data`` carries only
     # id/email references and metadata, never raw PII values.
-    PII_ACCESS = "pii_access"
-    PII_DELETION = "pii_deletion"
     PII_EXPORT = "pii_export"
     ANONYMIZATION = "anonymization"
     ERASURE_REQUESTED = "erasure_requested"
