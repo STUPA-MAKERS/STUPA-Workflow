@@ -229,6 +229,13 @@ describe('toFormlyFields', () => {
     expect(cfg.props?.['required']).toBeUndefined();
   });
 
+  it('shows the note of a table field in the page language', () => {
+    const fields: FormFieldDef[] = [{ key: 'tbl', type: 'table', label: { de: 'Tabelle', en: 'Table' } }];
+    expect(toFormlyFields(fields, 'en')[0].props?.['text']).toContain('table input');
+    // An unknown language falls back to the German reference text.
+    expect(toFormlyFields(fields, 'fr')[0].props?.['text']).toContain('Tabellen-Eingabe');
+  });
+
   it('maps a file field to a text input', () => {
     const fields: FormFieldDef[] = [{ key: 'doc', type: 'file', label: { de: 'Datei' } }];
     const [cfg] = toFormlyFields(fields, 'de');

@@ -17,6 +17,7 @@ type Cmp = AuditLogComponent & {
   setAction(v: string): void;
   setActor(v: string): void;
   setSince(v: string): void;
+  setRange(v: { from: string; to: string }): void;
   setUntil(v: string): void;
   resetFilters(): void;
   loadMore(): void;
@@ -792,16 +793,20 @@ describe('AuditLogComponent', () => {
     expect(screen.queryByRole('button', { name: 'Zurücksetzen' })).toBeNull();
   });
 
-  it('filters by day through the date chips', async () => {
+  it('filters by a period through the shared range chip', async () => {
     const { listAuditLog, fixture } = await setup();
-    const input = fixture.nativeElement.querySelectorAll('app-date-chip input[type=date]')[0] as HTMLInputElement;
-    input.value = '2026-06-01';
-    input.dispatchEvent(new Event('change'));
+    // One "Zeitraum" chip like the finance pages, no native date inputs.
+    expect(fixture.nativeElement.querySelector('input[type=date]')).toBeNull();
+    expect(screen.getByRole('button', { name: /Zeitraum/ })).toBeInTheDocument();
+    const cmp = fixture.componentInstance as Cmp;
+    cmp.setRange({ from: '2026-06-01', to: '2026-06-30' });
     fixture.detectChanges();
     expect(listAuditLog).toHaveBeenLastCalledWith(
-      expect.objectContaining({ since: localDayBound('2026-06-01', false) }),
+      expect.objectContaining({
+        since: localDayBound('2026-06-01', false),
+        until: localDayBound('2026-06-30', true),
+      }),
     );
-    expect(screen.getByRole('button', { name: 'Von: 01.06.2026' })).toBeInTheDocument();
   });
 
   it('observes the sentinel and loads more when it intersects', async () => {

@@ -18,6 +18,8 @@ import {
   FilterSelectComponent,
   type FilterSelectOption,
   PageHeaderComponent,
+  RangeChipComponent,
+  type RangeValue,
   SkeletonComponent,
 } from '@shared/ui';
 import {
@@ -34,7 +36,6 @@ import type {
   AuditVerification,
   ConfigRevisionDiff,
 } from '../admin.models';
-import { DateChipComponent } from './date-chip.component';
 
 const PAGE_SIZE = 50;
 
@@ -253,7 +254,7 @@ type VerifyState =
     FilterSelectComponent,
     PageHeaderComponent,
     SkeletonComponent,
-    DateChipComponent,
+    RangeChipComponent,
   ],
   templateUrl: './audit-log.component.html',
   styleUrl: './audit-log.component.scss',
@@ -417,6 +418,12 @@ export class AuditLogComponent {
   }
   protected setUntil(v: string): void {
     this.until.set(v);
+    this.reload();
+  }
+  /** The period chip: both days at once, like the date ranges of the finance pages. */
+  protected setRange(v: RangeValue): void {
+    this.since.set(v.from);
+    this.until.set(v.to);
     this.reload();
   }
   protected resetFilters(): void {

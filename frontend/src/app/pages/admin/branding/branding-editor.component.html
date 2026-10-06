@@ -26,7 +26,7 @@
       </p>
       <span class="br__lang">
         <span class="br__langLabel" id="br-lang">{{ 'admin.brand.textLang' | t }}</span>
-        <app-segmented [options]="langOptions" [value]="lang()" (valueChange)="setLang($event)" [ariaLabel]="'admin.brand.textLang' | t" />
+        <app-segmented width="equal" [options]="langOptions" [value]="lang()" (valueChange)="setLang($event)" [ariaLabel]="'admin.brand.textLang' | t" />
       </span>
     </div>
 

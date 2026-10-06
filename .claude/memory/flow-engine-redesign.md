@@ -43,6 +43,11 @@ ACTION_TYPES = `{webhook, notify, addToNextSession, assignBudget}`. Dropped expo
 - **assignBudget**: `{budgetId}`. The action sets application.budget_id to the cost center. It derives fiscal_year from the single active fiscal year of the top-level node. If there is no single active fiscal year, it leaves the field open.
 
 ## Permissions — reworked to 16 keys (shared/permissions.py)
+> Superseded: the catalog changed after this note. `application.create`, `vote.cast`, `vote.manage` and
+> `meeting.manage` are no global keys any more. Meeting, protocol and vote rights are Gremium
+> permissions (`GREMIUM_PERMISSIONS` in `admin/gremium_roles.py`). The current list is
+> `PERMISSION_CATALOGUE` in `backend/app/shared/permissions.py`.
+
 The keys: application.read, application.create, application.transition, application.manage, form.configure, flow.configure, vote.cast, vote.manage, meeting.manage, budget.view, budget.manage, notification.manage, webhook.manage, audit.read, admin.config, admin.roles.
 `application.transition` gates manual firing. The flow router uses it, and it replaced application.manage there. DROPPED: application.update(→manage), protocol.manage + protocol.write(→meeting.manage). The protocol router now gates on meeting.manage. Migration 0039 carries over grants (manage→transition, protocol.write→meeting.manage) + deletes the dropped keys.
 

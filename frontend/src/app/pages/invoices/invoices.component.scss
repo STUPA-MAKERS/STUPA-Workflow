@@ -112,27 +112,43 @@
   flex-direction: column;
   min-width: 0;
 }
-.inv__dot {
-  margin-inline: 6px;
-  color: var(--color-text-subtle);
-}
-/* The sub line is a flex row: only the invoice number shortens, with an ellipsis. The
-   status and the date (the due date of an open invoice) keep their width, so a long
-   number never pushes the date out of the row. */
+/* The sub line: status, invoice number, date, with a dot between two of them, also
+   after a wrap (DECISIONS: never a dot at a line start). The invoice number is a
+   reference: it is never cut with an ellipsis. A long number wraps to the next line, and
+   only a number longer than the whole line breaks inside.
+
+   Every part draws its dot before it, in a box of `--inv-sep`. The parts start
+   `--inv-sep` before the clip box, so the dot of the first part on each line falls
+   outside it. `overflow-x: clip` leaves the line height alone. */
 .inv__sub {
+  --inv-sep: 16px;
+  display: block;
+  min-width: 0;
+  overflow-x: clip;
+}
+.inv__parts {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin-inline-start: calc(-1 * var(--inv-sep));
   min-width: 0;
 }
-.inv__sub > * {
-  flex: none;
-}
-.inv__sub > .inv__no {
-  flex: 0 1 auto;
+.inv__part {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+.inv__part::before {
+  display: inline-block;
+  width: var(--inv-sep);
+  color: var(--color-text-subtle);
+  font-family: var(--font-sans);
+  text-align: center;
+  content: '·';
+  content: '·' / '';
+}
+.inv__no {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .inv__trail {
   display: flex;
@@ -343,9 +359,6 @@
   .inv__row {
     --li-pad-x: var(--space-3);
     --li-gap: var(--space-2);
-  }
-  .inv__dot {
-    margin-inline: var(--space-1);
   }
   /* Four segments with counts in a phone column: less padding, and a segment never gets
      narrower than its label and count, so no label gets an ellipsis. */

@@ -147,6 +147,34 @@ These rules are binding for every page.
   native `.field__control`) uses the same look; the kit mixins are in `_field.scss`
   (`@use 'field' as f;`).
 - **Long names get an ellipsis and a `title`** with the full text (`.ell`).
+- **Never truncate a copyable value.** A URL, an IBAN, an e-mail address or a reference wraps
+  (`overflow-wrap: anywhere`) and stays selectable. A URL is a real `<a target="_blank"
+  rel="noopener">`. An amount or a tag at the end of the row stays aligned on the right.
+- **One list/detail geometry.** Every 2-column page uses `app-list-detail` with the shared
+  list width `--ld-list-width` and `app-page-header`. No page overrides them. A sheet header
+  is `app-sheet-bar` (breadcrumb or context as the kicker).
+- **Pane pages do not scroll.** A page without a page scroll uses the global `.pane-page`
+  class (`styles.scss`). Each pane scrolls inside itself with the shared fade
+  (`appScrollFade`). The header controls and the search bar (`app-sticky-bar`) stay fixed.
+- **Filter chips use `app-filter-select`.** A chip never opens a native `<select>`. On a
+  desktop the menu is a popover, on a phone a bottom sheet.
+- **Phone (< 768 px): bottom sheets.** Pickers, filters and secondary panes open as a bottom
+  sheet (the kit `app-dialog` and `app-side-sheet` do this), not as a centered dialog. A page
+  header holds the title and at most one primary action. Other actions go into one ⋮ menu.
+- **The whole control is the hit area.** A chip, a button with an icon or a row menu reacts to
+  a click on all of its visible area.
+- **Empty states.** A list without data shows `app-empty-state`. A chart without data shows a
+  neutral grey skeleton shape, never a red "Keine Daten".
+- **Nested surfaces step up.** A table or a card on a pane or a sheet uses the next higher
+  surface (`--table-bg`). Fixed chrome (phone bottom bar, sticky headers, sheets) uses its own
+  elevated surface in both themes.
+- **Balanced bars.** Bars and headers have symmetric padding and centre their items on one
+  axis.
+- **Search fields search while you type** (`shared/live-search.ts`, 250 ms). There is no "Suchen"
+  button. Escape or × clears the field.
+- **Separators (·) only between two visible items.** A wrapped line never starts with one.
+- **Footer only on public pages.** The site footer shows on the start page and on the public
+  pages (route data `footer: true`). Other signed-in pages have no footer.
 - **Avatars only for persons.** Do not put an initials circle on a row of a thing (an
   application, a meeting).
 

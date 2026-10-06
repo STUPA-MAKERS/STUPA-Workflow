@@ -38,7 +38,7 @@ description: Hierarchical cost center budget tree with fiscal years, top-down al
 - `POST /api/applications/{id}/assign-budget`, `POST /api/applications/{id}/move-fiscal-year` — `application.manage`.
 
 **Conventions & gotchas:**
-- CRITICAL module — `budget` requires 100% branch coverage. Keep every decision in `tree_rules.py` (pure) and keep `tree_service.py` as thin DB wiring. Test the rules in isolation.
+- CRITICAL module — `budget` requires 100% branch coverage. Keep every decision in `tree_rules.py` (pure) and keep the `tree/` ops classes (`tree/service.py`) as thin DB wiring. Test the rules in isolation.
 - EUR only everywhere: DB CHECKs plus `_MAX_AMOUNT = 9999999999.99` `le` guards on input and on invoice import. A too-large amount must return 422, never a numeric-overflow 500.
 - The fiscal start day is capped at 1–28 (schema + `is_valid_fiscal_start`) so the start date exists in every month. Otherwise `fiscal_year_bounds` raises `ValueError`, which becomes a 422.
 - Allocation invariants raise 422 (`children_allocation_exceeds_parent`, `parent_allocation_below_children`). A fiscal year overlap gives 422. A delete with children or allocations gives 409. All errors use RFC-9457 problem+json.

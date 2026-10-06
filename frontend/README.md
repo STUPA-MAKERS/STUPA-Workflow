@@ -7,9 +7,13 @@ and the WebSocket service. `shared/` holds the UI kit and the Formly binding.
 
 These parts are built. The public **apply wizard** runs in several steps with ALTCHA and draft
 persistence. It comes with the **status timeline** and the **confirmation** page. The
-**dashboard** adapts to the role of the user. Full screens exist for **applications**,
-**voting**, **meetings** (with live vote and beamer) and **budget, expenses and invoices**. The
-**admin configuration** covers forms, flow, Gremien, roles, branding, mail templates and more.
+**start page** shows one work list (open tasks, own applications, votes) and a side sheet for
+today. List/detail pane pages exist for **applications**, **tasks**, **votes**, **meetings**
+(list or calendar, with live vote, beamer and the Kalender-Abo popover), **bookings** and
+**invoices**. The **budget** page shows the cost-centre tree. The **account** area and the **admin
+configuration** (forms, flow, Gremien, roles, branding, mail templates and more) share one
+2-pane frame. Guests of a
+public meeting join through `/j/:code`.
 Feature routes load lazily and a permission gate protects them.
 
 ## Commands
@@ -21,7 +25,7 @@ Feature routes load lazily and a permission gate protects them.
 | `npm test` | Jest (jsdom and Angular Testing Library) |
 | `npm run test:cov` | Jest with the coverage gate (statements 98 %, branches 96 %, functions 98 %, lines 99 %) |
 | `npm run lint` | ESLint (flat config, `@angular-eslint`) |
-| `npm run typecheck` | `tsc --strict --noEmit` |
+| `npm run typecheck` | `tsc -p tsconfig.app.json --noEmit` (strict) |
 
 > Node 22 or newer. `npm install` fetches Angular 20 and the toolchain. You do not need `sudo`.
 
@@ -43,10 +47,11 @@ src/
       formly/        Formly binding to the UI kit (field type `input`)
     layout/          ShellComponent (frame), nav rail, phone bottom bar, account menu,
                      public top bar, branded footer, rail marks
-    pages/           Home, Dashboard, Applications, Voting, Budget/Expenses/Invoices,
-                     Tasks, Account, Admin (Forms/Flow/Gremien/Roles/…), 404
+    pages/           Home, Dashboard, Applications, Budget/Expenses/Invoices, Tasks,
+                     Account, Admin (Forms/Flow/Gremien/Roles/…), 403, 404, error page
     features/        apply/ (Wizard, Confirmation, Timeline, Altcha), meetings/,
-                     voting/ (live vote, beamer)
+                     voting/ (live vote, beamer), public-meeting/ (guest join `/j/:code`),
+                     search/ (search palette)
     app.config.ts    Composition root (providers, interceptor chain, init)
     app.routes.ts    Routing (feature routes lazy, permission-gated)
 vendor/ui-kit/       Submodule STUPA-MAKERS/ui-kit: tokens, fonts, breakpoints, components
@@ -86,7 +91,7 @@ locale. Configurable database texts
 
 ## API client and mock
 
-`core/api/ApiClient` follows the types of the OpenAPI contracts (`sds/api.md`).
+`core/api/ApiClient` follows the types of the backend Pydantic schemas (camelCase wire keys).
 `mockApiInterceptor` returns in-memory answers. The default is **`USE_MOCK_API=false`** (#67).
 The SPA talks to the **real** backend under `/api`. The `web` nginx routes `/api` to `api`. In
 development, `proxy.conf.json` (`ng serve`) forwards `/api` and the WebSocket. The mock is now

@@ -119,18 +119,19 @@
                     [selected]="i.id === selectedId()"
                   >
                     <span sub class="inv__sub">
-                      <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
-                      @if (i.number) {
-                        <span class="inv__dot" aria-hidden="true">·</span>
-                        <span class="mono inv__no" [title]="i.number">{{ i.number }}</span>
-                      }
-                      @if (i.status === 'open' && i.dueDate) {
-                        <span class="inv__dot" aria-hidden="true">·</span>
-                        <span class="mono">{{ 'invoices.dueShort' | t: { date: day(i.dueDate) } }}</span>
-                      } @else if (i.issueDate) {
-                        <span class="inv__dot" aria-hidden="true">·</span>
-                        <span class="mono">{{ day(i.issueDate) }}</span>
-                      }
+                      <span class="inv__parts">
+                        <span class="inv__part">
+                          <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+                        </span>
+                        @if (i.number) {
+                          <span class="inv__part mono inv__no">{{ i.number }}</span>
+                        }
+                        @if (i.status === 'open' && i.dueDate) {
+                          <span class="inv__part mono">{{ 'invoices.dueShort' | t: { date: day(i.dueDate) } }}</span>
+                        } @else if (i.issueDate) {
+                          <span class="inv__part mono">{{ day(i.issueDate) }}</span>
+                        }
+                      </span>
                     </span>
                     <span trail class="inv__trail">
                       <span class="mono inv__amount">{{ money(i.grossAmount) }}</span>

@@ -382,7 +382,7 @@
           [attr.aria-label]="'applications.comments.add' | t"
         ></textarea>
         @if (canManage()) {
-          <app-segmented
+          <app-segmented width="equal"
             class="ad__composerVis"
             [ariaLabel]="'applications.comments.visibility' | t"
             [options]="visibilityOptions()"

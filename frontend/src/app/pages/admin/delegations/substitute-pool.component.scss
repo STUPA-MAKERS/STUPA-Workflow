@@ -1,3 +1,5 @@
+@use '../../../features/meetings/scroll-fade' as fade;
+
 :host {
   display: block;
   min-width: 0;
@@ -185,4 +187,9 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--space-3);
+}
+
+/* The shared top and bottom fade: an end fades only while more content lies past it. */
+.sp__hits {
+  @include fade.fade-y(var(--space-5));
 }

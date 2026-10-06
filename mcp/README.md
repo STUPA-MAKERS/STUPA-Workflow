@@ -80,7 +80,20 @@ Budget: `list_budgets`, `get_budget_applications`, `book_expense`, `list_expense
 Invoices: `list_invoices`, `get_invoice`, `create_invoice`, `update_invoice`,
 `delete_invoice`, `parse_invoice` (ZUGFeRD/Factur-X PDF → fields + fileToken),
 `upload_invoice_file`.
-Meetings: `list_meetings`, `get_meeting`.
+Meetings: `list_meetings`, `get_meeting`, `create_meeting`, `update_meeting`, `delete_meeting`,
+the agenda tools, attendance (`get_attendance`, `set_attendance`, `reset_attendance`) and the
+minute-taker handover (`protokollant_handover`, `cancel_protokollant_handover`).
+Public meeting (#17): `list_meeting_guests`, `admit_meeting_guest`, `admit_all_meeting_guests`,
+`reject_meeting_guest`, `remove_meeting_guest`, `rename_meeting_guest`,
+`get_meeting_join_link`, `rotate_meeting_join_code`. No tool casts a ballot for a guest.
+On behalf (#11): `create_application_on_behalf`, `search_on_behalf_applicants` (needs
+`application.create_on_behalf`).
+Audit: `list_audit`, `verify_audit_chain` (live), `get_latest_audit_verification` (stored).
+
+The list above is not complete. The server has about 160 tools in the modules of
+`antragsplattform_mcp/tools/`, also for flow and form editing, protocols, delegations,
+budget structure and the admin pages. `.claude/skills/mcp/SKILL.md` maps each tool group to
+its backend route.
 
 ## Token cache
 

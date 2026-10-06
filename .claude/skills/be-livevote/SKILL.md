@@ -1,6 +1,6 @@
 ---
 name: be-livevote
-description: Meetings — planned→live→closed lifecycle, agenda items, attendance roster, and live voting over WebSocket. The WebSocket layer has a voter channel plus a read-only beamer stream, and the meeting start creates the protocol. Use when working on meetings, agenda items, attendance, live-vote casting/tally, the meeting:{id} pub/sub channel, or MeetingService in backend/app/modules/livevote.
+description: Meetings — planned→live→closed lifecycle, agenda items, attendance roster, and live voting over WebSocket. The WebSocket layer has a voter channel plus a read-only beamer stream, and the meeting start creates the protocol. Also the minute-taker handover (keeper periods) and the public meeting with a QR code (#17: join code, guest requests, admitted guests, guests_mode). Use when working on meetings, agenda items, attendance, protokollant handover, public participation/guests, live-vote casting/tally, the meeting:{id} pub/sub channel, or MeetingService in backend/app/modules/livevote.
 ---
 
 # Live-Vote / Meetings — `backend/app/modules/livevote`

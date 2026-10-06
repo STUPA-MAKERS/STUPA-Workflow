@@ -16,7 +16,7 @@
       @if (loading()) {
         <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
       } @else if (choices().length) {
-        <div class="agd__list" role="radiogroup" aria-labelledby="agd-meetings">
+        <div class="agd__list" appScrollFade="y" role="radiogroup" aria-labelledby="agd-meetings">
           @for (c of choices(); track c.meeting.id) {
             <label class="agd__row" [class.agd__row--on]="pick() === c.meeting.id">
               <input

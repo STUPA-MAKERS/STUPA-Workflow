@@ -25,6 +25,7 @@ import {
   SwitchComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 
 /** A meeting row of the dialog. */
 interface MeetingChoice {
@@ -64,6 +65,7 @@ function localToday(): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ScrollFadeDirective,
     FormsModule,
     TranslatePipe,
     DateBlockComponent,

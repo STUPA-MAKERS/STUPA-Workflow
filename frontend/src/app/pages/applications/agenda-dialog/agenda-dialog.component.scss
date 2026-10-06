@@ -1,3 +1,5 @@
+@use '../../../features/meetings/scroll-fade' as fade;
+
 /* The host adds no box; a closed dialog takes no gap in a flex column of the page. */
 :host {
   display: contents;
@@ -156,4 +158,9 @@
 .agd__noteInput::placeholder {
   color: var(--color-text-subtle);
   opacity: 1;
+}
+
+/* The shared top and bottom fade: an end fades only while more content lies past it. */
+.agd__list {
+  @include fade.fade-y(var(--space-5));
 }

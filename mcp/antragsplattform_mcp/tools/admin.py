@@ -406,7 +406,7 @@ async def delete_deadline_policy(policy_id: str) -> dict:
 @group.tool
 async def get_notification_settings() -> dict:
     """Get the platform notification settings, such as the task reminder cadence. Admin."""
-    return await api().get("/admin/notifications")
+    return await api().get("/admin/notification-settings")
 
 
 @group.tool
@@ -416,7 +416,7 @@ async def update_notification_settings(patch: S.NotificationSettingsUpdate) -> d
     The fields are `taskReminderEnabled`, `taskReminderAfterDays` and
     `taskReminderRepeatDays`. Admin.
     """
-    return await api().put("/admin/notifications", json=dump_patch(patch))
+    return await api().put("/admin/notification-settings", json=dump_patch(patch))
 
 
 @group.tool

@@ -28,6 +28,7 @@ import {
   type SegmentedOption,
 } from '@stupa-makers/ui-kit';
 import { errorDetail, resolveI18n } from '../meetings-display.util';
+import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 
 /** What the new agenda item is: an application of the Gremium, or a free text. */
 export type AgendaItemKind = 'application' | 'freetext';
@@ -45,6 +46,7 @@ export type AgendaItemKind = 'application' | 'freetext';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ScrollFadeDirective,
     FormsModule,
     TranslatePipe,
     DialogComponent,

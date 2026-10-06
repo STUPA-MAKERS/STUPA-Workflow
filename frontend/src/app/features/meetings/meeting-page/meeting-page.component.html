@@ -80,7 +80,7 @@
 
 <div class="mp__body" appScrollFade="y" [class.mp__body--wide]="wide()" [class.mp__body--votes]="showVotes()">
   @if (wide()) {
-    <section class="mp__agenda" [attr.aria-label]="'meetings.agenda.title' | t">
+    <section class="mp__agenda" appScrollFade="y" [attr.aria-label]="'meetings.agenda.title' | t">
       <ng-container [ngTemplateOutlet]="agendaTpl" />
     </section>
   } @else {
@@ -103,7 +103,7 @@
   }
 
   @if (showVotes()) {
-    <aside class="mp__votes" [attr.aria-label]="'meetings.vote.count' | t">
+    <aside class="mp__votes" appScrollFade="y" [attr.aria-label]="'meetings.vote.count' | t">
       @for (vote of votes(); track vote.id) {
         <app-vote-card
           [vote]="vote"
@@ -136,7 +136,7 @@
 
   <div class="mp__main">
     @if (preparing()) {
-      <div class="mp__prep">
+      <div class="mp__prep" appScrollFade="y">
         <app-prep-checklist
           [meeting]="m"
           [agenda]="agenda()"

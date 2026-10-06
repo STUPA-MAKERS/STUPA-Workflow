@@ -220,7 +220,7 @@ class GremiumRoleOut(_CamelModel):
     # frontend hides the delete action for them.
     forced: bool = False
     # Granular meeting permissions of this role: session.manage, vote.manage,
-    # vote.cast and protocol.write.
+    # vote.cast, protocol.write and protocol.finalize.
     permissions: list[str] = Field(default_factory=list)
 
 
