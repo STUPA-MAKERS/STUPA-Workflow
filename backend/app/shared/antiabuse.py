@@ -292,6 +292,28 @@ async def rate_limit_attachments(
     )
 
 
+async def rate_limit_applicant_search(
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+) -> None:
+    """``GET /applications/on-behalf/applicants``: a limit per principal per hour (#11).
+
+    The search discloses the names and e-mails of the accounts, so the limit also
+    applies to an OAuth token: an agent must not walk the whole directory. Without a
+    principal the route answers 401 anyway.
+    """
+    if principal is None:
+        return
+    await _enforce(
+        limiter,
+        f"applicant-search:principal:{principal.sub}",
+        limit=settings.rl_applicant_search_per_hour,
+        window=_HOUR,
+        detail="Too many account searches. Try again later.",
+    )
+
+
 def require_altcha(field: str = "altcha") -> Callable[..., Awaitable[None]]:
     """Dependency factory: verify the ALTCHA solution field from the JSON body.
 

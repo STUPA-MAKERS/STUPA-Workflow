@@ -56,6 +56,16 @@ export const APPLICANT_SEARCH_DELAY_MS = 250;
 /** The shortest search text; the server answers nothing for a shorter one. */
 const APPLICANT_SEARCH_MIN = 2;
 
+/** The oldest received date, in days before today; the server checks it again. */
+export const RECEIVED_MAX_AGE_DAYS = 365;
+
+/** The refusal codes of the capture route, as texts of this form. */
+const ERROR_TEXTS: Record<string, TranslationKey> = {
+  applicant_unavailable: 'applications.capture.error.applicantUnavailable',
+  received_on_in_future: 'applications.capture.receivedFuture',
+  received_on_too_old: 'applications.capture.receivedTooOld',
+};
+
 /** A plain e-mail check; the server validates the address again. */
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -130,14 +140,23 @@ export class ApplicationCaptureComponent {
   readonly picked = signal<ApplicantCandidate | null>(null);
   readonly guestName = signal('');
   readonly guestEmail = signal('');
+  /**
+   * The account that a typed guest e-mail belongs to. The form then switched to that
+   * account and says so ("Zu dieser E-Mail gibt es ein Konto: <Name>").
+   */
+  readonly emailMatch = signal<ApplicantCandidate | null>(null);
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private searchSeq = 0;
+  private emailTimer: ReturnType<typeof setTimeout> | null = null;
+  private emailSeq = 0;
 
   // --- application ---------------------------------------------------------------
   readonly typeId = signal('');
   readonly effForm = signal<EffectiveForm | null>(null);
   readonly loadingForm = signal(false);
   readonly today = localToday();
+  /** The oldest allowed received date. */
+  readonly minReceived = localToday(daysAgo(RECEIVED_MAX_AGE_DAYS));
   readonly receivedOn = signal(this.today);
   readonly intake = signal('');
   readonly saving = signal(false);
@@ -182,6 +201,18 @@ export class ApplicationCaptureComponent {
   });
 
   protected readonly futureDate = computed(() => this.receivedOn() > this.today);
+  protected readonly tooOld = computed(() => {
+    const d = this.receivedOn();
+    return d !== '' && d < this.minReceived;
+  });
+  /** The error text of the received date, or null. */
+  protected readonly receivedError = computed<TranslationKey | null>(() =>
+    this.futureDate()
+      ? 'applications.capture.receivedFuture'
+      : this.tooOld()
+        ? 'applications.capture.receivedTooOld'
+        : null,
+  );
 
   private readonly applicantReady = computed(() =>
     this.mode() === 'account'
@@ -195,7 +226,7 @@ export class ApplicationCaptureComponent {
       this.applicantReady() &&
       this.effForm() !== null &&
       this.receivedOn() !== '' &&
-      !this.futureDate() &&
+      this.receivedError() === null &&
       this.form.valid &&
       !this.drafts.busy() &&
       !this.drafts.hasFailed()
@@ -218,6 +249,7 @@ export class ApplicationCaptureComponent {
   constructor() {
     this.destroyRef.onDestroy(() => {
       if (this.searchTimer) clearTimeout(this.searchTimer);
+      if (this.emailTimer) clearTimeout(this.emailTimer);
     });
   }
 
@@ -225,6 +257,7 @@ export class ApplicationCaptureComponent {
 
   setMode(value: string): void {
     this.mode.set(value === 'guest' ? 'guest' : 'account');
+    this.emailMatch.set(null);
   }
 
   /** The search field: it searches by itself after a short pause. */
@@ -266,7 +299,35 @@ export class ApplicationCaptureComponent {
 
   clearPick(): void {
     this.picked.set(null);
+    this.emailMatch.set(null);
     this.query.set('');
+  }
+
+  /**
+   * The e-mail of a new person. When it belongs to an active account (compared without
+   * case), the form switches to that account (user decision 2026-10-06; the server
+   * does the same).
+   */
+  onGuestEmail(value: string): void {
+    this.guestEmail.set(value);
+    if (this.emailTimer) clearTimeout(this.emailTimer);
+    const email = value.trim();
+    const seq = ++this.emailSeq;
+    if (!EMAIL.test(email)) return;
+    this.emailTimer = setTimeout(() => {
+      this.api.searchOnBehalfApplicants(email).subscribe({
+        next: (hits) => {
+          if (seq !== this.emailSeq || this.mode() !== 'guest') return;
+          const match = hits.find((h) => h.email?.toLowerCase() === email.toLowerCase());
+          if (!match) return;
+          this.pick(match);
+          this.emailMatch.set(match);
+          this.mode.set('account');
+        },
+        // A failed lookup leaves the new person; the server matches again.
+        error: () => undefined,
+      });
+    }, APPLICANT_SEARCH_DELAY_MS);
   }
 
   /** "Neue Person": the search text moves into the name or the e-mail field. */
@@ -375,8 +436,17 @@ export class ApplicationCaptureComponent {
     });
   }
 
-  /** A 422 goes onto the fields it names; any other error is a toast. */
+  /**
+   * A known refusal code gets its own text; a 422 with field errors goes onto the
+   * fields; any other error is a toast with a generic text. The server `detail` is
+   * English and technical, so the form never shows it.
+   */
   private onError(status: number | undefined, problem: ProblemDetail | null): void {
+    const known = problem?.code ? ERROR_TEXTS[problem.code] : undefined;
+    if (known) {
+      this.toast.error(this.i18n.translate(known));
+      return;
+    }
     if (status === 422) {
       this.drafts.markFailed(problem);
       const t = (key: TranslationKey) => this.i18n.translate(key);
@@ -386,13 +456,20 @@ export class ApplicationCaptureComponent {
         return;
       }
     }
-    this.toast.error(problem?.detail ?? this.i18n.translate('applications.capture.error'));
+    this.toast.error(this.i18n.translate('applications.capture.error'));
   }
 }
 
 /** "Name · e-mail", or the one that exists. */
 export function candidateLabel(c: ApplicantCandidate): string {
   return [c.displayName, c.email].filter(Boolean).join(' · ');
+}
+
+/** The date `days` before today, as a local `Date`. */
+function daysAgo(days: number, now: Date = new Date()): Date {
+  const d = new Date(now);
+  d.setDate(d.getDate() - days);
+  return d;
 }
 
 /** Today in the local timezone as `YYYY-MM-DD`. */

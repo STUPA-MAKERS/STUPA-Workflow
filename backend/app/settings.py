@@ -325,6 +325,10 @@ class Settings(BaseSettings):
     # GET /principals/{id}/avatar: requests per hour per logged-in principal. A page
     # with a long member list asks for one avatar per row, so the limit stays generous.
     rl_avatar_per_hour: int = 1200
+    # GET /applications/on-behalf/applicants: searches per hour per principal (#11). The
+    # search discloses names and e-mails of accounts; the dialog searches while the user
+    # types (debounced), so the limit stays generous for a person and stops a scraper.
+    rl_applicant_search_per_hour: int = 300
 
     # Gravatar proxy (GET /principals/{id}/avatar). The API fetches the image from the
     # fixed host gravatar.com and keeps the result in Redis. A found image and a missing

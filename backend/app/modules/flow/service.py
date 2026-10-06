@@ -52,6 +52,7 @@ from app.modules.deadlines.service import (
     DeadlineService,
     flow_deadline_passed,
     resolve_due_at,
+    submission_anchor,
 )
 from app.modules.flow import context as flow_context
 from app.modules.flow.dispatch import (
@@ -63,6 +64,7 @@ from app.modules.flow.dispatch import (
 )
 from app.modules.flow.models import State, Transition
 from app.modules.flow.schemas import TransitionOut, TransitionResult
+from app.settings import get_settings
 from app.shared.errors import (
     ConflictError,
     ForbiddenError,
@@ -262,7 +264,8 @@ class FlowService:
         """Materialize the named deadline policy of a state that the application enters.
 
         A `deadlinePolicyKey` in `state.config` selects the policy. The service resolves
-        it: `absolute` gives a fixed date, `relative_submitted` gives `created_at + X`,
+        it: `absolute` gives a fixed date, `relative_submitted` gives `created_at + X`
+        (`received_on` + X for a captured application, see `submission_anchor`),
         and `relative_changed` gives `updated_at + X`. It then creates a `Deadline` whose
         `action_on_pass` points at the `deadlinePassed` transition of this state. The
         cron fires that transition on expiry. Without such a transition the deadline is a
@@ -314,7 +317,9 @@ class FlowService:
             due_at = resolve_due_at(
                 policy,
                 now=datetime.now(UTC),
-                submitted_at=app.created_at,
+                submitted_at=submission_anchor(
+                    app.created_at, app.received_on, get_settings().local_timezone
+                ),
                 changed_at=app.updated_at,
             )
         if due_at is None:

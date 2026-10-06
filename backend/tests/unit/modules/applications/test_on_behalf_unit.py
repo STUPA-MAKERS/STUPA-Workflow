@@ -41,8 +41,9 @@ _PERM = "application.create_on_behalf"
 
 
 class _FakeApp:
-    def __init__(self) -> None:
+    def __init__(self, created_by: str | None = None) -> None:
         self.id = uuid4()
+        self.created_by = created_by
 
 
 class _FakeService:
@@ -54,7 +55,8 @@ class _FakeService:
     async def create_on_behalf(self, payload: OnBehalfCreate, **kwargs: Any) -> tuple[Any, str]:
         self.payload = payload
         self.kwargs = kwargs
-        return _FakeApp(), "applicant@example.org"
+        owner = "owner-sub" if payload.applicant_principal_id else None
+        return _FakeApp(owner), "applicant@example.org"
 
     async def search_applicants(self, query: str) -> list[ApplicantCandidateOut]:
         self.query = query
@@ -134,6 +136,7 @@ def test_route_needs_the_permission(api: FastAPI, service: _FakeService) -> None
     assert client.get("/api/applications/on-behalf/applicants?q=an").status_code == 403
     api.dependency_overrides[get_current_principal] = lambda: None
     assert client.post("/api/applications/on-behalf", json=_guest()).status_code == 401
+    assert client.get("/api/applications/on-behalf/applicants?q=an").status_code == 401
     assert service.payload is None
 
 
@@ -199,6 +202,9 @@ class _Scalars:
     def all(self) -> list[Any]:
         return self._rows
 
+    def first(self) -> Any:
+        return self._rows[0] if self._rows else None
+
 
 class _Session:
     def __init__(self, *, get: Any = None, rows: list[Any] | None = None) -> None:
@@ -242,6 +248,25 @@ async def test_guest_capture_hands_off_to_the_normal_create() -> None:
         received_on=date(2026, 10, 5),
         intake=None,
     )
+
+
+async def test_guest_email_of_an_account_takes_the_account() -> None:
+    pid = uuid4()
+    row = _Row(id=pid, sub="mia-sub", email="Mia@Example.org", display_name="Mia")
+    svc = _Recorder(_Session(rows=[row]))  # type: ignore[arg-type]
+    await svc.create_on_behalf(_payload(), actor="clerk", today=date(2026, 10, 5))
+    payload, kwargs = svc.created
+    # `EmailStr` folds the domain, so the stored address ends in lower case.
+    assert payload.applicant_email == "Mia@example.org"
+    assert payload.applicant_name == "Mia"
+    assert kwargs["capture"].owner_sub == "mia-sub"
+    assert kwargs["capture"].applicant_principal_id == pid
+    assert kwargs["capture"].matched_by_email is True
+    # A matching row without an e-mail (defensive) leaves the guest a guest.
+    empty = _Row(id=pid, sub="x", email=None, display_name="X")
+    svc = _Recorder(_Session(rows=[empty]))  # type: ignore[arg-type]
+    await svc.create_on_behalf(_payload(), actor="clerk", today=date(2026, 10, 5))
+    assert svc.created[1]["capture"].owner_sub is None
 
 
 async def test_account_capture_takes_the_account() -> None:
@@ -288,6 +313,37 @@ async def test_future_received_date_answers_422() -> None:
             _payload(receivedOn="2026-10-06"), actor="clerk", today=date(2026, 10, 5)
         )
     assert exc.value.code == "received_on_in_future"
+
+
+async def test_received_date_older_than_a_year_answers_422() -> None:
+    svc = _Recorder(_Session())  # type: ignore[arg-type]
+    with pytest.raises(ValidationProblem) as exc:
+        await svc.create_on_behalf(
+            _payload(receivedOn="2025-10-04"), actor="clerk", today=date(2026, 10, 5)
+        )
+    assert exc.value.code == "received_on_too_old"
+    # Exactly one year back is still fine.
+    await svc.create_on_behalf(
+        _payload(receivedOn="2025-10-05"), actor="clerk", today=date(2026, 10, 5)
+    )
+
+
+async def test_search_route_has_a_rate_limit(
+    api: FastAPI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.shared.antiabuse import get_rate_limiter
+    from app.shared.ratelimit import RateLimitResult
+
+    class _Deny:
+        async def hit(self, key: str, *, limit: int, window_seconds: int) -> Any:
+            assert key == "applicant-search:principal:clerk"
+            return RateLimitResult(allowed=False, retry_after=60)
+
+    _as(api, _PERM)
+    api.dependency_overrides[get_rate_limiter] = lambda: _Deny()
+    resp = TestClient(api).get("/api/applications/on-behalf/applicants?q=an")
+    assert resp.status_code == 429
+    assert resp.headers["retry-after"] == "60"
 
 
 async def test_applicant_search() -> None:

@@ -516,6 +516,25 @@ async def test_anonymize_clears_pii_keeps_application(session: AsyncSession) -> 
     assert out.applicant.anonymized is True
 
 
+async def test_anonymize_clears_the_capture_intake(session: AsyncSession) -> None:
+    # #11: the free-text intake note can name a person, so the anonymization clears it.
+    # The received date and the capturing member stay.
+    app_type, _, _ = await _seed_type(session)
+    svc = ApplicationsService(session)
+    app, _ = await svc.create(_create_payload(app_type.id))
+    app.captured_by = "clerk"
+    app.capture_intake = "per Mail von Frau Beispiel"
+    app.received_on = app.created_at.date()
+    await session.commit()
+
+    await svc.anonymize(app.id)
+
+    await session.refresh(app)
+    assert app.capture_intake is None
+    assert app.captured_by == "clerk"
+    assert app.received_on is not None
+
+
 async def test_anonymize_scrubs_version_history(session: AsyncSession) -> None:
     app_type, _, _ = await _seed_type(session)
     svc = ApplicationsService(session)

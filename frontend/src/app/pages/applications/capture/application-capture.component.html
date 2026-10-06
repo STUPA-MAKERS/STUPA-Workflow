@@ -91,6 +91,12 @@
                 </ul>
               }
             </div>
+            @if (emailMatch(); as match) {
+              <p class="ff__info" role="status" data-testid="cap-email-match">
+                <app-icon name="user" [size]="16" />
+                <span>{{ 'applications.capture.emailMatch' | t: { name: match.displayName || match.email || '' } }}</span>
+              </p>
+            }
             @if (noHits()) {
               <p class="ff__info" role="status">
                 <app-icon name="info" [size]="16" />
@@ -118,7 +124,7 @@
                 [required]="true"
                 [error]="guestEmailError() ? (guestEmailError()! | t) : ''"
                 [ngModel]="guestEmail()"
-                (ngModelChange)="guestEmail.set($event ?? '')"
+                (ngModelChange)="onGuestEmail($event ?? '')"
               />
             </div>
             <p class="ff__info">
@@ -144,8 +150,9 @@
               name="receivedOn"
               [label]="'applications.capture.receivedOn' | t"
               [required]="true"
+              [min]="minReceived"
               [max]="today"
-              [error]="futureDate() ? ('applications.capture.receivedFuture' | t) : ''"
+              [error]="receivedError() ? (receivedError()! | t) : ''"
               [ngModel]="receivedOn()"
               (ngModelChange)="receivedOn.set($event ?? '')"
             />

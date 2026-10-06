@@ -75,6 +75,7 @@ from app.modules.privacy.service import ErasureRequestService
 from app.settings import Settings
 from app.shared.antiabuse import (
     enforce_application_payload_limit,
+    rate_limit_applicant_search,
     rate_limit_applications,
     verify_altcha_unless_authenticated,
 )
@@ -285,8 +286,10 @@ async def create_application_on_behalf(
     The data goes through the validation of a normal submission against the effective
     form. The application is confirmed at once and its flow starts in this request.
     ``receivedOn`` defaults to today in the local timezone and must not lie in the
-    future. After the commit the applicant gets the mail ``application_captured``: an
-    account gets the normal link, a guest a magic link.
+    future or more than a year back. A guest e-mail of an active account (without
+    case) makes the application an account application of that account. After the
+    commit the applicant gets the mail ``application_captured``: an account gets the
+    normal link, a guest a magic link.
     """
     if len(json.dumps(payload.data)) > settings.max_application_payload_bytes:
         raise PayloadTooLargeError(
@@ -301,7 +304,9 @@ async def create_application_on_behalf(
         draft_pepper=settings.magic_link_secret,
     )
     pool = getattr(request.app.state, "arq_pool", None)
-    guest = payload.applicant_principal_id is None
+    # A guest e-mail of an active account became an account application, so the
+    # owner decides the link of the mail, not the request.
+    guest = app.created_by is None
     background.add_task(send_capture_mail, settings, email, app.id, guest, pool)
     return ApplicationCreated(applicationId=app.id)
 
@@ -309,7 +314,8 @@ async def create_application_on_behalf(
 @router.get(
     "/applications/on-behalf/applicants",
     response_model=list[ApplicantCandidateOut],
-    responses=_errors(401, 403),
+    dependencies=[Depends(rate_limit_applicant_search)],
+    responses=_errors(401, 403, 429),
 )
 async def search_on_behalf_applicants(
     service: ServiceDep,
@@ -320,7 +326,8 @@ async def search_on_behalf_applicants(
 
     The search matches the name and the e-mail of the active accounts. It needs at
     least two characters and returns at most 20 accounts. The route needs
-    ``application.create_on_behalf``, because it discloses e-mail addresses.
+    ``application.create_on_behalf``, because it discloses e-mail addresses, and it
+    has a limit per principal (``rl_applicant_search_per_hour``, 429).
     """
     return await service.search_applicants(q)
 

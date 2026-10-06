@@ -37,6 +37,8 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     # Capture an application on behalf of an applicant (#11): an existing account or a
     # guest with name and e-mail. The application belongs to the applicant; the holder
     # shows only in the history and the audit log. Global, no Gremium scope.
+    # Grant it deliberately: the applicant search of the capture dialog exposes the
+    # names and e-mail addresses of ALL active accounts to the holder.
     "application.create_on_behalf",
     "form.configure",
     "flow.configure",

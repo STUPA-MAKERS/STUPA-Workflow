@@ -792,6 +792,10 @@ export const de = {
   'applications.capture.typePlaceholder': 'Antragsart wählen',
   'applications.capture.receivedOn': 'Eingegangen am',
   'applications.capture.receivedFuture': 'Das Datum darf nicht in der Zukunft liegen.',
+  'applications.capture.receivedTooOld': 'Das Datum darf höchstens ein Jahr zurückliegen.',
+  'applications.capture.emailMatch': 'Zu dieser E-Mail gibt es ein Konto: {name}',
+  'applications.capture.error.applicantUnavailable':
+    'Dieses Konto kann keinen Antrag bekommen (unbekannt, deaktiviert oder ohne E-Mail).',
   'applications.capture.intake': 'Eingang',
   'applications.capture.intakePlaceholder': 'z. B. per PDF, per Mail',
   'applications.capture.details': 'Angaben',
@@ -3814,6 +3818,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.capture.typePlaceholder': 'Choose a type',
   'applications.capture.receivedOn': 'Received on',
   'applications.capture.receivedFuture': 'The date must not be in the future.',
+  'applications.capture.receivedTooOld': 'The date must not be more than one year back.',
+  'applications.capture.emailMatch': 'This e-mail belongs to an account: {name}',
+  'applications.capture.error.applicantUnavailable':
+    'This account cannot receive an application (unknown, deactivated or without e-mail).',
   'applications.capture.intake': 'Intake',
   'applications.capture.intakePlaceholder': 'e.g. as PDF, by mail',
   'applications.capture.details': 'Details',

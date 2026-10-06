@@ -51,6 +51,8 @@ class Capture:
     applicant_principal_id: UUID | None
     received_on: date
     intake: str | None
+    #: A guest e-mail matched an active account, which became the applicant.
+    matched_by_email: bool = False
 
 
 class CreateOps(ApplicationsServiceBase):
@@ -229,6 +231,7 @@ class CreateOps(ApplicationsServiceBase):
                     ),
                     "receivedOn": capture.received_on.isoformat(),
                     "intake": capture.intake is not None,
+                    "matchedByEmail": capture.matched_by_email,
                 },
             )
         await self.session.commit()

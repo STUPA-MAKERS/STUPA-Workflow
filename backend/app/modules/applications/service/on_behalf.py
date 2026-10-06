@@ -10,7 +10,7 @@ start. It only adds the capture columns and a second audit entry.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -33,6 +33,9 @@ if TYPE_CHECKING:
 APPLICANT_SEARCH_LIMIT = 20
 #: The shortest search text. A shorter one returns no account.
 APPLICANT_SEARCH_MIN = 2
+#: The oldest allowed received date, in days before today (review of #11): a typo
+#: such as 2016 instead of 2026 must not move an application years back.
+RECEIVED_ON_MAX_AGE_DAYS = 365
 
 
 class OnBehalfOps(CreateOps):
@@ -57,9 +60,14 @@ class OnBehalfOps(CreateOps):
         member entered it on purpose. Its flow starts in this call, like a logged-in
         submission.
 
+        A guest whose e-mail belongs to an active account (compared without case)
+        becomes an applicant account: the application belongs to that account. The
+        caller reads the outcome from ``created_by`` of the result.
+
         Raises:
             ValidationProblem: the account is unknown, inactive or has no e-mail, or
-                ``receivedOn`` lies in the future. Form errors raise from the create.
+                ``receivedOn`` lies in the future or more than a year back. Form
+                errors raise from the create.
 
         Returns:
             The application and the applicant e-mail, for the mail to the applicant.
@@ -71,15 +79,29 @@ class OnBehalfOps(CreateOps):
                 code="received_on_in_future",
                 errors=[{"field": "receivedOn", "msg": "must not lie in the future"}],
             )
-        owner_sub: str | None = None
-        if payload.applicant_principal_id is not None:
-            owner_sub, email, name = await self._applicant_account(
-                payload.applicant_principal_id
+        if received_on < today - timedelta(days=RECEIVED_ON_MAX_AGE_DAYS):
+            raise ValidationProblem(
+                "The received date lies more than one year in the past.",
+                code="received_on_too_old",
+                errors=[{"field": "receivedOn", "msg": "must not lie more than a year back"}],
             )
+        owner_sub: str | None = None
+        matched = False
+        principal_id = payload.applicant_principal_id
+        if principal_id is not None:
+            owner_sub, email, name = await self._applicant_account(principal_id)
         else:
             # The schema guarantees both values for a guest.
             email = str(payload.applicant_email)
             name = (payload.applicant_name or "").strip()
+            # User decision 2026-10-06: an e-mail of an active account makes the
+            # application an account application of that account. The account then
+            # owns it through `created_by` and reads it with the normal login, and no
+            # second access path (a guest magic link) exists for the same person.
+            match = await self._active_account_by_email(email)
+            if match is not None:
+                principal_id, owner_sub, email, name = match
+                matched = True
         intake = (payload.intake or "").strip() or None
         create = ApplicationCreate.model_validate(
             {
@@ -100,9 +122,10 @@ class OnBehalfOps(CreateOps):
             draft_pepper=draft_pepper,
             capture=Capture(
                 owner_sub=owner_sub,
-                applicant_principal_id=payload.applicant_principal_id,
+                applicant_principal_id=principal_id,
                 received_on=received_on,
                 intake=intake,
+                matched_by_email=matched,
             ),
         )
 
@@ -127,6 +150,28 @@ class OnBehalfOps(CreateOps):
                 ],
             )
         return row.sub, str(row.email), row.display_name
+
+    async def _active_account_by_email(
+        self, email: str
+    ) -> tuple[UUID, str, str, str | None] | None:
+        """Return the active account of an e-mail (CITEXT, so without case), or None.
+
+        Returns:
+            The principal id, the ``sub``, the stored e-mail and the name.
+        """
+        from app.modules.auth.models import Principal as PrincipalRow
+
+        row = (
+            await self.session.scalars(
+                select(PrincipalRow)
+                .where(PrincipalRow.email == email, PrincipalRow.active.is_(True))
+                .order_by(PrincipalRow.last_login.desc().nulls_last())
+                .limit(1)
+            )
+        ).first()
+        if row is None or not row.email:
+            return None
+        return row.id, row.sub, str(row.email), row.display_name
 
     async def search_applicants(self, query: str) -> list[ApplicantCandidateOut]:
         """Search the active accounts with an e-mail by name or e-mail.

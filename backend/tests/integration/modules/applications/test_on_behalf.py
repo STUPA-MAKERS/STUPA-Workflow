@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 import pytest
@@ -164,7 +164,8 @@ async def test_guest_capture_belongs_to_the_guest(
     seed = await seed_guest_flow(maker)
     await _add_principal(maker, "clerk-sub", "clerk@example.org", "Clara Clerk")
     sent: Sent = []
-    body = _guest_body(seed, receivedOn="2026-01-15", intake="  per PDF  ")
+    received = date.today() - timedelta(days=20)
+    body = _guest_body(seed, receivedOn=received.isoformat(), intake="  per PDF  ")
     with _client(migrated, settings, monkeypatch, _CLERK, sent) as client:
         resp = client.post("/api/applications/on-behalf", json=body)
     assert resp.status_code == 201, resp.text
@@ -175,7 +176,7 @@ async def test_guest_capture_belongs_to_the_guest(
     assert app.created_by is None
     assert app.captured_by == "clerk-sub"
     assert app.capture_intake == "per PDF"
-    assert app.received_on == date(2026, 1, 15)
+    assert app.received_on == received
     # Submitted directly into the flow: no confirmation by the guest.
     assert app.email_confirmed_at is not None
     assert app.current_state_id == seed.open_state_id
@@ -205,8 +206,9 @@ async def test_guest_capture_belongs_to_the_guest(
     assert behalf.data == {
         "applicantKind": "guest",
         "applicantPrincipalId": None,
-        "receivedOn": "2026-01-15",
+        "receivedOn": received.isoformat(),
         "intake": True,
+        "matchedByEmail": False,
     }
 
 
@@ -281,6 +283,7 @@ async def test_account_capture_belongs_to_the_account(
     [
         ({"data": {}}, "title"),
         ({"receivedOn": "2999-01-01"}, "receivedOn"),
+        ({"receivedOn": "2000-01-01"}, "receivedOn"),
     ],
 )
 async def test_invalid_capture_answers_422_and_writes_nothing(
@@ -301,6 +304,46 @@ async def test_invalid_capture_answers_422_and_writes_nothing(
     assert sent == []
     async with maker() as session:
         assert (await session.scalars(select(Application))).all() == []
+
+
+async def test_guest_email_of_an_active_account_becomes_that_account(
+    migrated: tuple[str, str],
+    settings: Settings,
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # User decision 2026-10-06: the lookup ignores the case; the account owns it.
+    seed = await seed_guest_flow(maker)
+    owner_id = await _add_principal(maker, "mia-sub", "Mia@Example.org", "Mia Muster")
+    await _add_principal(maker, "old-sub", "old@example.org", "Old", active=False)
+    sent: Sent = []
+    body = _guest_body(seed, applicantName="Mia", applicantEmail="mia@EXAMPLE.org")
+    with _client(migrated, settings, monkeypatch, _CLERK, sent) as client:
+        resp = client.post("/api/applications/on-behalf", json=body)
+        assert resp.status_code == 201, resp.text
+        app_id = uuid.UUID(resp.json()["applicationId"])
+        # An inactive account does not match: that one stays a guest.
+        other = client.post(
+            "/api/applications/on-behalf",
+            json=_guest_body(seed, applicantEmail="old@example.org"),
+        )
+        assert other.status_code == 201, other.text
+        other_id = uuid.UUID(other.json()["applicationId"])
+    app = await _get(maker, app_id)
+    assert app.created_by == "mia-sub"
+    async with maker() as session:
+        applicant = (
+            await session.scalars(select(Applicant).where(Applicant.application_id == app_id))
+        ).one()
+        assert (applicant.email, applicant.name) == ("Mia@example.org", "Mia Muster")
+    behalf = await _audit(maker, app_id, "application_create_on_behalf")
+    assert behalf.data["applicantKind"] == "principal"
+    assert behalf.data["applicantPrincipalId"] == str(owner_id)
+    assert behalf.data["matchedByEmail"] is True
+    # The account gets the normal link, the inactive one the magic link.
+    assert ("Mia@example.org", app_id, False) in sent
+    assert ("old@example.org", other_id, True) in sent
+    assert (await _get(maker, other_id)).created_by is None
 
 
 async def test_bad_applicant_answers_422(

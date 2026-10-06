@@ -337,6 +337,7 @@ describe('ApplicationCaptureComponent', () => {
       type: 'about:blank',
       title: 'Unprocessable',
       status: 422,
+      code: 'validation_error',
       detail: 'Invalid application data.',
       errors: [{ field: 'title', msg: 'required' }],
     };
@@ -348,27 +349,100 @@ describe('ApplicationCaptureComponent', () => {
     expect(s.created).not.toHaveBeenCalled();
   });
 
-  it('shows the detail of another refusal, or a fallback', async () => {
-    const refusal: ProblemDetail = {
+  it('maps the refusal codes to texts and never shows the server detail', async () => {
+    const problem = (code: string, errors?: { field: string; msg: string }[]): ProblemDetail => ({
       type: 'about:blank',
       title: 'Unprocessable',
       status: 422,
-      detail: 'The applicant account is unknown.',
-      errors: [{ field: 'applicantPrincipalId', msg: 'unknown' }],
-    };
+      code,
+      detail: 'An English server text.',
+      errors,
+    });
     const create = jest
       .fn()
-      .mockReturnValueOnce(throwError(() => ({ status: 422, error: refusal })))
+      .mockReturnValueOnce(throwError(() => ({ status: 422, error: problem('applicant_unavailable') })))
+      .mockReturnValueOnce(throwError(() => ({ status: 422, error: problem('received_on_in_future') })))
+      .mockReturnValueOnce(throwError(() => ({ status: 422, error: problem('received_on_too_old') })))
       .mockReturnValueOnce(throwError(() => ({ status: 500 })))
-      .mockReturnValueOnce(throwError(() => ({ status: 422, error: { ...refusal, errors: undefined } })));
+      .mockReturnValueOnce(throwError(() => ({ status: 422, error: problem('validation_error', []) })))
+      .mockReturnValueOnce(
+        throwError(() => ({ status: 422, error: problem('x', [{ field: 'nope', msg: 'bad' }]) })),
+      );
     const s = await setup({ create });
     await fillAccount(s);
     s.comp.submit();
-    expect(s.toast.error).toHaveBeenLastCalledWith('The applicant account is unknown.');
+    expect(s.toast.error).toHaveBeenLastCalledWith(
+      'Dieses Konto kann keinen Antrag bekommen (unbekannt, deaktiviert oder ohne E-Mail).',
+    );
     s.comp.submit();
-    expect(s.toast.error).toHaveBeenLastCalledWith('Der Antrag konnte nicht erfasst werden.');
+    expect(s.toast.error).toHaveBeenLastCalledWith('Das Datum darf nicht in der Zukunft liegen.');
     s.comp.submit();
-    expect(s.toast.error).toHaveBeenLastCalledWith('The applicant account is unknown.');
+    expect(s.toast.error).toHaveBeenLastCalledWith('Das Datum darf höchstens ein Jahr zurückliegen.');
+    for (let i = 0; i < 3; i++) {
+      s.comp.submit();
+      expect(s.toast.error).toHaveBeenLastCalledWith('Der Antrag konnte nicht erfasst werden.');
+    }
+    expect(s.toast.error).not.toHaveBeenCalledWith('An English server text.');
+  });
+
+  it('refuses a received date more than a year back', async () => {
+    const s = await setup();
+    await fillAccount(s);
+    s.comp.receivedOn.set('2000-01-01');
+    s.flush();
+    expect(s.comp.canSubmit()).toBe(false);
+    expect(screen.getByText('Das Datum darf höchstens ein Jahr zurückliegen.')).toBeTruthy();
+    s.comp.receivedOn.set(s.comp.minReceived);
+    expect(s.comp.canSubmit()).toBe(true);
+  });
+
+  it('switches a guest e-mail of an account to that account', async () => {
+    jest.useFakeTimers();
+    const search = jest
+      .fn()
+      .mockReturnValueOnce(of([{ ...ANNA, email: 'Anna@Example.org' }]))
+      .mockReturnValueOnce(of([ANNA]))
+      .mockReturnValueOnce(throwError(() => new Error('down')))
+      .mockReturnValueOnce(of([ANNA]));
+    const s = await setup({ search });
+    s.comp.setMode('guest');
+    // An invalid address asks nothing.
+    s.comp.onGuestEmail('anna@');
+    jest.advanceTimersByTime(APPLICANT_SEARCH_DELAY_MS);
+    expect(search).not.toHaveBeenCalled();
+    s.comp.onGuestEmail('ANNA@example.org');
+    jest.advanceTimersByTime(APPLICANT_SEARCH_DELAY_MS);
+    expect(search).toHaveBeenCalledWith('ANNA@example.org');
+    s.flush();
+    expect(s.comp.mode()).toBe('account');
+    expect(s.comp.picked()?.id).toBe('p1');
+    expect(screen.getByTestId('cap-email-match').textContent).toContain(
+      'Zu dieser E-Mail gibt es ein Konto: Anna Antrag',
+    );
+    // Back to a new person: the note goes; an address without an exact match stays.
+    s.comp.setMode('guest');
+    expect(s.comp.emailMatch()).toBeNull();
+    s.comp.onGuestEmail('other@example.org');
+    jest.advanceTimersByTime(APPLICANT_SEARCH_DELAY_MS);
+    expect(s.comp.mode()).toBe('guest');
+    // A failed lookup leaves the new person.
+    s.comp.onGuestEmail('anna@example.org');
+    jest.advanceTimersByTime(APPLICANT_SEARCH_DELAY_MS);
+    expect(s.comp.mode()).toBe('guest');
+    // A late answer after a switch to the account mode changes nothing.
+    s.comp.onGuestEmail('anna@example.org');
+    s.comp.setMode('account');
+    jest.advanceTimersByTime(APPLICANT_SEARCH_DELAY_MS);
+    expect(s.comp.picked()?.id).toBe('p1');
+    expect(s.comp.emailMatch()).toBeNull();
+    s.comp.clearPick();
+    expect(s.comp.picked()).toBeNull();
+    // A pending lookup ends with the component.
+    s.comp.setMode('guest');
+    s.comp.onGuestEmail('anna@example.org');
+    s.fixture.destroy();
+    jest.advanceTimersByTime(APPLICANT_SEARCH_DELAY_MS);
+    expect(search).toHaveBeenCalledTimes(4);
   });
 
   it('close discards the draft files and emits closed', async () => {
