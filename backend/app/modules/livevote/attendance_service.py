@@ -42,7 +42,6 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.delegations.models import MeetingDelegation
-from app.modules.delegations.pool import group_names_for
 from app.modules.livevote.keepers import (
     KEEPER_PERMISSION,
     VOTE_PERMISSION,
@@ -151,19 +150,16 @@ class AttendanceService:
         """Return the current Gremium members as Protokollant candidates.
 
         `canKeepProtocol` marks the members with `protocol.write` (O20). Only they
-        can keep the minutes. `substituteGroupName` names the faculty group of the
-        member (A8).
+        can keep the minutes.
         """
         members = await self._current_members(gremium_id)
         keepers = await keeper_principal_ids(self.session, gremium_id)
-        groups = await group_names_for(self.session, gremium_id, (m.id for m in members))
         return [
             MeetingMemberOut(
                 principalId=m.id,
                 displayName=m.display_name,
                 email=m.email,
                 canKeepProtocol=m.id in keepers,
-                substituteGroupName=groups.get(m.id),
             )
             for m in members
         ]
@@ -181,8 +177,7 @@ class AttendanceService:
         the members who can keep the minutes now (O20), for the keeper picker and
         the handover. `canVote` marks the members with an own vote now (gremium
         permission `vote.cast`): only they can be substituted (O6). A former member
-        with a record has neither flag. `substituteGroupName` names the faculty
-        group of the member (A8).
+        with a record has neither flag.
         """
         meeting = await self._meeting(meeting_id)
         members = list(
@@ -207,9 +202,6 @@ class AttendanceService:
         )
         by_principal = {r.principal_id: r for r in records}
         perms = await member_permissions(self.session, meeting.gremium_id)
-        groups = await group_names_for(
-            self.session, meeting.gremium_id, (m.id for m in members)
-        )
         out: list[AttendanceOut] = []
         for m in members:
             rec = by_principal.get(m.id)
@@ -226,7 +218,6 @@ class AttendanceService:
                     isSelf=is_self,
                     canKeepProtocol=KEEPER_PERMISSION in held,
                     canVote=VOTE_PERMISSION in held,
-                    substituteGroupName=groups.get(m.id),
                 )
             )
         return out

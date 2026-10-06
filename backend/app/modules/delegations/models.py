@@ -9,30 +9,20 @@ is exclusive and never a duplicate. The delegator cannot vote in that meeting.
 delegate to a pool member without the lead-time deadline. A pool member does not
 have to be a gremium member. A NULL `member_principal_id` marks a substitute for
 every member.
-
-`SubstituteGroup` is a faculty group of one gremium (Z5). It holds members and
-substitutes in `SubstituteGroupMember`. A substitute of a group may represent
-every member of that group without the lead-time deadline. A member counts only
-while the gremium membership from the OIDC groups is active.
 """
 
 from __future__ import annotations
 
 import uuid
-from typing import Literal
 
 from sqlalchemy import (
     Boolean,
-    CheckConstraint,
     ForeignKey,
-    ForeignKeyConstraint,
     Index,
-    Integer,
     Text,
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
@@ -122,75 +112,4 @@ class DelegationSubstitute(UUIDPkMixin, CreatedAtMixin, Base):
             postgresql_where=text("member_principal_id IS NULL"),
         ),
         Index("ix_delegation_substitute_gremium", "gremium_id"),
-    )
-
-
-# Role of a person in a faculty group.
-SubstituteGroupMemberKind = Literal["member", "substitute"]
-
-
-class SubstituteGroup(UUIDPkMixin, CreatedAtMixin, Base):
-    """Faculty group of one gremium: members and their substitutes (Z5).
-
-    A substitute of the group may represent every member of the group. The
-    unique pair `(id, gremium_id)` is the target of the composite foreign key of
-    `SubstituteGroupMember`, so a member row always carries the gremium of its
-    group.
-    """
-
-    __tablename__ = "substitute_group"
-
-    gremium_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("gremium.id", ondelete="CASCADE")
-    )
-    name_i18n: Mapped[dict[str, str]] = mapped_column(JSONB, server_default="{}")
-    # Sort order of the groups of one gremium in the admin view.
-    position: Mapped[int] = mapped_column(Integer, server_default="0")
-    created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-    __table_args__ = (
-        UniqueConstraint("id", "gremium_id", name="uq_substitute_group_id_gremium"),
-        Index("ix_substitute_group_gremium", "gremium_id"),
-    )
-
-
-class SubstituteGroupMember(CreatedAtMixin, Base):
-    """One person in a faculty group, as a member or as a substitute (Z5).
-
-    `gremium_id` is a copy of the gremium of the group. The composite foreign
-    key on `(group_id, gremium_id)` keeps the copy correct and deletes the row
-    with the group. The partial unique index puts a member into at most one
-    group per gremium. A substitute may be in more than one group.
-
-    The privacy erasure of a principal deletes the rows of the principal
-    explicitly. The principal row stays, so the CASCADE on `principal_id` does
-    not apply there.
-    """
-
-    __tablename__ = "substitute_group_member"
-
-    group_id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
-    principal_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("principal.id", ondelete="CASCADE"), primary_key=True
-    )
-    gremium_id: Mapped[uuid.UUID] = mapped_column()
-    kind: Mapped[str] = mapped_column(Text)
-    created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-
-    __table_args__ = (
-        ForeignKeyConstraint(
-            ["group_id", "gremium_id"],
-            ["substitute_group.id", "substitute_group.gremium_id"],
-            ondelete="CASCADE",
-            name="fk_substitute_group_member_group",
-        ),
-        CheckConstraint("kind IN ('member', 'substitute')", name="kind"),
-        Index(
-            "uq_substitute_group_member_gremium_member",
-            "gremium_id",
-            "principal_id",
-            unique=True,
-            postgresql_where=text("kind = 'member'"),
-        ),
-        Index("ix_substitute_group_member_principal", "principal_id"),
     )

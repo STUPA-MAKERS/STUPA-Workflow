@@ -46,8 +46,6 @@ from app.modules.deadlines.models import Deadline, DeadlinePolicy
 from app.modules.delegations.models import (
     DelegationSubstitute,
     MeetingDelegation,
-    SubstituteGroup,
-    SubstituteGroupMember,
 )
 from app.modules.files.models import Attachment, AttachmentDraftToken
 from app.modules.flow.models import FlowVersion, State, Transition
@@ -90,8 +88,6 @@ __all__ = [
     "DeadlinePolicy",
     "DelegationSubstitute",
     "MeetingDelegation",
-    "SubstituteGroup",
-    "SubstituteGroupMember",
     "FlowVersion",
     "FormField",
     "FormVersion",

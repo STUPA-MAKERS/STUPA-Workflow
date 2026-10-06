@@ -507,65 +507,6 @@ async def list_substitutes(gremium_id: str) -> dict:
 
 
 @group.tool
-async def list_substitute_groups(gremium_id: str) -> dict:
-    """List the faculty substitute groups of one Gremium with members and substitutes.
-
-    A substitute of a group may represent every member of that group without the
-    lead-time deadline. A member counts only while the gremium membership is active
-    (`active`). `tooManySubstitutes` warns above two substitutes; it is no limit.
-    """
-    return await api().get(
-        "/delegations/substitute-groups", params=params(gremiumId=gremium_id)
-    )
-
-
-@group.tool
-async def create_substitute_group(group: S.SubstituteGroupCreate) -> dict:
-    """Create a faculty substitute group in a Gremium.
-
-    Requires admin.delegations or session.manage in the gremium.
-    """
-    return await api().post("/delegations/substitute-groups", json=dump_create(group))
-
-
-@group.tool
-async def update_substitute_group(group_id: str, patch: S.SubstituteGroupUpdate) -> dict:
-    """Rename a faculty substitute group or change its position."""
-    return await api().patch(
-        f"/delegations/substitute-groups/{group_id}", json=dump_patch(patch)
-    )
-
-
-@group.tool
-async def delete_substitute_group(group_id: str) -> dict:
-    """Delete a faculty substitute group with its members and substitutes."""
-    return await api().delete(f"/delegations/substitute-groups/{group_id}")
-
-
-@group.tool
-async def add_substitute_group_member(
-    group_id: str, principal_id: str, kind: Literal["member", "substitute"]
-) -> dict:
-    """Add a person to a faculty substitute group as a member or as a substitute.
-
-    A member is in at most one group per Gremium (409 otherwise). A substitute may
-    be in several groups.
-    """
-    return await api().post(
-        f"/delegations/substitute-groups/{group_id}/members",
-        json={"principalId": principal_id, "kind": kind},
-    )
-
-
-@group.tool
-async def remove_substitute_group_member(group_id: str, principal_id: str) -> dict:
-    """Remove a person from a faculty substitute group."""
-    return await api().delete(
-        f"/delegations/substitute-groups/{group_id}/members/{principal_id}"
-    )
-
-
-@group.tool
 async def create_substitute(substitute: S.SubstituteCreate) -> dict:
     """Add a stand-in to the substitute pool of a Gremium."""
     return await api().post("/delegations/substitutes", json=dump_create(substitute))

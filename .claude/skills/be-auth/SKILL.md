@@ -42,7 +42,7 @@ description: Backend identity and access. Covers OIDC login against any discover
 - `GET /api/auth/login` — 307 → IdP authorize (503 when discovery fails). State, verifier and nonce ride in the signed `oidc_tx` cookie
 - `GET /api/auth/callback` — code→token→session. Sets the `sid` cookie. Redirects to `/api/oauth/finish` when an OAuth tx is in flight
 - `POST /api/auth/logout` — kill session + cookie (idempotent), returns the IdP `end_session_endpoint` URL for SSO logout (`null` when the IdP has none or discovery fails; the local session ends anyway)
-- `GET /api/auth/me` — principal + roles/permissions/groups + member/manage gremien, `gremium_permissions` (gremium id → gremium keys of the active role, scope-capped), scoped-budget & substitute-pool flags (`in_substitute_pool` reads `delegations.pool`, so faculty-group substitutes count, Z5)
+- `GET /api/auth/me` — principal + roles/permissions/groups + member/manage gremien, `gremium_permissions` (gremium id → gremium keys of the active role, scope-capped), scoped-budget & substitute-pool flags (`in_substitute_pool` reads `delegations.pool`, the `delegation_substitute` table)
 - `POST /api/auth/magic-link` — 202 always (anti-enumeration, constant time, delivery in background task)
 - `POST /api/auth/magic-link/verify` — token → applicant session cookie (always `edit`). Expired or used → 410. The redeem sets `expires_at = now` on every OLDER still-valid link of the same application (`created_at <=` the redeemed one, never itself); a newer unredeemed link stays valid
 - `GET /api/oauth/authorize` — validate client_id + loopback redirect_uri + S256 challenge, stash tx, start OIDC login

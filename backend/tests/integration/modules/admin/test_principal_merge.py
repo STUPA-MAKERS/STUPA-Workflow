@@ -62,8 +62,6 @@ from app.modules.config_revision.models import ConfigRevision
 from app.modules.delegations.models import (
     DelegationSubstitute,
     MeetingDelegation,
-    SubstituteGroup,
-    SubstituteGroupMember,
 )
 from app.modules.forms.models import FormVersion
 from app.modules.livevote.models import (
@@ -333,28 +331,14 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             ]
         )
 
-        # Substitute pool and a faculty group.
-        group = SubstituteGroup(
-            gremium_id=seed.gremium_id, name_i18n={"de": "Fak"}, created_by=old.sub
-        )
-        session.add(group)
-        await session.flush()
-        session.add_all(
-            [
-                DelegationSubstitute(
-                    gremium_id=seed.gremium_id,
-                    member_principal_id=other.id,
-                    substitute_principal_id=old.id,
-                    created_by=old.sub,
-                ),
-                SubstituteGroupMember(
-                    group_id=group.id,
-                    principal_id=old.id,
-                    gremium_id=seed.gremium_id,
-                    kind="member",
-                    created_by=old.sub,
-                ),
-            ]
+        # Substitute pool.
+        session.add(
+            DelegationSubstitute(
+                gremium_id=seed.gremium_id,
+                member_principal_id=other.id,
+                substitute_principal_id=old.id,
+                created_by=old.sub,
+            )
         )
 
         # Budget: a booking and an invoice.
@@ -544,7 +528,6 @@ async def test_merge_rewrites_every_area(maker: async_sessionmaker[AsyncSession]
         assert await _count(session, RoleAssignment.principal_id, w.old_id) == 0
         assert await _count(session, MeetingAttendance.principal_id, w.new_id) == 1
         assert await _count(session, DelegationSubstitute.substitute_principal_id, w.new_id) == 1
-        assert await _count(session, SubstituteGroupMember.principal_id, w.new_id) == 1
         # The erasure request stays on the old account: it is the proof.
         old = await session.get(PrincipalRow, w.old_id)
         assert old is not None
@@ -606,14 +589,6 @@ async def test_duplicates_are_combined(maker: async_sessionmaker[AsyncSession]) 
     w = await _seed(maker)
     async with maker() as session:
         role = (await session.scalars(select(Role).where(Role.key == "member"))).one()
-        group = (
-            await session.scalars(
-                select(SubstituteGroup).where(SubstituteGroup.gremium_id == w.gremium_id)
-            )
-        ).one()
-        second_group = SubstituteGroup(gremium_id=w.gremium_id, name_i18n={"de": "Fak 2"})
-        session.add(second_group)
-        await session.flush()
         session.add_all(
             [
                 # The new account has the same rows: they win.
@@ -626,13 +601,6 @@ async def test_duplicates_are_combined(maker: async_sessionmaker[AsyncSession]) 
                     gremium_id=w.gremium_id,
                     member_principal_id=w.other_id,
                     substitute_principal_id=w.new_id,
-                ),
-                # The new account is a member in another group of the same gremium.
-                SubstituteGroupMember(
-                    group_id=second_group.id,
-                    principal_id=w.new_id,
-                    gremium_id=w.gremium_id,
-                    kind="member",
                 ),
                 # The old account substitutes for the new one: that means nothing later.
                 DelegationSubstitute(
@@ -659,7 +627,6 @@ async def test_duplicates_are_combined(maker: async_sessionmaker[AsyncSession]) 
                 ),
             ]
         )
-        assert group is not None
         await session.commit()
 
     async with maker() as session:
@@ -673,11 +640,10 @@ async def test_duplicates_are_combined(maker: async_sessionmaker[AsyncSession]) 
     assert counts["roles"]["removed"] == 1
     assert counts["roles"]["combined"] == 0
     assert counts["attendance"] == {"rewritten": 0, "combined": 1, "removed": 0}
-    # Self entry + the same substitute for `other` + the member entry for `other`
-    # + the faculty group member row.
-    assert counts["substitutes"]["combined"] == 4
+    # Self entry + the same substitute for `other` + the member entry for `other`.
+    assert counts["substitutes"]["combined"] == 3
     assert counts["substitutes"]["rewritten"] >= 1
-    assert _areas(preview)["substitutes"]["combined"] == 4
+    assert _areas(preview)["substitutes"]["combined"] == 3
 
     async with maker() as session:
         prefs = (
@@ -706,14 +672,6 @@ async def test_duplicates_are_combined(maker: async_sessionmaker[AsyncSession]) 
             [(w.other_id, w.new_id), (None, w.new_id), (w.new_id, w.other_id)], key=str
         )
         assert w.old_id not in {m for row in pool for m in row}
-        members = (
-            await session.execute(
-                select(SubstituteGroupMember.principal_id, SubstituteGroupMember.group_id).where(
-                    SubstituteGroupMember.gremium_id == w.gremium_id
-                )
-            )
-        ).all()
-        assert members == [(w.new_id, second_group.id)]
 
 
 async def test_legacy_self_absent_attendance_becomes_a_lead_entry(

@@ -1,4 +1,4 @@
-"""Unit tests for the faculty substitute groups (Z5) and the lead entry (O6).
+"""Unit tests for the lead entry during a live meeting (O6).
 
 The fake session answers each `execute`, `get` and `scalar` from a queue. The
 conftest of this package replaces the pool helpers in the service with helpers
@@ -14,22 +14,12 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from pydantic import ValidationError
-from sqlalchemy.exc import IntegrityError
 
 from app.deps import Principal, get_current_principal
 from app.main import create_app
 from app.modules.delegations import service as service_mod
-from app.modules.delegations.models import SubstituteGroup, SubstituteGroupMember
 from app.modules.delegations.router import get_delegation_service
-from app.modules.delegations.schemas import (
-    DelegationCreate,
-    SubstituteGroupCreate,
-    SubstituteGroupMemberCreate,
-    SubstituteGroupMemberOut,
-    SubstituteGroupOut,
-    SubstituteGroupUpdate,
-)
+from app.modules.delegations.schemas import DelegationCreate
 from app.modules.delegations.service import DelegationService
 from app.settings import load_settings
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
@@ -77,310 +67,6 @@ def _gremium(*, allow: bool = True) -> SimpleNamespace:
 
 def _person(sub: str) -> SimpleNamespace:
     return SimpleNamespace(id=uuid4(), sub=sub)
-
-
-def _group(**over: Any) -> SimpleNamespace:
-    base: dict[str, Any] = {
-        "id": uuid4(),
-        "gremium_id": GREMIUM_ID,
-        "name_i18n": {"de": "Fakultät Informatik"},
-        "position": 0,
-    }
-    base.update(over)
-    return SimpleNamespace(**base)
-
-
-def _gm(group_id: UUID, kind: str, pid: UUID | None = None) -> SimpleNamespace:
-    return SimpleNamespace(group_id=group_id, principal_id=pid or uuid4(), kind=kind)
-
-
-# ---------------------------------------------------------------- schemas
-
-
-def test_group_create_cleans_the_name() -> None:
-    body = SubstituteGroupCreate.model_validate(
-        {"gremiumId": str(GREMIUM_ID), "nameI18n": {"de": " Informatik ", "en": "CS"}}
-    )
-    assert body.name_i18n == {"de": "Informatik", "en": "CS"}
-    assert body.position == 0
-
-
-@pytest.mark.parametrize(
-    "name",
-    [{}, {"fr": "Info"}, {"de": "  "}, {"de": "x" * 201}],
-)
-def test_group_create_refuses_a_bad_name(name: dict[str, str]) -> None:
-    with pytest.raises(ValidationError):
-        SubstituteGroupCreate.model_validate({"gremiumId": str(GREMIUM_ID), "nameI18n": name})
-
-
-def test_group_update_needs_one_field() -> None:
-    with pytest.raises(ValidationError):
-        SubstituteGroupUpdate.model_validate({})
-    assert SubstituteGroupUpdate.model_validate({"position": 3}).name_i18n is None
-    assert SubstituteGroupUpdate.model_validate({"nameI18n": {"en": "CS"}}).name_i18n == {
-        "en": "CS"
-    }
-
-
-def test_member_create_refuses_an_unknown_kind() -> None:
-    with pytest.raises(ValidationError):
-        SubstituteGroupMemberCreate.model_validate({"principalId": str(uuid4()), "kind": "x"})
-
-
-# ---------------------------------------------------------------- group CRUD
-
-
-async def test_groups_list_needs_view_rights() -> None:
-    db = fake_session(result(), result())  # no membership, no pool
-    db.get_results = [_gremium()]
-    with pytest.raises(ForbiddenError):
-        await _svc(db).substitute_groups_list(GREMIUM_ID, _actor())
-
-
-async def test_groups_list_empty() -> None:
-    db = fake_session(result())  # the groups
-    db.get_results = [_gremium()]
-    assert await _svc(db).substitute_groups_list(GREMIUM_ID, _actor(perms=_ADMIN)) == []
-
-
-async def test_groups_list_builds_members_and_warning() -> None:
-    g1, g2 = _group(), _group(position=1)
-    member = uuid4()
-    rows = [
-        _gm(g1.id, "member", member),
-        _gm(g1.id, "member"),
-        _gm(g1.id, "substitute"),
-        _gm(g1.id, "substitute"),
-        _gm(g1.id, "substitute"),
-        _gm(g2.id, "substitute"),
-    ]
-    db = fake_session(
-        result(g1, g2),  # the groups
-        result(*rows),  # their people
-        result((member, "Mia", None)),  # the names
-        result(member),  # active members of the gremium
-    )
-    db.get_results = [_gremium()]
-    out = await _svc(db).substitute_groups_list(GREMIUM_ID, _actor(perms=_ADMIN))
-    assert [g.id for g in out] == [g1.id, g2.id]
-    first = out[0]
-    assert first.too_many_substitutes is True
-    assert out[1].too_many_substitutes is False
-    actives = [(m.kind, m.active) for m in first.members]
-    assert actives == [
-        ("member", True),
-        ("member", False),
-        ("substitute", True),
-        ("substitute", True),
-        ("substitute", True),
-    ]
-    assert first.members[0].display_name == "Mia"
-
-
-async def test_group_create_needs_manage_rights() -> None:
-    db = fake_session(result())  # no session.manage role
-    payload = SubstituteGroupCreate(gremiumId=GREMIUM_ID, nameI18n={"de": "Info"})
-    with pytest.raises(ForbiddenError, match="session.manage"):
-        await _svc(db).substitute_group_create(payload, _actor())
-
-
-async def test_group_create_by_session_manage_persists_and_audits() -> None:
-    db = fake_session(_lead_roles(), result(), result(), result(), result())
-    db.get_results = [_gremium()]
-    payload = SubstituteGroupCreate(gremiumId=GREMIUM_ID, nameI18n={"de": "Info"}, position=2)
-    out = await _svc(db).substitute_group_create(payload, _actor())
-    group = next(a for a in db.added if isinstance(a, SubstituteGroup))
-    assert (group.gremium_id, group.position, group.created_by) == (GREMIUM_ID, 2, "lead")
-    assert out.name_i18n == {"de": "Info"}
-    assert out.members == []
-    entry = next(a for a in db.added if type(a).__name__ == "AuditEntry")
-    assert entry.action == "delegation_substitute_add"
-    assert entry.target_type == "substitute_group"
-    assert db.committed == 1
-
-
-async def test_group_create_unknown_gremium_404() -> None:
-    db = fake_session()
-    payload = SubstituteGroupCreate(gremiumId=GREMIUM_ID, nameI18n={"de": "Info"})
-    with pytest.raises(NotFoundError):
-        await _svc(db).substitute_group_create(payload, _actor(perms=_ADMIN))
-
-
-async def test_group_update_changes_fields() -> None:
-    group = _group()
-    db = fake_session(result(), result())  # people, active members
-    db.get_results = [group]
-    out = await _svc(db).substitute_group_update(
-        group.id,
-        SubstituteGroupUpdate(nameI18n={"en": "CS"}, position=4),
-        _actor(perms=_ADMIN),
-    )
-    assert (group.name_i18n, group.position) == ({"en": "CS"}, 4)
-    assert (out.name_i18n, out.position) == ({"en": "CS"}, 4)
-    assert db.committed == 1
-
-
-async def test_group_update_keeps_the_unset_fields() -> None:
-    group = _group(position=7)
-    db = fake_session(result(), result())
-    db.get_results = [group]
-    await _svc(db).substitute_group_update(
-        group.id, SubstituteGroupUpdate(position=1), _actor(perms=_ADMIN)
-    )
-    assert (group.name_i18n, group.position) == ({"de": "Fakultät Informatik"}, 1)
-
-
-async def test_group_update_name_only() -> None:
-    group = _group(position=7)
-    db = fake_session(result(), result())
-    db.get_results = [group]
-    await _svc(db).substitute_group_update(
-        group.id, SubstituteGroupUpdate(nameI18n={"de": "Neu"}), _actor(perms=_ADMIN)
-    )
-    assert (group.name_i18n, group.position) == ({"de": "Neu"}, 7)
-
-
-async def test_group_update_unknown_404() -> None:
-    db = fake_session()
-    with pytest.raises(NotFoundError, match="substitute group"):
-        await _svc(db).substitute_group_update(
-            uuid4(), SubstituteGroupUpdate(position=1), _actor(perms=_ADMIN)
-        )
-
-
-async def test_group_delete_audits_the_people() -> None:
-    group = _group()
-    member, sub = uuid4(), uuid4()
-    db = fake_session(result((member, "member"), (sub, "substitute")), result(), result())
-    db.get_results = [group]
-    await _svc(db).substitute_group_delete(group.id, _actor(perms=_ADMIN))
-    assert db.deleted == [group]
-    entry = next(a for a in db.added if type(a).__name__ == "AuditEntry")
-    assert entry.action == "delegation_substitute_remove"
-    assert entry.data["memberIds"] == [str(member)]
-    assert entry.data["substituteIds"] == [str(sub)]
-
-
-async def test_group_delete_of_another_gremium_403() -> None:
-    group = _group()
-    db = fake_session(_lead_roles(uuid4()))  # session.manage in another gremium
-    db.get_results = [group]
-    with pytest.raises(ForbiddenError):
-        await _svc(db).substitute_group_delete(group.id, _actor())
-
-
-# ---------------------------------------------------------------- group people
-
-
-async def test_member_add_persists_and_audits() -> None:
-    group = _group()
-    person = _person("p")
-    db = fake_session(result(person), result(), result(), result(), result())
-    db.get_results = [group, None]  # the group, not yet in the group
-    out = await _svc(db).substitute_group_member_add(
-        group.id,
-        SubstituteGroupMemberCreate(principalId=person.id, kind="member"),
-        _actor(perms=_ADMIN),
-    )
-    row = next(a for a in db.added if isinstance(a, SubstituteGroupMember))
-    assert (row.group_id, row.principal_id, row.gremium_id, row.kind) == (
-        group.id,
-        person.id,
-        GREMIUM_ID,
-        "member",
-    )
-    entry = next(a for a in db.added if type(a).__name__ == "AuditEntry")
-    assert entry.action == "delegation_substitute_add"
-    assert entry.data["kind"] == "member"
-    assert isinstance(out, SubstituteGroupOut)
-
-
-async def test_substitute_add_skips_the_member_probe() -> None:
-    group = _group()
-    person = _person("p")
-    db = fake_session(result(person), result(), result(), result(), result())
-    db.get_results = [group, None]
-    db.scalar_results = [uuid4()]  # would refuse a member, not a substitute
-    await _svc(db).substitute_group_member_add(
-        group.id,
-        SubstituteGroupMemberCreate(principalId=person.id, kind="substitute"),
-        _actor(perms=_ADMIN),
-    )
-    assert db.scalar_results  # not read
-
-
-async def test_member_add_unknown_principal_404() -> None:
-    db = fake_session(result())
-    db.get_results = [_group()]
-    with pytest.raises(NotFoundError, match="principal"):
-        await _svc(db).substitute_group_member_add(
-            uuid4(),
-            SubstituteGroupMemberCreate(principalId=uuid4(), kind="member"),
-            _actor(perms=_ADMIN),
-        )
-
-
-async def test_member_add_twice_409() -> None:
-    person = _person("p")
-    db = fake_session(result(person))
-    db.get_results = [_group(), SimpleNamespace()]
-    with pytest.raises(ConflictError, match="already in this group"):
-        await _svc(db).substitute_group_member_add(
-            uuid4(),
-            SubstituteGroupMemberCreate(principalId=person.id, kind="substitute"),
-            _actor(perms=_ADMIN),
-        )
-
-
-async def test_member_in_another_group_409() -> None:
-    person = _person("p")
-    db = fake_session(result(person))
-    db.get_results = [_group(), None]
-    db.scalar_results = [uuid4()]
-    with pytest.raises(ConflictError, match="another group"):
-        await _svc(db).substitute_group_member_add(
-            uuid4(),
-            SubstituteGroupMemberCreate(principalId=person.id, kind="member"),
-            _actor(perms=_ADMIN),
-        )
-
-
-class _RacingSession(FakeSession):
-    async def flush(self) -> None:
-        raise IntegrityError("insert", {}, Exception("uq"))
-
-
-async def test_member_add_race_409() -> None:
-    person = _person("p")
-    db = _RacingSession([result(person)])
-    db.get_results = [_group(), None]
-    with pytest.raises(ConflictError, match="same time"):
-        await _svc(db).substitute_group_member_add(
-            uuid4(),
-            SubstituteGroupMemberCreate(principalId=person.id, kind="member"),
-            _actor(perms=_ADMIN),
-        )
-    assert db.rolled_back == 1
-
-
-async def test_member_remove_deletes_and_audits() -> None:
-    group = _group()
-    row = _gm(group.id, "substitute")
-    db = fake_session(result(), result())
-    db.get_results = [group, row]
-    await _svc(db).substitute_group_member_remove(group.id, row.principal_id, _actor(perms=_ADMIN))
-    assert db.deleted == [row]
-    entry = next(a for a in db.added if type(a).__name__ == "AuditEntry")
-    assert entry.action == "delegation_substitute_remove"
-    assert entry.data["kind"] == "substitute"
-
-
-async def test_member_remove_unknown_404() -> None:
-    db = fake_session()
-    db.get_results = [_group(), None]
-    with pytest.raises(NotFoundError, match="is not in group"):
-        await _svc(db).substitute_group_member_remove(uuid4(), uuid4(), _actor(perms=_ADMIN))
 
 
 # ---------------------------------------------------------------- O6 lead entry
@@ -573,10 +259,10 @@ async def test_lead_entry_refuses_a_second_delegation_409() -> None:
         await _svc(db).create(_lead_payload(a, b), _actor())
 
 
-async def test_lead_entry_reads_the_pool_without_the_groups(
+async def test_lead_entry_reads_the_pool_of_the_member(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """O6: the lead entry asks the pool helper without the faculty groups."""
+    """O6: the lead entry asks the pool helper for the missing member."""
     a, b = _person("a"), _person("b")
     seen: list[dict[str, Any]] = []
 
@@ -590,7 +276,7 @@ async def test_lead_entry_reads_the_pool_without_the_groups(
     db = _lead_db(result(a), result(b), result(["vote.cast"]))
     with pytest.raises(ForbiddenError, match="pool substitute"):
         await _svc(db).create(_lead_payload(a, b), _actor())
-    assert seen == [{"gremium": GREMIUM_ID, "member": a.id, "include_groups": False}]
+    assert seen == [{"gremium": GREMIUM_ID, "member": a.id}]
 
 
 def _lead_view_db(*tail: Any) -> FakeSession:
@@ -615,7 +301,6 @@ async def test_lead_recipients_list_the_pool_of_the_member() -> None:
         (bert, True, False),
         (carla, True, True),
     ]
-    assert out[0].substitute_group_name is None
 
 
 async def test_lead_recipients_filter_by_the_needle() -> None:
@@ -751,46 +436,7 @@ async def test_revoke_unknown_principal_403() -> None:
 # ---------------------------------------------------------------- router
 
 
-class _GroupService:
-    def _out(self, gremium_id: UUID | None = None) -> SubstituteGroupOut:
-        return SubstituteGroupOut(
-            id=uuid4(),
-            gremium_id=gremium_id or GREMIUM_ID,
-            name_i18n={"de": "Info"},
-            position=0,
-            members=[
-                SubstituteGroupMemberOut(
-                    principal_id=uuid4(), display_name="Mia", kind="member", active=True
-                )
-            ],
-            too_many_substitutes=False,
-        )
-
-    async def substitute_groups_list(self, gremium_id: UUID, actor: Any) -> list[Any]:
-        return [self._out(gremium_id)]
-
-    async def substitute_group_create(self, payload: Any, actor: Any) -> Any:
-        return self._out(payload.gremium_id)
-
-    async def substitute_group_update(self, group_id: UUID, payload: Any, actor: Any) -> Any:
-        if str(group_id).startswith("00000000"):
-            raise NotFoundError("nope")
-        return self._out()
-
-    async def substitute_group_delete(self, group_id: UUID, actor: Any) -> None:
-        if str(group_id).startswith("11111111"):
-            raise ForbiddenError("not yours")
-
-    async def substitute_group_member_add(self, group_id: UUID, payload: Any, actor: Any) -> Any:
-        if payload.kind == "member" and str(group_id).startswith("22222222"):
-            raise ConflictError("dup", code="conflict")
-        return self._out()
-
-    async def substitute_group_member_remove(
-        self, group_id: UUID, principal_id: UUID, actor: Any
-    ) -> None:
-        return None
-
+class _CreateService:
     async def create(self, payload: Any, actor: Any) -> Any:
         self.created = payload
         raise ForbiddenError("stop")
@@ -807,75 +453,8 @@ def _client(service: Any, principal: Principal | None = None) -> TestClient:
 _MEMBER = Principal(sub="lead", roles=["member"], permissions=set())
 
 
-def test_router_lists_groups_in_camel_case() -> None:
-    r = _client(_GroupService(), _MEMBER).get(
-        f"/api/delegations/substitute-groups?gremiumId={GREMIUM_ID}"
-    )
-    assert r.status_code == 200, r.text
-    item = r.json()[0]
-    assert {"gremiumId", "nameI18n", "position", "members", "tooManySubstitutes"} <= item.keys()
-    assert item["members"][0] == {
-        "principalId": item["members"][0]["principalId"],
-        "displayName": "Mia",
-        "kind": "member",
-        "active": True,
-    }
-
-
-def test_router_needs_a_session() -> None:
-    r = _client(_GroupService()).get(f"/api/delegations/substitute-groups?gremiumId={uuid4()}")
-    assert r.status_code == 401
-
-
-def test_router_creates_updates_and_deletes() -> None:
-    client = _client(_GroupService(), _MEMBER)
-    created = client.post(
-        "/api/delegations/substitute-groups",
-        json={"gremiumId": str(GREMIUM_ID), "nameI18n": {"de": "Info"}},
-    )
-    bad = client.post(
-        "/api/delegations/substitute-groups",
-        json={"gremiumId": str(GREMIUM_ID), "nameI18n": {}},
-    )
-    patched = client.patch(f"/api/delegations/substitute-groups/{uuid4()}", json={"position": 1})
-    missing = client.patch(
-        "/api/delegations/substitute-groups/00000000-0000-0000-0000-000000000000",
-        json={"position": 1},
-    )
-    empty = client.patch(f"/api/delegations/substitute-groups/{uuid4()}", json={})
-    deleted = client.delete(f"/api/delegations/substitute-groups/{uuid4()}")
-    foreign = client.delete(
-        "/api/delegations/substitute-groups/11111111-1111-1111-1111-111111111111"
-    )
-    assert created.status_code == 201, created.text
-    assert bad.status_code == 422
-    assert patched.status_code == 200
-    assert missing.status_code == 404
-    assert missing.headers["content-type"].startswith("application/problem+json")
-    assert empty.status_code == 422
-    assert deleted.status_code == 204
-    assert foreign.status_code == 403
-
-
-def test_router_adds_and_removes_people() -> None:
-    client = _client(_GroupService(), _MEMBER)
-    gid = uuid4()
-    added = client.post(
-        f"/api/delegations/substitute-groups/{gid}/members",
-        json={"principalId": str(uuid4()), "kind": "substitute"},
-    )
-    dup = client.post(
-        "/api/delegations/substitute-groups/22222222-2222-2222-2222-222222222222/members",
-        json={"principalId": str(uuid4()), "kind": "member"},
-    )
-    removed = client.delete(f"/api/delegations/substitute-groups/{gid}/members/{uuid4()}")
-    assert added.status_code == 201, added.text
-    assert dup.status_code == 409
-    assert removed.status_code == 204
-
-
 def test_router_passes_the_delegator_id() -> None:
-    service = _GroupService()
+    service = _CreateService()
     a = uuid4()
     r = _client(service, _MEMBER).post(
         "/api/delegations",

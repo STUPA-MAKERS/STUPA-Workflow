@@ -514,17 +514,6 @@ class DelegationCreate(WireModel):
     )
 
 
-class SubstituteGroupCreate(WireModel):
-    gremiumId: str
-    nameI18n: I18nMap = Field(description='Group name per language, e.g. {"de": "Informatik"}')
-    position: int = Field(default=0, ge=0, description="Sort order in the gremium")
-
-
-class SubstituteGroupUpdate(WireModel):
-    nameI18n: I18nMap | None = None
-    position: int | None = Field(default=None, ge=0)
-
-
 class SubstituteCreate(WireModel):
     gremiumId: str
     memberId: str | None = Field(default=None, description="None = pool substitute for any member")

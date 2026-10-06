@@ -260,10 +260,7 @@ class PermissionOps(MeetingServiceBase):
         return member | pool
 
     async def _substitute_pool_gremium_ids(self, sub: str) -> set[UUID]:
-        """Return the gremien whose substitute pool contains `sub`.
-
-        The pool covers `delegation_substitute` and the faculty groups (Z5).
-        """
+        """Return the gremien whose substitute pool contains `sub`."""
         return await substitute_gremien_for_sub(self.session, sub)
 
     async def _emit(

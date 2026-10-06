@@ -13,7 +13,7 @@ import uuid
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import Engine, text
+from sqlalchemy import Connection, Engine, text
 from sqlalchemy.exc import IntegrityError
 
 
@@ -1357,6 +1357,7 @@ def test_substitute_groups(alembic_cfg: Config, engine: Engine) -> None:
     The upgrade creates both tables with the composite foreign key, the CHECK on
     `kind` and the partial unique index for members. The existing pool entries
     stay. The downgrade drops both tables. A second upgrade runs clean.
+    `e12bd65b2a79` drops the tables again, so the checks run at `92f23ad77fc5`.
     """
     command.downgrade(alembic_cfg, "734556b61a72")
     with engine.begin() as conn:
@@ -1382,7 +1383,7 @@ def test_substitute_groups(alembic_cfg: Config, engine: Engine) -> None:
             {"g": gremium, "p": person},
         )
 
-    command.upgrade(alembic_cfg, "head")
+    command.upgrade(alembic_cfg, "92f23ad77fc5")
     with engine.begin() as conn:
         names = set(
             conn.execute(
@@ -1449,9 +1450,91 @@ def test_substitute_groups(alembic_cfg: Config, engine: Engine) -> None:
     command.downgrade(alembic_cfg, "734556b61a72")
     with engine.connect() as conn:
         assert conn.execute(text("SELECT to_regclass('substitute_group')")).scalar() is None
-    command.upgrade(alembic_cfg, "head")
+    command.upgrade(alembic_cfg, "92f23ad77fc5")
     with engine.connect() as conn:
         assert conn.execute(text("SELECT to_regclass('substitute_group')")).scalar() is not None
+    command.upgrade(alembic_cfg, "head")
+
+
+def test_drop_substitute_groups(alembic_cfg: Config, engine: Engine) -> None:
+    """Migration e12bd65b2a79 drops the faculty substitute groups (Z5).
+
+    The upgrade drops both tables with their rows. The pool entries stay. The
+    downgrade is lossy: it creates both tables again, empty, with the composite
+    foreign key and the CHECK on `kind`. A second upgrade runs clean.
+    """
+
+    def tables(conn: Connection) -> set[str]:
+        return {
+            name
+            for name in ("substitute_group", "substitute_group_member")
+            if conn.execute(text("SELECT to_regclass(:t)"), {"t": name}).scalar() is not None
+        }
+
+    command.downgrade(alembic_cfg, "4c2570138998")
+    with engine.begin() as conn:
+        assert tables(conn) == {"substitute_group", "substitute_group_member"}
+        gremium = conn.execute(
+            text("INSERT INTO gremium (name, slug) VALUES ('G', :s) RETURNING id"),
+            {"s": f"g-dsg-{uuid.uuid4()}"},
+        ).scalar_one()
+        person = conn.execute(
+            text("INSERT INTO principal (sub) VALUES (:s) RETURNING id"),
+            {"s": f"dsg-{uuid.uuid4()}"},
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO delegation_substitute (gremium_id, substitute_principal_id) "
+                "VALUES (:g, :p)"
+            ),
+            {"g": gremium, "p": person},
+        )
+        group = conn.execute(
+            text(
+                "INSERT INTO substitute_group (gremium_id, name_i18n) "
+                "VALUES (:g, '{\"de\": \"Info\"}') RETURNING id"
+            ),
+            {"g": gremium},
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO substitute_group_member (group_id, principal_id, gremium_id, kind) "
+                "VALUES (:grp, :p, :g, 'member')"
+            ),
+            {"grp": group, "p": person, "g": gremium},
+        )
+
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        assert tables(conn) == set()
+        # The pool entry stays.
+        assert conn.execute(
+            text("SELECT count(*) FROM delegation_substitute WHERE gremium_id = :g"),
+            {"g": gremium},
+        ).scalar_one() == 1
+
+    command.downgrade(alembic_cfg, "4c2570138998")
+    with engine.begin() as conn:
+        assert tables(conn) == {"substitute_group", "substitute_group_member"}
+        # Lossy: the rows do not come back.
+        assert conn.execute(text("SELECT count(*) FROM substitute_group")).scalar_one() == 0
+        names = set(
+            conn.execute(
+                text(
+                    "SELECT conname FROM pg_constraint WHERE conrelid IN "
+                    "('substitute_group'::regclass, 'substitute_group_member'::regclass)"
+                )
+            ).scalars()
+        )
+        assert {
+            "uq_substitute_group_id_gremium",
+            "pk_substitute_group_member",
+            "fk_substitute_group_member_group",
+            "ck_substitute_group_member_kind",
+        } <= names
+    command.upgrade(alembic_cfg, "head")
+    with engine.connect() as conn:
+        assert tables(conn) == set()
 
 
 def test_audit_verification_and_role_key_report(
