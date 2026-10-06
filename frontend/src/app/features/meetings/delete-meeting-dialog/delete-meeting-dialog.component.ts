@@ -26,9 +26,11 @@ import { errorCode, errorDetail } from '../meetings-display.util';
  * "Sitzung löschen": the confirmation before a meeting goes for good.
  *
  * The text names what goes with the meeting: the agenda, the attendance and the
- * delegations, and the protocol once the meeting has one. The server refuses the
- * delete while a vote is open (409 `open_vote`) and, for a final protocol, without
- * `meeting.delete_finalized` (403).
+ * delegations, and the protocol once the meeting has one. The dialog also loads the
+ * meeting and names the number of its votes, because the server deletes all of them
+ * with the meeting ("Mit der Sitzung werden n Abstimmungen gelöscht."). The server
+ * refuses the delete while a vote is open (409 `open_vote`) and, for a final
+ * protocol, without `meeting.delete_finalized` (403).
  */
 @Component({
   selector: 'app-delete-meeting-dialog',
@@ -50,6 +52,21 @@ export class DeleteMeetingDialogComponent {
   readonly deleted = output<Uuid>();
 
   readonly deleting = signal(false);
+  /** The number of votes of the meeting. `null` while the dialog loads it. */
+  readonly voteCount = signal<number | null>(null);
+  /** The count did not load: the text then says that all votes go. */
+  readonly countFailed = signal(false);
+  /** The id of the meeting that the last count request belongs to. */
+  private countFor: Uuid | null = null;
+
+  /** "Mit der Sitzung werden n Abstimmungen gelöscht.", or nothing without votes. */
+  readonly votesText = computed<string | null>(() => {
+    if (this.countFailed()) return this.i18n.translate('meetings.delete.votesUnknown');
+    const count = this.voteCount();
+    if (!count) return null;
+    if (count === 1) return this.i18n.translate('meetings.delete.votesOne');
+    return this.i18n.translate('meetings.delete.votes', { count });
+  });
 
   /** A planned meeting has no protocol yet. A live or closed one has. */
   readonly bodyKey = computed<TranslationKey>(() =>
@@ -58,7 +75,24 @@ export class DeleteMeetingDialogComponent {
 
   constructor() {
     effect(() => {
-      if (this.meeting()) untracked(() => this.deleting.set(false));
+      const m = this.meeting();
+      if (m) untracked(() => this.open(m.id));
+    });
+  }
+
+  /** Reset the dialog and load the vote count of the meeting. */
+  private open(id: Uuid): void {
+    this.deleting.set(false);
+    this.voteCount.set(null);
+    this.countFailed.set(false);
+    this.countFor = id;
+    this.api.getMeeting(id, { quiet: true }).subscribe({
+      next: (full) => {
+        if (this.countFor === id) this.voteCount.set(full.votes.length);
+      },
+      error: () => {
+        if (this.countFor === id) this.countFailed.set(true);
+      },
     });
   }
 

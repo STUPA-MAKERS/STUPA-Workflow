@@ -46,8 +46,11 @@ describe('GuestViewComponent', () => {
     expect(screen.getByText('Keine offene Abstimmung')).toBeInTheDocument();
     expect(screen.getByText('Jetzt')).toBeInTheDocument();
     expect(screen.getByText('Personal')).toBeInTheDocument();
-    expect(screen.getByText('TOP 2 · Inhalt nur für Mitglieder')).toBeInTheDocument();
-    expect(screen.getByText('TOP 3 · Antrag · jetzt')).toBeInTheDocument();
+    expect(screen.getByText('Inhalt nur für Mitglieder')).toBeInTheDocument();
+    // D5: an application item says "Antrag"; a free-text item has no subtitle.
+    expect(screen.getByText('Antrag')).toBeInTheDocument();
+    expect(screen.queryByText(/^TOP \d/)).toBeNull();
+    expect(document.querySelector('.gv__item[aria-current="step"]')?.textContent).toContain('Antrag');
     expect(screen.getByText('Unbenannter TOP')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('radio', { name: /Protokoll/ }));
     expect(screen.getByText('Vorstellung')).toBeInTheDocument();

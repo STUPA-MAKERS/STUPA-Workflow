@@ -651,8 +651,12 @@ class FlowService:
         *,
         note: str | None = None,
         rollback_on_conflict: bool = False,
+        vote_id: UUID | None = None,
     ) -> StagedFire:
         """Stage the `pass` or `fail` transition of the current `vote` state.
+
+        `vote_id` names the vote whose close fires the branch. The status event keeps
+        it, so the timeline can link the vote (and show a deleted one).
 
         The method does not commit. By default it does not roll back either: the voting
         module runs it in a SAVEPOINT (`session.begin_nested()`). On an error only the
@@ -675,6 +679,7 @@ class FlowService:
             note=note or branch,
             manual=False,
             rollback_on_conflict=rollback_on_conflict,
+            vote_id=vote_id,
         )
 
     async def _cancel_votes(
@@ -787,10 +792,12 @@ class FlowService:
         non_public: bool = False,
         allow_unconfirmed: bool = True,
         rollback_on_conflict: bool = True,
+        vote_id: UUID | None = None,
     ) -> StagedFire:
         """Write a transition into the open transaction, without a commit.
 
-        `fire` documents the arguments. `rollback_on_conflict=False` leaves a lost race
+        `fire` documents the arguments. `vote_id` goes into the status event (the vote
+        whose close fires a branch). `rollback_on_conflict=False` leaves a lost race
         to the caller: the voting close runs this in a SAVEPOINT, and a full rollback
         there would also drop the staged vote close.
 
@@ -817,6 +824,14 @@ class FlowService:
         if manual and transition.branch is not None:
             raise ConflictError(
                 "Branch transitions are fired by the vote outcome, not manually.",
+                code="conflict",
+            )
+        # The worker fires an automatic transition when its guard holds. The list of
+        # the available transitions hides it, so a person must not fire it either. The
+        # list and this gate then agree, and so does the task list.
+        if manual and transition.automatic:
+            raise ConflictError(
+                "Automatic transitions are fired by the system, not manually.",
                 code="conflict",
             )
 
@@ -861,6 +876,7 @@ class FlowService:
             transition_id=transition.id,
             actor=principal.sub,
             note=note,
+            vote_id=vote_id,
         )
         self.session.add(event)
         await self.session.flush()

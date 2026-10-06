@@ -293,15 +293,13 @@ export const routes: Routes = [
         children: [
           {
             path: 'cost-centres',
-            // `adminNav: 'xl'`: the cost-centre table with its eight columns fits beside
-            // the admin navigation from 1440 px on (a sheet of 904 px, the table needs
-            // 870 px). Below that the page takes the full width.
+            // D6: the admin navigation stays beside the cost centres at every width. Where
+            // the sheet is narrower than the eight columns, the table scrolls inside it.
             data: {
               title: 'budget.tree.title',
               permission: 'budget.structure',
               parent: ['admin'],
               wide: true,
-              adminNav: 'xl',
             },
             canActivate: [authGuard],
             loadComponent: () =>

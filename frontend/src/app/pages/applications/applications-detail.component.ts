@@ -547,6 +547,9 @@ export class ApplicationsDetailComponent {
         lines.push(t('applications.history.transition', { label: e.transitionLabel }));
       }
       if (e.note) lines.push(e.note);
+      // The vote that decided the status: a link, or a note when the meeting delete
+      // took it along (the status stays).
+      if (e.voteDeleted) lines.push(t('applications.history.voteDeleted'));
       return {
         at: e.at,
         icon: i === 0 ? 'send' : 'flow',
@@ -554,6 +557,9 @@ export class ApplicationsDetailComponent {
         kind: flowColorKind(e.toState?.color),
         actor: this.actor(e.actorInfo, e.actor),
         body: lines.join('\n') || null,
+        link: e.voteId
+          ? { label: t('applications.history.voteLink'), route: ['/voting', e.voteId] }
+          : null,
       };
     });
     for (const v of versions) {

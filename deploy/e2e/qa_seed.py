@@ -81,6 +81,27 @@ def _role_group(role_key: str) -> str:
 # The Gremium role that a member without a role mapping gets.
 DEFAULT_GREMIUM_ROLE = "member"
 
+# Custom Gremium roles that the seed creates in each Gremium that uses them (D4). The
+# forced roles (vorstand, manager, member) exist already. `protokoll` is the
+# minute-taker: it can be assigned as keeper and write the minutes. The membership itself
+# gives the read access to the meetings of the Gremium, so the role needs no read key.
+#
+# The sync keeps ONE role per (person, Gremium): the role with more permissions wins,
+# then the lower key. `protokoll` therefore also holds `vote.cast`. Then it wins over
+# `member` (one permission), and the person keeps the vote of a member.
+SEED_GREMIUM_ROLES: dict[str, tuple[dict[str, str], list[str]]] = {
+    "protokoll": (
+        {"de": "Protokoll", "en": "Minute-taker"},
+        ["vote.cast", "protocol.write"],
+    ),
+}
+
+# Gremium roles IN ADDITION to the role in `PEOPLE` (sub -> [(gremium, role)]). D4:
+# qa-protocol stays a `member` of the StuPa and also gets the group of `protokoll`.
+EXTRA_GREMIUM_ROLES: dict[str, list[tuple[str, str]]] = {
+    "qa-protocol": [("stupa", "protokoll")],
+}
+
 
 def _membership_group(gremium_key: str) -> str:
     """Return the OIDC group that makes a person a member of a Gremium."""
@@ -93,9 +114,12 @@ def _gremium_role_group(gremium_key: str, gremium_role_key: str) -> str:
 
 
 def _groups_of(
-    role_key: str | None, gremium_key: str | None, gremium_role_key: str | None
+    role_key: str | None,
+    gremium_key: str | None,
+    gremium_role_key: str | None,
+    extra: list[tuple[str, str]] | None = None,
 ) -> list[str]:
-    """Return the OIDC groups of one person in `PEOPLE`."""
+    """Return the OIDC groups of one person in `PEOPLE`, plus its extra Gremium roles."""
     groups: list[str] = []
     if role_key is not None:
         groups.append(_role_group(role_key))
@@ -104,6 +128,10 @@ def _groups_of(
         role = gremium_role_key or DEFAULT_GREMIUM_ROLE
         if role != DEFAULT_GREMIUM_ROLE:
             groups.append(_gremium_role_group(gremium_key, role))
+    for extra_gremium, extra_role in extra or []:
+        group = _gremium_role_group(extra_gremium, extra_role)
+        if group not in groups:
+            groups.append(group)
     return groups
 
 
@@ -128,6 +156,7 @@ GREMIUM_ROLE_MAPPINGS = sorted(
         and gremium_role_key is not None
         and gremium_role_key != DEFAULT_GREMIUM_ROLE
     }
+    | {pair for pairs in EXTRA_GREMIUM_ROLES.values() for pair in pairs}
 )
 
 
@@ -149,6 +178,27 @@ async def _gremium_role(session, gremium_id: uuid.UUID, key: str) -> uuid.UUID |
             )
         )
     ).scalar_one_or_none()
+
+
+async def _ensure_seed_gremium_roles(session, gremien: dict[str, uuid.UUID]) -> None:
+    """Create the custom Gremium roles of `SEED_GREMIUM_ROLES` where `PEOPLE` uses them."""
+    for gremium_key, gremium_role_key in GREMIUM_ROLE_MAPPINGS:
+        spec = SEED_GREMIUM_ROLES.get(gremium_role_key)
+        gid = gremien.get(gremium_key)
+        if spec is None or gid is None:
+            continue
+        if await _gremium_role(session, gid, gremium_role_key) is not None:
+            continue
+        name_i18n, permissions = spec
+        session.add(
+            GremiumRole(
+                gremium_id=gid,
+                key=gremium_role_key,
+                name_i18n=name_i18n,
+                permissions=list(permissions),
+            )
+        )
+    await session.flush()
 
 
 async def _ensure_principal(session, sub: str, email: str, name: str) -> Principal:
@@ -241,12 +291,15 @@ async def main() -> None:
         gremien = await _gremien_by_key(session)
         await _ensure_group_mappings(session, roles)
         await _ensure_gremium_membership_mappings(session, gremien)
+        await _ensure_seed_gremium_roles(session, gremien)
         await _ensure_gremium_role_mappings(session, gremien)
 
         for sub, email, name, role_key, gremium_key, gremium_role_key in PEOPLE:
             principal = await _ensure_principal(session, sub, email, name)
             # The group cache that an OIDC login would fill.
-            principal.oidc_groups = _groups_of(role_key, gremium_key, gremium_role_key)
+            principal.oidc_groups = _groups_of(
+                role_key, gremium_key, gremium_role_key, EXTRA_GREMIUM_ROLES.get(sub)
+            )
             await _drop_manual_assignments(session, principal.id)
 
             label = sub.removeprefix("qa-")

@@ -14,13 +14,12 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
 import { ThemeService } from '@core/theme/theme.service';
 // By path, not through the `@shared/ui` barrel: the shell is in the initial bundle, and
 // the barrel would pull every shared block a lazy page uses into it.
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import { IconComponent, SwitchComponent } from '@stupa-makers/ui-kit';
-import { LocaleSwitchService } from '../locale-switch.service';
+import { LanguageSelectComponent } from '../language-select/language-select.component';
 
 /**
  * `popover`: the avatar at the foot of the rail, which opens the menu beside the rail.
@@ -48,7 +47,15 @@ let nextId = 0;
   selector: 'app-account-menu',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, RouterLink, TranslatePipe, IconComponent, SwitchComponent, AvatarComponent],
+  imports: [
+    NgTemplateOutlet,
+    RouterLink,
+    TranslatePipe,
+    IconComponent,
+    SwitchComponent,
+    AvatarComponent,
+    LanguageSelectComponent,
+  ],
   templateUrl: './account-menu.component.html',
   styleUrl: './account-menu.component.scss',
 })
@@ -56,7 +63,6 @@ export class AccountMenuComponent {
   readonly auth = inject(AuthService);
   readonly theme = inject(ThemeService);
   readonly i18n = inject(I18nService);
-  private readonly locales = inject(LocaleSwitchService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   readonly variant = input<AccountMenuVariant>('popover');
@@ -71,12 +77,6 @@ export class AccountMenuComponent {
   protected readonly panelId = `account-menu-${nextId++}`;
   private readonly trigger = viewChild<ElementRef<HTMLButtonElement>>('trigger');
   private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
-
-  /** The native name of each language, the same in every locale. */
-  protected readonly languageName: Record<string, TranslationKey> = {
-    de: 'shell.lang.de',
-    en: 'shell.lang.en',
-  };
 
   toggle(): void {
     if (this.open()) this.close();
@@ -95,7 +95,7 @@ export class AccountMenuComponent {
     });
     this.open.set(true);
     // The panel renders in this change detection; focus its first control right after.
-    setTimeout(() => this.panel()?.nativeElement.querySelector<HTMLElement>('a, button, select')?.focus());
+    setTimeout(() => this.panel()?.nativeElement.querySelector<HTMLElement>('a, button')?.focus());
   }
 
   /** Close the popover. `restoreFocus` puts the focus back on the avatar. */
@@ -109,10 +109,6 @@ export class AccountMenuComponent {
   onNavigate(): void {
     this.close();
     this.navigated.emit();
-  }
-
-  setLocale(value: string): void {
-    this.locales.switchTo(value);
   }
 
   setDark(dark: boolean): void {

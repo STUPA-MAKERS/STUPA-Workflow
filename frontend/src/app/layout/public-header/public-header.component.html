@@ -5,20 +5,7 @@
   </a>
   <span class="pub__spacer"></span>
 
-  <label class="pub__lang">
-    <app-icon class="pub__langIcon" name="globe" [size]="15" />
-    <select
-      class="pub__langSelect"
-      [attr.aria-label]="'lang.switch' | t"
-      [value]="i18n.locale()"
-      (change)="setLocale($any($event.target).value)"
-    >
-      @for (loc of i18n.locales; track loc) {
-        <option [value]="loc" [selected]="loc === i18n.locale()">{{ loc | uppercase }}</option>
-      }
-    </select>
-    <app-icon class="pub__langChevron" name="down" [size]="15" />
-  </label>
+  <app-language-select class="pub__lang" [label]="'lang.switch' | t" display="code" />
 
   <button
     type="button"

@@ -200,9 +200,13 @@ describe('SubstitutePoolComponent', () => {
     expect(add).toBeDisabled();
     await userEvent.type(within(dialog).getByRole('searchbox', { name: /Person suchen/ }), 'ki');
     await waitFor(() => expect(admin.listPrincipals).toHaveBeenCalledWith('ki'));
-    // An inactive person is no choice; a person without a name shows the subject.
+    // An inactive person is no choice; a person without a name reads "Ohne Namen" and
+    // keeps the subject in the tooltip.
     expect(await within(dialog).findByRole('button', { name: /Kim/ })).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: 'kc|ki' })).toBeInTheDocument();
+    // D7: a nameless account reads "Ohne Namen", never its sub.
+    expect(within(dialog).getByRole('button', { name: 'Ohne Namen' })).toBeInTheDocument();
+    expect(within(dialog).queryByText('kc|ki')).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Ohne Namen' })).toHaveAttribute('title', 'kc|ki');
     expect(within(dialog).queryByRole('button', { name: /Off/ })).toBeNull();
     await userEvent.click(within(dialog).getByRole('button', { name: /Kim/ }));
     expect(within(dialog).getByRole('status')).toHaveTextContent('Gewählt: Kim');
@@ -334,7 +338,8 @@ describe('SubstitutePoolComponent', () => {
     c.removing.set(new Set(['s-1']));
     c.remove(ENTRIES[0]);
     expect(delegations.removeSubstitute).not.toHaveBeenCalled();
-    expect(c.label({ ...PEOPLE[1], sub: 'kc|x' })).toBe('kc|x');
+    // D7: a nameless account reads "Ohne Namen", never its sub.
+    expect(c.label({ ...PEOPLE[1], sub: 'kc|x' })).toBe('Ohne Namen');
     expect(c.label({ ...PEOPLE[1], email: 'e@x.de' })).toBe('e@x.de');
   });
 });

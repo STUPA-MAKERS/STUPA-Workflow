@@ -267,6 +267,13 @@ class TimelineEventOut(_CamelModel):
     actor_info: ActorOut | None = Field(default=None, alias="actorInfo")
     at: datetime
     note: str | None = None
+    # The vote whose close fired this event, for the link to the vote. Null for every
+    # other event, for a deleted vote, and in the applicant view (no vote access).
+    vote_id: UUID | None = Field(default=None, alias="voteId")
+    # True when a vote close fired this event (note ``vote:<result>``) and the vote
+    # is gone: a meeting delete deleted it with its meeting. The application keeps the
+    # status that the vote decided.
+    vote_deleted: bool = Field(default=False, alias="voteDeleted")
 
 
 class VersionOut(_CamelModel):

@@ -6,6 +6,7 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -50,6 +51,8 @@ export interface HistoryEntry {
   body?: string | null;
   /** The changed fields, one line each, below the body. */
   changes?: readonly HistoryChange[] | null;
+  /** A link below the body, for example to the vote that decided the status. */
+  link?: { label: string; route: readonly string[] } | null;
 }
 
 interface HistoryDay {
@@ -76,7 +79,7 @@ let nextId = 0;
   selector: 'app-history',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconComponent, StatusTextComponent, TranslatePipe],
+  imports: [IconComponent, RouterLink, StatusTextComponent, TranslatePipe],
   templateUrl: './history.component.html',
   styleUrl: './history.component.scss',
 })

@@ -221,9 +221,7 @@
 }
 
 /* The shared top and bottom fade: an end fades only while more content lies past it. */
-.mt__list {
-  @include fade.fade-y(var(--space-5));
-}
+.mt__list,
 .mt__editor {
   @include fade.fade-y(var(--space-5));
 }

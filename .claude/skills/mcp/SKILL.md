@@ -57,5 +57,6 @@ description: The antragsplattform_mcp MCP server, a standalone FastMCP package. 
 - The platform injects `_baked.py` when a user downloads the package from a running instance. That file wires `BASE_URL` to `PUBLIC_BASE_URL`. A plain repo checkout has no `_baked.py`, so `ANTRAGSPLATTFORM_URL` is mandatory and `main()` fails fast when it is missing.
 - `finalize_protocol` renders asynchronously (arq). Poll the protocol again. A return to `status=draft` means that the render failed.
 - The client normalizes API errors to `ApiError(status, message)` from the RFC-9457 problem-detail `detail`/`title` of the platform.
+- Tests live in `antragsplattform_mcp/tests/` and `antragsplattform_mcp/test_*.py`. The CI job `mcp` (D2) runs `pip install -e '.[dev]'`, `ruff check .` and `pytest -q` in `mcp/`. Locally: `nix develop .#mcp`, then `ruff check .` and `.venv/bin/python -m pytest -q` (the pip `ruff` wheel does not start on NixOS; use the Nix one).
 
 **Related:** be-auth, be-flow, be-forms, be-voting, be-budget, be-livevote, be-audit

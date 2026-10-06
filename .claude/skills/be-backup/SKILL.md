@@ -9,6 +9,8 @@ description: Whole-platform backup and restore — age-encrypted archives (pg_du
 
 **Why in-app:** the shell scripts this replaced (`deploy/backup/`) could only be driven from an SSH session on the VM. The people who run this platform are a student government, not operators with a terminal.
 
+**Coverage:** CRITICAL module (D11). `modules/backup` and the worker side (`worker/backup.py`, listed as `backup.py` in coverage.xml) are in the 100 % branch gate of `[tool.coverage_critical]` in `backend/pyproject.toml`. The pure unit suite in `tests/unit/modules/backup/` reaches it with fakes, a real age key pair and a stubbed `pg_dump`/`pg_restore`.
+
 **Key files:**
 - `models.py` — the `Backup` catalogue row plus the archive member names. Metadata only; the archive is in MinIO.
 - `archive.py` — pure layer: tar layout, age encrypt/decrypt (`pyrage`), the manifest. No DB, no subprocess, so the unit tests drive it directly.

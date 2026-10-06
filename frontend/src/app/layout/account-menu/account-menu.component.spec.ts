@@ -216,11 +216,13 @@ describe('AccountMenuComponent', () => {
     it('names each language in its own language and switches with a reload', async () => {
       const location = createLocationMock();
       const { i18n } = await setup({ variant: 'sheet', location });
-      const select = screen.getByRole('combobox', { name: 'Sprache' }) as HTMLSelectElement;
-      expect(Array.from(select.options).map((o) => o.textContent?.trim())).toEqual(['Deutsch', 'English']);
-      expect(select.value).toBe('de');
+      expect(document.querySelector('select')).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Sprache: Deutsch' }));
+      const options = screen.getAllByRole('option');
+      expect(options.map((o) => o.textContent?.trim())).toEqual(['Deutsch', 'English']);
+      expect(screen.getByRole('option', { name: 'Deutsch' })).toHaveAttribute('aria-selected', 'true');
 
-      await userEvent.selectOptions(select, 'en');
+      await userEvent.click(screen.getByRole('option', { name: 'English' }));
       expect(i18n.locale()).toBe('en');
       expect(location.reload).toHaveBeenCalledTimes(1);
     });

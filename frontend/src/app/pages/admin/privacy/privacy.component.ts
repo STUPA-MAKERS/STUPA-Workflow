@@ -1,10 +1,19 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { PageHeaderComponent, StatusTextComponent, erasureStatus } from '@shared/ui';
+import { liveSearch } from '@shared/live-search';
+import {
+  AvatarComponent,
+  PageHeaderComponent,
+  SearchPillComponent,
+  StatusTextComponent,
+  erasureStatus,
+} from '@shared/ui';
 import {
   ButtonComponent,
   CellDirective,
@@ -16,7 +25,10 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
-import type { ErasureRequest } from '../admin.models';
+import type { AdminPrincipal, ErasureRequest } from '../admin.models';
+
+/** The picker shows this many hits. A longer list means: type more. */
+const PERSON_HITS = 6;
 
 /**
  * Privacy (board Admin-Datenschutz, permission `privacy.manage`) for GDPR administration.
@@ -25,7 +37,9 @@ import type { ErasureRequest } from '../admin.models';
  *   request is rejected (with an optional reason) or executed; executing erases data and
  *   is the danger action. Both ask for a confirmation.
  * - Access export (Art. 15): every record of an e-mail address as XLSX.
- * - Account erasure (Art. 17): clears the personal data of one account (danger).
+ * - Account erasure (Art. 17): clears the personal data of one account (danger). The
+ *   person comes from a picker (name or e-mail, D1). `?person=<sub>` preselects it; the
+ *   row action "Konto löschen (DSGVO)" in Verwaltung → Benutzer links here that way.
  * - Retention (Art. 5(1)(e)): months until a closed application is anonymized.
  *
  * The server audits every mutation.
@@ -45,6 +59,8 @@ import type { ErasureRequest } from '../admin.models';
     IconComponent,
     InputComponent,
     PageHeaderComponent,
+    SearchPillComponent,
+    AvatarComponent,
     StatusTextComponent,
   ],
   templateUrl: './privacy.component.html',
@@ -54,6 +70,7 @@ export class PrivacyComponent {
   private readonly api = inject(AdminApiService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly route = inject(ActivatedRoute);
 
   /**
    * True until the first answer. Without it the table shows its empty text while the
@@ -67,7 +84,15 @@ export class PrivacyComponent {
   protected readonly confirmExecute = signal<ErasureRequest | null>(null);
 
   protected readonly auskunftEmail = signal('');
-  protected readonly principalId = signal('');
+  /** The account to erase, as picked. */
+  protected readonly person = signal<AdminPrincipal | null>(null);
+  protected readonly personHits = signal<AdminPrincipal[]>([]);
+  protected readonly personSearch = liveSearch<AdminPrincipal[]>({
+    run: (q) => this.api.listPrincipals(q),
+    result: (list) => this.personHits.set(list.filter((p) => !p.mergedIntoId).slice(0, PERSON_HITS)),
+    reset: () => this.personHits.set([]),
+    error: () => this.personHits.set([]),
+  });
   protected readonly confirmPrincipal = signal(false);
 
   protected readonly retentionMonths = signal<number | null>(null);
@@ -86,6 +111,33 @@ export class PrivacyComponent {
   constructor() {
     this.reload();
     this.api.getPrivacySettings().subscribe((s) => this.retentionMonths.set(s.defaultRetentionMonths));
+    // `?person=<sub>` comes from the row action in Verwaltung → Benutzer. The search
+    // matches the `sub` too; only an exact match is taken.
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
+      const sub = qp.get('person');
+      if (!sub) return;
+      this.api.listPrincipals(sub).subscribe({
+        next: (list) => {
+          const hit = list.find((p) => p.sub === sub && !p.mergedIntoId);
+          if (hit) this.person.set(hit);
+        },
+        error: () => undefined,
+      });
+    });
+  }
+
+  /** The name of an account; "Ohne Namen" when it has neither a name nor an e-mail (D7). */
+  protected personName(p: AdminPrincipal): string {
+    return p.displayName || p.email || this.i18n.translate('common.unnamed');
+  }
+
+  protected pickPerson(p: AdminPrincipal): void {
+    this.person.set(p);
+    this.personSearch.clear();
+  }
+
+  protected clearPerson(): void {
+    this.person.set(null);
   }
 
   protected reload(): void {
@@ -155,17 +207,17 @@ export class PrivacyComponent {
   }
 
   protected askPrincipalErase(): void {
-    if (!this.principalId().trim()) return;
+    if (!this.person()) return;
     this.confirmPrincipal.set(true);
   }
 
   protected doPrincipalErase(): void {
-    const id = this.principalId().trim();
-    if (!id) return;
-    this.api.erasePrincipal(id).subscribe({
+    const p = this.person();
+    if (!p) return;
+    this.api.erasePrincipal(p.id).subscribe({
       next: () => {
         this.confirmPrincipal.set(false);
-        this.principalId.set('');
+        this.person.set(null);
         this.toast.success(this.i18n.translate('admin.privacy.principalErased'));
       },
       error: () => {

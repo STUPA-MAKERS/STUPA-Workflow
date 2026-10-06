@@ -79,16 +79,52 @@
     <section class="pv__card" aria-labelledby="pv-principal">
       <h2 class="pv__cardTitle" id="pv-principal">{{ 'admin.privacy.principalTitle' | t }}</h2>
       <p class="pv__hint">{{ 'admin.privacy.principalHint' | t }}</p>
+      <!-- D1: a person picker (name or e-mail), never a raw id. -->
       <form class="pv__form" (submit)="$event.preventDefault(); askPrincipalErase()">
-        <app-input
-          class="pv__idInput"
-          [label]="'admin.privacy.principalId' | t"
-          [ngModel]="principalId()"
-          (ngModelChange)="principalId.set($event)"
-          name="principalId"
-        />
+        @if (person(); as p) {
+          <div class="pv__person">
+            <app-avatar size="sm" [name]="personName(p)" [principalId]="p.id" [decorative]="true" />
+            <span class="pv__personWho">
+              <span class="pv__personName" [attr.title]="p.displayName || p.email ? null : p.sub">{{ personName(p) }}</span>
+              @if (p.email) {
+                <span class="pv__mail mono pv__muted">{{ p.email }}</span>
+              }
+            </span>
+            <app-button variant="text" size="sm" (click)="clearPerson()">{{ 'admin.privacy.personChange' | t }}</app-button>
+          </div>
+        } @else {
+          <app-search-pill
+            size="md"
+            [clearable]="true"
+            [placeholder]="'admin.privacy.personPlaceholder' | t"
+            [label]="'admin.privacy.personSearch' | t"
+            [busy]="personSearch.pending()"
+            [value]="personSearch.text()"
+            (valueChange)="personSearch.set($event)"
+            (commit)="personSearch.flush()"
+          />
+          @if (personSearch.applied()) {
+            <ul class="rowgroup rowgroup--bg3 pv__hits" [attr.aria-label]="'admin.privacy.personHits' | t">
+              @for (c of personHits(); track c.id) {
+                <li>
+                  <button type="button" class="pv__hit" (click)="pickPerson(c)">
+                    <app-avatar size="sm" [name]="personName(c)" [principalId]="c.id" [decorative]="true" />
+                    <span class="pv__personWho">
+                      <span class="pv__personName">{{ personName(c) }}</span>
+                      @if (c.email) {
+                        <span class="pv__mail mono pv__muted">{{ c.email }}</span>
+                      }
+                    </span>
+                  </button>
+                </li>
+              } @empty {
+                <li class="pv__none">{{ 'admin.users.noResults' | t }}</li>
+              }
+            </ul>
+          }
+        }
         <div>
-          <app-button type="submit" variant="danger" [disabled]="!principalId().trim()">
+          <app-button type="submit" variant="danger" [disabled]="!person()">
             {{ 'admin.privacy.principalErase' | t }}
           </app-button>
         </div>
@@ -159,7 +195,14 @@
   (closed)="confirmPrincipal.set(false)"
 >
   <p class="pv__dialogText">{{ 'admin.privacy.principalConfirm' | t }}</p>
-  <p class="pv__dialogText mono pv__mail">{{ principalId().trim() }}</p>
+  @if (person(); as p) {
+    <p class="pv__dialogText pv__confirmWho">
+      <strong>{{ personName(p) }}</strong>
+      @if (p.email) {
+        <span class="mono pv__mail pv__muted">{{ p.email }}</span>
+      }
+    </p>
+  }
   <div dialog-footer class="pv__dialogFoot">
     <app-button variant="text" (click)="confirmPrincipal.set(false)">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="danger" (click)="doPrincipalErase()">{{ 'admin.privacy.principalErase' | t }}</app-button>

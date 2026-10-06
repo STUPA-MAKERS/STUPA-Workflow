@@ -47,6 +47,8 @@
   /* The field label sits on that fill. The subtle text colour gives less than 4.5:1 on
      surface 3, so the label takes the muted text colour. */
   --color-text-subtle: var(--color-text-muted);
+  /* The person search of the account erasure sits on surface 2 as well. */
+  --sp-bg: var(--color-surface-3);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -69,8 +71,66 @@
   flex-direction: column;
   gap: var(--space-3);
 }
-.pv__idInput ::ng-deep input {
-  font-family: var(--font-mono);
+/* The picked account and the hits of the picker (D1). */
+.pv__person {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-3);
+}
+.pv__personWho {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pv__personName {
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+.pv__hits {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pv__hit {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 3rem;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.pv__hit:hover {
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.pv__hit:hover .pv__muted {
+  color: inherit;
+}
+.pv__hit:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.pv__none {
+  padding: var(--space-3);
+  color: var(--color-text-muted);
+}
+.pv__confirmWho {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .pv__retention {

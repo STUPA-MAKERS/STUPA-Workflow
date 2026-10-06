@@ -375,6 +375,10 @@ export interface TimelineEventOutWire {
   actorInfo?: ActorInfo | null;
   at: IsoDateTime;
   note?: string | null;
+  /** The vote whose close fired the event. Null in the applicant view. */
+  voteId?: Uuid | null;
+  /** A vote close fired the event, and the vote went with its meeting. */
+  voteDeleted?: boolean;
 }
 
 export type CommentVisibility = 'internal' | 'public';
@@ -660,6 +664,10 @@ export interface TimelineEntry {
   actorInfo?: ActorInfo | null;
   at: IsoDateTime;
   note: string | null;
+  /** The vote whose close fired the event, for the link to it. */
+  voteId: Uuid | null;
+  /** The vote that fired the event was deleted with its meeting. */
+  voteDeleted: boolean;
 }
 
 /** Comment, frontend view. `isPublic` comes from `visibility`. */

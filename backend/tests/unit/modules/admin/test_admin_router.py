@@ -894,3 +894,17 @@ def test_mutating_endpoints_declare_400(app: FastAPI) -> None:
         responses = spec["paths"][path][method]["responses"]
         assert "400" in responses, f"{method.upper()} {path} missing 400"
         assert list(responses["400"]["content"]) == ["application/problem+json"]
+
+
+def test_privacy_admin_reads_principals_for_the_erasure_picker(
+    app: FastAPI, client: TestClient
+) -> None:
+    """D1: the account erasure on the privacy page picks a person by name or e-mail.
+
+    `privacy.manage` alone must read the principal search, and nothing else of the
+    user administration.
+    """
+    _as(app, {"privacy.manage"})
+    assert client.get("/api/admin/principals?q=max").status_code == 200
+    patched = client.patch(f"/api/admin/principals/{uuid4()}", json={"active": False})
+    assert patched.status_code == 403

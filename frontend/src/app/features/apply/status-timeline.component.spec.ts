@@ -228,6 +228,26 @@ describe('StatusTimelineComponent', () => {
     expect(comp.historyEntries().map((e) => e.title)).toEqual(['Version 1 gespeichert']);
   });
 
+  it('names a vote that went with its meeting', async () => {
+    const { comp } = await setup(fakeApi({ timeline: () => of([]), versions: () => of([]) }));
+    await screen.findByRole('heading', { level: 1 });
+    comp.timeline.set([
+      {
+        toStateId: 's9',
+        toState: null,
+        label: 'Genehmigt',
+        actor: null,
+        at: '2026-06-05T10:00:00Z',
+        note: 'vote:passed',
+        voteId: null,
+        voteDeleted: true,
+      },
+    ]);
+    expect(comp.historyEntries()[0].body).toBe(
+      'Abstimmungsergebnis: Angenommen\nAbstimmung gelöscht (mit Sitzung)',
+    );
+  });
+
   it('translates vote notes and keeps other notes', async () => {
     const { comp } = await setup(fakeApi());
     expect(comp.noteText('vote:passed')).toBe('Abstimmungsergebnis: Angenommen');
@@ -422,6 +442,21 @@ describe('StatusTimelineComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Zurückziehen' }));
     expect(fire).toHaveBeenCalledWith(ID, { transitionId: 'tr1' });
     expect(getApplication).toHaveBeenCalledTimes(2);
+  });
+
+  it('offers no action when the server refuses the applicant transitions (403)', async () => {
+    // A staff member who is not the creator gets 403 from the list route.
+    const fire = jest.fn();
+    const { comp } = await setup(
+      fakeApi({
+        applicantTransitions: () => throwError(() => ({ status: 403 })),
+        fireApplicant: fire,
+      }),
+    );
+    expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
+    expect(comp.actions()).toEqual([]);
+    expect(screen.queryByRole('button', { name: 'Aktion ausführen' })).not.toBeInTheDocument();
+    expect(fire).not.toHaveBeenCalled();
   });
 
   it('toasts a failed transition and ignores a second fire', async () => {

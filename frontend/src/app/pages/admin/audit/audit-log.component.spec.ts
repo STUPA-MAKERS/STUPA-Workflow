@@ -16,9 +16,7 @@ import { AUDIT_ACTIONS, AuditLogComponent, localDayBound } from './audit-log.com
 type Cmp = AuditLogComponent & {
   setAction(v: string): void;
   setActor(v: string): void;
-  setSince(v: string): void;
   setRange(v: { from: string; to: string }): void;
-  setUntil(v: string): void;
   resetFilters(): void;
   loadMore(): void;
   toggle(id: number): void;
@@ -172,8 +170,6 @@ const BACKEND_AUDIT_ACTIONS = [
   'guest_removed',
   'guest_renamed',
   'guest_admit_all',
-  'pii_access',
-  'pii_deletion',
   'pii_export',
   'anonymization',
   'erasure_requested',
@@ -331,10 +327,10 @@ describe('AuditLogComponent', () => {
     expect(listAuditLog).toHaveBeenCalledWith(expect.objectContaining({ actor: 'kc|bob' }));
   });
 
-  it('setSince expands the date to a start-of-day bound', async () => {
+  it('setRange expands the start day to a start-of-day bound', async () => {
     const { cmp, listAuditLog } = await setup();
     listAuditLog.mockClear();
-    cmp.setSince('2026-06-01');
+    cmp.setRange({ from: '2026-06-01', to: '' });
     // The server wants an aware time: the local midnight goes out as UTC.
     expect(listAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({ since: localDayBound('2026-06-01', false) }),
@@ -343,10 +339,10 @@ describe('AuditLogComponent', () => {
     expect(localDayBound('2026-06-01', false)).not.toContain('+');
   });
 
-  it('setUntil expands the date to an end-of-day bound', async () => {
+  it('setRange expands the end day to an end-of-day bound', async () => {
     const { cmp, listAuditLog } = await setup();
     listAuditLog.mockClear();
-    cmp.setUntil('2026-06-30');
+    cmp.setRange({ from: '', to: '2026-06-30' });
     expect(listAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({ until: localDayBound('2026-06-30', true) }),
     );
@@ -364,9 +360,8 @@ describe('AuditLogComponent', () => {
     const { cmp, listAuditLog } = await setup();
     cmp.setAction('login');
     cmp.setActor('kc|bob');
-    cmp.setSince('2026-06-01');
-    cmp.setUntil('2026-06-30');
-    expect(cmp.activeFilterCount()).toBe(4);
+    cmp.setRange({ from: '2026-06-01', to: '2026-06-30' });
+    expect(cmp.activeFilterCount()).toBe(3);
     listAuditLog.mockClear();
     cmp.resetFilters();
     expect(cmp.activeFilterCount()).toBe(0);
@@ -380,10 +375,14 @@ describe('AuditLogComponent', () => {
     );
   });
 
-  it('activeFilterCount counts each populated filter independently', async () => {
+  it('activeFilterCount counts the period chip once', async () => {
     const { cmp } = await setup();
     expect(cmp.activeFilterCount()).toBe(0);
-    cmp.setSince('2026-06-01');
+    cmp.setRange({ from: '2026-06-01', to: '' });
+    expect(cmp.activeFilterCount()).toBe(1);
+    cmp.setRange({ from: '', to: '2026-06-30' });
+    expect(cmp.activeFilterCount()).toBe(1);
+    cmp.setRange({ from: '2026-06-01', to: '2026-06-30' });
     expect(cmp.activeFilterCount()).toBe(1);
   });
 

@@ -98,11 +98,14 @@ export class GuestViewComponent {
   protected readonly rows = computed<AgendaRow[]>(() =>
     this.ordered().map((item) => {
       const now = item.position === this.currentPos();
-      const parts = [this.i18n.translate('meetings.agenda.top', { n: item.position })];
-      if (item.nonPublic) parts.push(this.i18n.translate('guests.view.membersOnly'));
-      else if (item.kind === 'application') parts.push(this.i18n.translate('guests.view.application'));
-      if (now) parts.push(this.i18n.translate('guests.view.nowShort'));
-      return { item, done: item.position < this.currentPos(), now, sub: parts.join(' · ') };
+      // D5: the general agenda rule. Only an application item has a subtitle ("Antrag");
+      // a free-text item has none. The badge shows the number and the row colour shows
+      // the current item. A non-public item says why it shows no content, because the
+      // lock icon alone has no text.
+      let sub = '';
+      if (item.nonPublic) sub = this.i18n.translate('guests.view.membersOnly');
+      else if (item.kind === 'application') sub = this.i18n.translate('guests.view.application');
+      return { item, done: item.position < this.currentPos(), now, sub };
     }),
   );
 

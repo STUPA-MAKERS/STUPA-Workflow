@@ -148,8 +148,11 @@ These rules are binding for every page.
   (`@use 'field' as f;`).
 - **Long names get an ellipsis and a `title`** with the full text (`.ell`).
 - **Never truncate a copyable value.** A URL, an IBAN, an e-mail address or a reference wraps
-  (`overflow-wrap: anywhere`) and stays selectable. A URL is a real `<a target="_blank"
-  rel="noopener">`. An amount or a tag at the end of the row stays aligned on the right.
+  (`overflow-wrap: anywhere`) and stays selectable. A URL that opens is a real
+  `<a target="_blank" rel="noopener">`. A one-time copy value (for example a new share link
+  that the server shows only once) can be a `<code>` with a copy button. Only that `<code>`
+  gets `user-select: all`, never its label. An amount or a tag at the end of the row stays
+  aligned on the right.
 - **One list/detail geometry.** Every 2-column page uses `app-list-detail` with the shared
   list width `--ld-list-width` and `app-page-header`. No page overrides them. A sheet header
   is `app-sheet-bar` (breadcrumb or context as the kicker).
@@ -157,7 +160,10 @@ These rules are binding for every page.
   class (`styles.scss`). Each pane scrolls inside itself with the shared fade
   (`appScrollFade`). The header controls and the search bar (`app-sticky-bar`) stay fixed.
 - **Filter chips use `app-filter-select`.** A chip never opens a native `<select>`. On a
-  desktop the menu is a popover, on a phone a bottom sheet.
+  desktop the menu is a popover, on a phone a bottom sheet. The language switch is such a
+  chip too (`app-language-select`).
+- **Page header actions sit on the title row.** `app-page-header` centres the first row of
+  actions on the title line. A long subtitle does not move them.
 - **Phone (< 768 px): bottom sheets.** Pickers, filters and secondary panes open as a bottom
   sheet (the kit `app-dialog` and `app-side-sheet` do this), not as a centered dialog. A page
   header holds the title and at most one primary action. Other actions go into one ⋮ menu.

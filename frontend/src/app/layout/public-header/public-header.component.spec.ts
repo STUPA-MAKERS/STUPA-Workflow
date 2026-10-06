@@ -76,9 +76,9 @@ describe('PublicHeaderComponent', () => {
 
   it('switches the language with a reload', async () => {
     const { i18n, location } = await setup();
-    const select = screen.getByRole('combobox', { name: 'Sprache wechseln' }) as HTMLSelectElement;
-    expect(select.value).toBe('de');
-    await userEvent.selectOptions(select, 'en');
+    expect(document.querySelector('select')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Sprache wechseln: DE' }));
+    await userEvent.click(screen.getByRole('option', { name: 'English' }));
     expect(i18n.locale()).toBe('en');
     expect(location.reload).toHaveBeenCalled();
   });

@@ -184,8 +184,19 @@ class StatusEvent(UUIDPkMixin, Base):
         DateTime(timezone=True), server_default=func.now()
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The vote whose close fired this event (the ``pass`` or ``fail`` branch). NULL for
+    # every other event. A meeting delete deletes the votes of the meeting, and it sets
+    # this reference to NULL first. The note ``vote:<result>`` stays, so the timeline
+    # shows "vote deleted (with its meeting)" for such an event. The foreign key is
+    # ``SET NULL`` as a second line of defense.
+    vote_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("vote.id", ondelete="SET NULL"), nullable=True
+    )
 
-    __table_args__ = (Index("ix_status_event_application_id_at", "application_id", "at"),)
+    __table_args__ = (
+        Index("ix_status_event_application_id_at", "application_id", "at"),
+        Index("ix_status_event_vote_id", "vote_id"),
+    )
 
 
 class MagicLink(UUIDPkMixin, CreatedAtMixin, Base):

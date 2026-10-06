@@ -5,6 +5,9 @@
   (closed)="cancel()"
 >
   <p class="dmd__body">{{ bodyKey() | t: { name: meeting()?.title ?? '' } }}</p>
+  @if (votesText(); as votes) {
+    <p class="dmd__body dmd__votes" role="status">{{ votes }}</p>
+  }
   <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
   <app-button dialog-footer variant="danger" [loading]="deleting()" (click)="confirm()">
     <app-icon name="trash" [size]="16" />

@@ -53,17 +53,15 @@ function pathOf(url: string): string {
  *
  * - `false`: the page needs the full width at every size (the flow editor, the form
  *   editor), so the frame leaves out the navigation column.
- * - `'xl'`: the page fits beside the navigation only from {@link XL} on (the cost
- *   centres). Below that it takes the full width.
- * - anything else: the navigation column shows on a wide viewport.
+ * - anything else: the navigation column shows on a wide viewport. A wide page (the cost
+ *   centres) scrolls inside its sheet instead of dropping the navigation (D6).
  */
-type AdminNavMode = 'always' | 'xl' | 'never';
+type AdminNavMode = 'always' | 'never';
 
 function navMode(root: ActivatedRouteSnapshot): AdminNavMode {
   let r: ActivatedRouteSnapshot = root;
   while (r.firstChild) r = r.firstChild;
-  const v: unknown = r.data['adminNav'];
-  return v === false ? 'never' : v === 'xl' ? 'xl' : 'always';
+  return r.data['adminNav'] === false ? 'never' : 'always';
 }
 
 /**
@@ -78,9 +76,6 @@ function paneRoute(root: ActivatedRouteSnapshot): boolean {
   while (r.firstChild) r = r.firstChild;
   return r.data['adminPane'] === true;
 }
-
-/** From this width on, a page with `adminNav: 'xl'` fits beside the navigation. */
-const XL = '(min-width: 1440px)';
 
 /**
  * The scroll position of the page sheet per navigation id. Beside the navigation the
@@ -113,8 +108,8 @@ const sheetScroll = new Map<number, number>();
  *   then leave out "Verwaltung", because the navigation shows it.
  * - Narrower: an admin page fills the width and the breadcrumb "Verwaltung" leads back.
  * - A route with `data: { adminNav: false }` (the flow editor, the form editor) fills
- *   the width at every size, the same as the narrow mode. A route with
- *   `data: { adminNav: 'xl' }` (the cost centres) does so below 1440 px.
+ *   the width at every size, the same as the narrow mode. Every other admin page,
+ *   the cost centres too, keeps the navigation at every wide size (D6).
  * - A full-width route with `data: { adminPane: true }` (the two editors) is a pane
  *   page from wide on: the frame fills the window and the page gets the free height,
  *   so its columns scroll inside themselves.
@@ -182,17 +177,11 @@ export class AdminFrameComponent {
   /** The home page of the area is open. */
   readonly home = computed(() => this.path() === this.mode().home);
 
-  /** The viewport is wide enough for a page with `adminNav: 'xl'` beside the navigation. */
-  private readonly xl = mediaQuerySignal(XL);
-
   /** The `data.adminNav` mode of the active page. */
   private readonly navMode = signal(navMode(this.router.routerState.snapshot.root));
 
   /** The active page takes the full width, without the navigation column. */
-  readonly fullWidth = computed(() => {
-    const mode = this.navMode();
-    return mode === 'never' || (mode === 'xl' && !this.xl());
-  });
+  readonly fullWidth = computed(() => this.navMode() === 'never');
 
   /** The `data.adminPane` flag of the active page. */
   private readonly paneRoute = signal(paneRoute(this.router.routerState.snapshot.root));

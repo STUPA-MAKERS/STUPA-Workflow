@@ -14,8 +14,9 @@ from fastapi.testclient import TestClient
 
 from app.deps import get_current_applicant, get_current_principal
 from app.main import create_app
-from app.modules.applications.access import require_app_edit, require_app_read
+from app.modules.applications.access import require_app_applicant
 from app.modules.auth.principal import Principal
+from app.modules.flow import router as flow_router
 from app.modules.flow.dispatch import NullActionDispatcher
 from app.modules.flow.router import (
     get_action_dispatcher,
@@ -23,6 +24,7 @@ from app.modules.flow.router import (
 )
 from app.modules.flow.schemas import TransitionOut, TransitionResult
 from app.modules.flow.service import FlowService
+from app.shared.errors import ForbiddenError
 
 
 class _FakeService:
@@ -128,8 +130,33 @@ def fake_service() -> _FakeService:
     return _FakeService()
 
 
+class _ReadGate:
+    """Stand-in for `resolve_app_read` in the flow router.
+
+    It records each checked application and raises 403 when `deny` is set.
+    """
+
+    def __init__(self) -> None:
+        self.checked: list[object] = []
+        self.deny = False
+
+    async def __call__(self, _db, application_id, principal, applicant):  # noqa: ANN001, ANN204
+        assert principal is not None
+        assert applicant is None
+        self.checked.append(application_id)
+        if self.deny:
+            raise ForbiddenError("no read access")
+
+
 @pytest.fixture
-def app(fake_service: _FakeService) -> FastAPI:
+def read_gate(monkeypatch: pytest.MonkeyPatch) -> _ReadGate:
+    gate = _ReadGate()
+    monkeypatch.setattr(flow_router, "resolve_app_read", gate)
+    return gate
+
+
+@pytest.fixture
+def app(fake_service: _FakeService, read_gate: _ReadGate) -> FastAPI:
     application = create_app()
     application.dependency_overrides[get_flow_service] = lambda: fake_service
     return application
@@ -240,7 +267,7 @@ def test_list_applicant_transitions_ok(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     app_id = uuid4()
-    app.dependency_overrides[require_app_read] = lambda: SimpleNamespace(
+    app.dependency_overrides[require_app_applicant] = lambda: SimpleNamespace(
         application_id=app_id
     )
     r = client.get(f"/api/applications/{app_id}/applicant-transitions")
@@ -253,7 +280,7 @@ def test_fire_applicant_transition_ok(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     app_id, transition_id = uuid4(), uuid4()
-    app.dependency_overrides[require_app_edit] = lambda: SimpleNamespace(
+    app.dependency_overrides[require_app_applicant] = lambda: SimpleNamespace(
         application_id=app_id
     )
     r = client.post(
@@ -303,3 +330,38 @@ def test_openapi_declares_flow_error_responses(client: TestClient) -> None:
     post = spec["paths"]["/api/applications/{application_id}/transition"]["post"]
     assert {"400", "401", "403", "404", "409", "422"} <= set(post["responses"])
     assert "application/problem+json" in post["responses"]["409"]["content"]
+
+
+def test_transition_routes_check_read_access(
+    app: FastAPI, client: TestClient, fake_service: _FakeService, read_gate: _ReadGate
+) -> None:
+    """A holder of `application.transition` lists and fires only on a readable application."""
+    _as_principal(app, "application.transition")
+    app_id = uuid4()
+    assert client.get(f"/api/applications/{app_id}/transitions").status_code == 200
+    assert read_gate.checked == [app_id]
+
+    read_gate.deny = True
+    r = client.get(f"/api/applications/{app_id}/transitions")
+    assert r.status_code == 403
+    assert r.headers["content-type"] == "application/problem+json"
+    r = client.post(
+        f"/api/applications/{app_id}/transition", json={"transitionId": str(uuid4())}
+    )
+    assert r.status_code == 403
+    assert fake_service.fired is None
+
+
+def test_force_routes_check_read_access(
+    app: FastAPI, client: TestClient, fake_service: _FakeService, read_gate: _ReadGate
+) -> None:
+    _as_principal(app, "application.force_status")
+    read_gate.deny = True
+    app_id = uuid4()
+    assert client.get(f"/api/applications/{app_id}/flow-states").status_code == 403
+    r = client.post(
+        f"/api/applications/{app_id}/force-status",
+        json={"stateId": str(uuid4()), "note": "Korrektur"},
+    )
+    assert r.status_code == 403
+    assert fake_service.allow_unconfirmed == []

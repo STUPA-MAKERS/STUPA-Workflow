@@ -142,11 +142,9 @@ exclude_lines = [
 # the coverage `source` (= `app`), as coverage.xml lists them, for example
 # `modules/auth/oidc.py`. The gate turns on as soon as the path exists. The negative probe
 # is tests/test_coverage_gate.py.
-# In a pure unit run several of these modules stay far below 100 % branch coverage.
-# Integration tests cover oauth, mcp, flow, budget and audit for the most part. The goal
-# stays 100 %. The `coverage-gate` job therefore does not block yet (continue-on-error in
-# .github/workflows/ci.yml). It reports the distance until the unit branch coverage
-# catches up.
+# The pure unit run reaches 100 % branch coverage in each of these modules, and the
+# `coverage-gate` job in .github/workflows/ci.yml blocks on it. The backup module and
+# its worker (`worker/backup.py`) joined the list in D11.
 [tool.coverage_critical]
 modules = [
     "modules/auth",
@@ -155,5 +153,9 @@ modules = [
     "modules/budget",
     "modules/webhooks",
     "modules/audit",
+    "modules/backup",
+    # worker/backup.py: `worker` is its own coverage source, so coverage.xml lists the
+    # file as plain `backup.py`.
+    "backup.py",
 ]
 min_branch_rate = 1.0

@@ -65,8 +65,6 @@ export const AUDIT_ACTIONS = [
   'delegation_substitute_add',
   'delegation_substitute_remove',
   'export',
-  'pii_access',
-  'pii_deletion',
   'pii_export',
   'anonymization',
   'erasure_requested',
@@ -311,12 +309,12 @@ export class AuditLogComponent {
   protected readonly actorChip = computed(() =>
     this.chipText('admin.audit.filter.actor', this.actorOptions(), this.actor()),
   );
+  /** One per chip: the "Zeitraum" chip counts once, also when both days are set. */
   protected readonly activeFilterCount = computed(
     () =>
       (this.action() ? 1 : 0) +
       (this.actor() ? 1 : 0) +
-      (this.since() ? 1 : 0) +
-      (this.until() ? 1 : 0),
+      (this.since() || this.until() ? 1 : 0),
   );
 
   /** The title and the line of the chain check. */
@@ -410,14 +408,6 @@ export class AuditLogComponent {
   }
   protected setActor(v: string): void {
     this.actor.set(v);
-    this.reload();
-  }
-  protected setSince(v: string): void {
-    this.since.set(v);
-    this.reload();
-  }
-  protected setUntil(v: string): void {
-    this.until.set(v);
     this.reload();
   }
   /** The period chip: both days at once, like the date ranges of the finance pages. */
