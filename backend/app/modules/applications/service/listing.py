@@ -8,11 +8,11 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ARRAY, ColumnElement, Text, case, cast, false, func, or_, select
+from sqlalchemy import ARRAY, ColumnElement, Text, and_, case, cast, false, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB, array
 from sqlalchemy.orm import InstrumentedAttribute
 
-from app.modules.admin.models import ApplicationType, Gremium, GremiumMembership
+from app.modules.admin.models import ApplicationType, Gremium
 from app.modules.applications.models import Application
 from app.modules.applications.schemas import ApplicationListItem
 from app.modules.applications.service.service_base import (
@@ -86,13 +86,9 @@ class ListingOps(ApplicationsServiceBase):
         # An unconfirmed guest application stays invisible until the applicant confirms
         # the email. An existing or logged-in application carries `email_confirmed_at`.
         filters: list[ColumnElement[bool]] = [Application.email_confirmed_at.is_not(None)]
-        read_scope: list[ColumnElement[bool]] = []
-        if owner_sub is not None:
-            read_scope.append(Application.created_by == owner_sub)
-        if committee_sub is not None:
-            read_scope.extend(await self._committee_read_clauses(committee_sub))
-        if read_scope:
-            filters.append(or_(*read_scope))
+        read_scope = await self._read_scope(owner_sub=owner_sub, committee_sub=committee_sub)
+        if read_scope is not None:
+            filters.append(read_scope)
         # Archived applications leave the working list by default. `None` asks for both,
         # which is what a search across everything wants.
         if archived is False:
@@ -192,6 +188,36 @@ class ListingOps(ApplicationsServiceBase):
             )
         return Page(items=items, total=total or 0, limit=limit, offset=offset)
 
+    async def _read_scope(
+        self, *, owner_sub: str | None, committee_sub: str | None
+    ) -> ColumnElement[bool] | None:
+        """Build the read scope of the list as one SQL clause.
+
+        The clause holds the own applications (`owner_sub`) OR the Gremium read scope
+        (`committee_sub`, see `_committee_read_clauses`). None means no limit: the
+        full view of `application.read`, `application.read_all` and admin.
+        """
+        clauses: list[ColumnElement[bool]] = []
+        if owner_sub is not None:
+            clauses.append(Application.created_by == owner_sub)
+        if committee_sub is not None:
+            clauses.extend(await self._committee_read_clauses(committee_sub))
+        return or_(*clauses) if clauses else None
+
+    async def read_scope_for(self, principal: Any) -> ColumnElement[bool] | None:
+        """Build the read scope of `principal` as one SQL clause, or None for all.
+
+        This is the rule of `GET /applications` without `mine`: a principal with
+        `principal_reads_all` reads every application. Every other principal reads the
+        own applications and the Gremium read scope. `access.resolve_app_read` gives
+        the same answer for one application.
+        """
+        from app.modules.applications.access import principal_reads_all
+
+        if principal_reads_all(principal):
+            return None
+        return await self._read_scope(owner_sub=principal.sub, committee_sub=principal.sub)
+
     async def _all_pii_keys(self) -> set[str]:
         """Collect the ``isPII`` field keys of every form version of every type.
 
@@ -288,8 +314,8 @@ class ListingOps(ApplicationsServiceBase):
             clauses.append(Application.budget_id.in_(scoped))
 
         # (b) The current `vote` state belongs to a member Gremium. Python evaluates the
-        #     JSONB `config` to stay dialect-neutral, as `list_tasks` does. The set of
-        #     `vote` states is small.
+        #     JSONB `config` to stay dialect-neutral. The set of `vote` states is
+        #     small.
         member_str = {str(g) for g in member_ids}
         vote_state_ids = [
             s.id
@@ -329,112 +355,152 @@ class ListingOps(ApplicationsServiceBase):
         gremium_names = {gid: name for gid, name in gremium_rows}
         return type_names, gremium_names
 
-    async def _in_gremium(self, sub: str, gremium_id: UUID) -> bool:
-        """Tell if `sub` is a member of the Gremium with a currently valid term."""
-        from app.modules.auth.models import Principal as PrincipalRow
-
-        now = datetime.now(UTC)
-        row = await self.session.scalar(
-            select(GremiumMembership.id)
-            .join(PrincipalRow, PrincipalRow.id == GremiumMembership.principal_id)
-            .where(
-                PrincipalRow.sub == sub,
-                GremiumMembership.gremium_id == gremium_id,
-                (GremiumMembership.valid_from.is_(None)) | (GremiumMembership.valid_from <= now),
-                (GremiumMembership.valid_until.is_(None)) | (GremiumMembership.valid_until > now),
-            )
-            .limit(1)
-        )
-        return row is not None
-
     async def list_tasks(self, principal: Any) -> list[ApplicationListItem]:
         """List the open tasks of the principal.
 
-        An application is a task when the principal can act on it:
+        A task is an application that the principal can read AND act on now. The
+        read rule is the one of the list (`read_scope_for`), applied in SQL. The
+        principal acts on an application in two ways:
 
-        * the application is in a `vote` state and the principal can vote: a gremium
-          role with `vote.cast` in the gremium of the application, or a membership in
-          the gremium of the vote state, or
-        * at least one manual transition is firable because its guard holds, and the
-          principal may fire transitions with `application.transition` or as admin.
+        * a ballot: an open vote of the application takes a ballot of the principal
+          now (`VotingService.can_still_cast`, the gate of the cast route), or
+        * a transition: a manual transition with `requiresAction` that the principal
+          may fire. The member route needs `application.transition` and the read
+          access (`flow.router.require_transition_principal`) and lists
+          `available_transitions`. The applicant route admits the creator
+          (`access.require_app_applicant`) and lists
+          `available_applicant_transitions`.
+
+        So each task matches a route that accepts the action, and no other
+        application is a task. Before the per-row checks, SQL keeps only the
+        readable, confirmed applications that have an open vote or a manual exit
+        with `requiresAction`.
 
         Each task carries `stateSince`, the time of the last status change (A9).
         """
-        from app.modules.admin.gremium_roles import gremium_ids_for
         from app.modules.flow.service import FlowService
 
         flow = FlowService(self.session)
-        # A vote state is a task for someone who may cast in the gremium of the
-        # application: the gremium permission `vote.cast`. `gremium_ids_for` applies the
-        # OAuth scope cap, and `vote.cast` is in FORBIDDEN_PERMISSIONS, so a token gets
-        # the empty set. `application.transition` goes through `Principal.has`, which
-        # grants the admin role every right and still applies the scope cap.
-        cast_gremium_ids = await gremium_ids_for(self.session, principal, "vote.cast")
+        now = datetime.now(UTC)
         can_transition = principal.has("application.transition")
-
-        apps = (
-            await self.session.scalars(
-                select(Application)
-                .where(
-                    Application.current_state_id.is_not(None),
-                    Application.email_confirmed_at.is_not(None),
-                )
+        rows = (
+            await self.session.execute(
+                select(Application, State)
+                .join(State, State.id == Application.current_state_id)
+                .where(*await self._task_filters(principal, can_transition=can_transition))
                 .order_by(Application.created_at.desc())
             )
         ).all()
-        if not apps:
-            return []
-        states = (
-            await self.session.scalars(
-                select(State).where(State.id.in_({a.current_state_id for a in apps}))
-            )
-        ).all()
-        by_id = {s.id: s for s in states}
 
         items: list[ApplicationListItem] = []
-        for app in apps:
-            if app.current_state_id is None:
-                continue
-            s = by_id.get(app.current_state_id)
-            if s is None:
-                continue
-            ok = False
-            if s.kind == "vote":
-                if app.gremium_id is not None and app.gremium_id in cast_gremium_ids:
-                    ok = True
-                else:
-                    cfg = s.config if isinstance(s.config, dict) else {}
-                    gid = cfg.get("gremiumId")
-                    ok = (
-                        isinstance(gid, str)
-                        and bool(gid)
-                        and await self._in_gremium(principal.sub, UUID(gid))
-                    )
-            if not ok and (can_transition or app.created_by == principal.sub):
-                # Only a firable manual transition with `requiresAction` counts. An
-                # optional action creates no pseudo-task. A terminal state has no exit
-                # and is no task, also for an application of the principal.
-                ok = any(
-                    t.requires_action for t in await flow.available_transitions(app.id, principal)
+        for app, state in rows:
+            if not (
+                await self._casts_in_open_vote(app.id, principal, now)
+                or await self._fires_task_transition(
+                    flow, app, principal, can_transition=can_transition
                 )
-            if ok:
-                items.append(
-                    ApplicationListItem(
-                        id=app.id,
-                        typeId=app.type_id,
-                        title=_title_of(app.data),
-                        state=await self._state_out_resolved(s),
-                        gremiumId=app.gremium_id,
-                        amount=app.amount,
-                        currency=app.currency,
-                        createdAt=app.created_at,
-                        updatedAt=app.updated_at,
-                        stateSince=app.created_at,
-                    )
+            ):
+                continue
+            items.append(
+                ApplicationListItem(
+                    id=app.id,
+                    typeId=app.type_id,
+                    title=_title_of(app.data),
+                    state=await self._state_out_resolved(state),
+                    gremiumId=app.gremium_id,
+                    amount=app.amount,
+                    currency=app.currency,
+                    createdAt=app.created_at,
+                    updatedAt=app.updated_at,
+                    stateSince=app.created_at,
                 )
+            )
         # One grouped query for the kept tasks only (A9). An application without a
         # status event keeps its creation time.
         since_by_app = await self._state_since_map(item.id for item in items)
         for item in items:
             item.state_since = since_by_app.get(item.id, item.state_since)
         return items
+
+    async def _task_filters(
+        self, principal: Any, *, can_transition: bool
+    ) -> list[ColumnElement[bool]]:
+        """Build the SQL pre-filter of `list_tasks`.
+
+        The filter keeps the confirmed applications with a state inside the read
+        scope of the principal. Of these it keeps the ones with an open vote, and the
+        ones whose current state has a manual exit with `requiresAction`. Without
+        `application.transition` only the own applications keep that second path,
+        because only the applicant route is open to the creator.
+        """
+        from app.modules.flow.models import Transition
+        from app.modules.voting.models import Vote
+
+        filters: list[ColumnElement[bool]] = [
+            Application.current_state_id.is_not(None),
+            Application.email_confirmed_at.is_not(None),
+        ]
+        read_scope = await self.read_scope_for(principal)
+        if read_scope is not None:
+            filters.append(read_scope)
+        open_vote = (
+            select(Vote.id)
+            .where(Vote.application_id == Application.id, Vote.status == "open")
+            .exists()
+        )
+        action_exit: ColumnElement[bool] = (
+            select(Transition.id)
+            .where(
+                Transition.flow_version_id == Application.flow_version_id,
+                Transition.from_state_id == Application.current_state_id,
+                Transition.requires_action.is_(True),
+                Transition.automatic.is_(False),
+                Transition.branch.is_(None),
+            )
+            .exists()
+        )
+        if not can_transition:
+            action_exit = and_(action_exit, Application.created_by == principal.sub)
+        filters.append(or_(open_vote, action_exit))
+        return filters
+
+    async def _casts_in_open_vote(
+        self, application_id: UUID, principal: Any, now: datetime
+    ) -> bool:
+        """Tell whether an open vote of the application takes a ballot of the principal.
+
+        `VotingService.can_still_cast` holds the rule of the cast route.
+        """
+        from app.modules.voting.models import Vote
+        from app.modules.voting.service import VotingService
+
+        votes = (
+            await self.session.scalars(
+                select(Vote).where(Vote.application_id == application_id, Vote.status == "open")
+            )
+        ).all()
+        voting = VotingService(self.session)
+        for vote in votes:
+            if await voting.can_still_cast(vote, principal, now=now):
+                return True
+        return False
+
+    @staticmethod
+    async def _fires_task_transition(
+        flow: Any, app: Application, principal: Any, *, can_transition: bool
+    ) -> bool:
+        """Tell whether the principal may fire a manual transition with `requiresAction`.
+
+        The member route lists `available_transitions` for a holder of
+        `application.transition`. The caller already applied the read scope. The
+        applicant route lists `available_applicant_transitions` for the creator.
+        """
+        if can_transition and any(
+            t.requires_action for t in await flow.available_transitions(app.id, principal)
+        ):
+            return True
+        if app.created_by is None or app.created_by != principal.sub:
+            return False
+        return any(
+            t.requires_action for t in await flow.available_applicant_transitions(app.id)
+        )

@@ -199,7 +199,7 @@ async def _committee_can_read(
             return True
 
     # Case 2 evaluates the JSONB config in Python. This stays dialect-neutral,
-    # like ``ApplicationsService.list_tasks``.
+    # like ``ApplicationsService._committee_read_clauses``.
     from app.modules.flow.models import State
 
     row = (
@@ -322,13 +322,51 @@ async def require_app_edit(
     )
 
 
+async def require_app_applicant(
+    application_id: UUID,
+    db: DbSession,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+    applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
+) -> Access:
+    """Grant the applicant-transition access to one application.
+
+    Only two identities pass: the applicant with an ``edit`` magic link, and the
+    logged-in creator of the application. A principal with ``application.manage`` or
+    ``application.edit_any`` edits the data, but does not act as the applicant. That
+    principal gets 403 here, so nobody fires an applicant decision for the applicant.
+
+    Raises:
+        ForbiddenError: The caller is neither the applicant nor the creator.
+        UnauthorizedError: The request carries neither a principal nor an applicant.
+    """
+    access = await require_app_edit(application_id, db, principal, applicant)
+    if access.applicant is not None:
+        return access
+    if access.principal is not None and await _is_creator(
+        db, application_id, access.principal
+    ):
+        return access
+    raise ForbiddenError("Only the applicant fires this transition.")
+
+
+def principal_reads_all(principal: Principal) -> bool:
+    """Tell whether a principal reads every application without a scope.
+
+    The rights are ``application.read`` and ``application.read_all``. An admin holds
+    both through `Principal.has`, which also applies the OAuth scope cap. Every other
+    principal reads only the own applications and the Gremium read scope. The list,
+    the detail and the tasks use this one rule.
+    """
+    return principal.has(READ_PERMISSION) or principal.has(READ_ALL_PERMISSION)
+
+
 def principal_reads_pii(principal: Principal) -> bool:
     """Tell whether a principal reads the ``isPII`` fields of every application (O21).
 
     The rights are ``application.read`` and ``application.read_all``. An admin holds
     both through `Principal.has`, which also applies the OAuth scope cap.
     """
-    return principal.has(READ_PERMISSION) or principal.has(READ_ALL_PERMISSION)
+    return principal_reads_all(principal)
 
 
 async def can_read_pii(db: AsyncSession, access: Access) -> bool:

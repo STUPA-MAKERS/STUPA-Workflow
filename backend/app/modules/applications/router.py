@@ -31,10 +31,10 @@ from app.modules.applications.access import (
     DELETE_PERMISSION,
     EDIT_ANY_PERMISSION,
     MANAGE_PERMISSION,
-    READ_ALL_PERMISSION,
     SHARE_PERMISSION,
     Access,
     can_read_pii,
+    principal_reads_all,
     principal_reads_pii,
     require_app_edit,
     require_app_read,
@@ -343,9 +343,11 @@ async def list_tasks(
 ) -> list[ApplicationListItem]:
     """List the open tasks of the principal.
 
-    The list holds the applications in a vote state, the applications with a
-    firable transition, and the own applications in an editable state. The last
-    group appears even without ``application.read``.
+    A task is an application that the principal can read (the rule of
+    ``GET /applications``) and act on now: an open vote that takes a ballot of the
+    principal, or a manual transition with ``requiresAction`` that the transition
+    routes let the principal fire. The dashboard and the task badge of the
+    navigation read this list.
     """
     return await service.list_tasks(principal)
 
@@ -397,7 +399,7 @@ async def list_applications(
     # `Principal.has` is the single RBAC chokepoint: it grants every right to the admin
     # role AND applies the OAuth scope cap. Reading `principal.roles` directly would skip
     # the cap, so a narrowly scoped agent token would read as a full admin.
-    can_read = principal.has("application.read") or principal.has(READ_ALL_PERMISSION)
+    can_read = principal_reads_all(principal)
     restricted = not can_read and not mine
     return await service.list_applications(
         state_ids=state_ids,

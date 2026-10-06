@@ -444,6 +444,21 @@ describe('StatusTimelineComponent', () => {
     expect(getApplication).toHaveBeenCalledTimes(2);
   });
 
+  it('offers no action when the server refuses the applicant transitions (403)', async () => {
+    // A staff member who is not the creator gets 403 from the list route.
+    const fire = jest.fn();
+    const { comp } = await setup(
+      fakeApi({
+        applicantTransitions: () => throwError(() => ({ status: 403 })),
+        fireApplicant: fire,
+      }),
+    );
+    expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
+    expect(comp.actions()).toEqual([]);
+    expect(screen.queryByRole('button', { name: 'Aktion ausführen' })).not.toBeInTheDocument();
+    expect(fire).not.toHaveBeenCalled();
+  });
+
   it('toasts a failed transition and ignores a second fire', async () => {
     const fire = jest.fn(() => throwError(() => new Error('x')));
     const t = { id: 'tr1', label: 'Los', color: null, toStateId: 's9' } as Transition;

@@ -826,6 +826,14 @@ class FlowService:
                 "Branch transitions are fired by the vote outcome, not manually.",
                 code="conflict",
             )
+        # The worker fires an automatic transition when its guard holds. The list of
+        # the available transitions hides it, so a person must not fire it either. The
+        # list and this gate then agree, and so does the task list.
+        if manual and transition.automatic:
+            raise ConflictError(
+                "Automatic transitions are fired by the system, not manually.",
+                code="conflict",
+            )
 
         if deadline_passed is None:
             deadline_passed = await self._deadline_passed(app)
