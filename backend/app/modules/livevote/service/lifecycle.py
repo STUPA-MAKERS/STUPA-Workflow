@@ -445,9 +445,8 @@ class LifecycleOps(HandoverOps):
     async def _cancelled_events(self, votes: list[Vote]) -> list[VoteOut]:
         """Read the ``vote_cancelled`` payloads before the commit.
 
-        The method runs before the commit, while each vote still has its
-        ``meeting_id``. After a meeting delete the database sets that reference to
-        ``NULL``, and a payload read after the commit has no meeting channel.
+        The meeting close calls it before the commit, so the payloads and the
+        commit see the same state.
         """
         if self.publisher is None or not votes:
             return []
@@ -457,7 +456,7 @@ class LifecycleOps(HandoverOps):
         return [await voting.get(vote.id) for vote in votes]
 
     async def _publish_cancelled(self, events: list[VoteOut]) -> None:
-        """Send ``vote_cancelled`` for the drafts that a close or a delete cancelled.
+        """Send ``vote_cancelled`` for the drafts that a close cancelled.
 
         The method runs after the commit. A broker fault must not fail the committed
         change, so the method only logs it.
@@ -503,14 +502,17 @@ class LifecycleOps(HandoverOps):
 
         The delete locks the meeting row, as the close and the vote open do. A
         meeting with an open vote does not delete: the lead closes or cancels the
-        vote first. The delete cancels the draft votes of the meeting in the same
-        transaction (reason ``meeting_deleted``), then sends ``vote_cancelled``
-        after the commit. Thus no vote of a deleted meeting can open later.
+        vote first.
 
-        The cascade removes the protocol, the agenda and the attendance. The
-        database detaches bound votes with ``SET NULL`` on ``meeting_id`` and on
-        ``agenda_item_id`` (F21), so the votes, their ballots and their results
-        survive.
+        The delete deletes every vote of the meeting in the same transaction, in
+        any status (draft, cancelled, closed, secret, with guests), together with
+        their ballots, secret ballots, voted markers and protocol references
+        (``VotingService.delete_for_meeting``, one ``vote_delete`` per vote with the
+        reason ``meeting_deleted``). An application that such a vote decided keeps
+        its status; its timeline shows the vote as deleted. The cascade then
+        removes the protocol, the agenda, the attendance, the guests and the
+        delegations. ``meeting_delete`` carries the number and the ids of the
+        deleted votes, never a choice or a name.
 
         Raises:
             ForbiddenError: The caller does not manage the meeting, or the protocol
@@ -540,8 +542,8 @@ class LifecycleOps(HandoverOps):
         # back into this module.
         from app.modules.voting.service import VotingService
 
-        cancelled = await VotingService(self.session).cancel_drafts_for_meeting(
-            meeting.id, now=datetime.now(UTC), actor=principal.sub, reason="meeting_deleted"
+        deleted_votes = await VotingService(self.session).delete_for_meeting(
+            meeting.id, actor=principal.sub
         )
         await audit_record(
             self.session,
@@ -553,9 +555,9 @@ class LifecycleOps(HandoverOps):
                 "title": meeting.title,
                 "gremiumId": str(meeting.gremium_id),
                 "finalizedProtocol": finalized,
+                "deletedVotes": len(deleted_votes),
+                "deletedVoteIds": [str(vote_id) for vote_id in deleted_votes],
             },
         )
-        cancelled_events = await self._cancelled_events(cancelled)
         await self.session.delete(meeting)
         await self.session.commit()
-        await self._publish_cancelled(cancelled_events)

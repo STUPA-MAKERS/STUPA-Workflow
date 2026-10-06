@@ -51,15 +51,18 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     application_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application.id", ondelete="CASCADE"), nullable=True
     )
-    # SET NULL: a delete of the meeting detaches the (async) vote and does not cascade.
+    # The meeting delete deletes every vote of the meeting itself, with its ballots and
+    # one ``vote_delete`` audit entry per vote (``VotingService.delete_for_meeting``).
+    # SET NULL stays as the database rule for a delete outside the service (a gremium
+    # delete cascades to its meetings): such a vote detaches and does not cascade.
     meeting_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("meeting.id", ondelete="SET NULL"), nullable=True
     )
-    # The agenda item that the vote belongs to (live vote). SET NULL (F21): a meeting
-    # delete cascades to its agenda items, and the votes and their ballots must survive
-    # it, as ``meeting_id`` does. An agenda item with an open or closed vote cannot be
-    # removed (O25), and its remove deletes the draft and cancelled votes explicitly
-    # with a ``vote_delete`` audit entry.
+    # The agenda item that the vote belongs to (live vote). SET NULL, as for
+    # ``meeting_id``: the meeting delete deletes the votes before the agenda cascade.
+    # An agenda item with an open or closed vote cannot be removed (O25), and its
+    # remove deletes the draft and cancelled votes explicitly with a ``vote_delete``
+    # audit entry.
     agenda_item_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("meeting_agenda_item.id", ondelete="SET NULL"), nullable=True
     )

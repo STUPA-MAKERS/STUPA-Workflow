@@ -401,6 +401,7 @@ class _FakeFlow:
     branch: ClassVar[Any] = None
     branch_calls: ClassVar[list[str]] = []
     notes: ClassVar[list[str | None]] = []
+    vote_ids: ClassVar[list[UUID | None]] = []
     staged_deadlines: ClassVar[list[bool]] = []
     after: ClassVar[list[bool]] = []
 
@@ -411,9 +412,10 @@ class _FakeFlow:
         _FakeFlow.calls.append("called")
         return self._available
 
-    async def stage_branch(self, application_id, branch, principal, *, note=None):  # noqa: ANN001
+    async def stage_branch(self, application_id, branch, principal, *, note=None, vote_id=None):  # noqa: ANN001
         _FakeFlow.branch_calls.append(branch)
         _FakeFlow.notes.append(note)
+        _FakeFlow.vote_ids.append(vote_id)
         if _FakeFlow.fire_raises is not None:
             raise _FakeFlow.fire_raises
         if _FakeFlow.branch is None:
@@ -439,6 +441,7 @@ def _patch_flow(monkeypatch: pytest.MonkeyPatch) -> type[_FakeFlow]:
     _FakeFlow.branch = None
     _FakeFlow.branch_calls = []
     _FakeFlow.notes = []
+    _FakeFlow.vote_ids = []
     _FakeFlow.staged_deadlines = []
     _FakeFlow.after = []
     monkeypatch.setattr(voting_service, "FlowService", _FakeFlow)
@@ -468,6 +471,8 @@ async def test_close_fires_matching_branch(_patch_flow: type[_FakeFlow]) -> None
     assert vote.result_branch_transition_id == branch_t.id
     assert _patch_flow.branch_calls == ["pass"]
     assert _patch_flow.notes == ["vote:passed"]
+    # The status event of the branch names the vote, for the timeline link.
+    assert _patch_flow.vote_ids == [vote.id]
     # F20: the branch runs in a SAVEPOINT and the close commits ONCE, the deadline of
     # the new state included. after_commit does not schedule it a second time.
     assert db.savepoints == 1
@@ -980,6 +985,62 @@ async def test_delete_for_agenda_item_refuses_open_or_closed_vote(blocking: str)
     with pytest.raises(ConflictError) as ei:
         await VotingService(db).delete_for_agenda_item(item, actor="mgr", may_delete=True)
     assert ei.value.code == "agenda_item_has_vote"
+    assert db.deleted == []
+    assert _audits(db) == []
+
+
+async def test_delete_for_meeting_deletes_every_vote_in_order() -> None:
+    """The meeting delete takes every vote along, in any status, without a commit."""
+    mid = uuid4()
+    votes = [
+        _vote(meeting_id=mid, status="draft"),
+        _vote(meeting_id=mid, status="cancelled", application_id=None),
+        _vote(meeting_id=mid, status="closed", result="passed"),
+        _vote(meeting_id=mid, status="closed", config=_config(secret=True)),
+    ]
+    db = fake_session(result(*votes))
+    out = await VotingService(db).delete_for_meeting(mid, actor="mgr")
+    assert out == [v.id for v in votes]
+    assert db.deleted == votes
+    assert db.committed == 0
+    # The lock, then the protocol references, the secret ballots, the voted markers
+    # and the ballots, then the status events lose the vote reference.
+    tables = [
+        getattr(getattr(stmt, "table", None), "name", None) for stmt in db.statements[1:6]
+    ]
+    assert tables == [
+        "protocol_vote_ref",
+        "secret_ballot",
+        "voted_marker",
+        "ballot",
+        "status_event",
+    ]
+    entries = _audits(db)
+    assert [e.action for e in entries] == ["vote_delete"] * 4
+    assert [e.data["status"] for e in entries] == ["draft", "cancelled", "closed", "closed"]
+    assert {e.data["reason"] for e in entries} == {"meeting_deleted"}
+    assert entries[1].data["applicationId"] is None
+    # Id references and the status only: never a choice or a voter.
+    assert all(set(e.data) == {
+        "applicationId", "meetingId", "eligibleGroup", "agendaItemId", "status", "reason"
+    } for e in entries)
+
+
+async def test_delete_for_meeting_without_votes_runs_no_delete() -> None:
+    db = fake_session(result())
+    assert await VotingService(db).delete_for_meeting(uuid4(), actor="mgr") == []
+    assert len(db.statements) == 1  # only the locking select
+    assert db.deleted == []
+    assert _audits(db) == []
+
+
+async def test_delete_for_meeting_refuses_an_open_vote() -> None:
+    mid = uuid4()
+    db = fake_session(result(_vote(meeting_id=mid, status="draft"), _vote(meeting_id=mid)))
+    with pytest.raises(ConflictError) as ei:
+        await VotingService(db).delete_for_meeting(mid, actor="mgr")
+    assert ei.value.code == "open_vote"
+    assert len(db.statements) == 1
     assert db.deleted == []
     assert _audits(db) == []
 

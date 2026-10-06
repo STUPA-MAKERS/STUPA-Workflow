@@ -3314,6 +3314,63 @@ async def test_delete_ok_audits(monkeypatch: pytest.MonkeyPatch) -> None:
     assert sess.deleted == [m]
     assert sess.committed == 1
     assert calls[0]["data"]["finalizedProtocol"] is False
+    assert calls[0]["data"]["deletedVotes"] == 0
+    assert calls[0]["data"]["deletedVoteIds"] == []
+
+
+async def test_delete_deletes_the_votes_and_audits_their_ids(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The meeting delete deletes every vote of the meeting before the meeting row."""
+    from app.modules.voting.service import VotingService
+
+    m = _meeting(status="closed")
+    vote_ids = [uuid4(), uuid4()]
+    calls: list[dict[str, Any]] = []
+    order: list[str] = []
+
+    async def _final(self, _mid):  # noqa: ANN001, ANN202
+        return False
+
+    async def _record(session: Any, **kw: Any) -> None:
+        order.append("audit")
+        calls.append(kw)
+
+    async def _delete_votes(self, meeting_id, *, actor):  # noqa: ANN001, ANN202
+        assert (meeting_id, actor) == (m.id, "mgr")
+        order.append("votes")
+        return vote_ids
+
+    monkeypatch.setattr(MeetingService, "_protocol_final", _final)
+    monkeypatch.setattr(lifecycle_mod, "audit_record", _record)
+    monkeypatch.setattr(VotingService, "delete_for_meeting", _delete_votes)
+    sess = _QueueSession(executes=[res(m)])
+    await MeetingService(sess).delete(m.id, _admin())  # type: ignore[arg-type]
+    assert order == ["votes", "audit"]
+    assert sess.deleted == [m]
+    assert sess.committed == 1
+    assert calls[0]["data"]["deletedVotes"] == 2
+    assert calls[0]["data"]["deletedVoteIds"] == [str(v) for v in vote_ids]
+
+
+async def test_delete_forbidden_deletes_no_vote(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without the manage right nothing goes, not even a vote."""
+    from app.modules.voting.service import VotingService
+
+    m = _meeting()
+
+    async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
+        return set()
+
+    async def _delete_votes(self, meeting_id, *, actor):  # noqa: ANN001, ANN202
+        raise AssertionError("no vote may be deleted")
+
+    _patch_gids(monkeypatch, _none)
+    monkeypatch.setattr(VotingService, "delete_for_meeting", _delete_votes)
+    sess = _QueueSession(executes=[res(m)])
+    with pytest.raises(ForbiddenError):
+        await MeetingService(sess).delete(m.id, _principal())  # type: ignore[arg-type]
+    assert sess.deleted == []
 
 
 # attendance_service.py: the raise branch of _ensure_not_closed

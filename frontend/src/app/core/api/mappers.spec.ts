@@ -206,6 +206,17 @@ describe('mapTimelineEvent', () => {
       actorInfo: null,
       at: '2026-06-05T10:00:00Z',
       note: 'ok',
+      voteId: null,
+      voteDeleted: false,
+    });
+  });
+
+  it('carries the vote of a branch event and the deleted flag', () => {
+    const base: TimelineEventOutWire = { toStateId: 's1', at: '2026-06-05T10:00:00Z', note: 'vote:passed' };
+    expect(mapTimelineEvent({ ...base, voteId: 'v1' }, 'de')).toMatchObject({ voteId: 'v1', voteDeleted: false });
+    expect(mapTimelineEvent({ ...base, voteDeleted: true }, 'de')).toMatchObject({
+      voteId: null,
+      voteDeleted: true,
     });
   });
 

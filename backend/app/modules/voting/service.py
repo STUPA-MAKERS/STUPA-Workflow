@@ -30,11 +30,11 @@ from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.applications.models import Application
+from app.modules.applications.models import Application, StatusEvent
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
@@ -42,6 +42,7 @@ from app.modules.auth.rbac import vote_group_key
 from app.modules.delegations.service import voting_delegation_check
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
 from app.modules.flow.service import FlowService, StagedFire
+from app.modules.protocol.models import ProtocolVoteRef
 from app.modules.voting import tally as tally_mod
 from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
 from app.modules.voting.schemas import (
@@ -233,19 +234,79 @@ class VotingService:
             await self._delete_audited(vote, actor=actor)
         return [vote.id for vote in rows]
 
-    async def _delete_audited(self, vote: Vote, *, actor: str) -> None:
-        """Write ``vote_delete`` for a loaded vote and delete it, without a commit."""
+    async def delete_for_meeting(self, meeting_id: UUID, *, actor: str) -> list[UUID]:
+        """Delete every vote of a meeting, in any status, without a commit.
+
+        The meeting delete calls this under the lock of the meeting row, in its own
+        transaction. The method locks the vote rows (meeting row first, vote rows
+        after it). It then deletes, in this order, the protocol references, the secret
+        ballots, the voted markers and the ballots of these votes, clears the vote
+        reference of the status events, and deletes each vote with a ``vote_delete``
+        audit entry (reason ``meeting_deleted``). The foreign keys would cascade or
+        set NULL too, but the explicit deletes keep the order and the audit visible.
+
+        An application that such a vote decided keeps its status. Its status event
+        keeps the note ``vote:<result>``, and the timeline shows the vote as deleted.
+
+        The audit entries hold id references and the status only, never a voter and
+        never a choice, so the delete of a secret vote reveals nothing.
+
+        Returns:
+            The ids of the deleted votes, in creation order.
+
+        Raises:
+            ConflictError: A vote of the meeting is open (``open_vote``). The method
+                then deletes nothing.
+        """
+        rows = (
+            (
+                await self.session.execute(
+                    select(Vote)
+                    .where(Vote.meeting_id == meeting_id)
+                    .order_by(Vote.created_at)
+                    .with_for_update()
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if any(vote.status == "open" for vote in rows):
+            raise ConflictError(
+                "a vote of this meeting is still open — close or cancel it first",
+                code="open_vote",
+            )
+        ids = [vote.id for vote in rows]
+        if ids:
+            for model in (ProtocolVoteRef, SecretBallot, VotedMarker, Ballot):
+                await self.session.execute(delete(model).where(model.vote_id.in_(ids)))
+            await self.session.execute(
+                update(StatusEvent).where(StatusEvent.vote_id.in_(ids)).values(vote_id=None)
+            )
+        for vote in rows:
+            await self._delete_audited(vote, actor=actor, reason="meeting_deleted")
+        return ids
+
+    async def _delete_audited(
+        self, vote: Vote, *, actor: str, reason: str | None = None
+    ) -> None:
+        """Write ``vote_delete`` for a loaded vote and delete it, without a commit.
+
+        ``reason`` names a delete that another delete caused (``meeting_deleted``).
+        """
+        data: dict[str, str | None] = {
+            **self._audit_refs(vote),
+            "agendaItemId": str(vote.agenda_item_id) if vote.agenda_item_id else None,
+            "status": vote.status,
+        }
+        if reason is not None:
+            data["reason"] = reason
         await audit_record(
             self.session,
             actor=actor,
             action=AuditAction.VOTE_DELETE,
             target_type="vote",
             target_id=str(vote.id),
-            data={
-                **self._audit_refs(vote),
-                "agendaItemId": str(vote.agenda_item_id) if vote.agenda_item_id else None,
-                "status": vote.status,
-            },
+            data=data,
         )
         await self.session.delete(vote)
         await self.session.flush()
@@ -1358,10 +1419,10 @@ class VotingService:
     ) -> list[Vote]:
         """Cancel the ``draft`` votes of a meeting, without a commit.
 
-        The meeting close and the meeting delete use this: a draft of a closed or
-        deleted meeting can never open. Each vote gets ``closed_at`` and a
-        ``vote_cancel`` audit entry with ``reason`` (``meeting_closed`` or
-        ``meeting_deleted``).
+        The meeting close uses this: a draft of a closed meeting can never open. Each
+        vote gets ``closed_at`` and a ``vote_cancel`` audit entry with ``reason``
+        (default ``meeting_closed``). The meeting delete does not cancel: it deletes
+        the votes (``delete_for_meeting``).
 
         Returns:
             The cancelled votes.
@@ -1546,7 +1607,7 @@ class VotingService:
         try:
             async with self.session.begin_nested():
                 return await flow.stage_branch(
-                    application_id, branch_name, principal, note=note
+                    application_id, branch_name, principal, note=note, vote_id=vote.id
                 )
         except ConflictError as exc:
             reason = exc.code
