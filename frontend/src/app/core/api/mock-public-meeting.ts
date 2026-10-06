@@ -220,6 +220,8 @@ interface GuestMock {
   me: GuestMe | null;
   head: PublicMeetingHead | null;
   problem?: string;
+  /** The problem of the head when it differs from the one of `/me`. */
+  headProblem?: string;
 }
 
 function me(code: string, over: Partial<GuestMe>, view: Partial<NonNullable<GuestMe['view']>> | null): GuestMe {
@@ -271,10 +273,12 @@ function initial(code: string): GuestMock {
       return { head: head(code), me: me(code, { status: 'pending' }, null) };
     case 'MOCKREJECT':
       return { head: head(code), me: me(code, { status: 'rejected', displayName: 'Tobias Lang', number: 10, retryAfter: 150 }, null) };
+    // The head says "unknown" for a closed meeting and one without public participation
+    // (no probing); a device with a request learns the switch-off from `/me`.
     case 'MOCKOFF':
-      return { head: null, me: null, problem: 'meeting_not_public' };
+      return { head: null, me: null, problem: 'meeting_not_public', headProblem: 'join_code_unknown' };
     case 'MOCKCLOSED':
-      return { head: head(code, { status: 'closed' }), me: null };
+      return { head: null, me: null, problem: 'join_code_unknown' };
     default:
       return { head: null, me: null, problem: 'join_code_unknown' };
   }
@@ -303,6 +307,7 @@ export function mockPublicMeeting(method: string, p: string, body: unknown): Moc
   if (!m) return null;
   const code = m[1];
   const s = stateOf(code);
+  if (!m[2] && s.headProblem) return problem(404, s.headProblem);
   if (s.problem) return problem(404, s.problem);
   if (!m[2]) return method === 'GET' ? { status: 200, body: s.head } : null;
   if (m[2] === '/me') {

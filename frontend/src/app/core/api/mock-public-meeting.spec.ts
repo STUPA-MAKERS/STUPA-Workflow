@@ -45,8 +45,9 @@ describe('mock public meeting (#17)', () => {
     expect(body<GuestMe>(me('MOCKREJECT')).retryAfter).toBe(150);
     expect(code(me('MOCKOFF'))).toBe('meeting_not_public');
     expect(code(mockPublicMeeting('GET', '/api/public/meetings/NOPE', null))).toBe('join_code_unknown');
-    expect(body<{ status: string }>(mockPublicMeeting('GET', '/api/public/meetings/MOCKCLOSED', null)).status).toBe('closed');
-    expect(mockPublicMeeting('POST', '/api/public/meetings/MOCKCLOSED', null)).toBeNull();
+    expect(code(mockPublicMeeting('GET', '/api/public/meetings/MOCKCLOSED', null))).toBe('join_code_unknown');
+    expect(code(mockPublicMeeting('GET', '/api/public/meetings/MOCKOFF', null))).toBe('join_code_unknown');
+    expect(mockPublicMeeting('POST', '/api/public/meetings/MOCKWAIT', null)).toBeNull();
     expect(mockPublicMeeting('GET', '/api/other', null)).toBeNull();
   });
 

@@ -261,6 +261,30 @@ async def test_join_link_and_rotate() -> None:
     assert updated[0][1][0].status == "expired" and updated[0][1][1] == "rotated"
 
 
+async def test_assign_code_retries_a_collision() -> None:
+    from sqlalchemy.exc import IntegrityError
+
+    class Colliding(GuestFakeSession):
+        flushes = 0
+
+        async def flush(self) -> None:
+            type(self).flushes += 1
+            if type(self).flushes == 1:
+                raise IntegrityError("insert", {}, Exception("duplicate"))
+
+    session = Colliding()
+    m = meeting(join_code=None)
+    code = await GuestService(session).assign_code(m)  # type: ignore[arg-type]
+    assert m.join_code == code and Colliding.flushes == 2
+
+    class Always(GuestFakeSession):
+        async def flush(self) -> None:
+            raise IntegrityError("insert", {}, Exception("duplicate"))
+
+    with pytest.raises(ConflictError):
+        await GuestService(Always()).assign_code(meeting(join_code=None))  # type: ignore[arg-type]
+
+
 async def test_free_code_gives_up(monkeypatch: pytest.MonkeyPatch) -> None:
     session = db(scalars=[uuid4()] * 20)
     with pytest.raises(ConflictError) as err:
@@ -284,9 +308,12 @@ async def test_switch_off_purge_pseudonymize_attended() -> None:
         ("expired", "public_off"),
         ("removed", "public_off"),
     ]
-    purge = db()
-    await GuestService(purge).purge_on_close(meeting())  # type: ignore[arg-type]
-    assert len(purge.statements) == 2
+    waiting = guest()
+    purge = db(result(waiting))
+    closed = await GuestService(purge).purge_on_close(meeting())  # type: ignore[arg-type]
+    assert len(purge.statements) == 3
+    assert [(o.status, r) for o, r in closed.updated] == [("expired", "meeting_closed")]
+    assert "display_name" in str(purge.statements[2])
     rows = [guest(seq=5), guest(seq=9)]
     assert await GuestService(db(result(*rows))).pseudonymize(MID) == 2
     assert [(r.seq, r.display_name, r.token_hash) for r in rows] == [
@@ -315,9 +342,6 @@ async def test_meeting_by_code_and_head() -> None:
     with pytest.raises(NotFoundError) as unknown:
         await GuestService(db(result())).meeting_by_code("zzz")
     assert unknown.value.code == "join_code_unknown"
-    with pytest.raises(NotFoundError) as off:
-        await GuestService(db(result(meeting(public_join=False)))).meeting_by_code("7KQ4MP")
-    assert off.value.code == "meeting_not_public"
     head = await GuestService(db(result(meeting()), scalars=["Fachschaft"])).head("7kq-4mp")
     assert head.code == "7KQ4MP" and head.gremium_name == "Fachschaft"
 
@@ -350,10 +374,13 @@ async def test_join_new_device() -> None:
     assert recorder.events[0][0] == "requested"
 
 
-async def test_join_closed_meeting_409() -> None:
-    with pytest.raises(ConflictError) as err:
-        await GuestService(db(result(meeting(status="closed")))).join("C", "Jo Do", None, now=NOW)
-    assert err.value.code == "meeting_closed"
+async def test_join_of_a_closed_or_hidden_meeting_is_unknown() -> None:
+    session = db(result())
+    with pytest.raises(NotFoundError) as err:
+        await GuestService(session).join("C", "Jo Do", None, now=NOW)
+    assert err.value.code == "join_code_unknown"
+    query = str(session.statements[0])
+    assert "meeting.status !=" in query and "meeting.public_join IS true" in query
 
 
 async def test_join_same_device_rules() -> None:
@@ -398,12 +425,28 @@ async def test_join_removed_left_and_other_meeting() -> None:
         "C", "Jo Do", "tok", now=NOW
     )
     assert token is not None and left.token_hash is None and me.number == 2
-    elsewhere = guest(meeting_id=uuid4())
-    _, token = await GuestService(db(result(meeting()), result(elsewhere))).join(
+    for status in ("pending", "admitted"):
+        elsewhere = guest(meeting_id=uuid4(), status=status)
+        recorder = Recorder()
+        session = db(result(meeting()), result(elsewhere))
+        _, token = await GuestService(session, recorder).join(  # type: ignore[arg-type]
+            "C", "Jo Do", "tok", now=NOW
+        )
+        assert token is not None
+        assert (elsewhere.status, elsewhere.display_name, elsewhere.token_hash) == (
+            "left",
+            None,
+            None,
+        )
+        assert elsewhere.decided_at == NOW
+        # The other meeting hears about it, so its lead list and the device socket follow.
+        left = [e for e in recorder.events if e[0] == "updated"]
+        assert left and left[0][1][0].status == "left"
+    rejected_elsewhere = guest(meeting_id=uuid4(), status="rejected")
+    await GuestService(db(result(meeting()), result(rejected_elsewhere))).join(
         "C", "Jo Do", "tok", now=NOW
     )
-    assert token is not None
-    assert (elsewhere.status, elsewhere.display_name, elsewhere.token_hash) == ("left", None, None)
+    assert rejected_elsewhere.status == "rejected" and rejected_elsewhere.token_hash is None
 
 
 async def test_me_rename_leave() -> None:
@@ -482,7 +525,12 @@ async def test_cast_rules(monkeypatch: pytest.MonkeyPatch) -> None:
         session.get_results = [got]
         with pytest.raises(NotFoundError):
             await GuestService(session).cast(
-                "7KQ4MP", "tok", vote.id, "yes", voting=voting, now=NOW  # type: ignore[arg-type]
+                "7KQ4MP",
+                "tok",
+                vote.id,
+                "yes",
+                voting=voting,  # type: ignore[arg-type]
+                now=NOW,  # type: ignore[arg-type]
             )  # type: ignore[arg-type]
     for recorder in (Recorder(), Recorder(fail=True), None):
         session = db(result(admitted), result(meeting()), scalars=[False])

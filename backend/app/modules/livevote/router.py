@@ -42,6 +42,7 @@ from app.modules.livevote.schemas import (
     GuestNameBody,
     JoinLinkOut,
     MeetingCreate,
+    MeetingDefaultsOut,
     MeetingGremiumOut,
     MeetingGuestOut,
     MeetingMemberOut,
@@ -239,6 +240,26 @@ async def list_meeting_members(
     if not await service.can_manage(gremium_id, principal):
         raise ForbiddenError("not allowed to manage meetings for this committee")
     return await attendance.members(gremium_id)
+
+
+@router.get(
+    "/gremien/{gremium_id}/meeting-defaults",
+    response_model=MeetingDefaultsOut,
+    responses=_errors(401, 403),
+)
+async def get_meeting_defaults(
+    gremium_id: UUID, service: ServiceDep, principal: ReaderDep
+) -> MeetingDefaultsOut:
+    """What a new meeting of the gremium allows (#17).
+
+    Public participation needs a gremium without a quorum; the create dialog reads it
+    before the meeting exists. The caller must manage the gremium (``session.manage``
+    or admin).
+    """
+    if not await service.can_manage(gremium_id, principal):
+        raise ForbiddenError("not allowed to manage meetings for this committee")
+    quorum = await service.gremium_quorum_percent(gremium_id)
+    return MeetingDefaultsOut(publicJoinAllowed=quorum is None, quorumPercent=quorum)
 
 
 @router.get("/meetings", response_model=list[MeetingOut], responses=_errors(401, 403, 422))

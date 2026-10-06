@@ -775,6 +775,8 @@ let MOCK_MEETING: MeetingOutWire = {
   joinCode: '7KQ4MP',
   admittedGuests: 7,
   pendingGuests: 3,
+  // #17: the gremium of the live meeting has no quorum, so it may be public.
+  publicJoinAllowed: true,
   votes: [
     {
       id: 'a0000000-0000-0000-0000-0000000000a1',
@@ -828,6 +830,8 @@ const MOCK_PLANNED_MEETING: MeetingOutWire = {
   status: 'planned',
   gremiumId: null,
   gremiumName: 'Haushaltsausschuss',
+  // #17: this gremium has a quorum: no public participation (the switch is locked).
+  publicJoinAllowed: false,
   votes: [],
   createdAt: '2026-06-01T10:00:00Z',
   // The demo user leads it and nobody keeps the minutes yet: the preparation shows.
@@ -1642,6 +1646,12 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         { id: 'g0000000-0000-0000-0000-000000000001', name: 'Studierendenparlament' },
         { id: 'g0000000-0000-0000-0000-000000000002', name: 'Haushaltsausschuss' },
       ]);
+    }
+    // #17: the Studierendenparlament has a quorum of 50 %, every other gremium none.
+    const defaults = /\/gremien\/([^/]+)\/meeting-defaults$/.exec(p);
+    if (defaults) {
+      const quorum = defaults[1] === 'g0000000-0000-0000-0000-000000000001' ? 50 : null;
+      return ok({ publicJoinAllowed: quorum === null, quorumPercent: quorum });
     }
     if (/\/gremien\/[^/]+\/meeting-members$/.test(p)) {
       return ok(

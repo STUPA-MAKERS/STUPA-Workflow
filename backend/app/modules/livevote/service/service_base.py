@@ -57,6 +57,7 @@ class MeetingServiceBase:
         agenda: AgendaSummary = (0, None),
         keepers: KeeperSummary | None = None,
         guests: GuestCounts = (0, 0),
+        public_join_allowed: bool = True,
     ) -> MeetingOut:
         periods, planned = keepers if keepers is not None else ([], None)
         return MeetingOut(
@@ -98,6 +99,7 @@ class MeetingServiceBase:
             joinCode=getattr(meeting, "join_code", None) if can_manage else None,
             admittedGuests=guests[0],
             pendingGuests=guests[1] if can_manage else 0,
+            publicJoinAllowed=public_join_allowed,
         )
 
     async def _guest_counts(self, meeting_ids: Sequence[UUID]) -> dict[UUID, GuestCounts]:
@@ -186,6 +188,11 @@ class MeetingServiceBase:
             return None
         row = await session.get(PrincipalRow, principal_id)
         return (row.display_name or row.email) if row is not None else None
+
+    async def _gremium_quorum_set(self, gremium_id: UUID) -> bool:
+        """Tell if the gremium sets a default quorum (#17: then no public participation)."""
+        row = await self.session.get(Gremium, gremium_id)
+        return getattr(row, "quorum_percent", None) is not None
 
     async def _gremium_name_for(self, gremium_id: UUID | None) -> str | None:
         if gremium_id is None:

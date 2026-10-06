@@ -289,17 +289,26 @@ async def test_apply_public_rules() -> None:
     # vote -> watch with an open guest vote: 409.
     with pytest.raises(ConflictError) as err:
         await _Lifecycle(FakeSession(), open_vote=True)._apply_public(
-            m, MeetingPatch(guestsMode="watch"), lead, NOW  # type: ignore[arg-type]
+            m,  # type: ignore[arg-type]
+            MeetingPatch(guestsMode="watch"),
+            lead,
+            NOW,  # type: ignore[arg-type]
         )
     assert err.value.code == "guest_vote_open"
     # Switch off removes the guests.
     off = await _Lifecycle(FakeSession())._apply_public(
-        m, MeetingPatch(publicJoin=False), lead, NOW  # type: ignore[arg-type]
+        m,  # type: ignore[arg-type]
+        MeetingPatch(publicJoin=False),
+        lead,
+        NOW,  # type: ignore[arg-type]
     )
     assert m.public_join is False and off is not None and off.counts is True
     # Watch while off: only the mode changes.
     watch = await _Lifecycle(FakeSession())._apply_public(
-        m, MeetingPatch(guestsMode="watch"), lead, NOW  # type: ignore[arg-type]
+        m,  # type: ignore[arg-type]
+        MeetingPatch(guestsMode="watch"),
+        lead,
+        NOW,  # type: ignore[arg-type]
     )
     assert m.guests_mode == "watch" and watch is not None
 
@@ -402,10 +411,62 @@ async def test_public_rate_limits() -> None:
     await antiabuse.rate_limit_public_read(_request(), settings, limiter)
     with pytest.raises(RateLimitedError):
         await antiabuse.rate_limit_public_read(_request(), settings, limiter)
-    await antiabuse.rate_limit_public_guest_write(_request(cookie="tok"), settings, limiter)
+    from app.modules.livevote.public_router import rate_limit_public_guest_write
+
+    # A cookie that resolves to a guest counts against that guest.
+    known = FakeSession()
+    known.scalar_results = [uuid4()]
+    await rate_limit_public_guest_write(_request(cookie="tok"), settings, limiter, known)  # type: ignore[arg-type]
+    # Unknown cookies and no cookie count against the IP: random cookies get no budget.
+    await rate_limit_public_guest_write(_request(cookie="r1"), settings, limiter, FakeSession())  # type: ignore[arg-type]
     with pytest.raises(RateLimitedError):
-        await antiabuse.rate_limit_public_guest_write(_request(cookie="tok"), settings, limiter)
-    await antiabuse.rate_limit_public_guest_write(_request(), settings, limiter)
+        await rate_limit_public_guest_write(_request(cookie="r2"), settings, limiter, FakeSession())  # type: ignore[arg-type]
+    with pytest.raises(RateLimitedError):
+        await rate_limit_public_guest_write(_request(), settings, limiter, FakeSession())  # type: ignore[arg-type]
+
+
+def test_cookie_lifetime_follows_the_meeting_day() -> None:
+    from datetime import date as _date
+
+    from app.modules.livevote.public_router import cookie_ttl_seconds
+
+    settings = get_settings()
+    now = datetime(2026, 10, 6, 12, 0, tzinfo=UTC)
+    assert cookie_ttl_seconds(None, settings, now) == 24 * 3600
+    assert cookie_ttl_seconds(_date(2026, 10, 6), settings, now) == 36 * 3600
+    assert cookie_ttl_seconds(_date(2026, 10, 20), settings, now) == (14 * 24 + 36) * 3600
+    assert cookie_ttl_seconds(_date(2026, 9, 1), settings, now) == 24 * 3600
+
+
+def test_guest_name_drops_hidden_characters() -> None:
+    assert clean_guest_name("Ja\u200bna\u202e Roth\x07") == "Jana Roth"
+    with pytest.raises(ValueError):
+        clean_guest_name("\u200b\u200bA")
+
+
+def test_meeting_defaults_route(setup: Any) -> None:
+    client, meetings, *_ = setup
+    resp = client.get(f"/api/gremien/{uuid4()}/meeting-defaults")
+    assert resp.json() == {"publicJoinAllowed": True, "quorumPercent": None}
+    meetings._can_manage = False
+    assert client.get(f"/api/gremien/{uuid4()}/meeting-defaults").status_code == 403
+
+
+async def test_public_join_needs_a_gremium_without_quorum() -> None:
+    from app.shared.errors import ValidationProblem
+
+    lead = Principal(sub="lead")
+    session = FakeSession()
+    session.scalar_results = [50]  # the gremium quorum
+    with pytest.raises(ValidationProblem) as err:
+        await _Lifecycle(session)._apply_public(_m(), MeetingPatch(publicJoin=True), lead, NOW)  # type: ignore[arg-type]
+    assert err.value.code == "public_join_needs_no_quorum"
+    no_quorum = FakeSession()
+    assert await MeetingService(no_quorum).gremium_has_quorum(uuid4()) is False  # type: ignore[arg-type]
+    assert await MeetingService(no_quorum)._gremium_quorum_set(uuid4()) is False  # type: ignore[arg-type]
+    with_quorum = FakeSession()
+    with_quorum.get_results = [SimpleNamespace(quorum_percent=50)]
+    assert await MeetingService(with_quorum)._gremium_quorum_set(uuid4()) is True  # type: ignore[arg-type]
 
 
 async def test_votes_for_counts_guests_of_a_guest_vote() -> None:

@@ -36,6 +36,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import delete, func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import Gremium
@@ -267,7 +268,25 @@ class GuestService:
     async def ensure_code(self, meeting: Meeting) -> None:
         """Give the meeting a join code when it has none."""
         if meeting.join_code is None:
-            meeting.join_code = await self._free_code()
+            await self.assign_code(meeting)
+
+    async def assign_code(self, meeting: Meeting) -> str:
+        """Give the meeting a new free join code, safe against a parallel collision.
+
+        A parallel meeting can take the same code between the check and the write. The
+        flush in a SAVEPOINT meets the unique index then, and the method takes another
+        code instead of a 500. The meeting must be in the session.
+        """
+        for _ in range(_CODE_ATTEMPTS):
+            code = await self._free_code()
+            meeting.join_code = code
+            try:
+                async with self.session.begin_nested():
+                    await self.session.flush()
+            except IntegrityError:
+                continue
+            return code
+        raise ConflictError("No free join code; try again.", code="join_code_exhausted")
 
     async def _free_code(self) -> str:
         """Return a code that no open meeting uses."""
@@ -329,14 +348,35 @@ class GuestService:
             events.updated.append((out, "public_off"))
         return events
 
-    async def purge_on_close(self, meeting: Meeting) -> None:
-        """The meeting closes: delete the requests that never got admitted (#17).
+    async def purge_on_close(self, meeting: Meeting) -> GuestEvents:
+        """The meeting closes: delete the requests and pseudonymize the guests (#17).
 
-        This covers the rejected, the withdrawn and the still open requests. It also
-        clears every token hash: a token has no use after the close. The admitted
-        guests stay as numbers for the protocol until the finalization pseudonymizes
-        them. The caller commits.
+        The rows that never got admitted go: the rejected, the withdrawn and the still
+        open requests. The names of the admitted guests go too (decision 2026-10-06:
+        at the latest at the close); the numbers stay for the protocol. Every token
+        hash goes, because a token has no use after the close. The caller commits and
+        then sends the returned events: the lead list drops the deleted rows, and the
+        socket of a waiting device ends.
+
+        Returns:
+            The broadcasts for the deleted rows (status ``expired``, reason
+            ``meeting_closed``).
         """
+        events = GuestEvents(counts=True)
+        gone = (
+            (
+                await self.session.execute(
+                    select(MeetingGuest).where(
+                        MeetingGuest.meeting_id == meeting.id,
+                        MeetingGuest.admitted_at.is_(None),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for guest in gone:
+            events.updated.append((self._out(guest, status="expired"), "meeting_closed"))
         await self.session.execute(
             delete(MeetingGuest).where(
                 MeetingGuest.meeting_id == meeting.id, MeetingGuest.admitted_at.is_(None)
@@ -345,8 +385,9 @@ class GuestService:
         await self.session.execute(
             update(MeetingGuest)
             .where(MeetingGuest.meeting_id == meeting.id)
-            .values(token_hash=None)
+            .values(token_hash=None, display_name=None)
         )
+        return events
 
     async def pseudonymize(self, meeting_id: UUID) -> int:
         """Replace every guest name of the meeting with "Gast 1 … n" (#17).
@@ -558,8 +599,7 @@ class GuestService:
         """
         meeting = await self._meeting(meeting_id, for_update=True)
         self._assert_open(meeting)
-        code = await self._free_code()
-        meeting.join_code = code
+        code = await self.assign_code(meeting)
         events = GuestEvents(counts=True)
         voided = await self._void_pending(meeting, events, "rotated")
         await self._audit(
@@ -575,28 +615,25 @@ class GuestService:
     # -- the guest (public routes) ---------------------------------------------------------
 
     async def meeting_by_code(self, code: str, *, for_update: bool = False) -> Meeting:
-        """Find the meeting of a join code.
+        """Find the open public meeting of a join code.
 
-        An open meeting wins over a closed one with the same old code.
+        An unknown code, a meeting without public participation and a closed meeting
+        all give the same 404, so nobody can probe the codes.
 
         Raises:
-            NotFoundError: No meeting has the code (``join_code_unknown``), or its
-                public participation is off (``meeting_not_public``).
+            NotFoundError: ``join_code_unknown``.
         """
         normalized = normalize_code(code)
-        stmt = (
-            select(Meeting)
-            .where(Meeting.join_code == normalized)
-            .order_by((Meeting.status == "closed").asc(), Meeting.created_at.desc())
-            .limit(1)
+        stmt = select(Meeting).where(
+            Meeting.join_code == normalized,
+            Meeting.status != "closed",
+            Meeting.public_join.is_(True),
         )
         if for_update:
             stmt = stmt.with_for_update().execution_options(populate_existing=True)
         meeting = (await self.session.execute(stmt)).scalar_one_or_none()
         if meeting is None:
             raise NotFoundError("Unknown join code.", code="join_code_unknown")
-        if not meeting.public_join:
-            raise NotFoundError("The meeting is not public.", code="meeting_not_public")
         return meeting
 
     async def head(self, code: str) -> PublicMeetingHead:
@@ -645,17 +682,17 @@ class GuestService:
             keeps its token.
 
         Raises:
-            NotFoundError: The code is unknown or the meeting is not public.
-            ConflictError: The meeting is closed (``meeting_closed``) or the device is
-                already admitted (``already_admitted``).
+            NotFoundError: The code is unknown, or the meeting is closed or not
+                public (``join_code_unknown``).
+            ConflictError: The device is already admitted (``already_admitted``).
             RateLimitedError: A rejected or removed device asks again within 3 minutes
                 (``retry_later``).
         """
         # The lock serializes the number of the pseudonym per meeting.
         meeting = await self.meeting_by_code(code, for_update=True)
-        if meeting.status == "closed":
-            raise ConflictError("The meeting is closed.", code="meeting_closed")
         events = GuestEvents()
+        other_events = GuestEvents()
+        other_meeting: UUID | None = None
         existing = await self._by_token(token, for_update=True)
         new_token_value: str | None = None
         guest: MeetingGuest
@@ -689,12 +726,16 @@ class GuestService:
             if existing is not None:
                 if existing.meeting_id == meeting.id:
                     self._check_retry(existing, now)
-                elif existing.status == "pending":
-                    # A waiting request of another meeting from this device ends: one
-                    # device, one token. Its name goes at once, as on a withdrawal.
+                elif existing.status in ("pending", "admitted"):
+                    # The device leaves the other meeting: one device, one token. Its
+                    # request or its seat ends, and its name goes at once, as on
+                    # "Sitzung verlassen". The other meeting learns about it, so its
+                    # lead list and the socket of the device follow.
                     existing.status = "left"
                     existing.decided_at = now
                     existing.display_name = None
+                    other_meeting = existing.meeting_id
+                    other_events.updated.append((self._out(existing), None))
                 # One device, one token: the old row lets go of it.
                 existing.token_hash = None
             new_token_value = new_token()
@@ -720,6 +761,8 @@ class GuestService:
         me = await self._me(meeting, guest, now)
         await self.session.commit()
         await self.publish(meeting.id, events)
+        if other_meeting is not None:
+            await self.publish(other_meeting, other_events)
         return me, new_token_value
 
     def _check_retry(self, guest: MeetingGuest, now: datetime) -> None:

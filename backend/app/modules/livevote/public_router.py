@@ -12,11 +12,12 @@ campus NAT). The guest WebSocket checks the `Origin` like the member channel.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from typing import Annotated, Any
+from datetime import UTC, date, datetime, time, timedelta
+from typing import Annotated, Any, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response, WebSocket
+from sqlalchemy import select
 
 from app.deps import DbSession
 from app.modules.flow.dispatch import ActionDispatcher
@@ -30,7 +31,8 @@ from app.modules.livevote.connection import (
 )
 from app.modules.livevote.events import ErrorEvent, GuestStatusEvent
 from app.modules.livevote.guest_connection import GuestConnection
-from app.modules.livevote.guests import GuestService
+from app.modules.livevote.guests import GuestService, token_hash
+from app.modules.livevote.models import MeetingGuest
 from app.modules.livevote.public_schemas import (
     GuestBallotBody,
     GuestJoinBody,
@@ -44,13 +46,15 @@ from app.modules.voting.schemas import BallotAccepted
 from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings
 from app.shared.antiabuse import (
+    RateLimiterDep,
+    client_ip,
     enforce_auth_payload_limit,
-    rate_limit_public_guest_write,
+    get_rate_limiter,
     rate_limit_public_join,
     rate_limit_public_read,
     verify_altcha,
 )
-from app.shared.errors import NotFoundError, ProblemDetail, UnauthorizedError
+from app.shared.errors import NotFoundError, ProblemDetail, RateLimitedError, UnauthorizedError
 
 router = APIRouter(prefix="/public/meetings", tags=["public-meetings"])
 
@@ -58,6 +62,12 @@ router = APIRouter(prefix="/public/meetings", tags=["public-meetings"])
 GUEST_COOKIE_PATH = "/api/public/meetings"
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
+
+# Close code of a guest socket handshake over the rate limit.
+WS_RATE_LIMITED = 4429
+_HOUR = 3600
+# The cookie lasts at least this long; for a meeting in the future until its day ends.
+_MIN_COOKIE_TTL = timedelta(hours=24)
 
 # Cap of the concurrent sockets per guest device (DoS guard, per process).
 _MAX_CONNECTIONS_PER_GUEST = 3
@@ -95,11 +105,54 @@ def _token(request: Request, settings: Settings) -> str | None:
     return request.cookies.get(settings.guest_cookie_name)
 
 
-def _set_cookie(response: Response, token: str, settings: Settings) -> None:
+def cookie_ttl_seconds(meeting_date: date | None, settings: Settings, now: datetime) -> int:
+    """Return the lifetime of the device cookie.
+
+    The base is ``guest_cookie_ttl_hours``. A join before a planned meeting keeps the
+    cookie until the end of the day after the meeting day, so the guest can return on
+    that day. The token itself stops working when the meeting closes.
+    """
+    base = timedelta(hours=settings.guest_cookie_ttl_hours)
+    if meeting_date is None:
+        return int(base.total_seconds())
+    end = datetime.combine(meeting_date + timedelta(days=2), time(0, 0), tzinfo=UTC)
+    return int(max(base, _MIN_COOKIE_TTL, end - now).total_seconds())
+
+
+async def rate_limit_public_guest_write(
+    request: Request,
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+    session: DbSession,
+) -> None:
+    """The writes of a guest (name, leave, ballot): a limit per guest, else per IP.
+
+    The key is the guest of the device token when the token resolves. An unknown or
+    missing cookie counts against the IP, so random cookies get no fresh budget.
+    """
+    token = request.cookies.get(settings.guest_cookie_name)
+    guest_id = (
+        await session.scalar(
+            select(MeetingGuest.id).where(MeetingGuest.token_hash == token_hash(token))
+        )
+        if token
+        else None
+    )
+    key = f"public-guest:{guest_id}" if guest_id else f"public-guest:ip:{client_ip(request)}"
+    result = await limiter.hit(
+        key, limit=settings.rl_public_guest_write_per_hour, window_seconds=_HOUR
+    )
+    if not result.allowed:
+        raise RateLimitedError(
+            "Too many requests. Try again later.", retry_after=result.retry_after
+        )
+
+
+def _set_cookie(response: Response, token: str, settings: Settings, max_age: int) -> None:
     response.set_cookie(
         settings.guest_cookie_name,
         token,
-        max_age=settings.guest_cookie_ttl_hours * 3600,
+        max_age=max_age,
         httponly=True,
         secure=settings.cookie_secure,
         samesite="strict",
@@ -161,7 +214,8 @@ async def join_public_meeting(
         code, payload.display_name, _token(request, settings), now=datetime.now(UTC)
     )
     if token is not None:
-        _set_cookie(response, token, settings)
+        now = datetime.now(UTC)
+        _set_cookie(response, token, settings, cookie_ttl_seconds(me.meeting.date, settings, now))
     return me
 
 
@@ -278,10 +332,22 @@ async def guest_socket(
     """The live channel of a guest device (cookie token, Origin check).
 
     Close codes: 4401 without a valid token, 4404 for an unknown guest or meeting,
-    4403 for a foreign origin or too many connections.
+    4403 for a foreign origin or too many connections, 4429 over the handshake limit
+    per IP.
     """
     if not origin_allowed(websocket.headers.get("origin"), settings):
         await websocket.close(code=WS_FORBIDDEN)
+        return
+    # The handshake counts like a read of the guest page, per IP.
+    limiter = get_rate_limiter(cast(Request, websocket), settings)
+    ip = websocket.client.host if websocket.client is not None else "unknown"
+    hit = await limiter.hit(
+        f"public-ws:ip:{ip}",
+        limit=settings.rl_public_meeting_read_ip_per_hour,
+        window_seconds=_HOUR,
+    )
+    if not hit.allowed:
+        await websocket.close(code=WS_RATE_LIMITED)
         return
     guests = GuestService(session)
     try:

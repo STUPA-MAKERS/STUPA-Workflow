@@ -224,6 +224,11 @@ describe('MeetingSettingsDialogComponent', () => {
       const req = http.expectOne('/api/meetings/m-1');
       expect(req.request.body).toEqual(expect.objectContaining({ publicJoin: false }));
       req.flush({ code: 'guest_vote_open' }, { status: 409, statusText: 'Conflict' });
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      http
+        .expectOne('/api/meetings/m-1')
+        .flush({ code: 'public_join_needs_no_quorum' }, { status: 422, statusText: 'x' });
+      expect(toasts()).toContain('Öffentliche Teilnahme ist nur in Gremien ohne Quorum möglich.');
       expect(toasts()).toContain(
         'Eine Abstimmung mit Gästen ist offen. Schließe sie, bevor Gäste nur noch zuschauen.',
       );

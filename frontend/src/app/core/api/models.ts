@@ -1192,6 +1192,8 @@ export interface MeetingOutWire {
   admittedGuests?: number;
   /** The open join requests; the meeting lead only, else 0. */
   pendingGuests?: number;
+  /** Public participation is possible: only a gremium without a quorum allows it. */
+  publicJoinAllowed?: boolean;
 }
 
 /** `ProtocolOut`. Meeting protocol. POST /meetings/{id}/protocol, PATCH /protocols/{id}. */
@@ -1371,6 +1373,8 @@ export interface Meeting {
   admittedGuests: number;
   /** The open join requests (meeting lead only, else 0). */
   pendingGuests: number;
+  /** Public participation is possible: only a gremium without a quorum allows it. */
+  publicJoinAllowed: boolean;
 }
 
 /** Direction of the meeting timeline relative to *now*. */
@@ -1593,4 +1597,10 @@ export interface GuestMe {
   retryAfter: number | null;
   meeting: PublicMeetingHead;
   view: GuestView | null;
+}
+
+/** `GET /gremien/{id}/meeting-defaults`: what a new meeting of the gremium allows. */
+export interface MeetingDefaults {
+  publicJoinAllowed: boolean;
+  quorumPercent: number | null;
 }

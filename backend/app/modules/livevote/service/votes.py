@@ -52,6 +52,14 @@ class VoteReadOps(MeetingServiceBase):
         tallies = await self._vote_tallies(rows)
         present_by_meeting = await self._present_by_meeting(meeting_ids)
         guests_by_meeting = await self.admitted_guests_by_meeting(meeting_ids)
+        # #17: a vote with guests counts the guests who voted and left since then too.
+        guest_votes = [
+            v.id
+            for v in rows
+            if v.status not in ("closed", "cancelled")
+            and bool((v.config if isinstance(v.config, dict) else {}).get("guestsVote"))
+        ]
+        late_guests = await self._departed_guest_voters(guest_votes) if guest_votes else {}
         # The substitute ballots of absent delegators per meeting and gremium top up
         # the reveal denominator. The voting service applies the same rule in
         # `open_tally_revealed`, so the two paths cannot drift. The query runs only
@@ -89,10 +97,13 @@ class VoteReadOps(MeetingServiceBase):
             else:
                 members = present_by_meeting.get(v.meeting_id, 0)
                 guests = guests_by_meeting.get(v.meeting_id, 0)
-            # A vote with guests expects the ballots of the admitted guests too.
+            # A vote with guests expects the ballots of the admitted guests too, and
+            # keeps the guests who voted and left since then.
             present = present_by_meeting.get(v.meeting_id, 0)
-            if config.guests_vote:
-                present += guests_by_meeting.get(v.meeting_id, 0)
+            if config.guests_vote and v.status not in ("closed", "cancelled"):
+                extra = late_guests.get(v.id, 0)
+                guests = (guests or 0) + extra
+                present += guests_by_meeting.get(v.meeting_id, 0) + extra
             # The reveal rule matches the voting service. A closed vote reveals. A
             # non-secret vote reveals when all expected ballots are in. The expected
             # ballots are the present members plus the substitutes of absent
@@ -214,6 +225,35 @@ class VoteReadOps(MeetingServiceBase):
             )
         ).all()
         return {mid: n for mid, n in rows}
+
+    async def _departed_guest_voters(self, vote_ids: list[UUID]) -> dict[UUID, int]:
+        """Count per vote the guests with a ballot who are no longer admitted (#17)."""
+        from app.modules.voting.service import GUEST_VOTER_PREFIX
+
+        admitted = {
+            f"{GUEST_VOTER_PREFIX}{gid}"
+            for gid in (
+                await self.session.execute(
+                    select(MeetingGuest.id)
+                    .join(Vote, Vote.meeting_id == MeetingGuest.meeting_id)
+                    .where(Vote.id.in_(vote_ids), MeetingGuest.status == "admitted")
+                )
+            )
+            .scalars()
+            .all()
+        }
+        voters: dict[UUID, set[str]] = {}
+        for model in (Ballot, VotedMarker):
+            for vid, sub in (
+                await self.session.execute(
+                    select(model.vote_id, model.voter_sub).where(
+                        model.vote_id.in_(vote_ids),
+                        model.voter_sub.startswith(GUEST_VOTER_PREFIX),
+                    )
+                )
+            ).all():
+                voters.setdefault(vid, set()).add(sub)
+        return {vid: len(subs - admitted) for vid, subs in voters.items()}
 
     async def admitted_guests_by_meeting(self, meeting_ids: list[UUID]) -> dict[UUID, int]:
         """Return `{meeting_id: number of admitted guests}` (#17)."""

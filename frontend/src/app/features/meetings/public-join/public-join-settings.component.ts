@@ -26,6 +26,10 @@ export class PublicJoinSettingsComponent {
   readonly publicJoin = model(false);
   readonly guestsMode = model<GuestsMode>('vote');
   readonly disabled = input(false);
+  /** The gremium has no quorum: only then can the participation be switched on. */
+  readonly allowed = input(true);
+  /** The quorum of the gremium, for the explanation; `null` when it is unknown. */
+  readonly quorumPercent = input<number | null>(null);
   /** The join link of an existing meeting, or `null` (create dialog, not loaded yet). */
   readonly link = input<JoinLink | null>(null);
   /** The create dialog: the link exists only after the create. */
@@ -37,6 +41,16 @@ export class PublicJoinSettingsComponent {
     { value: 'vote', label: this.i18n.translate('guests.mode.vote') },
     { value: 'watch', label: this.i18n.translate('guests.mode.watch') },
   ]);
+
+  /** On only without a quorum; a meeting that is public already can always switch off. */
+  protected readonly switchLocked = computed(
+    () => this.disabled() || (!this.allowed() && !this.publicJoin()),
+  );
+  protected readonly notAllowedText = computed(() => {
+    const first = this.i18n.translate('guests.settings.needsNoQuorum');
+    const q = this.quorumPercent();
+    return q === null ? first : `${first} ${this.i18n.translate('guests.settings.hasQuorum', { n: q })}`;
+  });
 
   setMode(value: string | null): void {
     if (value === 'vote' || value === 'watch') this.guestsMode.set(value);

@@ -12,7 +12,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
-import type { GuestsMode, MeetingMember } from '@core/api/models';
+import type { GuestsMode, MeetingDefaults, MeetingMember } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -86,6 +86,8 @@ export class CreateMeetingDialogComponent {
   /** Public participation over a QR code (#17), with the guest mode. */
   readonly publicJoin = signal(false);
   readonly guestsMode = signal<GuestsMode>('vote');
+  /** What the chosen gremium allows: public participation only without a quorum. */
+  readonly defaults = signal<MeetingDefaults | null>(null);
   readonly members = signal<MeetingMember[]>([]);
   readonly gremiumOptions = signal<SelectOption[]>([]);
   /** The Gremium list arrived. Before that an empty list is no "no Gremium" case. */
@@ -168,7 +170,20 @@ export class CreateMeetingDialogComponent {
     if (id) this.loadMembers(id);
   }
 
+  private loadDefaults(gremiumId: string): void {
+    this.defaults.set(null);
+    this.api.meetingDefaults(gremiumId).subscribe({
+      next: (d) => {
+        if (this.gremium() !== gremiumId) return;
+        this.defaults.set(d);
+        if (!d.publicJoinAllowed) this.publicJoin.set(false);
+      },
+      error: () => {},
+    });
+  }
+
   private loadMembers(gremiumId: string): void {
+    this.loadDefaults(gremiumId);
     this.api.listMeetingMembers(gremiumId).subscribe({
       next: (rows) => {
         // A late answer for a Gremium that the user changed since then is stale.
@@ -231,9 +246,14 @@ export class CreateMeetingDialogComponent {
           // Open the new meeting, so the lead can prepare it right away.
           void this.router.navigate(['/meetings', m.id]);
         },
-        error: () => {
+        error: (err: unknown) => {
           this.creating.set(false);
-          this.toast.error(this.i18n.translate('meetings.toast.createFailed'));
+          const code = (err as { error?: { code?: string } } | null)?.error?.code;
+          this.toast.error(
+            this.i18n.translate(
+              code === 'public_join_needs_no_quorum' ? 'guests.toast.needsNoQuorum' : 'meetings.toast.createFailed',
+            ),
+          );
         },
       });
   }

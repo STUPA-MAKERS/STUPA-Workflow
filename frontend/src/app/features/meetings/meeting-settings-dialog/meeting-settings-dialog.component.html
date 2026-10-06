@@ -54,6 +54,7 @@
         (publicJoinChange)="setPublicJoin($event)"
         [(guestsMode)]="guestsMode"
         [disabled]="publicLocked()"
+        [allowed]="meeting()?.publicJoinAllowed ?? true"
         [link]="meeting()?.publicJoin ? link() : null"
         [rotating]="rotating()"
         (rotate)="rotate()"

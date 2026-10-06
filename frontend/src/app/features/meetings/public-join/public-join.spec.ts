@@ -179,4 +179,17 @@ describe('JoinQrComponent', () => {
     expect(await screen.findByText('Mit dem Handy scannen')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Auf dem Beamer zeigen/ })).toBeNull();
   });
+
+describe('public participation needs a gremium without a quorum', () => {
+  it('locks the switch and names the quorum, but lets a public meeting switch off', async () => {
+    const { fixture } = await render(PublicJoinSettingsComponent, { inputs: { allowed: false, quorumPercent: 50 } });
+    expect(screen.getByRole('switch', { name: /Öffentliche Teilnahme/ })).toBeDisabled();
+    expect(screen.getByText('Nur in Gremien ohne Quorum möglich. Dieses Gremium hat ein Quorum von 50 %.')).toBeInTheDocument();
+    fixture.componentRef.setInput('quorumPercent', null);
+    fixture.componentInstance.publicJoin.set(true);
+    fixture.detectChanges();
+    expect(screen.getByText('Nur in Gremien ohne Quorum möglich.')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /Öffentliche Teilnahme/ })).toBeEnabled();
+  });
+});
 });

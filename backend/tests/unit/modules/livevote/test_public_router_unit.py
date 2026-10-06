@@ -77,6 +77,11 @@ def rest() -> Any:
     fake = FakeGuests()
     app.dependency_overrides[public_router.get_public_guest_service] = lambda: fake
     app.dependency_overrides[public_router.get_public_voting_service] = lambda: object()
+
+    async def _session() -> AsyncIterator[Any]:
+        yield FakeSession()
+
+    app.dependency_overrides[get_session] = _session
     with TestClient(app) as client:
         yield client, fake
 
@@ -173,6 +178,24 @@ def test_ws_refuses_bad_handshakes(monkeypatch: pytest.MonkeyPatch) -> None:
             client.websocket_connect("/api/public/meetings/7KQ4MP/ws") as ws,
         ):
             ws.receive_json()
+
+
+def test_ws_handshake_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.shared.ratelimit import RateLimitResult
+
+    class Full:
+        async def hit(self, key: str, *, limit: int, window_seconds: int) -> RateLimitResult:
+            return RateLimitResult(allowed=False, retry_after=60)
+
+    app, _ = _ws_app(monkeypatch, _guest())
+    monkeypatch.setattr(public_router, "get_rate_limiter", lambda request, settings: Full())
+    client = TestClient(app)
+    with (
+        pytest.raises(WebSocketDisconnect) as err,
+        client.websocket_connect("/api/public/meetings/7KQ4MP/ws") as ws,
+    ):
+        ws.receive_json()
+    assert err.value.code == public_router.WS_RATE_LIMITED
 
 
 def test_ws_refuses_a_foreign_origin(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -430,3 +453,31 @@ async def test_run_of_a_closed_meeting_closes_at_once() -> None:
     conn.ws = Ws()  # type: ignore[assignment]
     await asyncio.wait_for(conn.run(), 2)
     assert closed == [1000]
+
+
+async def test_waiting_guest_socket_ends_with_the_meeting() -> None:
+    conn, sent = await _connection("pending")
+    with pytest.raises(_Closed):
+        await conn.handle({"type": "meeting_state", "status": "closed"})
+    assert sent == [
+        {
+            "type": "guest_status",
+            "status": "pending",
+            "displayName": "Jana",
+            "number": 3,
+            "reason": "meeting_closed",
+        }
+    ]
+
+
+async def test_item_turning_non_public_stops_its_vote_events() -> None:
+    conn, sent = await _connection()
+    vote = str(uuid4())
+    await conn.handle({"type": "vote_tally", "voteId": vote, "cast": 1})
+    assert len(sent) == 1
+    # The item turns non-public: the agenda edit sends a meeting state, the cache goes.
+    WsGuests.public = False
+    await conn.handle({"type": "meeting_state", "status": "live", "currentAgendaItemId": None})
+    sent.clear()
+    await conn.handle({"type": "vote_tally", "voteId": vote, "cast": 2})
+    assert sent == []

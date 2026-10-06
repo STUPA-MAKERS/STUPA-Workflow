@@ -287,6 +287,7 @@ export function mapMeeting(wire: MeetingOutWire): Meeting {
     joinCode: wire.joinCode ?? null,
     admittedGuests: wire.admittedGuests ?? 0,
     pendingGuests: wire.pendingGuests ?? 0,
+    publicJoinAllowed: wire.publicJoinAllowed ?? true,
   };
 }
 

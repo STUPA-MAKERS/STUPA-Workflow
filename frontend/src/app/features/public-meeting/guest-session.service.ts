@@ -71,6 +71,8 @@ export class GuestSessionService implements OnDestroy {
    * that the guest can still vote and that the count of voters is fixed at the close.
    */
   readonly admittedDuringVote = signal(false);
+  /** The server closed the meeting while this page was open (`guest_status` reason). */
+  private readonly endedByServer = signal(false);
 
   readonly state = computed<GuestPageState>(() => {
     if (this.loading()) return 'loading';
@@ -78,7 +80,7 @@ export class GuestSessionService implements OnDestroy {
     if (failure) return failure;
     const me = this.me();
     const head = me?.meeting ?? this.head();
-    if (head?.status === 'closed') return 'closed';
+    if (head?.status === 'closed' || this.endedByServer()) return 'closed';
     if (!me || me.status === 'left') return 'join';
     return me.status;
   });
@@ -92,6 +94,7 @@ export class GuestSessionService implements OnDestroy {
   /** Open the page for a code: the head, then the own request of this device. */
   load(code: string): void {
     this.code.set(code);
+    this.endedByServer.set(false);
     this.loading.set(true);
     this.failure.set(null);
     this.api.publicMeeting(code).subscribe({
@@ -100,6 +103,22 @@ export class GuestSessionService implements OnDestroy {
         this.refresh(true);
       },
       error: (err: unknown) => {
+        // The head answers 404 `join_code_unknown` also for a closed meeting and a
+        // meeting without public participation (no probing). A device with a request
+        // still learns from `/me` that the meeting is no longer public.
+        if (codeOf(err) === 'join_code_unknown') {
+          this.api.guestMe(code).subscribe({
+            next: (me) => {
+              this.adopt(me);
+              this.loading.set(false);
+            },
+            error: (meErr: unknown) => {
+              this.loading.set(false);
+              this.fail(codeOf(meErr) === 'meeting_not_public' ? meErr : err);
+            },
+          });
+          return;
+        }
         this.loading.set(false);
         this.fail(err);
       },
@@ -252,6 +271,12 @@ export class GuestSessionService implements OnDestroy {
     if (msg.type === 'error') return;
     if (msg.type === 'guest_status' && msg.reason === 'public_off') {
       this.failure.set('notPublic');
+    }
+    // The meeting closed while the request waited: the server purges it and closes.
+    if (msg.type === 'guest_status' && msg.reason === 'meeting_closed') {
+      this.endedByServer.set(true);
+      this.disconnect();
+      return;
     }
     this.scheduleRefresh();
   }

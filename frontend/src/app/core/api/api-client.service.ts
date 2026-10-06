@@ -69,6 +69,7 @@ import type {
   MeetingPageWire,
   MeetingPatchBody,
   MeetingGuest,
+  MeetingDefaults,
   JoinLink,
   PublicMeetingHead,
   GuestMe,
@@ -891,6 +892,13 @@ export class ApiClient {
       `${this.base}/meetings/${meetingId}/guests/admit-all`,
       {},
     );
+  }
+
+  /** GET /gremien/{id}/meeting-defaults — the defaults of a new meeting (`session.manage`). */
+  meetingDefaults(gremiumId: Uuid): Observable<MeetingDefaults> {
+    return this.http.get<MeetingDefaults>(`${this.base}/gremien/${gremiumId}/meeting-defaults`, {
+      context: skipLoading(),
+    });
   }
 
   /** GET /meetings/{id}/join-link — the join code, URL and QR matrix (`session.manage`). */

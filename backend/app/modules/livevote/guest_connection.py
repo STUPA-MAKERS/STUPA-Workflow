@@ -181,20 +181,27 @@ class GuestConnection:
             if self.status == "admitted":
                 await self.send_state()
             return
-        if self.status != "admitted":
-            return
         if kind == "meeting_state":
+            # An agenda change (for example an item that turns non-public) sends a
+            # meeting state: the visibility of the votes is read again.
+            self._public_votes.clear()
             status = message.get("status")
-            await self._send(
-                {
-                    "type": "meeting_state",
-                    "status": status,
-                    "currentAgendaItemId": message.get("currentAgendaItemId"),
-                }
-            )
+            if self.status == "admitted":
+                await self._send(
+                    {
+                        "type": "meeting_state",
+                        "status": status,
+                        "currentAgendaItemId": message.get("currentAgendaItemId"),
+                    }
+                )
+            elif status == "closed":
+                await self._send_status("meeting_closed")
             if status == "closed":
                 raise _Closed
-        elif kind == "guest_counts":
+            return
+        if self.status != "admitted":
+            return
+        if kind == "guest_counts":
             admitted = message.get("admittedGuests")
             await self._send({"type": "guest_counts", "admittedGuests": admitted})
         elif kind in _VOTE_EVENTS:

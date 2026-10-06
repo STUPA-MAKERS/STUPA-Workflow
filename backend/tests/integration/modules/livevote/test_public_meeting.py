@@ -390,7 +390,8 @@ async def test_public_routes_reject_bad_tokens_and_codes(
         await session.commit()
     with guest_client(ctx.app) as phone:
         resp = phone.get(f"/api/public/meetings/{code}")
-        assert resp.status_code == 404 and resp.json()["code"] == "meeting_not_public"
+        # The same 404 as an unknown code: nobody can probe the codes.
+        assert resp.status_code == 404 and resp.json()["code"] == "join_code_unknown"
 
 
 async def test_reject_and_ask_again_after_three_minutes(
@@ -728,10 +729,12 @@ async def test_close_purges_requests_and_finalize_pseudonymizes(
         closed = lead.patch(f"/api/meetings/{s.meeting_id}", json={"status": "closed"})
         assert closed.status_code == 200, closed.text
         # The closed meeting refuses a join and the token no longer works.
-        assert join(b, code).json()["code"] == "meeting_closed"
+        assert join(b, code).json()["code"] == "join_code_unknown"
+        assert b.get(f"/api/public/meetings/{code}").status_code == 404
         assert a.get(f"/api/public/meetings/{code}/me").status_code == 404
     rows = await guests(maker, s.meeting_id)
-    assert [(r.display_name, r.status) for r in rows] == [("Anna A", "admitted")]
+    # The close pseudonymizes at the latest (ruling 2026-10-06); the count stays.
+    assert [(r.display_name, r.status) for r in rows] == [(None, "admitted")]
     assert rows[0].token_hash is None
     async with maker() as session:
         protocol = Protocol(meeting_id=s.meeting_id, gremium_id=s.gremium_id, status="draft")
@@ -872,4 +875,65 @@ async def test_altcha_csrf_and_rate_limits(
         )
         assert limited.status_code == 429
         assert limited.headers["retry-after"]
+    c.app.dependency_overrides.clear()
+
+
+async def test_public_join_only_without_a_quorum(
+    maker: async_sessionmaker[AsyncSession], ctx: Ctx
+) -> None:
+    s = await seed(maker, status="planned", public_join=False, quorum_percent=50)
+    with TestClient(ctx.app) as lead:
+        resp = lead.patch(f"/api/meetings/{s.meeting_id}", json={"publicJoin": True})
+        assert resp.status_code == 422 and resp.json()["code"] == "public_join_needs_no_quorum"
+        created = lead.post(
+            "/api/meetings",
+            json={
+                "gremiumId": str(s.gremium_id),
+                "title": "Neu",
+                "date": "2026-11-01",
+                "startTime": "18:00",
+                "publicJoin": True,
+            },
+        )
+        assert created.status_code == 422
+        detail = lead.get(f"/api/meetings/{s.meeting_id}").json()
+        assert detail["publicJoinAllowed"] is False
+        defaults = lead.get(f"/api/gremien/{s.gremium_id}/meeting-defaults").json()
+        assert defaults == {"publicJoinAllowed": False, "quorumPercent": 50}
+
+
+async def test_admitted_device_joining_another_meeting_leaves_the_first(
+    maker: async_sessionmaker[AsyncSession], ctx: Ctx
+) -> None:
+    a_seed = await seed(maker)
+    b_seed = await seed(maker)
+    code_a = await code_of(maker, a_seed.meeting_id)
+    code_b = await code_of(maker, b_seed.meeting_id)
+    with TestClient(ctx.app) as lead, guest_client(ctx.app) as phone:
+        assert join(phone, code_a, "Jana Roth").status_code == 200
+        [g] = lead.get(f"/api/meetings/{a_seed.meeting_id}/guests").json()
+        admit_one(lead, a_seed, g["id"])
+        assert join(phone, code_b, "Jana Roth").status_code == 200
+        assert lead.get(f"/api/meetings/{a_seed.meeting_id}").json()["admittedGuests"] == 0
+    [row] = await guests(maker, a_seed.meeting_id)
+    assert (row.status, row.display_name, row.token_hash) == ("left", None, None)
+
+
+async def test_random_cookies_share_the_ip_budget(
+    maker: async_sessionmaker[AsyncSession],
+    migrated: tuple[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    s = await seed(maker)
+    code = await code_of(maker, s.meeting_id)
+    c = _make_app(migrated, monkeypatch, rate_limit_enabled=True, rl_public_guest_write_per_hour=2)
+    limiter = InMemoryRateLimiter()
+    c.app.dependency_overrides[get_rate_limiter] = lambda: limiter
+    with guest_client(c.app) as phone:
+        codes = []
+        for n in range(3):
+            phone.cookies.set("mg_token", f"random-{n}", path="/api/public/meetings")
+            codes.append(phone.delete(f"/api/public/meetings/{code}/me").status_code)
+            phone.cookies.clear()
+    assert codes == [404, 404, 429]
     c.app.dependency_overrides.clear()

@@ -290,4 +290,41 @@ describe('CreateMeetingDialogComponent', () => {
     cmp.next();
     expect(cmp.title()).toBe('Studierendenparlament meeting on 10 November 2026');
   });
+
+  describe('public participation (#17)', () => {
+    it('locks the switch for a gremium with a quorum and sends it for one without', async () => {
+      localStorage.setItem('ap.locale', 'de');
+      const { http, cmp, fixture } = await setup();
+      fixture.debugElement.injector.get(I18nService).setLocale('de');
+      fixture.detectChanges();
+      flushGremien(http, fixture);
+      cmp.onGremiumChange('g-1');
+      http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
+      http.expectOne('/api/gremien/g-1/meeting-defaults').flush({ publicJoinAllowed: false, quorumPercent: 50 });
+      cmp.publicJoin.set(true);
+      cmp.onGremiumChange('g-2');
+      http.expectOne('/api/gremien/g-2/meeting-members').flush([]);
+      const late = http.expectOne('/api/gremien/g-2/meeting-defaults');
+      cmp.onGremiumChange('g-1');
+      late.flush({ publicJoinAllowed: true, quorumPercent: null });
+      http.expectOne('/api/gremien/g-1/meeting-members').flush([]);
+      http.expectOne('/api/gremien/g-1/meeting-defaults').flush({ publicJoinAllowed: false, quorumPercent: 50 });
+      expect(cmp.publicJoin()).toBe(false);
+      cmp.date.set('2026-11-10');
+      cmp.time.set('18:00');
+      cmp.next();
+      fixture.detectChanges();
+      expect(screen.getByRole('dialog')).toHaveTextContent('Dieses Gremium hat ein Quorum von 50 %.');
+      expect(screen.getByRole('switch', { name: /Öffentliche Teilnahme/ })).toBeDisabled();
+
+      cmp.onGremiumChange('g-2');
+      http.expectOne('/api/gremien/g-2/meeting-members').flush([]);
+      http.expectOne('/api/gremien/g-2/meeting-defaults').error(new ProgressEvent('x'));
+      cmp.publicJoin.set(true);
+      cmp.submit();
+      const req = http.expectOne('/api/meetings');
+      expect(req.request.body).toEqual(expect.objectContaining({ publicJoin: true, guestsMode: 'vote' }));
+      req.flush({ code: 'public_join_needs_no_quorum' }, { status: 422, statusText: 'x' });
+    });
+  });
 });

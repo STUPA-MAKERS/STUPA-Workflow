@@ -104,15 +104,23 @@ async def test_cast_guest_unknown_option_422() -> None:
         )
 
 
-async def test_tally_counts_admitted_guests_for_a_guest_vote() -> None:
+async def test_tally_counts_admitted_and_departed_guest_voters() -> None:
     vote = _vote(meeting_id=uuid4(), config=_config(guestsVote=True))
-    db = fake_session(result(vote), result("yes", "yes"))
-    # present members 2, admitted guests 1, no absent delegators: expected 3.
-    db.scalar_results = [2, 1, 0]
+    stay, gone = uuid4(), uuid4()
+    db = fake_session(
+        result(vote),
+        result("yes", "yes"),
+        result(stay),  # admitted guests
+        result(f"guest:{stay}", f"guest:{gone}"),  # guest ballots
+        result(),  # guest voted markers
+    )
+    # present members 2; no absent delegators.
+    db.scalar_results = [2, 0]
     out = await VotingService(db).get(vote.id)
     assert out.guests_vote is True
-    assert out.tally.present == 3 and out.tally.revealed is False
-    assert (out.tally.present_members, out.tally.present_guests) == (2, 1)
+    # 2 members + the admitted guest + the guest who voted and left.
+    assert out.tally.present == 4 and out.tally.revealed is False
+    assert (out.tally.present_members, out.tally.present_guests) == (2, 2)
 
 
 async def test_tally_members_vote_shows_guests_but_does_not_wait_for_them() -> None:
@@ -156,8 +164,9 @@ async def test_close_fixes_attendance(
         eligible_count=23,
         config=_config(guestsVote=guests_vote),
     )
-    db = fake_session(result(vote), result("yes", "yes", "no"))
-    db.scalar_results = [19, 7]
+    guest_rows = [result(*[uuid4() for _ in range(7)]), result(), result()] if guests_vote else []
+    db = fake_session(result(vote), result("yes", "yes", "no"), *guest_rows)
+    db.scalar_results = [19] if guests_vote else [19, 7]
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
     assert out.result == "passed"
     assert (vote.present_members, vote.present_guests) == (19, 7)
@@ -179,6 +188,6 @@ async def test_close_without_meeting_keeps_attendance_empty(
 async def test_open_secret_meeting_vote_stays_hidden() -> None:
     vote = _vote(meeting_id=uuid4(), config=_config(secret=True, guestsVote=True))
     db = fake_session(result(vote), result("yes"))
-    db.scalar_results = [1, 0]
+    db.scalar_results = [1]
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False and out.tally.present == 1

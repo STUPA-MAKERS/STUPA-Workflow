@@ -34,6 +34,7 @@ from app.shared.errors import (
     ConflictError,
     ForbiddenError,
     NotFoundError,
+    ValidationProblem,
 )
 
 logger = logging.getLogger(__name__)
@@ -89,10 +90,12 @@ class LifecycleOps(HandoverOps):
             guests_mode=payload.guests_mode,
         )
         if payload.public_join:
-            # #17: the join link exists from the start, so it can go into the invitation.
-            await GuestService(self.session).ensure_code(meeting)
+            await self._assert_public_join_allowed(payload.gremium_id)
         self.session.add(meeting)
         await self.session.flush()
+        if payload.public_join:
+            # #17: the join link exists from the start, so it can go into the invitation.
+            await GuestService(self.session).ensure_code(meeting)
         await audit_record(
             self.session,
             actor=principal.sub,
@@ -313,8 +316,12 @@ class LifecycleOps(HandoverOps):
             cancelled = await VotingService(self.session).cancel_drafts_for_meeting(
                 meeting.id, now=now, actor=principal.sub
             )
-            # #17: the requests that never got admitted go, and every guest token.
-            await GuestService(self.session).purge_on_close(meeting)
+            # #17: the requests that never got admitted go, the guest names and every
+            # guest token too.
+            closed_events = await GuestService(self.session).purge_on_close(meeting)
+            if guest_events is not None:
+                closed_events.updated[:0] = guest_events.updated
+            guest_events = closed_events
         if payload.status is not None:
             meeting.status = payload.status
         after = _snapshot(meeting)
@@ -373,6 +380,8 @@ class LifecycleOps(HandoverOps):
                 "A vote with guests is open. Close it before the guests only watch.",
                 code="guest_vote_open",
             )
+        if new_public and not old_public:
+            await self._assert_public_join_allowed(meeting.gremium_id)
         meeting.public_join = new_public
         meeting.guests_mode = new_mode
         guests = GuestService(self.session)
@@ -394,6 +403,31 @@ class LifecycleOps(HandoverOps):
             },
         )
         return events
+
+    async def _assert_public_join_allowed(self, gremium_id: UUID) -> None:
+        """Allow public participation only in a gremium without a quorum (#17 ruling).
+
+        A gremium with a quorum (StuPa, AStA) decides by the members only; the feature
+        serves the gremien without a quorum (Fachschaften).
+
+        Raises:
+            ValidationProblem: ``public_join_needs_no_quorum``.
+        """
+        if await self.gremium_has_quorum(gremium_id):
+            raise ValidationProblem(
+                "Public participation needs a gremium without a quorum.",
+                code="public_join_needs_no_quorum",
+                errors=[{"field": "publicJoin", "msg": "the gremium has a quorum"}],
+            )
+
+    async def gremium_has_quorum(self, gremium_id: UUID) -> bool:
+        """Tell if the gremium sets a default quorum (the vote config of its meetings)."""
+        from app.modules.admin.models import Gremium
+
+        percent = await self.session.scalar(
+            select(Gremium.quorum_percent).where(Gremium.id == gremium_id)
+        )
+        return percent is not None
 
     async def _guest_vote_open(self, meeting_id: UUID) -> bool:
         """Tell if the meeting has an open vote with guests (#17)."""

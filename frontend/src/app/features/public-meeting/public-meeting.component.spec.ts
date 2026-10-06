@@ -149,7 +149,7 @@ describe('PublicMeetingComponent', () => {
     api.publicMeeting.mockReturnValue(throwError(() => err(404, 'join_code_unknown')));
     fixture.componentInstance['guest'].load('XXX');
     fixture.detectChanges();
-    expect(screen.getByText('Dieser Link gilt nicht')).toBeInTheDocument();
+    expect(screen.getByText('Dieser Link ist ungültig oder die Sitzung ist beendet.')).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Code der Sitzung'), 'abc');
     await userEvent.click(screen.getByRole('button', { name: 'Weiter' }));
     expect(router.navigate).not.toHaveBeenCalled();

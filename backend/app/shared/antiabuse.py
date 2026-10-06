@@ -357,31 +357,6 @@ async def rate_limit_public_read(
     )
 
 
-async def rate_limit_public_guest_write(
-    request: Request, settings: SettingsDep, limiter: RateLimiterDep
-) -> None:
-    """The writes of a guest (#17: name, leave, ballot): a limit per device token.
-
-    The key is a hash prefix of the token, never the token. Without a token the key
-    is the IP; the route then answers 401 anyway.
-    """
-    import hashlib
-
-    token = request.cookies.get(settings.guest_cookie_name)
-    key = (
-        f"public-guest:{hashlib.sha256(token.encode('utf-8')).hexdigest()[:24]}"
-        if token
-        else f"public-guest:ip:{client_ip(request)}"
-    )
-    await _enforce(
-        limiter,
-        key,
-        limit=settings.rl_public_guest_write_per_hour,
-        window=_HOUR,
-        detail="Too many requests. Try again later.",
-    )
-
-
 def require_altcha(field: str = "altcha") -> Callable[..., Awaitable[None]]:
     """Dependency factory: verify the ALTCHA solution field from the JSON body.
 

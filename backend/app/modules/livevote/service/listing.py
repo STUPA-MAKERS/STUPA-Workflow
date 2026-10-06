@@ -234,14 +234,16 @@ class ListingOps(PermissionOps, VoteReadOps):
         # meeting. The admin bypass skips the Gremium query of each right.
         all_gids = {m.gremium_id for m in meetings}
         # One batched query for the Gremium names, which the timeline shows.
-        gremium_names: dict[UUID, str] = {
-            gid: name
-            for gid, name in (
-                await self.session.execute(
-                    select(Gremium.id, Gremium.name).where(Gremium.id.in_(all_gids))
+        gremium_rows = (
+            await self.session.execute(
+                select(Gremium.id, Gremium.name, Gremium.quorum_percent).where(
+                    Gremium.id.in_(all_gids)
                 )
-            ).all()
-        }
+            )
+        ).all()
+        gremium_names: dict[UUID, str] = {row[0]: row[1] for row in gremium_rows}
+        # #17: public participation only in a gremium without a quorum.
+        quorum_gids = {row[0] for row in gremium_rows if len(row) > 2 and row[2] is not None}
         # One batched query for the protokollant names. Without it the timeline
         # shows no protokollant, because ``protokollantName`` stays null although
         # the database holds the id.
@@ -312,6 +314,7 @@ class ListingOps(PermissionOps, VoteReadOps):
                     agenda=agenda_by_meeting[m.id],
                     keepers=keepers_by_meeting[m.id],
                     guests=guests_by_meeting.get(m.id, (0, 0)),
+                    public_join_allowed=m.gremium_id not in quorum_gids,
                 )
             )
         return out

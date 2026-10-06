@@ -246,6 +246,9 @@ class MeetingOut(_CamelModel):
     join_code: str | None = Field(default=None, alias="joinCode")
     admitted_guests: int = Field(default=0, alias="admittedGuests")
     pending_guests: int = Field(default=0, alias="pendingGuests")
+    # #17 ruling: public participation only in a gremium without a quorum. The
+    # settings switch is off and explained when this is false.
+    public_join_allowed: bool = Field(default=True, alias="publicJoinAllowed")
 
 
 TimelineDirection = Literal["past", "upcoming"]
@@ -479,8 +482,18 @@ GUEST_NAME_MAX = 80
 
 
 def clean_guest_name(value: str) -> str:
-    """Trim a guest name and check its length (2 to 80 characters)."""
-    name = " ".join(value.split())
+    """Clean a guest name and check its length (2 to 80 characters).
+
+    The function removes the control, format (zero-width, bidi override) and
+    surrogate characters, so a name cannot hide or reorder text in the lead list. It
+    then folds the white space.
+    """
+    import unicodedata
+
+    visible = "".join(
+        ch for ch in value if unicodedata.category(ch) not in ("Cc", "Cf", "Cs", "Co", "Cn")
+    )
+    name = " ".join(visible.split())
     if not GUEST_NAME_MIN <= len(name) <= GUEST_NAME_MAX:
         raise ValueError(
             f"displayName must have {GUEST_NAME_MIN} to {GUEST_NAME_MAX} characters"
@@ -533,3 +546,11 @@ class JoinLinkOut(_CamelModel):
     join_code: str = Field(alias="joinCode")
     join_url: str = Field(alias="joinUrl")
     qr: QrMatrixOut
+
+
+class MeetingDefaultsOut(_CamelModel):
+    """``GET /gremien/{id}/meeting-defaults`` — what a new meeting of the gremium allows."""
+
+    # #17 ruling: public participation only without a quorum.
+    public_join_allowed: bool = Field(alias="publicJoinAllowed")
+    quorum_percent: int | None = Field(default=None, alias="quorumPercent")

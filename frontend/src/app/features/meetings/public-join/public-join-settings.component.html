@@ -2,11 +2,15 @@
   <app-switch
     [id]="'pj-public'"
     [hint]="'guests.settings.hint' | t"
-    [disabled]="disabled()"
+    [disabled]="switchLocked()"
     [checked]="publicJoin()"
     (checkedChange)="publicJoin.set($event)"
     ><span class="pj__label">{{ 'guests.settings.title' | t }}</span></app-switch
   >
+
+  @if (!allowed()) {
+    <app-note icon="lock">{{ notAllowedText() }}</app-note>
+  }
 
   @if (publicJoin()) {
     <div class="pj__group">

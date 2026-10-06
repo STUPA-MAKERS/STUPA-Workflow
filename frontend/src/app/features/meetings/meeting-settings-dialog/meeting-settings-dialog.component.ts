@@ -240,6 +240,10 @@ export class MeetingSettingsDialogComponent {
             this.toast.error(this.i18n.translate('meetings.toast.needsProtocolWrite'));
             return;
           }
+          if (errorCode(err) === 'public_join_needs_no_quorum') {
+            this.toast.error(this.i18n.translate('guests.toast.needsNoQuorum'));
+            return;
+          }
           if (errorCode(err) === 'guest_vote_open') {
             this.toast.error(this.i18n.translate('guests.toast.guestVoteOpen'));
             return;

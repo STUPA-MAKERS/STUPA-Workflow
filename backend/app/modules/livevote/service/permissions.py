@@ -280,6 +280,7 @@ class PermissionOps(MeetingServiceBase):
         agenda = (await self._agenda_summaries([meeting]))[meeting.id]
         keepers = (await keeper_summaries(self.session, [meeting.id]))[meeting.id]
         guests = (await self._guest_counts([meeting.id])).get(meeting.id, (0, 0))
+        allowed = not await self._gremium_quorum_set(meeting.gremium_id)
         if principal is None:
             return self._to_out(
                 meeting,
@@ -290,6 +291,7 @@ class PermissionOps(MeetingServiceBase):
                 agenda=agenda,
                 keepers=keepers,
                 guests=guests,
+                public_join_allowed=allowed,
             )
         return self._to_out(
             meeting,
@@ -306,4 +308,5 @@ class PermissionOps(MeetingServiceBase):
             agenda=agenda,
             keepers=keepers,
             guests=guests,
+            public_join_allowed=allowed,
         )

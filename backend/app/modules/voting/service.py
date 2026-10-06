@@ -387,6 +387,49 @@ class VotingService:
             )
         ) or 0
 
+    async def _guest_attendance(self, vote: Vote, config: VoteConfig) -> int:
+        """Count the guests of a vote (#17).
+
+        A members vote counts the admitted guests (display only). A vote with guests
+        counts the admitted guests plus the guests who left or were removed after
+        their ballot: the ballot stays counted, so the guest stays part of the base.
+        Without this the turnout could reach the expected ballots before every
+        present person voted and reveal the running tally too early, and the number
+        fixed at the close could be smaller than the cast ballots.
+        """
+        if not config.guests_vote:
+            return await self._admitted_guest_count(vote)
+        from app.modules.livevote.models import MeetingGuest
+
+        admitted = {
+            guest_voter_sub(gid)
+            for gid in (
+                await self.session.execute(
+                    select(MeetingGuest.id).where(
+                        MeetingGuest.meeting_id == vote.meeting_id,
+                        MeetingGuest.status == "admitted",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        }
+        voters: set[str] = set()
+        for model in (Ballot, VotedMarker):
+            voters.update(
+                (
+                    await self.session.execute(
+                        select(model.voter_sub).where(
+                            model.vote_id == vote.id,
+                            model.voter_sub.startswith(GUEST_VOTER_PREFIX),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        return len(admitted | voters)
+
     async def _absent_delegated_count(self, vote: Vote) -> int:
         """Count the active vote delegations whose delegator is NOT present.
 
@@ -458,7 +501,7 @@ class VotingService:
             present, revealed = 0, not config.secret
         else:
             members = await self._present_count(vote)
-            guests = await self._admitted_guest_count(vote)
+            guests = await self._guest_attendance(vote, config)
             present = members + guests if config.guests_vote else members
             if config.secret:
                 revealed = False
@@ -702,7 +745,8 @@ class VotingService:
             action=AuditAction.VOTE_OPEN,
             target_type="vote",
             target_id=str(vote.id),
-            data=self._audit_refs(vote),
+            # #17: a vote with guests has no quorum; the log keeps that rule.
+            data={**self._audit_refs(vote), "guestsVote": config.guests_vote},
         )
         await self.session.flush()
         await self.session.commit()
@@ -1407,7 +1451,7 @@ class VotingService:
         # display value only, because such a vote has no quorum.
         if vote.meeting_id is not None:
             members = await self._present_count(vote)
-            guests = await self._admitted_guest_count(vote)
+            guests = await self._guest_attendance(vote, config)
             vote.present_members = members
             vote.present_guests = guests
             if config.guests_vote:

@@ -140,6 +140,7 @@ describe('GuestSessionService', () => {
   it('maps the failures of the head: unknown code, not public, other errors', () => {
     setup();
     api['publicMeeting'].mockReturnValue(throwError(() => problem(404, 'join_code_unknown')));
+    api['guestMe'].mockReturnValue(throwError(() => problem(401)));
     svc.load('X');
     expect(svc.state()).toBe('unknown');
     api['publicMeeting'].mockReturnValue(throwError(() => problem(404)));
@@ -296,5 +297,27 @@ describe('GuestSessionService', () => {
     channels[0].subject.complete();
     jest.advanceTimersByTime(60_000);
     expect(channels).toHaveLength(1);
+  });
+
+  it('asks /me after an "unknown" head: the request of a device, a switch-off, or nothing', () => {
+    setup();
+    api['publicMeeting'].mockReturnValue(throwError(() => problem(404, 'join_code_unknown')));
+    svc.load('7KQ4MP');
+    expect(svc.state()).toBe('admitted');
+    api['guestMe'].mockReturnValue(throwError(() => problem(404, 'meeting_not_public')));
+    svc.load('7KQ4MP');
+    expect(svc.state()).toBe('notPublic');
+    api['guestMe'].mockReturnValue(throwError(() => problem(401, 'guest_token_missing')));
+    svc.load('7KQ4MP');
+    expect(svc.state()).toBe('unknown');
+  });
+
+  it('shows the closed meeting when the server ends a waiting request', () => {
+    setup();
+    api['guestMe'].mockReturnValue(of(guestMe({ status: 'pending', view: null })));
+    svc.load('7KQ4MP');
+    channels[0].subject.next({ type: 'guest_status', status: 'pending', displayName: null, number: 1, reason: 'meeting_closed' });
+    expect(svc.state()).toBe('closed');
+    expect(channels[0].closed).toBe(true);
   });
 });
