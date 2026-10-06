@@ -1,8 +1,9 @@
 import { of, throwError } from 'rxjs';
+import { provideRouter, Router } from '@angular/router';
 import { render, screen, fireEvent } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ToastService } from '@stupa-makers/ui-kit';
-import type { ErasureRequest, PrivacySettings } from '../admin.models';
+import type { AdminPrincipal, ErasureRequest, PrivacySettings } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { PrivacyComponent } from './privacy.component';
 
@@ -21,7 +22,32 @@ const DONE: ErasureRequest = {
   status: 'executed',
 };
 
+const ANNA: AdminPrincipal = {
+  id: 'p-7',
+  sub: 'kc|anna',
+  email: 'anna@x',
+  displayName: 'Anna Alt',
+  lastLogin: null,
+  active: true,
+  oidcGroups: [],
+  assignments: [],
+} as unknown as AdminPrincipal;
+const NAMELESS: AdminPrincipal = {
+  ...ANNA,
+  id: 'p-8',
+  sub: 'kc|nameless',
+  email: null,
+  displayName: null,
+} as unknown as AdminPrincipal;
+const MERGED: AdminPrincipal = {
+  ...ANNA,
+  id: 'p-9',
+  sub: 'kc|merged',
+  mergedIntoId: 'p-7',
+} as unknown as AdminPrincipal;
+
 interface ApiOverrides {
+  listPrincipals?: jest.Mock;
   listErasures?: jest.Mock;
   getPrivacySettings?: jest.Mock;
   executeErasure?: jest.Mock;
@@ -33,6 +59,7 @@ interface ApiOverrides {
 
 function makeApi(o: ApiOverrides = {}) {
   return {
+    listPrincipals: o.listPrincipals ?? jest.fn(() => of([ANNA, NAMELESS, MERGED])),
     listErasures: o.listErasures ?? jest.fn(() => of([OPEN, DONE])),
     getPrivacySettings:
       o.getPrivacySettings ?? jest.fn(() => of<PrivacySettings>({ defaultRetentionMonths: 24 })),
@@ -47,14 +74,18 @@ function makeApi(o: ApiOverrides = {}) {
   };
 }
 
-async function setup(api = makeApi()) {
+async function setup(api = makeApi(), url = '/') {
   const toast = { success: jest.fn(), error: jest.fn() };
   const view = await render(PrivacyComponent, {
     providers: [
+      provideRouter([{ path: '**', children: [] }]),
       { provide: AdminApiService, useValue: api },
       { provide: ToastService, useValue: toast },
     ],
   });
+  if (url !== '/') {
+    await view.fixture.ngZone!.run(() => view.fixture.debugElement.injector.get(Router).navigateByUrl(url));
+  }
   await view.fixture.whenStable();
   view.fixture.detectChanges();
   return { ...view, api, toast };
@@ -221,31 +252,97 @@ describe('PrivacyComponent', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  it('does nothing when asking to erase a principal with empty id', async () => {
-    const api = makeApi();
-    const { fixture } = await setup(api);
+  it('does nothing when asking to erase without a picked person', async () => {
+    const { fixture } = await setup();
     const cmp = fixture.componentInstance as unknown as {
       askPrincipalErase: () => void;
       confirmPrincipal: () => boolean;
     };
     cmp.askPrincipalErase();
     expect(cmp.confirmPrincipal()).toBe(false);
+    expect(screen.getByRole('button', { name: 'Konto löschen' })).toBeDisabled();
   });
 
-  it('opens the confirm dialog when a principal id is set', async () => {
-    const api = makeApi();
-    const { fixture } = await setup(api);
+  it('picks the person by name or e-mail, never by a raw id (D1)', async () => {
+    jest.useFakeTimers({ advanceTimers: true });
+    const { api, fixture } = await setup();
+    expect(screen.queryByLabelText(/UUID/)).toBeNull();
+    await userEvent.type(screen.getByRole('searchbox', { name: /Person suchen/ }), 'an');
+    jest.advanceTimersByTime(300);
+    fixture.detectChanges();
+    expect(api.listPrincipals).toHaveBeenCalledWith('an');
+    // A merged account is a locked reference and is not offered; a nameless one reads "Ohne Namen".
+    const hits = screen.getByRole('list', { name: 'Gefundene Konten' });
+    expect(hits.querySelectorAll('button')).toHaveLength(2);
+    expect(screen.getByText('Ohne Namen')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Anna Alt/ }));
+    fixture.detectChanges();
+    expect(screen.queryByRole('list', { name: 'Gefundene Konten' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Konto löschen' }));
+    fixture.detectChanges();
+    // The confirmation names the person, not an id.
+    expect(screen.getAllByText('Anna Alt').length).toBeGreaterThan(1);
+    expect(screen.queryByText('p-7')).toBeNull();
+    jest.useRealTimers();
+  });
+
+  it('shows the sub as a tooltip only for a nameless person (D7)', async () => {
+    const { fixture } = await setup();
+    const cmp = fixture.componentInstance as unknown as { pickPerson: (p: AdminPrincipal) => void };
+    cmp.pickPerson(ANNA);
+    fixture.detectChanges();
+    expect(screen.getByText('Anna Alt')).not.toHaveAttribute('title');
+    cmp.pickPerson(NAMELESS);
+    fixture.detectChanges();
+    expect(screen.getByText('Ohne Namen')).toHaveAttribute('title', 'kc|nameless');
+  });
+
+  it('can change the picked person', async () => {
+    const { fixture } = await setup();
     const cmp = fixture.componentInstance as unknown as {
-      principalId: { set: (v: string) => void };
-      askPrincipalErase: () => void;
-      confirmPrincipal: () => boolean;
+      pickPerson: (p: AdminPrincipal) => void;
+      person: () => AdminPrincipal | null;
     };
-    cmp.principalId.set('  p-1  ');
-    cmp.askPrincipalErase();
-    expect(cmp.confirmPrincipal()).toBe(true);
+    cmp.pickPerson(ANNA);
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Ändern' }));
+    expect(cmp.person()).toBeNull();
   });
 
-  it('doPrincipalErase is a no-op when the id is blank', async () => {
+  it('preselects the person from ?person=<sub> (the row action in Benutzer)', async () => {
+    const { api, fixture } = await setup(makeApi(), '/admin/privacy?person=kc%7Canna');
+    const cmp = fixture.componentInstance as unknown as { person: () => AdminPrincipal | null };
+    expect(api.listPrincipals).toHaveBeenCalledWith('kc|anna');
+    expect(cmp.person()?.id).toBe('p-7');
+  });
+
+  it('ignores a ?person=<sub> without an exact match', async () => {
+    const { fixture } = await setup(makeApi(), '/admin/privacy?person=kc%7Cnobody');
+    expect((fixture.componentInstance as unknown as { person: () => unknown }).person()).toBeNull();
+  });
+
+  it('ignores a ?person=<sub> when the lookup fails', async () => {
+    const failing = makeApi({ listPrincipals: jest.fn(() => throwError(() => new Error('x'))) });
+    const { fixture } = await setup(failing, '/admin/privacy?person=kc%7Canna');
+    expect((fixture.componentInstance as unknown as { person: () => unknown }).person()).toBeNull();
+  });
+
+  it('empties the hits when the search fails or is cleared', async () => {
+    const { fixture } = await setup(
+      makeApi({ listPrincipals: jest.fn(() => throwError(() => new Error('x'))) }),
+    );
+    const cmp = fixture.componentInstance as unknown as {
+      personSearch: { set: (v: string) => void; flush: () => void; clear: () => void };
+      personHits: () => AdminPrincipal[];
+    };
+    cmp.personSearch.set('anna');
+    cmp.personSearch.flush();
+    expect(cmp.personHits()).toEqual([]);
+    cmp.personSearch.clear();
+    expect(cmp.personHits()).toEqual([]);
+  });
+
+  it('doPrincipalErase is a no-op without a picked person', async () => {
     const api = makeApi();
     const { fixture } = await setup(api);
     (
@@ -254,20 +351,22 @@ describe('PrivacyComponent', () => {
     expect(api.erasePrincipal).not.toHaveBeenCalled();
   });
 
-  it('erases the principal, clears the field and closes the dialog', async () => {
+  it('erases the principal, clears the pick and closes the dialog', async () => {
     const api = makeApi();
     const { fixture, toast } = await setup(api);
     const cmp = fixture.componentInstance as unknown as {
-      principalId: { set: (v: string) => void; (): string };
+      pickPerson: (p: AdminPrincipal) => void;
+      person: () => AdminPrincipal | null;
       askPrincipalErase: () => void;
       doPrincipalErase: () => void;
       confirmPrincipal: () => boolean;
     };
-    cmp.principalId.set(' p-7 ');
+    cmp.pickPerson(ANNA);
     cmp.askPrincipalErase();
+    expect(cmp.confirmPrincipal()).toBe(true);
     cmp.doPrincipalErase();
     expect(api.erasePrincipal).toHaveBeenCalledWith('p-7');
-    expect(cmp.principalId()).toBe('');
+    expect(cmp.person()).toBeNull();
     expect(cmp.confirmPrincipal()).toBe(false);
     expect(toast.success).toHaveBeenCalled();
   });
@@ -276,11 +375,11 @@ describe('PrivacyComponent', () => {
     const api = makeApi({ erasePrincipal: jest.fn(() => throwError(() => new Error('x'))) });
     const { fixture, toast } = await setup(api);
     const cmp = fixture.componentInstance as unknown as {
-      principalId: { set: (v: string) => void };
+      pickPerson: (p: AdminPrincipal) => void;
       doPrincipalErase: () => void;
       confirmPrincipal: () => boolean;
     };
-    cmp.principalId.set('p-9');
+    cmp.pickPerson(ANNA);
     cmp.doPrincipalErase();
     expect(cmp.confirmPrincipal()).toBe(false);
     expect(toast.error).toHaveBeenCalled();

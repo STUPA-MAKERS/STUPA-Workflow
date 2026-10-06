@@ -17,7 +17,7 @@ description: Backend identity and access. Covers OIDC login against any discover
 - `oidc.py` — OIDC primitives: discovery (`discover`, TTL-cached per issuer), PKCE/state/nonce, authorize URL, code exchange, `id_token` JWKS verify (RS256), end-session URL
 - `sessions.py` — signed cookies (itsdangerous): opaque `sid` principal session, stateless applicant token, OIDC-tx, OAuth-tx
 - `tokens.py` — magic-link token CSPRNG + HMAC-SHA256(pepper) hashing, constant-time verify
-- `service.oidc_callback` also calls `admin.membership_sync.sync_principal_memberships` after the upsert, so gremium memberships follow the IdP groups from each login on.
+- `service.oidc_callback` also calls `admin.membership_sync.sync_principal_memberships` after the upsert, so gremium memberships follow the IdP groups from each login on. It then writes one `AuditAction.LOGIN` entry (D3) in the same transaction as the session: actor = the principal `sub`, target `principal`, `data` = `{"method": "oidc"}`. No IP address, no user agent, no e-mail. A refused login (deactivated, merged) writes nothing. A magic-link redeem writes no LOGIN, because it opens an applicant session and has no principal.
 - `bootstrap.py` — idempotent first-admin grant by `sub`/verified-email. It always grants the global `member` role
 - `oauth.py` — DB-free OAuth2 helpers: scope catalog, PKCE S256 verify, token gen/SHA-256 hash, scope→permission mapping
 - `oauth_service.py` — OAuth2-AS I/O: mint authorization code, exchange code→tokens, refresh rotation, `resolve_access_token`

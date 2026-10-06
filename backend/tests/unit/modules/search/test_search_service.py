@@ -239,3 +239,53 @@ async def test_a_nameless_record_reads_as_untitled_not_as_its_id(
 
     assert [h.title for h in hits] == [expected] * 3
     assert all(h.title not in {str(app_id), str(inv_id), str(exp_id)} for h in hits)
+
+
+@pytest.mark.parametrize(
+    ("lang", "expected"), [("de", "Gremium"), ("en", "Committee"), ("fr", "Gremium")]
+)
+async def test_a_gremium_hit_names_its_kind_not_its_slug(lang: str, expected: str) -> None:
+    """D10: the subtitle of a Gremium hit is the kind only. The slug is an internal key."""
+    from types import SimpleNamespace
+
+    gid = uuid.uuid4()
+    gremium = SimpleNamespace(id=gid, name="Studierendenparlament", slug="stupa")
+
+    class _Scalars:
+        def all(self) -> list[object]:
+            return [gremium]
+
+    class _Session:
+        bind = None
+
+        async def scalars(self, _stmt: object) -> _Scalars:
+            return _Scalars()
+
+    svc = SearchService(session=_Session())  # type: ignore[arg-type]
+    admin = Principal(sub="a", permissions={"admin.gremien"})
+    hits = await svc._gremien("stupa", admin, lang)
+
+    assert [(h.title, h.subtitle) for h in hits] == [("Studierendenparlament", expected)]
+
+
+@pytest.mark.parametrize(("lang", "expected"), [("de", "Ohne Namen"), ("en", "No name")])
+async def test_a_nameless_person_reads_no_name_not_its_sub(
+    monkeypatch: pytest.MonkeyPatch, lang: str, expected: str
+) -> None:
+    """D7: an account without a name and an e-mail never shows its `sub` as the title."""
+    from types import SimpleNamespace
+
+    from app.modules.admin.service.service import ConfigService
+
+    pid = uuid.uuid4()
+
+    async def _search(_self: object, _q: str, *, limit: int) -> list[object]:
+        return [SimpleNamespace(id=pid, sub="kc|ghost", display_name=None, email=None)]
+
+    monkeypatch.setattr(ConfigService, "search_principals", _search)
+    svc = SearchService(session=None)  # type: ignore[arg-type]
+    admin = Principal(sub="a", permissions={"admin.users"})
+    hits = await svc._principals("ghost", admin, lang)
+
+    assert [(h.title, h.subtitle) for h in hits] == [(expected, None)]
+    assert hits[0].url == "/admin/users?q=kc%7Cghost"

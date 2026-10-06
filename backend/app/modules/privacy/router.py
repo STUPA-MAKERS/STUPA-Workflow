@@ -168,7 +168,7 @@ async def reject_erasure(
     "/principals/{principal_id}/erase",
     status_code=204,
     dependencies=[_CONFIG],
-    responses=_errors(401, 403, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def erase_principal(
     principal_id: UUID,

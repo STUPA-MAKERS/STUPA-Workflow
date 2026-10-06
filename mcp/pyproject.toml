@@ -14,6 +14,13 @@ dependencies = [
     "pydantic>=2.7",
 ]
 
+[project.optional-dependencies]
+# Test and lint tools. CI installs them with `pip install -e '.[dev]'` (job `mcp`).
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+]
+
 [project.scripts]
 antragsplattform-mcp = "antragsplattform_mcp.server:main"
 
@@ -23,3 +30,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["antragsplattform_mcp"]
+
+# The lint rules of the CI job `mcp`. The list is explicit, so a new ruff release with
+# other default rules does not change the result. These are the ruff defaults that the
+# package was written against.
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

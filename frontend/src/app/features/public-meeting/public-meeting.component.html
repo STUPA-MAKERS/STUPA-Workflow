@@ -14,18 +14,7 @@
       <app-row-menu [sections]="menu()" [label]="'guests.page.menu' | t" (selected)="onMenu($event.id)" />
     </span>
   } @else {
-    <label class="pm__lang" [title]="'lang.switch' | t">
-      <app-icon name="globe" [size]="20" />
-      <select
-        class="pm__langSelect"
-        [attr.aria-label]="'lang.switch' | t"
-        (change)="setLocale($any($event.target).value)"
-      >
-        @for (loc of i18nSvc.locales; track loc) {
-          <option [value]="loc" [selected]="loc === i18nSvc.locale()">{{ loc.toUpperCase() }}</option>
-        }
-      </select>
-    </label>
+    <app-language-select [label]="'lang.switch' | t" display="code" />
   }
 </header>
 <div class="pm">

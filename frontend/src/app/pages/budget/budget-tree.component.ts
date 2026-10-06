@@ -291,7 +291,10 @@ export class BudgetTreeComponent {
     // The amounts get a fixed width, so the name column takes the free width.
     const money = (key: string, label: TranslationKey): ColumnDef => ({ key, label: t(label), align: 'end', width: AMOUNT_WIDTH });
     const cols: ColumnDef[] = [
-      { key: 'node', label: t('budget.tree.col.node'), card: 'title' },
+      // D6: the admin navigation stays beside the table at every width. The name column
+      // keeps a minimum width, so a narrow sheet scrolls the table sideways instead of
+      // squeezing the names and keys to a few characters.
+      { key: 'node', label: t('budget.tree.col.node'), card: 'title', width: '13rem' },
       money('allocated', 'budget.tree.col.allocated'),
       money('bound', 'budget.tree.col.bound'),
     ];
@@ -301,7 +304,7 @@ export class BudgetTreeComponent {
     cols.push(
       money('available', 'budget.tree.col.available'),
       { key: 'color', label: t('budget.tree.col.color'), width: '2.75rem' },
-      { key: 'actions', label: t('budget.tree.col.actions'), align: 'end', width: '9.5rem', card: 'actions' },
+      { key: 'actions', label: t('budget.tree.col.actions'), align: 'end', width: '9.5rem', card: 'actions', sticky: 'end' },
     );
     return cols;
   });

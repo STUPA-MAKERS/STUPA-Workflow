@@ -1,5 +1,5 @@
 import { of, throwError } from 'rxjs';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
@@ -74,13 +74,14 @@ const MAPPINGS: GroupMapping[] = [
   { id: 'gm-3', oidcGroup: 'vote:g-1', roleId: 'r-member' },
 ];
 
-function makeAuth(sub: string | null, canMappings = true, canMerge = false) {
+function makeAuth(sub: string | null, canMappings = true, canMerge = false, canErase = false) {
   return {
     principal: () => (sub === null ? null : { sub }),
     can: (p: string) =>
       p === 'admin.users' ||
       (canMappings && p === 'admin.group_mappings') ||
-      (canMerge && p === 'admin.users.merge'),
+      (canMerge && p === 'admin.users.merge') ||
+      (canErase && p === 'privacy.manage'),
   } as unknown as AuthService;
 }
 
@@ -219,11 +220,21 @@ describe('UsersComponent', () => {
     expect(inst.roleLabel('r-ref')).toBe('officer');
   });
 
-  it('userLabel prefers displayName, then email, then sub', async () => {
+  it('userLabel prefers displayName, then email, then "Ohne Namen" (D7)', async () => {
     const { inst } = await setup();
     expect(inst.userLabel({ displayName: 'Name', email: 'e', sub: 's' })).toBe('Name');
     expect(inst.userLabel({ displayName: '', email: 'e@x', sub: 's' })).toBe('e@x');
-    expect(inst.userLabel({ displayName: null, email: null, sub: 'sub-only' })).toBe('sub-only');
+    expect(inst.userLabel({ displayName: null, email: null, sub: 'sub-only' })).toBe('Ohne Namen');
+  });
+
+  it('a nameless account shows "Ohne Namen" with the sub only in the tooltip (D7)', async () => {
+    const nameless = { ...PRINCIPALS[1], id: 'p-5', sub: 'kc|ghost', displayName: null, email: null };
+    const api = makeApi({ listPrincipals: jest.fn(() => of([nameless])) });
+    const { inst } = await setup(api);
+    const name = screen.getByText('Ohne Namen');
+    expect(name).toHaveAttribute('title', 'kc|ghost');
+    expect(screen.queryByText('kc|ghost')).toBeNull();
+    expect(inst.userTitle(PRINCIPALS[0])).toBe('Alex Admin');
   });
 
   it('isSelf is true only when sub matches the logged-in sub', async () => {
@@ -379,6 +390,32 @@ describe('UsersComponent', () => {
       expect(inst.mergeSource()).toBeNull();
       inst.onMenu(other, PRINCIPALS[1]);
       expect(inst.mergeSource()).toEqual(PRINCIPALS[1]);
+    });
+
+    it('"Konto löschen (DSGVO)" needs privacy.manage and opens the privacy page (D1)', async () => {
+      const { inst, fixture } = await setup(makeApi(), makeAuth(null, true, false, true));
+      expect(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })).toHaveLength(2);
+      const items = inst.menuFor(PRINCIPALS[1])[0].items;
+      expect(items.map((i: { id: string }) => i.id)).toEqual(['erase']);
+      expect(items[0]).toMatchObject({ label: 'Konto löschen (DSGVO)', danger: true, disabledReason: null });
+      const router = fixture.debugElement.injector.get(Router);
+      const nav = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+      inst.onMenu(items[0], PRINCIPALS[1]);
+      expect(nav).toHaveBeenCalledWith(['/admin/privacy'], { queryParams: { person: 'kc|sam' } });
+    });
+
+    it('the own account cannot be erased: the action has a reason', async () => {
+      const { inst } = await setup(makeApi(), makeAuth('kc|alex', true, false, true));
+      const own = inst.menuFor(PRINCIPALS[0])[0].items[0];
+      expect(own.id).toBe('erase');
+      expect(own.disabledReason).toBe(
+        'Dein eigenes Konto kannst du nicht löschen. Bitte eine andere Administratorin oder einen anderen Administrator darum.',
+      );
+    });
+
+    it('with both permissions the menu holds merge and erase', async () => {
+      const { inst } = await setup(makeApi(), makeAuth(null, true, true, true));
+      expect(inst.menuFor(PRINCIPALS[1])[0].items.map((i: { id: string }) => i.id)).toEqual(['merge', 'erase']);
     });
 
     it('a merge reloads the list', async () => {

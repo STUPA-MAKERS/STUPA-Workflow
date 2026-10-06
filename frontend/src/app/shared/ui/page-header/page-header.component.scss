@@ -26,9 +26,12 @@
   margin-inline: auto;
 }
 
+/* D9: the actions sit on the title row, not on the centre of the text block. A long
+   subtitle therefore never moves them: they have the same y on every page. */
 .ph__bar {
+  --ph-title-lh: var(--lh-d2);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--space-4);
@@ -80,6 +83,9 @@
 }
 
 @media (max-width: 768px) {
+  .ph__bar {
+    --ph-title-lh: var(--lh-h1);
+  }
   .ph__title {
     font-size: var(--fs-h1);
     line-height: var(--lh-h1);
@@ -92,11 +98,16 @@
   display: none;
 }
 
+/* The first row of actions is centred on the title line. The row is one control high
+   (40 px) and its centre moves onto the centre of the title line (36 px, on a phone
+   28 px), so a small button and a normal one both sit on that line. */
 .ph__actions {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+  min-height: var(--control-height);
+  margin-top: calc((var(--ph-title-lh) - var(--control-height)) / 2);
 }
 
 /* ------------------------------------------------------------------ pane
@@ -118,6 +129,7 @@
   margin-bottom: 0;
 }
 :host(.ph--pane) .ph__bar {
+  align-items: center;
   flex-wrap: nowrap;
   gap: var(--space-1);
   min-height: var(--control-height);
@@ -138,6 +150,8 @@
   line-height: var(--lh-d2);
 }
 :host(.ph--pane) .ph__actions {
+  min-height: 0;
+  margin-top: 0;
   flex: none;
   flex-wrap: nowrap;
   gap: var(--space-1);

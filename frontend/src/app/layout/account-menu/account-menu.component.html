@@ -13,20 +13,11 @@
     </a>
   }
   <div class="am__sep" role="separator"></div>
-  <label class="am__item am__item--field">
+  <div class="am__item am__item--field">
     <app-icon name="globe" [size]="19" />
-    <span class="am__grow">{{ 'shell.account.language' | t }}</span>
-    <select
-      class="am__select"
-      [attr.aria-label]="'shell.account.language' | t"
-      [value]="i18n.locale()"
-      (change)="setLocale($any($event.target).value)"
-    >
-      @for (loc of i18n.locales; track loc) {
-        <option [value]="loc" [selected]="loc === i18n.locale()">{{ languageName[loc] | t }}</option>
-      }
-    </select>
-  </label>
+    <span class="am__grow" aria-hidden="true">{{ 'shell.account.language' | t }}</span>
+    <app-language-select [label]="'shell.account.language' | t" display="name" />
+  </div>
   <div class="am__item am__item--field">
     <app-icon name="moon" [size]="19" />
     <app-switch

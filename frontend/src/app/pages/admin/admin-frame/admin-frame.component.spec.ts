@@ -23,10 +23,9 @@ function fakeAuth(perms: string[]): Partial<AuthService> {
 const ALL = [...new Set(ADMIN_PAGES.flatMap((p) => p.permissions))];
 
 /** Let `matchMedia` report a wide viewport (or not). jsdom has none of its own. */
-function matchWide(wide: boolean, xl = false): void {
+function matchWide(wide: boolean): void {
   window.matchMedia = ((query: string) => ({
-    matches:
-      (wide && query.includes('min-width: 1200px')) || (xl && query.includes('min-width: 1440px')),
+    matches: wide && query.includes('min-width: 1200px'),
     media: query,
     onchange: null,
     addEventListener: () => undefined,
@@ -37,8 +36,8 @@ function matchWide(wide: boolean, xl = false): void {
   })) as unknown as typeof window.matchMedia;
 }
 
-async function setup(perms: string[], url = '/admin/users', wide = true, xl = false) {
-  matchWide(wide, xl);
+async function setup(perms: string[], url = '/admin/users', wide = true) {
+  matchWide(wide);
   const api = {
     latestAuditVerification: jest.fn(() => of(null)),
     verifyAuditChain: jest.fn(() => of({ valid: true, checked: 1, brokenAt: null, reason: null })),
@@ -54,7 +53,7 @@ async function setup(perms: string[], url = '/admin/users', wide = true, xl = fa
             { path: '', component: StubPageComponent, pathMatch: 'full' },
             { path: 'flow', component: StubPageComponent, data: { adminNav: false, adminPane: true } },
             { path: 'plain', component: StubPageComponent, data: { adminNav: false } },
-            { path: 'cost-centres', component: StubPageComponent, data: { adminNav: 'xl' } },
+            { path: 'cost-centres', component: StubPageComponent },
             { path: '**', component: StubPageComponent },
           ],
         },
@@ -180,14 +179,8 @@ describe('AdminFrameComponent', () => {
     expect(api.listBackups).toHaveBeenCalledTimes(1);
   });
 
-  it('leaves out the navigation beside an adminNav: xl page below 1440 px', async () => {
-    const view = await setup(ALL, '/admin/cost-centres', true, false);
-    expect(screen.queryByRole('navigation')).toBeNull();
-    expect(view.container.querySelector('.af')).not.toHaveClass('af--split');
-  });
-
-  it('shows the navigation beside an adminNav: xl page from 1440 px', async () => {
-    const view = await setup(ALL, '/admin/cost-centres', true, true);
+  it('keeps the navigation beside the cost centres at every wide size (D6)', async () => {
+    const view = await setup(ALL, '/admin/cost-centres', true);
     expect(screen.getByRole('navigation', { name: 'Verwaltungsbereiche' })).toBeInTheDocument();
     expect(view.container.querySelector('.af')).toHaveClass('af--split');
   });

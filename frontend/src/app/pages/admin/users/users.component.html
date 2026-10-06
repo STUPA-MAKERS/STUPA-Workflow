@@ -41,7 +41,7 @@
           <app-avatar class="au__avatar" size="sm" [name]="userLabel(p)" [principalId]="p.id" [decorative]="true" />
           <div class="au__who">
             <span class="au__name">
-              <span class="ell" [title]="userLabel(p)">{{ userLabel(p) }}</span>
+              <span class="ell" [title]="userTitle(p)">{{ userLabel(p) }}</span>
               @if (!p.mergedIntoId && p.active === false) {
                 <span class="au__offTag">{{ 'admin.users.inactive' | t }}</span>
               }
@@ -104,7 +104,7 @@
                 <span class="sr-only">{{ 'admin.users.cannotDeactivateSelf' | t }}</span>
               }
             }
-            @if (canMerge() && !p.mergedIntoId) {
+            @if (hasMenu() && !p.mergedIntoId) {
               <app-row-menu
                 [sections]="menuFor(p)"
                 [label]="('admin.users.moreActions' | t) + ': ' + userLabel(p)"

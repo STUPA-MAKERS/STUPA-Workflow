@@ -209,10 +209,13 @@ _ANY_ADMIN_AREA = Depends(require_any_permission(*_ALL_ADMIN_AREAS))
 _GREMIEN_OR_GREMIUM_ROLES = Depends(
     require_any_permission("admin.gremien", "admin.gremium_roles", "admin.group_mappings")
 )
-# The principal search serves the user page, the gremium members and the person picker
-# of the substitute pool on the delegations page (admin.delegations).
+# The principal search serves the user page, the gremium members, the person picker
+# of the substitute pool on the delegations page (admin.delegations) and the person
+# picker of the account erasure on the privacy page (privacy.manage, D1).
 _PRINCIPAL_READERS = Depends(
-    require_any_permission("admin.gremien", "admin.users", "admin.delegations")
+    require_any_permission(
+        "admin.gremien", "admin.users", "admin.delegations", "privacy.manage"
+    )
 )
 # The members of a gremium: the members page (admin.gremien) and the "represents" choice
 # of the substitute pool on the delegations page (admin.delegations).

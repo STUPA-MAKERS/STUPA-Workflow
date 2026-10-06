@@ -254,7 +254,10 @@ describe('PublicMeetingComponent', () => {
     const { container } = await setup(err(401));
     expect(container.querySelector('.pm__logo')).not.toBeNull();
     expect(container.querySelector('app-site-footer')).not.toBeNull();
-    await userEvent.selectOptions(screen.getByRole('combobox'), 'en');
+    // D8: the app list, never a native select.
+    expect(container.querySelector('select')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Sprache wechseln: DE' }));
+    await userEvent.click(screen.getByRole('option', { name: 'English' }));
     expect(switchTo).toHaveBeenCalledWith('en');
     switchTo.mockRestore();
   });

@@ -56,11 +56,13 @@ The non-negotiables. Source of truth: `CONTRIBUTING.md`, `.github/pull_request_t
 
 - Backend ≥ **97 %** (lines + branches). Frontend: statements **98 %**, branches **96 %**, functions
   **98 %**, lines **99 %**.
-- **100 % branch** for critical modules: `auth`, `voting`, `flow`, `budget`, `webhooks`, `audit`
-  (`scripts/coverage_critical.py`).
+- **100 % branch** for critical modules: `auth`, `voting`, `flow`, `budget`, `webhooks`, `audit`,
+  `backup` (`scripts/coverage_critical.py`, list in `[tool.coverage_critical]` of
+  `backend/pyproject.toml`).
 - Local (BE): `ruff check .` + `basedpyright` (0 errors) + `pytest`. Local (FE): `npm run lint`,
   `npm run typecheck`, `npm test`. CI order: `Lint → Typecheck → BE-Unit → BE-Integration →
   Contract (Schemathesis) → FE-Unit → E2E (Playwright) → Coverage-Gate → Image-Build + Smoke`.
+  The `mcp` job (ruff check + pytest of `mcp/`, D2) and the `typst` job run beside them.
 
 ## Alembic migrations
 

@@ -15,7 +15,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ThemeService } from '@core/theme/theme.service';
-import { LocaleSwitchService } from '../../layout/locale-switch.service';
+import { LanguageSelectComponent } from '../../layout/language-select/language-select.component';
 import { SiteFooterComponent } from '../../layout/site-footer/site-footer.component';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -65,6 +65,7 @@ export function normalizeJoinCode(raw: string): string {
     StatusTextComponent,
     GuestViewComponent,
     SiteFooterComponent,
+    LanguageSelectComponent,
   ],
   templateUrl: './public-meeting.component.html',
   styleUrl: './public-meeting.component.scss',
@@ -75,9 +76,7 @@ export class PublicMeetingComponent implements OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   protected readonly guest = inject(GuestSessionService);
-  protected readonly i18nSvc = this.i18n;
   private readonly theme = inject(ThemeService);
-  private readonly locales = inject(LocaleSwitchService);
   /** The wordmark of the own header, in the colours of the theme. */
   protected readonly logoSrc = computed(() => `assets/logos/stupa-wordmark-${this.theme.resolved()}.svg`);
 
@@ -207,10 +206,6 @@ export class PublicMeetingComponent implements OnDestroy {
   onMenu(id: string): void {
     if (id === 'rename') this.renaming.set(true);
     else if (id === 'leave') this.guest.leave();
-  }
-
-  setLocale(value: string): void {
-    this.locales.switchTo(value);
   }
 
   /** "Mitglied? Mit Konto anmelden". */

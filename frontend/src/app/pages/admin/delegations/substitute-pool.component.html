@@ -81,6 +81,7 @@
                 type="button"
                 class="sp__hit"
                 [class.sp__hit--on]="selected()?.id === c.id"
+                [attr.title]="c.displayName || c.email ? null : c.sub"
                 (click)="pick(c)"
               >
                 <span class="sp__hitName">{{ label(c) }}</span>

@@ -48,6 +48,14 @@ MIN_QUERY_LENGTH = 2
 #: reader nothing, so a nameless record reads as "untitled" in the reader's language.
 UNTITLED: Mapping[str, str] = {"de": "Ohne Titel", "en": "Untitled"}
 
+#: The subtitle of a Gremium hit (D10): the kind only, in the reader's language. The
+#: slug is an internal key and tells the reader nothing.
+GREMIUM_SUBTITLE: Mapping[str, str] = {"de": "Gremium", "en": "Committee"}
+
+#: The title of an account without a name and an e-mail (D7). The `sub` is an internal
+#: key: the user page shows it only in the tooltip.
+UNNAMED: Mapping[str, str] = {"de": "Ohne Namen", "en": "No name"}
+
 #: Where a hit of each kind sends the reader.
 #:
 #: Every template names the record: a path segment where the record has a page of its
@@ -261,7 +269,7 @@ class SearchService:
                 kind="gremium",
                 id=str(g.id),
                 title=g.name,
-                subtitle=g.slug,
+                subtitle=GREMIUM_SUBTITLE.get(lang, GREMIUM_SUBTITLE["de"]),
                 url=HIT_URL["gremium"].format(id=g.id),
             )
             for g in rows
@@ -280,7 +288,7 @@ class SearchService:
             SearchHit(
                 kind="principal",
                 id=str(p.id),
-                title=p.display_name or p.email or p.sub,
+                title=p.display_name or p.email or UNNAMED.get(lang, UNNAMED["de"]),
                 subtitle=p.email if p.display_name else None,
                 url=HIT_URL["principal"].format(id=quote(p.sub)),
             )

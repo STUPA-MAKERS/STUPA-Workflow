@@ -27,30 +27,6 @@
   flex: 1 1 auto;
 }
 /* The globe opens the native language picker; the select covers the icon button. */
-.pm__lang {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  color: var(--color-text-muted);
-}
-.pm__lang:hover {
-  background: var(--color-surface-3);
-}
-.pm__lang app-icon {
-  pointer-events: none;
-}
-.pm__langSelect {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-.pm__lang:focus-within {
-  outline: 2px solid var(--color-focus-ring);
-}
 .pm__footer {
   margin-top: auto;
 }

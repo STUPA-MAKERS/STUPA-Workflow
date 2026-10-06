@@ -278,12 +278,8 @@ app-button ::ng-deep .btn:not(.btn--icon) .btn__label > app-icon:first-child {
 }
 
 /* The shared top and bottom fade: an end fades only while more content lies past it. */
-.mp__agenda {
-  @include fade.fade-y(var(--space-5));
-}
-.mp__votes {
-  @include fade.fade-y(var(--space-5));
-}
+.mp__agenda,
+.mp__votes,
 .mp__prep {
   @include fade.fade-y(var(--space-5));
 }

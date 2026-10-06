@@ -189,8 +189,9 @@ export class SubstitutePoolComponent {
     this.search.set(q);
   }
 
+  /** Without a name and an e-mail: "Ohne Namen" (D7), never the `sub`. */
   protected label(p: AdminPrincipal): string {
-    return p.displayName || p.email || p.sub;
+    return p.displayName || p.email || this.i18n.translate('common.unnamed');
   }
 
   protected pick(p: AdminPrincipal): void {
