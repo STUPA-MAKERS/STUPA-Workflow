@@ -18,8 +18,8 @@ What the merge does with each reference:
   pool, attendance, meetings (creator, minute-taker, keeper periods), protocols, budget
   bookings and invoices, config versions, role assignments, privacy requests, backups
   and the stored audit checks.
-- It combines harmless duplicates: a notification preference, a pool entry, a
-  faculty-group row or an equal attendance that the target already has. The row
+- It combines harmless duplicates: a notification preference, a pool entry or an
+  equal attendance that the target already has. The row
   of the target wins, the row of the source goes. A pool entry in which one account
   substitutes for the other goes too, because a person never substitutes for themselves.
 - It removes the sessions and the OAuth codes and tokens of the source, its feed token,
@@ -109,8 +109,6 @@ from app.modules.budget.tree_models import BudgetExpense, Invoice
 from app.modules.delegations.models import (
     DelegationSubstitute,
     MeetingDelegation,
-    SubstituteGroup,
-    SubstituteGroupMember,
 )
 from app.modules.forms.models import FormVersion
 from app.modules.livevote.models import (
@@ -175,8 +173,6 @@ SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("votes", VotedMarker.voter_sub),
     ("delegations", MeetingDelegation.created_by),
     ("substitutes", DelegationSubstitute.created_by),
-    ("substitutes", SubstituteGroup.created_by),
-    ("substitutes", SubstituteGroupMember.created_by),
     ("meetings", Meeting.created_by),
     ("meetings", ProtocolKeeperPeriod.handed_over_by),
     ("meetings", Protocol.author),
@@ -225,7 +221,6 @@ COMBINED_COLUMNS: tuple[InstrumentedAttribute[Any], ...] = (
     MeetingAttendance.principal_id,
     DelegationSubstitute.member_principal_id,
     DelegationSubstitute.substitute_principal_id,
-    SubstituteGroupMember.principal_id,
 )
 
 # The principal columns that the merge leaves alone on purpose, with the reason. A guard
@@ -747,31 +742,6 @@ class PrincipalMergeService:
                 other.gremium_id == ds.gremium_id,
                 other.member_principal_id.is_not_distinct_from(ds.member_principal_id),
                 other.substitute_principal_id == new,
-            ),
-            tally,
-            apply=apply,
-        )
-
-        # Faculty groups (not in use, the tables stay until a cleanup). The row of the
-        # target in the same group wins. A member is in one group per gremium, so the
-        # member row of the target in the same gremium also wins.
-        sgm = SubstituteGroupMember
-        mine = aliased(SubstituteGroupMember)
-        await self._combine(
-            "substitutes",
-            sgm.principal_id,
-            old,
-            new,
-            or_(
-                exists().where(mine.principal_id == new, mine.group_id == sgm.group_id),
-                and_(
-                    sgm.kind == "member",
-                    exists().where(
-                        mine.principal_id == new,
-                        mine.gremium_id == sgm.gremium_id,
-                        mine.kind == "member",
-                    ),
-                ),
             ),
             tally,
             apply=apply,

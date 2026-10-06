@@ -1,8 +1,8 @@
-"""Shared fixtures of the delegation integration tests (Z5, O6).
+"""Shared fixtures of the delegation integration tests (O6).
 
 ``maker`` gives a session factory. ``api`` gives the real app
 wiring with the vote transfer switched on. ``act`` changes the calling principal.
-The helpers write gremium members, plain principals and faculty groups with the
+The helpers write gremium members, plain principals and pool entries with the
 ORM.
 """
 
@@ -25,11 +25,7 @@ from app.main import create_app
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
-from app.modules.delegations.models import (
-    DelegationSubstitute,
-    SubstituteGroup,
-    SubstituteGroupMember,
-)
+from app.modules.delegations.models import DelegationSubstitute
 from app.modules.livevote.broker import InMemoryBroker
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.publisher import NullPublisher, get_meeting_publisher
@@ -164,35 +160,6 @@ async def member(
         )
         await session.commit()
     return sub, pid
-
-
-async def faculty_group(
-    maker: async_sessionmaker[AsyncSession],
-    gremium_id: uuid.UUID,
-    *,
-    members: tuple[uuid.UUID, ...] = (),
-    substitutes: tuple[uuid.UUID, ...] = (),
-    name: str = "Informatik",
-) -> uuid.UUID:
-    """Write a faculty group with its members and substitutes."""
-    async with maker() as session:
-        group = SubstituteGroup(gremium_id=gremium_id, name_i18n={"de": name})
-        session.add(group)
-        await session.flush()
-        for pid in members:
-            session.add(
-                SubstituteGroupMember(
-                    group_id=group.id, principal_id=pid, gremium_id=gremium_id, kind="member"
-                )
-            )
-        for pid in substitutes:
-            session.add(
-                SubstituteGroupMember(
-                    group_id=group.id, principal_id=pid, gremium_id=gremium_id, kind="substitute"
-                )
-            )
-        await session.commit()
-        return group.id
 
 
 async def pool_entry(

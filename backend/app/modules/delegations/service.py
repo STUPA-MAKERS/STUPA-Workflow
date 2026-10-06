@@ -11,13 +11,14 @@ The server enforces these invariants:
   `allow_vote_delegation`. `delegate_voting` also needs the global vote transfer
   `delegation_voting_enabled`, else 422.
 * Own vote only. The delegator must be a voting member of the meeting gremium.
-  The right comes from a gremium role with `vote.cast`, from a direct role
-  assignment, or from an OIDC group mapping. Every other caller gets 403.
+  The right comes only from an active gremium membership whose gremium role
+  holds `vote.cast`. A global role, a role assignment or an OIDC group mapping
+  does not give it. Every other caller gets 403.
 * No chains. Per meeting a principal is either delegator or recipient, never
   both, else 422.
 * Recipient set. Gremium members and the substitute pool are always eligible.
-  Other users need `delegation_allow_external`, else 403. The pool is the union
-  of `delegation_substitute` and the faculty groups (Z5). The helpers in
+  Other users need `delegation_allow_external`, else 403. The pool is the
+  table `delegation_substitute` of the gremium. The helpers in
   `delegations.pool` are its only source.
 * Deadline. A delegation from outside the pool runs until the meeting start minus
   `delegation_lead_minutes` of the gremium config. A pool delegation runs until
@@ -25,7 +26,8 @@ The server enforces these invariants:
   runs until the meeting start.
 * Lead entry (O6). During a live meeting the meeting lead (`can_manage`) enters
   a substitution for a missing member (`delegatorId`). The delegate must be a
-  substitute of the faculty group of that member. The lead can also revoke a
+  pool substitute of that member: a personal entry for the member or a
+  gremium-wide entry. The lead can also revoke a
   delegation while the meeting is live. A ballot that the delegate already cast
   stays.
 * Transfer, not duplicate. Each (meeting, recipient) pair carries at most one
@@ -39,7 +41,6 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import or_, select, text
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -52,26 +53,17 @@ from app.modules.auth.principal import Principal
 from app.modules.delegations.models import (
     DelegationSubstitute,
     MeetingDelegation,
-    SubstituteGroup,
-    SubstituteGroupMember,
 )
 from app.modules.delegations.pool import (
-    group_names_for,
     substitute_gremien_for_sub,
     substitutes_for,
 )
 from app.modules.delegations.schemas import (
-    SUBSTITUTE_WARN_ABOVE,
     DelegationCreate,
     DelegationOut,
     MeetingDelegationContext,
     RecipientOut,
     SubstituteCreate,
-    SubstituteGroupCreate,
-    SubstituteGroupMemberCreate,
-    SubstituteGroupMemberOut,
-    SubstituteGroupOut,
-    SubstituteGroupUpdate,
     SubstituteOut,
     VoteDelegationStatus,
 )
@@ -467,7 +459,7 @@ class DelegationService:
         if not await _independently_eligible(self.session, me.id, gremium.id, now):
             raise ForbiddenError("Only voting members of the meeting's gremium may delegate.")
 
-        pool_ids = await substitutes_for(self.session, gremium.id, me.id, now)
+        pool_ids = await substitutes_for(self.session, gremium.id, me.id)
         member_ids = await self._member_ids(gremium.id, now)
         via_pool = delegate.id in pool_ids
         if not via_pool and delegate.id not in member_ids and not gremium.delegation_allow_external:
@@ -511,9 +503,8 @@ class DelegationService:
 
         The meeting lead (`can_manage`) names the missing member A (`delegatorId`)
         and a substitute B from the pool of the gremium for A: a personal entry
-        for A or a gremium-wide entry. The faculty groups do not count. The
-        checks are the same as
-        before the meeting: the gremium allows delegations, A may vote, the vote
+        for A or a gremium-wide entry. The checks are the same as before the
+        meeting: the gremium allows delegations, A may vote, the vote
         transfer switch, and no chains. A is missing when A has no attendance
         record, or the record is `excused` or `absent`. The lead cannot name
         themselves as B. The row stores the lead as `created_by` and
@@ -580,9 +571,7 @@ class DelegationService:
                 "The member is present and needs no substitution.",
                 errors=[{"field": "delegatorId", "msg": "member is not missing"}],
             )
-        if delegate.id not in await substitutes_for(
-            self.session, gremium.id, delegator.id, now, include_groups=False
-        ):
+        if delegate.id not in await substitutes_for(self.session, gremium.id, delegator.id):
             raise ForbiddenError("Recipient must be a pool substitute of the member.")
         row = await self._insert(
             meeting,
@@ -822,10 +811,9 @@ class DelegationService:
                     incoming.append(out)
 
             member_ids = await self._member_ids(gremium.id, now)
-            pool_ids = await substitutes_for(self.session, gremium.id, me.id, now)
+            pool_ids = await substitutes_for(self.session, gremium.id, me.id)
             ids = (member_ids | pool_ids) - {me.id}
             names = await self._names(ids)
-            groups = await group_names_for(self.session, gremium.id, ids, member_id=me.id)
             recipients = sorted(
                 (
                     RecipientOut(
@@ -833,7 +821,6 @@ class DelegationService:
                         display_name=names.get(pid),
                         via_pool=pid in pool_ids,
                         is_member=pid in member_ids,
-                        substitute_group_name=groups.get(pid),
                     )
                     for pid in ids
                 ),
@@ -887,10 +874,9 @@ class DelegationService:
         if me is None:
             return []
         member_ids = await self._member_ids(gremium.id, now)
-        pool_ids = await substitutes_for(self.session, gremium.id, me.id, now)
+        pool_ids = await substitutes_for(self.session, gremium.id, me.id)
         ids = (member_ids | pool_ids) - {me.id}
         names = await self._names(ids)
-        groups = await group_names_for(self.session, gremium.id, ids, member_id=me.id)
         needle = q.strip().lower()
         out = [
             RecipientOut(
@@ -898,7 +884,6 @@ class DelegationService:
                 display_name=names.get(pid),
                 via_pool=pid in pool_ids,
                 is_member=pid in member_ids,
-                substitute_group_name=groups.get(pid),
             )
             for pid in ids
             if not needle or needle in (names.get(pid) or "").lower()
@@ -940,9 +925,9 @@ class DelegationService:
         """List the pool substitutes of a member for the lead entry (O6).
 
         The list has the personal entries for the member and the gremium-wide
-        entries, the same set that `_create_by_lead` accepts. It does not read the
-        faculty groups. The lead and the member are not in the list: the lead
-        cannot name themselves, and a member cannot represent themselves.
+        entries, the same set that `_create_by_lead` accepts. The lead and the
+        member are not in the list: the lead cannot name themselves, and a
+        member cannot represent themselves.
 
         Raises:
             ForbiddenError: The actor is not the meeting lead (403).
@@ -951,9 +936,7 @@ class DelegationService:
             raise ForbiddenError("Only the meeting lead may list the substitutes of a member.")
         me = await self._principal_row(sub=actor.sub)
         excluded = {delegator_id} | ({me.id} if me is not None else set())
-        pool_ids = await substitutes_for(
-            self.session, gremium_id, delegator_id, now, include_groups=False
-        )
+        pool_ids = await substitutes_for(self.session, gremium_id, delegator_id)
         ids = pool_ids - excluded
         member_ids = await self._member_ids(gremium_id, now)
         names = await self._names(ids)
@@ -1154,284 +1137,4 @@ class DelegationService:
             target_id=str(substitute_id),
             data={"gremiumId": str(row.gremium_id)},
         )
-        await self.session.commit()
-
-    # ------------------------------------------------------------------
-    # Faculty substitute groups (Z5)
-    # ------------------------------------------------------------------
-
-    async def _group(self, group_id: UUID) -> SubstituteGroup:
-        group = await self.session.get(SubstituteGroup, group_id)
-        if group is None:
-            raise NotFoundError(f"substitute group {group_id} not found")
-        return group
-
-    async def _groups_out(self, groups: list[SubstituteGroup]) -> list[SubstituteGroupOut]:
-        """Build the group views with the members, the names and the warning flag."""
-        if not groups:
-            return []
-        rows = (
-            (
-                await self.session.execute(
-                    select(SubstituteGroupMember)
-                    .where(SubstituteGroupMember.group_id.in_([g.id for g in groups]))
-                    .order_by(SubstituteGroupMember.created_at)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        names = await self._names({r.principal_id for r in rows})
-        now = datetime.now(UTC)
-        active: dict[UUID, set[UUID]] = {}
-        for gremium_id in {g.gremium_id for g in groups}:
-            active[gremium_id] = await self._member_ids(gremium_id, now)
-        out: list[SubstituteGroupOut] = []
-        for group in groups:
-            members = [
-                SubstituteGroupMemberOut(
-                    principal_id=r.principal_id,
-                    display_name=names.get(r.principal_id),
-                    kind="member" if r.kind == "member" else "substitute",
-                    active=r.kind != "member" or r.principal_id in active[group.gremium_id],
-                )
-                for r in rows
-                if r.group_id == group.id
-            ]
-            substitutes = sum(1 for m in members if m.kind == "substitute")
-            out.append(
-                SubstituteGroupOut(
-                    id=group.id,
-                    gremium_id=group.gremium_id,
-                    name_i18n=dict(group.name_i18n or {}),
-                    position=group.position,
-                    members=members,
-                    too_many_substitutes=substitutes > SUBSTITUTE_WARN_ABOVE,
-                )
-            )
-        return out
-
-    async def _group_out(self, group: SubstituteGroup) -> SubstituteGroupOut:
-        return (await self._groups_out([group]))[0]
-
-    async def substitute_groups_list(
-        self, gremium_id: UUID, actor: Principal
-    ) -> list[SubstituteGroupOut]:
-        """List the faculty groups of a gremium with their members (Z5).
-
-        The same readers as for the substitute pool may read the groups.
-
-        Raises:
-            NotFoundError: The gremium does not exist (404).
-            ForbiddenError: The actor may not view this gremium (403).
-        """
-        await self._gremium(gremium_id)
-        await self._assert_can_view_gremium(gremium_id, actor)
-        groups = (
-            (
-                await self.session.execute(
-                    select(SubstituteGroup)
-                    .where(SubstituteGroup.gremium_id == gremium_id)
-                    .order_by(SubstituteGroup.position, SubstituteGroup.created_at)
-                )
-            )
-            .scalars()
-            .all()
-        )
-        return await self._groups_out(list(groups))
-
-    async def substitute_group_create(
-        self, payload: SubstituteGroupCreate, actor: Principal
-    ) -> SubstituteGroupOut:
-        """Create a faculty group in a gremium.
-
-        The caller needs `admin.delegations` or `session.manage` for the gremium.
-        The audit log records `delegation_substitute_add`.
-
-        Raises:
-            ForbiddenError: The actor may not manage the pool of the gremium (403).
-            NotFoundError: The gremium does not exist (404).
-        """
-        await self._require_pool_manage(payload.gremium_id, actor)
-        await self._gremium(payload.gremium_id)
-        group = SubstituteGroup(
-            gremium_id=payload.gremium_id,
-            name_i18n=payload.name_i18n,
-            position=payload.position,
-            created_by=actor.sub,
-        )
-        self.session.add(group)
-        await self.session.flush()
-        await audit_record(
-            self.session,
-            actor=actor.sub,
-            action=AuditAction.DELEGATION_SUBSTITUTE_ADD,
-            target_type="substitute_group",
-            target_id=str(group.id),
-            data={"gremiumId": str(payload.gremium_id)},
-        )
-        await self.session.commit()
-        return await self._group_out(group)
-
-    async def substitute_group_update(
-        self, group_id: UUID, payload: SubstituteGroupUpdate, actor: Principal
-    ) -> SubstituteGroupOut:
-        """Change the name or the position of a faculty group.
-
-        The change does not change who may represent whom, so it writes no audit
-        entry.
-
-        Raises:
-            NotFoundError: The group does not exist (404).
-            ForbiddenError: The actor may not manage the pool of the gremium (403).
-        """
-        group = await self._group(group_id)
-        await self._require_pool_manage(group.gremium_id, actor)
-        if payload.name_i18n is not None:
-            group.name_i18n = payload.name_i18n
-        if payload.position is not None:
-            group.position = payload.position
-        await self.session.commit()
-        return await self._group_out(group)
-
-    async def substitute_group_delete(self, group_id: UUID, actor: Principal) -> None:
-        """Delete a faculty group with its members and substitutes.
-
-        Existing delegations stay. The audit log records
-        `delegation_substitute_remove` with the ids of the people in the group.
-
-        Raises:
-            NotFoundError: The group does not exist (404).
-            ForbiddenError: The actor may not manage the pool of the gremium (403).
-        """
-        group = await self._group(group_id)
-        await self._require_pool_manage(group.gremium_id, actor)
-        rows = (
-            await self.session.execute(
-                select(SubstituteGroupMember.principal_id, SubstituteGroupMember.kind).where(
-                    SubstituteGroupMember.group_id == group.id
-                )
-            )
-        ).all()
-        await audit_record(
-            self.session,
-            actor=actor.sub,
-            action=AuditAction.DELEGATION_SUBSTITUTE_REMOVE,
-            target_type="substitute_group",
-            target_id=str(group.id),
-            data={
-                "gremiumId": str(group.gremium_id),
-                "memberIds": sorted(str(pid) for pid, kind in rows if kind == "member"),
-                "substituteIds": sorted(str(pid) for pid, kind in rows if kind != "member"),
-            },
-        )
-        await self.session.delete(group)
-        await self.session.commit()
-
-    async def substitute_group_member_add(
-        self, group_id: UUID, payload: SubstituteGroupMemberCreate, actor: Principal
-    ) -> SubstituteGroupOut:
-        """Add a person to a faculty group as a member or as a substitute.
-
-        A member is in at most one group per gremium. A substitute may be in more
-        than one group. A member counts only while the gremium membership is
-        active, so the call accepts a person without a membership. There is no
-        limit of substitutes: the response sets `tooManySubstitutes` above two.
-        The audit log records `delegation_substitute_add`.
-
-        Raises:
-            NotFoundError: The group or the principal does not exist (404).
-            ForbiddenError: The actor may not manage the pool of the gremium (403).
-            ConflictError: The person is already in this group, or is already a
-                member of another group of the gremium (409).
-        """
-        group = await self._group(group_id)
-        await self._require_pool_manage(group.gremium_id, actor)
-        principal = await self._principal_row(pid=payload.principal_id)
-        if principal is None:
-            raise NotFoundError(f"principal {payload.principal_id} not found")
-        in_group = await self.session.get(
-            SubstituteGroupMember, {"group_id": group.id, "principal_id": principal.id}
-        )
-        if in_group is not None:
-            raise ConflictError("The person is already in this group.", code="conflict")
-        if payload.kind == "member":
-            other = await self.session.scalar(
-                select(SubstituteGroupMember.group_id).where(
-                    SubstituteGroupMember.gremium_id == group.gremium_id,
-                    SubstituteGroupMember.principal_id == principal.id,
-                    SubstituteGroupMember.kind == "member",
-                )
-            )
-            if other is not None:
-                raise ConflictError(
-                    "The person is already a member of another group of this gremium.",
-                    code="conflict",
-                )
-        self.session.add(
-            SubstituteGroupMember(
-                group_id=group.id,
-                principal_id=principal.id,
-                gremium_id=group.gremium_id,
-                kind=payload.kind,
-                created_by=actor.sub,
-            )
-        )
-        try:
-            await self.session.flush()
-        except IntegrityError as exc:
-            await self.session.rollback()
-            raise ConflictError(
-                "Another change of this group ran at the same time. Try again.",
-                code="conflict",
-            ) from exc
-        await audit_record(
-            self.session,
-            actor=actor.sub,
-            action=AuditAction.DELEGATION_SUBSTITUTE_ADD,
-            target_type="substitute_group_member",
-            target_id=str(group.id),
-            data={
-                "gremiumId": str(group.gremium_id),
-                "groupId": str(group.id),
-                "principalId": str(principal.id),
-                "kind": payload.kind,
-            },
-        )
-        await self.session.commit()
-        return await self._group_out(group)
-
-    async def substitute_group_member_remove(
-        self, group_id: UUID, principal_id: UUID, actor: Principal
-    ) -> None:
-        """Remove a person from a faculty group.
-
-        Existing delegations stay. The audit log records
-        `delegation_substitute_remove`.
-
-        Raises:
-            NotFoundError: The group does not exist, or the person is not in it (404).
-            ForbiddenError: The actor may not manage the pool of the gremium (403).
-        """
-        group = await self._group(group_id)
-        await self._require_pool_manage(group.gremium_id, actor)
-        row = await self.session.get(
-            SubstituteGroupMember, {"group_id": group.id, "principal_id": principal_id}
-        )
-        if row is None:
-            raise NotFoundError(f"principal {principal_id} is not in group {group_id}")
-        await audit_record(
-            self.session,
-            actor=actor.sub,
-            action=AuditAction.DELEGATION_SUBSTITUTE_REMOVE,
-            target_type="substitute_group_member",
-            target_id=str(group.id),
-            data={
-                "gremiumId": str(group.gremium_id),
-                "groupId": str(group.id),
-                "principalId": str(principal_id),
-                "kind": row.kind,
-            },
-        )
-        await self.session.delete(row)
         await self.session.commit()

@@ -3,15 +3,15 @@
 Member self-service for meeting-bound delegations. A member lists, creates and
 revokes the own delegations. A member also reads the meeting context with the
 deadline and the recipients, reads the vote status, and manages the substitute
-pool and the faculty substitute groups (Z5) of a gremium.
+pool of a gremium.
 
 The server is authoritative for RBAC. Every route needs a session. The service
 checks the domain rules: gates, deadline, recipient circle and chains. A holder
 of `admin.delegations` sees and revokes every delegation. During a live meeting
 the meeting lead (`session.manage` in the gremium) enters a substitution for a
 missing member and revokes a delegation (O6). A holder of `admin.delegations`
-or of the gremium role with `session.manage` manages the pool and the faculty
-groups. The routes report errors as `ProblemDetail`.
+or of the gremium role with `session.manage` manages the pool. The routes
+report errors as `ProblemDetail`.
 """
 
 from __future__ import annotations
@@ -28,10 +28,6 @@ from app.modules.delegations.schemas import (
     MeetingDelegationContext,
     RecipientOut,
     SubstituteCreate,
-    SubstituteGroupCreate,
-    SubstituteGroupMemberCreate,
-    SubstituteGroupOut,
-    SubstituteGroupUpdate,
     SubstituteOut,
     VoteDelegationStatus,
 )
@@ -202,88 +198,4 @@ async def delete_substitute(
     substitute_id: UUID, service: ServiceDep, principal: Member
 ) -> Response:
     await service.substitute_delete(substitute_id, principal)
-    return Response(status_code=204)
-
-
-@router.get(
-    "/substitute-groups",
-    response_model=list[SubstituteGroupOut],
-    responses=_errors(401, 403, 404, 422),
-)
-async def list_substitute_groups(
-    service: ServiceDep,
-    principal: Member,
-    gremium_id: Annotated[UUID, Query(alias="gremiumId")],
-) -> list[SubstituteGroupOut]:
-    """List the faculty groups of a gremium with members and substitutes (Z5)."""
-    return await service.substitute_groups_list(gremium_id, principal)
-
-
-@router.post(
-    "/substitute-groups",
-    response_model=SubstituteGroupOut,
-    status_code=201,
-    responses=_errors(400, 401, 403, 404, 422),
-)
-async def create_substitute_group(
-    payload: SubstituteGroupCreate, service: ServiceDep, principal: Member
-) -> SubstituteGroupOut:
-    """Create a faculty group in a gremium."""
-    return await service.substitute_group_create(payload, principal)
-
-
-@router.patch(
-    "/substitute-groups/{group_id}",
-    response_model=SubstituteGroupOut,
-    responses=_errors(400, 401, 403, 404, 422),
-)
-async def update_substitute_group(
-    group_id: UUID,
-    payload: SubstituteGroupUpdate,
-    service: ServiceDep,
-    principal: Member,
-) -> SubstituteGroupOut:
-    """Change the name or the position of a faculty group."""
-    return await service.substitute_group_update(group_id, payload, principal)
-
-
-@router.delete(
-    "/substitute-groups/{group_id}",
-    status_code=204,
-    responses=_errors(401, 403, 404, 422),
-)
-async def delete_substitute_group(
-    group_id: UUID, service: ServiceDep, principal: Member
-) -> Response:
-    """Delete a faculty group with its members and substitutes."""
-    await service.substitute_group_delete(group_id, principal)
-    return Response(status_code=204)
-
-
-@router.post(
-    "/substitute-groups/{group_id}/members",
-    response_model=SubstituteGroupOut,
-    status_code=201,
-    responses=_errors(400, 401, 403, 404, 409, 422),
-)
-async def add_substitute_group_member(
-    group_id: UUID,
-    payload: SubstituteGroupMemberCreate,
-    service: ServiceDep,
-    principal: Member,
-) -> SubstituteGroupOut:
-    """Add a person to a faculty group as a member or as a substitute."""
-    return await service.substitute_group_member_add(group_id, payload, principal)
-
-
-@router.delete(
-    "/substitute-groups/{group_id}/members/{principal_id}",
-    status_code=204,
-    responses=_errors(401, 403, 404, 422),
-)
-async def remove_substitute_group_member(
-    group_id: UUID, principal_id: UUID, service: ServiceDep, principal: Member
-) -> Response:
-    """Remove a person from a faculty group."""
-    await service.substitute_group_member_remove(group_id, principal_id, principal)
     return Response(status_code=204)

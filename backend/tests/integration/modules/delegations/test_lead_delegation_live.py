@@ -4,9 +4,8 @@
   only while the meeting is live (not planned, not closed).
 * The member is missing: no attendance record, `excused` or `absent`.
 * The delegate is in the substitute pool for the member: a personal entry for
-  the member or a gremium-wide entry. A substitute of a faculty group does not
-  count (the faculty groups are not in use), an entry in the pool of another
-  gremium neither, and a person outside the pool neither.
+  the member or a gremium-wide entry. An entry in the pool of another gremium
+  does not count, and a person outside the pool neither.
 * The existing checks still apply: the vote right of the member and no second
   delegation.
 * The row stores the lead as `created_by` and `via_pool = true`.
@@ -39,7 +38,6 @@ from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ValidationProblem
 from tests.integration.modules.delegations.conftest import (
     act,
-    faculty_group,
     gremium,
     meeting,
     member,
@@ -307,33 +305,19 @@ async def test_substitute_from_the_pool_of_another_gremium_does_not_count(
     assert searched.json() == []
 
 
-async def test_faculty_group_substitute_does_not_count(
-    maker: async_sessionmaker[AsyncSession], api: FastAPI
-) -> None:
-    """The faculty groups are not in use: a group substitute of A is refused (403)."""
-    s = await _setup(maker)
-    _, group_sub = await person(maker, "Group")
-    await faculty_group(maker, s.gremium_id, members=(s.a,), substitutes=(group_sub,))
-    act(api, s.lead)
-    with TestClient(api) as client:
-        refused = client.post("/api/delegations", json=_body(s, delegate=group_sub))
-    assert refused.status_code == 403, refused.text
-
-
 async def test_lead_lists_the_pool_substitutes_of_a_member(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
-    """The recipient list with `delegatorId` has the pool for A, not the groups."""
+    """The recipient list with `delegatorId` has the pool for A only."""
     s = await _setup(maker)
     lead_id = await _principal_id(maker, s.lead)
     _, wide = await person(maker, "Wide")
-    _, group_sub = await person(maker, "Group")
+    await person(maker, "Outside")
     _, c = await member(maker, s.gremium_id, "Carla")
     _, for_c = await person(maker, "ForCarla")
     await pool_entry(maker, s.gremium_id, wide)
     await pool_entry(maker, s.gremium_id, lead_id)
     await pool_entry(maker, s.gremium_id, for_c, for_member=c)
-    await faculty_group(maker, s.gremium_id, members=(s.a,), substitutes=(group_sub,))
     url = f"/api/delegations/meetings/{s.meeting_id}/recipients"
     with TestClient(api) as client:
         act(api, s.lead)

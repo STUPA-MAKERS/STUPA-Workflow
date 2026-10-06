@@ -241,9 +241,9 @@ async def me(
 async def _in_substitute_pool(db: DbSession, sub: str) -> bool:
     """Tell if `sub` is in at least one substitute pool.
 
-    The pool covers `delegation_substitute` and the faculty groups (Z5). The
-    frontend uses the flag to show the meeting timeline to pool substitutes that
-    have no own membership.
+    The pool is the table `delegation_substitute`. The frontend uses the flag
+    to show the meeting timeline to pool substitutes that have no own
+    membership.
     """
     from app.modules.delegations.pool import substitute_gremien_for_sub
 

@@ -26,7 +26,6 @@ from app.modules.applications.service import ApplicationsService
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import AuthSession, Principal
-from app.modules.delegations.models import SubstituteGroupMember
 from app.modules.files.models import Attachment
 from app.modules.files.service import FilesService
 from app.modules.flow.models import State
@@ -55,8 +54,6 @@ class PrincipalService:
         self, principal_id: UUID, *, actor: str, commit: bool = True
     ) -> Principal:
         """Null the PII fields, deactivate the principal, and drop the sessions.
-
-        The call also deletes the rows of the principal in the faculty groups (Z5).
 
         The `sub` stays as a pseudonym for the audit chain. The IdP deletes the user
         out of band. The pseudonymity that remains depends on that deletion.
@@ -87,13 +84,6 @@ class PrincipalService:
         )
         await self.session.execute(
             delete(AuthSession).where(AuthSession.principal_id == principal_id)
-        )
-        # The faculty groups (Z5) name the person as a member or a substitute. The
-        # principal row stays, so the CASCADE of the foreign key does not apply.
-        await self.session.execute(
-            delete(SubstituteGroupMember).where(
-                SubstituteGroupMember.principal_id == principal_id
-            )
         )
         await audit_record(
             self.session,

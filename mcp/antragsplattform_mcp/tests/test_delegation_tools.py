@@ -1,4 +1,4 @@
-"""Tests for the substitute-group tools (Z5) and the lead entry of a delegation (O6)."""
+"""Tests for the substitute pool tools and the lead entry of a delegation (O6)."""
 
 from __future__ import annotations
 
@@ -39,28 +39,6 @@ def fake_api(monkeypatch: pytest.MonkeyPatch) -> _FakeApi:
     fake = _FakeApi()
     monkeypatch.setattr(_common, "_client", fake)
     return fake
-
-
-def test_group_tools_hit_the_routes(fake_api: _FakeApi) -> None:
-    base = "/delegations/substitute-groups"
-    asyncio.run(meetings.list_substitute_groups("g1"))
-    asyncio.run(
-        meetings.create_substitute_group(
-            S.SubstituteGroupCreate(gremiumId="g1", nameI18n={"de": "Info"})
-        )
-    )
-    asyncio.run(meetings.update_substitute_group("x", S.SubstituteGroupUpdate(position=2)))
-    asyncio.run(meetings.add_substitute_group_member("x", "p1", "substitute"))
-    asyncio.run(meetings.remove_substitute_group_member("x", "p1"))
-    asyncio.run(meetings.delete_substitute_group("x"))
-    assert fake_api.calls == [
-        ("GET", base, {"gremiumId": "g1"}),
-        ("POST", base, {"gremiumId": "g1", "nameI18n": {"de": "Info"}, "position": 0}),
-        ("PATCH", f"{base}/x", {"position": 2}),
-        ("POST", f"{base}/x/members", {"principalId": "p1", "kind": "substitute"}),
-        ("DELETE", f"{base}/x/members/p1", None),
-        ("DELETE", f"{base}/x", None),
-    ]
 
 
 def test_list_substitutes_sends_the_gremium(fake_api: _FakeApi) -> None:
