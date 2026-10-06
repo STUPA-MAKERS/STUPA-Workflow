@@ -2,6 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import type { MeetingChannel } from './ws.service';
 import { LIVE_VOTE_SOURCE, type LiveVoteSource } from './live-vote.source';
 import type {
+  GuestCountsMsg,
   MeetingStateMsg,
   ServerMessage,
   VoteClosedMsg,
@@ -24,6 +25,8 @@ export class LiveVoteSession {
   readonly tally = signal<VoteTallyMsg | null>(null);
   readonly result = signal<VoteClosedMsg | null>(null);
   readonly errorCode = signal<string | null>(null);
+  /** The public participation of the meeting (`guest_counts`): the code and the guests. */
+  readonly guestCounts = signal<GuestCountsMsg | null>(null);
 
   private channel: MeetingChannel | null = null;
   private closedByUser = false;
@@ -95,6 +98,9 @@ export class LiveVoteSession {
           this.tally.set(null);
           this.result.set(null);
         }
+        break;
+      case 'guest_counts':
+        this.guestCounts.set(m);
         break;
       case 'error':
         this.errorCode.set(m.code);

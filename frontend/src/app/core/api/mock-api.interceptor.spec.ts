@@ -1658,4 +1658,36 @@ describe('mockApiInterceptor', () => {
     const none = await firstValueFrom(api.search('zzzz'));
     expect(none).toEqual({ hits: [], truncated: false, failed: [] });
   });
+
+  describe('public meeting (#17)', () => {
+    it('serves the lead and the guest routes from the lazy mock, with problems as errors', async () => {
+      const { api } = setup(true);
+      const http = TestBed.inject(HttpClient);
+      expect(await firstValueFrom(api.listMeetingGuests('d0000000-0000-0000-0000-000000000001'))).toHaveLength(10);
+      expect((await firstValueFrom(api.getJoinLink('m'))).joinCode).toBe('7KQ4MP');
+      expect((await firstValueFrom(api.guestMe('7KQ4MP'))).status).toBe('admitted');
+      await expect(firstValueFrom(api.guestMe('MOCKJOIN'))).rejects.toMatchObject({
+        status: 401,
+        error: { code: 'guest_token_missing' },
+      });
+      await expect(firstValueFrom(http.put('/api/public/meetings/7KQ4MP/me', {}))).rejects.toMatchObject({
+        status: 404,
+      });
+    });
+
+    it('patches the public participation of the live meeting and opens a vote with guests', async () => {
+      const { api } = setup(true);
+      const id = 'd0000000-0000-0000-0000-000000000001';
+      const off = await firstValueFrom(api.patchMeeting(id, { publicJoin: false }));
+      expect(off.publicJoin).toBe(false);
+      const on = await firstValueFrom(api.patchMeeting(id, { publicJoin: true, guestsMode: 'watch' }));
+      expect(on).toEqual(expect.objectContaining({ publicJoin: true, guestsMode: 'watch', joinCode: '7KQ4MP' }));
+      await firstValueFrom(api.patchMeeting(id, { guestsMode: 'vote' }));
+      const m = await firstValueFrom(api.openMeetingVote(id, { agendaItemId: 'ag-s2', guestsVote: true }));
+      const v = m.votes[m.votes.length - 1];
+      expect(v).toEqual(expect.objectContaining({ guestsVote: true, presentMembers: 5, presentGuests: 7 }));
+      const m2 = await firstValueFrom(api.openMeetingVote(id, { agendaItemId: 'ag-s2' }));
+      expect(m2.votes[m2.votes.length - 1].guestsVote).toBe(false);
+    });
+  });
 });

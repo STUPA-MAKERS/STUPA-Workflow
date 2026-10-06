@@ -11,13 +11,17 @@ from uuid import UUID
 
 from app.modules.livevote.broker import MeetingBroker
 from app.modules.livevote.events import (
+    GuestCountsEvent,
+    GuestEventReason,
+    GuestRequestedEvent,
+    GuestUpdatedEvent,
     MeetingStateEvent,
     VoteCancelledEvent,
     VoteClosedEvent,
     VoteOpenedEvent,
     VoteTallyEvent,
 )
-from app.modules.livevote.schemas import MeetingOut
+from app.modules.livevote.schemas import GuestsMode, MeetingGuestOut, MeetingOut
 from app.modules.voting.schemas import VoteClosed, VoteOut
 
 
@@ -84,3 +88,37 @@ class BrokerPublisher:
             return
         event = VoteCancelledEvent(voteId=vote.id)
         await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
+
+    # Public meeting (#17). The connection layer filters these events: the guest
+    # events with names reach only the meeting lead, the counts reach everybody.
+    async def guest_requested(self, meeting_id: UUID, guest: MeetingGuestOut) -> None:
+        event = GuestRequestedEvent(guest=guest)
+        await self._broker.publish(meeting_channel(meeting_id), event.dump())
+
+    async def guest_updated(
+        self,
+        meeting_id: UUID,
+        guest: MeetingGuestOut,
+        reason: GuestEventReason | None = None,
+    ) -> None:
+        event = GuestUpdatedEvent(guest=guest, reason=reason)
+        await self._broker.publish(meeting_channel(meeting_id), event.dump())
+
+    async def guest_counts(
+        self,
+        meeting_id: UUID,
+        *,
+        public_join: bool,
+        guests_mode: GuestsMode,
+        join_code: str | None,
+        admitted: int,
+        pending: int,
+    ) -> None:
+        event = GuestCountsEvent(
+            publicJoin=public_join,
+            guestsMode=guests_mode,
+            joinCode=join_code,
+            admittedGuests=admitted,
+            pendingGuests=pending,
+        )
+        await self._broker.publish(meeting_channel(meeting_id), event.dump())

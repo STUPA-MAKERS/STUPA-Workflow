@@ -20,6 +20,8 @@ description: DSGVO/GDPR backend — erasure-request queue (Art. 17), application
 - **applicant** erasure → `ApplicationsService.anonymize`. It sets the PII to NULL, sets `Applicant.anonymized_at`, and drops the attachments plus their storage objects. The application row stays.
 - **principal** erasure → `PrincipalService.erase`. It sets email/display_name/calendar_token/oidc_groups to NULL, sets `active=False`, and deletes the `AuthSession` rows. It also sets `meeting_attendance.note` (the reason of an excuse, Z2) to NULL. The attendance status stays, because the protocols carry it. The update touches only rows `WHERE note IS NOT NULL`, so an older `(self, absent)` row does not meet the NOT VALID self-status check. It deletes the rows of the principal in the faculty substitute groups (`substitute_group_member`, Z5) explicitly: the principal row stays, so the FK CASCADE does not fire. It keeps `sub` as a pseudonym for the audit chain and the Keycloak link. Deletion of the Keycloak user itself happens out of band.
 
+- **Guests of a public meeting (#17)** have no account and no export path. Data minimization instead: leaving or withdrawing sets `meeting_guest.display_name` to NULL at once; the close of the meeting deletes the requests that never got admitted and every token hash; `ProtocolService.start_finalize` pseudonymizes all guests of the meeting ("Gast 1 … n", `GuestService.pseudonymize`). The audit log holds guest ids only.
+
 **API surface:**
 - `GET /api/admin/privacy/erasures?status=` — erasure queue, newest first.
 - `POST /api/admin/privacy/erasures/{id}/execute` — run erasure (anonymize/erase), atomic with status flip.

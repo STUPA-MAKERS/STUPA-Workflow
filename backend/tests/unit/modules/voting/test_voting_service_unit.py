@@ -1028,7 +1028,8 @@ async def test_get_meeting_open_hidden_until_proxy_voted() -> None:
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(result(vote), result("yes", "yes"))
-    db.scalar_results = [2, 1]  # present=2, absent-delegated=1 → expected=3
+    # present=2, admitted guests=0 (#17), absent-delegated=1 → expected=3
+    db.scalar_results = [2, 0, 1]
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is False
     assert out.tally.counts == {}
@@ -1038,7 +1039,8 @@ async def test_get_meeting_open_reveals_when_proxy_also_voted() -> None:
     gid = uuid4()
     vote = _vote(meeting_id=uuid4(), eligible_group=str(gid))
     db = fake_session(result(vote), result("yes", "yes", "no"))
-    db.scalar_results = [2, 1]  # present=2 + 1 proxy → expected=3, voted=3 → revealed
+    # present=2, no guests (#17), 1 proxy → expected=3, voted=3 → revealed
+    db.scalar_results = [2, 0, 1]
     out = await VotingService(db).get(vote.id)
     assert out.tally.revealed is True
     assert out.tally.counts == {"yes": 2, "no": 1, "abstain": 0}

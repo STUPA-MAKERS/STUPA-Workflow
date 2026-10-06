@@ -58,6 +58,11 @@ export function meeting(over: Partial<Meeting> = {}): Meeting {
     canFinalize: true,
     keeperPeriods: [],
     plannedHandover: null,
+    publicJoin: false,
+    guestsMode: 'vote',
+    joinCode: null,
+    admittedGuests: 0,
+    pendingGuests: 0,
     ...over,
   };
 }

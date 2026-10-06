@@ -47,4 +47,6 @@ description: Protocol — a Markdown editor backing per meeting, embedded vote s
 - **Variant:** a gremium `cd_variant` in {`stupa`,`asta`} selects the render variant `protocol-<cd>` (default logos). Any other value gives `None`, and the service reads the logos from the `gremium` frontmatter key.
 - The worker (`worker/protocol.py`) reverts to draft and broadcasts `meeting_state` on both success and permanent failure, so live followers see the status flip. The frontend polls the GET endpoint, because GET avoids the write rate-limit (#429).
 
+- **Guests (#17):** the header adds the data line `Gäste: n` (guests who took part) in both variants; a vote with guests gets the line "x Mitglieder + y Gäste anwesend · Abgegeben n · Mehrheit der abgegebenen Stimmen" in its snippet (`guest_vote_note`). Never a guest name. `start_finalize` pseudonymizes the guests.
+
 **Related:** be-pdf, be-livevote, be-notifications, be-voting, be-files, be-admin

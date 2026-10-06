@@ -59,10 +59,13 @@ from app.shared.errors import AppError, ForbiddenError
 
 logger = logging.getLogger("app.livevote")
 
-# Events the read-only beamer stream lets through.
+# Events the read-only beamer stream lets through. `guest_counts` carries counts and
+# the join code only, never a name (#17).
 _BEAMER_EVENTS = frozenset(
-    {"meeting_state", "vote_opened", "vote_tally", "vote_closed"}
+    {"meeting_state", "vote_opened", "vote_tally", "vote_closed", "guest_counts"}
 )
+# #17: guest events with names. Only a connection of the meeting lead gets them.
+_LEAD_EVENTS = frozenset({"guest_requested", "guest_updated"})
 # Application-defined close codes (4000–4999).
 WS_UNAUTHENTICATED = 4401
 WS_FORBIDDEN = 4403
@@ -198,8 +201,11 @@ class LiveVoteConnection:
         voting: VotingService,
         broker: MeetingBroker,
         locker: Locker,
+        can_manage: bool = False,
     ) -> None:
         self.ws = websocket
+        # #17: the meeting lead gets the guest events with names and the join code.
+        self.can_manage = can_manage
         self.meeting_id = meeting_id
         self.beamer = beamer
         self.principal = principal
@@ -329,11 +335,27 @@ class LiveVoteConnection:
         else:
             await self._send_error("unknown_type")
 
+    def _filter(self, message: dict[str, object]) -> dict[str, object] | None:
+        """Return the message as this connection may see it, or None to drop it.
+
+        The beamer gets its fixed event set. A guest event with names goes to the
+        meeting lead only. A member without ``canManage`` gets the guest counts
+        without the join code and without the open requests (#17).
+        """
+        kind = message.get("type")
+        if self.beamer:
+            return message if kind in _BEAMER_EVENTS else None
+        if kind in _LEAD_EVENTS:
+            return message if self.can_manage else None
+        if kind == "guest_counts" and not self.can_manage:
+            return {**message, "joinCode": None, "pendingGuests": 0}
+        return message
+
     async def _pump(self, subscription: object) -> None:
         async for message in subscription:  # type: ignore[attr-defined]
-            if self.beamer and message.get("type") not in _BEAMER_EVENTS:
-                continue
-            await self._send(message)
+            filtered = self._filter(message)
+            if filtered is not None:
+                await self._send(filtered)
 
     async def _receive(self) -> None:
         while True:

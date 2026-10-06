@@ -69,6 +69,11 @@ describe('WsService', () => {
     expect(MockWebSocket.instances[0].url).toContain('/api/ws/meetings/m-1/beamer');
   });
 
+  it('opens the guest channel of a public meeting', () => {
+    svc.connectGuest('7KQ4MP');
+    expect(MockWebSocket.instances[0].url).toContain('/api/public/meetings/7KQ4MP/ws');
+  });
+
   it('parses incoming JSON messages', () => {
     const ch = svc.connectMeeting('m-1');
     const received: ServerMessage[] = [];

@@ -314,6 +314,74 @@ async def rate_limit_applicant_search(
     )
 
 
+async def rate_limit_public_join(
+    request: Request, settings: SettingsDep, limiter: RateLimiterDep
+) -> None:
+    """``POST /public/meetings/join/{code}`` (#17): a limit per IP and per join code.
+
+    Many guests share the campus NAT, so the IP limit stays generous; ALTCHA is the
+    main guard. The code limit stops a flood of requests on one meeting.
+    """
+    await _enforce(
+        limiter,
+        f"public-join:ip:{client_ip(request)}",
+        limit=settings.rl_public_join_ip_per_hour,
+        window=_HOUR,
+        detail="Too many join requests from this IP. Try again later.",
+    )
+    raw = str(request.path_params.get("code", ""))
+    code = "".join(ch for ch in raw.upper() if ch not in " -")
+    await _enforce(
+        limiter,
+        f"public-join:code:{code}",
+        limit=settings.rl_public_join_code_per_hour,
+        window=_HOUR,
+        detail="Too many join requests for this meeting. Try again later.",
+    )
+
+
+async def rate_limit_public_read(
+    request: Request, settings: SettingsDep, limiter: RateLimiterDep
+) -> None:
+    """The reads of the public meeting routes (#17): a generous limit per IP.
+
+    The limit stops the enumeration of join codes; a guest page reads its state again
+    on each live event, and many guests share one IP.
+    """
+    await _enforce(
+        limiter,
+        f"public-meeting:ip:{client_ip(request)}",
+        limit=settings.rl_public_meeting_read_ip_per_hour,
+        window=_HOUR,
+        detail="Too many requests from this IP. Try again later.",
+    )
+
+
+async def rate_limit_public_guest_write(
+    request: Request, settings: SettingsDep, limiter: RateLimiterDep
+) -> None:
+    """The writes of a guest (#17: name, leave, ballot): a limit per device token.
+
+    The key is a hash prefix of the token, never the token. Without a token the key
+    is the IP; the route then answers 401 anyway.
+    """
+    import hashlib
+
+    token = request.cookies.get(settings.guest_cookie_name)
+    key = (
+        f"public-guest:{hashlib.sha256(token.encode('utf-8')).hexdigest()[:24]}"
+        if token
+        else f"public-guest:ip:{client_ip(request)}"
+    )
+    await _enforce(
+        limiter,
+        key,
+        limit=settings.rl_public_guest_write_per_hour,
+        window=_HOUR,
+        detail="Too many requests. Try again later.",
+    )
+
+
 def require_altcha(field: str = "altcha") -> Callable[..., Awaitable[None]]:
     """Dependency factory: verify the ALTCHA solution field from the JSON body.
 

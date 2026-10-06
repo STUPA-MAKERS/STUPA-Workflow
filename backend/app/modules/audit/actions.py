@@ -120,6 +120,17 @@ class AuditAction(StrEnum):
     VOTE_CLOSE = "vote_close"
     VOTE_CANCEL = "vote_cancel"
     VOTE_BRANCH_BLOCKED = "vote_branch_blocked"
+    # Public meeting with a QR code (#17). The meeting lead is the actor. ``data``
+    # carries id references and counts only, NEVER the name of a guest: the chain is
+    # append-only, so a name in it could never be deleted. A guest ballot writes
+    # VOTE_CAST with the actor ``guest:<meeting_guest.id>`` and no choice.
+    MEETING_PUBLIC_JOIN_CHANGED = "meeting_public_join_changed"
+    MEETING_JOIN_CODE_ROTATED = "meeting_join_code_rotated"
+    GUEST_ADMITTED = "guest_admitted"
+    GUEST_REJECTED = "guest_rejected"
+    GUEST_REMOVED = "guest_removed"
+    GUEST_RENAMED = "guest_renamed"
+    GUEST_ADMIT_ALL = "guest_admit_all"
     # GDPR/PII: access (Art. 15), erasure/anonymization (Art. 17), retention
     # (Art. 5(1)(e)) plus the erasure-request queue. ``data`` carries only
     # id/email references and metadata, never raw PII values.

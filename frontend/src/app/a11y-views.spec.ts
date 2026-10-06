@@ -207,6 +207,7 @@ describe('Kern-Views a11y (axe)', () => {
             useValue: {
               getMeeting: () => of({ id: 'm1', title: 'Sitzung', canVote: true, votes: [] }),
               listAgenda: () => of([{ id: 'ag1', position: 0 }]),
+              listAttendance: () => of([]),
               getVote: () =>
                 of({
                   id: 'v1',
@@ -267,6 +268,7 @@ describe('Kern-Views a11y (axe)', () => {
             useValue: {
               getMeeting: () => of({ id: 'm1', title: 'Sitzung', votes: [], currentAgendaItemId: 'ag1' }),
               listAgenda: () => of([{ id: 'ag1', title: 'Haushalt', position: 0 }]),
+              listAttendance: () => of([]),
               getVote: () =>
                 of({
                   id: 'v1',

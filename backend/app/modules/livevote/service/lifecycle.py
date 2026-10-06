@@ -23,6 +23,7 @@ from sqlalchemy import select
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
+from app.modules.livevote.guests import GuestEvents, GuestService
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.livevote.schemas import MeetingCreate, MeetingOut, MeetingPatch
 from app.modules.livevote.service.handover import HandoverOps
@@ -84,7 +85,12 @@ class LifecycleOps(HandoverOps):
             status="planned",
             created_by=principal.sub,
             protokollant_id=protokollant_id,
+            public_join=payload.public_join,
+            guests_mode=payload.guests_mode,
         )
+        if payload.public_join:
+            # #17: the join link exists from the start, so it can go into the invitation.
+            await GuestService(self.session).ensure_code(meeting)
         self.session.add(meeting)
         await self.session.flush()
         await audit_record(
@@ -93,7 +99,12 @@ class LifecycleOps(HandoverOps):
             action=AuditAction.MEETING_CREATE,
             target_type="meeting",
             target_id=str(meeting.id),
-            data={"gremiumId": str(meeting.gremium_id), **_snapshot(meeting)},
+            data={
+                "gremiumId": str(meeting.gremium_id),
+                **_snapshot(meeting),
+                "publicJoin": meeting.public_join,
+                "guestsMode": meeting.guests_mode,
+            },
         )
         await self.session.commit()
         return await self._emit(meeting, principal)
@@ -138,11 +149,14 @@ class LifecycleOps(HandoverOps):
                 open vote on close (``open_vote``), the start has no protokollant, or
                 the meeting is closed and the patch changes its planning.
         """
+        # #17: public participation and the guest mode are planning values of the lead.
+        wants_public = payload.public_join is not None or payload.guests_mode is not None
         wants_manage = (
             "date" in payload.model_fields_set
             or "start_time" in payload.model_fields_set
             or "end_time" in payload.model_fields_set
             or "protokollant_id" in payload.model_fields_set
+            or wants_public
         )
         wants_write = payload.status is not None or payload.active_application_id is not None
         wants_now = "current_agenda_item_id" in payload.model_fields_set
@@ -156,6 +170,7 @@ class LifecycleOps(HandoverOps):
                 payload.status is not None
                 or wants_now
                 or "protokollant_id" in payload.model_fields_set
+                or wants_public
             ),
         )
         if wants_manage and not await self.can_manage(meeting.gremium_id, principal):
@@ -204,6 +219,9 @@ class LifecycleOps(HandoverOps):
 
         before = _snapshot(meeting)
         now = datetime.now(UTC)
+        guest_events = (
+            await self._apply_public(meeting, payload, principal, now) if wants_public else None
+        )
         # planned to live: the router creates the protocol at meeting start, after this
         # commit, and nobody takes minutes or votes before that. ``meeting.status`` is
         # set only AFTER the protokollant check, which keeps the change atomic: no
@@ -295,6 +313,8 @@ class LifecycleOps(HandoverOps):
             cancelled = await VotingService(self.session).cancel_drafts_for_meeting(
                 meeting.id, now=now, actor=principal.sub
             )
+            # #17: the requests that never got admitted go, and every guest token.
+            await GuestService(self.session).purge_on_close(meeting)
         if payload.status is not None:
             meeting.status = payload.status
         after = _snapshot(meeting)
@@ -318,11 +338,75 @@ class LifecycleOps(HandoverOps):
         cancelled_events = await self._cancelled_events(cancelled)
         await self.session.commit()
         await self._publish_cancelled(cancelled_events)
+        if guest_events is not None:
+            await GuestService(self.session, self.publisher).publish(meeting.id, guest_events)
         votes = (await self._votes_for([meeting.id], principal)).get(meeting.id, [])
         out = await self._emit(meeting, principal, votes=votes)
         if self.publisher is not None:
             await self.publisher.meeting_state(out)
         return out
+
+    async def _apply_public(
+        self, meeting: Meeting, payload: MeetingPatch, principal: Principal, now: datetime
+    ) -> GuestEvents | None:
+        """Apply ``publicJoin`` and ``guestsMode`` of a patch (#17), without a commit.
+
+        Switching ``guestsMode`` from ``vote`` to ``watch`` is blocked while a vote with
+        guests is open: the guests would lose the ballot in the middle of the vote.
+        Switching ``publicJoin`` off voids the open requests and removes the admitted
+        guests; their cast ballots stay counted. A change writes
+        ``meeting_public_join_changed``.
+
+        Returns:
+            The guest broadcasts to send after the commit, or None without a change.
+
+        Raises:
+            ConflictError: ``guest_vote_open``.
+        """
+        old_public, old_mode = meeting.public_join, meeting.guests_mode
+        new_public = old_public if payload.public_join is None else payload.public_join
+        new_mode = old_mode if payload.guests_mode is None else payload.guests_mode
+        if (old_public, old_mode) == (new_public, new_mode):
+            return None
+        if old_mode == "vote" and new_mode == "watch" and await self._guest_vote_open(meeting.id):
+            raise ConflictError(
+                "A vote with guests is open. Close it before the guests only watch.",
+                code="guest_vote_open",
+            )
+        meeting.public_join = new_public
+        meeting.guests_mode = new_mode
+        guests = GuestService(self.session)
+        events = GuestEvents(counts=True)
+        if new_public:
+            await guests.ensure_code(meeting)
+        elif old_public:
+            events = await guests.switch_off(meeting, actor_sub=principal.sub, now=now)
+        await audit_record(
+            self.session,
+            actor=principal.sub,
+            action=AuditAction.MEETING_PUBLIC_JOIN_CHANGED,
+            target_type="meeting",
+            target_id=str(meeting.id),
+            data={
+                "gremiumId": str(meeting.gremium_id),
+                "publicJoin": {"from": old_public, "to": new_public},
+                "guestsMode": {"from": old_mode, "to": new_mode},
+            },
+        )
+        return events
+
+    async def _guest_vote_open(self, meeting_id: UUID) -> bool:
+        """Tell if the meeting has an open vote with guests (#17)."""
+        found = await self.session.scalar(
+            select(Vote.id)
+            .where(
+                Vote.meeting_id == meeting_id,
+                Vote.status == "open",
+                Vote.config["guestsVote"].as_boolean().is_(True),
+            )
+            .limit(1)
+        )
+        return found is not None
 
     async def _cancelled_events(self, votes: list[Vote]) -> list[VoteOut]:
         """Read the ``vote_cancelled`` payloads before the commit.

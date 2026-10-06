@@ -1,0 +1,220 @@
+:host {
+  display: block;
+}
+.gv {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.gv__state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.gv__state--watch {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.gv__stateIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--color-border-strong);
+}
+.gv__stateIcon--ok {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  box-shadow: none;
+}
+.gv__stateText {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--fs-small);
+}
+.gv__stateText strong {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+}
+.gv__now {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0 var(--space-1);
+}
+.gv__nowLine {
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.gv__nowLabel {
+  color: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
+}
+.gv__nowTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 1.375rem;
+  line-height: 1.8rem;
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+.gv__voteCard,
+.gv__noVote {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+}
+.gv__voteCard {
+  cursor: pointer;
+}
+.gv__voteCard:hover {
+  background: var(--color-surface-3);
+}
+.gv__voteCard:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.gv__voteCard--go {
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.gv__voteIcon {
+  flex: none;
+  color: var(--color-accent-text);
+}
+.gv__noVote {
+  border: 1px dashed var(--color-border-strong);
+  background: transparent;
+  color: var(--color-text-muted);
+}
+.gv__voteText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--fs-small);
+}
+.gv__voteText strong {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text);
+}
+.gv__voteCard--go .gv__voteText strong {
+  color: inherit;
+}
+.gv__agenda {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gv__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 46px;
+  padding: var(--space-1) 10px;
+  border-radius: var(--radius-md);
+}
+.gv__item--now {
+  background: var(--color-selected);
+}
+.gv__badge {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+}
+.gv__badge--now {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+.gv__badge--done {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--color-accent);
+  color: var(--color-accent-text);
+}
+.gv__itemText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.gv__itemTitle {
+  font-weight: var(--fw-medium);
+}
+.gv__item--done .gv__itemTitle {
+  color: var(--color-text-muted);
+}
+.gv__itemSub {
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.gv__proto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.gv__protoNote {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.gv__protoHead {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+}
+.gv__muted {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.gv__vote {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.gv__voteHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-inline-start: calc(-1 * var(--space-2));
+}
+.gv__voteTitles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.gv__voteTitle {
+  font-weight: var(--fw-semibold);
+}
+.gv__voteWhere {
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}

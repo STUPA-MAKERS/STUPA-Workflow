@@ -908,6 +908,8 @@ export interface VoteConfig {
   quorum?: Quorum | null;
   abstainCountsQuorum?: boolean;
   secret?: boolean;
+  /** Admitted guests of a public meeting vote too: no quorum, majority of the cast votes. */
+  guestsVote?: boolean;
 }
 
 /**
@@ -943,6 +945,10 @@ export interface Tally {
   /** Why a closed vote failed: `quorum` or `majority`. `null` while open, on a pass and
    *  on a tie. */
   failedReason?: 'quorum' | 'majority' | null;
+  /** The present members and the admitted guests: live while open, fixed at the close.
+   *  `null` for a vote that closed before public meetings existed. */
+  presentMembers?: number | null;
+  presentGuests?: number | null;
 }
 
 /**
@@ -982,6 +988,8 @@ export interface Vote {
   tally: Tally;
   /** The own ballot of the caller. Only `GET /votes/{id}` sets it. */
   myBallot?: MyBallot | null;
+  /** Admitted guests vote too: no quorum, the majority of the cast votes decides. */
+  guestsVote?: boolean;
   /** The caller cast the ballot of a delegator in this vote. Only `GET /votes/{id}`
    *  sets it. */
   representedCast?: boolean;
@@ -1102,6 +1110,11 @@ export interface MeetingVoteOutWire {
   myBallot?: MyBallot | null;
   /** The caller cast the ballot of a delegator in this vote. */
   representedCast?: boolean;
+  /** Admitted guests vote too (public meeting): no quorum. */
+  guestsVote?: boolean;
+  /** Present members and admitted guests (live while open, fixed at the close). */
+  presentMembers?: number | null;
+  presentGuests?: number | null;
 }
 
 /** `MeetingOut`. Meeting state and votes. GET /meetings/{id}. */
@@ -1169,6 +1182,16 @@ export interface MeetingOutWire {
   keeperPeriods?: KeeperPeriod[];
   /** The handover planned for the next agenda item. */
   plannedHandover?: KeeperPeriod | null;
+  /** Public participation over a QR code is on. */
+  publicJoin?: boolean;
+  /** Admitted guests vote (`vote`) or only follow the meeting (`watch`). */
+  guestsMode?: GuestsMode;
+  /** The join code (`7KQ4MP`); the server sends it to the meeting lead only. */
+  joinCode?: string | null;
+  /** The guests admitted now. */
+  admittedGuests?: number;
+  /** The open join requests; the meeting lead only, else 0. */
+  pendingGuests?: number;
 }
 
 /** `ProtocolOut`. Meeting protocol. POST /meetings/{id}/protocol, PATCH /protocols/{id}. */
@@ -1197,6 +1220,9 @@ export interface MeetingCreateBody {
   endTime?: string | null;
   /** Assigned protokollant, optional. The person must be a member of the gremium. */
   protokollantId?: Uuid | null;
+  /** Public participation over a QR code. */
+  publicJoin?: boolean;
+  guestsMode?: GuestsMode;
 }
 
 /** Body for `PATCH /meetings/{id}`. Status, active application, date or protokollant. */
@@ -1213,6 +1239,10 @@ export interface MeetingPatchBody {
   endTime?: string | null;
   /** (Re)assign the protokollant. */
   protokollantId?: Uuid | null;
+  /** Public participation on or off. Off voids the requests and ends the guests. */
+  publicJoin?: boolean;
+  /** Guests vote or only follow. `watch` gives 409 `guest_vote_open` while a guest vote runs. */
+  guestsMode?: GuestsMode;
 }
 
 /** Body for `PATCH /protocols/{id}`. It updates the markdown. */
@@ -1267,6 +1297,11 @@ export interface MeetingVote {
   /** The real open time, and the real end time (close or cancel). */
   openedAt?: IsoDateTime | null;
   closedAt?: IsoDateTime | null;
+  /** Admitted guests vote too: no quorum, majority of the cast votes. */
+  guestsVote?: boolean;
+  /** Present members and admitted guests ("19 Mitglieder + 7 Gäste anwesend"). */
+  presentMembers?: number | null;
+  presentGuests?: number | null;
 }
 
 /** The agenda item the room handles now, as `MeetingOut.currentAgendaItem` sends it. */
@@ -1326,6 +1361,16 @@ export interface Meeting {
   keeperPeriods: KeeperPeriod[];
   /** The handover planned for the next agenda item, or `null`. */
   plannedHandover: KeeperPeriod | null;
+  /** Public participation over a QR code is on. */
+  publicJoin: boolean;
+  /** Admitted guests vote or only follow the meeting. */
+  guestsMode: GuestsMode;
+  /** The join code, for the meeting lead only (`null` for everybody else). */
+  joinCode: string | null;
+  /** The guests admitted now. */
+  admittedGuests: number;
+  /** The open join requests (meeting lead only, else 0). */
+  pendingGuests: number;
 }
 
 /** Direction of the meeting timeline relative to *now*. */
@@ -1441,4 +1486,111 @@ export interface SearchResults {
   truncated: boolean;
   /** Sources that errored. The search degrades rather than returning nothing. */
   failed: string[];
+}
+
+// Public meeting with QR code (#17).
+
+/** Admitted guests vote (`vote`) or only follow the meeting (`watch`). */
+export type GuestsMode = 'vote' | 'watch';
+
+/** The state of a join request or of a guest. */
+export type GuestStatus = 'pending' | 'admitted' | 'rejected' | 'removed' | 'left';
+
+/** `MeetingGuest`: one join request or guest, for the meeting lead. */
+export interface MeetingGuest {
+  id: Uuid;
+  /** The pseudonym number ("Gast 3"), 1-based per meeting. */
+  number: number;
+  /** `null` once pseudonymized (left, withdrawn, protocol final): show "Gast {number}". */
+  displayName: string | null;
+  /** `expired` comes only with a `guest_updated` event: the row is gone (a voided request). */
+  status: GuestStatus | 'expired';
+  requestedAt: IsoDateTime;
+  decidedAt: IsoDateTime | null;
+  decidedByName: string | null;
+  admittedAt: IsoDateTime | null;
+}
+
+/** The QR matrix without a quiet zone: `size` rows of `size` characters `0`/`1`. */
+export interface QrMatrix {
+  size: number;
+  rows: string[];
+}
+
+/** `JoinLink`: the join code, the absolute join URL and its QR matrix. */
+export interface JoinLink {
+  joinCode: string;
+  joinUrl: string;
+  qr: QrMatrix;
+}
+
+/** `PublicMeetingHead`: what the join page shows before the admission. */
+export interface PublicMeetingHead {
+  code: string;
+  title: string;
+  gremiumName: string | null;
+  date: string | null;
+  startTime: string | null;
+  status: MeetingStatus;
+  startedAt: IsoDateTime | null;
+  guestsMode: GuestsMode;
+}
+
+/** One agenda item of the guest view. A non-public item carries its title, never a body. */
+export interface GuestAgendaItem {
+  id: Uuid;
+  position: number;
+  title: string | null;
+  kind: 'application' | 'freetext';
+  nonPublic: boolean;
+  body: string | null;
+}
+
+/** One vote of a public item, as an admitted guest sees it. */
+export interface GuestVote {
+  id: Uuid;
+  agendaItemId: Uuid | null;
+  question: string | null;
+  options: string[];
+  status: 'open' | 'closed';
+  secret: boolean;
+  majorityRule: MajorityRule;
+  guestsVote: boolean;
+  quorum: Quorum | null;
+  openedAt: IsoDateTime | null;
+  closedAt: IsoDateTime | null;
+  result: VoteResult | null;
+  failedReason: 'quorum' | 'majority' | null;
+  tally: {
+    counts: Record<string, number>;
+    voted: number;
+    present: number;
+    revealed: boolean;
+    leading: string | null;
+    presentMembers: number | null;
+    presentGuests: number | null;
+  };
+  myBallot: { cast: boolean; choice: string | null };
+  canCast: boolean;
+}
+
+/** The participant view of an admitted guest. */
+export interface GuestView {
+  currentAgendaItemId: Uuid | null;
+  presentMembers: number;
+  admittedGuests: number;
+  agenda: GuestAgendaItem[];
+  votes: GuestVote[];
+}
+
+/** `GuestMe`: the own request or participation of this device. */
+export interface GuestMe {
+  guestId: Uuid;
+  number: number;
+  displayName: string | null;
+  status: GuestStatus;
+  /** Seconds until a new request is possible (rejected, removed), else `null`. */
+  retryAfter: number | null;
+  meeting: PublicMeetingHead;
+  view: GuestView | null;
 }

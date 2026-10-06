@@ -30,32 +30,67 @@
 
     <span class="bm__fill" aria-hidden="true"></span>
 
-    @if (v.status === 'open') {
-      <p class="bm__foot">
-        <app-status-text kind="accent">{{ 'meetings.voteStatus.open' | t }}</app-status-text>
-        <span class="bm__sep" aria-hidden="true">·</span>
-        <span>{{ tx.rules }}</span>
-        @if (tx.quorumWarning; as warn) {
-          <span class="bm__sep" aria-hidden="true">·</span>
-          <span class="bm__warn">{{ warn }}</span>
+    <div class="bm__bottom">
+      <div class="bm__bottomText">
+        @if (v.status === 'open') {
+          <p class="bm__foot">
+            <app-status-text kind="accent">{{ 'meetings.voteStatus.open' | t }}</app-status-text>
+            <span class="bm__sep" aria-hidden="true">·</span>
+            <span>{{ tx.rules }}</span>
+            @if (tx.quorumWarning; as warn) {
+              <span class="bm__sep" aria-hidden="true">·</span>
+              <span class="bm__warn">{{ warn }}</span>
+            }
+          </p>
+        } @else {
+          <p class="bm__outcome" role="status" [class.bm__outcome--stack]="!!tx.composition">
+            <span class="bm__result" [class.bm__result--passed]="tx.passed">
+              <app-icon [name]="tx.passed ? 'check' : 'x'" [size]="30" />
+              {{ (tx.passed ? 'vote.result.passed' : 'vote.result.rejected') | t }}
+            </span>
+            <span class="bm__note">{{ tx.outcome }}</span>
+          </p>
         }
-      </p>
-    } @else {
-      <p class="bm__outcome" role="status">
-        <span class="bm__result" [class.bm__result--passed]="tx.passed">
-          <app-icon [name]="tx.passed ? 'check' : 'x'" [size]="30" />
-          {{ (tx.passed ? 'vote.result.passed' : 'vote.result.rejected') | t }}
-        </span>
-        <span class="bm__note">{{ tx.outcome }}</span>
-      </p>
-    }
-  } @else {
-    <div class="bm__idle" role="status">
-      @if (topLine(); as top) {
-        <p class="bm__cap">{{ 'beamer.now' | t }}</p>
-        <h1 class="bm__nowTop">{{ top }}</h1>
+        @if (tx.composition; as comp) {
+          <p class="bm__comp">{{ comp }}</p>
+        }
+      </div>
+      @if (join(); as j) {
+        <!-- The code stays as a corner badge, so late guests can still join. -->
+        <div class="bm__badge">
+          <app-qr-code class="bm__badgeQr" [qr]="j.qr" [label]="qrLabel(j)" />
+          <span class="bm__badgeText">
+            <strong>{{ 'guests.beamer.join' | t }}</strong>
+            <span class="mono">{{ formatCode(j.code) }}</span>
+          </span>
+        </div>
       }
-      <p class="bm__idleText">{{ 'beamer.idle' | t }}</p>
+    </div>
+  } @else {
+    <div class="bm__idleWrap" [class.bm__idleWrap--join]="!!join()">
+      <div class="bm__idle" role="status">
+        @if (topLine(); as top) {
+          <p class="bm__cap">{{ 'beamer.now' | t }}</p>
+          <h1 class="bm__nowTop">{{ top }}</h1>
+        }
+        <p class="bm__idleText">{{ 'beamer.idle' | t }}</p>
+        @if (presence(); as p) {
+          <p class="bm__presence">
+            <app-icon name="users" [size]="26" />
+            {{ 'guests.beamer.presence' | t: { n: p.members + p.guests, members: p.members, guests: p.guests } }}
+          </p>
+        }
+      </div>
+      @if (join(); as j) {
+        <aside class="bm__join" [attr.aria-label]="'guests.qr.title' | t">
+          <div class="bm__joinQr">
+            <app-qr-code [qr]="j.qr" [label]="qrLabel(j)" />
+          </div>
+          <p class="bm__joinScan">{{ 'guests.qr.scan' | t }}</p>
+          <p class="bm__joinUrl mono">{{ shortUrl(j) }}</p>
+          <p class="bm__joinHint">{{ 'guests.beamer.hint' | t }}</p>
+        </aside>
+      }
     </div>
   }
 </section>

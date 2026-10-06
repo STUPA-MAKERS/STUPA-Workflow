@@ -126,7 +126,8 @@ async def test_header_lists_every_keeper_period() -> None:
 
 async def test_header_falls_back_to_the_assigned_protokollant() -> None:
     session = _AttendanceSession([])
-    session.scalar_results = ["Frau Schmidt"]
+    # The guest count of #17 comes first (no guests), then the protokollant.
+    session.scalar_results = [0, "Frau Schmidt"]
     header = await _service(session)._header_meta(_meeting(protokollant_id=uuid4()))
     assert header.keepers == []
     assert header.protokollant == "Frau Schmidt"

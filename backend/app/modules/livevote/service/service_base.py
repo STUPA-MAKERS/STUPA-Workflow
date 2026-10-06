@@ -10,14 +10,14 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.livevote.agenda_service import agenda_order, title_of
 from app.modules.livevote.keepers import KeeperSummary
-from app.modules.livevote.models import Meeting, MeetingAgendaItem
+from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingGuest
 from app.modules.livevote.schemas import CurrentAgendaItemOut, MeetingOut, MeetingVoteOut
 from app.modules.protocol.models import Protocol
 from app.shared.errors import NotFoundError
@@ -29,6 +29,8 @@ if TYPE_CHECKING:
 
 # Per meeting: the number of agenda items and the current item (A2).
 AgendaSummary = tuple[int, CurrentAgendaItemOut | None]
+# Per meeting: the admitted and the pending guests (#17).
+GuestCounts = tuple[int, int]
 
 
 class MeetingServiceBase:
@@ -54,6 +56,7 @@ class MeetingServiceBase:
         votes: list[MeetingVoteOut] | None = None,
         agenda: AgendaSummary = (0, None),
         keepers: KeeperSummary | None = None,
+        guests: GuestCounts = (0, 0),
     ) -> MeetingOut:
         periods, planned = keepers if keepers is not None else ([], None)
         return MeetingOut(
@@ -88,7 +91,34 @@ class MeetingServiceBase:
             votes=votes or [],
             keeperPeriods=periods,
             plannedHandover=planned,
+            # `getattr`: a read model of an older caller may lack the #17 columns.
+            publicJoin=bool(getattr(meeting, "public_join", False)),
+            guestsMode=getattr(meeting, "guests_mode", None) or "vote",
+            # The join code and the open requests go to the meeting lead only (#17).
+            joinCode=getattr(meeting, "join_code", None) if can_manage else None,
+            admittedGuests=guests[0],
+            pendingGuests=guests[1] if can_manage else 0,
         )
+
+    async def _guest_counts(self, meeting_ids: Sequence[UUID]) -> dict[UUID, GuestCounts]:
+        """Count the admitted and the pending guests of each meeting (#17), batched."""
+        if not meeting_ids:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(MeetingGuest.meeting_id, MeetingGuest.status, func.count())
+                .where(
+                    MeetingGuest.meeting_id.in_(list(meeting_ids)),
+                    MeetingGuest.status.in_(("admitted", "pending")),
+                )
+                .group_by(MeetingGuest.meeting_id, MeetingGuest.status)
+            )
+        ).all()
+        out: dict[UUID, GuestCounts] = {}
+        for meeting_id, status, n in rows:
+            admitted, pending = out.get(meeting_id, (0, 0))
+            out[meeting_id] = (n, pending) if status == "admitted" else (admitted, n)
+        return out
 
     async def _agenda_summaries(self, meetings: Sequence[Meeting]) -> dict[UUID, AgendaSummary]:
         """Count the agenda items of each meeting and describe its current item (A2).

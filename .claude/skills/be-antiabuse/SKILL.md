@@ -35,4 +35,6 @@ description: ALTCHA proof-of-work captcha + sliding-window rate-limiting + body-
 - **Client IP** comes from `request.client.host` (uvicorn `--proxy-headers` behind the trusted edge nginx). Do **not** parse `X-Forwarded-For` yourself. The body-cap is defense in depth only. The real size limit is the nginx `client_max_body_size`, because chunked requests carry no `Content-Length`.
 - **The app caches providers lazily on `app.state`** (`_antiabuse_redis`, `_rate_limiter`, `_altcha_verifier`) and builds them from the injected `Settings`. In tests, replace them through `dependency_overrides` or with the `InMemory*`/`Null*` implementations.
 
+- **Public meeting (#17):** `rate_limit_public_join` (`public-join:ip:<ip>` and `public-join:code:<code>`, `rl_public_join_ip_per_hour` 120, `rl_public_join_code_per_hour` 400), `rate_limit_public_read` (`public-meeting:ip:<ip>`, 3000), `rate_limit_public_guest_write` (`public-guest:<sha256(token)[:24]>`, 120). The limits per IP are generous because the guests share the campus NAT; ALTCHA guards the join. The default write limit skips `/api/public/meetings/`.
+
 **Related:** be-auth, be-applications, be-files, conventions

@@ -43,6 +43,14 @@ class PermissionOps(MeetingServiceBase):
             return True
         return gremium_id in await gremium_ids_for(self.session, principal, "session.manage")
 
+    async def meeting_gremium_id(self, meeting_id: UUID) -> UUID:
+        """Return the gremium of a meeting.
+
+        Raises:
+            NotFoundError: The meeting does not exist.
+        """
+        return (await self._get(meeting_id)).gremium_id
+
     async def _is_protokollant(self, meeting: Meeting, principal: Principal) -> bool:
         if meeting.protokollant_id is None:
             return False
@@ -271,6 +279,7 @@ class PermissionOps(MeetingServiceBase):
         gremium_name = await self._gremium_name_for(meeting.gremium_id)
         agenda = (await self._agenda_summaries([meeting]))[meeting.id]
         keepers = (await keeper_summaries(self.session, [meeting.id]))[meeting.id]
+        guests = (await self._guest_counts([meeting.id])).get(meeting.id, (0, 0))
         if principal is None:
             return self._to_out(
                 meeting,
@@ -280,6 +289,7 @@ class PermissionOps(MeetingServiceBase):
                 votes=votes,
                 agenda=agenda,
                 keepers=keepers,
+                guests=guests,
             )
         return self._to_out(
             meeting,
@@ -295,4 +305,5 @@ class PermissionOps(MeetingServiceBase):
             votes=votes,
             agenda=agenda,
             keepers=keepers,
+            guests=guests,
         )

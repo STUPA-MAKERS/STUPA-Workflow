@@ -315,10 +315,27 @@ def build_protocol_document(doc: ProtocolDoc) -> str:
     return "\n".join(out).rstrip() + "\n"
 
 
+def guest_vote_note(
+    present_members: int | None, present_guests: int | None, cast: int
+) -> str:
+    """Describe the base of a vote with guests (#17), as counts and never as names.
+
+    Such a vote has no quorum; the majority of the cast ballots decides. The line
+    names the attendance when the close fixed it.
+    """
+    parts: list[str] = []
+    if present_members is not None and present_guests is not None:
+        parts.append(f"{present_members} Mitglieder + {present_guests} Gäste anwesend")
+    parts.append(f"Abgegeben {cast}")
+    parts.append("Mehrheit der abgegebenen Stimmen")
+    return " · ".join(parts)
+
+
 def build_vote_snippet(
     title: str,
     counts: dict[str, int] | None,
     question: str | None = None,
+    note: str | None = None,
 ) -> str:
     """Render a vote as a protocol callout (`> [!abstimmung]`).
 
@@ -335,6 +352,9 @@ def build_vote_snippet(
         # (yes/no/abstain). The ballot options carry exactly these keys.
         tally = ", ".join(f"{_md_escape(opt)}: {n}" for opt, n in counts.items())
         lines.append(f"> {tally}")
+    if note:
+        # A plain body line of the callout: the renderer keeps it below the tally box.
+        lines.append(f"> {_md_escape(note)}")
     return "\n".join(lines)
 
 

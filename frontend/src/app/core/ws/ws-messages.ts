@@ -1,5 +1,8 @@
 /** Live-vote WebSocket protocol. */
 
+import type { GuestStatus, GuestsMode, MeetingGuest } from '../api/models';
+
+
 export interface MeetingStateMsg {
   type: 'meeting_state';
   activeApplicationId: string | null;
@@ -35,6 +38,10 @@ export interface VoteTallyMsg {
   cast?: number;
   present?: number;
   revealed?: boolean;
+  /** Public meeting: the present members and the admitted guests, and whether guests vote. */
+  presentMembers?: number | null;
+  presentGuests?: number | null;
+  guestsVote?: boolean;
 }
 export interface VoteClosedMsg {
   type: 'vote_closed';
@@ -59,7 +66,39 @@ export interface ViewersMsg {
   viewers: string[];
 }
 
+/** Lead only: a new join request. */
+export interface GuestRequestedMsg {
+  type: 'guest_requested';
+  guest: MeetingGuest;
+}
+/** Lead only: a request or a guest changed; status `expired` means the row is gone. */
+export interface GuestUpdatedMsg {
+  type: 'guest_updated';
+  guest: MeetingGuest;
+}
+/** The public participation of the meeting changed. Members get no code and no pending count. */
+export interface GuestCountsMsg {
+  type: 'guest_counts';
+  publicJoin?: boolean;
+  guestsMode?: GuestsMode;
+  joinCode?: string | null;
+  admittedGuests: number;
+  pendingGuests?: number;
+}
+/** Guest channel: the own status. After a final status the server closes the socket. */
+export interface GuestStatusMsg {
+  type: 'guest_status';
+  status: GuestStatus | 'expired';
+  displayName: string | null;
+  number: number;
+  reason: 'public_off' | 'meeting_closed' | 'rotated' | null;
+}
+
 export type ServerMessage =
+  | GuestRequestedMsg
+  | GuestUpdatedMsg
+  | GuestCountsMsg
+  | GuestStatusMsg
   | MeetingStateMsg
   | VoteOpenedMsg
   | VoteTallyMsg

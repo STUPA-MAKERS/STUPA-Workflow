@@ -113,7 +113,12 @@ from app.modules.delegations.models import (
     SubstituteGroupMember,
 )
 from app.modules.forms.models import FormVersion
-from app.modules.livevote.models import Meeting, MeetingAttendance, ProtocolKeeperPeriod
+from app.modules.livevote.models import (
+    Meeting,
+    MeetingAttendance,
+    MeetingGuest,
+    ProtocolKeeperPeriod,
+)
 from app.modules.notifications.models import NotificationPreference
 from app.modules.privacy.models import ErasureRequest
 from app.modules.protocol.models import Protocol
@@ -196,6 +201,8 @@ ID_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("delegations", MeetingDelegation.delegate_principal_id),
     ("meetings", Meeting.protokollant_id),
     ("meetings", ProtocolKeeperPeriod.principal_id),
+    # #17: the meeting lead who decided on a join request of a guest.
+    ("meetings", MeetingGuest.decided_by),
     # Never written so far, but it holds a principal id.
     ("config", FormVersion.created_by),
 )

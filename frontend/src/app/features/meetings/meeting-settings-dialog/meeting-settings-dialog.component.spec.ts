@@ -173,4 +173,79 @@ describe('MeetingSettingsDialogComponent', () => {
     cmp.save();
     http.verify();
   });
+
+  describe('public participation (#17)', () => {
+    const LINK = { joinCode: '7KQ4MP', joinUrl: 'https://x.example/j/7KQ4MP', qr: { size: 1, rows: ['1'] } };
+    const LIVE = {
+      ...MEETING,
+      status: 'live',
+      canManage: true,
+      publicJoin: true,
+      guestsMode: 'vote',
+      pendingGuests: 2,
+      admittedGuests: 5,
+    } as unknown as Meeting;
+
+    it('offers the switch only to the lead and sends only the changed fields', async () => {
+      const { http, fixture, cmp } = await setup({ ...MEETING, canManage: true, publicJoin: false, guestsMode: 'vote' } as unknown as Meeting);
+      flushRoster(http, fixture);
+      await userEvent.click(screen.getByRole('switch', { name: /Öffentliche Teilnahme/ }));
+      await userEvent.click(screen.getByRole('radio', { name: /Gäste schauen nur zu/ }));
+      expect(cmp.confirmOff()).toBe(false);
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      const req = http.expectOne('/api/meetings/m-1');
+      expect(req.request.body).toEqual(expect.objectContaining({ publicJoin: true, guestsMode: 'watch' }));
+    });
+
+    it('loads the link, rotates it and asks before the switch goes off in a live meeting', async () => {
+      const { http, fixture, cmp, toasts } = await setup(LIVE);
+      http.expectOne('/api/meetings/m-1/join-link').flush(LINK);
+      flushRoster(http, fixture);
+      expect(screen.getByText(LINK.joinUrl)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: /Neuen Link erzeugen/ }));
+      await userEvent.click(screen.getAllByRole('button', { name: /Neuen Link erzeugen/ })[0]);
+      http.expectOne('/api/meetings/m-1/join-code/rotate').flush({ ...LINK, joinCode: '9XH2TR' });
+      expect(toasts()).toContain('Neuer Beitrittslink erzeugt. Der alte gilt nicht mehr.');
+      cmp.rotate();
+      http
+        .expectOne('/api/meetings/m-1/join-code/rotate')
+        .flush({ code: 'meeting_closed', detail: 'zu' }, { status: 409, statusText: 'Conflict' });
+      expect(toasts()).toContain('Aktion fehlgeschlagen.: zu');
+
+      await userEvent.click(screen.getByRole('switch', { name: /Öffentliche Teilnahme/ }));
+      const confirm = screen.getByRole('dialog', { name: 'Öffentliche Teilnahme ausschalten?' });
+      expect(confirm).toHaveTextContent('2 offene Anfragen verfallen und 5 zugelassene Gäste');
+      await userEvent.click(within(confirm).getAllByRole('button', { name: 'Abbrechen' }).at(-1)!);
+      expect(cmp.publicJoin()).toBe(true);
+      await userEvent.click(screen.getByRole('switch', { name: /Öffentliche Teilnahme/ }));
+      await userEvent.click(screen.getByRole('button', { name: 'Ausschalten' }));
+      expect(cmp.publicJoin()).toBe(false);
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      const req = http.expectOne('/api/meetings/m-1');
+      expect(req.request.body).toEqual(expect.objectContaining({ publicJoin: false }));
+      req.flush({ code: 'guest_vote_open' }, { status: 409, statusText: 'Conflict' });
+      expect(toasts()).toContain(
+        'Eine Abstimmung mit Gästen ist offen. Schließe sie, bevor Gäste nur noch zuschauen.',
+      );
+    });
+
+    it('ignores a second rotation and a late link of another meeting', async () => {
+      const { http, fixture, cmp } = await setup(LIVE);
+      const linkReq = http.expectOne('/api/meetings/m-1/join-link');
+      flushRoster(http, fixture);
+      fixture.componentRef.setInput('meeting', null);
+      fixture.detectChanges();
+      linkReq.flush(LINK);
+      expect(cmp.link()).toBeNull();
+      cmp.rotate();
+      http.expectNone('/api/meetings/m-1/join-code/rotate');
+      fixture.componentRef.setInput('meeting', LIVE);
+      fixture.detectChanges();
+      http.expectOne('/api/meetings/m-1/join-link').error(new ProgressEvent('x'));
+      flushRoster(http, fixture);
+      cmp.rotate();
+      cmp.rotate();
+      expect(http.match('/api/meetings/m-1/join-code/rotate')).toHaveLength(1);
+    });
+  });
 });

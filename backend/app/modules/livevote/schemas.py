@@ -15,6 +15,8 @@ from app.shared.config_schemas import Quorum
 from app.shared.i18n import I18nMap
 
 MeetingStatus = Literal["planned", "live", "closed"]
+# #17: admitted guests of a public meeting vote (`vote`) or only follow it (`watch`).
+GuestsMode = Literal["vote", "watch"]
 
 
 class _CamelModel(BaseModel):
@@ -37,6 +39,9 @@ class MeetingCreate(_CamelModel):
     end_time: _time | None = Field(default=None, alias="endTime")
     # The protokollant must be a member of the Gremium.
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
+    # #17: public participation with the QR code, and what the admitted guests do.
+    public_join: bool = Field(default=False, alias="publicJoin")
+    guests_mode: GuestsMode = Field(default="vote", alias="guestsMode")
 
     @model_validator(mode="after")
     def _end_after_start(self) -> MeetingCreate:
@@ -60,6 +65,10 @@ class MeetingPatch(_CamelModel):
     start_time: _time | None = Field(default=None, alias="startTime")
     end_time: _time | None = Field(default=None, alias="endTime")
     protokollant_id: UUID | None = Field(default=None, alias="protokollantId")
+    # #17: public participation and the guest mode. Both need ``canManage``. Switching
+    # ``publicJoin`` off voids the open requests and removes the admitted guests.
+    public_join: bool | None = Field(default=None, alias="publicJoin")
+    guests_mode: GuestsMode | None = Field(default=None, alias="guestsMode")
 
     @model_validator(mode="after")
     def _at_least_one(self) -> MeetingPatch:
@@ -70,10 +79,17 @@ class MeetingPatch(_CamelModel):
             "protokollant_id",
             "current_agenda_item_id",
         } & self.model_fields_set
-        if self.status is None and self.active_application_id is None and not managed:
+        public = self.public_join is not None or self.guests_mode is not None
+        if (
+            self.status is None
+            and self.active_application_id is None
+            and not managed
+            and not public
+        ):
             raise ValueError(
                 "at least one of 'status', 'activeApplicationId', 'currentAgendaItemId', "
-                "'date', 'startTime', 'endTime' or 'protokollantId' required"
+                "'date', 'startTime', 'endTime', 'protokollantId', 'publicJoin' or "
+                "'guestsMode' required"
             )
         return self
 
@@ -124,6 +140,12 @@ class MeetingVoteOut(_CamelModel):
     my_ballot: MyBallot | None = Field(default=None, alias="myBallot")
     # True when the caller cast the ballot of a delegator in this vote.
     represented_cast: bool = Field(default=False, alias="representedCast")
+    # #17: the admitted guests vote too (no quorum, majority of the cast ballots).
+    guests_vote: bool = Field(default=False, alias="guestsVote")
+    # #17: the present members and the admitted guests, live while the vote runs and
+    # fixed at the close. For a vote with guests ``present`` is their sum.
+    present_members: int | None = Field(default=None, alias="presentMembers")
+    present_guests: int | None = Field(default=None, alias="presentGuests")
 
 
 class CurrentAgendaItemOut(_CamelModel):
@@ -217,6 +239,13 @@ class MeetingOut(_CamelModel):
     # and the planned handover of the next agenda item.
     keeper_periods: list[KeeperPeriodOut] = Field(default_factory=list, alias="keeperPeriods")
     planned_handover: KeeperPeriodOut | None = Field(default=None, alias="plannedHandover")
+    # #17: public participation with the QR code. ``joinCode`` goes only to a caller
+    # with ``canManage``, ``pendingGuests`` too (0 for everybody else).
+    public_join: bool = Field(default=False, alias="publicJoin")
+    guests_mode: GuestsMode = Field(default="vote", alias="guestsMode")
+    join_code: str | None = Field(default=None, alias="joinCode")
+    admitted_guests: int = Field(default=0, alias="admittedGuests")
+    pending_guests: int = Field(default=0, alias="pendingGuests")
 
 
 TimelineDirection = Literal["past", "upcoming"]
@@ -395,6 +424,9 @@ class MeetingVoteOpenBody(_CamelModel):
     quorum_percent: int | None = Field(
         default=None, alias="quorumPercent", ge=0, le=100
     )
+    # #17: the admitted guests vote too. ``None`` picks the default: on in a meeting
+    # where guests vote, on a public agenda item; else off. Such a vote has no quorum.
+    guests_vote: bool | None = Field(default=None, alias="guestsVote")
 
     @model_validator(mode="after")
     def _min_options(self) -> MeetingVoteOpenBody:
@@ -437,3 +469,67 @@ class AgendaReorderBody(_CamelModel):
     """``PUT …/agenda/order`` — order the agenda items as supplied."""
 
     item_ids: list[UUID] = Field(alias="itemIds")
+
+
+# Public meeting with a QR code (#17)
+GuestStatus = Literal["pending", "admitted", "rejected", "removed", "left"]
+# A guest name: trimmed, 2 to 80 characters. No check for duplicates (decision #17).
+GUEST_NAME_MIN = 2
+GUEST_NAME_MAX = 80
+
+
+def clean_guest_name(value: str) -> str:
+    """Trim a guest name and check its length (2 to 80 characters)."""
+    name = " ".join(value.split())
+    if not GUEST_NAME_MIN <= len(name) <= GUEST_NAME_MAX:
+        raise ValueError(
+            f"displayName must have {GUEST_NAME_MIN} to {GUEST_NAME_MAX} characters"
+        )
+    return name
+
+
+class GuestNameBody(_CamelModel):
+    """``…/rename`` and ``PATCH /public/meetings/{code}/me`` — set the guest name."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    display_name: str = Field(alias="displayName", max_length=400)
+
+    @model_validator(mode="after")
+    def _clean(self) -> GuestNameBody:
+        self.display_name = clean_guest_name(self.display_name)
+        return self
+
+
+class MeetingGuestOut(_CamelModel):
+    """A guest of a public meeting, as the meeting lead sees it.
+
+    ``displayName`` is ``None`` after the pseudonymization; the client then shows
+    "Gast {number}".
+    """
+
+    id: UUID
+    number: int
+    display_name: str | None = Field(default=None, alias="displayName")
+    # ``expired`` appears only in a ``guest_updated`` event: the row is gone (a voided
+    # request).
+    status: Literal["pending", "admitted", "rejected", "removed", "left", "expired"]
+    requested_at: _datetime = Field(alias="requestedAt")
+    decided_at: _datetime | None = Field(default=None, alias="decidedAt")
+    decided_by_name: str | None = Field(default=None, alias="decidedByName")
+    admitted_at: _datetime | None = Field(default=None, alias="admittedAt")
+
+
+class QrMatrixOut(_CamelModel):
+    """A QR code as a module matrix without the quiet zone (rows of ``0``/``1``)."""
+
+    size: int
+    rows: list[str]
+
+
+class JoinLinkOut(_CamelModel):
+    """The join link of a public meeting: code, absolute URL and its QR code."""
+
+    join_code: str = Field(alias="joinCode")
+    join_url: str = Field(alias="joinUrl")
+    qr: QrMatrixOut

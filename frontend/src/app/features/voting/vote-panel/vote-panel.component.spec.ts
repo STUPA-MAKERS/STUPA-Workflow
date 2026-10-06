@@ -256,4 +256,43 @@ describe('VotePanelComponent', () => {
     fixture.detectChanges();
     expect(screen.getByText('Abgebrochen')).toBeInTheDocument();
   });
+
+  describe('a vote with guests (#17)', () => {
+    it('names the majority of the cast votes and sums the closed result up without a quorum', async () => {
+      await setup({
+        vote: vote({
+          guestsVote: true,
+          status: 'closed',
+          result: 'passed',
+          tally: { counts: { yes: 17, no: 4, abstain: 3 }, eligible: 26, voted: 24, present: 26, revealed: true, quorumMet: true, leading: 'yes', presentMembers: 19, presentGuests: 7 },
+        }),
+        own: null,
+      });
+      expect(screen.getByText(/Einfache Mehrheit der abgegebenen Stimmen/)).toBeInTheDocument();
+      expect(
+        screen.getByText('19 Mitglieder + 7 Gäste anwesend · Abgegeben 24 · Mehrheit der abgegebenen Stimmen'),
+      ).toBeInTheDocument();
+    });
+
+    it('leaves the room out while its counts are unknown', async () => {
+      await setup({
+        vote: vote({
+          config: { options: ['yes', 'no', 'abstain'], majorityRule: 'simple', guestsVote: true },
+          status: 'closed',
+          result: 'rejected',
+          tally: { counts: { yes: 1, no: 2 }, eligible: 0, quorumMet: true, leading: 'no', presentMembers: 19, presentGuests: null },
+        }),
+        own: null,
+      });
+      expect(screen.getByText('Abgegeben 3 · Mehrheit der abgegebenen Stimmen')).toBeInTheDocument();
+    });
+
+    it('ignores a missing member count', async () => {
+      await setup({
+        vote: vote({ guestsVote: true, status: 'closed', result: 'passed', tally: { counts: { yes: 1 }, eligible: 0, voted: 1, quorumMet: true, leading: 'yes' } }),
+        own: null,
+      });
+      expect(screen.getByText('Abgegeben 1 · Mehrheit der abgegebenen Stimmen')).toBeInTheDocument();
+    });
+  });
 });

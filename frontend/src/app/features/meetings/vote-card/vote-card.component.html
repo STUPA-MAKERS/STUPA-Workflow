@@ -14,6 +14,15 @@
     <p class="vc__fail">{{ 'vote.failedQuorum' | t }}</p>
   }
 
+  @if (composition(); as comp) {
+    @if (v.status === 'open') {
+      <p class="vc__comp">
+        <app-icon name="users" [size]="16" />
+        <span>{{ comp }}</span>
+      </p>
+    }
+  }
+
   @if (v.status === 'open') {
     <div class="vc__progress">
       <div class="vc__progressLine">
@@ -22,7 +31,12 @@
       </div>
       <app-seg-bar size="fat" [segments]="[{ value: v.voted, tone: 'filled' }]" [total]="v.present" [label]="progressLabel()" />
       @if (!showCounts()) {
-        <p class="vc__hint">{{ hiddenKey() | t }}</p>
+        <p class="vc__hint">
+          {{ hiddenKey() | t }}
+          @if (v.guestsVote) {
+            {{ 'guests.vote.lateHint' | t }}
+          }
+        </p>
       }
     </div>
   }
@@ -51,6 +65,25 @@
       <app-button variant="fill" [block]="true" (click)="close.emit(v.id)">{{ 'meetings.vote.close' | t }}</app-button>
       <app-button variant="danger" [block]="true" (click)="cancel.emit(v.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
     </div>
+  }
+
+  @if (guestResult(); as gr) {
+    <dl class="vc__counts vc__sum" [attr.aria-label]="'guests.vote.resultCaption' | t">
+      @if (composition(); as comp) {
+        <div class="vc__count">
+          <dt>{{ comp }}</dt>
+          <dd class="mono">{{ gr.present }}</dd>
+        </div>
+      }
+      <div class="vc__count">
+        <dt>{{ 'guests.vote.cast' | t }}</dt>
+        <dd class="mono">{{ gr.cast }}</dd>
+      </div>
+      <div class="vc__count">
+        <dt>{{ 'guests.vote.majorityOfCast' | t }}</dt>
+        <dd [class.vc__ok]="gr.passed">{{ (gr.passed ? 'guests.vote.reached' : 'guests.vote.notReached') | t }}</dd>
+      </div>
+    </dl>
   }
 
   @if (v.status === 'draft' && canEdit() && meetingStatus() === 'live') {

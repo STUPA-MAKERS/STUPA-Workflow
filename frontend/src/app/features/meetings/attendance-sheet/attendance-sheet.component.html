@@ -9,6 +9,13 @@
   @if (open()) {
     <div class="as">
       <div class="as__top">
+        @if (guestSummary(); as gs) {
+          <p class="as__total">
+            <strong class="num">{{ gs.total }}</strong> {{ 'guests.sheet.present' | t }}
+            <strong class="num">{{ gs.members }}</strong> {{ 'guests.sheet.members' | t }} +
+            <strong class="num">{{ gs.guests }}</strong> {{ 'guests.sheet.guests' | t }}
+          </p>
+        }
         <p class="as__counts">
           @for (c of counts(); track c.key) {
             <span><strong class="num">{{ c.n }}</strong> {{ c.key | t }}</span>
@@ -28,6 +35,25 @@
       </div>
 
       <div class="as__scroll" appScrollFade="y">
+        @if (guestsActive()) {
+          <div class="as__guests">
+            @if (guests!.joinLink(); as link) {
+              <app-join-link variant="sheet" [link]="link" (showLarge)="showQr.emit()" />
+            }
+            <app-guest-requests [meeting]="m" />
+            <app-segmented
+              class="as__tabs"
+              width="fill"
+              [ariaLabel]="'meetings.attendance.title' | t"
+              [options]="tabs()"
+              [value]="tab()"
+              (valueChange)="setTab($event)"
+            />
+          </div>
+        }
+        @if (guestsActive() && tab() === 'guests') {
+          <app-guest-list [meeting]="m" [query]="query()" />
+        } @else {
         <ul class="as__rows rowgroup rowgroup--bg3">
           @for (row of rows(); track row.a.principalId) {
             <li class="as__row" [class.as__row--conflict]="row.conflict">
@@ -114,6 +140,7 @@
             <li class="as__empty">{{ (query() ? 'meetings.dock.noMember' : 'meetings.attendance.empty') | t }}</li>
           }
         </ul>
+        }
 
         @if (meetingDelegations().length) {
           <section class="as__sec" [attr.aria-label]="'meetings.attendanceSheet.delegationsTitle' | t">

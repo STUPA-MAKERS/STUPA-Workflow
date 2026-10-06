@@ -61,6 +61,14 @@ from app.shared.paging import DEFAULT_LIMIT, Page
 
 # The problem code of a second cast (REST 409 and the live-vote error frame).
 ALREADY_VOTED = "already_voted"
+# The voter key of a guest of a public meeting (#17): ``guest:<meeting_guest.id>``. A
+# guest is not a principal, so the key never collides with an OIDC ``sub``.
+GUEST_VOTER_PREFIX = "guest:"
+
+
+def guest_voter_sub(guest_id: UUID) -> str:
+    """Return the ``voter_sub`` of a guest ballot (#17)."""
+    return f"{GUEST_VOTER_PREFIX}{guest_id}"
 
 
 def open_tally_revealed(present: int, voted: int, expected: int) -> bool:
@@ -362,6 +370,23 @@ class VotingService:
             )
         ) or 0
 
+    async def _admitted_guest_count(self, vote: Vote) -> int:
+        """Count the admitted guests of the meeting of the vote (#17), or 0 without one."""
+        if vote.meeting_id is None:
+            return 0
+        from app.modules.livevote.models import MeetingGuest
+
+        return (
+            await self.session.scalar(
+                select(func.count())
+                .select_from(MeetingGuest)
+                .where(
+                    MeetingGuest.meeting_id == vote.meeting_id,
+                    MeetingGuest.status == "admitted",
+                )
+            )
+        ) or 0
+
     async def _absent_delegated_count(self, vote: Vote) -> int:
         """Count the active vote delegations whose delegator is NOT present.
 
@@ -412,25 +437,37 @@ class VotingService:
         have voted. An open non-secret vote without a meeting stays visible, because
         there is no notion of 'present'. When the tally is hidden, only ``voted`` and
         ``present`` travel.
+
+        A vote with guests (#17) counts the admitted guests as present too: they are
+        expected ballots. ``presentMembers`` and ``presentGuests`` give the attendance
+        of a meeting vote, live while it runs and fixed after the close.
         """
         voted = sum(counts.values())
         outcome = tally_mod.result(config, counts, eligible)
+        members: int | None = None
+        guests: int | None = None
         # Query the present denominator only when it changes the reveal decision, that
         # is for an open vote with a meeting. A closed vote or a vote without a meeting
         # needs no query.
         if vote.status == "closed":
             present, revealed = 0, True
-        elif config.secret:
-            present = await self._present_count(vote)
-            revealed = False
+            members = getattr(vote, "present_members", None)
+            guests = getattr(vote, "present_guests", None)
         elif vote.meeting_id is None:
-            present, revealed = 0, True
+            # A secret vote never reveals a running tally, with or without a meeting.
+            present, revealed = 0, not config.secret
         else:
-            present = await self._present_count(vote)
-            # The expected votes are the present members plus the represented votes of
-            # absent delegators. Without them the interim count leaks too early.
-            expected = present + await self._absent_delegated_count(vote)
-            revealed = open_tally_revealed(present, voted, expected)
+            members = await self._present_count(vote)
+            guests = await self._admitted_guest_count(vote)
+            present = members + guests if config.guests_vote else members
+            if config.secret:
+                revealed = False
+            else:
+                # The expected votes are the present members (and guests) plus the
+                # represented votes of absent delegators. Without them the interim
+                # count leaks too early.
+                expected = present + await self._absent_delegated_count(vote)
+                revealed = open_tally_revealed(present, voted, expected)
         return TallyOut(
             counts=counts if revealed else {},
             eligible=eligible,
@@ -440,6 +477,8 @@ class VotingService:
             quorumMet=outcome.quorum_met,
             leading=outcome.leading if revealed else None,
             result=None,
+            presentMembers=members,
+            presentGuests=guests,
         )
 
     def _to_out(self, vote: Vote, config: VoteConfig, tally_out: TallyOut) -> VoteOut:
@@ -461,6 +500,7 @@ class VotingService:
             openedAt=vote.opens_at,
             closedAt=vote.closed_at,
             tally=tally_out,
+            guestsVote=config.guests_vote,
         )
 
     async def create(
@@ -495,6 +535,13 @@ class VotingService:
         """
         from app.modules.admin.gremium_roles import admin_bypass
 
+        if payload.config.guests_vote:
+            # Only a meeting vote of a public meeting has guests (#17).
+            raise ValidationProblem(
+                "Only a vote of a public meeting can include guests.",
+                code="guests_vote_unavailable",
+                errors=[{"field": "config.guestsVote", "msg": "not a public meeting vote"}],
+            )
         gremium_id = payload.eligible_group
         if not await self._gremium_exists(gremium_id):
             raise ValidationProblem(
@@ -731,6 +778,57 @@ class VotingService:
                 target_id=str(vote.id),
                 data={"eligibleGroup": vote.eligible_group},
             )
+        if config.secret:
+            return await self._cast_secret(vote.id, voter_sub, choice)
+        return await self._cast_open(vote.id, voter_sub, choice)
+
+    async def cast_guest(
+        self, vote_id: UUID, guest_id: UUID, choice: str, *, now: datetime
+    ) -> BallotAccepted:
+        """Cast the ballot of an admitted guest of a public meeting (#17).
+
+        This is the second, separate eligibility path of ``cast``. A guest is not a
+        principal: no ``vote.cast``, no gremium role and no delegation. The caller (the
+        public guest service) checks that the guest is admitted, that the meeting lets
+        guests vote, and that the vote belongs to a public agenda item of the meeting
+        of the guest. This method checks the vote itself: open, in its window, and
+        ``guestsVote``. The ballot runs under ``guest:<id>``. The same rules as for a
+        member apply: one ballot, never changed after the cast (O11), and a secret
+        vote keeps the identity (``voted_marker``) apart from the choice
+        (``secret_ballot``). The audit entry ``vote_cast`` names the guest id as the
+        actor and carries no choice.
+
+        Raises:
+            ConflictError: 409 - the vote is not open, or the guest already voted.
+            ForbiddenError: 403 - the vote is for members only (``vote_members_only``).
+            ValidationProblem: 422 - the choice is not a configured option.
+        """
+        vote = await self._get_vote(vote_id, for_update=True)
+        if vote.status != "open":
+            raise ConflictError("vote is not open.", code="conflict")
+        if vote.closes_at is not None and now >= vote.closes_at:
+            raise ConflictError("voting window has closed.", code="conflict")
+        config = self._config(vote)
+        if not config.guests_vote:
+            raise ForbiddenError(
+                "Only the members vote in this ballot.", code="vote_members_only"
+            )
+        if choice not in config.options:
+            raise ValidationProblem(
+                "Unknown vote option.",
+                errors=[{"field": "choice", "msg": "not in vote options"}],
+            )
+        voter_sub = guest_voter_sub(guest_id)
+        # Ids only, never the choice: a secret vote must not link a choice to the
+        # guest, and the chain is append-only.
+        await audit_record(
+            self.session,
+            actor=voter_sub,
+            action=AuditAction.VOTE_CAST,
+            target_type="vote",
+            target_id=str(vote.id),
+            data=self._audit_refs(vote),
+        )
         if config.secret:
             return await self._cast_secret(vote.id, voter_sub, choice)
         return await self._cast_open(vote.id, voter_sub, choice)
@@ -1303,6 +1401,19 @@ class VotingService:
         )
         closed_at = now or datetime.now(UTC)
 
+        # #17: fix the attendance of a meeting vote at the close. For a vote with
+        # guests the number of eligible voters is the present members plus the admitted
+        # guests at this moment: a guest admitted while the vote ran voted too. It is a
+        # display value only, because such a vote has no quorum.
+        if vote.meeting_id is not None:
+            members = await self._present_count(vote)
+            guests = await self._admitted_guest_count(vote)
+            vote.present_members = members
+            vote.present_guests = guests
+            if config.guests_vote:
+                eligible = members + guests
+                vote.eligible_count = eligible
+
         # Stage the vote state. The commit at the end writes it together with the
         # transition, or alone when the branch is blocked.
         vote.status = "closed"
@@ -1357,6 +1468,8 @@ class VotingService:
             leading=outcome.leading,
             result=result_value,
             failedReason=tally_mod.failed_reason(result_value, outcome.quorum_met),
+            presentMembers=getattr(vote, "present_members", None),
+            presentGuests=getattr(vote, "present_guests", None),
         )
         return VoteClosed(
             id=vote.id,

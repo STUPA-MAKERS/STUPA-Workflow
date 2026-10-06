@@ -137,4 +137,66 @@ describe('MeetingBeamerComponent', () => {
     });
     expect(screen.getByText('Zweidrittelmehrheit nicht erreicht · 9 Stimmen')).toBeInTheDocument();
   });
+
+  describe('public meeting (#17)', () => {
+    const JOIN = { code: '7KQ4MP', url: 'https://workflow.example/j/7KQ4MP', qr: { size: 1, rows: ['1'] } };
+
+    it('shares the idle screen with a large QR card and counts the room, never names', async () => {
+      const { fixture } = await render(MeetingBeamerComponent, {
+        inputs: {
+          logoSrc: 'x.svg',
+          meetingTitle: '7. Sitzung',
+          topLine: 'TOP 3 · Zuschuss',
+          vote: null,
+          join: JOIN,
+          presence: { members: 19, guests: 7 },
+        },
+      });
+      expect(screen.getByRole('complementary', { name: 'QR-Code zum Beitreten' })).toHaveTextContent('Mit dem Handy scannen');
+      expect(screen.getByText('workflow.example/j/7KQ4MP')).toBeInTheDocument();
+      expect(screen.getByText(/26 Anwesende · 19 Mitglieder \+ 7 Gäste/)).toBeInTheDocument();
+      fixture.destroy();
+    });
+
+    it('keeps the code as a corner badge in a vote with guests, without quorum', async () => {
+      await render(MeetingBeamerComponent, {
+        inputs: {
+          logoSrc: 'x.svg',
+          vote: vote({ guestsVote: true, quorum: null, presentMembers: 19, presentGuests: 7, present: 26 }),
+          join: JOIN,
+        },
+      });
+      expect(screen.getByText('Mit dem Handy beitreten')).toBeInTheDocument();
+      expect(screen.getByText('7KQ-4MP')).toBeInTheDocument();
+      expect(screen.getByText(/Mehrheit der abgegebenen Stimmen/)).toBeInTheDocument();
+      expect(screen.getByText('19 Mitglieder + 7 Gäste anwesend')).toBeInTheDocument();
+    });
+
+    it('names the cast votes and the room in the result of a vote with guests', async () => {
+      await render(MeetingBeamerComponent, {
+        inputs: {
+          logoSrc: 'x.svg',
+          vote: vote({
+            status: 'closed',
+            guestsVote: true,
+            quorum: null,
+            result: 'passed',
+            voted: 24,
+            counts: { yes: 17, no: 4, abstain: 3 },
+            presentMembers: 19,
+            presentGuests: 7,
+          }),
+        },
+      });
+      expect(screen.getByText('Abgegeben 24 · Mehrheit der abgegebenen Stimmen')).toBeInTheDocument();
+      expect(screen.getByText('19 Mitglieder + 7 Gäste anwesend')).toBeInTheDocument();
+    });
+
+    it('leaves the composition out while the counts are unknown', async () => {
+      await render(MeetingBeamerComponent, {
+        inputs: { logoSrc: 'x.svg', vote: vote({ status: 'closed', guestsVote: true, quorum: null, result: 'rejected', presentMembers: null }) },
+      });
+      expect(screen.queryByText(/Gäste anwesend/)).toBeNull();
+    });
+  });
 });

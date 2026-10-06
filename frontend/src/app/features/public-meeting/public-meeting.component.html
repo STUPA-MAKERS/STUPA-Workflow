@@ -1,0 +1,201 @@
+@let st = state();
+@let h = head();
+<header class="pm__bar">
+  <img class="pm__logo" [src]="logoSrc()" alt="" />
+  <span class="sr-only">{{ 'guests.page.routeTitle' | t }}</span>
+  <span class="pm__spacer"></span>
+  @if (guest.me() && (st === 'pending' || st === 'admitted')) {
+    <span class="pm__me">
+      <app-avatar [name]="ownName()" size="sm" [decorative]="true" />
+      <span class="pm__meText">
+        <strong class="ell">{{ ownName() }}</strong>
+        <span>{{ 'guests.tag' | t }}</span>
+      </span>
+      <app-row-menu [sections]="menu()" [label]="'guests.page.menu' | t" (selected)="onMenu($event.id)" />
+    </span>
+  } @else {
+    <label class="pm__lang" [title]="'lang.switch' | t">
+      <app-icon name="globe" [size]="20" />
+      <select
+        class="pm__langSelect"
+        [attr.aria-label]="'lang.switch' | t"
+        (change)="setLocale($any($event.target).value)"
+      >
+        @for (loc of i18nSvc.locales; track loc) {
+          <option [value]="loc" [selected]="loc === i18nSvc.locale()">{{ loc.toUpperCase() }}</option>
+        }
+      </select>
+    </label>
+  }
+</header>
+<div class="pm">
+  @switch (st) {
+    @case ('loading') {
+      <div class="pm__loading" aria-busy="true">
+        <span class="skel skel--line"></span>
+        <span class="skel skel--line"></span>
+        <span class="sr-only" role="status">{{ 'meetings.loading' | t }}</span>
+      </div>
+    }
+    @case ('unknown') {
+      <div class="pm__center">
+        <span class="pm__stateIcon pm__stateIcon--muted"><app-icon name="linkslash" [size]="38" /></span>
+        <h1 class="pm__h1">{{ 'guests.page.unknownTitle' | t }}</h1>
+        <p class="pm__lead">{{ 'guests.page.unknownText' | t }}</p>
+        <form class="pm__codeForm" (submit)="$event.preventDefault(); goToCode()">
+          <app-input
+            name="code"
+            [id]="'pm-code'"
+            [label]="'guests.page.codeLabel' | t"
+            [ngModel]="typedCode()"
+            (ngModelChange)="typedCode.set($event)"
+          />
+          <app-button variant="fill" type="submit" (click)="goToCode()">{{ 'guests.page.codeGo' | t }}</app-button>
+        </form>
+      </div>
+    }
+    @case ('error') {
+      <div class="pm__center" role="alert">
+        <span class="pm__stateIcon pm__stateIcon--muted"><app-icon name="alert" [size]="38" /></span>
+        <h1 class="pm__h1">{{ 'guests.page.errorTitle' | t }}</h1>
+        <app-button variant="tonal" (click)="guest.load(guest.code())">{{ 'guests.page.reload' | t }}</app-button>
+      </div>
+    }
+    @case ('notPublic') {
+      <div class="pm__center" role="status">
+        <span class="pm__stateIcon pm__stateIcon--muted"><app-icon name="lock" [size]="38" /></span>
+        <h1 class="pm__h1">{{ 'guests.page.notPublicTitle' | t }}</h1>
+        <p class="pm__lead">{{ 'guests.page.notPublicText' | t }}</p>
+        <p class="pm__login">{{ 'guests.join.member' | t }} <button type="button" class="pm__link" (click)="login()">{{ 'guests.join.login' | t }}</button></p>
+      </div>
+    }
+    @case ('closed') {
+      <div class="pm__center" role="status">
+        <span class="pm__stateIcon pm__stateIcon--muted"><app-icon name="check" [size]="38" /></span>
+        <h1 class="pm__h1">{{ 'guests.page.closedTitle' | t }}</h1>
+        <p class="pm__lead">{{ 'guests.page.closedText' | t }}</p>
+        @if (h) {
+          <ng-container *ngTemplateOutlet="meetingCard" />
+        }
+      </div>
+    }
+    @case ('join') {
+      @if (h) {
+        <div class="pm__head">
+          <span class="pm__eyebrow cap">{{ 'guests.page.eyebrow' | t }}</span>
+          <h1 class="pm__title">{{ h.title }}</h1>
+          <span class="pm__meta">
+            @if (status(); as s) {
+              <app-status-text [kind]="s.kind">{{ s.key | t }}</app-status-text>
+            }
+            @if (metaLine()) {
+              <span class="pm__sep" aria-hidden="true">·</span><span>{{ metaLine() }}</span>
+            }
+          </span>
+        </div>
+        <p class="pm__intro">{{ introKey() | t }}</p>
+        <form class="pm__form" (submit)="$event.preventDefault(); join()">
+          <app-input
+            name="displayName"
+            [id]="'pm-name'"
+            [label]="'guests.join.name' | t"
+            [required]="true"
+            [ngModel]="name()"
+            (ngModelChange)="name.set($event)"
+          />
+          <p class="pm__hint">{{ 'guests.join.nameHint' | t }}</p>
+          @if (joinErrorKey(); as e) {
+            <app-note kind="error" icon="alert" role="alert">{{ e | t }}</app-note>
+          }
+          <app-button variant="fill" size="lg" [block]="true" [loading]="guest.joining()" [disabled]="!nameValid()" (click)="join()">
+            <app-icon name="arrow" [size]="18" />
+            {{ 'guests.join.submit' | t }}
+          </app-button>
+          <button type="submit" hidden></button>
+        </form>
+        <p class="pm__login">{{ 'guests.join.member' | t }} <button type="button" class="pm__link" (click)="login()">{{ 'guests.join.login' | t }}</button></p>
+        <app-note icon="lock">{{ 'guests.join.privacy' | t }}</app-note>
+      }
+    }
+    @case ('pending') {
+      <div class="pm__center">
+        <span class="pm__stateIcon pm__stateIcon--wait"><app-icon name="clock" [size]="38" /></span>
+        <div class="pm__stateText" role="status">
+          <h1 class="pm__h1">{{ 'guests.page.waitTitle' | t }}</h1>
+          <p class="pm__lead">{{ 'guests.page.waitText' | t: { name: ownName() } }}</p>
+        </div>
+        <ng-container *ngTemplateOutlet="meetingCard" />
+        @if (renaming()) {
+          <form class="pm__form pm__form--inline" (submit)="$event.preventDefault(); saveRename()">
+            <app-input
+              name="rename"
+              [id]="'pm-rename'"
+              [label]="'guests.join.name' | t"
+              [ngModel]="name()"
+              (ngModelChange)="name.set($event)"
+            />
+            <div class="pm__row">
+              <app-button variant="text" (click)="renaming.set(false)">{{ 'action.cancel' | t }}</app-button>
+              <app-button variant="fill" [loading]="guest.saving()" [disabled]="!nameValid()" (click)="saveRename()">{{ 'action.save' | t }}</app-button>
+            </div>
+          </form>
+        } @else {
+          <div class="pm__row">
+            <app-button variant="outlined" (click)="renaming.set(true)">
+              <app-icon name="edit" [size]="16" />
+              {{ 'guests.page.rename' | t }}
+            </app-button>
+            <app-button variant="text" class="pm__danger" [loading]="guest.saving()" (click)="guest.leave()">{{ 'guests.page.withdraw' | t }}</app-button>
+          </div>
+        }
+      </div>
+    }
+    @case ('rejected') {
+      <ng-container *ngTemplateOutlet="refused; context: { title: 'guests.page.rejectedTitle', text: 'guests.page.rejectedText' }" />
+    }
+    @case ('removed') {
+      <ng-container *ngTemplateOutlet="refused; context: { title: 'guests.page.removedTitle', text: 'guests.page.removedText' }" />
+    }
+    @case ('admitted') {
+      <app-guest-view [me]="guest.me()!" [code]="guest.code()" [admittedDuringVote]="guest.admittedDuringVote()" (changed)="guest.refresh()" />
+    }
+  }
+</div>
+
+<app-site-footer class="pm__footer" />
+
+<ng-template #meetingCard>
+  @if (h) {
+    <div class="pm__card">
+      <span class="pm__cardMeta">
+        @if (status(); as s) {
+          <app-status-text [kind]="s.kind">{{ s.key | t }}</app-status-text>
+        }
+        @if (metaLine()) {
+          <span class="pm__sep" aria-hidden="true">·</span><span>{{ metaLine() }}</span>
+        }
+      </span>
+      <strong class="pm__cardTitle">{{ h.title }}</strong>
+    </div>
+  }
+</ng-template>
+
+<ng-template #refused let-title="title" let-text="text">
+  <div class="pm__center">
+    <span class="pm__stateIcon pm__stateIcon--error"><app-icon name="x" [size]="38" /></span>
+    <div class="pm__stateText" role="status">
+      <h1 class="pm__h1">{{ title | t }}</h1>
+      <p class="pm__lead">{{ text | t: { name: ownName() } }}</p>
+    </div>
+    <ng-container *ngTemplateOutlet="meetingCard" />
+    <div class="pm__retry">
+      <app-button variant="tonal" [disabled]="waitSeconds() > 0" [loading]="guest.joining()" (click)="retry()">
+        <app-icon name="repeat" [size]="16" />
+        {{ 'guests.page.retry' | t }}
+      </app-button>
+      @if (waitSeconds() > 0) {
+        <p class="pm__hint">{{ retryLine() }}</p>
+      }
+    </div>
+  </div>
+</ng-template>

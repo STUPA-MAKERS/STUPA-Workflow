@@ -1,0 +1,63 @@
+:host {
+  display: block;
+}
+.jl {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-3);
+}
+.jl--sheet {
+  align-items: center;
+}
+.jl__qr {
+  flex: none;
+  width: 76px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.jl--sheet .jl__qr {
+  width: 48px;
+}
+.jl__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.jl__cap {
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.jl__title {
+  font-weight: var(--fw-semibold);
+}
+/* A URL is never cut: it wraps anywhere and stays selectable (UI rule). */
+.jl__url {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  user-select: all;
+  color: var(--color-accent-text);
+  font-size: var(--fs-small);
+  text-decoration: none;
+}
+.jl__url:hover {
+  text-decoration: underline;
+}
+.jl__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin-left: calc(-1 * var(--space-3));
+}
+.jl__confirm {
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-small);
+  color: var(--color-text);
+}
+.jl__large {
+  flex: none;
+}

@@ -384,4 +384,18 @@ describe('SessionDockComponent', () => {
       expect(screen.queryByRole('dialog')).toBeNull();
     });
   });
+
+  describe('public meeting (#17)', () => {
+    it('counts the guests on the attendance chip and badges the open requests', async () => {
+      const { fixture } = await setup({ meeting: meeting({ publicJoin: true, admittedGuests: 7, pendingGuests: 3 }) });
+      const chip = screen.getByRole('button', { name: /Anwesend/ });
+      expect(chip).toHaveTextContent(/Anwesend \d+ \+ 7 Gäste/);
+      expect(within(chip).getByLabelText('3 offene Beitrittsanfragen')).toHaveTextContent('3');
+      fixture.componentRef.setInput('meeting', meeting({ publicJoin: false, admittedGuests: 2, pendingGuests: 4, status: 'closed' }));
+      fixture.detectChanges();
+      const closedChip = screen.getByRole('button', { name: /Anwesend/ });
+      expect(closedChip).toHaveTextContent(/\+ 2 Gäste/);
+      expect(within(closedChip).queryByLabelText(/offene Beitrittsanfragen/)).toBeNull();
+    });
+  });
 });

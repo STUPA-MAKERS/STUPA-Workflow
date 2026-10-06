@@ -686,4 +686,19 @@ describe('MeetingPageComponent', () => {
       Object.defineProperty(globalThis, 'ResizeObserver', { writable: true, value: original });
     }
   });
+
+  describe('public meeting (#17)', () => {
+    it('offers the QR code in the phone menu and shows it from the attendance sheet', async () => {
+      const { fixture } = await setup({ meeting: meeting({ publicJoin: true }) }, [MEDIA.phone]);
+      const menu = await openMenu();
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'QR-Code zum Beitreten' }));
+      const page = fixture.componentInstance;
+      expect(page.qrOpen()).toBe(true);
+      page.qrOpen.set(false);
+      page.panel.set('attendance');
+      page.showQr();
+      expect(page.panel()).toBe('none');
+      expect(page.qrOpen()).toBe(true);
+    });
+  });
 });

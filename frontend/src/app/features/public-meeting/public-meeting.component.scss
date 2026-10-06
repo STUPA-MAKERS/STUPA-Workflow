@@ -1,0 +1,230 @@
+/* A bare page (route data `chrome: false`): its own bar, one column, the footer at the
+   bottom. On a wide screen the same column in the middle. */
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--color-bg);
+}
+.pm__bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 64px;
+  padding: 0 6px 0 18px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-1);
+}
+.pm__logo {
+  display: block;
+  height: 30px;
+  width: auto;
+}
+.pm__spacer {
+  flex: 1 1 auto;
+}
+/* The globe opens the native language picker; the select covers the icon button. */
+.pm__lang {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--color-text-muted);
+}
+.pm__lang:hover {
+  background: var(--color-surface-3);
+}
+.pm__lang app-icon {
+  pointer-events: none;
+}
+.pm__langSelect {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.pm__lang:focus-within {
+  outline: 2px solid var(--color-focus-ring);
+}
+.pm__footer {
+  margin-top: auto;
+}
+.pm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-4) var(--space-6);
+}
+.pm__me {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.pm__meText {
+  display: flex;
+  flex: 0 1 auto;
+  max-width: 12rem;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.pm__meText strong {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text);
+}
+.pm__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.pm__eyebrow {
+  color: var(--color-accent-text);
+}
+.pm__title {
+  margin: 0;
+  font-size: 1.5625rem;
+  line-height: 2rem;
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+.pm__meta,
+.pm__cardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 6px;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.pm__sep {
+  color: var(--color-text-subtle);
+}
+.pm__intro,
+.pm__lead {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.pm__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+}
+.pm__form--inline {
+  align-self: stretch;
+  text-align: start;
+}
+.pm__hint {
+  margin: -4px var(--space-1) 0;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.pm__login {
+  margin: 0;
+  text-align: center;
+}
+.pm__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.pm__link:hover {
+  text-decoration: underline;
+}
+.pm__link:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.pm__center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  padding-top: var(--space-6);
+  text-align: center;
+}
+.pm__stateText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.pm__h1 {
+  margin: 0;
+  font-size: 1.4375rem;
+  line-height: 1.875rem;
+  font-weight: var(--fw-semibold);
+}
+.pm__stateIcon {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+}
+.pm__stateIcon--wait {
+  background: var(--color-selected);
+  color: var(--color-accent-text);
+  box-shadow: 0 0 0 12px color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+.pm__stateIcon--error {
+  background: color-mix(in srgb, var(--color-danger) 16%, var(--color-surface-2));
+  color: var(--color-danger);
+}
+.pm__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-self: stretch;
+  padding: 14px var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  text-align: start;
+}
+.pm__cardTitle {
+  font-weight: var(--fw-semibold);
+}
+.pm__row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.pm__danger {
+  color: var(--color-danger);
+}
+.pm__retry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+.pm__codeForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-self: stretch;
+  margin: 0;
+}
+.pm__loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}

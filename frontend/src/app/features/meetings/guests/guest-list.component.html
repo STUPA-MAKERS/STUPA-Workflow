@@ -1,0 +1,58 @@
+<ul class="g__rows rowgroup rowgroup--bg3">
+  @for (row of rows(); track row.g.id) {
+    <li class="g__row" [class.g__row--gone]="row.g.status !== 'admitted'">
+      <div class="g__who">
+        <app-avatar [name]="row.name" size="sm" [decorative]="true" />
+        <div class="g__names">
+          <span class="g__nameLine">
+            <span class="g__name ell" [title]="row.name">{{ row.name }}</span>
+            <span class="g__tag">{{ 'guests.tag' | t }}</span>
+          </span>
+          <span class="g__sub ell" [title]="row.sub">{{ row.sub }}</span>
+        </div>
+      </div>
+      <div class="g__ctl">
+        <app-status-text [kind]="row.status.kind">{{ row.status.key | t }}</app-status-text>
+        @if (row.menu.length) {
+          <app-row-menu [sections]="row.menu" [label]="'guests.list.menu' | t: { name: row.name }" (selected)="onMenu(row, $event.id)" />
+        } @else {
+          <span class="g__menuGap" aria-hidden="true"></span>
+        }
+      </div>
+    </li>
+  } @empty {
+    <li class="g__empty">{{ (query() ? 'meetings.dock.noMember' : 'guests.list.empty') | t }}</li>
+  }
+</ul>
+
+<app-dialog
+  [open]="renaming() !== null"
+  [title]="'guests.list.renameTitle' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="renaming.set(null)"
+>
+  <form class="g__form" (submit)="$event.preventDefault(); saveRename()">
+    <app-input
+      name="guestName"
+      [id]="'guest-rename'"
+      [label]="'guests.join.name' | t"
+      [required]="true"
+      [ngModel]="renameDraft()"
+      (ngModelChange)="renameDraft.set($event)"
+    />
+    <button type="submit" hidden></button>
+  </form>
+  <app-button dialog-footer variant="text" (click)="renaming.set(null)">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="fill" [disabled]="renameDraft().trim().length < 2" (click)="saveRename()">{{ 'action.save' | t }}</app-button>
+</app-dialog>
+
+<app-dialog
+  [open]="removing() !== null"
+  [title]="'guests.list.removeTitle' | t: { name: removing() ? nameOf(removing()!) : '' }"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="removing.set(null)"
+>
+  <p class="g__explain">{{ 'guests.list.removeHint' | t }}</p>
+  <app-button dialog-footer variant="text" (click)="removing.set(null)">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="danger" (click)="confirmRemove()">{{ 'guests.list.remove' | t }}</app-button>
+</app-dialog>

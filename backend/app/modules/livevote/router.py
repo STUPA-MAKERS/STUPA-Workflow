@@ -28,6 +28,7 @@ from app.modules.livevote.connection import (
     resolve_ws_principal,
 )
 from app.modules.livevote.events import ErrorEvent
+from app.modules.livevote.guests import GuestService
 from app.modules.livevote.locks import InMemoryLocker, Locker
 from app.modules.livevote.schemas import (
     AgendaAddBody,
@@ -38,8 +39,11 @@ from app.modules.livevote.schemas import (
     AttendanceOut,
     AttendanceSelfBody,
     AttendanceSetBody,
+    GuestNameBody,
+    JoinLinkOut,
     MeetingCreate,
     MeetingGremiumOut,
+    MeetingGuestOut,
     MeetingMemberOut,
     MeetingOut,
     MeetingPage,
@@ -166,7 +170,17 @@ async def get_ws_principal(
     return await resolve_ws_principal(websocket, session, settings)
 
 
+def get_guest_service(
+    session: DbSession,
+    broker: Annotated[MeetingBroker, Depends(get_broker_rest)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> GuestService:
+    """Guest service of the public meeting (#17) with the broker and the base URL."""
+    return GuestService(session, BrokerPublisher(broker), base_url=settings.public_base_url)
+
+
 ServiceDep = Annotated[MeetingService, Depends(get_meeting_service)]
+GuestServiceDep = Annotated[GuestService, Depends(get_guest_service)]
 AttendanceDep = Annotated[AttendanceService, Depends(get_attendance_service)]
 AgendaDep = Annotated[AgendaService, Depends(get_agenda_service)]
 VotingDep = Annotated[VotingService, Depends(get_voting_service)]
@@ -552,6 +566,26 @@ async def open_meeting_vote(
     if meeting.status != "live":
         raise ConflictError("the meeting has not started — start it before opening a vote")
     item = await agenda.item(meeting_id, payload.agenda_item_id)
+    # #17: the admitted guests vote too when the meeting lets them and the item is
+    # public. Such a vote has no quorum: only the majority of the cast ballots counts.
+    guests_allowed = meeting.public_join and meeting.guests_mode == "vote"
+    if payload.guests_vote and not guests_allowed:
+        raise ValidationProblem(
+            "Guests do not vote in this meeting.",
+            code="guests_vote_unavailable",
+            errors=[{"field": "guestsVote", "msg": "the meeting does not let guests vote"}],
+        )
+    if payload.guests_vote and item.non_public:
+        raise ValidationProblem(
+            "Guests never vote on a non-public agenda item.",
+            code="guests_vote_non_public",
+            errors=[{"field": "guestsVote", "msg": "non-public agenda item"}],
+        )
+    guests_vote = (
+        payload.guests_vote
+        if payload.guests_vote is not None
+        else guests_allowed and not item.non_public
+    )
     if item.application_id is not None:
         if await service.agenda_item_has_vote(item.id):
             raise ConflictError("this application TOP already has a decision vote")
@@ -572,19 +606,28 @@ async def open_meeting_vote(
         # A meeting vote has no casting vote (O18): a tie is ``rejected``. The body
         # has no ``tieBreak``, so the client cannot change this.
         "tieBreak": "rejected",
+        "guestsVote": guests_vote,
     }
     # Gremium quorum default: without an explicit percent, the vote inherits the
-    # percent quorum configured on the Gremium.
-    if payload.quorum_percent is not None:
-        config_data["quorum"] = {"type": "percent", "value": payload.quorum_percent}
-    else:
-        default_quorum = await service.gremium_quorum_percent(meeting.gremium_id)
-        if default_quorum is not None:
-            config_data["quorum"] = {"type": "percent", "value": default_quorum}
+    # percent quorum configured on the Gremium. A vote with guests has no quorum.
+    quorum_percent = (
+        None
+        if guests_vote
+        else payload.quorum_percent
+        if payload.quorum_percent is not None
+        else await service.gremium_quorum_percent(meeting.gremium_id)
+    )
+    if quorum_percent is not None:
+        config_data["quorum"] = {"type": "percent", "value": quorum_percent}
     config = VoteConfig.model_validate(config_data)
     # The server always derives the quorum denominator from the real roster and
     # never from the client. A holder of ``canManageVotes`` cannot manipulate it.
-    eligible = await service.vote_eligible_count(meeting.gremium_id)
+    # A vote with guests counts the present members and the admitted guests; the
+    # close fixes the number again (a display value, there is no quorum).
+    if guests_vote:
+        eligible = await service.present_member_count(meeting_id) + meeting.admitted_guests
+    else:
+        eligible = await service.vote_eligible_count(meeting.gremium_id)
     create = VoteCreateInternal(
         config=config,
         eligibleGroup=meeting.gremium_id,
@@ -763,6 +806,147 @@ async def set_agenda_body(
     return items
 
 
+# Public meeting with a QR code (#17): the routes of the meeting lead.
+async def _require_manage(service: MeetingService, meeting_id: UUID, principal: Principal) -> None:
+    """Allow only the meeting lead with ``session.manage`` in the gremium (or admin)."""
+    gremium_id = await service.meeting_gremium_id(meeting_id)
+    if not await service.can_manage(gremium_id, principal):
+        raise ForbiddenError("not allowed to manage the guests of this meeting")
+
+
+@router.get(
+    "/meetings/{meeting_id}/guests",
+    response_model=list[MeetingGuestOut],
+    responses=_errors(401, 403, 404),
+)
+async def list_meeting_guests(
+    meeting_id: UUID, service: ServiceDep, guests: GuestServiceDep, principal: ReaderDep
+) -> list[MeetingGuestOut]:
+    """List the join requests and the guests of a public meeting (#17).
+
+    The open requests come first. Only the meeting lead (``session.manage``) sees the
+    names.
+    """
+    await _require_manage(service, meeting_id, principal)
+    return await guests.list(meeting_id)
+
+
+@router.post(
+    "/meetings/{meeting_id}/guests/admit-all",
+    response_model=list[MeetingGuestOut],
+    responses=_errors(401, 403, 404, 409),
+)
+async def admit_all_meeting_guests(
+    meeting_id: UUID, service: ServiceDep, guests: GuestServiceDep, principal: ReaderDep
+) -> list[MeetingGuestOut]:
+    """Admit every waiting guest (#17). Writes ``guest_admit_all`` with the count."""
+    await _require_manage(service, meeting_id, principal)
+    return await guests.admit_all(meeting_id, actor_sub=principal.sub)
+
+
+@router.post(
+    "/meetings/{meeting_id}/guests/{guest_id}/admit",
+    response_model=MeetingGuestOut,
+    responses=_errors(401, 403, 404, 409),
+)
+async def admit_meeting_guest(
+    meeting_id: UUID,
+    guest_id: UUID,
+    service: ServiceDep,
+    guests: GuestServiceDep,
+    principal: ReaderDep,
+) -> MeetingGuestOut:
+    """Admit a waiting guest (#17). 409 ``guest_not_pending`` for any other status.
+
+    A guest admitted while a vote with guests is open votes in it too.
+    """
+    await _require_manage(service, meeting_id, principal)
+    return await guests.admit(meeting_id, guest_id, actor_sub=principal.sub)
+
+
+@router.post(
+    "/meetings/{meeting_id}/guests/{guest_id}/reject",
+    response_model=MeetingGuestOut,
+    responses=_errors(401, 403, 404, 409),
+)
+async def reject_meeting_guest(
+    meeting_id: UUID,
+    guest_id: UUID,
+    service: ServiceDep,
+    guests: GuestServiceDep,
+    principal: ReaderDep,
+) -> MeetingGuestOut:
+    """Reject a waiting guest (#17). The device may ask again after 3 minutes."""
+    await _require_manage(service, meeting_id, principal)
+    return await guests.reject(meeting_id, guest_id, actor_sub=principal.sub)
+
+
+@router.post(
+    "/meetings/{meeting_id}/guests/{guest_id}/remove",
+    response_model=MeetingGuestOut,
+    responses=_errors(401, 403, 404, 409),
+)
+async def remove_meeting_guest(
+    meeting_id: UUID,
+    guest_id: UUID,
+    service: ServiceDep,
+    guests: GuestServiceDep,
+    principal: ReaderDep,
+) -> MeetingGuestOut:
+    """Remove an admitted guest (#17). The cast ballots stay counted."""
+    await _require_manage(service, meeting_id, principal)
+    return await guests.remove(meeting_id, guest_id, actor_sub=principal.sub)
+
+
+@router.post(
+    "/meetings/{meeting_id}/guests/{guest_id}/rename",
+    response_model=MeetingGuestOut,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def rename_meeting_guest(
+    meeting_id: UUID,
+    guest_id: UUID,
+    payload: GuestNameBody,
+    service: ServiceDep,
+    guests: GuestServiceDep,
+    principal: ReaderDep,
+) -> MeetingGuestOut:
+    """Give a guest another name (#17). The audit entry holds the guest id only."""
+    await _require_manage(service, meeting_id, principal)
+    return await guests.rename(
+        meeting_id, guest_id, payload.display_name, actor_sub=principal.sub
+    )
+
+
+@router.get(
+    "/meetings/{meeting_id}/join-link",
+    response_model=JoinLinkOut,
+    responses=_errors(401, 403, 404, 409),
+)
+async def get_meeting_join_link(
+    meeting_id: UUID, service: ServiceDep, guests: GuestServiceDep, principal: ReaderDep
+) -> JoinLinkOut:
+    """Return the join link and its QR code (#17); 409 when the meeting is not public."""
+    await _require_manage(service, meeting_id, principal)
+    return await guests.join_link(meeting_id)
+
+
+@router.post(
+    "/meetings/{meeting_id}/join-code/rotate",
+    response_model=JoinLinkOut,
+    responses=_errors(401, 403, 404, 409),
+)
+async def rotate_meeting_join_code(
+    meeting_id: UUID, service: ServiceDep, guests: GuestServiceDep, principal: ReaderDep
+) -> JoinLinkOut:
+    """Replace the join code (#17). The old link stops working; open requests are void.
+
+    The admitted guests stay. Writes ``meeting_join_code_rotated``.
+    """
+    await _require_manage(service, meeting_id, principal)
+    return await guests.rotate(meeting_id, actor_sub=principal.sub)
+
+
 # WebSocket
 async def _authorize(
     websocket: WebSocket,
@@ -771,11 +955,12 @@ async def _authorize(
     meetings: MeetingService,
     *,
     beamer: bool,
-) -> Principal | None:
+) -> tuple[Principal, bool] | None:
     """Check the handshake authentication and the RBAC.
 
     Returns:
-        The principal, or ``None`` when the socket is already closed.
+        The principal and its ``canManage`` flag (#17: the guest events with names
+        reach only the meeting lead), or ``None`` when the socket is already closed.
     """
     if principal is None:
         await websocket.close(code=WS_UNAUTHENTICATED)
@@ -800,7 +985,7 @@ async def _authorize(
         await websocket.send_json(ErrorEvent(code="not_eligible").dump())
         await websocket.close(code=WS_FORBIDDEN)
         return None
-    return principal
+    return principal, meeting.can_manage
 
 
 async def _serve(
@@ -814,9 +999,10 @@ async def _serve(
     *,
     beamer: bool,
 ) -> None:
-    authorized = await _authorize(websocket, meeting_id, principal, meetings, beamer=beamer)
-    if authorized is None:
+    authorization = await _authorize(websocket, meeting_id, principal, meetings, beamer=beamer)
+    if authorization is None:
         return
+    authorized, can_manage = authorization
     # Check the connection cap per meeting and principal before the accept, so a
     # flooding client never opens a socket. Above the cap the server sends a
     # ``too_many_connections`` frame and closes with 4403, the code that the RBAC
@@ -837,6 +1023,7 @@ async def _serve(
             voting=voting,
             broker=broker,
             locker=locker,
+            can_manage=can_manage,
         ).run()
     finally:
         _release_slot(meeting_id, authorized.sub)

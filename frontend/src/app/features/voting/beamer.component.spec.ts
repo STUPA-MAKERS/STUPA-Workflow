@@ -1,3 +1,4 @@
+import { LINK } from '../../../testing/guest-fixtures';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { Subject, of, throwError } from 'rxjs';
 import { fireEvent, render, screen } from '@testing-library/angular';
@@ -84,6 +85,8 @@ async function setup(
   const api = {
     getMeeting: jest.fn(() => of(opts.meeting ?? meeting())),
     listAgenda: jest.fn(() => of(AGENDA)),
+    listAttendance: jest.fn(() => of([])),
+    getJoinLink: jest.fn(() => of(LINK)),
     getVote: jest.fn((id: string) => {
       const next = votes.length > 1 ? votes.shift()! : votes[0];
       return next ? of({ ...next, id }) : throwError(() => new Error('gone'));
@@ -385,6 +388,52 @@ describe('BeamerComponent', () => {
       await fixture.whenStable();
       expect(api.getVote).toHaveBeenCalledWith('v9', { quiet: true });
       expect(fixture.componentInstance.vote()).toBeNull();
+    });
+  });
+
+  describe('public meeting (#17)', () => {
+    it('shows the join code while idle with the room in numbers, and follows the stream', async () => {
+      const { api, push, fixture } = await setup({
+        meeting: meeting({ publicJoin: true, admittedGuests: 7, status: 'live' }),
+        votes: [],
+      });
+      api.listAttendance.mockClear();
+      expect(api.getJoinLink).toHaveBeenCalledWith('m1');
+      fixture.detectChanges();
+      expect(screen.getByText('Mit dem Handy scannen')).toBeInTheDocument();
+      expect(screen.getByText(/7 Anwesende · 0 Mitglieder \+ 7 Gäste/)).toBeInTheDocument();
+      // A new code (rotated) reads the link again; the same code does not.
+      push({ type: 'guest_counts', publicJoin: true, joinCode: LINK.joinCode, admittedGuests: 8 });
+      expect(api.getJoinLink).toHaveBeenCalledTimes(1);
+      push({ type: 'guest_counts', publicJoin: true, joinCode: '9XH2TR', admittedGuests: 8 });
+      expect(api.getJoinLink).toHaveBeenCalledTimes(2);
+      expect(screen.getByText(/8 Anwesende/)).toBeInTheDocument();
+      // Off: no code on the screen.
+      push({ type: 'guest_counts', publicJoin: false, joinCode: null, admittedGuests: 0 });
+      expect(screen.queryByText('Mit dem Handy scannen')).toBeNull();
+    });
+
+    it('reads no link for a meeting that is not public', async () => {
+      const { api } = await setup({ meeting: meeting({ publicJoin: false }), votes: [] });
+      expect(api.getJoinLink).not.toHaveBeenCalled();
+    });
+
+    it('shows no code when the link cannot load', async () => {
+      const second = await setup({ meeting: meeting({ publicJoin: true, status: 'live' }), votes: [] });
+      second.api.getJoinLink.mockReturnValue(throwError(() => new Error('x')));
+      second.push({ type: 'guest_counts', publicJoin: true, joinCode: 'NEW123', admittedGuests: 1 });
+      expect(screen.queryByText('Mit dem Handy scannen')).toBeNull();
+    });
+
+    it('passes the room of a vote with guests to the screen', async () => {
+      const { push } = await setup({
+        meeting: meeting({ publicJoin: true, status: 'live' }),
+        votes: [vote({ guestsVote: true, config: { options: ['yes', 'no', 'abstain'], majorityRule: 'simple', guestsVote: true }, tally: { counts: {}, eligible: 26, voted: 4, present: 26, revealed: false, quorumMet: true, leading: null, presentMembers: 19, presentGuests: 7 } })],
+      });
+      push(OPEN);
+      expect(await screen.findByText('19 Mitglieder + 7 Gäste anwesend')).toBeInTheDocument();
+      push({ type: 'vote_tally', voteId: 'v1', counts: {}, eligible: 27, quorumMet: true, leading: null, cast: 5, present: 27, revealed: false, presentMembers: 19, presentGuests: 8 });
+      expect(screen.getByText('19 Mitglieder + 8 Gäste anwesend')).toBeInTheDocument();
     });
   });
 });

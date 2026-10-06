@@ -72,6 +72,7 @@
         [ngModel]="keeper()"
         (ngModelChange)="keeper.set($event)"
       />
+      <app-public-join-settings [(publicJoin)]="publicJoin" [(guestsMode)]="guestsMode" [creating]="true" />
     }
     <!-- Enter in a field submits the step. -->
     <button type="submit" hidden></button>

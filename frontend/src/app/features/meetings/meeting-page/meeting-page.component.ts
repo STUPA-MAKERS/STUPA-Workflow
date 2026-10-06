@@ -50,9 +50,10 @@ import { VoteCardComponent } from '../vote-card/vote-card.component';
 import { voteSnippet, voteSnippetHead } from '../meetings.util';
 import { clockTime, voteOptionLabel } from '../meetings-display.util';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
+import { JoinQrComponent } from '../public-join/join-qr.component';
 
 /** The ids of the session menu. */
-type SessionAction = 'settings' | 'attendance' | 'beamer' | 'close' | 'delete';
+type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'delete';
 
 /**
  * The session page of the meeting lead and the minute-taker (`/meetings/:id`).
@@ -90,6 +91,7 @@ type SessionAction = 'settings' | 'attendance' | 'beamer' | 'close' | 'delete';
     TopSheetComponent,
     VoteCardComponent,
     AttendanceSheetComponent,
+    JoinQrComponent,
   ],
   templateUrl: './meeting-page.component.html',
   styleUrl: './meeting-page.component.scss',
@@ -178,6 +180,8 @@ export class MeetingPageComponent {
 
   /** The dock panel that is open: a popover above the dock, a bottom sheet on a phone. */
   readonly panel = signal<DockPanel>('none');
+  /** The large QR code of a public meeting (#17): the header popover or the phone sheet. */
+  readonly qrOpen = signal(false);
   /** The agenda sheet below the wide layout. */
   readonly agendaOpen = signal(false);
   /** The list of the people who have the meeting open. */
@@ -273,6 +277,10 @@ export class MeetingPageComponent {
     // The beamer route and its stream need session.manage in the gremium (`canManage`).
     if (!this.wide() && m.status !== 'closed' && m.canManage) {
       main.push({ id: 'beamer', label: t('meetings.beamer.enter'), icon: 'monitor' });
+    }
+    // A phone has no header button for the QR code of a public meeting.
+    if (this.phone() && m.publicJoin && m.status !== 'closed' && m.canManage) {
+      main.push({ id: 'qr', label: t('guests.qr.title'), icon: 'grid' });
     }
     const sections: RowMenuSection[] = [{ items: main }];
     const danger: RowMenuItem[] = [];
@@ -394,6 +402,12 @@ export class MeetingPageComponent {
     this.revision.update((r) => r + 1);
   }
 
+  /** "Groß zeigen" in the attendance sheet: close the sheet, show the large code. */
+  showQr(): void {
+    this.panel.set('none');
+    this.qrOpen.set(true);
+  }
+
   /** "Tagesordnung bearbeiten": the pane on a wide screen, else the agenda sheet. */
   editAgenda(): void {
     if (this.wide()) this.agendaPane()?.focus();
@@ -410,6 +424,9 @@ export class MeetingPageComponent {
         break;
       case 'beamer':
         this.toggleBeamer.emit();
+        break;
+      case 'qr':
+        this.qrOpen.set(true);
         break;
       case 'close':
         this.closeSession.emit();

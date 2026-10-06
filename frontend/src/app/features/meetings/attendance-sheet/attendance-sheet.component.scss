@@ -24,6 +24,21 @@
   font-size: var(--fs-small);
   color: var(--color-text-muted);
 }
+.as__total {
+  margin: 0 0 var(--space-1);
+  padding: 0 var(--space-2);
+  font-size: var(--fs-body);
+  color: var(--color-text);
+}
+.as__total strong {
+  font-weight: var(--fw-semibold);
+}
+.as__guests {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+}
 .as__counts strong {
   color: var(--color-text);
   font-weight: var(--fw-semibold);

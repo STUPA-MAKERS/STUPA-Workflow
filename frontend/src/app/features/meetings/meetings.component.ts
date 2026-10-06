@@ -37,6 +37,7 @@ import { MeetingDialogsService } from './meeting-dialogs.service';
 import { MeetingFollowViewComponent } from './meeting-follow-view.component';
 import { MeetingPageComponent } from './meeting-page/meeting-page.component';
 import { MeetingSessionService } from './meeting-session.service';
+import { MeetingGuestsService } from './meeting-guests.service';
 import { MeetingSettingsDialogComponent } from './meeting-settings-dialog/meeting-settings-dialog.component';
 import { MeetingsOverviewComponent } from './meetings-overview/meetings-overview.component';
 import { MeetingsTimelineService } from './meetings-timeline.service';
@@ -67,6 +68,7 @@ import { beamerUrl } from '../voting/beamer-link.util';
   providers: [
     MeetingAgendaService,
     MeetingSessionService,
+    MeetingGuestsService,
     MeetingsTimelineService,
     MeetingDialogsService,
   ],
@@ -145,6 +147,11 @@ export class MeetingsComponent {
   readonly saveState = this.agendaSvc.saveState;
   readonly selectedTop = this.agendaSvc.selectedTop;
   readonly selectedIndex = this.agendaSvc.selectedIndex;
+
+  /** The present members, for the voters line of the vote dialog. */
+  readonly presentMembers = computed(
+    () => this.attendance().filter((a) => a.status === 'present').length,
+  );
 
   /** The 1-based agenda number of the item that gets the vote. */
   readonly voteTopNumber = computed(() => {

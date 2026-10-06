@@ -692,6 +692,7 @@ async def test_votes_for_open_proxy_denominator_hides_until_proxy_votes() -> Non
             res((vrow.id, "yes"), (vrow.id, "yes")),  # open ballots: 2
             res(),  # secret ballots
             res((mid, 2)),  # present=2
+            res(),  # admitted guests (#17): none
             res((mid, gid, 1)),  # one proxy vote of an absent delegator, so expected=3
         ]
     )
@@ -3225,6 +3226,7 @@ async def test_get_with_votes_and_protocol() -> None:
             res((vrow.id, "yes")),  # open ballots
             res(),  # secret ballots
             res((mid, 1)),  # present
+            res(),  # admitted guests (#17): none
             res(),  # _ballots_of: voting delegations of the caller
             res(),  # _ballots_of: own open ballots
             res(),  # _ballots_of: own voted markers

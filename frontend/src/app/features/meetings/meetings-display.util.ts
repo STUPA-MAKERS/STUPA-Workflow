@@ -278,7 +278,9 @@ export function voteMetaLine(
 ): string {
   const parts: string[] = [];
   if (vote.majorityRule) {
-    parts.push(translate(`vote.majority.${vote.majorityRule}` as TranslationKey));
+    // A vote with guests has no quorum: the majority of the cast votes decides (#17).
+    const family = vote.guestsVote ? 'vote.majorityCast' : 'vote.majority';
+    parts.push(translate(`${family}.${vote.majorityRule}` as TranslationKey));
   }
   if (vote.secret !== undefined) {
     parts.push(translate(vote.secret ? 'meetings.vote.secretShort' : 'meetings.vote.publicShort'));
@@ -299,4 +301,19 @@ export function voteMetaLine(
     if (ended) parts.push(translate('meetings.vote.endedAt', { time: ended }));
   }
   return parts.join(' · ');
+}
+
+/**
+ * "19 Mitglieder + 7 Gäste anwesend" for a vote with guests (#17), or `null` while the
+ * counts are unknown (a vote that closed before the counts existed).
+ */
+export function guestComposition(
+  members: number | null | undefined,
+  guests: number | null | undefined,
+  translate: (key: TranslationKey, params?: Record<string, string | number>) => string,
+): string | null {
+  if (members === null || members === undefined || guests === null || guests === undefined) {
+    return null;
+  }
+  return translate('guests.vote.composition', { members, guests });
 }

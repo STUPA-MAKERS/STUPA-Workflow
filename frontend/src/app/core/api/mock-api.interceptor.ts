@@ -769,6 +769,12 @@ let MOCK_MEETING: MeetingOutWire = {
     },
   ],
   plannedHandover: null,
+  // #17: the meeting is public, guests vote; the lead sees the code and the requests.
+  publicJoin: true,
+  guestsMode: 'vote',
+  joinCode: '7KQ4MP',
+  admittedGuests: 7,
+  pendingGuests: 3,
   votes: [
     {
       id: 'a0000000-0000-0000-0000-0000000000a1',
@@ -788,7 +794,11 @@ let MOCK_MEETING: MeetingOutWire = {
       revealed: false,
       majorityRule: 'simple',
       secret: false,
-      quorum: { type: 'count', value: 8 },
+      // A vote with guests: no quorum, the majority of the cast votes.
+      quorum: null,
+      guestsVote: true,
+      presentMembers: 5,
+      presentGuests: 7,
       openedAt: '2026-06-12T16:48:00Z',
     },
     {
@@ -1413,6 +1423,10 @@ function mockDraftUpload(body: unknown): DraftAttachmentOutWire {
 const MOCK_ACCOUNT_PATH =
   /(^|\/)api\/(notifications\/preferences|oauth\/grants(\/[^/]+)?|oauth\/consent(-request)?|mcp\/(config|package))$/;
 
+/** The routes of the public meeting (#17): the guest side and the lead side. */
+const PUBLIC_MEETING_PATH =
+  /\/public\/meetings\/|\/meetings\/[^/]+\/(guests(\/[^/]+)*|join-link|join-code\/rotate)$/;
+
 function path(url: string): string {
   return url.split('?')[0];
 }
@@ -1437,6 +1451,29 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
 
   const substitutes = mockSubstitutes(req, p);
   if (substitutes) return substitutes;
+
+  // #17: the public meeting with QR code, lead and guest side. The data loads on first use.
+  if (PUBLIC_MEETING_PATH.test(p)) {
+    return from(import('./mock-public-meeting')).pipe(
+      mergeMap((m) => {
+        const reply = p.includes('/public/meetings/')
+          ? m.mockPublicMeeting(req.method, p, req.body)
+          : m.mockLeadGuests(req.method, p, req.body);
+        if (!reply) return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
+        if ('problem' in reply) {
+          return throwError(
+            () =>
+              new HttpErrorResponse({
+                status: reply.status,
+                error: { type: `app://error/${reply.problem.code}`, title: 'Error', status: reply.status, ...reply.problem },
+                url: req.url,
+              }),
+          ).pipe(delay(120));
+        }
+        return ok(reply.body, reply.status);
+      }),
+    );
+  }
 
   // The account pages and the consent page. The data loads on first use.
   if (MOCK_ACCOUNT_PATH.test(p)) {
@@ -1739,7 +1776,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       return 'id' in out ? ok(out) : out;
     }
     if (/\/meetings\/[^/]+\/votes$/.test(p)) {
-      const body = req.body as { applicationId?: string; question?: string | null } | null;
+      const body = req.body as { applicationId?: string; question?: string | null; guestsVote?: boolean | null } | null;
       MOCK_MEETING = {
         ...MOCK_MEETING,
         votes: [
@@ -1749,6 +1786,9 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
             applicationId: body?.applicationId ?? '',
             title: null,
             question: body?.question ?? null,
+            guestsVote: !!body?.guestsVote,
+            presentMembers: body?.guestsVote ? 5 : null,
+            presentGuests: body?.guestsVote ? 7 : null,
             status: 'open',
             result: null,
             counts: null,
@@ -1870,7 +1910,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'PATCH' && /\/meetings\/[^/]+$/.test(p)) {
-    const body = (req.body as { status?: MeetingOutWire['status']; activeApplicationId?: string; currentAgendaItemId?: string | null; date?: string | null; startTime?: string | null; endTime?: string | null; protokollantId?: string | null } | null) ?? {};
+    const body = (req.body as { status?: MeetingOutWire['status']; activeApplicationId?: string; currentAgendaItemId?: string | null; date?: string | null; startTime?: string | null; endTime?: string | null; protokollantId?: string | null; publicJoin?: boolean; guestsMode?: 'vote' | 'watch' } | null) ?? {};
     if (body.currentAgendaItemId !== undefined) {
       mockStartPlannedHandover(MOCK_MEETING.currentAgendaItemId, body.currentAgendaItemId);
     }
@@ -1899,6 +1939,9 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
           ? body.protokollantId === MOCK_PRINCIPAL.sub
           : MOCK_MEETING.isProtokollant,
       closedAt: body.status === 'closed' ? new Date().toISOString() : MOCK_MEETING.closedAt,
+      publicJoin: body.publicJoin ?? MOCK_MEETING.publicJoin,
+      guestsMode: body.guestsMode ?? MOCK_MEETING.guestsMode,
+      joinCode: body.publicJoin === true && !MOCK_MEETING.joinCode ? '7KQ4MP' : MOCK_MEETING.joinCode,
     };
     return ok(MOCK_MEETING);
   }

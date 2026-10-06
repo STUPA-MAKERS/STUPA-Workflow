@@ -1,0 +1,37 @@
+<section class="pj" [attr.aria-label]="'guests.settings.title' | t">
+  <app-switch
+    [id]="'pj-public'"
+    [hint]="'guests.settings.hint' | t"
+    [disabled]="disabled()"
+    [checked]="publicJoin()"
+    (checkedChange)="publicJoin.set($event)"
+    ><span class="pj__label">{{ 'guests.settings.title' | t }}</span></app-switch
+  >
+
+  @if (publicJoin()) {
+    <div class="pj__group">
+      <span class="pj__cap" id="pj-mode-cap">{{ 'guests.settings.modeCaption' | t }}</span>
+      <app-segmented
+        width="fill"
+        [ariaLabel]="'guests.settings.modeCaption' | t"
+        [options]="modes()"
+        [value]="guestsMode()"
+        [disabled]="disabled()"
+        (valueChange)="setMode($event)"
+      />
+      <dl class="pj__explain">
+        <div><dt>{{ 'guests.mode.vote' | t }}:</dt> <dd>{{ 'guests.mode.voteHint' | t }}</dd></div>
+        <div><dt>{{ 'guests.mode.watch' | t }}:</dt> <dd>{{ 'guests.mode.watchHint' | t }}</dd></div>
+      </dl>
+    </div>
+
+    @if (link(); as l) {
+      <app-join-link [link]="l" [rotating]="rotating()" [canRotate]="!disabled()" (rotate)="rotate.emit()" />
+    } @else if (creating()) {
+      <app-note icon="info">{{ 'guests.settings.linkAfterCreate' | t }}</app-note>
+    }
+    @if (guestsMode() === 'vote') {
+      <app-note icon="info">{{ 'guests.settings.perVote' | t }}</app-note>
+    }
+  }
+</section>

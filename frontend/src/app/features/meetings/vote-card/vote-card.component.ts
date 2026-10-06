@@ -7,7 +7,13 @@ import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { meetingVoteStatus, voteResultStatus, type StatusView } from '@shared/status-kind.util';
-import { countEntries, voteMetaLine, voteOptionLabel, voteOptionsFor } from '../meetings-display.util';
+import {
+  countEntries,
+  guestComposition,
+  voteMetaLine,
+  voteOptionLabel,
+  voteOptionsFor,
+} from '../meetings-display.util';
 
 /**
  * One vote of the open agenda item, as a card beside the sheet.
@@ -80,6 +86,26 @@ export class VoteCardComponent {
   protected readonly meta = computed(() =>
     voteMetaLine(this.vote(), (key, params) => this.i18n.translate(key, params), this.i18n.locale()),
   );
+
+  /** A vote with guests (#17): "19 Mitglieder + 7 Gäste anwesend", else `null`. */
+  protected readonly composition = computed(() => {
+    const v = this.vote();
+    if (!v.guestsVote) return null;
+    return guestComposition(v.presentMembers, v.presentGuests, (k, p) => this.i18n.translate(k, p));
+  });
+  /** The closed result of a vote with guests: present, cast, majority of the cast votes. */
+  protected readonly guestResult = computed(() => {
+    const v = this.vote();
+    if (!v.guestsVote || v.status !== 'closed') return null;
+    const cast = Object.values(v.counts ?? {}).reduce((a, b) => a + b, 0);
+    const members = v.presentMembers ?? null;
+    const guests = v.presentGuests ?? null;
+    return {
+      present: members !== null && guests !== null ? members + guests : null,
+      cast,
+      passed: v.result === 'passed',
+    };
+  });
 
   protected readonly percent = computed(() => {
     const v = this.vote();

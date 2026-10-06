@@ -43,6 +43,8 @@ _SECURITY_HEADERS = {
 }
 
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
+# The public meeting routes (#17). They apply their own rate limits.
+PUBLIC_MEETING_PREFIX = "/api/public/meetings/"
 
 Dispatch = Callable[[Request], Awaitable[Response]]
 
@@ -79,6 +81,7 @@ def _has_auth_cookie(request: Request, settings: Settings) -> bool:
     return bool(
         request.cookies.get(settings.session_cookie_name)
         or request.cookies.get(settings.applicant_cookie_name)
+        or request.cookies.get(settings.guest_cookie_name)
     )
 
 
@@ -165,7 +168,11 @@ class DefaultWriteRateLimitMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Dispatch) -> Response:
         settings = self._settings
-        if request.method not in _SAFE_METHODS:
+        # The public meeting routes (#17) carry their own limits per IP, per join code
+        # and per guest. Many guests often share one IP, and the default limit per IP
+        # would stop a meeting in the middle of a vote.
+        exempt = str(request.scope.get("path", "")).startswith(PUBLIC_MEETING_PREFIX)
+        if request.method not in _SAFE_METHODS and not exempt:
             limiter = self._limiter or get_rate_limiter(request, settings)
             result = await limiter.hit(
                 f"write:ip:{client_ip(request)}",

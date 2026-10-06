@@ -1,0 +1,51 @@
+@if (link(); as l) {
+  <div class="jq">
+    @if (button()) {
+      <app-button
+        variant="outlined"
+        [class.jq__trigger--on]="open()"
+        [attr.aria-expanded]="open()"
+        aria-haspopup="dialog"
+        (click)="open.set(!open())"
+      >
+        <app-icon name="grid" [size]="18" />
+        {{ 'guests.qr.button' | t }}
+      </app-button>
+    }
+    @if (phone()) {
+      <app-side-sheet side="bottom" [heading]="'guests.qr.title' | t" [(open)]="open">
+        @if (open()) {
+          <ng-container [ngTemplateOutlet]="body" />
+        }
+      </app-side-sheet>
+    } @else if (open()) {
+      <button type="button" class="jq__backdrop" aria-hidden="true" tabindex="-1" (click)="open.set(false)"></button>
+      <div class="jq__pop" role="dialog" [attr.aria-label]="'guests.qr.title' | t">
+        <ng-container [ngTemplateOutlet]="body" />
+      </div>
+    }
+  </div>
+
+  <ng-template #body>
+    <div class="jq__body">
+      <div class="jq__card">
+        <app-qr-code class="jq__qr" [qr]="l.qr" [label]="qrLabel(l.joinUrl)" />
+      </div>
+      <p class="jq__scan">{{ 'guests.qr.scan' | t }}</p>
+      <a class="jq__url mono" [href]="l.joinUrl" target="_blank" rel="noopener">{{ l.joinUrl }}</a>
+      <p class="jq__code">{{ 'guests.qr.code' | t: { code: formatCode(l.joinCode) } }}</p>
+      <div class="jq__actions">
+        <app-button size="sm" variant="tonal" (click)="copy()">
+          <app-icon [name]="copied() ? 'check' : 'copy'" [size]="16" />
+          {{ (copied() ? 'guests.link.copied' : 'guests.qr.copy') | t }}
+        </app-button>
+        @if (!phone()) {
+          <app-button size="sm" variant="tonal" (click)="showOnBeamer()">
+            <app-icon name="monitor" [size]="16" />
+            {{ 'guests.qr.beamer' | t }}
+          </app-button>
+        }
+      </div>
+    </div>
+  </ng-template>
+}

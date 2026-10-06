@@ -21,6 +21,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     Text,
     Time,
     UniqueConstraint,
@@ -77,12 +78,29 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     protokollant_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("principal.id", ondelete="SET NULL"), nullable=True
     )
+    # Public participation (#17): persons without an account join with the QR code
+    # and the meeting lead admits them. `guests_mode` tells if admitted guests vote
+    # (`vote`) or only follow the meeting (`watch`). It has an effect only while
+    # `public_join` is on.
+    public_join: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    guests_mode: Mapped[str] = mapped_column(Text, server_default="vote")
+    # The short code of the join link `/j/<code>`. The first switch-on of
+    # `public_join` creates it, and a rotation replaces it. It is unique among the
+    # meetings that are not closed.
+    join_code: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         CheckConstraint(
             "status IN ('planned','live','closed')", name="meeting_status"
         ),
+        CheckConstraint("guests_mode IN ('vote','watch')", name="guests_mode"),
         Index("ix_meeting_gremium_id", "gremium_id"),
+        Index(
+            "uq_meeting_join_code_open",
+            "join_code",
+            unique=True,
+            postgresql_where=text("join_code IS NOT NULL AND status <> 'closed'"),
+        ),
     )
 
 
@@ -219,5 +237,62 @@ class ProtocolKeeperPeriod(UUIDPkMixin, CreatedAtMixin, Base):
             "meeting_id",
             unique=True,
             postgresql_where=text("from_at IS NULL"),
+        ),
+    )
+
+
+class MeetingGuest(UUIDPkMixin, CreatedAtMixin, Base):
+    """A person without an account who takes part in a public meeting (#17).
+
+    A guest is not a principal: no OIDC identity, no role, no membership and no
+    delegation. The guest proves the identity with a random token in an HttpOnly
+    cookie. The table keeps only the SHA-256 hash of the token.
+
+    `status` runs `pending` to `admitted` or `rejected`. An admitted guest becomes
+    `removed` (the lead removes the guest, or public participation goes off) or
+    `left` (the guest leaves). A withdrawn request is `left` too. `seq` is the
+    per-meeting number of the pseudonym "Gast n". `display_name` is NULL after the
+    pseudonymization: at once when the guest leaves or withdraws, and for all guests
+    when the protocol is finalized. `admitted_at` marks a guest who took part. The
+    close of the meeting deletes the rows without it.
+    """
+
+    __tablename__ = "meeting_guest"
+
+    meeting_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("meeting.id", ondelete="CASCADE")
+    )
+    seq: Mapped[int] = mapped_column(Integer)
+    display_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(Text, server_default="pending")
+    # SHA-256 of the device token, never the token itself. NULL after the close.
+    token_hash: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    requested_at: Mapped[_datetime] = mapped_column(DateTime(timezone=True))
+    decided_at: Mapped[_datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # The meeting lead who decided last. Principal rows are never deleted, but a
+    # merge or an erasure must not fail on this reference.
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("principal.id", ondelete="SET NULL"), nullable=True
+    )
+    admitted_at: Mapped[_datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_seen_at: Mapped[_datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending','admitted','rejected','removed','left')",
+            name="status",
+        ),
+        Index("ix_meeting_guest_meeting_status", "meeting_id", "status"),
+        Index(
+            "uq_meeting_guest_token_hash",
+            "token_hash",
+            unique=True,
+            postgresql_where=text("token_hash IS NOT NULL"),
         ),
     )

@@ -131,6 +131,11 @@ class Settings(BaseSettings):
     # narrows the replay window.
     applicant_session_ttl_hours: int = 12
     cookie_secure: bool = True
+    # Device token of a guest of a public meeting (#17): HttpOnly, SameSite=Strict, path
+    # `/api/public/meetings`. The server keeps only its SHA-256 hash. The token stops
+    # working when the meeting closes; the cookie lifetime is a safety bound.
+    guest_cookie_name: str = "mg_token"
+    guest_cookie_ttl_hours: int = 24
 
     # OAuth2 AS for native and MCP clients (browser grant + PKCE, RFC 7636). It is
     # a public client with no secret, and it allows loopback redirects only. The
@@ -329,6 +334,16 @@ class Settings(BaseSettings):
     # search discloses names and e-mails of accounts; the dialog searches while the user
     # types (debounced), so the limit stays generous for a person and stops a scraper.
     rl_applicant_search_per_hour: int = 300
+    # Public meeting (#17). Many guests often share one IP (the campus NAT), so the
+    # per-IP limits stay generous: ALTCHA is the main guard of the join. The join
+    # counts per IP and per join code. The reads of the public routes (the head of the
+    # meeting, the own state) count per IP. The writes of an admitted or waiting guest
+    # (name, leave, ballot) count per guest. The public routes are outside the default
+    # write limit per IP, because each one has its own limit.
+    rl_public_join_ip_per_hour: int = 120
+    rl_public_join_code_per_hour: int = 400
+    rl_public_meeting_read_ip_per_hour: int = 3000
+    rl_public_guest_write_per_hour: int = 120
 
     # Gravatar proxy (GET /principals/{id}/avatar). The API fetches the image from the
     # fixed host gravatar.com and keeps the result in Redis. A found image and a missing

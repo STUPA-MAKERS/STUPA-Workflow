@@ -662,6 +662,9 @@ describe('mapMeetingVote', () => {
       quorum: null,
       openedAt: null,
       closedAt: null,
+      guestsVote: false,
+      presentMembers: null,
+      presentGuests: null,
     });
   });
 

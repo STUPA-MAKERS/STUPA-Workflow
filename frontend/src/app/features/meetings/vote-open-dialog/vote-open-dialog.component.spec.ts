@@ -128,4 +128,56 @@ describe('VoteOpenDialogComponent', () => {
     await userEvent.click(footerCancel);
     expect(empty.closed).toHaveBeenCalled();
   });
+
+  describe('guests vote too (#17)', () => {
+    const PUBLIC = { ...MEETING, publicJoin: true, guestsMode: 'vote', admittedGuests: 7 } as unknown as Meeting;
+
+    async function open(meeting: Meeting, item: AgendaItem = APP_TOP) {
+      const opened = jest.fn();
+      const view = await render(VoteOpenDialogComponent, {
+        inputs: { meeting, item, topNumber: 3, rosterCount: 23, presentMembers: 19 },
+        on: { opened },
+        providers: [provideHttpClient(), provideHttpClientTesting()],
+      });
+      const http = view.fixture.debugElement.injector.get(HttpTestingController);
+      const submit = () =>
+        userEvent.click(
+          screen.getAllByRole('button', { name: 'Abstimmung öffnen' }).find((b) => b.closest('.dialog__footer'))!,
+        );
+      return { http, submit };
+    }
+
+    it('lets guests vote by default, with the voters of the room, and sends the choice', async () => {
+      const { http, submit } = await open(PUBLIC);
+      const sw = screen.getByRole('switch', { name: 'Gäste stimmen mit ab' });
+      expect(sw).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByText(/7 zugelassene Gäste stimmen mit/)).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('Stimmberechtigt jetzt: 26 (19 Mitglieder + 7 Gäste anwesend)');
+      await userEvent.click(sw);
+      expect(screen.getByRole('status')).toHaveTextContent('Stimmberechtigt: 23 Mitglieder (19 anwesend)');
+      expect(screen.getByText(/nur die Mitglieder stimmen ab/)).toBeInTheDocument();
+      await submit();
+      expect(http.expectOne('/api/meetings/m-1/votes').request.body).toEqual(
+        expect.objectContaining({ guestsVote: false }),
+      );
+    });
+
+    it('keeps guests out of a non-public item', async () => {
+      const { http, submit } = await open(PUBLIC, { ...FREE_TOP, nonPublic: true });
+      const sw = screen.getByRole('switch', { name: 'Gäste stimmen mit ab' });
+      expect(sw).toHaveAttribute('aria-checked', 'false');
+      expect(screen.getByText(/In einem nicht öffentlichen TOP/)).toBeInTheDocument();
+      await submit();
+      expect(http.expectOne('/api/meetings/m-1/votes').request.body).toEqual(
+        expect.objectContaining({ guestsVote: false }),
+      );
+    });
+
+    it('has no switch when guests only watch', async () => {
+      const { http, submit } = await open({ ...PUBLIC, guestsMode: 'watch' } as Meeting);
+      expect(screen.queryByRole('switch', { name: 'Gäste stimmen mit ab' })).toBeNull();
+      await submit();
+      expect(http.expectOne('/api/meetings/m-1/votes').request.body).not.toHaveProperty('guestsVote');
+    });
+  });
 });
