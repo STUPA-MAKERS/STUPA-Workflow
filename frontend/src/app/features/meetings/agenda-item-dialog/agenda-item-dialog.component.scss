@@ -1,4 +1,5 @@
 @use '../dialog-form' as df;
+@use '../scroll-fade' as fade;
 
 @include df.host;
 
@@ -74,4 +75,9 @@
   flex: 1 1 auto;
   min-width: 0;
   font-weight: var(--fw-medium);
+}
+
+/* The shared top and bottom fade: an end fades only while more content lies past it. */
+.aid__list {
+  @include fade.fade-y(var(--space-5));
 }

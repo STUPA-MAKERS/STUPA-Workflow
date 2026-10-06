@@ -276,3 +276,14 @@ app-button ::ng-deep .btn:not(.btn--icon) .btn__label > app-icon:first-child {
     padding-bottom: var(--app-bottom-safe-area, env(safe-area-inset-bottom));
   }
 }
+
+/* The shared top and bottom fade: an end fades only while more content lies past it. */
+.mp__agenda {
+  @include fade.fade-y(var(--space-5));
+}
+.mp__votes {
+  @include fade.fade-y(var(--space-5));
+}
+.mp__prep {
+  @include fade.fade-y(var(--space-5));
+}

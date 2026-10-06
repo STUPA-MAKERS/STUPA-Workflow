@@ -27,6 +27,7 @@ import { Subscription } from 'rxjs';
 import { liveSearch } from '@shared/live-search';
 import { AdminApiService } from '../admin-api.service';
 import { type AdminPrincipal, isActiveMembership } from '../admin.models';
+import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 
 /** A member of the gremium: a choice of "Vertritt". */
 export interface PoolMember {
@@ -54,6 +55,7 @@ const SEARCH_LIMIT = 8;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ScrollFadeDirective,
     FormsModule,
     TranslatePipe,
     AvatarComponent,

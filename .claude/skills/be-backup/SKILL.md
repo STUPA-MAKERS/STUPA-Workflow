@@ -19,7 +19,7 @@ description: Whole-platform backup and restore — age-encrypted archives (pg_du
 
 ## Traps
 
-- **`backup.manage` is in `FORBIDDEN_PERMISSIONS`** (`modules/auth/oauth.py`), beside `vote.cast`. No OAuth agent token reaches a backup, an export or a restore, whatever the scope says. Its holder can read the whole database and replace it.
+- **`backup.manage` is in `FORBIDDEN_PERMISSIONS`** (`modules/auth/oauth.py`), beside `vote.cast` and `admin.users.merge`. No OAuth agent token reaches a backup, an export or a restore, whatever the scope says. Its holder can read the whole database and replace it.
 - **The private age key lives in the stack.** That is the price of restoring from a browser, and it is a real reduction against the old encrypt-only design. Use a key pair for the app ONLY; the disaster-recovery pair stays off host. `deploy/secrets/` is mounted read-only into `api` and `worker`.
 - **A restore takes a `pre_restore` safety archive FIRST** and aborts entirely when that fails. No undo means no restore. A `pre_restore` row and a pinned row never count towards retention and are never pruned.
 - **The restore audit entry lands in the RESTORED chain**, because the restore replaces `audit_entry` along with everything else. The safety archive is the only record of the state before it.

@@ -6,7 +6,7 @@
   (closed)="cancel()"
 >
   <form class="aid" (submit)="$event.preventDefault(); submit()">
-    <app-segmented
+    <app-segmented width="equal"
       class="aid__kind"
       [ariaLabel]="'meetings.agenda.kind' | t"
       [options]="kindOptions()"
@@ -28,7 +28,7 @@
         @if (loading()) {
           <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
         } @else if (shown().length) {
-          <div class="aid__list" role="radiogroup" aria-labelledby="aid-apps">
+          <div class="aid__list" appScrollFade="y" role="radiogroup" aria-labelledby="aid-apps">
             @for (a of shown(); track a.applicationId) {
               <label class="aid__row" [class.aid__row--on]="pick() === a.applicationId">
                 <input

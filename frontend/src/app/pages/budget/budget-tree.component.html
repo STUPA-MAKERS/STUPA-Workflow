@@ -45,7 +45,7 @@
         />
         @if (fyOptions().length) {
           <div class="bt__years">
-            <app-segmented
+            <app-segmented width="equal"
               [options]="fyOptions()"
               [value]="selectedFyId()"
               (valueChange)="selectFy($event)"

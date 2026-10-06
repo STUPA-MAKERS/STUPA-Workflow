@@ -11,7 +11,7 @@
         (valueChange)="select($event)"
       />
     } @else {
-      <nav class="mt__list" [attr.aria-label]="'admin.mailTemplates.title' | t">
+      <nav class="mt__list" appScrollFade="y" [attr.aria-label]="'admin.mailTemplates.title' | t">
         @for (tpl of templates(); track tpl.key) {
           <button
             type="button"
@@ -33,14 +33,14 @@
     }
 
     @if (draft(); as d) {
-      <section class="mt__editor" aria-labelledby="mt-title">
+      <section class="mt__editor" appScrollFade="y" aria-labelledby="mt-title">
         <header class="mt__head">
           <h2 class="mt__title" id="mt-title">{{ keyLabel(d.key) }}</h2>
           <span class="mt__headEnd">
             @if (d.source === 'override') {
               <span class="mt__custom">{{ 'admin.mailTemplates.customized' | t }}</span>
             }
-            <app-segmented [options]="langOptions" [value]="lang()" (valueChange)="setLang($event)" [ariaLabel]="'admin.mailTemplates.lang' | t" />
+            <app-segmented width="equal" [options]="langOptions" [value]="lang()" (valueChange)="setLang($event)" [ariaLabel]="'admin.mailTemplates.lang' | t" />
           </span>
         </header>
 

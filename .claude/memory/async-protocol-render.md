@@ -6,6 +6,9 @@ metadata:
   type: project
 ---
 
+> Superseded in part: the `typst` render service replaced pytex (#244). The pytex image, the
+> inkscape shim and the pytex cache volume are gone. The async render in the worker stays.
+
 **DONE 2026-06-10, pushed to `main`:** `bb94eb4` (backend) + `11e220b` (frontend).
 
 Implementation, as planned. `Protocol.status` gained `rendering`. Migration

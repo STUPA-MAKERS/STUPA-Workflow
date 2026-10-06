@@ -43,8 +43,13 @@
       [value]="actor()"
       (valueChange)="setActor($event)"
     />
-    <app-date-chip [label]="'admin.audit.filter.since' | t" [value]="since()" (valueChange)="setSince($event)" />
-    <app-date-chip [label]="'admin.audit.filter.until' | t" [value]="until()" (valueChange)="setUntil($event)" />
+    <app-range-chip
+      kind="date"
+      [label]="'admin.audit.filter.period' | t"
+      [from]="since()"
+      [to]="until()"
+      (applied)="setRange($event)"
+    />
     @if (activeFilterCount()) {
       <button type="button" class="al__reset" (click)="resetFilters()">{{ 'admin.audit.filter.reset' | t }}</button>
     }

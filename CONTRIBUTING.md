@@ -1,7 +1,7 @@
 # Contributing — Antragsplattform
 
 Binding workflow: **TDD (Red-Green-Refactor)**. The CI gate blocks pull requests
-(`sds/testing.md`). This document collects the workflow, the Definition of Done and the
+(`.github/workflows/ci.yml`). This document collects the workflow, the Definition of Done and the
 branch protection settings.
 
 ## TDD: Red → Green → Refactor

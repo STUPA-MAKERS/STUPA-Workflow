@@ -1,6 +1,7 @@
 import type { FormlyFieldConfig } from '@ngx-formly/core';
 import type { FieldType, FormFieldDef, FormSection, Lang } from '@core/api/models';
 import { evalJsonLogic, isFieldVisible, JsonLogicError } from './jsonlogic';
+import { CATALOG, de, type Locale } from '@core/i18n/translations';
 import { resolveI18n } from './i18n-text';
 
 /** HTML `type` for the `input` variant (text/number/currency/date/file). */
@@ -177,7 +178,10 @@ function mapField(
     if (!help) delete props['label'];
   }
   if (f.type === 'computed') props['computed'] = true;
-  if (f.type === 'table') props['text'] = '(Tabellen-Eingabe wird in einem späteren Schritt ergänzt.)';
+  if (f.type === 'table') {
+    // The UI catalogue, not a fixed German text: an English page shows English.
+    props['text'] = CATALOG[lang as Locale]?.['forms.table.pending'] ?? de['forms.table.pending'];
+  }
   if (f.type === 'positions') {
     if (f.validation?.minOffers !== undefined) props['minOffers'] = f.validation.minOffers;
     if (f.validation?.minPositions !== undefined) props['minPositions'] = f.validation.minPositions;

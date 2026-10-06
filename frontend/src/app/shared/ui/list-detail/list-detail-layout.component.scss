@@ -12,6 +12,11 @@
 
 .ld__list,
 .ld__detail {
+  /* A scroll container must also be the containing block of what it scrolls. An
+     absolute child (the `.sr-only` text of a row or a sheet) takes the nearest
+     positioned ancestor. Without one, that is the body: the child escapes the pane and
+     makes the document taller, so a pane page scrolled as a page. */
+  position: relative;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;

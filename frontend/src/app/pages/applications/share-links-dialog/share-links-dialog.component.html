@@ -13,13 +13,8 @@
     <div class="sld__fresh">
       <p class="sld__hint">{{ 'applications.share.onceHint' | t }}</p>
       <div class="sld__freshRow">
-        <input
-          class="sld__url mono"
-          type="text"
-          readonly
-          [value]="url"
-          [attr.aria-label]="'applications.share.url' | t"
-        />
+        <!-- The whole link, wrapped and selectable: a copyable value is never cut. -->
+        <p class="sld__url mono"><span class="sr-only">{{ 'applications.share.url' | t }}: </span><code>{{ url }}</code></p>
         <app-button variant="tonal" size="sm" (click)="copy()">
           {{ (copied() ? 'applications.share.copied' : 'applications.share.copy') | t }}
         </app-button>

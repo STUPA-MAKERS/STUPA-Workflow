@@ -74,7 +74,7 @@
         />
       </label>
       @if (candidates().length) {
-        <ul class="sp__hits" [attr.aria-label]="'admin.substitutes.hits' | t">
+        <ul class="sp__hits" appScrollFade="y" [attr.aria-label]="'admin.substitutes.hits' | t">
           @for (c of candidates(); track c.id) {
             <li>
               <button

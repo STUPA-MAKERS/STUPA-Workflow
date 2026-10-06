@@ -93,13 +93,17 @@
   font-weight: var(--fw-semibold);
 }
 
+/* The choices share the width equally. A label is never cut ("Enthalt…"): a button is
+   at least as wide as its label, and when the labels do not fit on one line the
+   buttons wrap to a second line. */
 .vc__ballot {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
 }
 .vc__ballot app-button {
   flex: 1 1 0;
-  min-width: 0;
+  min-width: max-content;
 }
 .vc__actions {
   display: flex;

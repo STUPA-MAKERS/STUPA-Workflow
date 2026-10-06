@@ -1,40 +1,35 @@
 ---
 name: deploy
-description: Single-VM docker-compose stack (web/migrate/api/worker/postgres/redis/minio/clamav/typst/altcha/backup) behind an external Caddy reverse proxy, with nginx routing, alembic one-shot migrate, age-encrypted backup/restore, least-privilege DB roles, and .env config. Use when working on the compose topology, nginx reverse-proxy/CSP, deploy/update scripts, DB roles, or backup/restore in deploy/.
+description: Single-VM docker-compose stack (web/migrate/api/worker/postgres/redis/minio/clamav/typst/altcha) behind an external Caddy reverse proxy, with nginx routing, alembic one-shot migrate, least-privilege DB roles, and .env config. Backups run in the app (see be-backup). Use when working on the compose topology, nginx reverse-proxy/CSP, deploy/update scripts, DB roles, or the backup secrets mount in deploy/.
 ---
 
 # Deploy stack (one VM, docker-compose) — `deploy`
 
-**Does:** Defines the whole production stack as docker-compose for a single VM. The stack holds the SPA+nginx edge, the FastAPI api, the arq worker, a one-shot alembic migrate, Postgres/Redis/MinIO/ClamAV/typst/altcha, and a daily encrypted backup. An external Caddy reverse proxy terminates TLS. Only `web` binds a host port (`127.0.0.1:8080`). Everything else is internal-only (no Internet ingress).
+**Does:** Defines the whole production stack as docker-compose for a single VM. The stack holds the SPA+nginx edge, the FastAPI api, the arq worker, a one-shot alembic migrate, Postgres/Redis/MinIO/ClamAV/typst/altcha. There is no backup container: backups run inside the application at `/admin/backups` (see `be-backup`). An external Caddy reverse proxy terminates TLS. Only `web` (`127.0.0.1:8080`) and `postgres` (`127.0.0.1:5433`, for the admin CLI) bind a host port, both on loopback. Everything else is internal-only (no Internet ingress).
 
 **Key files:**
-- `docker-compose.yml` — the full stack: 11 services, networks (`internal`, `typst_net` egress-less, `proxy`), volumes, healthchecks, `prod`/`backup` profiles.
+- `docker-compose.yml` — the full stack: 10 services, networks (`internal`, `typst_net` egress-less, `proxy`), volumes, healthchecks. No service has a profile, so `--profile prod` starts the same services as no profile.
 - `docker-compose.e2e.yml` — overlay for Playwright e2e: adds `mailpit` (SMTP sink), `seed` one-shot (`profiles:[seed]`), `:ro,z` SELinux relabel + IPv4 healthcheck for `web`. Mock OIDC stays OFF.
 - `docker-compose.keycloak.yml` — local-only OIDC: Keycloak `start-dev --import-realm`, `host.docker.internal` wiring. Not for prod.
 - `web/Dockerfile` — multi-stage: node:22 builds the Angular SPA (`dist/antragsplattform/browser`), nginx:1.27 serves it. Build context = repo root.
 - `web/nginx.conf` — plain-HTTP server: `real_ip` from proxy, `/api/` proxy with body caps, WS upgrade, `.well-known/oauth-*` + dynamic `/manifest.webmanifest` proxies, SPA fallback, security headers (CSP, X-Frame-Options DENY).
 - `db/roles.sql` — least-privilege DB roles (`migrator`/`app`/`audit_writer`). Revokes UPDATE/DELETE/TRUNCATE on `audit_entry` from the runtime user. Run it as superuser, in two stages around `alembic upgrade head`.
 - `deploy.sh` — prod update: `git pull --ff-only` → build all → recreate only services whose image-id changed (`--profile prod`).
-- `.env.example` — full secrets/config template (DB, Redis, MinIO, OIDC, SMTP, Nextcloud, webhooks, altcha, typst, rate-limits, CSRF, backup). Copy to `.env`.
-- `backup/backup.sh` — `pg_dump` (custom) + `mc mirror` MinIO → one age-encrypted `antrag-<UTC>.tar.age`. Prunes by retention. Optional off-host rsync.
-- `backup/restore.sh` — destructive restore: `age -d` → `pg_restore --clean --if-exists` + `mc mirror --remove`. Confirms `RESTORE` unless `FORCE=1`.
-- `backup/entrypoint.sh` — writes the crontab from `BACKUP_CRON`, then runs busybox `crond`. With args it runs one-shot instead.
-- `backup/lib.sh` — shared `need`/`pg_env`/`mc_env`/`age_recipient`/`log` helpers (derive libpq env from `POSTGRES_*`, NOT `DATABASE_URL`).
-- `backup/Dockerfile` — postgres:16-alpine + pinned `mc` + `age` + `rsync`.
-- `README.md`, `backup/README.md` — operator runbooks (start, migrations, roles, profiles, backup/restore).
-- `e2e/seed.py`, `keycloak/antrag-realm.json` — e2e seeding + Keycloak realm import.
+- `.env.example` — full secrets/config template (DB, Redis, MinIO, OIDC, SMTP, Nextcloud, webhooks, altcha, typst, rate-limits, CSRF, `BACKUP_*` of the in-app backup). Copy to `.env`.
+- `README.md` — operator runbook (start, migrations, roles, profiles, backup key pair and restore).
+- `e2e/seed.py`, `e2e/qa_seed.py`, `e2e/qa_api_seed.py` — e2e and QA seeding. `keycloak/antrag-realm.json` is a local file that git ignores (`deploy/.gitignore`). You supply it yourself for the Keycloak overlay.
 
 **Domain / data model:** Not an app domain module. This is infrastructure. The "model" is the service topology:
-- **Services:** `web` (nginx SPA + `/api` proxy, only host port `127.0.0.1:8080:80`), `migrate` (one-shot `alembic upgrade head`, `restart:no`), `api` (uvicorn `--proxy-headers`, no host port), `worker` (`arq worker.main.WorkerSettings`), `postgres:16-alpine`, `redis:7-alpine` (appendonly), `minio` (S3, console :9001), `clamav` (long ~5min signature load → 300s start_period), `typst` (md→pdf render service, typst_net only, read-only rootfs), `altcha` (ALTCHA Sentinel captcha, internal :8080), `backup` (`prod`/`backup` profiles only).
+- **Services:** `web` (nginx SPA + `/api` proxy, only host port `127.0.0.1:8080:80`), `migrate` (one-shot `alembic upgrade head`, `restart:no`), `api` (uvicorn `--proxy-headers`, no host port), `worker` (`arq worker.main.WorkerSettings`), `postgres:16-alpine` (loopback `127.0.0.1:5433` for `admin-cli/`), `redis:7-alpine` (appendonly), `minio` (S3, console :9001), `clamav` (long ~5min signature load → 300s start_period), `typst` (md→pdf render service, typst_net only, read-only rootfs), `altcha` (ALTCHA Sentinel captcha, internal :8080).
 - **Networks:** `internal` (bridge, no published ports → no ingress, egress allowed for SMTP/WebDAV/Webhooks/OIDC and the api's HTTPS to `gravatar.com` for the avatar proxy, see `be-avatars`), `typst_net` (`internal:true` → NO egress, api/worker↔typst render path, closes any exfil channel), `proxy` (in prod set `external:true` to reference the network of the Caddy container).
-- **Volumes:** `pg_data`, `redis_data`, `minio_data`, `clamav_data`, `backups`, `altcha_data`.
+- **Volumes:** `pg_data`, `redis_data`, `minio_data` (holds the attachment bucket and the backup bucket), `clamav_data`, `altcha_data`.
 - **Startup ordering:** `migrate` waits on `postgres` healthy. `api`/`worker` wait on `migrate` `service_completed_successfully` + datastores healthy. `web` waits on `api` healthy. `worker` only waits for `clamav` *started* (the scan task retries until clamd is ready).
 - **DB roles:** `migrator` (DDL, `DB_MIGRATION_URL`), `app` (DML runtime, `DATABASE_URL`), optional `audit_writer` (INSERT/SELECT only). Migration 0001 (the baseline) sets the append-only trigger + conditional audit grant.
 
 **API surface:** No router here. nginx routes (`web/nginx.conf`): `GET /healthz` (container liveness, returns `ok`). `/api/` → `api:8000` (body cap 1m). `/api/applications/{id}/attachments`, `/api/apply/attachments` (draft uploads of the wizard, Z4) and `/api/invoices/(parse|file)` → larger 11m body cap. `/api/attachments/{id}/download` → its own location: the app sends the frame headers (the inline preview allows `frame-ancestors 'self'`), and the edge adds `X-Frame-Options: DENY` and a strict CSP only when the app sent none (`map $ap_download_xfo`/`$ap_download_csp`). `/api/public/meetings/` → api with a 16k body cap (guest routes of a public meeting, #17); `^/api/public/meetings/<code>/ws$` → WS upgrade (the guest cookie has the path `/api/public/meetings`). `/api/ws/` → WS upgrade (3600s read timeout). `/.well-known/oauth-(authorization-server|protected-resource)` → api (MCP OAuth discovery). `/manifest.webmanifest` → `api:8000/api/manifest.webmanifest` (dynamic PWA manifest). The `map $ap_cache_control` gives `/api/principals/<id>/avatar` an EMPTY value, so `add_header` adds no `no-cache` beside the `Cache-Control: private, max-age=…` of the avatar proxy (every other `/api/` answer gets the server-level `no-cache` on top of its own header). `/` → SPA fallback (`try_files … /index.html`).
 
 **Conventions & gotchas:**
-- **Only `web` is host-bound** (`127.0.0.1:8080`). Never publish other service ports. The external Caddy proxies to it (set `proxy` net `external:true` in prod).
+- **Only `web` (`127.0.0.1:8080`) and `postgres` (`127.0.0.1:5433`, admin CLI) are host-bound, both on loopback.** Never publish other service ports, and never bind these two beyond loopback without a reason (`WEB_HOST`). The external Caddy proxies to it (set `proxy` net `external:true` in prod).
 - **`ENVIRONMENT=production` is mandatory in prod** — it arms invoice-AV fail-closed + the X-Forwarded-* spoofing guard. `STRICT_SECURITY` (default on) keeps the hardening even when you forget it. The app default is `development`.
 - **`FORWARDED_ALLOW_IPS` must be the concrete direct upstream IP** (the web/nginx container net), NEVER whole RFC1918 ranges. A wider range lets any internal host spoof `X-Forwarded-For`. That gives a rate-limit bypass and a wrong audit IP. Production forbids `*`.
 - **`nginx.conf` is baked into the image AND bind-mounted** so prod edits (e.g. `set_real_ip_from` CIDR) need no rebuild. Edit the mounted file for the real proxy CIDR. CSP/security headers live here at the edge.
@@ -43,9 +38,8 @@ description: Single-VM docker-compose stack (web/migrate/api/worker/postgres/red
 - **Bootstrap admins** (`BOOTSTRAP_ADMIN_SUBJECTS` / `BOOTSTRAP_ADMIN_EMAILS`): under real OIDC a fresh schema has no admin. Subjects match at login and in the startup-sweep. Emails match only at login, and only when `email_verified:true`.
 - **Magic-link lifetime and guest confirmation window are NOT env settings** (Z1). `MAGIC_LINK_EDIT_TTL_DAYS` and `MAGIC_LINK_ACTION_TTL_MINUTES` are gone. The values live in the DB row `guest_application_settings` (admin page Fristen, `admin.deadlines`; defaults: links without expiry, 12 h to confirm). An old `.env` that still sets the removed keys keeps starting, because `Settings` has `extra="ignore"`. `tests/unit/test_env_example_settings_parity.py` checks that every `.env.example` key is a real setting.
 - **`migrate` is idempotent** — `docker compose up -d --build` re-runs it on update. Alembic skips applied revisions. No manual migration step.
-- **Backup is encrypt-only on-host** — the host knows only `BACKUP_AGE_RECIPIENT` (public key). The private `age.key` lives off-host. Supply it only at restore time via `/secrets/age.key` (gitignored, `:ro,z` mounted). Empty recipient ⇒ the `backup` service refuses to start.
-- **Backup uses `POSTGRES_*`/`MINIO_*` directly, NOT `DATABASE_URL`** — `DATABASE_URL` carries the asyncpg driver, which libpq tools cannot parse.
-- **Restore is destructive** (`pg_restore --clean`, `mc mirror --remove`). It prompts for `RESTORE` unless `FORCE=1`. Stop `api worker` first.
+- **Backups are in-app** (`be-backup`). The api and worker write age-encrypted archives to the MinIO bucket `BACKUP_BUCKET`. The host knows only `BACKUP_AGE_RECIPIENT` (public key). The private key is mounted read-only at `BACKUP_AGE_IDENTITY_FILE` (`/secrets/backup-age.key`, from the gitignored `deploy/secrets/`). Without it, the stack still lists and creates backups, but cannot import or restore. An empty recipient makes `/admin/backups` answer 503.
+- **Restore is destructive** and runs from `/admin/backups`. It takes a safety copy first. `scripts/restore-smoke.sh` proves the round trip against a throwaway stack.
 - **`:z`/`:ro,z` mounts** are the SELinux relabel for Fedora and rootless-podman hosts. They are a no-op on CI/ubuntu. A missing `z` gives "Permission denied" on the mounted file.
 - **ClamAV start is slow** (signature download, several minutes). That is why `start_period` is 300s. Do not treat an early `unhealthy` as a failure. `SMOKE_TIMEOUT` defaults to 600s.
 - Smoke: `../scripts/smoke.sh`, real-stack smoke `../scripts/smoke-real-stack.sh`, restore-smoke `../scripts/restore-smoke.sh` (all opt-in CI jobs).

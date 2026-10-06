@@ -1,6 +1,6 @@
 ---
 name: be-applications
-description: Application lifecycle — public create with Altcha/magic-link, versioned data edits with diff, status timeline, internal/public comments, archiving, public share links, DSGVO anonymization, and dual Principal-or-Applicant access control. Use when working on application CRUD, submission versions, status_event timeline, comments, archive, share links, magic-link/owner/gremium read scope, or anonymization in backend/app/modules/applications.
+description: Application lifecycle — public create with Altcha/magic-link, versioned data edits with diff, status timeline, internal/public comments, archiving, public share links, DSGVO anonymization, the capture on behalf of an applicant (#11, application.create_on_behalf), and dual Principal-or-Applicant access control. Use when working on application CRUD, on-behalf capture, submission versions, status_event timeline, comments, archive, share links, magic-link/owner/gremium read scope, or anonymization in backend/app/modules/applications.
 ---
 
 # Applications — `backend/app/modules/applications`

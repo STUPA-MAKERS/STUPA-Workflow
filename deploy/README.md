@@ -28,10 +28,10 @@ docker compose up -d --build
 | `web` | nginx, serves the built SPA, routes `/api` to `api` | `${WEB_HOST:-127.0.0.1}:${WEB_PORT:-8080}` |
 | `migrate` | one-shot: `alembic upgrade head`, then exit | — |
 | `api` | FastAPI (uvicorn `--proxy-headers`) | — |
-| `worker` | arq (mail send, nightly budget rollup) | — |
+| `worker` | arq (mail send, virus scan, deadlines, reminders, budget rollup, retention, draft purge, nightly backup and audit check) | — |
 | `postgres` | PostgreSQL 16 | `127.0.0.1:5433` (admin CLI) |
 | `redis` | Redis 7 (arq broker, rate limit, ALTCHA replay) | — |
-| `minio` | S3 object store (attachments) | — |
+| `minio` | S3 object store (attachments, backup archives) | — |
 | `clamav` | virus scan (the first start is slow because it loads the signatures) | — |
 | `typst` | internal Markdown→PDF render service | — |
 | `altcha` | ALTCHA Sentinel (captcha verifier) | — |
@@ -165,7 +165,8 @@ BOOTSTRAP_ADMIN_EMAILS=admin@hochschule.example,vorstand@stupa.example
   docker compose --profile prod up -d --build
   ```
   For the real Caddy network, switch `proxy:` in the compose file to `external: true`.
-- Default (no profile) = smoke and dev stack.
+- No service in `docker-compose.yml` carries a profile now. `--profile prod` and the default
+  start the same services. `deploy.sh` keeps the flag, so a later profile works without a change.
 
 ## Backup and restore
 

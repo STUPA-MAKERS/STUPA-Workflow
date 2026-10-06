@@ -34,7 +34,7 @@ description: Outbound event webhooks — SSRF-guarded, HMAC-SHA256-signed HTTP P
 - Worker POSTs with `follow_redirects=False` and reads the response body **streamed, capped at 64 KiB** (only the status code matters) to avoid OOM from a hostile receiver.
 - Idempotency: dispatch dedups on `(webhook_id, idempotency_key)` via a per-delivery savepoint (`begin_nested`) that catches the unique-violation race. The arq job key `webhook:<delivery_id>` coalesces duplicate enqueues. Flow actions derive the idempotency base from `DispatchedAction.idempotency_key`.
 - If Redis/queue is unavailable the queue is `None`: deliveries stay `pending`, callers log and skip — no API block.
-- Settings: `webhook_timeout_seconds`, `webhook_max_tries`, `webhook_retry_backoff_seconds`, `webhook_host_allowlist` (empty = any *public* host, the SSRF guard stays on, strict-security warns when it is empty). See `[[security-audit-2026-06-13]]`.
+- Settings: `webhook_timeout_seconds`, `webhook_max_tries`, `webhook_retry_backoff_seconds`, `webhook_host_allowlist` (empty = any *public* host, the SSRF guard stays on, strict-security warns when it is empty).
 - Critical module: TDD with 100% branch coverage required (auth/voting/flow/budget/webhooks/audit). Whitelist dispatch, never eval. All error paths return `application/problem+json`.
 
 **Related:** be-admin, be-flow, conventions

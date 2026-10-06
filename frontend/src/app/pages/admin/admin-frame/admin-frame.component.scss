@@ -54,6 +54,7 @@
   padding: 0 var(--space-1) var(--space-2);
 }
 .af--split .af__navBody {
+  position: relative;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -213,6 +214,8 @@
 }
 .af--split .af__pageBody {
   --af-fade: var(--space-6);
+  /* The containing block of an absolute child (`.sr-only`), see `.ld__detail`. */
+  position: relative;
   display: flex;
   flex: 1 1 0;
   flex-direction: column;

@@ -18,6 +18,7 @@ import {
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import type { MailPreview, MailTemplate } from '../admin.models';
+import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 
 const LANGS = ['de', 'en'] as const;
 type Lang = (typeof LANGS)[number];
@@ -36,6 +37,7 @@ type Lang = (typeof LANGS)[number];
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ScrollFadeDirective,
     FormsModule,
     UpperCasePipe,
     TranslatePipe,
