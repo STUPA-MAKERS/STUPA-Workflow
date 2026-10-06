@@ -54,6 +54,7 @@ import { AltchaComponent } from './altcha.component';
 import { DraftAttachmentsService } from './draft-attachments.service';
 import { DraftFilesComponent } from './draft-files/draft-files.component';
 import { FormlyDraftFilesType } from './draft-files/formly-draft-files.type';
+import { provideFormly } from '@shared/formly/formly.providers';
 
 /** The steps of the wizard. `contact` drops out for a signed-in user without PII fields. */
 export type StepKey = 'type' | 'details' | 'contact' | 'review';
@@ -141,7 +142,9 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
     DraftFilesComponent,
     TranslatePipe,
   ],
-  providers: [DraftAttachmentsService],
+  // The field types of the form (`provideFormly`) come with the component, so Formly is not
+  // part of the initial bundle.
+  providers: [DraftAttachmentsService, provideFormly()],
   templateUrl: './apply-wizard.component.html',
   styleUrl: './apply-wizard.component.scss',
 })

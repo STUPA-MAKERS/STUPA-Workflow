@@ -26,10 +26,10 @@
 
 /* A projected kicker (`appSheetBarKicker`) keeps the font of the text kicker. Its own
    items (for example the links of a breadcrumb) shrink inside it; the bar never grows
-   past the width of the sheet. */
+   past the width of the sheet. The projected element clips its own items, so the hover
+   surface and the focus ring of its first item can reach past the edge of the slot. */
 .sheet-bar__kicker--slot {
   display: flex;
   align-items: center;
   min-width: 0;
-  overflow: hidden;
 }

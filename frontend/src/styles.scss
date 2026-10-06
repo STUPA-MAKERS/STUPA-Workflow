@@ -133,6 +133,20 @@
   --ld-gap: var(--space-3);
 }
 
+// The header of a detail sheet: the gap between the sheet bar (`app-sheet-bar`) and the
+// title, and between the lines below the title. Every detail sheet takes it from this
+// token, so the titles sit at the same height on every page.
+:root {
+  --sheet-head-gap: 10px;
+}
+
+// The text button of `app-row-menu` (the "…" of the budget breadcrumb): its minimum
+// size and its side padding. The breadcrumb reads the same tokens for its fit.
+:root {
+  --row-menu-text-min: 1.75rem;
+  --row-menu-text-pad: var(--space-2);
+}
+
 // The list column of such a page, in this order: the header (`app-page-header` with
 // `pane`), the search bar with its chips (`.ld-pane__filters`, normally on an
 // `app-sticky-bar`), then the rows. The search is the large search pill on every list.

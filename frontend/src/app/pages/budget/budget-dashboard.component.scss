@@ -335,9 +335,9 @@ button.tn__chev:hover:not(:disabled) {
   flex-wrap: nowrap;
   margin-inline-start: var(--space-3);
 }
-/* The title sits a small step below the bar, as on the other detail sheets. */
+/* The title sits below the bar at the gap of every detail sheet. */
 .bd--wide .bd__sheetBody {
-  padding-top: var(--space-2);
+  padding-top: var(--sheet-head-gap);
 }
 /* The title is a child of the scrolling flex column. It clips its text (ellipsis), so
    without `flex: none` the column would shrink it to zero height. */

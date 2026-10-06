@@ -44,6 +44,7 @@ import {
 } from '../../../features/apply/draft-attachments.service';
 import { DraftFilesComponent } from '../../../features/apply/draft-files/draft-files.component';
 import { FormlyDraftFilesType } from '../../../features/apply/draft-files/formly-draft-files.type';
+import { provideFormly } from '@shared/formly/formly.providers';
 
 /** Who the application is for: an account, or a new person without one. */
 export type ApplicantMode = 'account' | 'guest';
@@ -107,7 +108,10 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     SkeletonComponent,
     DraftFilesComponent,
   ],
+  // The field types of the form (`provideFormly`) come with the component, so Formly is not
+  // part of the initial bundle.
   providers: [
+    provideFormly(),
     DraftAttachmentsService,
     { provide: DRAFT_FILES_STORAGE_KEY, useValue: CAPTURE_FILES_KEY },
   ],

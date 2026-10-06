@@ -10,7 +10,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideRouter, withComponentInputBinding, withInMemoryScrolling } from '@angular/router';
 import { authInterceptor } from '@core/auth/auth.interceptor';
 import { AuthService } from '@core/auth/auth.service';
-import { mockApiInterceptor } from '@core/api/mock-api.interceptor';
+import { lazyMockApiInterceptor } from '@core/api/mock-api.lazy';
 import { cacheInterceptor } from '@core/cache/cache.interceptor';
 import { loadingInterceptor } from '@core/loading/loading.interceptor';
 import { LoadingService } from '@core/loading/loading.service';
@@ -23,7 +23,6 @@ import { ThemeService } from '@core/theme/theme.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { SwUpdateService } from '@core/pwa/sw-update.service';
-import { provideFormly } from '@shared/formly/formly.providers';
 import { routes } from './app.routes';
 import { provideServiceWorker } from '@angular/service-worker';
 
@@ -43,14 +42,16 @@ export const appConfig: ApplicationConfig = {
     // prod build `isDevMode()` returns false, so the app never registers it. No input at
     // runtime can activate it and spoof a session or data. This covers the `?mock=1` query
     // flag, the `useMockApi` localStorage key and the `__USE_MOCK_API__` global. The
-    // `isDevMode()` guard inside the interceptor stays as defense in depth.
+    // `isDevMode()` guard inside the interceptor stays as defense in depth. The mock
+    // loads on its first request (`lazyMockApiInterceptor`), so it is not part of the
+    // initial bundle.
     provideHttpClient(
       withInterceptors(
         isDevMode()
           // The cache sits INSIDE the loading interceptor: a served-from-cache answer
           // still counts as a completed request for the overlay, and the auth layer
           // must run for the revalidation that follows.
-          ? [loadingInterceptor, cacheInterceptor, authInterceptor, mockApiInterceptor]
+          ? [loadingInterceptor, cacheInterceptor, authInterceptor, lazyMockApiInterceptor]
           : [loadingInterceptor, cacheInterceptor, authInterceptor],
       ),
     ),
@@ -58,7 +59,6 @@ export const appConfig: ApplicationConfig = {
       provide: LIVE_VOTE_SOURCE,
       useFactory: () => (inject(USE_MOCK_API) ? inject(MockLiveVoteSource) : inject(WsService)),
     },
-    provideFormly(),
     { provide: UI_KIT_INTL, useFactory: () => uiKitIntlFromLang(inject(I18nService).locale) },
     { provide: UI_KIT_LOADING, useFactory: () => ({ visible: inject(LoadingService).visible }) },
     provideAppInitializer(() => {
