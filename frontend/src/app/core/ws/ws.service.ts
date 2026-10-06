@@ -31,7 +31,19 @@ export class WsService {
   /** Open `/api/ws/meetings/{id}`, or `…/beamer` for read-only access. */
   connectMeeting(meetingId: string, beamer = false): MeetingChannel {
     const suffix = beamer ? '/beamer' : '';
-    const ws = new WebSocket(this.url(`/api/ws/meetings/${meetingId}${suffix}`));
+    return this.open(`/api/ws/meetings/${meetingId}${suffix}`);
+  }
+
+  /**
+   * Open the guest channel of a public meeting, `/api/public/meetings/{code}/ws`. The
+   * HttpOnly device cookie authenticates it; the page never holds the token.
+   */
+  connectGuest(code: string): MeetingChannel {
+    return this.open(`/api/public/meetings/${encodeURIComponent(code)}/ws`);
+  }
+
+  private open(path: string): MeetingChannel {
+    const ws = new WebSocket(this.url(path));
     const subject = new Subject<ServerMessage>();
 
     // Outbound buffer. A socket drops a frame that goes out before the handshake ends

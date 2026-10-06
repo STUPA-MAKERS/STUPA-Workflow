@@ -3,8 +3,10 @@ import {
   Injectable,
   type OnDestroy,
   computed,
+  effect,
   inject,
   signal,
+  untracked,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import type { Observable } from 'rxjs';
@@ -26,6 +28,7 @@ import { WsService, type MeetingChannel } from '@core/ws/ws.service';
 import type { ServerMessage } from '@core/ws/ws-messages';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { MeetingAgendaService } from './meeting-agenda.service';
+import { MeetingGuestsService } from './meeting-guests.service';
 import {
   assembleProtocolMarkdown,
   canReportOwn,
@@ -50,6 +53,17 @@ export class MeetingSessionService implements OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
   private readonly useMock = inject(USE_MOCK_API);
   private readonly agendaSvc = inject(MeetingAgendaService);
+  /** The join requests and the guests (#17); provided beside this service. */
+  private readonly guests = inject(MeetingGuestsService, { optional: true });
+
+  constructor() {
+    // The guest list follows the loaded meeting: it loads for the lead of a public
+    // meeting and clears for everybody else.
+    effect(() => {
+      const m = this.meeting();
+      untracked(() => this.guests?.sync(m));
+    });
+  }
 
   readonly loading = signal(false);
   readonly error = signal(false);
@@ -604,6 +618,23 @@ export class MeetingSessionService implements OnDestroy {
           voted: msg.cast ?? 0,
           present: msg.present ?? 0,
           revealed: msg.revealed ?? true,
+          ...(msg.presentMembers !== undefined ? { presentMembers: msg.presentMembers } : {}),
+          ...(msg.presentGuests !== undefined ? { presentGuests: msg.presentGuests } : {}),
+        });
+        break;
+      case 'guest_requested':
+      case 'guest_updated':
+        this.guests?.apply(msg.guest);
+        break;
+      case 'guest_counts':
+        // The public participation changed (switch, mode, code, a decision).
+        this.meeting.set({
+          ...m,
+          publicJoin: msg.publicJoin ?? m.publicJoin,
+          guestsMode: msg.guestsMode ?? m.guestsMode,
+          joinCode: msg.joinCode !== undefined ? msg.joinCode : m.joinCode,
+          admittedGuests: msg.admittedGuests,
+          pendingGuests: msg.pendingGuests ?? m.pendingGuests,
         });
         break;
       case 'vote_closed':

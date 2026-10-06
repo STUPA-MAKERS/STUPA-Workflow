@@ -68,6 +68,11 @@ import type {
   SearchResults,
   MeetingPageWire,
   MeetingPatchBody,
+  MeetingGuest,
+  MeetingDefaults,
+  JoinLink,
+  PublicMeetingHead,
+  GuestMe,
   NewApplication,
   Page,
   Principal,
@@ -844,11 +849,111 @@ export class ApiClient {
       majorityRule?: 'simple' | 'absolute' | 'two_thirds';
       secret?: boolean;
       quorumPercent?: number | null;
+      /** Admitted guests vote too (no quorum). `undefined` lets the server choose. */
+      guestsVote?: boolean | null;
     },
   ): Observable<Meeting> {
     return this.http
       .post<MeetingOutWire>(`${this.base}/meetings/${meetingId}/votes`, body)
       .pipe(map(mapMeeting));
+  }
+
+  /** GET /meetings/{id}/guests — the join requests and guests (`session.manage`). */
+  listMeetingGuests(meetingId: Uuid): Observable<MeetingGuest[]> {
+    return this.http.get<MeetingGuest[]>(`${this.base}/meetings/${meetingId}/guests`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** POST /meetings/{id}/guests/{guestId}/{admit|reject|remove} — decide on a guest. */
+  decideMeetingGuest(
+    meetingId: Uuid,
+    guestId: Uuid,
+    action: 'admit' | 'reject' | 'remove',
+  ): Observable<MeetingGuest> {
+    return this.http.post<MeetingGuest>(
+      `${this.base}/meetings/${meetingId}/guests/${guestId}/${action}`,
+      {},
+      { context: skipLoading() },
+    );
+  }
+
+  /** POST /meetings/{id}/guests/{guestId}/rename — the lead corrects the name of a guest. */
+  renameMeetingGuest(meetingId: Uuid, guestId: Uuid, displayName: string): Observable<MeetingGuest> {
+    return this.http.post<MeetingGuest>(
+      `${this.base}/meetings/${meetingId}/guests/${guestId}/rename`,
+      { displayName },
+    );
+  }
+
+  /** POST /meetings/{id}/guests/admit-all — admit every open request. */
+  admitAllMeetingGuests(meetingId: Uuid): Observable<MeetingGuest[]> {
+    return this.http.post<MeetingGuest[]>(
+      `${this.base}/meetings/${meetingId}/guests/admit-all`,
+      {},
+    );
+  }
+
+  /** GET /gremien/{id}/meeting-defaults — the defaults of a new meeting (`session.manage`). */
+  meetingDefaults(gremiumId: Uuid): Observable<MeetingDefaults> {
+    return this.http.get<MeetingDefaults>(`${this.base}/gremien/${gremiumId}/meeting-defaults`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** GET /meetings/{id}/join-link — the join code, URL and QR matrix (`session.manage`). */
+  getJoinLink(meetingId: Uuid): Observable<JoinLink> {
+    return this.http.get<JoinLink>(`${this.base}/meetings/${meetingId}/join-link`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** POST /meetings/{id}/join-code/rotate — a new code; the open requests become void. */
+  rotateJoinCode(meetingId: Uuid): Observable<JoinLink> {
+    return this.http.post<JoinLink>(`${this.base}/meetings/${meetingId}/join-code/rotate`, {});
+  }
+
+  /** GET /public/meetings/{code} — the head of a public meeting (no login). */
+  publicMeeting(code: string): Observable<PublicMeetingHead> {
+    return this.http.get<PublicMeetingHead>(`${this.base}/public/meetings/${code}`, {
+      context: skipLoading(),
+    });
+  }
+
+  /**
+   * POST /public/meetings/join/{code} — ask to join. The server sets the HttpOnly device
+   * cookie; the page never sees the token.
+   */
+  joinPublicMeeting(code: string, displayName: string, altcha: string | null): Observable<GuestMe> {
+    return this.http.post<GuestMe>(`${this.base}/public/meetings/join/${code}`, {
+      displayName,
+      altcha,
+    });
+  }
+
+  /** GET /public/meetings/{code}/me — the own request or participation of this device. */
+  guestMe(code: string): Observable<GuestMe> {
+    return this.http.get<GuestMe>(`${this.base}/public/meetings/${code}/me`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** PATCH /public/meetings/{code}/me — change the name of an open request. */
+  renameGuestMe(code: string, displayName: string): Observable<GuestMe> {
+    return this.http.patch<GuestMe>(`${this.base}/public/meetings/${code}/me`, { displayName });
+  }
+
+  /** DELETE /public/meetings/{code}/me — withdraw the request or leave the meeting. */
+  leavePublicMeeting(code: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/public/meetings/${code}/me`);
+  }
+
+  /** POST /public/meetings/{code}/votes/{voteId}/ballot — the ballot of an admitted guest. */
+  castGuestBallot(code: string, voteId: Uuid, choice: string): Observable<BallotResult> {
+    return this.http.post<BallotResult>(
+      `${this.base}/public/meetings/${code}/votes/${voteId}/ballot`,
+      { choice },
+    );
   }
 
   /** DELETE /meetings/{id}/votes/{voteId} — delete a motion (incl. ballots). */

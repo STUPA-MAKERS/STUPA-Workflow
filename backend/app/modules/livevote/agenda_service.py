@@ -282,6 +282,13 @@ class AgendaService:
             row.title = title.strip()
             changed.append("title")
         if non_public is not None and non_public != row.non_public:
+            if non_public and await self._has_guest_vote(row.id):
+                # #17: guests saw and voted on this item. It cannot become non-public
+                # afterwards, or the guest view would have shown non-public content.
+                raise ConflictError(
+                    "Guests voted on this agenda item; it cannot become non-public.",
+                    code="guests_vote_on_item",
+                )
             row.non_public = non_public
             changed.append("nonPublic")
         if changed:
@@ -291,6 +298,21 @@ class AgendaService:
         await self.session.flush()
         await self.session.commit()
         return await self.list(meeting_id)
+
+    async def _has_guest_vote(self, item_id: UUID) -> bool:
+        """Tell if the item has an open or closed vote with guests (#17)."""
+        from app.modules.voting.models import Vote
+
+        found = await self.session.scalar(
+            select(Vote.id)
+            .where(
+                Vote.agenda_item_id == item_id,
+                Vote.status.in_(("open", "closed")),
+                Vote.config["guestsVote"].as_boolean().is_(True),
+            )
+            .limit(1)
+        )
+        return found is not None
 
     async def reorder(
         self, meeting_id: UUID, item_ids: list[UUID], *, actor: str | None = None

@@ -448,7 +448,8 @@ async def test_header_meta_resolves_protokollant_name() -> None:
     """Without keeper periods, protokollant_id resolves the name through `session.scalar`."""
     session = FakeSession()
     svc = _service(session)
-    session.scalar_results = ["Frau Schmidt"]
+    # The guest count of #17 comes first (no guests).
+    session.scalar_results = [0, "Frau Schmidt"]
     meeting = _meeting(protokollant_id=uuid4())
     header = await svc._header_meta(cast("Any", meeting))
     assert header.protokollant == "Frau Schmidt"
@@ -465,7 +466,8 @@ async def test_header_meta_public_redacts_names_keeps_counts() -> None:
     """
     session = FakeSession()
     svc = _service(session)
-    session.scalar_results = ["Frau Schmidt"]
+    # The guest count of #17 comes first (no guests).
+    session.scalar_results = [0, "Frau Schmidt"]
     meeting = _meeting(protokollant_id=uuid4())
     header = await svc._header_meta(cast("Any", meeting), public=True)
     assert header.protokollant is None and header.keepers == []
@@ -551,7 +553,7 @@ async def test_send_subject_and_body_include_gremium_and_date() -> None:
     )
     # has_non_public is false, then the quorate member count, then gremium_name for
     # _send. _meeting sets protokollant_id to None, so no protokollant scalar is read.
-    session.scalar_results = [0, 5, "StuPa"]
+    session.scalar_results = [0, 0, 5, "StuPa"]  # #17: the guest count first
     await _service(
         session, storage=ProtoStorage(), typst=FakeTypst(), mail_queue=mail
     ).finalize(PID, now=NOW)

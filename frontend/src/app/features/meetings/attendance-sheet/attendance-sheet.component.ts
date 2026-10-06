@@ -36,6 +36,11 @@ import {
 } from '../meeting-delegation-card.component';
 import { LeadSubstituteDialogComponent } from '../lead-substitute-dialog/lead-substitute-dialog.component';
 import { meetingLine } from '../meetings-display.util';
+import { MeetingGuestsService } from '../meeting-guests.service';
+import { GuestListComponent } from '../guests/guest-list.component';
+import { GuestRequestsComponent } from '../guests/guest-requests.component';
+import { JoinLinkComponent } from '../public-join/join-link.component';
+import { SegmentedComponent, type SegmentedOption } from '@stupa-makers/ui-kit';
 
 /** One attendance change. `note` is the reason of an excuse; omitted keeps the stored one. */
 export interface AttendanceChange {
@@ -130,6 +135,10 @@ const SELF_CHOICES: readonly { value: Choice; label: TranslationKey }[] = [
     ScrollFadeDirective,
     MeetingDelegationCardComponent,
     LeadSubstituteDialogComponent,
+    GuestListComponent,
+    GuestRequestsComponent,
+    JoinLinkComponent,
+    SegmentedComponent,
   ],
   templateUrl: './attendance-sheet.component.html',
   styleUrl: './attendance-sheet.component.scss',
@@ -159,6 +168,13 @@ export class AttendanceSheetComponent {
   readonly statusReset = output<Attendance>();
   /** O23: the delegation of this member (the `conflictId`) was revoked; clear the mark. */
   readonly conflictResolved = output<Uuid>();
+  /** "Groß zeigen": the page shows the large QR code (#17). */
+  readonly showQr = output<void>();
+
+  /** The join requests and the guests; the lead of a public meeting has them loaded. */
+  protected readonly guests = inject(MeetingGuestsService, { optional: true });
+  /** The tab of the lead: the members or the guests. */
+  protected readonly tab = signal<'members' | 'guests'>('members');
 
   protected readonly query = signal('');
   /** The delegations of the meeting: all of them for the lead, else the own ones. */
@@ -203,6 +219,44 @@ export class AttendanceSheetComponent {
   protected readonly meetingLine = computed(() =>
     meetingLine(this.meeting(), this.i18n.formatLocale()),
   );
+
+  /** The guest part shows: the lead of a public meeting, with the list loaded. */
+  protected readonly guestsActive = computed(
+    () => !!this.guests && this.guests.meetingId() === this.meeting().id,
+  );
+  /** The admitted guests: the loaded list of the lead, else the count of the meeting. */
+  private readonly admittedGuests = computed(() =>
+    this.guestsActive() ? this.guests!.admittedCount() : this.meeting().admittedGuests,
+  );
+  /** "26 anwesend: 19 Mitglieder + 7 Gäste", or `null` without guests in the meeting. */
+  protected readonly guestSummary = computed(() => {
+    const m = this.meeting();
+    if (!m.publicJoin && !this.admittedGuests()) return null;
+    const members = this.attendance().filter((a) => a.status === 'present').length;
+    const guests = this.admittedGuests();
+    return { total: members + guests, members, guests };
+  });
+  /** The tabs "Mitglieder 19 / 23" and "Gäste 7" (watch mode: "Gäste (zuschauend) 7"). */
+  protected readonly tabs = computed<SegmentedOption[]>(() => {
+    const present = this.attendance().filter((a) => a.status === 'present').length;
+    const watch = this.meeting().guestsMode === 'watch';
+    return [
+      {
+        value: 'members',
+        label: this.i18n.translate('guests.tab.members', { n: present, m: this.attendance().length }),
+      },
+      {
+        value: 'guests',
+        label: this.i18n.translate(watch ? 'guests.tab.guestsWatching' : 'guests.tab.guests', {
+          n: this.admittedGuests(),
+        }),
+      },
+    ];
+  });
+
+  setTab(value: string | null): void {
+    if (value === 'members' || value === 'guests') this.tab.set(value);
+  }
 
   /** The counts per state. A member who does not lead reads one "abwesend" count (Z2). */
   protected readonly counts = computed(() => {

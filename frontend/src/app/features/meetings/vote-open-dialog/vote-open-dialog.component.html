@@ -37,6 +37,21 @@
       (checkedChange)="secret.set($event)"
       ><span class="vod__switchLabel">{{ 'meetings.vote.secret' | t }}</span></app-switch
     >
+
+    @if (guestsAllowed()) {
+      <app-switch
+        [id]="'vod-guests'"
+        [hint]="(guestsLocked() ? 'guests.vote.switchNonPublic' : guestsVote() ? 'guests.vote.switchOn' : 'guests.vote.switchOff') | t: { n: meeting().admittedGuests }"
+        [disabled]="guestsLocked()"
+        [checked]="guestsVote() && !guestsLocked()"
+        (checkedChange)="guestsVote.set($event)"
+        ><span class="vod__switchLabel">{{ 'guests.vote.switch' | t }}</span></app-switch
+      >
+      <p class="vod__voters" role="status">
+        <app-icon name="users" [size]="16" />
+        <span>{{ votersLine() }}</span>
+      </p>
+    }
   </form>
   <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
   <app-button dialog-footer variant="fill" [loading]="submitting()" (click)="submit()">

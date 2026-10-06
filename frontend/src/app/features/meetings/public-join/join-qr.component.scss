@@ -1,0 +1,72 @@
+:host {
+  display: contents;
+}
+.jq {
+  position: relative;
+  flex: none;
+}
+.jq__trigger--on {
+  --btn-bg: var(--color-selected);
+}
+.jq__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+.jq__pop {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  inset-inline-end: 0;
+  z-index: 21;
+  width: 23rem;
+  max-width: calc(100vw - 2 * var(--space-4));
+  padding: var(--space-4);
+  border-radius: var(--radius-xl, 20px);
+  background: var(--color-surface-1);
+  box-shadow: var(--shadow-lg);
+}
+.jq__body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+/* Black on white in both themes: a scanner needs the contrast. */
+.jq__card {
+  width: min(100%, 17rem);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: #fff;
+}
+.jq__qr {
+  width: 100%;
+}
+.jq__scan {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-h3, 1.125rem);
+  font-weight: var(--fw-semibold);
+}
+.jq__url {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  user-select: all;
+  color: var(--color-text);
+  font-size: var(--fs-small);
+  text-decoration: none;
+}
+.jq__code {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.jq__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}

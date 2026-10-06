@@ -318,6 +318,10 @@ async def create_meeting_vote(meeting_id: str, vote: S.MeetingVoteOpenBody) -> d
     The agenda item can be a free-text item or an application item. The gremium of the
     meeting votes, and the server counts its eligible voters. Requires the lead of the
     meeting, the minute-taker, or the gremium permission `vote.manage`.
+
+    In a public meeting where guests vote, `guestsVote` (default on for a public item)
+    lets the admitted guests vote too: such a vote has no quorum, the majority of the
+    cast ballots decides.
     """
     return await api().post(f"/meetings/{meeting_id}/votes", json=dump_create(vote))
 
@@ -333,6 +337,84 @@ async def delete_meeting_vote(meeting_id: str, vote_id: str) -> dict:
     first). Every delete is audited.
     """
     return await api().delete(f"/meetings/{meeting_id}/votes/{vote_id}")
+
+
+# Public meeting with a QR code (#17). The meeting lead (session.manage in the gremium,
+# or admin) decides on the join requests. Guests vote themselves on their phones; no
+# tool casts a ballot.
+
+
+@group.tool
+async def list_meeting_guests(meeting_id: str) -> list[dict]:
+    """List the join requests and the guests of a public meeting.
+
+    The open requests (`pending`) come first. `displayName` is null once a guest is
+    pseudonymized ("Gast {number}"). Requires session.manage in the meeting's gremium.
+    """
+    return await api().get(f"/meetings/{meeting_id}/guests")
+
+
+@group.tool
+async def admit_meeting_guest(meeting_id: str, guest_id: str) -> dict:
+    """Admit a waiting guest (409 `guest_not_pending` otherwise).
+
+    A guest admitted while a vote with guests is open votes in it too. Audited
+    (`guest_admitted`, ids only).
+    """
+    return await api().post(f"/meetings/{meeting_id}/guests/{guest_id}/admit")
+
+
+@group.tool
+async def reject_meeting_guest(meeting_id: str, guest_id: str) -> dict:
+    """Reject a waiting guest. The device may ask again after 3 minutes."""
+    return await api().post(f"/meetings/{meeting_id}/guests/{guest_id}/reject")
+
+
+@group.tool
+async def remove_meeting_guest(meeting_id: str, guest_id: str) -> dict:
+    """Remove an admitted guest (409 `guest_not_admitted` otherwise).
+
+    The guest can no longer vote; the ballots already cast stay counted.
+    """
+    return await api().post(f"/meetings/{meeting_id}/guests/{guest_id}/remove")
+
+
+@group.tool
+async def rename_meeting_guest(meeting_id: str, guest_id: str, display_name: str) -> dict:
+    """Give a guest another name (2 to 80 characters).
+
+    A pseudonymized guest gives 409 `guest_pseudonymized`. The audit entry holds the
+    guest id only, never the name.
+    """
+    return await api().post(
+        f"/meetings/{meeting_id}/guests/{guest_id}/rename",
+        json={"displayName": display_name},
+    )
+
+
+@group.tool
+async def admit_all_meeting_guests(meeting_id: str) -> list[dict]:
+    """Admit every waiting guest at once. Returns the newly admitted guests."""
+    return await api().post(f"/meetings/{meeting_id}/guests/admit-all")
+
+
+@group.tool
+async def get_meeting_join_link(meeting_id: str) -> dict:
+    """Get the join link of a public meeting: `joinCode`, `joinUrl` and the QR matrix.
+
+    409 `meeting_not_public` while public participation is off.
+    """
+    return await api().get(f"/meetings/{meeting_id}/join-link")
+
+
+@group.tool
+async def rotate_meeting_join_code(meeting_id: str) -> dict:
+    """Replace the join code of a public meeting.
+
+    The old link stops working and the open requests become void; the admitted guests
+    stay. Audited (`meeting_join_code_rotated`).
+    """
+    return await api().post(f"/meetings/{meeting_id}/join-code/rotate")
 
 
 @group.tool

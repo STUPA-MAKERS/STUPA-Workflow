@@ -113,9 +113,11 @@ export class VotePanelComponent {
   /** "Einfache Mehrheit · Quorum 12 · geheime Abstimmung". */
   protected readonly rules = computed(() => {
     const v = this.vote();
+    // A vote with guests has no quorum: the majority of the cast votes decides (#17).
+    const family = this.guestsVote() ? 'vote.majorityCast' : 'vote.majority';
     const parts = [
       this.i18n.translate(
-        `vote.majority.${v.majorityRule ?? v.config.majorityRule ?? 'simple'}` as TranslationKey,
+        `${family}.${v.majorityRule ?? v.config.majorityRule ?? 'simple'}` as TranslationKey,
       ),
     ];
     const quorum = v.quorum ?? v.config.quorum;
@@ -129,6 +131,22 @@ export class VotePanelComponent {
     }
     if (this.secret()) parts.push(this.i18n.translate('meetings.vote.secretShort'));
     return parts.join(' · ');
+  });
+
+  /** Admitted guests vote too (public meeting, #17). */
+  protected readonly guestsVote = computed(
+    () => !!this.vote().guestsVote || !!this.vote().config.guestsVote,
+  );
+  /** "19 Mitglieder + 7 Gäste anwesend" for a vote with guests, else `null`. */
+  protected readonly composition = computed(() => {
+    if (!this.guestsVote()) return null;
+    const { presentMembers, presentGuests } = this.vote().tally;
+    if (presentMembers === null || presentMembers === undefined) return null;
+    if (presentGuests === null || presentGuests === undefined) return null;
+    return this.i18n.translate('guests.vote.composition', {
+      members: presentMembers,
+      guests: presentGuests,
+    });
   });
 
   protected readonly question = computed(
@@ -172,6 +190,16 @@ export class VotePanelComponent {
     if (v.status !== 'closed') return null;
     const t = v.tally;
     const cast = t.voted ?? Object.values(t.counts).reduce((sum, n) => sum + n, 0);
+    if (this.guestsVote()) {
+      // "Abgegeben 24 · Mehrheit der abgegebenen Stimmen", then the room (#17).
+      const parts = [
+        this.i18n.translate('guests.vote.castN', { n: cast }),
+        this.i18n.translate('guests.vote.majorityOfCast'),
+      ];
+      const comp = this.composition();
+      if (comp) parts.unshift(comp);
+      return parts.join(' · ');
+    }
     const parts = [this.i18n.translate('voting.beamer.votesOf', { cast, eligible: t.eligible })];
     if ((v.quorum ?? v.config.quorum) && t.failedReason !== 'quorum') {
       const state = this.i18n.translate(t.quorumMet ? 'vote.tally.quorumMet' : 'vote.tally.quorumMissed');

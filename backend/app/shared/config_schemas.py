@@ -463,6 +463,17 @@ class VoteConfig(_CamelModel):
     abstain_counts_quorum: bool = Field(default=True, alias="abstainCountsQuorum")
     secret: bool = False
     tie_break: Literal["passed", "rejected", "tie"] = Field(default="rejected", alias="tieBreak")
+    # Public meeting (#17): the admitted guests vote too. Such a vote has no quorum,
+    # only the majority of the cast ballots counts. Only a meeting vote in a meeting
+    # with ``guests_mode = vote`` sets it, never on a non-public agenda item.
+    guests_vote: bool = Field(default=False, alias="guestsVote")
+
+    @model_validator(mode="after")
+    def _guests_vote_has_no_quorum(self) -> VoteConfig:
+        """A vote with guests has no quorum (#17): only the majority of the cast ballots."""
+        if self.guests_vote and self.quorum is not None:
+            raise ValueError("a vote with guests (guestsVote) has no quorum")
+        return self
 
     @field_validator("options")
     @classmethod

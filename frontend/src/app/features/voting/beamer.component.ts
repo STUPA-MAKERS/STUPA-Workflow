@@ -10,14 +10,19 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink, type UrlTree } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
-import type { AgendaItem, Meeting, Vote, VoteResult } from '@core/api/models';
+import type { AgendaItem, JoinLink, Meeting, Vote, VoteResult } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ThemeService } from '@core/theme/theme.service';
 import { LiveVoteService, type LiveVoteSession } from '@core/ws/live-vote.service';
 import type { VoteClosedMsg } from '@core/ws/ws-messages';
 import { IconComponent } from '@stupa-makers/ui-kit';
-import { type BeamerVote, MeetingBeamerComponent } from '../meetings/meeting-beamer.component';
+import {
+  type BeamerJoin,
+  type BeamerPresence,
+  type BeamerVote,
+  MeetingBeamerComponent,
+} from '../meetings/meeting-beamer.component';
 import { BEAMER_FROM_PARAM, beamerOrigin } from './beamer-link.util';
 
 /** The exit control hides when the pointer rests this long (ms). */
@@ -74,6 +79,31 @@ export class BeamerComponent implements OnDestroy {
   /** The vote on the screen as `GET /votes/{id}` gave it. */
   private readonly loaded = signal<Vote | null>(null);
   private requested: string | null = null;
+  /** The join link of a public meeting (#17) and the present members. */
+  private readonly link = signal<JoinLink | null>(null);
+  private readonly presentMembers = signal(0);
+
+  /** The public participation: the stream first, then the meeting read. */
+  private readonly publicJoin = computed(() => {
+    const counts = this.session.guestCounts();
+    if (counts?.publicJoin !== undefined) return counts.publicJoin;
+    return this.meeting()?.publicJoin ?? false;
+  });
+
+  /** The join code on the screen: the large card while idle, a corner badge in a vote. */
+  readonly join = computed<BeamerJoin | null>(() => {
+    const l = this.link();
+    if (!l || !this.publicJoin() || this.meeting()?.status === 'closed') return null;
+    return { code: l.joinCode, url: l.joinUrl, qr: l.qr };
+  });
+
+  /** "26 Anwesende · 19 Mitglieder + 7 Gäste" while the meeting is public; never names. */
+  readonly presence = computed<BeamerPresence | null>(() => {
+    if (!this.join()) return null;
+    const counts = this.session.guestCounts();
+    const guests = counts?.admittedGuests ?? this.meeting()?.admittedGuests ?? 0;
+    return { members: this.presentMembers(), guests };
+  });
 
   readonly logoSrc = computed(() => `assets/logos/stupa-wordmark-${this.theme.resolved()}.svg`);
 
@@ -158,6 +188,16 @@ export class BeamerComponent implements OnDestroy {
         if (id) this.load(id);
       });
     });
+    // A new join code (rotated) or the public participation switched on: read the link.
+    effect(() => {
+      const code = this.session.guestCounts()?.joinCode;
+      const on = this.publicJoin();
+      untracked(() => {
+        if (routeId && on && (code === undefined || code !== this.link()?.joinCode)) {
+          this.loadLink(routeId);
+        }
+      });
+    });
     // The close: read the vote again for the exact turnout and the quorum.
     effect(() => {
       const closed = this.session.result();
@@ -200,6 +240,8 @@ export class BeamerComponent implements OnDestroy {
       voted: live?.cast ?? v.tally.voted ?? 0,
       present: live?.present ?? v.tally.present ?? 0,
       quorumMet: live?.quorumMet ?? v.tally.quorumMet,
+      presentMembers: live?.presentMembers ?? v.tally.presentMembers ?? null,
+      presentGuests: live?.presentGuests ?? v.tally.presentGuests ?? null,
     });
   }
 
@@ -226,6 +268,9 @@ export class BeamerComponent implements OnDestroy {
       counts: null,
       result: v.result,
       failedReason: v.tally.failedReason ?? null,
+      guestsVote: !!v.guestsVote || !!v.config.guestsVote,
+      presentMembers: v.tally.presentMembers ?? null,
+      presentGuests: v.tally.presentGuests ?? null,
       ...over,
     };
   }
@@ -244,6 +289,18 @@ export class BeamerComponent implements OnDestroy {
     this.api.listAgenda(id, { quiet: true }).subscribe({
       next: (rows) => this.agenda.set(rows),
       error: () => {},
+    });
+    this.api.listAttendance(id, { quiet: true }).subscribe({
+      next: (rows) => this.presentMembers.set(rows.filter((a) => a.status === 'present').length),
+      error: () => {},
+    });
+  }
+
+  /** The join link of a public meeting; the beamer route already needs `session.manage`. */
+  private loadLink(id: string): void {
+    this.api.getJoinLink(id).subscribe({
+      next: (l) => this.link.set(l),
+      error: () => this.link.set(null),
     });
   }
 

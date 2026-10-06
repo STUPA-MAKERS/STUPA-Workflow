@@ -1530,3 +1530,43 @@ def test_audit_verification_and_role_key_report(
         conn.execute(text("DELETE FROM gremium WHERE id = :g"), {"g": gremium})
         conn.execute(text("DELETE FROM role WHERE id = :i"), {"i": role})
     command.upgrade(alembic_cfg, "head")
+
+
+def test_public_meeting_guests(alembic_cfg: Config, engine: Engine) -> None:
+    """Migration 4c2570138998 (#17): the meeting columns, `meeting_guest`, vote counts.
+
+    The downgrade drops them; the upgrade is idempotent on a schema that has them.
+    """
+    from alembic.script import ScriptDirectory
+
+    script = ScriptDirectory.from_config(alembic_cfg)
+    before = script.get_revision("4c2570138998").down_revision
+    assert isinstance(before, str)
+    command.downgrade(alembic_cfg, before)
+    with engine.begin() as conn:
+        assert not _has_table(conn, "meeting_guest")
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        assert _has_table(conn, "meeting_guest")
+        cols = set(
+            conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'meeting' AND column_name IN "
+                    "('public_join','guests_mode','join_code')"
+                )
+            ).scalars()
+        )
+        assert cols == {"public_join", "guests_mode", "join_code"}
+        checks = set(
+            conn.execute(
+                text(
+                    "SELECT conname FROM pg_constraint "
+                    "WHERE conrelid = 'meeting_guest'::regclass AND contype = 'c'"
+                )
+            ).scalars()
+        )
+        assert checks == {"ck_meeting_guest_status"}
+        assert conn.execute(
+            text("SELECT count(*) FROM pg_indexes WHERE indexname = 'uq_meeting_join_code_open'")
+        ).scalar_one() == 1

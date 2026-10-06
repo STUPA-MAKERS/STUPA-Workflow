@@ -102,6 +102,12 @@ class TallyOut(_CamelModel):
     failed_reason: Literal["quorum", "majority"] | None = Field(
         default=None, alias="failedReason"
     )
+    # Attendance of a meeting vote (#17): the present members and the admitted guests.
+    # An open vote shows the values of now, a closed vote the values fixed at the
+    # close. None for a vote without a meeting and for a vote that closed before the
+    # values were stored.
+    present_members: int | None = Field(default=None, alias="presentMembers")
+    present_guests: int | None = Field(default=None, alias="presentGuests")
 
 
 class MyBallot(_CamelModel):
@@ -146,6 +152,9 @@ class VoteOut(_CamelModel):
     # The real moment when the vote ended (close or cancel). None while it runs.
     closed_at: datetime | None = Field(default=None, alias="closedAt")
     tally: TallyOut
+    # A vote with guests (#17): no quorum, only the majority of the cast ballots. A
+    # copy of ``config.guestsVote`` for the vote card.
+    guests_vote: bool = Field(default=False, alias="guestsVote")
     # The own ballot of the caller. Only ``GET /votes/{id}`` sets it. Other responses
     # and the live-vote events leave it None.
     my_ballot: MyBallot | None = Field(default=None, alias="myBallot")

@@ -404,6 +404,14 @@ class MeetingCreate(WireModel):
     date: str | None = Field(default=None, description="ISO date")
     startTime: str | None = Field(default=None, description="HH:MM")
     protokollantId: str | None = None
+    publicJoin: bool | None = Field(
+        default=None,
+        description="Public participation with a QR code: persons without an account ask "
+        "to join, the meeting lead admits them.",
+    )
+    guestsMode: Literal["vote", "watch"] | None = Field(
+        default=None, description="Admitted guests vote (`vote`) or only follow (`watch`)."
+    )
 
 
 class MeetingPatch(WireModel):
@@ -412,6 +420,15 @@ class MeetingPatch(WireModel):
     date: str | None = None
     startTime: str | None = None
     protokollantId: str | None = None
+    publicJoin: bool | None = Field(
+        default=None,
+        description="Switching it off voids the open join requests and removes the "
+        "admitted guests; their cast ballots stay counted.",
+    )
+    guestsMode: Literal["vote", "watch"] | None = Field(
+        default=None,
+        description="`watch` gives 409 `guest_vote_open` while a vote with guests is open.",
+    )
 
 
 class MeetingVoteOpenBody(WireModel):
@@ -424,6 +441,12 @@ class MeetingVoteOpenBody(WireModel):
     secret: bool = False
     # The server counts the eligible voters from the roster of the gremium.
     quorumPercent: int | None = None
+    guestsVote: bool | None = Field(
+        default=None,
+        description="Public meeting: the admitted guests vote too (no quorum, majority of "
+        "the cast ballots). Default: on when guests vote in the meeting and the item is "
+        "public. Never on a non-public item (422).",
+    )
 
 
 class VoteCreate(WireModel):

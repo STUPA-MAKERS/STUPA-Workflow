@@ -20,6 +20,7 @@ import { mediaQuerySignal } from '../../../layout/media-query';
 import { KeeperMenuComponent } from '../keeper-menu/keeper-menu.component';
 import { keeperNames } from '../keepers.util';
 import { clockTime } from '../meetings-display.util';
+import { MeetingGuestsService } from '../meeting-guests.service';
 
 /**
  * The panel that is open. The minute-taker menu is a popover above the dock (a bottom
@@ -98,6 +99,23 @@ export class SessionDockComponent {
   readonly pickHandover = output<Uuid>();
   /** Discard the planned handover. */
   readonly cancelHandover = output<void>();
+
+  private readonly guests = inject(MeetingGuestsService, { optional: true });
+
+  /**
+   * The guests of a public meeting (#17): "Anwesend 19 + 7 Gäste" on the chip and the
+   * number of open requests as a badge (the lead only), or `null` without the public
+   * participation.
+   */
+  protected readonly guestChip = computed<{ admitted: number; pending: number } | null>(() => {
+    const m = this.meeting();
+    if (!m.publicJoin && !m.admittedGuests) return null;
+    const counts = this.guests?.countsFor(m) ?? {
+      pending: m.pendingGuests,
+      admitted: m.admittedGuests,
+    };
+    return { admitted: counts.admitted, pending: m.status === 'closed' ? 0 : counts.pending };
+  });
 
   protected readonly presentCount = computed(
     () => this.attendance().filter((a) => a.status === 'present').length,

@@ -90,6 +90,12 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     result_branch_transition_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("transition.id", ondelete="SET NULL"), nullable=True
     )
+    # The attendance when a meeting vote closed (#17): the present members and the
+    # admitted guests. The close of a meeting vote sets both. NULL for an open vote, a
+    # vote without a meeting, and a vote that closed before the columns existed. The
+    # protocol and the result cards show them as counts, never as names.
+    present_members: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    present_guests: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
         # ``cancelled``: the application left the vote state manually, so the vote ends

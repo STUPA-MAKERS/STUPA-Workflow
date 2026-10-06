@@ -56,6 +56,10 @@ dependencies = [
     # age encryption for the backup archives. pyrage is the rust `age` implementation,
     # so an archive stays readable with the standard `age` CLI off host.
     "pyrage>=1.2",
+    # QR code of the join link of a public meeting (#17). segno is BSD-3-Clause, pure
+    # Python and has no dependencies. The API sends the module matrix; the browser
+    # draws it, so no QR library runs in the frontend bundle.
+    "segno>=1.6",
 ]
 
 [project.optional-dependencies]

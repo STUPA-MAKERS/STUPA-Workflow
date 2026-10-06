@@ -15,7 +15,7 @@ from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
-from app.modules.livevote.models import MeetingAttendance
+from app.modules.livevote.models import MeetingAttendance, MeetingGuest
 from app.modules.livevote.schemas import MeetingVoteOut
 from app.modules.livevote.service.service_base import MeetingServiceBase
 from app.modules.voting.models import Ballot, Vote, VotedMarker
@@ -51,6 +51,15 @@ class VoteReadOps(MeetingServiceBase):
         # these values. One batched query keeps this free of N+1.
         tallies = await self._vote_tallies(rows)
         present_by_meeting = await self._present_by_meeting(meeting_ids)
+        guests_by_meeting = await self.admitted_guests_by_meeting(meeting_ids)
+        # #17: a vote with guests counts the guests who voted and left since then too.
+        guest_votes = [
+            v.id
+            for v in rows
+            if v.status not in ("closed", "cancelled")
+            and bool((v.config if isinstance(v.config, dict) else {}).get("guestsVote"))
+        ]
+        late_guests = await self._departed_guest_voters(guest_votes) if guest_votes else {}
         # The substitute ballots of absent delegators per meeting and gremium top up
         # the reveal denominator. The voting service applies the same rule in
         # `open_tally_revealed`, so the two paths cannot drift. The query runs only
@@ -78,7 +87,23 @@ class VoteReadOps(MeetingServiceBase):
             secret = config.secret
             counts, leading, reason = tallies.get(v.id, (None, None, None))
             voted = sum((counts or {}).values())
+            members: int | None
+            guests: int | None
+            if v.status in ("closed", "cancelled"):
+                # The attendance fixed at the close (#17). A cancelled vote and an
+                # older closed vote have none.
+                members = getattr(v, "present_members", None)
+                guests = getattr(v, "present_guests", None)
+            else:
+                members = present_by_meeting.get(v.meeting_id, 0)
+                guests = guests_by_meeting.get(v.meeting_id, 0)
+            # A vote with guests expects the ballots of the admitted guests too, and
+            # keeps the guests who voted and left since then.
             present = present_by_meeting.get(v.meeting_id, 0)
+            if config.guests_vote and v.status not in ("closed", "cancelled"):
+                extra = late_guests.get(v.id, 0)
+                guests = (guests or 0) + extra
+                present += guests_by_meeting.get(v.meeting_id, 0) + extra
             # The reveal rule matches the voting service. A closed vote reveals. A
             # non-secret vote reveals when all expected ballots are in. The expected
             # ballots are the present members plus the substitutes of absent
@@ -113,6 +138,9 @@ class VoteReadOps(MeetingServiceBase):
                     closedAt=v.closed_at,
                     myBallot=own.get(v.id, MyBallot()) if principal is not None else None,
                     representedCast=v.id in represented,
+                    guestsVote=config.guests_vote,
+                    presentMembers=members,
+                    presentGuests=guests,
                 )
             )
         return out
@@ -194,6 +222,51 @@ class VoteReadOps(MeetingServiceBase):
                     MeetingAttendance.status == "present",
                 )
                 .group_by(MeetingAttendance.meeting_id)
+            )
+        ).all()
+        return {mid: n for mid, n in rows}
+
+    async def _departed_guest_voters(self, vote_ids: list[UUID]) -> dict[UUID, int]:
+        """Count per vote the guests with a ballot who are no longer admitted (#17)."""
+        from app.modules.voting.service import GUEST_VOTER_PREFIX
+
+        admitted = {
+            f"{GUEST_VOTER_PREFIX}{gid}"
+            for gid in (
+                await self.session.execute(
+                    select(MeetingGuest.id)
+                    .join(Vote, Vote.meeting_id == MeetingGuest.meeting_id)
+                    .where(Vote.id.in_(vote_ids), MeetingGuest.status == "admitted")
+                )
+            )
+            .scalars()
+            .all()
+        }
+        voters: dict[UUID, set[str]] = {}
+        for model in (Ballot, VotedMarker):
+            for vid, sub in (
+                await self.session.execute(
+                    select(model.vote_id, model.voter_sub).where(
+                        model.vote_id.in_(vote_ids),
+                        model.voter_sub.startswith(GUEST_VOTER_PREFIX),
+                    )
+                )
+            ).all():
+                voters.setdefault(vid, set()).add(sub)
+        return {vid: len(subs - admitted) for vid, subs in voters.items()}
+
+    async def admitted_guests_by_meeting(self, meeting_ids: list[UUID]) -> dict[UUID, int]:
+        """Return `{meeting_id: number of admitted guests}` (#17)."""
+        if not meeting_ids:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(MeetingGuest.meeting_id, func.count())
+                .where(
+                    MeetingGuest.meeting_id.in_(meeting_ids),
+                    MeetingGuest.status == "admitted",
+                )
+                .group_by(MeetingGuest.meeting_id)
             )
         ).all()
         return {mid: n for mid, n in rows}
@@ -337,6 +410,10 @@ class VoteReadOps(MeetingServiceBase):
                 select(Gremium.quorum_percent).where(Gremium.id == gremium_id)
             )
         ).scalar_one_or_none()
+
+    async def present_member_count(self, meeting_id: UUID) -> int:
+        """Return the present members of the meeting (#17: the base of a guest vote)."""
+        return (await self._present_by_meeting([meeting_id])).get(meeting_id, 0)
 
     async def vote_eligible_count(self, gremium_id: UUID) -> int:
         """Return the roster size for the quorum: active members with a `vote.cast` role."""

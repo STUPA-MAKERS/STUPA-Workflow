@@ -50,6 +50,7 @@ from app.modules.flow.router import router as flow_router
 from app.modules.forms.router import router as forms_router
 from app.modules.livevote.broker import RedisBroker
 from app.modules.livevote.locks import RedisLocker
+from app.modules.livevote.public_router import router as public_meeting_router
 from app.modules.livevote.router import router as livevote_router
 from app.modules.livevote.service import BrokerPublisher
 from app.modules.notifications.provider import close_mail_pool, create_mail_pool
@@ -92,6 +93,7 @@ api_router.include_router(applications_router)
 api_router.include_router(flow_router)
 api_router.include_router(voting_router)
 api_router.include_router(livevote_router)
+api_router.include_router(public_meeting_router)
 api_router.include_router(protocol_router)
 api_router.include_router(notifications_router)
 api_router.include_router(notification_settings_router)

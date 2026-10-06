@@ -245,6 +245,9 @@ export function mapMeetingVote(wire: MeetingVoteOutWire): MeetingVote {
     quorum: wire.quorum ?? null,
     openedAt: wire.openedAt ?? null,
     closedAt: wire.closedAt ?? null,
+    guestsVote: wire.guestsVote ?? false,
+    presentMembers: wire.presentMembers ?? null,
+    presentGuests: wire.presentGuests ?? null,
   };
 }
 
@@ -279,6 +282,12 @@ export function mapMeeting(wire: MeetingOutWire): Meeting {
     canFinalize: wire.canFinalize ?? false,
     keeperPeriods: wire.keeperPeriods ?? [],
     plannedHandover: wire.plannedHandover ?? null,
+    publicJoin: wire.publicJoin ?? false,
+    guestsMode: wire.guestsMode ?? 'vote',
+    joinCode: wire.joinCode ?? null,
+    admittedGuests: wire.admittedGuests ?? 0,
+    pendingGuests: wire.pendingGuests ?? 0,
+    publicJoinAllowed: wire.publicJoinAllowed ?? true,
   };
 }
 

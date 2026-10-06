@@ -66,7 +66,12 @@ from app.modules.delegations.models import (
     SubstituteGroupMember,
 )
 from app.modules.forms.models import FormVersion
-from app.modules.livevote.models import Meeting, MeetingAttendance, ProtocolKeeperPeriod
+from app.modules.livevote.models import (
+    Meeting,
+    MeetingAttendance,
+    MeetingGuest,
+    ProtocolKeeperPeriod,
+)
 from app.modules.notifications.models import NotificationPreference
 from app.modules.privacy.models import ErasureRequest
 from app.modules.protocol.models import Protocol
@@ -282,6 +287,15 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             [
                 ProtocolKeeperPeriod(
                     meeting_id=meeting.id, principal_id=old.id, handed_over_by=old.sub
+                ),
+                # #17: the old account decided on a join request of a guest.
+                MeetingGuest(
+                    meeting_id=meeting.id,
+                    seq=1,
+                    display_name="Gast",
+                    status="admitted",
+                    requested_at=datetime.now(UTC),
+                    decided_by=old.id,
                 ),
                 Protocol(meeting_id=meeting.id, gremium_id=seed.gremium_id, author=old.sub),
                 MeetingAttendance(

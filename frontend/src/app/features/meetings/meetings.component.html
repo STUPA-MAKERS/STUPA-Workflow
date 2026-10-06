@@ -143,6 +143,8 @@
     [meeting]="m"
     [item]="dialogs.voteItem()"
     [topNumber]="voteTopNumber()"
+    [rosterCount]="attendance().length"
+    [presentMembers]="presentMembers()"
     (closed)="dialogs.voteItem.set(null)"
     (opened)="dialogs.voteOpened($event)"
   />

@@ -47,6 +47,13 @@ describe('LiveVoteService', () => {
     expect(source.channels[0].sent[0]).toEqual({ type: 'subscribe' });
   });
 
+  it('keeps the public participation of the meeting (guest_counts)', () => {
+    const s = svc.open('m-1', { beamer: true });
+    const frame = { type: 'guest_counts', joinCode: '7KQ4MP', admittedGuests: 7 } as const;
+    source.channels[0].subject.next(frame);
+    expect(s.guestCounts()).toEqual(frame);
+  });
+
   it('opens the beamer stream read-only when requested', () => {
     const s = svc.open('m-1', { beamer: true });
     expect(source.lastBeamer).toBe(true);

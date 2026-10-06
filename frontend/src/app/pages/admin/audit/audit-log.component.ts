@@ -117,6 +117,14 @@ export const AUDIT_ACTIONS = [
   'attendance_set',
   'attendance_reset',
   'protokollant_handover',
+  // Public meeting with QR code (#17): only the ids of the guests, never their names.
+  'meeting_public_join_changed',
+  'meeting_join_code_rotated',
+  'guest_admitted',
+  'guest_rejected',
+  'guest_removed',
+  'guest_renamed',
+  'guest_admit_all',
   // Budget and money mutations. They mirror the BUDGET_* values in actions.py.
   'budget_node_create',
   'budget_node_update',

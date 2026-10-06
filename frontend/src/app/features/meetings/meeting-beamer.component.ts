@@ -2,7 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import type { MajorityRule, Quorum, VoteResult } from '@core/api/models';
+import type { MajorityRule, QrMatrix, Quorum, VoteResult } from '@core/api/models';
+import { QrCodeComponent, formatJoinCode } from '@shared/ui/qr-code/qr-code.component';
 import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { IconComponent } from '@stupa-makers/ui-kit';
@@ -25,6 +26,24 @@ export interface BeamerVote {
   counts: Readonly<Record<string, number>> | null;
   result: VoteResult | null;
   failedReason: 'quorum' | 'majority' | null;
+  /** Admitted guests vote too (#17): no quorum, the majority of the cast votes. */
+  guestsVote?: boolean;
+  /** The present members and the admitted guests, for "19 Mitglieder + 7 Gäste anwesend". */
+  presentMembers?: number | null;
+  presentGuests?: number | null;
+}
+
+/** The join code of a public meeting on the screen (#17): never a name, only the code. */
+export interface BeamerJoin {
+  code: string;
+  url: string;
+  qr: QrMatrix;
+}
+
+/** The people in the room: present members and admitted guests. */
+export interface BeamerPresence {
+  members: number;
+  guests: number;
 }
 
 /** The texts of the screen for one vote. */
@@ -41,6 +60,8 @@ interface BeamerText {
   passed: boolean;
   /** "Einfache Mehrheit · Quorum erreicht · 20 Stimmen". */
   outcome: string;
+  /** A vote with guests: "19 Mitglieder + 7 Gäste anwesend", else `null`. */
+  composition: string | null;
 }
 
 /**
@@ -64,7 +85,14 @@ interface BeamerText {
   selector: 'app-meeting-beamer',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, IconComponent, SegBarComponent, StatusTextComponent, VoteBarsComponent],
+  imports: [
+    TranslatePipe,
+    IconComponent,
+    QrCodeComponent,
+    SegBarComponent,
+    StatusTextComponent,
+    VoteBarsComponent,
+  ],
   templateUrl: './meeting-beamer.component.html',
   styleUrl: './meeting-beamer.component.scss',
 })
@@ -76,6 +104,21 @@ export class MeetingBeamerComponent {
   readonly topLine = input<string | null>(null);
   readonly vote = input<BeamerVote | null>(null);
   readonly logoSrc = input.required<string>();
+  /** The join code of a public meeting (#17): a large card while idle, a corner badge in a vote. */
+  readonly join = input<BeamerJoin | null>(null);
+  /** The people in the room, while the meeting is public. */
+  readonly presence = input<BeamerPresence | null>(null);
+
+  protected readonly formatCode = formatJoinCode;
+
+  /** The short link without the scheme: "workflow.example/j/7KQ4MP". */
+  protected shortUrl(j: BeamerJoin): string {
+    return j.url.replace(/^https?:\/\//, '');
+  }
+
+  protected qrLabel(j: BeamerJoin): string {
+    return this.i18n.translate('guests.qr.label', { url: j.url });
+  }
 
   /** The texts of the shown vote, or `null` while idle. */
   protected readonly text = computed<BeamerText | null>(() => {
@@ -86,7 +129,8 @@ export class MeetingBeamerComponent {
   private describe(v: BeamerVote): BeamerText {
     const t = (key: TranslationKey, params?: Record<string, string | number>) =>
       this.i18n.translate(key, params);
-    const majority = t(`vote.majority.${v.majorityRule}` as TranslationKey);
+    const guests = !!v.guestsVote;
+    const majority = t(`${guests ? 'vote.majorityCast' : 'vote.majority'}.${v.majorityRule}` as TranslationKey);
     const q = v.quorum;
     const quorum = q
       ? t(q.type === 'percent' ? 'meetings.vote.quorumPercent' : 'meetings.vote.quorumCount', {
@@ -107,6 +151,10 @@ export class MeetingBeamerComponent {
     const outcome = [passed || missedQuorum ? majority : t('beamer.majorityMissed', { rule: majority })];
     if (q) outcome.push(t(missedQuorum ? 'beamer.quorumMissed' : 'beamer.quorumMet'));
     outcome.push(v.voted === 1 ? t('beamer.ballotsOne') : t('beamer.ballots', { n: v.voted }));
+    const composition =
+      guests && typeof v.presentMembers === 'number' && typeof v.presentGuests === 'number'
+        ? t('guests.vote.composition', { members: v.presentMembers, guests: v.presentGuests })
+        : null;
 
     return {
       // Counts show after the close, or while open once the server revealed them.
@@ -116,7 +164,11 @@ export class MeetingBeamerComponent {
       rules: rules.join(' · '),
       quorumWarning: quorumOpen ? t('beamer.quorumPending', { quorum }) : null,
       passed,
-      outcome: outcome.join(' · '),
+      // A vote with guests: "Abgegeben 24 · Mehrheit der abgegebenen Stimmen" (#17).
+      outcome: guests
+        ? [t('guests.vote.castN', { n: v.voted }), t('guests.vote.majorityOfCast')].join(' · ')
+        : outcome.join(' · '),
+      composition,
     };
   }
 }

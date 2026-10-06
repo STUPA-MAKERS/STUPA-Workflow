@@ -62,6 +62,9 @@ export class VoteOpenDialogComponent {
   readonly item = input<AgendaItem | null>(null);
   /** The 1-based number of the item on the agenda. */
   readonly topNumber = input(0);
+  /** The members on the roster and the present ones, for the line of the voters. */
+  readonly rosterCount = input(0);
+  readonly presentMembers = input(0);
   readonly closed = output<void>();
   /** The server opened the vote. Carries the updated meeting. */
   readonly opened = output<Meeting>();
@@ -69,11 +72,36 @@ export class VoteOpenDialogComponent {
   readonly question = signal('');
   readonly majorityRule = signal<MajorityRule>('simple');
   readonly secret = signal(false);
+  /** Admitted guests vote too (#17): no quorum, the majority of the cast votes. */
+  readonly guestsVote = signal(false);
   readonly submitting = signal(false);
 
   readonly ruleOptions = computed<SegmentedOption[]>(() =>
     MAJORITY_RULES.map((v) => ({ value: v, label: this.i18n.translate(`meetings.vote.rule.${v}`) })),
   );
+
+  /** The switch exists only when the meeting lets guests vote. */
+  readonly guestsAllowed = computed(
+    () => this.meeting().publicJoin && this.meeting().guestsMode === 'vote',
+  );
+  /** A non-public item never lets guests vote. */
+  readonly guestsLocked = computed(() => !!this.item()?.nonPublic);
+  /** "Stimmberechtigt jetzt: 26 (19 Mitglieder + 7 Gäste anwesend)", or the members line. */
+  readonly votersLine = computed(() => {
+    const members = this.presentMembers();
+    if (this.guestsVote()) {
+      const guests = this.meeting().admittedGuests;
+      return this.i18n.translate('guests.vote.votersWith', {
+        n: members + guests,
+        members,
+        guests,
+      });
+    }
+    return this.i18n.translate('guests.vote.votersMembers', {
+      n: this.rosterCount(),
+      present: members,
+    });
+  });
 
   /** "TOP 3 · Zuschuss Erstsemester-Party WS 26/27". */
   readonly subtitle = computed(() => {
@@ -103,6 +131,7 @@ export class VoteOpenDialogComponent {
     );
     this.majorityRule.set('simple');
     this.secret.set(false);
+    this.guestsVote.set(this.guestsAllowed() && !it.nonPublic);
     this.submitting.set(false);
   }
 
@@ -127,6 +156,8 @@ export class VoteOpenDialogComponent {
         options: [...FIXED_VOTE_OPTIONS],
         secret: this.secret(),
         majorityRule: this.majorityRule(),
+        // Only a meeting that lets guests vote carries the switch; else the server decides.
+        ...(this.guestsAllowed() ? { guestsVote: this.guestsVote() && !this.guestsLocked() } : {}),
         // No quorum: the server takes the Gremium default.
       })
       .subscribe({

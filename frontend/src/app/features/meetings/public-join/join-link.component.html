@@ -1,0 +1,42 @@
+@let l = link();
+<div class="jl" [class.jl--sheet]="variant() === 'sheet'">
+  <app-qr-code class="jl__qr" [qr]="l.qr" [label]="qrLabel()" />
+  <div class="jl__text">
+    @if (variant() === 'sheet') {
+      <span class="jl__title">{{ 'guests.sheet.publicOn' | t }}</span>
+    } @else {
+      <span class="jl__cap">{{ 'guests.link.caption' | t: { code: code() } }}</span>
+    }
+    <a class="jl__url mono" [href]="l.joinUrl" target="_blank" rel="noopener">{{ l.joinUrl }}</a>
+    @if (variant() === 'settings') {
+      @if (confirming()) {
+        <p class="jl__confirm" role="alert">{{ 'guests.link.rotateConfirm' | t }}</p>
+        <div class="jl__actions">
+          <app-button size="sm" variant="danger" [loading]="rotating()" (click)="confirmRotate()">
+            {{ 'guests.link.rotateYes' | t }}
+          </app-button>
+          <app-button size="sm" variant="text" (click)="confirming.set(false)">{{ 'action.cancel' | t }}</app-button>
+        </div>
+      } @else {
+        <div class="jl__actions">
+          <app-button size="sm" variant="text" (click)="copy()">
+            <app-icon [name]="copied() ? 'check' : 'copy'" [size]="16" />
+            {{ (copied() ? 'guests.link.copied' : 'guests.link.copy') | t }}
+          </app-button>
+          @if (canRotate()) {
+            <app-button size="sm" variant="text" [loading]="rotating()" (click)="confirming.set(true)">
+              <app-icon name="repeat" [size]="16" />
+              {{ 'guests.link.rotate' | t }}
+            </app-button>
+          }
+        </div>
+      }
+    }
+  </div>
+  @if (variant() === 'sheet') {
+    <app-button class="jl__large" size="sm" variant="text" (click)="showLarge.emit()">
+      <app-icon name="grid" [size]="16" />
+      {{ 'guests.sheet.showLarge' | t }}
+    </app-button>
+  }
+</div>

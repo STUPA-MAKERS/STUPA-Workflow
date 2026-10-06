@@ -240,4 +240,41 @@ describe('VoteCardComponent', () => {
       expect(container.querySelector('.vc__meta')).toBeNull();
     });
   });
+
+  describe('a vote with guests (#17)', () => {
+    it('shows the room while open and the hint about late guests', async () => {
+      await setup({ vote: vote({ guestsVote: true, majorityRule: 'simple', presentMembers: 19, presentGuests: 7 }) });
+      expect(screen.getByText('19 Mitglieder + 7 Gäste anwesend')).toBeInTheDocument();
+      expect(screen.getByText(/Einfache Mehrheit der abgegebenen Stimmen/)).toBeInTheDocument();
+      expect(screen.getByText(/Gäste, die du jetzt zulässt, stimmen noch mit/)).toBeInTheDocument();
+    });
+
+    it('sums the closed result up without a quorum', async () => {
+      await setup({
+        vote: vote({
+          guestsVote: true,
+          status: 'closed',
+          result: 'passed',
+          counts: { yes: 17, no: 4, abstain: 3 },
+          revealed: true,
+          presentMembers: 19,
+          presentGuests: 7,
+        }),
+      });
+      const sum = document.querySelector('.vc__sum')!;
+      expect(sum).toHaveTextContent('Abgegeben24');
+      expect(sum).toHaveTextContent('26');
+      expect(sum).toHaveTextContent('erreicht');
+    });
+
+    it('says "nicht erreicht" for a rejection and skips the room while unknown', async () => {
+      await setup({
+        vote: vote({ guestsVote: true, status: 'closed', result: 'rejected', counts: null, revealed: true }),
+      });
+      const sum = document.querySelector('.vc__sum')!;
+      expect(sum).toHaveTextContent('nicht erreicht');
+      expect(sum).toHaveTextContent('Abgegeben0');
+      expect(screen.queryByText(/Gäste anwesend/)).toBeNull();
+    });
+  });
 });

@@ -218,3 +218,17 @@
     padding: 0 var(--space-3);
   }
 }
+
+/* The open join requests on the attendance chip (#17). */
+.sd__badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 0.75rem;
+  font-weight: var(--fw-semibold);
+}

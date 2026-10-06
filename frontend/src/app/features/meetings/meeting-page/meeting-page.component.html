@@ -40,6 +40,9 @@
     </div>
   }
 
+  <!-- #17: the QR code of a public meeting (lead only); a phone opens it from the menu. -->
+  <app-join-qr [meeting]="m" [button]="!phone()" [(open)]="qrOpen" (beamer)="toggleBeamer.emit()" />
+
   <!-- The beamer route and its stream need session.manage in the gremium (canManage). -->
   @if (wide() && m.status !== 'closed' && m.canManage) {
     <app-button class="mp__beamer" variant="outlined" (click)="toggleBeamer.emit()">
@@ -191,6 +194,7 @@
   (statusChange)="attendanceChange.emit($event)"
   (statusReset)="attendanceReset.emit($event)"
   (conflictResolved)="attendanceConflictResolved.emit($event)"
+  (showQr)="showQr()"
 />
 
 

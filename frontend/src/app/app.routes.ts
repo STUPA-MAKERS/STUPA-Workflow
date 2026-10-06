@@ -67,6 +67,18 @@ export const routes: Routes = [
           ),
       },
       {
+        // #17: the join page of a public meeting (the QR code of the beamer). Public: a
+        // device cookie, not a login, carries the participation.
+        path: 'j/:code',
+        // The page brings its own header (wordmark, language, the own name) and footer,
+        // as on the mockup: no public bar with "Anmelden".
+        data: { title: 'guests.page.routeTitle', chrome: false },
+        loadComponent: () =>
+          import('./features/public-meeting/public-meeting.component').then(
+            (m) => m.PublicMeetingComponent,
+          ),
+      },
+      {
         path: 'dashboard',
         // Wide: the two columns of the start page fill the width (board Main).
         // Fab: on a phone the shell keeps the foot of the page free for the "Antrag" button.

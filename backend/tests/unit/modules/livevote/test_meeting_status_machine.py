@@ -362,3 +362,63 @@ async def test_detail_and_list_carry_the_agenda_summary(
         assert dumped["agendaItemCount"] == 3
         assert dumped["currentAgendaItem"] == {"position": 2, "title": "Haushalt"}
         assert dumped["startedAt"] == m.started_at
+
+
+# #17: public participation in the lifecycle
+class _Guests:
+    calls: list[tuple[str, Any]] = []
+
+    def __init__(self, _session: Any, publisher: Any = None) -> None:
+        self.publisher = publisher
+
+    async def ensure_code(self, meeting: Any) -> None:
+        type(self).calls.append(("ensure_code", meeting.id))
+        meeting.join_code = "7KQ4MP"
+
+    async def purge_on_close(self, meeting: Any) -> None:
+        type(self).calls.append(("purge", meeting.id))
+
+    async def publish(self, meeting_id: UUID, events: Any) -> None:
+        type(self).calls.append(("publish", events))
+
+
+@pytest.fixture
+def guests(monkeypatch: pytest.MonkeyPatch) -> type[_Guests]:
+    _Guests.calls = []
+    monkeypatch.setattr(lifecycle_mod, "GuestService", _Guests)
+    return _Guests
+
+
+async def test_create_public_meeting_gets_a_code(
+    audit: list[dict[str, Any]], guests: type[_Guests]
+) -> None:
+    svc = MeetingService(_Session())  # type: ignore[arg-type]
+    out = await svc.create(
+        MeetingCreate(
+            gremiumId=uuid4(),
+            title="GV",
+            date=date(2026, 6, 20),
+            startTime=time(18, 0),
+            publicJoin=True,
+            guestsMode="watch",
+        ),
+        _admin(),
+    )
+    assert out.public_join is True and out.guests_mode == "watch"
+    assert out.join_code == "7KQ4MP"
+    assert audit[0]["data"]["publicJoin"] is True
+
+
+async def test_close_purges_guests_and_public_patch_publishes(
+    audit: list[dict[str, Any]], voting: SimpleNamespace, guests: type[_Guests]
+) -> None:
+    m = _meeting("live")
+    await _service(m, publisher=_Publisher()).patch(m.id, MeetingPatch(status="closed"), _admin())
+    assert ("purge", m.id) in guests.calls
+    m = _meeting("live")
+    m.public_join, m.guests_mode, m.join_code = False, "vote", None
+    pub = _Publisher()
+    out = await _service(m, publisher=pub).patch(m.id, MeetingPatch(publicJoin=True), _admin())
+    assert out.public_join is True and out.join_code == "7KQ4MP"
+    assert [c[0] for c in guests.calls][-2:] == ["ensure_code", "publish"]
+    assert audit[-1]["action"].value == "meeting_public_join_changed"

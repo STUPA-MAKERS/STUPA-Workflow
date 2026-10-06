@@ -74,12 +74,14 @@ from app.modules.protocol.markdown import (
     build_protocol_document,
     build_vote_snippet,
     demote_headings,
+    guest_vote_note,
     protocol_variant_for,
     vote_in_body,
 )
 from app.modules.protocol.models import Protocol, ProtocolVoteRef
 from app.modules.protocol.schemas import ProtocolOut
 from app.modules.voting.models import Vote
+from app.modules.voting.schemas import VoteOut
 from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings
 from app.shared.errors import (
@@ -466,6 +468,7 @@ class ProtocolService:
                     _vote_title(view.application_id, view.question),
                     view.tally.counts,
                     question=view.question,
+                    note=_guest_note(view),
                 )
             )
 
@@ -507,6 +510,11 @@ class ProtocolService:
                 code="protocol_not_draft",
             )
         protocol.status = "rendering"
+        # #17: the finalization pseudonymizes the guests ("Gast 1 … n"). The protocol
+        # carries them as a count only.
+        from app.modules.livevote.guests import GuestService
+
+        await GuestService(self.session).pseudonymize(protocol.meeting_id)
         await audit_record(
             self.session,
             actor=actor,
@@ -738,6 +746,11 @@ class ProtocolService:
         excused = [name or sub for status, name, sub in rows if status == "excused"]
         absent = [name or sub for status, name, sub in rows if status == "absent"]
         present_count = len(present)
+        # #17: the guests of a public meeting appear as a count only, never by name.
+        from app.modules.livevote.guests import GuestService
+
+        guests = await GuestService(self.session).attended_count(meeting.id)
+        guest_lines = [f"Gäste: {guests}"] if guests else []
         if public:
             return HeaderMeta(
                 present_count=present_count,
@@ -745,6 +758,7 @@ class ProtocolService:
                     f"Anwesend: {present_count}",
                     f"Entschuldigt: {len(excused)}",
                     f"Abwesend: {len(absent)}",
+                    *guest_lines,
                 ],
             )
         keepers = await self._keeper_lines(meeting)
@@ -762,6 +776,7 @@ class ProtocolService:
             excused=excused,
             absent=absent,
             present_count=present_count,
+            datalines=guest_lines,
         )
 
     async def _legacy_protokollant(self, meeting: Meeting) -> str | None:
@@ -844,6 +859,7 @@ class ProtocolService:
                     view.question or "Beschlussfrage",
                     view.tally.counts,
                     question=view.question,
+                    note=_guest_note(view),
                 )
                 # The protokollant may have put the result into the text already,
                 # with the same snippet. One box per vote.
@@ -1063,6 +1079,15 @@ class ProtocolService:
                 code="vote_not_in_meeting",
             )
         return vote
+
+
+def _guest_note(view: VoteOut) -> str | None:
+    """Return the base line of a vote with guests (#17), or None for a members vote."""
+    if not view.guests_vote:
+        return None
+    return guest_vote_note(
+        view.tally.present_members, view.tally.present_guests, sum(view.tally.counts.values())
+    )
 
 
 def _vote_title(application_id: UUID | None, question: str | None = None) -> str:
