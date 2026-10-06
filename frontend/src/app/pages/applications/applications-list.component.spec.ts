@@ -803,6 +803,56 @@ describe('ApplicationsListComponent', () => {
     });
   });
 
+  describe('#11: Antrag erfassen', () => {
+    const CAPTURE = [...ALL, 'application.create_on_behalf'];
+
+    it('hides the action without the permission', async () => {
+      const { cmp } = await start();
+      expect(screen.queryByRole('button', { name: 'Antrag erfassen' })).not.toBeInTheDocument();
+      expect(cmp.phoneMenuSections().flatMap((s) => s.items.map((i) => i.id))).not.toContain('capture');
+    });
+
+    it('opens the form in the detail pane and then the new application', async () => {
+      const { cmp, http, router, harness, settle } = await start('/applications', { perms: CAPTURE });
+      await userEvent.click(screen.getByRole('button', { name: 'Antrag erfassen' }));
+      harness.detectChanges();
+      expect(cmp.capturing()).toBe(true);
+      expect(cmp.captureInPane()).toBe(true);
+      expect(screen.getByRole('heading', { name: 'Antrag erfassen' })).toBeInTheDocument();
+      // "Zur Liste" closes the form first.
+      cmp.onBack();
+      expect(cmp.capturing()).toBe(false);
+      cmp.openCapture();
+      cmp.closeCapture();
+      expect(cmp.capturing()).toBe(false);
+      cmp.openCapture();
+      cmp.onCaptured('app-9');
+      http.expectOne(LIST).flush(page(ROWS));
+      await settle();
+      expect(cmp.capturing()).toBe(false);
+      expect(router.url).toBe('/applications/app-9');
+      // Without the form, "Zur Liste" closes the detail.
+      cmp.onBack();
+      await settle();
+      expect(router.url).toBe('/applications');
+    });
+
+    it('puts the action first into the phone menu and opens a bottom sheet', async () => {
+      const original = window.matchMedia;
+      window.matchMedia = ((q: string) => ({ ...original(q), matches: q === '(max-width: 768px)' })) as typeof window.matchMedia;
+      try {
+        const { cmp, harness } = await start('/applications', { perms: CAPTURE });
+        expect(cmp.phoneMenuSections()[0].items.map((i) => i.id)).toEqual(['capture']);
+        cmp.onHeaderMenu({ id: 'capture', label: 'Antrag erfassen' });
+        harness.detectChanges();
+        expect(cmp.capturing()).toBe(true);
+        expect(cmp.captureInPane()).toBe(false);
+      } finally {
+        window.matchMedia = original;
+      }
+    });
+  });
+
   describe('list and detail', () => {
     it('opens a row in the detail and keeps the filters', async () => {
       const { go, router, cmp, harness } = await start();

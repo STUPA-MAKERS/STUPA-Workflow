@@ -568,7 +568,9 @@ async def test_schedule_deadline_unknown_policy_just_commits(
             return None
 
     monkeypatch.setattr(flow_service, "DeadlinePolicyService", _PolSvc)
-    app = SimpleNamespace(id=uuid4(), created_at=None, updated_at=None, flow_version_id=uuid4())
+    app = SimpleNamespace(
+        id=uuid4(), created_at=None, updated_at=None, received_on=None, flow_version_id=uuid4()
+    )
     state = SimpleNamespace(id=uuid4(), config={"deadlinePolicyKey": "missing"})
     db = fake_session(result())  # only the DELETE of the old deadlines
     await FlowService(db).schedule_state_deadline(app, state)  # pyright: ignore[reportArgumentType]
@@ -586,7 +588,9 @@ async def test_schedule_deadline_unresolvable_due_just_commits(
 
     monkeypatch.setattr(flow_service, "DeadlinePolicyService", _PolSvc)
     monkeypatch.setattr(flow_service, "resolve_due_at", lambda *_a, **_k: None)
-    app = SimpleNamespace(id=uuid4(), created_at=None, updated_at=None, flow_version_id=uuid4())
+    app = SimpleNamespace(
+        id=uuid4(), created_at=None, updated_at=None, received_on=None, flow_version_id=uuid4()
+    )
     state = SimpleNamespace(id=uuid4(), config={"deadlinePolicyKey": "sem"})
     db = fake_session(result())
     await FlowService(db).schedule_state_deadline(app, state)  # pyright: ignore[reportArgumentType]
@@ -649,7 +653,12 @@ async def test_schedule_deadline_picks_first_satisfiable_guard(
         flow_service, "eval_guard", lambda guard, _ctx: guard == t2.guard
     )
     app = SimpleNamespace(
-        id=uuid4(), created_at=None, updated_at=None, flow_version_id=flow_id, data={}
+        id=uuid4(),
+        created_at=None,
+        updated_at=None,
+        received_on=None,
+        flow_version_id=flow_id,
+        data={},
     )
     state = SimpleNamespace(id=src, config={"deadlinePolicyKey": "sem"})
     db = fake_session(result(), result(t1, t2))  # DELETE old deadlines, then SELECT transitions
@@ -673,7 +682,12 @@ async def test_schedule_deadline_falls_back_to_first_when_none_satisfiable(
     )
     monkeypatch.setattr(flow_service, "eval_guard", lambda *_a, **_k: False)
     app = SimpleNamespace(
-        id=uuid4(), created_at=None, updated_at=None, flow_version_id=flow_id, data={}
+        id=uuid4(),
+        created_at=None,
+        updated_at=None,
+        received_on=None,
+        flow_version_id=flow_id,
+        data={},
     )
     state = SimpleNamespace(id=src, config={"deadlinePolicyKey": "sem"})
     db = fake_session(result(), result(t1, t2))
@@ -691,7 +705,12 @@ async def test_schedule_deadline_no_candidate_pins_null_marker(
         flow_id=flow_id, from_id=src, to_id=uuid4(), guard={"roleIs": "chair"}
     )
     app = SimpleNamespace(
-        id=uuid4(), created_at=None, updated_at=None, flow_version_id=flow_id, data={}
+        id=uuid4(),
+        created_at=None,
+        updated_at=None,
+        received_on=None,
+        flow_version_id=flow_id,
+        data={},
     )
     state = SimpleNamespace(id=src, config={"deadlinePolicyKey": "sem"})
     db = fake_session(result(), result(t))
@@ -934,7 +953,9 @@ async def test_available_flags_the_agenda_only_into_a_vote_state() -> None:
 
 
 async def test_schedule_deadline_without_commit_leaves_it_to_the_caller() -> None:
-    app = SimpleNamespace(id=uuid4(), created_at=None, updated_at=None, flow_version_id=uuid4())
+    app = SimpleNamespace(
+        id=uuid4(), created_at=None, updated_at=None, received_on=None, flow_version_id=uuid4()
+    )
     state = SimpleNamespace(id=uuid4(), config={})
     db = fake_session(result())  # the DELETE of the old deadlines
     out = await FlowService(db).schedule_state_deadline(  # pyright: ignore[reportArgumentType]

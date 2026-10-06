@@ -74,6 +74,7 @@ import {
   type RowAction,
 } from './row-transitions-menu/row-transitions-menu.component';
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
+import { ApplicationCaptureComponent } from './capture/application-capture.component';
 
 /**
  * One filter of the list.
@@ -164,6 +165,7 @@ type FilterSheet = 'budget' | 'more' | null;
     ShareLinksDialogComponent,
     ForceStatusDialogComponent,
     AgendaDialogComponent,
+    ApplicationCaptureComponent,
   ],
   providers: [ApplicationsPageService],
   templateUrl: './applications-list.component.html',
@@ -182,6 +184,12 @@ export class ApplicationsListComponent implements OnDestroy {
   private readonly frame = inject(PageFrameService);
 
   readonly canExport = computed(() => this.auth.can('application.export'));
+  /** #11: "Antrag erfassen" for another person. */
+  readonly canCapture = computed(() => this.auth.can('application.create_on_behalf'));
+  /** "Antrag erfassen" is open. */
+  readonly capturing = signal(false);
+  /** The capture form fills the detail pane (every layout but the phone). */
+  readonly captureInPane = computed(() => this.capturing() && !this.phone());
   readonly exporting = signal(false);
 
   readonly limit = 20;
@@ -401,7 +409,13 @@ export class ApplicationsListComponent implements OnDestroy {
 
   /** Phone: the sort orders and the export in one "more" menu of the header. */
   readonly phoneMenuSections = computed<RowMenuSection[]>(() => {
-    const sections = [...this.sortSections()];
+    const sections: RowMenuSection[] = [];
+    if (this.canCapture()) {
+      sections.push({
+        items: [{ id: 'capture', label: this.i18n.translate('applications.capture.title'), icon: 'add' }],
+      });
+    }
+    sections.push(...this.sortSections());
     if (this.exportShown()) {
       sections.push({
         items: [{ id: 'export', label: this.i18n.translate('applications.list.export'), icon: 'download' }],
@@ -514,6 +528,29 @@ export class ApplicationsListComponent implements OnDestroy {
     void this.router.navigate(['/applications', id], { queryParamsHandling: 'preserve' });
   }
 
+  // --- capture on behalf (#11) -------------------------------------------------
+
+  openCapture(): void {
+    this.capturing.set(true);
+  }
+
+  closeCapture(): void {
+    this.capturing.set(false);
+  }
+
+  /** The capture is done: the list loads again and the new application opens. */
+  onCaptured(id: Uuid): void {
+    this.capturing.set(false);
+    this.reload();
+    this.open(id);
+  }
+
+  /** "Zur Liste" of the narrow layout: it closes the capture form first. */
+  onBack(): void {
+    if (this.capturing()) this.closeCapture();
+    else this.closeDetail();
+  }
+
   /** "Zur Liste" (narrow layout): close the detail, keep the filters. */
   closeDetail(): void {
     void this.router.navigate(['/applications'], { queryParamsHandling: 'preserve' });
@@ -607,6 +644,10 @@ export class ApplicationsListComponent implements OnDestroy {
   onHeaderMenu(item: RowMenuItem): void {
     if (item.id === 'export') {
       this.onExport();
+      return;
+    }
+    if (item.id === 'capture') {
+      this.openCapture();
       return;
     }
     const [sort, order] = item.id.split(':');

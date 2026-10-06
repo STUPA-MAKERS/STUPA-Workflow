@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
@@ -36,6 +37,24 @@ if TYPE_CHECKING:
     from app.modules.flow.dispatch import ActionDispatcher
 
 
+@dataclass(frozen=True, slots=True)
+class Capture:
+    """A capture on behalf of the applicant (#11).
+
+    ``owner_sub`` is the ``sub`` of the applicant account, or None for a guest
+    applicant. It becomes ``created_by``, so the applicant owns the application as if
+    the applicant had submitted it. The capturing person (the ``actor`` of the create)
+    shows only in the history and the audit log.
+    """
+
+    owner_sub: str | None
+    applicant_principal_id: UUID | None
+    received_on: date
+    intake: str | None
+    #: A guest e-mail matched an active account, which became the applicant.
+    matched_by_email: bool = False
+
+
 class CreateOps(ApplicationsServiceBase):
     """Public and managed application creation."""
 
@@ -47,6 +66,7 @@ class CreateOps(ApplicationsServiceBase):
         dispatcher: ActionDispatcher | None = None,
         email_confirmed: bool | None = None,
         draft_pepper: str | None = None,
+        capture: Capture | None = None,
     ) -> tuple[Application, str]:
         """Create an application.
 
@@ -80,6 +100,11 @@ class CreateOps(ApplicationsServiceBase):
         The create writes an ``application_create`` audit entry in the same
         transaction (F12). It holds the type, the gremium, the initial state, the
         confirmation flag and the number of bound drafts, never PII.
+
+        ``capture`` marks a capture on behalf of the applicant (#11). The owner
+        (``created_by``) is then ``capture.owner_sub`` and not the actor. The actor
+        (the capturing person) writes version 1 and the first status event, and the
+        create writes a second audit entry ``application_create_on_behalf``.
 
         ``draft_pepper`` is the pepper of the draft-token hash
         (``MAGIC_LINK_SECRET``). The router passes the value of its settings.
@@ -127,8 +152,16 @@ class CreateOps(ApplicationsServiceBase):
             data=clean,
             lang=payload.lang,
             # A logged-in submission remembers the creator. An anonymous one
-            # stores None.
-            created_by=actor if actor != "applicant" else None,
+            # stores None. A capture stores the applicant account (or None for a
+            # guest), never the capturing person.
+            created_by=(
+                capture.owner_sub
+                if capture is not None
+                else (actor if actor != "applicant" else None)
+            ),
+            captured_by=actor if capture is not None else None,
+            capture_intake=capture.intake if capture is not None else None,
+            received_on=capture.received_on if capture is not None else None,
             # An unconfirmed submission stays invisible until the magic-link
             # verify. The worker discards it after `confirm_ttl_hours`.
             email_confirmed_at=datetime.now(UTC) if confirmed else None,
@@ -182,6 +215,25 @@ class CreateOps(ApplicationsServiceBase):
                 "attachments": len(set(payload.attachment_ids)),
             },
         )
+        if capture is not None:
+            await audit_record(
+                self.session,
+                actor=actor,
+                action=AuditAction.APPLICATION_CREATE_ON_BEHALF,
+                target_type="application",
+                target_id=str(app.id),
+                data={
+                    "applicantKind": "principal" if capture.owner_sub else "guest",
+                    "applicantPrincipalId": (
+                        str(capture.applicant_principal_id)
+                        if capture.applicant_principal_id
+                        else None
+                    ),
+                    "receivedOn": capture.received_on.isoformat(),
+                    "intake": capture.intake is not None,
+                    "matchedByEmail": capture.matched_by_email,
+                },
+            )
         await self.session.commit()
 
         if app.email_confirmed_at is not None:

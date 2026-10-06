@@ -23,6 +23,8 @@ import {
   toApplicationCreateBody,
 } from './mappers';
 import type {
+  ApplicantCandidate,
+  OnBehalfApplication,
   CalendarFeed,
   ConsentRequest,
   McpSetup,
@@ -253,6 +255,27 @@ export class ApiClient {
     return this.http
       .post<ApplicationCreatedWire>(`${this.base}/applications`, toApplicationCreateBody(input))
       .pipe(map(mapApplicationCreated));
+  }
+
+  /**
+   * POST /applications/on-behalf — capture and submit an application for an applicant
+   * (#11). Needs `application.create_on_behalf`. The response is `{ applicationId }`.
+   */
+  createApplicationOnBehalf(input: OnBehalfApplication): Observable<ApplicationCreated> {
+    return this.http
+      .post<ApplicationCreatedWire>(`${this.base}/applications/on-behalf`, input)
+      .pipe(map(mapApplicationCreated));
+  }
+
+  /**
+   * GET /applications/on-behalf/applicants — the accounts that match `q` by name or
+   * e-mail (#11). The server answers at most 20 and needs two characters.
+   */
+  searchOnBehalfApplicants(q: string): Observable<ApplicantCandidate[]> {
+    return this.http.get<ApplicantCandidate[]>(`${this.base}/applications/on-behalf/applicants`, {
+      params: new HttpParams().set('q', q),
+      context: skipLoading(),
+    });
   }
 
   /** PATCH /applications/{id} — update `data` (only when state.editAllowed). */

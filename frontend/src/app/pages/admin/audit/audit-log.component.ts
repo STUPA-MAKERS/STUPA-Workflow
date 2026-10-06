@@ -83,6 +83,8 @@ export const AUDIT_ACTIONS = [
   // protocols, votes. application_create (F12) and guest_application_discard (Z1) mark the
   // start and the discard of an application.
   'application_create',
+  // #11: an application captured on behalf of an applicant.
+  'application_create_on_behalf',
   'guest_application_discard',
   'application_update',
   // Archive, public share link and delete of an application.

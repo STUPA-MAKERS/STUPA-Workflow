@@ -171,6 +171,31 @@ describe('ApiClient', () => {
     req.flush({ applicationId: 'app-9' }, { status: 201, statusText: 'Created' });
   });
 
+  it('#11: POSTs a capture on behalf and searches the applicants', () => {
+    let created: unknown;
+    api
+      .createApplicationOnBehalf({
+        typeId: 't1',
+        data: { title: 'X' },
+        applicantPrincipalId: 'p1',
+        receivedOn: '2026-10-01',
+        lang: 'de',
+      })
+      .subscribe((c) => (created = c));
+    const req = http.expectOne('/api/applications/on-behalf');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toMatchObject({ applicantPrincipalId: 'p1', receivedOn: '2026-10-01' });
+    req.flush({ applicationId: 'app-9' }, { status: 201, statusText: 'Created' });
+    expect(created).toEqual({ applicationId: 'app-9' });
+
+    let hits: unknown;
+    api.searchOnBehalfApplicants('an').subscribe((h) => (hits = h));
+    const search = http.expectOne((r) => r.url === '/api/applications/on-behalf/applicants');
+    expect(search.request.params.get('q')).toBe('an');
+    search.flush([{ id: 'p1', displayName: 'Anna', email: 'a@b.de' }]);
+    expect(hits).toEqual([{ id: 'p1', displayName: 'Anna', email: 'a@b.de' }]);
+  });
+
   it('POSTs a transition with the camelCase transitionId', () => {
     api.fireTransition('app-1', { transitionId: 't-1', note: 'ok' }).subscribe();
     const req = http.expectOne('/api/applications/app-1/transition');

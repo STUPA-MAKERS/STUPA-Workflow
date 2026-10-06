@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import json
 from collections.abc import Awaitable, Callable
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response, status
 
@@ -40,6 +41,7 @@ from app.modules.applications.access import (
 )
 from app.modules.applications.models import ApplicationShare
 from app.modules.applications.schemas import (
+    ApplicantCandidateOut,
     ApplicationCreate,
     ApplicationCreated,
     ApplicationListItem,
@@ -48,6 +50,7 @@ from app.modules.applications.schemas import (
     CommentCreate,
     CommentOut,
     CommentPatch,
+    OnBehalfCreate,
     ShareCreate,
     ShareOut,
     TimelineEventOut,
@@ -61,6 +64,7 @@ from app.modules.auth import service as auth_service
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.forms.schemas import EffectiveFormOut
+from app.modules.notifications.captured import notify_application_captured
 from app.modules.notifications.privacy import notify_erasure_requested
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.service import (
@@ -71,6 +75,7 @@ from app.modules.privacy.service import ErasureRequestService
 from app.settings import Settings
 from app.shared.antiabuse import (
     enforce_application_payload_limit,
+    rate_limit_applicant_search,
     rate_limit_applications,
     verify_altcha_unless_authenticated,
 )
@@ -222,6 +227,109 @@ async def create_application(
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(send_magic_link, settings, email, app.id, pool)
     return ApplicationCreated(applicationId=app.id)
+
+
+#: The permission of the capture on behalf of an applicant (#11).
+CREATE_ON_BEHALF_PERMISSION = "application.create_on_behalf"
+
+OnBehalfCapturer = Annotated[Principal, Depends(require_principal(CREATE_ON_BEHALF_PERMISSION))]
+
+
+async def _deliver_capture_mail(
+    settings: Settings, email: str, application_id: UUID, guest: bool, pool: object
+) -> None:
+    """Send the mail to the applicant of a captured application (background task)."""
+    await notify_application_captured(
+        queue=mail_queue_from_pool(pool),  # type: ignore[arg-type]
+        settings=settings,
+        application_id=application_id,
+        email=email,
+        guest=guest,
+    )
+
+
+CaptureMailSender = Callable[[Settings, str, UUID, bool, object], Awaitable[None]]
+
+
+def get_capture_mail_sender() -> CaptureMailSender:
+    """Return the injectable sender of the capture mail that a test can override."""
+    return _deliver_capture_mail
+
+
+@router.post(
+    "/applications/on-behalf",
+    response_model=ApplicationCreated,
+    status_code=status.HTTP_201_CREATED,
+    # The body cap applies. The rate limit and ALTCHA do not: the route needs a
+    # session with `application.create_on_behalf`.
+    dependencies=[Depends(enforce_application_payload_limit)],
+    responses=_errors(401, 403, 404, 413, 422),
+)
+async def create_application_on_behalf(
+    payload: OnBehalfCreate,
+    service: ServiceDep,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    principal: OnBehalfCapturer,
+    send_capture_mail: Annotated[CaptureMailSender, Depends(get_capture_mail_sender)],
+    dispatcher: Annotated[ActionDispatcher, Depends(get_action_dispatcher)],
+) -> ApplicationCreated:
+    """Capture and submit an application on behalf of an applicant (#11).
+
+    The applicant is an account (``applicantPrincipalId``) or a guest
+    (``applicantName`` and ``applicantEmail``). The application belongs to the
+    applicant exactly as after an own submission: an account owns it through
+    ``created_by``, a guest reads it through the magic link. The capturing person
+    shows only in the history and in the audit log (``application_create_on_behalf``).
+
+    The data goes through the validation of a normal submission against the effective
+    form. The application is confirmed at once and its flow starts in this request.
+    ``receivedOn`` defaults to today in the local timezone and must not lie in the
+    future or more than a year back. A guest e-mail of an active account (without
+    case) makes the application an account application of that account. After the
+    commit the applicant gets the mail ``application_captured``: an account gets the
+    normal link, a guest a magic link.
+    """
+    if len(json.dumps(payload.data)) > settings.max_application_payload_bytes:
+        raise PayloadTooLargeError(
+            f"Application data exceeds {settings.max_application_payload_bytes} bytes."
+        )
+    today = datetime.now(ZoneInfo(settings.local_timezone)).date()
+    app, email = await service.create_on_behalf(
+        payload,
+        actor=principal.sub,
+        today=today,
+        dispatcher=dispatcher,
+        draft_pepper=settings.magic_link_secret,
+    )
+    pool = getattr(request.app.state, "arq_pool", None)
+    # A guest e-mail of an active account became an account application, so the
+    # owner decides the link of the mail, not the request.
+    guest = app.created_by is None
+    background.add_task(send_capture_mail, settings, email, app.id, guest, pool)
+    return ApplicationCreated(applicationId=app.id)
+
+
+@router.get(
+    "/applications/on-behalf/applicants",
+    response_model=list[ApplicantCandidateOut],
+    dependencies=[Depends(rate_limit_applicant_search)],
+    responses=_errors(401, 403, 429),
+)
+async def search_on_behalf_applicants(
+    service: ServiceDep,
+    _principal: OnBehalfCapturer,
+    q: Annotated[str, Query(max_length=200)] = "",
+) -> list[ApplicantCandidateOut]:
+    """Search the accounts that the capture dialog offers as the applicant (#11).
+
+    The search matches the name and the e-mail of the active accounts. It needs at
+    least two characters and returns at most 20 accounts. The route needs
+    ``application.create_on_behalf``, because it discloses e-mail addresses, and it
+    has a limit per principal (``rl_applicant_search_per_hour``, 429).
+    """
+    return await service.search_applicants(q)
 
 
 @router.get(
@@ -423,6 +531,8 @@ async def get_application(
         else False,
         allow_unconfirmed=access.is_owning_applicant,
         strip_pii_fields=not pii,
+        applicant_view=access.is_applicant_view,
+        magic_link_view=access.is_owning_applicant,
     )
 
 

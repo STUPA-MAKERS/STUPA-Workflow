@@ -218,7 +218,9 @@ async def test_schedule_state_deadline_creates_row_for_policy() -> None:
     # execute queue: delete the old flow deadlines, then get_by_key for the policy, then
     # the outgoing transitions.
     session = fake_session(result(), result(policy), result(transition))
-    app = SimpleNamespace(id=uuid4(), flow_version_id=flow_id, created_at=_NOW, updated_at=_NOW)
+    app = SimpleNamespace(
+        id=uuid4(), flow_version_id=flow_id, created_at=_NOW, updated_at=_NOW, received_on=None
+    )
     state = SimpleNamespace(id=state_id, config={"deadlinePolicyKey": "k"})
 
     await FlowService(session).schedule_state_deadline(cast("Any", app), cast("Any", state))
@@ -237,7 +239,9 @@ async def test_schedule_state_deadline_keeps_a_given_due_at() -> None:
     kept = _NOW + timedelta(days=3)
     # execute queue: delete the old flow deadlines, get_by_key, the outgoing transitions.
     session = fake_session(result(), result(policy), result())
-    app = SimpleNamespace(id=uuid4(), flow_version_id=uuid4(), created_at=_NOW, updated_at=_NOW)
+    app = SimpleNamespace(
+        id=uuid4(), flow_version_id=uuid4(), created_at=_NOW, updated_at=_NOW, received_on=None
+    )
     state = SimpleNamespace(id=uuid4(), config={"deadlinePolicyKey": "k"})
 
     await FlowService(session).schedule_state_deadline(
@@ -253,7 +257,9 @@ async def test_schedule_state_deadline_keeps_a_given_due_at() -> None:
 @pytest.mark.asyncio
 async def test_schedule_state_deadline_noop_without_policy_key() -> None:
     session = fake_session()
-    app = SimpleNamespace(id=uuid4(), flow_version_id=uuid4(), created_at=_NOW, updated_at=_NOW)
+    app = SimpleNamespace(
+        id=uuid4(), flow_version_id=uuid4(), created_at=_NOW, updated_at=_NOW, received_on=None
+    )
     state = SimpleNamespace(id=uuid4(), config={})
     await FlowService(session).schedule_state_deadline(cast("Any", app), cast("Any", state))
     assert session.added == []

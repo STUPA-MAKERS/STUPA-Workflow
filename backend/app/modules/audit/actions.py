@@ -57,6 +57,12 @@ class AuditAction(StrEnum):
     # state and whether the email still needs a confirmation. It never carries the
     # email, the name or a field value.
     APPLICATION_CREATE = "application_create"
+    # Application captured on behalf of an applicant (#11). The actor is the capturing
+    # person. ``data`` carries the kind of the applicant (``principal`` or ``guest``),
+    # the principal id of an account applicant, the received date, whether an intake
+    # note exists and whether a guest e-mail matched an active account
+    # (``matchedByEmail``). It never carries the email, the name or the note text.
+    APPLICATION_CREATE_ON_BEHALF = "application_create_on_behalf"
     # An application without a confirmed email was discarded after
     # ``guest_application_settings.confirm_ttl_hours`` (Z1). ``data`` carries the
     # type, the gremium, the attachment count and the window, never PII.

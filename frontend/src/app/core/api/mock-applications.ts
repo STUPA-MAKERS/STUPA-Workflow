@@ -1,5 +1,8 @@
 import type { HttpParams } from '@angular/common/http';
 import type {
+  ApplicantCandidate,
+  ApplicationCapture,
+  ApplicationCreatedWire,
   ApplicationListItemWire,
   ApplicationOutWire,
   ApplicationShareLink,
@@ -7,6 +10,7 @@ import type {
   EffectiveForm,
   MeetingOutWire,
   Page,
+  OnBehalfApplication,
   ProblemDetail,
   StateOutWire,
   TimelineEventOutWire,
@@ -29,6 +33,10 @@ import type {
  * and versions, and an edit that makes a new version. A position without any offer
  * gives the 422 of the server. Three planned meetings of the Gremium serve the agenda
  * dialog; a fire with `meetingId` checks that the meeting is one of them.
+ *
+ * "Antrag erfassen" (#11): the row "Flyer für die Hochschulgruppen-Messe" was captured
+ * on behalf of the applicant (per PDF). The search knows three accounts, and a capture
+ * adds a new row in "Eingereicht" on top.
  */
 
 /** The id prefix of the demo rows. The interceptor sends these paths here. */
@@ -80,11 +88,26 @@ interface DemoApp {
   versions?: VersionOutWire[];
   /** Status changes fired in this session. */
   events?: TimelineEventOutWire[];
+  /** Captured on behalf of the applicant (#11). */
+  capture?: ApplicationCapture;
 }
 
 const DEMO: DemoApp[] = [
   { n: 1, title: 'Zuschuss Kennenlernwochenende der Fachschaft Wirtschaft', type: TYPE_FUND, state: 'agenda', amount: 1340, created: '2026-09-29T10:25:00Z' },
-  { n: 2, title: 'Flyer für die Hochschulgruppen-Messe', type: TYPE_FUND, state: 'submitted', amount: 395, created: '2026-09-25T15:05:00Z' },
+  {
+    n: 2,
+    title: 'Flyer für die Hochschulgruppen-Messe',
+    type: TYPE_FUND,
+    state: 'submitted',
+    amount: 395,
+    created: '2026-09-25T15:05:00Z',
+    capture: {
+      capturedBy: { kind: 'principal', displayName: 'Clara Sachbearbeiterin' },
+      capturedAt: '2026-09-25T15:05:00Z',
+      receivedOn: '2026-09-23',
+      intake: 'per PDF',
+    },
+  },
   { n: 3, title: 'Werkzeugkiste für die Fahrradwerkstatt', type: TYPE_OTHER, state: 'agenda', amount: 1765, created: '2026-09-22T08:40:00Z' },
   { n: 4, title: 'Lesung mit einer Autorin im Foyer', type: TYPE_FUND, state: 'review', amount: 1180, created: '2026-09-17T13:15:00Z' },
   { n: 5, title: 'Seminarreihe Nachhaltigkeit im Studium mit Referierenden und Verpflegung an drei Abenden', type: TYPE_FUND, state: 'submitted', amount: 2260, created: '2026-09-14T09:50:00Z' },
@@ -135,6 +158,7 @@ function detail(d: DemoApp): ApplicationOutWire {
     canEdit: true,
     isOwner: false,
     hiddenKeys: [],
+    capture: d.capture ?? null,
   };
 }
 
@@ -306,6 +330,41 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
     return { newStateId: STATES[d.state].id, statusEventId: 'e1000000-0000-0000-0000-000000000002', dispatchedActions: [] };
   }
   return undefined;
+}
+
+/** #11: the accounts that the capture search knows. */
+const ACCOUNTS: ApplicantCandidate[] = [
+  { id: 'p1000000-0000-0000-0000-000000000001', displayName: 'Anna Antrag', email: 'anna.antrag@example.org' },
+  { id: 'p1000000-0000-0000-0000-000000000002', displayName: 'Anton Albers', email: 'anton.albers@example.org' },
+  { id: 'p1000000-0000-0000-0000-000000000003', displayName: 'Bea Beispiel', email: 'bea@example.org' },
+];
+
+/** `GET /applications/on-behalf/applicants`: the accounts whose name or e-mail holds `q`. */
+export function mockApplicantSearch(q: string): ApplicantCandidate[] {
+  const needle = q.trim().toLowerCase();
+  return ACCOUNTS.filter((a) => `${a.displayName} ${a.email}`.toLowerCase().includes(needle));
+}
+
+/** `POST /applications/on-behalf`: a new row on top, captured by the demo member. */
+export function mockCapture(body: OnBehalfApplication): ApplicationCreatedWire {
+  const n = Math.max(...rows.map((r) => r.n)) + 1;
+  const now = new Date().toISOString();
+  rows.unshift({
+    n,
+    title: String(body.data['title']),
+    type: body.typeId,
+    state: 'submitted',
+    amount: null,
+    created: now,
+    data: { ...body.data },
+    capture: {
+      capturedBy: { kind: 'principal', displayName: 'Demo Mitglied' },
+      capturedAt: now,
+      receivedOn: body.receivedOn ?? null,
+      intake: body.intake ?? null,
+    },
+  });
+  return { applicationId: idOf(n) };
 }
 
 /** Back to the start rows (tests). */

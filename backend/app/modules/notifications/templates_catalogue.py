@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.modules.notifications import action_dispatcher, auto, comments, privacy
+from app.modules.notifications import action_dispatcher, auto, captured, comments, privacy
 from app.modules.notifications import service as _svc
 
 # task_reminder: the worker (``worker/task_reminders.py``) sends it. The worker imports
@@ -201,6 +201,13 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         _svc._BUILTIN_MAGIC_LINK_SUBJECT,  # noqa: SLF001
         _svc._BUILTIN_MAGIC_LINK_BODY,  # noqa: SLF001
         {"link": "Anmelde-Link"},
+    ),
+    MailTemplateSpec(
+        captured.APPLICATION_CAPTURED_KEY,
+        captured.APPLICATION_CAPTURED_KEY,
+        captured.APPLICATION_CAPTURED_SUBJECT,
+        captured.APPLICATION_CAPTURED_BODY,
+        captured.APPLICATION_CAPTURED_PLACEHOLDERS,
     ),
     MailTemplateSpec(
         "erasure_requested",

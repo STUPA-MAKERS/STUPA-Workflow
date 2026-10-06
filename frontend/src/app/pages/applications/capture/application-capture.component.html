@@ -1,0 +1,209 @@
+<!-- "Antrag erfassen" (#11), in the pattern of "Buchung hinzufügen": a fixed head, a
+     body that scrolls with a fade, a fixed foot. The bottom sheet of a phone brings
+     its own head. -->
+<form
+  class="ff"
+  [class.ff--pane]="layout() === 'pane'"
+  [class.ff--page]="layout() === 'page'"
+  [class.ff--sheet]="layout() === 'sheet'"
+  [attr.aria-labelledby]="layout() === 'sheet' ? null : 'cap-title'"
+  (submit)="submit($event)"
+>
+  @if (layout() !== 'sheet') {
+    <header class="ff__head">
+      <div class="ff__titles">
+        <h2 class="ff__title" id="cap-title">{{ 'applications.capture.title' | t }}</h2>
+        <p class="ff__subtitle">{{ subtitle() }}</p>
+      </div>
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="close()">
+        <app-icon name="x" [size]="20" />
+      </app-button>
+    </header>
+  }
+
+  <div class="ff__body" appScrollFade="y">
+    <div class="ff__cols">
+      <div class="ff__col">
+        <fieldset class="ff__sec">
+          <legend class="sec ff__secTitle">{{ 'applications.capture.applicant' | t }}</legend>
+          <app-segmented
+            [ariaLabel]="'applications.capture.applicant' | t"
+            width="fill"
+            [options]="modeOptions()"
+            [value]="mode()"
+            (valueChange)="setMode($event ?? 'account')"
+          />
+          @if (mode() === 'account') {
+            <!-- The applicant search: a combobox in a filled field like the kit inputs. -->
+            <div class="ff__app">
+              <div class="ff__box">
+                <label class="ff__label" for="cap-applicant">{{ 'applications.capture.account' | t }}</label>
+                @if (picked()) {
+                  <span class="ff__picked" data-testid="cap-picked">
+                    <app-icon name="user" [size]="16" />
+                    <span class="cap__pickedText">{{ pickedLabel() }}</span>
+                    <button
+                      type="button"
+                      class="ff__iconBtn"
+                      [attr.aria-label]="'applications.capture.clearAccount' | t"
+                      [title]="'applications.capture.clearAccount' | t"
+                      (click)="clearPick()"
+                    >
+                      <app-icon name="x" [size]="16" />
+                    </button>
+                  </span>
+                } @else {
+                  <input
+                    id="cap-applicant"
+                    class="ff__control"
+                    type="search"
+                    autocomplete="off"
+                    name="applicantSearch"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-controls="cap-applicant-list"
+                    [attr.aria-expanded]="suggestOpen()"
+                    [placeholder]="'applications.capture.searchPlaceholder' | t"
+                    [ngModel]="query()"
+                    (ngModelChange)="onSearch($event)"
+                  />
+                  <app-icon class="ff__searchIcon" name="search" [size]="18" />
+                }
+              </div>
+              @if (suggestOpen()) {
+                <ul id="cap-applicant-list" class="ff__suggest" role="listbox">
+                  @for (c of candidates(); track c.id) {
+                    <li role="presentation">
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected="false"
+                        class="ff__option cap__option"
+                        (click)="pick(c)"
+                      >
+                        <span class="cap__optionName">{{ c.displayName || c.email }}</span>
+                        @if (c.displayName && c.email) {
+                          <span class="cap__optionMail">{{ c.email }}</span>
+                        }
+                      </button>
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+            @if (emailMatch(); as match) {
+              <p class="ff__info" role="status" data-testid="cap-email-match">
+                <app-icon name="user" [size]="16" />
+                <span>{{ 'applications.capture.emailMatch' | t: { name: match.displayName || match.email || '' } }}</span>
+              </p>
+            }
+            @if (noHits()) {
+              <p class="ff__info" role="status">
+                <app-icon name="info" [size]="16" />
+                <span class="cap__noHit">
+                  {{ 'applications.capture.noHits' | t }}
+                  <button type="button" class="cap__link" (click)="useAsGuest()">
+                    {{ 'applications.capture.useGuest' | t }}
+                  </button>
+                </span>
+              </p>
+            }
+          } @else {
+            <div class="ff__grid cap__guest">
+              <app-input
+                name="guestName"
+                [label]="'applications.capture.name' | t"
+                [required]="true"
+                [ngModel]="guestName()"
+                (ngModelChange)="guestName.set($event ?? '')"
+              />
+              <app-input
+                name="guestEmail"
+                type="email"
+                [label]="'applications.capture.email' | t"
+                [required]="true"
+                [error]="guestEmailError() ? (guestEmailError()! | t) : ''"
+                [ngModel]="guestEmail()"
+                (ngModelChange)="onGuestEmail($event ?? '')"
+              />
+            </div>
+            <p class="ff__info">
+              <app-icon name="mail" [size]="16" />
+              <span>{{ 'applications.capture.guestHint' | t }}</span>
+            </p>
+          }
+        </fieldset>
+
+        <fieldset class="ff__sec">
+          <legend class="sec ff__secTitle">{{ 'applications.capture.application' | t }}</legend>
+          <app-select
+            name="type"
+            [label]="'applications.capture.type' | t"
+            [placeholder]="'applications.capture.typePlaceholder' | t"
+            [required]="true"
+            [options]="typeOptions()"
+            [ngModel]="typeId()"
+            (ngModelChange)="selectType($event)"
+          />
+          <div class="ff__grid">
+            <app-datepicker
+              name="receivedOn"
+              [label]="'applications.capture.receivedOn' | t"
+              [required]="true"
+              [min]="minReceived"
+              [max]="today"
+              [error]="receivedError() ? (receivedError()! | t) : ''"
+              [ngModel]="receivedOn()"
+              (ngModelChange)="receivedOn.set($event ?? '')"
+            />
+            <app-input
+              name="intake"
+              [label]="'applications.capture.intake' | t"
+              [placeholder]="'applications.capture.intakePlaceholder' | t"
+              [ngModel]="intake()"
+              (ngModelChange)="intake.set($event ?? '')"
+            />
+          </div>
+        </fieldset>
+      </div>
+    </div>
+
+    @if (loadingForm()) {
+      <app-skeleton class="cap__loading" variant="lines" [count]="3" [label]="'apply.form.loading' | t" />
+    } @else if (effForm()) {
+      <fieldset class="ff__sec cap__answers">
+        <legend class="sec ff__secTitle">{{ 'applications.capture.details' | t }}</legend>
+        <div class="fe-form">
+          <formly-form [form]="form" [fields]="fields()" [model]="model" />
+        </div>
+        <app-draft-files
+          class="cap__files"
+          [heading]="'apply.files.title' | t"
+          [summary]="true"
+          [comparison]="true"
+        />
+      </fieldset>
+    } @else {
+      <p class="ff__info cap__pickType">
+        <app-icon name="info" [size]="16" />
+        <span>{{ 'applications.capture.pickType' | t }}</span>
+      </p>
+    }
+  </div>
+
+  <footer class="ff__foot">
+    <div class="ff__footEnd">
+      <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+      <app-button
+        data-testid="cap-submit"
+        [disabled]="!canSubmit()"
+        [loading]="saving()"
+        (click)="submit($event)"
+      >
+        <span class="ff__btn"><app-icon name="send" [size]="16" />{{
+          (layout() === 'sheet' ? 'applications.capture.submitShort' : 'applications.capture.submit') | t
+        }}</span>
+      </app-button>
+    </div>
+  </footer>
+</form>

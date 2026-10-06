@@ -282,6 +282,21 @@
   flex-direction: column;
   min-width: 0;
 }
+/* "Antrag erfassen" (#11) fills the pane; the routed detail waits behind it. */
+.apps__detail--capture {
+  min-height: 0;
+}
+/* The routed component comes from the router, so it carries no content attribute of
+   this component: `::ng-deep` reaches it, and the class keeps the rule local. */
+.apps__detail--capture > ::ng-deep :not(app-application-capture) {
+  display: none;
+}
+.apps__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
 
 /* ------------------------------------------------------------------ sheets */
 .apps__moreForm {

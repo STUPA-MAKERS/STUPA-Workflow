@@ -353,6 +353,25 @@ def _recurring_due(policy: DeadlinePolicy, now: datetime | None) -> datetime | N
     return min(upcoming) if upcoming else None
 
 
+def submission_anchor(
+    created_at: datetime | None, received_on: date | None, tz_name: str
+) -> datetime | None:
+    """Return the reference time of `relative_submitted` ("ab Einreichung").
+
+    An application captured on behalf of the applicant (#11) carries `received_on`,
+    the day on which it reached the Gremium. The deadline then counts from that day,
+    at the local time of day of `created_at` (so a capture on the same day changes
+    nothing). Without `received_on` the anchor is `created_at` (user decision
+    2026-10-06).
+    """
+    if received_on is None or created_at is None:
+        return created_at
+    zone = ZoneInfo(tz_name)
+    local = created_at.astimezone(zone)
+    anchored = datetime.combine(received_on, local.timetz().replace(tzinfo=None), zone)
+    return anchored.astimezone(created_at.tzinfo or UTC)
+
+
 def resolve_due_at(
     policy: DeadlinePolicy,
     *,

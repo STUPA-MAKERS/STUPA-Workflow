@@ -815,3 +815,21 @@ async def test_build_context_deadline_passed_propagates(monkeypatch: pytest.Monk
     assert ctx.deadline_passed is True
     assert ctx.actor_committees == frozenset({"g-1"})
     assert ctx.applicant_committees == frozenset({"g-1"})
+
+
+def test_submission_anchor_uses_the_received_date() -> None:
+    # #11: `relative_submitted` counts from `received_on` at the local time of the
+    # capture; without it from `created_at`.
+    from datetime import date
+
+    from app.modules.deadlines.service import submission_anchor
+
+    created = datetime(2026, 10, 6, 8, 30, tzinfo=UTC)  # 10:30 in Berlin
+    assert submission_anchor(created, None, "Europe/Berlin") == created
+    assert submission_anchor(None, date(2026, 9, 1), "Europe/Berlin") is None
+    assert submission_anchor(created, date(2026, 10, 6), "Europe/Berlin") == created
+    anchor = submission_anchor(created, date(2026, 9, 1), "Europe/Berlin")
+    assert anchor == datetime(2026, 9, 1, 8, 30, tzinfo=UTC)
+    # Across the DST change the local wall time stays 10:30.
+    winter = submission_anchor(created, date(2026, 11, 2), "Europe/Berlin")
+    assert winter == datetime(2026, 11, 2, 9, 30, tzinfo=UTC)

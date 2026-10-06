@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, InjectionToken, computed, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
@@ -38,6 +38,16 @@ interface StoredDraft {
 /** The key in `sessionStorage`. The token never goes into `localStorage`, a URL or a log. */
 export const DRAFT_FILES_KEY = 'ap.draftFiles';
 
+/**
+ * The `sessionStorage` key of one draft. The wizard keeps the default; the capture
+ * dialog of the applications page (#11) provides its own key, so the two drafts of one
+ * tab never mix.
+ */
+export const DRAFT_FILES_STORAGE_KEY = new InjectionToken<string>('DRAFT_FILES_STORAGE_KEY', {
+  providedIn: 'root',
+  factory: () => DRAFT_FILES_KEY,
+});
+
 const TOKEN_INVALID = 'draft_token_invalid';
 const QUOTA_EXCEEDED = 'draft_quota_exceeded';
 const MISSING = 'draft_attachments_missing';
@@ -75,6 +85,7 @@ export class DraftAttachmentsService {
   private readonly auth = inject(AuthService);
   private readonly altcha = inject(AltchaService);
   private readonly branding = inject(BrandingService);
+  private readonly storageKey = inject(DRAFT_FILES_STORAGE_KEY);
 
   private readonly _token = signal<string | null>(null);
   private expiresAt: string | null = null;
@@ -258,7 +269,7 @@ export class DraftAttachmentsService {
     this.expiresAt = null;
     this.files.set([]);
     try {
-      sessionStorage.removeItem(DRAFT_FILES_KEY);
+      sessionStorage.removeItem(this.storageKey);
     } catch {
       /* storage blocked: nothing to clear */
     }
@@ -306,11 +317,11 @@ export class DraftAttachmentsService {
     const token = this._token();
     try {
       if (!token) {
-        sessionStorage.removeItem(DRAFT_FILES_KEY);
+        sessionStorage.removeItem(this.storageKey);
         return;
       }
       const draft: StoredDraft = { token, expiresAt: this.expiresAt, files: this.files() };
-      sessionStorage.setItem(DRAFT_FILES_KEY, JSON.stringify(draft));
+      sessionStorage.setItem(this.storageKey, JSON.stringify(draft));
     } catch {
       /* storage blocked: the draft lives as long as the page */
     }
@@ -319,7 +330,7 @@ export class DraftAttachmentsService {
   private restore(): void {
     let raw: string | null = null;
     try {
-      raw = sessionStorage.getItem(DRAFT_FILES_KEY);
+      raw = sessionStorage.getItem(this.storageKey);
     } catch {
       return;
     }
@@ -329,7 +340,7 @@ export class DraftAttachmentsService {
       if (typeof draft.token !== 'string' || !draft.token) return;
       // An expired draft is gone on the server: start a new one.
       if (draft.expiresAt && Date.parse(draft.expiresAt) <= Date.now()) {
-        sessionStorage.removeItem(DRAFT_FILES_KEY);
+        sessionStorage.removeItem(this.storageKey);
         return;
       }
       this._token.set(draft.token);

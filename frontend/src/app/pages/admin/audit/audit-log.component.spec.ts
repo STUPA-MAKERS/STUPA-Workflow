@@ -143,6 +143,7 @@ const BACKEND_AUDIT_ACTIONS = [
   'attendance_reset',
   'application_delete',
   'application_create',
+  'application_create_on_behalf',
   'guest_application_discard',
   'application_update',
   'application_archive',
