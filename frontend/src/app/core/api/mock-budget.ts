@@ -81,7 +81,24 @@ const SPEC: Spec = {
           color: '#b8323a',
           cur: [14000, 3000, 3000, 600, 1200],
           children: [
-            { id: 'b1000000-0000-0000-0000-000000000024', key: '231', name: 'Werkstatt', cur: [4000, 1000, 1200, 600, 0] },
+            {
+              id: 'b1000000-0000-0000-0000-000000000024',
+              key: '231',
+              name: 'Werkstatt',
+              cur: [4000, 1000, 1200, 600, 0],
+              // A deep path, so the breadcrumb of the budget page has to make room.
+              children: [
+                {
+                  id: 'b1000000-0000-0000-0000-000000000025',
+                  key: '2311',
+                  name: 'Siebdruck und Textildruck',
+                  cur: [2500, 600, 700, 0, 0],
+                  children: [
+                    { id: 'b1000000-0000-0000-0000-000000000026', key: '23111', name: 'Materialbeschaffung Farben und Siebe', cur: [1500, 400, 500, 0, 0] },
+                  ],
+                },
+              ],
+            },
           ],
         },
       ],

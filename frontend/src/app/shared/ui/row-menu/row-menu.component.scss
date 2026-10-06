@@ -15,6 +15,18 @@
   color: var(--color-text-muted);
   cursor: pointer;
 }
+/* A text button (`text`), for example the "…" of a breadcrumb: the height of a line,
+   the width of its text. */
+.rm__trigger--text {
+  width: auto;
+  height: auto;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  font: inherit;
+  line-height: inherit;
+}
 .rm__trigger:hover {
   background: var(--color-surface-3);
   color: var(--color-text);

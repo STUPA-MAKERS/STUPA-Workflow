@@ -2,6 +2,7 @@
   #trigger
   type="button"
   class="rm__trigger"
+  [class.rm__trigger--text]="text()"
   [class.rm__trigger--on]="open()"
   aria-haspopup="menu"
   [attr.aria-expanded]="open()"
@@ -11,7 +12,11 @@
   (click)="toggle()"
   (keydown)="onTriggerKey($event)"
 >
-  <app-icon [name]="icon()" [size]="19" />
+  @if (text(); as label) {
+    <span aria-hidden="true">{{ label }}</span>
+  } @else {
+    <app-icon [name]="icon()" [size]="19" />
+  }
 </button>
 
 @if (open()) {
@@ -25,6 +30,7 @@
     [attr.aria-label]="label() ?? ('ui.rowMenu.trigger' | t)"
     [attr.aria-busy]="loading() ? 'true' : null"
     [style.top.px]="position().top"
+    [style.left.px]="position().left"
     [style.right.px]="position().right"
     (keydown)="onMenuKey($event)"
   >

@@ -41,6 +41,7 @@ import {
   type BudgetTreeNode,
   type FiscalYear,
 } from './budget-tree.api';
+import { BudgetCrumbsComponent } from './budget-crumbs.component';
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
 import { nodeColors, resolveNodeColors } from './budget-color.util';
@@ -139,6 +140,7 @@ export const APPS_SHOWN = 5;
     PageHeaderComponent,
     SheetBarComponent,
     SheetBarKickerDirective,
+    BudgetCrumbsComponent,
     NgTemplateOutlet,
     RouterLink,
     TranslatePipe,
