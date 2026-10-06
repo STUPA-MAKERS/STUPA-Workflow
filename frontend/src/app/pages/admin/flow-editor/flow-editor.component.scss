@@ -1,33 +1,156 @@
+// Flow editor (board Admin-Flow-Editor): the canvas sheet with its toolbar and legend,
+// and the inspector beside it.
+@use 'breakpoints' as bp;
+@use '../../../features/meetings/scroll-fade' as fade;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* Wide: the admin frame passes the free height down (route data `adminPane`). */
+:host(.fe-pane) {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.fe {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+.fe--wide {
+  min-height: 0;
+}
+
+.fe__headTools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.fe__validity {
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
+}
+
+/* ---- Work area ------------------------------------------------------------------- */
+
+/* Below wide: the canvas, then the inspector. */
+.fe__work {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+@include bp.wide {
+  .fe__work {
+    flex: 1 1 0;
+    grid-template-columns: minmax(0, 1fr) 23.75rem;
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+  }
+}
+
+/* The canvas sheet: a toolbar over the dotted canvas. */
+.fe__sheet {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+
+.fe__toolbar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 3.5rem;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.fe__zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+.fe__zoomValue {
+  min-width: 3.25rem;
+  font-size: var(--fs-small);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.fe__crumbs {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-4) 0;
+}
+.fe__crumbSep {
+  color: var(--color-text-muted);
+}
+.fe__crumb {
+  padding: 0.15rem 0.45rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--color-accent-text);
+  cursor: pointer;
+}
+.fe__crumb:hover {
+  background: var(--color-surface-2);
+}
+.fe__crumb--current {
+  font-weight: var(--fw-semibold);
+  color: var(--color-text);
+  cursor: default;
+}
+.fe__crumb--current:hover {
+  background: none;
+}
+
 .fe__alert {
-  margin: 0;
-  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-6);
-  border-radius: var(--radius-md);
+  flex: none;
+  margin: var(--space-3) var(--space-3) 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
   background: var(--color-danger-subtle);
   color: var(--color-danger);
   font-size: var(--fs-sm);
 }
-
-.fe__work {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 18rem;
-  gap: var(--space-4);
-  align-items: start;
+.fe__alert ul {
+  margin: 0;
+  padding-left: var(--space-4);
 }
 
-@media (max-width: 56rem) {
-  .fe__work {
-    grid-template-columns: 1fr;
-  }
-}
-
+/* The canvas box: a dotted grid; the SVG fills it. Below wide it has a fixed height. */
 .fe__canvas-wrap {
-  height: 30rem;
+  position: relative;
+  flex: 1 1 auto;
+  height: 34rem;
+  min-height: 0;
   overflow: hidden;
-  background: var(--color-surface-sunken);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  background-image: radial-gradient(var(--color-border) 1px, transparent 1px);
+  background-image: radial-gradient(var(--color-border) 1px, transparent 1.2px);
   background-size: 22px 22px;
+}
+@include bp.wide {
+  .fe__canvas-wrap {
+    height: auto;
+  }
 }
 
 .fe__canvas {
@@ -43,15 +166,125 @@
   cursor: grabbing;
 }
 
+/* The legend at the bottom left of the canvas. */
+.fe__legend {
+  position: absolute;
+  left: var(--space-5);
+  right: var(--space-5);
+  bottom: var(--space-3);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+.fe__legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fe__legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+.fe__legendDash {
+  width: 22px;
+  border-top: 2px dashed var(--color-text-subtle);
+}
+
+/* ---- Canvas: nodes and edges ----------------------------------------------------- */
+
 .fe__node-g {
   cursor: grab;
 }
 
-.fe__edge {
-  // Each transition sets --edge-color inline and overrides the default gray.
-  // The selection rule below still wins through its higher specificity.
-  stroke: var(--edge-color, var(--color-text-muted));
+/* A state: surface 2, an edge in the state colour (or the outline colour). */
+.fe__node {
+  fill: var(--color-surface-2);
+  stroke: var(--color-text-subtle);
   stroke-width: 2;
+  cursor: grab;
+}
+.fe__node--sel {
+  stroke: var(--color-accent);
+}
+.fe__node--multi {
+  stroke: var(--color-accent);
+  stroke-dasharray: 5 3;
+}
+/* The ring around the selected state. */
+.fe__node-halo {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-opacity: 0.3;
+  stroke-width: 4;
+  pointer-events: none;
+}
+
+.fe__node-initial-dot {
+  fill: var(--color-accent);
+  pointer-events: none;
+}
+
+.fe__node-text {
+  fill: var(--color-text);
+  font-size: 13.5px;
+  font-weight: var(--fw-semibold);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* "Endzustand" under the label of a terminal state. */
+.fe__node-tag {
+  fill: var(--color-text-muted);
+  font-size: 11px;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* The kind above a state ("Abstimmung (Gremium)"), in the accent colour. */
+.fe__node-kind {
+  fill: var(--color-accent-text);
+  font-size: 11.5px;
+  font-weight: var(--fw-semibold);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* A connector: a hollow port on the right edge of the state. */
+.fe__connector {
+  fill: var(--color-surface-3);
+  stroke: var(--color-text-subtle);
+  stroke-width: 2;
+  cursor: crosshair;
+}
+.fe__connector:hover {
+  stroke: var(--color-accent);
+}
+.fe__connector--branch {
+  stroke: var(--color-warning);
+}
+.fe__connector--guard {
+  stroke: var(--color-info, var(--color-accent));
+}
+.fe__dot-label {
+  fill: var(--color-text-muted);
+  font-size: 10.5px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.fe__edge {
+  // Each transition sets --edge-color inline and overrides the default colour.
+  // The selection rule below still wins through its higher specificity.
+  stroke: var(--edge-color, var(--color-text-subtle));
+  stroke-width: 1.6;
   fill: none;
   pointer-events: none;
 }
@@ -64,16 +297,16 @@
 }
 
 .fe__edge-g--sel .fe__edge {
-  stroke: var(--color-primary);
-  stroke-width: 3;
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
 }
 
 .fe__edge--auto {
-  stroke-dasharray: 6 4;
+  stroke-dasharray: 6 5;
 }
 
 .fe__edge--temp {
-  stroke: var(--color-primary);
+  stroke: var(--color-accent);
   stroke-dasharray: 4 4;
 }
 
@@ -82,192 +315,158 @@
   fill: context-stroke;
 }
 
+/* An edge label: muted; the selected edge in the accent colour. A halo in the colour
+   of the sheet keeps it readable where it crosses a line. */
 .fe__edge-label {
-  fill: var(--edge-color, var(--color-text-muted));
-  font-size: 11px;
+  fill: var(--color-text-muted);
+  font-size: 11.5px;
+  font-weight: var(--fw-medium);
+  paint-order: stroke;
+  stroke: var(--color-surface-1);
+  stroke-width: 4px;
+  stroke-linejoin: round;
   pointer-events: none;
 }
-
-.fe__node {
-  fill: var(--color-bg-elevated);
-  stroke: var(--color-border-strong);
-  stroke-width: 1.5;
-  cursor: grab;
+.fe__edge-g--sel .fe__edge-label {
+  fill: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
+}
+.fe__bolt {
+  fill: var(--color-warning);
 }
 
-.fe__node--initial {
-  stroke: var(--color-primary);
-  stroke-width: 2.5;
-}
-
-.fe__node--sel {
-  stroke: var(--color-primary);
-  stroke-width: 3;
-}
-
-.fe__node--multi {
-  stroke: var(--color-primary);
-  stroke-width: 2.5;
-  stroke-dasharray: 5 3;
-}
-
-.fe__crumb {
-  padding: 0.15rem 0.45rem;
-  font: inherit;
-  font-size: 0.9rem;
-  color: var(--color-primary);
-  background: none;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.fe__crumb:hover {
-  background: var(--color-surface-sunken);
-}
-
-.fe__crumb--current {
-  color: var(--color-text);
-  font-weight: 600;
-  cursor: default;
-}
-.fe__crumb--current:hover {
-  background: none;
-}
+/* ---- Canvas: groups and proxies -------------------------------------------------- */
 
 .fe__groupbox {
-  fill: var(--color-bg-elevated);
-  stroke: var(--color-border-strong);
+  fill: var(--color-surface-2);
+  stroke: var(--color-text-subtle);
   stroke-width: 2;
   stroke-dasharray: 8 5;
   cursor: pointer;
 }
-
 .fe__groupbox-g--multi .fe__groupbox {
-  stroke: var(--color-primary);
+  stroke: var(--color-accent);
   stroke-width: 2.5;
 }
-
 .fe__groupbox-name {
   fill: var(--color-text);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   pointer-events: none;
 }
-
 .fe__groupbox-count {
   fill: var(--color-text-muted);
   font-size: 11px;
   pointer-events: none;
 }
-
 .fe__groupbox-dot {
-  fill: var(--color-border-strong);
-  stroke: var(--color-bg-elevated);
+  fill: var(--color-surface-3);
+  stroke: var(--color-text-subtle);
   stroke-width: 1.5;
   pointer-events: none;
 }
 
 .fe__proxy {
-  fill: var(--color-surface-sunken);
+  fill: var(--color-surface-1);
   stroke: var(--color-border);
   stroke-width: 1.5;
   stroke-dasharray: 4 4;
   cursor: pointer;
 }
-
 .fe__proxy--group {
   stroke-dasharray: 8 5;
   stroke-width: 2;
 }
-
 .fe__proxy-g:hover .fe__proxy {
-  stroke: var(--color-primary);
+  stroke: var(--color-accent);
 }
-
 .fe__proxy-text {
   fill: var(--color-text-muted);
   font-size: 12px;
   pointer-events: none;
 }
 
-.fe__node-initial-dot {
-  fill: var(--color-primary);
-  pointer-events: none;
-}
-
-.fe__node-text {
-  fill: var(--color-text);
-  font-size: 13px;
-  pointer-events: none;
-  user-select: none;
-}
-
-.fe__connector {
-  fill: var(--color-primary);
-  stroke: var(--color-surface);
-  stroke-width: 2;
-  cursor: crosshair;
-  opacity: 0.55;
-}
-
-.fe__connector:hover {
-  opacity: 1;
-}
-.fe__connector--branch {
-  fill: var(--color-warning, #c47d00);
-  opacity: 0.85;
-}
-.fe__connector--guard {
-  fill: var(--color-info, #3b7dd8);
-  opacity: 0.85;
-}
-.fe__dot-label {
-  fill: var(--color-text-muted);
-  font-size: 10px;
-  pointer-events: none;
-  user-select: none;
-}
-.fe__node-kind {
-  fill: var(--color-text-muted);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  pointer-events: none;
-  user-select: none;
-}
+/* ---- Inspector ------------------------------------------------------------------- */
 
 .fe__panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
-  position: sticky;
-  top: var(--space-4);
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-5);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+@include bp.wide {
+  .fe__panel {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    @include fade.fade-y(var(--space-5));
+  }
 }
 
+.fe__back {
+  align-self: flex-start;
+  margin-left: calc(-1 * var(--space-2));
+}
+
+.fe__versions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.fe__hidden {
+  display: none;
+}
+
+.fe__empty {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.fe__json {
+  margin-top: auto;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.fe__json summary {
+  cursor: pointer;
+}
 .fe__json pre {
   max-height: 18rem;
+  margin: var(--space-2) 0 0;
   overflow: auto;
   padding: var(--space-3);
-  background: var(--color-surface-sunken);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  color: var(--color-text);
   font-size: var(--fs-xs);
 }
 
-.fe__status--ok {
-  color: var(--color-success);
-}
+/* ---- Phone ----------------------------------------------------------------------- */
 
-/* A phone in portrait mode needs a short canvas and an inspector that does not stick. */
-@media (max-width: 768px) {
-  .fe__panel {
-    position: static;
-  }
-
+@include bp.phone {
   .fe__canvas-wrap {
-    height: 22rem;
+    height: 26rem;
+  }
+  .fe__toolbar {
+    padding-inline: var(--space-2);
+  }
+  /* The zoom starts its own line, at the start like the other tools. */
+  .fe__zoom {
+    margin-left: 0;
+  }
+  .fe__legend {
+    left: var(--space-3);
+    right: var(--space-3);
+  }
+  /* The hint names the shift key, which a phone has not. */
+  .fe__legendHint {
+    display: none;
+  }
+  .fe__panel {
+    padding: var(--space-4);
   }
 }

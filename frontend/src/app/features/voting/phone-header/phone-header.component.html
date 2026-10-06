@@ -1,0 +1,17 @@
+<a
+  class="ph__back"
+  [routerLink]="back()"
+  [queryParamsHandling]="keepQuery() ? 'preserve' : ''" [attr.aria-label]="'voting.cast.back' | t" [title]="'voting.cast.back' | t">
+  <app-icon name="back" [size]="21" />
+</a>
+<div class="ph__text">
+  <span class="ph__title">{{ 'voting.cast.heading' | t }}</span>
+  @if (subtitle(); as sub) {
+    @if (subtitleLink(); as link) {
+      <a class="ph__sub ph__sub--link ell" [routerLink]="link" [title]="sub">{{ sub }}</a>
+    } @else {
+      <span class="ph__sub ell" [title]="sub">{{ sub }}</span>
+    }
+  }
+</div>
+<ng-content />

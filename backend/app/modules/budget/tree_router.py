@@ -55,6 +55,7 @@ from app.modules.budget.tree_schemas import (
     InvoiceCreate,
     InvoiceFileResult,
     InvoiceOut,
+    InvoicePage,
     InvoiceParseResult,
     InvoiceStatus,
     InvoiceUpdate,
@@ -128,6 +129,15 @@ async def _require_node_view(
     member = await _member_gremium_ids(service, principal.sub)
     if not await service.can_view_node(budget_id, member):
         raise ForbiddenError("no access to this cost centre")
+
+
+async def _booking_scope(
+    service: BudgetTreeService, principal: Principal
+) -> set[UUID] | None:
+    """Return the gremium scope for linked bookings, or ``None`` for the full view."""
+    if _has_full_view(principal):
+        return None
+    return await _member_gremium_ids(service, principal.sub)
 
 
 @router.get(
@@ -597,15 +607,17 @@ _INVOICE_READ = Depends(require_any_permission("budget.view", "budget.structure"
 
 @router.get(
     "/invoices",
-    response_model=Page[InvoiceOut],
+    response_model=InvoicePage,
     dependencies=[_INVOICE_READ],
     responses=_errors(401, 403),
 )
 async def list_invoices(
     service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
     invoice_id: Annotated[UUID | None, Query(alias="id")] = None,
     q: Annotated[str | None, Query()] = None,
     status: Annotated[InvoiceStatus | None, Query()] = None,
+    booked: Annotated[bool | None, Query()] = None,
     gross_min: Annotated[Decimal | None, Query(alias="grossMin", ge=0)] = None,
     gross_max: Annotated[Decimal | None, Query(alias="grossMax", ge=0)] = None,
     issue_from: Annotated[str | None, Query(alias="issueFrom")] = None,
@@ -614,25 +626,30 @@ async def list_invoices(
     due_to: Annotated[str | None, Query(alias="dueTo")] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
-) -> Page[InvoiceOut]:
+) -> InvoicePage:
     """List invoices with fuzzy search, filters and offset paging.
 
     ``id`` selects the exact invoice for the deep link.
     The newest issue date comes first. ``q`` searches number, supplier and note.
     ``status`` is ``open`` or ``paid``. ``grossMin`` and ``grossMax`` bound the
     gross amount. ``issueFrom``/``issueTo`` and ``dueFrom``/``dueTo`` bound the
-    dates.
+    dates. ``linkedBookings`` holds only the bookings on visible cost centres.
+    ``booked`` keeps the invoices with or without a visible booking. ``counts``
+    holds the size of the list segments (all, inbox, booked, paid) under the
+    other filters.
     """
     return await service.list_invoices_paged(
         invoice_id=invoice_id,
         q=q,
         status=status,
+        booked=booked,
         gross_min=gross_min,
         gross_max=gross_max,
         issue_from=issue_from,
         issue_to=issue_to,
         due_from=due_from,
         due_to=due_to,
+        visible_gremium_ids=await _booking_scope(service, principal),
         limit=limit,
         offset=offset,
     )
@@ -644,8 +661,15 @@ async def list_invoices(
     dependencies=[_INVOICE_READ],
     responses=_errors(401, 403, 404),
 )
-async def get_invoice(invoice_id: UUID, service: ServiceDep) -> InvoiceOut:
-    return await service.get_invoice(invoice_id)
+async def get_invoice(
+    invoice_id: UUID,
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
+) -> InvoiceOut:
+    """Read one invoice with the bookings on visible cost centres."""
+    return await service.get_invoice(
+        invoice_id, visible_gremium_ids=await _booking_scope(service, principal)
+    )
 
 
 @router.post(

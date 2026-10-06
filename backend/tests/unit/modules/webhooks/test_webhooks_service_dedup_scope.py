@@ -53,19 +53,6 @@ class _CapturingSession(FakeSession):
         return await super().scalars(stmt)
 
 
-async def test_dispatch_event_scopes_dedup_query_to_candidate_keys() -> None:
-    h1, h2 = _hook(), _hook()
-    base = "app:evt:0:webhook"
-    session = _CapturingSession(scalars=[[h1, h2], []])
-    n = await WebhookService(session, SETTINGS, queue=FakeWebhookQueue()).dispatch_event(  # type: ignore[arg-type]
-        "status_changed", idempotency_base=base
-    )
-    assert n == 2
-    # The dedup query bound EXACTLY the two candidate keys (one per fetched webhook),
-    # not an unbounded scan of all historical keys for the event.
-    assert session.in_params == [[f"{base}:{h1.id}", f"{base}:{h2.id}"]]
-
-
 async def test_dispatch_to_webhook_scopes_dedup_query_to_single_key() -> None:
     hook = _hook()
     base = "app:evt:0:webhook"

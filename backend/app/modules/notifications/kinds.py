@@ -23,10 +23,6 @@ NOTIFICATION_KINDS: tuple[str, ...] = (
     "task_reminder",
     # A meeting invitation or an agenda was published.
     "meeting",
-    # A vote was opened or closed.
-    "vote",
-    # An own role was assigned or revoked.
-    "role_change",
     # A vote delegation was received or revoked.
     "delegation",
     # A meeting protocol was finalized.

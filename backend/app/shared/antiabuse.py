@@ -130,6 +130,23 @@ def body_cap(limit_attr: str) -> Callable[[Request, Settings], None]:
 enforce_auth_payload_limit = body_cap("max_auth_payload_bytes")
 enforce_application_payload_limit = body_cap("max_application_payload_bytes")
 
+# Room for the multipart frame around the file: boundaries, part headers and the small
+# form fields (field key, flag, ALTCHA solution).
+_MULTIPART_OVERHEAD_BYTES = 64 * 1024
+
+
+def enforce_attachment_body_cap(request: Request, settings: SettingsDep) -> None:
+    """Answer 413 when the ``Content-Length`` of an upload is clearly too large.
+
+    The limit is ``attachment_max_bytes`` plus room for the multipart frame. Like
+    ``body_cap`` this is an early, cheap check only. The route reads the file under the
+    authoritative cap (``_read_capped``), also for a chunked body.
+    """
+    limit = settings.attachment_max_bytes + _MULTIPART_OVERHEAD_BYTES
+    raw = request.headers.get("content-length")
+    if raw is not None and raw.isdigit() and int(raw) > limit:
+        raise PayloadTooLargeError(f"Request body exceeds {limit} bytes.")
+
 
 async def _enforce(
     limiter: RateLimiter, key: str, *, limit: int, window: int, detail: str
@@ -252,7 +269,7 @@ async def rate_limit_attachments(
     principal: Annotated[Principal | None, Depends(get_current_principal)],
     applicant: Annotated[Applicant | None, Depends(get_current_applicant)],
 ) -> None:
-    """``POST /attachments``: 30/h per applicant.
+    """``POST /attachments`` and ``POST /apply/attachments``: 30/h per identity.
 
     The key follows the identity. It uses the principal ``sub``, or the bound
     ``application_id`` of the applicant, or the IP when neither exists. The auth
@@ -272,6 +289,71 @@ async def rate_limit_attachments(
         limit=settings.rl_attachments_per_hour,
         window=_HOUR,
         detail="Too many uploads. Try again later.",
+    )
+
+
+async def rate_limit_applicant_search(
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+) -> None:
+    """``GET /applications/on-behalf/applicants``: a limit per principal per hour (#11).
+
+    The search discloses the names and e-mails of the accounts, so the limit also
+    applies to an OAuth token: an agent must not walk the whole directory. Without a
+    principal the route answers 401 anyway.
+    """
+    if principal is None:
+        return
+    await _enforce(
+        limiter,
+        f"applicant-search:principal:{principal.sub}",
+        limit=settings.rl_applicant_search_per_hour,
+        window=_HOUR,
+        detail="Too many account searches. Try again later.",
+    )
+
+
+async def rate_limit_public_join(
+    request: Request, settings: SettingsDep, limiter: RateLimiterDep
+) -> None:
+    """``POST /public/meetings/join/{code}`` (#17): a limit per IP and per join code.
+
+    Many guests share the campus NAT, so the IP limit stays generous; ALTCHA is the
+    main guard. The code limit stops a flood of requests on one meeting.
+    """
+    await _enforce(
+        limiter,
+        f"public-join:ip:{client_ip(request)}",
+        limit=settings.rl_public_join_ip_per_hour,
+        window=_HOUR,
+        detail="Too many join requests from this IP. Try again later.",
+    )
+    raw = str(request.path_params.get("code", ""))
+    code = "".join(ch for ch in raw.upper() if ch not in " -")
+    await _enforce(
+        limiter,
+        f"public-join:code:{code}",
+        limit=settings.rl_public_join_code_per_hour,
+        window=_HOUR,
+        detail="Too many join requests for this meeting. Try again later.",
+    )
+
+
+async def rate_limit_public_read(
+    request: Request, settings: SettingsDep, limiter: RateLimiterDep
+) -> None:
+    """The reads of the public meeting routes (#17): a generous limit per IP.
+
+    The limit stops the enumeration of join codes; a guest page reads its state again
+    on each live event, and many guests share one IP.
+    """
+    await _enforce(
+        limiter,
+        f"public-meeting:ip:{client_ip(request)}",
+        limit=settings.rl_public_meeting_read_ip_per_hour,
+        window=_HOUR,
+        detail="Too many requests from this IP. Try again later.",
     )
 
 

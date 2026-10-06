@@ -8,7 +8,8 @@
 #      with `up -d` only the services with a new image ID. Unchanged services stay up,
 #      and so do the data services postgres, redis, minio, clamav and altcha.
 #
-# Scope: --profile prod (backup included), as in deploy/README.md.
+# Scope: `--profile prod`. No service of the stack has a profile, so this is every service;
+# backups run inside the api and the worker (no backup container).
 #
 # Limit: the script detects a change through the image ID only. A change that touches
 # only the compose config or the .env of an image-only service, such as a postgres env

@@ -8,12 +8,18 @@ definitions come from the ``config_schemas`` models. The branding model is
 
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.modules.admin.branding import Branding
 from app.modules.admin.cd_logos import CdBaseVariant, LogoSlot, VendoredLogoName
+from app.modules.applications.models import (
+    DEFAULT_CONFIRM_TTL_HOURS,
+    MAX_CONFIRM_TTL_HOURS,
+)
 from app.shared.config_schemas import ComparisonOffers, EventName, FlowGraph
 from app.shared.i18n import I18nMap
 from app.shared.permissions import PERMISSION_CATALOGUE
@@ -21,6 +27,12 @@ from app.shared.permissions import PERMISSION_CATALOGUE
 # A CD-variant key is a slug. It is the stable handle of the variant and never
 # changes after the create.
 CD_VARIANT_KEY_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
+
+# A role key (global role and gremium role, A10) starts with a lowercase letter and
+# holds lowercase letters, digits and underscores. The key is the stable handle that
+# seeds, migrations and the forced gremium roles use. A key that breaks the pattern
+# gives 422 on create. The update schemas have no key, because a key never changes.
+ROLE_KEY_PATTERN = r"^[a-z][a-z0-9_]*$"
 
 
 def _validate_permissions(perms: list[str] | None) -> list[str] | None:
@@ -126,6 +138,18 @@ class GremiumOut(_CamelModel):
     )
 
 
+class GremiumAdminOut(GremiumOut):
+    """A gremium in the admin list (``GET /admin/gremien``), with its counts.
+
+    ``memberCount`` is the number of persons with a membership in the gremium.
+    ``roleCount`` is the number of gremium roles, the forced roles included. The
+    public master-data list (``GET /gremien``) does not have these fields.
+    """
+
+    member_count: int = Field(default=0, serialization_alias="memberCount")
+    role_count: int = Field(default=0, serialization_alias="roleCount")
+
+
 class GremiumCreate(_CamelModel):
     name: str = Field(min_length=1)
     slug: str = Field(min_length=1)
@@ -196,12 +220,12 @@ class GremiumRoleOut(_CamelModel):
     # frontend hides the delete action for them.
     forced: bool = False
     # Granular meeting permissions of this role: session.manage, vote.manage,
-    # vote.cast and protocol.write.
+    # vote.cast, protocol.write and protocol.finalize.
     permissions: list[str] = Field(default_factory=list)
 
 
 class GremiumRoleCreate(_CamelModel):
-    key: str = Field(min_length=1)
+    key: str = Field(min_length=1, pattern=ROLE_KEY_PATTERN)
     name: I18nMap = Field(default_factory=dict)
     permissions: list[str] = Field(default_factory=list)
 
@@ -212,12 +236,24 @@ class GremiumRoleUpdate(_CamelModel):
 
 
 class GremiumMembershipOut(_CamelModel):
-    """A membership that the sync derived from the OIDC groups (read-only)."""
+    """A membership that the sync derived from the OIDC groups (read-only).
+
+    The display name and the e-mail address of the member come with the row, so the
+    members page needs no principal list. Without them a page must load every principal,
+    and the principal list stops after 50 rows.
+
+    ``active`` uses the same rule as the member count of the gremien list: the
+    principal is active and the membership is valid now. The members page shows only
+    the active rows, so its count agrees with the gremien list.
+    """
 
     id: UUID
     principal_id: UUID = Field(serialization_alias="principalId")
     gremium_id: UUID = Field(serialization_alias="gremiumId")
     gremium_role_id: UUID = Field(serialization_alias="gremiumRoleId")
+    display_name: str | None = Field(default=None, serialization_alias="displayName")
+    email: str | None = None
+    active: bool = True
 
 
 def _check_oidc_group(value: str) -> str:
@@ -300,6 +336,10 @@ class ApplicationTypeOut(_CamelModel):
     active_form_version_id: UUID | None = Field(
         serialization_alias="activeFormVersionId"
     )
+    # The number of the active form version. ``None`` while no version is active.
+    active_form_version: int | None = Field(
+        default=None, serialization_alias="activeFormVersion"
+    )
 
 
 class ApplicationTypeCreate(_CamelModel):
@@ -350,7 +390,7 @@ class RoleOut(_CamelModel):
 
 
 class RoleCreate(_CamelModel):
-    key: str = Field(min_length=1)
+    key: str = Field(min_length=1, pattern=ROLE_KEY_PATTERN)
     label: I18nMap = Field(default_factory=dict)
     permissions: list[str] = Field(default_factory=list)
 
@@ -393,6 +433,122 @@ class PrincipalOut(_CamelModel):
     assignments: list[RoleAssignmentOut]
     # The OIDC groups as of the last login. They drive the group mappings.
     oidc_groups: list[str] = Field(default_factory=list, serialization_alias="oidcGroups")
+    # Account merge: set when an admin merged this (old) account into another one.
+    # The account is then a locked reference and shows "merged into <name>".
+    merged_into_id: UUID | None = Field(default=None, serialization_alias="mergedIntoId")
+    merged_into_name: str | None = Field(default=None, serialization_alias="mergedIntoName")
+    merged_at: str | None = Field(default=None, serialization_alias="mergedAt")
+
+
+# Account merge (``admin/principal_merge.py``). The areas of the preview and the result,
+# in display order. Each area counts the rows that the merge rewrites to the new account,
+# the duplicate rows that it combines (drops, because the new account has the same row),
+# and the rows that it removes (sessions, tokens, derived memberships, the feed token).
+MergeArea = Literal[
+    "applications",
+    "versions",
+    "timeline",
+    "comments",
+    "votes",
+    "delegations",
+    "substitutes",
+    "attendance",
+    "meetings",
+    "budget",
+    "config",
+    "notifications",
+    "roles",
+    "privacy",
+    "backups",
+    "sessions",
+    "memberships",
+    "calendar",
+]
+
+# A real conflict blocks the merge. Each kind names a rule that the merged data would
+# break:
+# - ``ballot_same_vote``: both accounts voted in the same vote (open or secret).
+# - ``delegation_same_meeting``: both accounts delegated their seat in the same meeting.
+# - ``delegation_vote_twice``: both accounts received a vote transfer in the same meeting.
+# - ``delegation_chain``: one account delegated to the other, or is delegator while the
+#   other is delegate, in the same meeting.
+# - ``attendance_differs``: both accounts have a different attendance in the same meeting.
+# - ``erasure_open``: an erasure request for one of the accounts is still open.
+MergeConflictKind = Literal[
+    "ballot_same_vote",
+    "delegation_same_meeting",
+    "delegation_vote_twice",
+    "delegation_chain",
+    "attendance_differs",
+    "erasure_open",
+]
+
+
+class PrincipalMergeIn(_CamelModel):
+    """Body of ``POST /admin/principals/{id}/merge``: the account that stays."""
+
+    target_id: UUID = Field(alias="targetId")
+
+
+class MergePrincipalOut(_CamelModel):
+    """One side of a merge: the old account (source) or the account that stays."""
+
+    id: UUID
+    display_name: str | None = Field(serialization_alias="displayName")
+    email: str | None
+    last_login: str | None = Field(serialization_alias="lastLogin")
+
+
+class MergeAreaOut(_CamelModel):
+    """The counts of one area of a merge."""
+
+    area: MergeArea
+    rewritten: int = 0
+    combined: int = 0
+    removed: int = 0
+
+
+class MergeConflictOut(_CamelModel):
+    """One real conflict. ``label`` names the vote or the meeting, never an id."""
+
+    kind: MergeConflictKind
+    label: str | None = None
+
+
+class MergePermissionOut(_CamelModel):
+    """A right of the old account that the target lacks.
+
+    ``key`` is a permission key, or ``admin`` for the admin role (every right).
+    ``gremium`` names the gremium of a gremium permission, else null.
+    """
+
+    key: str
+    gremium: str | None = None
+
+
+class MergePreviewOut(_CamelModel):
+    """``GET /admin/principals/{id}/merge-preview``: what a merge would do."""
+
+    source: MergePrincipalOut
+    target: MergePrincipalOut
+    areas: list[MergeAreaOut]
+    conflicts: list[MergeConflictOut]
+    # The rights of the old account that the target lacks. The merge moves no right,
+    # but it moves ownership, so these block it unless the admin holds them all.
+    extra_permissions: list[MergePermissionOut] = Field(
+        default_factory=list, serialization_alias="extraPermissions"
+    )
+    actor_holds_extra: bool = Field(default=True, serialization_alias="actorHoldsExtra")
+    can_merge: bool = Field(serialization_alias="canMerge")
+
+
+class MergeResultOut(_CamelModel):
+    """``POST /admin/principals/{id}/merge``: what the merge did."""
+
+    source: MergePrincipalOut
+    target: MergePrincipalOut
+    areas: list[MergeAreaOut]
+    merged_at: str = Field(serialization_alias="mergedAt")
 
 
 class PrincipalUpdate(_CamelModel):
@@ -485,8 +641,64 @@ class SiteConfigOut(_CamelModel):
     has_draft_changes: bool = Field(serialization_alias="hasDraftChanges")
 
 
+class AttachmentLimitsOut(_CamelModel):
+    """Upload limits of the wizard (Z4), for the text below the drop zone.
+
+    ``maxFileBytes`` is the cap of one file. ``maxDraftFiles`` and
+    ``maxDraftBytes`` are the caps of all draft files of one draft token. The
+    server checks all three on each upload; the values only tell the applicant
+    the rules before a file is refused.
+    """
+
+    max_file_bytes: int = Field(serialization_alias="maxFileBytes")
+    max_draft_files: int = Field(serialization_alias="maxDraftFiles")
+    max_draft_bytes: int = Field(serialization_alias="maxDraftBytes")
+
+
 class PublicSiteConfigOut(_CamelModel):
-    """Public (auth-free) active branding config for frontend rendering."""
+    """Public (auth-free) active branding config for frontend rendering.
+
+    ``confirmTtlHours`` is the time a guest has to confirm the email. The
+    confirmation page of the wizard shows it. ``linkTtlDays`` is the lifetime of a
+    new magic link in days; null means that the link does not expire. The
+    confirmation page and the status page show it. ``attachmentLimits`` holds the
+    upload limits of the wizard.
+    """
 
     version: int
     branding: Branding
+    confirm_ttl_hours: int = Field(
+        default=DEFAULT_CONFIRM_TTL_HOURS, serialization_alias="confirmTtlHours"
+    )
+    link_ttl_days: int | None = Field(default=None, serialization_alias="linkTtlDays")
+    attachment_limits: AttachmentLimitsOut | None = Field(
+        default=None, serialization_alias="attachmentLimits"
+    )
+
+
+# The API caps the link lifetime at ten years. A larger value adds nothing, and a
+# far-future expiry can overflow the datetime arithmetic.
+MAX_LINK_TTL_DAYS = 3650
+
+
+class GuestSettingsOut(_CamelModel):
+    """Settings for applications without an account (Z1).
+
+    ``linkTtlDays`` null means: a new magic link has no expiry.
+    """
+
+    confirm_ttl_hours: int = Field(serialization_alias="confirmTtlHours")
+    link_ttl_days: int | None = Field(serialization_alias="linkTtlDays")
+    updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
+    updated_by: str | None = Field(default=None, serialization_alias="updatedBy")
+
+
+class GuestSettingsUpdate(_CamelModel):
+    """Full replacement of the guest settings. Send ``linkTtlDays: null`` for no expiry."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    confirm_ttl_hours: int = Field(
+        alias="confirmTtlHours", ge=1, le=MAX_CONFIRM_TTL_HOURS
+    )
+    link_ttl_days: int | None = Field(alias="linkTtlDays", ge=1, le=MAX_LINK_TTL_DAYS)

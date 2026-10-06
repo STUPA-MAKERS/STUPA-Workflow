@@ -1,0 +1,36 @@
+<!-- A privileged override. It bypasses the flow. -->
+<app-dialog
+  [open]="open()"
+  [title]="'applications.detail.forceStatusTitle' | t"
+  [closeLabel]="'applications.detail.cancel' | t"
+  (closed)="close()"
+>
+  <p class="fsd__lead">{{ 'applications.detail.forceStatusLead' | t }}</p>
+  <app-select
+    [label]="'applications.detail.forceStatusField' | t"
+    [placeholder]="'applications.detail.forceStatusPlaceholder' | t"
+    [options]="options()"
+    [ngModel]="choice()"
+    (ngModelChange)="choice.set($event)"
+  />
+  <label class="fsd__reason">
+    <span>{{ 'applications.detail.forceStatusReason' | t }}</span>
+    <textarea
+      rows="3"
+      name="forceReason"
+      [placeholder]="'applications.detail.forceStatusReasonPlaceholder' | t"
+      [ngModel]="note()"
+      (ngModelChange)="note.set($event)"
+    ></textarea>
+  </label>
+  <div dialog-footer>
+    <app-button variant="text" size="sm" (click)="close()">{{ 'applications.detail.cancel' | t }}</app-button>
+    <app-button
+      variant="danger"
+      size="sm"
+      [loading]="saving()"
+      [disabled]="!choice() || !note().trim()"
+      (click)="submit()"
+    >{{ 'applications.detail.forceStatusConfirm' | t }}</app-button>
+  </div>
+</app-dialog>

@@ -1,0 +1,56 @@
+<nav class="bb" [attr.aria-label]="'nav.main' | t">
+  @for (item of barItems(); track item.key) {
+    <a
+      class="bb__item"
+      [routerLink]="item.path"
+      routerLinkActive="is-active"
+      ariaCurrentWhenActive="page"
+    >
+      <span class="bb__ind">
+        <app-icon [name]="item.icon" [size]="22" />
+        <app-nav-mark [key]="item.key" />
+      </span>
+      <span class="bb__label">{{ item.labelKey | t }}</span>
+      <app-nav-mark [key]="item.key" part="text" />
+    </a>
+  }
+  <button
+    type="button"
+    class="bb__item"
+    [class.is-active]="moreActive()"
+    aria-haspopup="dialog"
+    [attr.aria-expanded]="moreOpen()"
+    (click)="openMore()"
+  >
+    <span class="bb__ind"><app-icon name="menu" [size]="22" /></span>
+    <span class="bb__label">{{ 'shell.nav.more' | t }}</span>
+  </button>
+</nav>
+
+<app-side-sheet side="bottom" [heading]="'shell.nav.more' | t" [(open)]="moreOpen">
+  <div class="more">
+    @if (moreItems().length > 0) {
+      <div class="more__group">
+        @for (item of moreItems(); track item.key) {
+          <a
+            class="more__item"
+            [routerLink]="item.path"
+            routerLinkActive="is-active"
+            ariaCurrentWhenActive="page"
+            (click)="closeMore()"
+          >
+            <app-icon [name]="item.icon" [size]="20" />
+            <span class="ell">{{ item.labelKey | t }}</span>
+          </a>
+        }
+      </div>
+    }
+    <div class="more__group">
+      <button type="button" class="more__item" (click)="search()">
+        <app-icon name="search" [size]="20" />
+        <span class="ell">{{ 'search.title' | t }}</span>
+      </button>
+    </div>
+    <app-account-menu variant="sheet" (navigated)="closeMore()" />
+  </div>
+</app-side-sheet>

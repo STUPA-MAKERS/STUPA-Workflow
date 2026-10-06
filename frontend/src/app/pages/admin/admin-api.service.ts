@@ -17,17 +17,23 @@ import type { FormFieldDef } from '@core/api/models';
 import {
   BACKUP_RESTORE_CONFIRMATION,
   type AdminPrincipal,
+  type MergePreview,
+  type MergeResult,
   type Backup,
   type BackupList,
   type ApplicationTypeCreateBody,
   type ApplicationTypeFull,
   type ApplicationTypeUpdateBody,
   type AuditActor,
+  type AuditEntry,
+  type AuditChainCheck,
   type AuditRevertResult,
+  type AuditVerification,
   type ConfigRevision,
   type ConfigRevisionDiff,
   type ConfigRevisionDiffWire,
   type NotificationSettings,
+  type GuestSettings,
   type AuditPage,
   type Branding,
   type CdLogoSlot,
@@ -68,19 +74,33 @@ import {
 } from './admin.models';
 import {
   MOCK_APP_TYPES,
+  MOCK_AUDIT_ACTORS,
+  MOCK_AUDIT_ENTRIES,
+  MOCK_AUDIT_VERIFICATION,
   MOCK_BACKUPS,
   MOCK_BRANDING,
+  MOCK_CD_VARIANTS,
+  MOCK_DEADLINE_POLICIES,
+  MOCK_ERASURES,
+  MOCK_FLOW,
   MOCK_FORM_DRAFTS,
   MOCK_FORMS,
   MOCK_GREMIEN,
+  MOCK_GREMIUM_MAIL_RECIPIENTS,
   MOCK_GREMIUM_MEMBERSHIP_MAPPINGS,
   MOCK_GREMIUM_MEMBERSHIPS,
   MOCK_GREMIUM_ROLE_MAPPINGS,
   MOCK_GREMIUM_ROLES,
+  MOCK_GREMIUM_STUPA_ID,
   MOCK_GROUP_MAPPINGS,
+  MOCK_GUEST_SETTINGS,
+  MOCK_MAIL_TEMPLATES,
   MOCK_PERMISSIONS,
   MOCK_PRINCIPALS,
+  mockMergePreview,
   MOCK_ROLES,
+  MOCK_SITE_REVISIONS,
+  MOCK_WEBHOOK_STATUS,
   MOCK_WEBHOOKS,
 } from './admin.mock';
 
@@ -101,6 +121,7 @@ interface ApplicationTypeOutWire {
   hasBudget?: boolean;
   retentionMonths?: number | null;
   activeFormVersionId?: Uuid | null;
+  activeFormVersion?: number | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -118,12 +139,19 @@ export class AdminApiService {
     gremien: structuredCopy(MOCK_GREMIEN),
     appTypes: structuredCopy(MOCK_APP_TYPES),
     formDrafts: structuredCopy(MOCK_FORM_DRAFTS) as Record<string, FormDraft>,
+    flow: structuredCopy(MOCK_FLOW) as FlowGraph,
     gremiumRoles: structuredCopy(MOCK_GREMIUM_ROLES),
     groupMappings: structuredCopy(MOCK_GROUP_MAPPINGS),
     membershipMappings: structuredCopy(MOCK_GREMIUM_MEMBERSHIP_MAPPINGS),
     roleMappings: structuredCopy(MOCK_GREMIUM_ROLE_MAPPINGS),
-    deadlinePolicies: [] as DeadlinePolicy[],
-    erasures: [] as ErasureRequest[],
+    mailRecipients: structuredCopy(MOCK_GREMIUM_MAIL_RECIPIENTS),
+    deadlinePolicies: structuredCopy(MOCK_DEADLINE_POLICIES) as DeadlinePolicy[],
+    guestSettings: structuredCopy(MOCK_GUEST_SETTINGS) as GuestSettings,
+    cdVariants: structuredCopy(MOCK_CD_VARIANTS) as CdVariant[],
+    mailTemplates: structuredCopy(MOCK_MAIL_TEMPLATES) as MailTemplate[],
+    erasures: structuredCopy(MOCK_ERASURES) as ErasureRequest[],
+    audit: structuredCopy(MOCK_AUDIT_ENTRIES) as AuditEntry[],
+    auditVerification: structuredCopy(MOCK_AUDIT_VERIFICATION) as AuditVerification | null,
     backups: [...MOCK_BACKUPS] as Backup[],
     privacySettings: <PrivacySettings>{ defaultRetentionMonths: 24 },
     webhooks: structuredCopy(MOCK_WEBHOOKS),
@@ -145,7 +173,18 @@ export class AdminApiService {
 
   /** `quiet` = the gremien page shows its own loading indicator (no overlay). */
   listGremien(opts: { quiet?: boolean } = {}): Observable<Gremium[]> {
-    if (this.mock) return of(structuredCopy(this.store.gremien));
+    if (this.mock) {
+      // The admin list counts the members and the roles of each gremium.
+      return of(
+        structuredCopy(this.store.gremien).map((g) => ({
+          ...g,
+          memberCount: new Set(
+            MOCK_GREMIUM_MEMBERSHIPS.filter((m) => m.gremiumId === g.id).map((m) => m.principalId),
+          ).size,
+          roleCount: this.store.gremiumRoles.filter((r) => r.gremiumId === g.id).length,
+        })),
+      );
+    }
     return this.http.get<Gremium[]>(`${this.base}/admin/gremien`, {
       context: opts.quiet ? skipLoading() : undefined,
     });
@@ -155,7 +194,7 @@ export class AdminApiService {
    * Gremien master data as a dropdown source — GET `/gremien`. Any logged-in principal
    * can call it. No admin right is necessary. Unlike {@link listGremien}
    * (`/admin/gremien`, P `admin.gremien`), it also works for "create meeting" and for
-   * budget, where the actor only holds `meeting.manage` or `budget.*`.
+   * budget, where the actor only holds a gremium role or `budget.*`.
    */
   listGremienOptions(): Observable<Gremium[]> {
     if (this.mock) return of(structuredCopy(this.store.gremien));
@@ -167,6 +206,15 @@ export class AdminApiService {
     if (this.mock) {
       const created: Gremium = { id: `g-${this.store.gremien.length + 1}`, allowVoteDelegation: false, ...body };
       this.store.gremien.push(created);
+      // The server creates the forced roles together with the gremium.
+      this.store.gremiumRoles = [
+        ...this.store.gremiumRoles,
+        ...MOCK_GREMIUM_ROLES.filter((r) => r.gremiumId === MOCK_GREMIUM_STUPA_ID && r.forced).map((r) => ({
+          ...structuredCopy(r),
+          id: `${created.id}-${r.key}`,
+          gremiumId: created.id,
+        })),
+      ];
       return of(structuredCopy(created));
     }
     return this.http.post<Gremium>(`${this.base}/admin/gremien`, body);
@@ -192,7 +240,7 @@ export class AdminApiService {
 
   /** GET /admin/gremien/{id}/mail-recipients — extra protocol recipients. */
   getGremiumMailRecipients(id: Uuid): Observable<{ recipients: string[] }> {
-    if (this.mock) return of({ recipients: [] });
+    if (this.mock) return of({ recipients: [...(this.store.mailRecipients[id] ?? [])] });
     return this.http.get<{ recipients: string[] }>(
       `${this.base}/admin/gremien/${id}/mail-recipients`,
     );
@@ -200,7 +248,10 @@ export class AdminApiService {
 
   /** PUT /admin/gremien/{id}/mail-recipients — replace extra recipients (idempotent). */
   setGremiumMailRecipients(id: Uuid, recipients: string[]): Observable<{ recipients: string[] }> {
-    if (this.mock) return of({ recipients });
+    if (this.mock) {
+      this.store.mailRecipients[id] = [...recipients];
+      return of({ recipients });
+    }
     return this.http.put<{ recipients: string[] }>(
       `${this.base}/admin/gremien/${id}/mail-recipients`,
       { recipients },
@@ -213,6 +264,7 @@ export class AdminApiService {
 
   /** GET /admin/cd-variants — the variants with their title and footer logos. */
   listCdVariants(): Observable<CdVariant[]> {
+    if (this.mock) return of(structuredCopy(this.store.cdVariants));
     return this.http.get<CdVariant[]>(`${this.base}/admin/cd-variants`, {
       context: skipLoading(),
     });
@@ -385,20 +437,54 @@ export class AdminApiService {
   }
 
   listMailTemplates(): Observable<MailTemplate[]> {
+    if (this.mock) return of(structuredCopy(this.store.mailTemplates));
     return this.http.get<MailTemplate[]>(`${this.base}/admin/mail-templates`);
   }
   /** Create/update an override by key — also for builtin defaults. */
   upsertMailTemplate(body: MailTemplateUpsertBody): Observable<MailTemplate> {
+    if (this.mock) {
+      const cur = this.store.mailTemplates.find((t) => t.key === body.key);
+      const saved: MailTemplate = {
+        id: cur?.id ?? `mt-${body.key}`,
+        key: body.key,
+        subjectI18n: { ...body.subjectI18n },
+        bodyI18n: { ...body.bodyI18n },
+        bodyHtmlI18n: { ...body.bodyHtmlI18n },
+        placeholders: { ...(cur?.placeholders ?? {}) },
+        source: 'override',
+      };
+      this.store.mailTemplates = this.store.mailTemplates.map((t) => (t.key === body.key ? saved : t));
+      return of(structuredCopy(saved));
+    }
     return this.http.put<MailTemplate>(`${this.base}/admin/mail-templates`, body);
   }
   /** Delete an override → restore the builtin default. */
   resetMailTemplate(key: string): Observable<MailTemplate> {
+    if (this.mock) {
+      // The seed stands in for the builtin catalogue.
+      const builtin = MOCK_MAIL_TEMPLATES.find((t) => t.key === key) ?? MOCK_MAIL_TEMPLATES[0];
+      const reset: MailTemplate = { ...structuredCopy(builtin), id: null, source: 'builtin' };
+      this.store.mailTemplates = this.store.mailTemplates.map((t) => (t.key === key ? reset : t));
+      return of(structuredCopy(reset));
+    }
     return this.http.delete<MailTemplate>(
       `${this.base}/admin/mail-templates/by-key/${encodeURIComponent(key)}`,
     );
   }
   /** Preview from the editor draft (no id). */
   previewMailPayload(body: MailPreviewPayload): Observable<MailPreview> {
+    if (this.mock) {
+      // The mock fills `{{ name }}` from the context; the server renders Jinja2.
+      const fill = (text: string | undefined): string =>
+        (text ?? '').replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k: string) => String(body.context[k] ?? ''));
+      const html = fill(body.bodyHtmlI18n[body.lang]);
+      return of({
+        subject: fill(body.subjectI18n[body.lang]),
+        text: fill(body.bodyI18n[body.lang]),
+        html: html || null,
+        lang: body.lang,
+      });
+    }
     return this.http.post<MailPreview>(`${this.base}/admin/mail-templates/preview`, body);
   }
 
@@ -485,6 +571,57 @@ export class AdminApiService {
       return of(structuredCopy(p ?? this.store.principals[0]));
     }
     return this.http.patch<AdminPrincipal>(`${this.base}/admin/principals/${principalId}`, { active });
+  }
+
+  /**
+   * What a merge of the (old) account `sourceId` into `targetId` would do —
+   * GET /admin/principals/{id}/merge-preview?targetId=. Needs `admin.users.merge`.
+   */
+  previewPrincipalMerge(sourceId: Uuid, targetId: Uuid): Observable<MergePreview> {
+    if (this.mock) {
+      const preview = mockMergePreview(this.store.principals, sourceId, targetId);
+      return preview ? of(preview) : throwError(() => ({ status: 404 }));
+    }
+    const params = new HttpParams().set('targetId', targetId);
+    return this.http.get<MergePreview>(
+      `${this.base}/admin/principals/${sourceId}/merge-preview`,
+      { params },
+    );
+  }
+
+  /**
+   * Merge the (old) account `sourceId` into `targetId` — POST /admin/principals/{id}/merge.
+   * A real conflict answers 409 `merge_conflict`; nothing changes then.
+   */
+  mergePrincipal(sourceId: Uuid, targetId: Uuid): Observable<MergeResult> {
+    if (this.mock) {
+      const preview = mockMergePreview(this.store.principals, sourceId, targetId);
+      if (!preview) return throwError(() => ({ status: 404 }));
+      if (!preview.canMerge) {
+        return throwError(() => ({
+          status: 409,
+          error: {
+            code: 'merge_conflict',
+            errors: preview.conflicts.map((c) => ({ field: c.kind, msg: c.label ?? '' })),
+          },
+        }));
+      }
+      const mergedAt = new Date().toISOString();
+      const source = this.store.principals.find((x) => x.id === sourceId)!;
+      source.mergedIntoId = targetId;
+      source.mergedIntoName = preview.target.displayName;
+      source.mergedAt = mergedAt;
+      source.active = false;
+      return of({
+        source: preview.source,
+        target: preview.target,
+        areas: preview.areas,
+        mergedAt,
+      });
+    }
+    return this.http.post<MergeResult>(`${this.base}/admin/principals/${sourceId}/merge`, {
+      targetId,
+    });
   }
 
   /** Delete a role — DELETE /admin/roles/{id} (admin/member protected server-side). */
@@ -574,6 +711,7 @@ export class AdminApiService {
             hasBudget: t.hasBudget ?? false,
             retentionMonths: t.retentionMonths ?? null,
             activeFormVersionId: t.activeFormVersionId ?? null,
+            activeFormVersion: t.activeFormVersion ?? null,
           })),
         ),
       );
@@ -699,13 +837,16 @@ export class AdminApiService {
 
   /** Load the active global flow — `null` if none exists yet. */
   getGlobalFlow(): Observable<FlowGraph | null> {
-    if (this.mock) return of(null);
+    if (this.mock) return of(structuredCopy(this.store.flow));
     return this.http.get<FlowGraph | null>(`${this.base}/admin/flow-versions/global`);
   }
 
   /** Create the global flow as a new version. */
   createGlobalFlowVersion(graph: FlowGraph): Observable<{ id: Uuid }> {
-    if (this.mock) return of({ id: `gflow-${graph.states.length}` });
+    if (this.mock) {
+      this.store.flow = structuredCopy(graph);
+      return of({ id: `gflow-${graph.states.length}` });
+    }
     return this.http.post<{ id: Uuid }>(`${this.base}/admin/flow-versions/global`, { graph });
   }
 
@@ -733,7 +874,7 @@ export class AdminApiService {
   /** Latest delivery state per webhook. Needs P(`webhook.manage`). The overlay stays
    *  off, because the call only decorates the list. */
   listWebhookDeliveryStatus(): Observable<WebhookDeliveryStatus[]> {
-    if (this.mock) return of([]);
+    if (this.mock) return of(structuredCopy(MOCK_WEBHOOK_STATUS));
     return this.http.get<WebhookDeliveryStatus[]>(
       `${this.base}/admin/webhooks/delivery-status`,
       { context: skipLoading() },
@@ -819,7 +960,15 @@ export class AdminApiService {
   /** Memberships of one gremium (read-only). The OIDC group sync writes them. */
   listGremiumMemberships(gremiumId: Uuid): Observable<GremiumMembership[]> {
     if (this.mock) {
-      return of(structuredCopy(MOCK_GREMIUM_MEMBERSHIPS.filter((m) => m.gremiumId === gremiumId)));
+      // The server joins the name and the e-mail of each member.
+      const byId = new Map(this.store.principals.map((p) => [p.id, p]));
+      return of(
+        structuredCopy(MOCK_GREMIUM_MEMBERSHIPS.filter((m) => m.gremiumId === gremiumId)).map((m) => ({
+          ...m,
+          displayName: byId.get(m.principalId)?.displayName ?? null,
+          email: byId.get(m.principalId)?.email ?? null,
+        })),
+      );
     }
     return this.http.get<GremiumMembership[]>(`${this.base}/admin/gremien/${gremiumId}/memberships`);
   }
@@ -837,7 +986,21 @@ export class AdminApiService {
     } = {},
   ): Observable<AuditPage> {
     const limit = opts.limit ?? 50;
-    if (this.mock) return of({ items: [], nextCursor: null, hasMore: false });
+    if (this.mock) {
+      const items = this.store.audit.filter(
+        (e) =>
+          (!opts.action || e.action === opts.action) &&
+          (!opts.actor || e.actor === opts.actor) &&
+          (opts.before == null || e.id < opts.before),
+      );
+      const page = items.slice(0, limit);
+      const hasMore = items.length > limit;
+      return of({
+        items: structuredCopy(page),
+        nextCursor: hasMore ? page[page.length - 1].id : null,
+        hasMore,
+      });
+    }
     let params = new HttpParams().set('limit', String(limit));
     if (opts.before != null) params = params.set('before', String(opts.before));
     if (opts.action) params = params.set('action', opts.action);
@@ -852,7 +1015,7 @@ export class AdminApiService {
 
   /** Distinct audit-log actors (for the actor filter). */
   listAuditActors(): Observable<AuditActor[]> {
-    if (this.mock) return of([]);
+    if (this.mock) return of(structuredCopy(MOCK_AUDIT_ACTORS));
     return this.http.get<AuditActor[]>(`${this.base}/admin/audit/actors`);
   }
 
@@ -860,10 +1023,67 @@ export class AdminApiService {
    *  Status 409 = a newer state exists or the change is not revertible.
    *  Status 404 = the entry or the revision is missing. */
   revertAuditEntry(entryId: number): Observable<AuditRevertResult> {
+    if (this.mock) {
+      const entry = this.store.audit.find((e) => e.id === entryId);
+      if (entry) entry.revertable = false;
+      return of({
+        revertedAuditId: entryId,
+        entityType: entry?.targetType ?? '',
+        entityId: entry?.targetId ?? '',
+      });
+    }
     return this.http.post<AuditRevertResult>(
       `${this.base}/admin/audit/${entryId}/revert`,
       {},
     );
+  }
+
+  /**
+   * The newest stored check of the audit chain — GET /admin/audit/verify/latest
+   * (P `audit.read`). `null` before the first check. A cheap read for the tiles.
+   */
+  latestAuditVerification(): Observable<AuditVerification | null> {
+    if (this.mock) return of(structuredCopy(this.store.auditVerification));
+    return this.http.get<AuditVerification | null>(`${this.base}/admin/audit/verify/latest`, {
+      context: skipLoading(),
+    });
+  }
+
+  /**
+   * Check the whole chain now and store the result — POST /admin/audit/verify
+   * (P `audit.verify`). 409 while another check runs, 429 inside the cooldown.
+   */
+  runAuditVerification(): Observable<AuditVerification> {
+    if (this.mock) {
+      const now = new Date().toISOString();
+      const row: AuditVerification = {
+        id: `av-${Date.now()}`,
+        startedAt: now,
+        finishedAt: now,
+        valid: true,
+        checked: this.store.audit.length,
+        brokenAt: null,
+        reason: null,
+        trigger: 'manual',
+        triggeredBy: null,
+      };
+      this.store.auditVerification = row;
+      return of(structuredCopy(row));
+    }
+    return this.http.post<AuditVerification>(`${this.base}/admin/audit/verify`, {});
+  }
+
+  /**
+   * Check the whole chain live, without a stored result — GET /admin/audit/verify
+   * (P `audit.verify`). The tiles use it only while no stored check exists.
+   */
+  verifyAuditChain(): Observable<AuditChainCheck> {
+    if (this.mock) {
+      return of({ valid: true, checked: this.store.audit.length, brokenAt: null, reason: null });
+    }
+    return this.http.get<AuditChainCheck>(`${this.base}/admin/audit/verify`, {
+      context: skipLoading(),
+    });
   }
 
   /** Snapshots of a config entity (newest first) — version sidebar. */
@@ -871,7 +1091,13 @@ export class AdminApiService {
     entityType: string,
     entityId: string,
   ): Observable<ConfigRevision[]> {
-    if (this.mock) return of([]);
+    if (this.mock) {
+      return of(
+        structuredCopy(
+          MOCK_SITE_REVISIONS.filter((r) => r.entityType === entityType && r.entityId === entityId),
+        ),
+      );
+    }
     const params = new HttpParams()
       .set('entityType', entityType)
       .set('entityId', entityId);
@@ -884,13 +1110,25 @@ export class AdminApiService {
   /** Field diff of a snapshot against its predecessor (wire → array form). */
   getConfigRevisionDiff(id: Uuid): Observable<ConfigRevisionDiff> {
     if (this.mock) {
+      // The mock flow change of the audit log (revision `rev-12`) has a small diff.
+      const diff: ConfigRevisionDiff['diff'] =
+        id === 'rev-12'
+          ? {
+              added: [],
+              removed: [],
+              changed: [
+                { key: 'transitions[3].label', old: 'Zurückstellen', new: 'Nachforderung stellen' },
+                { key: 'transitions[3].color', old: 'neutral', new: 'warning' },
+              ],
+            }
+          : null;
       return of({
         id,
-        entityType: '',
-        entityId: '',
-        version: 0,
-        prevVersion: null,
-        diff: null,
+        entityType: id === 'rev-12' ? 'flow' : '',
+        entityId: id === 'rev-12' ? 'global' : '',
+        version: id === 'rev-12' ? 12 : 0,
+        prevVersion: id === 'rev-12' ? 11 : null,
+        diff,
       });
     }
     return this.http
@@ -921,14 +1159,44 @@ export class AdminApiService {
   putNotificationSettings(
     settings: Partial<NotificationSettings>,
   ): Observable<NotificationSettings> {
+    if (this.mock) {
+      return of({
+        taskReminderEnabled: true,
+        taskReminderAfterDays: 5,
+        taskReminderRepeatDays: 7,
+        ...settings,
+      });
+    }
     return this.http.put<NotificationSettings>(
       `${this.base}/admin/notification-settings`,
       settings,
     );
   }
 
+  // Guest applications (Z1). Both routes need P(admin.deadlines).
+  /** GET /admin/guest-settings — the confirm window and the link lifetime. */
+  getGuestSettings(): Observable<GuestSettings> {
+    if (this.mock) return of(structuredCopy(this.store.guestSettings));
+    return this.http.get<GuestSettings>(`${this.base}/admin/guest-settings`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** PUT /admin/guest-settings — replaces both values; `linkTtlDays: null` = no expiry. */
+  putGuestSettings(body: Pick<GuestSettings, 'confirmTtlHours' | 'linkTtlDays'>): Observable<GuestSettings> {
+    if (this.mock) {
+      this.store.guestSettings = { ...this.store.guestSettings, ...body };
+      return of(structuredCopy(this.store.guestSettings));
+    }
+    return this.http.put<GuestSettings>(`${this.base}/admin/guest-settings`, body);
+  }
+
   // Every DSGVO/privacy endpoint below needs P(privacy.manage).
-  listErasures(status?: ErasureStatus): Observable<ErasureRequest[]> {
+  /** `quiet` = the caller shows its own loading state (no overlay). */
+  listErasures(
+    status?: ErasureStatus,
+    opts: { quiet?: boolean } = {},
+  ): Observable<ErasureRequest[]> {
     if (this.mock) {
       const rows = status
         ? this.store.erasures.filter((r) => r.status === status)
@@ -939,6 +1207,7 @@ export class AdminApiService {
     if (status) params = params.set('status', status);
     return this.http.get<ErasureRequest[]>(`${this.base}/admin/privacy/erasures`, {
       params,
+      context: opts.quiet ? skipLoading() : undefined,
     });
   }
 
@@ -990,8 +1259,11 @@ export class AdminApiService {
   // Backups (P backup.manage). The archive itself never passes through the browser
   // except as a signed download; these calls move metadata only.
 
-  /** GET /admin/backups — the catalogue plus what this installation can do. */
-  listBackups(): Observable<BackupList> {
+  /**
+   * GET /admin/backups — the catalogue plus what this installation can do.
+   * `quiet` = the caller shows its own loading state (no overlay).
+   */
+  listBackups(opts: { quiet?: boolean } = {}): Observable<BackupList> {
     if (this.mock) {
       return of({
         items: structuredCopy(this.store.backups),
@@ -1000,7 +1272,9 @@ export class AdminApiService {
         retentionCount: 14,
       });
     }
-    return this.http.get<BackupList>(`${this.base}/admin/backups`);
+    return this.http.get<BackupList>(`${this.base}/admin/backups`, {
+      context: opts.quiet ? skipLoading() : undefined,
+    });
   }
 
   /** GET /admin/backups/{id} — one row. The page polls this while a job runs. */
@@ -1170,8 +1444,8 @@ function structuredCopy<T>(value: T): T {
 }
 
 /**
- * Agent-token stubs for mock mode. The second row has no owner name and no expiry, so
- * the placeholder and the "never expires" rendering are visible without a backend.
+ * Agent-token stubs for mock mode, with the real scope keys. The second row has no owner
+ * name, so the placeholder is visible without a backend.
  */
 const MOCK_OAUTH_GRANTS: OAuthGrantAdmin[] = [
   {
@@ -1180,10 +1454,10 @@ const MOCK_OAUTH_GRANTS: OAuthGrantAdmin[] = [
     principalName: 'Alex Admin',
     principalEmail: 'alex@stupa.example',
     clientId: 'antragsplattform-mcp',
-    scope: 'mcp:read mcp:write',
+    scope: 'read meetings:write votes:write',
     createdAt: '2026-06-01T10:00:00+00:00',
-    accessExpiresAt: '2026-09-01T10:00:00+00:00',
-    refreshExpiresAt: '2026-12-01T10:00:00+00:00',
+    accessExpiresAt: '2026-06-02T10:00:00+00:00',
+    refreshExpiresAt: '2026-07-01T10:00:00+00:00',
   },
   {
     id: 'grant-2',
@@ -1191,10 +1465,21 @@ const MOCK_OAUTH_GRANTS: OAuthGrantAdmin[] = [
     principalName: null,
     principalEmail: null,
     clientId: 'antragsplattform-mcp',
-    scope: 'mcp:read',
+    scope: 'read',
     createdAt: '2026-05-02T08:30:00+00:00',
-    accessExpiresAt: null,
-    refreshExpiresAt: null,
+    accessExpiresAt: '2026-05-02T16:30:00+00:00',
+    refreshExpiresAt: '2026-06-01T08:30:00+00:00',
+  },
+  {
+    id: 'grant-3',
+    principalId: 'p-4',
+    principalName: 'Kim Kasse',
+    principalEmail: 'kim@stupa.example',
+    clientId: 'antragsplattform-mcp',
+    scope: 'read applications:write budget:write forms:write flows:write',
+    createdAt: '2026-04-20T13:31:00+00:00',
+    accessExpiresAt: '2026-05-20T13:31:00+00:00',
+    refreshExpiresAt: '2026-07-19T13:31:00+00:00',
   },
 ];
 

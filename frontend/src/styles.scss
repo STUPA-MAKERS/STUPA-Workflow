@@ -1,6 +1,7 @@
 @use 'fonts';
 @use 'tokens';
 @use 'base';
+@use 'surface';
 
 // Tailwind adds utilities only. tailwind.config.js disables preflight, so there is no
 // base reset and no visual change. Sass passes the unknown at-rules through to PostCSS
@@ -9,6 +10,72 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+// Text utilities of the design system. The ui-kit base styles bring `.num` (tabular
+// numbers), `.mono` (IBM Plex Mono), `.ell` (one line with an ellipsis; add a `title`),
+// `.cap` (caption) and `.kbd` (a key). The app adds the section heading.
+
+// Section heading above a group of rows or fields (for example "Details", "Verlauf"):
+// accent text, semibold. The surrounding layout sets the spacing.
+.sec {
+  margin: 0;
+  font-size: 0.84375rem; // 13.5px
+  line-height: 1.25rem;
+  font-weight: var(--fw-semibold);
+  color: var(--color-accent-text);
+}
+
+// A group of rows that reads as one block (`app-field-group`, the days of a history, a
+// short list on a sheet): the rows sit 2px apart on their own surface, and only the outer
+// corners are round. The rows sit on surface 2, which suits the page and a sheet on
+// surface 1. `.rowgroup--bg1` and `.rowgroup--bg3` pick another row surface, for example surface 3
+// in a side sheet on surface 2. Global, because the rows are projected content.
+.rowgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.rowgroup > * {
+  border-radius: 4px;
+  background: var(--color-surface-2);
+}
+.rowgroup > :first-child {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+.rowgroup > :last-child {
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+.rowgroup.rowgroup--bg1 > * {
+  background: var(--color-surface-1);
+}
+.rowgroup.rowgroup--bg3 > * {
+  background: var(--color-surface-3);
+}
+// On surface 3 the subtle text of a muted status is below 4.5:1 (WCAG 1.4.3). The muted
+// text passes. This rule is more specific than the `:host(.st--muted)` rule of
+// `app-status-text`, so it wins.
+.rowgroup--bg3 app-status-text.st--muted {
+  color: var(--color-text-muted);
+}
+// The circle of an avatar is surface 3. On rows of surface 3 it would vanish and leave
+// the initials floating in the row (the attendance sheet), so it steps up to surface 4.
+// The accent avatar of the viewer keeps its colour (`:host(.av--accent)` is more specific).
+.rowgroup--bg3 app-avatar {
+  background: var(--color-surface-4);
+}
+
+// Nested surfaces step up: a table on a container that is itself a surface takes the
+// next higher surface (see `surface.context` in the ui-kit). The shared sheets set their
+// own context: the side sheet, the dialog, the detail pane of the list/detail layout.
+// The admin pages sit on one shared sheet of the admin frame (surface 1) when the frame
+// is wide. Without the sheet, the page sits on the page background and the tables keep
+// surface 1.
+.af--split .af__page {
+  @include surface.context(1);
+}
 
 // The layout box of a page. The ui-kit ships the same rules under `.container`, but
 // Tailwind emits a `.container` utility of its own with breakpoint max-widths
@@ -27,6 +94,88 @@
   .page-shell {
     padding-inline: var(--space-4);
   }
+}
+
+// A pane page: the page does not scroll as a page. It fills the free height of the main
+// column of the shell, and its panes scroll inside themselves (budget, bookings and the
+// applications list beside the detail). The page host gets the class, for example with
+// `host: { '[class.pane-page]': 'wide()' }`.
+//
+// - `flex: 1 1 0` takes the free height of `.main` (a flex column). A basis of 0 keeps the
+//   rows from pushing the page taller than the viewport.
+// - The bottom padding of `.main` is for a page that scrolls. A pane page pulls it back
+//   and keeps only `--pane-foot-gap`, which the shell sets: the page gutter (plus the
+//   safe area in the installed app). Work pages have no footer (route data `footer`).
+// - A large sheet with round corners in a pane page must clip what scrolls in it: the
+//   rounded element is the scroll container, or an `overflow: hidden` parent of it.
+// - A dialog or a side sheet of the page is an overlay. Closed, it is empty, but as a
+//   flex item it would still take the gap of the host. `display: contents` gives it no
+//   box of its own.
+.pane-page {
+  flex: 1 1 0;
+  min-height: 0;
+  margin-bottom: calc(var(--pane-foot-gap, 0px) - var(--main-pad-bottom, 0px));
+}
+.pane-page > app-dialog,
+.pane-page > app-side-sheet {
+  display: contents;
+}
+
+// ONE list/detail geometry. Every page with a list or a navigation column beside a sheet
+// (applications, tasks, votes, meetings, bookings, invoices, the budget tree, Verwaltung)
+// takes the width of that column and the gap to the sheet from these two tokens. A page
+// never sets them itself; list-geometry.contract.spec.ts fails if one does.
+//
+// The column is 440px from a 1375px viewport on. Below that it gets narrower with the
+// viewport (32vw), down to 320px, so the sheet keeps its room on the first wide screens.
+:root {
+  --ld-list-width: clamp(20rem, 32vw, 27.5rem);
+  --ld-gap: var(--space-3);
+}
+
+// The header of a detail sheet: the gap between the sheet bar (`app-sheet-bar`) and the
+// title, and between the lines below the title. Every detail sheet takes it from this
+// token, so the titles sit at the same height on every page.
+:root {
+  --sheet-head-gap: 10px;
+}
+
+// The text button of `app-row-menu` (the "…" of the budget breadcrumb): its minimum
+// size and its side padding. The breadcrumb reads the same tokens for its fit.
+:root {
+  --row-menu-text-min: 1.75rem;
+  --row-menu-text-pad: var(--space-2);
+}
+
+// The list column of such a page, in this order: the header (`app-page-header` with
+// `pane`), the search bar with its chips (`.ld-pane__filters`, normally on an
+// `app-sticky-bar`), then the rows. The search is the large search pill on every list.
+// Side by side the column takes the full height and only its rows scroll; one pane at a
+// time the page scrolls.
+//
+// The column does not read the state of `app-list-detail` (its host class). The layout
+// sets `--ld-pane-height` on its list slot while it splits; a column of its own beside a
+// sheet (the budget tree) sets it with `.ld-pane--fill`.
+.ld-pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+  height: var(--ld-pane-height, auto);
+}
+.ld-pane--fill {
+  --ld-pane-height: 100%;
+}
+// Two classes: the bar is mostly an `app-sticky-bar`, whose own host style
+// (`display: block`) would win over one global class.
+.ld-pane > .ld-pane__filters {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
 }
 
 // Mobile: the page itself must NEVER scroll horizontally. An element that overflows,
@@ -92,5 +241,36 @@ td:first-child > .skel--bar {
 @media (prefers-reduced-motion: reduce) {
   .skel {
     animation: none;
+  }
+}
+
+// The edit grid of a form (`toFormlySections`): two columns, long fields (`fe-full`)
+// over both, one column below a 32rem container. The applications detail, the apply
+// wizard and the status page share it. Global, because Formly draws the fields.
+.fe-form {
+  min-width: 0;
+  container-type: inline-size;
+}
+.fe-form .fe-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  min-width: 0;
+}
+.fe-form .fe-grid > formly-field {
+  min-width: 0;
+}
+// A field that `visibleIf` hides keeps its `formly-field` host, but Formly removes its
+// content. The empty host takes no cell, so the next field moves up and the grid has
+// no holes. A grid item is a block box anyway, so no other rule sets `display`.
+.fe-form .fe-grid > formly-field:empty {
+  display: none;
+}
+.fe-form .fe-grid > .fe-full {
+  grid-column: 1 / -1;
+}
+@container (max-width: 32rem) {
+  .fe-form .fe-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

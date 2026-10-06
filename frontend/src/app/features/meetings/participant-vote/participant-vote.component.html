@@ -1,0 +1,14 @@
+@if (state.vote(); as v) {
+  <app-vote-panel
+    [layout]="layout()"
+    [context]="context()"
+    [vote]="v"
+    [own]="state.own()"
+    [proxyName]="state.proxyName()"
+    [proxyCast]="state.proxyCast()"
+    [caster]="state.caster"
+    [notice]="state.notice()"
+    (castDone)="state.onCastDone()"
+    (castFailed)="state.onCastFailed($event)"
+  />
+}

@@ -14,10 +14,12 @@ import logging
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.modules.admin.membership_sync import sync_principal_memberships
+from app.modules.applications.guest_settings import load_guest_settings
 from app.modules.applications.models import Applicant as ApplicantRow
 from app.modules.applications.models import Application, MagicLink
 from app.modules.auth import oidc, sessions, tokens
@@ -27,7 +29,8 @@ from app.modules.auth.bootstrap import (
 )
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import ApplicantScope
-from app.modules.flow.models import State
+from app.modules.flow.dispatch import ActionDispatcher
+from app.modules.flow.service import FlowService
 from app.settings import Settings
 from app.shared.errors import ForbiddenError, GoneError
 
@@ -71,18 +74,6 @@ async def resolve_application(
     return (await db.execute(stmt)).scalars().first()
 
 
-async def _scope_for(db: AsyncSession, app: Application) -> ApplicantScope:
-    """Return `edit` only if the current state has `edit_allowed`, otherwise `view`."""
-    if app.current_state_id is None:
-        return "edit"
-    state = (
-        await db.execute(select(State).where(State.id == app.current_state_id))
-    ).scalar_one_or_none()
-    if state is not None and state.edit_allowed is False:
-        return "view"
-    return "edit"
-
-
 async def request_magic_link(
     db: AsyncSession,
     settings: Settings,
@@ -94,25 +85,32 @@ async def request_magic_link(
     """Request a magic link.
 
     The function sends a mail only on a hit. The caller always answers 202.
+
+    Every new link has `scope = 'edit'` and can be used more than once (O3). The
+    session it opens has no fixed scope: each action checks the current state, so
+    a locked state still allows a transition with `actorIsApplicant` and an upload
+    (F5, O4). The data lock stays the 409 of the edit service.
+
+    The lifetime comes from `guest_application_settings.link_ttl_days`. NULL gives
+    a link without an expiry. A request expires no other link. Otherwise anybody
+    who knows the address could cut off the applicant. The redeem does that.
     """
     app = await resolve_application(db, email=email, application_id=application_id)
     if app is None:
         return  # anti-enumeration: tell the outside nothing
 
-    scope = await _scope_for(db, app)
-    ttl = (
-        timedelta(days=settings.magic_link_edit_ttl_days)
-        if scope == "edit"
-        else timedelta(minutes=settings.magic_link_action_ttl_minutes)
+    link_ttl_days = (await load_guest_settings(db)).link_ttl_days
+    expires_at = (
+        _now() + timedelta(days=link_ttl_days) if link_ttl_days is not None else None
     )
     token = tokens.generate_token()
     db.add(
         MagicLink(
             application_id=app.id,
             token_hash=tokens.hash_token(token, settings.magic_link_secret),
-            scope=scope,
-            expires_at=_now() + ttl,
-            single_use=scope != "edit",
+            scope="edit",
+            expires_at=expires_at,
+            single_use=False,
         )
     )
     await db.flush()
@@ -127,14 +125,35 @@ async def request_magic_link(
 
 
 async def verify_magic_link(
-    db: AsyncSession, settings: Settings, *, token: str
+    db: AsyncSession,
+    settings: Settings,
+    *,
+    token: str,
+    dispatcher: ActionDispatcher | None = None,
 ) -> tuple[str, ApplicantScope, str]:
     """Verify a magic-link token.
 
-    A single-use token gets `used_at` set.
+    A link without an expiry (`expires_at` NULL) stays valid until a newer link is
+    redeemed or the application is archived or anonymized. A single-use token (only
+    rows from before O3) gets `used_at` set.
+
+    The redeem expires every older link of the same application that is still
+    valid (`expires_at = now`). An unlimited link therefore does not collect old
+    access paths. A newer link that is not yet redeemed stays valid.
+
+    The applicant session always has the scope `edit`, also for an old `view`
+    link (O4). Each action checks the current state.
+
+    The first verify of a guest application confirms its email. The application
+    then leaves its rest in the flow: `FlowService.start_confirmed` schedules the
+    deadline of the current state, runs the automatic transitions and sends the
+    task mail. `dispatcher` sends the mails and the other flow actions. The start
+    commits the session. A later verify finds the email confirmed and starts
+    nothing, so a second click sends no second mail.
 
     Returns:
-        The application id, the scope and the applicant session token.
+        The application id, the scope (always `edit`) and the applicant session
+        token.
 
     Raises:
         GoneError: The token is invalid, expired or already used. The router maps this
@@ -149,7 +168,7 @@ async def verify_magic_link(
     ):
         raise GoneError("Magic-Link invalid or expired.")
     now = _now()
-    if row.expires_at <= now:
+    if row.expires_at is not None and row.expires_at <= now:
         raise GoneError("Magic-Link expired.")
     if row.single_use:
         # Atomic redemption: only one concurrent verify wins. This blocks a replay.
@@ -166,17 +185,38 @@ async def verify_magic_link(
         if claimed is None:
             raise GoneError("Magic-Link already used.")
     # Email confirmation: the first successful verify makes a guest submission visible
-    # and protects it from the 12-hour discard. The update is idempotent because it
-    # runs only while the column is NULL.
-    await db.execute(
-        update(Application)
-        .where(
-            Application.id == row.application_id,
-            Application.email_confirmed_at.is_(None),
+    # and protects it from the discard after `confirm_ttl_hours`. The update is
+    # idempotent because it runs only while the column is NULL. Of two concurrent
+    # verifies, only one gets the row back.
+    confirmed = (
+        await db.execute(
+            update(Application)
+            .where(
+                Application.id == row.application_id,
+                Application.email_confirmed_at.is_(None),
+            )
+            .values(email_confirmed_at=now)
+            .returning(Application.id)
         )
-        .values(email_confirmed_at=now)
+    ).scalar_one_or_none()
+    # The redeem ends the older links of this application (O4). "Older" includes a
+    # link with the same creation time, but never this link itself. The creation
+    # time comes from the database, so the compare stays in SQL.
+    redeemed = aliased(MagicLink)
+    redeemed_at = (
+        select(redeemed.created_at).where(redeemed.id == row.id).scalar_subquery()
     )
-    scope: ApplicantScope = "edit" if row.scope == "edit" else "view"
+    await db.execute(
+        update(MagicLink)
+        .where(
+            MagicLink.application_id == row.application_id,
+            MagicLink.id != row.id,
+            MagicLink.created_at <= redeemed_at,
+            or_(MagicLink.expires_at.is_(None), MagicLink.expires_at > now),
+        )
+        .values(expires_at=now)
+    )
+    scope: ApplicantScope = "edit"
     app_id = str(row.application_id)
     # Create a server-side session instead of a stateless token. The opaque `sid` is
     # valid only with an existing `applicant_session` row. A token forged from
@@ -189,14 +229,29 @@ async def verify_magic_link(
         scope=scope,
         expires_at=expires_at,
     )
+    if confirmed is not None:
+        await FlowService(db, dispatcher).start_confirmed(row.application_id)
     return app_id, scope, session_token
 
 
 async def upsert_principal(db: AsyncSession, claims: oidc.OidcClaims) -> PrincipalRow:
-    """Create or update a principal by the OIDC `sub` (identity and group cache)."""
+    """Create or update a principal by the OIDC `sub` (identity and group cache).
+
+    Raises:
+        ForbiddenError: The `sub` belongs to a principal that an admin merged into
+            another one (code `account_merged`). The login fails closed and changes
+            nothing: the old row stays a locked reference. It does not log in as the
+            new principal either, because only the IdP `sub` of the new principal
+            proves that identity.
+    """
     row = (
         await db.execute(select(PrincipalRow).where(PrincipalRow.sub == claims.sub))
     ).scalar_one_or_none()
+    if row is not None and row.merged_into is not None:
+        raise ForbiddenError(
+            "This account was merged into another account. Log in with that account.",
+            code="account_merged",
+        )
     if row is None:
         row = PrincipalRow(sub=claims.sub)
         db.add(row)

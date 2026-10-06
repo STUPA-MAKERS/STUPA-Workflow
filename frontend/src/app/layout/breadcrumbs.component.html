@@ -1,12 +1,16 @@
 @if (crumbs().length > 1) {
-  <nav class="bc flex flex-wrap items-center gap-2 text-sm" aria-label="Breadcrumb">
-    @for (c of crumbs(); track c.url; let last = $last) {
-      @if (last) {
-        <span class="bc__crumb text-text font-normal" aria-current="page">{{ c.label }}</span>
-      } @else {
-        <a class="bc__crumb" [routerLink]="c.url">{{ c.label }}</a>
-        <span class="text-muted" aria-hidden="true">›</span>
+  <nav class="bc" [attr.aria-label]="'shell.breadcrumb' | t">
+    <ol class="bc__list">
+      @for (c of crumbs(); track c.url; let last = $last) {
+        <li class="bc__entry">
+          @if (last) {
+            <span class="bc__crumb bc__crumb--current ell" aria-current="page" [title]="c.label">{{ c.label }}</span>
+          } @else {
+            <a class="bc__crumb bc__crumb--link ell" [routerLink]="c.url" [title]="c.label">{{ c.label }}</a>
+            <app-icon class="bc__sep" name="right" [size]="14" aria-hidden="true" />
+          }
+        </li>
       }
-    }
+    </ol>
   </nav>
 }

@@ -1,0 +1,255 @@
+/* The ballot (boards Arbeit-Abstimmungen, Telefon-Abstimmen): large choices, then one
+   confirm button below a fixed line. */
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+
+.ballot__row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ballot__name {
+  padding: 0 2px 2px;
+}
+
+.ballot__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* One choice: the whole surface is the button. */
+.choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  height: 72px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: var(--fw-medium);
+  text-align: start;
+  cursor: pointer;
+  transition: background var(--motion-fast) var(--ease-standard);
+}
+.choice:hover:not(:disabled) {
+  background: var(--color-surface-3);
+}
+.choice:focus-visible,
+.pchoice:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.choice--on,
+.choice--on:hover:not(:disabled) {
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+  font-weight: var(--fw-semibold);
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+.choice:disabled {
+  cursor: default;
+}
+/* The other options of a cast ballot fade; the chosen one stays as it is. */
+.choice:disabled:not(.choice--on) {
+  opacity: 0.5;
+}
+
+/* The round mark at the start: an empty ring, or the accent with a check. */
+.choice__mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px var(--color-border-strong);
+}
+.choice--on .choice__mark {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  box-shadow: none;
+}
+.choice__label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The represented ballot: a row of outlined buttons. */
+.ballot__proxy {
+  display: flex;
+  gap: var(--space-2);
+}
+.pchoice {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.pchoice:hover:not(:disabled) {
+  background: var(--color-surface-2);
+}
+.pchoice--on,
+.pchoice--on:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.pchoice:disabled {
+  cursor: default;
+}
+.pchoice:disabled:not(.pchoice--on) {
+  opacity: 0.5;
+}
+
+.ballot__done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  text-align: center;
+}
+.ballot__thanks {
+  margin: 0;
+  font-weight: var(--fw-medium);
+}
+.ballot__lock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+}
+.ballot__lock--start {
+  justify-content: flex-start;
+}
+
+.ballot__bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Phone (board Telefon-Abstimmen): smaller choices, and the button bar is fixed above
+   the bottom bar of the app, on its own raised surface. */
+:host(.ballot--phone) {
+  gap: var(--space-5);
+
+  .choice {
+    height: 64px;
+    padding: 0 18px;
+    border-radius: 18px;
+    font-size: 1.125rem;
+  }
+
+  .ballot__bar {
+    position: fixed;
+    inset-inline: 0;
+    bottom: var(--app-bottom-inset, 0px);
+    z-index: var(--z-sticky, 10);
+    padding: var(--space-3) var(--space-4) calc(var(--space-3) + var(--app-bottom-safe-area, env(safe-area-inset-bottom)));
+    border-top: var(--border-width) solid var(--color-border);
+    background: var(--color-surface-2);
+  }
+}
+
+/* Compact (the side column of the participant view, board Teilnahme-Live): the own
+   row is a row of buttons like the represented one, the row names are small muted
+   text, and the thanks line starts at the edge like the rows. A button keeps its label
+   whole (20px each side, as the board) and takes a share of the free width; a row
+   that does not fit wraps. */
+:host(.ballot--compact) {
+  gap: var(--space-4);
+
+  .ballot__row {
+    gap: var(--space-2);
+  }
+  .ballot__name {
+    padding: 0;
+    font-size: var(--fs-small);
+    line-height: 1.125rem;
+    font-weight: var(--fw-regular);
+    color: var(--color-text-muted);
+  }
+  .ballot__proxy {
+    flex-wrap: wrap;
+  }
+  .pchoice {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: auto;
+    padding: 0 20px;
+    overflow: visible;
+  }
+  .ballot__done {
+    align-items: flex-start;
+    text-align: start;
+  }
+  .ballot__lock {
+    justify-content: flex-start;
+  }
+  .ballot__bar .ballot__lock {
+    justify-content: center;
+  }
+}
+
+/* Columns (the strip of a narrow screen, board Schmal-Teilnahme): two rows side by
+   side, and below them one line with the fixed text and a button of its own width. */
+:host(.ballot--columns) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+
+  .ballot__row {
+    gap: 6px;
+  }
+  .ballot__bar {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-4);
+  }
+  .ballot__bar .ballot__lock {
+    justify-content: flex-start;
+  }
+}
+
+/* The spacer keeps the last row clear of the fixed bar. The flex gap already adds one
+   gap above it. */
+.ballot__spacer {
+  flex: none;
+  margin-top: calc(-1 * var(--space-5));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .choice {
+    transition: none;
+  }
+}

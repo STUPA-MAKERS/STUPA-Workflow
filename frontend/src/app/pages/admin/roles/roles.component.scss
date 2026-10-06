@@ -1,37 +1,186 @@
-.roles__chevron {
-  color: var(--color-text-muted);
-  transition: transform var(--motion-fast) var(--ease-standard);
+:host {
+  display: block;
 }
-.roles__chevron--open {
-  transform: rotate(180deg);
-  color: var(--color-primary);
+
+.ar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  container-type: inline-size;
 }
-.roles__key {
-  font-family: var(--font-mono, monospace);
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
+
+.ar__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-/* Rename row: a narrow key column, then the DE and EN columns of equal width. */
-.roles__nameEdit {
-  display: grid;
-  grid-template-columns: minmax(7rem, 0.5fr) 1fr 1fr;
-  gap: var(--space-3) var(--space-4);
-  align-items: end;
-}
-.roles__lbl--key {
-  min-width: 0;
-}
-@media (max-width: 40rem) {
-  .roles__nameEdit {
-    grid-template-columns: 1fr;
-  }
-}
-.roles__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+
+.ar__head {
+  display: flex;
   align-items: center;
-  gap: var(--space-3) var(--space-4);
+  gap: var(--space-4);
+  min-height: 3.5rem;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
+}
+
+/* The toggle takes the free width, so a click anywhere on the name opens the row. */
+.ar__toggle {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 2.5rem;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.ar__toggle:hover .ar__name {
+  text-decoration: underline;
+}
+.ar__toggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.ar__chev {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.ar__name {
+  font-weight: var(--fw-semibold);
+}
+
+.ar__fixed {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.ar__key {
+  flex: 0 1 9rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.ar__count {
+  flex: none;
+  min-width: 4.5rem;
+  text-align: end;
+  font-size: var(--fs-sm);
+}
+
+/* The delete slot keeps its width, so the counts of all rows line up. */
+.ar__del {
+  display: flex;
+  flex: none;
+  justify-content: center;
+  width: 2.5rem;
+}
+
+.ar__body {
+  /* The row is surface 2, so the fields take surface 3. */
+  --color-surface-sunken: var(--color-surface-3);
+  /* The field label sits on that fill. The subtle text colour gives less than 4.5:1 on
+     surface 3, so the label takes the muted text colour. */
+  --color-text-subtle: var(--color-text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-5) var(--space-5) var(--space-8);
+}
+
+.ar__names {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.7fr) 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.ar__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ar__sec {
+  display: block;
+  min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
+}
+/* A legend takes no part in the gap of the fieldset, so it keeps its own space. */
+.ar__secTitle {
+  margin-bottom: var(--space-3);
+  padding: 0;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.ar__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: var(--space-2) var(--space-4);
+}
+.ar__perm {
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.ar__empty {
+  padding: var(--space-5);
+  color: var(--color-text-muted);
+}
+
+.ar__foot {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.ar__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.ar__keyInput ::ng-deep input {
+  font-family: var(--font-mono);
+}
+
+.ar__dialogText {
+  margin: 0;
+}
+.ar__dialogFoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+@container (max-width: 40rem) {
+  .ar__head {
+    flex-wrap: wrap;
+    gap: var(--space-1) var(--space-3);
+  }
+  .ar__key {
+    display: none;
+  }
+  .ar__body {
+    padding: var(--space-2) var(--space-4) var(--space-4);
+  }
+  .ar__names {
+    grid-template-columns: 1fr;
+  }
 }

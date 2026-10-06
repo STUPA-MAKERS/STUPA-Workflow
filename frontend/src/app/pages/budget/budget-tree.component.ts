@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -8,43 +18,106 @@ import type { Uuid } from '@core/api/models';
 import {
   ButtonComponent,
   CellDirective,
+  CheckboxComponent,
   type ColumnDef,
   CurrencyInputComponent,
   DataTableComponent,
   DialogComponent,
   IconComponent,
+  InputComponent,
+  MEDIA,
   RowDetailDirective,
+  SegmentedComponent,
+  type SegmentedOption,
   SelectComponent,
   type SelectOption,
+  SwitchComponent,
+  ToastService,
 } from '@stupa-makers/ui-kit';
-import { ToastService } from '@stupa-makers/ui-kit';
+import { mediaQuerySignal } from '../../layout/media-query';
 import { AdminApiService } from '../admin/admin-api.service';
-import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
-import { SimplifyPathPipe } from '@shared/budget-path';
-import { BudgetYearTreeComponent, type BudgetYearSelection } from './budget-year-tree.component';
+import { FilterSelectComponent, type FilterSelectOption } from '@shared/ui/filter-select/filter-select.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
+import { PALETTE, resolveNodeColors } from './budget-color.util';
+import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
 
-/** A tree row: a node plus the depth for the indentation. */
+/** A visible tree row: a node, its depth and whether it has children. */
 interface Row {
   node: BudgetTreeNode;
   depth: number;
+  hasChildren: boolean;
 }
 
+/** How the colour cell shows a node: its own colour, a colour from above, or none. */
+export interface Swatch {
+  kind: 'own' | 'inherited' | 'none';
+  color: string | null;
+}
+
+/** The colour of a cost centre: `#rrggbb`, the format the dialog stores. */
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
+/** The width of an amount column: "120.000 €" in the mono font of the table. A longer
+ *  amount widens its column; the name column gives up the room. */
+const AMOUNT_WIDTH = '6rem';
+
 /**
- * Budget and cost-center tree editor. The page is budget-scoped. Pick a budget at
- * the top, then edit its cost-center subtree (`VS-800-40 – …`) below.
+ * From this page width on, the table shows all five amounts. The fixed columns (five
+ * amounts, colour, four row actions) take about 690 px; the rest, at least 180 px, is
+ * the name column. The sheet beside the admin navigation is 904 px wide at 1440 px.
+ */
+const FULL_TABLE_MIN = 870;
+/** From this page width on, the table leaves out only "Einnahmen". */
+const MID_TABLE_MIN = 780;
+
+/** The cutoff day must exist in every month (backend: 1..28). */
+const MAX_CUTOFF_DAY = 28;
+
+/**
+ * The cost centres of the admin area (boards Admin-Kostenstellen, Admin-Kostenstelle-Dialog).
  *
- * A budget is NOT bound to a Gremium. Fiscal years belong to the budget. Each
- * selected budget shows them on its own card. There is no global fiscal-year
- * dropdown. Available rolls down as the allocation. Bound rolls up from the
- * assigned applications. Each node has an inline-editable allocation for the
- * selected fiscal year.
+ * A toolbar holds the budget-wide actions: the accepted and bound flow states, the
+ * fiscal-year cutoff, "Haushaltsjahr anlegen" (with the list of the years to correct or
+ * delete) and "Budget anlegen". A chip picks the top budget, a segmented control its
+ * fiscal year (an inactive year says so).
+ *
+ * The table is the cost-centre tree of the picked budget: a node with children folds, the
+ * name stands over its key path, the five amounts of the year follow (Zugeteilt, Gebunden,
+ * Ausgegeben, Einnahmen, Verfügbar), then the colour: a node shows its own colour, the
+ * colour of the nearest coloured parent in a muted look (O19), or an empty box. Each row
+ * edits its node, sets its allocation for the year, adds a sub cost centre (an inline row
+ * at the end of its subtree) and deletes it after a confirmation.
+ *
+ * The edit dialog holds every setting of a node: key, name, colour, active, "Im Budget-Tab
+ * ausblenden" and the visibility gremium (`viewGremiumId`, gaps N32), whose members see the
+ * subtree in the budget tab without a budget right.
  */
 @Component({
   selector: 'app-budget-tree',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageHeaderComponent, FormsModule, TranslatePipe, SimplifyPathPipe, ButtonComponent, DialogComponent, DataTableComponent, CellDirective, RowDetailDirective, IconComponent, CurrencyInputComponent, SelectComponent, BudgetYearTreeComponent],
+  imports: [
+    FormsModule,
+    TranslatePipe,
+    ButtonComponent,
+    CellDirective,
+    CheckboxComponent,
+    CurrencyInputComponent,
+    DataTableComponent,
+    DialogComponent,
+    FilterSelectComponent,
+    IconComponent,
+    InputComponent,
+    NoteComponent,
+    PageHeaderComponent,
+    RowDetailDirective,
+    RowMenuComponent,
+    SegmentedComponent,
+    SelectComponent,
+    SwitchComponent,
+  ],
   templateUrl: './budget-tree.component.html',
   styleUrl: './budget-tree.component.scss',
 })
@@ -54,22 +127,40 @@ export class BudgetTreeComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
+
+  /** Phone: the toolbar actions go into the header menu, the rows into cards. */
+  readonly phone = mediaQuerySignal(MEDIA.phone);
+  /** The width of the page, measured: the sheet beside the admin navigation is narrower
+   *  than the viewport says. `0` until the first measure (all columns). */
+  readonly width = signal(0);
+  /** The amounts a narrow page leaves out; lines under "Verfügbar" show them. */
+  readonly hidden = computed<ReadonlySet<'expended' | 'income'>>(() => {
+    const w = this.width();
+    // A phone shows cards: they stack the amounts and have room for all five.
+    if (this.phone() || w === 0 || w >= FULL_TABLE_MIN) return new Set();
+    return w >= MID_TABLE_MIN ? new Set(['income']) : new Set(['expended', 'income']);
+  });
 
   /** `budget.structure` as a front-end gate for the fiscal-year edit and delete. The
    *  backend stays authoritative. The value is reactive, because the principal loads
    *  asynchronously. */
   readonly canStructure = computed(() => this.auth.can('budget.structure'));
 
+  readonly palette = PALETTE;
+
   readonly tree = signal<BudgetTreeNode[]>([]);
   readonly fiscalYears = signal<FiscalYear[]>([]);
-  /** Fiscal years per top budget (for the left navigation tree). */
-  readonly fiscalYearsByBudget = signal<Record<Uuid, FiscalYear[]>>({});
   readonly selectedTopId = signal('');
   readonly selectedFyId = signal('');
   readonly loading = signal(true);
   readonly loadError = signal(false);
+  /** Nodes whose children are folded away. Every node starts open. */
+  readonly collapsed = signal<ReadonlySet<string>>(new Set());
 
-  /** Top budgets (roots) for the left tree. */
+  /** Top budgets (roots). */
   readonly tops = computed(() => this.tree().filter((n) => n.parentId === null));
 
   /** Flow-state keys (global flow) for the accepted/denied config. */
@@ -83,37 +174,37 @@ export class BudgetTreeComponent {
     fiscalStartMonth: number;
     fiscalStartDay: number;
   }>({ key: '', name: '', fiscalStartMonth: 1, fiscalStartDay: 1 });
-  /** Top-budget dialog (opened via the header button). */
   readonly topOpen = signal(false);
-  /** Fiscal-year dialog (opened via the header button). */
   readonly fyOpen = signal(false);
-  /** Cutoff dialog for the selected top budget (opened via the header button). */
   readonly stichtagOpen = signal(false);
-  /** Status config dialog (accepted/denied states of the top budget). */
   readonly stateConfigOpen = signal(false);
-  /** Add child node: which parent is expanded + the draft. */
+  /** Add a sub cost centre: the parent and the draft of the inline row. */
   readonly addingChildOf = signal<Uuid | null>(null);
   readonly childDraft = signal<{ key: string; name: string }>({ key: '', name: '' });
   /** Set the limit (allocation) of a node through a per-row dialog. */
   readonly limitNode = signal<BudgetTreeNode | null>(null);
   readonly limitValue = signal('');
-  /** Edit a cost center (key, name, visibility) through a per-row dialog. */
+  /** Edit every setting of a cost centre in one dialog. */
   readonly editNode = signal<BudgetTreeNode | null>(null);
   readonly editKey = signal('');
   readonly editName = signal('');
+  /** `#rrggbb`, or '' for no own colour (the node then shows the colour of its parent). */
+  readonly editColor = signal('');
+  readonly editActive = signal(true);
   /** Hide in the budget tab. This setting changes the display only. */
   readonly editHidden = signal(false);
   /** Visibility Gremium. Its members see the subtree in the budget tab as a root.
    *  An empty string means no assignment. */
   readonly editViewGremium = signal('');
   readonly gremiumOptions = signal<SelectOption[]>([]);
+  /** Delete a cost centre after a confirmation; a 409 names the reason in the dialog. */
+  readonly nodeDelete = signal<BudgetTreeNode | null>(null);
+  readonly nodeDeleteBlocked = signal(false);
   /** Create a fiscal year inside the selected budget. It takes only the year. */
   readonly newFy = signal<{ year: number }>({ year: new Date().getFullYear() });
-  /** Fiscal year under edit. Its dialog corrects the year and the active flag. */
   readonly fyEdit = signal<FiscalYear | null>(null);
   readonly fyEditYear = signal<number>(new Date().getFullYear());
   readonly fyEditActive = signal(true);
-  /** Fiscal year whose delete the user confirms now. */
   readonly fyDelete = signal<FiscalYear | null>(null);
   /** Translated reason why the delete was refused (409), else `null`. */
   readonly fyDeleteBlocked = signal<string | null>(null);
@@ -122,42 +213,107 @@ export class BudgetTreeComponent {
     () => this.tree().find((n) => n.id === this.selectedTopId()) ?? null,
   );
 
-  /** Display label of the selected budget (for the fiscal-year dialog). */
+  /** Display label of the selected budget (for the dialogs). */
   readonly selectedTopLabel = computed<string>(() => {
     const t = this.selectedTop();
     return t ? `${t.key} – ${t.name}` : '';
   });
 
-  /** Subtree of the selected budget -> flat rows (pre-order) with depth. */
+  /** "01.01.": the cutoff of the selected budget. */
+  readonly cutoffLabel = computed(() => {
+    const t = this.selectedTop();
+    if (!t) return '';
+    const p = (n: number): string => String(n).padStart(2, '0');
+    return `${p(t.fiscalStartDay)}.${p(t.fiscalStartMonth)}.`;
+  });
+
+  /** The budget chip: every top budget, by name and key. */
+  readonly topOptions = computed<FilterSelectOption[]>(() =>
+    this.tops().map((t) => ({ value: t.id, label: `${t.name} (${t.key})` })),
+  );
+  readonly topChipText = computed(() => {
+    const t = this.selectedTop();
+    if (!t) return null;
+    return this.i18n.translate('budget.tree.topChip', { name: t.name, key: t.key, cutoff: this.cutoffLabel() });
+  });
+
+  /** The fiscal years as segments, newest first; an inactive year says so. */
+  readonly fyOptions = computed<SegmentedOption[]>(() =>
+    [...this.fiscalYears()]
+      .sort((a, b) => b.year - a.year)
+      .map((fy) => ({
+        value: fy.id,
+        label: fy.active
+          ? this.i18n.translate('budget.tree.fyChip', { year: fy.display })
+          : this.i18n.translate('budget.tree.fyChipInactive', { year: fy.display }),
+      })),
+  );
+
+  /** The colours as the table shows them: own, from the nearest coloured parent, or none. */
+  private readonly resolved = computed(() => resolveNodeColors(this.tree()));
+
+  /** Subtree of the selected budget -> visible rows (pre-order) with depth. */
   readonly rows = computed<Row[]>(() => {
     const top = this.selectedTop();
     if (!top) return [];
+    const folded = this.collapsed();
     const out: Row[] = [];
     const walk = (node: BudgetTreeNode, depth: number): void => {
-      out.push({ node, depth });
+      out.push({ node, depth, hasChildren: node.children.length > 0 });
+      if (folded.has(node.id)) return;
       for (const c of node.children) walk(c, depth + 1);
     };
     walk(top, 0);
     return out;
   });
 
-  readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'node', label: this.i18n.translate('budget.tree.col.node') },
-    { key: 'allocated', label: this.i18n.translate('budget.tree.col.allocated'), align: 'end' },
-    { key: 'committed', label: this.i18n.translate('budget.tree.col.committed'), align: 'end' },
-    { key: 'available', label: this.i18n.translate('budget.tree.col.available'), align: 'end' },
-    { key: 'color', label: this.i18n.translate('budget.tree.col.color'), width: '4rem' },
-    { key: 'actions', label: this.i18n.translate('budget.tree.col.actions'), align: 'end', width: '8.5rem' },
-  ]);
+  /** The row after which the inline create row of `addingChildOf` stands: the last
+   *  visible row of the parent's subtree. */
+  private readonly childFormAfter = computed<string | null>(() => {
+    const parentId = this.addingChildOf();
+    if (!parentId) return null;
+    const rows = this.rows();
+    const start = rows.findIndex((r) => r.node.id === parentId);
+    if (start < 0) return null;
+    let last = start;
+    for (let i = start + 1; i < rows.length && rows[i].depth > rows[start].depth; i++) last = i;
+    return rows[last].node.id;
+  });
+
+  /** The parent of the inline create row, for its label "Unter VS-200". */
+  readonly childParent = computed<BudgetTreeNode | null>(() => {
+    const id = this.addingChildOf();
+    return id ? (this.findNode(id) ?? null) : null;
+  });
+
+  readonly columns = computed<ColumnDef[]>(() => {
+    const t = (k: TranslationKey): string => this.i18n.translate(k);
+    // The amounts get a fixed width, so the name column takes the free width.
+    const money = (key: string, label: TranslationKey): ColumnDef => ({ key, label: t(label), align: 'end', width: AMOUNT_WIDTH });
+    const cols: ColumnDef[] = [
+      { key: 'node', label: t('budget.tree.col.node'), card: 'title' },
+      money('allocated', 'budget.tree.col.allocated'),
+      money('bound', 'budget.tree.col.bound'),
+    ];
+    const hidden = this.hidden();
+    if (!hidden.has('expended')) cols.push(money('expended', 'budget.tree.col.expended'));
+    if (!hidden.has('income')) cols.push(money('income', 'budget.tree.col.income'));
+    cols.push(
+      money('available', 'budget.tree.col.available'),
+      { key: 'color', label: t('budget.tree.col.color'), width: '2.75rem' },
+      { key: 'actions', label: t('budget.tree.col.actions'), align: 'end', width: '9.5rem', card: 'actions' },
+    );
+    return cols;
+  });
   readonly rowId = (r: unknown): string => (r as Row).node.id;
-  readonly childExpanded = (r: unknown): boolean => this.addingChildOf() === (r as Row).node.id;
+  readonly childExpanded = (r: unknown): boolean => this.childFormAfter() === (r as Row).node.id;
 
   /** Fiscal-year table inside the manage dialog. The action column appears only with
    *  `budget.structure`, so a read-only user never sees an edit or a delete button. */
   readonly fyColumns = computed<ColumnDef[]>(() => {
     const cols: ColumnDef[] = [
-      { key: 'display', label: this.i18n.translate('budget.tree.fyYear') },
-      { key: 'active', label: this.i18n.translate('budget.tree.fyActive'), align: 'start', width: '5rem' },
+      { key: 'display', label: this.i18n.translate('budget.tree.fyYear'), card: 'title' },
+      { key: 'active', label: this.i18n.translate('budget.tree.fyState') },
     ];
     if (this.canStructure()) {
       cols.push({
@@ -165,6 +321,7 @@ export class BudgetTreeComponent {
         label: this.i18n.translate('budget.tree.col.actions'),
         align: 'end',
         width: '6rem',
+        card: 'actions',
       });
     }
     return cols;
@@ -173,10 +330,16 @@ export class BudgetTreeComponent {
 
   constructor() {
     this.reload();
-    // Gremien for the visibility dropdown in the edit dialog.
+    // Measure the page: beside the admin navigation it is narrower than the viewport.
+    afterNextRender(() => {
+      if (typeof ResizeObserver === 'undefined') return;
+      const observer = new ResizeObserver((entries) => this.width.set(entries[0].contentRect.width));
+      observer.observe(this.host.nativeElement);
+      this.destroyRef.onDestroy(() => observer.disconnect());
+    });
+    // Gremien for the visibility select in the edit dialog.
     this.adminApi.listGremienOptions().subscribe({
-      next: (list) =>
-        this.gremiumOptions.set(list.map((g) => ({ value: g.id, label: g.name }))),
+      next: (list) => this.gremiumOptions.set(list.map((g) => ({ value: g.id, label: g.name }))),
       error: () => this.gremiumOptions.set([]),
     });
     // The global flow gives the state keys for the accepted/denied config. An error
@@ -193,10 +356,8 @@ export class BudgetTreeComponent {
     });
   }
 
-  /** Currently selected top budget. The color and state config read it. */
-  private readonly currentTop = computed(() => this.selectedTop());
-  readonly acceptedKeys = computed(() => new Set(this.currentTop()?.acceptedStateKeys ?? []));
-  readonly deniedKeys = computed(() => new Set(this.currentTop()?.deniedStateKeys ?? []));
+  readonly acceptedKeys = computed(() => new Set(this.selectedTop()?.acceptedStateKeys ?? []));
+  readonly deniedKeys = computed(() => new Set(this.selectedTop()?.deniedStateKeys ?? []));
   isAccepted(key: string): boolean {
     return this.acceptedKeys().has(key);
   }
@@ -204,9 +365,15 @@ export class BudgetTreeComponent {
     return this.deniedKeys().has(key);
   }
 
+  /** An amount in the currency of the node; cents only where they are not zero. */
   money(value: string | number | null | undefined, currency: string): string {
     const n = value == null || value === '' ? 0 : Number(value);
-    return new Intl.NumberFormat(this.i18n.formatLocale(), { style: 'currency', currency }).format(n);
+    return new Intl.NumberFormat(this.i18n.formatLocale(), {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+      maximumFractionDigits: 2,
+    }).format(n);
   }
 
   alloc(node: BudgetTreeNode) {
@@ -214,9 +381,110 @@ export class BudgetTreeComponent {
     return node.byFiscalYear.find((a) => a.fiscalYearId === fy) ?? null;
   }
 
+  /** One amount of the selected year, or a dash without an allocation view. */
+  amount(node: BudgetTreeNode, field: 'allocated' | 'bound' | 'expended' | 'income' | 'available'): string {
+    const a = this.alloc(node);
+    return a ? this.money(a[field], node.currency) : '—';
+  }
+
+  /**
+   * The amounts a narrow table leaves out, as visible lines under "Verfügbar". They are
+   * text in the cell, not a tooltip, so a keyboard, touch or screen-reader user reads
+   * them too. Empty when the table shows every amount or the node has no allocation.
+   */
+  hiddenAmounts(node: BudgetTreeNode): string[] {
+    const hidden = this.hidden();
+    if (!hidden.size || !this.alloc(node)) return [];
+    const lines: string[] = [];
+    if (hidden.has('expended')) {
+      lines.push(this.i18n.translate('budget.tree.expendedTitle', { amount: this.amount(node, 'expended') }));
+    }
+    lines.push(this.i18n.translate('budget.tree.incomeTitle', { amount: this.amount(node, 'income') }));
+    return lines;
+  }
+
+  isNegative(node: BudgetTreeNode): boolean {
+    const a = this.alloc(node);
+    return !!a && Number(a.available) < 0;
+  }
+
+  swatch(node: BudgetTreeNode): Swatch {
+    const own = node.color?.trim();
+    if (own) return { kind: 'own', color: own };
+    const above = this.resolved().get(node.id) ?? null;
+    return above ? { kind: 'inherited', color: above } : { kind: 'none', color: null };
+  }
+
+  swatchLabel(s: Swatch): string {
+    if (s.kind === 'own') return this.i18n.translate('budget.tree.colorOwn', { color: String(s.color) });
+    if (s.kind === 'inherited') return this.i18n.translate('budget.tree.colorInherited', { color: String(s.color) });
+    return this.i18n.translate('budget.tree.colorNone');
+  }
+
+  isCollapsed(id: string): boolean {
+    return this.collapsed().has(id);
+  }
+
+  toggleCollapse(id: string): void {
+    this.collapsed.update((set) => {
+      const next = new Set(set);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  /** The phone menu of a row: the same four actions as the icon buttons. */
+  readonly rowMenu = computed<RowMenuSection[]>(() => {
+    const t = (k: TranslationKey): string => this.i18n.translate(k);
+    return [
+      {
+        items: [
+          { id: 'edit', label: t('budget.tree.editNode'), icon: 'edit' },
+          {
+            id: 'limit',
+            label: t('budget.tree.setLimit'),
+            icon: 'euro',
+            disabledReason: this.selectedFyId() ? null : t('budget.tree.noFy'),
+          },
+          { id: 'child', label: t('budget.tree.addChild'), icon: 'plus' },
+        ],
+      },
+      { items: [{ id: 'delete', label: t('budget.tree.delete'), icon: 'trash', danger: true }] },
+    ];
+  });
+
+  onRowMenu(node: BudgetTreeNode, item: RowMenuItem): void {
+    if (item.id === 'edit') this.openEditNode(node);
+    else if (item.id === 'limit') this.openLimit(node);
+    else if (item.id === 'child') this.startAddChild(node);
+    else this.askDeleteNode(node);
+  }
+
+  /** The header menu on a phone: the toolbar actions except "Budget anlegen". */
+  readonly headerMenu = computed<RowMenuSection[]>(() => {
+    const t = (k: TranslationKey): string => this.i18n.translate(k);
+    const noTop = this.selectedTopId() ? null : t('budget.tree.pickHint');
+    return [
+      {
+        items: [
+          { id: 'states', label: t('budget.tree.stateConfig'), disabledReason: noTop },
+          { id: 'cutoff', label: t('budget.tree.stichtagTitle'), disabledReason: noTop },
+          { id: 'fy', label: t('budget.tree.fyTitle'), icon: 'cal', disabledReason: noTop },
+        ],
+      },
+    ];
+  });
+
+  onHeaderMenu(item: RowMenuItem): void {
+    if (item.id === 'states') this.openStateConfig();
+    else if (item.id === 'cutoff') this.openStichtag();
+    else this.openFy();
+  }
+
   /** Load sequence counter. It increases for each load. A response of an older
-   *  reload() fan-out can arrive after a newer reload(). The sequence check drops it.
-   *  Without the check it overwrites the fiscal year and the selection. */
+   *  load can arrive after a newer one. The sequence check drops it. Without the
+   *  check it overwrites the fiscal year and the selection. */
   private reloadSeq = 0;
 
   private reload(): void {
@@ -231,24 +499,9 @@ export class BudgetTreeComponent {
         const keep = tops.some((t) => t.id === this.selectedTopId());
         const topId = keep ? this.selectedTopId() : (tops[0]?.id ?? '');
         this.selectedTopId.set(topId);
-        if (!topId) this.fiscalYears.set([]);
-        // Load the fiscal years of all top budgets for the left tree. An error stays
-        // silent. For the selected budget, also set the fiscal-year list on the right.
-        for (const top of tops) {
-          this.api.listFiscalYears(top.id as Uuid).subscribe({
-            next: (fys) => {
-              if (seq !== this.reloadSeq) return;
-              this.fiscalYearsByBudget.update((m) => ({ ...m, [top.id]: fys }));
-              if (top.id === topId) {
-                this.fiscalYears.set(fys);
-                if (!fys.some((fy) => fy.id === this.selectedFyId()))
-                  this.selectedFyId.set(fys[0]?.id ?? '');
-              }
-            },
-            error: () => undefined,
-          });
-        }
         this.loading.set(false);
+        if (topId) this.loadFiscalYears(topId);
+        else this.fiscalYears.set([]);
       },
       error: () => {
         if (seq !== this.reloadSeq) return;
@@ -258,18 +511,15 @@ export class BudgetTreeComponent {
     });
   }
 
-  /** Load the fiscal years of the selected budget. They live inside the budget. This
-   *  raises the load sequence. A reload() fan-out that still runs then does not
-   *  overwrite this selection. The reverse also holds. */
+  /** Load the fiscal years of a budget. The first active year (else the newest) is the
+   *  default; a year that still exists stays selected. */
   private loadFiscalYears(topId: string): void {
     const seq = ++this.reloadSeq;
     this.api.listFiscalYears(topId as Uuid).subscribe({
       next: (fys) => {
         if (seq !== this.reloadSeq) return;
         this.fiscalYears.set(fys);
-        // Keep the left navigation in sync after a fiscal-year edit or delete.
-        this.fiscalYearsByBudget.update((m) => ({ ...m, [topId]: fys }));
-        if (!fys.some((fy) => fy.id === this.selectedFyId())) this.selectedFyId.set(fys[0]?.id ?? '');
+        if (!fys.some((fy) => fy.id === this.selectedFyId())) this.selectedFyId.set(defaultFy(fys));
       },
       error: () => {
         if (seq !== this.reloadSeq) return;
@@ -279,36 +529,20 @@ export class BudgetTreeComponent {
   }
 
   selectTop(id: string): void {
+    if (!id) return;
     this.selectedTopId.set(id);
     this.selectedFyId.set('');
+    this.addingChildOf.set(null);
     this.loadFiscalYears(id);
   }
 
-  /** Handle a year picked in the left tree. Set the budget and the fiscal year. This
-   *  raises the load sequence. A reload() fan-out that still runs then does not
-   *  overwrite this selection, the same as in loadFiscalYears and selectTop. */
-  onYearPicked(sel: BudgetYearSelection): void {
-    ++this.reloadSeq;
-    this.selectedTopId.set(sel.budgetId);
-    const fys = this.fiscalYearsByBudget()[sel.budgetId] ?? [];
-    this.fiscalYears.set(fys);
-    this.selectedFyId.set(sel.fiscalYearId);
-  }
-
-  /** Set or clear the color of a cost center. An empty value means automatic. */
-  saveColor(node: BudgetTreeNode, color: string): void {
-    this.api.updateNode(node.id, { color: color || '' }).subscribe({
-      next: () => {
-        this.toast.success(this.i18n.translate('budget.tree.toast.colorSaved'));
-        this.reload();
-      },
-      error: () => this.toast.error(this.i18n.translate('budget.tree.toast.failed')),
-    });
+  selectFy(id: string | null): void {
+    if (id) this.selectedFyId.set(id);
   }
 
   /** Toggle a state key in the top budget's accepted/denied set. */
   toggleState(kind: 'accepted' | 'denied', key: string): void {
-    const top = this.currentTop();
+    const top = this.selectedTop();
     if (!top) return;
     const accepted = new Set(this.acceptedKeys());
     const denied = new Set(this.deniedKeys());
@@ -321,25 +555,20 @@ export class BudgetTreeComponent {
       other.delete(key); // A state is never accepted and denied at the same time.
     }
     this.api
-      .updateNode(top.id, {
-        acceptedStateKeys: [...accepted],
-        deniedStateKeys: [...denied],
-      })
+      .updateNode(top.id, { acceptedStateKeys: [...accepted], deniedStateKeys: [...denied] })
       .subscribe({
         next: () => this.reload(),
         error: () => this.toast.error(this.i18n.translate('budget.tree.toast.failed')),
       });
   }
 
-  // Create and delete nodes.
+  // Create a top budget.
   patchTop<K extends 'key' | 'name'>(key: K, value: string): void {
     this.newTop.update((t) => ({ ...t, [key]: value }));
   }
 
   patchTopStichtag(key: 'fiscalStartMonth' | 'fiscalStartDay', value: string): void {
-    const n = Math.trunc(Number(value)) || 1;
-    const clamped = key === 'fiscalStartMonth' ? clampRange(n, 1, 12) : clampRange(n, 1, 31);
-    this.newTop.update((t) => ({ ...t, [key]: clamped }));
+    this.newTop.update((t) => ({ ...t, [key]: clampCutoff(key, value) }));
   }
 
   openTop(): void {
@@ -365,9 +594,9 @@ export class BudgetTreeComponent {
       .subscribe({
         next: (node) => {
           this.toast.success(this.i18n.translate('budget.tree.toast.created'));
-          this.newTop.set({ key: '', name: '', fiscalStartMonth: 1, fiscalStartDay: 1 });
           this.topOpen.set(false);
           this.selectedTopId.set(node.id);
+          this.selectedFyId.set('');
           this.reload();
         },
         error: () => this.toast.error(this.i18n.translate('budget.tree.toast.failed')),
@@ -379,13 +608,10 @@ export class BudgetTreeComponent {
   saveStichtag(key: 'fiscalStartMonth' | 'fiscalStartDay', value: string): void {
     const top = this.selectedTop();
     if (!top) return;
-    const n = Math.trunc(Number(value)) || 1;
-    const clamped = key === 'fiscalStartMonth' ? clampRange(n, 1, 12) : clampRange(n, 1, 31);
-    this.api.updateNode(top.id, { [key]: clamped }).subscribe({
+    this.api.updateNode(top.id, { [key]: clampCutoff(key, value) }).subscribe({
       next: () => {
         this.toast.success(this.i18n.translate('budget.tree.toast.stichtagSaved'));
         this.reload();
-        this.loadFiscalYears(top.id);
       },
       error: () => this.toast.error(this.i18n.translate('budget.tree.toast.failed')),
     });
@@ -404,9 +630,27 @@ export class BudgetTreeComponent {
     this.stateConfigOpen.set(false);
   }
 
+  // The inline row for a sub cost centre.
   startAddChild(node: BudgetTreeNode): void {
+    // The row stands at the end of the subtree, so the subtree must be open.
+    this.collapsed.update((set) => {
+      const next = new Set(set);
+      next.delete(node.id);
+      return next;
+    });
     this.addingChildOf.set(node.id);
     this.childDraft.set({ key: '', name: '' });
+    // The row can stand far below the button, after a large subtree. Move the focus to
+    // its key field: the focus also scrolls the row into view inside the pane.
+    afterNextRender(() => this.focusChildKey(), { injector: this.injector });
+  }
+
+  /** Focus the key field of the inline row for a sub cost centre, when it shows. */
+  private focusChildKey(): void {
+    const input = this.host.nativeElement.querySelector<HTMLInputElement>('.bt__child .bt__childKey input');
+    if (!input) return;
+    input.focus();
+    input.scrollIntoView?.({ block: 'nearest' });
   }
 
   cancelAddChild(): void {
@@ -432,21 +676,45 @@ export class BudgetTreeComponent {
       });
   }
 
-  deleteNode(node: BudgetTreeNode): void {
+  // Delete a node after a confirmation.
+  askDeleteNode(node: BudgetTreeNode): void {
+    this.nodeDeleteBlocked.set(false);
+    this.nodeDelete.set(node);
+  }
+
+  closeDeleteNode(): void {
+    this.nodeDelete.set(null);
+    this.nodeDeleteBlocked.set(false);
+  }
+
+  deleteNode(): void {
+    const node = this.nodeDelete();
+    if (!node) return;
     this.api.deleteNode(node.id).subscribe({
       next: () => {
         this.toast.success(this.i18n.translate('budget.tree.toast.deleted'));
+        this.closeDeleteNode();
+        if (node.id === this.selectedTopId()) this.selectedTopId.set('');
         this.reload();
       },
-      error: () => this.toast.error(this.i18n.translate('budget.tree.toast.deleteFailed')),
+      error: (err: { status?: number }) => {
+        // 409: the node still has sub cost centres or allocations. The dialog says so.
+        if (err?.status === 409) {
+          this.nodeDeleteBlocked.set(true);
+          return;
+        }
+        this.toast.error(this.i18n.translate('budget.tree.toast.deleteFailed'));
+      },
     });
   }
 
-  // Per-row dialogs for the node edit and the allocation limit.
+  // The edit dialog with every setting of a node.
   openEditNode(node: BudgetTreeNode): void {
     this.editNode.set(node);
     this.editKey.set(node.key);
     this.editName.set(node.name);
+    this.editColor.set(node.color?.trim() ?? '');
+    this.editActive.set(node.active);
     this.editHidden.set(node.hiddenInBudget);
     this.editViewGremium.set(node.viewGremiumId ?? '');
   }
@@ -455,27 +723,44 @@ export class BudgetTreeComponent {
     this.editNode.set(null);
   }
 
+  /** The hex field takes any text; only `#rrggbb` (or empty) can be saved. */
+  readonly editColorInvalid = computed(() => {
+    const c = this.editColor();
+    return c !== '' && !HEX_COLOR.test(c);
+  });
+
+  pickColor(color: string): void {
+    this.editColor.set(color.toLowerCase());
+  }
+
+  clearColor(): void {
+    this.editColor.set('');
+  }
+
   saveEditNode(): void {
     const node = this.editNode();
     if (!node) return;
     const key = this.editKey().trim();
     const name = this.editName().trim();
-    if (!key || !name) return;
+    if (!key || !name || this.editColorInvalid()) return;
     this.api
       .updateNode(node.id, {
         key,
         name,
+        // '' clears the own colour; the node then takes the colour of its parent.
+        color: this.editColor(),
+        active: this.editActive(),
         hiddenInBudget: this.editHidden(),
         viewGremiumId: this.editViewGremium() || null,
       })
       .subscribe({
-      next: () => {
-        this.toast.success(this.i18n.translate('budget.tree.toast.saved'));
-        this.editNode.set(null);
-        this.reload();
-      },
-      error: () => this.toast.error(this.i18n.translate('budget.tree.toast.keyFailed')),
-    });
+        next: () => {
+          this.toast.success(this.i18n.translate('budget.tree.toast.saved'));
+          this.editNode.set(null);
+          this.reload();
+        },
+        error: () => this.toast.error(this.i18n.translate('budget.tree.toast.keyFailed')),
+      });
   }
 
   openLimit(node: BudgetTreeNode): void {
@@ -503,6 +788,11 @@ export class BudgetTreeComponent {
     });
   }
 
+  /** The label of the selected fiscal year ("2026"), for the limit dialog. */
+  readonly selectedFyLabel = computed(
+    () => this.fiscalYears().find((fy) => fy.id === this.selectedFyId())?.display ?? '',
+  );
+
   // Fiscal years, which live inside the budget.
   patchFyYear(value: string): void {
     const year = Math.trunc(Number(value)) || new Date().getFullYear();
@@ -524,10 +814,10 @@ export class BudgetTreeComponent {
     const f = this.newFy();
     if (!top || !f.year) return;
     this.api.createFiscalYear(top as Uuid, { year: f.year }).subscribe({
-      next: () => {
+      next: (fy) => {
         this.toast.success(this.i18n.translate('budget.tree.toast.fyCreated'));
-        this.newFy.set({ year: new Date().getFullYear() });
         this.fyOpen.set(false);
+        this.selectedFyId.set(fy.id);
         this.loadFiscalYears(top);
       },
       error: () => this.toast.error(this.i18n.translate('budget.tree.toast.fyFailed')),
@@ -617,9 +907,29 @@ export class BudgetTreeComponent {
     if (detail?.includes('applications')) return 'budget.tree.fyBlocked.applications';
     return 'budget.tree.fyBlocked.generic';
   }
+
+  private findNode(id: string): BudgetTreeNode | undefined {
+    const walk = (nodes: readonly BudgetTreeNode[]): BudgetTreeNode | undefined => {
+      for (const n of nodes) {
+        if (n.id === id) return n;
+        const hit = walk(n.children);
+        if (hit) return hit;
+      }
+      return undefined;
+    };
+    return walk(this.tree());
+  }
 }
 
-/** Clamp an integer to [min, max]. */
-function clampRange(n: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, n));
+/** The default year of a budget: the newest active year, else the newest year. */
+function defaultFy(fys: readonly FiscalYear[]): string {
+  const sorted = [...fys].sort((a, b) => b.year - a.year);
+  return (sorted.find((fy) => fy.active) ?? sorted[0])?.id ?? '';
+}
+
+/** A cutoff part as a whole number in its range: month 1..12, day 1..28. */
+function clampCutoff(key: 'fiscalStartMonth' | 'fiscalStartDay', value: string): number {
+  const n = Math.trunc(Number(value)) || 1;
+  const max = key === 'fiscalStartMonth' ? 12 : MAX_CUTOFF_DAY;
+  return Math.min(max, Math.max(1, n));
 }

@@ -1,0 +1,285 @@
+@use 'breakpoints' as bp;
+
+:host {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* One column below wide: the navigation (home page only) above the page.
+
+   The frame has no width cap of its own and no centring. The route is `wide`, so the
+   columns start on the same content edge next to the rail as the other list and detail
+   pages (applications, budget, bookings): the side padding of the shell main is the only
+   inset. A cap with `margin-inline: auto` pushed the navigation away from the rail on a
+   wide screen. */
+.af {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  width: 100%;
+}
+
+/* Wide: a pane page (`.pane-page` on the host, see styles.scss). The frame takes the
+   free height of the shell main and does not scroll as a page. The navigation and the
+   page sheet each scroll inside themselves. */
+/* The column has the one list width of the app and the same gap to the sheet as every
+   list/detail page (`--ld-list-width`, `--ld-gap` in styles.scss), on the home page and
+   beside every admin page. */
+.af--split {
+  display: grid;
+  flex: 1 1 0;
+  grid-template-columns: var(--ld-list-width) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--ld-gap);
+  min-height: 0;
+}
+
+/* The column is a list column (`.ld-pane`, styles.scss). One column keeps its wider
+   gap. */
+.af:not(.af--split) .af__nav {
+  gap: var(--space-4);
+}
+.af--split .af__nav {
+  min-height: 0;
+}
+
+/* The entries scroll inside the column; the title and the search stay. */
+.af__navBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-height: 0;
+  padding: 0 var(--space-1) var(--space-2);
+}
+.af--split .af__navBody {
+  position: relative;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+/* One column: the title, the search, the tiles and the entries start on the content
+   edge, the same as the gremien under them. The inset only keeps the focus rings and
+   the fades clear of the edge of the scrolling column. */
+.af:not(.af--split) {
+  --ph-inset: 0px;
+}
+.af:not(.af--split) .af__navBody {
+  padding-inline: 0;
+}
+
+.af__navBody.is-fade-start {
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--space-6));
+}
+.af__navBody.is-fade-end {
+  mask-image: linear-gradient(to top, transparent, #000 var(--space-6));
+}
+.af__navBody.is-fade-start.is-fade-end {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--space-6),
+    #000 calc(100% - var(--space-6)),
+    transparent
+  );
+}
+
+.af__hidden {
+  display: none;
+}
+
+.af__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.af__groupTitle {
+  padding-inline: var(--space-3);
+}
+
+.af__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The home page below wide: the entries fill the width in columns. */
+.af:not(.af--split) .af__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+}
+
+.af__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  text-decoration: none;
+}
+.af__item:hover {
+  background: var(--color-surface-2);
+}
+.af__item:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.af__item--on,
+.af__item--on:hover {
+  background: var(--color-selected);
+}
+
+.af__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.af__item--on .af__icon {
+  color: var(--color-accent-text);
+}
+
+.af__itemText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.af__itemTitle {
+  font-weight: var(--fw-medium);
+}
+.af__itemDesc {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.af__none {
+  margin: 0;
+  padding-inline: var(--space-3);
+  color: var(--color-text-muted);
+}
+
+.af__page {
+  min-width: 0;
+}
+
+/* "Zur Liste" above an account page below wide: back to the navigation. The same look
+   as the control of the list/detail layout. */
+.af__back {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--control-height-sm);
+  margin: 0 0 var(--space-2) calc(-1 * var(--space-2));
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  color: var(--color-accent-text);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+.af__back:hover {
+  background: var(--color-selected);
+}
+.af__back:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+/* Without the sheet the page sits on the page background: the rows of a row-group
+   table (`surface="rowgroup"`) take that colour between them. */
+.af:not(.af--split) .af__page {
+  --dt-gap: var(--color-bg);
+}
+
+/* Wide: the page sits on a sheet that reaches down to the bottom of the window. The
+   sheet is a window with round corners: it clips (`overflow: hidden` with the radius),
+   and its body is the scroll container. So the round corners clip the content at the
+   top and at the bottom in every scroll position, and a straight cut by a rectangular
+   scroll box (or by the viewport edge) cannot occur. A sticky bar of the page sticks to
+   the top or the bottom of the body. The scroll padding keeps an element that gets the
+   focus clear of the corners and the fades. */
+.af--split .af__page {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+  /* A sticky search bar of the page covers the rows with the colour of the sheet. */
+  --stb-bg: var(--color-surface-1);
+}
+.af--split .af__pageBody {
+  --af-fade: var(--space-6);
+  /* The containing block of an absolute child (`.sr-only`), see `.ld__detail`. */
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--space-6) var(--space-6) var(--space-7);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--af-fade);
+}
+/* The page in the sheet keeps its content height, and the body scrolls. A page with
+   columns of its own (the mail templates) takes the free height of the body with
+   `flex: 1 1 0` (`:host-context(.af--split)`) and scrolls its columns inside itself. */
+.af--split .af__pageBody > ::ng-deep * {
+  flex-shrink: 0;
+}
+/* The shared fades of a scroll area: an end fades only while content is hidden past it
+   (`appScrollFade` sets the classes). The mask is on the body, so the sheet keeps its
+   colour and its shape. */
+/* A page with a sticky bar (`app-sticky-bar`, the users search) has the fade of the bar
+   at the top. The top fade of the body would make the stuck bar transparent, so the body
+   fades only at the end. */
+.af--split .af__pageBody.is-fade-start:has(app-sticky-bar:not(.stb--off)) {
+  mask-image: none;
+}
+.af--split .af__pageBody.is-fade-end:has(app-sticky-bar:not(.stb--off)) {
+  mask-image: linear-gradient(to top, transparent, #000 var(--af-fade));
+}
+.af--split .af__pageBody.is-fade-start {
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--af-fade));
+}
+.af--split .af__pageBody.is-fade-end {
+  mask-image: linear-gradient(to top, transparent, #000 var(--af-fade));
+}
+.af--split .af__pageBody.is-fade-start.is-fade-end {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--af-fade),
+    #000 calc(100% - var(--af-fade)),
+    transparent
+  );
+}
+/* A mask makes the body the containing block of every `position: fixed` element in it.
+   An open dialog or side sheet of the page would then cover only the sheet and be cut by
+   its round corners (the merge dialog of the users list, a long list with the end fade).
+   While an overlay of the page is open, the body has no fade. The state wins over every
+   fade rule above, whatever their specificity. */
+.af--split .af__pageBody:has(.dialog__backdrop, .ss__scrim) {
+  mask-image: none !important;
+}
+
+/* Wide, a full-width page with columns of its own (`adminPane`): the frame passes the
+   free height down, and the page scrolls only inside its columns. */
+.af--pane,
+.af--pane .af__page,
+.af--pane .af__pageBody {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+}
+
+@include bp.phone {
+  .af {
+    gap: var(--space-5);
+  }
+}

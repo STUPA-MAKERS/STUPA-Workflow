@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import and_, or_, select
 
-from app.modules.admin.gremium_roles import gremium_ids_with_permission
+from app.modules.admin.gremium_roles import admin_bypass, gremium_ids_for
 from app.modules.admin.models import Gremium
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.livevote.keepers import keeper_summaries
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.schemas import MeetingGremiumOut, MeetingOut, MeetingPage
 from app.modules.livevote.service.paging import (
@@ -37,7 +38,7 @@ class ListingOps(PermissionOps, VoteReadOps):
         need the flags and calls without one.
         """
         meeting = await self._get(meeting_id)
-        votes = (await self._votes_for([meeting.id])).get(meeting.id, [])
+        votes = (await self._votes_for([meeting.id], principal)).get(meeting.id, [])
         return await self._emit(
             meeting,
             principal,
@@ -45,11 +46,27 @@ class ListingOps(PermissionOps, VoteReadOps):
             votes=votes,
         )
 
-    async def list(self, principal: Principal, gremium_id: UUID | None = None) -> list[MeetingOut]:
-        """List the meetings, newest first, optionally filtered to one Gremium."""
+    async def list(
+        self,
+        principal: Principal,
+        gremium_id: UUID | None = None,
+        *,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> list[MeetingOut]:
+        """List the meetings, newest first, optionally filtered to one Gremium.
+
+        ``date_from`` and ``date_to`` limit the list to the meetings whose planned
+        date is in this range (both ends included), for example one month of the
+        calendar view. A meeting without a date is then not in the list.
+        """
         stmt = select(Meeting).order_by(Meeting.created_at.desc())
         if gremium_id is not None:
             stmt = stmt.where(Meeting.gremium_id == gremium_id)
+        if date_from is not None:
+            stmt = stmt.where(Meeting.date >= date_from)
+        if date_to is not None:
+            stmt = stmt.where(Meeting.date <= date_to)
         visible = await self._visible_gremium_ids(principal)
         if visible is not None:
             # Delegation recipients see their meetings even without a membership.
@@ -196,7 +213,7 @@ class ListingOps(PermissionOps, VoteReadOps):
         return MeetingPage(items=items, nextCursor=next_cursor)
 
     async def _decorate(self, meetings: list[Meeting], principal: Principal) -> list[MeetingOut]:
-        """Enrich meetings with the protocol id, the votes and per-principal RBAC flags.
+        """Enrich meetings with the protocol id, the votes, the agenda summary and the flags.
 
         `list` and `list_timeline` share this helper. It loads everything in batches
         and creates no N+1 queries. It filters NO meetings: the visibility rule is
@@ -214,17 +231,19 @@ class ListingOps(PermissionOps, VoteReadOps):
         ).all()
         proto_by_meeting = {meeting_id: pid for meeting_id, pid in proto_rows}
         # Load the Gremium scopes of the principal once, to avoid one query per
-        # meeting. An admin or a global ``meeting.manage`` skips all Gremium queries.
+        # meeting. The admin bypass skips the Gremium query of each right.
         all_gids = {m.gremium_id for m in meetings}
         # One batched query for the Gremium names, which the timeline shows.
-        gremium_names: dict[UUID, str] = {
-            gid: name
-            for gid, name in (
-                await self.session.execute(
-                    select(Gremium.id, Gremium.name).where(Gremium.id.in_(all_gids))
+        gremium_rows = (
+            await self.session.execute(
+                select(Gremium.id, Gremium.name, Gremium.quorum_percent).where(
+                    Gremium.id.in_(all_gids)
                 )
-            ).all()
-        }
+            )
+        ).all()
+        gremium_names: dict[UUID, str] = {row[0]: row[1] for row in gremium_rows}
+        # #17: public participation only in a gremium without a quorum.
+        quorum_gids = {row[0] for row in gremium_rows if len(row) > 2 and row[2] is not None}
         # One batched query for the protokollant names. Without it the timeline
         # shows no protokollant, because ``protokollantName`` stays null although
         # the database holds the id.
@@ -245,45 +264,57 @@ class ListingOps(PermissionOps, VoteReadOps):
             if prot_ids
             else {}
         )
-        # `has` covers the admin role and applies the OAuth scope cap; a raw role read
-        # would hand a narrowly scoped token the full cross-gremium view.
-        if principal.has("meeting.manage"):
-            manage_ids = write_ids = votes_mgmt_ids = all_gids
-            my_id: UUID | None = None
-        else:
-            manage_ids = await gremium_ids_with_permission(
-                self.session, principal.sub, "session.manage"
-            )
-            write_ids = manage_ids | await gremium_ids_with_permission(
-                self.session, principal.sub, "protocol.write"
-            )
-            votes_mgmt_ids = manage_ids | await gremium_ids_with_permission(
-                self.session, principal.sub, "vote.manage"
-            )
-            my_id = await self._principal_id(principal.sub)
+        # The same rules as `PermissionOps.can_manage`, `can_write`,
+        # `can_manage_votes` and `can_finalize`, batched. Each of these rules has
+        # the admin bypass. Each right applies the OAuth scope cap, the admin bypass
+        # included; a raw role read would hand a narrowly scoped token the full
+        # cross-gremium view. Keep this block and `PermissionOps` in step: the router
+        # gates on the detail flags, so a list flag that differs offers an action
+        # that the API refuses.
+        async def ids_for(perm: str) -> set[UUID]:
+            if admin_bypass(principal, perm):
+                return set(all_gids)
+            return await gremium_ids_for(self.session, principal, perm)
+
+        manage_ids = await ids_for("session.manage")
+        write_ids = manage_ids | await ids_for("protocol.write")
+        votes_mgmt_ids = manage_ids | await ids_for("vote.manage")
+        finalize_ids = await ids_for("protocol.finalize")
+        my_id = await self._principal_id(principal.sub)
+        prot_writes = principal.scope_allows("protocol.write")
+        prot_votes = principal.scope_allows("vote.manage")
         # A management right never grants a ballot. Only an active gremium role with
         # `vote.cast` passes the cast gate, so `canVote` reads that roster for every
-        # principal, the global meeting manager included. `PermissionOps.can_vote`
+        # principal, the admin included. `PermissionOps.can_vote`
         # applies the same rule to the meeting detail.
         vote_ids = await self._vote_cast_gremium_ids(principal)
-        votes_by_meeting = await self._votes_for([m.id for m in meetings])
+        votes_by_meeting = await self._votes_for([m.id for m in meetings], principal)
+        agenda_by_meeting = await self._agenda_summaries(meetings)
+        keepers_by_meeting = await keeper_summaries(self.session, [m.id for m in meetings])
+        guests_by_meeting = await self._guest_counts([m.id for m in meetings])
         out: list[MeetingOut] = []
         for m in meetings:
             is_prot = m.protokollant_id is not None and m.protokollant_id == my_id
+            can_write = (m.gremium_id in write_ids) or (is_prot and prot_writes)
             out.append(
                 self._to_out(
                     m,
                     proto_by_meeting.get(m.id),
                     can_manage=m.gremium_id in manage_ids,
-                    can_write=(m.gremium_id in write_ids) or is_prot,
-                    can_manage_votes=(m.gremium_id in votes_mgmt_ids) or is_prot,
+                    can_write=can_write,
+                    can_manage_votes=(m.gremium_id in votes_mgmt_ids) or (is_prot and prot_votes),
                     can_vote=m.gremium_id in vote_ids,
+                    can_finalize=can_write and m.gremium_id in finalize_ids,
                     is_protokollant=is_prot,
                     gremium_name=gremium_names.get(m.gremium_id),
                     protokollant_name=(
                         prot_names.get(m.protokollant_id) if m.protokollant_id is not None else None
                     ),
                     votes=votes_by_meeting.get(m.id, []),
+                    agenda=agenda_by_meeting[m.id],
+                    keepers=keepers_by_meeting[m.id],
+                    guests=guests_by_meeting.get(m.id, (0, 0)),
+                    public_join_allowed=m.gremium_id not in quorum_gids,
                 )
             )
         return out

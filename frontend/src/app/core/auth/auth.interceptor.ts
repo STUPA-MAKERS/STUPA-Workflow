@@ -29,9 +29,18 @@ function isSameOriginApi(url: string, origin: string): boolean {
   return false;
 }
 
-/** Endpoints where a 401 is expected. A forced re-login would loop or race. */
+/**
+ * Endpoints where a 401 is expected. A forced re-login would loop or race. The public
+ * meeting routes answer 401 to a device without a join cookie: the guest page shows the
+ * join form then, never a login.
+ */
 function skipReloginOn(url: string): boolean {
-  return url.includes('/auth/me') || url.includes('/auth/login') || url.includes('/auth/logout');
+  return (
+    url.includes('/auth/me') ||
+    url.includes('/auth/login') ||
+    url.includes('/auth/logout') ||
+    url.includes('/public/meetings/')
+  );
 }
 
 function readCookie(name: string): string | null {

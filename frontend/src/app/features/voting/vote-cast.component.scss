@@ -1,55 +1,125 @@
-.vote {
+/* The detail pane of the page "Abstimmungen". Side by side the vote sits on a sheet
+   (surface 1, large radius) that fills the pane, as the open application does. One pane
+   at a time it sits on the page, and the panel keeps its card (board
+   Arbeit-Abstimmungen). */
+:host {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.vc {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.vc--sheet {
+  gap: var(--space-2);
+  padding: 0 var(--space-6) var(--space-6);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.vc--busy {
+  gap: var(--space-3);
+}
+.vc--busy.vc--sheet {
+  padding-top: var(--space-6);
+}
+.vc__skelMeta {
+  width: 30%;
+}
+.vc__skelTitle {
+  width: 60%;
+  height: 2rem;
+}
+.vc--center {
+  align-items: center;
+  justify-content: center;
+}
+
+
+/* The vote below the bar: the reconnect line and the panel, in the rhythm of the sheet. */
+.vc__body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-  max-width: 42rem;
-  margin: 0 auto;
+  gap: inherit;
+  min-width: 0;
 }
 
-.vote--narrow {
-  max-width: 32rem;
+/* Side by side the sheet is as high as the pane. The bar stays at the top, and only the
+   vote below it scrolls (DECISIONS: the header controls of a pane stay fixed). The
+   padding of the sheet moves into the bar and the scroll area, so the scroll area does
+   not cut a focus ring at its sides. */
+:host(.vc-host--split) {
+  min-height: 0;
+}
+.vc--ready.vc--sheet {
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+/* The bar of the sheet (`app-sheet-bar`) keeps 4px between the outlined beamer button
+   and the menu, as before the shared bar. */
+.vc__bar {
+  gap: var(--space-1);
+}
+/* The bar on top of the sheet (`app-sheet-bar`): the sheet padding moves into it. */
+.vc--ready.vc--sheet .vc__bar {
+  padding-inline: var(--space-6) calc(var(--space-6) - var(--space-3));
+}
+.vc--ready.vc--sheet .vc__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--space-6) var(--space-6);
+  scroll-padding-block: var(--space-5);
+}
+/* The shared fade of a scroll area: an end fades only while more of the vote lies past
+   it (`appScrollFade` sets the classes). */
+.vc--ready.vc--sheet .vc__body.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
+}
+.vc--ready.vc--sheet .vc__body.is-fade-end {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--space-5));
+  mask-image: linear-gradient(to top, transparent, #000 var(--space-5));
+}
+.vc--ready.vc--sheet .vc__body.is-fade-start.is-fade-end {
+  --vc-fade: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--space-5),
+    #000 calc(100% - var(--space-5)),
+    transparent
+  );
+  -webkit-mask-image: var(--vc-fade);
+  mask-image: var(--vc-fade);
 }
 
-.vote__link {
-  color: var(--color-primary);
+.vc__line {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+}
+.vc__line--warn {
+  color: var(--color-warning);
+}
+
+.vc__link {
+  color: var(--color-accent-text);
   font-weight: var(--fw-semibold);
   text-decoration: none;
 }
-
-// The options need large touch targets, because a user operates them with a thumb.
-.vote__options {
-  display: grid;
-  gap: var(--space-3);
+.vc__link:hover {
+  text-decoration: underline;
 }
 
-.vote__option {
-  width: 100%;
-}
-
-.vote__option ::ng-deep .btn {
-  width: 100%;
-  min-height: 3.25rem;
-}
-
-@media (min-width: 32rem) {
-  .vote__options {
-    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-  }
-}
-
-// Mobile: stack the options full width. This block only adds rules and leaves desktop as is.
-@media (max-width: 48rem) {
-  .vote__options {
-    grid-template-columns: 1fr;
-  }
-
-  .vote__option ::ng-deep .btn {
-    min-height: 3.25rem;
-  }
-
-  .vote__link {
-    display: inline-flex;
-    align-items: center;
-    min-height: 2.75rem;
-  }
+/* Board Telefon-Abstimmen: the phone header sits closer to the panel. */
+.vc--phone {
+  gap: var(--space-2);
 }

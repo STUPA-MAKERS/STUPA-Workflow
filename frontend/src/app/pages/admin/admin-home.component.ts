@@ -1,61 +1,42 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { AuthService } from '@core/auth/auth.service';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { type IconName, IconComponent } from '@stupa-makers/ui-kit';
-
-interface AdminTile {
-  link: string;
-  title: TranslationKey;
-  desc: TranslationKey;
-  icon: IconName;
-  /** Visible if the user holds at least ONE of these permissions (ANY-of). It mirrors
-   *  the route-guard right in `app.routes.ts`. This is UX only. The backend stays
-   *  authoritative. */
-  permissions: string[];
-}
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /**
- * Admin landing. Entry into the config UIs. Each tile is its own (lazy) route with
- * an icon-left layout and a one-line description.
+ * The page pane of `/admin` before an admin page is open (board Verwaltung).
+ *
+ * The admin frame shows the navigation beside it, so this pane is the empty sheet of
+ * the other list/detail pages ("Keine Seite geöffnet"), on the same surface as an open
+ * admin page. The pane does not jump when an entry opens. Only the side-by-side layout
+ * shows it; one column at a time, the navigation fills the screen.
  */
 @Component({
   selector: 'app-admin-home',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslatePipe, IconComponent, PageHeaderComponent],
-  templateUrl: './admin-home.component.html',
-  styleUrl: './admin-home.component.scss',
+  imports: [TranslatePipe, EmptyStateComponent],
+  template: `
+    <div class="none">
+      <app-empty-state
+        icon="shield"
+        [heading]="'admin.home.none' | t"
+        [body]="'admin.home.noneBody' | t"
+      />
+    </div>
+  `,
+  styles: [
+    `
+      :host {
+        display: flex;
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+      .none {
+        display: grid;
+        flex: 1 1 auto;
+        place-items: center;
+      }
+    `,
+  ],
 })
-export class AdminHomeComponent {
-  private readonly auth = inject(AuthService);
-
-  protected readonly tiles: AdminTile[] = [
-    { link: 'users', title: 'admin.home.users', desc: 'admin.home.usersDesc', icon: 'members', permissions: ['admin.users'] },
-    { link: 'roles', title: 'admin.home.roles', desc: 'admin.home.rolesDesc', icon: 'roles', permissions: ['admin.roles'] },
-    { link: 'group-mappings', title: 'admin.home.groupMappings', desc: 'admin.home.groupMappingsDesc', icon: 'key', permissions: ['admin.group_mappings'] },
-    { link: 'oauth-grants', title: 'admin.oauthGrants.title', desc: 'admin.home.oauthGrantsDesc', icon: 'key', permissions: ['admin.users'] },
-    { link: 'gremien', title: 'admin.home.gremien', desc: 'admin.home.gremienDesc', icon: 'parliament', permissions: ['admin.gremien'] },
-    { link: 'cost-centres', title: 'budget.tree.title', desc: 'admin.home.costCentresDesc', icon: 'euro', permissions: ['budget.structure'] },
-    { link: 'forms', title: 'admin.home.formBuilder', desc: 'admin.home.formBuilderDesc', icon: 'form', permissions: ['form.configure'] },
-    // The flow editor route and its save both accept either key.
-    { link: 'flow', title: 'admin.home.flowEditor', desc: 'admin.home.flowEditorDesc', icon: 'flow', permissions: ['flow.configure', 'admin.types'] },
-    { link: 'branding', title: 'admin.home.branding', desc: 'admin.home.brandingDesc', icon: 'palette', permissions: ['admin.site'] },
-    { link: 'cd-variants', title: 'admin.cdVariants.title', desc: 'admin.home.cdVariantsDesc', icon: 'document', permissions: ['admin.cd_variants'] },
-    { link: 'webhooks', title: 'admin.home.webhooks', desc: 'admin.home.webhooksDesc', icon: 'webhook', permissions: ['webhook.manage'] },
-    { link: 'delegations', title: 'admin.home.delegations', desc: 'admin.home.delegationsDesc', icon: 'repeat', permissions: ['admin.delegations'] },
-    { link: 'audit', title: 'admin.audit.title', desc: 'admin.audit.desc', icon: 'audit', permissions: ['audit.read'] },
-    { link: 'deadlines', title: 'admin.deadlines.title', desc: 'admin.deadlines.subtitle', icon: 'clock', permissions: ['admin.deadlines'] },
-    { link: 'privacy', title: 'admin.home.privacy', desc: 'admin.home.privacyDesc', icon: 'key', permissions: ['privacy.manage'] },
-    { link: 'backups', title: 'admin.home.backups', desc: 'admin.home.backupsDesc', icon: 'export', permissions: ['backup.manage'] },
-    { link: 'notifications', title: 'admin.notifications.title', desc: 'admin.notifications.intro', icon: 'bell', permissions: ['admin.notifications'] },
-    { link: 'mail-templates', title: 'admin.home.mailTemplates', desc: 'admin.home.mailTemplatesDesc', icon: 'send', permissions: ['admin.notifications'] },
-  ];
-
-  /** Only tiles the user has the right for. Admin sees everything (auth.can). */
-  protected readonly visibleTiles = computed(() =>
-    this.tiles.filter((t) => this.auth.canAny(...t.permissions)),
-  );
-}
+export class AdminHomeComponent {}

@@ -33,4 +33,26 @@ describe('EmptyStateComponent', () => {
     });
     expect(container.querySelector('.es__icon')).toBeTruthy();
   });
+
+  it('stays at its own height by default, for cards and list rows', async () => {
+    const { fixture } = await render(EmptyStateComponent, {
+      inputs: { heading: 'Leer' },
+    });
+    expect(fixture.nativeElement).not.toHaveClass('es-host--fill');
+  });
+
+  it('fills and centres in the page when fill is set', async () => {
+    const { fixture } = await render(EmptyStateComponent, {
+      inputs: { heading: 'Leer', fill: true },
+    });
+    expect(fixture.nativeElement).toHaveClass('es-host--fill');
+  });
+
+  it('accepts fill as a bare attribute', async () => {
+    const { container } = await render(
+      `<app-empty-state heading="Leer" fill />`,
+      { imports: [EmptyStateComponent] },
+    );
+    expect(container.querySelector('app-empty-state')).toHaveClass('es-host--fill');
+  });
 });

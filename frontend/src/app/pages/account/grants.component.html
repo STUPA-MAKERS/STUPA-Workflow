@@ -1,98 +1,138 @@
-<section class="grants">
+<section class="gr">
   <app-page-header
+    [flush]="true"
     [title]="'account.grants.title' | t"
     [subtitle]="'account.grants.intro' | t"
   />
 
+  @if (actionError(); as e) {
+    <app-note kind="error" icon="alert" role="alert">{{ e | t }}</app-note>
+  }
+
   @if (canUseMcp()) {
-    <section class="card mcp">
-      <h2>{{ 'account.mcp.title' | t }}</h2>
-      <p>{{ 'account.mcp.intro' | t }}</p>
-      <div class="my-3">
-        <app-button variant="primary" size="sm" (click)="downloadPackage()">
-          <app-icon name="export" [size]="16" />
+    <section class="gr__mcp" aria-labelledby="gr-mcp-title">
+      <div class="gr__mcpHead">
+        <app-icon class="gr__mcpIcon" name="webhook" [size]="22" />
+        <div class="gr__mcpText">
+          <h2 class="gr__h2" id="gr-mcp-title">{{ 'account.mcp.title' | t }}</h2>
+          <p class="gr__muted">{{ 'account.mcp.intro' | t }}</p>
+        </div>
+        <app-button class="gr__download" variant="fill" [loading]="downloading()" (click)="downloadPackage()">
+          <app-icon name="download" [size]="16" />
           {{ 'account.mcp.download' | t }}
         </app-button>
       </div>
+
       @if (setup(); as s) {
-        <ol class="mcp__steps">
+        <ol class="gr__steps">
           <li>{{ 'account.mcp.step1' | t }}</li>
-          <li><code>{{ s.install }}</code></li>
+          <li>
+            <code class="gr__cmd mono">{{ installCommand() }}</code>
+            <span class="gr__muted"> {{ 'account.mcp.step2Where' | t }}</span>
+          </li>
           <li>{{ 'account.mcp.step3' | t }}</li>
         </ol>
-        <div class="mcp__config">
-          <div class="mcp__config-head">
-            <span>{{ 'account.mcp.config' | t }}</span>
-            <app-button variant="ghost" size="sm" (click)="copySetup()">
-              {{ 'action.copy' | t }}
+
+        <div class="gr__config">
+          <div class="gr__configHead">
+            <span class="cap gr__configTitle" id="gr-config-title">{{ 'account.mcp.config' | t }}</span>
+            <app-button
+              variant="text"
+              size="sm"
+              [ariaLabel]="(copied() ? 'account.mcp.copied' : 'account.mcp.copyConfig') | t"
+              (click)="copySetup()"
+            >
+              <app-icon [name]="copied() ? 'check' : 'copy'" [size]="14" />
+              {{ (copied() ? 'account.mcp.copied' : 'action.copy') | t }}
             </app-button>
           </div>
-          <pre><code>{{ setupJson() }}</code></pre>
-          <p class="mcp__hint">{{ 'account.mcp.wired' | t }}: <code>{{ s.baseUrl }}</code></p>
+          <pre class="gr__json mono"><code>{{ setupJson() }}</code></pre>
         </div>
+        <span class="sr-only" aria-live="polite">{{ copied() ? ('account.mcp.copied' | t) : '' }}</span>
+
+        <p class="gr__url">
+          {{ 'account.mcp.wired' | t }}:
+          <a class="mono" [href]="s.baseUrl" target="_blank" rel="noopener">{{ s.baseUrl }}</a>
+        </p>
       }
     </section>
   }
 
-  <section class="card">
-    <div class="grants__list-head">
-      <h2>{{ 'account.grants.active' | t }}</h2>
+  <section class="gr__active" aria-labelledby="gr-active-title">
+    <div class="gr__activeHead">
+      <h2 class="sec gr__activeTitle" id="gr-active-title">
+        @if (loaded()) {
+          {{ 'account.grants.activeCount' | t: { count: grants().length } }}
+        } @else {
+          {{ 'account.grants.active' | t }}
+        }
+      </h2>
       @if (grants().length > 0) {
-        <app-button variant="ghost" size="sm" (click)="revokeAll()">
+        <app-button variant="danger" size="sm" (click)="askRevokeAll()">
           {{ 'account.grants.revokeAll' | t }}
         </app-button>
       }
     </div>
 
-    @if (error()) {
-      <p class="text-danger" role="alert">{{ 'account.grants.error' | t }}</p>
+    @if (loadError()) {
+      <app-note kind="error" icon="alert" role="alert">{{ 'account.grants.error' | t }}</app-note>
+    } @else if (loading() && grants().length === 0) {
+      <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
     } @else {
-      <!-- The table stays on screen while the grants reload. It keeps its header and
-           column widths and draws skeleton rows, so a revoke does not make the page
-           jump. The card already supplies the border, so the table is not boxed. -->
-      <app-data-table
-        [columns]="columns()"
-        [rows]="grants()"
-        [rowKey]="rowId"
-        [boxed]="false"
-        [loading]="loading()"
-        [loadingText]="'common.loading' | t"
-        [skeletonRowCount]="3"
-        [emptyText]="'account.grants.empty' | t"
-      >
-        <ng-template appCell="scope" let-g>
-          <span class="grants__scopes">
-            @for (s of scopes($any(g)); track s) {
-              <app-badge variant="neutral">{{ s }}</app-badge>
-            }
-          </span>
-        </ng-template>
-
-        <ng-template appCell="created" let-g>
-          {{ ($any(g).createdAt | ldate) || '—' }}
-        </ng-template>
-
-        <ng-template appCell="expires" let-g>
-          @if ($any(g).accessExpiresAt; as at) {
-            {{ at | ldate }}
-          } @else {
-            <app-badge variant="warning">{{ 'account.grants.never' | t }}</app-badge>
-          }
-        </ng-template>
-
-        <ng-template appCell="actions" let-g>
-          <app-button
-            variant="ghost"
-            size="sm"
-            [iconOnly]="true"
-            [ariaLabel]="'account.grants.revoke' | t"
-            [title]="'account.grants.revoke' | t"
-            (click)="revoke($any(g).id)"
-          >
-            <app-icon name="delete" />
-          </app-button>
-        </ng-template>
-      </app-data-table>
+      <ul class="rowgroup gr__list" [attr.aria-label]="'account.grants.active' | t" [attr.aria-busy]="loading()">
+        @for (g of grants(); track g.id) {
+          <li class="gr__row">
+            <div class="gr__rowText">
+              <span class="gr__scopes">{{ scopeLabels(g) }}</span>
+              <span class="gr__meta">
+                <span class="gr__metaItem"
+                  >{{ 'account.grants.created' | t }}
+                  <span class="mono">{{ g.createdAt ? (g.createdAt | ldate: 'medium') : '—' }}</span></span
+                >
+                <span class="gr__metaItem"
+                  >{{ 'account.grants.expires' | t }}
+                  <span class="mono">{{
+                    g.accessExpiresAt ? (g.accessExpiresAt | ldate: 'medium') : '—'
+                  }}</span></span
+                >
+              </span>
+            </div>
+            <app-button
+              variant="danger"
+              size="sm"
+              [ariaLabel]="('account.grants.revoke' | t) + ': ' + scopeLabels(g)"
+              (click)="askRevoke(g)"
+            >
+              {{ 'account.grants.revoke' | t }}
+            </app-button>
+          </li>
+        } @empty {
+          <li class="gr__empty">{{ 'account.grants.empty' | t }}</li>
+        }
+      </ul>
     }
   </section>
 </section>
+
+<app-dialog
+  [open]="confirm() !== null"
+  [title]="(confirm()?.kind === 'all' ? 'account.grants.revokeAllTitle' : 'account.grants.revokeTitle') | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="confirm.set(null)"
+>
+  @if (confirm(); as c) {
+    <p class="gr__dialogText">
+      @if (c.kind === 'one') {
+        {{ 'account.grants.revokeConfirm' | t: { scopes: scopeLabels(c.grant) } }}
+      } @else {
+        {{ 'account.grants.revokeAllConfirm' | t }}
+      }
+    </p>
+  }
+  <div dialog-footer class="gr__dialogFoot">
+    <app-button variant="text" (click)="confirm.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="danger" [loading]="revoking()" (click)="doRevoke()">
+      {{ (confirm()?.kind === 'all' ? 'account.grants.revokeAll' : 'account.grants.revoke') | t }}
+    </app-button>
+  </div>
+</app-dialog>

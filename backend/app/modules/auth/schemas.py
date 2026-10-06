@@ -65,8 +65,13 @@ class MeOut(BaseModel):
     # the user-facing "my Gremien" view.
     gremien: list[GremiumRef] = []
     # Gremien the principal MANAGES through a gremium role (`session.manage`). The
-    # frontend uses this to show "create meeting" without global `meeting.manage`.
+    # frontend uses this to show "create meeting". The OAuth scope caps the list.
     session_manage_gremien: list[UUID] = []
+    # Gremium id to the gremium permissions of the active role of the principal in
+    # that gremium. The OAuth scope caps the lists: a key outside the token scope does
+    # not show. The frontend gates the meeting pages on it. This is UX only; the
+    # server checks every call.
+    gremium_permissions: dict[UUID, list[str]] = {}
     # True if at least one cost center has a Gremium of the principal as visibility
     # root. The frontend uses this to show the budget tab without a global `budget.*`
     # permission.

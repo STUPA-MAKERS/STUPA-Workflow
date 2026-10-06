@@ -15,6 +15,7 @@ from uuid import UUID
 from pydantic import Field, model_validator
 
 from app.modules.budget.schemas import _CamelModel
+from app.shared.paging import Page
 
 # Money cap that matches the DB column `numeric(12, 2)`. An input field applies
 # it as `le`, so an oversized amount gives a clean 422 instead of a
@@ -432,8 +433,30 @@ class InvoiceUpdate(_CamelModel):
         return self
 
 
+class InvoiceBookingOut(_CamelModel):
+    """A booking that references the invoice (A6), as the invoice list shows it."""
+
+    id: UUID
+    budget_id: UUID = Field(alias="budgetId")
+    path_key: str = Field(alias="pathKey")
+    budget_name: str = Field(alias="budgetName")
+    fiscal_year_id: UUID = Field(alias="fiscalYearId")
+    kind: ExpenseKind = "expense"
+    amount: Decimal
+    description: str
+    payment_date: date | None = Field(default=None, alias="paymentDate")
+    # Set when the booking is a sub-booking of another booking.
+    parent_expense_id: UUID | None = Field(default=None, alias="parentExpenseId")
+    created_at: datetime = Field(alias="createdAt")
+
+
 class InvoiceOut(_CamelModel):
-    """Invoice base data plus the file flag."""
+    """Invoice base data plus the file flag and the linked bookings.
+
+    ``linkedBookings`` holds only the bookings on cost centres that the caller may
+    see. The same invoice can therefore show fewer bookings to a gremium-scoped
+    reader than to a holder of the full budget view.
+    """
 
     id: UUID
     number: str | None = None
@@ -450,6 +473,30 @@ class InvoiceOut(_CamelModel):
     has_file: bool = Field(default=False, alias="hasFile")
     actor: str | None = None
     created_at: datetime = Field(alias="createdAt")
+    linked_bookings: list[InvoiceBookingOut] = Field(
+        default_factory=list, alias="linkedBookings"
+    )
+
+
+class InvoiceSegmentCounts(_CamelModel):
+    """The number of invoices in each segment of the invoice list.
+
+    The counts apply every filter of the request except ``status`` and ``booked``,
+    so that each segment shows how many hits it holds. ``inbox`` is an open invoice
+    without a visible booking ("Eingang"), ``booked`` an open invoice with at least
+    one ("Verbucht"). ``inbox + booked + paid`` is ``all``.
+    """
+
+    all: int
+    inbox: int
+    booked: int
+    paid: int
+
+
+class InvoicePage(Page[InvoiceOut]):
+    """One page of invoices plus the counts of the list segments."""
+
+    counts: InvoiceSegmentCounts
 
 
 class TransferCreate(_CamelModel):

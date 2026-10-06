@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.modules.notifications import action_dispatcher, auto, comments, privacy
+from app.modules.notifications import action_dispatcher, auto, captured, comments, privacy
 from app.modules.notifications import service as _svc
 
 # task_reminder: the worker (``worker/task_reminders.py``) sends it. The worker imports
@@ -149,8 +149,8 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
             "applicationTitle": "Titel des Antrags",
             "status": "Aktueller Status",
             "comment": "Kommentartext (Auszug)",
-            "commentAuthor": "Name der Kommentar-Autor:in",
-            "commentAuthorInitials": "Initialen der Kommentar-Autor:in",
+            "commentAuthor": "Name des Gremiums (nie der Name des Mitglieds)",
+            "commentAuthorInitials": "Initialen des Gremiums",
             "applicationId": "ID des Antrags",
         },
     ),
@@ -182,20 +182,6 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         },
     ),
     MailTemplateSpec(
-        "role_assigned",
-        "role_change",
-        auto._BUILTIN_ROLE_ASSIGNED_SUBJECT,  # noqa: SLF001
-        auto._BUILTIN_ROLE_ASSIGNED_BODY,  # noqa: SLF001
-        {"roleLabel": "Bezeichnung der Rolle", "gremiumName": "Gremium"},
-    ),
-    MailTemplateSpec(
-        "role_revoked",
-        "role_change",
-        auto._BUILTIN_ROLE_REVOKED_SUBJECT,  # noqa: SLF001
-        auto._BUILTIN_ROLE_REVOKED_BODY,  # noqa: SLF001
-        {"roleLabel": "Bezeichnung der Rolle", "gremiumName": "Gremium"},
-    ),
-    MailTemplateSpec(
         "delegation_granted",
         "delegation",
         auto._BUILTIN_DELEGATION_GRANTED_SUBJECT,  # noqa: SLF001
@@ -215,6 +201,13 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         _svc._BUILTIN_MAGIC_LINK_SUBJECT,  # noqa: SLF001
         _svc._BUILTIN_MAGIC_LINK_BODY,  # noqa: SLF001
         {"link": "Anmelde-Link"},
+    ),
+    MailTemplateSpec(
+        captured.APPLICATION_CAPTURED_KEY,
+        captured.APPLICATION_CAPTURED_KEY,
+        captured.APPLICATION_CAPTURED_SUBJECT,
+        captured.APPLICATION_CAPTURED_BODY,
+        captured.APPLICATION_CAPTURED_PLACEHOLDERS,
     ),
     MailTemplateSpec(
         "erasure_requested",

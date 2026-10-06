@@ -1,0 +1,262 @@
+@let e = expense();
+<article class="fd" [class.fd--split]="split()" aria-labelledby="bd-title">
+  <header class="fd__head">
+    <app-sheet-bar [bleed]="split()" [kicker]="metaLine()">
+      @if (canManage()) {
+        @if (phone()) {
+          <app-button variant="tonal" size="sm" (click)="edit.emit(e)">
+            <span class="fd__btn"><app-icon name="edit" [size]="16" />{{ 'action.edit' | t }}</span>
+          </app-button>
+        } @else {
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'expenses.edit' | t"
+            [title]="'expenses.edit' | t"
+            (click)="edit.emit(e)"
+          ><app-icon name="edit" [size]="19" /></app-button>
+        }
+      }
+      @if (menu().length) {
+        <app-row-menu [label]="'expenses.detail.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />
+      }
+    </app-sheet-bar>
+    <h2 id="bd-title" class="fd__title">{{ e.description }}</h2>
+    <p class="fd__line fd__seps">
+      <span class="fd__parts">
+        <span class="fd__part">
+          <app-status-text [kind]="e.kind === 'income' ? 'accent' : 'neutral'">{{
+            (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t
+          }}</app-status-text>
+        </span>
+        <span class="fd__part fd__cc ell" [title]="cc().path + ' · ' + cc().name">
+          @if (cc().color) {
+            <span class="fd__swatch" aria-hidden="true" [style.background]="cc().color"></span>
+          }
+          {{ cc().name }}
+        </span>
+        <span class="fd__part"><span class="mono fd__amount">{{ amount() }}</span></span>
+      </span>
+    </p>
+  </header>
+
+  <div class="fd__cols">
+    <div class="fd__col">
+      <section class="fd__sec bd__pay" aria-labelledby="bd-pay">
+        <h3 id="bd-pay" class="sec fd__secTitle">{{ 'expenses.detail.payment' | t }}</h3>
+        <dl class="fd__card fd__grid">
+          <div>
+            <dt>{{ 'expenses.field.paymentDate' | t }}</dt>
+            <dd class="mono">{{ e.paymentDate ? (e.paymentDate | ldate: 'mediumDate') : '—' }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'expenses.field.invoiceDate' | t }}</dt>
+            <dd class="mono">{{ e.invoiceDate ? (e.invoiceDate | ldate: 'mediumDate') : '—' }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'expenses.field.correspondent' | t }}</dt>
+            <dd class="fd__wrap">{{ e.correspondent || '—' }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'expenses.field.paymentMethod' | t }}</dt>
+            <dd>{{ paymentMethod() || '—' }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'expenses.field.referenceNumber' | t }}</dt>
+            <dd class="mono fd__wrap">{{ e.referenceNumber || '—' }}</dd>
+          </div>
+          <div>
+            <dt>{{ 'expenses.field.category' | t }}</dt>
+            <dd class="fd__wrap">{{ e.category || '—' }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      @if (showSubs()) {
+        <section class="fd__sec bd__subs" aria-labelledby="bd-subs">
+          <div class="fd__secHead">
+            <h3 id="bd-subs" class="sec fd__secTitle">
+              {{ 'expenses.sub.title' | t }}
+              @if (isParent()) {
+                <span class="fd__count">{{ e.childCount }}</span>
+              }
+            </h3>
+            @if (canManage() && !e.parentExpenseId) {
+              <app-button variant="text" size="sm" (click)="addSub.emit()">
+                <span class="fd__btn"><app-icon name="add" [size]="16" />{{
+                  (phone() ? 'expenses.sub.addShort' : 'expenses.sub.add') | t
+                }}</span>
+              </app-button>
+            }
+          </div>
+          @if (subLoading() && !subRows().length) {
+            <app-skeleton variant="rows" [count]="2" [label]="'expenses.sub.loading' | t" />
+          } @else if (subRows().length) {
+            <div class="rowgroup" role="list">
+              @for (s of subRows(); track s.id) {
+                <div class="fd__subRow" role="listitem">
+                  <span class="fd__subMark" aria-hidden="true">↳</span>
+                  <span class="fd__subBody">
+                    <span class="fd__subTitle ell" [title]="s.description">{{ s.description }}</span>
+                    <span class="fd__subMeta ell">
+                      <span class="mono">{{ s.paymentDate ? (s.paymentDate | ldate: 'mediumDate') : '—' }}</span>
+                      @if (s.correspondent) {
+                        <span class="fd__dot" aria-hidden="true">·</span>{{ s.correspondent }}
+                      }
+                    </span>
+                  </span>
+                  <span class="mono fd__subAmount">{{ signed(s) }}</span>
+                  @if (canManage()) {
+                    <app-row-menu
+                      [label]="'expenses.rowMenu' | t: { description: s.description }"
+                      [sections]="subMenu()"
+                      (selected)="onSubMenu($event, s)"
+                    />
+                  }
+                </div>
+              }
+              <div class="fd__subSum">
+                <span>{{ 'expenses.sub.sumLine' | t }}</span>
+                <span class="mono">{{ subSum() }}</span>
+              </div>
+            </div>
+          } @else {
+            <p class="fd__none">{{ 'expenses.sub.none' | t }}</p>
+          }
+        </section>
+      }
+    </div>
+
+    <div class="fd__col">
+      <section class="fd__sec bd__details" aria-labelledby="bd-details">
+        <h3 id="bd-details" class="sec fd__secTitle">{{ 'expenses.detail.details' | t }}</h3>
+        <dl class="fd__card fd__stack">
+          <div>
+            <dt>{{ 'expenses.detail.costCentreFy' | t }}</dt>
+            <dd class="fd__ccLine">
+              @if (cc().color) {
+                <span class="fd__swatch" aria-hidden="true" [style.background]="cc().color"></span>
+              }
+              <span>{{ ccTrail() }}</span>
+              @if (fyLabel(); as fy) {
+                <span class="fd__dot" aria-hidden="true">·</span>
+                <span>{{ 'expenses.detail.fy' | t: { fy } }}</span>
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>{{ 'expenses.detail.created' | t }}</dt>
+            <dd>
+              @if (e.actorName) {
+                {{ e.actorName }} ·
+              }
+              {{ createdAt() }}
+            </dd>
+          </div>
+          @if (e.note) {
+            <div>
+              <dt>{{ 'expenses.field.note' | t }}</dt>
+              <dd class="fd__note">{{ e.note }}</dd>
+            </div>
+          }
+        </dl>
+      </section>
+
+      @if (app() || inv()) {
+        <section class="fd__sec bd__linked" aria-labelledby="bd-linked">
+          <h3 id="bd-linked" class="sec fd__secTitle">{{ 'expenses.detail.linked' | t }}</h3>
+          <div class="rowgroup">
+            @if (app(); as a) {
+              <a class="fd__link" [routerLink]="['/applications', a.id]">
+                <app-icon class="fd__linkIcon" name="file" [size]="18" />
+                <span class="fd__linkBody">
+                  <span class="fd__linkKind">{{ 'expenses.col.application' | t }}</span>
+                  <span class="fd__linkTitle">{{ a.title }}</span>
+                  @if (a.state) {
+                    <app-status-text [kind]="a.stateKind">{{ a.state.label }}</app-status-text>
+                  }
+                </span>
+                @if (a.amount) {
+                  <span class="mono fd__linkAmount">{{ a.amount }}</span>
+                }
+                <app-icon class="fd__chev" name="chevron-right" [size]="17" />
+              </a>
+            }
+            @if (inv(); as i) {
+              <a class="fd__link" routerLink="/invoices" [queryParams]="{ id: e.invoiceId }">
+                <app-icon class="fd__linkIcon" name="receipt" [size]="18" />
+                <span class="fd__linkBody">
+                  <span class="fd__linkKind">{{ 'expenses.field.invoice' | t }}</span>
+                  <span class="fd__linkTitle">{{ i.title || ('expenses.field.invoice' | t) }}</span>
+                  @if (i.loaded; as loaded) {
+                    <span class="fd__linkMeta">
+                      @let st = invoiceStatus(loaded.status);
+                      <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+                      @if (loaded.dueDate) {
+                        <span class="fd__dot" aria-hidden="true">·</span>
+                        <span class="mono">{{ 'invoices.dueLine' | t: { date: (loaded.dueDate | ldate: 'mediumDate') } }}</span>
+                      }
+                    </span>
+                  }
+                </span>
+                @if (i.loaded; as loaded) {
+                  <span class="mono fd__linkAmount">{{ money(loaded.grossAmount) }}</span>
+                }
+                <app-icon class="fd__chev" name="chevron-right" [size]="17" />
+              </a>
+              @if (i.booked; as b) {
+                <div class="fd__booked">
+                  <div class="fd__bookedLine">
+                    <span>{{ 'invoices.booked' | t }}</span>
+                    <span class="mono">{{ 'invoices.bookedOf' | t: { booked: money(b.booked), gross: money(b.gross) } }}</span>
+                  </div>
+                  <app-seg-bar
+                    size="thin"
+                    [segments]="[{ value: b.booked, tone: 'filled' }]"
+                    [total]="b.gross"
+                    [label]="bookedLabel(b.booked, b.gross)"
+                  />
+                </div>
+              }
+            }
+          </div>
+        </section>
+      }
+
+      <section class="fd__sec bd__cc" aria-labelledby="bd-cc">
+        <div class="fd__secHead">
+          <h3 id="bd-cc" class="sec fd__secTitle">{{ 'expenses.field.costCentre' | t }}</h3>
+          <a class="fd__secLink" routerLink="/budget" [queryParams]="budgetLink()">{{ 'expenses.detail.toBudget' | t }}</a>
+        </div>
+        <div class="fd__card fd__ccCard">
+          <div class="fd__ccHead">
+            @if (cc().color) {
+              <span class="fd__swatch" aria-hidden="true" [style.background]="cc().color"></span>
+            }
+            <span class="fd__ccName ell" [title]="cc().name">{{ cc().name }}</span>
+            <span class="mono fd__ccPath">{{ path() }}</span>
+          </div>
+          @if (figures(); as f) {
+            <app-seg-bar [segments]="f.segments" [total]="f.total" [label]="usageLabel(f)" />
+            <dl class="fd__figs">
+              <div>
+                <dt>{{ 'expenses.detail.expended' | t }}</dt>
+                <dd class="mono">{{ money(f.expended) }}</dd>
+              </div>
+              <div>
+                <dt>{{ 'expenses.detail.bound' | t }}</dt>
+                <dd class="mono">{{ money(f.bound) }}</dd>
+              </div>
+              <div>
+                <dt>{{ 'expenses.detail.available' | t }}</dt>
+                <dd class="mono" [class.fd__pos]="f.available >= 0" [class.fd__neg]="f.available < 0">
+                  {{ money(f.available) }}
+                </dd>
+              </div>
+            </dl>
+          }
+        </div>
+      </section>
+    </div>
+  </div>
+</article>

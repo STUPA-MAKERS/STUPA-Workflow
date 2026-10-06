@@ -1,0 +1,102 @@
+@use '../../budget/finance-form';
+
+/* No preview of the pages: the receipt is one file card. So the form is one column, the
+   file card on top at the full width and the fields below it, also at the full width.
+   Two columns would leave the receipt column empty below the card. */
+.if__cols {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+.if__fileCol,
+.if__fields {
+  flex: none;
+  min-width: 0;
+}
+.if__file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+}
+.ff--sheet .if__file {
+  background: var(--color-surface-3);
+}
+.if__file--open {
+  cursor: pointer;
+}
+.if__file--open:hover {
+  background: var(--color-surface-3);
+}
+.if__file--open:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.if__fileIcon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+/* A file name is not a copyable value: it shortens with an ellipsis, and the title
+   shows it in full. */
+.if__fileName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.if__fileSize {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.if__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+}
+.if__ok {
+  color: var(--color-text);
+}
+.if__ok app-icon {
+  color: var(--color-accent-text);
+}
+/* The duplicate warning: amber, with the way to the existing invoice. */
+.if__dup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-warning-subtle);
+  color: var(--color-text);
+  font-size: var(--fs-small);
+}
+.if__dup > app-icon {
+  flex: none;
+  color: var(--color-warning);
+}
+.if__dupText {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.if__legend {
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+}

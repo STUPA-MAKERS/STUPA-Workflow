@@ -1,0 +1,35 @@
+.fsd__lead {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+
+.fsd__reason {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+
+  span {
+    color: var(--color-text-muted);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
+  }
+
+  textarea {
+    width: 100%;
+    resize: vertical;
+    padding: var(--space-2) var(--space-3);
+    border: 0;
+    border-radius: var(--radius-field);
+    background: var(--color-surface-3);
+    color: var(--color-text);
+    font: inherit;
+    line-height: 1.4;
+  }
+
+  textarea:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 1px;
+  }
+}

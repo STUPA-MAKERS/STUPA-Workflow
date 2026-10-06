@@ -7,6 +7,7 @@ import { FormlyTextareaType } from './types/formly-textarea.type';
 import { FormlySelectType } from './types/formly-select.type';
 import { FormlyCheckboxType } from './types/formly-checkbox.type';
 import { FormlyMultiCheckboxType } from './types/formly-multicheckbox.type';
+import { FormlyMultiSelectType } from './types/formly-multiselect.type';
 import { FormlyDisplayType } from './types/formly-display.type';
 import { FormlyPositionsType } from './types/formly-positions.type';
 import { FormlyDateRangeType } from './types/formly-daterange.type';
@@ -16,7 +17,8 @@ import { FormlyDateRangeType } from './types/formly-daterange.type';
  *
  * This provider registers the UI-kit-bound field types of the form definition. The
  * `input` type covers text, number, currency and date through `props.type`. The other
- * types are textarea, select, checkbox and multicheckbox, plus a read-only `display`
+ * types are textarea, select, checkbox, multicheckbox and multiselect (a dropdown with
+ * several choices, for the edit form of the detail), plus a read-only `display`
  * type for `markdown` and `computed`. The mapping lives in `@shared/forms/formly-mapper`.
  *
  * The validation messages come from the translation catalog. A second `FORMLY_CONFIG`
@@ -32,6 +34,7 @@ export function provideFormly(): Provider {
         { name: 'select', component: FormlySelectType },
         { name: 'checkbox', component: FormlyCheckboxType },
         { name: 'multicheckbox', component: FormlyMultiCheckboxType },
+        { name: 'multiselect', component: FormlyMultiSelectType },
         { name: 'display', component: FormlyDisplayType },
         { name: 'positions', component: FormlyPositionsType },
         { name: 'daterange', component: FormlyDateRangeType },

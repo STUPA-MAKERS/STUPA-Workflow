@@ -1,53 +1,238 @@
+@use 'breakpoints' as bp;
+
 :host {
+  display: block;
+}
+
+.grem {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+  container-type: inline-size;
 }
-.grem__mono {
-  font-family: var(--font-mono, monospace);
-  font-size: var(--fs-xs);
-}
-.grem__yes,
-.grem__no {
-  font-size: var(--fs-md);
-  font-weight: var(--fw-bold);
-  line-height: 1;
-}
-.grem__yes {
-  color: var(--color-success);
-}
-.grem__no {
-  color: var(--color-danger);
-}
-.grem__th-actions {
-  text-align: end;
+
+.grem__noteLink {
+  margin-inline-start: var(--space-2);
+  font-weight: var(--fw-semibold);
+  color: var(--color-accent-text);
   white-space: nowrap;
 }
-.grem__th-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  justify-content: flex-end;
+
+.grem__error {
+  margin: 0;
+  color: var(--color-danger);
 }
-.grem__icon-link {
-  display: inline-flex;
+
+.grem__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.grem__head {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  gap: var(--space-2);
+  min-height: 4rem;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
+}
+
+/* The heading of a row only holds the toggle; it takes the free width. */
+.grem__h {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font: inherit;
+}
+
+/* The toggle takes the free width, so a click anywhere on the name opens the row. */
+.grem__toggle {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-4);
+  min-width: 0;
+  min-height: 3rem;
+  padding: 0 var(--space-3);
+  border: 0;
   border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.grem__toggle:hover .grem__label {
+  text-decoration: underline;
+}
+.grem__toggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.grem__icon {
+  flex: none;
   color: var(--color-text-muted);
 }
-.grem__icon-link:hover {
-  color: var(--color-primary);
-  background: var(--color-surface-sunken);
+.grem__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
-.field__control {
-  height: var(--control-height);
-  padding: 0 var(--space-3);
-  background: var(--color-surface);
+.grem__name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.grem__label {
+  font-weight: var(--fw-semibold);
+}
+.grem__slug {
+  flex: none;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.grem__counts {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+
+.grem__actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+}
+.grem__link {
+  margin-inline-end: var(--space-3);
+  font-weight: var(--fw-semibold);
+  color: var(--color-accent-text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.grem__link:hover {
+  text-decoration: underline;
+}
+.grem__chev {
+  display: inline-grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.grem__chev:hover {
+  background: var(--color-surface-3);
   color: var(--color-text);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  font-size: var(--fs-md);
+}
+.grem__chev:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.grem__body {
+  /* The row is surface 2: the settings card and the matrix rows take surface 3. */
+  --color-surface-sunken: var(--color-surface-3);
+  --color-text-subtle: var(--color-text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.grem__cap {
+  margin: 0 0 var(--space-2);
+}
+
+.grem__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-5);
+  margin: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-3);
+}
+.grem__setting {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+/* The recipients take a whole line: an address is never cut. */
+.grem__setting--wide {
+  grid-column: 1 / -1;
+}
+.grem__setting dt {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.grem__setting dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.grem__copy {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  user-select: text;
+}
+
+.grem__emptyRow {
+  padding: var(--space-6);
+}
+
+.grem__confirm {
+  margin: 0;
+}
+.grem__dialogFoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+@container (max-width: 44rem) {
+  .grem__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (max-width: 34rem) {
+  .grem__head {
+    flex-wrap: wrap;
+  }
+  /* First line: the name and the toggle chevron. Second line: the link and the icons. */
+  .grem__h {
+    flex-basis: calc(100% - 3rem);
+  }
+  .grem__actions {
+    display: contents;
+  }
+  .grem__actions > * {
+    order: 2;
+  }
+  .grem__actions > .grem__chev {
+    order: 1;
+  }
+  .grem__link {
+    margin-inline-start: calc(20px + var(--space-7));
+    margin-inline-end: auto;
+  }
+  .grem__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .grem__body {
+    padding: 0 var(--space-3) var(--space-3);
+  }
+}
+
+@include bp.phone {
+  .grem__toggle {
+    gap: var(--space-3);
+    padding-inline: var(--space-2);
+  }
 }

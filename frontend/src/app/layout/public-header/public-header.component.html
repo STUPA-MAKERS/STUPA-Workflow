@@ -1,0 +1,37 @@
+<header class="pub">
+  <a class="pub__brand" routerLink="/" [attr.aria-label]="branding.appName()">
+    <img class="pub__logo" [src]="logoSrc()" alt="" />
+    <img class="pub__mark" [src]="markSrc" alt="" />
+  </a>
+  <span class="pub__spacer"></span>
+
+  <label class="pub__lang">
+    <app-icon class="pub__langIcon" name="globe" [size]="15" />
+    <select
+      class="pub__langSelect"
+      [attr.aria-label]="'lang.switch' | t"
+      [value]="i18n.locale()"
+      (change)="setLocale($any($event.target).value)"
+    >
+      @for (loc of i18n.locales; track loc) {
+        <option [value]="loc" [selected]="loc === i18n.locale()">{{ loc | uppercase }}</option>
+      }
+    </select>
+    <app-icon class="pub__langChevron" name="down" [size]="15" />
+  </label>
+
+  <button
+    type="button"
+    class="pub__icon"
+    [attr.aria-label]="'theme.toggle' | t"
+    [title]="'theme.toggle' | t"
+    [attr.aria-pressed]="theme.resolved() === 'dark'"
+    (click)="theme.toggle()"
+  >
+    <app-icon [name]="theme.resolved() === 'dark' ? 'sun' : 'moon'" [size]="19" />
+  </button>
+
+  @if (!auth.isAuthenticated()) {
+    <button type="button" class="pub__login" (click)="login()">{{ 'action.login' | t }}</button>
+  }
+</header>

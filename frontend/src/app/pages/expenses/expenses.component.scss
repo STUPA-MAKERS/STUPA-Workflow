@@ -1,410 +1,450 @@
-:host {
-  display: block;
-}
-.exp__search,
-.exp__input {
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: inherit;
-}
-/* Text inputs keep the control height, so they sit flush with app-select and datepicker. */
-input.exp__input {
-  height: var(--control-height);
-  box-sizing: border-box;
-}
-.exp__search {
-  min-width: 14rem;
-  height: 2.25rem;
-}
-.exp__layout {
-  display: grid;
-  grid-template-columns:
-    minmax(12rem, 1fr)
-    minmax(0, var(--layout-max-width))
-    minmax(0, 1fr);
-  gap: var(--space-5);
-  align-items: start;
-}
-/* The cost center tree breaks out into the left margin and stays sticky, like applications. */
-.exp__tree {
-  justify-self: end;
-  width: 100%;
-  max-width: 16rem;
-  position: sticky;
-  top: calc(var(--layout-header-height) + var(--space-4));
-  align-self: start;
-  /* Caps the tree at three-quarters of the viewport height, so it scrolls inside
-     itself and floats independently. */
-  max-height: 75vh;
-  overflow-y: auto;
-}
-/* Bookings / transfers switch above the table. */
-.exp__tabs {
-  display: inline-flex;
-  gap: var(--space-1);
-  margin-bottom: var(--space-3);
-}
+@use 'breakpoints' as bp;
 
-.exp__main {
+:host {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
 }
-@media (max-width: 60rem) {
-  .exp__layout {
-    grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
-  }
+/* One pane at a time the host takes at least the free height of the shell main. Side by
+   side it is a pane page (`.pane-page`), which sets its own flex. */
+:host(:not(.pane-page)) {
+  flex: 1 0 auto;
 }
-@media (max-width: 40rem) {
-  .exp__layout {
-    grid-template-columns: 1fr;
-  }
-  .exp__tree {
-    position: static;
-    max-height: none;
-  }
+
+.exp {
+  min-width: 0;
 }
-.exp__status {
-  color: var(--color-text-muted);
-  padding: var(--space-4) 0;
+.exp:not(.exp--split) {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
 }
-.exp__appLink {
-  color: var(--color-primary);
-  text-decoration: none;
+.exp:not(.exp--split) > app-list-detail {
+  flex: 1 0 auto;
 }
-.exp__appLink:hover {
-  text-decoration: underline;
+.exp--split {
+  flex: 1 1 0;
+  min-height: 0;
 }
-.exp__amount {
-  font-variant-numeric: tabular-nums;
+
+/* ------------------------------------------------------------------ list pane */
+/* The column, its header and the search bar are the shared list geometry: `.ld-pane`
+   (styles.scss) and `app-page-header` with `pane`. */
+
+/* Phone: the title row as the bar of the bulk actions. */
+.exp__selBar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--control-height);
+  padding-inline: var(--space-1) 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.exp__selTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-lg);
   font-weight: var(--fw-semibold);
+}
+.exp__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* The bulk delete icon is red, like every destructive action. The inner button of an
+   icon button sets its own grey (`.btn--text.btn--icon`), so the colour goes on the inner
+   button, with a selector that is more specific than that of the kit. A disabled button
+   keeps a muted red (the opacity and grayscale of the kit). */
+.exp__danger ::ng-deep .btn.btn--icon,
+.exp__danger ::ng-deep .btn.btn--icon:hover:not(:disabled) {
+  color: var(--color-danger);
+}
+.exp__danger ::ng-deep .btn.btn--icon:hover:not(:disabled) {
+  background: var(--color-danger-subtle);
+}
+
+.exp__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.exp__chip {
+  max-width: 100%;
+}
+/* The whole chip is the button: the icons never take the click. */
+.exp__chip app-icon,
+.exp__chip .exp__swatch {
+  pointer-events: none;
+}
+.exp__swatch {
+  display: inline-block;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+.exp__bar,
+.exp__selbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-height);
+  min-width: 0;
+}
+/* Equal segments that share the width of the control. */
+.exp__tabs {
+  flex: none;
+}
+.exp__count {
+  margin-inline-start: auto;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
   white-space: nowrap;
 }
-.exp__amount--income {
-  color: var(--color-success, #2e7d32);
+.exp__selbar {
+  gap: var(--space-2);
+  padding: 0 var(--space-2) 0 var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-selected);
+  color: var(--color-on-selected);
 }
-.exp__actions {
-  display: inline-flex;
-  gap: var(--space-1);
-  justify-content: flex-end;
+.exp__selText {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-md);
 }
-.exp__invDetails {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--space-2) var(--space-4);
-  margin: 0 0 var(--space-4);
-}
-.exp__invDetails > div {
-  display: contents;
-}
-.exp__invDetails dt {
-  color: var(--color-text-muted);
-}
-.exp__invDetails dd {
+.exp__check {
+  flex: none;
+  width: 18px;
+  height: 18px;
   margin: 0;
+  accent-color: var(--color-accent);
+  cursor: pointer;
 }
+/* The row check box sits above the stretched title, so it takes its own click. */
+.exp__check--row {
+  position: relative;
+  z-index: 1;
+}
+
+/* ------------------------------------------------------------------ rows */
+.exp__scroll {
+  --exp-fade: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* The FAB covers the end of the list: room to scroll the last row above it. */
+  padding-bottom: calc(56px + var(--space-6));
+}
+.exp--split .exp__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--exp-fade);
+}
+.exp--split .exp__scroll > * {
+  flex: none;
+}
+/* An end fades only while more rows lie past it (`appScrollFade` sets the classes). */
+.exp__scroll.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--exp-fade));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--exp-fade));
+}
+.exp__scroll.is-fade-end {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--exp-fade));
+  mask-image: linear-gradient(to top, transparent, #000 var(--exp-fade));
+}
+.exp__scroll.is-fade-start.is-fade-end {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--exp-fade),
+    #000 calc(100% - var(--exp-fade)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--exp-fade),
+    #000 calc(100% - var(--exp-fade)),
+    transparent
+  );
+}
+
+.exp__group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.exp__month {
+  padding: 18px var(--space-4) 6px;
+}
+.exp__group:first-child .exp__month {
+  padding-top: var(--space-2);
+}
+.exp__rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.exp__row--checked {
+  --li-bg: var(--color-selected);
+  --li-hover: var(--color-selected);
+  --li-color: var(--color-on-selected);
+}
+.exp__dot {
+  margin-inline: 6px;
+  color: var(--color-text-subtle);
+}
+/* The sub line is a flex row: only the cost-centre name shortens, with an ellipsis. The
+   kind, the dots, the date, the arrow and the receipt icon keep their width, so a long
+   name never pushes them out of the row. */
+.exp__sub {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.exp__sub > * {
+  flex: none;
+}
+.exp__sub > .exp__cc {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.exp__cc .exp__swatch {
+  margin-inline-end: 6px;
+  vertical-align: 0;
+}
+.exp__arrow {
+  display: inline-flex;
+  margin-inline: 6px;
+  vertical-align: middle;
+  color: var(--color-text-subtle);
+}
+.exp__receipt {
+  display: inline-flex;
+  margin-inline-start: 6px;
+  vertical-align: middle;
+}
+.exp__trail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-end: calc(-1 * var(--space-2));
+}
+.exp__amount {
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+.exp__amount--in {
+  color: var(--color-accent-text);
+}
+
+/* With a pointer, the row menu shows on hover, on focus and while it is open. It keeps
+   its place, so nothing shifts. One pane at a time a chevron sits in that place while
+   the menu is hidden. Without hover (touch), the menu always shows. */
+.exp__menuSlot {
+  position: relative;
+  display: inline-flex;
+}
+.exp__chev {
+  display: none;
+}
+@media (hover: hover) {
+  .exp__menu,
+  .exp__chev {
+    transition: opacity var(--motion-fast) var(--ease-standard);
+  }
+  .exp__menu {
+    opacity: 0;
+  }
+  .exp__chev {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted);
+    pointer-events: none;
+  }
+  .exp__row:hover .exp__menu,
+  .exp__row:focus-within .exp__menu,
+  .exp__menu:has([aria-expanded='true']) {
+    opacity: 1;
+  }
+  .exp__row:hover .exp__chev,
+  .exp__row:focus-within .exp__chev,
+  .exp__menuSlot:has([aria-expanded='true']) .exp__chev {
+    opacity: 0;
+  }
+}
+
 .exp__sentinel {
   height: 1px;
 }
-/* What is left here is what only this page knows: how one cell should read. The box,
-   the header, the hover, the sort control, the skeleton, the sticky column and the
-   mobile cards all come from `app-data-table` now. */
-.exp__cellDate {
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-.exp__cellDesc {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-1) var(--space-2);
-  min-width: 12rem;
-  max-width: 22rem;
-  font-weight: var(--fw-medium);
-}
-/* The collapsed line takes the room, the "more" button keeps its own. */
-.exp__cellDesc > .dt__truncate {
-  flex: 1 1 0;
-}
 .exp__more {
-  background: transparent;
-  border: 0;
-  padding: 0;
-  margin-inline-start: var(--space-1);
-  cursor: pointer;
-  font: inherit;
-  font-weight: var(--fw-medium);
-  color: var(--color-primary);
-  white-space: nowrap;
-}
-.exp__more:hover {
-  text-decoration: underline;
-}
-/* The sub-booking expander lives with its row, under the description, not in the
-   actions strip. Muted rather than primary: it is a disclosure, not an action, and the
-   description above it must stay the thing the eye lands on. */
-.exp__subToggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  margin-top: var(--space-1);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-.exp__subToggle:hover {
-  color: var(--color-text);
-  text-decoration: underline;
-}
-.exp__subToggle:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
-// Wrap the payee, the payer, and the cost center instead of letting them overflow.
-// A long name or IBAN without spaces must still break onto a new line.
-.exp__cellMeta {
-  max-width: 14rem;
-}
-.exp__mono {
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted);
-}
-.exp__amount {
-  font-weight: var(--fw-semibold);
-}
-.exp__amount--income {
-  color: var(--color-success, #2e7d32);
-}
-.exp__appLink {
-  color: var(--color-primary);
-  text-decoration: none;
-}
-.exp__appLink:hover {
-  text-decoration: underline;
-}
-.exp__actions {
-  display: inline-flex;
-  gap: var(--space-1);
-  justify-content: flex-end;
-}
-.exp__grid2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
-  align-items: end;
-}
-.exp__textarea {
-  resize: vertical;
-  min-height: 4.5rem;
-}
-@media (max-width: 30rem) {
-  .exp__grid2 {
-    grid-template-columns: 1fr;
-  }
-}
-/* Application typeahead, like the user search. */
-.exp__suggest {
-  list-style: none;
-  margin: var(--space-1) 0 0;
-  padding: var(--space-1);
-  position: absolute;
-  z-index: 10;
-  left: 0;
-  right: 0;
-  max-height: 14rem;
-  overflow-y: auto;
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md, 0 4px 16px rgba(0, 0, 0, 0.3));
-}
-.exp__suggestItem {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: var(--space-2) var(--space-3);
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--color-text);
-  cursor: pointer;
-  font: inherit;
-}
-.exp__suggestItem:hover {
-  background: var(--color-primary-subtle);
-}
-@media (max-width: 720px) {
-  .exp__layout {
-    grid-template-columns: 1fr;
-  }
-  .exp__tree {
-    position: static;
-    max-height: none;
-  }
-}
-/* Mobile (≤768px): a collapsible toggle hides the tree, and the layout drops to one
-   column. The toggle starts closed. Desktop keeps the tree and hides the toggle. */
-.exp__treeToggle {
-  display: none;
-}
-@media (max-width: 768px) {
-  .exp__layout {
-    grid-template-columns: 1fr;
-  }
-  .exp__tree {
-    position: static;
-    max-height: none;
-    max-width: none;
-    justify-self: stretch;
-  }
-  .exp__treeToggle {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    width: 100%;
-    min-height: 2.5rem;
-    padding: var(--space-2) var(--space-3);
-    font: inherit;
-    font-weight: var(--fw-medium);
-    color: var(--color-text);
-    background: var(--color-surface);
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-  }
-  .exp__treeBody {
-    display: none;
-    padding-top: var(--space-3);
-  }
-  .exp__treeBody--open {
-    display: block;
-  }
-}
-/* Mobile (≤768px): full-width search, table rows as cards (pure CSS). */
-@media (max-width: 768px) {
-  .exp__search {
-    flex: 1 1 100%;
-    min-width: 0;
-  }
-  /* Card layout: the description sits on top in bold at full width. The kind badge and
-     the amount follow. A muted meta row closes the card. */
-  .exp__cellDesc {
-    flex: 1 1 100%;
-    min-width: 0;
-    max-width: none;
-    order: -3;
-    font-weight: var(--fw-medium);
-  }
-  .exp__cellKind {
-    order: -2;
-  }
-  /* The amount stays prominent and right-aligned on the badge row. */
-  .exp__amount {
-    order: -1;
-    margin-left: auto;
-    font-size: var(--fs-md);
-    font-weight: var(--fw-semibold);
-  }
-  /* Secondary data stays small and muted on its own wrapping row, so the card looks
-     less crowded. This covers the dates, the payee, the cost center and the
-     application. */
-  .exp__cellDate,
-  .exp__cellMeta {
-    flex: 0 1 auto;
-    max-width: none;
-    order: 1;
-    font-size: var(--fs-xs);
-    color: var(--color-text-muted);
-  }
-  /* The actions get their own row to give large tap targets. */
-  .exp__actions {
-    margin-left: auto;
-    order: 2;
-  }
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-3);
 }
 
-/* Sub-bookings are `childrenOf` rows of the shared table now, which tints and indents
-   them. Only the count badge is this page's own. */
-.exp__subCount {
-  font-size: var(--fs-xs);
-  font-variant-numeric: tabular-nums;
-  font-weight: var(--fw-semibold);
-}
-/* Bulk actions in a floating bottom bar. The bar is fixed at the bottom
-   center and appears only for an active selection. It stacks below the dialogs
-   (--z-dialog) and above the sticky table cells. */
-.exp__bulkbar {
+/* "Buchung hinzufügen": at the end of the list pane side by side, else fixed at the end
+   of the screen. */
+.exp__fab {
   position: fixed;
-  bottom: max(var(--space-4), env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
+  right: var(--space-4);
+  bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
   z-index: var(--z-sticky);
-  display: flex;
-  flex-wrap: wrap;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  max-width: min(calc(100vw - 2 * var(--space-4)), 56rem);
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
+  gap: var(--space-3);
+  height: 56px;
+  padding: 0 var(--space-5) 0 var(--space-4);
+  border: 0;
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-}
-/* The count leads: a large tabular digit, its noun small beside it. The second line
-   is where the delete cap speaks, so nothing is bolted onto the button. */
-.exp__bulkcount {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  white-space: nowrap;
-}
-.exp__bulknum {
-  font-size: 1.5rem;
-  font-weight: var(--fw-bold);
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-primary);
-}
-.exp__bulklabels {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.15;
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-}
-.exp__bulkcap {
-  color: var(--color-danger);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font: inherit;
+  font-size: var(--fs-md);
   font-weight: var(--fw-semibold);
+  box-shadow: var(--shadow-elevated);
+  cursor: pointer;
 }
-/* Mobile: keep the bar as one row that scrolls horizontally. It never stacks. */
-@media (max-width: 768px) {
-  .exp__bulkbar {
+.exp__fab:hover {
+  filter: brightness(1.08);
+}
+.exp__fab:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.exp--split .exp__fab {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-4);
+}
+
+/* ------------------------------------------------------------------ detail pane */
+.exp__detail {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+/* The empty sheet: the same surface the open booking sits on, so nothing jumps. */
+.exp__none {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+.exp--split .exp__none {
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.exp__none--skeleton {
+  gap: var(--space-4);
+  padding: 76px var(--space-6) var(--space-6);
+}
+.exp__ghost {
+  display: block;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.exp__ghost--title {
+  width: 45%;
+  height: 30px;
+}
+.exp__ghost--meta {
+  width: 30%;
+  height: 12px;
+}
+.exp__ghost--rule {
+  height: 1px;
+  margin-block: var(--space-2);
+  background: var(--color-border);
+}
+.exp__ghostCols {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: var(--space-5);
+}
+.exp__ghost--card {
+  height: 120px;
+}
+
+.exp__confirm {
+  margin: 0;
+}
+.exp__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+@include bp.phone {
+  /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
+  .exp__chips {
+    --exp-chip-fade: var(--space-6);
     flex-wrap: nowrap;
-    justify-content: flex-start;
-    width: calc(100vw - 2 * var(--space-4));
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
-  .exp__bulkbar > * {
-    flex: 0 0 auto;
+  .exp__chips::-webkit-scrollbar {
+    display: none;
   }
-}
-/* Space at the end of the list, so the floating bar does not hide the last rows or the
-   load-more button. */
-.exp__layout:has(.exp__bulkbar) {
-  padding-bottom: 4.5rem;
-}
-/* The income tint. The table hands `rowClass` back to us for exactly this: a state it
-   cannot know about. The selected state is the table's own now, so it is gone from here. */
-.dt__table tbody tr.exp__tr--income td {
-  background: color-mix(in srgb, var(--color-success, #2e7d32) 6%, transparent);
+  .exp__chips.is-fade-start {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--exp-chip-fade));
+    mask-image: linear-gradient(to right, transparent, #000 var(--exp-chip-fade));
+  }
+  .exp__chips.is-fade-end {
+    -webkit-mask-image: linear-gradient(to left, transparent, #000 var(--exp-chip-fade));
+    mask-image: linear-gradient(to left, transparent, #000 var(--exp-chip-fade));
+  }
+  .exp__chips.is-fade-start.is-fade-end {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--exp-chip-fade),
+      #000 calc(100% - var(--exp-chip-fade)),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--exp-chip-fade),
+      #000 calc(100% - var(--exp-chip-fade)),
+      transparent
+    );
+  }
+  /* A phone row gives the sub line more width, so a cost-centre name stays readable:
+     less padding, a smaller gap to the amount and narrower dots. */
+  .exp__row {
+    --li-pad-x: var(--space-3);
+    --li-gap: var(--space-2);
+  }
+  .exp__dot {
+    margin-inline: var(--space-1);
+  }
+  .exp__arrow {
+    margin-inline: var(--space-1);
+  }
+  .exp__month {
+    padding-inline: var(--space-1);
+  }
+  .exp__scroll {
+    padding-bottom: var(--space-6);
+  }
 }

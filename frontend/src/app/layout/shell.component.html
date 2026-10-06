@@ -1,228 +1,47 @@
 <a class="skip-link" href="#main">{{ 'app.skipToContent' | t }}</a>
 
-<header class="header">
-  <div class="page-shell header__inner">
-    @if (visibleNav().length > 0) {
-      <button
-        type="button"
-        class="menu-btn"
-        [attr.aria-label]="(mobileNavOpen() ? 'nav.menuClose' : 'nav.menuOpen') | t"
-        [attr.aria-expanded]="mobileNavOpen()"
-        aria-controls="mobile-nav"
-        (click)="toggleMobileNav()"
-      >
-        <app-icon [name]="mobileNavOpen() ? 'remove' : 'menu'" [size]="18" />
-      </button>
+<div
+  class="frame"
+  [class.frame--rail]="frame() === 'rail' && !phone()"
+  [class.frame--phone]="frame() === 'rail' && phone()"
+  [class.frame--fab]="frame() === 'rail' && phone() && fab()"
+  [class.frame--public]="frame() === 'public'"
+  [class.frame--bare]="frame() === 'bare'"
+>
+  @if (frame() === 'rail' && !phone()) {
+    <app-nav-rail class="frame__rail" />
+  }
+
+  <div class="frame__body">
+    @if (frame() === 'public') {
+      <app-public-header />
     }
 
-    <!-- Two images, swapped in CSS. On a phone the wordmark is both unreadable and the
-         single widest thing in the header, so below the breakpoint only the mark shows.
-         A media query rather than a resize listener: no change detection on every drag. -->
-    <a class="header__brand" [routerLink]="brandTarget()" [attr.aria-label]="branding.appName()">
-      <img class="header__logo" [src]="logoSrc()" alt="" aria-hidden="true" />
-      <img class="header__mark" [src]="markSrc" alt="" aria-hidden="true" />
-    </a>
+    <main
+      id="main"
+      class="main"
+      [class.page-shell]="frame() !== 'bare'"
+      [class.main--wide]="wide()"
+      [class.main--fill]="fill()"
+      tabindex="-1"
+    >
+      <router-outlet />
+    </main>
 
-    <nav class="header__nav" appScrollFade [attr.aria-label]="'nav.main' | t">
-      @for (item of visibleNav(); track item.path) {
-        <a
-          class="header__link"
-          [routerLink]="item.path"
-          routerLinkActive="is-active"
-          [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
-        >
-          {{ item.labelKey | t }}
-        </a>
-      }
-    </nav>
-
-    <div class="header__actions">
-      @if (auth.isAuthenticated()) {
-        <!-- A magnifier rather than a funnel: the funnel is the filter button of the
-             list pages, and searching is not filtering. -->
-        <button
-          type="button"
-          class="header__search"
-          [attr.aria-label]="'search.open' | t"
-          [title]="'search.open' | t"
-          (click)="palette.show()"
-        >
-          <app-icon name="search" [size]="16" />
-          <span class="header__searchLabel">{{ 'search.title' | t }}</span>
-          <kbd class="header__searchKbd">{{ searchShortcut() }}</kbd>
-        </button>
-        <div class="relative flex items-center gap-2">
-          <!-- The trigger is the icon alone. A full display name in the header cost more
-               room than anything else in it and pushed the nav around as the name got
-               longer; the name is not lost, it heads the menu this opens. -->
-          <button
-            type="button"
-            class="account__name-btn"
-            [attr.aria-expanded]="accountMenuOpen()"
-            aria-haspopup="menu"
-            [attr.aria-label]="('auth.signedInAs' | t) + ': ' + auth.displayName()"
-            [title]="('auth.signedInAs' | t) + ': ' + auth.displayName()"
-            (click)="toggleAccountMenu()"
-          >
-            <app-icon name="user" [size]="18" />
-            <app-icon [name]="accountMenuOpen() ? 'chevron-up' : 'chevron-down'" [size]="12" />
-          </button>
-          @if (accountMenuOpen()) {
-            <button type="button" class="account__backdrop" aria-hidden="true" tabindex="-1" (click)="closeAccountMenu()"></button>
-            <div class="account__menu" role="menu">
-              <p class="account__menuName">
-                <span class="account__menuNameLabel">{{ 'auth.signedInAs' | t }}</span>
-                <span class="account__menuNameValue">{{ auth.displayName() }}</span>
-              </p>
-              <a
-                class="account__menu-item"
-                role="menuitem"
-                routerLink="/account/notifications"
-                (click)="closeAccountMenu()"
-              >
-                <app-icon name="bell" [size]="16" />
-                {{ 'account.menu.notifications' | t }}
-              </a>
-              <a
-                class="account__menu-item"
-                role="menuitem"
-                routerLink="/account/calendar"
-                (click)="closeAccountMenu()"
-              >
-                <app-icon name="clock" [size]="16" />
-                {{ 'account.menu.calendar' | t }}
-              </a>
-              @if (auth.canAny('mcp.use')) {
-                <a
-                  class="account__menu-item"
-                  role="menuitem"
-                  routerLink="/account/grants"
-                  (click)="closeAccountMenu()"
-                >
-                  <app-icon name="webhook" [size]="16" />
-                  {{ 'account.menu.apiAccess' | t }}
-                </a>
-              }
-              <button type="button" class="account__menu-item" role="menuitem" (click)="logout()">
-                <app-icon name="power" [size]="16" />
-                {{ 'action.logout' | t }}
-              </button>
-
-              <!-- Language and appearance live here at EVERY width, not only on a phone.
-                   Two more controls in the header made it cramped on a desktop and broke
-                   it outright on a phone; both are settings rather than navigation, so
-                   the account menu is where they belong. -->
-              <div class="account__menuSep" role="separator"></div>
-              <label class="account__menu-item account__menu-item--field">
-                <app-icon name="language" [size]="16" />
-                <span>{{ 'lang.switch' | t }}</span>
-                <select
-                  class="account__menuSelect"
-                  [attr.aria-label]="'lang.switch' | t"
-                  [value]="i18n.locale()"
-                  (change)="setLocale($any($event.target).value)"
-                >
-                  @for (loc of i18n.locales; track loc) {
-                    <option [value]="loc" [selected]="loc === i18n.locale()">{{ loc | uppercase }}</option>
-                  }
-                </select>
-              </label>
-              <button
-                type="button"
-                class="account__menu-item"
-                role="menuitemcheckbox"
-                [attr.aria-checked]="theme.resolved() === 'dark'"
-                (click)="toggleTheme()"
-              >
-                <app-icon [name]="theme.resolved() === 'dark' ? 'moon' : 'sun'" [size]="16" />
-                {{ 'theme.toggle' | t }}
-              </button>
-            </div>
-          }
-        </div>
-      } @else {
-        <button type="button" class="account__btn account__btn--primary" (click)="login()">
-          {{ 'action.login' | t }}
-        </button>
-      }
-
-      <!-- Signed out there is no account menu to hold them, and the header is nearly
-           empty anyway, so the pair stays inline on that one branch. -->
-      @if (!auth.isAuthenticated()) {
-      <div class="inline-flex items-center gap-1 flex-none">
-        <label class="lang">
-          <span class="lang__icon" aria-hidden="true"><app-icon name="language" [size]="16" /></span>
-          <select
-            class="lang__select"
-            [attr.aria-label]="'lang.switch' | t"
-            [value]="i18n.locale()"
-            (change)="setLocale($any($event.target).value)"
-          >
-            @for (loc of i18n.locales; track loc) {
-              <option [value]="loc" [selected]="loc === i18n.locale()">{{ loc | uppercase }}</option>
-            }
-          </select>
-        </label>
-
-        <button
-          type="button"
-          class="theme-toggle"
-          [attr.aria-label]="'theme.toggle' | t"
-          [attr.aria-pressed]="theme.resolved() === 'dark'"
-          (click)="toggleTheme()"
-        >
-          <app-icon [name]="theme.resolved() === 'dark' ? 'moon' : 'sun'" [size]="18" />
-        </button>
-      </div>
-      }
-    </div>
-  </div>
-</header>
-
-@if (mobileNavOpen()) {
-  <button
-    type="button"
-    class="mobile-nav__backdrop"
-    aria-hidden="true"
-    tabindex="-1"
-    (click)="closeMobileNav()"
-  ></button>
-  <nav id="mobile-nav" class="mobile-nav" [attr.aria-label]="'nav.main' | t">
-    @for (item of visibleNav(); track item.path) {
-      <a
-        class="mobile-nav__link"
-        [routerLink]="item.path"
-        routerLinkActive="is-active"
-        [routerLinkActiveOptions]="{ exact: item.exact ?? false }"
-        (click)="closeMobileNav()"
-      >
-        {{ item.labelKey | t }}
-      </a>
-    }
-  </nav>
-}
-
-<main id="main" class="main page-shell" [class.main--wide]="wide()" tabindex="-1">
-  <router-outlet />
-</main>
-
-<footer class="footer">
-  <div class="page-shell flex items-center flex-wrap gap-4 py-6 text-muted text-sm">
-    <img class="footer__logo" [src]="logoSrc()" alt="" aria-hidden="true" />
-    <span class="footer__text">{{ footerCopyright() || ('footer.coBranding' | t) }}</span>
-    @if (footerLinks().length > 0) {
-      <nav class="footer__links" [attr.aria-label]="'nav.footer' | t">
-        @for (link of footerLinks(); track link.url) {
-          <a [href]="link.url">{{ link.label }}</a>
-        }
-      </nav>
+    @if (footer()) {
+      <app-site-footer class="frame__footer" />
     }
   </div>
-</footer>
+
+  @if (frame() === 'rail' && phone()) {
+    <app-bottom-bar />
+  }
+</div>
 
 <app-loading-overlay />
 <app-toast />
 
-<!-- Global search. It owns its own overlay, so it sits outside the header and the
-     main region rather than inside either. -->
-<app-command-palette #palette />
+<!-- Global search. It owns its own overlay, so it sits outside the frame. -->
+@if (frame() === 'rail') {
+  <app-command-palette />
+}

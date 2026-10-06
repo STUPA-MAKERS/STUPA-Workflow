@@ -1,4 +1,4 @@
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
@@ -84,12 +84,17 @@ describe('WebhooksComponent', () => {
     const { saveWebhook } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Webhook hinzufügen' }));
 
-    expect(screen.getByText('Bitte eine gültige http(s)-URL angeben.')).toBeInTheDocument();
+    // An empty field is not yet wrong, but the save stays off.
+    expect(screen.queryByText('Bitte eine gültige http(s)-URL angeben.')).not.toBeInTheDocument();
     const save = screen.getByRole('button', { name: 'Speichern' });
     expect(save).toBeDisabled();
+    const url = screen.getByRole('textbox', { name: 'Ziel-URL' });
+    await userEvent.type(url, 'ftp://x');
+    expect(screen.getByText('Bitte eine gültige http(s)-URL angeben.')).toBeInTheDocument();
 
     // A valid URL is enough. The save works even without a single event.
-    await userEvent.type(screen.getByRole('textbox', { name: 'Ziel-URL' }), 'https://hook.test');
+    await userEvent.clear(url);
+    await userEvent.type(url, 'https://hook.test');
 
     expect(save).toBeEnabled();
     await userEvent.click(save);
@@ -207,7 +212,7 @@ describe('WebhooksComponent', () => {
 
   it('renders a delete control that opens the confirm dialog', async () => {
     await setup(HOOKS);
-    const remove = screen.getAllByRole('button', { name: 'Entfernen' })[0];
+    const remove = screen.getByRole('button', { name: 'Entfernen: A' });
     await userEvent.click(remove);
     expect(screen.getByText(/„A“ wird mit seiner Zustellhistorie gelöscht/)).toBeInTheDocument();
   });
@@ -244,7 +249,9 @@ describe('WebhooksComponent', () => {
 
   it('opens the diagnosis dialog with the failure class, code and attempts', async () => {
     await setup(HOOKS, { status: [SENT, DEAD] });
-    await userEvent.click(screen.getAllByRole('button', { name: 'Zustellstatus anzeigen' })[1]);
+    const toggle = screen.getAllByRole('button', { name: 'Zustellstatus' })[1];
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(
       screen.getByText('Das Ziel ist nicht erreichbar oder aus Sicherheitsgründen blockiert.'),
     ).toBeInTheDocument();
@@ -257,17 +264,20 @@ describe('WebhooksComponent', () => {
 
   it('renders the response code and the timestamp of a successful delivery', async () => {
     await setup(HOOKS, { status: [SENT] });
-    await userEvent.click(screen.getByRole('button', { name: 'Zustellstatus anzeigen' }));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Zustellstatus' })[0]);
     expect(screen.getByText('200')).toBeInTheDocument();
     expect(screen.getByText('Erfolgreich zugestellt.')).toBeInTheDocument();
   });
 
   it('falls back to the hook URL and an empty-state text when no record exists', async () => {
-    const { c } = await setup(HOOKS, { status: [] });
-    c.openStatus({ ...HOOKS[0], name: '' });
-    await Promise.resolve();
+    const { c, fixture } = await setup([{ ...HOOKS[0], name: '' }], { status: [] });
+    // Without a name the card shows the URL as its title.
+    expect(screen.getAllByText('https://a')).toHaveLength(2);
+    c.toggleStatus(c.hooks()[0]);
+    fixture.detectChanges();
     expect(c.statusDetail()).not.toBeNull();
-    c.closeStatus();
+    expect(screen.getByText('Für diesen Webhook liegt noch kein Zustellstatus vor.')).toBeInTheDocument();
+    c.toggleStatus(c.hooks()[0]);
     expect(c.statusDetail()).toBeNull();
   });
 
@@ -278,13 +288,78 @@ describe('WebhooksComponent', () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
-  it('maps every state to a badge variant and falls back for an unknown one', async () => {
+  it('maps every state to a status text', async () => {
     const { c } = await setup();
-    expect(c.stateVariant('sent')).toBe('success');
-    expect(c.stateVariant('dead')).toBe('danger');
-    expect(c.stateVariant('pending')).toBe('info');
-    expect(c.stateVariant('never')).toBe('neutral');
-    expect(c.stateVariant('from_a_newer_backend')).toBe('neutral');
+    expect(c.deliveryStatus('sent')).toEqual({ kind: 'accent', key: 'admin.webhook.delivery.state.sent' });
+    expect(c.deliveryStatus('dead').kind).toBe('error');
+    expect(c.deliveryStatus('pending').kind).toBe('neutral');
+    expect(c.deliveryStatus('never').kind).toBe('neutral');
+  });
+
+  it('shows the real event keys of a hook, or the flow note without fixed events', async () => {
+    await setup([
+      { id: 'wh-1', name: 'A', url: 'https://a', events: ['status_changed', 'vote_closed'], active: true },
+      { id: 'wh-2', name: 'B', url: 'https://b', events: [], active: false },
+    ]);
+    expect(screen.getByText('status_changed')).toBeInTheDocument();
+    expect(screen.getByText('vote_closed')).toBeInTheDocument();
+    expect(screen.getByText('Keine festen Ereignisse · Trigger aus dem Flow')).toBeInTheDocument();
+  });
+
+  it('saves the active switch at once and puts it back after a failure', async () => {
+    const { c, saveWebhook } = await setup(HOOKS);
+    await userEvent.click(screen.getByRole('switch', { name: 'Aktiv: A' }));
+    expect(saveWebhook).toHaveBeenCalledWith(expect.objectContaining({ id: 'wh-1', active: false }));
+    expect(c.hooks()[0].active).toBe(false);
+    expect(c.toggling().size).toBe(0);
+  });
+
+  it('puts the active switch back after a failed save', async () => {
+    const { c, toast } = await setup(HOOKS, { saveError: true });
+    c.setActive(HOOKS[1], false);
+    expect(c.hooks()[1].active).toBe(true);
+    expect(c.toggling().size).toBe(0);
+    expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
+  });
+
+  it('ignores a second toggle of the same webhook while its save runs', async () => {
+    const { c, saveWebhook } = await setup(HOOKS);
+    c.toggling.set(new Set(['wh-2']));
+    c.setActive(HOOKS[1], false);
+    expect(saveWebhook).not.toHaveBeenCalled();
+  });
+
+  it('saves a second webhook while the save of the first is pending', async () => {
+    const { c, saveWebhook } = await setup(HOOKS);
+    const pending = new Subject<WebhookConfig>();
+    saveWebhook.mockImplementationOnce(() => pending);
+    const a = screen.getByRole('switch', { name: 'Aktiv: A' });
+    const b = screen.getByRole('switch', { name: 'Aktiv: B' });
+    await userEvent.click(a);
+    expect(c.isToggling('wh-1')).toBe(true);
+    await userEvent.click(b);
+    expect(saveWebhook).toHaveBeenCalledTimes(2);
+    expect(saveWebhook).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'wh-2', active: false }));
+    // Each switch shows the state that its webhook holds.
+    expect(b).toHaveAttribute('aria-checked', String(c.hooks()[1].active));
+    expect(b).toHaveAttribute('aria-checked', 'false');
+    pending.next({ ...HOOKS[0], active: false });
+    pending.complete();
+    expect(c.toggling().size).toBe(0);
+    expect(a).toHaveAttribute('aria-checked', String(c.hooks()[0].active));
+  });
+
+  it('shows "Noch nie" for a webhook created in this session', async () => {
+    const { c, fixture } = await setup([], { status: [] });
+    c.openAdd();
+    c.patch('name', 'New');
+    c.patch('url', 'https://hook.test');
+    c.save();
+    fixture.detectChanges();
+    expect(c.statusOf('wh-new')).toEqual(
+      expect.objectContaining({ lastState: 'never', reasonClass: 'no_deliveries', attempts: 0 }),
+    );
+    expect(screen.getByText('Noch nie')).toBeInTheDocument();
   });
 
   it('reads an unknown reason class back raw', async () => {
@@ -300,28 +375,16 @@ describe('WebhooksComponent', () => {
     expect(c.canManage()).toBe(false);
     // The diagnosis route needs the permission, so it is never called.
     expect(listWebhookDeliveryStatus).not.toHaveBeenCalled();
-    expect(c.columns().map((col: { key: string }) => col.key)).toEqual([
-      'name',
-      'url',
-      'events',
-      'active',
-      'actions',
-    ]);
     expect(screen.queryByRole('button', { name: 'Webhook hinzufügen' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Bearbeiten' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Entfernen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Bearbeiten/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Entfernen/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Zustellstatus' })).toBeNull();
+    expect(screen.getByRole('switch', { name: 'Aktiv: A' })).toBeDisabled();
   });
 
-  it('adds the delivery column with webhook.manage', async () => {
-    const { c } = await setup(HOOKS);
-    expect(c.columns().map((col: { key: string }) => col.key)).toEqual([
-      'name',
-      'url',
-      'events',
-      'active',
-      'delivery',
-      'actions',
-    ]);
+  it('offers the delivery status with webhook.manage', async () => {
+    await setup(HOOKS);
+    expect(screen.getAllByRole('button', { name: 'Zustellstatus' })).toHaveLength(2);
   });
 
   it('stops loading when the list fails, rather than spinning forever', async () => {

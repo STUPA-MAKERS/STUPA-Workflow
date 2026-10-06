@@ -1,0 +1,124 @@
+/* Fixed to the bottom edge. The bar has its own surface (surface 3) and a top border, so
+   it stands out from the page and from the cards on it (surface 1 and 2) in both themes.
+   The entries fill the bar height, so each one is a 64px high touch target. The
+   safe-area padding keeps the entries above the gesture bar of an installed app
+   (viewport-fit=cover). The shell sets --bottom-bar-height and keeps the page clear of
+   the bar with it. */
+:host {
+  display: block;
+}
+
+.bb {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  box-sizing: border-box;
+  height: calc(var(--bottom-bar-height, 64px) + env(safe-area-inset-bottom));
+  padding: 0 4px env(safe-area-inset-bottom);
+  border-top: var(--border-width) solid var(--color-border);
+  background: var(--color-surface-3);
+  /* The live dot gets a ring in the colour of the bar. */
+  --nav-mark-ring: var(--color-surface-3);
+}
+
+.bb__item {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 88px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: var(--fw-medium);
+  line-height: 14px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.bb__label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bb__ind {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 32px;
+  border-radius: 16px;
+}
+.bb__item.is-active {
+  color: var(--color-text);
+  font-weight: var(--fw-semibold);
+}
+/* The selected token is too close to surface 3 in both themes. The pill mixes the accent
+   into the bar surface instead. */
+.bb__item.is-active .bb__ind {
+  background: color-mix(in srgb, var(--color-accent) 28%, var(--color-surface-3));
+  color: var(--color-accent-text);
+}
+.bb__item:focus-visible {
+  outline: none;
+}
+.bb__item:focus-visible .bb__ind {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* The "Mehr" sheet: the remaining areas, the search and the account menu. */
+.more {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.more__group {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.more__item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 48px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+}
+.more__item > app-icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.more__item:hover {
+  background: var(--color-surface-3);
+}
+.more__item.is-active {
+  background: var(--color-selected);
+}
+.more__item.is-active > app-icon {
+  color: var(--color-accent-text);
+}
+.more__item:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}

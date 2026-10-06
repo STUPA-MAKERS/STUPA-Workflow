@@ -7,6 +7,10 @@ import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
  * One component owns the whole block, so the breadcrumb cannot drift away from the title
  * it belongs to, and a `wide` route aligns the same way a normal one does.
  *
+ * A status of the page object (for example "Aktiv" next to the name of a form) goes into
+ * the `heading` slot. It sits on the baseline of the title, as `meta` does, so it does
+ * not float away from the title on a phone the way an entry of the `actions` slot does.
+ *
  * Put actions in the `actions` slot:
  *
  * ```html
@@ -23,6 +27,7 @@ import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
   host: {
     '[class.ph--flush]': 'flush()',
     '[class.ph--rail]': 'rail()',
+    '[class.ph--pane]': 'pane()',
   },
   templateUrl: './page-header.component.html',
   styleUrl: './page-header.component.scss',
@@ -30,6 +35,15 @@ import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 export class PageHeaderComponent {
   readonly title = input.required<string>();
   readonly subtitle = input<string | null>(null);
+
+  /**
+   * A short fact about the page, such as a count ("8 offen").
+   *
+   * The header shows it as muted text on the baseline of the title. Do not put such a
+   * text into the `actions` slot: on a phone the slot moves next to or under the title
+   * and the text then floats away from the title it belongs to.
+   */
+  readonly meta = input<string | null>(null);
 
   /**
    * Drop the header's own bottom margin.
@@ -56,4 +70,25 @@ export class PageHeaderComponent {
    * first place.
    */
   readonly rail = input(false);
+
+  /**
+   * The header of a list column beside a detail sheet (applications, tasks, votes,
+   * meetings, bookings, invoices, the budget tree, the Verwaltung navigation).
+   *
+   * The pane header is one line at the height of a control: the title inset like the
+   * rows, the `heading` slot beside it, the `actions` at the end edge of the column. It
+   * has no breadcrumbs and no bottom margin (the column spaces its children). Every list
+   * column uses it, so the columns share one title geometry; a page never styles its
+   * list header itself.
+   */
+  readonly pane = input(false);
+
+  /** The id of the title element, for an `aria-labelledby` of the region it names. */
+  readonly titleId = input<string | null>(null);
+
+  /**
+   * The element of the title. `p` is for a title that is no heading of the page: the
+   * Verwaltung navigation beside an admin page, whose page has the h1.
+   */
+  readonly titleTag = input<'h1' | 'p'>('h1');
 }

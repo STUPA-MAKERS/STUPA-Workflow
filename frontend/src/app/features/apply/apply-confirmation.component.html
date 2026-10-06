@@ -1,36 +1,54 @@
 <section class="done">
   @if (loggedIn()) {
-    <app-card [heading]="'apply.submitted.heading' | t">
-      <div class="flex items-center gap-3">
-        <span class="done__ok" aria-hidden="true">✓</span>
-        <app-badge variant="success">{{ 'apply.submitted.badge' | t }}</app-badge>
-      </div>
+    <article class="done__card" aria-labelledby="done-title">
+      <app-icon class="done__icon done__icon--ok" name="check" [size]="32" [strokeWidth]="2" />
+      <app-status-text kind="accent">{{ 'apply.submitted.badge' | t }}</app-status-text>
+      <h1 class="done__title" id="done-title">{{ 'apply.submitted.heading' | t }}</h1>
       <p class="done__text">{{ 'apply.submitted.body' | t }}</p>
-      @if (applicationId()) {
-        <p class="mt-4 text-muted text-sm">
-          {{ 'apply.confirm.ref' | t }} <code>{{ shortRef() }}</code>
+      @if (shortRef()) {
+        <p class="done__meta">
+          {{ 'apply.confirm.ref' | t }} <span class="mono done__ref">{{ shortRef() }}</span>
         </p>
-        <a card-footer [routerLink]="['/applications', applicationId()]" class="done__home">
-          {{ 'apply.submitted.link' | t }}
-        </a>
       }
-      <a card-footer routerLink="/" class="done__home">{{ 'apply.confirm.home' | t }}</a>
-    </app-card>
-  } @else {
-    <app-card [heading]="'apply.confirm.heading' | t">
-      <div class="flex items-center gap-3">
-        <span class="done__mail" aria-hidden="true">✉</span>
-        <app-badge variant="warning">{{ 'apply.confirm.badge' | t }}</app-badge>
+      <div class="done__actions">
+        @if (applicationId()) {
+          <a class="done__btn done__btn--fill" [routerLink]="['/applications', applicationId()]">
+            {{ 'apply.submitted.link' | t }}
+          </a>
+        }
+        <a class="done__btn done__btn--text" routerLink="/">{{ 'apply.confirm.home' | t }}</a>
       </div>
+    </article>
+  } @else {
+    <article class="done__card" aria-labelledby="done-title">
+      <app-icon class="done__icon done__icon--warn" name="mail" [size]="32" [strokeWidth]="1.6" />
+      <app-status-text kind="warn">{{ 'apply.confirm.badge' | t }}</app-status-text>
+      <h1 class="done__title" id="done-title">{{ 'apply.confirm.heading' | t }}</h1>
       <p class="done__text">{{ 'apply.confirm.body' | t }}</p>
-      <p class="done__expiry" role="note">{{ 'apply.confirm.expiry' | t }}</p>
-      @if (applicationId()) {
-        <p class="mt-4 text-muted text-sm">
-          {{ 'apply.confirm.ref' | t }} <code>{{ shortRef() }}</code>
-        </p>
-      }
-      <p class="mt-2 text-muted text-sm">{{ 'apply.confirm.hint' | t }}</p>
-      <a card-footer routerLink="/" class="done__home">{{ 'apply.confirm.home' | t }}</a>
-    </app-card>
+      <app-note icon="clock" role="note">
+        {{ 'apply.confirm.expiry' | t: { hours: confirmTtlHours() } }}
+      </app-note>
+      <div class="done__metaBlock">
+        @if (shortRef()) {
+          <p class="done__meta">
+            {{ 'apply.confirm.ref' | t }} <span class="mono done__ref">{{ shortRef() }}</span>
+          </p>
+        }
+        <!-- Only after the config loaded: before, "unbegrenzt" can be wrong. -->
+        @if (linkTtlLoaded()) {
+          <p class="done__meta">
+            @if (linkTtlDays(); as days) {
+              {{ 'apply.confirm.linkDays' | t: { days: days } }}
+            } @else {
+              {{ 'apply.confirm.linkUnlimited' | t }}
+            }
+          </p>
+        }
+        <p class="done__meta">{{ 'apply.confirm.hint' | t }}</p>
+      </div>
+      <div class="done__actions">
+        <a class="done__btn done__btn--outlined" routerLink="/">{{ 'apply.confirm.home' | t }}</a>
+      </div>
+    </article>
   }
 </section>

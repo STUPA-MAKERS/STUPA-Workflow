@@ -1,0 +1,7 @@
+/* The empty state fills the sheet of the frame and centres in it. */
+:host {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}

@@ -3,7 +3,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
-import { render } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ToastService } from '@stupa-makers/ui-kit';
@@ -11,6 +12,7 @@ import * as downloadUtil from '@shared/download.util';
 import { InvoicesComponent } from './invoices.component';
 import type {
   Invoice,
+  InvoiceBooking,
   InvoiceFileResult,
   InvoicePage,
   InvoiceParseResult,
@@ -141,48 +143,30 @@ describe('InvoicesComponent', () => {
     expect(c.hasMore()).toBe(true);
   });
 
-  it('asks for the one invoice the URL names', async () => {
-    // Where a global-search hit lands. A bare `/invoices` would open the whole list and
-    // leave the reader to find the invoice they had already named.
-    localStorage.setItem('ap.locale', 'de');
-    const auth = new FakeAuth();
-    const view = await render(InvoicesComponent, {
-      providers: [
-        provideRouter([]),
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: USE_MOCK_API, useValue: false },
-        { provide: AuthService, useValue: auth },
-        {
-          provide: ActivatedRoute,
-          useValue: {
-            snapshot: { queryParamMap: convertToParamMap({ id: 'i-42' }) },
-            queryParamMap: of(convertToParamMap({ id: 'i-42' })),
-          },
-        },
-      ],
-    });
-    const http = TestBed.inject(HttpTestingController);
-    // One request, and it already carries the filter. A second, unfiltered one could
-    // resolve last and overwrite the row the reader came for.
-    const req = http.expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'GET');
-    expect(req.request.params.get('id')).toBe('i-42');
-    req.flush(page([inv({ id: 'i-42' })], 1));
-    view.fixture.detectChanges();
-
-    const c = view.fixture.componentInstance as unknown as {
-      activeFilterCount(): number;
-      invoiceId(): string;
-    };
-    // It counts, so the filter badge says the list is narrowed and the reset clears it.
-    expect(c.invoiceId()).toBe('i-42');
-    expect(c.activeFilterCount()).toBe(1);
-    http.verify();
+  it('opens the invoice the URL names and loads it when the list does not hold it', async () => {
+    // Where a global-search hit lands: the list stays whole, the invoice opens beside it.
+    const { c, http, fixture } = await setup({ queryParams: { id: 'i-42' } });
+    expect(c.selectedId()).toBe('i-42');
+    expect(c.activeFilterCount()).toBe(0);
+    fixture.detectChanges();
+    http.expectOne((r) => r.url.endsWith('/api/invoices/i-42')).flush(inv({ id: 'i-42' }));
+    fixture.detectChanges();
+    expect(c.selectedInvoice()?.id).toBe('i-42');
+    expect(c.detailView()).toBe('invoice');
+    expect(c.detailOpen()).toBe(true);
   });
 
-  it('re-filters when the palette sends it here while it is already here', async () => {
-    // Same route, new query string: the router keeps this component, so reading the
-    // snapshot once would leave the list showing the invoice the reader came from.
+  it('says that the invoice of the URL is not there', async () => {
+    const { c, http, fixture } = await setup({ queryParams: { id: 'gone' } });
+    fixture.detectChanges();
+    http
+      .expectOne((r) => r.url.endsWith('/api/invoices/gone'))
+      .flush(null, { status: 404, statusText: 'x' });
+    expect(c.selectedMissing()).toBe(true);
+    expect(c.detailView()).toBe('missing');
+  });
+
+  it('opens another invoice when the palette sends it here, without a new list', async () => {
     localStorage.setItem('ap.locale', 'de');
     const params = new BehaviorSubject(convertToParamMap({ id: 'i-1' }));
     const view = await render(InvoicesComponent, {
@@ -199,103 +183,56 @@ describe('InvoicesComponent', () => {
       ],
     });
     const http = TestBed.inject(HttpTestingController);
-    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([inv({ id: 'i-1' })], 1));
+    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([inv({ id: 'i-1' }), inv({ id: 'i-9' })], 2));
     view.fixture.detectChanges();
-
     params.next(convertToParamMap({ id: 'i-9' }));
+    view.fixture.detectChanges();
+    http.expectNone((r) => r.url.endsWith('/api/invoices'));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((view.fixture.componentInstance as any).selectedInvoice()?.id).toBe('i-9');
+    // A filter of the URL reloads the list; one that goes away clears.
+    params.next(convertToParamMap({ id: 'i-9', seg: 'paid', q: 'acme' }));
     const again = http.expectOne((r) => r.url.endsWith('/api/invoices'));
-    expect(again.request.params.get('id')).toBe('i-9');
-    again.flush(page([inv({ id: 'i-9' })], 1));
+    expect(again.request.params.get('status')).toBe('paid');
+    expect(again.request.params.get('q')).toBe('acme');
+    again.flush(page([inv({ id: 'i-9', status: 'paid' })], 1));
+    params.next(convertToParamMap({}));
+    const cleared = http.expectOne((r) => r.url.endsWith('/api/invoices'));
+    expect(cleared.request.params.has('status')).toBe(false);
+    cleared.flush(page([], 0));
     http.verify();
   });
 
-  it('writes a cleared filter back, so the palette can send you to it again', async () => {
-    // The bug this holds: the page read `?id=` but never wrote it. A reset cleared the
-    // list but left `?id=i-1` in the address bar, so picking that same invoice in the
-    // palette navigated to the URL the browser was ALREADY on. The router drops a
-    // same-URL navigation, `queryParamMap` never fired, and nothing happened at all.
-    localStorage.setItem('ap.locale', 'de');
-    const params = new BehaviorSubject(convertToParamMap({ id: 'i-1' }));
-    const view = await render(InvoicesComponent, {
-      providers: [
-        provideRouter([]),
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: USE_MOCK_API, useValue: false },
-        { provide: AuthService, useValue: new FakeAuth() },
-        {
-          provide: ActivatedRoute,
-          useValue: { snapshot: { queryParamMap: params.value }, queryParamMap: params },
-        },
-      ],
-    });
-    const http = TestBed.inject(HttpTestingController);
-    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([inv({ id: 'i-1' })], 1));
-    view.fixture.detectChanges();
-
+  it('writes the segment and the filters back into the URL', async () => {
+    const { c, http, fixture } = await setup();
     const navigate = jest.spyOn(TestBed.inject(Router), 'navigate');
-    const c = view.fixture.componentInstance as unknown as { resetFilters(): void };
-    c.resetFilters();
-    view.fixture.detectChanges();
-
-    // The URL loses the id, so it states what the list is actually showing.
+    c.setSegment('inbox');
+    fixture.detectChanges();
     expect(navigate).toHaveBeenCalledWith(
       [],
       expect.objectContaining({
-        queryParams: expect.objectContaining({ id: null }),
+        queryParams: expect.objectContaining({ seg: 'inbox', q: null }),
         replaceUrl: true,
       }),
     );
     http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([], 0));
-    http.verify();
+    // The same segment again sends nothing; an unknown one is "all".
+    c.setSegment('inbox');
+    c.setSegment('nonsense');
+    expect(c.segment()).toBe('all');
+    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([], 0));
   });
 
-  it('drops a filter the URL no longer carries', async () => {
-    // Absence clears. Reading only what is present let a filter outlive the URL that
-    // put it there, which is the other half of the same drift.
-    localStorage.setItem('ap.locale', 'de');
-    const params = new BehaviorSubject(convertToParamMap({ id: 'i-1' }));
-    const view = await render(InvoicesComponent, {
-      providers: [
-        provideRouter([]),
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: USE_MOCK_API, useValue: false },
-        { provide: AuthService, useValue: new FakeAuth() },
-        {
-          provide: ActivatedRoute,
-          useValue: { snapshot: { queryParamMap: params.value }, queryParamMap: params },
-        },
-      ],
-    });
-    const http = TestBed.inject(HttpTestingController);
-    http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([inv({ id: 'i-1' })], 1));
-    view.fixture.detectChanges();
-
-    params.next(convertToParamMap({}));
-    const again = http.expectOne((r) => r.url.endsWith('/api/invoices'));
-    expect(again.request.params.get('id')).toBeNull();
-    again.flush(page([inv({ id: 'i-1' }), inv({ id: 'i-2' })], 2));
-    http.verify();
+  it('adopts every filter and the segment the URL carries', async () => {
+    const { c } = await setup({ queryParams: { grossMin: '10', seg: 'booked' } });
+    expect(c.grossMin()).toBe('10');
+    expect(c.segment()).toBe('booked');
   });
 
-  it('adopts every filter the URL carries, not only the invoice id', async () => {
-    // Reading the whole set is what makes the URL a faithful description of the list.
-    const { c, http } = await setup({ queryParams: { grossMin: '10', status: 'paid' } });
-    const typed = c as unknown as { grossMin(): string; statusFilter(): string };
-    expect(typed.grossMin()).toBe('10');
-    expect(typed.statusFilter()).toBe('paid');
-    http.verify();
-  });
-
-  it('refuses a filter value the panel could never produce', async () => {
-    // The query string is typed by whoever holds the link. Reading every filter from it
-    // is what makes a bad number or an unknown status reachable at all.
-    const { c, http } = await setup({ queryParams: { grossMin: 'abc', status: 'nonsense' } });
-    const typed = c as unknown as { grossMin(): string; statusFilter(): string };
-    expect(typed.grossMin()).toBe('');
-    expect(typed.statusFilter()).toBe('');
-    http.verify();
+  it('refuses a value the chips could never produce', async () => {
+    const { c } = await setup({ queryParams: { grossMin: 'abc', seg: 'nonsense' } });
+    expect(c.grossMin()).toBe('');
+    expect(c.segment()).toBe('all');
   });
 
   it('clears items/total on an initial load error', async () => {
@@ -312,25 +249,6 @@ describe('InvoicesComponent', () => {
 
   // These two hold what the shared table brings: the header and the skeleton stay
   // through a filter, a search or a reload, and the pinned actions column survives one.
-  it('keeps the table and its header on screen while reloading', async () => {
-    const { c, fixture, container } = await setup({ initial: [inv({ id: 'a' })] });
-    c.loading.set(true);
-    fixture.detectChanges();
-    expect(container.querySelector('table')).not.toBeNull();
-    expect(container.querySelectorAll('th').length).toBeGreaterThan(0);
-    expect(container.querySelectorAll('.dt__skeleton-row').length).toBeGreaterThan(0);
-  });
-
-  it('pins the actions column for a user who may book', async () => {
-    const { container } = await setup({ initial: [inv({ id: 'a' })], canManage: true });
-    expect(container.querySelector('td.dt__cell--stickyEnd')).not.toBeNull();
-  });
-
-  it('has no actions column at all for a user who may only read', async () => {
-    const { container } = await setup({ initial: [inv({ id: 'a' })], canManage: false });
-    expect(container.querySelector('.dt__cell--stickyEnd')).toBeNull();
-  });
-
   it('money() formats in de-DE vs en-GB per locale', async () => {
     const { c } = await setup();
     const de = c.money('119.00');
@@ -345,10 +263,10 @@ describe('InvoicesComponent', () => {
     expect(en).toContain('€');
   });
 
-  it('statusLabel() maps both statuses', async () => {
-    const { c } = await setup();
-    expect(c.statusLabel('paid')).toBe('Bezahlt');
-    expect(c.statusLabel('open')).toBe('Offen');
+  it('shows the status as coloured text', async () => {
+    const { container } = await setup({ initial: [inv({ status: 'paid' })] });
+    const status = container.querySelector('app-status-text');
+    expect(status?.textContent?.trim()).toBe('Bezahlt');
   });
 
   it('onSearch debounces and reloads with the q param', async () => {
@@ -387,55 +305,59 @@ describe('InvoicesComponent', () => {
     req.flush(page([]));
   });
 
-  it('setStatus filters immediately (no debounce)', async () => {
+  it('asks each segment with its status and booked filter, and keeps the counts', async () => {
     const { c, http } = await setup();
-    c.setStatus('paid');
-    expect(c.statusFilter()).toBe('paid');
-    const req = lastInvoicesReq(http);
-    expect(req.request.params.get('status')).toBe('paid');
-    req.flush(page([inv({ status: 'paid' })]));
+    const cases: [string, Record<string, string | null>][] = [
+      ['inbox', { status: 'open', booked: 'false' }],
+      ['booked', { status: 'open', booked: 'true' }],
+      ['paid', { status: 'paid', booked: null }],
+      ['all', { status: null, booked: null }],
+    ];
+    for (const [seg, want] of cases) {
+      c.setSegment(seg);
+      const req = lastInvoicesReq(http);
+      expect(req.request.params.get('status')).toBe(want['status']);
+      expect(req.request.params.get('booked')).toBe(want['booked']);
+      req.flush({ ...page([]), counts: { all: 9, inbox: 2, booked: 3, paid: 4 } });
+    }
+    expect(c.counts()).toEqual({ all: 9, inbox: 2, booked: 3, paid: 4 });
+    expect(c.segmentOptions().map((o: { label: string; count: number }) => `${o.label} ${o.count}`)).toEqual([
+      'Alle 9',
+      'Eingang 2',
+      'Verbucht 3',
+      'Bezahlt 4',
+    ]);
   });
 
-  it('onGrossFilter sets min and max and passes numeric params', async () => {
+  it('shows no counts from a backend without them', async () => {
+    const { c } = await setup();
+    expect(c.counts()).toBeNull();
+    expect(c.segmentOptions()[0].count).toBeNull();
+  });
+
+  it('applies the amount and the two date chips at once', async () => {
     const { c, http } = await setup();
-    jest.useFakeTimers();
-    c.onGrossFilter('min', '10');
-    c.onGrossFilter('max', '50');
-    expect(c.grossMin()).toBe('10');
-    expect(c.grossMax()).toBe('50');
-    jest.advanceTimersByTime(400);
-    jest.useRealTimers();
-    const req = lastInvoicesReq(http);
+    c.onGrossRange({ from: '10', to: '50' });
+    let req = lastInvoicesReq(http);
     expect(req.request.params.get('grossMin')).toBe('10');
     expect(req.request.params.get('grossMax')).toBe('50');
     req.flush(page([]));
-  });
-
-  it('onDateFilter sets each of the four date fields', async () => {
-    const { c, http } = await setup();
-    jest.useFakeTimers();
-    c.onDateFilter('issueFrom', '2026-01-01');
-    c.onDateFilter('issueTo', '2026-02-01');
-    c.onDateFilter('dueFrom', '2026-03-01');
-    c.onDateFilter('dueTo', '2026-04-01');
-    expect(c.issueFrom()).toBe('2026-01-01');
-    expect(c.issueTo()).toBe('2026-02-01');
-    expect(c.dueFrom()).toBe('2026-03-01');
-    expect(c.dueTo()).toBe('2026-04-01');
-    jest.advanceTimersByTime(400);
-    jest.useRealTimers();
-    const req = lastInvoicesReq(http);
+    c.onIssueRange({ from: '2026-01-01', to: '2026-02-01' });
+    req = lastInvoicesReq(http);
     expect(req.request.params.get('issueFrom')).toBe('2026-01-01');
     expect(req.request.params.get('issueTo')).toBe('2026-02-01');
+    req.flush(page([]));
+    c.onDueRange({ from: '2026-03-01', to: '2026-04-01' });
+    req = lastInvoicesReq(http);
     expect(req.request.params.get('dueFrom')).toBe('2026-03-01');
     expect(req.request.params.get('dueTo')).toBe('2026-04-01');
     req.flush(page([]));
   });
 
-  it('activeFilterCount counts non-empty filters (search excluded)', async () => {
+  it('activeFilterCount counts non-empty filters and the search', async () => {
     const { c } = await setup();
     expect(c.activeFilterCount()).toBe(0);
-    c.statusFilter.set('open');
+    c.q.set('acme');
     c.grossMin.set(' 5 ');
     c.grossMax.set('   '); // Whitespace does not count as an active filter.
     c.issueFrom.set('2026-01-01');
@@ -444,7 +366,7 @@ describe('InvoicesComponent', () => {
 
   it('resetFilters clears every filter and reloads', async () => {
     const { c, http } = await setup();
-    c.statusFilter.set('open');
+    c.q.set('acme');
     c.grossMin.set('1');
     c.grossMax.set('2');
     c.issueFrom.set('a');
@@ -609,7 +531,43 @@ describe('InvoicesComponent', () => {
     http.expectNone((r) => r.url.includes('/invoices/parse'));
   });
 
-  it('successful parse prefills the create dialog + success toast', async () => {
+  it('onDrop leaves a drop on the drop zone to the zone', async () => {
+    const { c, http } = await setup();
+    c.onDragEnter(dragEvent(['Files']));
+    const zone = document.createElement('app-file-drop-zone');
+    const inner = document.createElement('span');
+    zone.appendChild(inner);
+    const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
+    const ev = { ...dragEvent(['Files'], file), target: inner } as unknown as DragEvent;
+    c.onDrop(ev);
+    expect(ev.preventDefault).not.toHaveBeenCalled();
+    expect(c.dragActive()).toBe(false);
+    http.expectNone((r) => r.url.includes('/invoices/parse'));
+    // A target outside the zone, and a target without `closest`, count as the page.
+    const outside = { ...dragEvent(['Files']), target: document.createElement('div') } as unknown as DragEvent;
+    c.onDrop(outside);
+    expect(outside.preventDefault).toHaveBeenCalled();
+    const odd = { ...dragEvent(['Files']), target: {} } as unknown as DragEvent;
+    c.onDrop(odd);
+    expect(odd.preventDefault).toHaveBeenCalled();
+  });
+
+  it('onZoneFiles imports nothing for a reader', async () => {
+    const { c, http } = await setup({ canManage: false });
+    c.onZoneFiles([new File(['x'], 'a.pdf', { type: 'application/pdf' })]);
+    http.expectNone((r) => r.url.includes('/invoices/parse'));
+  });
+
+  it('onZoneFiles imports the first file for a manager', async () => {
+    const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
+    const { c, http } = await setup();
+    c.onZoneFiles([]);
+    http.expectNone((r) => r.url.includes('/invoices/parse'));
+    c.onZoneFiles([file]);
+    http.expectOne((r) => r.url.endsWith('/api/invoices/parse')).flush(PARSE);
+  });
+
+  it('successful parse prefills the review dialog and says so in it, not in a toast', async () => {
     const { c, http, toast } = await setup();
     const spy = jest.spyOn(toast, 'success');
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
@@ -621,7 +579,9 @@ describe('InvoicesComponent', () => {
     expect(c.newGross()).toBe('238.00');
     expect(c.importToken()).toBe('tok-parse');
     expect(c.importFileName()).toBe('parsed.pdf');
-    expect(spy).toHaveBeenCalled();
+    expect(c.importNotice()).toBe('parsed');
+    expect(c.importDuplicate()).toBeNull();
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('parse with null fields prefills empty strings', async () => {
@@ -657,31 +617,46 @@ describe('InvoicesComponent', () => {
     expect(c.newGross()).toBe('');
   });
 
-  it('parse flagged as duplicate shows a warning toast', async () => {
-    const { c, http, toast } = await setup();
-    const spy = jest.spyOn(toast, 'show');
+  it('parse flagged as duplicate shows the warning in the review dialog (N31)', async () => {
+    const { c, http, fixture } = await setup();
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
     http
       .expectOne((r) => r.url.endsWith('/api/invoices/parse'))
       .flush({ ...PARSE, duplicate: true, number: 'DUP' });
-    expect(spy).toHaveBeenCalledWith(expect.any(String), 'warning');
+    fixture.detectChanges();
+    expect(c.importDuplicate()).toBe('DUP');
+    const dialog = within(screen.getByRole('form', { name: 'Importierte Rechnung prüfen' }));
+    expect(dialog.getByText('Rechnung gelesen — bitte prüfen.')).toBeInTheDocument();
+    expect(dialog.getByText(/Mögliche Dublette: Rechnung „DUP“/)).toBeInTheDocument();
+    expect(dialog.getByText('parsed.pdf')).toBeInTheDocument();
   });
 
   it('duplicate warning tolerates a null number', async () => {
-    const { c, http, toast } = await setup();
-    const spy = jest.spyOn(toast, 'show');
+    const { c, http } = await setup();
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
     http
       .expectOne((r) => r.url.endsWith('/api/invoices/parse'))
       .flush({ ...PARSE, duplicate: true, number: null });
-    expect(spy).toHaveBeenCalledWith(expect.any(String), 'warning');
+    expect(c.importDuplicate()).toBe('');
+  });
+
+  it('a manual add clears the notes of an earlier import', async () => {
+    const { c, http } = await setup();
+    const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
+    c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
+    http
+      .expectOne((r) => r.url.endsWith('/api/invoices/parse'))
+      .flush({ ...PARSE, duplicate: true });
+    c.createOpen.set(false);
+    c.openCreate();
+    expect(c.importNotice()).toBeNull();
+    expect(c.importDuplicate()).toBeNull();
   });
 
   it('not-zugferd parse error opens an empty dialog and attaches the file', async () => {
-    const { c, http, toast } = await setup();
-    const showSpy = jest.spyOn(toast, 'show');
+    const { c, http } = await setup();
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
     http
@@ -695,7 +670,8 @@ describe('InvoicesComponent', () => {
     up.flush(FILE_RES);
     expect(c.importToken()).toBe('tok-upload');
     expect(c.importFileName()).toBe('manual.pdf');
-    expect(showSpy).toHaveBeenCalledWith(expect.any(String), 'info');
+    // The dialog says why the fields are empty.
+    expect(c.importNotice()).toBe('manual');
   });
 
   it('other parse errors surface a problem-detail error toast', async () => {
@@ -800,13 +776,32 @@ describe('InvoicesComponent', () => {
     expect(c.importToken()).toBe('');
   });
 
-  it('canSubmitCreate requires a positive gross amount', async () => {
+  it('canSubmitCreate requires a number, a supplier and a positive gross amount', async () => {
     const { c } = await setup();
     expect(c.canSubmitCreate()).toBe(false);
+    c.newNumber.set('R-1');
+    c.newSupplier.set('Sup');
     c.newGross.set('0');
     expect(c.canSubmitCreate()).toBe(false);
     c.newGross.set('12.50');
     expect(c.canSubmitCreate()).toBe(true);
+    c.newNumber.set('   ');
+    expect(c.canSubmitCreate()).toBe(false);
+    c.newNumber.set('R-1');
+    c.newSupplier.set('');
+    expect(c.canSubmitCreate()).toBe(false);
+  });
+
+  it('create() is a no-op without a number or a supplier (manual entry)', async () => {
+    const { c, http } = await setup();
+    c.openCreate();
+    c.newGross.set('5');
+    c.newSupplier.set('Sup');
+    c.create({ preventDefault: jest.fn() } as unknown as Event);
+    c.newNumber.set('R-1');
+    c.newSupplier.set(' ');
+    c.create({ preventDefault: jest.fn() } as unknown as Event);
+    http.expectNone((r) => r.url.endsWith('/api/invoices') && r.method === 'POST');
   });
 
   it('create() submits trimmed fields, includes the file handle, toasts and reloads', async () => {
@@ -852,14 +847,16 @@ describe('InvoicesComponent', () => {
   it('create() sends nulls for blank optional fields and no file handle', async () => {
     const { c, http } = await setup();
     c.openCreate();
+    c.newNumber.set('R-1');
+    c.newSupplier.set('Sup');
     c.newGross.set('5');
-    // Every other field stays blank and there is no importToken.
+    // Every optional field stays blank and there is no importToken.
     const ev = { preventDefault: jest.fn() } as unknown as Event;
     c.create(ev);
     const req = http.expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'POST');
     expect(req.request.body).toMatchObject({
-      number: null,
-      supplier: null,
+      number: 'R-1',
+      supplier: 'Sup',
       issueDate: null,
       dueDate: null,
       netAmount: null,
@@ -877,6 +874,8 @@ describe('InvoicesComponent', () => {
   it('create() with a file handle but no mime sends fileMime null', async () => {
     const { c, http } = await setup();
     c.openCreate();
+    c.newNumber.set('R-1');
+    c.newSupplier.set('Sup');
     c.newGross.set('5');
     c.importToken.set('tok');
     c.importFileName.set('f.pdf');
@@ -893,6 +892,8 @@ describe('InvoicesComponent', () => {
   it('create() is a no-op when gross is not positive', async () => {
     const { c, http } = await setup();
     c.openCreate();
+    c.newNumber.set('R-1');
+    c.newSupplier.set('Sup');
     c.newGross.set('0');
     c.create({ preventDefault: jest.fn() } as unknown as Event);
     http.expectNone((r) => r.url.endsWith('/api/invoices') && r.method === 'POST');
@@ -901,6 +902,8 @@ describe('InvoicesComponent', () => {
   it('create() is a no-op while already saving', async () => {
     const { c, http } = await setup();
     c.openCreate();
+    c.newNumber.set('R-1');
+    c.newSupplier.set('Sup');
     c.newGross.set('5');
     c.saving.set(true);
     c.create({ preventDefault: jest.fn() } as unknown as Event);
@@ -911,6 +914,8 @@ describe('InvoicesComponent', () => {
     const { c, http, toast } = await setup();
     const spy = jest.spyOn(toast, 'error');
     c.openCreate();
+    c.newNumber.set('R-1');
+    c.newSupplier.set('Sup');
     c.newGross.set('5');
     c.create({ preventDefault: jest.fn() } as unknown as Event);
     http
@@ -941,13 +946,44 @@ describe('InvoicesComponent', () => {
     expect(c.editSupplier()).toBe('');
     expect(c.editGross()).toBe('99');
     expect(c.editStatus()).toBe('paid');
-    expect(c.editGrossValid()).toBe(true);
+    // A stored invoice without number and supplier saves without them.
+    expect(c.editNumberRequired()).toBe(false);
+    expect(c.editSupplierRequired()).toBe(false);
+    expect(c.canSubmitEdit()).toBe(true);
   });
 
-  it('editGrossValid is false for a non-positive gross', async () => {
+  it('canSubmitEdit keeps a stored number and supplier from becoming empty', async () => {
+    const { c } = await setup();
+    c.openEdit(inv({ id: 'e1' }));
+    expect(c.editNumberRequired()).toBe(true);
+    expect(c.editSupplierRequired()).toBe(true);
+    c.editNumber.set('  ');
+    expect(c.canSubmitEdit()).toBe(false);
+    c.editNumber.set('R-9');
+    c.editSupplier.set('');
+    expect(c.canSubmitEdit()).toBe(false);
+  });
+
+  it('saveEdit marks an invoice without number and supplier as paid', async () => {
+    const { c, http } = await setup({
+      initial: [inv({ id: 'e1', number: null, supplier: null, status: 'open', grossAmount: '40' })],
+    });
+    c.openEdit(c.items()[0]);
+    c.editStatus.set('paid');
+    c.saveEdit({ preventDefault: jest.fn() } as unknown as Event);
+    const req = http.expectOne((r) => r.url.endsWith('/api/invoices/e1') && r.method === 'PATCH');
+    expect(req.request.body).toMatchObject({ number: null, supplier: null, status: 'paid' });
+    req.flush(inv({ id: 'e1', number: null, supplier: null, status: 'paid' }));
+    expect(c.editing()).toBe(null);
+    expect(c.items()[0].status).toBe('paid');
+    // The status moves the invoice to another segment: the list loads again.
+    lastInvoicesReq(http).flush(page([]));
+  });
+
+  it('canSubmitEdit is false for a non-positive gross', async () => {
     const { c } = await setup();
     c.openEdit(inv({ grossAmount: '0' }));
-    expect(c.editGrossValid()).toBe(false);
+    expect(c.canSubmitEdit()).toBe(false);
   });
 
   it('saveEdit patches the invoice and replaces it in the list', async () => {
@@ -966,6 +1002,17 @@ describe('InvoicesComponent', () => {
     expect(c.editing()).toBe(null);
     expect(c.items()[0].supplier).toBe('New Sup');
     expect(spy).toHaveBeenCalled();
+  });
+
+  it('saveEdit keeps the line breaks of a note', async () => {
+    const { c, http } = await setup({ initial: [inv({ id: 'e1', note: 'Teil 1\nTeil 2' })] });
+    c.openEdit(c.items()[0]);
+    expect(c.editNote()).toBe('Teil 1\nTeil 2');
+    c.editNote.set('Teil 1\nTeil 2\nTeil 3\n');
+    c.saveEdit({ preventDefault: jest.fn() } as unknown as Event);
+    const req = http.expectOne((r) => r.url.endsWith('/api/invoices/e1') && r.method === 'PATCH');
+    expect(req.request.body.note).toBe('Teil 1\nTeil 2\nTeil 3');
+    req.flush(inv({ id: 'e1', note: 'Teil 1\nTeil 2\nTeil 3' }));
   });
 
   it('saveEdit leaves untouched list entries alone', async () => {
@@ -998,11 +1045,13 @@ describe('InvoicesComponent', () => {
       ],
     });
     c.openEdit(c.items()[0]);
+    c.editNumber.set(' R-1 ');
+    c.editSupplier.set('Sup');
     c.saveEdit({ preventDefault: jest.fn() } as unknown as Event);
     const req = http.expectOne((r) => r.url.endsWith('/api/invoices/e1') && r.method === 'PATCH');
     expect(req.request.body).toMatchObject({
-      number: null,
-      supplier: null,
+      number: 'R-1',
+      supplier: 'Sup',
       issueDate: null,
       dueDate: null,
       netAmount: null,
@@ -1016,6 +1065,14 @@ describe('InvoicesComponent', () => {
   it('saveEdit is a no-op without an editing target', async () => {
     const { c, http } = await setup();
     c.editing.set(null);
+    c.saveEdit({ preventDefault: jest.fn() } as unknown as Event);
+    http.expectNone((r) => r.method === 'PATCH');
+  });
+
+  it('saveEdit is a no-op without a supplier', async () => {
+    const { c, http } = await setup();
+    c.openEdit(inv({ id: 'e1' }));
+    c.editSupplier.set('  ');
     c.saveEdit({ preventDefault: jest.fn() } as unknown as Event);
     http.expectNone((r) => r.method === 'PATCH');
   });
@@ -1070,6 +1127,8 @@ describe('InvoicesComponent', () => {
     expect(c.items().map((x: Invoice) => x.id)).toEqual(['d2']);
     expect(c.total()).toBe(1);
     expect(spy).toHaveBeenCalled();
+    // The counts of the segments change: the list loads again.
+    lastInvoicesReq(http).flush(page([inv({ id: 'd2' })], 1));
   });
 
   it('doDelete clamps the total at zero', async () => {
@@ -1078,6 +1137,7 @@ describe('InvoicesComponent', () => {
     c.doDelete();
     http.expectOne((r) => r.url.endsWith('/api/invoices/d1') && r.method === 'DELETE').flush(null);
     expect(c.total()).toBe(0);
+    lastInvoicesReq(http).flush(page([]));
   });
 
   it('doDelete is a no-op without a confirm target', async () => {
@@ -1217,27 +1277,26 @@ describe('InvoicesComponent filter declaration', () => {
     filterSignals: readonly {
       signal: { (): string; set(v: string): void };
       key: string;
-      clearedByReset: boolean;
     }[];
     filterParams(): Record<string, unknown>;
     resetFilters(): void;
     activeFilterCount(): number;
+    segment(): string;
   }
 
-  it('resets exactly the filters it declares as reset by the button', async () => {
+  it('resets every filter it declares and keeps the segment', async () => {
     // The count, the reset and the request each kept their own list. A filter added to
     // one and forgotten in another is invisible: the control moves, and the list does
     // not change. This is what /applications was reported broken for.
-    const { c, http } = await setup();
+    const { c, http } = await setup({ queryParams: { seg: 'paid' } });
     const host = c as unknown as FilterHost;
     for (const f of host.filterSignals) f.signal.set('x');
 
     host.resetFilters();
     http.expectOne((r) => r.url.endsWith('/api/invoices')).flush(page([], 0));
 
-    for (const f of host.filterSignals) {
-      expect(f.signal()).toBe(f.clearedByReset ? '' : 'x');
-    }
+    for (const f of host.filterSignals) expect(f.signal()).toBe('');
+    expect(host.segment()).toBe('paid');
   });
 
   it('sends every declared filter that has a value', async () => {
@@ -1249,15 +1308,309 @@ describe('InvoicesComponent filter declaration', () => {
     expect(Object.keys(params).sort()).toEqual(host.filterSignals.map((f) => f.key).sort());
   });
 
-  it('counts only the filters the reset button owns', async () => {
-    // The search box sits in the page header, outside the filter panel, so counting it
-    // would show a badge no button in that panel can clear.
+  it('counts every declared filter', async () => {
     const { c } = await setup();
     const host = c as unknown as FilterHost;
     for (const f of host.filterSignals) f.signal.set('7');
+    expect(host.activeFilterCount()).toBe(host.filterSignals.length);
+  });
+});
 
-    expect(host.activeFilterCount()).toBe(
-      host.filterSignals.filter((f) => f.clearedByReset).length,
-    );
+// --- list/detail (FE10c) ---------------------------------------------------
+
+/** Let `matchMedia` match the queries that contain one of the given parts. */
+function setViewport(...parts: string[]): void {
+  window.matchMedia = ((query: string) => ({
+    matches: parts.some((p) => query.includes(p)),
+    media: query,
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+const realMatchMedia = window.matchMedia;
+
+const BOOKING: InvoiceBooking = {
+  id: 'b-1',
+  budgetId: 'cc-1',
+  pathKey: 'VS-220',
+  budgetName: 'Maschinenbau',
+  fiscalYearId: 'fy',
+  kind: 'expense',
+  amount: '50.00',
+  description: 'Anzahlung',
+  paymentDate: '2026-01-05',
+  parentExpenseId: null,
+  createdAt: '2026-01-05T00:00:00Z',
+};
+
+describe('InvoicesComponent (list/detail)', () => {
+  afterEach(() => {
+    window.matchMedia = realMatchMedia;
+    TestBed.inject(HttpTestingController).verify();
+  });
+
+  it('lists the invoices by month with status, number and due date', async () => {
+    setViewport('min-width: 1200px');
+    const { container } = await setup({
+      initial: [inv(), inv({ id: 'i-2', status: 'paid', supplier: null, number: 'R-2', issueDate: '2025-12-20' })],
+    });
+    const months = [...container.querySelectorAll('.inv__month')].map((h) => h.textContent?.trim());
+    expect(months).toEqual(['Januar 2026', 'Dezember 2025']);
+    expect(screen.getByRole('link', { name: /ACME GmbH/ }).getAttribute('href')).toContain('id=i-1');
+    // A row without supplier is named by its number.
+    expect(screen.getByRole('link', { name: /^R-2/ })).toBeInTheDocument();
+    expect(screen.getByText('fällig 31.01.')).toBeInTheDocument();
+    expect(screen.getByText('Keine Rechnung geöffnet')).toBeInTheDocument();
+  });
+
+  it('names a row without supplier and number, and shows the empty sheet of an empty list', async () => {
+    setViewport('min-width: 1200px');
+    const { c, container, fixture, http } = await setup({ initial: [] });
+    expect(container.querySelector('.inv__none--skeleton')).not.toBeNull();
+    expect(c.titleOf(inv({ supplier: null, number: null }))).toBe('Rechnung ohne Lieferant');
+    c.q.set('x');
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    expect(c.q()).toBe('');
+    lastInvoicesReq(http).flush(page([]));
+  });
+
+  it('shows the open invoice and its actions; marks it paid and creates a booking', async () => {
+    setViewport('min-width: 1200px');
+    const { c, http, fixture, toast } = await setup({ initial: [inv({ linkedBookings: [BOOKING] })] });
+    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    c.selectedId.set('i-1');
+    fixture.detectChanges();
+    // The tree loads once, for the swatches of the bookings.
+    http.expectOne((r) => r.url.endsWith('/api/budgets')).flush([]);
+    fixture.detectChanges();
+    expect(screen.getByRole('heading', { name: 'ACME GmbH' })).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('button', { name: 'Buchung anlegen' })[0]);
+    expect(navigate).toHaveBeenCalledWith(['/expenses'], { queryParams: { new: 'booking', invoice: 'i-1' } });
+
+    const success = jest.spyOn(toast, 'success');
+    await userEvent.click(screen.getByRole('button', { name: 'Als bezahlt markieren' }));
+    expect(c.markingPaid()).toBe('i-1');
+    // A second click while it runs sends nothing.
+    c.markPaid(c.items()[0]);
+    const patch = http.expectOne((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'PATCH');
+    expect(patch.request.body).toEqual({ status: 'paid' });
+    patch.flush(inv({ status: 'paid', linkedBookings: [BOOKING] }));
+    expect(success).toHaveBeenCalledWith('Rechnung als bezahlt markiert.');
+    lastInvoicesReq(http).flush(page([inv({ status: 'paid', linkedBookings: [BOOKING] })]));
+    expect(c.items()[0].status).toBe('paid');
+    // A paid invoice is not marked again.
+    c.markPaid(c.items()[0]);
+    navigate.mockRestore();
+  });
+
+  it('reports a failed "mark paid"', async () => {
+    const { c, http, toast } = await setup();
+    const error = jest.spyOn(toast, 'error');
+    c.markPaid(c.items()[0]);
+    http
+      .expectOne((r) => r.url.endsWith('/api/invoices/i-1'))
+      .flush({ detail: 'Nein' }, { status: 409, statusText: 'x' });
+    expect(error).toHaveBeenCalledWith('Nein');
+    expect(c.markingPaid()).toBeNull();
+  });
+
+  it('keeps a loaded invoice of a deep link up to date after "mark paid"', async () => {
+    const { c, http, fixture } = await setup({ initial: [], queryParams: { id: 'i-7' } });
+    fixture.detectChanges();
+    http.expectOne((r) => r.url.endsWith('/api/invoices/i-7')).flush(inv({ id: 'i-7' }));
+    c.markPaid(c.selectedInvoice());
+    http.expectOne((r) => r.url.endsWith('/api/invoices/i-7')).flush(inv({ id: 'i-7', status: 'paid' }));
+    lastInvoicesReq(http).flush(page([]));
+    expect(c.selectedInvoice().status).toBe('paid');
+  });
+
+  it('keeps the open invoice in the detail when "mark paid" drops it from "Eingang"', async () => {
+    const { c, http, fixture } = await setup({ queryParams: { id: 'i-1', seg: 'inbox' } });
+    expect(c.segment()).toBe('inbox');
+    expect(c.detailView()).toBe('invoice');
+    c.markPaid(c.selectedInvoice());
+    http
+      .expectOne((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'PATCH')
+      .flush(inv({ status: 'paid' }));
+    // The reload of the segment no longer holds the paid invoice.
+    lastInvoicesReq(http).flush(page([inv({ id: 'i-9' })]));
+    fixture.detectChanges();
+    expect(c.items().map((i: Invoice) => i.id)).toEqual(['i-9']);
+    expect(c.detailView()).toBe('invoice');
+    expect(c.selectedInvoice().status).toBe('paid');
+    // The kept copy is current: no request by id.
+    http.expectNone((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'GET');
+  });
+
+  it('loads the open invoice by its id when a filter change drops it from the list', async () => {
+    const { c, http, fixture } = await setup({ queryParams: { id: 'i-1' } });
+    c.setSegment('paid');
+    lastInvoicesReq(http).flush(page([inv({ id: 'i-9', status: 'paid' })]));
+    fixture.detectChanges();
+    http.expectOne((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'GET').flush(inv());
+    expect(c.detailView()).toBe('invoice');
+    expect(c.selectedInvoice().id).toBe('i-1');
+  });
+
+  it('closes an open form when the URL opens another row', async () => {
+    const { c } = await setup({ initial: [inv(), inv({ id: 'i-2' })] });
+    c.openEdit(c.items()[0]);
+    expect(c.detailView()).toBe('form');
+    c.adoptUrl(convertToParamMap({ id: 'i-2' }));
+    expect(c.formMode()).toBeNull();
+    expect(c.detailView()).toBe('invoice');
+    expect(c.selectedInvoice().id).toBe('i-2');
+    // A form opened on the open row stays while the URL keeps that row.
+    c.openEdit(c.items()[1]);
+    c.adoptUrl(convertToParamMap({ id: 'i-2' }));
+    expect(c.formMode()).toBe('edit');
+  });
+
+  it('builds the row menu from the rights and runs every item', async () => {
+    const { c, http } = await setup();
+    const row = c.items()[0];
+    expect(c.rowMenu(row).flatMap((s: { items: { id: string }[] }) => s.items.map((i) => i.id))).toEqual([
+      'edit',
+      'paid',
+      'book',
+      'file',
+      'delete',
+    ]);
+    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    c.onRowMenu({ id: 'book', label: '' }, row);
+    expect(navigate).toHaveBeenCalledWith(['/expenses'], { queryParams: { new: 'booking', invoice: 'i-1' } });
+    c.onRowMenu({ id: 'edit', label: '' }, row);
+    expect(c.editing()).toBe(row);
+    c.onRowMenu({ id: 'delete', label: '' }, row);
+    expect(c.confirmDelete()).toBe(row);
+    const blob = jest.spyOn(downloadUtil, 'downloadBlob').mockImplementation(() => undefined);
+    c.onRowMenu({ id: 'file', label: '' }, row);
+    http.expectOne((r) => r.url.endsWith('/api/invoices/i-1/file')).flush(new Blob(['x']));
+    c.onRowMenu({ id: 'paid', label: '' }, row);
+    http.expectOne((r) => r.url.endsWith('/api/invoices/i-1') && r.method === 'PATCH').flush(inv({ status: 'paid' }));
+    lastInvoicesReq(http).flush(page([inv({ status: 'paid' })]));
+    c.onRowMenu({ id: 'other', label: '' }, row);
+    expect(c.rowMenuLabel(row)).toBe('Aktionen für Rechnung R-001');
+    expect(c.rowMenuLabel(inv({ number: null, supplier: null }))).toBe('Aktionen für Rechnung ');
+    blob.mockRestore();
+    navigate.mockRestore();
+  });
+
+  it('offers a reader only the receipt in the row menu', async () => {
+    const { c } = await setup({ canManage: false });
+    expect(c.rowMenu(inv({ hasFile: false }))).toEqual([]);
+    expect(c.rowMenu(inv()).flatMap((s: { items: { id: string }[] }) => s.items.map((i) => i.id))).toEqual(['file']);
+  });
+
+  it('opens and closes a row and a form through the URL', async () => {
+    const { c } = await setup();
+    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    c.openInvoice('i-3');
+    expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { id: 'i-3' } }));
+    c.closeDetail();
+    expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { id: null } }));
+    navigate.mockClear();
+    c.openCreate();
+    expect(c.formMode()).toBe('create');
+    expect(c.detailView()).toBe('form');
+    expect(c.formTitle()).toBe('Rechnung hinzufügen');
+    c.closeDetail();
+    expect(c.formMode()).toBeNull();
+    expect(navigate).not.toHaveBeenCalled();
+    c.openEdit(c.items()[0]);
+    expect(c.formTitle()).toBe('Rechnung bearbeiten');
+    navigate.mockRestore();
+  });
+
+  it('opens a new invoice after the create', async () => {
+    const { c, http } = await setup();
+    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    c.openCreate();
+    c.newNumber.set('R-9');
+    c.newSupplier.set('X');
+    c.newGross.set('10');
+    c.create({ preventDefault: jest.fn() } as unknown as Event);
+    http.expectOne((r) => r.url.endsWith('/api/invoices') && r.method === 'POST').flush(inv({ id: 'new' }));
+    lastInvoicesReq(http).flush(page([inv({ id: 'new' })]));
+    expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { id: 'new' } }));
+    navigate.mockRestore();
+  });
+
+  it('closes the detail of a deleted invoice', async () => {
+    const { c, http } = await setup();
+    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    c.selectedId.set('i-1');
+    c.openEdit(c.items()[0]);
+    c.askDelete(c.items()[0]);
+    c.doDelete();
+    http.expectOne((r) => r.method === 'DELETE').flush(null);
+    lastInvoicesReq(http).flush(page([]));
+    expect(c.editing()).toBeNull();
+    expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { id: null } }));
+    navigate.mockRestore();
+  });
+
+  it('searches the number of a duplicate in every segment ("Vorhandene öffnen")', async () => {
+    const { c, http } = await setup({ queryParams: { seg: 'paid' } });
+    c.openDuplicate(); // nothing to open yet
+    const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
+    c.onFilePicked({ target: { files: [file], value: 'x' } } as unknown as Event);
+    http.expectOne((r) => r.url.endsWith('/api/invoices/parse')).flush({ ...PARSE, duplicate: true, number: 'DUP' });
+    expect(c.importFileSize()).toBe(1);
+    expect(c.formTitle()).toBe('Importierte Rechnung prüfen');
+    c.openDuplicate();
+    expect(c.createOpen()).toBe(false);
+    expect(c.q()).toBe('DUP');
+    expect(c.segment()).toBe('all');
+    const req = lastInvoicesReq(http);
+    expect(req.request.params.get('q')).toBe('DUP');
+    req.flush(page([]));
+  });
+
+  it('opens the file picker from the header menu of a phone', async () => {
+    setViewport('max-width: 768px');
+    const { c, container } = await setup();
+    const input = container.querySelector('input[type=file]') as HTMLInputElement;
+    const click = jest.spyOn(input, 'click').mockImplementation(() => undefined);
+    c.onHeaderMenu({ id: 'import', label: '' });
+    expect(click).toHaveBeenCalled();
+    c.onHeaderMenu({ id: 'other', label: '' });
+    expect(click).toHaveBeenCalledTimes(1);
+    // The phone has the form in a bottom sheet.
+    expect(screen.getByRole('button', { name: 'Rechnung' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Rechnung' }));
+    expect(screen.getByRole('dialog', { name: 'Rechnung hinzufügen' }).classList.contains('ss--bottom')).toBe(true);
+    expect(c.detailView()).toBe('none');
+  });
+
+  it('shows the whole page as the drop target while a PDF is dragged over it', async () => {
+    const { c, fixture, container } = await setup();
+    c.dragActive.set(true);
+    fixture.detectChanges();
+    expect(container.querySelector('.inv__dropOverlay')?.textContent).toContain('PDF hier ablegen, um zu importieren');
+  });
+
+  it('formats days and loads the tree only once', async () => {
+    const { c, http, fixture } = await setup({ initial: [inv({ linkedBookings: [BOOKING] }), inv({ id: 'i-2', linkedBookings: [BOOKING] })] });
+    expect(c.day('2026-09-28')).toBe('28.09.');
+    c.selectedId.set('i-1');
+    fixture.detectChanges();
+    http.expectOne((r) => r.url.endsWith('/api/budgets')).error(new ProgressEvent('x'));
+    c.selectedId.set('i-2');
+    fixture.detectChanges();
+    http.expectNone((r) => r.url.endsWith('/api/budgets'));
+    expect(c.tree()).toEqual([]);
+  });
+
+  it('marks the page as a pane page side by side', async () => {
+    setViewport('min-width: 1200px');
+    const { fixture } = await setup();
+    expect(fixture.nativeElement.classList.contains('pane-page')).toBe(true);
+    fixture.destroy();
   });
 });

@@ -1,1 +1,147 @@
-:host { display: flex; flex-direction: column; gap: var(--space-4); }
+@use 'breakpoints' as bp;
+
+/* The same two panes as the applications page (applications-list.component.scss). */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Side by side the page does not scroll: the host is a pane page (`.pane-page` in
+   styles.scss) that takes the free height of the main column of the shell, and each pane
+   scrolls inside itself. One pane at a time, the page scrolls. */
+.tasks {
+  min-width: 0;
+}
+.tasks--split {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* ------------------------------------------------------------------ list pane */
+/* The column and its header are the shared list geometry: `.ld-pane` (styles.scss) and
+   `app-page-header` with `pane`. */
+
+/* ------------------------------------------------------------------ rows */
+.tasks__scroll {
+  --tasks-fade: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tasks--split .tasks__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--tasks-fade);
+}
+.tasks--split .tasks__scroll > * {
+  flex: none;
+}
+/* An end fades only while more rows lie past it (`appScrollFade` sets the classes). */
+.tasks__scroll.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--tasks-fade));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--tasks-fade));
+}
+.tasks__scroll.is-fade-end {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--tasks-fade));
+  mask-image: linear-gradient(to top, transparent, #000 var(--tasks-fade));
+}
+.tasks__scroll.is-fade-start.is-fade-end {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--tasks-fade),
+    #000 calc(100% - var(--tasks-fade)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--tasks-fade),
+    #000 calc(100% - var(--tasks-fade)),
+    transparent
+  );
+}
+
+.tasks__group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tasks__month {
+  padding: 18px var(--space-4) 6px;
+}
+.tasks__group:first-child .tasks__month {
+  padding-top: var(--space-2);
+}
+.tasks__rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tasks__dot {
+  margin-inline: 6px;
+  color: var(--color-text-subtle);
+}
+
+/* The amount over the waiting time, both at the end of the row. */
+.tasks__trail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.tasks__facts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.tasks__amount {
+  font-size: 0.8125rem; /* 13px */
+  white-space: nowrap;
+}
+.tasks__waiting {
+  color: var(--color-text-muted);
+  font-size: 0.75rem; /* 12px */
+  white-space: nowrap;
+}
+.tasks__chev {
+  display: inline-flex;
+  margin-inline-end: calc(-1 * var(--space-2));
+  color: var(--color-text-muted);
+}
+
+.tasks__status {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.tasks__status--error {
+  color: var(--color-danger);
+}
+.tasks__empty {
+  margin-block: var(--space-6);
+}
+
+/* ------------------------------------------------------------------ detail pane */
+.tasks__detail {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+@include bp.phone {
+  .tasks__month {
+    padding-inline: var(--space-1);
+  }
+  /* The whole row is the target; the title needs the room more than the chevron. */
+  .tasks__chev {
+    display: none;
+  }
+}

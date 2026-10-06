@@ -30,6 +30,8 @@ from app.modules.auth.schemas import (
     MagicLinkVerifyRequest,
     MeOut,
 )
+from app.modules.flow.dispatch import ActionDispatcher
+from app.modules.flow.router import get_action_dispatcher
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.service import (
     NotificationService,
@@ -44,6 +46,7 @@ from app.shared.antiabuse import (
 )
 from app.shared.errors import (
     BadRequestError,
+    ForbiddenError,
     NotFoundError,
     ProblemDetail,
     ServiceUnavailableError,
@@ -139,6 +142,17 @@ async def callback(
         raise ServiceUnavailableError("The identity provider is unavailable.") from exc
     except OidcError as exc:
         raise BadRequestError("OIDC login failed.") from exc
+    except ForbiddenError as exc:
+        if exc.code != "account_merged":
+            raise
+        # A login with the sub of a merged (old) account: the browser lands on the
+        # start page, which says what happened, instead of a raw 403. Nothing is
+        # committed, and the OIDC transaction ends.
+        await db.rollback()
+        dest = settings.public_base_url.rstrip("/") + "/?loginError=account_merged"
+        refused = RedirectResponse(dest, status_code=status.HTTP_303_SEE_OTHER)
+        refused.delete_cookie(settings.oidc_tx_cookie_name, path="/")
+        return refused
     # Persist the principal and the auth_session row. `get_session` never commits.
     # Without this commit the request close rolls both rows back.
     await db.commit()
@@ -217,7 +231,8 @@ async def me(
         permissions=sorted(principal.permissions),
         groups=sorted(principal.groups),
         gremien=await _gremien_for(db, principal.sub),
-        session_manage_gremien=await _session_manage_gremien(db, principal.sub),
+        session_manage_gremien=await _session_manage_gremien(db, principal),
+        gremium_permissions=await _gremium_permissions(db, principal),
         has_scoped_budget_view=await _has_scoped_budget_view(db, principal.sub),
         in_substitute_pool=await _in_substitute_pool(db, principal.sub),
     )
@@ -226,19 +241,13 @@ async def me(
 async def _in_substitute_pool(db: DbSession, sub: str) -> bool:
     """Tell if `sub` is in at least one substitute pool.
 
-    The frontend uses the flag to show the meeting timeline to pool substitutes that
-    have no own membership.
+    The pool is the table `delegation_substitute`. The frontend uses the flag
+    to show the meeting timeline to pool substitutes that have no own
+    membership.
     """
-    from app.modules.auth.models import Principal as PrincipalRow
-    from app.modules.delegations.models import DelegationSubstitute
+    from app.modules.delegations.pool import substitute_gremien_for_sub
 
-    pid_subq = select(PrincipalRow.id).where(PrincipalRow.sub == sub).scalar_subquery()
-    hit = await db.scalar(
-        select(DelegationSubstitute.id)
-        .where(DelegationSubstitute.substitute_principal_id == pid_subq)
-        .limit(1)
-    )
-    return hit is not None
+    return bool(await substitute_gremien_for_sub(db, sub))
 
 
 async def _has_scoped_budget_view(db: DbSession, sub: str) -> bool:
@@ -258,17 +267,36 @@ async def _has_scoped_budget_view(db: DbSession, sub: str) -> bool:
     return hit is not None
 
 
-async def _session_manage_gremien(db: DbSession, sub: str) -> list[UUID]:
-    """Return the Gremien that `sub` manages through a gremium role (`session.manage`).
+async def _session_manage_gremien(db: DbSession, principal: Principal) -> list[UUID]:
+    """Return the Gremien that the principal manages through a gremium role.
 
-    This reads the same source as `MeetingService.can_manage`. The frontend gate for
-    "create meeting" and the server decision therefore stay congruent.
+    The gremium role must hold `session.manage`. This reads the same scope-capped
+    source as `MeetingService.can_manage`. The frontend gate for "create meeting"
+    and the server decision therefore stay congruent.
     """
-    from app.modules.admin.gremium_roles import gremium_ids_with_permission
+    from app.modules.admin.gremium_roles import gremium_ids_for
 
-    return sorted(
-        await gremium_ids_with_permission(db, sub, "session.manage"), key=str
-    )
+    return sorted(await gremium_ids_for(db, principal, "session.manage"), key=str)
+
+
+async def _gremium_permissions(
+    db: DbSession, principal: Principal
+) -> dict[UUID, list[str]]:
+    """Return the gremium permissions of the principal per Gremium.
+
+    Only the active memberships count. The OAuth scope cap removes each key that
+    the token scope does not let through. A Gremium without a remaining key stays
+    in the map with an empty list, because the membership itself still counts.
+    """
+    from app.modules.admin.gremium_roles import GREMIUM_PERMISSIONS, active_gremium_roles
+
+    out: dict[UUID, list[str]] = {}
+    for gid, role in await active_gremium_roles(db, principal.sub):
+        held = set(role.permissions or [])
+        out[gid] = [
+            p for p in GREMIUM_PERMISSIONS if p in held and principal.scope_allows(p)
+        ]
+    return out
 
 
 async def _gremien_for(db: DbSession, sub: str) -> list[GremiumRef]:
@@ -376,6 +404,7 @@ async def verify_magic_link(
     db: DbSession,
     settings: SettingsDep,
     response: Response,
+    dispatcher: Annotated[ActionDispatcher, Depends(get_action_dispatcher)],
 ) -> MagicLinkVerifyOut:
     """Verify a token and open an applicant session scoped to one application.
 
@@ -383,9 +412,12 @@ async def verify_magic_link(
 
     The server sets the session only as an HttpOnly cookie. It never returns the token
     in the body, so JavaScript cannot read it.
+
+    The first verify of a guest application starts its flow (deadline, automatic
+    transitions, task mail) through the flow action dispatcher.
     """
     app_id, scope, token = await service.verify_magic_link(
-        db, settings, token=body.token
+        db, settings, token=body.token, dispatcher=dispatcher
     )
     await db.commit()
     response.set_cookie(

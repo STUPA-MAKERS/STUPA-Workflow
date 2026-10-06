@@ -1,0 +1,117 @@
+@let v = vote();
+<section class="vc" [attr.aria-label]="v.question || ('meetings.vote.untitled' | t)">
+  <div class="vc__status">
+    <app-status-text class="vc__cap" [kind]="status().kind">{{ capKey() | t }}</app-status-text>
+    @if (result(); as r) {
+      <app-status-text class="vc__result" [kind]="r.kind">{{ r.key | t }}</app-status-text>
+    }
+  </div>
+  <h3 class="vc__q">{{ v.question || ('meetings.vote.untitled' | t) }}</h3>
+  @if (meta()) {
+    <p class="vc__meta">{{ meta() }}</p>
+  }
+  @if (v.result === 'rejected' && v.failedReason === 'quorum') {
+    <p class="vc__fail">{{ 'vote.failedQuorum' | t }}</p>
+  }
+
+  @if (composition(); as comp) {
+    @if (v.status === 'open') {
+      <p class="vc__comp">
+        <app-icon name="users" [size]="16" />
+        <span>{{ comp }}</span>
+      </p>
+    }
+  }
+
+  @if (v.status === 'open') {
+    <div class="vc__progress">
+      <div class="vc__progressLine">
+        <span class="vc__progressText">{{ progressLabel() }}</span>
+        <span class="vc__pct mono">{{ percent() }} %</span>
+      </div>
+      <app-seg-bar size="fat" [segments]="[{ value: v.voted, tone: 'filled' }]" [total]="v.present" [label]="progressLabel()" />
+      @if (!showCounts()) {
+        <p class="vc__hint">
+          {{ hiddenKey() | t }}
+          @if (v.guestsVote) {
+            {{ 'guests.vote.lateHint' | t }}
+          }
+        </p>
+      }
+    </div>
+  }
+
+  @if (showCounts()) {
+    <dl class="vc__counts" [attr.aria-label]="'meetings.vote.tally' | t">
+      @for (entry of counts(); track entry.key) {
+        <div class="vc__count" [class.vc__count--lead]="entry.key === v.leading">
+          <dt>{{ optionLabel(entry.key) }}</dt>
+          <dd class="mono">{{ entry.value }}</dd>
+        </div>
+      }
+    </dl>
+  }
+
+  @if (v.status === 'open' && canVote() && !hasVoted()) {
+    <div class="vc__ballot" role="group" [attr.aria-label]="'meetings.dock.yourVote' | t">
+      @for (opt of options(); track opt) {
+        <app-button size="sm" variant="tonal" [block]="true" [loading]="casting() === v.id" (click)="cast.emit({ voteId: v.id, choice: opt })">{{ optionLabel(opt) }}</app-button>
+      }
+    </div>
+  }
+
+  @if (v.status === 'open' && canManage()) {
+    <div class="vc__actions">
+      <app-button variant="fill" [block]="true" (click)="close.emit(v.id)">{{ 'meetings.vote.close' | t }}</app-button>
+      <app-button variant="danger" [block]="true" (click)="cancel.emit(v.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
+    </div>
+  }
+
+  @if (guestResult(); as gr) {
+    <dl class="vc__counts vc__sum" [attr.aria-label]="'guests.vote.resultCaption' | t">
+      @if (composition(); as comp) {
+        <div class="vc__count">
+          <dt>{{ comp }}</dt>
+          <dd class="mono">{{ gr.present }}</dd>
+        </div>
+      }
+      <div class="vc__count">
+        <dt>{{ 'guests.vote.cast' | t }}</dt>
+        <dd class="mono">{{ gr.cast }}</dd>
+      </div>
+      <div class="vc__count">
+        <dt>{{ 'guests.vote.majorityOfCast' | t }}</dt>
+        <dd [class.vc__ok]="gr.passed">{{ (gr.passed ? 'guests.vote.reached' : 'guests.vote.notReached') | t }}</dd>
+      </div>
+    </dl>
+  }
+
+  @if (v.status === 'draft' && canEdit() && meetingStatus() === 'live') {
+    <div class="vc__actions">
+      <app-button variant="fill" [block]="true" [disabled]="otherOpen()" [title]="(otherOpen() ? 'meetings.vote.openBlocked' : 'meetings.vote.open') | t" (click)="open.emit(v.id)">{{ 'meetings.vote.open' | t }}</app-button>
+    </div>
+    @if (otherOpen()) {
+      <p class="vc__hint">{{ 'meetings.vote.openBlocked' | t }}</p>
+    }
+  }
+
+  @if (v.status === 'closed' && inProtocol()) {
+    <p class="vc__inProtocol">
+      <app-icon name="check" [size]="16" />
+      {{ 'meetings.voteResult.inProtocol' | t }}
+    </p>
+  } @else if (v.status === 'closed' && canInsert()) {
+    <div class="vc__actions">
+      <app-button variant="tonal" [block]="true" (click)="insertResult.emit(v)">
+        <app-icon name="fileplus" [size]="16" />
+        {{ 'meetings.dock.insertResult' | t }}
+      </app-button>
+    </div>
+  }
+
+  @if (canDelete()) {
+    <div class="vc__actions">
+      <app-button variant="danger" [block]="true" [loading]="deleting() === v.id" (click)="remove.emit(v.id)">{{ 'meetings.vote.delete' | t }}</app-button>
+    </div>
+  }
+</section>

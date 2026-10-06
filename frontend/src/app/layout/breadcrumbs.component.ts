@@ -1,9 +1,12 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, type ActivatedRouteSnapshot } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs';
 import { I18nService } from '@core/i18n/i18n.service';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { IconComponent } from '@stupa-makers/ui-kit';
 import type { TranslationKey } from '@core/i18n/translations';
+import { PageFrameService } from './page-frame.service';
 
 interface Crumb {
   label: string;
@@ -17,22 +20,44 @@ interface Crumb {
  * `data.title`. Where a route has flat siblings instead of real child routes, it
  * prepends the parents declared in `data.parent`, a list of paths. There is no
  * "Home" or dashboard prefix. The bar appears only when a parent level exists,
- * because the H1 is otherwise enough. The style follows the budget crumbs: pill
- * links and `›` separators.
+ * because the H1 is otherwise enough. The parents are accent links with a chevron
+ * between them; the current page is muted text with `aria-current`.
  */
 @Component({
   selector: 'app-breadcrumbs',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink],
+  imports: [RouterLink, TranslatePipe, IconComponent],
   templateUrl: './breadcrumbs.component.html',
   styleUrl: './breadcrumbs.component.scss',
 })
 export class BreadcrumbsComponent {
   private readonly router = inject(Router);
   private readonly i18n = inject(I18nService);
+  private readonly frame = inject(PageFrameService);
 
-  readonly crumbs = signal<Crumb[]>([]);
+  /** The crumbs of the route, the parent that a frame shows included. */
+  private readonly all = signal<Crumb[]>([]);
+
+  /**
+   * The crumbs to show. A parent that the frame around the page shows already is left
+   * out: the root of the frame and every page below it (the admin navigation shows
+   * "Verwaltung" and marks "Gremien" on a gremium sub-page), so every page in the frame
+   * starts its title at the same place. A label that the page gives for its own URL
+   * replaces the label of the current crumb.
+   */
+  readonly crumbs = computed<Crumb[]>(() => {
+    const root = this.frame.crumbRoot();
+    const own = this.frame.crumbLabel();
+    let list = this.all();
+    const last = list.at(-1);
+    if (own && last && own.url === last.url) {
+      list = [...list.slice(0, -1), { ...last, label: own.label }];
+    }
+    if (!root) return list;
+    const inFrame = (url: string): boolean => url === `/${root}` || url.startsWith(`/${root}/`);
+    return list.filter((c, i) => i === list.length - 1 || !inFrame(c.url));
+  });
 
   /** Path to i18n title key, taken from the route config to resolve parents. */
   private titleByPath: Map<string, TranslationKey> | null = null;
@@ -48,7 +73,7 @@ export class BreadcrumbsComponent {
   }
 
   private refresh(): void {
-    this.crumbs.set(this.build());
+    this.all.set(this.build());
   }
 
   private build(): Crumb[] {

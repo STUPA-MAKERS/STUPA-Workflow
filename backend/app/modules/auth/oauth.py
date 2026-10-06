@@ -4,6 +4,11 @@ A scope caps the rights of the logged-in principal. A scoped token gets exactly 
 intersection of the RBAC permissions of the user and the permission set of the scope. See
 `Principal.scope_permissions`. This also applies to an admin. The admin bypass in
 `Principal.has` works only for in-scope permissions.
+
+The cap applies to the gremium permissions too (`session.manage`, `protocol.write`,
+`protocol.finalize`, `vote.manage`). A gremium role grants such a permission to a token
+only when the scope of the token contains the key. See `Principal.scope_allows` and
+`app.modules.admin.gremium_roles.gremium_ids_for`.
 """
 
 from __future__ import annotations
@@ -14,14 +19,25 @@ import hmac
 import secrets
 
 # Permissions that no agent gets, whatever the scope or the admin status says. To cast a
-# ballot with `vote.cast` stays strictly human. Every scope resolution removes it.
+# ballot with the gremium permission `vote.cast` stays strictly human. Every scope
+# resolution removes it, so `scope_allows("vote.cast")` is False for every token.
 # `backup.manage` joins it for the same reason: a backup holds the whole database in
 # readable form, and a restore replaces it. Both stay with a human at a browser.
-FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset({"vote.cast", "backup.manage"})
+# `admin.users.merge` joins them: an account merge rewrites the history of two people
+# and cannot be undone.
+FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset(
+    {"vote.cast", "backup.manage", "admin.users.merge"}
+)
 
 # Scope key to the allowed permission keys. `read` covers every reading endpoint. The
 # `*:write` scopes add the mutations. `votes:write` covers vote management only, that is
 # create, open and close. It never covers `vote.cast`, because voting stays human.
+# `vote.manage`, `session.manage`, `protocol.write` and `protocol.finalize` are gremium
+# permissions: a gremium role grants them, and the scope only lets them through.
+# The meeting lead (`session.manage`) includes the votes of the gremium, so a
+# `meetings:write` token of a lead can manage those votes also without `votes:write`.
+# `read` holds `meeting.view_all`, a global read-only key, so an admin token keeps the
+# view over the meetings of every gremium.
 SCOPES: dict[str, frozenset[str]] = {
     "read": frozenset(
         {
@@ -31,14 +47,15 @@ SCOPES: dict[str, frozenset[str]] = {
             "budget.export",
             "audit.read",
             "audit.verify",
+            "meeting.view_all",
         }
     ),
     "applications:write": frozenset(
-        {"application.create", "application.transition", "application.manage"}
+        {"application.transition", "application.manage", "application.create_on_behalf"}
     ),
     "votes:write": frozenset({"vote.manage"}),
     "budget:write": frozenset({"budget.structure", "budget.book"}),
-    "meetings:write": frozenset({"meeting.manage", "protocol.finalize"}),
+    "meetings:write": frozenset({"session.manage", "protocol.write", "protocol.finalize"}),
     "forms:write": frozenset({"form.configure"}),
     "flows:write": frozenset({"flow.configure"}),
     "admin:write": frozenset(
@@ -140,9 +157,10 @@ def parse_scope(raw: str | None) -> list[str]:
 def scope_permissions(scopes: list[str]) -> frozenset[str]:
     """Return the union of the permission sets of the scopes, minus the forbidden ones.
 
-    The function subtracts `FORBIDDEN_PERMISSIONS`, so it always removes `vote.cast` and
-    `backup.manage`. The removal holds even when a scope ever contains one of them, and it
-    holds for an admin. The scope cap in `Principal.has` stops the admin bypass.
+    The function subtracts `FORBIDDEN_PERMISSIONS`, so it always removes `vote.cast`,
+    `backup.manage` and `admin.users.merge`. The removal holds even when a scope ever
+    contains one of them, and it holds for an admin. The scope cap in `Principal.has`
+    stops the admin bypass.
     """
     perms: set[str] = set()
     for s in scopes:

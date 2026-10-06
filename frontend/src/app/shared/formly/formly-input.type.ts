@@ -11,7 +11,8 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
  * field (`props.type === 'date'`) renders the a11y-capable {@link DatepickerComponent}.
  * A currency field (`props.type === 'currency'`) renders the
  * {@link CurrencyInputComponent} with a euro symbol and localized formatting. Every
- * other field renders a plain UI-kit input.
+ * other field renders a plain UI-kit input. The help text of the form definition
+ * (`props.description`) shows as the hint below the box, as on the other field types.
  */
 @Component({
   selector: 'app-formly-input',
@@ -30,7 +31,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
         [formControl]="formControl"
         [label]="props.label ?? ''"
         [required]="!!props.required"
-        [hint]="props['hint'] ?? ''"
+        [hint]="props['hint'] ?? props.description ?? ''"
         [min]="asString(props['min'])"
         [max]="asString(props['max'])"
         [error]="
@@ -42,7 +43,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
         [formControl]="formControl"
         [label]="props.label ?? ''"
         [required]="!!props.required"
-        [hint]="props['hint'] ?? ''"
+        [hint]="props['hint'] ?? props.description ?? ''"
         [placeholder]="props.placeholder ?? ''"
         [error]="
           showError && formControl.errors ? (props['errorText'] ?? ('formly.field.error' | t)) : ''
@@ -55,7 +56,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
         [type]="props.type ?? 'text'"
         [placeholder]="props.placeholder ?? ''"
         [required]="!!props.required"
-        [hint]="props['hint'] ?? ''"
+        [hint]="props['hint'] ?? props.description ?? ''"
         [error]="
           showError && formControl.errors ? (props['errorText'] ?? ('formly.field.error' | t)) : ''
         "

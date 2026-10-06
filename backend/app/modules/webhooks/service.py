@@ -2,11 +2,12 @@
 
 The service has two strictly separated jobs.
 
-* `dispatch_event` runs on the API and flow side. It finds the active webhooks that
-  subscribe to a domain event. It creates one `webhook_delivery` row in state `pending`
-  per webhook and enqueues a `deliver_webhook` job. It is idempotent over
+* `dispatch_to_webhook` runs on the flow side. The flow action `webhook` names one
+  webhook. The method creates one `webhook_delivery` row in state `pending` and
+  enqueues a `deliver_webhook` job. It is idempotent over
   `(webhook_id, idempotency_key)`. A flow retry of the same status event creates no
-  duplicate delivery.
+  duplicate delivery. No other caller fans a domain event out to the `events`
+  subscriptions of the webhooks.
 * `deliver` runs on the worker side. It sends one delivery: SSRF guard at send time,
   HMAC signature, POST without redirects, and a write-back of status, attempts and
   backoff. It returns a `DeliveryOutcome`. The worker translates `retry` into
@@ -76,78 +77,6 @@ class WebhookService:
     settings: Settings
     queue: WebhookQueue | None = None
 
-    async def dispatch_event(
-        self,
-        event: str,
-        *,
-        payload: dict[str, object] | None = None,
-        idempotency_base: str | None = None,
-    ) -> int:
-        """Create one delivery and one job per active webhook that subscribes to `event`.
-
-        Returns:
-            The number of new deliveries. A delivery that the dedup skips does not count.
-        """
-        webhooks = (
-            await self.session.scalars(
-                select(Webhook).where(
-                    Webhook.active.is_(True), Webhook.events.contains([event])
-                )
-            )
-        ).all()
-        if not webhooks:
-            return 0
-
-        candidate_keys = (
-            [f"{idempotency_base}:{hook.id}" for hook in webhooks]
-            if idempotency_base
-            else []
-        )
-        existing = await self._existing_keys(event, candidate_keys)
-        body = dict(payload or {})
-        created: list[WebhookDelivery] = []
-        for hook in webhooks:
-            key = f"{idempotency_base}:{hook.id}" if idempotency_base else None
-            if key is not None and key in existing:
-                logger.info("webhook delivery deduped (event=%s hook=%s)", event, hook.id)
-                continue
-            delivery = WebhookDelivery(
-                webhook_id=hook.id,
-                event=event,
-                payload=body,
-                status="pending",
-                attempts=0,
-                idempotency_key=key,
-            )
-            # One savepoint per delivery. A concurrent insert violates the
-            # `unique(webhook_id, idempotency_key)` constraint. Another run then already
-            # created and enqueued the delivery, so skip it instead of losing the batch.
-            try:
-                async with self.session.begin_nested():
-                    self.session.add(delivery)
-                    await self.session.flush()
-            except IntegrityError:
-                logger.info(
-                    "webhook delivery race-deduped (event=%s hook=%s)", event, hook.id
-                )
-                continue
-            created.append(delivery)
-
-        if not created:
-            return 0
-        await self.session.commit()
-
-        if self.queue is None:
-            logger.info(
-                "webhook queue unavailable — %d delivery(ies) stay pending (event=%s)",
-                len(created),
-                event,
-            )
-        else:
-            for delivery in created:
-                await self.queue.enqueue(delivery.id)
-        return len(created)
-
     async def dispatch_to_webhook(
         self,
         webhook_id: UUID,
@@ -202,13 +131,10 @@ class WebhookService:
         """Return the idempotency keys of this event that exist already.
 
         The query uses an `IN` over the concrete candidate keys. It does not scan every
-        delivery ever created for the event. The cost therefore stays at the order of the
-        number of webhooks and does not grow with the delivery history. The constraint
-        `unique(webhook_id, idempotency_key)` and the savepoint give correctness on their
-        own. This pre-check is only an optimization.
+        delivery ever created for the event. The constraint
+        `unique(webhook_id, idempotency_key)` and the savepoint give correctness on
+        their own. This pre-check is only an optimization.
         """
-        if not candidate_keys:
-            return set()
         rows = (
             await self.session.scalars(
                 select(WebhookDelivery.idempotency_key).where(

@@ -1,6 +1,11 @@
-import type { AgendaItem, MeetingVote } from '@core/api/models';
+import type { AgendaItem, Meeting, MeetingVote } from '@core/api/models';
 import {
+  voteMetaLine,
   assembleProtocolMarkdown,
+  clockTime,
+  errorCode,
+  meetingDay,
+  meetingTimeText,
   attendanceBadgeVariant,
   attendanceButtonVariant,
   attendanceIcon,
@@ -9,10 +14,13 @@ import {
   errorDetail,
   liveOpenedVote,
   longDate,
+  meetingLine,
+  weekdayDate,
   meetingStatusKey,
   meetingTimeSuffix,
   meetingStatusVariant,
-  pickBeamerVote,
+  memberAttendanceBadgeVariant,
+  memberAttendanceKey,
   resolveI18n,
   shortTime,
   voteOptionLabel,
@@ -30,7 +38,7 @@ const VOTE = (over: Partial<MeetingVote> = {}): MeetingVote => ({
   title: null,
   question: null,
   options: [],
-  status: 'pending',
+  status: 'draft',
   result: null,
   counts: null,
   leading: null,
@@ -45,22 +53,37 @@ const VOTE = (over: Partial<MeetingVote> = {}): MeetingVote => ({
 describe('meetings-display.util', () => {
   it('maps meeting status to badge variants and keys', () => {
     expect(meetingStatusVariant('live')).toBe('success');
-    expect(meetingStatusVariant('closed')).toBe('neutral');
+    expect(meetingStatusVariant('closed')).toBe('info');
     expect(meetingStatusVariant('planned')).toBe('info');
     expect(meetingStatusKey('live')).toBe('meetings.status.live');
   });
 
   it('maps vote status and results', () => {
     expect(voteStatusVariant('open')).toBe('success');
-    expect(voteStatusVariant('closed')).toBe('neutral');
+    expect(voteStatusVariant('closed')).toBe('info');
     expect(voteStatusVariant('cancelled')).toBe('danger');
-    expect(voteStatusVariant('pending')).toBe('warning');
+    expect(voteStatusVariant('draft')).toBe('warning');
     expect(voteStatusKey('open')).toBe('meetings.voteStatus.open');
     expect(voteResultKey('passed')).toBe('vote.result.passed');
     expect(voteResultKey(null)).toBe('vote.result.tie');
     expect(voteResultVariant('passed')).toBe('success');
     expect(voteResultVariant('rejected')).toBe('danger');
-    expect(voteResultVariant('tie')).toBe('neutral');
+    expect(voteResultVariant('tie')).toBe('info');
+  });
+
+  it('never maps a status to the neutral tag variant', () => {
+    // `neutral` is a tag (a grey plate). A status shows as coloured text only.
+    const variants = [
+      ...(['planned', 'live', 'closed'] as const).map(meetingStatusVariant),
+      ...(['draft', 'open', 'closed', 'cancelled'] as const).map(voteStatusVariant),
+      ...['passed', 'rejected', 'tie', null, undefined, 'unknown'].map(voteResultVariant),
+      ...(['present', 'excused', 'absent'] as const).flatMap((s) => [
+        attendanceBadgeVariant(s),
+        memberAttendanceBadgeVariant(s),
+      ]),
+    ];
+    expect(variants).not.toContain('neutral');
+    expect(variants).not.toContain('accent');
   });
 
   it('maps attendance to keys, variants and icons', () => {
@@ -74,6 +97,15 @@ describe('meetings-display.util', () => {
     expect(attendanceBadgeVariant('present')).toBe('success');
     expect(attendanceBadgeVariant('excused')).toBe('warning');
     expect(attendanceBadgeVariant('absent')).toBe('danger');
+  });
+
+  it('gives a member only the labels "Anwesend" and "Abwesend" (Z2)', () => {
+    expect(memberAttendanceKey('present')).toBe('meetings.attendance.selfPresent');
+    expect(memberAttendanceKey('excused')).toBe('meetings.attendance.selfExcused');
+    expect(memberAttendanceKey('absent')).toBe('meetings.attendance.selfExcused');
+    expect(memberAttendanceBadgeVariant('present')).toBe('success');
+    expect(memberAttendanceBadgeVariant('excused')).toBe('warning');
+    expect(memberAttendanceBadgeVariant('absent')).toBe('warning');
   });
 
   it('lists tally entries and vote options with the count-key fallback', () => {
@@ -117,13 +149,12 @@ describe('meetings-display.util', () => {
     );
   });
 
-  it('picks the beamer vote: open first, else last closed, else null', () => {
-    const open = VOTE({ id: 'open', status: 'open' });
-    const c1 = VOTE({ id: 'c1', status: 'closed' });
-    const c2 = VOTE({ id: 'c2', status: 'closed' });
-    expect(pickBeamerVote([c1, open, c2])?.id).toBe('open');
-    expect(pickBeamerVote([c1, c2])?.id).toBe('c2');
-    expect(pickBeamerVote([VOTE()])).toBeNull();
+  it('formats a meeting date with a short weekday and names the meeting with it', () => {
+    expect(weekdayDate('2026-10-13', 'de-DE')).toBe('Di., 13.10.2026');
+    expect(weekdayDate('kein Datum', 'de-DE')).toBe('kein Datum');
+    const m = { title: '35. Sitzung', date: '2026-10-13' } as Parameters<typeof meetingLine>[0];
+    expect(meetingLine(m, 'de-DE')).toBe('35. Sitzung · Di., 13.10.2026');
+    expect(meetingLine({ ...m, date: null }, 'de-DE')).toBe('35. Sitzung');
   });
 
   it('formats long dates per locale and passes invalid input through', () => {
@@ -172,5 +203,92 @@ describe('meetings-display.util', () => {
       status: 'open',
       revealed: false,
     });
+    expect(vote.secret).toBeUndefined();
+    expect(vote.openedAt).toEqual(expect.any(String));
+    expect(liveOpenedVote({ type: 'vote_opened', voteId: 'v-8', options: [], closesAt: null, secret: true }).secret).toBe(true);
+  });
+
+  it('reads the stable problem+json code of an HTTP error', () => {
+    expect(errorCode({ error: { code: 'open_vote' } })).toBe('open_vote');
+    expect(errorCode({ error: { code: 7 } })).toBe('');
+    expect(errorCode(null)).toBe('');
+  });
+
+  it('prints the clock time of a timestamp in local time, 24 h', () => {
+    const local = new Date(2026, 8, 29, 18, 4).toISOString();
+    expect(clockTime(local, 'de')).toBe('18:04');
+    expect(clockTime(local, 'en')).toBe('18:04');
+    expect(clockTime(null, 'de')).toBe('');
+    expect(clockTime('kaputt', 'de')).toBe('');
+  });
+
+  describe('meetingTimeText', () => {
+    const base = {
+      status: 'planned',
+      startTime: '18:00:00',
+      endTime: null,
+      startedAt: null,
+      closedAt: null,
+    } as unknown as Meeting;
+    const at = (h: number, m: number) => new Date(2026, 8, 29, h, m).toISOString();
+
+    it('shows the planned start, and the end when there is one', () => {
+      expect(meetingTimeText(base, 'de')).toEqual({ text: '18:00', since: false });
+      expect(meetingTimeText({ ...base, startTime: '17:30', endTime: '19:00' }, 'de')).toEqual({
+        text: '17:30–19:00',
+        since: false,
+      });
+      expect(meetingTimeText({ ...base, startTime: null }, 'de')).toEqual({ text: '', since: false });
+    });
+
+    it('shows a live meeting as "since" its real start (O9)', () => {
+      const live = { ...base, status: 'live', startedAt: at(18, 4) } as Meeting;
+      expect(meetingTimeText(live, 'de')).toEqual({ text: '18:04', since: true });
+      // Started before the real start was stored: the planned start.
+      expect(meetingTimeText({ ...live, startedAt: null }, 'de')).toEqual({ text: '18:00', since: false });
+    });
+
+    it('shows a closed meeting from the real start to the close', () => {
+      const closed = { ...base, status: 'closed', startedAt: at(18, 4), closedAt: at(21, 40) } as Meeting;
+      expect(meetingTimeText(closed, 'de')).toEqual({ text: '18:04–21:40', since: false });
+      expect(meetingTimeText({ ...closed, closedAt: null }, 'de')).toEqual({ text: '18:04', since: false });
+      expect(meetingTimeText({ ...closed, startedAt: null }, 'de').text).toBe('18:00');
+    });
+  });
+
+  it('gives the date block a local midnight, or null without a date', () => {
+    expect(meetingDay({ date: '2026-10-13' } as Meeting)).toBe('2026-10-13T00:00:00');
+    expect(meetingDay({ date: null } as Meeting)).toBeNull();
+  });
+});
+
+describe('voteMetaLine', () => {
+  const base: MeetingVote = {
+    id: 'v-1', applicationId: null, agendaItemId: null, title: null, question: null,
+    options: [], status: 'open', result: null, counts: null, leading: null, closesAt: null,
+    voted: 0, present: 0, revealed: false, failedReason: null,
+  };
+  const t = (key: string, params?: Record<string, string | number>) =>
+    params ? `${key}(${Object.values(params).join(',')})` : key;
+
+  it('joins rule, secrecy, quorum and the open time', () => {
+    const line = voteMetaLine(
+      { ...base, majorityRule: 'two_thirds', secret: false, quorum: { type: 'count', value: 12 }, openedAt: '2026-10-15T16:48:00Z' },
+      t as never,
+      'de',
+    );
+    expect(line).toMatch(/^vote\.majority\.two_thirds · meetings\.vote\.publicShort · meetings\.vote\.quorumCount\(12\) · meetings\.vote\.since\(\d\d:48\)$/);
+  });
+
+  it('names a secret vote, a percentage quorum and the end of a closed or cancelled vote', () => {
+    expect(
+      voteMetaLine({ ...base, status: 'closed', secret: true, quorum: { type: 'percent', value: 50 }, closedAt: '2026-10-15T17:02:00Z' }, t as never, 'de'),
+    ).toMatch(/^meetings\.vote\.secretShort · meetings\.vote\.quorumPercent\(50\) · meetings\.vote\.endedAt\(\d\d:02\)$/);
+    expect(voteMetaLine({ ...base, status: 'cancelled', closedAt: null }, t as never, 'de')).toBe('');
+  });
+
+  it('leaves out what a live event did not bring yet', () => {
+    expect(voteMetaLine(base, t as never, 'de')).toBe('');
+    expect(voteMetaLine({ ...base, status: 'draft', majorityRule: 'simple' }, t as never, 'de')).toBe('vote.majority.simple');
   });
 });

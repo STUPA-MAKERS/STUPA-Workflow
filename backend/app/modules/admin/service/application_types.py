@@ -14,10 +14,12 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service.service_base import ConfigServiceBase
 from app.modules.audit.actions import AuditAction
+from app.modules.forms.models import FormVersion
 from app.shared.errors import ConflictError, NotFoundError
 
 
-def _type_out(row: ApplicationType) -> ApplicationTypeOut:
+def _type_out(row: ApplicationType, version: int | None = None) -> ApplicationTypeOut:
+    """Map a type row to its DTO. ``version`` is the number of the active form version."""
     return ApplicationTypeOut(
         id=row.id,
         gremium_id=row.gremium_id,
@@ -27,6 +29,7 @@ def _type_out(row: ApplicationType) -> ApplicationTypeOut:
         comparison_offers=row.comparison_offers,
         retention_months=row.retention_months,
         active_form_version_id=row.active_form_version_id,
+        active_form_version=version,
     )
 
 
@@ -34,12 +37,19 @@ class ApplicationTypeOps(ConfigServiceBase):
     """Application-type CRUD."""
 
     async def list_application_types(self) -> list[ApplicationTypeOut]:
+        """List every type with the number of its active form version.
+
+        One outer join gives the version numbers, so the list needs no request
+        per type.
+        """
         rows = (
-            await self.session.scalars(
-                select(ApplicationType).order_by(ApplicationType.key)
+            await self.session.execute(
+                select(ApplicationType, FormVersion.version)
+                .outerjoin(FormVersion, FormVersion.id == ApplicationType.active_form_version_id)
+                .order_by(ApplicationType.key)
             )
         ).all()
-        return [_type_out(r) for r in rows]
+        return [_type_out(row, version) for row, version in rows]
 
     async def create_application_type(
         self, payload: ApplicationTypeCreate, actor: str
@@ -87,7 +97,7 @@ class ApplicationTypeOps(ConfigServiceBase):
             row.retention_months = payload.retention_months
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "application_type", row.id)
         await self.session.commit()
-        return _type_out(row)
+        return _type_out(row, await self._active_version(row))
 
     async def delete_application_type(self, type_id: UUID, actor: str) -> None:
         """Delete an application type.
@@ -114,6 +124,14 @@ class ApplicationTypeOps(ConfigServiceBase):
         await self.session.delete(row)
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "application_type", row_id)
         await self.session.commit()
+
+    async def _active_version(self, row: ApplicationType) -> int | None:
+        """Return the number of the active form version of a type, or ``None``."""
+        if row.active_form_version_id is None:
+            return None
+        return await self.session.scalar(
+            select(FormVersion.version).where(FormVersion.id == row.active_form_version_id)
+        )
 
     async def _get_type(self, type_id: UUID) -> ApplicationType:
         row = await self.session.get(ApplicationType, type_id)

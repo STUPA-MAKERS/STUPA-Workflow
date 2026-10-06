@@ -1,12 +1,21 @@
-import { provideRouter } from '@angular/router';
+import { signal } from '@angular/core';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
+import { BrandingService } from '@core/branding/branding.service';
 import { HomeComponent } from './home.component';
 
-function setup(auth: { login: jest.Mock } = { login: jest.fn() }) {
+function setup(
+  auth: { login: jest.Mock } = { login: jest.fn() },
+  freetexts: Record<string, Record<string, string>> = {},
+) {
   return render(HomeComponent, {
-    providers: [provideRouter([]), { provide: AuthService, useValue: auth }],
+    providers: [
+      provideRouter([]),
+      { provide: AuthService, useValue: auth },
+      { provide: BrandingService, useValue: { freetexts: signal(freetexts) } },
+    ],
   }).then((view) => ({ ...view, auth }));
 }
 
@@ -24,6 +33,16 @@ describe('HomeComponent', () => {
     // Nothing else competes with them: one link and one button in the body.
     expect(screen.getAllByRole('link')).toHaveLength(1);
     expect(screen.getAllByRole('button')).toHaveLength(1);
+  });
+
+  it('shows the configured welcome text below the heading, in the active language', async () => {
+    await setup(undefined, { welcome: { de: 'Hier stellst du Anträge an den StuPa.', en: 'Apply here.' } });
+    expect(screen.getByText('Hier stellst du Anträge an den StuPa.')).toBeInTheDocument();
+  });
+
+  it('shows no welcome line without a configured text', async () => {
+    const { container } = await setup(undefined, { welcome: { de: '   ' } });
+    expect(container.querySelector('.home__welcome')).toBeNull();
   });
 
   it('starts the OIDC login from the member choice', async () => {
@@ -46,5 +65,33 @@ describe('HomeComponent', () => {
       screen.getByRole('button', { name: /Sign in as a committee member/ }),
     ).toBeInTheDocument();
     expect(screen.getByText(/confirmation email/)).toBeInTheDocument();
+  });
+
+  describe('refused login', () => {
+    async function withQuery(q: Record<string, string>) {
+      return render(HomeComponent, {
+        providers: [
+          provideRouter([]),
+          { provide: AuthService, useValue: { login: jest.fn() } },
+          { provide: BrandingService, useValue: { freetexts: signal({}) } },
+          {
+            provide: ActivatedRoute,
+            useValue: { snapshot: { queryParamMap: convertToParamMap(q) } },
+          },
+        ],
+      });
+    }
+
+    it('says why the login of a merged account was refused', async () => {
+      await withQuery({ loginError: 'account_merged' });
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Dieses Konto wurde zusammengeführt und ist gesperrt.',
+      );
+    });
+
+    it('ignores an unknown reason', async () => {
+      await withQuery({ loginError: 'anything' });
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
   });
 });

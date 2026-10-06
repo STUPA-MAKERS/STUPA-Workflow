@@ -8,18 +8,18 @@ description: Outbound event webhooks — SSRF-guarded, HMAC-SHA256-signed HTTP P
 **Does:** Delivers signed outbound HTTP webhooks for domain events. The module separates dispatch from delivery. Dispatch finds the subscribed webhooks, creates `pending` deliveries and enqueues arq jobs. Delivery runs in the worker. The worker re-resolves DNS and runs the SSRF guard at send-time. It then HMAC-signs the request, POSTs it without redirects, and writes back status, attempts and backoff.
 
 **Key files:**
-- `service.py` — `WebhookService`: `dispatch_event`/`dispatch_to_webhook` (API side) + `deliver` (worker side), plus status classification, retry/backoff/dead-letter, `DeliveryOutcome`
+- `service.py` — `WebhookService`: `dispatch_to_webhook` (flow side) + `deliver` (worker side), plus status classification, retry/backoff/dead-letter, `DeliveryOutcome`. `dispatch_event` (fan-out to every webhook that subscribes to an event) is removed: nothing called it (F10).
 - `ssrf.py` — `assert_allowed_url` (scheme/allowlist/resolved-IP check), `pin_url` (DNS-rebind pinning), `_unmap` (unwraps IPv4-mapped/6to4/NAT64), `SsrfError`, injectable `Resolver`
 - `signing.py` — HMAC-SHA256 over `"{timestamp}.{body}"`, `canonical_body`, `build_headers`. Header names `X-Signature`/`X-Timestamp`/`X-Webhook-Event`
 - `queue.py` — `WebhookQueue` Protocol + `ArqWebhookQueue`. `WEBHOOK_TASK_NAME="deliver_webhook"`, job id `webhook:<delivery_id>` (coalesces duplicate enqueues)
-- `action_dispatcher.py` — `WebhookActionDispatcher`: flow-engine `webhook` action handler → `dispatch_to_webhook`. Event `application.transition`
+- `action_dispatcher.py` — `WebhookActionDispatcher`: flow-engine `webhook` action handler → `dispatch_to_webhook`. Event `application.transition`. `flow.dispatch.build_worker_dispatcher` builds it for the API and the worker, so a vote close, a deadline and an automatic transition also deliver (F2).
 - `worker/webhook.py` (sibling, not in module dir) — arq task `deliver_webhook`. Maps `retry`→`arq.Retry`, no-redirect httpx client
 - Models live in `app/modules/admin/models.py`. Schemas live in `app/modules/admin/schemas.py`. The CRUD router lives in `app/modules/admin/router.py`
 
 **Domain / data model:**
 - `Webhook` (table `webhook`): `name`, `url`, `events` (Text[] whitelist), `secret` (LargeBinary, server-generated `secrets.token_bytes(32)`, never returned/logged), `active`.
 - `WebhookDelivery` (table `webhook_delivery`): `webhook_id` (FK CASCADE), `event`, `payload` (JSONB), `status` ∈ `pending|ok|failed|dead` (CHECK), `attempts`, `idempotency_key`, `last_at`, `next_at`, `response_code`. Index `(status, next_at)` = worker pickup. Unique `(webhook_id, idempotency_key)` = dedup (NULL key = no dedup, present since the 0001 baseline).
-- `events` values are `EventName` from `app/shared/config_schemas.py`: `application_created`, `application_updated`, `status_changed`, `vote_opened`, `vote_closed`, `application_approved`, `application_rejected`, `comment_added`, `budget_reserved`, `budget_booked`, `protocol_finalized`, `deadline_approaching`, `deadline_passed`.
+- `events` is stored and validated, but no code fans a domain event out to the subscriptions. Only the flow `webhook` action (one named webhook) creates deliveries. `events` values are `EventName` from `app/shared/config_schemas.py`: `application_created`, `application_updated`, `status_changed`, `vote_opened`, `vote_closed`, `application_approved`, `application_rejected`, `comment_added`, `budget_reserved`, `budget_booked`, `protocol_finalized`, `deadline_approaching`, `deadline_passed`.
 
 **API surface:** (admin router, permission `webhook.manage`)
 - `GET /api/admin/webhooks` — list (`webhook.manage` OR `flow.configure`)
@@ -34,7 +34,7 @@ description: Outbound event webhooks — SSRF-guarded, HMAC-SHA256-signed HTTP P
 - Worker POSTs with `follow_redirects=False` and reads the response body **streamed, capped at 64 KiB** (only the status code matters) to avoid OOM from a hostile receiver.
 - Idempotency: dispatch dedups on `(webhook_id, idempotency_key)` via a per-delivery savepoint (`begin_nested`) that catches the unique-violation race. The arq job key `webhook:<delivery_id>` coalesces duplicate enqueues. Flow actions derive the idempotency base from `DispatchedAction.idempotency_key`.
 - If Redis/queue is unavailable the queue is `None`: deliveries stay `pending`, callers log and skip — no API block.
-- Settings: `webhook_timeout_seconds`, `webhook_max_tries`, `webhook_retry_backoff_seconds`, `webhook_host_allowlist` (empty = any *public* host, the SSRF guard stays on, strict-security warns when it is empty). See `[[security-audit-2026-06-13]]`.
+- Settings: `webhook_timeout_seconds`, `webhook_max_tries`, `webhook_retry_backoff_seconds`, `webhook_host_allowlist` (empty = any *public* host, the SSRF guard stays on, strict-security warns when it is empty).
 - Critical module: TDD with 100% branch coverage required (auth/voting/flow/budget/webhooks/audit). Whitelist dispatch, never eval. All error paths return `application/problem+json`.
 
 **Related:** be-admin, be-flow, conventions

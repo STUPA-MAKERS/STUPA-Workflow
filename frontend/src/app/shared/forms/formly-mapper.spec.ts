@@ -1,6 +1,6 @@
 import type { FormlyFieldConfig } from '@ngx-formly/core';
-import type { FormFieldDef } from '@core/api/models';
-import { toFormlyFields } from './formly-mapper';
+import type { FormFieldDef, FormSection } from '@core/api/models';
+import { toFormlyFields, toFormlySections } from './formly-mapper';
 
 function callExpr(
   config: FormlyFieldConfig,
@@ -187,11 +187,34 @@ describe('toFormlyFields', () => {
     expect(cfg.props?.['description']).toBe('Erläuterung');
   });
 
+  it('hides a section help that only repeats the heading', () => {
+    const fields: FormFieldDef[] = [
+      { key: 's', type: 'section', label: { de: 'Block' }, help: { de: ' Block ' } },
+      { key: 't', type: 'section', label: { de: 'Leer' }, help: { de: '  ' } },
+    ];
+    const [a, b] = toFormlyFields(fields, 'de');
+    expect(a.props?.['label']).toBe('Block');
+    expect(a.props?.['description']).toBeUndefined();
+    expect(b.props?.['description']).toBeUndefined();
+  });
+
+  it('shows an info text once when its help repeats its label', () => {
+    const fields: FormFieldDef[] = [
+      { key: 'note', type: 'markdown', label: { de: 'Gleich' }, help: { de: 'Gleich' } },
+    ];
+    const [cfg] = toFormlyFields(fields, 'de');
+    expect(cfg.props?.['text']).toBe('Gleich');
+    expect(cfg.props?.['label']).toBeUndefined();
+    expect(cfg.props?.['description']).toBeUndefined();
+  });
+
   it('maps a markdown field without help, falling back to label as text', () => {
     const fields: FormFieldDef[] = [{ key: 'note', type: 'markdown', label: { de: 'Nur Label' } }];
     const [cfg] = toFormlyFields(fields, 'de');
     expect(cfg.type).toBe('display');
     expect(cfg.props?.['text']).toBe('Nur Label');
+    // The text shows once: no bold label over the same text.
+    expect(cfg.props?.['label']).toBeUndefined();
     // Display fields never carry required, even when the definition sets it.
     expect(cfg.props?.['required']).toBeUndefined();
   });
@@ -204,6 +227,13 @@ describe('toFormlyFields', () => {
     expect(cfg.type).toBe('display');
     expect(cfg.props?.['text']).toContain('Tabellen-Eingabe');
     expect(cfg.props?.['required']).toBeUndefined();
+  });
+
+  it('shows the note of a table field in the page language', () => {
+    const fields: FormFieldDef[] = [{ key: 'tbl', type: 'table', label: { de: 'Tabelle', en: 'Table' } }];
+    expect(toFormlyFields(fields, 'en')[0].props?.['text']).toContain('table input');
+    // An unknown language falls back to the German reference text.
+    expect(toFormlyFields(fields, 'fr')[0].props?.['text']).toContain('Tabellen-Eingabe');
   });
 
   it('maps a file field to a text input', () => {
@@ -279,5 +309,73 @@ describe('toFormlyFields', () => {
     ];
     expect(toFormlyFields(fields, 'en')[0].props?.label).toBe('EN');
     expect(toFormlyFields(fields, 'fr')[0].props?.label).toBe('DE');
+  });
+});
+
+describe('toFormlySections', () => {
+  const sections: FormSection[] = [
+    {
+      key: 'plan',
+      label: { de: 'Vorhaben' },
+      fields: [
+        { key: 'title', type: 'text', label: { de: 'Titel' } },
+        { key: 'desc', type: 'textarea', label: { de: 'Beschreibung' } },
+        { key: 'date', type: 'date', label: { de: 'Datum' } },
+        { key: 'room', type: 'text', label: { de: 'Raum' }, visibleIf: { '==': [{ var: 'has_budget' }, true] } },
+      ],
+    },
+    {
+      key: 'costs',
+      label: { de: 'Kosten' },
+      fields: [
+        { key: 'costs', type: 'positions', label: { de: 'Kostenaufstellung' } },
+        { key: 'marker', type: 'section', label: { de: 'Marke' } },
+      ],
+    },
+    { key: 'hidden', label: { de: 'Kontakt' }, fields: [{ key: 'iban', type: 'iban', label: { de: 'IBAN' } }] },
+  ];
+
+  it('puts the title first, then a heading per section, in a grid group', () => {
+    const [group] = toFormlySections(sections, 'de', { has_budget: false }, { omitKeys: ['iban'] });
+    expect(group.fieldGroupClassName).toBe('fe-grid');
+    const rows = (group.fieldGroup ?? []).map((f) => [f.key ?? f.props?.label, f.className]);
+    expect(rows).toEqual([
+      ['title', 'fe-full'],
+      ['Vorhaben', 'fe-full fe-heading'],
+      ['desc', 'fe-full'],
+      ['date', 'fe-half'],
+      ['room', 'fe-half'],
+      ['Kosten', 'fe-full fe-heading'],
+      ['costs', 'fe-full'],
+    ]);
+    // The section without a field left (the omitted PII field) has no heading.
+    expect(rows.some(([label]) => label === 'Kontakt')).toBe(false);
+    // The context reaches visibleIf.
+    const room = group.fieldGroup?.find((f) => f.key === 'room') as FormlyFieldConfig;
+    expect(callExpr(room, 'hide', {})).toBe(true);
+  });
+
+  it('shows several choices as a half-width dropdown, the wizard as a checkbox list', () => {
+    const fields: FormFieldDef[] = [
+      { key: 'gremium', type: 'gremium_select', label: { de: 'Gremium' }, options: [] },
+      {
+        key: 'cat',
+        type: 'multiselect',
+        label: { de: 'Kategorie' },
+        options: [{ value: 'party', label: { de: 'Party' } }],
+      },
+    ];
+    const [group] = toFormlySections([{ key: 's', label: { de: 'S' }, fields }], 'de');
+    const cat = group.fieldGroup?.find((f) => f.key === 'cat');
+    expect(cat?.type).toBe('multiselect');
+    expect(cat?.className).toBe('fe-half');
+    expect(cat?.props?.['options']).toEqual([{ value: 'party', label: 'Party' }]);
+    expect(group.fieldGroup?.find((f) => f.key === 'gremium')?.className).toBe('fe-half');
+    expect(toFormlyFields(fields, 'de')[1].type).toBe('multicheckbox');
+  });
+
+  it('works without a title and without options', () => {
+    const [group] = toFormlySections([{ key: 'm', label: { de: 'M' }, fields: [{ key: 'a', type: 'text', label: { de: 'A' } }] }], 'de');
+    expect(group.fieldGroup?.map((f) => f.key ?? f.props?.label)).toEqual(['M', 'a']);
   });
 });

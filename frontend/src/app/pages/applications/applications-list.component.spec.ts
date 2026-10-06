@@ -1,972 +1,1150 @@
+import { Component } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting,
+  type TestRequest,
 } from '@angular/common/http/testing';
-import { convertToParamMap, Router, provideRouter } from '@angular/router';
-import { render, screen, within } from '@testing-library/angular';
+import { TestBed } from '@angular/core/testing';
+import { Router, provideRouter } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
+import { screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { ApplicationsListComponent } from './applications-list.component';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
-import type { BudgetTreeNode } from '../budget/budget-tree.api';
 import type {
   ApplicationListItemWire,
   ApplicationTypeListItemWire,
   Page,
   StateOutWire,
+  TransitionOutWire,
 } from '@core/api/models';
+import type { BudgetTreeNode } from '../budget/budget-tree.api';
+import { RailStatusService } from '../../layout/rail-status.service';
+import { ApplicationsListComponent, actionErrorKey } from './applications-list.component';
+import { ApplicationsPageService } from './applications-page.service';
 
-function fakeAuth(perms: string[]): Partial<AuthService> {
-  const set = new Set(perms);
-  return { can: (p: string) => set.has(p), canAny: (...p: string[]) => p.some((x) => set.has(x)) };
-}
+/** The detail of the outlet. The detail has its own spec; here only the route matters. */
+@Component({ standalone: true, template: '<p>detail</p>' })
+class DetailStub {}
 
-const OPEN_STATE: StateOutWire = {
+@Component({ standalone: true, template: '' })
+class NoneStub {}
+
+@Component({ standalone: true, template: '' })
+class ApplyStub {}
+
+const SUBMITTED: StateOutWire = {
   id: 's1',
   key: 'submitted',
   label: { de: 'Eingereicht', en: 'Submitted' },
   color: '#4a90d9',
   editAllowed: true,
 };
+const REVIEW: StateOutWire = {
+  id: 's2',
+  key: 'review',
+  label: { de: 'In Prüfung', en: 'In review' },
+  color: '#e8a33d',
+  editAllowed: false,
+};
 
 const TYPES: Page<ApplicationTypeListItemWire> = {
-  items: [{ id: 't1', name: 'Finanzantrag', hasBudget: true, active: true, activeFormVersionId: 'v1' }],
+  items: [{ id: 't1', name: 'Förderantrag', hasBudget: true, active: true, activeFormVersionId: 'v1' }],
   total: 1,
   limit: 20,
   offset: 0,
 };
 
-function listPage(items: ApplicationListItemWire[], total = items.length): Page<ApplicationListItemWire> {
-  return { items, total, limit: 20, offset: 0 };
+function row(over: Partial<ApplicationListItemWire> = {}): ApplicationListItemWire {
+  return {
+    id: 'app-1',
+    typeId: 't1',
+    title: 'Zuschuss Kennenlernwochenende',
+    state: SUBMITTED,
+    gremiumId: null,
+    amount: '1250.00',
+    currency: 'EUR',
+    createdAt: '2026-09-26T12:00:00',
+    updatedAt: '2026-09-26T12:00:00',
+    archivedAt: null,
+    ...over,
+  };
 }
 
-const ITEM: ApplicationListItemWire = {
-  id: 'app-1',
-  typeId: 't1',
-  title: 'Mein Antrag',
-  state: OPEN_STATE,
-  gremiumId: null,
-  amount: '250.00',
-  currency: 'EUR',
-  createdAt: '2026-05-30T09:00:00Z',
-  updatedAt: '2026-05-30T09:00:00Z',
-};
+const ROWS: ApplicationListItemWire[] = [
+  row(),
+  row({ id: 'app-2', title: 'Flyer für die Hochschulgruppen-Messe', state: REVIEW, amount: '480.00', createdAt: '2026-09-02T12:00:00' }),
+  row({ id: 'app-3', title: 'Trikots', amount: null, createdAt: '2026-08-15T12:00:00', archivedAt: '2026-09-01T10:00:00Z' }),
+];
 
-const ITEM2: ApplicationListItemWire = { ...ITEM, id: 'app-2', title: 'Zweiter Antrag' };
+function page(items: ApplicationListItemWire[], total = items.length, offset = 0): Page<ApplicationListItemWire> {
+  return { items, total, limit: 20, offset };
+}
 
-async function setup(opts: { perms?: string[]; flushBudgets?: boolean } = {}) {
-  const view = await render(ApplicationsListComponent, {
+const TREE: BudgetTreeNode[] = [
+  {
+    id: 'b1',
+    parentId: null,
+    name: 'Haushalt',
+    hiddenInBudget: false,
+    children: [
+      { id: 'b2', parentId: 'b1', name: 'Kultur', hiddenInBudget: false, children: [] },
+      { id: 'b3', parentId: 'b1', name: 'Versteckt', hiddenInBudget: true, children: [] },
+    ],
+  } as unknown as BudgetTreeNode,
+];
+
+const ALL = [
+  'application.read',
+  'application.transition',
+  'application.export',
+  'application.share',
+  'application.archive',
+  'application.force_status',
+  'application.delete',
+];
+
+const LIST = (r: { url: string; method: string }) => r.method === 'GET' && r.url === '/api/applications';
+
+interface Opts {
+  perms?: string[];
+  rows?: ApplicationListItemWire[];
+  total?: number;
+  tree?: BudgetTreeNode[] | 'error';
+  types?: 'error';
+  /** Leave the first list request open. */
+  holdList?: boolean;
+}
+
+async function start(url = '/applications', opts: Opts = {}) {
+  const perms = new Set(opts.perms ?? ALL);
+  const rail = { refresh: jest.fn() };
+  TestBed.configureTestingModule({
     providers: [
-      provideRouter([]),
+      provideRouter([
+        {
+          path: 'applications',
+          component: ApplicationsListComponent,
+          children: [
+            { path: '', component: NoneStub },
+            { path: ':id', component: DetailStub },
+          ],
+        },
+        { path: 'apply', component: ApplyStub },
+      ]),
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
-      { provide: AuthService, useValue: fakeAuth(opts.perms ?? []) },
+      { provide: AuthService, useValue: { can: (p: string) => perms.has(p) } },
+      { provide: RailStatusService, useValue: rail },
     ],
   });
-  const http = view.fixture.debugElement.injector.get(HttpTestingController);
-  const router = view.fixture.debugElement.injector.get(Router);
-  const cmp = view.fixture.componentInstance;
-  if (opts.flushBudgets !== false) flushBudgets(http);
-  return { ...view, http, router, cmp };
+  const http = TestBed.inject(HttpTestingController);
+  const harness = await RouterTestingHarness.create();
+  const cmp = await harness.navigateByUrl(url, ApplicationsListComponent);
+  // The row menu renders its items after a timer; it needs change detection on its own.
+  harness.fixture.autoDetectChanges(true);
+  if (opts.types === 'error') {
+    http.expectOne((r) => r.url === '/api/application-types').flush({}, { status: 500, statusText: 'x' });
+  } else {
+    http.expectOne((r) => r.url === '/api/application-types').flush(TYPES);
+  }
+  const tree = opts.tree ?? TREE;
+  const treeReq = http.expectOne((r) => r.url === '/api/budgets');
+  if (tree === 'error') treeReq.flush({}, { status: 403, statusText: 'x' });
+  else treeReq.flush(tree);
+  let first: TestRequest | null = null;
+  if (opts.holdList) first = http.expectOne(LIST);
+  else http.expectOne(LIST).flush(page(opts.rows ?? ROWS, opts.total));
+  harness.detectChanges();
+  const router = TestBed.inject(Router);
+  const toast = TestBed.inject(ToastService);
+  const pageService = harness.routeDebugElement!.injector.get(ApplicationsPageService);
+  /** Navigate and answer the reload of the list. */
+  const go = async (path: string, items = opts.rows ?? ROWS) => {
+    await router.navigateByUrl(path);
+    const req = http.expectOne(LIST);
+    req.flush(page(items));
+    harness.detectChanges();
+    return req;
+  };
+  const settle = async () => {
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+  };
+  return { harness, cmp, http, router, toast, rail, pageService, go, settle, first };
 }
 
-function flushTypes(http: HttpTestingController) {
-  http.expectOne((r) => r.url === '/api/application-types').flush(TYPES);
+/** Open the row menu of a row and answer its transitions. */
+async function openRowMenu(
+  http: HttpTestingController,
+  title: string,
+  transitions: TransitionOutWire[] = [],
+  detect: () => void = () => {},
+) {
+  const trigger = screen.getByRole('button', { name: `Aktionen für ${title}` });
+  await userEvent.click(trigger);
+  const req = http.expectOne((r) => r.url.endsWith('/transitions'));
+  req.flush(transitions);
+  await new Promise((r) => setTimeout(r));
+  detect();
+  return req;
 }
 
-/** The cost center tree (left filter picker) loads eagerly in the constructor. */
-function flushBudgets(http: HttpTestingController) {
-  for (const req of http.match((r) => r.url === '/api/budgets')) req.flush([]);
+/** Let a download run without a real file. Returns the undo. */
+function stubDownload() {
+  const u = URL as unknown as { createObjectURL?: unknown; revokeObjectURL?: unknown };
+  u.createObjectURL = () => 'blob:mock';
+  u.revokeObjectURL = () => undefined;
+  const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+  return () => click.mockRestore();
 }
 
 describe('ApplicationsListComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  afterEach(() => TestBed.inject(HttpTestingController).verify());
 
-  it('renders a row per application with type name, state badge and amount', async () => {
-    const { http, detectChanges } = await setup();
-    flushTypes(http);
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-    detectChanges();
-
-    expect(screen.getByRole('heading', { name: 'Anträge', level: 1 })).toBeInTheDocument();
-    // The state appears both as the row badge and as a status filter option.
-    const badge = screen.getAllByText('Eingereicht').find((el) => el.tagName !== 'OPTION');
-    expect(badge).toBeTruthy();
-    expect(screen.getByText(/250/)).toBeInTheDocument();
-    // The type name shows as a plain cell and in the filter option.
-    expect(screen.getAllByText('Finanzantrag').length).toBeGreaterThan(0);
-    const link = screen.getByRole('link', { name: /Mein Antrag/ });
-    expect(link).toHaveAttribute('href', '/applications/app-1');
-    http.verify();
-  });
-
-  it('offers the real loaded states as status filter options with the state UUID as value (#review2 §2)', async () => {
-    const { http, detectChanges } = await setup();
-    flushTypes(http);
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-    detectChanges();
-    await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
-    flushBudgets(http);
-
-    // The status filter is a dropdown, not free text. The option label is the state
-    // name. The option value is the backend state UUID, which the filter sends unchanged.
-    const option = screen.getByRole('option', { name: 'Eingereicht' }) as HTMLOptionElement;
-    expect(option.value).toBe('s1');
-    http.verify();
-  });
-
-  it('shows the empty state when no applications match', async () => {
-    const { http, detectChanges } = await setup();
-    flushTypes(http);
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([], 0));
-    detectChanges();
-    expect(screen.getByText('Keine Anträge gefunden.')).toBeInTheDocument();
-    http.verify();
-  });
-
-  it('renders an error message when the list request fails', async () => {
-    const { http, detectChanges } = await setup();
-    flushTypes(http);
-    http
-      .expectOne((r) => r.url === '/api/applications')
-      .flush(null, { status: 500, statusText: 'Server Error' });
-    detectChanges();
-    expect(screen.getByRole('alert')).toHaveTextContent('Anträge konnten nicht geladen werden.');
-    http.verify();
-  });
-
-  it('sends the current filter values as query params on submit', async () => {
-    const { http, detectChanges, router } = await setup();
-    flushTypes(http);
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-    detectChanges();
-
-    const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-    await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
-    flushBudgets(http);
-    await userEvent.type(screen.getByLabelText('Suche'), 'Beamer');
-    await userEvent.click(screen.getByRole('button', { name: 'Filtern' }));
-
-    expect(navigate).toHaveBeenCalledWith(
-      [],
-      expect.objectContaining({
-        queryParams: expect.objectContaining({ q: 'Beamer', offset: null }),
-        queryParamsHandling: 'merge',
-      }),
-    );
-    http.verify();
-  });
-
-  it('requests the first page and shows the count + "load more" when more exist', async () => {
-    const { http, detectChanges } = await setup();
-    flushTypes(http);
-    // 50 in total and only 1 loaded so far, so the infinite-scroll fallback button shows.
-    const req = http.expectOne((r) => r.url === '/api/applications');
-    expect(req.request.params.get('limit')).toBe('20');
-    expect(req.request.params.get('offset')).toBe('0');
-    req.flush(listPage([ITEM], 50));
-    detectChanges();
-
-    expect(screen.getByText('1 von 50')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Mehr laden' })).toBeEnabled();
-    http.verify();
-  });
-
-  it('appends the next page on "load more" (infinite scroll)', async () => {
-    const { http, detectChanges } = await setup();
-    flushTypes(http);
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM], 50));
-    detectChanges();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Mehr laden' }));
-    // The next offset is the number of results loaded so far (1 here). Filters stay.
-    const more = http.expectOne((r) => r.url === '/api/applications');
-    expect(more.request.params.get('offset')).toBe('1');
-    more.flush(listPage([ITEM2], 50));
-    detectChanges();
-
-    expect(screen.getByRole('link', { name: /Mein Antrag/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Zweiter Antrag/ })).toBeInTheDocument();
-    expect(screen.getByText('2 von 50')).toBeInTheDocument();
-    http.verify();
-  });
-
-  it('clears every filter param on reset', async () => {
-    const { http, detectChanges, router } = await setup();
-    flushTypes(http);
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-    detectChanges();
-
-    const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-    await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
-    flushBudgets(http);
-    await userEvent.click(screen.getByRole('button', { name: 'Zurücksetzen' }));
-    expect(navigate).toHaveBeenCalledWith(
-      [],
-      expect.objectContaining({
-        queryParams: {
-          q: null, type: null, state: null, gremium: null, budget: null,
-          amountMin: null, amountMax: null, createdFrom: null, createdTo: null,
-          // `archived` clears with the rest. It is a tri-state, so a reset has to put it
-          // back to its default rather than merely leave it alone.
-          archived: null, offset: null,
-        },
-      }),
-    );
-    http.verify();
-  });
-
-  it('writes the archived filter to the URL, like every other filter', async () => {
-    // Setting the signal and reloading directly left the choice out of the URL, so it
-    // could not be shared or survive a reload — and a reset had no parameter to clear.
-    const { fixture, http, detectChanges, router } = await setup();
-    flushTypes(http);
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-    detectChanges();
-    const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const cmp = fixture.componentInstance as any;
-
-    cmp.setFilter('archived', 'all');
-    expect(navigate).toHaveBeenCalledWith(
-      [],
-      expect.objectContaining({ queryParams: { archived: 'all', offset: null } }),
-    );
-
-    // The default travels as no parameter at all, so a shared URL carries only what was
-    // actually chosen.
-    cmp.setFilter('archived', 'false');
-    expect(navigate).toHaveBeenLastCalledWith(
-      [],
-      expect.objectContaining({ queryParams: { archived: null, offset: null } }),
-    );
-    for (const req of http.match((r) => r.url === '/api/applications')) req.flush(listPage([]));
-    http.verify();
-  });
-
-  it('reloads the list on a reset, not just the filter panel', async () => {
-    // Reported: the panel reset visually — the badge cleared, another segment looked
-    // active — and the data did not move. The reset clears the query params, so the
-    // reload only happens if the filters live in the URL in the first place.
-    const { fixture, http, detectChanges, router } = await setup();
-    flushTypes(http);
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-    detectChanges();
-    const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const cmp = fixture.componentInstance as any;
-
-    cmp.reset();
-    expect(cmp.archived()).toBe('false');
-    expect(navigate).toHaveBeenCalledWith(
-      [],
-      expect.objectContaining({ queryParams: expect.objectContaining({ archived: null }) }),
-    );
-    for (const req of http.match((r) => r.url === '/api/applications')) req.flush(listPage([]));
-    http.verify();
-  });
-
-  it('keeps the loaded rows when loading another page fails', async () => {
-    // Only the FIRST page turns a failure into the error state. A later page failing must
-    // not blank a list the reader is already looking at.
-    const { fixture, http, detectChanges } = await setup();
-    flushTypes(http);
-    http
-      .expectOne((r) => r.url === '/api/applications')
-      .flush({ items: [ITEM], total: 40, limit: 20, offset: 0 });
-    detectChanges();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const cmp = fixture.componentInstance as any;
-
-    cmp.loadMore();
-    http
-      .expectOne((r) => r.url === '/api/applications')
-      .flush({ code: 'boom' }, { status: 500, statusText: 'Server Error' });
-
-    expect(cmp.error()).toBe(false);
-    expect(cmp.items()).toHaveLength(1);
-    expect(cmp.loadingMore()).toBe(false);
-    http.verify();
-  });
-
-  describe('every filter, generically', () => {
-    /**
-     * These walk the component's own filter list rather than naming filters, so a filter
-     * added later is covered the day it is declared.
-     *
-     * The failure they guard against: a filter that reaches the signal and the panel but
-     * not the URL, so a reset clears the control and the list keeps its rows, because
-     * the list reloads from the URL.
-     */
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    function defs(cmp: any): { param: string; empty: string; signal: any }[] {
-      return cmp.filters;
-    }
-
-    async function ready() {
-      const view = await setup();
-      flushTypes(view.http);
-      view.http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-      view.detectChanges();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return { ...view, cmp: view.fixture.componentInstance as any };
-    }
-
-    function drain(http: HttpTestingController) {
-      for (const req of http.match((r) => r.url === '/api/applications')) req.flush(listPage([]));
-      http.verify();
-    }
-
-    it('declares every filter the panel offers', async () => {
-      const { cmp, http } = await ready();
-      expect(defs(cmp).map((f) => f.param)).toEqual(
-        expect.arrayContaining(['q', 'type', 'state', 'budget', 'amountMin', 'archived']),
-      );
-      drain(http);
+  describe('rows', () => {
+    it('groups the rows by the month of submission', async () => {
+      await start();
+      const months = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent?.trim());
+      expect(months).toEqual(['September 2026', 'August 2026']);
+      const sept = screen.getByRole('region', { name: 'September 2026' });
+      expect(within(sept).getAllByRole('listitem')).toHaveLength(2);
     });
 
-    it('sends nothing for a filter at its default', async () => {
-      const { cmp, http, router } = await ready();
-      const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-
-      cmp.applyFilters();
-
-      const params = navigate.mock.calls[0][1]?.queryParams as Record<string, unknown>;
-      for (const f of defs(cmp)) expect(params[f.param]).toBeNull();
-      drain(http);
+    it('shows title, status text, type and amount; an archived row says so', async () => {
+      await start();
+      expect(screen.getByRole('link', { name: 'Zuschuss Kennenlernwochenende' })).toBeInTheDocument();
+      expect(screen.getAllByText('Eingereicht').length).toBeGreaterThan(0);
+      const items = screen.getAllByRole('listitem');
+      expect(items.filter((li) => within(li).queryByText('Förderantrag')).length).toBe(3);
+      expect(screen.getByText('1.250,00 €')).toBeInTheDocument();
+      expect(screen.getByText('Archiviert')).toBeInTheDocument();
+      // No amount, no placeholder.
+      const trikots = screen.getByRole('link', { name: 'Trikots' }).closest('app-list-item')!;
+      expect(trikots.querySelector('.apps__amount')).toBeNull();
     });
 
-    it('clears every filter on a reset, in the signals AND in the URL', async () => {
-      // Both halves matter: the signals drive the panel, the URL drives the reload. The
-      // reported bug was the panel resetting while the list kept its old rows.
-      const { cmp, http, router } = await ready();
-      const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-      for (const f of defs(cmp)) f.signal.set(f.param === 'archived' ? 'all' : 'x');
-
-      cmp.reset();
-
-      const params = navigate.mock.calls.at(-1)?.[1]?.queryParams as Record<string, unknown>;
-      for (const f of defs(cmp)) {
-        expect(f.signal()).toBe(f.empty);
-        expect(params[f.param]).toBeNull();
-      }
-      drain(http);
-    });
-
-    it('carries a chosen value into the URL', async () => {
-      const { cmp, http, router } = await ready();
-      const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-
-      for (const f of defs(cmp)) {
-        const value = f.param === 'archived' ? 'all' : '42';
-        f.signal.set(value);
-        cmp.applyFilters();
-        const params = navigate.mock.calls.at(-1)?.[1]?.queryParams as Record<string, unknown>;
-        expect(String(params[f.param])).toBe(value);
-        f.signal.set(f.empty);
-      }
-      drain(http);
-    });
-
-    it('applies any filter immediately through the URL, never past it', async () => {
-      // The defect was a bespoke setter that set the signal and reloaded, leaving no
-      // query parameter for a reset to clear.
-      const { cmp, http, router } = await ready();
-      const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-
-      for (const f of defs(cmp)) {
-        const value = f.param === 'archived' ? 'all' : '42';
-        cmp.setFilter(f.param, value);
-        expect(navigate.mock.calls.at(-1)?.[1]?.queryParams).toEqual({
-          [f.param]: value,
-          offset: null,
-        });
-
-        // And its own default clears the parameter rather than writing it out.
-        cmp.setFilter(f.param, f.empty);
-        expect(navigate.mock.calls.at(-1)?.[1]?.queryParams).toEqual({
-          [f.param]: null,
-          offset: null,
-        });
-      }
-      drain(http);
-    });
-
-    it('reads every filter back out of the URL', async () => {
-      const { cmp, http } = await ready();
-      const raw: Record<string, string> = {};
-      for (const f of defs(cmp)) raw[f.param] = f.param === 'archived' ? 'all' : '42';
-
-      cmp.readFilters(convertToParamMap(raw));
-
-      for (const f of defs(cmp)) expect(f.signal()).toBe(raw[f.param]);
-      drain(http);
-    });
-  });
-
-  it('offers all three archived states at once, like the bookings kind filter', async () => {
-    const { http, detectChanges } = await setup();
-    flushTypes(http);
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-    detectChanges();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
-    flushBudgets(http);
-    detectChanges();
-    // A dropdown hid two of the three behind a click; a segmented control shows them.
-    // Scoped to the group: the cost-centre tree has an "Alle" of its own, and the point
-    // of the group is that these three belong together.
-    const group = within(screen.getByRole('group', { name: 'Archiv' }));
-    expect(group.getByRole('button', { name: 'Ohne archivierte' })).toBeInTheDocument();
-    expect(group.getByRole('button', { name: 'Nur archivierte' })).toBeInTheDocument();
-    expect(group.getByRole('button', { name: 'Alle' })).toBeInTheDocument();
-    // The active one says so, which a row of look-alike buttons otherwise does not.
-    expect(group.getByRole('button', { name: 'Ohne archivierte' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    http.verify();
-  });
-
-  it('sorts by amount when the Amount header is clicked', async () => {
-    const { http, detectChanges, router } = await setup();
-    flushTypes(http);
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-    detectChanges();
-
-    const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-    await userEvent.click(screen.getByRole('button', { name: /Betrag/ }));
-    expect(navigate).toHaveBeenCalledWith(
-      [],
-      expect.objectContaining({
-        queryParams: expect.objectContaining({ sort: 'amount', order: 'desc', offset: null }),
-      }),
-    );
-    http.verify();
-  });
-
-  it('sends amount range and date filters on submit', async () => {
-    const { http, detectChanges, router } = await setup();
-    flushTypes(http);
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-    detectChanges();
-
-    const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-    await userEvent.click(screen.getByRole('button', { name: 'Filter' }));
-    flushBudgets(http);
-    await userEvent.type(screen.getByLabelText('Min'), '100');
-    await userEvent.type(screen.getByLabelText('Max'), '500');
-    await userEvent.click(screen.getByRole('button', { name: 'Filtern' }));
-    expect(navigate).toHaveBeenCalledWith(
-      [],
-      expect.objectContaining({
-        queryParams: expect.objectContaining({ amountMin: 100, amountMax: 500, offset: null }),
-      }),
-    );
-    http.verify();
-  });
-
-  it('renders a dash for a missing amount', async () => {
-    const { http, detectChanges } = await setup();
-    flushTypes(http);
-    http
-      .expectOne((r) => r.url === '/api/applications')
-      .flush(listPage([{ ...ITEM, amount: null }]));
-    detectChanges();
-    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
-    http.verify();
-  });
-
-  it('maps every nullable list field to its fallback in the table rows', async () => {
-    const { http, cmp } = await setup();
-    flushTypes(http);
-    http.expectOne((r) => r.url === '/api/applications').flush(
-      listPage([
-        {
-          ...ITEM,
-          title: undefined as never,
-          state: undefined as never,
-          amount: undefined as never,
-          currency: undefined as never,
-          createdAt: undefined as never,
-        },
-      ]),
-    );
-    const [row] = cmp.tableRows();
-    // titleOf uses the untitled i18n string as the fallback.
-    expect(row.title).toBe('Ohne Titel');
-    expect(row.stateLabel).toBeNull();
-    expect(row.stateColor).toBeNull();
-    expect(row.amount).toBeNull();
-    expect(row.currency).toBeNull();
-    expect(row.createdAt).toBeNull();
-    http.verify();
-  });
-
-  it('treats a whitespace-only / null filter value as inactive in the indicator count', async () => {
-    const { http, cmp } = await setup();
-    flushTypes(http);
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-    // One real value, one whitespace-only and one null. Only the real value counts.
-    cmp.q.set('beamer');
-    cmp.typeId.set('   ');
-    cmp.state.set(null as never);
-    expect(cmp.activeFilterCount()).toBe(1);
-    http.verify();
-  });
-
-  it('accumulates filter status options across pages (collectStates), tolerating stateless items', async () => {
-    const { http, cmp } = await setup();
-    flushTypes(http);
-    const stateB: StateOutWire = { ...OPEN_STATE, id: 's2', label: { de: 'Genehmigt', en: 'Approved' } };
-    // First page: one item with state s1 and one with no state, which skips the state branch.
-    http.expectOne((r) => r.url === '/api/applications').flush(
-      listPage([ITEM, { ...ITEM2, state: undefined as never }], 50),
-    );
-    expect(cmp.stateOptions().map((o) => o.value)).toEqual(['s1']);
-
-    cmp.loadMore();
-    const more = http.expectOne((r) => r.url === '/api/applications');
-    // A second sighting of s1 must not duplicate. The new s2 appends (changed=true branch).
-    more.flush(listPage([{ ...ITEM, id: 'app-3', state: stateB }], 50));
-    expect(cmp.stateOptions().map((o) => o.value)).toEqual(['s1', 's2']);
-    http.verify();
-  });
-
-  describe('export', () => {
-    function stubBlobDownload() {
-      (URL as unknown as { createObjectURL?: unknown }).createObjectURL = () => 'blob:mock';
-      (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
-      const createObj = jest.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
-      const revoke = jest.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-      const click = jest
-        .spyOn(HTMLAnchorElement.prototype, 'click')
-        .mockImplementation(() => undefined);
-      return () => {
-        createObj.mockRestore();
-        revoke.mockRestore();
-        click.mockRestore();
-      };
-    }
-
-    it('hides the export button without the application.export permission', async () => {
-      const { http, detectChanges, cmp } = await setup({ perms: [] });
-      flushTypes(http);
-      http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-      detectChanges();
-      expect(cmp.canExport()).toBe(false);
-      expect(screen.queryByRole('button', { name: /Export/i })).not.toBeInTheDocument();
-      http.verify();
-    });
-
-    it('shows the export button and downloads the xlsx with the URL filters, clearing the flag', async () => {
-      const restore = stubBlobDownload();
-      const { http, detectChanges, cmp, router } = await setup({ perms: ['application.export'] });
-      flushTypes(http);
-      http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-      detectChanges();
-      expect(cmp.canExport()).toBe(true);
-
-      // The export reads the live query param snapshot, so fill the params first.
-      await router.navigate([], {
-        queryParams: {
-          q: 'beamer',
-          type: 't1',
-          state: 's1',
-          gremium: 'g1',
-          budget: 'b1',
-          createdFrom: '2026-01-01',
-          createdTo: '2026-12-31',
-          amountMin: '100',
-          amountMax: '500',
-          sort: 'amount',
-          order: 'asc',
-        },
+    it('names an untitled row and leaves an unknown type and a missing state out', async () => {
+      await start('/applications', {
+        rows: [row({ title: '  ', typeId: 'unknown', state: null, amount: 'abc', currency: null })],
       });
-      // The query param change reloads the list. Flush that reload request.
-      http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
+      expect(screen.getByRole('link', { name: 'Ohne Titel' })).toBeInTheDocument();
+      // An amount the browser cannot read stays as the server sent it.
+      expect(screen.getByText('abc')).toBeInTheDocument();
+      expect(document.querySelector('.apps__dot')).toBeNull();
+    });
 
-      cmp.onExport();
-      expect(cmp.exporting()).toBe(true);
-      const req = http.expectOne((r) => r.url === '/api/applications/export.xlsx');
+    it('starts an archived row without state and type with the marker, not with a dot', async () => {
+      await start('/applications?archived=all', {
+        rows: [row({ typeId: 'unknown', state: null, archivedAt: '2026-09-01T10:00:00Z' })],
+      });
+      expect(screen.getByText('Archiviert')).toBeInTheDocument();
+      expect(document.querySelector('.apps__dot')).toBeNull();
+    });
+
+    it('puts a chevron in the place of the row menu in the full-width list', async () => {
+      const { cmp } = await start();
+      expect(cmp.split()).toBe(false);
+      const chevrons = document.querySelectorAll('.apps__menuSlot .apps__chev');
+      expect(chevrons).toHaveLength(ROWS.length);
+      // The chevron is decoration. The row menu stays the control.
+      expect(chevrons[0].getAttribute('aria-hidden')).toBe('true');
+    });
+
+    it('formats an amount without a currency as euros', async () => {
+      await start('/applications', { rows: [row({ currency: null, amount: '12.50' })] });
+      expect(screen.getByText('12,50 €')).toBeInTheDocument();
+    });
+
+    it('opens the filter sheets from the bottom on a phone', async () => {
+      const original = window.matchMedia;
+      window.matchMedia = ((q: string) => ({ ...original(q), matches: q === '(max-width: 768px)' })) as typeof window.matchMedia;
+      try {
+        const { cmp } = await start();
+        expect(cmp.sheetSide()).toBe('bottom');
+        expect(screen.getByRole('button', { name: 'Liste sortieren oder exportieren' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Exportieren' })).not.toBeInTheDocument();
+      } finally {
+        window.matchMedia = original;
+      }
+    });
+
+    it('shows one group without a heading while the list sorts by amount', async () => {
+      const { go } = await start();
+      await go('/applications?sort=amount&order=desc');
+      expect(screen.queryAllByRole('heading', { level: 2 })).toHaveLength(0);
+      expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    });
+
+    it('shows the empty text and no group for no rows', async () => {
+      const { cmp } = await start('/applications', { rows: [] });
+      expect(screen.getByText('Keine Anträge gefunden.')).toBeInTheDocument();
+      expect(cmp.groups()).toEqual([]);
+      cmp.sortField.set('amount');
+      expect(cmp.groups()).toEqual([]);
+    });
+
+    it('shows the error when the list fails, and a placeholder while it loads', async () => {
+      const { first, harness } = await start('/applications', { holdList: true });
+      expect(screen.getByText('Anträge werden geladen …')).toBeInTheDocument();
+      first!.flush({}, { status: 500, statusText: 'x' });
+      harness.detectChanges();
+      expect(screen.getByRole('alert')).toHaveTextContent('Anträge konnten nicht geladen werden.');
+    });
+
+    it('puts the number of applications into the search field', async () => {
+      const { cmp } = await start('/applications', { total: 132 });
+      expect(screen.getByPlaceholderText('132 Anträge durchsuchen')).toBeInTheDocument();
+      cmp.total.set(1);
+      expect(cmp.searchPlaceholder()).toBe('1 Antrag durchsuchen');
+      cmp.total.set(0);
+      cmp.loading.set(true);
+      expect(cmp.searchPlaceholder()).toBe('Anträge durchsuchen');
+    });
+  });
+
+  describe('paging', () => {
+    it('loads the next page on "Mehr laden" and shows the count', async () => {
+      const { http, harness } = await start('/applications', { rows: [ROWS[0]], total: 2 });
+      expect(screen.getByText('1 von 2')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Mehr laden' }));
+      const req = http.expectOne(LIST);
+      expect(req.request.params.get('offset')).toBe('1');
+      harness.detectChanges();
+      expect(screen.getByText('Weitere Anträge werden geladen …')).toBeInTheDocument();
+      req.flush(page([ROWS[1]], 2, 1));
+      harness.detectChanges();
+      expect(screen.getAllByRole('listitem')).toHaveLength(2);
+      expect(screen.queryByRole('button', { name: 'Mehr laden' })).not.toBeInTheDocument();
+    });
+
+    it('keeps the loaded rows when a further page fails, and guards double loads', async () => {
+      const { http, cmp, harness } = await start('/applications', { rows: [ROWS[0]], total: 3 });
+      cmp.loadMore();
+      cmp.loadMore();
+      http.expectOne(LIST).flush({}, { status: 500, statusText: 'x' });
+      harness.detectChanges();
+      expect(cmp.error()).toBe(false);
+      expect(cmp.items()).toHaveLength(1);
+    });
+
+    it('does nothing while the first page loads or when nothing is left', async () => {
+      const { http, cmp, first } = await start('/applications', { holdList: true });
+      cmp.loadMore();
+      first!.flush(page([ROWS[0]]));
+      cmp.loadMore();
+      http.verify();
+    });
+
+    it('drops a late page of an earlier filter, also a late error', async () => {
+      const { http, router, cmp } = await start();
+      await router.navigateByUrl('/applications?q=a');
+      const stale = http.expectOne(LIST);
+      await router.navigateByUrl('/applications?q=ab');
+      const fresh = http.expectOne(LIST);
+      stale.flush(page([row({ id: 'stale', title: 'Alt' })]));
+      expect(cmp.items().map((i) => i.id)).not.toContain('stale');
+      fresh.flush(page([row({ id: 'new', title: 'Neu' })]));
+      expect(cmp.items().map((i) => i.id)).toEqual(['new']);
+      await router.navigateByUrl('/applications?q=abc');
+      const stale2 = http.expectOne(LIST);
+      await router.navigateByUrl('/applications?q=abcd');
+      const fresh2 = http.expectOne(LIST);
+      stale2.flush({}, { status: 500, statusText: 'x' });
+      expect(cmp.error()).toBe(false);
+      fresh2.flush(page([]));
+    });
+
+    it('loads the next page when the end of the list comes into view', async () => {
+      let trigger: ((entries: { isIntersecting: boolean }[]) => void) | null = null;
+      const disconnect = jest.fn();
+      class FakeObserver {
+        constructor(cb: (entries: { isIntersecting: boolean }[]) => void) {
+          trigger = cb;
+        }
+        observe(): void {}
+        disconnect = disconnect;
+      }
+      const g = globalThis as { IntersectionObserver?: unknown };
+      const original = g.IntersectionObserver;
+      g.IntersectionObserver = FakeObserver;
+      try {
+        const { http, harness } = await start('/applications', { rows: [ROWS[0]], total: 2 });
+        trigger!([{ isIntersecting: false }]);
+        http.verify();
+        trigger!([{ isIntersecting: true }]);
+        http.expectOne(LIST).flush(page([ROWS[1]], 2, 1));
+        harness.detectChanges();
+        expect(disconnect).toHaveBeenCalled();
+      } finally {
+        g.IntersectionObserver = original;
+      }
+    });
+  });
+
+  describe('filters', () => {
+    it('sends nothing for the defaults: no archived rows, newest first', async () => {
+      const { http, router } = await start();
+      await router.navigateByUrl('/applications?x=1');
+      const req = http.expectOne(LIST);
       const p = req.request.params;
-      expect(p.get('q')).toBe('beamer');
+      expect(p.keys().sort()).toEqual(['limit', 'offset', 'order', 'sort']);
+      expect(p.get('sort')).toBe('createdAt');
+      expect(p.get('order')).toBe('desc');
+      req.flush(page([]));
+    });
+
+    it('builds every filter from the URL, the status repeated', async () => {
+      const { http, router, cmp } = await start();
+      await router.navigateByUrl(
+        '/applications?state=s1&state=s2&type=t1&budget=b2&q=%20fest%20&amountMin=100&amountMax=500' +
+          '&createdFrom=2026-01-01&createdTo=2026-12-31&archived=all&gremium=g1&mine=true&sort=amount&order=asc',
+      );
+      const req = http.expectOne(LIST);
+      const p = req.request.params;
+      expect(p.getAll('state')).toEqual(['s1', 's2']);
       expect(p.get('type')).toBe('t1');
-      expect(p.get('state')).toBe('s1');
-      expect(p.get('gremium')).toBe('g1');
-      expect(p.get('budget')).toBe('b1');
-      expect(p.get('createdFrom')).toBe('2026-01-01');
-      expect(p.get('createdTo')).toBe('2026-12-31');
+      expect(p.get('budget')).toBe('b2');
+      expect(p.get('q')).toBe('fest');
       expect(p.get('amountMin')).toBe('100');
       expect(p.get('amountMax')).toBe('500');
+      expect(p.get('createdFrom')).toBe('2026-01-01');
+      expect(p.get('createdTo')).toBe('2026-12-31');
+      expect(p.get('archived')).toBe('all');
+      expect(p.get('gremium')).toBe('g1');
+      expect(p.get('mine')).toBe('true');
       expect(p.get('sort')).toBe('amount');
       expect(p.get('order')).toBe('asc');
-      req.flush(new Blob(['x']));
-      expect(cmp.exporting()).toBe(false);
-      restore();
-      http.verify();
+      req.flush(page(ROWS));
+      expect(cmp.activeFilterCount()).toBe(10);
     });
 
-    it('ignores invalid sort/order in the export query', async () => {
-      const restore = stubBlobDownload();
-      const { http, detectChanges, cmp, router } = await setup({ perms: ['application.export'] });
-      flushTypes(http);
-      http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-      detectChanges();
+    it('reads a hand-edited archive and mine value as the default', async () => {
+      const { http, router, cmp } = await start();
+      await router.navigateByUrl('/applications?archived=maybe&mine=yes&state=%20');
+      const req = http.expectOne(LIST);
+      expect(req.request.params.has('archived')).toBe(false);
+      expect(req.request.params.has('mine')).toBe(false);
+      expect(req.request.params.has('state')).toBe(false);
+      req.flush(page([]));
+      expect(cmp.archived()).toBe('false');
+    });
 
-      await router.navigate([], { queryParams: { sort: 'bogus', order: 'sideways' } });
-      http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
+    it('checks and unchecks states in the status menu, each as a repeated param', async () => {
+      const { cmp, harness } = await start();
+      const http = TestBed.inject(HttpTestingController);
+      const reloadAfter = async (label: string) => {
+        await userEvent.click(screen.getByRole('option', { name: label }));
+        await harness.fixture.whenStable();
+        const req = http.expectOne(LIST);
+        const state = req.request.params.getAll('state');
+        req.flush(page(ROWS));
+        harness.detectChanges();
+        return state;
+      };
+      await userEvent.click(screen.getByRole('button', { name: 'Status' }));
+      harness.detectChanges();
+      const list = screen.getByRole('listbox', { name: 'Status' });
+      expect(list).toHaveAttribute('aria-multiselectable', 'true');
+      expect(await reloadAfter('Eingereicht')).toEqual(['s1']);
+      // Several choices: the menu stays open.
+      expect(await reloadAfter('In Prüfung')).toEqual(['s1', 's2']);
+      expect(screen.getByRole('option', { name: 'In Prüfung' })).toHaveAttribute('aria-selected', 'true');
+      expect(cmp.stateChipLabel()).toBe('Eingereicht, In Prüfung');
+      expect(screen.getByRole('button', { name: 'Status: Eingereicht, In Prüfung' })).toBeInTheDocument();
+      expect(await reloadAfter('Eingereicht')).toEqual(['s2']);
+      // Unchecking the last state drops the param.
+      expect(await reloadAfter('In Prüfung')).toBeNull();
+      expect(await reloadAfter('In Prüfung')).toEqual(['s2']);
+      // The reset in the menu clears all states.
+      await userEvent.click(document.querySelector<HTMLElement>('.fs__reset')!);
+      await harness.fixture.whenStable();
+      const reload = http.expectOne(LIST);
+      expect(reload.request.params.has('state')).toBe(false);
+      reload.flush(page(ROWS));
+    });
 
+    it('counts states it has not seen yet instead of naming them', async () => {
+      const { go, cmp } = await start('/applications', { rows: [] });
+      await go('/applications?state=x1&state=x2', []);
+      expect(cmp.stateChipLabel()).toBe('2 Status');
+    });
+
+    it('says when there is no state to pick yet', async () => {
+      const { harness } = await start('/applications', { rows: [] });
+      await userEvent.click(screen.getByRole('button', { name: 'Status' }));
+      harness.detectChanges();
+      expect(screen.getByText('Noch keine Status in der Liste.')).toBeInTheDocument();
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    });
+
+    it('collects the states of every page, also past a row without a state', async () => {
+      const { cmp, go } = await start();
+      await go('/applications?q=x', [row({ id: 'n', state: null }), row({ id: 'm', state: REVIEW })]);
+      expect(cmp.stateOptions().map((o) => o.value)).toEqual(['s1', 's2']);
+    });
+
+    it('picks a cost centre in the tree sheet, without the hidden ones', async () => {
+      const { cmp, harness, http } = await start();
+      expect(cmp.budgetTree()[0].children.map((c) => c.id)).toEqual(['b2']);
+      await userEvent.click(screen.getByRole('button', { name: 'Kostenstelle' }));
+      harness.detectChanges();
+      expect(cmp.budgetSheetOpen()).toBe(true);
+      cmp.selectBudgetNode('b2');
+      await harness.fixture.whenStable();
+      const req = http.expectOne(LIST);
+      expect(req.request.params.get('budget')).toBe('b2');
+      req.flush(page(ROWS));
+      harness.detectChanges();
+      expect(cmp.sheet()).toBeNull();
+      expect(cmp.budgetChipLabel()).toBe('Kultur');
+      cmp.selectBudgetNode('');
+      await harness.fixture.whenStable();
+      const back = http.expectOne(LIST);
+      expect(back.request.params.has('budget')).toBe(false);
+      back.flush(page(ROWS));
+    });
+
+    it('names an unknown cost centre with the filter name', async () => {
+      const { cmp, go } = await start();
+      await go('/applications?budget=gone');
+      expect(cmp.budgetChipLabel()).toBe('Kostenstelle');
+    });
+
+    it('hides the cost-centre chip without a tree, and the type chip without types', async () => {
+      await start('/applications', { tree: 'error', types: 'error' });
+      expect(screen.queryByRole('button', { name: 'Kostenstelle' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Typ' })).not.toBeInTheDocument();
+    });
+
+    it('filters by type and by archive through the menus of the chips', async () => {
+      const { cmp, http, harness } = await start();
+      // No native select: every chip opens the menu of the app.
+      expect(document.querySelector('.apps__chips select')).toBeNull();
+      const pick = async (chip: string, option: string) => {
+        await userEvent.click(screen.getByRole('button', { name: chip }));
+        harness.detectChanges();
+        await userEvent.click(screen.getByRole('option', { name: option }));
+        await harness.fixture.whenStable();
+        const req = http.expectOne(LIST);
+        req.flush(page(ROWS));
+        harness.detectChanges();
+        return req.request.params;
+      };
+      expect((await pick('Typ', 'Förderantrag')).get('type')).toBe('t1');
+      expect(cmp.typeChipLabel()).toBe('Förderantrag');
+      // A single choice closes the menu and the focus goes back to the chip.
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Typ: Förderantrag' }));
+
+      expect((await pick('Archiv', 'Nur archivierte')).get('archived')).toBe('true');
+      expect(cmp.archivedChipLabel()).toBe('Archiv: Nur archivierte');
+      cmp.archived.set('all');
+      expect(cmp.archivedChipLabel()).toBe('Archiv: Alle');
+      harness.detectChanges();
+
+      // Back to the default: the param goes away.
+      expect((await pick('Archiv: Alle', 'Ohne archivierte')).has('archived')).toBe(false);
+      expect((await pick('Typ: Förderantrag', 'Alle Typen')).has('type')).toBe(false);
+    });
+
+    it('names an unknown type with the filter name', async () => {
+      const { cmp, go } = await start();
+      await go('/applications?type=gone');
+      expect(cmp.typeChipLabel()).toBe('Typ');
+    });
+
+    it('applies the amount and the date range of "Weitere Filter" and clears them', async () => {
+      const { cmp, http, harness } = await start();
+      await userEvent.click(screen.getByRole('button', { name: 'Weitere Filter' }));
+      harness.detectChanges();
+      expect(cmp.moreSheetOpen()).toBe(true);
+      cmp.draftAmountMin.set(' 100 ');
+      cmp.draftAmountMax.set('');
+      cmp.draftCreatedFrom.set('2026-01-01');
+      cmp.draftCreatedTo.set('2026-06-30');
+      cmp.applyMore();
+      await harness.fixture.whenStable();
+      let req = http.expectOne(LIST);
+      expect(req.request.params.get('amountMin')).toBe('100');
+      expect(req.request.params.has('amountMax')).toBe(false);
+      expect(req.request.params.get('createdFrom')).toBe('2026-01-01');
+      expect(req.request.params.get('createdTo')).toBe('2026-06-30');
+      req.flush(page(ROWS));
+      harness.detectChanges();
+      expect(cmp.moreCount()).toBe(3);
+      expect(screen.getByRole('button', { name: 'Weitere Filter, 3 aktiv' })).toBeInTheDocument();
+
+      // The sheet opens again with the applied values as its draft.
+      cmp.openMore();
+      expect(cmp.draftAmountMin()).toBe('100');
+      expect(cmp.draftCreatedTo()).toBe('2026-06-30');
+
+      cmp.clearMore();
+      await harness.fixture.whenStable();
+      req = http.expectOne(LIST);
+      expect(req.request.params.has('amountMin')).toBe(false);
+      expect(req.request.params.has('createdFrom')).toBe(false);
+      req.flush(page(ROWS));
+    });
+
+    it('drops the draft of "Weitere Filter" when the sheet closes without "Anwenden"', async () => {
+      const restore = stubDownload();
+      try {
+        const { cmp, http, harness } = await start('/applications', { total: 40 });
+        await userEvent.click(screen.getByRole('button', { name: 'Weitere Filter' }));
+        harness.detectChanges();
+        cmp.draftAmountMin.set('500');
+        cmp.draftCreatedFrom.set('2026-01-01');
+        // Escape, the scrim or a swipe: the sheet closes, nothing is applied.
+        cmp.sheet.set(null);
+        harness.detectChanges();
+        expect(cmp.moreCount()).toBe(0);
+        expect(cmp.activeFilterCount()).toBe(0);
+        expect(screen.getByRole('button', { name: 'Weitere Filter' })).toBeInTheDocument();
+
+        // The next page and the export send no unapplied value.
+        cmp.loadMore();
+        const more = http.expectOne(LIST);
+        expect(more.request.params.has('amountMin')).toBe(false);
+        expect(more.request.params.has('createdFrom')).toBe(false);
+        expect(more.request.params.get('offset')).toBe('3');
+        more.flush(page(ROWS));
+        cmp.onExport();
+        const xlsx = http.expectOne((r) => r.url === '/api/applications/export.xlsx');
+        expect(xlsx.request.params.has('amountMin')).toBe(false);
+        xlsx.flush(new Blob(['x']));
+
+        // A new open of the sheet starts from the applied values again.
+        cmp.openMore();
+        expect(cmp.draftAmountMin()).toBe('');
+        expect(cmp.draftCreatedFrom()).toBe('');
+      } finally {
+        restore();
+      }
+    });
+
+    it('sends only the applied search while the debounce waits', async () => {
+      jest.useFakeTimers();
+      try {
+        const { cmp, http } = await start('/applications', { total: 40 });
+        cmp.onSearch('fest');
+        expect(cmp.searchText()).toBe('fest');
+        expect(cmp.q()).toBe('');
+        cmp.loadMore();
+        const more = http.expectOne(LIST);
+        expect(more.request.params.has('q')).toBe(false);
+        more.flush(page(ROWS));
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('debounces the search and writes q to the URL', async () => {
+      jest.useFakeTimers();
+      try {
+        const { cmp, http, router } = await start();
+        cmp.onSearch('fe');
+        cmp.onSearch(' fest ');
+        jest.advanceTimersByTime(400);
+        await Promise.resolve();
+        jest.useRealTimers();
+        await new Promise((r) => setTimeout(r));
+        expect(router.url).toBe('/applications?q=fest');
+        http.expectOne(LIST).flush(page(ROWS));
+        // An emptied search drops the param.
+        jest.useFakeTimers();
+        cmp.onSearch('  ');
+        jest.advanceTimersByTime(400);
+        jest.useRealTimers();
+        await new Promise((r) => setTimeout(r));
+        expect(router.url).toBe('/applications');
+        http.expectOne(LIST).flush(page(ROWS));
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('cancels a pending search when the page goes away', async () => {
+      jest.useFakeTimers();
+      try {
+        const { cmp, harness, http } = await start();
+        cmp.onSearch('x');
+        harness.fixture.destroy();
+        jest.advanceTimersByTime(500);
+        http.verify();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('shows "Nur meine Anträge" as a chip that removes the filter', async () => {
+      const { go, cmp, http, harness } = await start();
+      await go('/applications?mine=true');
+      expect(cmp.activeFilterCount()).toBe(1);
+      await userEvent.click(screen.getByRole('button', { name: 'Filter „Nur meine Anträge“ entfernen' }));
+      await harness.fixture.whenStable();
+      const req = http.expectOne(LIST);
+      expect(req.request.params.has('mine')).toBe(false);
+      req.flush(page(ROWS));
+    });
+
+    it('resets every filter in the signals and in the URL', async () => {
+      const { go, cmp, http, harness, router } = await start();
+      await go('/applications?state=s1&type=t1&q=x&archived=all&amountMin=5&mine=true&sort=amount');
+      expect(cmp.activeFilterCount()).toBe(6);
+      // A search still waiting for its debounce must not undo the reset.
+      cmp.onSearch('pending');
+      await userEvent.click(screen.getByRole('button', { name: 'Zurücksetzen' }));
+      await harness.fixture.whenStable();
+      const req = http.expectOne(LIST);
+      expect(req.request.params.keys().sort()).toEqual(['limit', 'offset', 'order', 'sort']);
+      req.flush(page(ROWS));
+      expect(router.url).toBe('/applications?sort=amount');
+      expect(cmp.activeFilterCount()).toBe(0);
+      await new Promise((r) => setTimeout(r, 450));
+      http.verify();
+    });
+  });
+
+  describe('sort and export', () => {
+    it('sorts through the sort menu', async () => {
+      const { http, harness } = await start();
+      await userEvent.click(screen.getByRole('button', { name: 'Sortieren' }));
+      await new Promise((r) => setTimeout(r));
+      harness.detectChanges();
+      expect(screen.getByRole('menuitemcheckbox', { name: 'Neueste zuerst' })).toHaveAttribute('aria-checked', 'true');
+      await userEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Höchster Betrag zuerst' }));
+      await harness.fixture.whenStable();
+      const req = http.expectOne(LIST);
+      expect(req.request.params.get('sort')).toBe('amount');
+      expect(req.request.params.get('order')).toBe('desc');
+      req.flush(page(ROWS));
+    });
+
+    it('exports the list with its filters, without paging and without mine', async () => {
+      const restore = stubDownload();
+      try {
+        const { go, http, cmp } = await start();
+        await go('/applications?state=s1&state=s2&q=fest&sort=amount&order=asc');
+        await userEvent.click(screen.getByRole('button', { name: 'Exportieren' }));
+        cmp.onExport();
+        const req = http.expectOne((r) => r.url === '/api/applications/export.xlsx');
+        const p = req.request.params;
+        expect(p.getAll('state')).toEqual(['s1', 's2']);
+        expect(p.get('q')).toBe('fest');
+        expect(p.get('sort')).toBe('amount');
+        expect(p.has('limit')).toBe(false);
+        expect(p.has('offset')).toBe(false);
+        req.flush(new Blob(['x']));
+        expect(cmp.exporting()).toBe(false);
+      } finally {
+        restore();
+      }
+    });
+
+    it('reports a failed export', async () => {
+      const { http, cmp, toast } = await start();
+      const error = jest.spyOn(toast, 'error');
       cmp.onExport();
-      const req = http.expectOne((r) => r.url === '/api/applications/export.xlsx');
-      expect(req.request.params.get('sort')).toBeNull();
-      expect(req.request.params.get('order')).toBeNull();
-      req.flush(new Blob(['x']));
-      restore();
-      http.verify();
+      http.expectOne((r) => r.url === '/api/applications/export.xlsx').flush(null, { status: 500, statusText: 'x' });
+      expect(cmp.exporting()).toBe(false);
+      expect(error).toHaveBeenCalledWith('Der Export ist fehlgeschlagen.');
     });
 
-    it('is a no-op while an export is already running', async () => {
-      const { http, detectChanges, cmp } = await setup({ perms: ['application.export'] });
-      flushTypes(http);
-      http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-      detectChanges();
-      cmp.exporting.set(true);
+    it('hides the export without the right', async () => {
+      await start('/applications', { perms: ['application.read'] });
+      expect(screen.queryByRole('button', { name: 'Exportieren' })).not.toBeInTheDocument();
+    });
+
+    it('exports the archived rows when the list shows them', async () => {
+      const restore = stubDownload();
+      try {
+        const { go, http, cmp } = await start();
+        await go('/applications?archived=all');
+        expect(screen.getByRole('button', { name: 'Exportieren' })).toBeInTheDocument();
+        cmp.onExport();
+        const req = http.expectOne((r) => r.url === '/api/applications/export.xlsx');
+        expect(req.request.params.get('archived')).toBe('all');
+        req.flush(new Blob(['x']));
+      } finally {
+        restore();
+      }
+    });
+
+    it('hides the export while mine is set', async () => {
+      const { go, cmp, http } = await start();
+      expect(screen.getByRole('button', { name: 'Exportieren' })).toBeInTheDocument();
+      await go('/applications?mine=true');
+      expect(screen.queryByRole('button', { name: 'Exportieren' })).not.toBeInTheDocument();
+      // A call from elsewhere (the phone menu) sends nothing either.
       cmp.onExport();
       http.expectNone((r) => r.url === '/api/applications/export.xlsx');
-      http.verify();
     });
 
-    it('clears the exporting flag when the export request fails', async () => {
-      const { http, detectChanges, cmp } = await setup({ perms: ['application.export'] });
-      flushTypes(http);
-      http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-      detectChanges();
-      cmp.onExport();
-      expect(cmp.exporting()).toBe(true);
-      http
-        .expectOne((r) => r.url === '/api/applications/export.xlsx')
-        .flush(null, { status: 500, statusText: 'fail' });
-      expect(cmp.exporting()).toBe(false);
-      http.verify();
+    it('puts the sort orders and the export into one menu on a phone', async () => {
+      const { cmp, http, router } = await start();
+      expect(cmp.phoneMenuSections().map((s) => s.items.map((i) => i.id))).toEqual([
+        ['createdAt:desc', 'createdAt:asc', 'amount:desc', 'amount:asc'],
+        ['export'],
+      ]);
+      cmp.onHeaderMenu({ id: 'export', label: 'Exportieren' });
+      http.expectOne((r) => r.url === '/api/applications/export.xlsx').flush(null, { status: 500, statusText: 'x' });
+      cmp.onHeaderMenu({ id: 'createdAt:asc', label: '' });
+      await new Promise((r) => setTimeout(r));
+      expect(router.url).toBe('/applications?sort=createdAt&order=asc');
+      http.expectOne(LIST).flush(page(ROWS));
+      cmp.mine.set('true');
+      expect(cmp.phoneMenuSections()).toHaveLength(1);
     });
   });
 
-  it('falls back to empty lists when the types and budget-tree requests fail', async () => {
-    const { http, cmp } = await setup({ flushBudgets: false });
-    http
-      .expectOne((r) => r.url === '/api/application-types')
-      .flush(null, { status: 500, statusText: 'x' });
-    for (const req of http.match((r) => r.url === '/api/budgets')) {
-      req.flush(null, { status: 500, statusText: 'x' });
-    }
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-    expect(cmp.types()).toEqual([]);
-    expect(cmp.budgetTree()).toEqual([]);
-    // typeName falls back to the raw id when the type is unknown.
-    expect(cmp.typeName('t1' as never)).toBe('t1');
-    http.verify();
-  });
+  describe('#11: Antrag erfassen', () => {
+    const CAPTURE = [...ALL, 'application.create_on_behalf'];
 
-  it('prunes cost centres hidden in the budget tab (and their subtree)', async () => {
-    const { http, cmp } = await setup({ flushBudgets: false });
-    flushTypes(http);
-    const child = (id: string, hidden = false): BudgetTreeNode =>
-      ({ id, name: id, key: id, pathKey: id, children: [], hiddenInBudget: hidden } as unknown as BudgetTreeNode);
-    const tree: BudgetTreeNode[] = [
-      { ...child('visible'), children: [child('visibleChild'), child('hiddenChild', true)] } as BudgetTreeNode,
-      child('hiddenTop', true),
-    ];
-    for (const req of http.match((r) => r.url === '/api/budgets')) req.flush(tree);
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-
-    const pruned = cmp.budgetTree();
-    expect(pruned.map((n) => n.id)).toEqual(['visible']);
-    expect(pruned[0].children.map((n) => n.id)).toEqual(['visibleChild']);
-    http.verify();
-  });
-
-  it('debounces the header search before writing the q query param', async () => {
-    jest.useFakeTimers();
-    try {
-      const { http, cmp, router } = await setup();
-      flushTypes(http);
-      http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-      const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-
-      cmp.onSearch('bea');
-      // A second keystroke before the timer fires must reset the debounce.
-      cmp.onSearch('beamer');
-      expect(navigate).not.toHaveBeenCalled();
-      jest.advanceTimersByTime(400);
-      expect(navigate).toHaveBeenCalledTimes(1);
-      expect(navigate).toHaveBeenCalledWith(
-        [],
-        expect.objectContaining({ queryParams: { q: 'beamer', offset: null } }),
-      );
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  it('cancels a pending debounced search when the component is destroyed', async () => {
-    jest.useFakeTimers();
-    try {
-      const { http, cmp, fixture, router } = await setup();
-      flushTypes(http);
-      http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-      const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-
-      cmp.onSearch('beamer');
-      // A destroy inside the 400 ms window must not fire a stray navigate.
-      fixture.destroy();
-      jest.advanceTimersByTime(400);
-      expect(navigate).not.toHaveBeenCalled();
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  it('clears the q param when the debounced search is emptied', async () => {
-    jest.useFakeTimers();
-    try {
-      const { http, cmp, router } = await setup();
-      flushTypes(http);
-      http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-      const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-      cmp.onSearch('   ');
-      jest.advanceTimersByTime(400);
-      // A blank search gives q:null (the `|| null` branch).
-      expect(navigate).toHaveBeenCalledWith(
-        [],
-        expect.objectContaining({ queryParams: { q: null, offset: null } }),
-      );
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  it('navigates to the chosen cost-centre on tree selection (and clears it for "all")', async () => {
-    const { http, cmp, router } = await setup();
-    flushTypes(http);
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-    const navigate = jest.spyOn(router, 'navigate').mockResolvedValue(true);
-
-    cmp.selectBudgetNode('b-42');
-    expect(cmp.budgetId()).toBe('b-42');
-    expect(navigate).toHaveBeenLastCalledWith(
-      [],
-      expect.objectContaining({ queryParams: { budget: 'b-42', offset: null } }),
-    );
-
-    cmp.selectBudgetNode('');
-    // An empty id gives budget:null (the `id || null` branch).
-    expect(navigate).toHaveBeenLastCalledWith(
-      [],
-      expect.objectContaining({ queryParams: { budget: null, offset: null } }),
-    );
-    http.verify();
-  });
-
-  it('toggles the mobile tree open/closed', async () => {
-    const { http, cmp } = await setup();
-    flushTypes(http);
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-    expect(cmp.treeOpen()).toBe(false);
-    const toggle = screen.getByRole('button', { name: /Kostenstelle|Budget|Topf/i });
-    await userEvent.click(toggle);
-    expect(cmp.treeOpen()).toBe(true);
-    http.verify();
-  });
-
-  it('does not ask for archived applications by default', async () => {
-    // The working list hides them, and the parameter stays off the request entirely so
-    // the URL and the query are clean for the case everyone is in.
-    const { http, cmp } = await setup();
-    flushTypes(http);
-    const req = http.expectOne((r) => r.url.endsWith('/api/applications'));
-    expect(req.request.params.has('archived')).toBe(false);
-    req.flush({ items: [], total: 0, limit: 20, offset: 0 });
-    expect(cmp.archived()).toBe('false');
-  });
-
-  it('asks for only the archived ones, or for both, when told to', async () => {
-    const { http, cmp } = await setup();
-    flushTypes(http);
-    http
-      .expectOne((r) => r.url.endsWith('/api/applications'))
-      .flush({ items: [], total: 0, limit: 20, offset: 0 });
-
-    cmp.archived.set('true');
-    cmp.reload();
-    let req = http.expectOne((r) => r.url.endsWith('/api/applications'));
-    expect(req.request.params.get('archived')).toBe('true');
-    req.flush({ items: [], total: 0, limit: 20, offset: 0 });
-
-    cmp.archived.set('all');
-    cmp.reload();
-    req = http.expectOne((r) => r.url.endsWith('/api/applications'));
-    expect(req.request.params.get('archived')).toBe('all');
-    req.flush({ items: [], total: 0, limit: 20, offset: 0 });
-  });
-
-  it('counts a non-default archive filter as an active filter', async () => {
-    // Otherwise the filter badge says "none set" while the list is quietly narrowed.
-    const { cmp } = await setup();
-    expect(cmp.activeFilterCount()).toBe(0);
-    cmp.archived.set('true');
-    expect(cmp.activeFilterCount()).toBe(1);
-  });
-
-  it('keeps the table on screen while loading instead of replacing it with text', async () => {
-    // The table owns the loading state: it keeps its header and its column widths and
-    // draws skeleton rows. Hiding it behind `@if (loading())` would make the list vanish
-    // on every filter and sort, and make the first load a bare line of text.
-    const { fixture, container, cmp } = await setup();
-    cmp.loading.set(true);
-    fixture.detectChanges();
-
-    expect(container.querySelector('table')).not.toBeNull();
-    expect(container.querySelectorAll('th').length).toBeGreaterThan(0);
-    expect(container.querySelectorAll('.dt__skeleton-row').length).toBeGreaterThan(0);
-  });
-
-  it('ignores loadMore while loading, while already loading more, or when nothing is left', async () => {
-    const { http, cmp, detectChanges } = await setup();
-    flushTypes(http);
-    // Every item is loaded, so hasMore() is false.
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM], 1));
-    detectChanges();
-    cmp.loadMore();
-    http.expectNone((r) => r.url === '/api/applications');
-
-    cmp.loading.set(true);
-    cmp.loadMore();
-    http.expectNone((r) => r.url === '/api/applications');
-    cmp.loading.set(false);
-
-    cmp.loadingMore.set(true);
-    cmp.loadMore();
-    http.expectNone((r) => r.url === '/api/applications');
-    http.verify();
-  });
-
-  it('discards an out-of-order page from a superseded filter (fetchSeq guard)', async () => {
-    const { http, cmp, router } = await setup();
-    flushTypes(http);
-    // Keep the request of the first (initial) fetch pending.
-    const first = http.expectOne((r) => r.url === '/api/applications');
-
-    // A real filter change reloads, raises fetchSeq and sends a new request.
-    await router.navigate([], { queryParams: { q: 'beamer' } });
-    const second = http.expectOne((r) => r.url === '/api/applications');
-
-    // The stale first response arrives late. The component must ignore it.
-    first.flush(listPage([ITEM], 99));
-    expect(cmp.items()).toEqual([]);
-    expect(cmp.total()).toBe(0);
-
-    second.flush(listPage([ITEM2], 1));
-    expect(cmp.items().map((i) => i.id)).toEqual(['app-2']);
-    expect(cmp.total()).toBe(1);
-    http.verify();
-  });
-
-  it('ignores a late ERROR from a superseded fetch (error fetchSeq guard)', async () => {
-    const { http, cmp, detectChanges, router } = await setup();
-    flushTypes(http);
-    const first = http.expectOne((r) => r.url === '/api/applications');
-    await router.navigate([], { queryParams: { q: 'beamer' } });
-    const second = http.expectOne((r) => r.url === '/api/applications');
-
-    // A stale error must not flip the error flag.
-    first.flush(null, { status: 500, statusText: 'late' });
-    expect(cmp.error()).toBe(false);
-
-    second.flush(listPage([ITEM], 1));
-    detectChanges();
-    expect(cmp.error()).toBe(false);
-    http.verify();
-  });
-
-  it('builds the list query from every active filter field', async () => {
-    const { http, cmp, router } = await setup();
-    flushTypes(http);
-    http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM]));
-
-    await router.navigate([], {
-      queryParams: {
-        q: ' beamer ',
-        type: 't1',
-        state: 's1',
-        gremium: 'g1',
-        budget: 'b1',
-        amountMin: '100',
-        amountMax: '500',
-        createdFrom: '2026-01-01',
-        createdTo: '2026-12-31',
-        sort: 'amount',
-        order: 'asc',
-      },
+    it('hides the action without the permission', async () => {
+      const { cmp } = await start();
+      expect(screen.queryByRole('button', { name: 'Antrag erfassen' })).not.toBeInTheDocument();
+      expect(cmp.phoneMenuSections().flatMap((s) => s.items.map((i) => i.id))).not.toContain('capture');
     });
-    const req = http.expectOne((r) => r.url === '/api/applications');
-    const p = req.request.params;
-    expect(p.get('q')).toBe('beamer');
-    expect(p.get('type')).toBe('t1');
-    expect(p.get('state')).toBe('s1');
-    expect(p.get('gremium')).toBe('g1');
-    expect(p.get('budget')).toBe('b1');
-    expect(p.get('amountMin')).toBe('100');
-    expect(p.get('amountMax')).toBe('500');
-    expect(p.get('createdFrom')).toBe('2026-01-01');
-    expect(p.get('createdTo')).toBe('2026-12-31');
-    expect(p.get('sort')).toBe('amount');
-    expect(p.get('order')).toBe('asc');
-    req.flush(listPage([ITEM]));
-    // activeFilterCount counts q, type, state, amountMin, amountMax, createdFrom and
-    // createdTo. budget, gremium and topf are not part of the indicator, so 7 count here.
-    expect(cmp.activeFilterCount()).toBe(7);
-    http.verify();
-  });
 
-  it('wires an IntersectionObserver to the sentinel that triggers loadMore', async () => {
-    const observed: Element[] = [];
-    let trigger: ((entries: { isIntersecting: boolean }[]) => void) | null = null;
-    const disconnect = jest.fn();
-    class FakeObserver {
-      constructor(cb: (entries: { isIntersecting: boolean }[]) => void) {
-        trigger = cb;
+    it('opens the form in the detail pane and then the new application', async () => {
+      const { cmp, http, router, harness, settle } = await start('/applications', { perms: CAPTURE });
+      await userEvent.click(screen.getByRole('button', { name: 'Antrag erfassen' }));
+      harness.detectChanges();
+      expect(cmp.capturing()).toBe(true);
+      expect(cmp.captureInPane()).toBe(true);
+      expect(screen.getByRole('heading', { name: 'Antrag erfassen' })).toBeInTheDocument();
+      // "Zur Liste" closes the form first.
+      cmp.onBack();
+      expect(cmp.capturing()).toBe(false);
+      cmp.openCapture();
+      cmp.closeCapture();
+      expect(cmp.capturing()).toBe(false);
+      cmp.openCapture();
+      cmp.onCaptured('app-9');
+      http.expectOne(LIST).flush(page(ROWS));
+      await settle();
+      expect(cmp.capturing()).toBe(false);
+      expect(router.url).toBe('/applications/app-9');
+      // Without the form, "Zur Liste" closes the detail.
+      cmp.onBack();
+      await settle();
+      expect(router.url).toBe('/applications');
+    });
+
+    it('puts the action first into the phone menu and opens a bottom sheet', async () => {
+      const original = window.matchMedia;
+      window.matchMedia = ((q: string) => ({ ...original(q), matches: q === '(max-width: 768px)' })) as typeof window.matchMedia;
+      try {
+        const { cmp, harness } = await start('/applications', { perms: CAPTURE });
+        expect(cmp.phoneMenuSections()[0].items.map((i) => i.id)).toEqual(['capture']);
+        cmp.onHeaderMenu({ id: 'capture', label: 'Antrag erfassen' });
+        harness.detectChanges();
+        expect(cmp.capturing()).toBe(true);
+        expect(cmp.captureInPane()).toBe(false);
+      } finally {
+        window.matchMedia = original;
       }
-      observe(el: Element) {
-        observed.push(el);
-      }
-      disconnect = disconnect;
-    }
-    const original = (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver;
-    (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver =
-      FakeObserver as unknown as typeof IntersectionObserver;
-    try {
-      const { http, cmp, detectChanges } = await setup();
-      flushTypes(http);
-      // More pages remain, so the sentinel and the observer appear.
-      http.expectOne((r) => r.url === '/api/applications').flush(listPage([ITEM], 50));
-      detectChanges();
-      expect(observed.length).toBe(1);
+    });
+  });
 
-      const loadMore = jest.spyOn(cmp, 'loadMore');
-      // The observer skips a non-intersecting entry. An intersecting entry loads more.
-      trigger?.([{ isIntersecting: false }]);
-      expect(loadMore).not.toHaveBeenCalled();
-      trigger?.([{ isIntersecting: true }]);
-      expect(loadMore).toHaveBeenCalled();
-      const more = http.expectOne((r) => r.url === '/api/applications');
-      more.flush(listPage([ITEM2], 50));
-      detectChanges();
+  describe('list and detail', () => {
+    it('opens a row in the detail and keeps the filters', async () => {
+      const { go, router, cmp, harness } = await start();
+      await go('/applications?q=fest');
+      // The title is a real link with the filters, so it also opens in a new tab.
+      const link = screen.getByRole('link', { name: 'Flyer für die Hochschulgruppen-Messe' });
+      expect(link).toHaveAttribute('href', '/applications/app-2?q=fest');
+      await userEvent.click(link);
+      await harness.fixture.whenStable();
+      harness.detectChanges();
+      expect(router.url).toBe('/applications/app-2?q=fest');
+      expect(cmp.selectedId()).toBe('app-2');
+      // The list stays (one pane at a time here, so hidden): the filters did not change,
+      // so nothing reloads, and the open row is marked.
+      expect(
+        screen.getByRole('link', { name: 'Flyer für die Hochschulgruppen-Messe', hidden: true }),
+      ).toHaveAttribute('aria-current', 'true');
+      expect(screen.getByText('detail')).toBeInTheDocument();
+    });
+
+    it('opens a deep link with the application in the detail', async () => {
+      const { cmp } = await start('/applications/app-1');
+      expect(cmp.selectedId()).toBe('app-1');
+      expect(screen.getByText('detail')).toBeInTheDocument();
+    });
+
+    it('opens the deep link of an owner without application.read', async () => {
+      // The server lists only the own applications; the page asks the same way.
+      const { cmp } = await start('/applications/app-1', { perms: [] });
+      expect(cmp.selectedId()).toBe('app-1');
+      expect(screen.getByText('detail')).toBeInTheDocument();
+    });
+
+    it('goes back to the list with "Zur Liste" and keeps the filters', async () => {
+      const { cmp, router, go } = await start();
+      await go('/applications?q=x');
+      await router.navigateByUrl('/applications/app-1?q=x');
+      cmp.closeDetail();
+      await new Promise((r) => setTimeout(r));
+      expect(router.url).toBe('/applications?q=x');
+      expect(cmp.selectedId()).toBeNull();
+    });
+
+    it('keeps the detail open while a filter changes', async () => {
+      const { router, cmp, http, harness } = await start();
+      await router.navigateByUrl('/applications/app-1');
+      cmp.setFilter('type', 't1');
+      await harness.fixture.whenStable();
+      http.expectOne(LIST).flush(page(ROWS));
+      expect(router.url).toBe('/applications/app-1?type=t1');
+    });
+
+    it('links "Antrag stellen" to the wizard', async () => {
+      await start();
+      expect(screen.getByRole('link', { name: 'Antrag stellen' })).toHaveAttribute('href', '/apply');
+    });
+
+    it('keeps every loaded page when the detail changes an application', async () => {
+      const first = Array.from({ length: 20 }, (_, i) => row({ id: `p0-${i}`, title: `Antrag ${i}` }));
+      const second = Array.from({ length: 5 }, (_, i) => row({ id: `p1-${i}`, title: `Antrag ${20 + i}` }));
+      const { http, cmp, pageService, harness } = await start('/applications', { rows: first, total: 25 });
+      cmp.loadMore();
+      http.expectOne(LIST).flush(page(second, 25, 20));
+      expect(cmp.items()).toHaveLength(25);
+
+      pageService.notify({ id: 'p1-3', kind: 'updated', source: 'detail' });
+      const req = http.expectOne(LIST);
+      expect(req.request.params.get('offset')).toBe('0');
+      expect(req.request.params.get('limit')).toBe('25');
+      req.flush({ items: [...first, ...second], total: 25, limit: 25, offset: 0 });
+      harness.detectChanges();
+      expect(cmp.items().map((i) => i.id)).toContain('p1-3');
+      expect(cmp.hasMore()).toBe(false);
+
+      // A deleted application leaves the list; the other rows stay, without a request.
+      pageService.notify({ id: 'p1-4', kind: 'deleted', source: 'detail' });
       http.verify();
-    } finally {
-      (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver = original;
-    }
+      expect(cmp.items()).toHaveLength(24);
+      expect(cmp.total()).toBe(24);
+      // An unknown id changes nothing.
+      pageService.notify({ id: 'gone', kind: 'deleted', source: 'detail' });
+      expect(cmp.total()).toBe(24);
+    });
+
+    it('keeps the rows when the refresh after a change fails, and loads on from the old end', async () => {
+      const first = Array.from({ length: 20 }, (_, i) => row({ id: `p0-${i}`, title: `Antrag ${i}` }));
+      const { http, cmp, pageService } = await start('/applications', { rows: first, total: 30 });
+      pageService.notify({ id: 'p0-1', kind: 'updated', source: 'detail' });
+      http.expectOne(LIST).flush({}, { status: 500, statusText: 'x' });
+      expect(cmp.error()).toBe(false);
+      expect(cmp.items()).toHaveLength(20);
+      cmp.loadMore();
+      const more = http.expectOne(LIST);
+      expect(more.request.params.get('offset')).toBe('20');
+      more.flush(page([], 30, 20));
+    });
+
+    it('reloads the first page when a change arrives before any row', async () => {
+      const { http, cmp, pageService, first } = await start('/applications', { holdList: true });
+      pageService.notify({ id: 'x', kind: 'updated', source: 'detail' });
+      const req = http.expectOne(LIST);
+      expect(req.request.params.get('limit')).toBe('20');
+      first!.flush(page(ROWS));
+      expect(cmp.items()).toHaveLength(0);
+      req.flush(page(ROWS));
+      expect(cmp.items()).toHaveLength(3);
+    });
+
+    it('tells the detail the layout and reloads when the detail changed an application', async () => {
+      const { pageService, http, cmp } = await start();
+      expect(pageService.split()).toBe(cmp.split());
+      pageService.notify({ id: 'app-1', kind: 'updated', source: 'detail' });
+      http.expectOne(LIST).flush(page(ROWS));
+      // Its own notices do not reload it a second time.
+      pageService.notify({ id: 'app-1', kind: 'updated', source: 'list' });
+      http.verify();
+    });
+  });
+
+  describe('row menu', () => {
+    const START: TransitionOutWire = { id: 'tr-1', fromStateId: 's1', toStateId: 's2', label: { de: 'Prüfung beginnen' } };
+    const AGENDA: TransitionOutWire = {
+      id: 'tr-2',
+      fromStateId: 's1',
+      toStateId: 's3',
+      label: { de: 'Auf Tagesordnung setzen' },
+      addsToAgenda: true,
+    };
+
+    it('loads the transitions only when the menu opens, and fires one', async () => {
+      const { http, harness, toast, rail, pageService, cmp } = await start();
+      const success = jest.spyOn(toast, 'success');
+      const notices: unknown[] = [];
+      pageService.changes$.subscribe((c) => notices.push(c));
+      http.verify();
+      await openRowMenu(http, 'Zuschuss Kennenlernwochenende', [START], () => harness.detectChanges());
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Prüfung beginnen' }));
+      const post = http.expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-1/transition');
+      expect(post.request.body).toEqual({ transitionId: 'tr-1' });
+      expect(cmp.busyRow()).toBe('app-1');
+      // A second action waits for the first.
+      cmp.onRowAction(cmp.items()[0], { kind: 'archive' });
+      post.flush({ newStateId: 's2', statusEventId: 'e', dispatchedActions: [] });
+      expect(success).toHaveBeenCalledWith('Status geändert.');
+      expect(rail.refresh).toHaveBeenCalled();
+      http.expectOne(LIST).flush(page(ROWS));
+      expect(notices).toEqual([{ id: 'app-1', kind: 'updated', source: 'list' }]);
+    });
+
+    it.each([
+      [403, 'applications.transitions.forbidden'],
+      [409, 'applications.actions.conflict'],
+      [500, 'applications.actions.error'],
+    ])('reports a failed transition (%s) and reloads', async (status, key) => {
+      expect(actionErrorKey(status)).toBe(key);
+      const { http, cmp, toast } = await start();
+      const error = jest.spyOn(toast, 'error');
+      cmp.onRowAction(cmp.items()[0], { kind: 'transition', transition: { ...START, label: 'x', color: null, addsToAgenda: false, agendaGremiumId: null } });
+      http.expectOne((r) => r.method === 'POST').flush({}, { status, statusText: 'x' });
+      expect(error).toHaveBeenCalled();
+      http.expectOne(LIST).flush(page(ROWS));
+    });
+
+    it('opens the agenda dialog for a transition onto the agenda and reloads after it', async () => {
+      const { http, harness, router, cmp } = await start();
+      await openRowMenu(http, 'Zuschuss Kennenlernwochenende', [{ ...AGENDA, agendaGremiumId: 'g1' }], () =>
+        harness.detectChanges(),
+      );
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Auf Tagesordnung setzen' }));
+      harness.detectChanges();
+      // The row stays where it is: the dialog asks for the meeting, nothing fires yet.
+      expect(router.url).not.toBe('/applications/app-1');
+      expect(cmp.agendaOpen()).toBe(true);
+      expect(cmp.agendaFor()?.item.id).toBe('app-1');
+      http.expectNone((r) => r.url === '/api/applications/app-1/transition');
+      http.expectOne((r) => r.url === '/api/meetings' && r.params.get('gremiumId') === 'g1').flush([]);
+      harness.detectChanges();
+      expect(screen.getByRole('dialog', { name: /Auf Tagesordnung setzen/ })).toBeInTheDocument();
+
+      // The dialog fired: the list loads its rows again.
+      cmp.onAgendaDone();
+      http.expectOne(LIST).flush(page(ROWS));
+      cmp.agendaFor.set(null);
+      cmp.onAgendaDone();
+      http.verify();
+    });
+
+    it('opens the row through "Öffnen"', async () => {
+      const { http, harness, router } = await start();
+      await openRowMenu(http, 'Flyer für die Hochschulgruppen-Messe', [], () => harness.detectChanges());
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Öffnen' }));
+      await harness.fixture.whenStable();
+      expect(router.url).toBe('/applications/app-2');
+    });
+
+    it('opens the share links of the row', async () => {
+      const { http, harness, cmp } = await start();
+      await openRowMenu(http, 'Flyer für die Hochschulgruppen-Messe', [], () => harness.detectChanges());
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Öffentliche Links' }));
+      harness.detectChanges();
+      expect(cmp.shareFor()).toBe('app-2');
+      http.expectOne((r) => r.url === '/api/applications/app-2/shares').flush([]);
+      expect(screen.getByRole('dialog', { name: 'Öffentlicher Link' })).toBeInTheDocument();
+    });
+
+    it('opens "Status setzen" for the row and reloads after it', async () => {
+      const { http, harness, cmp } = await start();
+      await openRowMenu(http, 'Flyer für die Hochschulgruppen-Messe', [], () => harness.detectChanges());
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Status setzen' }));
+      harness.detectChanges();
+      http.expectOne((r) => r.url === '/api/applications/app-2/flow-states').flush([]);
+      expect(cmp.forceOpen()).toBe(true);
+      cmp.onForced();
+      http.expectOne(LIST).flush(page(ROWS));
+      cmp.forceFor.set(null);
+      cmp.onForced();
+      http.verify();
+    });
+
+    it('archives a row and brings an archived one back, without a question', async () => {
+      const { http, harness, toast, cmp } = await start();
+      const success = jest.spyOn(toast, 'success');
+      await openRowMenu(http, 'Flyer für die Hochschulgruppen-Messe', [], () => harness.detectChanges());
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Archivieren' }));
+      http.expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-2/archive').flush(ROWS[1]);
+      expect(success).toHaveBeenCalledWith('Antrag archiviert.');
+      http.expectOne(LIST).flush(page(ROWS));
+
+      cmp.onRowAction(cmp.items()[2], { kind: 'archive' });
+      http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/applications/app-3/archive').flush(ROWS[2]);
+      http.expectOne(LIST).flush(page(ROWS));
+    });
+
+    it('reports a failed archive', async () => {
+      const { http, cmp, toast } = await start();
+      const error = jest.spyOn(toast, 'error');
+      cmp.onRowAction(cmp.items()[0], { kind: 'archive' });
+      // One row action at a time.
+      cmp.onRowAction(cmp.items()[1], { kind: 'archive' });
+      cmp.onRowAction(cmp.items()[1], {
+        kind: 'transition',
+        transition: { id: 't', fromStateId: 'a', toStateId: 'b', label: 'x', color: null, addsToAgenda: false, agendaGremiumId: null },
+      });
+      http.expectOne((r) => r.url.endsWith('/archive')).flush({}, { status: 500, statusText: 'x' });
+      expect(error).toHaveBeenCalled();
+      expect(cmp.busyRow()).toBeNull();
+    });
+
+    it('deletes only after the red confirmation', async () => {
+      const { http, harness, toast, cmp } = await start();
+      const success = jest.spyOn(toast, 'success');
+      await openRowMenu(http, 'Flyer für die Hochschulgruppen-Messe', [], () => harness.detectChanges());
+      const del = screen.getByRole('menuitem', { name: 'Löschen' });
+      expect(del).toHaveClass('rm__item--danger');
+      await userEvent.click(del);
+      harness.detectChanges();
+      http.verify();
+      const dialog = screen.getByRole('dialog', { name: 'Antrag löschen' });
+      expect(dialog).toHaveTextContent('„Flyer für die Hochschulgruppen-Messe“ endgültig löschen?');
+      const confirm = within(dialog).getAllByRole('button', { name: 'Löschen' }).pop()!;
+      await userEvent.click(confirm);
+      cmp.confirmDelete();
+      http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/applications/app-2').flush(null);
+      expect(success).toHaveBeenCalled();
+      expect(cmp.deleteFor()).toBeNull();
+      // The row leaves the list without a new request.
+      http.verify();
+      expect(cmp.items().map((i) => i.id)).toEqual(['app-1', 'app-3']);
+      expect(cmp.total()).toBe(2);
+    });
+
+    it('closes the detail when the open application was deleted', async () => {
+      const { http, cmp, router } = await start();
+      await router.navigateByUrl('/applications/app-1');
+      cmp.deleteFor.set(cmp.items()[0]);
+      cmp.confirmDelete();
+      http.expectOne((r) => r.method === 'DELETE').flush(null);
+      await new Promise((r) => setTimeout(r));
+      expect(router.url).toBe('/applications');
+    });
+
+    it('keeps the confirmation open when the delete fails, and does nothing without a row', async () => {
+      const { http, cmp, toast } = await start();
+      const error = jest.spyOn(toast, 'error');
+      cmp.confirmDelete();
+      cmp.deleteFor.set(cmp.items()[0]);
+      cmp.confirmDelete();
+      cmp.confirmDelete();
+      http.expectOne((r) => r.method === 'DELETE').flush({}, { status: 500, statusText: 'x' });
+      expect(error).toHaveBeenCalled();
+      expect(cmp.deleteFor()).not.toBeNull();
+      expect(cmp.deleting()).toBe(false);
+    });
   });
 });

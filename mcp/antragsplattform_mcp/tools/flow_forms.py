@@ -16,7 +16,7 @@ from .. import graphops
 from .. import schemas as S
 from ..client import ApiError
 from ..schemas import dump_create, dump_patch
-from ._common import ToolGroup, api, params
+from ._common import ToolGroup, api
 
 group = ToolGroup()
 

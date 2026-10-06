@@ -1,33 +1,124 @@
+:host {
+  display: block;
+}
+
 .vh {
-  list-style: none;
-  margin: 0;
-  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--space-2);
+  container-type: inline-size;
+}
+.vh__title {
+  padding-inline: var(--space-1);
+}
+.vh__empty {
+  margin: 0;
+  padding-inline: var(--space-1);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
 }
 
+.vh__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .vh__item {
-  border: 1px solid var(--color-line, #e0e0e0);
-  border-radius: var(--radius-md, 0.5rem);
-  padding: 0.6rem 0.75rem;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
 }
 
+/* Version and state, time and person, then the actions at the end of the line. */
+.vh__row {
+  display: grid;
+  grid-template-columns: minmax(8rem, auto) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 2.5rem;
+}
 .vh__head {
-  display: flex;
+  display: inline-flex;
   align-items: baseline;
-  flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: var(--space-2);
+}
+.vh__version {
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+}
+.vh__meta time {
+  white-space: nowrap;
+}
+.vh__meta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.vh__actor {
+  min-width: 0;
+}
+.vh__actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 
-.vh__actions {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.4rem;
+/* The disclosure of the diff: a text button with a chevron, as wide as its words. */
+.vh__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 2rem;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.vh__toggle:hover {
+  background: var(--color-surface-3);
+}
+.vh__toggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 0;
 }
 
 .vh__diff {
-  margin-top: 0.6rem;
-  padding-top: 0.6rem;
-  border-top: 1px dashed var(--color-line, #e0e0e0);
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.vh__confirm {
+  margin: 0;
+}
+.vh__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* A narrow sheet (a phone) or a narrow column (the side column of the form editor, the
+   inspector of the flow editor): one column. Version and state, then time and person,
+   then the actions, each on a line of its own; "Version 2" and the time never break
+   inside. */
+@container (max-width: 34rem) {
+  .vh__row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-1);
+  }
+  .vh__meta {
+    grid-row: 2;
+  }
+  .vh__actions {
+    grid-row: 3;
+    justify-content: flex-start;
+    margin-inline-start: calc(-1 * var(--space-2));
+  }
 }

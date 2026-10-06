@@ -25,6 +25,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.deps import DbSession, Principal, SettingsDep, require_principal
+from app.modules.admin.gremium_roles import active_gremium_roles
 from app.modules.auth import oauth, oauth_service, sessions
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oauth_models import OAuthToken
@@ -261,6 +262,7 @@ def _loopback_redirect(redirect_uri: str, params: dict[str, str]) -> str:
 @router.get("/consent-request", responses=_errors(400, 401))
 async def consent_request(
     request: Request,
+    db: DbSession,
     settings: SettingsDep,
     principal: Annotated[Principal, Depends(require_principal())],
 ) -> dict[str, Any]:
@@ -280,10 +282,20 @@ async def consent_request(
     requested = oauth.parse_scope(tx["scope"])
     # The requested scopes that the user can really exercise. This is a UX hint only,
     # because the server caps the permissions at runtime. An admin holds all of them.
+    # A key counts when the user holds it globally OR through a gremium role in any
+    # gremium. Otherwise a gremium chair would see `meetings:write` as not held.
+    gremium_perms = {
+        p
+        for _, role in await active_gremium_roles(db, principal.sub)
+        for p in (role.permissions or [])
+    }
     held = {
         s
         for s in requested
-        if any(principal.has(p) for p in oauth.SCOPES.get(s, frozenset()))
+        if any(
+            principal.has(p) or p in gremium_perms
+            for p in oauth.SCOPES.get(s, frozenset())
+        )
     }
     return {
         "clientId": tx["client_id"],

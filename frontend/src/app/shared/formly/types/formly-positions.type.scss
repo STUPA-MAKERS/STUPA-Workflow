@@ -1,0 +1,315 @@
+// The positions editor (board Anträge-Bearbeiten): one card per position on surface 2,
+// the fields of the ui-kit look (grey box, label inside), no edge and no shadow.
+@use 'field' as f;
+
+:host {
+  display: block;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.pos {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.pos__legend {
+  float: left;
+  max-width: 60%;
+  padding: 0 var(--space-1);
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  font-weight: var(--fw-medium);
+}
+.pos__req {
+  margin-inline-start: 2px;
+  color: var(--color-danger);
+}
+.pos__sum {
+  float: right;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+.pos__sum .mono {
+  color: var(--color-text);
+}
+.pos__inner {
+  display: flex;
+  clear: both;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+.pos__hint {
+  margin: 0;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+
+.pos__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.pos__card--open {
+  padding: var(--space-3);
+}
+
+.pos__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* The collapsed position: one button over the row. */
+.pos__summary {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 2.75rem;
+  padding: 4px var(--space-2) 4px 6px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.pos__summary:hover {
+  background: var(--color-surface-3);
+}
+.pos__summary:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 0;
+}
+.pos__sumText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+/* The name and the preferred supplier (often a URL) are never cut: they wrap. */
+.pos__sumName {
+  min-width: 0;
+  font-size: var(--fs-md);
+  overflow-wrap: anywhere;
+}
+.pos__sumSub {
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+.pos__sumValue {
+  flex: none;
+}
+
+.pos__chev {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.pos__chev--open {
+  transform: rotate(180deg);
+}
+
+/* Icon buttons: the whole circle is the target, the icon takes no pointer. */
+.pos__icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.pos__icon app-icon {
+  pointer-events: none;
+}
+.pos__icon:hover:not(:disabled) {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+.pos__icon:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 0;
+}
+.pos__icon:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Open: the body sits under the field, set in by the chevron column. */
+.pos__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding-inline-start: calc(2.25rem + var(--space-2));
+}
+.pos__switch {
+  display: block;
+  padding: var(--space-1) 0;
+}
+.pos__switchLabel {
+  font-weight: var(--fw-medium);
+}
+.pos__lead {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.pos__offers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.pos__offer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.pos__radio {
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0 var(--space-1);
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+.pos__radio:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.pos__grow {
+  flex: 1 1 auto;
+}
+.pos__money {
+  flex: 0 0 8.5rem;
+}
+.pos__link {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 6px;
+  min-height: 2.25rem;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.pos__link app-icon {
+  pointer-events: none;
+}
+.pos__link:hover {
+  background: var(--color-surface-3);
+}
+.pos__link:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+}
+.pos__error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--fs-small);
+}
+.pos__add {
+  align-self: flex-start;
+}
+
+/* A field of the editor in the ui-kit look. */
+.pf {
+  @include f.box;
+  @include f.box-labelled;
+  cursor: text;
+}
+/* On the card (surface 2) the fields take the next surface, so they stand out. */
+.pf,
+.pf:hover {
+  background: var(--color-surface-3);
+}
+.pf--invalid {
+  @include f.box-invalid;
+}
+.pf__label {
+  @include f.label;
+}
+.pf:focus-within .pf__label {
+  @include f.label-focus;
+}
+.pf__control {
+  @include f.control;
+  @include f.control-labelled;
+}
+/* The amount: its euro sign stays inside the box, after the number. */
+.pos__money .pf__control {
+  padding-inline-end: 2rem;
+  text-align: end;
+}
+.pf__suffix {
+  position: absolute;
+  right: var(--space-3);
+  bottom: 9px;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+.pf--area .pf__control {
+  height: auto;
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+/* A narrow editor (a phone): the supplier takes the line beside the radio; the amount
+   and the bin go below it. */
+@container (max-width: 30rem) {
+  .pos__body {
+    padding-inline-start: 0;
+  }
+  .pos__offer {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: var(--space-2);
+  }
+  .pos__offer > .pos__radio {
+    grid-area: 1 / 1;
+  }
+  .pos__offer > .pos__grow {
+    grid-area: 1 / 2 / 2 / 4;
+  }
+  .pos__offer > .pos__money {
+    grid-area: 2 / 2;
+  }
+  .pos__offer > .pos__icon {
+    grid-area: 2 / 3;
+  }
+  .pos__offer--single {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pos__offer--single > .pos__grow,
+  .pos__offer--single > .pos__money {
+    grid-column: 1;
+  }
+}

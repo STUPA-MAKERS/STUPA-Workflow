@@ -107,7 +107,30 @@ describe('mapApplication', () => {
       isOwner: false,
       // Absent on the wire means not archived, not "unknown".
       archivedAt: null,
+      stateSince: null,
+      hiddenKeys: [],
+      capture: null,
     });
+  });
+
+  it('passes the capture block through (#11)', () => {
+    const capture = {
+      capturedBy: { kind: 'gremium' as const, displayName: 'StuPa' },
+      capturedAt: '2026-10-05T10:00:00Z',
+      receivedOn: '2026-10-01',
+      intake: 'per PDF',
+    };
+    expect(mapApplication({ ...wire, capture }, 'de').capture).toEqual(capture);
+  });
+
+  it('passes hiddenKeys through (O21)', () => {
+    const view = mapApplication({ ...wire, hiddenKeys: ['iban'] }, 'de');
+    expect(view.hiddenKeys).toEqual(['iban']);
+  });
+
+  it('passes stateSince through (A9)', () => {
+    const view = mapApplication({ ...wire, stateSince: '2026-09-28T14:30:00Z' }, 'de');
+    expect(view.stateSince).toBe('2026-09-28T14:30:00Z');
   });
 
   it('normalises omitted optionals to null and missing data to {}', () => {
@@ -145,6 +168,21 @@ describe('mapApplicationListItem', () => {
     expect(view.state?.label).toBe('Submitted');
     expect(view.gremiumId).toBeNull();
     expect(view.amount).toBe('10.00');
+    expect(view.stateSince).toBeNull();
+  });
+
+  it('passes stateSince through (A9)', () => {
+    const view = mapApplicationListItem(
+      {
+        id: 'a1',
+        typeId: 't1',
+        createdAt: '2026-06-05T10:00:00Z',
+        updatedAt: '2026-06-05T10:00:00Z',
+        stateSince: '2026-09-28T14:30:00Z',
+      },
+      'de',
+    );
+    expect(view.stateSince).toBe('2026-09-28T14:30:00Z');
   });
 });
 
@@ -163,10 +201,33 @@ describe('mapTimelineEvent', () => {
       toStateId: 's1',
       toState: { id: 's1', key: 'submitted', label: 'Submitted', color: '#4a90d9', editAllowed: true, kind: 'normal' },
       label: 'Submitted',
+      transitionLabel: null,
       actor: 'Referat',
+      actorInfo: null,
       at: '2026-06-05T10:00:00Z',
       note: 'ok',
     });
+  });
+
+  it('passes the resolved actor through', () => {
+    const wire: TimelineEventOutWire = {
+      toStateId: 's1',
+      actor: 'system:deadlines',
+      actorInfo: { kind: 'system', key: 'deadlines' },
+      at: '2026-06-05T10:00:00Z',
+    };
+    expect(mapTimelineEvent(wire, 'de').actorInfo).toEqual({ kind: 'system', key: 'deadlines' });
+  });
+
+  it('resolves the transition label to the locale (A3)', () => {
+    const wire: TimelineEventOutWire = {
+      toStateId: 's1',
+      toState: STATE,
+      transitionLabel: { de: 'Genehmigen', en: 'Approve' },
+      at: '2026-06-05T10:00:00Z',
+    };
+    expect(mapTimelineEvent(wire, 'en').transitionLabel).toBe('Approve');
+    expect(mapTimelineEvent(wire, 'de').transitionLabel).toBe('Genehmigen');
   });
 
   it('falls back to an empty label and null defaults when toState is absent', () => {
@@ -193,6 +254,7 @@ describe('mapComment', () => {
       id: 'c1',
       author: 'Referat',
       authorKind: 'principal',
+      authorInfo: null,
       body: 'Hallo',
       visibility: 'public',
       isPublic: true,
@@ -277,7 +339,23 @@ describe('mapTransition', () => {
       toStateId: 's2',
       label: 'Accept',
       color: null,
+      addsToAgenda: false,
+      agendaGremiumId: null,
     });
+  });
+
+  it('passes the agenda action through (A1)', () => {
+    const wire: TransitionOutWire = {
+      id: 'tr1',
+      fromStateId: 's1',
+      toStateId: 's2',
+      label: { de: 'Auf Tagesordnung' },
+      addsToAgenda: true,
+      agendaGremiumId: 'g1',
+    };
+    const view = mapTransition(wire, 'de');
+    expect(view.addsToAgenda).toBe(true);
+    expect(view.agendaGremiumId).toBe('g1');
   });
 
   it('passes the transition color through (and defaults to null)', () => {
@@ -329,6 +407,19 @@ describe('toApplicationCreateBody', () => {
     const body = toApplicationCreateBody(input);
     expect(body.applicantName).toBeNull();
   });
+
+  it('sends the draft uploads only with ids and a token (Z4)', () => {
+    const base: NewApplication = { typeId: 't1', data: {}, lang: 'de' };
+    expect(
+      toApplicationCreateBody({ ...base, attachmentIds: ['d1'], draftToken: 'tok' }),
+    ).toMatchObject({ attachmentIds: ['d1'], draftToken: 'tok' });
+    expect(toApplicationCreateBody({ ...base, attachmentIds: [], draftToken: 'tok' })).not.toHaveProperty(
+      'draftToken',
+    );
+    expect(toApplicationCreateBody({ ...base, attachmentIds: ['d1'], draftToken: null })).not.toHaveProperty(
+      'attachmentIds',
+    );
+  });
 });
 
 describe('mapVersion', () => {
@@ -343,6 +434,7 @@ describe('mapVersion', () => {
     const v = mapVersion(wire);
     expect(v.diff).toBeNull();
     expect(v.changedBy).toBeNull();
+    expect(v.changedByInfo).toBeNull();
     expect(v.data).toEqual({ title: 'Alt' });
   });
 
@@ -375,6 +467,23 @@ describe('mapVersion', () => {
     expect(v.diff?.added).toEqual([{ key: 'a', value: 1 }]);
     expect(v.diff?.removed).toEqual([]);
     expect(v.diff?.changed).toEqual([]);
+    expect(v.changedKeys).toEqual([]);
+  });
+
+  it('maps the metadata view of the applicant without values (A11)', () => {
+    const wire: VersionOutWire = {
+      version: 2,
+      data: null,
+      diff: null,
+      changedKeys: ['note', 'title'],
+      changedBy: 'StuPa',
+      at: '2026-06-02T10:00:00Z',
+    };
+    const v = mapVersion(wire);
+    expect(v.data).toEqual({});
+    expect(v.diff).toBeNull();
+    expect(v.changedKeys).toEqual(['note', 'title']);
+    expect(v.changedBy).toBe('StuPa');
   });
 });
 
@@ -450,6 +559,30 @@ describe('mapMeeting', () => {
     } as unknown as MeetingOutWire;
     expect(mapMeeting(wire).votes).toEqual([]);
   });
+
+  it('maps the agenda summary and the real start, with defaults (A2, Z7)', () => {
+    const base = {
+      id: 'm-3',
+      title: 'Sitzung',
+      status: 'live',
+      votes: [],
+      createdAt: '2026-06-12T17:00:00Z',
+    } as MeetingOutWire;
+    const empty = mapMeeting(base);
+    expect(empty.currentAgendaItem).toBeNull();
+    expect(empty.agendaItemCount).toBe(0);
+    expect(empty.startedAt).toBeNull();
+    expect(empty.closedAt).toBeNull();
+    const full = mapMeeting({
+      ...base,
+      currentAgendaItem: { position: 2, title: 'Haushalt' },
+      agendaItemCount: 5,
+      startedAt: '2026-06-12T17:04:00Z',
+    });
+    expect(full.currentAgendaItem).toEqual({ position: 2, title: 'Haushalt' });
+    expect(full.agendaItemCount).toBe(5);
+    expect(full.startedAt).toBe('2026-06-12T17:04:00Z');
+  });
 });
 
 describe('mapProtocol', () => {
@@ -506,7 +639,7 @@ describe('mapProtocol', () => {
 
 describe('mapMeetingVote', () => {
   it('maps every field through and normalises the null/0/true defaults', () => {
-    const minimal = { id: 'v-1', status: 'pending' } as MeetingVoteOutWire;
+    const minimal = { id: 'v-1', status: 'draft' } as MeetingVoteOutWire;
     expect(mapMeetingVote(minimal)).toEqual({
       id: 'v-1',
       applicationId: null,
@@ -514,7 +647,7 @@ describe('mapMeetingVote', () => {
       title: null,
       question: null,
       options: [],
-      status: 'pending',
+      status: 'draft',
       result: null,
       counts: null,
       leading: null,
@@ -523,6 +656,15 @@ describe('mapMeetingVote', () => {
       present: 0,
       revealed: true,
       failedReason: null,
+      myBallot: null,
+      majorityRule: 'simple',
+      secret: false,
+      quorum: null,
+      openedAt: null,
+      closedAt: null,
+      guestsVote: false,
+      presentMembers: null,
+      presentGuests: null,
     });
   });
 
@@ -551,6 +693,33 @@ describe('mapMeetingVote', () => {
     expect(v.voted).toBe(10);
     expect(v.present).toBe(12);
     expect(v.result).toBe('rejected');
+  });
+
+  it('keeps the rules and the times of the vote for the vote card', () => {
+    const wire = {
+      id: 'v-4',
+      status: 'open',
+      majorityRule: 'two_thirds',
+      secret: true,
+      quorum: { type: 'count', value: 12 },
+      openedAt: '2026-06-12T16:48:00Z',
+      closedAt: null,
+    } as MeetingVoteOutWire;
+    const v = mapMeetingVote(wire);
+    expect(v.majorityRule).toBe('two_thirds');
+    expect(v.secret).toBe(true);
+    expect(v.quorum).toEqual({ type: 'count', value: 12 });
+    expect(v.openedAt).toBe('2026-06-12T16:48:00Z');
+    expect(v.closedAt).toBeNull();
+  });
+
+  it('keeps the own ballot of the caller', () => {
+    const wire = {
+      id: 'v-3',
+      status: 'open',
+      myBallot: { cast: true, choice: 'ja' },
+    } as MeetingVoteOutWire;
+    expect(mapMeetingVote(wire).myBallot).toEqual({ cast: true, choice: 'ja' });
   });
 });
 
@@ -582,7 +751,27 @@ describe('mapMeeting permission flags', () => {
     expect(m.canManage).toBe(false);
     expect(m.canManageVotes).toBe(false);
     expect(m.canVote).toBe(false);
+    expect(m.canFinalize).toBe(false);
     expect(m.isProtokollant).toBe(false);
+    expect(m.keeperPeriods).toEqual([]);
+    expect(m.plannedHandover).toBeNull();
+  });
+
+  it('passes the keeper periods and the planned handover through (Z3)', () => {
+    const period = {
+      principalId: 'p-1',
+      name: 'Anna',
+      fromAt: '2026-06-20T16:00:00Z',
+      toAt: null,
+      fromAgendaItemId: 't-1',
+      toAgendaItemId: null,
+      fromPosition: 1,
+      toPosition: null,
+    };
+    const planned = { ...period, principalId: 'p-2', name: 'Bert', fromAt: null };
+    const m = mapMeeting({ ...base, keeperPeriods: [period], plannedHandover: planned });
+    expect(m.keeperPeriods).toEqual([period]);
+    expect(m.plannedHandover).toEqual(planned);
   });
 
   it('passes through all the explicit camelCase flags and names', () => {
@@ -601,6 +790,7 @@ describe('mapMeeting permission flags', () => {
       canManage: true,
       canManageVotes: true,
       canVote: true,
+      canFinalize: true,
     });
     expect(m.date).toBe('2026-06-20');
     expect(m.startTime).toBe('18:00');
@@ -611,6 +801,7 @@ describe('mapMeeting permission flags', () => {
     expect(m.canManage).toBe(true);
     expect(m.canManageVotes).toBe(true);
     expect(m.canVote).toBe(true);
+    expect(m.canFinalize).toBe(true);
   });
 });
 

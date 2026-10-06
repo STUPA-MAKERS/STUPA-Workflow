@@ -24,7 +24,7 @@ sibling memory here.
 
 - [nextcloud-parity-ui](nextcloud-parity-ui.md) — admin UIs (user table, form builder) modeled on Nextcloud
 - [ui-patterns-and-backlog2](ui-patterns-and-backlog2.md) — add-via-dialog, typeahead, dropdowns, per-entity subpages, no expert-mode
-- [mobile-view-decisions](mobile-view-decisions.md) — mobile pass: hamburger drawer, card tables, vertical stacking, 768px, desktop unchanged
+- [mobile-view-decisions](mobile-view-decisions.md) — phone bottom bar + "Mehr" sheet (replaced the hamburger drawer), card tables, vertical stacking, 768px
 - [empty-state-convention](empty-state-convention.md) — global `.empty-state` utility = one source for all table/list/card empty-states
 - [no-uuids-in-ui](no-uuids-in-ui.md) — never show raw UUIDs or ids in the UI, resolve to names server-side (`_author_names`)
 - [loading-overlay-convention](loading-overlay-convention.md) — overlay = GET-only interceptor + `SKIP_LOADING` token, mutations/polls/typeahead opt out
@@ -41,7 +41,7 @@ sibling memory here.
 ## Feature specs & designs
 
 - [budget-kostenstellen-spec](budget-kostenstellen-spec.md) — hierarchical budgets: VS-800-40 naming, roll-down available / roll-up consumed
-- [budget-tab-redesign](budget-tab-redesign.md) — Budget tab: left Budget→Year tree, stacked pies, requested column, cost-center colors, URL sync
+- [budget-tab-redesign](budget-tab-redesign.md) — Budget tab: FE10a tree pane + sheet (six figures, Verteilung, Auslastung, applications), O19 colour inheritance, URL sync
 - [budget-import-zugferd](budget-import-zugferd.md) — ZUGFeRD/Factur-X expense import, drag-into-window + drop-overlay
 - [flow-engine-redesign](flow-engine-redesign.md) — guard catalog + compare guard, 3 actions (webhook/notify/addToNextSession), 16-perm rework
 - [sessions-protokollant-redesign](sessions-protokollant-redesign.md) — per-meeting protokollant, granular Gremium-role perms, 3-pane meeting view, beamer follow

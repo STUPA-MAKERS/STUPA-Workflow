@@ -69,6 +69,11 @@ describe('WsService', () => {
     expect(MockWebSocket.instances[0].url).toContain('/api/ws/meetings/m-1/beamer');
   });
 
+  it('opens the guest channel of a public meeting', () => {
+    svc.connectGuest('7KQ4MP');
+    expect(MockWebSocket.instances[0].url).toContain('/api/public/meetings/7KQ4MP/ws');
+  });
+
   it('parses incoming JSON messages', () => {
     const ch = svc.connectMeeting('m-1');
     const received: ServerMessage[] = [];
@@ -77,6 +82,21 @@ describe('WsService', () => {
       data: JSON.stringify({ type: 'meeting_state', activeApplicationId: null, status: 'live' }),
     });
     expect(received[0]).toEqual({ type: 'meeting_state', activeApplicationId: null, status: 'live' });
+  });
+
+  it('forwards every meeting_state frame to meetingStates$, and nothing else', () => {
+    const states: ServerMessage[] = [];
+    svc.meetingStates$.subscribe((m) => states.push(m));
+    svc.connectMeeting('m-1');
+    svc.connectMeeting('m-2');
+    MockWebSocket.instances[0].emit('message', {
+      data: JSON.stringify({ type: 'meeting_state', activeApplicationId: null, status: 'live' }),
+    });
+    MockWebSocket.instances[1].emit('message', {
+      data: JSON.stringify({ type: 'viewers', count: 2 }),
+    });
+    MockWebSocket.instances[1].emit('message', { data: '{not json' });
+    expect(states).toEqual([{ type: 'meeting_state', activeApplicationId: null, status: 'live' }]);
   });
 
   it('emits an error message on malformed payloads', () => {

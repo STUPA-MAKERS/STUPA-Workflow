@@ -3,18 +3,34 @@ import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
-  CheckboxComponent,
+  IconComponent,
+  InputComponent,
   SelectComponent,
+  SwitchComponent,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
 import type { TransitionDef } from '../admin.models';
+import { FlowColorComponent } from './flow-color.component';
 
-/** Inspector panel for the selected transition. It edits endpoints, labels and flags. */
+/**
+ * Inspector panel for the selected transition. It edits endpoints, labels, colour, the
+ * flags (automatic, requires action) and the result branch. The guard and the actions
+ * follow it in the panel (`app-transition-detail`).
+ */
 @Component({
   selector: 'app-transition-inspector',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, CheckboxComponent, SelectComponent],
+  imports: [
+    FormsModule,
+    TranslatePipe,
+    ButtonComponent,
+    IconComponent,
+    InputComponent,
+    SelectComponent,
+    SwitchComponent,
+    FlowColorComponent,
+  ],
   templateUrl: './transition-inspector.component.html',
   styleUrl: './transition-inspector.component.scss',
 })

@@ -1,39 +1,72 @@
 :host {
+  display: block;
+}
+
+.fl {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
 }
+
+/* The name opens the form editor. It is the title of the row, not an accent link. */
 .fl__name {
-  font-weight: var(--fw-medium);
-  color: var(--color-primary);
+  display: block;
+  font-weight: var(--fw-semibold);
+  color: var(--color-text);
   text-decoration: none;
 }
 .fl__name:hover {
   text-decoration: underline;
 }
-.fl__yes,
-.fl__no {
-  font-size: var(--fs-md);
-  font-weight: var(--fw-bold);
-  line-height: 1;
+.fl__name:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
-.fl__yes {
-  color: var(--color-success);
-}
-.fl__no {
-  color: var(--color-danger);
-}
-.fl__icon-link {
-  display: inline-flex;
+
+.fl__muted,
+.fl__version {
   color: var(--color-text-muted);
 }
-.fl__icon-link:hover {
-  color: var(--color-primary);
+
+.fl__actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
 }
-.fl__mono {
-  font-family: var(--font-mono, monospace);
-  font-size: var(--fs-xs);
+
+/* The edit link has the size and the look of the icon button beside it. */
+.fl__iconLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-pill);
+  color: var(--color-text-muted);
 }
-.fl__dialog-foot {
-  display: contents;
+.fl__iconLink:hover {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+.fl__iconLink:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 0;
+}
+
+.fl__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.fl__confirm {
+  margin: 0;
+}
+
+.fl__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }

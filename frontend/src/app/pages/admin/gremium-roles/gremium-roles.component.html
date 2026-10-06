@@ -1,98 +1,12 @@
 <section class="gr">
-  <app-page-header [title]="'admin.gremiumRoles.title' | t" [subtitle]="'admin.gremiumRoles.subtitle' | t">
-    <app-button actions size="sm" (click)="openAdd()">{{ 'admin.gremiumRoles.add' | t }}</app-button>
-  </app-page-header>
-
-  <app-data-table
-    [loading]="loading()"
-    [loadingText]="'common.loading' | t" [columns]="columns()" [rows]="roles()" [emptyText]="'admin.gremiumRoles.empty' | t">
-    <ng-template appCell="name" let-r>{{ label($any(r)) | capitalize }}</ng-template>
-    <ng-template appCell="key" let-r><span class="font-mono text-xs">{{ $any(r).key }}</span></ng-template>
-    <ng-template appCell="permissions" let-r>
-      <span class="inline-flex flex-wrap gap-1">
-        @for (p of $any(r).permissions ?? []; track p) {
-          <span class="gr__permTag">{{ permLabel(p) | t }}</span>
-        } @empty {
-          <span class="font-mono text-xs">—</span>
-        }
-      </span>
-    </ng-template>
-    <ng-template appCell="actions" let-r let-i="index">
-      <span class="inline-flex items-center gap-1 justify-end">
-        <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.edit' | t" (click)="openEdit(i)">
-          <app-icon name="edit" />
-        </app-button>
-        <app-button
-          variant="ghost"
-          size="sm"
-          [iconOnly]="true"
-          [disabled]="$any(r).forced"
-          [ariaLabel]="'admin.common.remove' | t"
-          [title]="$any(r).forced ? ('admin.gremiumRoles.forced' | t) : ''"
-          (click)="askDelete($any(r))"
-        >
-          <app-icon name="delete" />
-        </app-button>
-      </span>
-    </ng-template>
-  </app-data-table>
+  <app-page-header
+    [flush]="true"
+    [title]="('admin.gremiumRoles.title' | t) + titleSuffix()"
+    [subtitle]="'admin.gremiumRoles.subtitle' | t"
+  />
+  <app-gremium-role-matrix
+    [gremiumId]="gremiumId"
+    [gremiumName]="gremiumName()"
+    [heading]="false"
+  />
 </section>
-
-<app-dialog
-  [open]="draft() !== null"
-  [title]="(editingId() === null ? 'admin.gremiumRoles.add' : 'admin.common.edit') | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="close()"
->
-  @if (draft(); as d) {
-    <form class="flex flex-col gap-4" (submit)="$event.preventDefault(); save()">
-      <app-input
-        [label]="'admin.common.key' | t"
-        [ngModel]="d.key"
-        (ngModelChange)="patch('key', $event)"
-        name="key"
-        placeholder="z. B. vorsitz"
-        [disabled]="editingId() !== null"
-      />
-      <app-input
-        [label]="'admin.common.labelDe' | t"
-        [ngModel]="d.labelDe"
-        (ngModelChange)="patch('labelDe', $event)"
-        name="labelDe"
-      />
-      <app-input
-        [label]="'admin.common.labelEn' | t"
-        [ngModel]="d.labelEn"
-        (ngModelChange)="patch('labelEn', $event)"
-        name="labelEn"
-      />
-      <fieldset class="flex flex-col gap-2 border-0 m-0 p-0">
-        <legend class="text-sm font-medium">{{ 'admin.gremiumRoles.permissions' | t }}</legend>
-        @for (p of allPermissions; track p) {
-          <app-checkbox
-            [ngModel]="d.permissions.includes(p)"
-            (ngModelChange)="togglePerm(p, $event)"
-            [name]="'perm-' + p"
-          >{{ permLabel(p) | t }}</app-checkbox>
-        }
-      </fieldset>
-    </form>
-  }
-  <div dialog-footer class="flex justify-end gap-3">
-    <app-button size="sm" variant="ghost" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-    <app-button size="sm" [disabled]="!draft()?.key?.trim()" (click)="save()">{{ 'action.save' | t }}</app-button>
-  </div>
-</app-dialog>
-
-<app-dialog
-  [open]="confirmDelete() !== null"
-  [title]="'admin.gremiumRoles.deleteTitle' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="confirmDelete.set(null)"
->
-  <p>{{ 'admin.gremiumRoles.deleteConfirm' | t: { name: label(confirmDelete()) } }}</p>
-  <div dialog-footer class="flex justify-end gap-3">
-    <app-button size="sm" variant="ghost" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button size="sm" variant="danger" (click)="doDelete()">{{ 'admin.common.remove' | t }}</app-button>
-  </div>
-</app-dialog>

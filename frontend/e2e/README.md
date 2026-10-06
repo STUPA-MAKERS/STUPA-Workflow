@@ -22,12 +22,10 @@ Playwright and cleans up fully (`down -v`). Precondition: run
 Deterministic. No Keycloak, typst or ClamAV on the gate path:
 
 - **01 apply** — the public apply wizard through ALL steps to the review summary
-  (application type → contact → dynamic form of the seeded form version → review).
-  The final submit click is NOT part of the assertion. The frontend ALTCHA component
-  is a stub (`altcha-stub-solution`), and the backend schema rejects it with 422 as a
-  malformed altcha solution. The UI submit is blocked independent of T-40 (issue
-  #111, the real captcha wiring is a separate task). Test 02 covers the real
-  application *creation* and the follow-up journey (scenario 1, part).
+  (application type → "Angaben" with the dynamic form of the seeded form version and
+  a draft upload of a PDF (Z4) → contact → review). The final submit click is NOT
+  part of the assertion. Test 02 covers the real application *creation* and the
+  follow-up journey (scenario 1, part).
 - **02 magic-link-flow** — create the application → magic link (real SMTP over
   mailpit) → edit → the admin moves it to `pruefung` with a flow transition →
   read-only and locked (scenarios 1 + 2 + read-only).

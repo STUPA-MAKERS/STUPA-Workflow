@@ -198,6 +198,7 @@ def build_applications_workbook(
         "Währung",
         "Erstellt",
         "Aktualisiert",
+        "Status seit",
     ]
     wb = Workbook()
     ws = wb.active
@@ -221,6 +222,7 @@ def build_applications_workbook(
                 item.currency or "",
                 _fmt_dt(item.created_at),
                 _fmt_dt(item.updated_at),
+                _fmt_dt(item.state_since),
             ],
         )
 

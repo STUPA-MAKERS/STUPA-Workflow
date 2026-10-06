@@ -4,10 +4,12 @@ import { toFormatLocale } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import type {
   AgendaItem,
+  Attendance,
   AttendanceStatus,
   I18nMap,
   Meeting,
   MeetingVote,
+  SelfAttendanceStatus,
 } from '@core/api/models';
 import type { BadgeVariant, IconName } from '@stupa-makers/ui-kit';
 import type { ServerMessage } from '@core/ws/ws-messages';
@@ -15,8 +17,12 @@ import type { ServerMessage } from '@core/ws/ws-messages';
 /** Canonical ballot options. The pass/fail evaluation needs yes, no and abstain. */
 export const FIXED_VOTE_OPTIONS = ['yes', 'no', 'abstain'] as const;
 
+/**
+ * The status mappers return status variants only (coloured text). `neutral` is a tag
+ * (a grey plate), so a status that has no colour of its own uses `info` (muted text).
+ */
 export function meetingStatusVariant(status: Meeting['status']): BadgeVariant {
-  return status === 'live' ? 'success' : status === 'closed' ? 'neutral' : 'info';
+  return status === 'live' ? 'success' : 'info';
 }
 
 export function meetingStatusKey(status: Meeting['status']): TranslationKey {
@@ -25,7 +31,7 @@ export function meetingStatusKey(status: Meeting['status']): TranslationKey {
 
 export function voteStatusVariant(status: MeetingVote['status']): BadgeVariant {
   if (status === 'open') return 'success';
-  if (status === 'closed') return 'neutral';
+  if (status === 'closed') return 'info';
   return status === 'cancelled' ? 'danger' : 'warning';
 }
 
@@ -38,7 +44,7 @@ export function voteResultKey(result: string | null | undefined): TranslationKey
 }
 
 export function voteResultVariant(result: string | null | undefined): BadgeVariant {
-  return result === 'passed' ? 'success' : result === 'rejected' ? 'danger' : 'neutral';
+  return result === 'passed' ? 'success' : result === 'rejected' ? 'danger' : 'info';
 }
 
 export function attendanceKey(status: AttendanceStatus | 'unknown'): TranslationKey {
@@ -57,6 +63,36 @@ export function attendanceIcon(status: AttendanceStatus): IconName {
 
 export function attendanceBadgeVariant(status: AttendanceStatus): BadgeVariant {
   return status === 'present' ? 'success' : status === 'excused' ? 'warning' : 'danger';
+}
+
+/** The statuses a member reports for the own record (Z2). Only the lead records `absent`. */
+export const SELF_ATTENDANCE_STATUSES: readonly SelfAttendanceStatus[] = ['present', 'excused'];
+
+/** The member labels: "Anwesend / Abwesend", where "Abwesend" is `excused` (Z2). */
+export function selfAttendanceKey(status: SelfAttendanceStatus): TranslationKey {
+  return status === 'present' ? 'meetings.attendance.selfPresent' : 'meetings.attendance.selfExcused';
+}
+
+/**
+ * The status label that a member sees on any row (Z2): "Anwesend" or "Abwesend".
+ * A member does not see the difference between `excused` and `absent`; only the
+ * meeting lead sees "Entschuldigt" and "Unentschuldigt".
+ */
+export function memberAttendanceKey(status: AttendanceStatus): TranslationKey {
+  return selfAttendanceKey(status === 'present' ? 'present' : 'excused');
+}
+
+/** The badge colour that a member sees. `excused` and `absent` look the same (Z2). */
+export function memberAttendanceBadgeVariant(status: AttendanceStatus): BadgeVariant {
+  return status === 'present' ? 'success' : 'warning';
+}
+
+/**
+ * True when a member may report this status for this record: the own row, a status
+ * other than `absent`, and a record that the meeting lead did not set (O15).
+ */
+export function canReportOwn(member: Attendance, status: AttendanceStatus): boolean {
+  return member.isSelf && member.source !== 'lead' && status !== 'absent';
 }
 
 export function countEntries(vote: MeetingVote): { key: string; value: number }[] {
@@ -84,6 +120,12 @@ export function voteOptionLabel(
   return label === key ? opt : label;
 }
 
+/** The stable problem+json `code` of an HTTP error (for example `open_vote`), or `''`. */
+export function errorCode(err: unknown): string {
+  const body = (err as { error?: { code?: string } } | null)?.error;
+  return typeof body?.code === 'string' ? body.code : '';
+}
+
 /** The problem+json `detail` message of an HTTP error, or an empty string. */
 export function errorDetail(err: unknown): string {
   const body = (err as { error?: { detail?: string } } | null)?.error;
@@ -107,13 +149,23 @@ export function assembleProtocolMarkdown(agenda: AgendaItem[]): string {
     .join('\n\n');
 }
 
-/** Beamer pick: the currently open vote, else the last closed one. */
-export function pickBeamerVote(votes: MeetingVote[]): MeetingVote | null {
-  return (
-    votes.find((v) => v.status === 'open') ??
-    [...votes].reverse().find((v) => v.status === 'closed') ??
-    null
-  );
+/** A meeting date with a short weekday ("Di., 13.10.2026"). `formatLocale` is the
+ *  `Intl` locale of the page (`I18nService.formatLocale()`). */
+export function weekdayDate(isoDate: string, formatLocale: string): string {
+  const date = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return isoDate;
+  return new Intl.DateTimeFormat(formatLocale, {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+}
+
+/** "35. Sitzung des Studierendenparlaments · Di., 13.10.2026": the meeting below the
+ *  title of a dialog. */
+export function meetingLine(m: Meeting, formatLocale: string): string {
+  return m.date ? `${m.title} · ${weekdayDate(m.date, formatLocale)}` : m.title;
 }
 
 /** Long localized date ("14. Juni 2026"). It mirrors the `ldate` pipe. */
@@ -160,9 +212,108 @@ export function liveOpenedVote(
     counts: null,
     leading: null,
     closesAt: msg.closesAt,
+    // The event carries the secrecy, so the card shows the right hint before the next read.
+    secret: msg.secret,
+    openedAt: new Date().toISOString(),
     voted: 0,
     present: 0,
     revealed: false,
     failedReason: null,
   };
+}
+
+/** The clock time (`HH:MM`, 24 h) of an ISO timestamp in local time, or `''`. */
+export function clockTime(iso: string | null | undefined, i18nLocale: string): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat(toFormatLocale(i18nLocale), {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(date);
+}
+
+/** The time line of a meeting row: a running meeting shows its start (`since`). */
+export interface MeetingTimeText {
+  /** `HH:MM` or `HH:MM–HH:MM`. Empty when the meeting has no time at all. */
+  text: string;
+  /** True for a live meeting with a known start: the row reads "seit HH:MM". */
+  since: boolean;
+}
+
+/**
+ * The time of a meeting row in the list.
+ *
+ * A planned meeting shows the planned start and end. A live meeting shows the real
+ * start (`startedAt`, "seit 18:04"). A closed meeting shows the real start and close.
+ * A meeting that started before the real times existed falls back to the planned
+ * times.
+ */
+export function meetingTimeText(m: Meeting, i18nLocale: string): MeetingTimeText {
+  const range = (a: string, b: string): string => (a && b ? `${a}–${b}` : a);
+  const planned = range(shortTime(m.startTime), shortTime(m.endTime));
+  const started = clockTime(m.startedAt, i18nLocale);
+  if (m.status === 'live' && started) return { text: started, since: true };
+  if (m.status === 'closed' && started) {
+    return { text: range(started, clockTime(m.closedAt, i18nLocale)), since: false };
+  }
+  return { text: planned, since: false };
+}
+
+/** The date of a meeting as a local midnight, for the date block. `null` without a date. */
+export function meetingDay(m: Meeting): string | null {
+  return m.date ? `${m.date}T00:00:00` : null;
+}
+
+/**
+ * The rules line of a vote card: "Einfache Mehrheit · offene Abstimmung · Quorum 12 ·
+ * seit 18:48". A part without data stays out: a vote that a live event added before the
+ * next read has no rules yet, and a vote without a quorum shows none.
+ */
+export function voteMetaLine(
+  vote: MeetingVote,
+  translate: (key: TranslationKey, params?: Record<string, string | number>) => string,
+  i18nLocale: string,
+): string {
+  const parts: string[] = [];
+  if (vote.majorityRule) {
+    // A vote with guests has no quorum: the majority of the cast votes decides (#17).
+    const family = vote.guestsVote ? 'vote.majorityCast' : 'vote.majority';
+    parts.push(translate(`${family}.${vote.majorityRule}` as TranslationKey));
+  }
+  if (vote.secret !== undefined) {
+    parts.push(translate(vote.secret ? 'meetings.vote.secretShort' : 'meetings.vote.publicShort'));
+  }
+  if (vote.quorum) {
+    parts.push(
+      translate(
+        vote.quorum.type === 'percent' ? 'meetings.vote.quorumPercent' : 'meetings.vote.quorumCount',
+        { n: vote.quorum.value },
+      ),
+    );
+  }
+  if (vote.status === 'open') {
+    const since = clockTime(vote.openedAt, i18nLocale);
+    if (since) parts.push(translate('meetings.vote.since', { time: since }));
+  } else if (vote.status === 'closed' || vote.status === 'cancelled') {
+    const ended = clockTime(vote.closedAt, i18nLocale);
+    if (ended) parts.push(translate('meetings.vote.endedAt', { time: ended }));
+  }
+  return parts.join(' · ');
+}
+
+/**
+ * "19 Mitglieder + 7 Gäste anwesend" for a vote with guests (#17), or `null` while the
+ * counts are unknown (a vote that closed before the counts existed).
+ */
+export function guestComposition(
+  members: number | null | undefined,
+  guests: number | null | undefined,
+  translate: (key: TranslationKey, params?: Record<string, string | number>) => string,
+): string | null {
+  if (members === null || members === undefined || guests === null || guests === undefined) {
+    return null;
+  }
+  return translate('guests.vote.composition', { members, guests });
 }

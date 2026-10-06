@@ -1,8 +1,17 @@
 import { Injectable, Injector, computed, effect, inject, signal } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { ApiClient } from '@core/api/api-client.service';
-import type { I18nMap, PublicFooterLink } from '@core/api/models';
+import type {
+  AttachmentLimits,
+  I18nMap,
+  PublicFooterColumn,
+  PublicFooterLink,
+  PublicSiteConfig,
+} from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
+
+/** The free texts of the branding, keyed by their slot. */
+export type FreeTexts = NonNullable<NonNullable<PublicSiteConfig['branding']>['freetexts']>;
 
 /**
  * App name from the active site config, which needs no authentication.
@@ -34,11 +43,65 @@ export class BrandingService {
      from `/admin/site-config` would refuse that request and fall back to the defaults. */
   private readonly _copyright = signal<I18nMap | null>(null);
   private readonly _legalLinks = signal<PublicFooterLink[]>([]);
+  private readonly _footerColumns = signal<PublicFooterColumn[]>([]);
+
+  /** Default confirmation window of a guest application, in hours. */
+  static readonly DEFAULT_CONFIRM_TTL_HOURS = 12;
+
+  private readonly _confirmTtlHours = signal(BrandingService.DEFAULT_CONFIRM_TTL_HOURS);
+
+  /** The upload limits of the backend defaults (10 MB per file, 20 files, 50 MB). */
+  static readonly DEFAULT_ATTACHMENT_LIMITS: AttachmentLimits = {
+    maxFileBytes: 10 * 1024 * 1024,
+    maxDraftFiles: 20,
+    maxDraftBytes: 50 * 1024 * 1024,
+  };
+
+  private readonly _linkTtlDays = signal<number | null>(null);
+  private readonly _attachmentLimits = signal<AttachmentLimits>(
+    BrandingService.DEFAULT_ATTACHMENT_LIMITS,
+  );
+  private readonly _freetexts = signal<FreeTexts>({});
+
+  private readonly _loaded = signal(false);
+
+  private readonly _gravatarEnabled = signal(true);
+
+  /**
+   * The admin switch for the Gravatar images of the avatars (`gravatarEnabled`). An older
+   * config without the field counts as on. Read {@link loaded} as well: the avatars load
+   * no image before the config is there.
+   */
+  readonly gravatarEnabled = this._gravatarEnabled.asReadonly();
+
+  /**
+   * Days a new magic link works; `null` means that it does not expire. The default of
+   * the backend is `null`, and the value stays so until the config is loaded. Read
+   * {@link loaded} before a text says "unbegrenzt".
+   */
+  readonly linkTtlDays = this._linkTtlDays.asReadonly();
+
+  /** True after the public config loaded. A failed load keeps it false. */
+  readonly loaded = this._loaded.asReadonly();
+
+  /** The upload limits of the wizard (Z4). The backend defaults until the config loads. */
+  readonly attachmentLimits = this._attachmentLimits.asReadonly();
+
+  /** The free texts of the branding (Freitexte), per locale. Empty until loaded. */
+  readonly freetexts = this._freetexts.asReadonly();
+
+  /**
+   * Hours a guest has to confirm the email. The wizard confirmation page shows it.
+   * The value is the backend default (12) until the config is loaded.
+   */
+  readonly confirmTtlHours = this._confirmTtlHours.asReadonly();
 
   /** Footer copyright per locale, or `null` for the built-in co-branding text. */
   readonly copyright = this._copyright.asReadonly();
   /** Maintained footer links; empty means the built-in imprint/privacy pair. */
   readonly legalLinks = this._legalLinks.asReadonly();
+  /** Footer columns, each a heading and its links. */
+  readonly footerColumns = this._footerColumns.asReadonly();
 
   /**
    * Full app name: the config value, else i18n `app.title`. The value reacts to
@@ -67,6 +130,17 @@ export class BrandingService {
         this._configuredName.set(cfg.branding?.appName ?? '');
         this._copyright.set(cfg.branding?.copyright ?? null);
         this._legalLinks.set(cfg.branding?.legalLinks ?? []);
+        this._footerColumns.set(cfg.branding?.footerColumns ?? []);
+        if (typeof cfg.confirmTtlHours === 'number' && cfg.confirmTtlHours > 0) {
+          this._confirmTtlHours.set(cfg.confirmTtlHours);
+        }
+        if (typeof cfg.linkTtlDays === 'number' && cfg.linkTtlDays > 0) {
+          this._linkTtlDays.set(cfg.linkTtlDays);
+        }
+        if (cfg.attachmentLimits) this._attachmentLimits.set(cfg.attachmentLimits);
+        this._freetexts.set(cfg.branding?.freetexts ?? {});
+        this._gravatarEnabled.set(cfg.branding?.gravatarEnabled !== false);
+        this._loaded.set(true);
       },
       error: () => {
         /* Keep everything empty so the i18n default fallbacks stay. */

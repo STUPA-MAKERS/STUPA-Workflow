@@ -1,0 +1,101 @@
+@use 'surface';
+
+/* The host fills the height its parent gives it; each pane scrolls on its own. The width
+   of the list (`--ld-list-width`) and the gap (`--ld-gap`) are global tokens in
+   styles.scss: every list column of the app has the same width. */
+:host {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.ld__list,
+.ld__detail {
+  /* A scroll container must also be the containing block of what it scrolls. An
+     absolute child (the `.sr-only` text of a row or a sheet) takes the nearest
+     positioned ancestor. Without one, that is the body: the child escapes the pane and
+     makes the document taller, so a pane page scrolled as a page. */
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+.ld__list[hidden],
+.ld__detail[hidden] {
+  display: none;
+}
+
+/* Wide: the list at a fixed width, the detail sheet fills the rest. */
+:host(.ld--split) {
+  gap: var(--ld-gap);
+}
+:host(.ld--split) .ld__list {
+  flex: none;
+  width: var(--ld-list-width);
+  /* The list column (`.ld-pane`, styles.scss) takes the full height and scrolls only its
+     rows. The column reads this property, not the class of this host. */
+  --ld-pane-height: 100%;
+}
+:host(.ld--split) .ld__detail {
+  flex: 1 1 0;
+  /* The detail pane is a window with round corners (the radius of the detail sheet,
+     `--ld-detail-radius`). The pane is the scroll container, so the round corners clip
+     everything that scrolls in it: the sheet, a sticky bar of the sheet, the end of a
+     long sheet. Without the radius here the sheet was round only at its own top and
+     bottom, and the rectangular pane cut it with a straight line at the window edges.
+     The scroll padding keeps an element that gets the focus clear of the corners. */
+  border-radius: var(--ld-detail-radius, var(--radius-2xl));
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-4);
+}
+
+/* Narrow: one pane at a time, at the full width. */
+:host(.ld--collapsed) .ld__list,
+:host(.ld--collapsed) .ld__detail {
+  flex: 1 1 0;
+}
+/* One pane at a time the page scrolls, not the pane. A pane that is a scroll container
+   would hold a sticky bar (the search of the list, the edit bar of an application) in
+   place of the page, and the bar would scroll away with it. */
+:host(.ld--collapsed) .ld__list,
+:host(.ld--collapsed) .ld__detail {
+  overflow: visible;
+}
+
+.ld__detail {
+  display: flex;
+  flex-direction: column;
+}
+/* The detail takes the focus only from the script (tabindex -1) when it has no "Zur
+   Liste"; the pane itself is no control, so it draws no ring. */
+.ld__detail:focus {
+  outline: none;
+}
+
+.ld__back {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--control-height-sm);
+  margin: 0 0 var(--space-2) calc(-1 * var(--space-2));
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.ld__back:hover {
+  background: var(--color-selected);
+}
+
+/* Wide: the detail is a sheet on surface 1 beside the list, so a table in it steps up
+   to surface 2. Narrow, the detail sits on the page and its tables keep surface 1. */
+:host(.ld--split) .ld__detail {
+  @include surface.context(1);
+}

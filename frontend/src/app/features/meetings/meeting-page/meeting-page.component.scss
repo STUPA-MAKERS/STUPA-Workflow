@@ -1,0 +1,289 @@
+@use 'breakpoints' as bp;
+@use '../scroll-fade' as fade;
+
+/* The session page is a pane page that runs edge to edge: it takes the free height of
+   the main column of the shell (`flex: 1 1 0`, no height from the viewport), and pulls
+   the block padding and the page gutter of the main region back. The page has no footer.
+   Above the phone limit the page itself does not scroll; the agenda, the sheet and the
+   vote cards scroll inside themselves. A scroll area with round cards in it has the
+   radius of the cards, so its corners clip a card that scrolls past an end. */
+:host {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+  margin-block: calc(-1 * var(--main-pad-top, var(--space-8)))
+    calc(-1 * var(--main-pad-bottom, var(--space-8)));
+  margin-inline: calc(-1 * var(--layout-gutter));
+}
+
+/* An icon before the label of a button keeps the gap of the design (8px). An icon
+   button has no label: a margin there would push its glyph off the centre. */
+app-button ::ng-deep .btn:not(.btn--icon) .btn__label > app-icon:first-child {
+  margin-inline-end: var(--space-1);
+}
+
+.mp__muted {
+  color: var(--color-text-muted);
+}
+
+/* ------------------------------------------------------------------ header */
+.mp__head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 84px;
+  padding: var(--space-3) var(--space-5) var(--space-3) var(--space-3);
+}
+.mp__back {
+  flex: none;
+}
+.mp__titles {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.mp__titleLine {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.mp__title {
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-h1);
+  line-height: 1.75rem;
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mp__status {
+  flex: none;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+}
+.mp__sub {
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mp__presence {
+  position: relative;
+  flex: none;
+}
+.mp__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.84375rem; /* 13.5px */
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.mp__chip:hover {
+  background: var(--color-surface-3);
+}
+.mp__chip:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.mp__viewers {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  inset-inline-end: 0;
+  z-index: 3;
+  min-width: 12rem;
+  max-height: 16rem;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  overflow-y: auto;
+  list-style: none;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-1);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--fs-body);
+  line-height: 1.75rem;
+}
+.mp__beamer {
+  flex: none;
+}
+/* Why the close is disabled, beside the button. */
+.mp__blocked {
+  flex: 0 1 13rem;
+  min-width: 8rem;
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+  text-align: end;
+}
+
+/* ------------------------------------------------------------------ body */
+.mp__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  padding: 0 var(--space-3);
+  overflow-y: auto;
+}
+.mp__agendaBtn {
+  align-self: flex-start;
+}
+.mp__votes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.mp__main {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.mp__sheet {
+  flex: 1 1 auto;
+  min-height: 24rem;
+}
+.mp__prep {
+  flex: 1 1 auto;
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+
+/* Wide: agenda | sheet | votes, each column scrolls inside itself. */
+.mp__body--wide {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-areas: 'agenda main';
+  align-items: stretch;
+  padding: 0 var(--space-3) 0 0;
+  overflow: hidden;
+}
+.mp__body--wide.mp__body--votes {
+  grid-template-columns: 320px minmax(0, 1fr) 320px;
+  grid-template-areas: 'agenda main votes';
+}
+.mp__body--wide .mp__agenda {
+  grid-area: agenda;
+  min-height: 0;
+  overflow-y: auto;
+}
+.mp__body--wide .mp__main {
+  grid-area: main;
+  min-height: 0;
+}
+.mp__body--wide .mp__sheet {
+  min-height: 0;
+}
+.mp__body--wide .mp__prep {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.mp__body--wide .mp__votes {
+  grid-area: votes;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* The radius of the vote cards: the column is the window they scroll in. */
+  border-radius: var(--radius-xl);
+  scroll-padding-block: var(--space-4);
+}
+
+/* Below wide (above the phone limit) the body is the one scroll area of the vote cards
+   and the sheet. Its edges are the edges of the cards and it has their radius, so a card
+   that scrolls past an end is clipped round, not with a straight line; an end fades
+   while more content lies past it. */
+@include bp.below-wide {
+  .mp__body:not(.mp__body--wide) {
+    margin-inline: var(--space-3);
+    padding-inline: 0;
+    border-radius: var(--radius-xl);
+    overscroll-behavior: contain;
+    @include fade.fade-y(var(--space-6));
+  }
+}
+
+/* ------------------------------------------------------------------ dock */
+.mp__dock {
+  flex: none;
+  margin: var(--space-3) var(--space-3) var(--space-3) 0;
+}
+@include bp.below-wide {
+  .mp__dock {
+    margin-inline-start: var(--space-3);
+  }
+}
+
+/* Phone: the page scrolls as one, the dock sits on the viewport above the navigation
+   bar, and the page keeps the height of the dock free below its content. Further page
+   actions go into the session menu. */
+@include bp.phone {
+  :host {
+    flex: 1 0 auto;
+    min-height: 100dvh;
+    margin-inline: calc(-1 * var(--space-4));
+    padding-bottom: var(--fx-dock-h, 0px);
+  }
+  .mp__head {
+    gap: var(--space-1);
+    min-height: 0;
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-1);
+  }
+  /* The room state is in the attendance popover of the dock. */
+  .mp__presence {
+    display: none;
+  }
+  .mp__title {
+    font-size: var(--fs-h2);
+    line-height: 1.375rem;
+  }
+  .mp__body,
+  .mp__body:not(.mp__body--wide) {
+    margin-inline: 0;
+    padding-inline: var(--space-3);
+    border-radius: 0;
+    overflow: visible;
+  }
+  .mp__sheet {
+    min-height: 60dvh;
+  }
+  .mp__dock {
+    position: fixed;
+    inset-inline: 0;
+    bottom: var(--app-bottom-inset, 0px);
+    z-index: var(--z-sticky, 10);
+    margin: 0;
+    border-top: var(--border-width) solid var(--color-border);
+    background: var(--color-surface-2);
+    padding-bottom: var(--app-bottom-safe-area, env(safe-area-inset-bottom));
+  }
+}
+
+/* The shared top and bottom fade: an end fades only while more content lies past it. */
+.mp__agenda {
+  @include fade.fade-y(var(--space-5));
+}
+.mp__votes {
+  @include fade.fade-y(var(--space-5));
+}
+.mp__prep {
+  @include fade.fade-y(var(--space-5));
+}

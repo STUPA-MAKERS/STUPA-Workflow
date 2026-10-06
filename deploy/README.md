@@ -1,6 +1,6 @@
 # deploy
 
-Compose stack for one VM. Internal traffic is plain HTTP. The external Nginx Proxy Manager
+Compose stack for one VM. Internal traffic is plain HTTP. The external Caddy reverse proxy
 terminates TLS. `web` publishes `127.0.0.1:8080` by default (`WEB_PORT` moves the port,
 `WEB_HOST` the bind address; see `.env.example` before opening it beyond loopback). `postgres` also publishes a loopback-only
 port for the admin CLI (see the service table). Every other service stays on the internal
@@ -28,10 +28,10 @@ docker compose up -d --build
 | `web` | nginx, serves the built SPA, routes `/api` to `api` | `${WEB_HOST:-127.0.0.1}:${WEB_PORT:-8080}` |
 | `migrate` | one-shot: `alembic upgrade head`, then exit | — |
 | `api` | FastAPI (uvicorn `--proxy-headers`) | — |
-| `worker` | arq (mail send, nightly budget rollup) | — |
+| `worker` | arq (mail send, virus scan, deadlines, reminders, budget rollup, retention, draft purge, nightly backup and audit check) | — |
 | `postgres` | PostgreSQL 16 | `127.0.0.1:5433` (admin CLI) |
 | `redis` | Redis 7 (arq broker, rate limit, ALTCHA replay) | — |
-| `minio` | S3 object store (attachments) | — |
+| `minio` | S3 object store (attachments, backup archives) | — |
 | `clamav` | virus scan (the first start is slow because it loads the signatures) | — |
 | `typst` | internal Markdown→PDF render service | — |
 | `altcha` | ALTCHA Sentinel (captcha verifier) | — |
@@ -39,7 +39,7 @@ docker compose up -d --build
 Docker builds `web` from the repository root `..` in two stages (`web/Dockerfile`). Stage 1
 builds the Angular frontend with Node. Stage 2 serves it with nginx. The image contains
 `web/nginx.conf`, but compose also mounts it. You can therefore edit the file in production
-without a rebuild, for example the `real_ip` CIDR of the Proxy Manager.
+without a rebuild, for example the `real_ip` CIDR of Caddy.
 
 ## Migrations
 
@@ -111,11 +111,15 @@ Then point `DATABASE_URL` to user `app` and `DB_MIGRATION_URL` to user `migrator
 ## Networks
 
 - `internal` — bridge with no published ports, so there is no ingress. Egress stays open.
-  The worker needs SMTP, WebDAV and webhooks, and the api needs OIDC.
+  The worker needs SMTP, WebDAV and webhooks. The api needs OIDC and outbound HTTPS to
+  `gravatar.com` (port 443) for the avatar proxy (`GET /api/principals/{id}/avatar`).
+  If your firewall limits the egress of the VM, allow that host, or turn the proxy off
+  in the admin area (site config, "Gravatar-Bilder zeigen"). Without the egress the
+  proxy answers 404 after its timeout and the app shows the initials.
 - `typst_net` — `internal: true`, so there is no egress. api and worker reach the typst
   render service over it, and the typst container sits on this network only.
-- `proxy` — in production this is the network of the Nginx Proxy Manager. Set `external: true`
-  there and reference the NPM network.
+- `proxy` — in production this is the network of the Caddy container. Set `external: true`
+  there and reference the Caddy network.
 
 ## Configuration
 
@@ -156,12 +160,13 @@ BOOTSTRAP_ADMIN_EMAILS=admin@hochschule.example,vorstand@stupa.example
 
 ## Profiles
 
-- **prod** — behind NPM, with an external OIDC IdP, SMTP and Nextcloud, ClamAV on:
+- **prod** — behind Caddy, with an external OIDC IdP, SMTP and Nextcloud, ClamAV on:
   ```bash
   docker compose --profile prod up -d --build
   ```
-  For the real NPM network, switch `proxy:` in the compose file to `external: true`.
-- Default (no profile) = smoke and dev stack.
+  For the real Caddy network, switch `proxy:` in the compose file to `external: true`.
+- No service in `docker-compose.yml` carries a profile now. `--profile prod` and the default
+  start the same services. `deploy.sh` keeps the flag, so a later profile works without a change.
 
 ## Backup and restore
 

@@ -1,9 +1,93 @@
-.field__control {
-  height: var(--control-height);
-  padding: 0 var(--space-3);
-  background: var(--color-surface);
-  color: var(--color-text);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  font-size: var(--fs-md);
+.dc {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dc__cap {
+  margin: 0;
+  padding: 0 var(--space-2);
+}
+.dc__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dc__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: var(--space-2) var(--space-2) var(--space-2) 14px;
+  font-size: var(--fs-body);
+}
+.dc__row > .dc__person {
+  flex: 1 1 auto;
+}
+.dc__person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.dc__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.dc__sub {
+  display: flex;
+  gap: var(--space-2);
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+/* Separators only between two visible items. */
+.dc__sub > span + span::before {
+  content: '·';
+  margin-inline-end: var(--space-2);
+}
+.dc__muted {
+  color: var(--color-text-muted);
+}
+
+/* The box of the participant view (boards Teilnahme-Vorher, Teilnahme-Live). */
+.dc--box {
+  gap: 10px;
+  padding: var(--space-4) 18px;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-1);
+}
+.dc--box .dc__cap {
+  padding: 0;
+}
+.dc__lead {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.dc__small {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+}
+.dc__setup {
+  align-self: flex-start;
+}
+.dc__strong {
+  font-weight: var(--fw-medium);
+}
+.dc--box .dc__person + .dc__person {
+  margin-top: var(--space-1);
+}
+
+/* The dock of the participant view on a narrow screen (board Schmal-Teilnahme): the
+   persons in one line, each name cut with an ellipsis. */
+.dc--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-5);
+  min-width: 0;
+}
+.dc--inline .dc__person {
+  flex: 0 1 auto;
 }

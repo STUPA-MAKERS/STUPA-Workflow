@@ -1,0 +1,40 @@
+<div class="fc" role="radiogroup" [attr.aria-label]="'admin.flow.color' | t">
+  <span class="fc__label" aria-hidden="true">{{ 'admin.flow.color' | t }}</span>
+  <button
+    type="button"
+    role="radio"
+    class="fc__dot fc__dot--none"
+    [class.fc__dot--on]="!value()"
+    [attr.aria-checked]="!value()"
+    [attr.aria-label]="'admin.flow.colorNone' | t"
+    [title]="'admin.flow.colorNone' | t"
+    (click)="changed.emit('')"
+  ></button>
+  @for (c of presets; track c) {
+    <button
+      type="button"
+      role="radio"
+      class="fc__dot"
+      [class.fc__dot--on]="current() === c"
+      [style.background]="c"
+      [attr.aria-checked]="current() === c"
+      [attr.aria-label]="'admin.flow.colorPreset' | t: { c: c }"
+      [title]="c"
+      (click)="changed.emit(c)"
+    ></button>
+  }
+  <label
+    class="fc__dot fc__dot--custom"
+    [class.fc__dot--on]="custom()"
+    [style.background]="custom() ? value() : null"
+    [title]="'admin.flow.colorCustom' | t"
+  >
+    <input
+      type="color"
+      class="fc__picker"
+      [attr.aria-label]="'admin.flow.colorCustom' | t"
+      [value]="value() || '#6b7280'"
+      (input)="changed.emit($any($event.target).value)"
+    />
+  </label>
+</div>

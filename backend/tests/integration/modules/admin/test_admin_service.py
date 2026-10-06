@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator, Iterator
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import Engine, create_engine, func, select, text
@@ -21,6 +22,8 @@ from app.modules.admin.branding import Branding
 from app.modules.admin.models import (
     ApplicationType,
     Gremium,
+    GremiumMembership,
+    GremiumRole,
     SiteConfigVersion,
     Webhook,
 )
@@ -251,6 +254,67 @@ async def test_gremium_crud_and_slug_conflict(session: AsyncSession) -> None:
     assert updated.name == "AStA neu"
 
 
+async def test_admin_gremien_list_counts_members_and_roles(session: AsyncSession) -> None:
+    """The admin list counts the current members and the roles of each gremium.
+
+    An expired membership and a deactivated principal do not count.
+    """
+    svc = ConfigService(session)
+    full = await svc.create_gremium(
+        GremiumCreate(name="Zählgremium", slug=f"z-{uuid.uuid4().hex[:8]}"), _ACTOR
+    )
+    empty = await svc.create_gremium(
+        GremiumCreate(name="Leergremium", slug=f"l-{uuid.uuid4().hex[:8]}"), _ACTOR
+    )
+    roles = (
+        await session.scalars(select(GremiumRole).where(GremiumRole.gremium_id == full.id))
+    ).all()
+    member_role = next(r for r in roles if r.key == "member")
+    for _ in range(2):
+        principal = Principal(sub=f"s-{uuid.uuid4()}", display_name="P")
+        session.add(principal)
+        await session.flush()
+        session.add(
+            GremiumMembership(
+                principal_id=principal.id, gremium_id=full.id, gremium_role_id=member_role.id
+            )
+        )
+    expired = Principal(sub=f"s-{uuid.uuid4()}", display_name="Ehemalig")
+    inactive = Principal(sub=f"s-{uuid.uuid4()}", display_name="Gesperrt", active=False)
+    future = Principal(sub=f"s-{uuid.uuid4()}", display_name="Später")
+    session.add_all([expired, inactive, future])
+    await session.flush()
+    now = datetime.now(UTC)
+    session.add_all(
+        [
+            GremiumMembership(
+                principal_id=expired.id,
+                gremium_id=full.id,
+                gremium_role_id=member_role.id,
+                valid_from=now - timedelta(days=60),
+                valid_until=now - timedelta(days=1),
+            ),
+            GremiumMembership(
+                principal_id=inactive.id, gremium_id=full.id, gremium_role_id=member_role.id
+            ),
+            GremiumMembership(
+                principal_id=future.id,
+                gremium_id=full.id,
+                gremium_role_id=member_role.id,
+                valid_from=now + timedelta(days=1),
+            ),
+        ]
+    )
+    await session.commit()
+
+    by_id = {g.id: g for g in await svc.list_gremien_admin()}
+    assert by_id[full.id].member_count == 2
+    assert by_id[full.id].role_count == len(roles)
+    assert by_id[empty.id].member_count == 0
+    # The forced roles exist in every gremium.
+    assert by_id[empty.id].role_count == len(roles)
+
+
 async def test_application_type_crud_and_conflict(session: AsyncSession) -> None:
     svc = ConfigService(session)
     key = f"grant-{uuid.uuid4().hex[:8]}"
@@ -275,16 +339,49 @@ async def test_application_type_crud_and_conflict(session: AsyncSession) -> None
         created.id, ApplicationTypeUpdate(hasBudget=False), _ACTOR
     )
     assert updated.has_budget is False
+    assert updated.active_form_version is None
+
+
+async def test_application_type_list_gives_the_active_form_version(
+    session: AsyncSession,
+) -> None:
+    from app.modules.forms.models import FormVersion
+
+    svc = ConfigService(session)
+    with_form = ApplicationType(
+        key=f"with-{uuid.uuid4().hex[:8]}", name_i18n={"de": "Mit"}, has_budget=False
+    )
+    without_form = ApplicationType(
+        key=f"without-{uuid.uuid4().hex[:8]}", name_i18n={"de": "Ohne"}, has_budget=False
+    )
+    session.add_all([with_form, without_form])
+    await session.flush()
+    old = FormVersion(application_type_id=with_form.id, version=1, active=False)
+    active = FormVersion(application_type_id=with_form.id, version=2, active=True)
+    session.add_all([old, active])
+    await session.flush()
+    with_form.active_form_version_id = active.id
+    await session.commit()
+
+    listed = {t.key: t for t in await svc.list_application_types()}
+    assert listed[with_form.key].active_form_version == 2
+    assert listed[without_form.key].active_form_version is None
+    updated = await svc.update_application_type(
+        with_form.id, ApplicationTypeUpdate(hasBudget=True), _ACTOR
+    )
+    assert updated.active_form_version == 2
 
 
 async def test_role_crud_and_listing(session: AsyncSession) -> None:
     svc = ConfigService(session)
-    key = f"role-{uuid.uuid4().hex[:8]}"
+    key = f"role_{uuid.uuid4().hex[:8]}"
     created = await svc.create_role(
-        RoleCreate(key=key, label={"de": "Sonderrolle"}, permissions=["vote.cast", "audit.read"]),
+        RoleCreate(
+            key=key, label={"de": "Sonderrolle"}, permissions=["application.read", "audit.read"]
+        ),
         _ACTOR,
     )
-    assert set(created.permissions) == {"vote.cast", "audit.read"}
+    assert set(created.permissions) == {"application.read", "audit.read"}
     with pytest.raises(ConflictError):
         await svc.create_role(RoleCreate(key=key), _ACTOR)
     updated = await svc.update_role(

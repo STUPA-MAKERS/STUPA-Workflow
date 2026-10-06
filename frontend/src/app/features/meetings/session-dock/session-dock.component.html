@@ -1,0 +1,136 @@
+@let m = meeting();
+
+@let keeperOpen = shownPanel() === 'protokollant';
+
+<!-- The minute-taker menu: a popover above the dock, a bottom sheet on a phone (UI
+     feedback 2026-10-04). The attendance is a side sheet of the page. -->
+@if (phone()) {
+  <app-side-sheet side="bottom" [heading]="panelHeading() | t" [open]="keeperOpen" (openChange)="$event || closePanel()">
+    @if (keeperOpen) {
+      <app-keeper-menu [meeting]="m" [attendance]="attendance()" [inSheet]="true" (pick)="pickKeeper($event)" (discard)="discardHandover()" />
+    }
+  </app-side-sheet>
+} @else if (keeperOpen) {
+  <button type="button" class="sd__backdrop" aria-hidden="true" tabindex="-1" (click)="closePanel()"></button>
+  <div class="sd__pop" role="dialog" [attr.aria-label]="panelHeading() | t" [style.--sd-pop-end.px]="popEnd()">
+    <app-keeper-menu [meeting]="m" [attendance]="attendance()" (pick)="pickKeeper($event)" (discard)="discardHandover()" />
+  </div>
+}
+
+<div class="sd">
+  @if (m.status === 'planned') {
+    <div class="sd__state">
+      <span class="sd__small">{{ 'meetings.dock.notStarted' | t }}</span>
+      <span class="sd__strong">{{ 'meetings.dock.topsPrepared' | t: { n: agenda().length } }}</span>
+    </div>
+  } @else if (m.status === 'closed') {
+    <div class="sd__state">
+      <span class="sd__small">{{ closedLine() }}</span>
+      <span class="sd__strong">{{ agenda().length === 1 ? ('meetings.dock.topsOne' | t) : ('meetings.dock.tops' | t: { n: agenda().length }) }}</span>
+    </div>
+  } @else {
+    <div class="sd__nav">
+      <app-button variant="text" [iconOnly]="true" [disabled]="!hasPrev()" [ariaLabel]="'meetings.dock.prev' | t" (click)="step.emit(-1)"><app-icon name="chevron-left" /></app-button>
+      <span class="sd__pos">
+        <span class="sd__small">{{ 'meetings.dock.top' | t }}</span>
+        <span class="sd__strong num">
+          @if (topIndex() >= 0) {
+            {{ 'meetings.dock.of' | t: { n: topIndex() + 1, m: agenda().length } }}
+          } @else {
+            {{ 'meetings.dock.none' | t }}
+          }
+        </span>
+      </span>
+      <app-button variant="text" [iconOnly]="true" [disabled]="!hasNext()" [ariaLabel]="'meetings.dock.next' | t" (click)="step.emit(1)"><app-icon name="chevron-right" /></app-button>
+    </div>
+    <span class="sd__vr" aria-hidden="true"></span>
+    <div class="sd__mid">
+      @if (nowElsewhere(); as now) {
+        <span class="sd__now">{{ 'meetings.dock.nowRunning' | t: { top: now.label } }}</span>
+        <app-button size="sm" variant="tonal" (click)="jumpNow.emit(now.item.id)">{{ 'meetings.dock.backToNow' | t }}</app-button>
+      } @else if (myVote(); as choice) {
+        <span class="sd__vote">
+          <app-icon name="vote" [size]="18" />
+          <span>{{ 'meetings.dock.yourVote' | t }}: <strong>{{ choice }}</strong></span>
+        </span>
+      }
+    </div>
+  }
+
+  <span class="sd__spacer"></span>
+
+  <div class="sd__chips">
+    @if (m.status === 'live') {
+      <ng-container [ngTemplateOutlet]="presentChip" />
+      <ng-container [ngTemplateOutlet]="keeperChip" />
+    } @else {
+      <ng-container [ngTemplateOutlet]="keeperChip" />
+      <ng-container [ngTemplateOutlet]="presentChip" />
+    }
+  </div>
+
+  @if (m.status === 'live' && topIndex() >= 0) {
+    <span class="sd__vr sd__vr--end" aria-hidden="true"></span>
+    <span class="sd__words mono">{{ 'meetings.dock.words' | t: { n: wordCount() } }}</span>
+  }
+</div>
+
+<ng-template #presentChip>
+  <button
+    type="button"
+    class="sd__chip"
+    [class.sd__chip--open]="panel() === 'attendance'"
+    [attr.aria-expanded]="panel() === 'attendance'"
+    aria-haspopup="dialog"
+    [title]="'meetings.attendance.title' | t"
+    (click)="togglePanel('attendance')"
+  >
+    <app-icon name="users" [size]="18" />
+    @if (guestChip(); as g) {
+      <span>{{ 'guests.dock.present' | t: { n: presentCount(), g: g.admitted } }}</span>
+      @if (g.pending > 0) {
+        <span class="sd__badge num" [attr.aria-label]="'guests.dock.pending' | t: { n: g.pending }">{{ g.pending }}</span>
+      }
+    } @else {
+      <span>{{ 'meetings.dock.present' | t: { n: presentCount(), m: attendance().length } }}</span>
+    }
+  </button>
+</ng-template>
+
+<ng-template #keeperChip>
+  @if (m.status === 'closed') {
+    <!-- A closed meeting changes no keeper: every keeper of the meeting, locked. -->
+    <span class="sd__chip sd__chip--static" [title]="closedKeeperTitle()">
+      <app-icon name="lock" [size]="16" />
+      <span class="sd__chipText">{{ 'meetings.dock.protokollantIs' | t: { name: keepers() || '—' } }}</span>
+    </span>
+  } @else if (canPickKeeper() || canHandOver()) {
+    <button
+      type="button"
+      class="sd__chip"
+      [class.sd__chip--warn]="!m.protokollantId"
+      [class.sd__chip--open]="keeperOpen"
+      [attr.aria-expanded]="keeperOpen"
+      aria-haspopup="dialog"
+      [title]="(canHandOver() ? 'meetings.handover.title' : 'meetings.protokollant.label') | t"
+      (click)="togglePanel('protokollant', $any($event.currentTarget))"
+    >
+      <app-icon name="edit" [size]="18" />
+      <span class="sd__chipText">{{ m.protokollantId ? ('meetings.dock.protokollantIs' | t: { name: m.protokollantName ?? '' }) : ('meetings.dock.protokollantMissing' | t) }}</span>
+      @if (m.plannedHandover) {
+        <span class="sd__muted">· {{ 'meetings.handover.plannedShort' | t }}</span>
+      }
+      <app-icon class="sd__chev" name="chevron-down" [size]="16" />
+    </button>
+  } @else if (m.protokollantId) {
+    <span class="sd__chip sd__chip--static" [title]="'meetings.dock.protokollantIs' | t: { name: m.protokollantName ?? '' }">
+      <app-icon name="edit" [size]="18" />
+      <span class="sd__chipText">{{ 'meetings.dock.protokollantIs' | t: { name: m.protokollantName ?? '' } }}</span>
+    </span>
+  } @else {
+    <span class="sd__chip sd__chip--static sd__chip--warn">
+      <app-icon name="edit" [size]="18" />
+      <span class="sd__chipText">{{ 'meetings.dock.protokollantMissing' | t }}</span>
+    </span>
+  }
+</ng-template>

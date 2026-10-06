@@ -155,7 +155,7 @@ async def _seed(session: AsyncSession) -> _Scenario:
             Vote(
                 application_id=app_voted_member.id,
                 meeting_id=meet_member.id,
-                eligible_group="member",
+                eligible_group=str(g_member.id),
                 config={},
                 status="closed",
                 result="passed",
@@ -163,7 +163,7 @@ async def _seed(session: AsyncSession) -> _Scenario:
             Vote(
                 application_id=app_voted_other.id,
                 meeting_id=meet_other.id,
-                eligible_group="member",
+                eligible_group=str(g_other.id),
                 config={},
                 status="closed",
                 result="passed",

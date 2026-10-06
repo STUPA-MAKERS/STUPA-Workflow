@@ -1,0 +1,121 @@
+@let own = ownState();
+@let proxy = proxyState();
+@let busy = pending() !== null;
+
+@if (own) {
+  <section class="ballot__row" [attr.aria-label]="'voting.ballot.own' | t">
+    @if (named()) {
+      <h2 class="sec ballot__name">{{ 'voting.ballot.own' | t }}</h2>
+    }
+    @if (compact()) {
+      <div class="ballot__proxy" role="group" [attr.aria-label]="'voting.ballot.own' | t">
+        @for (opt of options(); track opt) {
+          @let on = isOn('own', opt);
+          <button
+            type="button"
+            class="pchoice"
+            [class.pchoice--on]="on"
+            [attr.aria-pressed]="on"
+            [disabled]="own.cast || busy"
+            (click)="pick('own', opt)"
+          >
+            @if (on) {
+              <app-icon name="check" [size]="15" />
+            }
+            {{ label(opt) }}
+          </button>
+        }
+      </div>
+    } @else {
+      <div class="ballot__choices" role="group" [attr.aria-label]="'voting.ballot.own' | t">
+        @for (opt of options(); track opt) {
+          @let on = isOn('own', opt);
+          <button
+            type="button"
+            class="choice"
+            [class.choice--on]="on"
+            [attr.aria-pressed]="on"
+            [disabled]="own.cast || busy"
+            (click)="pick('own', opt)"
+          >
+            <span class="choice__mark" aria-hidden="true">
+              @if (on) {
+                <app-icon name="check" [size]="18" />
+              }
+            </span>
+            <span class="choice__label">{{ label(opt) }}</span>
+          </button>
+        }
+      </div>
+    }
+    @if (own.cast) {
+      @let choice = castChoice('own');
+      <div class="ballot__done" role="status">
+        <p class="ballot__thanks">
+          {{ choice ? ('voting.ballot.thanks' | t: { choice: label(choice) }) : ('voting.ballot.thanksSecret' | t) }}
+        </p>
+        <p class="ballot__lock">
+          <app-icon name="lock" [size]="13" />
+          {{ 'voting.ballot.locked' | t }}
+        </p>
+      </div>
+    }
+  </section>
+}
+
+@if (proxy) {
+  @let name = proxyName() ?? '';
+  <section class="ballot__row" [attr.aria-label]="'voting.ballot.proxy' | t: { name }">
+    <h2 class="sec ballot__name ell" [title]="'voting.ballot.proxy' | t: { name }">
+      {{ 'voting.ballot.proxy' | t: { name } }}
+    </h2>
+    <div class="ballot__proxy" role="group" [attr.aria-label]="'voting.ballot.proxy' | t: { name }">
+      @for (opt of options(); track opt) {
+        @let on = isOn('proxy', opt);
+        <button
+          type="button"
+          class="pchoice"
+          [class.pchoice--on]="on"
+          [attr.aria-pressed]="on"
+          [disabled]="proxy.cast || busy"
+          (click)="pick('proxy', opt)"
+        >
+          {{ label(opt) }}
+        </button>
+      }
+    </div>
+    @if (proxy.cast) {
+      @let choice = castChoice('proxy');
+      <p class="ballot__lock ballot__lock--start" role="status">
+        <app-icon name="lock" [size]="13" />
+        {{
+          choice
+            ? ('voting.ballot.proxyDone' | t: { name, choice: label(choice) })
+            : ('voting.ballot.proxyDoneSecret' | t: { name })
+        }}
+      </p>
+    }
+  </section>
+}
+
+@if (showBar()) {
+  @if (layout() === 'phone') {
+    <div class="ballot__spacer" aria-hidden="true" [style.height.px]="barHeight()"></div>
+  }
+  <div #bar class="ballot__bar">
+    <p class="ballot__lock">
+      <app-icon name="lock" [size]="13" />
+      {{ 'voting.ballot.final' | t }}
+    </p>
+    <app-button
+      variant="fill"
+      [size]="compact() ? 'md' : 'lg'"
+      [block]="!columns()"
+      [disabled]="!canConfirm()"
+      [loading]="busy"
+      (click)="confirm()"
+    >
+      {{ confirmLabel() }}
+    </app-button>
+  </div>
+}

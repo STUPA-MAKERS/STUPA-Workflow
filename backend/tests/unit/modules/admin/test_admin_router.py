@@ -29,6 +29,7 @@ from app.modules.admin.router import (
 from app.modules.admin.schemas import (
     ApplicationTypeOut,
     FlowVersionOut,
+    GremiumAdminOut,
     GremiumMailRecipients,
     GremiumMembershipMappingOut,
     GremiumMembershipOut,
@@ -61,6 +62,20 @@ _ALL_PERMS = {
 
 
 class _FakeConfig:
+    async def list_gremien_admin(self):
+        return [
+            GremiumAdminOut(
+                id=uuid4(),
+                name="StuPa",
+                slug="stupa",
+                cd_variant_id=None,
+                default_lang="de",
+                allow_vote_delegation=False,
+                member_count=23,
+                role_count=4,
+            )
+        ]
+
     async def list_gremien(self):
         return [
             GremiumOut(
@@ -431,6 +446,16 @@ def test_list_create_update_gremium(app: FastAPI, client: TestClient) -> None:
     assert patched.status_code == 200
 
 
+def test_admin_gremien_list_has_counts(app: FastAPI, client: TestClient) -> None:
+    """The admin list names the member and role counts; the public list does not."""
+    _as_admin(app)
+    row = client.get("/api/admin/gremien").json()[0]
+    assert row["memberCount"] == 23
+    assert row["roleCount"] == 4
+    public = client.get("/api/gremien").json()[0]
+    assert "memberCount" not in public and "roleCount" not in public
+
+
 def test_update_gremium_404(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
     r = client.patch("/api/admin/gremien/00000000-0000-0000-0000-000000000000", json={"name": "x"})
@@ -508,7 +533,7 @@ def test_roles_and_assignments_and_mappings(app: FastAPI, client: TestClient) ->
     assert client.get("/api/admin/roles").json()[0]["permissions"] == ["admin.gremien"]
     created = client.post(
         "/api/admin/roles",
-        json={"key": "r", "label": {"de": "R"}, "permissions": ["vote.cast"]},
+        json={"key": "r", "label": {"de": "R"}, "permissions": ["audit.read"]},
     )
     assert created.status_code == 201
     patched = client.patch(f"/api/admin/roles/{uuid4()}", json={"permissions": ["audit.read"]})
@@ -557,6 +582,20 @@ def test_gremien_admin_can_manage_members_without_admin_roles(
     assert client.get(f"/api/admin/gremien/{gid}/memberships").status_code == 200
     assert client.get(f"/api/admin/gremien/{gid}/roles").status_code == 200
     assert client.get("/api/admin/principals").status_code == 200
+
+
+def test_delegations_admin_reads_members_and_principals(app: FastAPI, client: TestClient) -> None:
+    """The substitute pool on the delegations page runs under admin.delegations.
+
+    It needs the members of a gremium for the "represents" choice and the principal
+    search for the person picker. The gremium roles stay closed to it.
+    """
+    app.dependency_overrides[get_gremium_role_service] = lambda: _FakeGremiumRoles()
+    _as(app, {"admin.delegations"})
+    gid = uuid4()
+    assert client.get(f"/api/admin/gremien/{gid}/memberships").status_code == 200
+    assert client.get("/api/admin/principals?q=max").status_code == 200
+    assert client.get(f"/api/admin/gremien/{gid}/roles").status_code == 403
 
 
 def test_members_endpoints_forbidden_for_unrelated_area(app: FastAPI, client: TestClient) -> None:

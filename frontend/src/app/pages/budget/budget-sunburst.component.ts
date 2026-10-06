@@ -11,7 +11,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { SimplifyPathPipe } from '@shared/budget-path';
 import type { BudgetTreeNode } from './budget-tree.api';
-import { PALETTE } from './budget-year-tree.component';
+import { nodeColors } from './budget-color.util';
 
 /** Overview metrics (tab selector in the overlay). */
 export type SunburstMetric = 'allocated' | 'available' | 'expended';
@@ -42,6 +42,9 @@ const R_MAX = SIZE / 2 - 8;
  * selected cost center, with its total value. Hover shows a tooltip with the name,
  * the amount and the share. A click reports the cost center for the drilldown in the
  * tab. The chart is pure SVG and uses no third-party library.
+ *
+ * Without an amount the chart keeps its size and shows one neutral ring with the root
+ * and 0 in the center, like a skeleton. It shows no "no data" text.
  */
 @Component({
   selector: 'app-budget-sunburst',
@@ -57,6 +60,9 @@ export class BudgetSunburstComponent {
   readonly root = input<BudgetTreeNode | null>(null);
   readonly fyId = input<string>('');
   readonly metric = input<SunburstMetric>('allocated');
+  /** Display colour per node id, so that the rings match the rest of the page. Without
+   *  it, the chart applies the same rule to the subtree of the root by itself. */
+  readonly colors = input<ReadonlyMap<string, string> | null>(null);
   /** Click on a segment or on the center: emits the cost center id. */
   readonly nodeClick = output<string>();
 
@@ -64,6 +70,9 @@ export class BudgetSunburstComponent {
   protected readonly CX = CX;
   protected readonly CY = CY;
   protected readonly R_CENTER = R_CENTER;
+  /** The neutral ring without an amount: the middle radius and the width of the rings. */
+  protected readonly R_EMPTY = (R_CENTER + R_MAX) / 2;
+  protected readonly W_EMPTY = R_MAX - R_CENTER;
 
   protected readonly hovered = signal<SunSeg | null>(null);
   protected readonly tip = signal<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -96,24 +105,16 @@ export class BudgetSunburstComponent {
     if (!r || total <= 0) return [];
     const depthMax = Math.max(1, this.maxDepth(r));
     const ringW = (R_MAX - R_CENTER) / depthMax;
+    const colors = this.colors() ?? nodeColors([r]);
     const out: SunSeg[] = [];
-    const layout = (
-      node: BudgetTreeNode,
-      start: number,
-      span: number,
-      depth: number,
-      color: string | null,
-    ): void => {
+    const layout = (node: BudgetTreeNode, start: number, span: number, depth: number): void => {
       const nodeVal = this.subtree(node);
       if (nodeVal <= 0) return;
       let angle = start;
-      node.children.forEach((c, i) => {
+      for (const c of node.children) {
         const v = this.subtree(c);
-        if (v <= 0) return;
+        if (v <= 0) continue;
         const childSpan = span * (v / nodeVal);
-        // The color set on the cost center wins, as in the small pies. Without an own
-        // color the segment inherits the color of the parent branch.
-        const childColor = c.color ?? color ?? PALETTE[i % PALETTE.length];
         const r0 = R_CENTER + (depth - 1) * ringW;
         out.push({
           id: c.id,
@@ -121,16 +122,16 @@ export class BudgetSunburstComponent {
           pathKey: c.pathKey,
           depth,
           d: annular(angle, angle + childSpan, r0, r0 + ringW - 2),
-          color: childColor,
+          color: colors.get(c.id) ?? '',
           opacity: Math.max(0.35, 1 - 0.16 * (depth - 1)),
           value: v,
           percent: Math.round((v / total) * 100),
         });
-        layout(c, angle, childSpan, depth + 1, childColor);
+        layout(c, angle, childSpan, depth + 1);
         angle += childSpan;
-      });
+      }
     };
-    layout(r, -Math.PI / 2, Math.PI * 2, 1, null);
+    layout(r, -Math.PI / 2, Math.PI * 2, 1);
     return out;
   });
 

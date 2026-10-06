@@ -47,9 +47,10 @@ def _patch_service(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(mod, "NotificationService", _FakeService)
 
 
-def _app_row(title: str | None = "Beamer") -> list[Any]:
+def _app_row(title: str | None = "Beamer", gremium_id: uuid.UUID | None = None) -> list[Any]:
+    """Return the `(data, current_state_id, gremium_id)` row of the application."""
     data = {"title": title} if title else {}
-    return [(data, None)]
+    return [(data, None, gremium_id)]
 
 
 async def test_principal_public_comment_mails_applicant() -> None:
@@ -161,3 +162,108 @@ async def test_preference_optout_blocks_comment_mail() -> None:
         body="Hallo",
     )
     assert sent == 0
+
+
+def _capture_context(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    """Record the render context of each builtin mail."""
+    seen: list[dict[str, Any]] = []
+    real = mod.render_mail
+
+    def spy(**kwargs: Any) -> Any:
+        seen.append(kwargs["context"])
+        return real(**kwargs)
+
+    monkeypatch.setattr(mod, "render_mail", spy)
+    return seen
+
+
+async def test_principal_comment_mail_names_the_gremium_not_the_member(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A12/O16: the applicant mail shows the Gremium, never the member name."""
+    seen = _capture_context(monkeypatch)
+    gremium_id = uuid.uuid4()
+    # executes: the application row, then the (lang, gremium_id) row for the
+    # language. scalar: the Gremium name. scalars: the preference filter.
+    session = cast(
+        AsyncSession,
+        FakeSession(
+            executes=[_app_row(gremium_id=gremium_id), [("de", gremium_id)]],
+            scalar=["AStA Finanzen"],
+            scalars=[[]],
+        ),
+    )
+    sent = await send_comment_notifications(
+        session,
+        queue=FakeQueue(),
+        settings=SETTINGS,
+        application_id=uuid.uuid4(),
+        comment_id=uuid.uuid4(),
+        author_kind="principal",
+        visibility="public",
+        body="Bitte Angebot nachreichen.",
+        author_name="Max Mitglied",
+    )
+    assert sent == 1
+    svc = _FakeService.last
+    assert svc is not None
+    msg = svc.enqueued[0]
+    assert "von AStA Finanzen:" in msg.text
+    assert "Max Mitglied" not in msg.text
+    assert seen[0]["commentAuthor"] == "AStA Finanzen"
+    assert seen[0]["commentAuthorInitials"] == "AF"
+
+
+async def test_principal_comment_mail_without_gremium_uses_the_committee_label() -> None:
+    """Without a Gremium the mail shows the generic label, not the member name."""
+    session = cast(
+        AsyncSession,
+        FakeSession(executes=[_app_row(), [("en", None)]], scalars=[[]]),
+    )
+    sent = await send_comment_notifications(
+        session,
+        queue=FakeQueue(),
+        settings=SETTINGS,
+        application_id=uuid.uuid4(),
+        comment_id=uuid.uuid4(),
+        author_kind="principal",
+        visibility="public",
+        body="Please add the quote.",
+        author_name="Max Mitglied",
+    )
+    assert sent == 1
+    svc = _FakeService.last
+    assert svc is not None
+    msg = svc.enqueued[0]
+    assert "from Committee:" in msg.text
+    assert "Max Mitglied" not in msg.text
+
+
+
+async def test_applicant_comment_mail_keeps_the_display_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The team mail keeps the display name of the author."""
+
+    async def fake_actionable(
+        session: Any, *, application_id: Any, state: Any
+    ) -> list[str]:
+        return ["team@x.de"]
+
+    monkeypatch.setattr(mod, "actionable_principal_emails", fake_actionable)
+    seen = _capture_context(monkeypatch)
+    session = cast(AsyncSession, FakeSession(executes=[_app_row()], scalars=[[]]))
+    sent = await send_comment_notifications(
+        session,
+        queue=FakeQueue(),
+        settings=SETTINGS,
+        application_id=uuid.uuid4(),
+        comment_id=uuid.uuid4(),
+        author_kind="applicant",
+        visibility="public",
+        body="Wann?",
+        author_name="Anna Antrag",
+    )
+    assert sent == 1
+    assert seen[0]["commentAuthor"] == "Anna Antrag"
+    assert seen[0]["commentAuthorInitials"] == "AA"

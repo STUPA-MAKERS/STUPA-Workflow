@@ -7,7 +7,9 @@ import userEvent from '@testing-library/user-event';
 import { USE_MOCK_API } from '@core/api/api.config';
 import type { SearchResults } from '@core/api/models';
 import { CommandPaletteComponent } from './command-palette.component';
+import { CommandPaletteService } from './command-palette.service';
 import { PageIndexService } from './page-index.service';
+import { runAxe } from '../../../testing/a11y';
 
 const PAGES = [
   { path: '/admin/roles', label: 'Rollen', parentLabel: 'Verwaltung' },
@@ -45,6 +47,18 @@ async function setup(pages = PAGES) {
   return { ...view, http, router, cmp };
 }
 
+/**
+ * A key in the search field. It bubbles to the document listener, the way a real
+ * keystroke does; the row keys only count when the field is the target.
+ */
+function pressInField(key: string, init: KeyboardEventInit = {}): KeyboardEvent {
+  const field = document.querySelector<HTMLInputElement>('.pal__input');
+  if (!field) throw new Error('palette field missing');
+  const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...init });
+  field.dispatchEvent(event);
+  return event;
+}
+
 /** Let the 180ms debounce elapse and answer the request it produced. */
 async function answer(http: HttpTestingController, body: SearchResults = HITS) {
   jest.advanceTimersByTime(200);
@@ -54,7 +68,13 @@ async function answer(http: HttpTestingController, body: SearchResults = HITS) {
 }
 
 describe('CommandPaletteComponent', () => {
-  beforeEach(() => jest.useFakeTimers());
+  // jsdom has no layout, so no scrollIntoView. The arrow keys call it for the active row.
+  const scrollIntoView = jest.fn();
+  beforeAll(() => (Element.prototype.scrollIntoView = scrollIntoView));
+  beforeEach(() => {
+    jest.useFakeTimers();
+    scrollIntoView.mockClear();
+  });
   afterEach(() => jest.useRealTimers());
 
   it('is closed until it is opened', async () => {
@@ -116,7 +136,7 @@ describe('CommandPaletteComponent', () => {
     const byTitle = new Map(cmp.rows().map((r) => [r.title, r.icon]));
     expect(byTitle.get('Seite Dashboard')).toBe('home');
     expect(byTitle.get('Seite Rollen')).toBe('gear');
-    expect(byTitle.get('Seite Rechnungen')).toBe('euro');
+    expect(byTitle.get('Seite Rechnungen')).toBe('receipt');
   });
 
   it('falls back to a gear for a section nothing maps', async () => {
@@ -133,7 +153,7 @@ describe('CommandPaletteComponent', () => {
     await answer(http);
     fixture.detectChanges();
 
-    expect(screen.getByText('Anschaffung Beamer')).toBeInTheDocument();
+    expect(screen.getByTitle('Anschaffung Beamer')).toBeInTheDocument();
     expect(screen.getByText('Entwurf')).toBeInTheDocument();
     expect(screen.getByText('Anträge')).toBeInTheDocument();
   });
@@ -164,11 +184,11 @@ describe('CommandPaletteComponent', () => {
     cmp.onQuery('Beamer');
     await answer(http);
     fixture.detectChanges();
-    expect(screen.getByText('Anschaffung Beamer')).toBeInTheDocument();
+    expect(screen.getByTitle('Anschaffung Beamer')).toBeInTheDocument();
 
     cmp.onQuery('B');
     fixture.detectChanges();
-    expect(screen.queryByText('Anschaffung Beamer')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Anschaffung Beamer')).not.toBeInTheDocument();
   });
 
   it('moves the highlight with the arrow keys and opens the row on Enter', async () => {
@@ -180,12 +200,12 @@ describe('CommandPaletteComponent', () => {
     fixture.detectChanges();
 
     expect(cmp.active()).toBe(0);
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    pressInField('ArrowDown');
     fixture.detectChanges();
     // One page matches "Re" (Rechnungen), so the list wraps back to itself.
     expect(cmp.active()).toBe(0);
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    pressInField('Enter');
     expect(nav).toHaveBeenCalledWith('/invoices');
     expect(cmp.open()).toBe(false);
   });
@@ -276,8 +296,234 @@ describe('CommandPaletteComponent', () => {
     });
     fixture.detectChanges();
 
-    const badges = fixture.nativeElement.querySelectorAll('.pal__rowBadge');
-    expect(badges).toHaveLength(1);
-    expect(badges[0].textContent.trim()).toBe('Archiviert');
+    const marks = fixture.nativeElement.querySelectorAll('.pal__archived');
+    expect(marks).toHaveLength(1);
+    expect(marks[0].textContent.trim()).toBe('Archiviert');
+  });
+
+  it('groups the records by kind and gives each kind the icon of its area', async () => {
+    const { cmp, fixture, http, container } = await setup([]);
+    cmp.show();
+    cmp.onQuery('rad');
+    await answer(http, {
+      hits: [
+        { kind: 'application', id: 'a', title: 'Lastenrad', subtitle: 'Auf Tagesordnung', url: '/applications/a' },
+        { kind: 'invoice', id: 'i', title: 'RE-118', subtitle: '2.890,00 € · Radhaus', url: '/invoices?id=i' },
+        { kind: 'expense', id: 'e', title: 'Anzahlung Rad', subtitle: null, url: '/expenses?id=e' },
+        { kind: 'principal', id: 'p', title: 'Konrad Pfeiffer', subtitle: 'k@stupa', url: '/admin/users' },
+      ],
+      truncated: false,
+      failed: [],
+    });
+    fixture.detectChanges();
+    expect(cmp.groups().map((g) => g.label)).toEqual(['Anträge', 'Rechnungen', 'Buchungen', 'Personen']);
+    expect(cmp.rows().map((r) => r.icon)).toEqual(['file', 'receipt', 'swap', 'user']);
+    expect(screen.getByRole('group', { name: 'Rechnungen' })).toBeInTheDocument();
+    // The state of an application is status text; other subtitles are plain.
+    const status = container.querySelector('app-status-text.pal__rowSub');
+    expect(status).toHaveTextContent('Auf Tagesordnung');
+  });
+
+  it('marks the matching letters in titles and subtitles', async () => {
+    const { cmp, fixture, http, container } = await setup([]);
+    cmp.show();
+    cmp.onQuery('rad');
+    await answer(http, {
+      hits: [{ kind: 'invoice', id: 'i', title: 'Lastenrad', subtitle: 'Radhaus', url: '/invoices' }],
+      truncated: false,
+      failed: [],
+    });
+    fixture.detectChanges();
+    const hits = Array.from(container.querySelectorAll('.pal__hit')).map((h) => h.textContent);
+    expect(hits).toEqual(['rad', 'Rad']);
+    expect(container.querySelector('.pal__rowTitle')).toHaveTextContent('Lastenrad');
+  });
+
+  it('keeps the focus in the field and points it at the active row', async () => {
+    const { cmp, fixture, http } = await setup([]);
+    cmp.show();
+    cmp.onQuery('Beamer');
+    await answer(http, {
+      hits: [
+        { kind: 'application', id: 'a-1', title: 'Beamer A', subtitle: null, url: '/applications/a-1' },
+        { kind: 'application', id: 'a-2', title: 'Beamer B', subtitle: null, url: '/applications/a-2' },
+      ],
+      truncated: false,
+      failed: [],
+    });
+    fixture.detectChanges();
+    const field = screen.getByRole('combobox', { name: 'Suche' });
+    const options = screen.getAllByRole('option');
+    expect(field).toHaveAttribute('aria-activedescendant', options[0].id);
+    expect(options[0]).toHaveAttribute('aria-selected', 'true');
+    expect(options[0]).toHaveTextContent('Enter');
+
+    pressInField('ArrowDown');
+    fixture.detectChanges();
+    expect(field).toHaveAttribute('aria-activedescendant', options[1].id);
+    expect(options[1]).toHaveAttribute('aria-selected', 'true');
+
+    pressInField('ArrowUp');
+    fixture.detectChanges();
+    expect(field).toHaveAttribute('aria-activedescendant', options[0].id);
+  });
+
+  it('shows the key hints at the foot and closes from the close control', async () => {
+    const { cmp, fixture } = await setup([]);
+    cmp.show();
+    fixture.detectChanges();
+    expect(screen.getByText('Auswählen')).toBeInTheDocument();
+    expect(screen.getByText('Öffnen')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Suche schließen' }), {
+      advanceTimers: jest.advanceTimersByTime,
+    });
+    expect(cmp.open()).toBe(false);
+  });
+
+  it('opens from the service and starts clean there too', async () => {
+    const { cmp, fixture, http } = await setup([]);
+    const svc = TestBed.inject(CommandPaletteService);
+    svc.open();
+    cmp.onQuery('Beamer');
+    await answer(http);
+    svc.close();
+    svc.open();
+    fixture.detectChanges();
+    expect(cmp.open()).toBe(true);
+    expect(cmp.query()).toBe('');
+    expect(cmp.rows()).toEqual([]);
+  });
+
+  it('keeps searching after a failed request', async () => {
+    const { cmp, http } = await setup([]);
+    cmp.show();
+    cmp.onQuery('Beamer');
+    jest.advanceTimersByTime(200);
+    http.expectOne((r) => r.url.endsWith('/api/search')).flush(null, { status: 500, statusText: 'Error' });
+    cmp.onQuery('Beamer2');
+    await answer(http);
+    expect(cmp.rows().map((r) => r.title)).toEqual(['Anschaffung Beamer']);
+  });
+
+  it('gives the focus back to where it was when it closes', async () => {
+    const { cmp, fixture } = await setup([]);
+    const before = document.createElement('button');
+    document.body.appendChild(before);
+    before.focus();
+    cmp.show();
+    fixture.detectChanges();
+    cmp.close();
+    expect(before).toHaveFocus();
+    before.remove();
+  });
+
+  it('has no a11y violations with results open', async () => {
+    jest.useRealTimers();
+    const { cmp, fixture, http, container } = await setup();
+    cmp.show();
+    cmp.onQuery('Rollen');
+    await new Promise((r) => setTimeout(r, 200));
+    http.expectOne((r) => r.url.endsWith('/api/search')).flush(HITS);
+    fixture.detectChanges();
+    expect(screen.getAllByRole('option').length).toBeGreaterThan(0);
+    expect(await runAxe(container)).toHaveNoViolations();
+  });
+
+  it('toggles on Ctrl+K and ignores other keys while closed or without rows', async () => {
+    const { cmp, fixture } = await setup([]);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    expect(cmp.open()).toBe(false);
+    cmp.close();
+    expect(cmp.open()).toBe(false);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
+    fixture.detectChanges();
+    expect(cmp.open()).toBe(true);
+    // No rows yet: the arrows and other keys do nothing.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }));
+    expect(cmp.active()).toBe(0);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
+    expect(cmp.open()).toBe(false);
+  });
+
+  it('scrolls the active row into view and ignores keys other than the arrows and Enter', async () => {
+    const { cmp, fixture, http } = await setup([]);
+    cmp.show();
+    cmp.onQuery('Beamer');
+    await answer(http, {
+      hits: [
+        { kind: 'application', id: 'a-1', title: 'Beamer A', subtitle: null, url: '/applications/a-1' },
+        { kind: 'application', id: 'a-2', title: 'Beamer B', subtitle: null, url: '/applications/a-2' },
+      ],
+      truncated: false,
+      failed: [],
+    });
+    fixture.detectChanges();
+    pressInField('ArrowDown');
+    jest.runAllTicks();
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
+    expect(cmp.active()).toBe(1);
+    expect(cmp.open()).toBe(true);
+  });
+
+  it('closes on Enter on the close button and does not open the active row', async () => {
+    const { cmp, fixture, http, router } = await setup();
+    const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    cmp.show();
+    cmp.onQuery('Re');
+    await answer(http, { hits: [], truncated: false, failed: [] });
+    fixture.detectChanges();
+    expect(cmp.rows().length).toBe(1);
+
+    const close = screen.getByRole('button', { name: 'Suche schließen' });
+    close.focus();
+    // The document listener must leave the key to the button.
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    close.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(nav).not.toHaveBeenCalled();
+    // The browser turns Enter on a button into a click.
+    close.click();
+    expect(cmp.open()).toBe(false);
+    expect(nav).not.toHaveBeenCalled();
+  });
+
+  it('keeps Tab inside the dialog', async () => {
+    const { cmp, fixture } = await setup([]);
+    cmp.show();
+    fixture.detectChanges();
+    const field = screen.getByRole('combobox', { name: 'Suche' });
+    const close = screen.getByRole('button', { name: 'Suche schließen' });
+
+    // From the last stop forward to the first.
+    close.focus();
+    let event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    close.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(field).toHaveFocus();
+
+    // From the first stop backward to the last.
+    event = pressInField('Tab', { shiftKey: true });
+    expect(event.defaultPrevented).toBe(true);
+    expect(close).toHaveFocus();
+
+    // Inside the dialog the browser moves the focus itself.
+    field.focus();
+    event = pressInField('Tab');
+    expect(event.defaultPrevented).toBe(false);
+
+    // Focus outside the dialog comes back to the field.
+    const outside = document.createElement('button');
+    document.body.appendChild(outside);
+    outside.focus();
+    event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    outside.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(field).toHaveFocus();
+    outside.remove();
   });
 });

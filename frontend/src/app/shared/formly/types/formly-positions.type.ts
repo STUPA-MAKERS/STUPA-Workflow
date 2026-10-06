@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, type OnInit, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, type OnInit, inject, signal } from '@angular/core';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
+import { ButtonComponent, IconComponent, SwitchComponent } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 
@@ -19,203 +20,128 @@ interface Position {
   noOffersReason?: string;
 }
 
+let nextUid = 0;
+
 /**
  * Formly field type `positions` (cost positions). The model value is an array of
  * positions. Each position carries at least `minOffers` comparison offers. Exactly one
  * offer is preferred, and its value is the value of the position. The server writes the
  * total of all positions into `amount`. The component mirrors validity onto the
  * FormControl: minimum positions and offers, one preferred offer, and values above 0.
+ *
+ * Look (board Anträge-Bearbeiten): one card per position. A complete position starts
+ * collapsed (name, "n Angebote · bevorzugt: …", amount); a new or an incomplete one
+ * starts open. Open, it shows the name, the switch "keine Vergleichsangebote möglich",
+ * the offers with the radio for the preferred one, and "Angebot hinzufügen". A position
+ * without comparison offers keeps exactly one offer (supplier and amount) and needs a
+ * reason (D12); without the offer the server answers 422.
+ *
+ * `props.serverErrors` (index → text) holds the 422 messages of the last save; the
+ * position shows its message and opens. The next change clears them.
  */
 @Component({
   selector: 'app-formly-positions',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <fieldset class="pos">
-      <legend class="pos__legend">
-        {{ props.label }}
-        @if (props.required) { <span class="pos__req" aria-hidden="true">*</span> }
-      </legend>
-      @if (props.description) { <p class="pos__hint">{{ props.description }}</p> }
-
-      @for (p of positions; track $index; let pi = $index) {
-        <div class="pos__card">
-          <div class="pos__card-head">
-            <input
-              class="pos__title"
-              [class.pos__invalid]="titleInvalid(p)"
-              [attr.aria-invalid]="titleInvalid(p) ? 'true' : null"
-              [value]="p.label"
-              (input)="setPositionLabel(pi, $any($event.target).value)"
-              [attr.placeholder]="t('apply.positions.label')"
-              [attr.aria-label]="t('apply.positions.label')"
-            />
-            <span class="pos__value">{{ t('apply.positions.positionValue') }}: {{ fmt(positionValue(p)) }}</span>
-            <button type="button" class="pos__icon" (click)="removePosition(pi)" [attr.aria-label]="t('apply.positions.remove')">✕</button>
-          </div>
-
-          <table class="pos__offers">
-            <thead>
-              <tr>
-                <th>{{ t('apply.positions.offer') }}</th>
-                <th class="pos__num">{{ t('apply.positions.value') }}</th>
-                <th class="pos__pref">{{ t('apply.positions.preferred') }}</th>
-                <th class="pos__actcol"></th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (o of p.offers; track $index; let oi = $index) {
-                <tr>
-                  <td>
-                    <input [value]="o.label" (input)="setOfferLabel(pi, oi, $any($event.target).value)"
-                      [class.pos__invalid]="offerLabelInvalid(o)" [attr.aria-invalid]="offerLabelInvalid(o) ? 'true' : null"
-                      [attr.placeholder]="t('apply.positions.offer')" [attr.aria-label]="t('apply.positions.offer')" />
-                  </td>
-                  <td class="pos__num">
-                    <input type="text" inputmode="decimal" class="pos__money" [value]="offerValueText(pi, oi)"
-                      [class.pos__invalid]="offerValueInvalid(o)" [attr.aria-invalid]="offerValueInvalid(o) ? 'true' : null"
-                      (focus)="beginEditValue(pi, oi)" (blur)="endEditValue()"
-                      (input)="setOfferValue(pi, oi, $any($event.target).value)"
-                      [attr.aria-label]="t('apply.positions.value')" />
-                  </td>
-                  <td class="pos__pref">
-                    <input type="radio" [name]="'pref-' + pi" [checked]="o.preferred"
-                      (change)="setPreferred(pi, oi)" [attr.aria-label]="t('apply.positions.preferred')" />
-                  </td>
-                  <td class="pos__actcol">
-                    <button type="button" class="pos__icon" (click)="removeOffer(pi, oi)"
-                      [disabled]="p.offers.length <= requiredOffers(p)"
-                      [attr.title]="p.offers.length <= requiredOffers(p) ? t('apply.positions.minOffersHint') : null"
-                      [attr.aria-label]="t('apply.positions.remove')">✕</button>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-          <button type="button" class="pos__add pos__add--sm" (click)="addOffer(pi)">+ {{ t('apply.positions.addOffer') }}</button>
-          @if (allowNoOffers) {
-            <label class="pos__noOffers">
-              <input type="checkbox" [checked]="p.noOffers === true"
-                (change)="setNoOffers(pi, $any($event.target).checked)" />
-              <span>{{ t('apply.positions.noOffers') }}</span>
-            </label>
-            @if (p.noOffers) {
-              <p class="pos__hint">{{ t('apply.positions.noOffersHint') }}</p>
-              <textarea class="pos__reason" rows="2"
-                [value]="p.noOffersReason ?? ''"
-                [class.pos__invalid]="reasonInvalid(p)"
-                [attr.aria-invalid]="reasonInvalid(p) ? 'true' : null"
-                (input)="setNoOffersReason(pi, $any($event.target).value)"
-                [attr.placeholder]="t('apply.positions.noOffersReason')"
-                [attr.aria-label]="t('apply.positions.noOffersReason')"></textarea>
-            }
-          }
-          @if (cardError(p); as msg) {
-            <p class="pos__field-error" role="alert">{{ msg }}</p>
-          }
-        </div>
-      }
-
-      <button type="button" class="pos__add" (click)="addPosition()">+ {{ t('apply.positions.add') }}</button>
-      @if (showError && positions.length < minPositions) {
-        <p class="pos__field-error" role="alert">{{ t('apply.positions.errMinPositions') }}</p>
-      }
-
-      <p class="pos__total"><strong>{{ t('apply.positions.total') }}: {{ fmt(total()) }}</strong></p>
-    </fieldset>
-  `,
-  styles: [
-    `
-      /* Standalone, set-off block — clearly separated from the rest of the form. */
-      .pos {
-        display: flex; flex-direction: column; gap: var(--space-4);
-        border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-lg);
-        background: var(--color-surface-sunken, var(--color-surface));
-        padding: var(--space-4);
-        margin: 0;
-      }
-      .pos__legend { float: left; width: 100%; font-size: var(--fs-md); font-weight: var(--fw-semibold); padding: 0; margin-bottom: var(--space-1); }
-      .pos__req { color: var(--color-danger); margin-left: var(--space-1); }
-      .pos__hint { font-size: var(--fs-sm); color: var(--color-text-muted); margin: 0; }
-      .pos__card {
-        display: flex; flex-direction: column; gap: var(--space-3);
-        padding: var(--space-4); border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-md); background: var(--color-bg-elevated, var(--color-surface));
-      }
-      .pos__card-head { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
-      .pos__title { flex: 1; min-width: 12rem; font-weight: var(--fw-medium); }
-      .pos__value { font-size: var(--fs-sm); color: var(--color-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-      /* table-layout: fixed — otherwise the intrinsic min-width of the inputs
-         (~20ch default) forces a table wider than the mobile viewport. */
-      .pos__offers { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); table-layout: fixed; }
-      .pos__offers th { text-align: start; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-muted); font-weight: var(--fw-semibold); padding: 0 var(--space-2) var(--space-2); }
-      .pos__offers td { padding: var(--space-1) var(--space-2); vertical-align: middle; }
-      .pos__num { text-align: end; width: 9rem; }
-      .pos__num input { text-align: end; }
-      .pos__pref { text-align: center; width: 5rem; }
-      .pos__actcol { width: 2.5rem; }
-      /* Inputs consistent with the rest of the app (height/padding/radius). */
-      .pos input {
-        padding: var(--space-2) var(--space-3);
-        border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-md);
-        background: var(--color-bg); color: inherit; width: 100%;
-        min-width: 0; /* inputs may shrink below their intrinsic width */
-        min-height: 2.25rem; font: inherit;
-      }
-      .pos input:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
-      /* No browser spin buttons on number inputs (inconsistent with the rest). */
-      .pos input[type='number'] { appearance: textfield; -moz-appearance: textfield; }
-      .pos input[type='number']::-webkit-outer-spin-button,
-      .pos input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-      .pos__pref input[type='radio'] { width: 1.15rem; height: 1.15rem; min-height: 0; accent-color: var(--color-primary); cursor: pointer; }
-      .pos__noOffers { display: flex; align-items: center; gap: var(--space-2); font-size: var(--fs-sm); cursor: pointer; }
-      .pos__noOffers input[type='checkbox'] { width: 1.15rem; height: 1.15rem; min-height: 0; padding: 0; accent-color: var(--color-primary); cursor: pointer; flex: 0 0 auto; }
-      .pos textarea.pos__reason {
-        padding: var(--space-2) var(--space-3);
-        border: var(--border-width) solid var(--color-border);
-        border-radius: var(--radius-md);
-        background: var(--color-bg); color: inherit; width: 100%;
-        font: inherit; resize: vertical;
-      }
-      .pos textarea.pos__reason:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
-      .pos textarea.pos__invalid { border-color: var(--color-danger); }
-      .pos__icon { background: transparent; border: 0; cursor: pointer; color: var(--color-text-muted); font-size: var(--fs-md); line-height: 1; padding: var(--space-1); }
-      .pos__icon:hover:not(:disabled) { color: var(--color-danger); }
-      .pos__icon:disabled { opacity: 0.35; cursor: not-allowed; }
-      .pos__money { font-variant-numeric: tabular-nums; }
-      .pos input.pos__invalid { border-color: var(--color-danger); }
-      .pos input.pos__invalid:focus-visible { outline-color: var(--color-danger); }
-      .pos__field-error { font-size: var(--fs-xs); color: var(--color-danger); margin: 0; }
-      .pos__add { align-self: flex-start; background: transparent; border: var(--border-width) dashed var(--color-border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); cursor: pointer; color: var(--color-primary); font: inherit; font-weight: var(--fw-medium); }
-      .pos__add:hover { background: var(--color-surface); }
-      .pos__add--sm { border-style: none; padding: var(--space-1) 0; }
-      .pos__total { margin: 0; font-size: var(--fs-md); font-variant-numeric: tabular-nums; }
-      .pos__error { font-size: var(--fs-sm); color: var(--color-danger); margin: 0; }
-      /* Mobile (768px convention): narrower columns + tighter padding, the header
-         row is dropped (placeholders/aria-labels carry the meaning) — this keeps the
-         card within the viewport instead of overflowing horizontally. */
-      @media (max-width: 768px) {
-        .pos { padding: var(--space-3); }
-        .pos__card { padding: var(--space-3); }
-        .pos__offers thead { display: none; }
-        .pos__offers th, .pos__offers td { padding-inline: var(--space-1); }
-        .pos__num { width: 5.5rem; }
-        .pos__pref { width: 2.5rem; }
-        .pos__actcol { width: 2rem; }
-        .pos__title { min-width: 0; }
-      }
-    `,
-  ],
+  imports: [ButtonComponent, IconComponent, SwitchComponent],
+  templateUrl: './formly-positions.type.html',
+  styleUrl: './formly-positions.type.scss',
 })
 export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements OnInit {
   private readonly i18n = inject(I18nService);
+  private readonly uid = `pos-${nextUid++}`;
+
+  /** The open positions, by index. */
+  private readonly open = signal<ReadonlySet<number>>(new Set());
 
   ngOnInit(): void {
+    // A complete position starts collapsed; a new or an incomplete one starts open.
+    this.open.set(
+      new Set(this.positions.flatMap((p, i) => (this.positionComplete(p) ? [] : [i]))),
+    );
     // Mirror validity at once. A field below `minPositions` is invalid even when the
     // applicant never touches it. Otherwise it passes the required check of the wizard.
     queueMicrotask(() => this.revalidate(this.positions));
+  }
+
+  /** The position is open: always while the server named an error for it. */
+  protected isOpen(pi: number): boolean {
+    return this.open().has(pi) || this.serverError(pi) !== '';
+  }
+
+  protected toggleOpen(pi: number): void {
+    this.open.update((cur) => {
+      const next = new Set(cur);
+      if (this.isOpen(pi)) next.delete(pi);
+      else next.add(pi);
+      return next;
+    });
+    // An open position with a server error closes only after its error is gone. The
+    // errors of the other positions stay.
+    if (this.serverError(pi)) this.dropServerError(pi);
+  }
+
+  protected cardId(pi: number): string {
+    return `${this.uid}-${pi}`;
+  }
+
+  /** The radios of one position form one group; the name is unique on the page. */
+  protected radioName(pi: number): string {
+    return `${this.uid}-pref-${pi}`;
+  }
+
+  /** The second line of a collapsed position. */
+  protected summary(p: Position): string {
+    const count = this.i18n.translate(
+      p.offers.length === 1 ? 'forms.positions.offerOne' : 'forms.positions.offerOther',
+      { count: p.offers.length },
+    );
+    if (p.noOffers) return `${count} · ${this.t('forms.positions.noOffersShort')}`;
+    const preferred = p.offers.find((o) => o.preferred)?.label.trim();
+    return preferred
+      ? `${count} · ${this.i18n.translate('forms.positions.preferredBy', { name: preferred })}`
+      : count;
+  }
+
+  /** The 422 message of the last save for one position (index), or ''. Index -1 is the
+   *  message for the field as a whole. */
+  protected serverError(pi: number): string {
+    const map = this.props['serverErrors'] as Record<number, string> | undefined;
+    return map?.[pi] ?? '';
+  }
+
+  private clearServerErrors(): void {
+    if (this.props['serverErrors']) delete this.props['serverErrors'];
+  }
+
+  /** Remove the 422 message of one position. When no message is left, the control is
+   *  valid or invalid by its own checks again. */
+  private dropServerError(pi: number): void {
+    const map = { ...(this.props['serverErrors'] as Record<number, string>) };
+    delete map[pi];
+    if (Object.keys(map).length) {
+      this.props['serverErrors'] = map;
+      return;
+    }
+    this.clearServerErrors();
+    this.revalidate(this.positions);
+  }
+
+  /** The accessible name of the radio of an offer: "Bevorzugt: <supplier>". */
+  protected radioLabel(o: Offer, oi: number): string {
+    const name =
+      o.label.trim() || this.i18n.translate('forms.positions.offerN', { n: oi + 1 });
+    return this.i18n.translate('forms.positions.preferOfferNamed', { name });
+  }
+
+  private positionComplete(p: Position): boolean {
+    return (
+      !!p.label.trim() &&
+      p.offers.length >= this.requiredOffers(p) &&
+      p.offers.filter((o) => o.preferred).length === 1 &&
+      p.offers.every((o) => !!o.label.trim() && o.value !== null && o.value > 0) &&
+      !(p.noOffers === true && !(p.noOffersReason ?? '').trim())
+    );
   }
 
   protected t(key: string): string {
@@ -264,8 +190,11 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     return this.showError && p.noOffers === true && !(p.noOffersReason ?? '').trim();
   }
 
-  /** Terse error message for one position card, or '' when the position is valid. */
-  protected cardError(p: Position): string {
+  /** Terse error message for one position card, or '' when the position is valid. The
+   *  message of the server comes first. */
+  protected cardError(p: Position, pi = -2): string {
+    const server = this.serverError(pi);
+    if (server) return server;
     if (!this.showError) return '';
     if (p.offers.length < this.requiredOffers(p)) return this.t('apply.positions.errMinOffers');
     if (p.offers.filter((o) => o.preferred).length !== 1) return this.t('apply.positions.errPreferred');
@@ -298,6 +227,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   }
 
   private commit(next: Position[]): void {
+    this.clearServerErrors();
     this.formControl.setValue(next);
     this.formControl.markAsDirty();
     this.formControl.markAsTouched();
@@ -308,13 +238,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   private revalidate(positions: Position[]): void {
     let ok = positions.length >= this.minPositions;
     for (const p of positions) {
-      if (!p.label.trim()) ok = false;
-      if (p.offers.length < this.requiredOffers(p)) ok = false;
-      if (p.offers.filter((o) => o.preferred).length !== 1) ok = false;
-      for (const o of p.offers) {
-        if (!o.label.trim() || o.value === null || o.value <= 0) ok = false;
-      }
-      if (p.noOffers === true && !(p.noOffersReason ?? '').trim()) ok = false;
+      if (!this.positionComplete(p)) ok = false;
     }
     if (this.props.required && positions.length === 0) ok = false;
     this.formControl.setErrors(ok ? null : { positions: true });
@@ -322,11 +246,17 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
 
   addPosition(): void {
     const offers = Array.from({ length: this.minOffers }, (_, i) => this.blankOffer(i === 0));
+    const index = this.positions.length;
     this.commit([...this.positions, { label: '', offers }]);
+    this.open.update((cur) => new Set([...cur, index]));
   }
 
   removePosition(pi: number): void {
     this.commit(this.positions.filter((_, i) => i !== pi));
+    // The positions after the removed one move up by one.
+    this.open.update(
+      (cur) => new Set([...cur].filter((i) => i !== pi).map((i) => (i > pi ? i - 1 : i))),
+    );
   }
 
   addOffer(pi: number): void {

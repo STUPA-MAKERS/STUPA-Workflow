@@ -1,0 +1,98 @@
+<button
+  #trigger
+  type="button"
+  class="chip fs__chip"
+  [class.fs__chip--md]="size() === 'md'"
+  [class.on]="active()"
+  aria-haspopup="listbox"
+  [attr.aria-expanded]="open()"
+  [attr.aria-controls]="open() ? listId : null"
+  [attr.aria-label]="chipName()"
+  [title]="chipText()"
+  (click)="toggle()"
+  (keydown)="onTriggerKey($event)"
+>
+  @if (icon(); as lead) {
+    <app-icon [name]="lead" [size]="15" />
+  }
+  <span class="ell fs__text">{{ chipText() }}</span>
+  @if (chevron()) {
+    <app-icon class="fs__chev" name="down" [size]="15" />
+  }
+</button>
+
+<ng-template #optionList let-inSheet>
+  @if (options().length) {
+    <div
+      class="fs__options"
+      [class.rowgroup]="inSheet"
+      [class.rowgroup--bg3]="inSheet"
+      role="listbox"
+      [id]="listId"
+      [attr.aria-label]="label()"
+      [attr.aria-multiselectable]="multiple() ? 'true' : null"
+      (keydown)="onListKey($event)"
+    >
+      @for (opt of options(); track opt.value) {
+        <button
+          type="button"
+          class="fs__option"
+          role="option"
+          [class.fs__option--sheet]="inSheet"
+          [attr.aria-selected]="isOn(opt.value)"
+          [attr.tabindex]="opt.value === tabValue() ? 0 : -1"
+          [title]="opt.label"
+          (click)="choose(opt)"
+        >
+          @if (multiple()) {
+            <span class="fs__box" [class.fs__box--on]="isOn(opt.value)" aria-hidden="true">
+              @if (isOn(opt.value)) {
+                <app-icon name="check" [size]="14" />
+              }
+            </span>
+          }
+          <span class="fs__label">{{ opt.label }}</span>
+          @if (!multiple() && isOn(opt.value)) {
+            <app-icon class="fs__check" name="check" [size]="18" />
+          }
+        </button>
+      }
+    </div>
+  } @else {
+    <p class="fs__empty">{{ emptyText() ?? ('ui.filterSelect.empty' | t) }}</p>
+  }
+</ng-template>
+
+@if (popoverOpen()) {
+  <div
+    #list
+    class="fs__menu"
+    popover="manual"
+    tabindex="-1"
+    [style.top.px]="position().top"
+    [style.left.px]="position().left"
+    (keydown)="onMenuKey($event)"
+  >
+    <ng-container [ngTemplateOutlet]="optionList" [ngTemplateOutletContext]="{ $implicit: false }" />
+    @if (multiple() && resetLabel() && values().length) {
+      <div class="fs__sep" role="separator"></div>
+      <button type="button" class="fs__reset" (click)="reset()">{{ resetLabel() }}</button>
+    }
+  </div>
+}
+
+<!-- Phone: the shared bottom sheet. It exists only while it is open and returns the focus
+     to the chip when it goes. It sits in the top layer (popover), so a chip row that
+     scrolls or fades (overflow, mask) does not clip it. -->
+@if (sheetOpen()) {
+  <div #layer class="fs__layer" popover="manual">
+    <app-side-sheet side="bottom" [heading]="label()" [open]="true" (openChange)="onSheetOpen($event)">
+      @if (multiple() && resetLabel() && values().length) {
+        <button sheet-actions type="button" class="fs__reset fs__reset--head" (click)="reset()">
+          {{ resetLabel() }}
+        </button>
+      }
+      <ng-container [ngTemplateOutlet]="optionList" [ngTemplateOutletContext]="{ $implicit: true }" />
+    </app-side-sheet>
+  </div>
+}

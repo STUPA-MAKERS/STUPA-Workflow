@@ -12,8 +12,7 @@
   opacity: 0.45;
 }
 .sb__center {
-  fill: var(--color-surface-sunken);
-  stroke: var(--color-border);
+  fill: var(--color-surface-2);
   cursor: pointer;
 }
 .sb__center-name {
@@ -25,6 +24,7 @@
 .sb__center-val {
   fill: var(--color-text-muted);
   font-size: 12px;
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
@@ -34,17 +34,24 @@
   flex-direction: column;
   gap: 0.1rem;
   padding: var(--space-2) var(--space-3);
-  background: var(--color-bg-elevated);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-sm);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
   font-size: var(--fs-xs);
   pointer-events: none;
   z-index: 1;
   max-width: 16rem;
 }
-.sb__hint,
-.sb__empty {
+/* No amount: one ring in a neutral surface colour, like a skeleton. */
+.sb__ring {
+  fill: none;
+  stroke: var(--color-surface-3);
+}
+.sb__center--empty {
+  cursor: default;
+}
+.sb__hint {
   color: var(--color-text-muted);
   font-size: var(--fs-xs);
   text-align: center;

@@ -19,10 +19,11 @@ description: Whole-platform backup and restore — age-encrypted archives (pg_du
 
 ## Traps
 
-- **`backup.manage` is in `FORBIDDEN_PERMISSIONS`** (`modules/auth/oauth.py`), beside `vote.cast`. No OAuth agent token reaches a backup, an export or a restore, whatever the scope says. Its holder can read the whole database and replace it.
+- **`backup.manage` is in `FORBIDDEN_PERMISSIONS`** (`modules/auth/oauth.py`), beside `vote.cast` and `admin.users.merge`. No OAuth agent token reaches a backup, an export or a restore, whatever the scope says. Its holder can read the whole database and replace it.
 - **The private age key lives in the stack.** That is the price of restoring from a browser, and it is a real reduction against the old encrypt-only design. Use a key pair for the app ONLY; the disaster-recovery pair stays off host. `deploy/secrets/` is mounted read-only into `api` and `worker`.
 - **A restore takes a `pre_restore` safety archive FIRST** and aborts entirely when that fails. No undo means no restore. A `pre_restore` row and a pinned row never count towards retention and are never pruned.
 - **The restore audit entry lands in the RESTORED chain**, because the restore replaces `audit_entry` along with everything else. The safety archive is the only record of the state before it.
+- **A finished restore verifies the restored chain** (Z6): after the restore audit entry, `restore_backup` calls `worker.audit_verify.verify_after_restore`, which stores an `audit_verification` row with `trigger = restore` and the restore actor. A failed check only logs (for example an archive from a schema without `audit_verification`); the task still returns `done`. The nightly chain check at 04:30 is a separate cron and does not depend on the backup. See be-audit.
 - **`pg_dump` must match the server major.** The backend image installs `postgresql-client-16` from PGDG; compose runs `postgres:16-alpine`. An older `pg_dump` refuses to run.
 - **`pg_restore` is run with `tolerate_nonzero=True`.** `--clean` warns for every object the target does not have yet, which sets a non-zero exit even on a good restore.
 - **Nothing buffers a whole archive.** `archive.py` works on file objects, and `build_archive` stages the bucket on disk first, so peak memory is one object. `tempfile` honours `TMPDIR`: a container with a small tmpfs there fails here first.

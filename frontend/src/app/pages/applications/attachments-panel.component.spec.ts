@@ -21,9 +21,9 @@ function wire(over: Partial<AttachmentOutWire> = {}): AttachmentOutWire {
   };
 }
 
-async function setup(canUpload = true) {
+async function setup(canUpload = true, canDelete?: boolean) {
   const view = await render(AttachmentsPanelComponent, {
-    inputs: { applicationId: APP_ID, canUpload },
+    inputs: { applicationId: APP_ID, canUpload, canDelete },
     providers: [
       provideHttpClient(),
       provideHttpClientTesting(),
@@ -49,6 +49,13 @@ async function uploadFile(name = 'plan.pdf') {
 
 describe('AttachmentsPanelComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  it('shows its heading, or keeps it for screen readers only in a titled sheet', async () => {
+    const { rerender } = await setup(false);
+    expect(screen.getByRole('heading', { name: 'Anhänge' })).not.toHaveClass('sr-only');
+    await rerender({ inputs: { applicationId: APP_ID, canUpload: false, titled: false }, partialUpdate: true });
+    expect(screen.getByRole('heading', { name: 'Anhänge' })).toHaveClass('sr-only');
+  });
 
   it('shows the empty state and no upload control without permission', async () => {
     await setup(false);
@@ -90,6 +97,24 @@ describe('AttachmentsPanelComponent', () => {
 
     expect(screen.queryByText('plan.pdf')).not.toBeInTheDocument();
     expect(success).toHaveBeenCalled();
+    http.verify();
+  });
+
+  it('uploads but offers no delete when canDelete is false (locked state)', async () => {
+    const { http, detectChanges, fixture } = await setup(true, false);
+    await uploadFile();
+    http.expectOne(uploadUrl).flush(wire(), { status: 201, statusText: 'Created' });
+    detectChanges();
+
+    expect(screen.getByText('plan.pdf')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Anhang löschen' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    // The guards also hold when a caller bypasses the template.
+    const cmp = fixture.componentInstance;
+    cmp.remove(cmp.attachments()[0]);
+    cmp.toggleSelect('att-1', true);
+    cmp.bulkDelete();
+    http.expectNone((r) => r.method === 'DELETE');
     http.verify();
   });
 
@@ -375,12 +400,56 @@ describe('AttachmentsPanelComponent', () => {
     http.verify();
   });
 
-  it('formats size and resolves scan labels by state', async () => {
+  it('formats size and shows the scan state as status text', async () => {
     const { fixture } = await setup();
     const cmp = fixture.componentInstance;
     expect(cmp.size(wire({ size: 2048 }) as never)).toBe('2.0 KB');
-    expect(cmp.scanLabel('clean')).toBe('applications.attachments.scan.clean');
-    expect(cmp.scanLabel('quarantined')).toBe('applications.attachments.scan.quarantined');
+    expect(cmp.scan('clean')).toEqual({ kind: 'neutral', key: 'applications.attachments.scan.clean' });
+    expect(cmp.scan('quarantined').kind).toBe('error');
+  });
+
+  it('reports the number of attachments after the load and after each change', async () => {
+    const counts: number[] = [];
+    const view = await render(AttachmentsPanelComponent, {
+      inputs: { applicationId: APP_ID, canUpload: true },
+      on: { countChange: (n: number) => counts.push(n) },
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+      ],
+    });
+    const http = view.fixture.debugElement.injector.get(HttpTestingController);
+    // Nothing before the list arrived: "0" would be a claim, not a count.
+    view.detectChanges();
+    expect(counts).toEqual([]);
+    http
+      .expectOne((r) => r.method === 'GET' && r.url === `/api/applications/${APP_ID}/attachments`)
+      .flush([wire({ id: 'a' }), wire({ id: 'b' })]);
+    view.detectChanges();
+    expect(counts).toEqual([2]);
+    view.fixture.componentInstance.attachments.set([]);
+    view.detectChanges();
+    expect(counts).toEqual([2, 0]);
+  });
+
+  it('counts after a failed load too', async () => {
+    const counts: number[] = [];
+    const view = await render(AttachmentsPanelComponent, {
+      inputs: { applicationId: APP_ID },
+      on: { countChange: (n: number) => counts.push(n) },
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+      ],
+    });
+    const http = view.fixture.debugElement.injector.get(HttpTestingController);
+    http
+      .expectOne((r) => r.url === `/api/applications/${APP_ID}/attachments`)
+      .flush({}, { status: 500, statusText: 'x' });
+    view.detectChanges();
+    expect(counts).toEqual([0]);
   });
 
   // Bulk select
@@ -701,7 +770,7 @@ describe('AttachmentsPanelComponent', () => {
     // The `inline=1` flag keeps Content-Disposition inline. The file then renders
     // instead of downloading.
     expect(cmp.previewUrl()).toBe('/api/attachments/att-1/download?sig=ok&inline=1');
-    expect(screen.getByTitle('plan.pdf')).toBeInTheDocument();
+    expect(document.querySelector('iframe[title="plan.pdf"]')).not.toBeNull();
 
     cmp.closePreview();
     detectChanges();

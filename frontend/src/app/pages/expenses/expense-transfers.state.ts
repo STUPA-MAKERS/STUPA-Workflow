@@ -43,6 +43,8 @@ export class ExpenseTransfersState {
   readonly editInvoiceDate = signal('');
   readonly editPaymentDate = signal('');
   readonly confirmDelete = signal<BudgetTransfer | null>(null);
+  /** Called with the transfer after a delete, so the page can close its detail. */
+  onDeleted: ((gone: BudgetTransfer) => void) | null = null;
 
   readonly canSubmitEdit = computed(
     () => !!this.editDescription().trim() && Number(this.editAmount()) > 0,
@@ -193,6 +195,7 @@ export class ExpenseTransfersState {
         this.total.update((n) => Math.max(0, n - 1));
         this.toast.success(this.i18n.translate('expenses.transfers.deleted'));
         this.list.refresh();
+        this.onDeleted?.(t);
       },
       error: (err) => {
         this.saving.set(false);

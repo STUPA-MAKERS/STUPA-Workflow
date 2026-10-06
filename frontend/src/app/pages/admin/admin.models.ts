@@ -188,6 +188,10 @@ export interface Gremium {
   delegationAllowExternal?: boolean;
   /** Default quorum as a percent of eligible voters who must attend. null = none. */
   quorumPercent?: number | null;
+  /** Number of members. Only the admin list (`GET /admin/gremien`) gives it. */
+  memberCount?: number;
+  /** Number of gremium roles, the forced roles included. Admin list only. */
+  roleCount?: number;
 }
 
 /** Body for `POST /admin/gremien` (`GremiumCreate`). */
@@ -394,6 +398,104 @@ export interface AdminPrincipal {
   assignments: RoleAssignment[];
   /** The OIDC groups as of the last login. The group mappings read them. */
   oidcGroups: string[];
+  /**
+   * Account merge: set when an admin merged this (old) account into another one. The
+   * account is then a locked reference: "zusammengeführt in <name>", no actions.
+   */
+  mergedIntoId?: Uuid | null;
+  mergedIntoName?: string | null;
+  mergedAt?: string | null;
+}
+
+/**
+ * The areas of an account merge, in display order. Each one counts the rows that the
+ * merge rewrites to the new account, the duplicates it combines, and the rows it removes.
+ * Mirrors `MergeArea` in `backend/app/modules/admin/schemas.py`.
+ */
+export const MERGE_AREAS = [
+  'applications',
+  'versions',
+  'timeline',
+  'comments',
+  'votes',
+  'delegations',
+  'substitutes',
+  'attendance',
+  'meetings',
+  'budget',
+  'config',
+  'notifications',
+  'roles',
+  'privacy',
+  'backups',
+  'sessions',
+  'memberships',
+  'calendar',
+] as const;
+export type MergeArea = (typeof MERGE_AREAS)[number];
+
+/** A real conflict that blocks a merge. Mirrors `MergeConflictKind` in the backend. */
+export type MergeConflictKind =
+  | 'ballot_same_vote'
+  | 'delegation_same_meeting'
+  | 'delegation_vote_twice'
+  | 'delegation_chain'
+  | 'attendance_differs'
+  | 'erasure_open';
+
+export interface MergeAreaCount {
+  area: MergeArea;
+  rewritten: number;
+  combined: number;
+  removed: number;
+}
+
+export interface MergeConflict {
+  kind: MergeConflictKind;
+  /** The vote or the meeting, never an id. Null when the kind names no object. */
+  label: string | null;
+}
+
+/** One side of a merge: the old account (source) or the account that stays (target). */
+export interface MergePrincipal {
+  id: Uuid;
+  displayName: string | null;
+  email: string | null;
+  lastLogin: string | null;
+}
+
+/**
+ * A right of the old account that the target lacks. `key` is a permission key, or
+ * `admin` for the admin role (every right); `gremium` names the gremium of a gremium
+ * right.
+ */
+export interface MergePermission {
+  key: string;
+  gremium?: string | null;
+}
+
+/** GET /admin/principals/{id}/merge-preview?targetId= */
+export interface MergePreview {
+  source: MergePrincipal;
+  target: MergePrincipal;
+  areas: MergeAreaCount[];
+  conflicts: MergeConflict[];
+  /**
+   * The rights of the old account that the target lacks. The merge moves no right, but
+   * it moves ownership, so they block it unless the admin holds them all
+   * (`actorHoldsExtra`).
+   */
+  extraPermissions?: MergePermission[];
+  actorHoldsExtra?: boolean;
+  canMerge: boolean;
+}
+
+/** POST /admin/principals/{id}/merge */
+export interface MergeResult {
+  source: MergePrincipal;
+  target: MergePrincipal;
+  areas: MergeAreaCount[];
+  mergedAt: string;
 }
 
 export interface ApplicationTypeAdmin {
@@ -425,6 +527,8 @@ export interface ApplicationTypeFull {
   /** DSGVO retention in months. null = the global default. */
   retentionMonths?: number | null;
   activeFormVersionId?: Uuid | null;
+  /** Number of the active form version (`v7`). `null` while no version is active. */
+  activeFormVersion?: number | null;
 }
 
 /** Body for `POST /admin/application-types` — create an application type/form. */
@@ -546,19 +650,49 @@ export interface GremiumRole {
   gremiumId: Uuid;
   key: string;
   name: I18nMap;
-  /** Forced role (board/manager/member) — present in every gremium, not deletable. */
+  /** Forced role (`vorstand`, `manager`, `member`): present in every gremium, not deletable. */
   forced?: boolean;
-  /** Granular meeting permissions (session.manage/vote.manage/vote.cast/protocol.write). */
+  /** The gremium permissions of the role, a subset of {@link GREMIUM_PERMISSIONS}. */
   permissions?: string[];
 }
 
-/** Configurable granular gremium-role permissions. */
+/**
+ * The fixed catalogue of gremium permissions (O7), in display order. It mirrors
+ * `GREMIUM_PERMISSIONS` in `backend/app/modules/admin/gremium_roles.py`. The catalogue
+ * is not configurable, so this list is the source of the role matrix and the role
+ * dialog.
+ */
 export const GREMIUM_PERMISSIONS = [
   'session.manage',
   'vote.manage',
   'vote.cast',
   'protocol.write',
+  'protocol.finalize',
 ] as const;
+
+/** One key of the fixed gremium permission catalogue. */
+export type GremiumPermission = (typeof GREMIUM_PERMISSIONS)[number];
+
+/**
+ * The keys of the forced gremium roles, in display order. Every gremium has them and
+ * nobody can delete them. A member without a role mapping gets `member`.
+ */
+export const FORCED_GREMIUM_ROLE_KEYS = ['vorstand', 'manager', 'member'] as const;
+
+/** The key of the forced role that every member without a role mapping gets. */
+export const MEMBER_GREMIUM_ROLE_KEY = 'member';
+
+/**
+ * Sort the roles of one gremium for display: the forced roles first, in the order of
+ * {@link FORCED_GREMIUM_ROLE_KEYS}, then the other roles by name.
+ */
+export function sortGremiumRoles(roles: readonly GremiumRole[], label: (r: GremiumRole) => string): GremiumRole[] {
+  const rank = (r: GremiumRole): number => {
+    const i = (FORCED_GREMIUM_ROLE_KEYS as readonly string[]).indexOf(r.key);
+    return i < 0 ? FORCED_GREMIUM_ROLE_KEYS.length : i;
+  };
+  return [...roles].sort((a, b) => rank(a) - rank(b) || label(a).localeCompare(label(b)));
+}
 
 /** Kind of a named deadline policy. */
 export type DeadlineKind =
@@ -604,9 +738,9 @@ export interface OAuthGrantAdmin {
   clientId: string;
   scope: string;
   createdAt: string;
-  /** `null` means the access token never expires. Only a revoke ends it. */
+  /** The server caps every lifetime, so a value is normal. The page shows `null` as a dash. */
   accessExpiresAt: string | null;
-  /** `null` means the refresh token never expires. Only a revoke ends it. */
+  /** The server caps every lifetime, so a value is normal. The page shows `null` as a dash. */
   refreshExpiresAt: string | null;
 }
 
@@ -629,6 +763,20 @@ export interface GremiumMembership {
   principalId: Uuid;
   gremiumId: Uuid;
   gremiumRoleId: Uuid;
+  /** The display name of the member. `null` when the IdP gives none. */
+  displayName?: string | null;
+  /** The e-mail address of the member. `null` when the IdP gives none. */
+  email?: string | null;
+  /**
+   * The principal is active and the membership is valid now, the rule of the member
+   * count in the gremien list. A missing value counts as active.
+   */
+  active?: boolean;
+}
+
+/** True when a membership counts as a current member (see `GremiumMembership.active`). */
+export function isActiveMembership(m: GremiumMembership): boolean {
+  return m.active !== false;
 }
 
 /**
@@ -691,6 +839,38 @@ export interface AuditEntry {
   revertable?: boolean;
   hash: string;
   prevHash: string | null;
+}
+
+/** What started a stored chain check: the nightly job, a person, or a restore. */
+export type AuditVerificationTrigger = 'cron' | 'manual' | 'restore';
+
+/** Why a chain check failed. */
+export type AuditChainBreak = 'prev_hash_mismatch' | 'hash_mismatch';
+
+/**
+ * A stored check of the audit hash chain (`GET /admin/audit/verify/latest`,
+ * `POST /admin/audit/verify`). `brokenAt` and `reason` name the first break when
+ * `valid` is false.
+ */
+export interface AuditVerification {
+  id: Uuid;
+  startedAt: string;
+  finishedAt: string | null;
+  valid: boolean;
+  /** Number of entries the check read. */
+  checked: number;
+  brokenAt: number | null;
+  reason: AuditChainBreak | null;
+  trigger: AuditVerificationTrigger;
+  triggeredBy: string | null;
+}
+
+/** A live check of the chain that the server does not store (`GET /admin/audit/verify`). */
+export interface AuditChainCheck {
+  valid: boolean;
+  checked: number;
+  brokenAt: number | null;
+  reason: string | null;
 }
 
 /** Cursor-paged audit response (keyset on `id`, newest first). */
@@ -756,6 +936,24 @@ export interface NotificationSettings {
   /** Then again every N days. 0 = only once per state visit. */
   taskReminderRepeatDays: number;
 }
+
+/**
+ * Settings for applications without an account (Z1, P admin.deadlines):
+ * `GET/PUT /admin/guest-settings`.
+ */
+export interface GuestSettings {
+  /** Hours until the platform discards an unconfirmed guest application (1 to 720). */
+  confirmTtlHours: number;
+  /** Lifetime of a new personal link in days (1 to 3650). `null` = no expiry. */
+  linkTtlDays: number | null;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+}
+
+/** Upper bound of {@link GuestSettings.confirmTtlHours} (`MAX_CONFIRM_TTL_HOURS`). */
+export const MAX_CONFIRM_TTL_HOURS = 720;
+/** Upper bound of {@link GuestSettings.linkTtlDays} (`MAX_LINK_TTL_DAYS`). */
+export const MAX_LINK_TTL_DAYS = 3650;
 
 /** DSGVO erasure request (queue, P privacy.manage). */
 export type ErasureSubjectType = 'applicant' | 'principal';
@@ -869,6 +1067,8 @@ export interface Branding {
   copyright: I18nMap;
   legalLinks: FooterLink[];
   freetexts: SiteFreetexts;
+  /** Show the Gravatar images of the avatars. Missing (an older config) = on. */
+  gravatarEnabled?: boolean;
 }
 
 /** Versioned site config: active version + editable draft. */
@@ -901,3 +1101,10 @@ export const LOGO_MAX_SIZE_MB = 2;
 
 /** Re-export so admin code imports only from `admin.models`. */
 export type { FormFieldDef };
+
+/**
+ * Pattern for the key of a new role (global role and gremium role). It mirrors
+ * `ROLE_KEY_PATTERN` in `backend/app/modules/admin/schemas.py`. The server refuses
+ * a key that does not match with 422. A key never changes after the create.
+ */
+export const ROLE_KEY_PATTERN = /^[a-z][a-z0-9_]*$/;

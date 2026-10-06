@@ -12,7 +12,6 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.read",
     # Read every application, independent of Gremium and ownership. This is global.
     "application.read_all",
-    "application.create",
     "application.transition",
     # Force an application into ANY state directly. This bypasses the flow guards and
     # the transitions. The override is audit-sensitive: the log records every use as
@@ -35,18 +34,28 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     # application and deciding it may be read by anyone with a URL are different
     # decisions, and someone reading through a magic link must not be able to publish.
     "application.share",
+    # Capture an application on behalf of an applicant (#11): an existing account or a
+    # guest with name and e-mail. The application belongs to the applicant; the holder
+    # shows only in the history and the audit log. Global, no Gremium scope.
+    # Grant it deliberately: the applicant search of the capture dialog exposes the
+    # names and e-mail addresses of ALL active accounts to the holder.
+    "application.create_on_behalf",
     "form.configure",
     "flow.configure",
-    "vote.cast",
-    "vote.manage",
-    "meeting.manage",
+    # Voting rights are NOT in this catalog. They are gremium permissions
+    # (`vote.cast`, `vote.manage`) of the gremium role catalog in
+    # `app.modules.admin.gremium_roles`. A vote names its gremium in `eligibleGroup`.
     # A global READ permission that only adds. The holder sees every meeting across all
     # Gremien: timeline, list, detail, agenda, protocol and vote results. The holder
     # never writes and never votes.
     "meeting.view_all",
-    "protocol.finalize",
-    # Delete a meeting that has a finalized protocol. This is separate from
-    # meeting.manage. The audit log records each delete as meeting_delete.
+    # Meeting management, protocol writing and protocol finalization are NOT in
+    # this catalog. They are gremium permissions (`session.manage`,
+    # `protocol.write`, `protocol.finalize`) of the gremium role catalog in
+    # `app.modules.admin.gremium_roles`.
+    # Delete a meeting that has a finalized protocol. This is separate from the
+    # gremium permission session.manage. The audit log records each delete as
+    # meeting_delete.
     "meeting.delete_finalized",
     "budget.view",
     "budget.structure",
@@ -73,6 +82,10 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "admin.roles",
     # /admin/users: activate or deactivate a user and manage role assignments.
     "admin.users",
+    # /admin/users: merge an old account (for example a Keycloak-era `sub`) into a new
+    # one. It rewrites the references of the old account and locks it. Only the admin
+    # role has it by default. No OAuth scope carries it, so an agent token never merges.
+    "admin.users.merge",
     # /admin/group-mappings: map an IdP group to a role.
     "admin.group_mappings",
     # /admin/gremien/:id/roles: Gremium role definitions.

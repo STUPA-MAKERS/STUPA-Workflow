@@ -1,0 +1,185 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.hist {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.hist__day {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hist__date {
+  margin: 0;
+  padding: 0 4px;
+}
+
+.hist__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hist__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: var(--space-3) 14px;
+}
+
+.hist__icon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-text-muted);
+}
+
+.hist__text {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.hist__title {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text);
+}
+/* A status title keeps the weight of the line. */
+.hist__title app-status-text {
+  font-weight: inherit;
+  white-space: normal;
+}
+
+.hist__body,
+.hist__meta {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  overflow-wrap: anywhere;
+}
+.hist__body {
+  color: var(--color-text-muted);
+  white-space: pre-line;
+}
+
+.hist__changes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  overflow-wrap: anywhere;
+}
+.hist__changes app-status-text {
+  margin-inline-end: 4px;
+  font-weight: var(--fw-semibold);
+  white-space: normal;
+}
+.hist__arrow {
+  margin-inline: 4px;
+}
+.hist__changes del {
+  color: var(--color-text-subtle);
+}
+.hist__changes ins {
+  color: var(--color-text);
+  text-decoration: none;
+}
+/* "Werte anzeigen": a text button on its own line below the change. The whole button
+   is the target, with the chevron. */
+.hist__more {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  margin-inline-start: -6px;
+  padding: 0 8px 0 6px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.hist__more:hover {
+  background: var(--color-selected);
+}
+.hist__more:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.hist__chev {
+  flex: none;
+  transition: transform var(--motion-fast) var(--ease-standard);
+}
+.hist__chev--open {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hist__chev {
+    transition: none;
+  }
+}
+/* The old and the new value as blocks. A block keeps the lines and the indent of its
+   text and wraps a long word; a wrapped line keeps the indent of its first part. */
+.hist__values {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 2px 0 6px;
+}
+.hist__valuesCap {
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+  font-weight: var(--fw-semibold);
+}
+.hist__changes .hist__block {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-3);
+  overflow-wrap: anywhere;
+}
+.hist__line {
+  display: block;
+  /* An empty line is a paragraph break: it keeps the height of a line. */
+  min-height: 1lh;
+  white-space: pre-wrap;
+}
+/* A struck paragraph is hard to read: the caption "Vorher" marks the old block, so it
+   keeps a plain muted text. */
+.hist__changes del.hist__block {
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+.rowgroup--bg3 .hist__changes .hist__block {
+  background: var(--color-surface-4);
+}
+.rowgroup--bg3 .hist__valuesCap {
+  color: var(--color-text-muted);
+}
+.hist__meta {
+  color: var(--color-text-subtle);
+}
+/* On surface 3 the subtle text is below 4.5:1 (WCAG 1.4.3); the muted text passes.
+   A status title of the kind `muted` gets the same fix from the global `.rowgroup--bg3`
+   rule in `styles.scss`. */
+.rowgroup--bg3 .hist__meta {
+  color: var(--color-text-muted);
+}
+.rowgroup--bg3 .hist__changes del {
+  color: var(--color-text-muted);
+}

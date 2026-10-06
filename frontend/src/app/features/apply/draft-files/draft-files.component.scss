@@ -1,0 +1,120 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+.df {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.df__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  padding: 0 var(--space-1);
+}
+.df__title {
+  flex: 1 1 auto;
+}
+.df__req {
+  color: var(--color-danger);
+}
+.df__count {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.df__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.df__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3.375rem;
+  padding: 6px var(--space-2) 6px var(--space-4);
+}
+.df__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.df__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+/* A long file name stays on one line with an ellipsis; the title shows all of it. */
+.df__name {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--fw-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.df__sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.df__sep {
+  color: var(--color-text-subtle);
+}
+.df__tag {
+  flex: none;
+}
+.df__remove {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.df__remove:hover {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+.df__row--failed .df__name {
+  color: var(--color-text-muted);
+}
+.df__spinner {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-text-muted);
+  border-right-color: transparent;
+  border-radius: var(--radius-pill);
+  animation: df-spin 0.7s linear infinite;
+}
+@keyframes df-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .df__spinner {
+    animation-duration: 2s;
+  }
+}
+.df__offer {
+  padding-inline: var(--space-1);
+}
+.df__error {
+  margin: 0;
+  padding-inline: var(--space-1);
+  color: var(--color-danger);
+  font-size: var(--fs-small);
+}

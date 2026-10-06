@@ -6,15 +6,19 @@ permissions, votes, listing, and lifecycle concerns all use them.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.modules.admin.models import Gremium
+from app.modules.applications.models import Application
 from app.modules.auth.models import Principal as PrincipalRow
-from app.modules.livevote.models import Meeting
-from app.modules.livevote.schemas import MeetingOut, MeetingVoteOut
+from app.modules.livevote.agenda_service import agenda_order, title_of
+from app.modules.livevote.keepers import KeeperSummary
+from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingGuest
+from app.modules.livevote.schemas import CurrentAgendaItemOut, MeetingOut, MeetingVoteOut
 from app.modules.protocol.models import Protocol
 from app.shared.errors import NotFoundError
 
@@ -22,6 +26,11 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.modules.livevote.service.pubsub import BrokerPublisher
+
+# Per meeting: the number of agenda items and the current item (A2).
+AgendaSummary = tuple[int, CurrentAgendaItemOut | None]
+# Per meeting: the admitted and the pending guests (#17).
+GuestCounts = tuple[int, int]
 
 
 class MeetingServiceBase:
@@ -40,11 +49,17 @@ class MeetingServiceBase:
         can_write: bool = False,
         can_manage_votes: bool = False,
         can_vote: bool = False,
+        can_finalize: bool = False,
         is_protokollant: bool = False,
         protokollant_name: str | None = None,
         gremium_name: str | None = None,
         votes: list[MeetingVoteOut] | None = None,
+        agenda: AgendaSummary = (0, None),
+        keepers: KeeperSummary | None = None,
+        guests: GuestCounts = (0, 0),
+        public_join_allowed: bool = True,
     ) -> MeetingOut:
+        periods, planned = keepers if keepers is not None else ([], None)
         return MeetingOut(
             id=meeting.id,
             gremiumId=meeting.gremium_id,
@@ -53,10 +68,13 @@ class MeetingServiceBase:
             date=meeting.date,
             startTime=meeting.start_time,
             endTime=meeting.end_time,
+            startedAt=meeting.started_at,
             closedAt=meeting.closed_at,
             status=meeting.status,  # type: ignore[arg-type]
             activeApplicationId=meeting.active_application_id,
             currentAgendaItemId=meeting.current_agenda_item_id,
+            currentAgendaItem=agenda[1],
+            agendaItemCount=agenda[0],
             protocolId=protocol_id,
             createdAt=meeting.created_at,
             protokollantId=meeting.protokollant_id,
@@ -70,8 +88,93 @@ class MeetingServiceBase:
             canWrite=can_write,
             canManageVotes=can_manage_votes,
             canVote=can_vote,
+            canFinalize=can_finalize,
             votes=votes or [],
+            keeperPeriods=periods,
+            plannedHandover=planned,
+            # `getattr`: a read model of an older caller may lack the #17 columns.
+            publicJoin=bool(getattr(meeting, "public_join", False)),
+            guestsMode=getattr(meeting, "guests_mode", None) or "vote",
+            # The join code and the open requests go to the meeting lead only (#17).
+            joinCode=getattr(meeting, "join_code", None) if can_manage else None,
+            admittedGuests=guests[0],
+            pendingGuests=guests[1] if can_manage else 0,
+            publicJoinAllowed=public_join_allowed,
         )
+
+    async def _guest_counts(self, meeting_ids: Sequence[UUID]) -> dict[UUID, GuestCounts]:
+        """Count the admitted and the pending guests of each meeting (#17), batched."""
+        if not meeting_ids:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(MeetingGuest.meeting_id, MeetingGuest.status, func.count())
+                .where(
+                    MeetingGuest.meeting_id.in_(list(meeting_ids)),
+                    MeetingGuest.status.in_(("admitted", "pending")),
+                )
+                .group_by(MeetingGuest.meeting_id, MeetingGuest.status)
+            )
+        ).all()
+        out: dict[UUID, GuestCounts] = {}
+        for meeting_id, status, n in rows:
+            admitted, pending = out.get(meeting_id, (0, 0))
+            out[meeting_id] = (n, pending) if status == "admitted" else (admitted, n)
+        return out
+
+    async def _agenda_summaries(self, meetings: Sequence[Meeting]) -> dict[UUID, AgendaSummary]:
+        """Count the agenda items of each meeting and describe its current item (A2).
+
+        Two batched queries for any number of meetings: the agenda items in agenda
+        order, then the titles of the applications behind the current items. The
+        position is the 1-based number of the item in the agenda order, as the agenda
+        list shows it.
+        """
+        if not meetings:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(
+                    MeetingAgendaItem.meeting_id,
+                    MeetingAgendaItem.id,
+                    MeetingAgendaItem.application_id,
+                    MeetingAgendaItem.title,
+                )
+                .where(MeetingAgendaItem.meeting_id.in_([m.id for m in meetings]))
+                .order_by(MeetingAgendaItem.meeting_id, *agenda_order())
+            )
+        ).all()
+        current = {m.id: m.current_agenda_item_id for m in meetings}
+        counts: dict[UUID, int] = {}
+        hits: dict[UUID, tuple[int, UUID | None, str | None]] = {}
+        for meeting_id, item_id, application_id, title in rows:
+            counts[meeting_id] = counts.get(meeting_id, 0) + 1
+            if item_id == current.get(meeting_id):
+                hits[meeting_id] = (counts[meeting_id], application_id, title)
+        app_ids = {app_id for _, app_id, _ in hits.values() if app_id is not None}
+        app_titles: dict[UUID, str | None] = {}
+        if app_ids:
+            app_titles = {
+                app_id: title_of(data)
+                for app_id, data in (
+                    await self.session.execute(
+                        select(Application.id, Application.data).where(
+                            Application.id.in_(app_ids)
+                        )
+                    )
+                ).all()
+            }
+        out: dict[UUID, AgendaSummary] = {}
+        for meeting in meetings:
+            hit = hits.get(meeting.id)
+            item: CurrentAgendaItemOut | None = None
+            if hit is not None:
+                position, application_id, title = hit
+                if application_id is not None:
+                    title = app_titles.get(application_id)
+                item = CurrentAgendaItemOut(position=position, title=title)
+            out[meeting.id] = (counts.get(meeting.id, 0), item)
+        return out
 
     async def _principal_id(self, sub: str) -> UUID | None:
         """Return the `principal.id` for an OIDC `sub`, used for the protokollant check."""
@@ -86,16 +189,31 @@ class MeetingServiceBase:
         row = await session.get(PrincipalRow, principal_id)
         return (row.display_name or row.email) if row is not None else None
 
+    async def _gremium_quorum_set(self, gremium_id: UUID) -> bool:
+        """Tell if the gremium sets a default quorum (#17: then no public participation)."""
+        row = await self.session.get(Gremium, gremium_id)
+        return getattr(row, "quorum_percent", None) is not None
+
     async def _gremium_name_for(self, gremium_id: UUID | None) -> str | None:
         if gremium_id is None:
             return None
         row = await self.session.get(Gremium, gremium_id)
         return row.name if row is not None else None
 
-    async def _get(self, meeting_id: UUID) -> Meeting:
-        meeting = (
-            await self.session.execute(select(Meeting).where(Meeting.id == meeting_id))
-        ).scalar_one_or_none()
+    async def _get(self, meeting_id: UUID, *, for_update: bool = False) -> Meeting:
+        """Load a meeting by id.
+
+        ``for_update`` locks the meeting row until the commit and reads the current
+        values again. A status change, an agenda change and a vote open all take this
+        lock first, so they run one after the other (O12, O25).
+
+        Raises:
+            NotFoundError: No meeting has this id.
+        """
+        stmt = select(Meeting).where(Meeting.id == meeting_id)
+        if for_update:
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        meeting = (await self.session.execute(stmt)).scalar_one_or_none()
         if meeting is None:
             raise NotFoundError(f"meeting {meeting_id} not found")
         return meeting

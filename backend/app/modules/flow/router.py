@@ -2,6 +2,9 @@
 
 RBAC is fail-closed. A request without a session gets 401. A request without the
 permission gets 403. Every error is declared as `ProblemDetail` (problem+json contract).
+
+An unconfirmed guest application rests in the flow until the magic link confirms it.
+Every route here passes `allow_unconfirmed=False` and answers 404 for it.
 """
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ from app.modules.flow.schemas import (
     TransitionResult,
 )
 from app.modules.flow.service import FlowService
+from app.modules.livevote.publisher import MeetingPublisher, get_meeting_publisher
 from app.shared.errors import ProblemDetail
 
 router = APIRouter(tags=["flow"])
@@ -43,9 +47,11 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 
 def get_action_dispatcher() -> ActionDispatcher:
-    """Return the worker dispatcher.
+    """Return the flow action dispatcher.
 
-    The default dispatcher only logs. The concrete queue wiring lives elsewhere.
+    The default dispatcher only logs. `app.main` overrides this dependency with the
+    full chain (`build_worker_dispatcher`). The voting and live-vote routers use the
+    same dependency, so the override reaches every route that fires a transition.
     """
     return NullActionDispatcher()
 
@@ -53,8 +59,11 @@ def get_action_dispatcher() -> ActionDispatcher:
 def get_flow_service(
     session: DbSession,
     dispatcher: Annotated[ActionDispatcher, Depends(get_action_dispatcher)],
+    # A transition that leaves a vote state cancels its votes. The publisher sends
+    # `vote_cancelled` to the live clients of the meeting.
+    publisher: Annotated[MeetingPublisher, Depends(get_meeting_publisher)],
 ) -> FlowService:
-    return FlowService(session, dispatcher)
+    return FlowService(session, dispatcher, publisher)
 
 
 ServiceDep = Annotated[FlowService, Depends(get_flow_service)]
@@ -73,7 +82,9 @@ async def list_transitions(
     principal: PrincipalDep,
 ) -> list[TransitionOut]:
     """List the transitions whose guard the principal satisfies."""
-    return await service.available_transitions(application_id, principal)
+    return await service.available_transitions(
+        application_id, principal, allow_unconfirmed=False
+    )
 
 
 @router.post(
@@ -88,12 +99,21 @@ async def fire_transition(
     service: ServiceDep,
     principal: PrincipalDep,
 ) -> TransitionResult:
-    """Fire a transition: 200 with `{newStateId}`, or 409 on a guard or state conflict."""
+    """Fire a transition: 200 with `{newStateId}`, or 409 on a guard or state conflict.
+
+    With `meetingId` the application goes on the agenda of that meeting in the same
+    transaction. The call gives 422 when the transition has no `addToNextSession`
+    action, its target is not a vote state, or the meeting is not visible, not
+    `planned` or of another Gremium.
+    """
     return await service.fire(
         application_id,
         payload.transition_id,
         principal,
         note=payload.note,
+        meeting_id=payload.meeting_id,
+        non_public=payload.non_public,
+        allow_unconfirmed=False,
     )
 
 
@@ -108,7 +128,7 @@ async def list_flow_states(
     principal: ForcePrincipalDep,
 ) -> list[StateOut]:
     """List all states of the application flow. These are the force-status picker options."""
-    return await service.list_states(application_id)
+    return await service.list_states(application_id, allow_unconfirmed=False)
 
 
 @router.post(
@@ -134,6 +154,7 @@ async def force_status(
         payload.state_id,
         principal,
         note=payload.note,
+        allow_unconfirmed=False,
     )
 
 
@@ -148,7 +169,9 @@ async def list_applicant_transitions(
     access: Annotated[Access, Depends(require_app_read)],
 ) -> list[TransitionOut]:
     """List the transitions the applicant may fire. Only `actorIsApplicant` opens one."""
-    return await service.available_applicant_transitions(access.application_id)
+    return await service.available_applicant_transitions(
+        access.application_id, allow_unconfirmed=False
+    )
 
 
 @router.post(
@@ -168,5 +191,8 @@ async def fire_applicant_transition(
     A transition that `actorIsApplicant` does not open gives 403.
     """
     return await service.fire_as_applicant(
-        access.application_id, payload.transition_id, note=payload.note
+        access.application_id,
+        payload.transition_id,
+        note=payload.note,
+        allow_unconfirmed=False,
     )

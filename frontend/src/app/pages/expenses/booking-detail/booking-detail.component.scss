@@ -1,0 +1,19 @@
+@use '../../budget/finance-sheet';
+
+/* The order on a phone (board Fin-Tel-Buchung): Verknüpft, Unterbuchungen, Zahlung,
+   Details, Kostenstelle. Side by side the two columns keep the desktop order. */
+.bd__linked {
+  --fd-phone-order: 1;
+}
+.bd__subs {
+  --fd-phone-order: 2;
+}
+.bd__pay {
+  --fd-phone-order: 3;
+}
+.bd__details {
+  --fd-phone-order: 4;
+}
+.bd__cc {
+  --fd-phone-order: 5;
+}

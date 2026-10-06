@@ -1,39 +1,21 @@
-<section class="beamer">
-  <header class="beamer__head">
-    <h1 class="beamer__title">{{ 'voting.beamer.heading' | t }}</h1>
-    @if (result()) {
-      <span class="beamer__phase--done text-xl font-semibold">{{ 'voting.beamer.closed' | t }}</span>
-    }
-  </header>
+<!-- The route has no chrome, so this is the only way back without the browser (Escape
+     also leaves). It shows when the pointer moves or the keyboard reaches it, and hides
+     again when the pointer rests, so the projector shows no control. -->
+<a
+  class="beamer__exit"
+  [class.beamer__exit--shown]="controlsVisible()"
+  [routerLink]="backLink"
+  (click)="leaveFullscreen()"
+>
+  <app-icon name="x" [size]="18" />
+  {{ 'beamer.exit' | t }}
+</a>
 
-  @if (vote(); as v) {
-    @if (tally(); as t) {
-      <app-vote-bars
-        variant="beamer"
-        [options]="v.options"
-        [counts]="t.counts"
-        [eligible]="t.eligible"
-        [leading]="t.leading"
-      />
-
-      <footer class="flex items-baseline gap-6 flex-wrap text-2xl font-semibold">
-        <p class="beamer__count">{{ 'voting.beamer.votesOf' | t: { cast: castCount(), eligible: t.eligible } }}</p>
-        <p
-          class="m-0"
-          [class.beamer__quorum--met]="t.quorumMet"
-          [class.beamer__quorum--missed]="!t.quorumMet"
-        >
-          {{ 'vote.tally.quorum' | t }}:
-          {{ (t.quorumMet ? 'vote.tally.quorumMet' : 'vote.tally.quorumMissed') | t }}
-        </p>
-        @if (result(); as res) {
-          <p class="ml-auto text-3xl font-bold text-danger" [class.beamer__result--passed]="res.result === 'passed'">
-            {{ resultKey() | t }}
-          </p>
-        }
-      </footer>
-    }
-  } @else {
-    <p class="m-0 py-12 px-4 text-center text-2xl text-muted" role="status">{{ 'voting.beamer.waiting' | t }}</p>
-  }
-</section>
+<app-meeting-beamer
+  [meetingTitle]="meeting()?.title ?? null"
+  [topLine]="topLine()"
+  [vote]="vote()"
+  [logoSrc]="logoSrc()"
+  [join]="join()"
+  [presence]="presence()"
+/>

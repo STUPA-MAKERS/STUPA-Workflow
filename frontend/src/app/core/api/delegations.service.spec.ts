@@ -138,6 +138,21 @@ describe('DelegationsApiService', () => {
     req.flush(recipients);
   });
 
+  it('lists the pool substitutes of a member for the lead entry', (done) => {
+    const pool: DelegationRecipient[] = [
+      { principalId: 'p-9', displayName: 'Sven', viaPool: true, isMember: false },
+    ];
+    svc.poolSubstitutes('m-1', 'pr-4').subscribe((r) => {
+      expect(r).toEqual(pool);
+      done();
+    });
+    const req = http.expectOne((r) => r.url === '/api/delegations/meetings/m-1/recipients');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('delegatorId')).toBe('pr-4');
+    expect(req.request.params.has('q')).toBe(false);
+    req.flush(pool);
+  });
+
   it('fetches the vote delegation status', (done) => {
     const status: VoteDelegationStatus = {
       blocked: true,

@@ -1,0 +1,129 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.km__cap {
+  margin: 0;
+  padding: var(--space-1) var(--space-4) var(--space-2);
+}
+.km__sec {
+  display: flex;
+  flex-direction: column;
+}
+.km__plan {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-3) var(--space-2) var(--space-4);
+}
+.km__rule {
+  margin: 2px 0 var(--space-2);
+  border: 0;
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.km__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 40px;
+  margin: 0 var(--space-3) 6px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-4);
+  color: var(--color-text-muted);
+  cursor: text;
+}
+.km__search:focus-within {
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+}
+.km__search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-body);
+  outline: none;
+}
+
+.km__people {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.km__person {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 52px;
+  padding: var(--space-1) var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.km__person:hover {
+  background: var(--color-surface-4);
+}
+
+/* A bottom sheet sits on surface 2: the field and the hover take surface 3. The sheet
+   pads its body, so the rows drop their own inset. */
+:host(.km--sheet) .km__search,
+:host(.km--sheet) .km__person:hover {
+  background: var(--color-surface-3);
+}
+:host(.km--sheet) .km__search {
+  margin-inline: 0;
+}
+:host(.km--sheet) .km__cap,
+:host(.km--sheet) .km__plan,
+:host(.km--sheet) .km__person,
+:host(.km--sheet) .km__hint {
+  padding-inline: var(--space-1);
+}
+:host(.km--sheet) .km__person {
+  border-radius: var(--radius-lg);
+}
+.km__person:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.km__names {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.km__name {
+  font-size: var(--fs-body);
+}
+.km__sub {
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.km__check {
+  flex: none;
+  color: var(--color-accent-text);
+}
+.km__empty {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--fs-body);
+  color: var(--color-text-muted);
+}
+.km__hint {
+  margin: 0;
+  padding: var(--space-2) var(--space-4) var(--space-1);
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}

@@ -72,6 +72,8 @@ async def test_publisher_vote_opened_for_meeting_bound_vote() -> None:
     assert channel == f"meeting:{mid}"
     assert msg["type"] == "vote_opened"
     assert msg["options"] == ["yes", "no"]
+    # A broadcast is a vote that opens now, not the replay of a connect.
+    assert msg["replay"] is False
 
 
 @pytest.mark.asyncio
@@ -172,6 +174,26 @@ async def test_publisher_meeting_state() -> None:
 
 
 # MeetingService against a fake session
+@pytest.fixture(autouse=True)
+def _no_audit_chain(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep the audit chain off the fake session, and find no open vote.
+
+    `_FakeSession.execute` answers every query with the same row. The audit chain
+    would read that row as the previous hash, and the open-vote check of the close
+    would read it as an open vote.
+    """
+    import app.modules.livevote.service.lifecycle as lifecycle_mod
+
+    async def _record(_session, **_kw):  # noqa: ANN001, ANN202
+        return None
+
+    async def _no_open_vote(_self, _meeting_id):  # noqa: ANN001, ANN202
+        return None
+
+    monkeypatch.setattr(lifecycle_mod, "audit_record", _record)
+    monkeypatch.setattr(MeetingService, "open_vote", _no_open_vote)
+
+
 class _Scalars:
     def __init__(self, rows: list) -> None:
         self._rows = rows
@@ -202,7 +224,10 @@ class _FakeSession:
         self.commits = 0
         self.added: list[object] = []
 
-    async def execute(self, _stmt: object) -> _Result:
+    async def execute(self, stmt: object) -> _Result:
+        # The meeting has no keeper period (Z3) in these tests.
+        if "protocol_keeper_period" in str(stmt):
+            return _Result(None)
         return _Result(self.existing)
 
     async def get(self, _model: object, _pk: object) -> object | None:
@@ -303,7 +328,7 @@ async def test_service_patch_to_live_without_protokollant_conflicts() -> None:
 async def test_service_patch_without_publisher_is_silent() -> None:
     meeting = Meeting(gremium_id=uuid4(), title="GV")
     meeting.id = uuid4()
-    meeting.status = "planned"
+    meeting.status = "live"
     meeting.date = None
     meeting.active_application_id = None
     meeting.created_at = datetime(2026, 6, 8, tzinfo=UTC)
@@ -332,7 +357,10 @@ async def test_service_patch_closed_session_cannot_reopen() -> None:
 async def test_service_open_vote_returns_row() -> None:
     vote = Vote(application_id=uuid4(), eligible_group="stupa", config={})
     svc = MeetingService(_FakeSession(existing=vote))  # type: ignore[arg-type]
-    assert await svc.open_vote(uuid4()) is vote
+    # The autouse fixture stubs `open_vote` on the facade. Call the real one.
+    from app.modules.livevote.service.votes import VoteReadOps
+
+    assert await VoteReadOps.open_vote(svc, uuid4()) is vote
 
 
 # The list endpoint finds meetings again.
@@ -345,6 +373,9 @@ class _ListResult:
 
     def all(self) -> list:
         return self._rows
+
+    def scalar_one_or_none(self) -> object:
+        return self._rows[0] if self._rows else None
 
 
 class _ListSession:
@@ -394,8 +425,9 @@ async def test_service_list_empty_returns_empty() -> None:
 def _principal():  # noqa: ANN202
     from app.modules.auth.principal import Principal
 
-    # For an admin, can_control short-circuits without a query against the fake session.
-    return Principal(sub="mgr", permissions={"meeting.manage"}, roles=["admin"])
+    # For an admin, the permission flags short-circuit without a gremium query
+    # against the fake session.
+    return Principal(sub="mgr", roles=["admin"])
 
 
 def test_meeting_patch_requires_at_least_one_field() -> None:
@@ -420,7 +452,7 @@ def _meeting(status: str = "planned") -> Meeting:
 @pytest.mark.asyncio
 async def test_service_patch_close_sets_closed_at() -> None:
     """#14: a change to closed stamps `closed_at` once, for the end of the protocol."""
-    meeting = _meeting()
+    meeting = _meeting(status="live")
     svc = MeetingService(_FakeSession(existing=meeting))  # type: ignore[arg-type]
     out = await svc.patch(meeting.id, MeetingPatch(status="closed"), _principal())
     assert out.status == "closed"
@@ -491,17 +523,20 @@ async def test_service_delete_finalized_requires_special_permission(
     session = _DeletableSession(existing=meeting)
     svc = MeetingService(session)  # type: ignore[arg-type]
 
-    manager = Principal(sub="mgr", permissions={"meeting.manage"}, roles=["manager"])
+    # The manager holds `session.manage` through a gremium role of the meeting.
+    from app.modules.admin import gremium_roles as gremium_roles_mod
+
+    async def _manages(_s, _sub, perm, _now=None):  # noqa: ANN001, ANN202
+        return {meeting.gremium_id} if perm == "session.manage" else set()
+
+    monkeypatch.setattr(gremium_roles_mod, "gremium_ids_with_permission", _manages)
+    manager = Principal(sub="mgr")
     with pytest.raises(ForbiddenError):
         await svc.delete(meeting.id, manager)
     assert session.deleted == []
     assert calls == []
 
-    privileged = Principal(
-        sub="archiv",
-        permissions={"meeting.manage", "meeting.delete_finalized"},
-        roles=["manager"],
-    )
+    privileged = Principal(sub="archiv", permissions={"meeting.delete_finalized"})
     await svc.delete(meeting.id, privileged)
     assert session.deleted == [meeting]
     assert calls[0]["action"].value == "meeting_delete"
@@ -635,8 +670,8 @@ async def test_assert_can_read_allows_member(monkeypatch: pytest.MonkeyPatch) ->
 async def test_view_all_sees_every_committee() -> None:
     """#meeting-view-all: the global read holder sees every Gremium.
 
-    `_visible_gremium_ids` returns `None`, which means no Gremium filter. The
-    `meeting.manage` permission and the admin role behave the same way.
+    `_visible_gremium_ids` returns `None`, which means no Gremium filter. The admin
+    role behaves the same way.
     """
     from app.modules.auth.principal import Principal
     from tests._support.auth_fakes import fake_session

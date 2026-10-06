@@ -47,7 +47,12 @@ function node(
 const FY = 'fy-1';
 
 async function setup(
-  inputs: Partial<{ root: BudgetTreeNode | null; fyId: string; metric: string }> = {},
+  inputs: Partial<{
+    root: BudgetTreeNode | null;
+    fyId: string;
+    metric: string;
+    colors: ReadonlyMap<string, string> | null;
+  }> = {},
 ) {
   const view = await render(BudgetSunburstComponent, {
     inputs: { root: null, fyId: FY, metric: 'allocated', ...inputs },
@@ -58,11 +63,22 @@ async function setup(
 describe('BudgetSunburstComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('total() is 0 with no root and shows the empty paragraph', async () => {
+  it('total() is 0 with no root and shows one neutral ring, never a "no data" text', async () => {
     const view = await setup({ root: null });
     expect((view.fixture.componentInstance as unknown as SunInternals).total()).toBe(0);
-    expect(view.container.querySelector('p.sb__empty')).toBeTruthy();
-    expect(view.container.querySelector('svg.sb__svg')).toBeNull();
+    const svg = view.container.querySelector('svg.sb__svg--empty');
+    expect(svg?.querySelectorAll('circle.sb__ring')).toHaveLength(1);
+    expect(svg?.querySelectorAll('path.sb__seg')).toHaveLength(0);
+    expect(svg?.querySelector('.sb__center-val')?.textContent).toMatch(/^0\s€$/);
+    expect(view.container.textContent).not.toContain('Keine Daten');
+  });
+
+  it('names the root and says that there is no amount when the root total is 0', async () => {
+    const root = node('root', { fiscalYearId: FY, allocated: '0' });
+    const view = await setup({ root });
+    const svg = view.container.querySelector('svg.sb__svg--empty');
+    expect(svg?.getAttribute('aria-label')).toMatch(/: kein Betrag vorhanden$/);
+    expect(svg?.querySelector('.sb__center-name')?.textContent).toBe(root.name);
   });
 
   it('segments() is empty when the root total is 0 (no metric data)', async () => {
@@ -131,6 +147,13 @@ describe('BudgetSunburstComponent', () => {
     const root = node('root', { fiscalYearId: FY, allocated: '50' }, [colored]);
     const { c } = await setup({ root });
     expect(c.segments()[0].color).toBe('#abcdef');
+  });
+
+  it('takes the colours of the page when it gets them', async () => {
+    const child = node('a', { fiscalYearId: FY, allocated: '50' });
+    const root = node('root', { fiscalYearId: FY, allocated: '50' }, [child]);
+    const { c } = await setup({ root, colors: new Map([['a', '#123456']]) });
+    expect(c.segments()[0].color).toBe('#123456');
   });
 
   it('emits the root id from the centre click and the segment id from a segment click', async () => {
@@ -207,6 +230,6 @@ describe('BudgetSunburstComponent', () => {
     });
     expect(view.container.querySelector('svg.sb__svg')).toBeTruthy();
     expect(view.container.querySelector('text.sb__center-name')?.textContent).toContain('Node root');
-    expect(view.container.querySelector('p.sb__empty')).toBeNull();
+    expect(view.container.querySelector('svg.sb__svg--empty')).toBeNull();
   });
 });

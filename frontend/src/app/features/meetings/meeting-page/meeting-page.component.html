@@ -1,0 +1,223 @@
+@let m = meeting();
+@let proto = protocol();
+
+<header class="mp__head" role="toolbar" [attr.aria-label]="'meetings.control.title' | t">
+  <app-button class="mp__back" variant="text" [iconOnly]="true" [ariaLabel]="'meetings.page.back' | t" (click)="back.emit()">
+    <app-icon name="back" />
+  </app-button>
+  <div class="mp__titles">
+    <div class="mp__titleLine">
+      <h1 class="mp__title" [title]="m.title">{{ m.title }}</h1>
+      <app-status-text class="mp__status" [kind]="status().kind">{{ status().key | t }}</app-status-text>
+    </div>
+    @if (subLine()) {
+      <span class="mp__sub">{{ subLine() }}</span>
+    }
+  </div>
+
+  @if (showPresence()) {
+    <div class="mp__presence">
+      <button
+        type="button"
+        class="mp__chip"
+        [attr.aria-expanded]="presenceOpen()"
+        [title]="presenceTitle()"
+        (click)="presenceOpen.set(!presenceOpen())"
+        (blur)="presenceOpen.set(false)"
+      >
+        <app-icon name="eye" [size]="18" />
+        {{ 'meetings.dock.live' | t: { n: viewers().length } }}
+      </button>
+      @if (presenceOpen()) {
+        <ul class="mp__viewers" [attr.aria-label]="'meetings.viewers.title' | t">
+          @for (name of viewers(); track name) {
+            <li>{{ name }}</li>
+          } @empty {
+            <li class="mp__muted">{{ 'meetings.viewers.empty' | t }}</li>
+          }
+        </ul>
+      }
+    </div>
+  }
+
+  <!-- #17: the QR code of a public meeting (lead only); a phone opens it from the menu. -->
+  <app-join-qr [meeting]="m" [button]="!phone()" [(open)]="qrOpen" (beamer)="toggleBeamer.emit()" />
+
+  <!-- The beamer route and its stream need session.manage in the gremium (canManage). -->
+  @if (wide() && m.status !== 'closed' && m.canManage) {
+    <app-button class="mp__beamer" variant="outlined" (click)="toggleBeamer.emit()">
+      <app-icon name="monitor" [size]="18" />
+      {{ 'meetings.beamer.enter' | t }}
+    </app-button>
+  }
+
+  <app-row-menu [sections]="menu()" [label]="'meetings.page.menu' | t" (selected)="onMenu($event)" />
+
+  <!-- One main action. Only a live meeting closes, and "closed" is terminal: a planned
+       meeting that does not take place is deleted (O13). The finalize is a step of its
+       own after the close, in the protocol bar of the sheet. A phone keeps the title
+       alone: the opening is on the preparation page, the close is in the menu. -->
+  @if (!phone()) {
+    @switch (mainAction()) {
+      @case ('open') {
+        <app-button variant="fill" [disabled]="!m.protokollantId" [title]="(m.protokollantId ? 'meetings.control.open' : 'meetings.control.needProtokollant') | t" (click)="startSession.emit()">
+          <app-icon name="play" [size]="16" />
+          {{ 'meetings.control.open' | t }}
+        </app-button>
+      }
+      @case ('close') {
+        <!-- Visible, not only a tooltip: a disabled button takes no focus and no touch. -->
+        @if (anyOpenVote()) {
+          <span class="mp__blocked">{{ 'meetings.page.closeBlocked' | t }}</span>
+        }
+        <app-button variant="danger" [loading]="finalizing()" [disabled]="anyOpenVote()" [title]="(anyOpenVote() ? 'meetings.page.closeBlocked' : 'meetings.control.closeSession') | t" (click)="closeSession.emit()">
+          {{ 'meetings.control.closeSession' | t }}
+        </app-button>
+      }
+    }
+  }
+</header>
+
+<div class="mp__body" appScrollFade="y" [class.mp__body--wide]="wide()" [class.mp__body--votes]="showVotes()">
+  @if (wide()) {
+    <section class="mp__agenda" appScrollFade="y" [attr.aria-label]="'meetings.agenda.title' | t">
+      <ng-container [ngTemplateOutlet]="agendaTpl" />
+    </section>
+  } @else {
+    <app-button class="mp__agendaBtn" variant="tonal" size="sm" [title]="'meetings.dock.agenda' | t" (click)="agendaOpen.set(true)">
+      <app-icon name="list" [size]="18" />
+      {{ 'meetings.agenda.title' | t }}
+      <span class="mp__muted">· {{ agenda().length }}</span>
+    </app-button>
+    <!-- A phone opens the agenda as a bottom sheet, a narrow screen from the start edge. -->
+    <app-side-sheet [side]="phone() ? 'bottom' : 'start'" [heading]="'meetings.agenda.title' | t" [(open)]="agendaOpen">
+      @if (canAddTop()) {
+        <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'meetings.agenda.dialogTitle' | t" (click)="addTop.emit()">
+          <app-icon name="plus" [size]="20" />
+        </app-button>
+      }
+      @if (agendaOpen()) {
+        <ng-container [ngTemplateOutlet]="agendaTpl" [ngTemplateOutletContext]="{ inSheet: true }" />
+      }
+    </app-side-sheet>
+  }
+
+  @if (showVotes()) {
+    <aside class="mp__votes" appScrollFade="y" [attr.aria-label]="'meetings.vote.count' | t">
+      @for (vote of votes(); track vote.id) {
+        <app-vote-card
+          [vote]="vote"
+          [meetingStatus]="m.status"
+          [canManage]="m.canManageVotes"
+          [canVote]="m.canVote"
+          [myChoice]="myChoice(vote.id)"
+          [casting]="casting()"
+          [deleting]="deletingVote()"
+          [locked]="locked()"
+          [canInsert]="pendingResult()?.id === vote.id && editable()"
+          [inProtocol]="inText(vote)"
+          [otherOpen]="anyOpenVote()"
+          (close)="voteClose.emit($event)"
+          (cancel)="voteCancel.emit($event)"
+          (open)="voteOpen.emit($event)"
+          (remove)="voteDelete.emit($event)"
+          (cast)="castVote.emit($event)"
+          (insertResult)="insertResult($event)"
+        />
+      }
+      @if (canAddVote() && top(); as t) {
+        <app-button class="mp__addVote" variant="tonal" [block]="true" (click)="voteDialog.emit(t)">
+          <app-icon name="plus" [size]="18" />
+          {{ (t.applicationId ? 'meetings.vote.openFor' : 'meetings.vote.addQuestion') | t }}
+        </app-button>
+      }
+    </aside>
+  }
+
+  <div class="mp__main">
+    @if (preparing()) {
+      <div class="mp__prep" appScrollFade="y">
+        <app-prep-checklist
+          [meeting]="m"
+          [agenda]="agenda()"
+          [attendance]="attendance()"
+          (editAgenda)="editAgenda()"
+          (assignKeeper)="panel.set('protokollant')"
+          (recordAttendance)="panel.set('attendance')"
+          (start)="startSession.emit()"
+        />
+      </div>
+    } @else {
+      <app-top-sheet
+        class="mp__sheet"
+        [meeting]="m"
+        [protocol]="proto"
+        [top]="top()"
+        [topIndex]="topIndex()"
+        [editable]="editable()"
+        [canEdit]="canEdit()"
+        [saveState]="saveState()"
+        [revision]="revision()"
+        [finalizing]="finalizing()"
+        (bodyChange)="bodyChange.emit($event)"
+        (finalize)="finalize.emit()"
+      />
+    }
+  </div>
+</div>
+
+<app-session-dock
+  class="mp__dock"
+  [meeting]="m"
+  [agenda]="agenda()"
+  [topIndex]="topIndex()"
+  [attendance]="attendance()"
+  [wordCount]="wordCount()"
+  [myVote]="myVote()"
+  [(panel)]="panel"
+  (step)="step($event)"
+  (jumpNow)="jump($event)"
+  (setProtokollant)="setProtokollant.emit($event)"
+  (pickHandover)="pickHandover.emit($event)"
+  (cancelHandover)="cancelHandover.emit()"
+/>
+
+<!-- The attendance: a side sheet from the end, a bottom sheet on a phone. -->
+<app-attendance-sheet
+  [open]="panel() === 'attendance'"
+  (openChange)="$event || panel.set('none')"
+  [meeting]="m"
+  [attendance]="attendance()"
+  [saving]="savingAttendance()"
+  [viewers]="viewers()"
+  [conflictId]="attendanceConflict()"
+  (statusChange)="attendanceChange.emit($event)"
+  (statusReset)="attendanceReset.emit($event)"
+  (conflictResolved)="attendanceConflictResolved.emit($event)"
+  (showQr)="showQr()"
+/>
+
+
+<ng-template #agendaTpl let-inSheet="inSheet">
+  <app-agenda-pane
+    [inSheet]="inSheet === true"
+    [meeting]="m"
+    [agenda]="agenda()"
+    [selectedId]="preparing() ? null : (top()?.id ?? null)"
+    [locked]="locked()"
+    [savingAgenda]="savingAgenda()"
+    [renamingTopId]="renamingTopId()"
+    [(renameDraft)]="renameDraft"
+    (pick)="jump($event)"
+    (add)="addTop.emit()"
+    (startRename)="startRename.emit($event)"
+    (cancelRename)="cancelRename.emit()"
+    (renameTop)="renameTop.emit($event)"
+    (setNonPublic)="setNonPublic.emit($event)"
+    (move)="moveTop.emit($event)"
+    (remove)="removeFromAgenda.emit($event)"
+    (dragStart)="dragStart.emit($event)"
+    (dragOver)="dragOver.emit($event)"
+    (dropAt)="dropAt.emit($event)"
+  />
+</ng-template>

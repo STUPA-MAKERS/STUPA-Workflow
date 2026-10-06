@@ -9,14 +9,15 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.deps import Principal, get_current_principal, get_session
+from app.deps import Principal, get_current_applicant, get_current_principal, get_session
 from app.main import create_app
+from app.modules.auth.principal import Applicant
 from app.modules.files.models import Attachment
-from app.modules.files.router import get_files_service
+from app.modules.files.router import PREVIEW_CSP, get_files_service
 from app.modules.files.schemas import AttachmentOut, SignedUrlOut
 from app.modules.files.service import FilesService
 from app.settings import load_settings
-from app.shared.errors import NotFoundError
+from app.shared.errors import ConflictError, NotFoundError
 
 APP_ID = uuid4()
 ATT_ID = uuid4()
@@ -24,9 +25,13 @@ ATT_ID = uuid4()
 
 class _FakeService:
     max_bytes = 10 * 1024 * 1024
+    # The sniffed type that `download_stream` reports for the stored file.
+    mime = "application/pdf"
 
     def __init__(self) -> None:
         self.uploaded: list[tuple[UUID, str | None, int]] = []
+        self.locked = False
+        self.lock_checked: list[UUID] = []
 
     async def upload(
         self,
@@ -78,13 +83,22 @@ class _FakeService:
             yield b"PDF-"
             yield b"BYTES"
 
-        return _iter(), "doc.pdf", "application/pdf", len(b"PDF-BYTES")
+        return _iter(), "doc.pdf", self.mime, len(b"PDF-BYTES")
+
+    async def assert_editable(self, application_id: UUID) -> None:
+        self.lock_checked.append(application_id)
+        if self.locked:
+            raise ConflictError("Application is locked for editing in its current state.")
 
     async def delete(self, attachment_id: UUID, *, actor: str) -> None:
         self.deleted = attachment_id
 
     async def list_for_application(
-        self, application_id: UUID, *, allow_unconfirmed: bool = True
+        self,
+        application_id: UUID,
+        *,
+        allow_unconfirmed: bool = True,
+        hidden: object = None,
     ) -> list[AttachmentOut]:
         self.listed = application_id
         return [
@@ -194,6 +208,20 @@ def test_upload_missing_file_422(app: FastAPI, client: TestClient) -> None:
     assert r.status_code == 422
 
 
+def test_upload_long_field_key_422(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """A field key longer than 256 characters gives 422 before the service."""
+    _as(app, "application.manage")
+    r = client.post(
+        f"/api/applications/{APP_ID}/attachments",
+        files={"file": ("doc.pdf", b"%PDF-data", "application/pdf")},
+        data={"field_key": "k" * 257},
+    )
+    assert r.status_code == 422
+    assert fake_service.uploaded == []
+
+
 def test_upload_too_large_413(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
@@ -254,6 +282,57 @@ def test_download_inline_renders_in_browser(app: FastAPI, client: TestClient) ->
     assert r.status_code == 200
     assert 'inline; filename="doc.pdf"' in r.headers["content-disposition"]
     assert r.headers["x-content-type-options"] == "nosniff"
+
+
+@pytest.mark.parametrize(
+    "mime", ["application/pdf", "image/png", "image/jpeg", "image/gif", "image/webp"]
+)
+def test_download_inline_preview_may_be_framed_by_same_origin(
+    app: FastAPI, client: TestClient, fake_service: _FakeService, mime: str
+) -> None:
+    # The preview dialog frames the file. Only 'self' may frame it, in a sandbox.
+    fake_service.mime = mime
+    _as(app, "application.read")
+    r = client.get(f"/api/attachments/{ATT_ID}/download?inline=1")
+    assert r.status_code == 200
+    assert r.headers["content-type"] == mime
+    assert r.headers["content-disposition"].startswith("inline;")
+    assert r.headers.get_list("x-frame-options") == ["SAMEORIGIN"]
+    assert r.headers.get_list("content-security-policy") == [PREVIEW_CSP]
+    assert r.headers["x-content-type-options"] == "nosniff"
+
+
+def test_download_without_inline_keeps_frame_deny(app: FastAPI, client: TestClient) -> None:
+    _as(app, "application.read")
+    r = client.get(f"/api/attachments/{ATT_ID}/download")
+    assert r.headers.get_list("x-frame-options") == ["DENY"]
+    assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
+
+
+@pytest.mark.parametrize(
+    "mime",
+    [
+        "text/html",
+        "image/svg+xml",
+        "application/xml",
+        "text/xml",
+        "application/zip",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ],
+)
+def test_download_inline_refused_for_unsafe_types(
+    app: FastAPI, client: TestClient, fake_service: _FakeService, mime: str
+) -> None:
+    # Anything outside the PDF and raster-image allowlist stays a forced download that
+    # no page may frame, even with ?inline=1.
+    fake_service.mime = mime
+    _as(app, "application.read")
+    r = client.get(f"/api/attachments/{ATT_ID}/download?inline=1")
+    assert r.status_code == 200
+    assert r.headers["content-disposition"].startswith("attachment;")
+    assert r.headers.get_list("x-frame-options") == ["DENY"]
+    assert "frame-ancestors 'none'" in r.headers["content-security-policy"]
+    assert "sandbox" not in r.headers["content-security-policy"]
 
 
 def test_download_cross_tenant_is_404(app: FastAPI, client: TestClient) -> None:
@@ -327,6 +406,52 @@ def test_delete_ok_with_edit_any(
     assert fake_service.deleted == ATT_ID
 
 
+def _as_applicant(app: FastAPI) -> None:
+    app.dependency_overrides[get_current_principal] = lambda: None
+    app.dependency_overrides[get_current_applicant] = lambda: Applicant(
+        application_id=str(APP_ID), scope="edit"
+    )
+
+
+def test_delete_applicant_open_state_ok(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _as_applicant(app)
+    r = client.delete(f"/api/attachments/{ATT_ID}")
+    assert r.status_code == 204
+    assert fake_service.lock_checked == [APP_ID]
+    assert fake_service.deleted == ATT_ID
+
+
+def test_delete_applicant_locked_state_409(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    # A delete is a data change. In a locked state the applicant can upload, but not
+    # delete (Z1, O4).
+    fake_service.locked = True
+    _as_applicant(app)
+    r = client.delete(f"/api/attachments/{ATT_ID}")
+    assert r.status_code == 409
+    assert not hasattr(fake_service, "deleted")
+
+
+def test_delete_manage_bypasses_lock(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    fake_service.locked = True
+    _as(app, "application.manage")
+    r = client.delete(f"/api/attachments/{ATT_ID}")
+    assert r.status_code == 204
+    assert fake_service.lock_checked == []
+
+
+def test_delete_declares_409(app: FastAPI) -> None:
+    responses = app.openapi()["paths"]["/api/attachments/{attachment_id}"]["delete"][
+        "responses"
+    ]
+    assert list(responses["409"]["content"]) == ["application/problem+json"]
+
+
 # Attachment read covers the same paths as require_app_read, not only the global
 # application.read: read_all, the creator and Gremium read.
 def test_get_url_read_all_ok(app: FastAPI, client: TestClient) -> None:
@@ -356,12 +481,13 @@ def _patch_creator(monkeypatch: pytest.MonkeyPatch, *, is_creator: bool) -> None
 
 
 def _patch_committee(monkeypatch: pytest.MonkeyPatch, *, can_read: bool) -> None:
-    import app.modules.files.router as router_mod
+    # The files router resolves read access through `access.resolve_app_read`.
+    import app.modules.applications.access as access_mod
 
     async def _fake_committee(*_a: object, **_k: object) -> bool:
         return can_read
 
-    monkeypatch.setattr(router_mod, "_committee_can_read", _fake_committee)
+    monkeypatch.setattr(access_mod, "_committee_can_read", _fake_committee)
 
 
 def test_get_url_creator_fallback_ok(

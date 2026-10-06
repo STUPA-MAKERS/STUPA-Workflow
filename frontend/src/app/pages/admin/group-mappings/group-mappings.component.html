@@ -1,91 +1,71 @@
-<app-page-header [title]="'admin.groupMappings.title' | t" [subtitle]="'admin.groupMappings.subtitle' | t" />
+<section class="gm">
+  <app-page-header
+    [flush]="true"
+    [title]="'admin.groupMappings.title' | t"
+    [subtitle]="'admin.groupMappings.subtitle' | t"
+  />
 
-<!-- Three separate mappings. They do not depend on each other. -->
+  <!-- Three separate mappings. They do not depend on each other. -->
+  @for (sec of sections(); track sec.kind) {
+    <section class="gm__section" [attr.aria-labelledby]="'gm-' + sec.kind + '-title'">
+      <header class="gm__head">
+        <h2 class="sec" [id]="'gm-' + sec.kind + '-title'">{{ key(sec.kind, 'title') | t }}</h2>
+        <app-button size="sm" variant="tonal" (click)="openAdd(sec.kind)">
+          <app-icon name="plus" [size]="16" /> {{ key(sec.kind, 'add') | t }}
+        </app-button>
+      </header>
+      <p class="gm__hint">{{ key(sec.kind, 'hint') | t }}</p>
+      @if (sec.kind === 'role') {
+        <p class="gm__hint">{{ 'admin.groupMappings.role.ruleHint' | t }}</p>
+      }
 
-<!-- 1. OIDC group → global role. -->
-<section class="gm__section" aria-labelledby="gm-global-title">
-  <header class="gm__head">
-    <div>
-      <h2 id="gm-global-title" class="gm__title">{{ 'admin.groupMappings.global.title' | t }}</h2>
-      <p class="gm__hint">{{ 'admin.groupMappings.global.hint' | t }}</p>
-    </div>
-    <app-button size="sm" (click)="openAdd('global')">{{ 'admin.groupMappings.global.add' | t }}</app-button>
-  </header>
-  <app-data-table
-    [loading]="loading().global"
-    [loadingText]="'common.loading' | t"
-    [columns]="globalColumns()"
-    [rows]="globalRows()"
-    [rowKey]="rowId"
-    [emptyText]="'admin.groupMappings.global.empty' | t"
-  >
-    <ng-template appCell="oidcGroup" let-r><code>{{ $any(r).oidcGroup }}</code></ng-template>
-    <ng-template appCell="roleLabel" let-r><app-badge variant="primary">{{ $any(r).roleLabel }}</app-badge></ng-template>
-    <ng-template appCell="actions" let-r>
-      <ng-container *ngTemplateOutlet="rowActions; context: { kind: 'global', row: r }" />
-    </ng-template>
-  </app-data-table>
+      @if (sec.loading) {
+        <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
+      } @else {
+        <ul class="rowgroup gm__list">
+          @for (r of sec.rows; track r.id) {
+            <li class="gm__row">
+              <code class="gm__group mono">{{ r.oidcGroup }}</code>
+              <app-icon class="gm__arrow" name="arrow" [size]="16" />
+              <span class="gm__target ell" [title]="r.role ? r.target + ' · ' + r.role : r.target">
+                {{ r.target }}
+                @if (r.role) {
+                  · <strong class="gm__role">{{ r.role }}</strong>
+                }
+              </span>
+              <span class="gm__actions">
+                <app-button
+                  variant="text"
+                  size="sm"
+                  [iconOnly]="true"
+                  [ariaLabel]="('action.edit' | t) + ': ' + r.oidcGroup"
+                  [title]="'action.edit' | t"
+                  (click)="openEdit(sec.kind, r.id)"
+                >
+                  <app-icon name="edit" />
+                </app-button>
+                <app-button
+                  variant="text"
+                  size="sm"
+                  [iconOnly]="true"
+                  [ariaLabel]="('action.delete' | t) + ': ' + r.oidcGroup"
+                  [title]="'action.delete' | t"
+                  (click)="askDelete(sec.kind, r.id)"
+                >
+                  <app-icon name="trash" />
+                </app-button>
+              </span>
+            </li>
+          } @empty {
+            <li class="gm__empty">{{ key(sec.kind, 'empty') | t }}</li>
+          }
+        </ul>
+      }
+    </section>
+  }
+
+  <p class="gm__foot">{{ 'admin.groupMappings.reserved' | t }}</p>
 </section>
-
-<!-- 2. OIDC group → gremium membership. -->
-<section class="gm__section" aria-labelledby="gm-membership-title">
-  <header class="gm__head">
-    <div>
-      <h2 id="gm-membership-title" class="gm__title">{{ 'admin.groupMappings.membership.title' | t }}</h2>
-      <p class="gm__hint">{{ 'admin.groupMappings.membership.hint' | t }}</p>
-    </div>
-    <app-button size="sm" (click)="openAdd('membership')">{{ 'admin.groupMappings.membership.add' | t }}</app-button>
-  </header>
-  <app-data-table
-    [loading]="loading().membership"
-    [loadingText]="'common.loading' | t"
-    [columns]="membershipColumns()"
-    [rows]="membershipRows()"
-    [rowKey]="rowId"
-    [emptyText]="'admin.groupMappings.membership.empty' | t"
-  >
-    <ng-template appCell="oidcGroup" let-r><code>{{ $any(r).oidcGroup }}</code></ng-template>
-    <ng-template appCell="actions" let-r>
-      <ng-container *ngTemplateOutlet="rowActions; context: { kind: 'membership', row: r }" />
-    </ng-template>
-  </app-data-table>
-</section>
-
-<!-- 3. OIDC group → gremium role. Only for members of that gremium. -->
-<section class="gm__section" aria-labelledby="gm-role-title">
-  <header class="gm__head">
-    <div>
-      <h2 id="gm-role-title" class="gm__title">{{ 'admin.groupMappings.role.title' | t }}</h2>
-      <p class="gm__hint">{{ 'admin.groupMappings.role.hint' | t }}</p>
-    </div>
-    <app-button size="sm" (click)="openAdd('role')">{{ 'admin.groupMappings.role.add' | t }}</app-button>
-  </header>
-  <app-data-table
-    [loading]="loading().role"
-    [loadingText]="'common.loading' | t"
-    [columns]="roleColumns()"
-    [rows]="roleRows()"
-    [rowKey]="rowId"
-    [emptyText]="'admin.groupMappings.role.empty' | t"
-  >
-    <ng-template appCell="oidcGroup" let-r><code>{{ $any(r).oidcGroup }}</code></ng-template>
-    <ng-template appCell="roleLabel" let-r><app-badge variant="primary">{{ $any(r).roleLabel }}</app-badge></ng-template>
-    <ng-template appCell="actions" let-r>
-      <ng-container *ngTemplateOutlet="rowActions; context: { kind: 'role', row: r }" />
-    </ng-template>
-  </app-data-table>
-</section>
-
-<ng-template #rowActions let-kind="kind" let-row="row">
-  <span class="inline-flex items-center gap-1 justify-end">
-    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="('action.edit' | t) + ': ' + row.oidcGroup" (click)="openEdit(kind, row.id)">
-      <app-icon name="edit" />
-    </app-button>
-    <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="('action.delete' | t) + ': ' + row.oidcGroup" (click)="askDelete(kind, row.id)">
-      <app-icon name="delete" />
-    </app-button>
-  </span>
-</ng-template>
 
 <!-- Add or edit one mapping. The fields depend on the section. -->
 <app-dialog
@@ -95,24 +75,17 @@
   (closed)="closeDialog()"
 >
   @if (dialog(); as kind) {
-    <form class="flex flex-col gap-4" (submit)="$event.preventDefault(); save()">
-      <div class="flex flex-col gap-1">
-        <label class="gm__lbl" for="gm-group">{{ 'admin.groupMappings.oidcGroup' | t }}</label>
-        <input
-          id="gm-group"
-          class="gm__control"
-          autocomplete="off"
-          [placeholder]="'admin.groupMappings.oidcGroupPlaceholder' | t"
-          [attr.aria-invalid]="groupReserved()"
-          [attr.aria-describedby]="groupReserved() ? 'gm-group-err' : null"
-          [ngModel]="oidcGroup()"
-          (ngModelChange)="oidcGroup.set($event)"
-          name="oidcGroup"
-        />
-        @if (groupReserved()) {
-          <p id="gm-group-err" class="m-0 text-sm gm__err">{{ 'admin.groupMappings.reserved' | t }}</p>
-        }
-      </div>
+    <form class="gm__form" (submit)="$event.preventDefault(); save()">
+      <app-input
+        class="gm__groupInput"
+        [label]="'admin.groupMappings.oidcGroup' | t"
+        [placeholder]="'admin.groupMappings.oidcGroupPlaceholder' | t"
+        [required]="true"
+        [error]="groupError()"
+        [ngModel]="oidcGroup()"
+        (ngModelChange)="oidcGroup.set($event)"
+        name="oidcGroup"
+      />
 
       @switch (kind) {
         @case ('global') {
@@ -155,21 +128,22 @@
             name="gremiumRole"
           />
           @if (gremiumId() && dialogGremiumRoles()?.length === 0) {
-            <p class="m-0 text-sm">
+            <p class="gm__dialogNote">
               {{ 'admin.groupMappings.gremiumRolesEmpty' | t }}
               @if (canManageGremiumRoles()) {
                 <a [routerLink]="['/admin/gremien', gremiumId(), 'roles']">{{ 'admin.gremiumRoles.manage' | t }}</a>
               }
             </p>
           }
-          <p class="text-muted m-0 text-xs">{{ 'admin.groupMappings.role.ruleHint' | t }}</p>
+          <p class="gm__dialogNote gm__dialogNote--muted">{{ 'admin.groupMappings.role.ruleHint' | t }}</p>
         }
       }
+      <button type="submit" hidden></button>
     </form>
   }
-  <div dialog-footer class="flex justify-end gap-3">
-    <app-button size="sm" variant="ghost" (click)="closeDialog()">{{ 'action.cancel' | t }}</app-button>
-    <app-button size="sm" [disabled]="!valid()" [loading]="saving()" (click)="save()">{{ 'action.save' | t }}</app-button>
+  <div dialog-footer class="gm__dialogFoot">
+    <app-button variant="text" (click)="closeDialog()">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="fill" [disabled]="!valid()" [loading]="saving()" (click)="save()">{{ 'action.save' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -179,9 +153,9 @@
   [closeLabel]="'action.cancel' | t"
   (closed)="confirm.set(null)"
 >
-  <p>{{ confirmBody() | t }}</p>
-  <div dialog-footer class="flex justify-end gap-3">
-    <app-button size="sm" variant="ghost" (click)="confirm.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button size="sm" variant="danger" (click)="remove()">{{ 'action.delete' | t }}</app-button>
+  <p class="gm__dialogText">{{ confirmBody() | t }}</p>
+  <div dialog-footer class="gm__dialogFoot">
+    <app-button variant="text" (click)="confirm.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="danger" (click)="remove()">{{ 'action.delete' | t }}</app-button>
   </div>
 </app-dialog>

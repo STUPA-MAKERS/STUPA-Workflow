@@ -97,18 +97,24 @@ async def _budget_fits(session: AsyncSession, app: Application) -> bool:
 
 
 async def _has_attachment(session: AsyncSession, app: Application) -> bool:
-    """Report whether the application has at least one attachment out of quarantine.
+    """Report whether the application has at least one scanned, clean attachment.
 
     This backs the `attachmentPresent` guard, for example when receipts or offers are
-    required. `storage_key IS NULL` marks an attachment that a ClamAV hit removed. Such
-    an attachment does not count as present.
+    required. Only a file that ClamAV scanned and found clean counts. A file that
+    still waits for the scan stays in quarantine and does not count. `storage_key IS
+    NULL` marks an attachment that a ClamAV hit removed. Such an attachment does not
+    count either. A draft of the wizard (Z4) has no application and never counts.
     """
     return bool(
         await session.scalar(
             select(
                 exists().where(
+                    Attachment.application_id.is_not(None),
                     Attachment.application_id == app.id,
                     Attachment.storage_key.is_not(None),
+                    Attachment.scanned.is_(True),
+                    # `SCAN_RESULT_CLEAN` of the files service.
+                    Attachment.scan_result == "clean",
                 )
             )
         )

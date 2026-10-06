@@ -1,0 +1,25 @@
+@use '../dialog-form' as df;
+@use 'breakpoints' as bp;
+
+@include df.host;
+
+.msd {
+  @include df.form;
+}
+
+.msd__when {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-3);
+}
+@include bp.phone {
+  .msd__when {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.msd__confirm {
+  @include df.hint;
+  font-size: var(--fs-body);
+  color: var(--color-text);
+}

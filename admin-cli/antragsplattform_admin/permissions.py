@@ -13,17 +13,17 @@ from __future__ import annotations
 PERMISSION_CATALOGUE: tuple[str, ...] = (
     "application.read",
     "application.read_all",
-    "application.create",
     "application.transition",
+    "application.force_status",
     "application.manage",
     "application.edit_any",
+    "application.delete",
+    "application.archive",
+    "application.share",
+    "application.create_on_behalf",
     "form.configure",
     "flow.configure",
-    "vote.cast",
-    "vote.manage",
-    "meeting.manage",
     "meeting.view_all",
-    "protocol.finalize",
     "meeting.delete_finalized",
     "budget.view",
     "budget.structure",
@@ -40,16 +40,19 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     "admin.types_delete",
     "admin.roles",
     "admin.users",
+    "admin.users.merge",
     "admin.group_mappings",
     "admin.gremium_roles",
+    "admin.cd_variants",
     "admin.delegations",
     "admin.deadlines",
     "admin.notifications",
     "privacy.manage",
+    "backup.manage",
     "mcp.use",
 )
 
-# The API never grants vote.cast, because voting is human-only. The CLI writes to the
-# database directly, so it can still set the key. The editor shows a warning. This module
-# does not block the key.
+# `vote.cast` is a gremium permission now and not in the global catalog. A global role
+# row that still holds the key has no effect. The editor shows the key with a warning
+# when the database holds it. This module does not block the key.
 FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset({"vote.cast"})

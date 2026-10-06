@@ -1,0 +1,146 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.sp {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--control-height-lg);
+  padding: 0 6px 0 0;
+  border-radius: var(--radius-pill);
+  /* A parent on a surface-2 background (a side sheet, for example) sets `--sp-bg` to a
+     different surface, so that the field stays visible. */
+  background: var(--sp-bg, var(--color-surface-2));
+  color: var(--color-text-muted);
+  font-size: var(--fs-md);
+}
+:host(.sp--md) .sp {
+  height: 2.75rem;
+  font-size: var(--fs-body);
+}
+.sp:focus-within {
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+
+/* The field fills the pill up to the trailing slot. */
+.sp__field {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  height: 100%;
+  padding: 0 var(--space-2) 0 18px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: text;
+}
+.sp__button {
+  cursor: pointer;
+}
+.sp__button:focus-visible {
+  outline: none;
+}
+
+.sp__icon {
+  flex: none;
+}
+
+/* The spinner takes the place of the magnifier at the same size, so nothing moves. */
+.sp__spinner {
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  margin: 2px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-accent-text);
+  border-radius: 50%;
+  animation: sp-spin 0.7s linear infinite;
+}
+@keyframes sp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp__spinner {
+    animation-duration: 2s;
+  }
+}
+
+/* The own × replaces the browser's cancel button of a search input. */
+.sp__clear {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.sp__clear:hover {
+  background: var(--color-surface-3, var(--color-surface-2));
+  color: var(--color-text);
+}
+.sp__clear:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.sp__ph {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sp__input {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  outline: none;
+}
+.sp__input::-webkit-search-cancel-button,
+.sp__input::-webkit-search-decoration {
+  appearance: none;
+  display: none;
+}
+.sp__input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
+.sp__kbd {
+  flex: none;
+}
+/* A touch screen without a hover pointer has, as a rule, no keyboard for the shortcut. */
+@media (hover: none) {
+  .sp__kbd {
+    display: none;
+  }
+}
+
+.sp__trail:empty {
+  display: none;
+}
+.sp__trail {
+  display: flex;
+  flex: none;
+  align-items: center;
+}

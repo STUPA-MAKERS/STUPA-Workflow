@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from typing import Any
 
@@ -9,10 +10,11 @@ from fastapi.testclient import TestClient
 
 from app.deps import get_current_principal
 from app.main import create_app
-from app.modules.audit.models import AuditEntry
+from app.modules.audit.models import AuditEntry, AuditVerification
 from app.modules.audit.router import get_audit_service
 from app.modules.audit.service import ChainVerification
 from app.modules.auth.principal import Principal
+from app.shared.errors import ConflictError, RateLimitedError
 
 _AT = datetime(2026, 6, 6, 12, 0, 0, tzinfo=UTC)
 
@@ -42,6 +44,9 @@ class _FakeService:
         self.actors: list[tuple[str, str | None]] = []
         self.verification = ChainVerification(valid=True, checked=0)
         self.revertable: dict[int, bool] = {}
+        self.latest: AuditVerification | None = None
+        self.stored: list[tuple[str, str | None]] = []
+        self.refuse: Exception | None = None
 
     async def query_cursor(self, **kwargs: Any) -> tuple[list[AuditEntry], bool]:
         self.cursor_kwargs = kwargs
@@ -70,6 +75,26 @@ class _FakeService:
 
     async def verify_chain(self) -> ChainVerification:
         return self.verification
+
+    async def run_manual_verification(self, *, triggered_by: str) -> AuditVerification:
+        if self.refuse is not None:
+            raise self.refuse
+        trigger = "manual"
+        self.stored.append((trigger, triggered_by))
+        return AuditVerification(
+            id=uuid.UUID(int=1),
+            started_at=_AT,
+            finished_at=_AT,
+            valid=self.verification.valid,
+            checked=self.verification.checked,
+            broken_at=self.verification.broken_at,
+            reason=self.verification.reason,
+            trigger=trigger,
+            triggered_by=triggered_by,
+        )
+
+    async def latest_verification(self) -> AuditVerification | None:
+        return self.latest
 
 
 def _principal(*perms: str) -> Principal:
@@ -224,3 +249,92 @@ def test_verify_endpoint_reports_break() -> None:
 def test_verify_requires_permission() -> None:
     client = _client(_FakeService(), _principal())
     assert client.get("/api/admin/audit/verify").status_code == 403
+
+
+def test_post_verify_stores_a_manual_check() -> None:
+    service = _FakeService()
+    service.verification = ChainVerification(
+        valid=False, checked=4, broken_at=5, reason="hash_mismatch"
+    )
+    client = _client(service, _principal("audit.verify"))
+    resp = client.post("/api/admin/audit/verify")
+    assert resp.status_code == 200
+    assert service.stored == [("manual", "admin-1")]
+    assert resp.json() == {
+        "id": str(uuid.UUID(int=1)),
+        "startedAt": "2026-06-06T12:00:00Z",
+        "finishedAt": "2026-06-06T12:00:00Z",
+        "valid": False,
+        "checked": 4,
+        "brokenAt": 5,
+        "reason": "hash_mismatch",
+        "trigger": "manual",
+        "triggeredBy": "admin-1",
+    }
+
+
+def test_post_verify_requires_audit_verify() -> None:
+    service = _FakeService()
+    client = _client(service, _principal("audit.read"))
+    resp = client.post("/api/admin/audit/verify")
+    assert resp.status_code == 403
+    assert resp.headers["content-type"].startswith("application/problem+json")
+    assert service.stored == []
+
+
+def test_post_verify_requires_authentication() -> None:
+    assert _client(_FakeService(), None).post("/api/admin/audit/verify").status_code == 401
+
+
+def test_post_verify_while_a_check_runs_is_409() -> None:
+    service = _FakeService()
+    service.refuse = ConflictError("busy", code="audit_verify_running")
+    resp = _client(service, _principal("audit.verify")).post("/api/admin/audit/verify")
+    assert resp.status_code == 409
+    assert resp.json()["code"] == "audit_verify_running"
+    assert service.stored == []
+
+
+def test_post_verify_inside_the_cooldown_is_429() -> None:
+    service = _FakeService()
+    service.refuse = RateLimitedError(
+        "too soon", retry_after=120, code="audit_verify_cooldown"
+    )
+    resp = _client(service, _principal("audit.verify")).post("/api/admin/audit/verify")
+    assert resp.status_code == 429
+    assert resp.headers["Retry-After"] == "120"
+    assert resp.json()["code"] == "audit_verify_cooldown"
+    assert service.stored == []
+
+
+def test_latest_verification_returns_the_stored_row() -> None:
+    service = _FakeService()
+    service.latest = AuditVerification(
+        id=uuid.UUID(int=2),
+        started_at=_AT,
+        finished_at=_AT,
+        valid=True,
+        checked=12,
+        trigger="cron",
+    )
+    client = _client(service, _principal("audit.read"))
+    resp = client.get("/api/admin/audit/verify/latest")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["valid"] is True
+    assert body["checked"] == 12
+    assert body["trigger"] == "cron"
+    assert body["triggeredBy"] is None
+
+
+def test_latest_verification_is_null_before_the_first_check() -> None:
+    client = _client(_FakeService(), _principal("audit.read"))
+    resp = client.get("/api/admin/audit/verify/latest")
+    assert resp.status_code == 200
+    assert resp.json() is None
+
+
+def test_latest_verification_requires_audit_read() -> None:
+    # audit.verify alone does not open the stored result; the tile reads with audit.read.
+    client = _client(_FakeService(), _principal("audit.verify"))
+    assert client.get("/api/admin/audit/verify/latest").status_code == 403

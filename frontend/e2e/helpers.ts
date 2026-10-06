@@ -113,3 +113,14 @@ export function extractToken(body: string): string | null {
 export async function expectAccessDenied(page: Page, deniedHeading: RegExp): Promise<void> {
   await expect(page.getByRole('heading', { name: deniedHeading })).toHaveCount(0);
 }
+
+/**
+ * Check that the page shows the public frame: the top bar with the sign-in button and
+ * no navigation of the signed-in app (no rail, no phone bar). The sign-in button and
+ * the landmark name exist in both languages, so the check does not depend on the
+ * browser locale.
+ */
+export async function expectPublicFrame(page: Page): Promise<void> {
+  await expect(page.getByRole('button', { name: /^(Anmelden|Sign in)$/ })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: /^(Hauptnavigation|Main navigation)$/ })).toHaveCount(0);
+}

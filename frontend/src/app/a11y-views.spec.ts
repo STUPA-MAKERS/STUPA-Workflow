@@ -21,17 +21,22 @@ import { ShellComponent } from './layout/shell.component';
 import { ForbiddenComponent } from './pages/forbidden.component';
 import { NotFoundComponent } from './pages/not-found.component';
 import { ApplyWizardComponent } from './features/apply/apply-wizard.component';
-import { LiveVoteComponent } from './features/voting/live-vote.component';
+import { VoteCastComponent } from './features/voting/vote-cast.component';
 import { BeamerComponent } from './features/voting/beamer.component';
 import { AdminHomeComponent } from './pages/admin/admin-home.component';
 import { UsersComponent } from './pages/admin/users/users.component';
 import { FlowEditorComponent } from './pages/admin/flow-editor/flow-editor.component';
 import { BrandingEditorComponent } from './pages/admin/branding/branding-editor.component';
+import { AdminGremienComponent } from './pages/admin/gremien/gremien.component';
+import { GremiumMembersComponent } from './pages/admin/gremien/gremium-members.component';
+import { DelegationsComponent } from './pages/admin/delegations/delegations.component';
+import { MOCK_GREMIUM_STUPA_ID } from './pages/admin/admin.mock';
 import { AdminApiService } from './pages/admin/admin-api.service';
 import { BudgetTreeApi } from './pages/budget/budget-tree.api';
-import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ApiClient } from '@core/api/api-client.service';
+import { DelegationsApiService } from '@core/api/delegations.service';
+import { AuthService } from '@core/auth/auth.service';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { LIVE_VOTE_SOURCE, type LiveVoteSource } from '@core/ws/live-vote.source';
 import type { MeetingChannel } from '@core/ws/ws.service';
@@ -58,31 +63,26 @@ describe('Kern-Views a11y (axe)', () => {
           { provide: USE_MOCK_API, useValue: false },
         ],
       });
-      const auth = view.fixture.debugElement.injector.get(AuthService);
       const http = view.fixture.debugElement.injector.get(HttpTestingController);
-      http
-        .match((r) => r.url.endsWith('/admin/site-config'))
-        .forEach((req) =>
-          req.flush({
-            version: 1,
-            active: { logos: {}, footerColumns: [], copyright: {}, legalLinks: [], freetexts: {} },
-            draft: { logos: {}, footerColumns: [], copyright: {}, legalLinks: [], freetexts: {} },
-            hasDraftChanges: false,
-          }),
-        );
-      return { view, auth, http };
+      return { view, http };
     }
 
-    it('anonymous shell has valid landmarks and no violations', async () => {
-      const { view } = await setupShell();
+    it('anonymous shell (public frame) has valid landmarks and no violations', async () => {
+      const { view, http } = await setupShell();
+      http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
+      view.fixture.detectChanges();
       expect(await runAxe(view.container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
     });
 
-    it('authenticated shell (full nav) has no violations', async () => {
-      const { view, auth, http } = await setupShell();
-      auth.ensureLoaded().subscribe();
+    it('authenticated shell (rail and account menu) has no violations', async () => {
+      const { view, http } = await setupShell();
       http.expectOne('/api/auth/me').flush(MEMBER);
       view.fixture.detectChanges();
+      expect(await runAxe(view.container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
+      // The open account popover too: it holds a select and a switch.
+      (view.container.querySelector('.am__trigger') as HTMLButtonElement).click();
+      view.fixture.detectChanges();
+      expect(view.container.querySelector('.am--popover')).not.toBeNull();
       expect(await runAxe(view.container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
     });
   });
@@ -191,24 +191,60 @@ describe('Kern-Views a11y (axe)', () => {
 
     @Component({
       standalone: true,
-      imports: [LiveVoteComponent],
-      template: `<main><app-live-vote /></main>`,
+      imports: [VoteCastComponent],
+      template: `<main><app-vote-cast /></main>`,
     })
     class LiveVoteHost {}
 
-    it('open live-vote (options + live region) has no violations', async () => {
+    it('open meeting vote (ballot with a represented row) has no violations', async () => {
       const source = new FakeSource();
       const view = await render(LiveVoteHost, {
         providers: [
           provideRouter([]),
           { provide: LIVE_VOTE_SOURCE, useValue: source },
-          { provide: AuthService, useValue: { can: () => true } },
+          {
+            provide: ApiClient,
+            useValue: {
+              getMeeting: () => of({ id: 'm1', title: 'Sitzung', canVote: true, votes: [] }),
+              listAgenda: () => of([{ id: 'ag1', position: 0 }]),
+              listAttendance: () => of([]),
+              getVote: () =>
+                of({
+                  id: 'v1',
+                  applicationId: 'a1',
+                  meetingId: 'm1',
+                  agendaItemId: 'ag1',
+                  question: 'Beschlussfrage?',
+                  eligibleGroup: 'g1',
+                  config: { options: ['yes', 'no', 'abstain'], majorityRule: 'simple' },
+                  status: 'open',
+                  opensAt: null,
+                  closesAt: null,
+                  result: null,
+                  secret: false,
+                  tally: { counts: {}, eligible: 9, voted: 3, present: 9, revealed: false, quorumMet: false, leading: null },
+                  canCast: true,
+                  myBallot: { cast: false, choice: null },
+                }),
+            },
+          },
+          {
+            provide: DelegationsApiService,
+            useValue: {
+              voteStatus: () =>
+                of({ blocked: false, delegatedToName: null, exercising: true, delegatedByName: 'Jonas Weber' }),
+            },
+          },
           {
             provide: ActivatedRoute,
-            useValue: { snapshot: { paramMap: convertToParamMap({ id: 'm1' }) } },
+            useValue: {
+              paramMap: of(convertToParamMap({ id: 'v1' })),
+              snapshot: { paramMap: convertToParamMap({ id: 'v1' }) },
+            },
           },
         ],
       });
+      // The open meeting vote follows its meeting over the live channel.
       source.channels[0].subject.next(OPEN_VOTE);
       view.fixture.detectChanges();
       expect(await runAxe(view.container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
@@ -228,11 +264,42 @@ describe('Kern-Views a11y (axe)', () => {
           provideRouter([]),
           { provide: LIVE_VOTE_SOURCE, useValue: source },
           {
+            provide: ApiClient,
+            useValue: {
+              getMeeting: () => of({ id: 'm1', title: 'Sitzung', votes: [], currentAgendaItemId: 'ag1' }),
+              listAgenda: () => of([{ id: 'ag1', title: 'Haushalt', position: 0 }]),
+              listAttendance: () => of([]),
+              getVote: () =>
+                of({
+                  id: 'v1',
+                  applicationId: 'a1',
+                  meetingId: 'm1',
+                  agendaItemId: 'ag1',
+                  question: 'Beschlussfrage?',
+                  eligibleGroup: 'g1',
+                  config: { options: ['yes', 'no', 'abstain'], majorityRule: 'simple' },
+                  status: 'open',
+                  opensAt: null,
+                  closesAt: null,
+                  result: null,
+                  secret: false,
+                  tally: { counts: {}, eligible: 9, voted: 3, present: 9, revealed: false, quorumMet: true, leading: null },
+                }),
+            },
+          },
+          {
             provide: ActivatedRoute,
-            useValue: { snapshot: { paramMap: convertToParamMap({ id: 'm1' }) } },
+            useValue: {
+              paramMap: of(convertToParamMap({ id: 'v1' })),
+              snapshot: {
+                paramMap: convertToParamMap({ id: 'v1' }),
+                queryParamMap: convertToParamMap({}),
+              },
+            },
           },
         ],
       });
+      // The open meeting vote follows its meeting over the live channel.
       source.channels[0].subject.next(OPEN_VOTE);
       view.fixture.detectChanges();
       expect(await runAxe(view.container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
@@ -271,6 +338,67 @@ describe('Kern-Views a11y (axe)', () => {
       template: `<main><app-branding-editor /></main>`,
     })
     class BrandingHost {}
+
+    @Component({
+      standalone: true,
+      imports: [AdminGremienComponent],
+      template: `<main><app-admin-gremien /></main>`,
+    })
+    class GremienHost {}
+
+    @Component({
+      standalone: true,
+      imports: [GremiumMembersComponent],
+      template: `<main><app-gremium-members /></main>`,
+    })
+    class MembersHost {}
+
+    @Component({
+      standalone: true,
+      imports: [DelegationsComponent],
+      template: `<main><app-delegations /></main>`,
+    })
+    class DelegationsHost {}
+
+    /** An admin: every page shows all its parts. */
+    const adminAuth = { provide: AuthService, useValue: { can: () => true, canInGremium: () => true } };
+    /** The delegations and the pool of the gremien pages, without HTTP. */
+    const fakeDelegations = {
+      provide: DelegationsApiService,
+      useValue: {
+        list: () =>
+          of([
+            {
+              id: 'd-1',
+              meetingId: 'm-1',
+              meetingTitle: '35. Sitzung',
+              meetingDate: '2999-01-01',
+              gremiumId: MOCK_GREMIUM_STUPA_ID,
+              gremiumName: 'Studierendenparlament',
+              delegatorId: 'p-1',
+              delegatorName: 'Alex',
+              delegateId: 'p-2',
+              delegateName: 'Robin',
+              delegateVoting: true,
+              viaPool: true,
+              createdAt: '2026-01-01T00:00:00Z',
+              revocable: true,
+              direction: null,
+            },
+          ]),
+        substitutes: () =>
+          of([
+            {
+              id: 's-1',
+              gremiumId: MOCK_GREMIUM_STUPA_ID,
+              memberId: null,
+              memberName: null,
+              substituteId: 'p-3',
+              substituteName: 'Sam',
+            },
+          ]),
+      },
+    };
 
     function fakeAdminApi(): Partial<AdminApiService> {
       const role = {
@@ -328,6 +456,50 @@ describe('Kern-Views a11y (axe)', () => {
           { provide: BudgetTreeApi, useValue: { tree: () => of([]) } },
         ],
       });
+      expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
+    });
+
+    it('/admin/gremien (open row with settings and role matrix) has no violations', async () => {
+      const { container, fixture } = await render(GremienHost, {
+        providers: [provideRouter([]), ...adminHttp, { provide: USE_MOCK_API, useValue: true }, adminAuth],
+      });
+      await fixture.whenStable();
+      expect(container.querySelector('[role=table]')).not.toBeNull();
+      expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
+    });
+
+    it('/admin/gremien/:id/members (with the substitute pool) has no violations', async () => {
+      const { container, fixture } = await render(MembersHost, {
+        providers: [
+          provideRouter([]),
+          ...adminHttp,
+          { provide: USE_MOCK_API, useValue: true },
+          adminAuth,
+          fakeDelegations,
+          {
+            provide: ActivatedRoute,
+            useValue: {
+              snapshot: {
+                paramMap: convertToParamMap({ id: MOCK_GREMIUM_STUPA_ID }),
+                pathFromRoot: [
+                  { url: [] },
+                  { url: [{ path: 'admin' }] },
+                  { url: [{ path: 'gremien' }, { path: MOCK_GREMIUM_STUPA_ID }, { path: 'members' }] },
+                ],
+              },
+            },
+          },
+        ],
+      });
+      await fixture.whenStable();
+      expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
+    });
+
+    it('/admin/delegations has no violations', async () => {
+      const { container, fixture } = await render(DelegationsHost, {
+        providers: [provideRouter([]), ...adminHttp, { provide: USE_MOCK_API, useValue: true }, adminAuth, fakeDelegations],
+      });
+      await fixture.whenStable();
       expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
     });
 

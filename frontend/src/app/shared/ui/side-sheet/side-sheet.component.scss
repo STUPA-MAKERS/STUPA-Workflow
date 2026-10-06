@@ -1,0 +1,164 @@
+@use 'breakpoints' as bp;
+@use 'surface';
+
+.ss__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  background: var(--color-scrim);
+}
+
+/* The sheet is on surface 2, so a table in it steps up to surface 3. */
+.ss {
+  @include surface.context(2);
+  position: fixed;
+  z-index: var(--z-dialog);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  box-shadow: var(--shadow-elevated);
+}
+.ss:focus {
+  outline: none;
+}
+
+/* From the end: the attendance sheet, 640px, 12px off the edges. */
+.ss--end {
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: min(40rem, calc(100vw - 24px));
+  border-radius: var(--radius-2xl);
+}
+/* From the start: the agenda drawer. */
+.ss--start {
+  top: 12px;
+  bottom: 12px;
+  left: 12px;
+  width: min(22.5rem, calc(100vw - 24px));
+  border-radius: var(--radius-2xl);
+}
+/* From the bottom: the phone sheet, above the gesture bar. A swipe moves it with
+   `transform`; after the swipe it snaps back with a short transition. */
+.ss--bottom {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  max-height: 85vh;
+  max-height: 85dvh;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+  transition: transform var(--motion-fast) ease-out;
+}
+.ss--dragging {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ss--bottom {
+    transition: none;
+  }
+}
+
+@include bp.phone {
+  .ss--end,
+  .ss--start {
+    top: 8px;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    width: auto;
+  }
+}
+
+/* The handle and the header. On a bottom sheet a swipe down here closes the sheet, so
+   the browser must not take the gesture for a scroll. */
+.ss__top {
+  flex: none;
+}
+.ss--bottom .ss__top {
+  touch-action: none;
+}
+.ss__grip {
+  display: flex;
+  justify-content: center;
+  padding-top: var(--space-3);
+  cursor: grab;
+}
+.ss--dragging .ss__grip {
+  cursor: grabbing;
+}
+.ss__handle {
+  width: 32px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-strong);
+}
+.ss--bottom .ss__head {
+  padding-top: var(--space-2);
+}
+
+.ss__head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 20px var(--space-4) var(--space-1) var(--space-5);
+}
+.ss__title {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-h1);
+  line-height: var(--lh-h1);
+  font-weight: var(--fw-semibold);
+}
+
+.ss__close {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.ss__close:hover {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+
+.ss__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-4) var(--space-4);
+}
+/* The content scrolls by itself: the body passes the height down. */
+.ss__body--fill {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Fade an end of the body only where more content is hidden in that direction. */
+.ss__body--fadeTop {
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
+}
+.ss__body--fadeBottom {
+  mask-image: linear-gradient(to top, transparent, #000 var(--space-5));
+}
+.ss__body--fadeTop.ss__body--fadeBottom {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--space-5),
+    #000 calc(100% - var(--space-5)),
+    transparent
+  );
+}

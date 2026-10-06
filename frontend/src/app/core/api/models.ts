@@ -20,17 +20,35 @@ export type Lang = 'de' | 'en';
 /** Configurable multilingual text (`*_i18n` JSONB). */
 export type I18nMap = Record<string, string>;
 
-/** Public branding config of the active site version. It needs no authentication.
- *  The type stays loose on purpose. The frontend reads only the free texts, for
- *  example `applyInfo`, and the app name. */
 /** One maintained footer link: a label per locale plus its target. */
 export interface PublicFooterLink {
   label: I18nMap;
   url: string;
 }
 
+/** A footer column of the branding: a heading and its links. */
+export interface PublicFooterColumn {
+  label: I18nMap;
+  links: PublicFooterLink[];
+}
+
+/** Public branding config of the active site version. It needs no authentication.
+ *  The type stays loose on purpose. The frontend reads only what it shows: the free
+ *  texts (for example `applyInfo`), the app name and the footer. */
 export interface PublicSiteConfig {
   version: number;
+  /**
+   * Hours a guest has to confirm the email before the platform discards the
+   * application (admin setting `guest_application_settings.confirm_ttl_hours`).
+   */
+  confirmTtlHours?: number;
+  /**
+   * Lifetime of a new magic link in days (admin setting
+   * `guest_application_settings.link_ttl_days`). `null`: the link does not expire.
+   */
+  linkTtlDays?: number | null;
+  /** Upload limits of the wizard (Z4): one file, and all draft files of a draft token. */
+  attachmentLimits?: AttachmentLimits | null;
   branding?: {
     /** Configured app name (language neutral). Empty falls back to i18n or the default. */
     appName?: string;
@@ -38,12 +56,23 @@ export interface PublicSiteConfig {
     appShortName?: string;
     /** Footer copyright line per locale. Empty falls back to the co-branding text. */
     copyright?: I18nMap;
-    /** Footer legal links. Empty falls back to the built-in imprint/privacy pair. */
+    /** Footer legal links. Empty shows no legal link. */
     legalLinks?: PublicFooterLink[];
+    /** Footer columns: a heading and its links each. Empty shows no column. */
+    footerColumns?: PublicFooterColumn[];
     freetexts?: Partial<
       Record<'loginHint' | 'welcome' | 'support' | 'emailFooter' | 'applyInfo', I18nMap>
     >;
+    /** Show the Gravatar images of the avatars (through the API proxy). Missing = on. */
+    gravatarEnabled?: boolean;
   } | null;
+}
+
+/** Upload limits of the wizard (`attachmentLimits` of the public site config). */
+export interface AttachmentLimits {
+  maxFileBytes: number;
+  maxDraftFiles: number;
+  maxDraftBytes: number;
 }
 
 /** Uniform problem object (close to RFC 9457). */
@@ -81,6 +110,10 @@ export interface Principal {
   gremien?: GremiumRef[];
   /** Gremien the principal manages through a gremium role with `session.manage`. */
   session_manage_gremien?: Uuid[];
+  /** Gremium id to the gremium permissions of the active role in that gremium
+   *  (`session.manage`, `protocol.write`, `protocol.finalize`, `vote.manage`,
+   *  `vote.cast`). */
+  gremium_permissions?: Record<Uuid, string[]>;
   /** At least one cost center belongs to a gremium of this principal. */
   has_scoped_budget_view?: boolean;
   /** The principal is in at least one substitute pool. The meeting timeline shows. */
@@ -101,7 +134,11 @@ export interface Page<T> {
 }
 
 export interface ApplicationListQuery {
-  state?: string;
+  /**
+   * Flow state UUIDs. The request repeats `state` once per value (A4), and the list keeps
+   * the applications in any of these states.
+   */
+  state?: readonly string[];
   gremium?: Uuid;
   type?: Uuid;
   /** Cost center in the budget tree. The filter includes the subtree. */
@@ -111,7 +148,9 @@ export interface ApplicationListQuery {
   amountMax?: number;
   createdFrom?: string;
   createdTo?: string;
-  sort?: 'createdAt' | 'amount';
+  /** `stateSince`: the time of the last status change, the date a row of "Meine Anträge"
+   *  shows. */
+  sort?: 'createdAt' | 'amount' | 'stateSince';
   order?: 'asc' | 'desc';
   /** Own applications only. It forces the owner filter even with `application.read`. */
   mine?: boolean;
@@ -163,6 +202,55 @@ export interface ApplicationOutWire {
   canEdit?: boolean;
   isOwner?: boolean;
   archivedAt?: IsoDateTime | null;
+  /** Time of the last status change (A9). */
+  stateSince?: IsoDateTime | null;
+  /**
+   * The `isPII` field keys that the server removed from `data` for this reader (O21).
+   * Empty for a reader with the PII right.
+   */
+  hiddenKeys?: string[];
+  /** Set when a person captured the application on behalf of the applicant (#11). */
+  capture?: ApplicationCapture | null;
+}
+
+/**
+ * `CaptureOut`. How an application captured on behalf of the applicant came in (#11).
+ * `capturedBy` follows the actor rules of the timeline: the applicant view names the
+ * Gremium instead of the member.
+ */
+export interface ApplicationCapture {
+  capturedBy: ActorInfo | null;
+  capturedAt: IsoDateTime;
+  /** The date on which the application came in (`YYYY-MM-DD`). */
+  receivedOn: string | null;
+  /** The free-text intake channel ("Eingang"), for example "per PDF". */
+  intake: string | null;
+}
+
+/** `ApplicantCandidateOut`. An account that the capture dialog offers as applicant. */
+export interface ApplicantCandidate {
+  id: Uuid;
+  displayName: string | null;
+  email: string | null;
+}
+
+/**
+ * `OnBehalfCreate`. The body of `POST /applications/on-behalf` (#11). The applicant is
+ * EITHER an account (`applicantPrincipalId`) OR a guest (`applicantName` and
+ * `applicantEmail`).
+ */
+export interface OnBehalfApplication {
+  typeId: Uuid;
+  data: Record<string, unknown>;
+  applicantPrincipalId?: Uuid | null;
+  applicantName?: string | null;
+  applicantEmail?: string | null;
+  /** `YYYY-MM-DD`; the server defaults to today. */
+  receivedOn?: string | null;
+  intake?: string | null;
+  lang: Lang;
+  attachmentIds?: Uuid[];
+  draftToken?: string | null;
 }
 
 /** `ApplicationListItem`. A list entry without `data` and without `applicant`. */
@@ -177,6 +265,8 @@ export interface ApplicationListItemWire {
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
   archivedAt?: IsoDateTime | null;
+  /** Time of the last status change (A9). */
+  stateSince?: IsoDateTime | null;
 }
 
 /** `ApplicationCreated`. The 201 response of `POST /applications`. It holds only the id. */
@@ -184,26 +274,44 @@ export interface ApplicationCreatedWire {
   applicationId: Uuid;
 }
 
-/** Attendance status of a member in a meeting. */
+/** Attendance status of a member in a meeting. `absent` means absent without an excuse. */
 export type AttendanceStatus = 'present' | 'excused' | 'absent';
 
-/** `AttendanceOut`. Attendance of a gremium member. GET/PUT …/attendance. */
+/** The statuses a member reports for the own record (Z2). Only the lead records `absent`. */
+export type SelfAttendanceStatus = 'present' | 'excused';
+
 /** A current gremium member. This is a protokollant candidate for a new meeting. */
 export interface MeetingMember {
   principalId: Uuid;
   displayName: string | null;
   email: string | null;
+  /** O20: the member holds `protocol.write` in the gremium and can keep the minutes. */
+  canKeepProtocol?: boolean;
 }
 
+/** `AttendanceOut`. Attendance of a gremium member. GET/PUT/DELETE …/attendance. */
 export interface Attendance {
   principalId: Uuid;
   displayName: string | null;
   email: string | null;
-  /** `null` = not recorded yet. */
+  /** `null` = not recorded yet ("open"). */
   status: AttendanceStatus | null;
+  /** Who set the record. A `lead` record wins: the member cannot change it (O15). */
   source: 'self' | 'lead' | null;
+  /**
+   * The reason of an excuse. The server sends it only to the member and to the
+   * meeting lead (`canWrite`). All other readers get `null`.
+   */
+  note: string | null;
   /** True if this row is the requesting user. It enables self-marking. */
   isSelf: boolean;
+  /** O20: the member holds `protocol.write` in the gremium and can keep the minutes. */
+  canKeepProtocol?: boolean;
+  /**
+   * The member has an own vote now (gremium permission `vote.cast`). Only such a member
+   * can be substituted (O6). An older server leaves the flag out.
+   */
+  canVote?: boolean;
 }
 
 /** `AgendaItemOut`. An agenda item holds a linked application or free text. */
@@ -236,12 +344,35 @@ export interface AltchaChallenge {
   maxnumber: number;
 }
 
+/**
+ * `ActorOut`. The resolved actor of a timeline event, a version or a comment.
+ * - `principal`: a member; `displayName` is the name (or the email).
+ * - `applicant`: the applicant through the magic link; no name (PII, O21).
+ * - `system`: an automatic action; `key` names the source (`deadlines`, `flow`, `auto`, …).
+ * - `gremium`: the applicant view names the Gremium for a member (A12/O16).
+ * - `deleted`: an unknown or anonymized account; no name, no id.
+ */
+export type ActorKind = 'principal' | 'applicant' | 'system' | 'gremium' | 'deleted';
+
+export interface ActorInfo {
+  kind: ActorKind;
+  key?: string | null;
+  displayName?: string | null;
+  /** Only for `principal`: the account id, for the avatar. Never in the applicant view. */
+  principalId?: Uuid | null;
+}
+
 /** `TimelineEventOut`. A status transition in the timeline. */
 export interface TimelineEventOutWire {
   fromStateId?: Uuid | null;
   toStateId: Uuid;
   toState?: StateOutWire | null;
+  /** Label of the fired transition (A3). Null for the creation and for a revert. */
+  transitionLabel?: I18nMap | null;
+  /** In the applicant view, the Gremium for every action of a member (A12). */
   actor?: string | null;
+  /** The resolved actor. The UI renders this and never the raw `actor`. */
+  actorInfo?: ActorInfo | null;
   at: IsoDateTime;
   note?: string | null;
 }
@@ -254,6 +385,8 @@ export interface CommentOutWire {
   id: Uuid;
   author?: string | null;
   authorKind: CommentAuthorKind;
+  /** The resolved author. The UI renders this and never the raw `author`. */
+  authorInfo?: ActorInfo | null;
   body: string;
   visibility: CommentVisibility;
   at: IsoDateTime;
@@ -281,6 +414,11 @@ export interface TransitionOutWire {
   label: I18nMap;
   /** Optional color for the decision button. */
   color?: string | null;
+  /** The transition carries an `addToNextSession` action into a vote state (A1), so a
+   *  fire takes a `meetingId`. */
+  addsToAgenda?: boolean;
+  /** The gremium whose planned meetings the agenda dialog offers (A1). */
+  agendaGremiumId?: Uuid | null;
 }
 
 /** A field change in the version diff (`FieldChange`). */
@@ -302,12 +440,21 @@ export interface DataDiffWire {
   changed: Record<string, FieldChangeWire>;
 }
 
-/** `VersionOut`. One submission version and its diff. */
+/**
+ * `VersionOut`. One submission version and its diff.
+ *
+ * The applicant view gets the metadata only (A11): `data` and `diff` are null, and
+ * `changedKeys` lists the changed fields. A reader without the PII right gets no
+ * `isPII` field in `data`, `diff` and `changedKeys` (O21).
+ */
 export interface VersionOutWire {
   version: number;
-  data: Record<string, unknown>;
+  data?: Record<string, unknown> | null;
   diff?: DataDiffWire | null;
+  changedKeys?: string[];
   changedBy?: string | null;
+  /** The resolved editor. The UI renders this and never the raw `changedBy`. */
+  changedByInfo?: ActorInfo | null;
   at: IsoDateTime;
 }
 
@@ -330,6 +477,15 @@ export interface AttachmentOutWire {
 }
 
 /**
+ * `DraftAttachmentOut` (files/schemas.py): 201 of `POST /apply/attachments` (Z4). The
+ * attachment fields stay snake_case like `AttachmentOut`; the token fields are camelCase.
+ */
+export interface DraftAttachmentOutWire extends AttachmentOutWire {
+  draftToken: string;
+  draftExpiresAt: IsoDateTime;
+}
+
+/**
  * `SignedUrlOut` (files/schemas.py). An app-relative /download route behind an
  * authorization check. `expiresIn` is an advisory cache hint for the frontend. It
  * is not a URL expiry.
@@ -349,6 +505,10 @@ export interface ApplicationCreateBody {
   applicantName?: string | null;
   lang: Lang;
   altcha?: string | null;
+  /** Draft uploads of the wizard to bind (Z4). Needs `draftToken`. */
+  attachmentIds?: Uuid[];
+  /** The token of the draft uploads (Z4). */
+  draftToken?: string | null;
 }
 
 /** Body for `POST /applications/{id}/comments` (`CommentCreate`). */
@@ -361,6 +521,14 @@ export interface CommentCreateBody {
 export interface TransitionRequestBody {
   transitionId: Uuid;
   note?: string | null;
+  /**
+   * The meeting whose agenda gets the application (A1). Only for a transition with
+   * `addsToAgenda`; the meeting must be planned and belong to `agendaGremiumId`, else
+   * the server answers 422 `agenda_meeting_invalid`.
+   */
+  meetingId?: Uuid | null;
+  /** The new agenda item is not public (NÖ). Only with `meetingId`. */
+  nonPublic?: boolean;
 }
 
 /** `POST /applications/{id}/force-status`. A privileged direct status override.
@@ -426,6 +594,16 @@ export interface Application {
    * left the working list. `be-privacy` owns the DSGVO erasure people confuse this with.
    */
   archivedAt: IsoDateTime | null;
+  /** Time of the last status change (A9), for "since" on the status page. */
+  stateSince?: IsoDateTime | null;
+  /**
+   * The `isPII` field keys that the server removed from `data` (O21). The edit form
+   * leaves out these fields. A key that is only missing from `data` was never
+   * answered, and the field stays editable.
+   */
+  hiddenKeys?: string[];
+  /** Set when a person captured the application on behalf of the applicant (#11). */
+  capture?: ApplicationCapture | null;
 }
 
 /**
@@ -462,6 +640,8 @@ export interface ApplicationListItem {
   updatedAt: IsoDateTime;
   /** Set when the row is archived, so a combined list can mark it. */
   archivedAt: IsoDateTime | null;
+  /** Time of the last status change (A9), for "waiting since". */
+  stateSince?: IsoDateTime | null;
 }
 
 /** Result of `POST /applications`, frontend view. */
@@ -474,7 +654,10 @@ export interface TimelineEntry {
   toStateId: Uuid;
   toState: ApplicationState | null;
   label: string;
+  /** Label of the fired transition (A3), resolved to the locale. */
+  transitionLabel?: string | null;
   actor: string | null;
+  actorInfo?: ActorInfo | null;
   at: IsoDateTime;
   note: string | null;
 }
@@ -484,6 +667,7 @@ export interface ApplicationComment {
   id: Uuid;
   author: string | null;
   authorKind: CommentAuthorKind;
+  authorInfo?: ActorInfo | null;
   body: string;
   visibility: CommentVisibility;
   isPublic: boolean;
@@ -511,6 +695,16 @@ export interface Transition {
   label: string;
   /** Optional color for the decision button. `null` selects the default. */
   color: string | null;
+  /**
+   * The transition puts the application on the agenda of a meeting and leads into a
+   * vote state (A1), so the server takes a chosen meeting. The detail and the row menu
+   * open the agenda dialog for it, which asks for the meeting. A transition whose
+   * action leads into a normal state is `false` here and fires as a plain transition;
+   * the server action then picks the next planned meeting.
+   */
+  addsToAgenda: boolean;
+  /** The gremium whose planned meetings the agenda dialog offers, or null. */
+  agendaGremiumId: Uuid | null;
 }
 
 /** A changed field cell, frontend view. The `key` comes out of the diff map. */
@@ -536,7 +730,10 @@ export interface ApplicationVersion {
   version: number;
   data: Record<string, unknown>;
   diff: DataDiff | null;
+  /** Keys of the changed fields. The applicant view gets only these (A11). */
+  changedKeys?: string[];
   changedBy: string | null;
+  changedByInfo?: ActorInfo | null;
   at: IsoDateTime;
 }
 
@@ -575,6 +772,25 @@ export interface NewApplication {
   applicantName?: string | null;
   lang: Lang;
   altcha?: string | null;
+  /** Draft uploads of the wizard to bind (Z4). */
+  attachmentIds?: Uuid[];
+  /** The token of the draft uploads; required with `attachmentIds`. */
+  draftToken?: string | null;
+}
+
+/**
+ * A draft upload of the wizard (Z4), frontend view: the attachment plus the field it
+ * belongs to (`null` = the general block "Anhänge").
+ */
+export interface DraftAttachment extends Attachment {
+  fieldKey: string | null;
+}
+
+/** The result of `POST /apply/attachments`: the draft and its (new) token. */
+export interface DraftUpload {
+  attachment: Attachment;
+  draftToken: string;
+  draftExpiresAt: IsoDateTime;
 }
 
 // Form definition. A mirror of the backend `FormFieldDef`.
@@ -670,7 +886,7 @@ export interface MagicLinkVerifyResult {
 }
 
 export type MajorityRule = 'simple' | 'absolute' | 'two_thirds';
-/** `cancelled`. The application left the vote state by hand. The vote stopped. */
+/** `draft`: planned, not open yet. `cancelled`: the application left the vote state by hand, so the vote stopped. */
 export type VoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
 export type VoteResult = 'passed' | 'rejected' | 'tie';
 
@@ -682,8 +898,9 @@ export interface Quorum {
 
 /**
  * Vote configuration (`VoteConfig`). The backend `_CamelModel` sends the fields in
- * camelCase. The defaults mirror the Pydantic defaults: `abstainCountsQuorum` and
- * `allowChange` are true, `secret` is false.
+ * camelCase. The defaults mirror the Pydantic defaults: `abstainCountsQuorum` is
+ * true, `secret` is false. The frontend never sets a tie break: a tie is a
+ * rejection (O18).
  */
 export interface VoteConfig {
   options: string[];
@@ -691,8 +908,18 @@ export interface VoteConfig {
   quorum?: Quorum | null;
   abstainCountsQuorum?: boolean;
   secret?: boolean;
-  allowChange?: boolean;
-  tieBreak?: VoteResult;
+  /** Admitted guests of a public meeting vote too: no quorum, majority of the cast votes. */
+  guestsVote?: boolean;
+}
+
+/**
+ * The own ballot of the caller in one vote (`MyBallot`). `choice` is the chosen
+ * option. A secret vote keeps the choice apart from the identity, so there `choice`
+ * is always `null` and only `cast` tells that the caller voted.
+ */
+export interface MyBallot {
+  cast: boolean;
+  choice: string | null;
 }
 
 /**
@@ -705,6 +932,23 @@ export interface Tally {
   quorumMet: boolean;
   leading: string | null;
   result?: VoteResult | null;
+  /** Turnout: the ballots cast so far. The server always sends it, also while the
+   *  counts stay hidden. */
+  voted?: number;
+  /** The present members of the meeting (the reveal denominator). It is 0 for a vote
+   *  without a meeting and for a closed vote. */
+  present?: number;
+  /** `counts` and `leading` are visible: the vote is closed, or it is open, not secret
+   *  and every present member voted (a vote without a meeting is always visible).
+   *  Otherwise `counts` is empty. */
+  revealed?: boolean;
+  /** Why a closed vote failed: `quorum` or `majority`. `null` while open, on a pass and
+   *  on a tie. */
+  failedReason?: 'quorum' | 'majority' | null;
+  /** The present members and the admitted guests: live while open, fixed at the close.
+   *  `null` for a vote that closed before public meetings existed. */
+  presentMembers?: number | null;
+  presentGuests?: number | null;
 }
 
 /**
@@ -715,32 +959,121 @@ export interface Tally {
  */
 export interface Vote {
   id: Uuid;
-  applicationId: Uuid;
+  /** `null` marks a motion on a free-text agenda item, with no application. */
+  applicationId: Uuid | null;
   /** The meeting that holds the vote. `null` marks a standalone (async) vote.
    *  A meeting-bound vote is deleted through its meeting, never through
    *  `DELETE /votes/{id}` (that route answers 409). */
   meetingId?: Uuid | null;
+  /** The agenda item of a meeting vote. The page reads its number ("TOP 3") from the
+   *  agenda. */
+  agendaItemId?: Uuid | null;
+  /** The motion of a meeting vote. A standalone vote often has none. */
+  question?: string | null;
   eligibleGroup: string;
   config: VoteConfig;
   status: VoteStatus;
   opensAt: IsoDateTime | null;
+  /** The planned end of the cast window (a deadline), not the real end. */
   closesAt: IsoDateTime | null;
   result: VoteResult | null;
   secret: boolean;
+  /** Copies of `config.majorityRule` and `config.quorum` for the vote card. */
+  majorityRule?: MajorityRule;
+  quorum?: Quorum | null;
+  /** The real moment when the vote opened. */
+  openedAt?: IsoDateTime | null;
+  /** The real moment when the vote ended (close or cancel). `null` while it runs. */
+  closedAt?: IsoDateTime | null;
   tally: Tally;
+  /** The own ballot of the caller. Only `GET /votes/{id}` sets it. */
+  myBallot?: MyBallot | null;
+  /** Admitted guests vote too: no quorum, the majority of the cast votes decides. */
+  guestsVote?: boolean;
+  /** The caller cast the ballot of a delegator in this vote. Only `GET /votes/{id}`
+   *  sets it. */
+  representedCast?: boolean;
+  /** The caller may open, close, cancel and delete the vote: the admin role, or the
+   *  gremium permission `vote.manage` or `session.manage` in the gremium of the vote.
+   *  Only `GET /votes/{id}` sets it. */
+  canManage?: boolean;
+  /** The caller may cast an own ballot: the gremium permission `vote.cast` in the
+   *  gremium of the vote, in a browser session. A delegated ballot has its own check.
+   *  Only `GET /votes/{id}` sets it. */
+  canCast?: boolean;
 }
 
-/** Response to an accepted ballot. POST /api/votes/{id}/ballot. */
+/**
+ * One row of the vote list (`GET /votes`, `VoteListItem`). The row carries no tally;
+ * `GET /votes/{id}` reads it. `myBallot` and `canCast` are the own ballot state of the
+ * caller: a secret vote gives only `cast`, never the choice. `meetingTitle` and
+ * `agendaPosition` (the number of the agenda item, "TOP 3") are `null` for a vote
+ * without a meeting. `gremiumName` is `null` when the vote names no gremium.
+ */
+export interface VoteListItem {
+  id: Uuid;
+  question: string | null;
+  status: VoteStatus;
+  result: VoteResult | null;
+  secret: boolean;
+  applicationId: Uuid | null;
+  meetingId: Uuid | null;
+  meetingTitle: string | null;
+  agendaItemId: Uuid | null;
+  agendaPosition: number | null;
+  gremiumId: Uuid | null;
+  gremiumName: string | null;
+  createdAt: IsoDateTime;
+  openedAt: IsoDateTime | null;
+  closedAt: IsoDateTime | null;
+  /** The planned end of the cast window, not the real end. */
+  closesAt: IsoDateTime | null;
+  canCast: boolean;
+  myBallot: MyBallot;
+}
+
+/**
+ * The filters of `GET /votes`. `status` repeats; without it the server leaves out the
+ * drafts. `q` searches the question and the meeting title.
+ */
+export interface VoteListQuery {
+  status?: VoteStatus[];
+  gremiumId?: Uuid;
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/** Response to an accepted ballot. POST /api/votes/{id}/ballot. A ballot never
+ *  changes after the cast: a second cast gives 409 `already_voted`. */
 export interface BallotResult {
-  status: 'cast' | 'changed';
+  status: 'cast';
+}
+
+/**
+ * Result of `POST /votes/{id}/close` (`VoteClosed`). The close always ends the vote.
+ * `branchFired` is false when the pass or fail transition of the application did not
+ * fire (the guard failed, or the state has no such transition). A person must then
+ * move the application by hand.
+ */
+export interface VoteClosed {
+  id: Uuid;
+  meetingId?: Uuid | null;
+  applicationId?: Uuid | null;
+  result: VoteResult;
+  tally: Tally;
+  closedAt?: IsoDateTime | null;
+  firedTransitionId?: Uuid | null;
+  newStateId?: Uuid | null;
+  branchFired: boolean;
 }
 
 // Meetings and protocol. The wire form is camelCase (`_CamelModel`).
 
 /** Meeting status. The backend enum is `planned|live|closed`. */
 export type MeetingStatus = 'planned' | 'live' | 'closed';
-/** `cancelled`. The application left the vote state by hand. The vote stopped. */
-export type MeetingVoteStatus = 'pending' | 'open' | 'closed' | 'cancelled';
+/** `draft`: planned, not open yet. `cancelled`: the application left the vote state by hand, so the vote stopped. */
+export type MeetingVoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
 
 /** `MeetingVoteOut`. A vote summary in the meeting state. GET /meetings/{id}. */
 export interface MeetingVoteOutWire {
@@ -767,9 +1100,43 @@ export interface MeetingVoteOutWire {
   /** Reason for the rejection. `quorum` means the vote missed the quorum.
    *  `majority` means the vote missed the majority. */
   failedReason?: 'quorum' | 'majority' | null;
+  majorityRule?: MajorityRule;
+  secret?: boolean;
+  quorum?: Quorum | null;
+  /** The real open time and the real end time (close or cancel). */
+  openedAt?: IsoDateTime | null;
+  closedAt?: IsoDateTime | null;
+  /** The own ballot of the caller. A secret vote gives only `cast`. */
+  myBallot?: MyBallot | null;
+  /** The caller cast the ballot of a delegator in this vote. */
+  representedCast?: boolean;
+  /** Admitted guests vote too (public meeting): no quorum. */
+  guestsVote?: boolean;
+  /** Present members and admitted guests (live while open, fixed at the close). */
+  presentMembers?: number | null;
+  presentGuests?: number | null;
 }
 
 /** `MeetingOut`. Meeting state and votes. GET /meetings/{id}. */
+/**
+ * `KeeperPeriodOut`. One period of a protocol keeper (Z3, A13). `fromAt` is `null`
+ * for the planned handover, `toAt` is `null` while the period runs. The positions
+ * are 1-based numbers in the current agenda order, `null` without an item.
+ */
+export interface KeeperPeriod {
+  principalId: Uuid;
+  name: string | null;
+  fromAt: IsoDateTime | null;
+  toAt: IsoDateTime | null;
+  fromAgendaItemId: Uuid | null;
+  toAgendaItemId: Uuid | null;
+  fromPosition: number | null;
+  toPosition: number | null;
+}
+
+/** How the minutes change hands: at once, or with the next agenda item. */
+export type HandoverMode = 'now' | 'next_item';
+
 export interface MeetingOutWire {
   id: Uuid;
   title: string;
@@ -780,6 +1147,14 @@ export interface MeetingOutWire {
   activeApplicationId?: Uuid | null;
   /** The agenda item the room handles now. */
   currentAgendaItemId?: Uuid | null;
+  /** Number (1-based, in agenda order) and title of the current agenda item. */
+  currentAgendaItem?: CurrentAgendaItem | null;
+  /** Number of items on the agenda. */
+  agendaItemCount?: number;
+  /** The real start. `null` before the start and for an older meeting. */
+  startedAt?: IsoDateTime | null;
+  /** The close sets it. */
+  closedAt?: IsoDateTime | null;
   gremiumId?: Uuid | null;
   gremiumName?: string | null;
   votes: MeetingVoteOutWire[];
@@ -800,6 +1175,25 @@ export interface MeetingOutWire {
   canManageVotes?: boolean;
   /** Eligible to vote in this meeting. The user needs a role with `vote.cast`. */
   canVote?: boolean;
+  /** Finalize and send the protocol: write access plus the gremium permission
+   *  `protocol.finalize`. */
+  canFinalize?: boolean;
+  /** The periods of the protocol keepers, running and ended, in time order. */
+  keeperPeriods?: KeeperPeriod[];
+  /** The handover planned for the next agenda item. */
+  plannedHandover?: KeeperPeriod | null;
+  /** Public participation over a QR code is on. */
+  publicJoin?: boolean;
+  /** Admitted guests vote (`vote`) or only follow the meeting (`watch`). */
+  guestsMode?: GuestsMode;
+  /** The join code (`7KQ4MP`); the server sends it to the meeting lead only. */
+  joinCode?: string | null;
+  /** The guests admitted now. */
+  admittedGuests?: number;
+  /** The open join requests; the meeting lead only, else 0. */
+  pendingGuests?: number;
+  /** Public participation is possible: only a gremium without a quorum allows it. */
+  publicJoinAllowed?: boolean;
 }
 
 /** `ProtocolOut`. Meeting protocol. POST /meetings/{id}/protocol, PATCH /protocols/{id}. */
@@ -828,6 +1222,9 @@ export interface MeetingCreateBody {
   endTime?: string | null;
   /** Assigned protokollant, optional. The person must be a member of the gremium. */
   protokollantId?: Uuid | null;
+  /** Public participation over a QR code. */
+  publicJoin?: boolean;
+  guestsMode?: GuestsMode;
 }
 
 /** Body for `PATCH /meetings/{id}`. Status, active application, date or protokollant. */
@@ -844,6 +1241,10 @@ export interface MeetingPatchBody {
   endTime?: string | null;
   /** (Re)assign the protokollant. */
   protokollantId?: Uuid | null;
+  /** Public participation on or off. Off voids the requests and ends the guests. */
+  publicJoin?: boolean;
+  /** Guests vote or only follow. `watch` gives 409 `guest_vote_open` while a guest vote runs. */
+  guestsMode?: GuestsMode;
 }
 
 /** Body for `PATCH /protocols/{id}`. It updates the markdown. */
@@ -887,6 +1288,29 @@ export interface MeetingVote {
   /** Reason for the rejection. `quorum` means the vote missed the quorum.
    *  `majority` means the vote missed the majority. */
   failedReason: 'quorum' | 'majority' | null;
+  /** The own ballot of the caller. A secret vote gives only `cast`. `null` when the
+   *  server sent none (for example a broadcast). */
+  myBallot?: MyBallot | null;
+  /** The rules of the vote, for the vote card (A5). A vote that a WS event added
+   *  before the next GET has none of them. */
+  majorityRule?: MajorityRule;
+  secret?: boolean;
+  quorum?: Quorum | null;
+  /** The real open time, and the real end time (close or cancel). */
+  openedAt?: IsoDateTime | null;
+  closedAt?: IsoDateTime | null;
+  /** Admitted guests vote too: no quorum, majority of the cast votes. */
+  guestsVote?: boolean;
+  /** Present members and admitted guests ("19 Mitglieder + 7 Gäste anwesend"). */
+  presentMembers?: number | null;
+  presentGuests?: number | null;
+}
+
+/** The agenda item the room handles now, as `MeetingOut.currentAgendaItem` sends it. */
+export interface CurrentAgendaItem {
+  /** 1-based number in the agenda order ("TOP 3"). */
+  position: number;
+  title: string | null;
 }
 
 /** Meeting, frontend view. */
@@ -903,6 +1327,15 @@ export interface Meeting {
   activeApplicationId: Uuid | null;
   /** The agenda item the room handles now ("Jetzt"). Followers and the beamer follow it. */
   currentAgendaItemId: Uuid | null;
+  /** Number (1-based, in agenda order) and title of the current agenda item. */
+  currentAgendaItem?: CurrentAgendaItem | null;
+  /** Number of items on the agenda. */
+  agendaItemCount?: number;
+  /** The real start. The start sets it once. `null` before the start, and for a
+   *  meeting that started before the field existed: show the planned start then. */
+  startedAt?: IsoDateTime | null;
+  /** The close sets it. */
+  closedAt?: IsoDateTime | null;
   gremiumId: Uuid | null;
   /** Name of the gremium. The timeline shows it. */
   gremiumName: string | null;
@@ -923,6 +1356,25 @@ export interface Meeting {
   canManageVotes: boolean;
   /** Eligible to vote in this meeting. */
   canVote: boolean;
+  /** Finalize and send the protocol: write access plus the gremium permission
+   *  `protocol.finalize`. */
+  canFinalize: boolean;
+  /** The periods of the protocol keepers, running and ended, in time order (Z3). */
+  keeperPeriods: KeeperPeriod[];
+  /** The handover planned for the next agenda item, or `null`. */
+  plannedHandover: KeeperPeriod | null;
+  /** Public participation over a QR code is on. */
+  publicJoin: boolean;
+  /** Admitted guests vote or only follow the meeting. */
+  guestsMode: GuestsMode;
+  /** The join code, for the meeting lead only (`null` for everybody else). */
+  joinCode: string | null;
+  /** The guests admitted now. */
+  admittedGuests: number;
+  /** The open join requests (meeting lead only, else 0). */
+  pendingGuests: number;
+  /** Public participation is possible: only a gremium without a quorum allows it. */
+  publicJoinAllowed: boolean;
 }
 
 /** Direction of the meeting timeline relative to *now*. */
@@ -971,7 +1423,10 @@ export interface OAuthGrant {
   clientId: string;
   scope: string;
   createdAt: IsoDateTime | null;
-  /** `null` means the access token never expires. Only a revocation ends it. */
+  /**
+   * Every new token expires (90 days at most). `null` comes only from a token of the time
+   * before the cap; the pages show a dash, never "Läuft nie ab".
+   */
   accessExpiresAt: IsoDateTime | null;
   refreshExpiresAt: IsoDateTime | null;
 }
@@ -1035,4 +1490,117 @@ export interface SearchResults {
   truncated: boolean;
   /** Sources that errored. The search degrades rather than returning nothing. */
   failed: string[];
+}
+
+// Public meeting with QR code (#17).
+
+/** Admitted guests vote (`vote`) or only follow the meeting (`watch`). */
+export type GuestsMode = 'vote' | 'watch';
+
+/** The state of a join request or of a guest. */
+export type GuestStatus = 'pending' | 'admitted' | 'rejected' | 'removed' | 'left';
+
+/** `MeetingGuest`: one join request or guest, for the meeting lead. */
+export interface MeetingGuest {
+  id: Uuid;
+  /** The pseudonym number ("Gast 3"), 1-based per meeting. */
+  number: number;
+  /** `null` once pseudonymized (left, withdrawn, protocol final): show "Gast {number}". */
+  displayName: string | null;
+  /** `expired` comes only with a `guest_updated` event: the row is gone (a voided request). */
+  status: GuestStatus | 'expired';
+  requestedAt: IsoDateTime;
+  decidedAt: IsoDateTime | null;
+  decidedByName: string | null;
+  admittedAt: IsoDateTime | null;
+}
+
+/** The QR matrix without a quiet zone: `size` rows of `size` characters `0`/`1`. */
+export interface QrMatrix {
+  size: number;
+  rows: string[];
+}
+
+/** `JoinLink`: the join code, the absolute join URL and its QR matrix. */
+export interface JoinLink {
+  joinCode: string;
+  joinUrl: string;
+  qr: QrMatrix;
+}
+
+/** `PublicMeetingHead`: what the join page shows before the admission. */
+export interface PublicMeetingHead {
+  code: string;
+  title: string;
+  gremiumName: string | null;
+  date: string | null;
+  startTime: string | null;
+  status: MeetingStatus;
+  startedAt: IsoDateTime | null;
+  guestsMode: GuestsMode;
+}
+
+/** One agenda item of the guest view. A non-public item carries its title, never a body. */
+export interface GuestAgendaItem {
+  id: Uuid;
+  position: number;
+  title: string | null;
+  kind: 'application' | 'freetext';
+  nonPublic: boolean;
+  body: string | null;
+}
+
+/** One vote of a public item, as an admitted guest sees it. */
+export interface GuestVote {
+  id: Uuid;
+  agendaItemId: Uuid | null;
+  question: string | null;
+  options: string[];
+  status: 'open' | 'closed';
+  secret: boolean;
+  majorityRule: MajorityRule;
+  guestsVote: boolean;
+  quorum: Quorum | null;
+  openedAt: IsoDateTime | null;
+  closedAt: IsoDateTime | null;
+  result: VoteResult | null;
+  failedReason: 'quorum' | 'majority' | null;
+  tally: {
+    counts: Record<string, number>;
+    voted: number;
+    present: number;
+    revealed: boolean;
+    leading: string | null;
+    presentMembers: number | null;
+    presentGuests: number | null;
+  };
+  myBallot: { cast: boolean; choice: string | null };
+  canCast: boolean;
+}
+
+/** The participant view of an admitted guest. */
+export interface GuestView {
+  currentAgendaItemId: Uuid | null;
+  presentMembers: number;
+  admittedGuests: number;
+  agenda: GuestAgendaItem[];
+  votes: GuestVote[];
+}
+
+/** `GuestMe`: the own request or participation of this device. */
+export interface GuestMe {
+  guestId: Uuid;
+  number: number;
+  displayName: string | null;
+  status: GuestStatus;
+  /** Seconds until a new request is possible (rejected, removed), else `null`. */
+  retryAfter: number | null;
+  meeting: PublicMeetingHead;
+  view: GuestView | null;
+}
+
+/** `GET /gremien/{id}/meeting-defaults`: what a new meeting of the gremium allows. */
+export interface MeetingDefaults {
+  publicJoinAllowed: boolean;
+  quorumPercent: number | null;
 }

@@ -1,0 +1,28 @@
+// The shared top and bottom fade of a scroll area in the meeting overview. An end fades
+// only while more content lies past it (`appScrollFade="y"` sets the two classes).
+@mixin fade-y($size) {
+  &.is-fade-start {
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 $size);
+    mask-image: linear-gradient(to bottom, transparent, #000 $size);
+  }
+  &.is-fade-end {
+    -webkit-mask-image: linear-gradient(to top, transparent, #000 $size);
+    mask-image: linear-gradient(to top, transparent, #000 $size);
+  }
+  &.is-fade-start.is-fade-end {
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 $size,
+      #000 calc(100% - #{$size}),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 $size,
+      #000 calc(100% - #{$size}),
+      transparent
+    );
+  }
+}

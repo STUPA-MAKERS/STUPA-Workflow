@@ -1,0 +1,202 @@
+@use 'breakpoints' as bp;
+@use '../scroll-fade' as fade;
+
+/* The list/detail pane page of the applications and the tasks
+   (applications-list.component.scss), with the meetings as rows. */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.mtl {
+  min-width: 0;
+}
+/* One pane at a time the column takes at least the free height and the page scrolls. */
+.mtl:not(.mtl--split) {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
+.mtl:not(.mtl--split) > app-list-detail {
+  flex: 1 0 auto;
+}
+/* Side by side the page does not scroll: each pane scrolls inside itself. */
+.mtl--split {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* ------------------------------------------------------------------ list pane */
+/* The column, its header and the search bar are the shared list geometry: `.ld-pane`
+   (styles.scss) and `app-page-header` with `pane`. */
+
+/* The gap between the icon and the text of a header button; an icon button has none. */
+app-page-header app-button ::ng-deep .btn:not(.btn--icon) app-icon {
+  margin-inline-end: 4px;
+}
+
+.mtl__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.mtl__chip {
+  max-width: 100%;
+}
+
+/* ------------------------------------------------------------------ rows */
+.mtl__scroll {
+  --mtl-fade: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* The FAB covers the end of the list: room to scroll the last row above it. */
+  padding-bottom: calc(56px + var(--space-6));
+  @include fade.fade-y(var(--mtl-fade));
+}
+.mtl--split .mtl__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--mtl-fade);
+}
+.mtl--split .mtl__scroll > * {
+  flex: none;
+}
+
+.mtl__group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.mtl__month {
+  padding: 18px var(--space-4) 6px;
+}
+.mtl__group:first-child .mtl__month {
+  padding-top: var(--space-2);
+}
+.mtl__rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.mtl__row {
+  cursor: default;
+}
+.mtl__dot {
+  margin-inline: 6px;
+  color: var(--color-text-subtle);
+}
+
+/* The time over the number of agenda items, at the end of the row. */
+.mtl__trail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.mtl__facts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.mtl__time {
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+.mtl__tops {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.mtl__chev {
+  display: inline-flex;
+  margin-inline-end: calc(-1 * var(--space-2));
+  color: var(--color-text-muted);
+}
+
+.mtl__status {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.mtl__empty {
+  margin-block: var(--space-6);
+}
+.mtl__more {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+.mtl__more--start {
+  justify-content: flex-start;
+  padding-inline: var(--space-2);
+}
+.mtl__more app-icon {
+  margin-inline-end: 6px;
+}
+
+/* "Neue Sitzung": at the end of the list pane side by side, else fixed at the end of the
+   screen. */
+.mtl__fab {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
+  z-index: var(--z-sticky);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 56px;
+  padding: 0 var(--space-5) 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  box-shadow: var(--shadow-elevated);
+  cursor: pointer;
+}
+.mtl__fab:hover {
+  filter: brightness(1.08);
+}
+.mtl__fab:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.mtl--split .mtl__fab {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-4);
+}
+
+/* ------------------------------------------------------------------ detail pane */
+.mtl__detail {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+/* The empty sheet side by side: the same sheet as an open meeting, so nothing jumps. */
+.mtl__none {
+  display: grid;
+  flex: 1 1 auto;
+  place-items: center;
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+
+@include bp.phone {
+  .mtl__month {
+    padding-inline: var(--space-1);
+  }
+  .mtl__scroll {
+    padding-bottom: var(--space-4);
+  }
+}

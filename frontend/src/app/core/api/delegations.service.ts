@@ -41,6 +41,11 @@ export interface DelegationInput {
   meetingId: Uuid;
   delegateId: Uuid;
   delegateVoting: boolean;
+  /**
+   * The meeting lead enters a substitute for this missing member while the meeting is
+   * live (O6). Omit it to delegate for yourself.
+   */
+  delegatorId?: Uuid;
 }
 
 /** Selectable recipient (typeahead source). */
@@ -134,6 +139,17 @@ export class DelegationsApiService {
     return this.http.get<DelegationRecipient[]>(
       `${this.base}/delegations/meetings/${meetingId}/recipients`,
       { params: new HttpParams().set('q', q), context: skipLoading() },
+    );
+  }
+
+  /**
+   * The pool substitutes of one member for the lead entry (O6): the personal entries for
+   * the member and the gremium-wide entries. Only the meeting lead may ask (else 403).
+   */
+  poolSubstitutes(meetingId: Uuid, delegatorId: Uuid): Observable<DelegationRecipient[]> {
+    return this.http.get<DelegationRecipient[]>(
+      `${this.base}/delegations/meetings/${meetingId}/recipients`,
+      { params: new HttpParams().set('delegatorId', delegatorId), context: skipLoading() },
     );
   }
 

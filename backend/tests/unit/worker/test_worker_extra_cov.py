@@ -18,7 +18,6 @@ from uuid import uuid4
 
 import pytest
 from arq import Retry
-from freezegun import freeze_time
 
 import worker.deadlines as wd
 import worker.main as wmain
@@ -76,8 +75,9 @@ class _FinalizeFilesService:
 
     async def finalize_scan(
         self, aid: uuid.UUID, verdict: ScanVerdict, *, actor: str = "system"
-    ) -> None:
+    ) -> bool:
         _FinalizeFilesService.calls.append((aid, verdict, actor))
+        return True
 
 
 @pytest.fixture(autouse=True)
@@ -430,8 +430,21 @@ async def test_main_on_startup_calls_all_inits(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(wmain, "protocol_on_startup", await _mk("protocol"))
     monkeypatch.setattr(wmain, "webhook_on_startup", await _mk("webhook"))
     monkeypatch.setattr(wmain, "deadlines_on_startup", await _mk("deadlines"))
-    await wmain._on_startup({})
-    assert called == ["mail", "scan", "protocol", "webhook", "deadlines"]
+    monkeypatch.setattr(wmain, "backup_on_startup", await _mk("backup"))
+    sentinel = object()
+    built: list[tuple[Any, ...]] = []
+
+    def _build(*args: Any) -> object:
+        built.append(args)
+        return sentinel
+
+    monkeypatch.setattr(wmain, "build_worker_dispatcher", _build)
+    ctx: dict[str, Any] = {"redis": "pool", "settings": "cfg"}
+    await wmain._on_startup(ctx)
+    assert called == ["mail", "scan", "protocol", "webhook", "deadlines", "backup"]
+    # F2: the worker builds the full flow dispatcher once, over the arq pool.
+    assert ctx["flow_dispatcher"] is sentinel
+    assert built and built[0][0] == "pool" and built[0][2] == "cfg"
 
 
 # worker/deadlines.py: the discard log and the auto-transitions
@@ -459,29 +472,78 @@ def _dl_maker(sessions: list[Any]) -> Any:
     return lambda: _SessionCM(next(it))
 
 
-@freeze_time("2026-06-16 12:00:00")
-async def test_discard_unconfirmed_logs_when_rows_deleted() -> None:
-    session = _DlSession([], rowcount=2)
-    ctx = {"settings": SETTINGS, "deadlines_sessionmaker": _maker(session)}
-    assert await wd._discard_unconfirmed(ctx, NOW) == 2
-    assert session.committed == 1
+class _DiscardSession:
+    """A fake session for the discard: no settings row and no due application."""
+
+    def __init__(self) -> None:
+        self.committed = 0
+
+    async def get(self, _model: Any, _ident: Any) -> None:
+        return None
+
+    async def execute(self, _stmt: Any) -> Any:
+        return SimpleNamespace(all=lambda: [])
+
+    async def commit(self) -> None:
+        self.committed += 1
 
 
-@freeze_time("2026-06-16 12:00:00")
-async def test_discard_unconfirmed_none_rowcount() -> None:
-    session = _DlSession([])
-
-    async def _exec(_stmt: Any) -> Any:
-        return SimpleNamespace(rowcount=None)
-
-    session.execute = _exec  # type: ignore[method-assign]
+async def test_discard_unconfirmed_without_due_rows_writes_nothing() -> None:
+    session = _DiscardSession()
     ctx = {"settings": SETTINGS, "deadlines_sessionmaker": _maker(session)}
     assert await wd._discard_unconfirmed(ctx, NOW) == 0
+    assert session.committed == 0
+
+
+class _Storage:
+    def __init__(self, fail: set[str] | None = None) -> None:
+        self.removed: list[str] = []
+        self.fail = fail or set()
+
+    async def remove(self, key: str) -> None:
+        if key in self.fail:
+            raise StorageError("boom")
+        self.removed.append(key)
+
+
+async def test_remove_objects_without_keys_builds_no_storage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(wd, "build_object_storage", lambda _s: pytest.fail("built"))
+    await wd._remove_objects({}, SETTINGS, [])
+
+
+async def test_remove_objects_keeps_going_after_a_storage_error() -> None:
+    storage = _Storage(fail={"a"})
+    await wd._remove_objects({"object_storage": storage}, None, ["a", "b"])
+    assert storage.removed == ["b"]
+
+
+async def test_remove_objects_builds_the_storage_from_the_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage = _Storage()
+    monkeypatch.setattr(wd, "build_object_storage", lambda _s: storage)
+    await wd._remove_objects({}, SETTINGS, ["k"])
+    assert storage.removed == ["k"]
+
+
+async def test_remove_objects_without_storage_only_warns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Record the warning on the module logger itself. Another test in the suite can
+    # change the propagation of the "app" loggers, so caplog is not reliable here.
+    warnings: list[str] = []
+    monkeypatch.setattr(
+        wd.logger, "warning", lambda msg, *args: warnings.append(msg % args)
+    )
+    await wd._remove_objects({}, None, ["k"])
+    assert any("object(s) of discarded applications stay" in w for w in warnings)
 
 
 @pytest.fixture
 def _patched_auto(monkeypatch: pytest.MonkeyPatch) -> Any:
-    monkeypatch.setattr(wd, "build_notify_dispatcher", lambda _pool: object())
+    monkeypatch.setattr(wd, "build_worker_dispatcher", lambda *_a: object())
     yield
 
 

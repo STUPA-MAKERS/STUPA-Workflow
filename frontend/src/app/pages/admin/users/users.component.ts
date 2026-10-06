@@ -1,51 +1,56 @@
-import { SlicePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { liveSearch } from '@shared/live-search';
 import {
-  BadgeComponent,
-  ButtonComponent,
-  CellDirective,
-  type ColumnDef,
-  DataTableComponent,
-  IconComponent,
-  ToastService,
-} from '@stupa-makers/ui-kit';
+  AvatarComponent,
+  EmptyStateComponent,
+  NoteComponent,
+  PageHeaderComponent,
+  RowMenuComponent,
+  SearchPillComponent,
+  StickyBarComponent,
+  SkeletonComponent,
+} from '@shared/ui';
+import { ButtonComponent, ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, GroupMapping, Role } from '../admin.models';
+import type { RowMenuItem, RowMenuSection } from '@shared/ui';
+import { UserMergeComponent } from './user-merge/user-merge.component';
 
 /**
- * Users and roles as a table. The table follows the Nextcloud user table.
+ * Users (board Admin-Benutzer): a search and one row per principal.
  *
- * Each row holds one principal: name, e-mail, the global roles, the OIDC groups and
- * the last login. The roles are read-only. They come from the OIDC groups through the
- * group mappings (`/admin/group-mappings`), plus the bootstrap assignments (`admin`
- * from the settings and the implicit `member`). Gremium membership and gremium roles
- * have their own mappings on the same page. The frontend only gates the UX. The
- * server stays authoritative.
+ * A row shows the person, the global roles, the OIDC groups and the last login, and
+ * "Deaktivieren" or "Aktivieren". The roles are read-only. They come from the OIDC
+ * groups through the group mappings (`/admin/group-mappings`), plus the bootstrap
+ * assignments (`admin` from the settings and the implicit `member`). Gremium membership
+ * and gremium roles have their own mappings on the same page. The frontend only gates
+ * the UX. The server stays authoritative.
  */
 @Component({
   selector: 'app-admin-users',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    FormsModule,
     RouterLink,
-    SlicePipe,
     TranslatePipe,
-    CapitalizePipe,
+    LocalizedDatePipe,
     ButtonComponent,
-    BadgeComponent,
-    DataTableComponent,
-    CellDirective,
-    IconComponent,
+    AvatarComponent,
+    EmptyStateComponent,
+    NoteComponent,
     PageHeaderComponent,
+    RowMenuComponent,
+    SearchPillComponent,
+    StickyBarComponent,
+    SkeletonComponent,
+    UserMergeComponent,
   ],
   templateUrl: './users.component.html',
   styleUrl: './users.component.scss',
@@ -56,11 +61,26 @@ export class UsersComponent {
   private readonly i18n = inject(I18nService);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
+  private readonly capitalize = new CapitalizePipe();
 
   /** OIDC `sub` of the logged-in user. The view uses it to block self-deactivation. */
   protected readonly mySub = computed(() => this.auth.principal()?.sub ?? null);
 
-  protected readonly query = signal('');
+  /**
+   * The search runs while the user types (debounced, a new query cancels the old
+   * request). Below two characters the list shows every user.
+   */
+  protected readonly search = liveSearch<AdminPrincipal[]>({
+    run: (q) => this.api.listPrincipals(q),
+    result: (list) => {
+      this.principals.set(list);
+      this.loading.set(false);
+    },
+    error: () => {
+      this.loading.set(false);
+      this.toast.error(this.i18n.translate('admin.users.loadFailed'));
+    },
+  });
   protected readonly principals = signal<AdminPrincipal[]>([]);
   protected readonly roles = signal<Role[]>([]);
   /** The global group mappings. Empty without `admin.group_mappings`. */
@@ -69,37 +89,20 @@ export class UsersComponent {
   /** The group-mappings page needs its own permission. The hint links to it only then. */
   protected readonly canManageMappings = computed(() => this.auth.can('admin.group_mappings'));
 
+  /** "Mit anderem Konto zusammenführen" needs its own permission (admin only by default). */
+  protected readonly canMerge = computed(() => this.auth.can('admin.users.merge'));
+  /** The old account of the open merge dialog. Null: the dialog is closed. */
+  protected readonly mergeSource = signal<AdminPrincipal | null>(null);
+
   protected readonly rolesById = computed(() => new Map(this.roles().map((r) => [r.id, r])));
 
   /**
    * True until the first answer. Without it the table says "Keine Treffer" while the
    * request is still out, which asserts there is nothing when nothing has arrived yet.
+   * A later search keeps the rows and turns the magnifier into a spinner instead, so
+   * the list does not jump on every key press.
    */
   protected readonly loading = signal(true);
-
-  /**
-   * Widths are floors: the table scrolls rather than crushing a column. A `width` alone
-   * is a suggestion under `table-layout: auto`, so a column can be squeezed until every
-   * value wraps and no two rows are the same height.
-   */
-  protected readonly columns = computed<ColumnDef[]>(() => [
-    { key: 'name', label: this.i18n.translate('admin.users.col.name'), width: '14rem', card: 'title' },
-    // Long enough for a full university address without a mid-domain break.
-    { key: 'email', label: this.i18n.translate('admin.users.col.email'), width: '22rem' },
-    { key: 'roles', label: this.i18n.translate('admin.users.col.roles'), width: '16rem' },
-    { key: 'groups', label: this.i18n.translate('admin.users.col.groups'), width: '16rem' },
-    { key: 'lastLogin', label: this.i18n.translate('admin.users.col.lastLogin'), width: '9rem' },
-    {
-      key: 'actions',
-      label: this.i18n.translate('admin.users.col.actions'),
-      align: 'end',
-      // Pinned, so the row's actions stay reachable while the rest scrolls under them.
-      sticky: 'end',
-      width: '5rem',
-    },
-  ]);
-
-  protected readonly rowId = (p: unknown): string => (p as AdminPrincipal).id;
 
   constructor() {
     this.api.listRoles().subscribe((r) => this.roles.set(r));
@@ -117,27 +120,12 @@ export class UsersComponent {
     // The subscription and not one read of the snapshot: the palette can send us here
     // while we are already here, and a hit on another person changes only the query
     // string. The router keeps this component, so a snapshot read would never run again.
-    // The first emission arrives before the initial search, so there is one request.
+    // The query param map emits at once, so its first value makes the initial load.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
       const q = qp.get('q') ?? '';
-      if (q === this.query()) return;
-      this.query.set(q);
-      this.search();
-    });
-    this.search();
-  }
-
-  protected search(): void {
-    this.loading.set(true);
-    this.api.listPrincipals(this.query()).subscribe({
-      next: (list) => {
-        this.principals.set(list);
-        this.loading.set(false);
-      },
-      error: () => {
-        this.loading.set(false);
-        this.toast.error(this.i18n.translate('admin.users.loadFailed'));
-      },
+      if (q === this.search.text() && this.principals().length) return;
+      this.search.sync(q);
+      this.search.refresh();
     });
   }
 
@@ -162,6 +150,13 @@ export class UsersComponent {
     return role.label[this.i18n.locale()] ?? role.label['de'] ?? role.key;
   }
 
+  /** The global roles of one principal as one line, for example "Administration, Mitglied". */
+  protected roleText(p: AdminPrincipal): string {
+    return this.roleIds(p)
+      .map((id) => this.capitalize.transform(this.roleLabel(id)))
+      .join(', ');
+  }
+
   protected userLabel(p: AdminPrincipal): string {
     return p.displayName || p.email || p.sub;
   }
@@ -171,13 +166,39 @@ export class UsersComponent {
     return this.mySub() !== null && p.sub === this.mySub();
   }
 
+  /** The row menu of an account that is not merged. */
+  protected menuFor(p: AdminPrincipal): RowMenuSection[] {
+    return [
+      {
+        items: [
+          {
+            id: 'merge',
+            label: this.i18n.translate('admin.users.merge.action'),
+            icon: 'users',
+            danger: true,
+            disabledReason: this.isSelf(p) ? this.i18n.translate('admin.users.merge.notSelf') : null,
+          },
+        ],
+      },
+    ];
+  }
+
+  protected onMenu(item: RowMenuItem, p: AdminPrincipal): void {
+    if (item.id === 'merge') this.mergeSource.set(p);
+  }
+
+  /** The merge ran: the old account is now a reference. Reload the list. */
+  protected onMerged(): void {
+    this.search.refresh();
+  }
+
   protected setActive(principal: AdminPrincipal, active: boolean): void {
     this.api.setPrincipalActive(principal.id, active).subscribe({
       next: () => {
         this.toast.success(
           this.i18n.translate(active ? 'admin.users.activated' : 'admin.users.deactivated'),
         );
-        this.search();
+        this.search.refresh();
       },
       error: () => this.toast.error(this.i18n.translate('admin.users.actionFailed')),
     });

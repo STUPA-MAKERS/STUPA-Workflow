@@ -1,270 +1,600 @@
-/* The apply link is a secondary button. A signed-in member came for their tasks and
-   meetings, so it does not lead the page — but it is the one action they take FROM
-   here, so it has to read as a control rather than as text. */
-/* Their own line under the greeting. The negative top margin pulls them up against the
-   heading, because the page gap is sized for blocks and these belong to the line above. */
-.dash__gremien {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: calc(var(--space-6) * -1 + var(--space-2));
-}
+@use 'breakpoints' as bp;
+@use 'surface';
 
-/* The one action taken from this page, so it is a primary control rather than a quiet
-   outlined link. It still does not lead the page — a signed-in member came for their
-   tasks and meetings — but a bordered surface button beside panels of the same surface
-   disappeared into them, which is the opposite of what a call to action has to do. */
-.dash__apply {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  align-self: flex-start;
-  padding: var(--space-4) var(--space-6);
-  color: var(--color-on-primary);
-  background: var(--color-primary);
-  border: var(--border-width) solid var(--color-primary);
-  border-radius: var(--radius-md);
-  font-size: var(--fs-lg);
-  font-weight: var(--fw-semibold);
-  text-decoration: none;
-  transition:
-    background-color var(--motion-fast) var(--ease-standard),
-    border-color var(--motion-fast) var(--ease-standard);
-
-  &:hover,
-  &:focus-visible {
-    background: var(--color-primary-hover);
-    border-color: var(--color-primary-hover);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--color-focus);
-    outline-offset: 2px;
-  }
-}
-
-/* Full-width tap target on a phone, where the inline size was hardest to hit. */
-@media (max-width: 768px) {
-  .dash__apply {
-    width: 100%;
-    justify-content: center;
-  }
-}
-
+/* One column that scrolls with the page (narrow, phone): the head, "Heute", the work
+   list. Wide, the host is a pane page (`.pane-page` in styles.scss) and a grid: the list
+   column on the start side, the sheet "Heute" on the end side over the full height. */
 :host {
+  --dash-fade: var(--space-6);
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
 }
 
-/* Flex and grid items default to min-width: auto. A long application title without
-   a line break can make a panel wider than the viewport on mobile. This rule clamps
-   the item chain to 0, so the nowrap .dash__row-title class shows an ellipsis
-   instead of overflowing. */
-:host > *,
-.dash__panels > * {
+/* Flex and grid items default to min-width: auto, so a long title without a break would
+   push a column past the viewport. Clamp the chain to 0 and let the rows cut it. */
+:host > * {
   min-width: 0;
 }
 
-.dash__panels {
+:host(.dash--wide) {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1fr) clamp(420px, 26vw, 500px);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  column-gap: var(--space-6);
+  row-gap: 0;
+}
+:host(.dash--wide) > .dash__top {
+  grid-area: 1 / 1;
+}
+:host(.dash--wide) > .dash__head {
+  grid-area: 2 / 1;
+  margin-block: var(--space-5) var(--space-6);
+}
+:host(.dash--wide) > .dash__work {
+  grid-area: 3 / 1;
+  min-height: 0;
+}
+:host(.dash--wide) > .dash__today {
+  grid-area: 1 / 2 / -1 / 3;
+  min-height: 0;
 }
 
-@media (min-width: 52rem) {
-  .dash__panels {
-    grid-template-columns: 1fr 1fr;
-  }
+/* ------------------------------------------------------------------ head */
+
+/* Search at the start, the action at the end edge. */
+.dash__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+/* The pill shrinks before anything wraps. */
+.dash__search {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 600px;
+}
+
+/* A link that looks like a kit button (the kit button is a <button> only). */
+.dash__btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--control-height);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: filter var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard);
+}
+.dash__btn:focus-visible,
+.dash__more:focus-visible,
+.dash__fab:focus-visible,
+.dash__me:focus-visible,
+.dash__iconBtn:focus-visible,
+.dash__budget:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.dash__btn--fill {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+.dash__btn--fill:hover {
+  filter: brightness(1.08);
+}
+.dash__btn--block {
+  width: 100%;
+}
+
+/* The account button at the end of the phone pill. */
+.dash__me {
+  display: inline-flex;
+  margin-inline-end: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  cursor: pointer;
+}
+
+.dash__more {
+  flex: none;
+  padding: 6px 10px;
+  border-radius: var(--radius-pill);
+  color: var(--color-accent-text);
+  font-size: 0.8125rem; /* 13px */
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.dash__more:hover {
+  background: var(--color-surface-2);
+}
+
+.dash__dot {
+  margin-inline: 6px;
+  color: var(--color-text-subtle);
+}
+.dash__chev {
+  display: inline-flex;
+  color: var(--color-text-muted);
+}
+.dash__muted {
+  color: var(--color-text-muted);
+}
+.dash__date {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ work list */
+
+.dash__work {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* The tabs and "Alle … öffnen" share one rule under them. */
+.dash__tabbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.dash__tabs {
+  flex: 1 1 auto;
+}
+.dash__tabs ::ng-deep .tabs {
+  gap: var(--space-1);
+  border-bottom: 0;
+}
+.dash__tabs ::ng-deep .tabs__tab {
+  gap: var(--space-2);
+  padding-inline: 14px;
+}
+/* The count as a small plate, so it reads as a number of rows and not as a label. */
+.dash__tabs ::ng-deep .tabs__count {
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+  line-height: 18px;
+}
+
+/* Wide: the panel scrolls inside the list column; the tabs stay.
+
+   The rows of the work list sit on surface 2, as the row groups of the other lists on
+   the page background, with the page background between them (board B). */
+.dash__panel {
+  min-width: 0;
+  @include surface.context(1);
+  --dt-gap: var(--color-bg);
+}
+:host(.dash--wide) .dash__panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--dash-fade);
+}
+.dash__panel.is-fade-start,
+.dash__todayBody.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--dash-fade));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--dash-fade));
+}
+.dash__panel.is-fade-end,
+.dash__todayBody.is-fade-end {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--dash-fade));
+  mask-image: linear-gradient(to top, transparent, #000 var(--dash-fade));
+}
+.dash__panel.is-fade-start.is-fade-end,
+.dash__todayBody.is-fade-start.is-fade-end {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--dash-fade),
+    #000 calc(100% - var(--dash-fade)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--dash-fade),
+    #000 calc(100% - var(--dash-fade)),
+    transparent
+  );
+}
+
+/* A title takes up to two lines in the table, then the ellipsis. */
+.dash__cellTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  /* A margin, not a padding: the clamp cuts at the content box, and a padding would show
+     the top of the third line. */
+  margin-block: 6px;
+  font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
+}
+.dash__amount {
+  white-space: nowrap;
+}
+.dash__ballot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-accent-text);
+  white-space: nowrap;
+}
+.dash__ballot--pending {
+  color: var(--color-warning);
 }
 
 .dash__state {
-  color: var(--color-text-muted);
   margin: 0;
+  padding: var(--space-4);
+  color: var(--color-text-muted);
 }
-
 .dash__state--error {
   color: var(--color-danger);
 }
 
-.dash__empty-cta {
-  color: var(--color-primary);
-  font-weight: var(--fw-medium);
-  text-decoration: none;
+/* Empty tab: the empty state, and for a new user the card "Antrag stellen" beside it. */
+.dash__emptyGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: stretch;
+  padding-top: var(--space-2);
+}
+.dash__emptyGrid--two {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+}
+.dash__emptyBox {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+}
+/* The empty state of a block, not of a page: a smaller heading and less air. */
+.dash__emptyBox ::ng-deep .es {
+  padding: var(--space-6) var(--space-5);
+}
+.dash__emptyBox ::ng-deep .es__icon {
+  box-sizing: content-box;
+  width: 22px;
+  height: 22px;
+  padding: 13px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+}
+.dash__emptyBox ::ng-deep .es__heading {
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+.dash__emptyBox ::ng-deep .es__body {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
 }
 
-.dash__empty-cta:hover {
-  text-decoration: underline;
+.dash__apply {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.dash__applyH {
+  margin: 0;
+  padding-inline: var(--space-1);
+  font-size: var(--fs-h3);
+  line-height: var(--lh-h3);
+  font-weight: var(--fw-semibold);
+}
+.dash__typeIcon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-container);
+  color: var(--color-on-accent-container);
 }
 
-.dash__row {
+/* ------------------------------------------------------------------ "Heute" */
+
+/* The sheet: surface 1, round, the body scrolls inside it (wide). Narrow, the same block
+   is a card at the top of the page. */
+.dash__today {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+  @include surface.context(1);
+}
+:host(.dash--wide) .dash__today {
+  overflow: hidden;
+}
+
+.dash__todayHead {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 18px var(--space-3) 10px var(--space-5);
+}
+.dash__todayTitle {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.dash__todayDate {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+}
+.dash__todayH {
+  margin: 0;
+  font-size: var(--fs-h1);
+  line-height: var(--lh-h1);
+  font-weight: var(--fw-semibold);
+}
+.dash__iconBtn {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-muted);
+}
+.dash__iconBtn:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+.dash__todayBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  padding: 0 14px 14px;
+}
+.dash__todayBody > * {
+  flex: none;
+}
+:host(.dash--wide) .dash__todayBody {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.dash__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.dash__blockHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
-  border-bottom: var(--border-width) solid var(--color-border);
+  gap: var(--space-2);
+  min-height: 2rem;
+  padding: 10px 6px 0;
+}
+.dash__blockHead .dash__more {
+  margin-inline-end: -4px;
 }
 
-.dash__row:last-child {
-  border-bottom: none;
-}
-.dash__row:active {
-  background: var(--color-surface-sunken);
-  border-radius: var(--radius-md);
-}
-
-.dash__row-link {
+/* The live meeting: a block on surface 2 with its progress on surface 3. */
+.dash__live {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+}
+.dash__liveHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   min-width: 0;
+}
+.dash__liveText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dash__liveTitle {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.dash__name {
+  display: -webkit-box;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: var(--fs-h3);
+  line-height: 1.25rem;
+  font-weight: var(--fw-semibold);
+}
+.dash__liveTitle app-status-text {
+  flex: none;
+}
+.dash__sub {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.1875rem;
+}
+
+.dash__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-3);
+}
+/* On surface 3 the muted text keeps 4.5:1; the subtle text does not. */
+.dash__progress .dash__sub {
+  color: var(--color-text-muted);
+}
+.dash__progressLine {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.dash__progressLabel {
+  flex: 1 1 auto;
+  font-weight: var(--fw-medium);
+}
+.dash__progressCount {
+  flex: none;
+  font-size: 0.8125rem;
+  word-spacing: -0.15em;
+}
+.dash__voteLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin: 0;
+  padding-inline: 2px;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.1875rem;
+}
+
+.dash__note {
+  color: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
+}
+
+/* The budget summary: a link card on surface 2. */
+.dash__budget {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  color: inherit;
   text-decoration: none;
 }
-
-.dash__row-title {
-  color: var(--color-primary);
-  font-weight: var(--fw-medium);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.dash__budget:hover {
+  background: var(--color-surface-3);
+}
+.dash__budgetHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+.dash__budgetTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: var(--fw-semibold);
+}
+.dash__budgetSum {
+  flex: none;
+  font-size: 0.9375rem;
 }
 
-.dash__row-link:hover .dash__row-title {
-  text-decoration: underline;
+
+/* Row feedback. In a row group the rows already sit on surface 2, the hover colour of
+   the list item, so hover and press take surface 3. The row keeps the corners the group
+   gives it. */
+.rowgroup > app-list-item ::ng-deep .li {
+  border-radius: inherit;
+}
+.rowgroup > app-list-item:hover ::ng-deep .li,
+.rowgroup > app-list-item:active ::ng-deep .li {
+  background: var(--color-surface-3);
 }
 
-.dash__row-meta {
+/* ------------------------------------------------------------------ narrow */
+
+/* Narrow (not a phone): the blocks of "Heute" sit side by side in the card. */
+@include bp.narrow {
+  .dash__todayBody {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+    align-items: start;
+    column-gap: var(--space-4);
+  }
+}
+
+/* ------------------------------------------------------------------ phone */
+
+/* The floating apply button stands above the bottom bar. The route data `fab` makes the
+   shell keep the foot of the page free for it, below the footer (shell.component.scss). */
+.dash__fab {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
+  z-index: var(--z-sticky);
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
-  flex-shrink: 0;
-}
-
-.dash__row-cta {
-  color: var(--color-primary);
-  font-size: var(--fs-sm);
-  text-decoration: none;
-  white-space: nowrap;
-}
-.dash__row-cta:hover {
-  text-decoration: underline;
-}
-
-.dash__row-date {
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-  font-variant-numeric: tabular-nums;
-}
-
-.dash__more {
-  align-self: start;
-  margin-top: auto;
-  color: var(--color-primary);
-  font-weight: var(--fw-medium);
-  font-size: var(--fs-sm);
-  text-decoration: none;
-}
-
-.dash__more:hover {
-  text-decoration: underline;
-}
-
-.dash__quick-h {
-  margin: 0 0 var(--space-4);
-  font-size: var(--fs-md);
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.dash__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
-  gap: var(--space-4);
-}
-
-.dash__tile {
-  display: grid;
-  text-decoration: none;
-  color: inherit;
-}
-
-.dash__link {
-  color: var(--color-primary);
-  font-weight: var(--fw-medium);
-  font-size: var(--fs-sm);
-}
-
-.dash__session {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-4);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
+  height: 56px;
+  padding: 0 var(--space-5) 0 var(--space-4);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  transition:
-    box-shadow var(--motion-base) var(--ease-standard),
-    border-color var(--motion-base) var(--ease-standard),
-    background-color var(--motion-fast) var(--ease-standard);
-}
-.dash__session:hover {
-  box-shadow: var(--shadow-md);
-  border-color: var(--color-border-strong);
-}
-.dash__session:active {
-  background: var(--color-surface-sunken);
-  border-color: var(--color-border-strong);
-}
-.dash__session--live {
-  border-color: var(--color-success);
-}
-.dash__session-badge {
-  position: absolute;
-  top: var(--space-3);
-  right: var(--space-3);
-}
-.dash__session-title {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--fs-md);
   font-weight: var(--fw-semibold);
-  /* Room for the badge in the top-right. */
-  padding-right: 4.5rem;
-}
-.dash__session-date {
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-  font-variant-numeric: tabular-nums;
-}
-.dash__session .dash__link {
-  /* Push the link to the bottom left of the tile. */
-  margin-top: auto;
-  align-self: start;
+  text-decoration: none;
+  box-shadow: var(--shadow-elevated);
 }
 
-@media (max-width: 768px) {
-  .dash__row {
-    flex-wrap: wrap;
-  }
-  .dash__row-link {
-    flex: 1 1 100%;
-  }
-  .dash__row-meta {
-    flex-wrap: wrap;
-  }
-  /* One column so each tile is a full-width tap target. */
-  .dash__grid {
-    grid-template-columns: 1fr;
-  }
+:host(.dash--phone) {
+  gap: var(--space-5);
 }
-
-/* The loading placeholder of a panel. Each line stands in for a list row, so the panel
-   keeps roughly the height it will have. */
-.dash__skel {
-  padding: var(--space-2) 0;
+/* Phone: "Heute" is a band on the page, not a card; its blocks keep their surfaces. */
+:host(.dash--phone) .dash__today {
+  border-radius: 0;
+  background: none;
 }
-.dash__skel .skel--line {
-  height: 1.75rem;
-  margin-bottom: var(--space-2);
+:host(.dash--phone) .dash__todayHead {
+  padding: 0 var(--space-1) var(--space-1);
+}
+:host(.dash--phone) .dash__todayH {
+  font-size: var(--fs-h2);
+  line-height: var(--lh-h2);
+}
+:host(.dash--phone) .dash__todayBody {
+  padding: 0;
+}
+:host(.dash--phone) .dash__tabs ::ng-deep .tabs__tab {
+  padding-inline: var(--space-2);
+}
+/* Phone: "Alle … öffnen" under the rows, at the end edge. */
+:host(.dash--phone) .dash__all {
+  align-self: flex-end;
+  margin-inline-end: -4px;
+}
+/* Phone: the empty states are compact, so the next block stays in view. */
+:host(.dash--phone) .dash__emptyBox ::ng-deep .es {
+  padding: var(--space-5) var(--space-4);
 }

@@ -49,7 +49,7 @@ from app.shared.errors import BadRequestError, ConflictError
 pytestmark = pytest.mark.integration
 
 _CONFIG = VoteConfig.model_validate(
-    {"options": ["yes", "no"], "majorityRule": "simple", "allowChange": False}
+    {"options": ["yes", "no"], "majorityRule": "simple"}
 )
 
 
@@ -92,7 +92,13 @@ async def _member(session: AsyncSession, gremium: Gremium) -> PrincipalRow:
     p = PrincipalRow(sub=f"s-{uuid.uuid4()}", display_name="Max P", email="m@x.de")
     session.add(p)
     await session.flush()
-    role = GremiumRole(gremium_id=gremium.id, key=f"r-{uuid.uuid4()}", name_i18n={"de": "M"})
+    # O20: the member can keep the minutes.
+    role = GremiumRole(
+        gremium_id=gremium.id,
+        key=f"r-{uuid.uuid4()}",
+        name_i18n={"de": "M"},
+        permissions=["protocol.write"],
+    )
     session.add(role)
     await session.flush()
     session.add(
@@ -249,7 +255,7 @@ async def test_open_vote_lookup(session: AsyncSession) -> None:
     vote = Vote(
         application_id=application.id,
         meeting_id=meeting.id,
-        eligible_group="stupa",
+        eligible_group=str(gremium.id),
         config=_CONFIG.model_dump(by_alias=True),
         eligible_count=5,
         status="open",
@@ -280,15 +286,12 @@ async def test_parallel_casts_yield_single_ballot(
     session.add(vote)
     await session.commit()
 
-    # A voter needs the ``vote.cast`` permission AND the voting membership in the GREMIUM
-    # (service.cast, fail-closed). The membership is the namespaced key
-    # ``vote:<gremium>`` (AUD-066), which only a real vote.cast membership sets. The
-    # bare UUID string does not work. Set both, or the cast gives 403.
+    # A voter needs the gremium `vote.cast` in the GREMIUM of the vote (service.cast,
+    # fail-closed). The right is the namespaced key ``vote:<gremium>`` (AUD-066), which
+    # only a real vote.cast membership sets. The bare UUID string does not work.
     from app.modules.auth.rbac import vote_group_key
 
-    principal = Principal(
-        sub="alice", permissions={"vote.cast"}, groups={vote_group_key(gremium.id)}
-    )
+    principal = Principal(sub="alice", groups={vote_group_key(gremium.id)})
     from datetime import UTC, datetime
 
     now = datetime.now(UTC)
@@ -408,7 +411,8 @@ async def test_broker_publisher_roundtrip_over_redis(redis_url: str) -> None:
 async def test_agenda_set_body_renames_freetext_top_only(session: AsyncSession) -> None:
     """``set_body(title=...)`` renames free-text agenda items but never application ones."""
     gremium, application = await _gremium_and_application(session)
-    meeting = Meeting(gremium_id=gremium.id, title="GV", status="planned")
+    # The body needs a live meeting (O22). The rename alone also passes when planned.
+    meeting = Meeting(gremium_id=gremium.id, title="GV", status="live")
     session.add(meeting)
     await session.flush()
     free = MeetingAgendaItem(

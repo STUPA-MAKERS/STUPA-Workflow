@@ -1,10 +1,38 @@
-.home {
-  padding-block: var(--space-10) var(--space-8);
-  max-width: 46rem;
-}
+@use 'breakpoints' as bp;
 
+/* Centred in the free space of the public frame (the shell main is a flex column). */
+:host {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+.home {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+  width: min(55rem, 100%);
+  padding-block: var(--space-8);
+}
+.home__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+}
 .home__heading {
-  margin-block: var(--space-3) var(--space-6);
+  margin: 0;
+  font-size: 2.75rem;
+  line-height: 3.25rem;
+  letter-spacing: -0.01em;
+}
+.home__welcome {
+  max-width: 40rem;
+  margin: 0;
+  color: var(--color-text-muted);
+  white-space: pre-line;
 }
 
 /* Two columns that collapse to one. Both choices keep the same width and the same
@@ -12,58 +40,73 @@
    that question for them. */
 .home__choices {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
   gap: var(--space-4);
+  width: 100%;
 }
-
 .home__choice {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-2);
-  padding: var(--space-5);
   min-height: 100%;
+  padding: 28px;
+  border: 0;
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
   color: var(--color-text);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-lg);
-  text-align: left;
-  text-decoration: none;
   font: inherit;
+  text-align: start;
+  text-decoration: none;
   cursor: pointer;
-  transition:
-    border-color var(--motion-fast) var(--ease-standard),
-    background-color var(--motion-fast) var(--ease-standard);
-
-  &:hover,
-  &:focus-visible {
-    border-color: var(--color-primary);
-    background: var(--color-surface-hover, var(--color-surface));
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--color-focus);
-    outline-offset: 2px;
-  }
+  transition: background-color var(--motion-fast) var(--ease-standard);
 }
-
+.home__choice:hover {
+  background: var(--color-surface-2);
+}
+.home__choice:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.home__icon {
+  margin-bottom: var(--space-3);
+  color: var(--color-accent-text);
+}
 .home__choice-title {
-  font-size: var(--fs-lg);
+  font-size: var(--fs-h1);
+  line-height: var(--lh-h1);
   font-weight: var(--fw-semibold);
 }
-
 .home__choice-desc {
-  font-size: var(--fs-sm);
   color: var(--color-text-muted);
 }
-
-.home__note {
-  margin-top: var(--space-6);
+.home__go {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-3);
+  color: var(--color-accent-text);
   font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+.home__note {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  text-align: center;
 }
 
-@media (max-width: 768px) {
+@include bp.phone {
   .home {
-    padding-block: var(--space-6) var(--space-6);
+    gap: var(--space-5);
+    padding-block: var(--space-4);
+  }
+  .home__heading {
+    font-size: var(--fs-d2);
+    line-height: var(--lh-d2);
+  }
+  .home__choice {
+    padding: var(--space-5);
+    border-radius: var(--radius-xl);
   }
 }

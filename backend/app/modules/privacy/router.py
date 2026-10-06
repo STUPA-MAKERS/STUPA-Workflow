@@ -230,6 +230,7 @@ async def auskunft(
             "applications": len(data["applications"]),
             "comments": len(data["comments"]),
             "attachments": len(data["attachments"]),
+            "attendance": len(data["attendance"]),
             "hasPrincipal": data["principal"] is not None,
         },
     )

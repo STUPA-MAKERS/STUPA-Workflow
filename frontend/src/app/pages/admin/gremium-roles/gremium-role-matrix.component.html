@@ -1,0 +1,158 @@
+<section
+  class="rm"
+  [class.rm--bg3]="surface() === 3"
+  [attr.aria-labelledby]="heading() ? uid + '-title' : null"
+>
+  @if (heading() || canEdit()) {
+    <header class="rm__head">
+      @if (heading()) {
+        <h3 class="cap rm__title" [id]="uid + '-title'">
+          {{ 'admin.gremiumRoles.matrixTitle' | t }}
+        </h3>
+      }
+      @if (canEdit()) {
+        <app-button class="rm__add" size="sm" variant="tonal" (click)="openAdd()">
+          <app-icon name="plus" [size]="16" /> {{ 'admin.gremiumRoles.add' | t }}
+        </app-button>
+      }
+    </header>
+  }
+
+  @if (loading()) {
+    <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
+  } @else if (failed()) {
+    <p class="rm__error" role="alert">{{ 'admin.gremiumRoles.loadFailed' | t }}</p>
+  } @else {
+    <div
+      class="rowgroup rm__table"
+      [class.rowgroup--bg3]="surface() === 3"
+      role="table"
+      [attr.aria-label]="
+        ('admin.gremiumRoles.matrixTitle' | t) + (gremiumName() ? ': ' + gremiumName() : '')
+      "
+    >
+      <div class="rm__row rm__row--head" role="row">
+        <span class="rm__colRole" role="columnheader">{{ 'admin.gremiumRoles.colRole' | t }}</span>
+        @for (p of permissions; track p) {
+          <span class="rm__colPerm" role="columnheader">
+            <span class="rm__colLabel">{{ permLabel(p) | t }}</span>
+            <!-- The key may break after its dot, never inside a word. -->
+            <span class="mono rm__colKey">{{ keyHead(p) }}.<wbr />{{ keyTail(p) }}</span>
+          </span>
+        }
+        <span class="rm__colAct" role="columnheader"
+          ><span class="sr-only">{{ 'admin.common.actions' | t }}</span></span
+        >
+      </div>
+
+      @for (r of sorted(); track r.id) {
+        <div class="rm__row" role="row">
+          <div class="rm__role" role="rowheader">
+            <span class="rm__nameLine">
+              <span class="rm__name ell" [title]="label(r) | capitalize">{{
+                label(r) | capitalize
+              }}</span>
+              @if (r.forced) {
+                <span class="rm__forced" [title]="'admin.gremiumRoles.forced' | t">{{
+                  'admin.gremiumRoles.forcedTag' | t
+                }}</span>
+              }
+            </span>
+            @if (canGroups()) {
+              @let groups = groupsOf(r);
+              @if (isMember(r)) {
+                <span class="rm__groups">
+                  {{ 'admin.gremiumRoles.memberVia' | t }}
+                  <span class="mono">{{ groups.length ? groups.join(', ') : '—' }}</span>
+                </span>
+              } @else if (groups.length) {
+                <span class="rm__groups mono">{{ groups.join(', ') }}</span>
+              }
+            }
+          </div>
+          @for (p of permissions; track p) {
+            <div class="rm__cell" role="cell">
+              <label
+                class="rm__chip"
+                [class.rm__chip--on]="has(r, p)"
+                [class.rm__chip--off]="!canEdit()"
+              >
+                <input
+                  type="checkbox"
+                  class="rm__box"
+                  [checked]="has(r, p)"
+                  [disabled]="!canEdit() || busy().has(r.id)"
+                  [attr.aria-label]="(permLabel(p) | t) + ': ' + (label(r) | capitalize)"
+                  (change)="toggle(r, p, $event)"
+                />
+                <span class="rm__chipText" aria-hidden="true">{{ permLabel(p) | t }}</span>
+              </label>
+            </div>
+          }
+          <div class="rm__act" role="cell">
+            @if (canEdit()) {
+              <app-button
+                variant="text"
+                size="sm"
+                [iconOnly]="true"
+                [ariaLabel]="('action.edit' | t) + ': ' + (label(r) | capitalize)"
+                [title]="'action.edit' | t"
+                (click)="openEdit(r)"
+              >
+                <app-icon name="edit" />
+              </app-button>
+              <app-button
+                variant="text"
+                size="sm"
+                [iconOnly]="true"
+                [disabled]="!!r.forced"
+                [ariaLabel]="('admin.gremiumRoles.delete' | t) + ': ' + (label(r) | capitalize)"
+                [title]="
+                  r.forced ? ('admin.gremiumRoles.forced' | t) : ('admin.gremiumRoles.delete' | t)
+                "
+                (click)="askDelete(r)"
+              >
+                <app-icon name="trash" />
+              </app-button>
+            }
+          </div>
+        </div>
+      } @empty {
+        <div class="rm__row rm__row--empty" role="row">
+          <span role="cell">{{ 'admin.gremiumRoles.empty' | t }}</span>
+        </div>
+      }
+    </div>
+  }
+</section>
+
+<app-gremium-role-dialog
+  [open]="dialogRole() !== undefined"
+  [role]="lastDialogRole()"
+  [gremiumId]="gremiumId()"
+  [gremiumName]="gremiumName()"
+  [groups]="groupsOf(lastDialogRole())"
+  [showGroups]="canGroups()"
+  (closed)="closeDialog()"
+  (saved)="onSaved($event)"
+  (deleteRequested)="askDelete($event)"
+/>
+
+<app-dialog
+  [open]="confirmDelete() !== null"
+  [title]="'admin.gremiumRoles.deleteTitle' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="confirmDelete.set(null)"
+>
+  @if (confirmDelete(); as r) {
+    <p class="rm__dialogText">{{ 'admin.gremiumRoles.deleteConfirm' | t: { name: label(r) } }}</p>
+  }
+  <div dialog-footer class="rm__dialogFoot">
+    <app-button variant="text" (click)="confirmDelete.set(null)">{{
+      'action.cancel' | t
+    }}</app-button>
+    <app-button variant="danger" [loading]="deleting()" (click)="doDelete()">{{
+      'admin.gremiumRoles.delete' | t
+    }}</app-button>
+  </div>
+</app-dialog>

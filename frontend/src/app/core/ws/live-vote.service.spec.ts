@@ -47,6 +47,13 @@ describe('LiveVoteService', () => {
     expect(source.channels[0].sent[0]).toEqual({ type: 'subscribe' });
   });
 
+  it('keeps the public participation of the meeting (guest_counts)', () => {
+    const s = svc.open('m-1', { beamer: true });
+    const frame = { type: 'guest_counts', joinCode: '7KQ4MP', admittedGuests: 7 } as const;
+    source.channels[0].subject.next(frame);
+    expect(s.guestCounts()).toEqual(frame);
+  });
+
   it('opens the beamer stream read-only when requested', () => {
     const s = svc.open('m-1', { beamer: true });
     expect(source.lastBeamer).toBe(true);
@@ -171,6 +178,20 @@ describe('LiveVoteService', () => {
     });
     s.cast('no');
     expect(ch.sent).toContainEqual({ type: 'cast', voteId: 'v9', choice: 'no' });
+  });
+
+  it('marks a represented ballot with asDelegation', () => {
+    const s = svc.open('m-1');
+    const ch = source.channels[0];
+    ch.subject.next({
+      type: 'vote_opened',
+      voteId: 'v9',
+      applicationId: 'a1',
+      options: ['yes', 'no'],
+      closesAt: null,
+    });
+    s.cast('yes', true);
+    expect(ch.sent).toContainEqual({ type: 'cast', voteId: 'v9', choice: 'yes', asDelegation: true });
   });
 
   it('ignores casts when no vote is open', () => {

@@ -99,7 +99,7 @@ async def get_protocol(
 
     This is the reload and poll path. The read scope is the meeting view
     (`assert_can_read`): gremium members, pool substitutes, delegation
-    recipients, plus the global `meeting.view_all`, `meeting.manage` and admin.
+    recipients, plus the global `meeting.view_all` and admin.
     """
     await service.authorize_read_meeting(meeting_id, principal)
     return await service.get_by_meeting(meeting_id)
@@ -164,26 +164,29 @@ async def embed_votes(
 @router.post(
     "/protocols/{protocol_id}/finalize",
     response_model=ProtocolOut,
-    responses=_errors(401, 403, 404, 503),
+    responses=_errors(400, 401, 403, 404, 409, 503),
 )
 async def finalize_protocol(
     protocol_id: UUID, service: ServiceDep, request: Request, principal: PrincipalDep
 ) -> ProtocolOut:
     """Start the finalization: set `status=rendering` and enqueue `render_protocol`.
 
-    The caller needs write access AND `protocol.finalize`, either global or as
-    a gremium role. This is stricter than a write to the draft.
+    The caller needs write access AND the gremium permission `protocol.finalize`
+    in the gremium of the meeting (or the admin role). This is stricter than a
+    write to the draft.
+
+    The meeting must be closed (409 `meeting_not_closed`, F8, O13), and the
+    protocol must be a draft (409 `protocol_not_draft`): a protocol is finalized
+    once, also when several members kept the minutes (O2). The start writes
+    `protocol_finalize`.
 
     The call does not block, because the typst render runs in the arq worker.
     The worker sets `final` and sends the mail. A permanent failure falls back
-    to `draft`. Without Redis the request renders synchronously as a fallback,
-    so a protocol never stays stuck in `rendering`. The call is idempotent: it
-    returns `rendering` or `final` unchanged and never renders or sends twice.
+    to `draft`, and a new call starts again. Without Redis the request renders
+    synchronously as a fallback, so a protocol never stays stuck in `rendering`.
     """
     await service.authorize_finalize(protocol_id, principal)
-    out, needs_render = await service.start_finalize(protocol_id)
-    if not needs_render:
-        return out
+    out = await service.start_finalize(protocol_id, actor=principal.sub)
     pool = getattr(request.app.state, "arq_pool", None)
     queue = protocol_render_queue_from_pool(pool)
     if queue is None:

@@ -1,0 +1,63 @@
+@let key = (nodes().at(-1)?.pathKey ?? '') | simplifyPath;
+@let squeeze = fit().squeeze;
+<nav
+  #nav
+  class="bd__crumbs"
+  [class.bd__crumbs--parents]="squeeze === 'parents' || squeeze === 'name'"
+  [attr.aria-label]="'budget.breadcrumbs' | t"
+>
+  @for (item of items(); track item.kind === 'more' ? 'more' : item.node.id; let first = $first) {
+    @if (item.kind === 'more') {
+      <app-row-menu
+        class="bd__more"
+        [class.bd__more--lead]="first"
+        text="…"
+        align="start"
+        [label]="'budget.crumbs.more' | t"
+        [sections]="menuSections(item.nodes)"
+        (selected)="choose($event.id)"
+      />
+      <app-icon class="bd__crumbSep" name="chevron-right" [size]="sepIcon" />
+    } @else if (item.current) {
+      <span
+        #current
+        class="bd__crumb bd__crumb--current ell"
+        [class.bd__crumb--tight]="squeeze === 'name'"
+        [style.--crumb-w]="crumbWidth(item.index)"
+        aria-current="page"
+        tabindex="-1"
+        [attr.data-node]="item.node.id"
+        [title]="item.node.name"
+        >{{ item.node.name }}</span
+      >
+      <!-- The key shortens at its start, so its end (the own level) stays visible. -->
+      <span class="bd__key mono" [class.bd__key--tight]="squeeze !== 'none'"
+        [class.bd__key--min]="squeeze === 'parents' || squeeze === 'name'"
+        [style.--key-w]="keyWidth()"
+        [title]="key"
+        ><span class="bd__keyText">{{ key }}</span></span
+      >
+    } @else {
+      <button
+        type="button"
+        class="bd__crumb ell"
+        [style.--crumb-w]="crumbWidth(item.index)"
+        [title]="item.node.name"
+        (click)="choose(item.node.id)"
+      >
+        {{ item.node.name }}
+      </button>
+      <app-icon class="bd__crumbSep" name="chevron-right" [size]="sepIcon" />
+    }
+  }
+  <!-- The natural widths, for the fit. The names are drawn from an attribute, so neither
+       a screen reader nor a text search finds them twice. -->
+  <span #measure class="bd__measure" aria-hidden="true">
+    @for (node of nodes(); track node.id; let last = $last) {
+      <span data-crumb [class.bd__measureParent]="!last" [attr.data-text]="node.name"></span>
+    }
+    <span data-key class="bd__measureKey mono" [attr.data-text]="key"></span>
+    <span data-min class="bd__measureMin"></span>
+    <span data-more class="bd__measureMore" data-text="…"></span>
+  </span>
+</nav>

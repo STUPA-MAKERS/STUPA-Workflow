@@ -31,10 +31,46 @@ class AuditAction(StrEnum):
     EXPORT = "export"
     # Meeting deleted. To delete a finalized meeting you need ``meeting.delete_finalized``.
     MEETING_DELETE = "meeting_delete"
+    # Meeting and agenda (F12). ``data`` carries id references and planning values
+    # only. MEETING_UPDATE records a status change and a change of the date, the times
+    # or the protokollant, each as ``{"from": ..., "to": ...}``. The current agenda item
+    # and the beamer focus change many times in a meeting and are not recorded.
+    # AGENDA_ITEM_UPDATE names the changed fields, never the Markdown text: a body
+    # edit is recorded only after the close, as a correction of the minutes (O22).
+    MEETING_CREATE = "meeting_create"
+    MEETING_UPDATE = "meeting_update"
+    AGENDA_ITEM_ADD = "agenda_item_add"
+    AGENDA_ITEM_UPDATE = "agenda_item_update"
+    AGENDA_ITEM_REMOVE = "agenda_item_remove"
+    AGENDA_REORDER = "agenda_reorder"
+    # Attendance set or reset by the meeting lead (F12, Z2). ``data`` carries the
+    # principal id and the status before and after the change. It never carries the
+    # note, because the reason of an excuse is personal data. The own report of a
+    # member is not recorded.
+    ATTENDANCE_SET = "attendance_set"
+    ATTENDANCE_RESET = "attendance_reset"
     # Application deleted. This admin action is irreversible. It cascades to PII,
     # versions, status events, magic links, comments, budget entries and votes.
     # ``data`` carries only id references and metadata, never raw PII.
     APPLICATION_DELETE = "application_delete"
+    # Application created (F12). ``data`` carries the type, the gremium, the initial
+    # state and whether the email still needs a confirmation. It never carries the
+    # email, the name or a field value.
+    APPLICATION_CREATE = "application_create"
+    # Application captured on behalf of an applicant (#11). The actor is the capturing
+    # person. ``data`` carries the kind of the applicant (``principal`` or ``guest``),
+    # the principal id of an account applicant, the received date, whether an intake
+    # note exists and whether a guest e-mail matched an active account
+    # (``matchedByEmail``). It never carries the email, the name or the note text.
+    APPLICATION_CREATE_ON_BEHALF = "application_create_on_behalf"
+    # An application without a confirmed email was discarded after
+    # ``guest_application_settings.confirm_ttl_hours`` (Z1). ``data`` carries the
+    # type, the gremium, the attachment count and the window, never PII.
+    GUEST_APPLICATION_DISCARD = "guest_application_discard"
+    # Application data edited (PATCH). ``data`` carries the new version number and
+    # the keys of the added, removed and changed fields. It never carries a value,
+    # because a field value can hold PII. The version diff keeps the values.
+    APPLICATION_UPDATE = "application_update"
     # Application archived or brought back. Reversible, unlike the delete above, but it
     # changes what the working list shows, so both directions are recorded. ``data``
     # carries id references and the direction, never raw PII.
@@ -46,6 +82,12 @@ class AuditAction(StrEnum):
     APPLICATION_SHARE = "application_share"
     APPLICATION_SHARE_REVOKE = "application_share_revoke"
     WEBHOOK_CONFIG = "webhook_config"
+    # Attachment uploaded (F12). ``data`` names the application, or carries
+    # ``draft: true`` for a draft upload of the wizard (Z4). It holds the field key,
+    # the comparison-offer flag, the MIME type and the size, never the file name,
+    # because a file name can hold PII. The quarantine and the delete of a draft carry
+    # ``draft: true`` the same way.
+    ATTACHMENT_UPLOAD = "attachment_upload"
     ATTACHMENT_QUARANTINE = "attachment_quarantine"
     ATTACHMENT_DELETE = "attachment_delete"
     # Application comment edited or removed in place. A comment keeps no version
@@ -57,8 +99,38 @@ class AuditAction(StrEnum):
     # Draft protocol removed. A finalized protocol is a signed record and the
     # route refuses to delete it.
     PROTOCOL_DELETE = "protocol_delete"
+    # Start of the finalization of a protocol (F8, F12). ``data`` carries the meeting
+    # and the gremium. A render that fails sets the protocol back to a draft, and a
+    # new finalization writes a new entry.
+    PROTOCOL_FINALIZE = "protocol_finalize"
+    # Handover of the minutes during a live meeting (Z3, F12). ``data`` carries the
+    # ``mode`` (``now``, ``next_item``, ``activate`` when a move of the agenda item
+    # starts the planned period, ``cancel`` when the planned handover goes away),
+    # the principal ids ``from`` and ``to``, and the current agenda item.
+    PROTOKOLLANT_HANDOVER = "protokollant_handover"
     # Vote removed before it ever opened. A vote with ballots is not deletable.
     VOTE_DELETE = "vote_delete"
+    # Vote lifecycle (F12). ``data`` carries id references and aggregates only, never
+    # a voter: VOTE_CLOSE holds the result and the counts per option. VOTE_CANCEL
+    # holds the reason (a person cancelled, or the application left the vote state).
+    # VOTE_BRANCH_BLOCKED records a close whose pass or fail transition did not fire
+    # (the guard failed, or the state has no such transition). The vote then stays
+    # closed and the application stays in its state.
+    VOTE_OPEN = "vote_open"
+    VOTE_CLOSE = "vote_close"
+    VOTE_CANCEL = "vote_cancel"
+    VOTE_BRANCH_BLOCKED = "vote_branch_blocked"
+    # Public meeting with a QR code (#17). The meeting lead is the actor. ``data``
+    # carries id references and counts only, NEVER the name of a guest: the chain is
+    # append-only, so a name in it could never be deleted. A guest ballot writes
+    # VOTE_CAST with the actor ``guest:<meeting_guest.id>`` and no choice.
+    MEETING_PUBLIC_JOIN_CHANGED = "meeting_public_join_changed"
+    MEETING_JOIN_CODE_ROTATED = "meeting_join_code_rotated"
+    GUEST_ADMITTED = "guest_admitted"
+    GUEST_REJECTED = "guest_rejected"
+    GUEST_REMOVED = "guest_removed"
+    GUEST_RENAMED = "guest_renamed"
+    GUEST_ADMIT_ALL = "guest_admit_all"
     # GDPR/PII: access (Art. 15), erasure/anonymization (Art. 17), retention
     # (Art. 5(1)(e)) plus the erasure-request queue. ``data`` carries only
     # id/email references and metadata, never raw PII values.
@@ -70,6 +142,10 @@ class AuditAction(StrEnum):
     ERASURE_EXECUTED = "erasure_executed"
     ERASURE_REJECTED = "erasure_rejected"
     PRINCIPAL_ERASED = "principal_erased"
+    # Account merge: an admin merged an old principal into a new one. The data holds
+    # the two principal ids and the counts per area. The log rows of the old principal
+    # stay unchanged; the display resolves its `sub` through `principal.merged_into`.
+    PRINCIPAL_MERGE = "principal_merge"
     RETENTION_ANONYMIZE = "retention_anonymize"
     # Budget and money mutations: cost-center CRUD, top-down allocation, bookings
     # and transfers, invoices, moves of an application to another cost center or

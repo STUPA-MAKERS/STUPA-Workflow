@@ -1,67 +1,264 @@
+/* The beamer (board Beamer, 1440 × 900): the type scales with the width of the screen,
+   so a 1280 × 720 projector and a 1920 × 1080 screen show the same layout. */
 :host {
-  display: contents;
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
 }
-.mtg__beamer {
+
+.bm {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: clamp(1.5rem, 2.8vw, 3.5rem);
+  min-width: 0;
+  padding: clamp(2rem, 3.9vw, 5rem) clamp(1.5rem, 5.5vw, 7rem);
+}
+
+.bm__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+.bm__logo {
+  flex: none;
+  height: clamp(2.25rem, 3.6vw, 4.5rem);
+  width: auto;
+}
+.bm__where {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--space-6);
-  padding: clamp(var(--space-6), 6vw, var(--space-8)) var(--space-4);
-  text-align: center;
+  align-items: flex-end;
+  min-width: 0;
+  text-align: end;
 }
-.mtg__beamerTop {
+.bm__meeting {
   margin: 0;
-  font-size: clamp(1rem, 2vw, 1.5rem);
-  font-weight: var(--fw-semibold, 600);
+  font-size: clamp(1rem, 1.25vw, 1.5rem);
+  line-height: 1.4;
+  font-weight: var(--fw-semibold);
+}
+.bm__top {
+  margin: 0;
+  font-size: clamp(0.875rem, 1.04vw, 1.25rem);
+  line-height: 1.4;
   color: var(--color-text-muted);
-  letter-spacing: 0.02em;
 }
-.mtg__beamerQ {
-  font-size: clamp(1.75rem, 4vw, 3rem);
-  font-weight: var(--fw-bold, 700);
+
+.bm__q {
   margin: 0;
-  max-width: 24ch;
+  font-size: clamp(1.75rem, 3.05vw, 4rem);
+  line-height: 1.23;
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
 }
-.mtg__beamerTally {
+
+/* The open vote: the number of ballots in large type. */
+.bm__turnout {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.75rem, 1.25vw, 1.5rem);
+}
+.bm__count {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  align-items: baseline;
   gap: var(--space-4);
   margin: 0;
 }
-.mtg__beamerOpt {
+.bm__big {
+  font-size: clamp(4rem, 6.67vw, 8rem);
+  line-height: 1;
+  font-weight: var(--fw-medium);
+}
+.bm__of {
+  font-size: clamp(1.25rem, 2.08vw, 2.5rem);
+  color: var(--color-text-muted);
+}
+.bm__hint {
+  margin: 0;
+  font-size: clamp(1rem, 1.53vw, 1.875rem);
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+/* The foot sits at the bottom of the screen. */
+.bm__fill {
+  flex: 1 1 auto;
+}
+
+.bm__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  font-size: clamp(1rem, 1.18vw, 1.5rem);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+.bm__sep {
+  color: var(--color-text-subtle);
+}
+.bm__warn {
+  color: var(--color-warning);
+  font-weight: var(--fw-semibold);
+}
+
+.bm__outcome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-6);
+  margin: 0;
+}
+.bm__result {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: clamp(1.5rem, 2.08vw, 2.75rem);
+  line-height: 1.2;
+  font-weight: var(--fw-semibold);
+  color: var(--color-danger);
+}
+.bm__result--passed {
+  color: var(--color-accent-text);
+}
+.bm__note {
+  font-size: clamp(1rem, 1.18vw, 1.5rem);
+  color: var(--color-text-muted);
+}
+
+/* No vote: the current agenda item in the middle of the screen. */
+.bm__idle {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-4);
+}
+.bm__cap {
+  margin: 0;
+  font-size: clamp(0.8125rem, 1.04vw, 1.25rem);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.bm__nowTop {
+  margin: 0;
+  font-size: clamp(2rem, 3.6vw, 4.75rem);
+  line-height: 1.2;
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
+}
+.bm__idleText {
+  margin: 0;
+  font-size: clamp(1.25rem, 1.8vw, 2.25rem);
+  color: var(--color-text-muted);
+}
+
+/* #17: the foot of a vote shares its line with the join badge at the end. */
+.bm__bottom {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-6);
+}
+.bm__bottomText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.bm__outcome--stack {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.bm__comp {
+  margin: 0;
+  font-size: clamp(1rem, 1.18vw, 1.5rem);
+  color: var(--color-text-muted);
+}
+/* The QR code stays black on white in both themes: a scanner needs the contrast. */
+.bm__badge {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--radius-xl, 20px);
+  background: var(--color-surface-2);
+}
+.bm__badgeQr {
+  width: clamp(5rem, 8vw, 9rem);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+.bm__badgeText {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  min-width: 7rem;
-  padding: var(--space-4) var(--space-5);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
+  max-width: 10rem;
+  font-size: clamp(1rem, 1.25vw, 1.5rem);
+  line-height: 1.3;
 }
-.mtg__beamerOpt dd {
+.bm__badgeText .mono {
+  color: var(--color-text-muted);
+}
+
+.bm__idleWrap {
+  display: flex;
+  flex: 1 1 auto;
+}
+.bm__idleWrap--join {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(2rem, 5vw, 6rem);
+}
+.bm__presence {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-3) 0 0;
+  font-size: clamp(1rem, 1.5vw, 1.875rem);
+  color: var(--color-text-muted);
+}
+.bm__join {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: clamp(1.5rem, 2vw, 2.5rem);
+  border-radius: clamp(1.25rem, 2vw, 2rem);
+  background: var(--color-surface-2);
+  text-align: center;
+}
+.bm__joinQr {
+  width: min(100%, clamp(14rem, 22vw, 26rem));
+  padding: clamp(1rem, 1.6vw, 2rem);
+  border-radius: var(--radius-xl, 20px);
+  background: #fff;
+}
+.bm__joinScan {
+  margin: var(--space-3) 0 0;
+  font-size: clamp(1.5rem, 2.1vw, 2.5rem);
+  font-weight: var(--fw-semibold);
+}
+.bm__joinUrl {
   margin: 0;
-  font-size: clamp(2rem, 5vw, 3.5rem);
-  font-weight: var(--fw-bold, 700);
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  font-size: clamp(1rem, 1.3vw, 1.5rem);
 }
-.mtg__beamerOpt dt {
+.bm__joinHint {
+  margin: 0;
+  max-width: 22rem;
+  font-size: clamp(0.875rem, 1.1vw, 1.25rem);
   color: var(--color-text-muted);
-  font-size: var(--fs-md);
-}
-.mtg__beamerOpt--lead {
-  border-color: var(--color-success);
-  background: color-mix(in srgb, var(--color-success) 14%, var(--color-surface));
-}
-.mtg__beamerOpt--lead dt {
-  color: var(--color-success);
-}
-.mtg__beamerResult {
-  font-size: var(--fs-lg);
-}
-.mtg__beamerIdle {
-  color: var(--color-text-muted);
-  font-size: var(--fs-lg);
-  padding: var(--space-8) 0;
 }

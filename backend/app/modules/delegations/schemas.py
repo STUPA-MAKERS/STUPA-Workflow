@@ -24,11 +24,18 @@ class DelegationCreate(_CamelModel):
 
     `delegateId` gets access to the meeting `meetingId`. With `delegateVoting`
     the delegate also gets the vote.
+
+    Without `delegatorId` the caller delegates for themselves, only while the
+    meeting is planned. With `delegatorId` the meeting lead (`can_manage`)
+    enters a substitution for a missing member during a live meeting (O6). The
+    delegate must then be in the pool for that member: a personal entry for the
+    member or a gremium-wide entry.
     """
 
     meeting_id: UUID = Field(alias="meetingId")
     delegate_id: UUID = Field(alias="delegateId")
     delegate_voting: bool = Field(default=False, alias="delegateVoting")
+    delegator_id: UUID | None = Field(default=None, alias="delegatorId")
 
 
 class DelegationOut(_CamelModel):

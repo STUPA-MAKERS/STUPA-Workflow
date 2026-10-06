@@ -1,7 +1,8 @@
 """Integration test for per-Gremium protocol permissions (AUD-016, real Postgres).
 
 Regression: the protocol write and read paths were gated on the GLOBAL
-``meeting.manage``, ``protocol.finalize`` and ``meeting.view_all`` permissions. That
+``meeting.manage``, ``protocol.finalize`` and ``meeting.view_all`` permissions (the
+first two are gone now). That
 locked out a protocol writer assigned per Gremium. It also locked out the holder of a
 Gremium role with ``protocol.write``, who may edit the agenda item bodies in the live
 stack. ``resolve_principal`` keeps the Gremium role permissions out of
@@ -146,20 +147,51 @@ async def test_finalize_requires_protocol_finalize_permission(
     await svc.authorize_finalize(fin_protocol.id, Principal(sub=fin_member.sub))
 
 
-async def test_global_meeting_manage_still_writes(session: AsyncSession) -> None:
-    """The global ``meeting.manage`` permission (admin, org-wide) still grants write."""
+async def test_former_global_keys_grant_nothing(session: AsyncSession) -> None:
+    """The global ``meeting.manage`` and ``protocol.finalize`` keys are gone.
+
+    A stale grant of these keys opens neither the write nor the finalize path.
+    """
     _, meeting, protocol, _ = await _gremium_with_protocol(session, role_perms=[])
     svc = ProtocolService(session)
-    admin = Principal(sub="org-admin", permissions={"meeting.manage"})
-    await svc.authorize_write_meeting(meeting.id, admin)
-    await svc.authorize_write(protocol.id, admin)
-    # Read: an org-wide holder sees everything (meeting.view_all, meeting.manage, admin).
+    stale = Principal(sub="org-mgr", permissions={"meeting.manage", "protocol.finalize"})
+    with pytest.raises(ForbiddenError):
+        await svc.authorize_write_meeting(meeting.id, stale)
+    with pytest.raises(ForbiddenError):
+        await svc.authorize_finalize(protocol.id, stale)
+    # Read: the global ``meeting.view_all`` still sees every gremium.
     viewer = Principal(sub="org-view", permissions={"meeting.view_all"})
     await svc.authorize_read(protocol.id, viewer)
-    # Finalize also needs protocol.finalize, even with meeting.manage.
-    with pytest.raises(ForbiddenError):
-        await svc.authorize_finalize(protocol.id, admin)
-    finalizer = Principal(
-        sub="org-fin", permissions={"meeting.manage", "protocol.finalize"}
+
+
+async def test_admin_writes_and_finalizes_unless_scope_caps(
+    session: AsyncSession,
+) -> None:
+    """The admin bypass grants write and finalize; a ``read`` token caps both."""
+    _, meeting, protocol, _ = await _gremium_with_protocol(session, role_perms=[])
+    svc = ProtocolService(session)
+    admin = Principal(sub="org-admin", roles=["admin"])
+    await svc.authorize_write_meeting(meeting.id, admin)
+    await svc.authorize_finalize(protocol.id, admin)
+    read_token = Principal(
+        sub="org-admin",
+        roles=["admin"],
+        scope_permissions=frozenset({"application.read", "meeting.view_all"}),
     )
-    await svc.authorize_finalize(protocol.id, finalizer)
+    await svc.authorize_read(protocol.id, read_token)
+    with pytest.raises(ForbiddenError):
+        await svc.authorize_write_meeting(meeting.id, read_token)
+    with pytest.raises(ForbiddenError):
+        await svc.authorize_finalize(protocol.id, read_token)
+
+
+async def test_scope_caps_gremium_finalize(session: AsyncSession) -> None:
+    """F16: a token without ``protocol.finalize`` in its scope cannot finalize."""
+    _, _, protocol, member = await _gremium_with_protocol(
+        session, role_perms=["protocol.write", "protocol.finalize"]
+    )
+    svc = ProtocolService(session)
+    token = Principal(sub=member.sub, scope_permissions=frozenset({"protocol.write"}))
+    await svc.authorize_write(protocol.id, token)
+    with pytest.raises(ForbiddenError):
+        await svc.authorize_finalize(protocol.id, token)

@@ -1,0 +1,22 @@
+@if (view() === 'calendar') {
+  <app-meetings-calendar
+    [canCreate]="canCreate()"
+    (viewChange)="setView($event)"
+    (create)="createOpen.set(true)"
+  />
+} @else {
+  <app-meetings-list
+    [canCreate]="canCreate()"
+    [showSwitch]="!phone()"
+    (viewChange)="setView($event)"
+    (create)="createOpen.set(true)"
+  />
+}
+
+@if (canCreate()) {
+  <app-create-meeting-dialog
+    [open]="createOpen()"
+    [gremiumId]="timeline.gremiumFilter()"
+    (closed)="createOpen.set(false)"
+  />
+}

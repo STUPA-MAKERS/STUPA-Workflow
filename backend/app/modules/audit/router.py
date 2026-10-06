@@ -1,5 +1,10 @@
 """Audit API router (``/api/admin/audit``): read, verify, revert.
 
+The chain check has two forms. ``GET /verify`` computes the result live and stores
+nothing; the MCP tool uses it. ``POST /verify`` computes the result and stores it in
+``audit_verification``. ``GET /verify/latest`` reads the newest stored result for the
+admin tile, without the cost of a full check.
+
 RBAC is fail-closed. A request without a session gets 401. A request without the
 permission gets 403. The read view resolves actor subs, target ids and ``data``
 UUIDs to display names on the server.
@@ -22,10 +27,12 @@ from app.modules.audit.schemas import (
     AuditEntryOut,
     AuditPageOut,
     AuditRevertOut,
+    AuditVerificationOut,
     ChainVerificationOut,
 )
 from app.modules.audit.service import AuditService, data_uuid_strings
 from app.modules.config_revision.revert import RevertService
+from app.modules.livevote.publisher import MeetingPublisher, get_meeting_publisher
 from app.shared.errors import ProblemDetail
 from app.shared.paging import DEFAULT_LIMIT, MAX_LIMIT
 
@@ -131,6 +138,40 @@ async def verify_audit_chain(service: ServiceDep) -> ChainVerificationOut:
 
 
 @router.post(
+    "/verify",
+    response_model=AuditVerificationOut,
+    # 409 while another check runs. 429 (with Retry-After) inside the cooldown after
+    # the last manual check.
+    responses={**_AUTH_ERRORS, 409: _PROBLEM, 429: _PROBLEM},
+)
+async def run_audit_verification(
+    service: ServiceDep,
+    principal: Annotated[Principal, Depends(require_principal("audit.verify"))],
+) -> AuditVerificationOut:
+    """Verify the whole chain now and store the result (``trigger = manual``).
+
+    The call reads the whole log, so it takes as long as the live check. Only one
+    check runs at a time, and a manual check can run again only after a cooldown of
+    5 minutes. The store keeps the newest 100 results, the first failed result of
+    each break and the newest result of each trigger.
+    """
+    row = await service.run_manual_verification(triggered_by=principal.sub)
+    return AuditVerificationOut.from_row(row)
+
+
+@router.get(
+    "/verify/latest",
+    response_model=AuditVerificationOut | None,
+    dependencies=[Depends(require_principal("audit.read"))],
+    responses=_AUTH_ERRORS,
+)
+async def latest_audit_verification(service: ServiceDep) -> AuditVerificationOut | None:
+    """Read the newest stored chain check. ``null`` before the first check."""
+    row = await service.latest_verification()
+    return AuditVerificationOut.from_row(row) if row is not None else None
+
+
+@router.post(
     "/{entry_id}/revert",
     response_model=AuditRevertOut,
     # Destructive. It has its own permission, separate from audit.read and audit.verify.
@@ -142,6 +183,9 @@ async def revert_audit_entry(
     entry_id: int,
     session: DbSession,
     principal: Annotated[Principal, Depends(require_principal("audit.revert"))],
+    # A status revert that leaves a vote state cancels its votes. The publisher sends
+    # `vote_cancelled` to the live clients of the meeting.
+    publisher: Annotated[MeetingPublisher, Depends(get_meeting_publisher)],
 ) -> AuditRevertOut:
     """Revert the change that ``entry_id`` describes.
 
@@ -151,7 +195,7 @@ async def revert_audit_entry(
     # audit.revert gates the route. RevertService also re-asserts the granular
     # permission of the original operation. That is why the route passes the
     # principal through.
-    result = await RevertService(session).revert(entry_id, principal.sub, principal)
+    result = await RevertService(session, publisher).revert(entry_id, principal.sub, principal)
     return AuditRevertOut(
         revertedAuditId=result.reverted_audit_id,
         entityType=result.entity_type,

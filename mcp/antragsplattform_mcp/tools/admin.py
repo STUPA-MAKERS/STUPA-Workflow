@@ -137,7 +137,9 @@ async def list_gremium_memberships(gremium_id: str) -> dict:
     """List the memberships of a Gremium.
 
     A membership links a member to a role of that Gremium. Each item has the keys
-    id, principalId, gremiumId and gremiumRoleId. The list is read-only. The platform
+    id, principalId, gremiumId, gremiumRoleId, displayName, email and active. active is
+    true when the principal is active and the membership is valid now; the member
+    count of the Gremium counts only these rows. The list is read-only. The platform
     derives the memberships from the OIDC groups of the members, the membership
     mappings and the Gremium role mappings. To change a membership, change a mapping
     or the groups in the IdP.
@@ -404,7 +406,7 @@ async def delete_deadline_policy(policy_id: str) -> dict:
 @group.tool
 async def get_notification_settings() -> dict:
     """Get the platform notification settings, such as the task reminder cadence. Admin."""
-    return await api().get("/admin/notifications")
+    return await api().get("/admin/notification-settings")
 
 
 @group.tool
@@ -414,7 +416,35 @@ async def update_notification_settings(patch: S.NotificationSettingsUpdate) -> d
     The fields are `taskReminderEnabled`, `taskReminderAfterDays` and
     `taskReminderRepeatDays`. Admin.
     """
-    return await api().put("/admin/notifications", json=dump_patch(patch))
+    return await api().put("/admin/notification-settings", json=dump_patch(patch))
+
+
+@group.tool
+async def get_guest_settings() -> dict:
+    """Get the settings for applications without an account.
+
+    `confirmTtlHours` is the time a guest has to confirm the email before the platform
+    discards the application. `linkTtlDays` is the lifetime of a new magic link
+    (null = no expiry). Requires admin.deadlines.
+    """
+    return await api().get("/admin/guest-settings")
+
+
+@group.tool
+async def update_guest_settings(settings: S.GuestSettingsUpdate) -> dict:
+    """Replace the settings for applications without an account.
+
+    Send both fields. `linkTtlDays` is required: `null` gives magic links without an
+    expiry. To keep the current lifetime, read it with `get_guest_settings` first. A new
+    `confirmTtlHours` applies to the waiting applications too. Requires admin.deadlines.
+    """
+    return await api().put(
+        "/admin/guest-settings",
+        json={
+            "confirmTtlHours": settings.confirmTtlHours,
+            "linkTtlDays": settings.linkTtlDays,
+        },
+    )
 
 
 @group.tool
@@ -481,8 +511,25 @@ async def list_audit(
 
 @group.tool
 async def verify_audit_chain() -> dict:
-    """Verify the hash chain of the audit log to find tampering. Requires audit.verify."""
+    """Verify the hash chain of the audit log to find tampering. Requires audit.verify.
+
+    The check runs live and stores nothing. It reads the whole log, so it is slow on a
+    long log. To see the result of the last stored check, use
+    `get_latest_audit_verification`.
+    """
     return await api().get("/admin/audit/verify")
+
+
+@group.tool
+async def get_latest_audit_verification() -> dict | None:
+    """Read the newest stored check of the audit hash chain. Requires audit.read.
+
+    The worker checks the chain every night at 04:30 and after each restore. An admin
+    can also start a check. The result holds `startedAt`, `finishedAt`, `valid`,
+    `checked`, `brokenAt` and `reason` (the first break), `trigger`
+    (cron/manual/restore) and `triggeredBy`. It is null before the first check.
+    """
+    return await api().get("/admin/audit/verify/latest")
 
 
 def register(mcp: FastMCP) -> None:

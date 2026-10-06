@@ -11,9 +11,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
-  BadgeComponent,
   ButtonComponent,
-  CardComponent,
   ConfigDiffComponent,
   DialogComponent,
   IconComponent,
@@ -22,6 +20,7 @@ import {
 import { AdminApiService } from '../admin-api.service';
 import type { ConfigRevision, ConfigRevisionDiff } from '../admin.models';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 
 /**
  * Version sidebar for the immutable config snapshots of an entity.
@@ -36,12 +35,12 @@ import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
   selector: 'app-version-history',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SkeletonComponent, 
+  imports: [
+    SkeletonComponent,
+    StatusTextComponent,
     TranslatePipe,
     LocalizedDatePipe,
-    BadgeComponent,
     ButtonComponent,
-    CardComponent,
     ConfigDiffComponent,
     DialogComponent,
     IconComponent,
@@ -58,6 +57,11 @@ export class VersionHistoryComponent {
   readonly entityId = input.required<string>();
   /** Emits after a successful restore. The editor then reloads its state. */
   readonly restored = output<void>();
+  /**
+   * Emits the number of the current version after each load, or `null` when no version
+   * is current. The flow editor shows it under its title ("Version 12 aktiv").
+   */
+  readonly current = output<number | null>();
 
   protected readonly revisions = signal<ConfigRevision[]>([]);
   protected readonly loading = signal(false);
@@ -86,6 +90,7 @@ export class VersionHistoryComponent {
       next: (rows) => {
         this.revisions.set(rows);
         this.loading.set(false);
+        this.current.emit(rows.find((r) => r.isCurrent)?.version ?? null);
       },
       error: () => {
         this.revisions.set([]);
@@ -132,7 +137,9 @@ export class VersionHistoryComponent {
     });
   }
 
+  /** The name of the person; never the raw id. A missing person reads "System". */
   protected actor(rev: ConfigRevision): string {
-    return rev.createdByName ?? rev.createdBy ?? this.i18n.translate('admin.audit.system');
+    if (rev.createdByName) return rev.createdByName;
+    return this.i18n.translate(rev.createdBy ? 'admin.config.history.unknownActor' : 'admin.audit.system');
   }
 }

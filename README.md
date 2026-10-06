@@ -6,7 +6,7 @@ applications, run meetings with live votes and a protocol, and manage cost cente
 budgets and invoices. The platform versions and audits all of it.
 
 Monorepo, one VM, `docker compose`. Internally everything speaks plain HTTP. An
-**external Nginx Proxy Manager** in front of the stack terminates TLS. The stack does not
+**external Caddy reverse proxy** in front of the stack terminates TLS. The stack does not
 handle certificates and does not contain a built-in identity provider.
 
 Full documentation in the [Wiki](https://github.com/STUPA-MAKERS/STUPA-Workflow/wiki).
@@ -24,42 +24,55 @@ Full documentation in the [Wiki](https://github.com/STUPA-MAKERS/STUPA-Workflow/
 
 ## Features
 
-The backend works and has tests (about 3400 unit tests plus an integration suite).
+The backend works and has tests (about 4500 test functions in unit and integration suites).
 It implements:
 
 - **Auth & RBAC** — OIDC against any IdP with a discovery document, such as authentik or
   Keycloak (authorization code + PKCE, server session), and a magic link for applicants
-  (HMAC-hashed single-use token). Roles, permissions and time-bound assignments. Each `/admin/` page has its own permission.
+  (HMAC-hashed single-use token). Global roles and permissions come from OIDC groups. Meeting,
+  protocol and vote rights are Gremium permissions of a Gremium role. Each `/admin/` page has its own
+  permission. An admin can merge an old account into a new one (`admin.users.merge`).
 - **Forms** — forms as versioned JSON. The backend validates the definition and the
   answers against a schema. This covers `visibleIf` and compute through JsonLogic, with
   ReDoS-hardened patterns.
 - **Applications** — create an application (public, with captcha, rate limit and payload
-  cap), edit it with a version diff, timeline, comments and GDPR anonymization.
+  cap), edit it with a version diff, timeline, comments and GDPR anonymization. A guest
+  confirms the e-mail address within a configurable window. The wizard uploads attachments
+  as drafts before the submit. A holder of `application.create_on_behalf` captures an
+  application for an applicant (an account or a guest).
 - **Flow** — a declarative state machine with a guard evaluator (whitelist operators in
   a dispatch table, **no `eval`**) and transition actions
-  (notify/webhook/exportPdf/budget/openVote/…).
+  (`notify`, `webhook`, `addToNextSession`, `assignBudget`, `assignBudgetFromField`).
 - **Voting** — quorum (count or percent), majorities (simple, absolute, two thirds),
   tie-break, secret ballot (the choice stays separate from the identity). The platform
   scopes read access to the Gremium.
 - **Meetings / LiveVote** — meetings with an agenda, attendance and a live vote over
   WebSocket (voter channel plus read-only beamer stream). The protocol starts with the
-  meeting.
+  meeting. The minute-taker can hand over during a live meeting. A meeting of a Gremium
+  without a quorum can allow public participation: guests join with a QR code (`/j/:code`),
+  the meeting lead admits them, and they watch or vote. Each person gets an ICS calendar feed.
 - **Protocol** — meeting protocol (Markdown), votes as snippets, an async PDF render
   (typst → MinIO) and a mail dispatch when you finalize it.
-- **Delegations** — meeting-bound vote and representation delegations plus a substitute
-  pool.
+- **Delegations** — meeting-bound vote and representation delegations plus a per-Gremium
+  substitute pool. During a live meeting the meeting lead can enter a substitute from the pool
+  for a missing member.
 - **Budget** — a hierarchical cost center tree with fiscal years, top-down allocation,
   bookings and transfers, and **invoices with ZUGFeRD/Factur-X import**. The
   platform audits every money mutation.
 - **Notifications** — mail templates (Jinja2, sandboxed, DE/EN), rules
   (event→template→recipient), per-user preferences, dispatch through the arq worker.
 - **Audit** — an append-only hash chain (`sha256(prev || canonical)`), a DB trigger
-  against UPDATE and DELETE, and chain verification.
+  against UPDATE and DELETE, and chain verification (nightly and on demand, the result is stored).
 - **Webhooks** — outgoing event webhooks with an SSRF guard (blocks private, loopback,
   link-local and NAT64 targets, pins DNS against rebinding) and an HMAC signature.
+- **Backups** — age-encrypted whole-platform backups inside the app (`/admin/backups`), a
+  nightly job, retention and an in-app restore.
+- **Privacy** — GDPR erasure requests, anonymization, subject-access export and retention.
+- **MCP** — an MCP server (`mcp/`) lets an agent act through the API as the logged-in user.
 
-Frontend: screens for applications, voting, meetings, budget/expenses/invoices and the
-admin configuration (forms, flow, Gremien, roles, branding, …).
+Frontend: a start page with a work list, list/detail pages for applications, tasks, votes,
+meetings (list or calendar), bookings and invoices, the budget overview, the account area and
+the admin configuration (forms, flow, Gremien, roles, branding, …).
 
 Open work and roadmap: a wider E2E suite (Playwright) and more flow action handlers.
 
@@ -116,14 +129,15 @@ secrets in `deploy/.env` only, which `.gitignore` blocks. Never commit a secret.
 
 ## Branching and releases
 
-Trunk-based, with a protected `main` and tag-based delivery. The setup stays light on
-purpose: no long-lived `develop` branch and no GitFlow overhead for a single-VM
-deployment.
+A protected `main`, one integration branch `development` and tag-based delivery. Feature
+PRs go to `development`. Each merge to `development` deploys the dev site. A release merges
+`development` into `main` and tags it. There is no other long-lived branch.
 
 | Branch | Purpose | Rules |
 |---|---|---|
 | `main` | always green, always deployable | **protected**: PR + green CI + 1 review, no direct push, linear history |
-| `feat/*`, `fix/*`, `chore/*`, `docs/*` | short-lived branches off `main` | merge by PR (squash), delete after the merge |
+| `development` | integration branch, deploys the dev site on each merge | PR + green CI, no direct push |
+| `feat/*`, `fix/*`, `chore/*`, `docs/*` | short-lived branches off `development` | merge by PR (squash) into `development`, delete after the merge |
 | `hotfix/*` | urgent production fix off the running release tag | PR → `main`, then a new patch tag |
 
 **Releases.** Production runs on a **tag**, not on the HEAD of `main`. Versions follow
@@ -132,9 +146,9 @@ marks them with the tag and deploys them. This keeps the production state reprod
 at any time. A rollback is a re-deploy of the previous tag.
 
 ```
-feat/x ──PR──▶ main ──tag v1.2.0──▶ Build+Deploy
-                 ▲
-hotfix/y ──PR────┘  (from v1.2.0)  ──tag v1.2.1──▶ Deploy
+feat/x ──PR──▶ development ──PR──▶ main ──tag v1.2.0──▶ Build+Deploy
+                                    ▲
+hotfix/y ──PR───────────────────────┘  (from v1.2.0)  ──tag v1.2.1──▶ Deploy
 ```
 
 **DB migrations** belong to the release. Prefer additive, backward-compatible Alembic

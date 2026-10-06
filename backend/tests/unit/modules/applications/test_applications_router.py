@@ -89,19 +89,35 @@ class _FakeAuditSession:
     async def commit(self) -> None:
         self.committed = True
 
+    async def scalar(self, _stmt: object) -> None:
+        # `can_read_pii` asks for `created_by`: no creator in the fake.
+        return None
+
 
 class _FakeService:
     def __init__(self) -> None:
         self.created: object | None = None
         self.created_actor: str | None = None
+        self.created_email_confirmed: bool | None = None
         self.last_include_pii: bool | None = None
         self.comment_args: dict[str, object] | None = None
         self.comment_write_args: dict[str, object] | None = None
         self.session = _FakeAuditSession()
 
-    async def create(self, payload, *, actor="applicant"):  # noqa: ANN001
+    async def create(  # noqa: ANN001
+        self,
+        payload,
+        *,
+        actor="applicant",
+        dispatcher=None,
+        email_confirmed=None,
+        draft_pepper=None,
+    ):
         self.created = payload
+        self.created_draft_pepper = draft_pepper
         self.created_actor = actor
+        self.created_dispatcher = dispatcher
+        self.created_email_confirmed = email_confirmed
         return _FakeApp(uuid4()), str(payload.applicant_email)
 
     async def get(  # noqa: ANN001
@@ -112,34 +128,70 @@ class _FakeService:
         requester_sub=None,
         requester_can_manage=False,
         allow_unconfirmed=True,
+        strip_pii_fields=False,
+        applicant_view=False,
+        magic_link_view=False,
     ):
+        self.last_applicant_view = applicant_view
         self.last_include_pii = include_pii
+        self.last_strip_pii_fields = strip_pii_fields
         self.last_allow_unconfirmed = allow_unconfirmed
         return _out(application_id, with_pii=include_pii)
 
     async def patch(  # noqa: ANN001
-        self, application_id, data, *, changed_by, bypass_state_lock=False, allow_unconfirmed=True
+        self,
+        application_id,
+        data,
+        *,
+        changed_by,
+        bypass_state_lock=False,
+        allow_unconfirmed=True,
+        preserve_pii=False,
     ):
         self.last_bypass_state_lock = bypass_state_lock
+        self.last_preserve_pii = preserve_pii
         return _out(application_id, with_pii=False)
 
     async def delete(self, application_id, *, actor=None):  # noqa: ANN001
         self.deleted = application_id
         self.deleted_actor = actor
 
-    async def set_archived(self, application_id, *, archived, actor=None):  # noqa: ANN001
+    async def set_archived(  # noqa: ANN001
+        self, application_id, *, archived, actor=None, strip_pii_fields=False
+    ):
         self.archived_call = (application_id, archived, actor)
+        self.archived_strip = strip_pii_fields
         return _out(application_id, with_pii=False)
 
-    async def timeline(self, application_id, *, allow_unconfirmed=True):  # noqa: ANN001
+    async def timeline(  # noqa: ANN001
+        self,
+        application_id,
+        *,
+        allow_unconfirmed=True,
+        applicant_view=False,
+        magic_link_view=False,
+    ):
+        self.timeline_applicant_view = applicant_view
+        self.timeline_magic_link_view = magic_link_view
         return [
             TimelineEventOut(
                 fromStateId=None, toStateId=uuid4(), actor="applicant", at=_NOW, note=None
             )
         ]
 
-    async def versions(self, application_id, *, allow_unconfirmed=True):  # noqa: ANN001
+    async def versions(  # noqa: ANN001
+        self,
+        application_id,
+        *,
+        allow_unconfirmed=True,
+        applicant_view=False,
+        magic_link_view=False,
+        strip_pii=False,
+    ):
+        self.versions_magic_link_view = magic_link_view
         self.versions_allow_unconfirmed = allow_unconfirmed
+        self.versions_applicant_view = applicant_view
+        self.versions_strip_pii = strip_pii
         return [VersionOut(version=1, data={"title": "X"}, diff=None, changedBy="x", at=_NOW)]
 
     async def list_applications(self, **kwargs):  # noqa: ANN003
@@ -178,8 +230,10 @@ class _FakeService:
         allow_unconfirmed=True,
         viewer_sub=None,
         viewer_is_applicant=False,
+        applicant_view=False,
     ):
         self.last_include_internal = include_internal
+        self.last_comments_applicant_view = applicant_view
         self.last_viewer_sub = viewer_sub
         self.last_viewer_is_applicant = viewer_is_applicant
         return []
@@ -328,6 +382,10 @@ def test_create_application_logged_in_skips_altcha_and_derives_identity(
     assert fake_service.created.applicant_name == "Userin"  # type: ignore[union-attr]
     assert fake_service.created_actor == "u-7"
     assert sent and sent[0][0] == "user@example.org"
+    # The route hands the flow action dispatcher to the create, which starts the flow.
+    assert fake_service.created_dispatcher is not None
+    # The account email confirms the submission at once.
+    assert fake_service.created_email_confirmed is True
 
 
 def test_create_application_logged_in_explicit_email_on_behalf(
@@ -340,6 +398,26 @@ def test_create_application_logged_in_explicit_email_on_behalf(
     # The explicit value wins over the account derivation (creation for another person).
     assert fake_service.created.applicant_email == "applicant@example.org"  # type: ignore[union-attr]
     assert fake_service.created_actor == "verwalter"
+    # F23: the account does not prove the other address, so it stays unconfirmed.
+    assert fake_service.created_email_confirmed is False
+
+
+def test_create_application_logged_in_same_email_other_case_is_confirmed(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _login(app, sub="u-8", email="User@Example.org", display_name="U")
+    body = _create_body() | {"applicantEmail": "user@EXAMPLE.org"}
+    r = client.post("/api/applications", json=body)
+    assert r.status_code == 201
+    assert fake_service.created_email_confirmed is True
+
+
+def test_create_application_anonymous_is_unconfirmed(
+    client: TestClient, fake_service: _FakeService
+) -> None:
+    r = client.post("/api/applications", json=_create_body())
+    assert r.status_code == 201
+    assert fake_service.created_email_confirmed is False
 
 
 def test_create_application_oversize_payload_413(
@@ -360,6 +438,7 @@ def test_get_application_principal_sees_pii(
     r = client.get(f"/api/applications/{app_id}")
     assert r.status_code == 200
     assert fake_service.last_include_pii is True
+    assert fake_service.last_strip_pii_fields is False
 
 
 def test_get_application_applicant_no_pii(
@@ -370,6 +449,8 @@ def test_get_application_applicant_no_pii(
     r = client.get(f"/api/applications/{app_id}")
     assert r.status_code == 200
     assert fake_service.last_include_pii is False
+    # The applicant reads the own isPII fields (O21).
+    assert fake_service.last_strip_pii_fields is False
 
 
 def test_get_application_requires_auth_401(client: TestClient) -> None:
@@ -520,25 +601,45 @@ def test_delete_application_applicant_unauthorized(app: FastAPI, client: TestCli
     assert r.status_code == 401  # no principal, so require_principal answers 401
 
 
-def test_timeline_ap(app: FastAPI, client: TestClient) -> None:
+def test_timeline_ap(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:
     app_id = uuid4()
     _as_applicant(app, app_id, "view")
     r = client.get(f"/api/applications/{app_id}/timeline")
     assert r.status_code == 200
     assert len(r.json()) == 1
+    # A12: the applicant reads the timeline in the applicant view.
+    assert fake_service.timeline_applicant_view is True
+    assert fake_service.timeline_magic_link_view is True
 
 
-def test_versions_principal_only(app: FastAPI, client: TestClient) -> None:
+def test_versions_principal_full(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
     _as_principal(app, "application.read")
     r = client.get(f"/api/applications/{uuid4()}/versions")
     assert r.status_code == 200
+    assert fake_service.versions_applicant_view is False
+    assert fake_service.versions_strip_pii is False
+    assert fake_service.versions_allow_unconfirmed is False
 
 
-def test_versions_applicant_forbidden(app: FastAPI, client: TestClient) -> None:
+def test_versions_applicant_gets_metadata_view(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    # A11/O17: the applicant reads the version metadata of the own application.
     app_id = uuid4()
     _as_applicant(app, app_id, "edit")
     r = client.get(f"/api/applications/{app_id}/versions")
-    assert r.status_code in (401, 403)
+    assert r.status_code == 200
+    assert fake_service.versions_applicant_view is True
+    assert fake_service.versions_magic_link_view is True
+    assert fake_service.versions_allow_unconfirmed is True
+
+
+def test_versions_foreign_applicant_forbidden(app: FastAPI, client: TestClient) -> None:
+    _as_applicant(app, uuid4(), "edit")
+    r = client.get(f"/api/applications/{uuid4()}/versions")
+    assert r.status_code == 403
 
 
 def test_list_applications_filters_passed(
@@ -550,12 +651,14 @@ def test_list_applications_filters_passed(
     assert r.status_code == 200
     body = r.json()
     assert body["total"] == 1
-    assert fake_service.list_kwargs["state_id"] == state
+    assert fake_service.list_kwargs["state_ids"] == [state]
     assert fake_service.list_kwargs["gremium_id"] == gremium
     assert fake_service.list_kwargs["q"] == "foo"
     assert fake_service.list_kwargs["limit"] == 10
     # With application.read there is no owner filter. All applications stay visible.
     assert fake_service.list_kwargs["owner_sub"] is None
+    # O21: the reader with the PII right searches the isPII values too.
+    assert fake_service.list_kwargs["hide_pii_in_search"] is False
 
 
 def test_list_applications_without_read_scopes_to_own(
@@ -566,6 +669,8 @@ def test_list_applications_without_read_scopes_to_own(
     r = client.get("/api/applications")
     assert r.status_code == 200
     assert fake_service.list_kwargs["owner_sub"] == "admin"  # principal.sub of the fake
+    # O21: no search over the isPII values of the committee-scope applications.
+    assert fake_service.list_kwargs["hide_pii_in_search"] is True
 
 
 def test_list_applications_mine_forces_owner_filter(
@@ -596,6 +701,15 @@ def test_list_applications_amount_date_sort_passed(
     assert kw["amount_min"] == Decimal("100") and kw["amount_max"] == Decimal("500")
     assert kw["created_from"] == date(2026, 1, 1) and kw["created_to"] == date(2026, 2, 1)
     assert kw["sort"] == "amount" and kw["order"] == "asc"
+
+
+def test_list_applications_state_since_sort_passed(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _as_principal(app, "application.read")
+    r = client.get("/api/applications?mine=true&sort=stateSince&order=desc")
+    assert r.status_code == 200
+    assert fake_service.list_kwargs["sort"] == "stateSince"
 
 
 def test_list_applications_rejects_bad_sort_422(app: FastAPI, client: TestClient) -> None:
@@ -634,6 +748,20 @@ def test_applications_export_xlsx(
     assert entry.actor == "admin"
     assert entry.target_id == "applications.xlsx"
     assert fake_service.session.committed is True
+
+
+def test_applications_export_archived_filter(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """The export takes `archived` as the list does: hidden by default, else only or both."""
+    _as_principal(app, "application.export")
+    expected = {None: False, "false": False, "true": True, "all": None}
+    for raw, value in expected.items():
+        suffix = f"?archived={raw}" if raw else ""
+        r = client.get(f"/api/applications/export.xlsx{suffix}")
+        assert r.status_code == 200
+        assert fake_service.list_kwargs["archived"] is value
+    assert client.get("/api/applications/export.xlsx?archived=maybe").status_code == 422
 
 
 def test_applications_export_caps_rows(app: FastAPI, client: TestClient) -> None:

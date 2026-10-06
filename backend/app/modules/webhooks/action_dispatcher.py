@@ -1,16 +1,16 @@
 """Flow action handler for `webhook`.
 
 The flow engine calls `ActionDispatcher.dispatch(actions)` after the commit. This
-dispatcher handles `webhook` actions. It resolves the domain event and fans it out with
-`WebhookService.dispatch_event` to every subscribed webhook. There is no separate event
-system. The dispatcher hooks into the existing action dispatch.
+dispatcher handles `webhook` actions. Each action names one webhook, and
+`WebhookService.dispatch_to_webhook` creates the delivery for it. There is no separate
+event system. The dispatcher hooks into the existing action dispatch.
 
 `DispatchedAction.idempotency_key` is stable over the application, the status event, the
 position and the action type. It is the idempotency base of the delivery. A worker retry
 or a flow retry therefore sends nothing twice.
 
 `ChainActionDispatcher` chains several handlers. One transition can therefore trigger
-`notify`, `exportPdf` and `webhook` at the same time.
+`notify`, `webhook` and the budget and agenda actions at the same time.
 """
 
 from __future__ import annotations
@@ -22,11 +22,10 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.db import get_sessionmaker
 from app.modules.flow.dispatch import DispatchedAction
-from app.modules.webhooks.queue import WebhookQueue, webhook_queue_from_pool
+from app.modules.webhooks.queue import WebhookQueue
 from app.modules.webhooks.service import WebhookService
-from app.settings import Settings, get_settings
+from app.settings import Settings
 
 logger = logging.getLogger("app.webhooks")
 
@@ -76,12 +75,3 @@ class WebhookActionDispatcher:
                 payload=payload,
                 idempotency_base=action.idempotency_key,
             )
-
-
-def build_webhook_dispatcher(pool: object) -> WebhookActionDispatcher:
-    """Build the dispatcher from the optional arq pool for the app wiring in `main.py`."""
-    return WebhookActionDispatcher(
-        get_sessionmaker(),
-        webhook_queue_from_pool(pool),  # type: ignore[arg-type]
-        get_settings(),
-    )

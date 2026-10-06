@@ -1,0 +1,227 @@
+<div class="cal">
+  <!-- The same header as the list view: the switch and the Abo button close the header
+       in both views, so they keep their order when the view changes. -->
+  <app-page-header [pane]="true" [title]="'meetings.title' | t">
+    <ng-container ngProjectAs="[actions]">
+      @if (canCreate()) {
+        <app-button class="cal__new" variant="fill" (click)="create.emit()">
+          <app-icon name="plus" [size]="17" />
+          {{ 'meetings.list.new' | t }}
+        </app-button>
+      }
+      <app-meetings-view-switch value="calendar" (valueChange)="viewChange.emit($event)" />
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.overview.subscribe' | t"
+        [ariaPressed]="abo.isOpen()"
+        (click)="abo.toggle($event.currentTarget)"
+      ><app-icon name="cal" [size]="21" /></app-button>
+      <app-calendar-subscribe #abo />
+    </ng-container>
+  </app-page-header>
+
+  <div class="cal__tools" role="toolbar" [attr.aria-label]="'meetings.overview.toolbar' | t">
+    <div class="cal__nav">
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.overview.prevMonth' | t"
+        [title]="'meetings.overview.prevMonth' | t"
+        (click)="prevMonth()"
+      ><app-icon name="chevron-left" [size]="20" /></app-button>
+      <h2 class="cal__month" aria-live="polite">{{ monthText() }}</h2>
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'meetings.overview.nextMonth' | t"
+        [title]="'meetings.overview.nextMonth' | t"
+        (click)="nextMonth()"
+      ><app-icon name="chevron-right" [size]="20" /></app-button>
+      <app-button variant="outlined" size="sm" (click)="goToday()">{{ 'meetings.overview.today' | t }}</app-button>
+    </div>
+    <div class="cal__filters">
+      <app-search-pill
+        class="cal__search"
+        size="md"
+        [placeholder]="'meetings.overview.searchShort' | t"
+        [label]="'meetings.list.searchPlaceholder' | t"
+        [value]="query()"
+        (valueChange)="query.set($event)"
+      />
+      @if (showFilter()) {
+        <app-filter-select
+          class="cal__chip"
+          icon="building"
+          size="md"
+          [label]="'meetings.list.committeeFilter' | t"
+          [options]="timeline.filterGremiumOptions()"
+          [value]="timeline.gremiumFilter()"
+          (valueChange)="timeline.selectGremiumFilter($event)"
+          [text]="filterLabel()"
+          [active]="timeline.gremiumFilter() !== ''"
+        />
+      }
+    </div>
+  </div>
+
+  <div
+    class="cal__grid"
+    role="grid"
+    [attr.aria-label]="monthText()"
+    [attr.aria-busy]="loading() ? 'true' : null"
+    [style.--cal-weeks]="weeks().length"
+    (keydown)="onGridKey($event)"
+  >
+    <div class="cal__row cal__row--head" role="row">
+      @for (name of weekdays(); track $index) {
+        <span class="cal__wd cap" role="columnheader">{{ name }}</span>
+      }
+    </div>
+    @for (week of weeks(); track week[0].iso) {
+      <div class="cal__row" role="row">
+        @for (d of week; track d.iso) {
+          <div
+            class="cal__cell"
+            role="gridcell"
+            [class.cal__cell--out]="!d.inMonth"
+            [class.cal__cell--sel]="d.iso === selectedDay()"
+            [attr.aria-selected]="d.iso === selectedDay()"
+          >
+            <!-- The day button covers the whole cell: a click anywhere selects the day.
+                 The entries are a picture of the day; the side panel has their controls. -->
+            <button
+              type="button"
+              class="cal__day"
+              [attr.tabindex]="d.iso === selectedDay() ? 0 : -1"
+              [attr.aria-label]="dayLabel(d)"
+              [attr.aria-current]="d.isToday ? 'date' : null"
+              (click)="selectDay(d.iso)"
+            ></button>
+            <span class="cal__num" [class.cal__num--today]="d.isToday" aria-hidden="true">{{ d.day }}</span>
+            <span class="cal__entries" aria-hidden="true">
+              @for (m of entries(d.iso); track m.id) {
+                <span class="cal__entry" [class.cal__entry--live]="m.status === 'live'" [class.cal__entry--closed]="m.status === 'closed'">
+                  @if (entryTime(m)) {
+                    <span class="cal__entryTime" [class.mono]="m.status !== 'live'">{{ entryTime(m) }}</span>
+                  }
+                  <span class="cal__entryTitle">{{ m.title }}</span>
+                </span>
+              }
+              @if (more(d.iso) > 0) {
+                <span class="cal__more">{{ 'meetings.overview.more' | t: { n: more(d.iso) } }}</span>
+              }
+            </span>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <aside class="cal__panel" [attr.aria-label]="'meetings.overview.panel' | t">
+    <!-- The selected day is the kicker of the panel, in the same bar as on every other
+         detail sheet. It stays fixed; only the content below it scrolls. The person picks
+         the day, so only the meetings of the day are a live region (one region). -->
+    <app-sheet-bar class="cal__dayHead" kickerId="cal-day" [kicker]="dayHeading()" />
+    <div class="cal__panelScroll" appScrollFade="y">
+      <section class="cal__daySec" aria-labelledby="cal-day" aria-live="polite">
+        @if (error()) {
+          <p class="cal__note cal__note--error" role="alert">{{ 'meetings.overview.calendarError' | t }}</p>
+        } @else if (loading() && !dayCards().length) {
+          <span class="skel skel--panel"></span>
+        } @else if (!dayCards().length) {
+          <p class="cal__note">{{ 'meetings.overview.dayEmpty' | t }}</p>
+        }
+        @for (c of dayCards(); track c.meeting.id) {
+          <article class="cal__card" [attr.aria-labelledby]="'cal-m-' + c.meeting.id">
+            <div class="cal__cardHead">
+              <h3 class="cal__cardTitle" [id]="'cal-m-' + c.meeting.id">{{ c.meeting.title }}</h3>
+              @if (c.menu.length) {
+                <app-row-menu
+                  [label]="('meetings.overview.menu' | t) + ': ' + c.meeting.title"
+                  [sections]="c.menu"
+                  (selected)="onMenu(c.meeting, $event)"
+                />
+              }
+            </div>
+            <p class="cal__line">
+              <span class="cal__parts">
+                <span class="cal__part"><app-status-text [kind]="c.status.kind">{{ c.status.key | t }}</app-status-text></span>
+                @if (c.time) {
+                  <span class="cal__part mono">{{ c.time }}</span>
+                }
+                @if (c.meeting.gremiumName) {
+                  <span class="cal__part">{{ c.meeting.gremiumName }}</span>
+                }
+              </span>
+            </p>
+            <div class="cal__actions">
+              <app-button variant="fill" size="sm" (click)="open(c.meeting)">
+                <app-icon name="arrow" [size]="16" />
+                {{ 'meetings.overview.open' | t }}
+              </app-button>
+              @if (c.meeting.canManage && c.meeting.status !== 'closed') {
+                <app-button variant="tonal" size="sm" (click)="beamer(c.meeting)">
+                  <app-icon name="monitor" [size]="16" />
+                  {{ 'meetings.overview.beamerShort' | t }}
+                </app-button>
+              }
+            </div>
+            @if (c.progress; as p) {
+              <div class="cal__fact">
+                <div class="cal__factHead">
+                  <strong>{{ 'meetings.overview.topOf' | t: { n: p.position, m: p.count } }}</strong>
+                  <span class="mono">{{ p.percent }} %</span>
+                </div>
+                <app-seg-bar [segments]="c.progressSegs" [total]="p.count" [label]="t('meetings.overview.topOf', { n: p.position, m: p.count })" />
+                @if (p.title) {
+                  <span class="cal__factSub ell" [title]="p.title">{{ p.title }}</span>
+                }
+              </div>
+            }
+            @if (c.vote; as v) {
+              <div class="cal__fact">
+                <div class="cal__factHead">
+                  <app-status-text kind="accent">{{ 'meetings.overview.voteOpen' | t }}</app-status-text>
+                  <span class="mono">{{ v.voted }} / {{ v.present }}</span>
+                </div>
+                <app-seg-bar [segments]="v.segs" [total]="v.present" [label]="t('meetings.vote.progress', { voted: v.voted, present: v.present })" />
+                <span class="cal__factSub">{{ 'meetings.vote.progress' | t: { voted: v.voted, present: v.present } }}</span>
+              </div>
+            }
+          </article>
+        }
+      </section>
+
+      @if (upcoming().length) {
+        <section class="cal__upcoming" aria-labelledby="cal-up">
+          <h2 id="cal-up" class="sec cal__upHead">{{ 'meetings.overview.upcoming' | t }}</h2>
+          <div class="cal__rows" role="list">
+            @for (m of upcoming(); track m.id) {
+              @let st = status(m);
+              <app-list-item
+                role="listitem"
+                class="cal__upRow"
+                [title]="m.title"
+                [selected]="m.date === selectedDay()"
+                (activate)="showMeeting(m)"
+              >
+                <app-date-block lead [date]="day(m)" />
+                <span sub>
+                  <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+                  @if (m.gremiumName) {
+                    <span class="cal__dot" aria-hidden="true">·</span><span>{{ m.gremiumName }}</span>
+                  }
+                </span>
+                <span trail class="cal__facts">
+                  <span class="mono cal__time">{{ rowTime(m) }}</span>
+                  <span class="cal__tops">{{ tops(m) }}</span>
+                </span>
+              </app-list-item>
+            }
+          </div>
+        </section>
+      }
+    </div>
+  </aside>
+</div>

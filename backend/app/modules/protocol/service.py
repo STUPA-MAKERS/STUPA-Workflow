@@ -7,7 +7,10 @@ The service binds to an `AsyncSession` and drives the protocol lifecycle.
   the meeting and the Gremium.
 * `update_markdown` updates the editor body. It accepts a draft only.
 * `embed_votes` appends votes as Markdown snippets and writes
-  `protocol_vote_ref`. It is idempotent and skips an already referenced vote.
+  `protocol_vote_ref`. It is idempotent and skips an already referenced vote. A
+  vote of another meeting gives 422 `vote_not_in_meeting` (F25).
+* `start_finalize` starts the finalization once, and only after the close of the
+  meeting (F8, O13). It writes `protocol_finalize`.
 * `finalize` renders the Markdown through typst into a PDF. It stores the PDF
   in MinIO and mails it to MAIL_LIST(gremium). It sets `status='final'` and
   `sent_at`.
@@ -24,7 +27,9 @@ then rolls back, the protocol stays draft and the caller can repeat the call.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from datetime import date as _date
 from datetime import time as _time
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -38,14 +43,16 @@ from app.modules.admin.cd_resolver import (
     cd_variant_key_for_gremium,
     resolve_cd_variant_by_key,
 )
-from app.modules.admin.gremium_roles import gremium_ids_with_permission
-from app.modules.admin.models import Gremium, GremiumMembership, MailList
+from app.modules.admin.models import Gremium, MailList
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.files.storage import ObjectStorage, StorageError
+from app.modules.livevote.agenda_service import agenda_order
+from app.modules.livevote.keepers import agenda_positions, keeper_periods, principal_names
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
+from app.modules.livevote.roster import meeting_roster_filter, roster_filter
 from app.modules.livevote.service import MeetingService
 from app.modules.notifications.layout import (
     reason_text,
@@ -62,16 +69,19 @@ from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.service import filter_recipients_by_preference
 from app.modules.pdf.typst_client import TypstClient, TypstError
 from app.modules.protocol.markdown import (
+    KeeperLine,
     ProtocolDoc,
     build_protocol_document,
     build_vote_snippet,
     demote_headings,
+    guest_vote_note,
     protocol_variant_for,
     vote_in_body,
 )
 from app.modules.protocol.models import Protocol, ProtocolVoteRef
 from app.modules.protocol.schemas import ProtocolOut
 from app.modules.voting.models import Vote
+from app.modules.voting.schemas import VoteOut
 from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings
 from app.shared.errors import (
@@ -80,6 +90,7 @@ from app.shared.errors import (
     ForbiddenError,
     NotFoundError,
     ServiceUnavailableError,
+    ValidationProblem,
 )
 
 
@@ -101,6 +112,23 @@ _NON_PUBLIC_PLACEHOLDER = "*(nicht-öffentlicher Tagesordnungspunkt)*"
 _NON_PUBLIC_HEADING = "Nicht-öffentlicher Tagesordnungspunkt"
 
 
+@dataclass(slots=True)
+class HeaderMeta:
+    """The person-related header data of one protocol variant.
+
+    `present_count` holds the true number of attendees and feeds the quorum, also
+    in the public variant that leaves the names out.
+    """
+
+    protokollant: str | None = None
+    keepers: list[KeeperLine] = field(default_factory=list)
+    present: list[str] = field(default_factory=list)
+    excused: list[str] = field(default_factory=list)
+    absent: list[str] = field(default_factory=list)
+    present_count: int = 0
+    datalines: list[str] = field(default_factory=list)
+
+
 class ProtocolService:
     """Run the protocol operations and the finalization over the shared render stack."""
 
@@ -119,21 +147,24 @@ class ProtocolService:
         self.mail_queue = mail_queue
         self.settings = settings
 
-    async def _get(self, protocol_id: UUID) -> Protocol:
-        protocol = (
-            await self.session.execute(
-                select(Protocol).where(Protocol.id == protocol_id)
-            )
-        ).scalar_one_or_none()
+    async def _get(self, protocol_id: UUID, *, for_update: bool = False) -> Protocol:
+        """Load a protocol.
+
+        With `for_update`, the method locks the row (`SELECT … FOR UPDATE`) and
+        reads the columns again, also when the session holds the row already.
+        """
+        stmt = select(Protocol).where(Protocol.id == protocol_id)
+        if for_update:
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
+        protocol = (await self.session.execute(stmt)).scalar_one_or_none()
         if protocol is None:
             raise NotFoundError(f"protocol {protocol_id} not found")
         return protocol
 
     # The protocol assembles the per-item bodies. The live stack already authorizes
     # these bodies PER GREMIUM: the assigned protokollant plus the Gremium roles with
-    # `session.manage` or `protocol.write`. A global `meeting.manage` alone would lock
-    # those users out. The service therefore delegates to `MeetingService` and applies
-    # the same scope rules as `/api/meetings/…`.
+    # `session.manage` or `protocol.write`. The service therefore delegates to
+    # `MeetingService` and applies the same scope rules as `/api/meetings/…`.
     def _meeting_service(self) -> MeetingService:
         return MeetingService(self.session)
 
@@ -148,9 +179,9 @@ class ProtocolService:
     ) -> None:
         """Check the write access to the protocol of a meeting (create or load).
 
-        One of these rights is enough: the manager permission `meeting.manage`, the
-        Gremium permission `session.manage`, the assigned protokollant role, or a
-        Gremium role with `protocol.write`. The rule is the same as `can_write`.
+        One of these rights is enough: the admin role, the Gremium permission
+        `session.manage`, the assigned protokollant role, or a Gremium role with
+        `protocol.write`. The rule is the same as `can_write`.
 
         Raises:
             ForbiddenError: The principal must not write the minutes of this meeting.
@@ -167,9 +198,10 @@ class ProtocolService:
     async def authorize_finalize(self, protocol_id: UUID, principal: Principal) -> None:
         """Check the right to finalize and send a protocol.
 
-        The caller needs the write access AND `protocol.finalize`. The permission
-        counts as a global permission OR as a Gremium role of this Gremium. This rule
-        is stricter than the rule for a draft write.
+        The caller needs the write access AND the Gremium permission
+        `protocol.finalize` in the Gremium of the meeting (or the admin role). This
+        rule is stricter than the rule for a draft write. `MeetingService.can_finalize`
+        holds the rule, so the `canFinalize` flag of the meeting agrees with it.
 
         Raises:
             ForbiddenError: The caller has no write access or lacks
@@ -180,13 +212,8 @@ class ProtocolService:
         svc = self._meeting_service()
         if not await svc.can_write(meeting, principal):
             raise ForbiddenError("not allowed to write this meeting's minutes")
-        if principal.has("protocol.finalize"):
-            return
-        if meeting.gremium_id in await gremium_ids_with_permission(
-            self.session, principal.sub, "protocol.finalize"
-        ):
-            return
-        raise ForbiddenError("Missing permission(s): protocol.finalize")
+        if not await svc.can_finalize(meeting, principal):
+            raise ForbiddenError("Missing permission(s): protocol.finalize")
 
     async def authorize_read(self, protocol_id: UUID, principal: Principal) -> None:
         """Check the read access with the meeting visibility rule `assert_can_read`."""
@@ -418,7 +445,9 @@ class ProtocolService:
         for vote_id in vote_ids:
             if vote_id in already:
                 continue  # already embedded, so no duplicate snippet
-            await self._get_vote(vote_id)  # 404 and avoids an FK IntegrityError
+            # 404 avoids an FK IntegrityError. 422 keeps a vote of another meeting,
+            # maybe of another gremium, out of these minutes (F25).
+            await self._get_vote(vote_id, meeting_id=protocol.meeting_id)
             already.add(vote_id)
             # Race-safe through ON CONFLICT (protocol_id, vote_id) DO NOTHING. If a
             # parallel request wrote the ref first, RETURNING gives nothing. There is
@@ -439,6 +468,7 @@ class ProtocolService:
                     _vote_title(view.application_id, view.question),
                     view.tally.counts,
                     question=view.question,
+                    note=_guest_note(view),
                 )
             )
 
@@ -450,24 +480,55 @@ class ProtocolService:
         await self.session.commit()
         return self._to_out(protocol)
 
-    async def start_finalize(self, protocol_id: UUID) -> tuple[ProtocolOut, bool]:
+    async def start_finalize(self, protocol_id: UUID, *, actor: str) -> ProtocolOut:
         """Start the finalization and move the protocol from `draft` to `rendering`.
 
         The method commits and does not block. The caller, that is the router, then
-        enqueues the `render_protocol` worker job. The method is idempotent. A
-        protocol that is already `rendering` or `final` comes back unchanged.
+        enqueues the `render_protocol` worker job. It writes `protocol_finalize`
+        (F12).
 
-        Returns:
-            The protocol and a flag. The flag is `False` when the caller must not
-            enqueue the job. This rule blocks a double render and a double send.
+        The finalization happens once, after the close of the meeting (F8, O13, O2).
+        A protocol under render or a final protocol gives 409. That rule blocks a
+        double render and a double send. The method locks the protocol row, so two
+        parallel calls run one after the other: the second call sees `rendering`
+        and gets 409.
+
+        Raises:
+            ConflictError: The meeting is not closed (`meeting_not_closed`), or the
+                protocol is not a draft (`protocol_not_draft`).
         """
-        protocol = await self._get(protocol_id)
-        if protocol.status in ("rendering", "final"):
-            return self._to_out(protocol), False
+        protocol = await self._get(protocol_id, for_update=True)
+        meeting = await self._meeting(protocol.meeting_id)
+        if meeting.status != "closed":
+            raise ConflictError(
+                "close the meeting before the protocol is finalized",
+                code="meeting_not_closed",
+            )
+        if protocol.status != "draft":
+            raise ConflictError(
+                f"the protocol is {protocol.status} — it is finalized only once",
+                code="protocol_not_draft",
+            )
         protocol.status = "rendering"
+        # #17: the finalization pseudonymizes the guests ("Gast 1 … n"). The protocol
+        # carries them as a count only.
+        from app.modules.livevote.guests import GuestService
+
+        await GuestService(self.session).pseudonymize(protocol.meeting_id)
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.PROTOCOL_FINALIZE,
+            target_type="protocol",
+            target_id=str(protocol_id),
+            data={
+                "meetingId": str(protocol.meeting_id),
+                "gremiumId": str(protocol.gremium_id),
+            },
+        )
         await self.session.flush()
         await self.session.commit()
-        return self._to_out(protocol), True
+        return self._to_out(protocol)
 
     async def revert_to_draft(self, protocol_id: UUID) -> None:
         """Roll a protocol back from `rendering` to `draft`.
@@ -539,44 +600,100 @@ class ProtocolService:
         # `protocol.markdown`. `public=True` redacts a non-public item.
         assembled = await self._assemble_from_agenda(protocol.meeting_id, public=public)
         # `public=True` also redacts the header metadata. The mailed variant must not
-        # carry the names of the attendees, of the absentees or of the protokollant.
-        # `_header_meta` then returns empty name lists and the counters only, as data
-        # lines. The quorum statement rests on the counters and stays meaningful.
-        protokollant, present, absent, present_count, datalines = await self._header_meta(
-            meeting, public=public
-        )
+        # carry the names of the attendees, of the excused members, of the absentees
+        # or of the protocol keepers. `_header_meta` then returns empty name lists and
+        # the counters only, as data lines. The quorum statement rests on the
+        # counters and stays meaningful.
+        header = await self._header_meta(meeting, public=public)
+        date, start_time = self._start_of(meeting)
         return build_protocol_document(
             ProtocolDoc(
                 title=title,
                 gremium_name=getattr(gremium, "name", None) if gremium is not None else None,
                 cd_variant=protocol.cd_variant,
-                date=meeting.date if meeting is not None else None,
-                start_time=getattr(meeting, "start_time", None) if meeting is not None else None,
+                date=date,
+                start_time=start_time,
                 end_time=self._local_end_time(
                     getattr(meeting, "closed_at", None) if meeting is not None else None
                 ),
-                protokollant=protokollant,
-                present=present,
-                absent=absent,
-                datalines=datalines,
-                quorate=await self._quorate(gremium, present_count),
+                started_at=(
+                    f"{date.isoformat()} {start_time.strftime('%H:%M')}"
+                    if date is not None and start_time is not None
+                    else None
+                ),
+                protokollant=header.protokollant,
+                keepers=header.keepers,
+                present=header.present,
+                excused=header.excused,
+                absent=header.absent,
+                datalines=header.datalines,
+                quorate=await self._quorate(gremium, meeting, header.present_count),
                 markdown=assembled or protocol.markdown,
             )
         )
+
+    def _tz(self) -> ZoneInfo:
+        settings = self.settings or get_settings()
+        return ZoneInfo(settings.local_timezone)
+
+    def _start_of(self, meeting: Meeting | None) -> tuple[_date | None, _time | None]:
+        """Return the local date and time of the start: the real one, else the planned.
+
+        `started_at = COALESCE(meeting.started_at, planned start)` (Z7). A meeting
+        from before the real start existed shows the planned date and time.
+        """
+        if meeting is None:
+            return None, None
+        started = getattr(meeting, "started_at", None)
+        if isinstance(started, datetime):
+            local = started.astimezone(self._tz())
+            return local.date(), local.time().replace(second=0, microsecond=0)
+        return meeting.date, getattr(meeting, "start_time", None)
 
     def _local_end_time(self, closed_at: object) -> _time | None:
         """Convert `meeting.closed_at` from UTC to local time for the end line."""
         if not isinstance(closed_at, datetime):
             return None
-        settings = self.settings or get_settings()
-        tz = ZoneInfo(settings.local_timezone)
-        return closed_at.astimezone(tz).time().replace(second=0, microsecond=0)
+        return closed_at.astimezone(self._tz()).time().replace(second=0, microsecond=0)
 
-    async def _quorate(self, gremium: object | None, present_count: int) -> bool | None:
-        """Compute the quorum from the attendees and the active members.
+    def _local_hhmm(self, value: datetime | None) -> str | None:
+        if value is None:
+            return None
+        return value.astimezone(self._tz()).strftime("%H:%M")
 
-        The threshold is `gremium.quorum_percent` when that value is set. If not, the
-        threshold is more than half of the members.
+    async def _keeper_lines(self, meeting: Meeting) -> list[KeeperLine]:
+        """Build the header lines of the keeper periods that started (Z3, O2).
+
+        A TOP number comes from the current agenda order. A period without an agenda
+        item, or with a deleted one, carries the time only.
+        """
+        periods = [p for p in await keeper_periods(self.session, [meeting.id]) if p.from_at]
+        if not periods:
+            return []
+        names = await principal_names(self.session, {p.principal_id for p in periods})
+        positions = await agenda_positions(self.session, [meeting.id])
+        return [
+            KeeperLine(
+                name=names.get(p.principal_id) or "—",
+                from_time=self._local_hhmm(p.from_at),
+                to_time=self._local_hhmm(p.to_at),
+                from_top=positions.get(p.from_agenda_item_id) if p.from_agenda_item_id else None,
+                to_top=positions.get(p.to_agenda_item_id) if p.to_agenda_item_id else None,
+            )
+            for p in periods
+        ]
+
+    async def _quorate(
+        self, gremium: object | None, meeting: Meeting | None, present_count: int
+    ) -> bool | None:
+        """Compute the quorum from the attendees and the members of the meeting.
+
+        The members are the roster of the meeting: the members whose membership
+        overlaps the meeting window, plus each principal with an attendance record
+        (see `app.modules.livevote.roster`). A later end of a membership thus does
+        not change the quorum of a closed meeting. Without a meeting the members
+        that are valid now count. The threshold is `gremium.quorum_percent` when
+        that value is set. If not, the threshold is more than half of the members.
 
         Returns:
             The quorum result, or `None` when the Gremium or its members are missing.
@@ -585,16 +702,15 @@ class ProtocolService:
         gremium_id = getattr(gremium, "id", None)
         if gremium_id is None:
             return None
-        now = datetime.now(UTC)
+        tz_name = self._tz().key
+        if meeting is not None and getattr(meeting, "gremium_id", None) == gremium_id:
+            where = meeting_roster_filter(meeting, tz_name)
+        else:
+            now = datetime.now(UTC)
+            where = roster_filter(gremium_id, now, now)
         members = (
             await self.session.scalar(
-                select(func.count(func.distinct(GremiumMembership.principal_id))).where(
-                    GremiumMembership.gremium_id == gremium_id,
-                    (GremiumMembership.valid_from.is_(None))
-                    | (GremiumMembership.valid_from <= now),
-                    (GremiumMembership.valid_until.is_(None))
-                    | (GremiumMembership.valid_until > now),
-                )
+                select(func.count()).select_from(PrincipalRow).where(where)
             )
         ) or 0
         if members == 0:
@@ -604,31 +720,18 @@ class ProtocolService:
             return present_count * 100 >= percent * members
         return present_count * 2 > members
 
-    async def _header_meta(
-        self, meeting: Meeting | None, *, public: bool = False
-    ) -> tuple[str | None, list[str], list[str], int, list[str]]:
-        """Resolve the protokollant and the attendance lists for the header.
+    async def _header_meta(self, meeting: Meeting | None, *, public: bool = False) -> HeaderMeta:
+        """Resolve the protocol keepers and the attendance groups for the header.
 
         A list entry holds the display name of the principal, or the sub as a
-        fallback. `public=True` redacts the person-related header metadata for the
-        mailed variant. The full attendance lists and the name of the protokollant
-        must never go external. The method then emits the counters only, as the data
-        lines `Anwesend: n` and `Abwesend: n`.
-
-        Returns:
-            The tuple `(protokollant, present, absent, present_count, datalines)`.
-            `present_count` holds the true number of attendees and feeds the quorum,
-            even when `public=True` suppresses the name lists.
+        fallback. The excused members are their own group (F17). `public=True`
+        redacts the person-related header metadata for the mailed variant. The full
+        attendance lists and the names of the protocol keepers must never go
+        external. The method then emits the counters only, as the data lines
+        `Anwesend: n`, `Entschuldigt: n` and `Abwesend: n`.
         """
         if meeting is None:
-            return None, [], [], 0, []
-        protokollant: str | None = None
-        if getattr(meeting, "protokollant_id", None) is not None:
-            protokollant = await self.session.scalar(
-                select(PrincipalRow.display_name).where(
-                    PrincipalRow.id == meeting.protokollant_id
-                )
-            )
+            return HeaderMeta()
         rows = (
             await self.session.execute(
                 select(
@@ -640,15 +743,49 @@ class ProtocolService:
             )
         ).all()
         present = [name or sub for status, name, sub in rows if status == "present"]
+        excused = [name or sub for status, name, sub in rows if status == "excused"]
         absent = [name or sub for status, name, sub in rows if status == "absent"]
         present_count = len(present)
+        # #17: the guests of a public meeting appear as a count only, never by name.
+        from app.modules.livevote.guests import GuestService
+
+        guests = await GuestService(self.session).attended_count(meeting.id)
+        guest_lines = [f"Gäste: {guests}"] if guests else []
         if public:
-            datalines = [
-                f"Anwesend: {present_count}",
-                f"Abwesend: {len(absent)}",
-            ]
-            return None, [], [], present_count, datalines
-        return protokollant, present, absent, present_count, []
+            return HeaderMeta(
+                present_count=present_count,
+                datalines=[
+                    f"Anwesend: {present_count}",
+                    f"Entschuldigt: {len(excused)}",
+                    f"Abwesend: {len(absent)}",
+                    *guest_lines,
+                ],
+            )
+        keepers = await self._keeper_lines(meeting)
+        protokollant: str | None
+        if keepers:
+            # The legacy key names every keeper once, for a render service that does
+            # not read `keepers` yet.
+            protokollant = ", ".join(dict.fromkeys(k.name for k in keepers))
+        else:
+            protokollant = await self._legacy_protokollant(meeting)
+        return HeaderMeta(
+            protokollant=protokollant,
+            keepers=keepers,
+            present=present,
+            excused=excused,
+            absent=absent,
+            present_count=present_count,
+            datalines=guest_lines,
+        )
+
+    async def _legacy_protokollant(self, meeting: Meeting) -> str | None:
+        """Return the name of `meeting.protokollant_id` for a meeting without periods."""
+        if getattr(meeting, "protokollant_id", None) is None:
+            return None
+        return await self.session.scalar(
+            select(PrincipalRow.display_name).where(PrincipalRow.id == meeting.protokollant_id)
+        )
 
     async def _has_non_public(self, meeting_id: UUID) -> bool:
         """Return True if the meeting has a non-public agenda item.
@@ -678,7 +815,9 @@ class ProtocolService:
             await self.session.execute(
                 select(MeetingAgendaItem)
                 .where(MeetingAgendaItem.meeting_id == meeting_id)
-                .order_by(MeetingAgendaItem.position)
+                # The agenda order of the meeting page, so "TOP n" in the PDF and
+                # the TOP numbers of the keeper periods agree.
+                .order_by(*agenda_order())
             )
         ).scalars().all()
         if not items:
@@ -720,6 +859,7 @@ class ProtocolService:
                     view.question or "Beschlussfrage",
                     view.tally.counts,
                     question=view.question,
+                    note=_guest_note(view),
                 )
                 # The protokollant may have put the result into the text already,
                 # with the same snippet. One box per vote.
@@ -821,8 +961,8 @@ class ProtocolService:
         The mail carries the PDF as an attachment. The subject and the body name the
         Gremium and the meeting. The HTML version uses the branded mail layout. The
         mail holds no link, by design. The former `/api/protocols/{id}/pdf` link
-        needed a login and `meeting.manage`. It was broken for the members and for the
-        external list addresses.
+        needed a login and a meeting management right. It was broken for the members
+        and for the external list addresses.
         """
         if self.mail_queue is None:
             return
@@ -922,11 +1062,32 @@ class ProtocolService:
                 "Protocol is being rendered and is read-only.", code="conflict"
             )
 
-    async def _get_vote(self, vote_id: UUID) -> Vote:
+    async def _get_vote(self, vote_id: UUID, *, meeting_id: UUID) -> Vote:
+        """Load a vote of the meeting of the protocol.
+
+        Raises:
+            NotFoundError: The vote does not exist.
+            ValidationProblem: The vote belongs to another meeting or to none
+                (`vote_not_in_meeting`, F25).
+        """
         vote = await self.session.get(Vote, vote_id)
         if vote is None:
             raise NotFoundError(f"vote {vote_id} not found")
+        if vote.meeting_id != meeting_id:
+            raise ValidationProblem(
+                f"vote {vote_id} does not belong to the meeting of this protocol",
+                code="vote_not_in_meeting",
+            )
         return vote
+
+
+def _guest_note(view: VoteOut) -> str | None:
+    """Return the base line of a vote with guests (#17), or None for a members vote."""
+    if not view.guests_vote:
+        return None
+    return guest_vote_note(
+        view.tally.present_members, view.tally.present_guests, sum(view.tally.counts.values())
+    )
 
 
 def _vote_title(application_id: UUID | None, question: str | None = None) -> str:

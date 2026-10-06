@@ -1,6 +1,7 @@
 import type { FormlyFieldConfig } from '@ngx-formly/core';
-import type { FieldType, FormFieldDef, Lang } from '@core/api/models';
+import type { FieldType, FormFieldDef, FormSection, Lang } from '@core/api/models';
 import { evalJsonLogic, isFieldVisible, JsonLogicError } from './jsonlogic';
+import { CATALOG, de, type Locale } from '@core/i18n/translations';
 import { resolveI18n } from './i18n-text';
 
 /** HTML `type` for the `input` variant (text/number/currency/date/file). */
@@ -67,11 +68,79 @@ export function toFormlyFields(
   );
 }
 
+/** Field types that take the full width of the edit grid; the rest take one half. A
+ *  `multiselect` takes one half there: the edit form shows it as a dropdown. */
+const FULL_WIDTH_TYPES: ReadonlySet<FieldType> = new Set<FieldType>([
+  'textarea',
+  'daterange',
+  'markdown',
+  'table',
+  'positions',
+]);
+
+/** Options of `toFormlySections`. */
+export interface FormlySectionOptions {
+  /** Keys the form leaves out, for example the PII fields the server held back (O21). */
+  omitKeys?: readonly string[];
+}
+
+/**
+ * Translate the sections of an effective form into one Formly group for the edit
+ * form of the detail (board Anträge-Bearbeiten).
+ *
+ * The `title` field comes first over the full width. Each section then starts with its
+ * heading; short fields take half a row (class `fe-half`), long ones the full row
+ * (`fe-full`). The group carries the class `fe-grid`; the page lays it out as a grid of
+ * two columns. Everything else is as in `toFormlyFields`.
+ */
+export function toFormlySections(
+  sections: readonly FormSection[],
+  lang: Lang | string,
+  extraContext: Record<string, unknown> = {},
+  options: FormlySectionOptions = {},
+): FormlyFieldConfig[] {
+  const omit = new Set(options.omitKeys ?? []);
+  const keep = (f: FormFieldDef) => !omit.has(f.key) && f.type !== 'section';
+  const all = sections.flatMap((s) => s.fields);
+  const title = all.find((f) => f.key === 'title' && keep(f));
+  const group: FormlyFieldConfig[] = [];
+  if (title) group.push({ ...mapField(title, lang, extraContext), className: 'fe-full' });
+  for (const section of sections) {
+    const fields = section.fields.filter((f) => keep(f) && f !== title);
+    if (!fields.length) continue;
+    group.push({
+      type: 'display',
+      className: 'fe-full fe-heading',
+      props: { heading: true, label: resolveI18n(section.label, lang) },
+    });
+    for (const f of fields) {
+      const mapped = mapField(f, lang, extraContext);
+      // The edit form shows several choices as a dropdown (board Anträge-Bearbeiten), not
+      // as the checkbox list of the wizard.
+      if (f.type === 'multiselect') mapped.type = 'multiselect';
+      group.push({ ...mapped, className: FULL_WIDTH_TYPES.has(f.type) ? 'fe-full' : 'fe-half' });
+    }
+  }
+  return [{ fieldGroupClassName: 'fe-grid', fieldGroup: group }];
+}
+
 /** Section marker → non-editable heading (Formly `display`, `heading`). */
 function sectionHeading(f: FormFieldDef, lang: Lang | string): FormlyFieldConfig {
-  const props: Record<string, unknown> = { heading: true, label: resolveI18n(f.label, lang) };
-  if (f.help) props['description'] = resolveI18n(f.help, lang);
+  const label = resolveI18n(f.label, lang);
+  const props: Record<string, unknown> = { heading: true, label };
+  // A help text that only repeats the heading would show the same words twice.
+  const help = ownHelp(f, label, lang);
+  if (help) props['description'] = help;
   return { type: 'display', props };
+}
+
+/**
+ * The help text of a field, or undefined when it has none or when it only repeats the
+ * label. A form can hold the same words in both, and the field would then show them twice.
+ */
+function ownHelp(f: FormFieldDef, label: string, lang: Lang | string): string | undefined {
+  const help = f.help ? resolveI18n(f.help, lang) : '';
+  return help.trim() && help.trim() !== label.trim() ? help : undefined;
 }
 
 function mapField(
@@ -80,7 +149,8 @@ function mapField(
   extraContext: Record<string, unknown>,
 ): FormlyFieldConfig {
   const label = resolveI18n(f.label, lang);
-  const help = f.help ? resolveI18n(f.help, lang) : undefined;
+  // An info text whose help repeats its label counts as an info text without help.
+  const help = f.type === 'markdown' ? ownHelp(f, label, lang) : f.help ? resolveI18n(f.help, lang) : undefined;
   const isDisplay = f.type === 'markdown' || f.type === 'computed' || f.type === 'table';
 
   const props: Record<string, unknown> = { label };
@@ -101,9 +171,17 @@ function mapField(
 
   applyValidation(f, props);
 
-  if (f.type === 'markdown') props['text'] = help ?? label;
+  if (f.type === 'markdown') {
+    props['text'] = help ?? label;
+    // An info text without help has its text in the label. Show it once, not as a
+    // bold label over the same text.
+    if (!help) delete props['label'];
+  }
   if (f.type === 'computed') props['computed'] = true;
-  if (f.type === 'table') props['text'] = '(Tabellen-Eingabe wird in einem späteren Schritt ergänzt.)';
+  if (f.type === 'table') {
+    // The UI catalogue, not a fixed German text: an English page shows English.
+    props['text'] = CATALOG[lang as Locale]?.['forms.table.pending'] ?? de['forms.table.pending'];
+  }
   if (f.type === 'positions') {
     if (f.validation?.minOffers !== undefined) props['minOffers'] = f.validation.minOffers;
     if (f.validation?.minPositions !== undefined) props['minPositions'] = f.validation.minPositions;

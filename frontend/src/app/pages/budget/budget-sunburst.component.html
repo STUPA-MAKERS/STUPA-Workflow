@@ -25,6 +25,17 @@
     }
     <p class="sb__hint" aria-hidden="true">{{ 'budget.overview.hint' | t }}</p>
   } @else {
-    <p class="sb__empty">{{ 'budget.pie.empty' | t }}</p>
+    <!-- No amount: one neutral ring at the full size, the root and 0 in the center. -->
+    <svg
+      [attr.viewBox]="'0 0 ' + SIZE + ' ' + SIZE"
+      class="sb__svg sb__svg--empty"
+      role="img"
+      [attr.aria-label]="'budget.pie.emptyLabel' | t: { name: root()?.name ?? '' }"
+    >
+      <circle [attr.cx]="CX" [attr.cy]="CY" [attr.r]="R_EMPTY" [attr.stroke-width]="W_EMPTY" class="sb__ring" />
+      <circle [attr.cx]="CX" [attr.cy]="CY" [attr.r]="R_CENTER - 6" class="sb__center sb__center--empty" />
+      <text [attr.x]="CX" [attr.y]="CY - 6" text-anchor="middle" class="sb__center-name">{{ root()?.name }}</text>
+      <text [attr.x]="CX" [attr.y]="CY + 14" text-anchor="middle" class="sb__center-val">{{ money(0) }}</text>
+    </svg>
   }
 </div>

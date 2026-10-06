@@ -1,0 +1,79 @@
+<div
+  class="pv"
+  role="group"
+  [class.pv--bg1]="surface() === 1"
+  [class.pv--bg3]="surface() === 3"
+  [attr.aria-labelledby]="id + '-label'"
+>
+  <div
+    class="rowgroup"
+    [class.rowgroup--bg1]="surface() === 1"
+    [class.rowgroup--bg3]="surface() === 3"
+  >
+    <div class="pv__head">
+      <span class="pv__label" [id]="id + '-label'">{{ label() }}</span>
+    </div>
+
+    @for (p of rows(); track $index; let i = $index) {
+      <div class="pv__pos">
+        <!-- The whole row opens the position, not only the chevron. -->
+        <button
+          type="button"
+          class="pv__toggle"
+          [attr.aria-expanded]="isOpen(i)"
+          [attr.aria-controls]="isOpen(i) ? id + '-' + i : null"
+          (click)="toggle(i)"
+        >
+          <app-icon class="pv__chev" [class.pv__chev--open]="isOpen(i)" name="down" [size]="18" />
+          <span class="pv__text">
+            <span class="pv__name">{{ p.label || ('forms.positions.untitled' | t) }}</span>
+            <span class="pv__sub">
+              <span class="pv__count">{{ p.count }}</span>
+              @if (p.noOffers) {
+                <span class="pv__dot" aria-hidden="true">·</span>
+                <app-status-text kind="warn">{{ 'forms.positions.noOffersShort' | t }}</app-status-text>
+              } @else if (p.preferred) {
+                <span class="pv__dot" aria-hidden="true">·</span>
+                <span class="pv__pref">{{ 'forms.positions.preferredBy' | t: { name: p.preferred } }}</span>
+              }
+            </span>
+          </span>
+          <span class="mono pv__amount">{{ p.amount }}</span>
+        </button>
+
+        @if (isOpen(i)) {
+          <div class="pv__body" [id]="id + '-' + i">
+            @if (p.offers.length) {
+              <ul class="pv__offers" [attr.aria-label]="'forms.positions.offers' | t">
+                @for (o of p.offers; track $index) {
+                  <li class="pv__offer" [class.pv__offer--pref]="o.preferred">
+                    @if (o.href) {
+                      <a class="pv__offerName" [href]="o.href" target="_blank" rel="noopener">{{ o.label }}</a>
+                    } @else {
+                      <span class="pv__offerName">{{ o.label || '—' }}</span>
+                    }
+                    @if (o.preferred) {
+                      <app-status-text kind="accent">{{ 'forms.positions.preferred' | t }}</app-status-text>
+                    }
+                    <span class="mono pv__offerValue">{{ money(o.value) }}</span>
+                  </li>
+                }
+              </ul>
+            }
+            @if (p.noOffers) {
+              <p class="pv__reason">
+                <app-status-text kind="warn">{{ 'forms.positions.noOffers' | t }}</app-status-text>
+                <span>{{ p.noOffersReason || '—' }}</span>
+              </p>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <div class="pv__total">
+    <span>{{ 'forms.positions.total' | t }}</span>
+    <span class="mono">{{ total() }}</span>
+  </div>
+</div>

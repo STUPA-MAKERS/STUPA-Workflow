@@ -369,6 +369,25 @@ def test_consent_request_unheld_scope() -> None:
     assert held["admin:write"] is False
 
 
+def test_consent_request_counts_gremium_permissions_as_held(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A gremium chair holds `meetings:write` through the gremium role alone."""
+
+    async def _roles(db: object, sub: str, *a: object) -> list[tuple[str, object]]:
+        return [("g1", SimpleNamespace(permissions=["session.manage", "protocol.write"]))]
+
+    monkeypatch.setattr(oauth_router_mod, "active_gremium_roles", _roles)
+    p = Principal(sub="chair", permissions={"mcp.use", "application.read"})
+    client = _build_client(ENABLED, principal=p)
+    client.cookies.set(
+        ENABLED.oauth_tx_cookie_name, _issue_tx(scope="read meetings:write votes:write")
+    )
+    body = client.get("/api/oauth/consent-request").json()
+    held = {s["key"]: s["held"] for s in body["requestedScopes"]}
+    assert held == {"read": True, "meetings:write": True, "votes:write": False}
+
+
 def test_consent_no_tx_400() -> None:
     client = _build_client(ENABLED)
     resp = client.post("/api/oauth/consent", json={"approve": True, "scopes": ["read"]})
@@ -1070,8 +1089,32 @@ async def test_me_gremien_helpers_with_rows(monkeypatch: pytest.MonkeyPatch) -> 
     assert len(out) == 1
     assert out[0].name == "StuPa"
 
-    out2 = await router_mod._session_manage_gremien(fake_session(), "u1")
+    out2 = await router_mod._session_manage_gremien(fake_session(), Principal(sub="u1"))
     assert out2 == [gid]
+    # A `read` token caps the gremium permission away.
+    capped = Principal(sub="u1", scope_permissions=frozenset({"application.read"}))
+    assert await router_mod._session_manage_gremien(fake_session(), capped) == []
+
+
+async def test_me_gremium_permissions_scope_capped(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`/auth/me` lists the gremium keys per gremium, capped by the token scope."""
+    from app.modules.admin import gremium_roles as gr
+
+    async def _roles(db: object, sub: str, *a: object) -> list[tuple[str, object]]:
+        return [
+            ("g1", SimpleNamespace(permissions=["vote.cast", "session.manage", "bogus"])),
+            ("g2", SimpleNamespace(permissions=None)),
+        ]
+
+    monkeypatch.setattr(gr, "active_gremium_roles", _roles)
+    full = await router_mod._gremium_permissions(fake_session(), Principal(sub="u1"))
+    # Catalog order, unknown keys dropped, a role without keys keeps the gremium.
+    assert full == {"g1": ["session.manage", "vote.cast"], "g2": []}
+    capped = Principal(sub="u1", scope_permissions=oauth.scope_permissions(["read"]))
+    assert await router_mod._gremium_permissions(fake_session(), capped) == {
+        "g1": [],
+        "g2": [],
+    }
 
 
 async def test_me_gremien_for_empty(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1111,10 +1154,10 @@ async def test_has_scoped_budget_view_branches(monkeypatch: pytest.MonkeyPatch) 
 
 
 async def test_in_substitute_pool_branches() -> None:
-    hit_db = fake_session()
-    hit_db.scalar_results.append("sub-id")
+    """The flag is true when the pool helper (Z5) finds at least one gremium."""
+    hit_db = fake_session(result("gremium-id"))
     assert await router_mod._in_substitute_pool(hit_db, "u1") is True
-    assert await router_mod._in_substitute_pool(fake_session(), "u1") is False
+    assert await router_mod._in_substitute_pool(fake_session(result()), "u1") is False
 
 
 def test_me_endpoint_aggregates(monkeypatch: pytest.MonkeyPatch) -> None:

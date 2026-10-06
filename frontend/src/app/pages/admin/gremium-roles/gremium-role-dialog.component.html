@@ -1,0 +1,102 @@
+<app-dialog
+  size="lg"
+  [open]="open()"
+  [title]="title() | t"
+  [subtitle]="gremiumName()"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="close()"
+>
+  <form class="rd" (submit)="$event.preventDefault(); save()">
+    <div class="rd__names">
+      <app-input
+        class="rd__key"
+        [label]="'admin.common.key' | t"
+        [ngModel]="draft().key"
+        (ngModelChange)="patch('key', $event)"
+        name="key"
+        [required]="isNew()"
+        [disabled]="!isNew()"
+        [hint]="isNew() ? ('admin.common.roleKeyHint' | t) : ''"
+        [error]="keyError()"
+      />
+      <app-input
+        [label]="'admin.common.labelDe' | t"
+        [ngModel]="draft().labelDe"
+        (ngModelChange)="patch('labelDe', $event)"
+        name="labelDe"
+      />
+      <app-input
+        [label]="'admin.common.labelEn' | t"
+        [ngModel]="draft().labelEn"
+        (ngModelChange)="patch('labelEn', $event)"
+        name="labelEn"
+      />
+    </div>
+
+    @if (role()?.forced) {
+      <app-note icon="lock">{{ 'admin.gremiumRoles.forcedNote' | t }}</app-note>
+    }
+
+    <fieldset class="rd__perms">
+      <legend class="cap rd__cap">
+        {{ 'admin.gremiumRoles.permissionsIn' | t: { gremium: gremiumName() } }}
+      </legend>
+      @for (p of permissions; track p) {
+        <div class="rd__perm">
+          <app-checkbox
+            [ngModel]="has(p)"
+            (ngModelChange)="togglePerm(p, $event)"
+            [name]="'perm-' + p"
+            >{{ permLabel(p) | t }}</app-checkbox
+          >
+          <span class="mono rd__permKey" aria-hidden="true">{{ p }}</span>
+        </div>
+      }
+    </fieldset>
+
+    @if (showGroups()) {
+      <section class="rd__groups" aria-labelledby="rd-groups-title">
+        <h3 class="cap rd__cap" id="rd-groups-title">{{ 'admin.gremiumRoles.groups' | t }}</h3>
+        <div class="rd__groupBox">
+          <span class="rd__groupText">
+            @if (isMemberRole()) {
+              <span class="rd__groupLead">{{ 'admin.gremiumRoles.memberVia' | t }}</span>
+            }
+            @if (groups().length) {
+              <span class="mono rd__groupNames">{{ groups().join(', ') }}</span>
+            } @else {
+              <span class="rd__muted">{{ 'admin.gremiumRoles.noGroups' | t }}</span>
+            }
+          </span>
+          <a class="rd__groupLink" routerLink="/admin/group-mappings">{{
+            'admin.gremiumRoles.changeGroups' | t
+          }}</a>
+        </div>
+      </section>
+    }
+
+    @if (saveFailed()) {
+      <p class="rd__error" role="alert">{{ 'admin.common.saveFailed' | t }}</p>
+    }
+    <button type="submit" hidden></button>
+  </form>
+
+  <div dialog-footer class="rd__foot">
+    @if (role(); as r) {
+      @if (!r.forced) {
+        <app-button class="rd__del" variant="danger" (click)="askDelete()">{{
+          'admin.gremiumRoles.delete' | t
+        }}</app-button>
+      }
+    }
+    <span class="rd__spacer"></span>
+    <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+    <app-button
+      variant="fill"
+      [disabled]="!keyValid() || (isNew() && !draft().key.trim())"
+      [loading]="saving()"
+      (click)="save()"
+      >{{ 'action.save' | t }}</app-button
+    >
+  </div>
+</app-dialog>

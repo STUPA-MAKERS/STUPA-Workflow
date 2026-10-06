@@ -1,0 +1,127 @@
+@let me_ = me();
+@if (pageVote(); as v) {
+  <!-- The vote on its own page (board Telefon-Abstimmen): the same panel as for members. -->
+  <section class="gv__vote" [attr.aria-label]="'voting.cast.heading' | t">
+    <div class="gv__voteHead">
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'guests.vote.back' | t" (click)="openVoteId.set(null)">
+        <app-icon name="back" [size]="20" />
+      </app-button>
+      <span class="gv__voteTitles">
+        <span class="gv__voteTitle">{{ 'voting.cast.heading' | t }}</span>
+        <span class="gv__voteWhere ell" [title]="voteWhere()">{{ voteWhere() }}</span>
+      </span>
+    </div>
+    @if (voteNote(); as n) {
+      <app-note [icon]="n.icon">{{ n.key | t: { gremium: me_.meeting.gremiumName ?? '' } }}</app-note>
+    }
+    <app-vote-panel
+      layout="phone"
+      [vote]="panelVote()!"
+      [own]="own()"
+      [caster]="caster()"
+      (castDone)="changed.emit()"
+      (castFailed)="changed.emit()"
+    />
+  </section>
+} @else if (view(); as vw) {
+  <div class="gv">
+    @if (watch()) {
+      <div class="gv__state gv__state--watch" role="status">
+        <span class="gv__stateIcon"><app-icon name="eye" [size]="18" /></span>
+        <span class="gv__stateText">
+          <strong>{{ 'guests.view.watching' | t }}</strong>
+          <span>{{ 'guests.view.watchingHint' | t }}</span>
+        </span>
+      </div>
+    } @else {
+      <div class="gv__state" role="status">
+        <span class="gv__stateIcon gv__stateIcon--ok"><app-icon name="check" [size]="18" /></span>
+        <span class="gv__stateText">
+          <strong>{{ 'guests.view.admitted' | t }}</strong>
+          <span>{{ 'guests.view.admittedHint' | t }}</span>
+        </span>
+      </div>
+    }
+
+    @if (current(); as c) {
+      <div class="gv__now">
+        <span class="gv__nowLine"><span class="gv__nowLabel">{{ 'meetings.follow.now' | t }}</span> · {{ currentLine() }}</span>
+        <h2 class="gv__nowTitle">
+          @if (c.nonPublic) {
+            <app-icon name="lock" [size]="18" />
+          }
+          {{ c.title || ('meetings.agenda.untitled' | t) }}
+        </h2>
+      </div>
+    }
+
+    @if (focusVote(); as fv) {
+      <button type="button" class="gv__voteCard" [class.gv__voteCard--go]="fv.canCast" (click)="openVoteId.set(fv.id)">
+        <app-icon class="gv__voteIcon" name="vote" [size]="22" />
+        <span class="gv__voteText">
+          @if (fv.status === 'open') {
+            <strong>
+              @if (fv.canCast) {
+                {{ 'guests.view.voteNow' | t }}
+              } @else if (fv.myBallot.cast) {
+                {{ 'guests.view.voteCast' | t }}
+              } @else {
+                {{ (fv.guestsVote && !watch() ? 'guests.view.voteRunning' : 'guests.view.voteMembers') | t }}
+              }
+            </strong>
+            <span>{{ progressOf(fv) }}</span>
+          } @else {
+            <strong>{{ 'guests.view.voteResult' | t }}: <app-status-text [kind]="resultOf(fv).kind">{{ resultOf(fv).key | t }}</app-status-text></strong>
+            <span class="ell">{{ fv.question }}</span>
+          }
+        </span>
+        <app-icon name="chevron-right" [size]="18" />
+      </button>
+    } @else {
+      <div class="gv__noVote">
+        <app-icon name="vote" [size]="22" />
+        <span class="gv__voteText">
+          <strong>{{ 'guests.view.noVote' | t }}</strong>
+          <span>{{ 'guests.view.noVoteHint' | t }}</span>
+        </span>
+      </div>
+    }
+
+    <app-segmented width="fill" [ariaLabel]="'guests.view.tabs' | t" [options]="tabs()" [value]="tab()" (valueChange)="setTab($event)" />
+
+    @if (tab() === 'agenda') {
+      <ol class="gv__agenda">
+        @for (row of rows(); track row.item.id) {
+          <li class="gv__item" [class.gv__item--now]="row.now" [class.gv__item--done]="row.done">
+            <span class="gv__badge" [class.gv__badge--now]="row.now" [class.gv__badge--done]="row.done && !row.item.nonPublic">
+              @if (row.item.nonPublic) {
+                <app-icon name="lock" [size]="15" />
+              } @else if (row.done) {
+                <app-icon name="check" [size]="15" />
+              } @else {
+                {{ row.item.position }}
+              }
+            </span>
+            <span class="gv__itemText">
+              <span class="gv__itemTitle ell" [title]="row.item.title ?? ''">{{ row.item.title || ('meetings.agenda.untitled' | t) }}</span>
+              <span class="gv__itemSub ell">{{ row.sub }}</span>
+            </span>
+          </li>
+        }
+      </ol>
+    } @else {
+      <section class="gv__proto" [attr.aria-label]="'guests.view.protocol' | t">
+        <p class="gv__protoNote">
+          <app-icon name="edit" [size]="14" />
+          {{ 'guests.view.protocolNote' | t }}
+        </p>
+        @for (item of excerpts(); track item.id) {
+          <h3 class="gv__protoHead">{{ 'meetings.agenda.top' | t: { n: item.position } }} · {{ item.title }}</h3>
+          <app-markdown-view [src]="item.body ?? ''" />
+        } @empty {
+          <p class="gv__muted">{{ 'guests.view.protocolEmpty' | t }}</p>
+        }
+      </section>
+    }
+  </div>
+}

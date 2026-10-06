@@ -1,0 +1,64 @@
+@if (loadState() !== 'forbidden') {
+  <section class="gs" aria-labelledby="gs-title">
+    <header class="gs__head">
+      <div class="gs__text">
+        <h2 class="gs__title" id="gs-title">{{ 'admin.guest.title' | t }}</h2>
+        <p class="gs__sub">{{ 'admin.guest.subtitle' | t }}</p>
+      </div>
+      @if (loadState() === 'ok' && !loading()) {
+        <app-button variant="tonal" [disabled]="!canSave()" [loading]="saving()" (click)="save()">
+          {{ 'action.save' | t }}
+        </app-button>
+      }
+    </header>
+
+    @if (loading()) {
+      <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
+    } @else if (loadState() === 'error') {
+      <app-note kind="error" icon="alert" role="alert">{{ 'admin.guest.loadError' | t }}</app-note>
+    } @else {
+      <form class="gs__grid" (submit)="$event.preventDefault(); save()">
+        <div class="gs__field">
+          <div class="gs__unitBox">
+            <app-input
+              type="number"
+              [label]="'admin.guest.hours' | t"
+              [error]="hoursError()"
+              [hint]="'admin.guest.hoursHint' | t: { max: maxHours }"
+              name="confirmTtlHours"
+              [ngModel]="draft().hours"
+              (ngModelChange)="patch({ hours: $event })"
+            />
+            <span class="gs__unit" aria-hidden="true">{{ 'admin.guest.hoursUnit' | t }}</span>
+          </div>
+        </div>
+
+        <div class="gs__field">
+          <div class="gs__link" [class.gs__link--days]="draft().mode === 'days'">
+            <app-select
+              [label]="'admin.guest.link' | t"
+              [hint]="'admin.guest.linkHint' | t"
+              [options]="modeOptions()"
+              name="linkMode"
+              [ngModel]="draft().mode"
+              (ngModelChange)="setMode($event)"
+            />
+            @if (draft().mode === 'days') {
+              <div class="gs__unitBox">
+                <app-input
+                  type="number"
+                  [label]="'admin.guest.days' | t"
+                  [error]="daysError()"
+                  name="linkTtlDays"
+                  [ngModel]="draft().days"
+                  (ngModelChange)="patch({ days: $event })"
+                />
+                <span class="gs__unit" aria-hidden="true">{{ 'admin.guest.daysUnit' | t }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      </form>
+    }
+  </section>
+}

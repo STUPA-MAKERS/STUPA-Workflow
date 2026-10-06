@@ -1,3 +1,5 @@
+@use 'breakpoints' as bp;
+
 :host {
   display: block;
   width: 100%;
@@ -26,23 +28,62 @@
 
 .ph__bar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--space-4);
 }
 
+/* The text takes the free width and wraps inside it, so a long subtitle does not push
+   the actions onto a line of their own. On a narrow screen the basis no longer fits
+   beside the actions, and they wrap below the text. */
 .ph__text {
+  flex: 1 1 20rem;
   min-width: 0;
 }
 
+/* The page title of the design system (d2): 28/36, semibold, a little tighter. */
 .ph__title {
   margin: 0;
+  font-size: var(--fs-d2);
+  line-height: var(--lh-d2);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-tight);
 }
 
+/* The title and its meta text share one baseline. The meta text wraps under the title
+   only when the line has no space for both. */
+.ph__heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+  min-width: 0;
+}
+
+/* A short fact about the page, such as "8 offen". It is part of the title block, not a
+   control, so it does not go into the actions slot. */
+.ph__meta {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The lead line. Give it only when it says something the title does not. */
 .ph__subtitle {
   margin: var(--space-1) 0 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
   color: var(--color-text-muted);
+}
+
+@media (max-width: 768px) {
+  .ph__title {
+    font-size: var(--fs-h1);
+    line-height: var(--lh-h1);
+  }
 }
 
 /* The slot stays in the flow only when a page fills it. An empty slot would
@@ -56,4 +97,53 @@
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+}
+
+/* ------------------------------------------------------------------ pane
+
+   The header of a list column (`pane`): the applications, the tasks, the votes, the
+   meetings, the bookings, the invoices, the budget tree and the Verwaltung navigation.
+   This block is the ONLY place that sets its geometry, so the title starts at the same
+   x and y, with the same size, on every such page, and the actions end on the edge of
+   the column. A page does not style its list header itself (see
+   list-geometry.contract.spec.ts).
+
+   - One line at the height of a control: the title at the start, the actions at the end.
+     Nothing wraps; the title shrinks first.
+   - The title is inset from the column edge like the rows below it. `--ph-inset` changes
+     the inset only where the column is no column (the Verwaltung home page in one column).
+   - The title keeps the d2 size on a phone too: the list is the page there. */
+:host(.ph--pane) {
+  flex: none;
+  margin-bottom: 0;
+}
+:host(.ph--pane) .ph__bar {
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+  min-height: var(--control-height);
+  padding-inline: var(--ph-inset, var(--space-4)) 0;
+}
+:host(.ph--pane) .ph__text {
+  flex: 1 1 0;
+}
+/* A control in the `heading` slot (the "Liste | Kalender" switch) sits on the centre
+   line of the title, as the actions do. */
+:host(.ph--pane) .ph__heading {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+:host(.ph--pane) .ph__title {
+  min-width: 0;
+  font-size: var(--fs-d2);
+  line-height: var(--lh-d2);
+}
+:host(.ph--pane) .ph__actions {
+  flex: none;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+}
+@include bp.phone {
+  :host(.ph--pane) .ph__bar {
+    padding-inline-start: var(--ph-inset, var(--space-1));
+  }
 }

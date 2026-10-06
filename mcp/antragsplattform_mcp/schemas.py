@@ -404,6 +404,14 @@ class MeetingCreate(WireModel):
     date: str | None = Field(default=None, description="ISO date")
     startTime: str | None = Field(default=None, description="HH:MM")
     protokollantId: str | None = None
+    publicJoin: bool | None = Field(
+        default=None,
+        description="Public participation with a QR code: persons without an account ask "
+        "to join, the meeting lead admits them.",
+    )
+    guestsMode: Literal["vote", "watch"] | None = Field(
+        default=None, description="Admitted guests vote (`vote`) or only follow (`watch`)."
+    )
 
 
 class MeetingPatch(WireModel):
@@ -412,25 +420,56 @@ class MeetingPatch(WireModel):
     date: str | None = None
     startTime: str | None = None
     protokollantId: str | None = None
+    publicJoin: bool | None = Field(
+        default=None,
+        description="Switching it off voids the open join requests and removes the "
+        "admitted guests; their cast ballots stay counted.",
+    )
+    guestsMode: Literal["vote", "watch"] | None = Field(
+        default=None,
+        description="`watch` gives 409 `guest_vote_open` while a vote with guests is open.",
+    )
 
 
 class MeetingVoteOpenBody(WireModel):
+    """Open a live vote. A meeting vote has no casting vote: a tie is `rejected`."""
+
     agendaItemId: str
     question: str | None = None
     options: list[str] = Field(default_factory=lambda: ["yes", "no", "abstain"])
     majorityRule: Literal["simple", "absolute", "two_thirds"] = "simple"
     secret: bool = False
-    eligibleCount: int | None = None
+    # The server counts the eligible voters from the roster of the gremium.
     quorumPercent: int | None = None
+    guestsVote: bool | None = Field(
+        default=None,
+        description="Public meeting: the admitted guests vote too (no quorum, majority of "
+        "the cast ballots). Default: on when guests vote in the meeting and the item is "
+        "public. Never on a non-public item (422).",
+    )
 
 
 class VoteCreate(WireModel):
-    """Application-bound vote (voting module)."""
+    """Application-bound vote (voting module).
 
-    config: dict[str, Any] = Field(description="Vote config (options/majority/secret …)")
-    eligibleGroup: str
+    The server counts the eligible voters from the roster of the gremium. The body has
+    no `eligibleCount`.
+    """
+
+    config: dict[str, Any] = Field(
+        description=(
+            "Vote config: options, majorityRule, quorum, abstainCountsQuorum, secret, "
+            "tieBreak. A ballot never changes after the cast, so there is no "
+            "`allowChange` (the server refuses the key with 422)."
+        )
+    )
+    eligibleGroup: str = Field(
+        description=(
+            "UUID of the gremium that votes. It must be the gremium of the application "
+            "(see `get_application` / `list_gremien`). A free group key gives 422."
+        )
+    )
     question: str | None = None
-    eligibleCount: int | None = None
     opensStateId: str | None = None
     closesAt: str | None = Field(default=None, description="ISO datetime")
     resultBranchTransitionId: str | None = None
@@ -443,10 +482,36 @@ class NotificationSettingsUpdate(WireModel):
     taskReminderRepeatDays: int | None = None
 
 
+class GuestSettingsUpdate(WireModel):
+    confirmTtlHours: int = Field(
+        ge=1, le=720, description="Hours a guest has to confirm the email (1..720)"
+    )
+    # Required on purpose, like in the backend: the PUT replaces both fields, and
+    # null means "no expiry". A default would silently remove the expiry when a
+    # caller changes only confirmTtlHours.
+    linkTtlDays: int | None = Field(
+        ge=1,
+        le=3650,
+        description=(
+            "Lifetime of a new magic link in days. Required: send null for no expiry, "
+            "or the current value from get_guest_settings to keep it"
+        ),
+    )
+
+
 class DelegationCreate(WireModel):
     meetingId: str
     delegateId: str
     delegateVoting: bool = False
+    delegatorId: str | None = Field(
+        default=None,
+        description=(
+            "Meeting lead only, while the meeting is live (O6): the missing member to "
+            "substitute. The delegate must be in the substitute pool for that member "
+            "(a personal entry for the member or a gremium-wide entry). "
+            "Leave unset to delegate for yourself while the meeting is planned."
+        ),
+    )
 
 
 class SubstituteCreate(WireModel):

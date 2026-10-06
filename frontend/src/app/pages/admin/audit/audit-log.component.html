@@ -1,144 +1,170 @@
-<section class="audit">
-  <app-page-header [title]="'admin.audit.title' | t" [subtitle]="'admin.audit.desc' | t">
-    <app-filter-bar actions [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
-      <app-select
-        [label]="'admin.audit.filter.action' | t"
-        [placeholder]="'admin.audit.filter.allActions' | t"
-        [options]="actionOptions()"
-        [ngModel]="action()"
-        (ngModelChange)="setAction($event)"
-      />
-      <app-select
-        [label]="'admin.audit.filter.actor' | t"
-        [placeholder]="'admin.audit.filter.allActors' | t"
-        [options]="actorOptions()"
-        [ngModel]="actor()"
-        (ngModelChange)="setActor($event)"
-      />
-      <app-filter-field [label]="'admin.audit.filter.since' | t">
-        <app-datepicker [ngModel]="since()" (ngModelChange)="setSince($event)" />
-      </app-filter-field>
-      <app-filter-field [label]="'admin.audit.filter.until' | t">
-        <app-datepicker [ngModel]="until()" (ngModelChange)="setUntil($event)" />
-      </app-filter-field>
-    </app-filter-bar>
-  </app-page-header>
+<section class="al">
+  <app-page-header [flush]="true" [title]="'admin.audit.title' | t" [subtitle]="'admin.audit.desc' | t" />
+
+  <!-- The chain check: the newest stored result and "Jetzt prüfen". -->
+  <div class="al__verify" [class]="'al__verify al__verify--' + (verifyView()?.kind ?? 'muted')" role="status">
+    <app-icon
+      class="al__verifyIcon"
+      [name]="verifyView()?.kind === 'error' ? 'alert' : verifyView()?.kind === 'ok' ? 'shieldok' : 'shield'"
+      [size]="22"
+    />
+    <div class="al__verifyText">
+      @if (verifyView(); as v) {
+        <span class="al__verifyTitle">{{ v.title }}</span>
+        @if (v.sub) {
+          <span class="al__verifySub">{{ v.sub }}</span>
+        }
+      } @else {
+        <span class="skel skel--bar al__verifySkel" aria-hidden="true"></span>
+        <span class="sr-only">{{ 'admin.audit.loading' | t }}</span>
+      }
+    </div>
+    @if (canVerify()) {
+      <app-button variant="tonal" size="sm" [loading]="verifying()" (click)="runVerify()">
+        <app-icon name="shieldok" [size]="16" /> {{ 'admin.audit.verify.now' | t }}
+      </app-button>
+    }
+  </div>
+
+  <div class="al__filters" role="group" [attr.aria-label]="'admin.audit.filter.label' | t">
+    <app-filter-select
+      [label]="'admin.audit.filter.action' | t"
+      [text]="actionChip()"
+      [active]="!!action()"
+      [options]="actionOptions()"
+      [value]="action()"
+      (valueChange)="setAction($event)"
+    />
+    <app-filter-select
+      [label]="'admin.audit.filter.actor' | t"
+      [text]="actorChip()"
+      [active]="!!actor()"
+      [options]="actorOptions()"
+      [value]="actor()"
+      (valueChange)="setActor($event)"
+    />
+    <app-range-chip
+      kind="date"
+      [label]="'admin.audit.filter.period' | t"
+      [from]="since()"
+      [to]="until()"
+      (applied)="setRange($event)"
+    />
+    @if (activeFilterCount()) {
+      <button type="button" class="al__reset" (click)="resetFilters()">{{ 'admin.audit.filter.reset' | t }}</button>
+    }
+  </div>
 
   @if (loadError()) {
-    <p class="audit__status--error text-muted text-center" role="alert">{{ 'admin.audit.error' | t }}</p>
+    <p class="al__error" role="alert">{{ 'admin.audit.error' | t }}</p>
   }
 
-  @if (!groups().length && !loading()) {
-    <p class="text-muted text-center">{{ 'admin.audit.empty' | t }}</p>
-  }
-
-  @for (g of groups(); track g.key) {
-    <h2 class="audit__day">{{ dayLabel(g) }}</h2>
-    <ul class="list-none m-0 p-0 border border-solid border-line rounded-md bg-surface overflow-hidden">
-      @for (e of g.entries; track e.id) {
-        <li class="audit__item">
+  @if (entries().length) {
+    <ul class="rowgroup al__list">
+      @for (e of entries(); track e.id) {
+        <li class="al__item">
           <button
             type="button"
-            class="audit__row"
-            (click)="toggle(e.id)"
+            class="al__row"
             [attr.aria-expanded]="isOpen(e.id)"
+            [attr.aria-controls]="'al-detail-' + e.id"
+            (click)="toggle(e.id)"
           >
-            <span class="audit__icon" aria-hidden="true">
-              <app-icon [name]="icon(e.action)" [size]="14" />
-            </span>
-            <span class="audit__msg">{{ message(e) }}</span>
-            <time class="audit__time" [attr.datetime]="e.at">{{ e.at | ldate: 'time' }}</time>
-            <app-icon
-              class="audit__chev"
-              [name]="isOpen(e.id) ? 'chevron-up' : 'chevron-down'"
-              [size]="12"
-            />
+            <time class="al__time mono" [attr.datetime]="e.at">{{ e.at | ldate: 'medium' }}</time>
+            <span class="al__action ell" [title]="actionLabel(e.action)">{{ actionLabel(e.action) }}</span>
+            <span class="al__actor ell" [title]="actorLabel(e)">{{ actorLabel(e) }}</span>
+            <span class="al__target ell" [title]="targetText(e)">{{ targetText(e) }}</span>
+            <app-icon class="al__chev" [name]="isOpen(e.id) ? 'chevron-up' : 'chevron-down'" [size]="16" />
           </button>
           @if (isOpen(e.id)) {
-            <div class="audit__details">
-              <dl class="audit__meta">
-                <div class="audit__metaRow">
-                  <dt>{{ 'admin.audit.detail.action' | t }}</dt>
-                  <dd><app-badge variant="neutral">{{ actionLabel(e.action) }}</app-badge></dd>
-                </div>
+            <div class="al__details" [id]="'al-detail-' + e.id">
+              <dl class="al__meta">
+                <dt>{{ 'admin.audit.detail.action' | t }}</dt>
+                <dd>{{ actionLabel(e.action) }}</dd>
                 @if (e.targetType || e.targetId) {
-                  <div class="audit__metaRow">
-                    <dt>{{ 'admin.audit.detail.target' | t }}</dt>
-                    <dd>
-                      @if (e.targetType) {<span>{{ targetTypeLabel(e.targetType) }}</span>}@if (e.targetLabel) {<span> · {{ e.targetLabel }}</span>}@if (e.targetId) {<span> · {{ e.targetId }}</span>}
-                    </dd>
-                  </div>
+                  <dt>{{ 'admin.audit.detail.target' | t }}</dt>
+                  <dd class="al__wrap">
+                    @if (e.targetType) {<span>{{ targetTypeLabel(e.targetType) }}</span>}@if (e.targetLabel) {<span> · {{ e.targetLabel }}</span>}@if (e.targetId) {<span class="mono"> · {{ e.targetId }}</span>}@if (revisionId(e); as rev) {<span> · </span><span class="mono">rev {{ rev }}</span>}
+                  </dd>
                 }
-                <div class="audit__metaRow">
-                  <dt>{{ 'admin.audit.detail.actor' | t }}</dt>
-                  <dd>{{ actorDisplay(e) }}</dd>
-                </div>
-                @for (p of dataPairs(e); track p[0]) {
-                  <div class="audit__metaRow">
-                    <dt>{{ p[0] }}</dt>
-                    <dd class="audit__mono">{{ p[1] }}</dd>
-                  </div>
+                <dt>{{ 'admin.audit.detail.actor' | t }}</dt>
+                <dd class="al__wrap">{{ actorDisplay(e) }}</dd>
+                @for (row of dataRows(e); track row.key) {
+                  <dt [class.mono]="!row.known">{{ row.label }}</dt>
+                  <dd class="al__wrap" [class.mono]="!row.known">{{ row.value }}</dd>
                 }
               </dl>
               @if (revisionId(e)) {
-                <div class="audit__diff">
+                <div class="al__diff">
                   @if (diffOf(e); as d) {
-                    <app-config-diff [diff]="d.diff" />
+                    @if (diffLines(d); as lines) {
+                      <!-- One compact code block: the field, "-" the old value, "+" the new. -->
+                      <div class="al__code mono" role="group" [attr.aria-label]="'admin.audit.diff.label' | t">
+                        @for (l of lines; track l.key) {
+                          <div class="al__codeItem">
+                            <div class="al__codeKey">{{ l.key }}</div>
+                            @if (l.before !== null) {
+                              <div class="al__codeDel">
+                                <span aria-hidden="true">- </span><span class="sr-only">{{ 'admin.audit.diff.before' | t }}: </span>{{ l.before }}
+                              </div>
+                            }
+                            @if (l.after !== null) {
+                              <div class="al__codeIns">
+                                <span aria-hidden="true">+ </span><span class="sr-only">{{ 'admin.audit.diff.after' | t }}: </span>{{ l.after }}
+                              </div>
+                            }
+                          </div>
+                        } @empty {
+                          <p class="al__codeNone">{{ 'admin.audit.diff.none' | t }}</p>
+                        }
+                      </div>
+                    }
                   } @else {
-                    <p class="text-muted">{{ 'common.loading' | t }}</p>
+                    <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
                   }
                 </div>
               }
-              <div class="flex gap-3 items-center flex-wrap">
-                @if (targetLink(e); as link) {
-                  <a class="text-sm" [routerLink]="link">{{ 'admin.audit.openTarget' | t }}</a>
-                }
-                @if (isRevertable(e)) {
-                  <app-button
-                    variant="danger"
-                    size="sm"
-                    [disabled]="reverting()"
-                    (click)="askRevert(e)"
-                  >
-                    {{ 'admin.audit.revert.action' | t }}
-                  </app-button>
-                }
-              </div>
+              @if (targetLink(e) || isRevertable(e)) {
+                <div class="al__actions">
+                  @if (targetLink(e); as link) {
+                    <a class="al__open" [routerLink]="link">{{ 'admin.audit.openTarget' | t }}</a>
+                  }
+                  @if (isRevertable(e)) {
+                    <app-button variant="danger" size="sm" [disabled]="reverting()" (click)="askRevert(e)">
+                      {{ 'admin.audit.revert.action' | t }}
+                    </app-button>
+                  }
+                </div>
+              }
             </div>
           }
         </li>
       }
     </ul>
+  } @else if (!loading() && !loadError()) {
+    <p class="al__empty">{{ 'admin.audit.empty' | t }}</p>
   }
 
-  <div #sentinel class="audit__sentinel" aria-hidden="true"></div>
-
-  <app-dialog
-    [open]="!!confirmRevert()"
-    [title]="'admin.audit.revert.title' | t"
-    [closeLabel]="'admin.gremien.cancel' | t"
-    (closed)="confirmRevert.set(null)"
-  >
-    @if (confirmRevert()) {
-      <p>{{ 'admin.audit.revert.confirm' | t }}</p>
-      <div class="flex gap-2 justify-end mt-4">
-        <app-button variant="ghost" size="sm" (click)="confirmRevert.set(null)">
-          {{ 'admin.gremien.cancel' | t }}
-        </app-button>
-        <app-button variant="danger" size="sm" (click)="doRevert()">
-          {{ 'admin.audit.revert.action' | t }}
-        </app-button>
-      </div>
-    }
-  </app-dialog>
+  <div #sentinel class="al__sentinel" aria-hidden="true"></div>
 
   @if (loading()) {
     <app-skeleton variant="rows" [count]="6" [label]="'admin.audit.loading' | t" />
   } @else if (hasMore()) {
-    <div class="flex justify-center">
-      <app-button variant="secondary" size="sm" (click)="loadMore()">
-        {{ 'admin.audit.loadMore' | t }}
-      </app-button>
+    <div class="al__more">
+      <app-button variant="tonal" (click)="loadMore()">{{ 'admin.audit.loadMore' | t }}</app-button>
     </div>
   }
 </section>
+
+<app-dialog
+  [open]="!!confirmRevert()"
+  [title]="'admin.audit.revert.title' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="confirmRevert.set(null)"
+>
+  <p class="al__dialogText">{{ 'admin.audit.revert.confirm' | t }}</p>
+  <div dialog-footer class="al__dialogFoot">
+    <app-button variant="text" (click)="confirmRevert.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="danger" (click)="doRevert()">{{ 'admin.audit.revert.action' | t }}</app-button>
+  </div>
+</app-dialog>

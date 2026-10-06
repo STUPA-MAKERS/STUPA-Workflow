@@ -1,123 +1,135 @@
-.consent__card {
+@use 'breakpoints' as bp;
+
+:host {
+  display: block;
+}
+
+/* One card in the middle of the page. */
+.cs {
+  display: flex;
+  justify-content: center;
+  padding-block: var(--space-6);
+}
+
+.cs__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
   width: 100%;
   max-width: 40rem;
+  padding: var(--space-6) var(--space-6) var(--space-5);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
 }
 
-.consent__head {
+.cs__head {
   display: flex;
-  gap: var(--space-3);
   align-items: flex-start;
-
-  h1 {
-    margin: 0 0 var(--space-1);
-    font-size: var(--fs-lg);
-  }
+  gap: var(--space-4);
 }
-
-.consent__label {
-  font-size: var(--fs-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--color-text-muted);
-  margin: var(--space-5) 0 var(--space-2);
+.cs__headIcon {
+  flex: none;
+  margin-top: var(--space-1);
+  color: var(--color-accent-text);
 }
-
-.consent__scopes {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.cs__headText {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  min-width: 0;
 }
-
-.scope label {
-  display: flex;
-  gap: var(--space-3);
-  align-items: flex-start;
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  cursor: pointer;
+.cs__title {
+  margin: 0;
+  font-size: var(--fs-h1);
+  line-height: var(--lh-h1);
+  font-weight: var(--fw-semibold);
 }
-
-.scope label:hover {
-  border-color: var(--color-border-strong);
+.cs__muted {
+  margin: 0;
+  color: var(--color-text-muted);
 }
-
-.scope--unheld {
-  opacity: 0.7;
+.cs__client {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
 }
-
-.chip {
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-pill);
-  padding: var(--space-1) var(--space-3);
-  background: var(--color-surface);
+/* A client id is a value to compare: it wraps, it is never cut. */
+.cs__clientId {
   color: var(--color-text);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
 }
 
-.chip--active {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-on-primary);
+.cs__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cs__cap {
+  padding-inline: var(--space-1);
+  color: var(--color-text-muted);
 }
 
-.consent__actions {
+.cs__scopes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* The whole row is the label of the box, so a press anywhere on it toggles. */
+.cs__scope app-checkbox {
+  display: flex;
+}
+.cs__scope ::ng-deep app-checkbox > label {
+  flex: 1 1 auto;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+}
+.cs__scope ::ng-deep app-checkbox .cbx__input {
+  margin-top: 1px;
+}
+.cs__scopeText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cs__scopeLabel {
+  font-weight: var(--fw-semibold);
+}
+.cs__scopeDesc {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--color-text-muted);
+}
+.cs__scopeWarn {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--color-danger);
+}
+.cs__scope--unheld .cs__scopeLabel {
+  color: var(--color-text-muted);
+}
+
+.cs__lifetimes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cs__actions {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-3);
-  margin-top: var(--space-5);
+  gap: var(--space-2);
 }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 0 var(--space-4);
-  height: var(--control-height);
-  background: var(--color-surface);
-  color: var(--color-text);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--fs-sm);
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn--primary {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-on-primary);
-}
-
-.btn--ghost {
-  border-color: transparent;
-  background: transparent;
-}
-
-@media (max-width: 768px) {
-  .consent__actions {
-    flex-direction: column-reverse;
-    align-items: stretch;
+@include bp.phone {
+  .cs {
+    padding-block: var(--space-2);
   }
-  .consent__actions .btn {
-    justify-content: center;
-    min-height: 2.75rem;
+  .cs__card {
+    padding: var(--space-5) var(--space-4) var(--space-4);
   }
-  .chip {
-    min-height: 2.5rem;
-    padding-inline: var(--space-4);
-  }
-  .scope label {
-    padding: var(--space-3);
+  .cs__lifetimes .chip {
+    height: 2.5rem;
   }
 }

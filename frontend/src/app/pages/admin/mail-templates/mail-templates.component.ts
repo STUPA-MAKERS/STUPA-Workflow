@@ -1,28 +1,53 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { UpperCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { FilterSelectComponent, type FilterSelectOption } from '@shared/ui/filter-select/filter-select.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { ButtonComponent } from '@stupa-makers/ui-kit';
-import { ToastService } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  IconComponent,
+  InputComponent,
+  MEDIA,
+  SegmentedComponent,
+  type SegmentedOption,
+  ToastService,
+} from '@stupa-makers/ui-kit';
+import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import type { MailPreview, MailTemplate } from '../admin.models';
+import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 
 const LANGS = ['de', 'en'] as const;
 type Lang = (typeof LANGS)[number];
 
 /**
- * Mail-template editor at `/admin/mail-templates`. Needs the `admin.notifications` permission.
+ * Mail-template editor at `/admin/mail-templates` (board Admin-Mail-Vorlagen). Needs the
+ * `admin.notifications` permission.
  *
- * The page shows the template list on the left and the editor on the right. The editor has
- * language tabs for subject, text and HTML, a placeholder reference and a live preview.
+ * The page shows the template list on the left ("angepasst" marks an override; on a
+ * phone a chip picks the template) and the editor on the right: DE/EN for subject, text
+ * and the optional HTML, the placeholders of the template, the preview, and "Auf Standard
+ * zurücksetzen" for an override.
  */
 @Component({
   selector: 'app-mail-templates',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, PageHeaderComponent],
+  imports: [
+    ScrollFadeDirective,
+    FormsModule,
+    UpperCasePipe,
+    TranslatePipe,
+    ButtonComponent,
+    FilterSelectComponent,
+    IconComponent,
+    InputComponent,
+    PageHeaderComponent,
+    SegmentedComponent,
+  ],
   templateUrl: './mail-templates.component.html',
   styleUrl: './mail-templates.component.scss',
 })
@@ -31,7 +56,9 @@ export class MailTemplatesComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
-  readonly langs = LANGS;
+  readonly langOptions: SegmentedOption[] = LANGS.map((l) => ({ value: l, label: l.toUpperCase() }));
+  /** Phone: a chip picks the template instead of the list column. */
+  readonly phone = mediaQuerySignal(MEDIA.phone);
   private readonly templates_ = signal<MailTemplate[]>([]);
   readonly templates = this.templates_.asReadonly();
   // Select by key, not by ID. A builtin template has no database ID.
@@ -52,6 +79,20 @@ export class MailTemplatesComponent {
     const k = `admin.mailTemplates.key.${key}`;
     const label = this.i18n.translate(k as TranslationKey);
     return label === k ? key : label;
+  }
+
+  /** The choices of the phone chip. An override carries "· angepasst", as in the
+   *  desktop list, because the chip list has no second text line. */
+  readonly templateOptions = computed<FilterSelectOption[]>(() => {
+    const custom = this.i18n.translate('admin.mailTemplates.customized');
+    return this.templates_().map((t) => ({
+      value: t.key,
+      label: t.source === 'override' ? `${this.keyLabel(t.key)} · ${custom}` : this.keyLabel(t.key),
+    }));
+  });
+
+  setLang(value: string | null): void {
+    this.lang.set(value === 'en' ? 'en' : 'de');
   }
 
   readonly placeholderList = computed<{ key: string; desc: string; token: string }[]>(() => {

@@ -1,0 +1,87 @@
+<app-dialog
+  [open]="meeting() !== null"
+  [title]="'meetings.settings.title' | t"
+  [subtitle]="meeting()?.title ?? ''"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="cancel()"
+>
+  <form class="msd" (submit)="$event.preventDefault(); save()">
+    @if (locked()) {
+      <app-note icon="lock">{{ 'meetings.settings.closedHint' | t }}</app-note>
+    } @else if (keeperLocked()) {
+      <app-note icon="lock">{{ 'meetings.protokollant.lockedHint' | t }}</app-note>
+    }
+    <app-select
+      name="keeper"
+      [id]="'msd-keeper'"
+      [label]="'meetings.protokollant.label' | t"
+      [options]="keeperOptions()"
+      [disabled]="keeperLocked()"
+      [ngModel]="keeper()"
+      (ngModelChange)="keeper.set($event)"
+    />
+    <div class="msd__when">
+      <app-datepicker
+        name="date"
+        [id]="'msd-date'"
+        [label]="'meetings.create.date' | t"
+        [required]="true"
+        [disabled]="locked()"
+        [ngModel]="date()"
+        (ngModelChange)="date.set($event)"
+      />
+      <app-time-input
+        name="time"
+        [id]="'msd-time'"
+        [label]="'meetings.create.time' | t"
+        [required]="true"
+        [disabled]="locked()"
+        [ngModel]="time()"
+        (ngModelChange)="time.set($event)"
+      />
+      <app-time-input
+        name="endTime"
+        [id]="'msd-end'"
+        [label]="'meetings.create.endTime' | t"
+        [disabled]="locked()"
+        [ngModel]="endTime()"
+        (ngModelChange)="endTime.set($event)"
+      />
+    </div>
+    @if (meeting()?.canManage) {
+      <app-public-join-settings
+        [publicJoin]="publicJoin()"
+        (publicJoinChange)="setPublicJoin($event)"
+        [(guestsMode)]="guestsMode"
+        [disabled]="publicLocked()"
+        [allowed]="meeting()?.publicJoinAllowed ?? true"
+        [link]="meeting()?.publicJoin ? link() : null"
+        [rotating]="rotating()"
+        (rotate)="rotate()"
+      />
+    }
+    <button type="submit" hidden></button>
+  </form>
+  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
+  <app-button
+    dialog-footer
+    variant="fill"
+    [loading]="saving()"
+    [disabled]="locked() || !valid()"
+    (click)="save()"
+  >
+    {{ 'action.save' | t }}
+  </app-button>
+</app-dialog>
+
+<!-- Off in a live meeting: the consequences in one sentence, with the numbers. -->
+<app-dialog
+  [open]="confirmOff()"
+  [title]="'guests.off.title' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="keepPublic()"
+>
+  <p class="msd__confirm">{{ 'guests.off.text' | t: { pending: offCounts().pending, admitted: offCounts().admitted } }}</p>
+  <app-button dialog-footer variant="text" (click)="keepPublic()">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="danger" (click)="confirmPublicOff()">{{ 'guests.off.confirm' | t }}</app-button>
+</app-dialog>

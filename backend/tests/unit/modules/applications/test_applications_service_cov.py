@@ -40,8 +40,10 @@ from app.shared.errors import (
     NotFoundError,
     ValidationProblem,
 )
+from tests._support.identity_rows import sub_ref
 
 NOW = datetime(2026, 6, 16, 12, 0, tzinfo=UTC)
+AUTHOR_ID = UUID("00000000-0000-0000-0000-00000000a001")
 
 
 # generic fakes
@@ -182,6 +184,10 @@ def _app(**over: Any) -> _Obj:
         # Not archived by default, which is the state nearly every test wants.
         "archived_at": None,
         "archived_by": None,
+        # Not captured on behalf of the applicant (#11).
+        "captured_by": None,
+        "capture_intake": None,
+        "received_on": None,
     }
     base.update(over)
     return _Obj(**base)
@@ -281,8 +287,9 @@ async def test_get_with_pii_owner_and_applicant() -> None:
     applicant = _Obj(email="a@b.de", name="Alice", anonymized_at=None)
     session = _Session(
         get_results=[app, state],
-        # _to_out: first the applicant query, then _resolve_state_colors (cached).
-        execute_results=[[applicant], [("draft", "#zzz")]],
+        # _to_out: the stateSince query (no event, so created_at), the applicant
+        # query, then _resolve_state_colors (cached).
+        execute_results=[[], [applicant], [("draft", "#zzz")]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.get(app.id, include_pii=True, requester_sub="user-1")
@@ -291,6 +298,52 @@ async def test_get_with_pii_owner_and_applicant() -> None:
     assert out.applicant is not None
     assert out.applicant.email == "a@b.de"
     assert out.version == 0  # scalar() default None → 0
+    assert out.state_since == app.created_at  # no status event → creation time
+
+
+async def test_get_carries_the_capture_block() -> None:
+    # #11: a captured application names the capturing person, or the Gremium in the
+    # applicant view.
+    state = _state()
+    app = _app(
+        created_by="anna",
+        current_state_id=state.id,
+        captured_by="clerk",
+        capture_intake="per PDF",
+        received_on=date(2026, 10, 1),
+    )
+    clerk_id = uuid4()
+    session = _Session(
+        get_results=[app, state],
+        # stateSince, state colours, then the name of the capturing person.
+        # A row of `refs_by_sub`: sub, id, name, email, then the merge target (none).
+        execute_results=[
+            [],
+            [("draft", "#zzz")],
+            [("clerk", clerk_id, "Clara", "c@x.de", None, None, None)],
+        ],
+    )
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    out = await svc.get(app.id, include_pii=False, requester_sub="admin")
+    assert out.capture is not None
+    assert out.capture.captured_by is not None
+    assert out.capture.captured_by.kind == "principal"
+    assert out.capture.captured_by.display_name == "Clara"
+    assert out.capture.received_on == date(2026, 10, 1)
+    assert out.capture.intake == "per PDF"
+    assert out.capture.captured_at == NOW
+
+    session = _Session(
+        get_results=[app, state],
+        execute_results=[[], [("draft", "#zzz")]],
+        # The Gremium name of the applicant view.
+        scalar_results=[None, "StuPa"],
+    )
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    out = await svc.get(app.id, include_pii=False, requester_sub="anna", applicant_view=True)
+    assert out.capture is not None
+    assert out.capture.captured_by is not None
+    assert out.capture.captured_by.kind == "gremium"
 
 
 async def test_get_without_pii_and_can_manage() -> None:
@@ -316,7 +369,8 @@ async def test_get_include_pii_but_no_applicant_row() -> None:
     app = _app(current_state_id=state.id)
     session = _Session(
         get_results=[app, state],
-        execute_results=[[], [("draft", "#zzz")]],  # empty applicant result, then colors
+        # stateSince, empty applicant result, then colors
+        execute_results=[[], [], [("draft", "#zzz")]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.get(app.id, include_pii=True)
@@ -354,6 +408,9 @@ def _payload(**over: Any) -> SimpleNamespace:
         "applicant_email": "a@b.de",
         "applicant_name": "Alice",
         "lang": "de",
+        # Z4: no draft uploads unless a test sets them.
+        "attachment_ids": [],
+        "draft_token": None,
     }
     base.update(over)
     return SimpleNamespace(**base)
@@ -380,13 +437,22 @@ class _FakeForms:
 
 class _FakeFlow:
     scheduled: list[tuple[Any, Any]] = []
+    # The `start_confirmed` calls as (application id, dispatcher).
+    started: list[tuple[Any, Any]] = []
     available: list[Any] = []
+    # The gremien where the principal holds the gremium permission `vote.cast`
+    # (`gremium_ids_for` in `list_tasks`).
+    cast_gids: set[Any] = set()
 
-    def __init__(self, session: object) -> None:
+    def __init__(self, session: object, dispatcher: object = None) -> None:
         self.session = session
+        self.dispatcher = dispatcher
 
     async def schedule_state_deadline(self, app: Any, state: Any) -> None:
         _FakeFlow.scheduled.append((app, state))
+
+    async def start_confirmed(self, application_id: Any) -> None:
+        _FakeFlow.started.append((application_id, self.dispatcher))
 
     async def available_transitions(
         self, _app_id: Any, _principal: Any, *, deadline_passed: Any = None
@@ -397,6 +463,7 @@ class _FakeFlow:
 @pytest.fixture(autouse=True)
 def _reset_flow() -> None:
     _FakeFlow.scheduled = []
+    _FakeFlow.started = []
     _FakeFlow.available = []
     _FakeForms.effective = None
 
@@ -411,6 +478,12 @@ def _patch_forms(monkeypatch: pytest.MonkeyPatch) -> type[_FakeForms]:
 @pytest.fixture
 def _patch_flow(monkeypatch: pytest.MonkeyPatch) -> type[_FakeFlow]:
     monkeypatch.setattr("app.modules.flow.service.FlowService", _FakeFlow)
+    _FakeFlow.cast_gids = set()
+
+    async def _gremium_ids_for(_session: Any, _principal: Any, perm: str) -> set[Any]:
+        return set(_FakeFlow.cast_gids) if perm == "vote.cast" else set()
+
+    monkeypatch.setattr("app.modules.admin.gremium_roles.gremium_ids_for", _gremium_ids_for)
     return _FakeFlow
 
 
@@ -490,7 +563,10 @@ async def test_create_anonymous_ok(
     assert session.committed == 1
     kinds = {type(o).__name__ for o in session.added}
     assert {"Application", "Applicant", "SubmissionVersion", "StatusEvent"} <= kinds
-    assert _FakeFlow.scheduled  # the deadline is materialized
+    # O14: a guest application rests in the flow until the magic-link verify. The
+    # create schedules no deadline and starts nothing.
+    assert _FakeFlow.scheduled == []
+    assert _FakeFlow.started == []
 
 
 async def test_create_logged_in_actor_confirms_immediately(
@@ -505,11 +581,16 @@ async def test_create_logged_in_actor_confirms_immediately(
         execute_results=[[fv_id], [initial]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
+    dispatcher = object()
     app, _ = await svc.create(
-        _payload(data={"title": "T"}), actor="principal-sub-1"  # type: ignore[arg-type]
+        _payload(data={"title": "T"}),  # type: ignore[arg-type]
+        actor="principal-sub-1",
+        dispatcher=dispatcher,  # type: ignore[arg-type]
     )
     assert app.created_by == "principal-sub-1"
     assert app.email_confirmed_at is not None
+    # A confirmed application starts its flow at once, with the route dispatcher.
+    assert _FakeFlow.started == [(app.id, dispatcher)]
 
 
 async def test_effective_form_delegates_with_pinned_version(
@@ -756,16 +837,53 @@ async def test_timeline_resolves_actor_names_and_states() -> None:
     session = _Session(
         get_results=[app, to_state, to_state],
         execute_results=[
-            [("sub-1", "Alice", None)],  # _author_names
+            # timeline events with the label of the fired transition (A3)
+            [(ev1, {"de": "Genehmigen"}), (ev2, None)],
+            [sub_ref("sub-1", "Alice", None, AUTHOR_ID)],  # _author_refs
             [("approved", "#0f0")],  # _resolve_state_colors (cached after this call)
         ],
-        scalars_results=[[ev1, ev2]],  # timeline events
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.timeline(app.id)
     assert len(out) == 2
     assert out[0].actor == "Alice"  # resolved
+    assert out[0].transition_label == {"de": "Genehmigen"}
     assert out[1].actor is None  # no actor
+    assert out[1].transition_label is None  # creation or revert
+
+
+async def test_timeline_applicant_view_names_the_gremium() -> None:
+    app = _app(created_by="owner-sub")
+    to_state = _state(key="approved")
+    member = _Obj(
+        from_state_id=None, to_state_id=to_state.id, actor="sub-1", at=NOW, note=None
+    )
+    own = _Obj(
+        from_state_id=None, to_state_id=to_state.id, actor="owner-sub", at=NOW, note=None
+    )
+    magic = _Obj(
+        from_state_id=None, to_state_id=to_state.id, actor="applicant", at=NOW, note=None
+    )
+    session = _Session(
+        get_results=[app, to_state, to_state, to_state],
+        execute_results=[
+            [(member, None), (own, None), (magic, None)],
+            [
+                sub_ref("sub-1", "Alice", None, AUTHOR_ID),
+                sub_ref("owner-sub", "Olga", None, uuid4()),
+            ],
+            [("approved", "#0f0")],
+        ],
+        scalar_results=["StuPa"],  # name of the Gremium of the application
+    )
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    out = await svc.timeline(app.id, applicant_view=True)
+    assert [e.actor for e in out] == ["StuPa", "Olga", "applicant"]
+
+
+async def test_gremium_actor_without_gremium_is_none() -> None:
+    svc = ApplicationsService(_Session())  # type: ignore[arg-type]
+    assert await svc._gremium_actor(_app(gremium_id=None)) is None  # type: ignore[arg-type]
 
 
 async def test_timeline_missing_404() -> None:
@@ -780,7 +898,7 @@ async def test_versions_resolves_names() -> None:
     v2 = _Obj(version=2, data={"title": "b"}, diff=None, changed_by=None, at=NOW)
     session = _Session(
         get_results=[app],
-        execute_results=[[("sub-1", None, "alice@x.de")]],  # _author_names falls back to email
+        execute_results=[[sub_ref("sub-1", None, "alice@x.de", AUTHOR_ID)]],  # _author_refs: email
         scalars_results=[[v1, v2]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -832,8 +950,8 @@ async def test_list_applications_no_filters_default_sort() -> None:
     state = _state()
     session = _Session(
         get_results=[state],
-        execute_results=[[("draft", "#z")]],
-        scalars_results=[[app]],
+        # the page rows with stateSince (none: creation time), then the colors
+        execute_results=[[(app, None)], [("draft", "#z")]],
         scalar_results=[1],  # total
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -841,6 +959,7 @@ async def test_list_applications_no_filters_default_sort() -> None:
     assert page.total == 1
     assert len(page.items) == 1
     assert page.items[0].title == "Antrag"
+    assert page.items[0].state_since == app.created_at
 
 
 async def test_list_applications_all_filters_postgres_search(
@@ -849,15 +968,15 @@ async def test_list_applications_all_filters_postgres_search(
     app = _app(budget_id=uuid4())
     state = _state()
     node_path = "VS-800"
+    since = datetime(2026, 7, 1, tzinfo=UTC)
     session = _Session(
         get_results=[state],
-        execute_results=[[("draft", "#z")]],
-        scalars_results=[[app]],
+        execute_results=[[(app, since)], [("draft", "#z")]],
         scalar_results=[node_path, 1],  # budget path_key lookup, then total
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     page = await svc.list_applications(
-        state_id=uuid4(),
+        state_ids=[uuid4()],
         gremium_id=uuid4(),
         type_id=uuid4(),
         budget_id=uuid4(),
@@ -874,6 +993,21 @@ async def test_list_applications_all_filters_postgres_search(
     )
     assert page.total == 1
     assert page.offset == 5
+    assert page.items[0].state_since == since
+
+
+async def test_list_applications_sort_state_since() -> None:
+    """`sort=stateSince` orders by the last status change (the order itself: integration)."""
+    app = _app()
+    since = datetime(2026, 7, 1, tzinfo=UTC)
+    session = _Session(
+        get_results=[_state()],
+        execute_results=[[(app, since)], [("draft", "#z")]],
+        scalar_results=[1],
+    )
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    page = await svc.list_applications(sort="stateSince", order="desc", limit=10, offset=0)
+    assert page.items[0].state_since == since
 
 
 async def test_list_applications_unknown_budget_yields_empty() -> None:
@@ -983,17 +1117,50 @@ async def test_list_tasks_no_apps_returns_empty(_patch_flow: type[_FakeFlow]) ->
     assert out == []
 
 
-async def test_list_tasks_vote_state_admin(_patch_flow: type[_FakeFlow]) -> None:
-    app = _app(current_state_id=uuid4())
+async def test_list_tasks_vote_state_cast_right_in_app_gremium(
+    _patch_flow: type[_FakeFlow],
+) -> None:
+    """The gremium permission `vote.cast` in the gremium of the application makes a task."""
+    gid = uuid4()
+    app = _app(current_state_id=uuid4(), gremium_id=gid)
     vote_state = _state(kind="vote")
     vote_state.id = app.current_state_id
+    _FakeFlow.cast_gids = {gid}
     session = _Session(
         execute_results=[[("draft", "#z")]],  # _resolve_state_colors
         scalars_results=[[app], [vote_state]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
-    out = await svc.list_tasks(_principal(roles=["admin"]))
+    out = await svc.list_tasks(_principal())
     assert len(out) == 1
+
+
+async def test_list_tasks_vote_state_cast_right_elsewhere_is_no_task(
+    _patch_flow: type[_FakeFlow],
+) -> None:
+    """`vote.cast` in another gremium, or the admin role, makes no vote task."""
+    app = _app(current_state_id=uuid4(), created_by="other")
+    vote_state = _state(kind="vote")
+    vote_state.id = app.current_state_id
+    _FakeFlow.cast_gids = {uuid4()}
+    _FakeFlow.available = []
+    session = _Session(scalars_results=[[app], [vote_state]])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    assert await svc.list_tasks(_principal(roles=["admin"])) == []
+
+
+async def test_list_tasks_vote_state_app_without_gremium(
+    _patch_flow: type[_FakeFlow],
+) -> None:
+    """An application without a gremium never matches the cast set."""
+    app = _app(current_state_id=uuid4(), gremium_id=None, created_by="other")
+    vote_state = _state(kind="vote")
+    vote_state.id = app.current_state_id
+    _FakeFlow.cast_gids = {uuid4()}
+    _FakeFlow.available = []
+    session = _Session(scalars_results=[[app], [vote_state]])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    assert await svc.list_tasks(_principal()) == []
 
 
 async def test_list_tasks_vote_state_member_in_gremium(
@@ -1009,7 +1176,7 @@ async def test_list_tasks_vote_state_member_in_gremium(
         scalar_results=[uuid4()],  # _in_gremium → membership row exists
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
-    out = await svc.list_tasks(_principal(_perms={"vote.cast"}))
+    out = await svc.list_tasks(_principal())
     assert len(out) == 1
 
 
@@ -1114,36 +1281,39 @@ async def test_list_tasks_current_state_none_skipped(
 async def test_author_names_empty_set_short_circuits() -> None:
     session = _Session()
     svc = ApplicationsService(session)  # type: ignore[arg-type]
-    assert await svc._author_names(set()) == {}
+    assert await svc._author_refs(set()) == {}
     assert session.statements == []  # no query runs
 
 
-async def test_author_names_resolves_display_then_email_then_sub() -> None:
+async def test_author_refs_resolve_display_then_email_and_skip_the_rest() -> None:
+    id1, id2 = uuid4(), uuid4()
     session = _Session(
         execute_results=[
             [
-                ("s1", "Display", "e1@x.de"),  # display_name
-                ("s2", None, "e2@x.de"),  # email
-                ("s3", None, None),  # sub
+                sub_ref("s1", "Display", "e1@x.de", id1),  # display_name
+                sub_ref("s2", None, "e2@x.de", id2),  # email
+                sub_ref("s3", None, None, uuid4()),  # anonymized: missing, never the raw sub
             ]
         ]
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
-    names = await svc._author_names({"s1", "s2", "s3", ""})
-    assert names == {"s1": "Display", "s2": "e2@x.de", "s3": "s3"}
+    refs = await svc._author_refs({"s1", "s2", "s3", ""})
+    assert refs == {"s1": ("Display", id1), "s2": ("e2@x.de", id2)}
 
 
 async def test_add_comment_with_author() -> None:
     app = _app()
     session = _Session(
         get_results=[app],
-        execute_results=[[("sub-1", "Alice", None)]],  # _author_names
+        execute_results=[[sub_ref("sub-1", "Alice", None, AUTHOR_ID)]],  # _author_refs
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.add_comment(
         app.id, author="sub-1", author_kind="principal", body="hi", visibility="public"
     )
     assert out.author == "Alice"
+    # The author carries the id for the avatar.
+    assert out.author_info is not None and out.author_info.principal_id == AUTHOR_ID
     assert out.body == "hi"
     assert session.committed == 1
 
@@ -1178,7 +1348,7 @@ async def test_list_comments_include_internal() -> None:
     )
     session = _Session(
         get_results=[app],
-        execute_results=[[("sub-1", "Alice", None)]],
+        execute_results=[[sub_ref("sub-1", "Alice", None, AUTHOR_ID)]],
         scalars_results=[[c1, c2]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -1196,7 +1366,7 @@ async def test_list_comments_public_only() -> None:
     )
     session = _Session(
         get_results=[app],
-        execute_results=[[("sub-1", "A", None)]],
+        execute_results=[[sub_ref("sub-1", "A", None, AUTHOR_ID)]],
         scalars_results=[[c]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
@@ -1355,7 +1525,7 @@ async def test_update_comment_by_author() -> None:
     c = _comment(application_id=app.id)
     session = _Session(
         get_results=[app],
-        execute_results=[[c], [], [], [("sub-1", "Alice", None)]],
+        execute_results=[[c], [], [], [sub_ref("sub-1", "Alice", None, AUTHOR_ID)]],
     )
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.update_comment(
@@ -1394,8 +1564,10 @@ async def test_update_comment_by_manager_of_foreign_comment() -> None:
         viewer_is_applicant=False,
         can_manage=True,
     )
-    # The manager is not the author, so the response is not marked as own.
-    assert out.is_own is False and out.author == "other"
+    # The manager is not the author, so the response is not marked as own. The
+    # author sub names no account, so the response carries no name and no sub.
+    assert out.is_own is False and out.author is None
+    assert out.author_info is not None and out.author_info.kind == "deleted"
 
 
 async def test_update_comment_of_applicant_by_applicant() -> None:
@@ -1498,3 +1670,27 @@ async def test_delete_comment_unknown_404() -> None:
             viewer_is_applicant=False,
             can_manage=True,
         )
+
+
+async def test_patch_moves_a_relative_changed_deadline(
+    monkeypatch: pytest.MonkeyPatch, _patch_flow: type[_FakeFlow]
+) -> None:
+    """F7: a state whose policy follows edits gets its deadline re-created."""
+    from app.modules.applications.service import edits as edits_mod
+
+    app = _app(data={"title": "old"})
+    state = _state(edit_allowed=True, config={"deadlinePolicyKey": "k"})
+    app_type = _Obj(id=app.type_id, has_budget=False)
+    _patch_pinned(monkeypatch, [_ff("title", required=True)])
+
+    async def _follows(_session: Any, config: Any) -> bool:
+        return config == {"deadlinePolicyKey": "k"}
+
+    monkeypatch.setattr(edits_mod, "state_deadline_follows_edits", _follows)
+    session = _Session(
+        get_results=[app, state, app_type, state],
+        execute_results=[[("draft", "#z")]],
+        scalar_results=[1, None],
+    )
+    await ApplicationsService(session).patch(app.id, {"title": "new"}, changed_by="u")  # type: ignore[arg-type]
+    assert _FakeFlow.scheduled == [(app, state)]

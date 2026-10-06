@@ -1,5 +1,5 @@
 # Antragsplattform — docker-compose skeleton (T-01)
-# One VM, plain HTTP inside, behind an external Nginx Proxy Manager (the TLS edge).
+# One VM, plain HTTP inside, behind an external Caddy reverse proxy (the TLS edge).
 # The stack holds no TLS, no certificate and no Keycloak. The only host port is `web`
 # (127.0.0.1:${WEB_PORT:-8080}). Every other service stays internal, so nothing enters from the
 # internet. Egress stays allowed (worker: SMTP/WebDAV/webhooks, api: OIDC). The typst
@@ -13,7 +13,7 @@ x-restart: &restart
 
 services:
   web:
-    # Static SPA plus routing /api -> api. The only NPM upstream.
+    # Static SPA plus routing /api -> api. The only upstream of Caddy.
     # The multi-stage image builds the Angular frontend (frontend/), and nginx serves it.
     # The context is the repository root, so frontend/ and deploy/web/nginx.conf are in
     # reach.
@@ -25,11 +25,11 @@ services:
       api:
         condition: service_healthy
     ports:
-      # Loopback by default: the external NPM proxies here, or reaches `web` over the
+      # Loopback by default: the external Caddy proxies here, or reaches `web` over the
       # `proxy` network without any host port at all. `WEB_PORT` moves the port when
       # 8080 is taken; the container port stays 80, because nginx.conf listens there.
       #
-      # `WEB_HOST` moves the BIND ADDRESS, for an NPM that cannot reach 127.0.0.1 of
+      # `WEB_HOST` moves the BIND ADDRESS, for a Caddy that cannot reach 127.0.0.1 of
       # this host. Setting it to 0.0.0.0 puts the app on every interface, so it is
       # reachable WITHOUT TLS and PAST the proxy's access rules, and FORWARDED_ALLOW_IPS
       # then trusts headers from whoever gets there. Use a host firewall with it, or
@@ -300,6 +300,6 @@ networks:
     driver: bridge
     internal: true
   proxy:
-    # In production this is the external NPM network. Set `external: true` here and
-    # reference the network that the Nginx Proxy Manager manages.
+    # In production this is the external Caddy network. Set `external: true` here and
+    # reference the network of the Caddy container.
     driver: bridge

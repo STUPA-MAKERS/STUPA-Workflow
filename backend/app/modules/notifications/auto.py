@@ -1,4 +1,4 @@
-"""Auto mails for platform events: meetings, roles, delegations.
+"""Auto mails for platform events: meetings and delegations.
 
 Every entry point runs as a background task with its own session after the API
 response. All of them are best effort. A mail failure must never break the
@@ -44,29 +44,6 @@ _BUILTIN_MEETING_BODY = {
     "{% if meetingTime %}, {{ meetingTime }}{% endif %}\n",
 }
 
-_BUILTIN_ROLE_ASSIGNED_SUBJECT = {
-    "de": "Neue Rolle: {{ roleLabel }}",
-    "en": "New role: {{ roleLabel }}",
-}
-_BUILTIN_ROLE_ASSIGNED_BODY = {
-    "de": "Hallo,\n\ndir wurde die Rolle „{{ roleLabel }}“"
-    "{% if gremiumName %} im Gremium {{ gremiumName }}{% endif %} zugewiesen.\n",
-    "en": "Hello,\n\nyou have been assigned the role \"{{ roleLabel }}\""
-    "{% if gremiumName %} in committee {{ gremiumName }}{% endif %}.\n",
-}
-_BUILTIN_ROLE_REVOKED_SUBJECT = {
-    "de": "Rolle entzogen: {{ roleLabel }}",
-    "en": "Role revoked: {{ roleLabel }}",
-}
-_BUILTIN_ROLE_REVOKED_BODY = {
-    "de": "Hallo,\n\ndie Rolle „{{ roleLabel }}“"
-    "{% if gremiumName %} im Gremium {{ gremiumName }}{% endif %} wurde dir "
-    "entzogen.\n",
-    "en": "Hello,\n\nthe role \"{{ roleLabel }}\""
-    "{% if gremiumName %} in committee {{ gremiumName }}{% endif %} was "
-    "revoked from you.\n",
-}
-
 # Session-bound delegations: the substitute gets the mail. The context names
 # the meeting, the Gremium and the delegating member.
 _BUILTIN_DELEGATION_GRANTED_SUBJECT = {
@@ -97,66 +74,6 @@ _BUILTIN_DELEGATION_REVOKED_BODY = {
     "{% if gremiumName %} ({{ gremiumName }}){% endif %}"
     "{% if meetingDate %} on {{ meetingDate }}{% endif %} was revoked.\n",
 }
-
-
-@dataclass(frozen=True, slots=True)
-class AssignmentMailInfo:
-    """Role assignment data collected before the send or before the deletion."""
-
-    assignment_id: uuid.UUID
-    email: str | None
-    role_label: str
-    gremium_name: str | None
-    delegated_by: str | None
-
-
-async def assignment_mail_info(
-    session: object, assignment_id: uuid.UUID
-) -> AssignmentMailInfo | None:
-    """Collect the mail data of a role assignment.
-
-    The call is best effort. If the query fails, the caller skips only the mail
-    and never the request that triggered it.
-
-    Returns:
-        The collected data, or None when the assignment is unknown or the query
-        failed.
-    """
-    from app.modules.admin.models import Gremium
-    from app.modules.auth.models import Principal, Role, RoleAssignment
-
-    try:
-        row = (
-            await session.execute(  # type: ignore[attr-defined]
-                select(
-                    Principal.email,
-                    Role.name_i18n,
-                    Role.key,
-                    Gremium.name,
-                    RoleAssignment.delegated_by,
-                )
-                .join(Principal, Principal.id == RoleAssignment.principal_id)
-                .join(Role, Role.id == RoleAssignment.role_id)
-                .outerjoin(Gremium, Gremium.id == RoleAssignment.gremium_id)
-                .where(RoleAssignment.id == assignment_id)
-            )
-        ).first()
-    except Exception:  # noqa: BLE001 — mail info is best effort
-        logger.exception("assignment mail info failed (assignment=%s)", assignment_id)
-        return None
-    if row is None:
-        return None
-    email, name_i18n, key, gremium_name, delegated_by = row
-    label = key
-    if isinstance(name_i18n, dict) and name_i18n:
-        label = name_i18n.get("de") or next(iter(name_i18n.values())) or key
-    return AssignmentMailInfo(
-        assignment_id=assignment_id,
-        email=email,
-        role_label=label,
-        gremium_name=gremium_name,
-        delegated_by=delegated_by,
-    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -238,19 +155,6 @@ class AutoMailer:
         except Exception:  # noqa: BLE001 — mail must never break the request
             logger.exception("meeting mail failed (meeting=%s)", meeting_id)
 
-    async def assignment_changed(
-        self,
-        settings: Settings,
-        info: AssignmentMailInfo | None,
-        *,
-        granted: bool,
-        pool: object,
-    ) -> None:
-        try:
-            await self._assignment_changed(settings, info, granted=granted, pool=pool)
-        except Exception:  # noqa: BLE001
-            logger.exception("role mail failed")
-
     async def delegation_changed(
         self,
         settings: Settings,
@@ -302,42 +206,6 @@ class AutoMailer:
                     "gremiumName": gremium_name or "",
                 },
                 idempotency_parts=("meeting_created", str(meeting.id)),
-            )
-
-    async def _assignment_changed(
-        self,
-        settings: Settings,
-        info: AssignmentMailInfo | None,
-        *,
-        granted: bool,
-        pool: object,
-    ) -> None:
-        if info is None or not info.email:
-            return
-        template_key = "role_assigned" if granted else "role_revoked"
-        builtin = (
-            (_BUILTIN_ROLE_ASSIGNED_SUBJECT, _BUILTIN_ROLE_ASSIGNED_BODY)
-            if granted
-            else (_BUILTIN_ROLE_REVOKED_SUBJECT, _BUILTIN_ROLE_REVOKED_BODY)
-        )
-        queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
-        sessionmaker = get_sessionmaker()
-        async with sessionmaker() as session:
-            service = NotificationService(session, queue=queue, settings=settings)
-            await service.send_kind_mail(
-                [info.email],
-                kind="role_change",
-                template_key=template_key,
-                builtin_subject=builtin[0],
-                builtin_body=builtin[1],
-                context={
-                    "roleLabel": info.role_label,
-                    "gremiumName": info.gremium_name or "",
-                },
-                idempotency_parts=(
-                    template_key,
-                    str(info.assignment_id),
-                ),
             )
 
     async def _delegation_changed(

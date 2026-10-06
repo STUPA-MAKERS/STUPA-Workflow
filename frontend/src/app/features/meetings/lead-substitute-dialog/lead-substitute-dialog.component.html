@@ -1,0 +1,78 @@
+<app-dialog
+  [open]="open()"
+  [title]="'meetings.leadSubstitute.title' | t"
+  [subtitle]="subtitle()"
+  [closeLabel]="'delegation.dialog.cancel' | t"
+  (closed)="closed.emit()"
+>
+  <div class="dd">
+    @if (!allowed()) {
+      <p class="dd__note" role="status">{{ 'meetings.leadSubstitute.notAllowed' | t }}</p>
+    }
+
+    <section class="dd__group" [attr.aria-label]="'meetings.leadSubstitute.pool' | t">
+      <h3 class="dd__cap cap">{{ 'meetings.leadSubstitute.pool' | t }}</h3>
+      @if (searchable()) {
+        <label class="dd__search">
+          <app-icon name="search" [size]="17" />
+          <input
+            class="dd__searchInput"
+            type="search"
+            name="lead-substitute-search"
+            [ngModel]="query()"
+            (ngModelChange)="query.set($event)"
+            [placeholder]="'meetings.leadSubstitute.search' | t"
+            [attr.aria-label]="'meetings.leadSubstitute.search' | t"
+          />
+        </label>
+      }
+      <div class="dd__rows rowgroup rowgroup--bg3" role="radiogroup" [attr.aria-label]="'meetings.leadSubstitute.pool' | t">
+        @if (pool() === null) {
+          <p class="dd__empty">{{ 'meetings.leadSubstitute.loading' | t }}</p>
+        } @else {
+          @for (r of shown(); track r.principalId) {
+            <label class="dd__row" [class.dd__row--on]="selected() === r.principalId" [class.dd__row--off]="!allowed()">
+              <input
+                class="dd__radio"
+                type="radio"
+                name="lead-substitute"
+                [value]="r.principalId"
+                [checked]="selected() === r.principalId"
+                [disabled]="!allowed()"
+                (change)="selected.set(r.principalId)"
+              />
+              <app-avatar [name]="name(r)" [principalId]="r.principalId" size="sm" [decorative]="true" />
+              <span class="dd__text">
+                <span class="dd__name ell" [title]="name(r)">{{ name(r) }}</span>
+                <span class="dd__sub">{{ (r.isMember ? 'participant.delegation.member' : 'participant.delegation.substitute') | t }}</span>
+              </span>
+            </label>
+          } @empty {
+            <p class="dd__empty">
+              {{ (failed() ? 'meetings.leadSubstitute.loadFailed' : query() ? 'participant.delegation.noMember' : 'meetings.leadSubstitute.empty') | t: { name: memberName() } }}
+            </p>
+          }
+        }
+      </div>
+      <p class="dd__note">{{ 'meetings.leadSubstitute.poolNote' | t }}</p>
+    </section>
+
+    @if (votingEnabled()) {
+      <div class="dd__voting">
+        <span class="dd__votingText">
+          <span class="dd__votingLabel">{{ 'delegation.dialog.voting' | t }}</span>
+          <span class="dd__note">{{ (voting() ? 'meetings.leadSubstitute.votingOn' : 'meetings.leadSubstitute.votingOff') | t: { name: memberName() } }}</span>
+        </span>
+        <app-switch [checked]="voting()" (checkedChange)="voting.set($event)" [ariaLabel]="'delegation.dialog.voting' | t" />
+      </div>
+    }
+  </div>
+
+  <div dialog-footer class="dd__foot">
+    <app-button variant="text" (click)="closed.emit()">{{ 'delegation.dialog.cancel' | t }}</app-button>
+    <app-button variant="fill" [disabled]="!canSubmit()" [loading]="busy()" (click)="submit()">
+      <app-icon name="repeat" [size]="16" />
+      {{ 'meetings.leadSubstitute.submit' | t }}
+    </app-button>
+  </div>
+</app-dialog>

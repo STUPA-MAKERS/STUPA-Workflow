@@ -125,5 +125,14 @@ describe('authInterceptor', () => {
       http.expectOne('/api/auth/logout').flush(null, { status: 401, statusText: 'Unauthorized' });
       expect(spy).not.toHaveBeenCalled();
     });
+
+    it('ignores a 401 of a public meeting route (a device without a join cookie)', () => {
+      const spy = jest.spyOn(auth, 'handleUnauthorized').mockImplementation(() => undefined);
+      httpClient.get('/api/public/meetings/7KQ4MP/me').subscribe({ error: () => undefined });
+      http
+        .expectOne('/api/public/meetings/7KQ4MP/me')
+        .flush(null, { status: 401, statusText: 'Unauthorized' });
+      expect(spy).not.toHaveBeenCalled();
+    });
   });
 });

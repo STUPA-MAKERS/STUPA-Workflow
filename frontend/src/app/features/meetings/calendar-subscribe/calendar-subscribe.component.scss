@@ -1,0 +1,131 @@
+:host {
+  display: contents;
+}
+
+.cs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  color: var(--color-text);
+}
+
+/* Desktop: a popover in the top layer, under its anchor. */
+.cs--pop {
+  position: fixed;
+  inset: auto;
+  z-index: var(--z-dropdown);
+  width: min(26rem, calc(100vw - 16px));
+  max-height: min(32rem, calc(100vh - 16px));
+  margin: 0;
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border: 0;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-3);
+  box-shadow: var(--shadow-elevated);
+}
+.cs--pop:focus {
+  outline: none;
+}
+/* The popover shows only once it is placed (the frame adds `cs--placed` right after it
+   wrote the place), so no frame paints it at the corner of the viewport. Outside the top
+   layer it does not render at all: `.cs` sets a display, which would else override the
+   hidden state of a closed popover. Browsers without the popover API drop the second
+   rule (unknown selector). */
+.cs--pop:not(.cs--placed) {
+  visibility: hidden;
+}
+.cs--pop:not(:popover-open) {
+  display: none;
+}
+
+/* Phone: the top-layer box of the bottom sheet has no box of its own. */
+.cs__layer {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+.cs--sheet {
+  position: relative;
+  padding-block-end: var(--space-2);
+}
+
+.cs__title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+}
+.cs__intro,
+.cs__none,
+.cs__confirmText {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+}
+.cs__error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--fs-sm);
+}
+.cs__label {
+  margin-block-end: calc(-1 * var(--space-2));
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: var(--fw-semibold);
+}
+/* A URL is never cut: it wraps anywhere and stays selectable as a whole. */
+.cs__url {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-1);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  user-select: all;
+}
+.cs--sheet .cs__url {
+  background: var(--color-surface-3);
+}
+.cs__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.cs__actions app-icon {
+  margin-inline-end: 4px;
+}
+.cs__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-subtle);
+}
+.cs__confirmText {
+  color: var(--color-text);
+}
+.cs__live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

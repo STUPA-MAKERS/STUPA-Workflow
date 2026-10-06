@@ -194,3 +194,48 @@ async def test_applications_source_includes_archived_and_marks_them(
     assert seen["archived"] is None, "None means both; False would hide the archived one"
     assert [h.archived for h in hits] == [False, True]
     assert [h.id for h in hits] == [str(live_id), str(filed_id)]
+
+
+@pytest.mark.parametrize(
+    ("lang", "expected"), [("de", "Ohne Titel"), ("en", "Untitled"), ("fr", "Ohne Titel")]
+)
+async def test_a_nameless_record_reads_as_untitled_not_as_its_id(
+    monkeypatch: pytest.MonkeyPatch, lang: str, expected: str
+) -> None:
+    """A raw id tells the reader nothing; a nameless hit reads "untitled" in their language."""
+    from types import SimpleNamespace
+
+    from app.modules.applications.service import ApplicationsService
+    from app.modules.budget.tree.service import BudgetTreeService
+
+    app_id, inv_id, exp_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+
+    async def _apps(_self: object, **_kw: object) -> object:
+        return SimpleNamespace(
+            items=[SimpleNamespace(id=app_id, title=None, state=None, archived_at=None)]
+        )
+
+    async def _invoices(_self: object, **_kw: object) -> object:
+        return SimpleNamespace(
+            items=[SimpleNamespace(id=inv_id, number=None, supplier=None, gross_amount=None)]
+        )
+
+    async def _expenses(_self: object, **_kw: object) -> object:
+        return SimpleNamespace(
+            items=[SimpleNamespace(id=exp_id, description="", amount=None, correspondent=None)]
+        )
+
+    monkeypatch.setattr(ApplicationsService, "list_applications", _apps)
+    monkeypatch.setattr(BudgetTreeService, "list_invoices_paged", _invoices)
+    monkeypatch.setattr(BudgetTreeService, "list_expenses_paged", _expenses)
+
+    svc = SearchService(session=None)  # type: ignore[arg-type]
+    reader = Principal(sub="s", permissions={"budget.view"})
+    hits = [
+        *(await svc._applications("antrag", reader, lang)),
+        *(await svc._invoices("antrag", reader, lang)),
+        *(await svc._expenses("antrag", reader, lang)),
+    ]
+
+    assert [h.title for h in hits] == [expected] * 3
+    assert all(h.title not in {str(app_id), str(inv_id), str(exp_id)} for h in hits)

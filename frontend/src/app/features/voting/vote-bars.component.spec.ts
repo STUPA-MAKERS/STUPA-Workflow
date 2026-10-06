@@ -1,126 +1,78 @@
 import { render, screen } from '@testing-library/angular';
+import { runAxe } from '../../../testing/a11y';
 import { VoteBarsComponent } from './vote-bars.component';
 
-async function renderBars(inputs: Record<string, unknown>) {
-  return render(VoteBarsComponent, { inputs });
+const OPTIONS = ['yes', 'no', 'abstain'];
+
+async function setup(inputs: Record<string, unknown> = {}) {
+  return render(VoteBarsComponent, {
+    inputs: { options: OPTIONS, counts: { yes: 15, no: 3, abstain: 2 }, ...inputs },
+  });
 }
 
 describe('VoteBarsComponent', () => {
-  it('renders one bar per option with translated labels and counts', async () => {
-    await renderBars({
-      options: ['yes', 'no', 'abstain'],
-      counts: { yes: 5, no: 2, abstain: 1 },
-      eligible: 12,
-      leading: 'yes',
-    });
+  it('shows one row per option with count and share of the cast ballots', async () => {
+    await setup();
     expect(screen.getByText('Ja')).toBeInTheDocument();
-    expect(screen.getByText('Nein')).toBeInTheDocument();
-    expect(screen.getByText('Enthaltung')).toBeInTheDocument();
-    expect(screen.getByText('5')).toBeInTheDocument();
+    expect(screen.getByText('15')).toBeInTheDocument();
+    expect(screen.getByText('75 %')).toBeInTheDocument();
+    expect(screen.getByText('15 %')).toBeInTheDocument();
+    expect(screen.getByText('10 %')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Ja: 15 Stimmen, 75 %' })).toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Ergebnis, 20 Stimmen' })).toBeInTheDocument();
   });
 
-  it('scales bar width relative to eligible voters', async () => {
-    const { container } = await renderBars({
-      options: ['yes', 'no'],
-      counts: { yes: 6, no: 0 },
-      eligible: 12,
-      leading: 'yes',
-    });
-    const fill = container.querySelector('.bars__fill') as HTMLElement;
-    expect(fill.style.width).toBe('50%'); // 6 / 12
+  it('draws Ja in the accent, Nein in the error colour and Enthaltung grey', async () => {
+    const { container } = await setup();
+    const segs = [...container.querySelectorAll('app-seg-bar')].map(
+      (bar) => bar.querySelector('.bar__seg')?.className ?? '',
+    );
+    expect(segs[0]).toContain('bar__seg--filled');
+    expect(segs[1]).toContain('bar__seg--error');
+    expect(segs[2]).toContain('bar__seg--muted');
   });
 
-  it('falls back to scaling by maximum when eligible is unknown', async () => {
-    const { container } = await renderBars({
-      options: ['yes', 'no'],
-      counts: { yes: 4, no: 2 },
-      eligible: 0,
-    });
-    const fills = container.querySelectorAll('.bars__fill');
-    expect((fills[0] as HTMLElement).style.width).toBe('100%'); // max
-    expect((fills[1] as HTMLElement).style.width).toBe('50%');
+  it('shows no status line without a result', async () => {
+    await setup();
+    expect(screen.queryByText(/Angenommen|Abgelehnt/)).not.toBeInTheDocument();
   });
 
-  it('marks the leading option', async () => {
-    const { container } = await renderBars({
-      options: ['yes', 'no'],
-      counts: { yes: 3, no: 1 },
-      leading: 'yes',
-    });
-    expect(container.querySelector('.bars__row--leading .bars__label')?.textContent).toContain('Ja');
+  it('shows Angenommen for a passed vote', async () => {
+    await setup({ result: 'passed' });
+    expect(screen.getByText('Angenommen')).toHaveClass('st--accent');
   });
 
-  it('keeps raw key for unknown options (no leak of i18n key)', async () => {
-    await renderBars({ options: ['maybe'], counts: { maybe: 1 } });
+  it('shows a tie as Abgelehnt (O18)', async () => {
+    await setup({ result: 'tie', counts: { yes: 4, no: 4, abstain: 1 } });
+    expect(screen.getByText('Abgelehnt')).toHaveClass('st--error');
+    expect(screen.queryByText(/Stimmengleichheit/)).not.toBeInTheDocument();
+  });
+
+  it('adds the missed quorum to a rejection', async () => {
+    await setup({ result: 'rejected', failedReason: 'quorum' });
+    expect(screen.getByText('Abgelehnt')).toBeInTheDocument();
+    expect(screen.getByText('Quorum nicht erreicht')).toBeInTheDocument();
+  });
+
+  it('shows zero shares and a grey bar without any ballot', async () => {
+    const { container } = await setup({ counts: {} });
+    expect(screen.getAllByText('0 %')).toHaveLength(3);
+    expect(container.querySelectorAll('.bar__rest')).toHaveLength(3);
+  });
+
+  it('keeps an unknown option as its raw key in the accent', async () => {
+    const { container } = await setup({ options: ['maybe'], counts: { maybe: 1 } });
     expect(screen.getByText('maybe')).toBeInTheDocument();
+    expect(container.querySelector('.bar__seg')?.className).toContain('bar__seg--filled');
   });
 
-  it('exposes accessible progressbar semantics without names', async () => {
-    await renderBars({
-      options: ['yes'],
-      counts: { yes: 5 },
-      eligible: 12,
-    });
-    const bar = screen.getByRole('progressbar');
-    expect(bar).toHaveAttribute('aria-valuenow', '5');
-    expect(bar).toHaveAttribute('aria-valuemax', '12');
-    expect(bar).toHaveAttribute('aria-label', 'Ja: 5');
+  it('switches to the beamer variant', async () => {
+    const { fixture } = await setup({ variant: 'beamer' });
+    expect(fixture.nativeElement).toHaveClass('bars--beamer');
   });
 
-  it('treats options with no recorded count as zero', async () => {
-    // counts has no entry for "no" → the ?? 0 kicks in (no NaN bar).
-    const { container } = await renderBars({
-      options: ['yes', 'no'],
-      counts: { yes: 3 },
-      eligible: 6,
-    });
-    expect(screen.getByText('3')).toBeInTheDocument();
-    expect(screen.getByText('0')).toBeInTheDocument();
-    const fills = container.querySelectorAll('.bars__fill');
-    expect((fills[1] as HTMLElement).style.width).toBe('0%'); // 0 / 6
-  });
-
-  it('marks no row leading when leading is null', async () => {
-    const { container } = await renderBars({
-      options: ['yes', 'no'],
-      counts: { yes: 2, no: 2 },
-      eligible: 4,
-      leading: null,
-    });
-    expect(container.querySelector('.bars__row--leading')).toBeNull();
-  });
-
-  it('defaults to the compact variant (no beamer modifier)', async () => {
-    const { container } = await renderBars({
-      options: ['yes'],
-      counts: { yes: 1 },
-    });
-    expect(container.querySelector('.bars--beamer')).toBeNull();
-  });
-
-  it('switches to the beamer variant when requested', async () => {
-    const { container } = await renderBars({
-      options: ['yes'],
-      counts: { yes: 1 },
-      variant: 'beamer',
-    });
-    expect(container.querySelector('.bars--beamer')).not.toBeNull();
-  });
-
-  it('clamps bar width to 100% when a count exceeds the base', async () => {
-    // More votes than eligible (e.g. resync glitch) → bar capped at 100%.
-    const { container } = await renderBars({
-      options: ['yes'],
-      counts: { yes: 9 },
-      eligible: 4,
-      leading: 'yes',
-    });
-    const fill = container.querySelector('.bars__fill') as HTMLElement;
-    expect(fill.style.width).toBe('100%');
-  });
-
-  it('omits aria-valuemax when eligible is unknown (no false quorum scale)', async () => {
-    await renderBars({ options: ['yes'], counts: { yes: 2 } });
-    expect(screen.getByRole('progressbar')).not.toHaveAttribute('aria-valuemax');
+  it('has no a11y violations', async () => {
+    const { container } = await setup({ result: 'passed' });
+    expect(await runAxe(container)).toHaveNoViolations();
   });
 });

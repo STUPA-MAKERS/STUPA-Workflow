@@ -1,8 +1,10 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   type ElementRef,
   HostListener,
+  afterNextRender,
   computed,
   effect,
   inject,
@@ -12,8 +14,22 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, ToastService, type SelectOption } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  IconComponent,
+  MEDIA,
+  ToastService,
+  type SelectOption,
+} from '@stupa-makers/ui-kit';
+import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import {
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+} from '@shared/ui/row-menu/row-menu.component';
+import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
+import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import {
   COMPARE_OPS,
@@ -69,13 +85,20 @@ import { TransitionInspectorComponent } from './transition-inspector.component';
 import { TransitionListsComponent } from './transition-lists.component';
 
 /**
- * Flow editor as a visual drag-and-drop canvas.
+ * Flow editor as a visual drag-and-drop canvas (board Admin-Flow-Editor).
  *
  * The user moves the states freely as nodes. Node positions persist in `layout`.
  * To draw a transition, the user drags from a connector dot onto a target node.
- * A click on a node or an edge opens the inspector. A save creates a flow version.
- * Client validation mirrors the server function `validate_flow_graph`. It accepts
- * only whitelisted operators and no free-text eval.
+ * A click on a node or an edge opens it in the inspector beside the canvas: a state
+ * with its settings and its incoming and outgoing transitions, a transition with its
+ * settings, its guard and its actions. "Versionen" in the header shows the version
+ * history in the inspector. A save creates a flow version. Client validation mirrors
+ * the server function `validate_flow_graph`. It accepts only whitelisted operators and
+ * no free-text eval. The header says whether the flow is valid.
+ *
+ * Wide (`MEDIA.wide`): the canvas and the inspector fill the free height of the window
+ * (route data `adminPane`), and the inspector scrolls inside itself. Narrower, the
+ * inspector follows the canvas.
  */
 @Component({
   selector: 'app-flow-editor',
@@ -92,7 +115,12 @@ import { TransitionListsComponent } from './transition-lists.component';
     TransitionListsComponent,
     TransitionDetailComponent,
     PageHeaderComponent,
+    IconComponent,
+    StatusTextComponent,
+    RowMenuComponent,
+    ScrollFadeDirective,
   ],
+  host: { '[class.fe-pane]': 'wide()' },
   templateUrl: './flow-editor.component.html',
   styleUrl: './flow-editor.component.scss',
 })
@@ -103,6 +131,22 @@ export class FlowEditorComponent {
   private readonly opts = inject(FlowEditorOptionsService);
 
   protected readonly canvas = viewChild<ElementRef<SVGSVGElement>>('canvas');
+  /** The inspector. Wide, it scrolls inside itself. */
+  private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
+  /** The box around the canvas. Its size sets the scale of the fitted view. */
+  private readonly canvasWrap = viewChild<ElementRef<HTMLElement>>('canvasWrap');
+
+  /** Wide viewport: the canvas and the inspector fill the window side by side. */
+  protected readonly wide = mediaQuerySignal(MEDIA.wide);
+  /** Phone: the header keeps "Speichern" and moves "Versionen" into a ⋮ menu. */
+  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+
+  /** The inspector shows the version history instead of the selection. */
+  protected readonly showVersions = signal(false);
+  /** The number of the active flow version, once the version history has loaded. */
+  protected readonly currentVersion = signal<number | null>(null);
+  /** The size of the canvas box in px (0 until it is measured). */
+  private readonly canvasSize = signal({ w: 0, h: 0 });
   /** Version sidebar. The editor reloads it after each save. */
   protected readonly versionHistory = viewChild(VersionHistoryComponent);
 
@@ -168,7 +212,7 @@ export class FlowEditorComponent {
     updateGraph: (fn) => this.graph.update(fn),
     positions: () => this.vm.positions(),
     nodes: () => this.vm.nodes(),
-    contentBounds: () => this.vm.contentBounds(),
+    contentBounds: () => this.fitBounds(),
     deepKeys: (id) => this.vm.deepKeys(id),
     openGroup: (id) => this.openGroup(id),
     selection: this.selection,
@@ -196,6 +240,20 @@ export class FlowEditorComponent {
         // validation stays hidden: there is no flow to have findings about.
         error: () => this.toast.error(this.i18n.translate('admin.flow.loadFailed')),
       });
+
+    // Measure the canvas box, so a small flow shows at its real size instead of
+    // blown up to the full box.
+    const destroyRef = inject(DestroyRef);
+    afterNextRender(() => {
+      const el = this.canvasWrap()?.nativeElement;
+      if (!el || typeof ResizeObserver === 'undefined') return;
+      const ro = new ResizeObserver(([entry]) => {
+        const { width, height } = entry.contentRect;
+        this.canvasSize.set({ w: Math.round(width), h: Math.round(height) });
+      });
+      ro.observe(el);
+      destroyRef.onDestroy(() => ro.disconnect());
+    });
 
     // The drill-down context must never point at a deleted group. Undo, redo or a
     // dissolve from another path can delete it. Fall back to the top level.
@@ -229,11 +287,61 @@ export class FlowEditorComponent {
   );
   protected readonly json = computed(() => serializeFlowGraph(this.graph()));
 
+  /**
+   * The view that fits the whole content. A flow smaller than the canvas box keeps its
+   * real size (scale 1) and sits in the middle of the box; a larger flow scales down to
+   * fit. Before the box is measured (and in tests) it is the content bounds.
+   */
+  protected readonly fitBounds = computed(() => {
+    const b = this.contentBounds();
+    const { w, h } = this.canvasSize();
+    if (!w || !h) return b;
+    const fw = Math.max(b.w, w);
+    const fh = Math.max(b.h, h);
+    return { x: b.x - (fw - b.w) / 2, y: b.y - (fh - b.h) / 2, w: fw, h: fh };
+  });
+
   protected readonly viewBox = computed(() => {
     const v = this.view();
-    const b = this.contentBounds();
+    const b = this.fitBounds();
     return v ? `${v.x} ${v.y} ${v.w} ${v.h}` : `${b.x} ${b.y} ${b.w} ${b.h}`;
   });
+
+  /** The zoom in percent of the fitted view (100 % = the whole flow fits). */
+  protected readonly zoomPercent = computed(() => {
+    const v = this.view();
+    return v ? Math.round((this.fitBounds().w / v.w) * 100) : 100;
+  });
+
+  /** The lead line: the scope of the flow and, once known, its active version. */
+  protected readonly subtitle = computed(() => {
+    const notice = this.i18n.translate('admin.flow.globalNotice');
+    const v = this.currentVersion();
+    return v === null ? notice : `${notice} · ${this.i18n.translate('admin.flow.versionActive', { n: v })}`;
+  });
+
+  /** The ⋮ menu of the header on a phone: "Versionen". */
+  protected readonly headerMenu = computed<RowMenuSection[]>(() => [
+    {
+      items: [
+        {
+          id: 'versions',
+          label: this.i18n.translate('admin.flow.versions'),
+          icon: 'history',
+          checked: this.showVersions(),
+        },
+      ],
+    },
+  ]);
+
+  protected onHeaderMenu(item: RowMenuItem): void {
+    if (item.id === 'versions') this.toggleVersions();
+  }
+
+  /** Show the version history in the inspector, or go back to the selection. */
+  protected toggleVersions(): void {
+    this.showVersions.update((v) => !v);
+  }
 
   protected readonly selectedState = computed<StateDef | undefined>(() => {
     const sel = this.selection();
@@ -673,6 +781,17 @@ export class FlowEditorComponent {
   protected selectEdge(index: number): void {
     this.selection.set({ kind: 'transition', index });
   }
+
+  /**
+   * A new selection on the canvas (or in a list) brings the inspector back from the
+   * versions, and the inspector starts at its top.
+   */
+  private readonly onSelect = effect(() => {
+    if (this.selection() === null) return;
+    this.showVersions.set(false);
+    const panel = this.panel()?.nativeElement;
+    if (panel) panel.scrollTop = 0;
+  });
 
   protected clearSelection(): void {
     this.pointer.clearSelection();

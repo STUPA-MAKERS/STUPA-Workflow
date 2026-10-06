@@ -1,0 +1,231 @@
+@let m = meeting();
+<article class="ms" [class.ms--split]="split()" aria-labelledby="ms-title">
+  <header class="ms__head">
+    <app-sheet-bar [bleed]="split()" [kicker]="metaLine()">
+      @if (m.canManage && !phone()) {
+        <app-button
+          variant="text"
+          [iconOnly]="true"
+          [ariaLabel]="('meetings.settings.title' | t) + ': ' + m.title"
+          [title]="'meetings.settings.title' | t"
+          (click)="edit.emit(m)"
+        ><app-icon name="edit" [size]="19" /></app-button>
+      }
+      @if (menu().length) {
+        <app-row-menu
+          [label]="('meetings.overview.menu' | t) + ': ' + m.title"
+          [sections]="menu()"
+          (selected)="onMenu($event)"
+        />
+      }
+    </app-sheet-bar>
+
+    <h2 id="ms-title" class="ms__title">{{ m.title }}</h2>
+    <!-- Every part draws its dot before it; the line clips the dot of the first part on
+         each line, so a dot shows only between two parts, also after a wrap. -->
+    <p class="ms__line">
+      <span class="ms__parts">
+        <span class="ms__part">
+          <app-status-text [kind]="status().kind">{{ status().key | t }}</app-status-text>
+        </span>
+        @if (timeText()) {
+          <span class="ms__part mono">{{ timeText() }}</span>
+        }
+        @if (keeperMissing()) {
+          <span class="ms__part ms__warn">{{ 'meetings.overview.noKeeper' | t }}</span>
+        } @else if (keepers()) {
+          <span class="ms__part">{{ 'meetings.dock.protokollantIs' | t: { name: keepers() } }}</span>
+        }
+      </span>
+    </p>
+
+    <div class="ms__actions">
+      <app-button variant="fill" [class.ms__grow]="phone()" (click)="open()">
+        <app-icon name="arrow" [size]="17" />
+        {{ 'meetings.overview.open' | t }}
+      </app-button>
+      @if (canBeamer() && !phone()) {
+        <app-button variant="tonal" (click)="beamer.emit(m)">
+          <app-icon name="monitor" [size]="17" />
+          {{ 'meetings.beamer.enter' | t }}
+        </app-button>
+      }
+      @if (keeperMissing() && m.canManage) {
+        <app-button variant="tonal" (click)="edit.emit(m)">
+          <app-icon name="user" [size]="17" />
+          {{ 'meetings.overview.setKeeper' | t }}
+        </app-button>
+      }
+    </div>
+  </header>
+
+  @if (loading()) {
+    <div class="ms__busy" aria-busy="true">
+      <span class="skel skel--panel"></span>
+      <span class="sr-only" role="status">{{ 'meetings.overview.loadingDetail' | t }}</span>
+    </div>
+  } @else {
+    <div class="ms__body">
+      <section class="ms__sec ms__agenda" aria-labelledby="ms-agenda">
+        <div class="ms__secHead">
+          <h3 id="ms-agenda" class="sec">{{ 'meetings.agenda.title' | t }}</h3>
+          @if (data()?.agenda) {
+            <span class="ms__count">{{ topsText(agendaRows().length) }}</span>
+          }
+        </div>
+        @if (!data()?.agenda) {
+          <p class="ms__note ms__note--error" role="alert">{{ 'meetings.overview.agendaError' | t }}</p>
+        } @else if (!agendaRows().length) {
+          <p class="ms__note">{{ 'meetings.overview.agendaEmpty' | t }}</p>
+        } @else {
+          <ol class="ms__tops rowgroup">
+            @for (row of agendaRows(); track row.item.id) {
+              <li class="ms__top" [class.ms__top--now]="row.mark === 'now'" [attr.aria-current]="row.mark === 'now' ? 'step' : null">
+                <span class="ms__topNo mono" aria-hidden="true">{{ row.number }}</span>
+                <span class="ms__topBody">
+                  <span class="ms__topTitle ell" [title]="row.title">
+                    <span class="sr-only">{{ 'meetings.agenda.top' | t: { n: row.number } }}: </span>{{ row.title }}
+                  </span>
+                  <!-- A sub line only for an application or a non-public item: the number
+                       names the TOP, and "Freitext" says nothing. -->
+                  @if (row.item.applicationId || row.item.nonPublic) {
+                    <span class="ms__topSub">
+                      @if (row.item.applicationId) {
+                        {{ 'meetings.agenda.kindApplication' | t }}
+                      }
+                      @if (row.item.applicationId && row.item.nonPublic) {
+                        <span aria-hidden="true"> · </span>
+                      }
+                      @if (row.item.nonPublic) {
+                        {{ 'meetings.overview.nonPublic' | t }}
+                      }
+                    </span>
+                  }
+                </span>
+                @if (row.mark === 'done') {
+                  <span class="ms__topMark">{{ 'meetings.dock.done' | t }}</span>
+                } @else if (row.mark === 'now') {
+                  <span class="ms__topMark ms__topMark--now">{{ 'meetings.list.now' | t }}</span>
+                }
+              </li>
+            }
+          </ol>
+        }
+      </section>
+
+      <div class="ms__facts">
+        @if (progress(); as p) {
+          <section class="ms__sec" aria-labelledby="ms-now">
+            <h3 id="ms-now" class="sec">{{ 'meetings.list.now' | t }}</h3>
+            <div class="ms__card">
+              <div class="ms__cardHead">
+                <strong>{{ 'meetings.overview.topOf' | t: { n: p.position, m: p.count } }}</strong>
+                <span class="mono">{{ p.percent }} %</span>
+              </div>
+              <app-seg-bar
+                [segments]="p.segs"
+                [total]="p.count"
+                [label]="'meetings.overview.topOf' | t: { n: p.position, m: p.count }"
+              />
+              @if (p.title) {
+                <span class="ms__cardSub ell" [title]="p.title">{{ p.title }}</span>
+              }
+            </div>
+          </section>
+        }
+
+        @if (openVote(); as v) {
+          <section class="ms__sec" aria-labelledby="ms-vote">
+            <h3 id="ms-vote" class="sec">{{ 'meetings.overview.vote' | t }}</h3>
+            <div class="ms__card">
+              <div class="ms__cardHead">
+                <span class="ms__voteHead">
+                  <app-status-text kind="accent">{{ 'meetings.voteStatus.open' | t }}</app-status-text>
+                  @if (v.meta) {
+                    <span class="ms__voteMeta">{{ v.meta }}</span>
+                  }
+                </span>
+                <span class="mono">{{ v.voted }} / {{ v.present }}</span>
+              </div>
+              <app-seg-bar
+                [segments]="v.segs"
+                [total]="v.present"
+                [label]="turnoutLabel(v.voted, v.present)"
+              />
+              <span class="ms__cardSub" [title]="v.rules">{{ turnoutLabel(v.voted, v.present) }}</span>
+            </div>
+          </section>
+        }
+
+        <section class="ms__sec" aria-labelledby="ms-att">
+          <div class="ms__secHead">
+            <h3 id="ms-att" class="sec">{{ 'meetings.attendance.title' | t }}</h3>
+            @if (counts(); as c) {
+              <span class="ms__count">{{ 'meetings.overview.presentOf' | t: { n: c.present, m: c.total } }}</span>
+            }
+          </div>
+          @if (counts(); as c) {
+            <dl class="ms__card ms__stats">
+              <div><dt>{{ 'meetings.attendance.present' | t }}</dt><dd class="mono">{{ c.present }}</dd></div>
+              <div><dt>{{ 'meetings.attendance.excused' | t }}</dt><dd class="mono">{{ c.excused }}</dd></div>
+              <div><dt>{{ 'meetings.attendance.absent' | t }}</dt><dd class="mono" [class.ms__warn]="c.absent > 0">{{ c.absent }}</dd></div>
+              <div><dt>{{ 'meetings.attendance.unknown' | t }}</dt><dd class="mono">{{ c.open }}</dd></div>
+            </dl>
+          } @else {
+            <p class="ms__note ms__note--error" role="alert">{{ 'meetings.overview.attendanceError' | t }}</p>
+          }
+        </section>
+
+        @if (delegations().length) {
+          <section class="ms__sec" aria-labelledby="ms-del">
+            <div class="ms__secHead">
+              <h3 id="ms-del" class="sec">{{ 'meetings.overview.delegations' | t }}</h3>
+              <span class="ms__count">{{ delegations().length }}</span>
+            </div>
+            <ul class="ms__dels rowgroup">
+              @for (d of delegations(); track d.id) {
+                <li class="ms__del">
+                  <span class="ms__delNames">
+                    {{ d.delegatorName ?? ('meetings.overview.unknownPerson' | t) }}
+                    <app-icon name="arrow" [size]="14" />
+                    <span class="sr-only">{{ 'meetings.overview.representedBy' | t }}</span>
+                    {{ d.delegateName ?? ('meetings.overview.unknownPerson' | t) }}
+                  </span>
+                  @if (d.delegateVoting) {
+                    <span class="ms__cardSub">{{ 'meetings.overview.withVote' | t }}</span>
+                  }
+                </li>
+              }
+            </ul>
+          </section>
+        }
+
+        @if (m.protocolId || m.status === 'closed') {
+          <section class="ms__sec" aria-labelledby="ms-prot">
+            <h3 id="ms-prot" class="sec">{{ 'meetings.overview.protocol' | t }}</h3>
+            <dl class="ms__card ms__stats ms__stats--3">
+              <div>
+                <dt>{{ 'meetings.overview.protocolState' | t }}</dt>
+                <dd>{{ (protocolKey() ?? 'meetings.overview.protocolNone') | t }}</dd>
+              </div>
+              <div class="ms__statWide">
+                <dt>{{ 'meetings.protokollant.label' | t }}</dt>
+                <dd class="ms__wrap">{{ keepers() || ('meetings.dock.none' | t) }}</dd>
+              </div>
+              @if (protocol()?.isFinal && protocol()?.pdfUrl) {
+                <div>
+                  <dt>{{ 'meetings.overview.pdf' | t }}</dt>
+                  <dd>
+                    <a class="ms__link" [href]="protocol()!.pdfUrl" target="_blank" rel="noopener">{{
+                      'meetings.overview.pdfOpen' | t
+                    }}</a>
+                  </dd>
+                </div>
+              }
+            </dl>
+          </section>
+        }
+      </div>
+    </div>
+  }
+</article>

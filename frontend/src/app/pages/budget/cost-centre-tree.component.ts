@@ -2,13 +2,13 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { NgTemplateOutlet } from '@angular/common';
 import type { Uuid } from '@core/api/models';
 import type { BudgetTreeNode } from './budget-tree.api';
-import { PALETTE } from './budget-year-tree.component';
+import { nodeColors, paletteColor } from './budget-color.util';
 
 /**
- * Reusable cost-center tree picker. It looks like the budget-to-year tree
- * (`app-budget-year-tree`): colored dots at the roots, dotted light-green connector
- * lines to the sub-nodes, and a compact selection highlight. It recurses over the
- * whole hierarchy. An optional "all" node with the value ``''`` sits at the top.
+ * Reusable cost-centre tree picker: colour swatches at the roots and at every node with
+ * its own colour, dotted connector lines in the colour of the branch, and the selection
+ * surface of the design system. It recurses over the whole hierarchy. An optional "all" node with
+ * the value ``''`` sits at the top.
  */
 @Component({
   selector: 'app-cost-centre-tree',
@@ -30,11 +30,18 @@ export class CostCentreTreeComponent {
   /** Selected cost center. The value ``''`` means all. */
   readonly picked = output<Uuid | ''>();
 
-  private readonly rootIds = computed(() => this.nodes().map((n) => n.id));
+  /** Display colour per node, by the same rule as the budget page (`nodeColors`). */
+  private readonly colors = computed(() => nodeColors(this.nodes()));
 
+  /** Colour of a root: the set colour, else a stable palette colour by position. A node
+   *  that is not in the tree gets its own colour, else the last palette colour. */
   dotColor(node: BudgetTreeNode): string {
-    if (node.color) return node.color;
-    const idx = this.rootIds().indexOf(node.id);
-    return PALETTE[((idx % PALETTE.length) + PALETTE.length) % PALETTE.length];
+    return this.colors().get(node.id) ?? (node.color?.trim() || paletteColor(-1));
+  }
+
+  /** The own colour of a node below the roots, or `null`. Only a node with its own colour
+   *  (for example a faculty) gets a swatch and passes its colour to its lines (O19). */
+  ownColor(node: BudgetTreeNode): string | null {
+    return node.color?.trim() || null;
   }
 }

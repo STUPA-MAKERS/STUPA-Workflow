@@ -1,0 +1,165 @@
+:host {
+  display: block;
+  min-width: 0;
+  /* The legend moves below the ring when the chart itself is narrow, whatever the
+     viewport: the pie sits in a column of the sheet. */
+  container-type: inline-size;
+}
+
+/* The ring keeps 12px of its box free for the lifted slice, so a 16px gap puts the
+   legend about 36px from the ring, as on the Budget board. */
+.pie {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0;
+  min-width: 0;
+}
+
+.pie__chart {
+  position: relative;
+  flex: none;
+  width: 168px;
+  height: 168px;
+}
+.pie__svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+/* A thin edge in the sheet colour keeps the slices apart. */
+.pie__slice {
+  stroke: var(--color-surface-1);
+  stroke-width: 2.5;
+  transform-origin: 100px 100px;
+  transition:
+    transform var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard);
+}
+/* No amount: one ring in a neutral surface colour, like a skeleton. */
+.pie__ring {
+  fill: var(--color-surface-3);
+}
+.pie__total--empty {
+  color: var(--color-text-muted);
+}
+.pie__slice--link {
+  cursor: pointer;
+}
+.pie__slice--dim {
+  opacity: 0.4;
+}
+
+.pie__hole {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.pie__cap {
+  font-size: 0.78125rem; // 12.5px
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+}
+.pie__total {
+  font-size: 1.0625rem; // 17px
+  line-height: 1.5rem;
+  font-weight: var(--fw-medium);
+  color: var(--color-text);
+}
+
+.pie__legend {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pie__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 2rem;
+  padding: 2px var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: start;
+  cursor: pointer;
+}
+.pie__item:disabled {
+  cursor: default;
+}
+.pie__item--on,
+.pie__item:hover:not(:disabled) {
+  background: var(--color-surface-2);
+}
+.pie__item:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.pie__swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.pie__name {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.pie__val {
+  flex: none;
+  font-size: 0.78125rem;
+  color: var(--color-text);
+}
+
+.pie__empty {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: 0 var(--space-2);
+}
+/* One neutral line per legend entry, like a skeleton. No shimmer: nothing loads. */
+.pie__skel {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--color-surface-3);
+}
+.pie__skel:nth-child(2) {
+  width: 80%;
+}
+.pie__skel:nth-child(3) {
+  width: 60%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pie__slice {
+    transition: none;
+  }
+}
+
+/* A narrow column: the legend goes below the ring. */
+@container (max-width: 400px) {
+  .pie {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-4);
+  }
+  .pie__chart {
+    align-self: center;
+  }
+}

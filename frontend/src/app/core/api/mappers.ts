@@ -93,6 +93,9 @@ export function mapApplication(wire: ApplicationOutWire, lang: string): Applicat
     canEdit: wire.canEdit ?? false,
     isOwner: wire.isOwner ?? false,
     archivedAt: wire.archivedAt ?? null,
+    stateSince: wire.stateSince ?? null,
+    hiddenKeys: wire.hiddenKeys ?? [],
+    capture: wire.capture ?? null,
   };
 }
 
@@ -111,6 +114,7 @@ export function mapApplicationListItem(
     createdAt: wire.createdAt,
     updatedAt: wire.updatedAt,
     archivedAt: wire.archivedAt ?? null,
+    stateSince: wire.stateSince ?? null,
   };
 }
 
@@ -124,7 +128,9 @@ export function mapTimelineEvent(wire: TimelineEventOutWire, lang: string): Time
     toStateId: wire.toStateId,
     toState,
     label: toState?.label ?? '',
+    transitionLabel: wire.transitionLabel ? resolveI18n(wire.transitionLabel, lang) : null,
     actor: wire.actor ?? null,
+    actorInfo: wire.actorInfo ?? null,
     at: wire.at,
     note: wire.note ?? null,
   };
@@ -135,6 +141,7 @@ export function mapComment(wire: CommentOutWire): ApplicationComment {
     id: wire.id,
     author: wire.author ?? null,
     authorKind: wire.authorKind,
+    authorInfo: wire.authorInfo ?? null,
     body: wire.body,
     visibility: wire.visibility,
     isPublic: wire.visibility === 'public',
@@ -162,6 +169,8 @@ export function mapTransition(wire: TransitionOutWire, lang: string): Transition
     toStateId: wire.toStateId,
     label: resolveI18n(wire.label, lang),
     color: wire.color ?? null,
+    addsToAgenda: wire.addsToAgenda === true,
+    agendaGremiumId: wire.agendaGremiumId ?? null,
   };
 }
 
@@ -206,7 +215,9 @@ export function mapVersion(wire: VersionOutWire): ApplicationVersion {
     version: wire.version,
     data: wire.data ?? {},
     diff: mapDiff(wire.diff),
+    changedKeys: wire.changedKeys ?? [],
     changedBy: wire.changedBy ?? null,
+    changedByInfo: wire.changedByInfo ?? null,
     at: wire.at,
   };
 }
@@ -228,6 +239,15 @@ export function mapMeetingVote(wire: MeetingVoteOutWire): MeetingVote {
     present: wire.present ?? 0,
     revealed: wire.revealed ?? true,
     failedReason: wire.failedReason ?? null,
+    myBallot: wire.myBallot ?? null,
+    majorityRule: wire.majorityRule ?? 'simple',
+    secret: wire.secret ?? false,
+    quorum: wire.quorum ?? null,
+    openedAt: wire.openedAt ?? null,
+    closedAt: wire.closedAt ?? null,
+    guestsVote: wire.guestsVote ?? false,
+    presentMembers: wire.presentMembers ?? null,
+    presentGuests: wire.presentGuests ?? null,
   };
 }
 
@@ -242,6 +262,10 @@ export function mapMeeting(wire: MeetingOutWire): Meeting {
     status: wire.status,
     activeApplicationId: wire.activeApplicationId ?? null,
     currentAgendaItemId: wire.currentAgendaItemId ?? null,
+    currentAgendaItem: wire.currentAgendaItem ?? null,
+    agendaItemCount: wire.agendaItemCount ?? 0,
+    startedAt: wire.startedAt ?? null,
+    closedAt: wire.closedAt ?? null,
     gremiumId: wire.gremiumId ?? null,
     gremiumName: wire.gremiumName ?? null,
     votes: (wire.votes ?? []).map(mapMeetingVote),
@@ -255,6 +279,15 @@ export function mapMeeting(wire: MeetingOutWire): Meeting {
     canWrite,
     canManageVotes: wire.canManageVotes ?? false,
     canVote: wire.canVote ?? false,
+    canFinalize: wire.canFinalize ?? false,
+    keeperPeriods: wire.keeperPeriods ?? [],
+    plannedHandover: wire.plannedHandover ?? null,
+    publicJoin: wire.publicJoin ?? false,
+    guestsMode: wire.guestsMode ?? 'vote',
+    joinCode: wire.joinCode ?? null,
+    admittedGuests: wire.admittedGuests ?? 0,
+    pendingGuests: wire.pendingGuests ?? 0,
+    publicJoinAllowed: wire.publicJoinAllowed ?? true,
   };
 }
 
@@ -288,5 +321,10 @@ export function toApplicationCreateBody(input: NewApplication): ApplicationCreat
     applicantName: input.applicantName ?? null,
     lang: input.lang,
     altcha: input.altcha ?? null,
+    // Only with draft uploads: the server reads an empty list without a token as "no
+    // drafts", but a token without ids is still valid, so both stay out then.
+    ...(input.attachmentIds?.length && input.draftToken
+      ? { attachmentIds: input.attachmentIds, draftToken: input.draftToken }
+      : {}),
   };
 }

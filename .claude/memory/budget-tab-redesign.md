@@ -1,10 +1,49 @@
 ---
 name: budget-tab-redesign
-description: "Spec for the Budget-tab redesign: left Budget-to-Year tree, stacked pie charts, requested column, cost-center colors, state-based roll-up, URL sync, admin reuse"
+description: "Budget tab: FE10a layout (cost-centre tree pane + sheet with six figures, Verteilung, Auslastung, applications; O19 colour inheritance) on top of the 2026-06 state-based roll-up, colours and URL sync"
 metadata: 
   node_type: memory
   type: project
 ---
+
+## Current layout — redesign FE10a (2026-10-04)
+
+The 2026-06 layout below (left Budget-to-Year tree, middle usage table, right stacked pies) is
+SUPERSEDED for `/budget`. The data rules, the colours and the URL sync stay.
+
+- **Wide (>= 1200px):** a 340px pane and a sheet. The pane holds the page title, the fiscal-year
+  chip ("HHJ 2026", a native select over the years of the selected root), the "Übersicht" chip
+  (the sunburst dialog), "Kostenstelle suchen" and the cost-centre tree. A tree row shows the
+  name, the allocation and a thin utilisation bar (committed / (allocated + income)). The path to
+  the selection is always open; a chevron opens and closes the other nodes. A search shows the
+  hits and the way to them.
+- **Sheet:** path (ancestors are buttons) + path key, title, "Exportieren" (`budget.export`),
+  "Buchungen ansehen" (only with a global budget permission; a gremium scope alone has none).
+  Six figures: Zuteilung, Beantragt, Gebunden (`bound`), Ausgegeben, Einnahmen, Verfügbar (N28).
+  "Verteilung": donut over the direct sub cost centres for one figure (select chip), plus a grey
+  "(nicht verteilt)" slice for what the node keeps; left out for a node without children.
+  "Auslastung je Budget": the direct sub cost centres (or the node itself) with Beantragt, % and
+  Verfügbar and a seg-bar (expended filled, bound second, both error when overdrawn).
+  "Anträge auf dieser Kostenstelle": GET /budgets/{id}/applications (subtree, fiscal year), the
+  newest 5 as `app-list-item` with status text, path key and cost-centre name, "Alle ansehen" ->
+  /applications?budget=…
+- **Narrow and phone:** title + actions on top, a path chip (opens the tree in a start side sheet)
+  and the year chip, the figures as cards (3 or 2 columns), the sections as cards.
+- **Colours (O19, user: "koloriert nach Fakultätsfarben"):** `pages/budget/budget-color.util.ts`.
+  One function, `nodeColors`, gives each node one display colour (gaps D6). The tree rows, the
+  "Auslastung" bars (the seg-bar takes it through `--color-accent`), the "Verteilung" donut,
+  the sunburst and the picker roots all use it. Rule: an own colour; else the colour of the
+  nearest coloured ancestor, in shades when siblings share it; else the PALETTE colour of the
+  position among the siblings. Below the top level that palette colour goes down to the
+  children like an own colour; a top budget does not hand it down, so its first split shows
+  different colours. A swatch shows only for a node with an own or inherited colour
+  (`resolveNodeColors`).
+- **Several roots:** fiscal years belong to a top budget. A node under another root shows the
+  year with the same start year; a pick there switches root and year.
+- **Mock:** `core/api/mock-budget.ts` (lazy import in the mock interceptor) serves /budgets,
+  fiscal years and the applications per cost centre, so `?mock=1` shows the page.
+
+## History (2026-06)
 
 Budget-tab redesign on branch feat/admin-ux-flow-editor-fixes (2026-06-09). The user confirmed
 every decision with the question tool. The "Budget" nav tab is `/budget` and renders
@@ -63,8 +102,12 @@ lives in budget/tree_service.py and tree_rules.py. Budget is a critical module, 
 `accepted_state_keys` and `denied_state_keys` (migration 0041), and the state-based committed and
 requested roll-up. `tree_rules.build_forest` takes requested_rows. `tree_service.get_tree` joins
 Application to State and classifies per top config. Frontend: the shared
-`budget-year-tree.component.ts` (left nav) and `budget-pie.component.ts` (interactive donut, with
-PALETTE fallback colors). The dashboard is rebuilt with a 3-zone layout, the Requested column, the
+`budget-year-tree.component.ts` (left nav, removed in FE12a, see below) and
+`budget-pie.component.ts` (interactive donut, with PALETTE fallback colors).
+
+**Update (FE12a):** `budget-year-tree.component` no longer exists. The cost-centre page now picks
+the budget with an `app-filter-select` chip and the fiscal year with segmented chips
+(`app-segmented`) above the table. The dashboard is rebuilt with a 3-zone layout, the Requested column, the
 breadcrumb omission at the top level, and URL sync through the query params budget, ks and fy. The
 admin page /admin/budget-pots is rebuilt with the left tree, the color picker and the accepted and
 denied state matrix. It loads the global flow states through AdminApiService.getGlobalFlow.

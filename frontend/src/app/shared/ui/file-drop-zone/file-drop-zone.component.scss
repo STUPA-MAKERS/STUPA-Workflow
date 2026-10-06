@@ -1,0 +1,67 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.fdz {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border: 1.5px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  color: var(--color-text);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+.fdz--over {
+  border-color: var(--color-accent);
+  background: var(--color-selected);
+}
+.fdz--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fdz__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+.fdz__text {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+}
+.fdz__label {
+  font-weight: var(--fw-medium);
+}
+.fdz__hint {
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--color-text-muted);
+}
+
+/* The outlined small button of the kit (`.btn.outl.sm` in the design). */
+.fdz__button {
+  flex: none;
+  height: var(--control-height-sm);
+  padding: 0 14px;
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.fdz__button:hover:not(:disabled) {
+  background: var(--color-surface-2);
+}
+.fdz__button:disabled {
+  cursor: not-allowed;
+}

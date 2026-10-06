@@ -99,14 +99,34 @@ async def test_session_manager_may_close_the_vote(
     assert await _parity(meeting, Principal(sub="manager")) is True
 
 
-async def test_global_meeting_manage_may_close_the_vote(
+async def test_admin_may_close_the_vote(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The global meeting manager sees the flag, so the gate must admit it too."""
+    """The admin sees the flag through the bypass, so the gate must admit it too."""
+    _patch_gremium_perms(monkeypatch, {})
+    meeting = _meeting(protokollant_id=uuid4())
+    assert await _parity(meeting, Principal(sub="ops", roles=["admin"])) is True
+
+
+async def test_former_global_meeting_manage_no_longer_manages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The global `meeting.manage` key is gone; a stale grant opens nothing."""
     _patch_gremium_perms(monkeypatch, {})
     meeting = _meeting(protokollant_id=uuid4())
     principal = Principal(sub="ops", permissions={"meeting.manage"})
-    assert await _parity(meeting, principal) is True
+    assert await _parity(meeting, principal) is False
+
+
+async def test_read_token_of_protokollant_may_not_close_the_vote(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F16: the scope cap also stops the protokollant path and the gremium roles."""
+    _patch_gremium_perms(monkeypatch, {"vote.manage": {GID}, "session.manage": {GID}})
+    principal = Principal(
+        sub="protokoll", scope_permissions=frozenset({"application.read"})
+    )
+    assert await _parity(_meeting(), principal) is False
 
 
 async def test_gremium_vote_manage_may_close_the_vote(

@@ -1,68 +1,321 @@
-<div class="mtg__follow">
-  <app-card [heading]="'meetings.follow.title' | t">
-    <p class="text-text-muted mb-3">{{ 'meetings.follow.lead' | t }}</p>
-    @for (item of agenda(); track item.id; let i = $index) {
-      <article class="mtg__followTop" [class.mtg__followTop--now]="item.id === meeting().currentAgendaItemId" [id]="'top-' + item.id">
-        <h3 class="m-0 text-base">
-          {{ 'meetings.agenda.top' | t: { n: i + 1 } }}: {{ item.title || ('meetings.agenda.untitled' | t) }}
-          @if (item.id === meeting().currentAgendaItemId) {
-            <app-badge variant="primary">{{ 'meetings.follow.now' | t }}</app-badge>
-          }
-          @if (stateLabelOf(item.stateLabel); as st) {
-            <app-badge variant="neutral">{{ st }}</app-badge>
-          }
-        </h3>
-        @if (item.applicationId) {
-          <a class="text-primary text-sm font-medium" [routerLink]="['/applications', item.applicationId]">{{ 'meetings.agenda.openApplication' | t }}</a>
-        }
-        @if (item.body) { <div class="mtg__preview" [innerHTML]="renderBody(item.body)"></div> }
-        @for (vote of votesForTop(item.id); track vote.id) {
-          <div class="mtg__vote">
-            <div class="mtg__voteHead">
-              <span class="font-medium mr-auto">{{ vote.question || ('meetings.vote.untitled' | t) }}</span>
-              <app-badge [variant]="voteVariant(vote.status)">{{ voteStatusKey(vote.status) | t }}</app-badge>
-              @if (vote.result) { <app-badge [variant]="voteResultVariant(vote.result)">{{ voteResultKey(vote.result) | t }}</app-badge> }
-              @if (vote.result === 'rejected' && vote.failedReason === 'quorum') {
-                <span class="text-xs text-danger font-medium">{{ 'vote.failedQuorum' | t }}</span>
-              }
-            </div>
-            @if (vote.status === 'open' && meeting().canVote) {
-              <div class="mtg__voteActions">
-                @for (opt of voteOptionsFor(vote); track opt) {
-                  <app-button size="sm" [variant]="myChoice(vote.id) === opt ? 'primary' : 'secondary'" [loading]="casting() === vote.id" (click)="castVote.emit({ voteId: vote.id, choice: opt })">{{ optionLabel(opt) }}@if (myChoice(vote.id) === opt) { <app-icon name="check" [size]="13" /> }</app-button>
-                }
-              </div>
-            }
-            @if (vote.status === 'open') {
-              <p class="mtg__voteProgress">{{ 'meetings.vote.progress' | t: { voted: vote.voted, present: vote.present } }}</p>
-            }
-            @if (vote.revealed && vote.counts) {
-              <dl class="mtg__tally">
-                @for (entry of countEntries(vote); track entry.key) {
-                  <div [class.mtg__tally--leading]="entry.key === vote.leading"><dt>{{ optionLabel(entry.key) }}</dt><dd>{{ entry.value }}</dd></div>
-                }
-              </dl>
-            } @else if (vote.status === 'open') {
-              <p class="mtg__voteHidden text-text-muted">{{ 'meetings.vote.progressHidden' | t }}</p>
-            }
-          </div>
-        }
-      </article>
-    } @empty {
-      <p class="text-text-muted">{{ 'meetings.follow.noTops' | t }}</p>
+@let m = meeting();
+@let top = shownTop();
+
+<header class="fv__head">
+  <app-button class="fv__back" variant="text" [iconOnly]="true" [ariaLabel]="'meetings.page.back' | t" (click)="back.emit()">
+    <app-icon name="back" />
+  </app-button>
+  <div class="fv__titles">
+    <div class="fv__titleLine">
+      <h1 class="fv__title" [title]="m.title">{{ m.title }}</h1>
+      <app-status-text class="fv__status" [kind]="status().kind">{{ status().key | t }}</app-status-text>
+    </div>
+    <span class="fv__sub">{{ phone() ? phoneSubLine() : subLine() }}</span>
+  </div>
+  @if (!wide()) {
+    @if (phone()) {
+      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.dock.agenda' | t" (click)="agendaOpen.set(true)">
+        <app-icon name="list" />
+      </app-button>
+    } @else {
+      <app-button variant="tonal" size="sm" [title]="'meetings.dock.agenda' | t" (click)="agendaOpen.set(true)">
+        <app-icon name="list" [size]="18" />
+        {{ 'meetings.agenda.title' | t }}
+      </app-button>
     }
-  </app-card>
+  }
+</header>
 
-  <app-card [heading]="'meetings.attendance.title' | t">
-    <app-meeting-attendance-table
-      [rows]="attendance()"
-      [protokollantId]="meeting().protokollantId"
-      [editAll]="false"
-      [locked]="meeting().status === 'closed'"
-      [saving]="savingAttendance()"
-      (statusChange)="attendanceChange.emit($event)"
-    />
-  </app-card>
+@if (!wide()) {
+  <!-- A phone opens the agenda as a bottom sheet, a narrow screen from the start edge. -->
+  <app-side-sheet [side]="phone() ? 'bottom' : 'start'" [heading]="'meetings.agenda.title' | t" [(open)]="agendaOpen">
+    @if (agendaOpen()) {
+      <ng-container [ngTemplateOutlet]="agendaTpl" [ngTemplateOutletContext]="{ inSheet: true }" />
+    }
+  </app-side-sheet>
+}
 
-  <app-meeting-delegation-card [meetingId]="meeting().id" />
-</div>
+@if (phone()) {
+  <!-- Board Teilnahme-Telefon: the item, the vote, the protocol excerpt, then the own
+       attendance and the delegation. -->
+  <div class="fv__phone">
+    @if (top) {
+      <div class="fv__phoneTop">
+        <span class="fv__kind">
+          @if (showsNow()) {
+            <span class="fv__nowLabel">{{ 'meetings.follow.now' | t }}</span> ·
+          }
+          {{ positionText() }}
+        </span>
+        <h2 class="fv__phoneTitle">{{ top.title || ('meetings.agenda.untitled' | t) }}</h2>
+        @if (nowElsewhere()) {
+          <app-button class="fv__toNow" variant="tonal" size="sm" (click)="backToNow()">{{ 'meetings.dock.backToNow' | t }}</app-button>
+        }
+      </div>
+    } @else if (m.status === 'planned') {
+      <ng-container [ngTemplateOutlet]="startTpl" />
+    } @else {
+      <ng-container [ngTemplateOutlet]="waitTpl" />
+    }
+
+    <app-participant-vote />
+    <ng-container [ngTemplateOutlet]="votesTpl" />
+
+    @if (top) {
+      <section class="fv__excerpt" [attr.aria-label]="excerptCap()">
+        <h3 class="fv__cap cap">{{ excerptCap() }}</h3>
+        @if (fullText()) {
+          <app-top-sheet
+            class="fv__fullTop"
+            [meeting]="m"
+            [protocol]="null"
+            [top]="top"
+            [topIndex]="shownIndex()"
+            [editable]="false"
+            [canEdit]="false"
+            saveState="idle"
+            [follow]="true"
+          />
+        } @else if (excerpt().text) {
+          <p class="fv__excerptText">{{ excerpt().text }}</p>
+        } @else {
+          <p class="fv__excerptText fv__muted">{{ 'participant.top.empty' | t }}</p>
+        }
+        @if (fullText() || excerpt().cut) {
+          <app-button class="fv__readAll" variant="text" size="sm" (click)="fullText.set(!fullText())">
+            {{ (fullText() ? 'participant.top.readLess' : 'participant.top.readAll') | t }}
+          </app-button>
+        }
+      </section>
+    }
+
+    @if (me(); as row) {
+      <app-participant-attendance
+        [member]="row"
+        [meetingStatus]="m.status"
+        [saving]="savingAttendance()"
+        [delegated]="delegated()"
+        (change)="reportAttendance($event)"
+      >
+        <ng-container [ngTemplateOutlet]="rosterButtonTpl" />
+      </app-participant-attendance>
+    } @else {
+      <ng-container [ngTemplateOutlet]="rosterButtonTpl" />
+    }
+    <ng-container [ngTemplateOutlet]="delegationTpl" [ngTemplateOutletContext]="{ variant: 'box' }" />
+  </div>
+} @else {
+  <!-- Board Schmal-Teilnahme: below the wide layout the vote card is a strip above the
+       text, outside the scroll area, so it stays in view. -->
+  @if (!wide() && votes.vote()) {
+    <app-participant-vote class="fv__strip" layout="strip" [position]="votePosition()" />
+  }
+  <div class="fv__body fv__fade" [class.fv__body--wide]="wide()" appScrollFade="y">
+    @if (wide()) {
+      <section class="fv__agenda fv__fade" appScrollFade="y" [attr.aria-label]="'meetings.agenda.title' | t">
+        <ng-container [ngTemplateOutlet]="agendaTpl" />
+      </section>
+    }
+
+    <div class="fv__main">
+      @if (top) {
+        <app-top-sheet
+          class="fv__sheet"
+          [meeting]="m"
+          [protocol]="null"
+          [top]="top"
+          [topIndex]="shownIndex()"
+          [editable]="false"
+          [canEdit]="false"
+          saveState="idle"
+          [follow]="true"
+        />
+      } @else {
+        <article class="fv__start">
+          <ng-container [ngTemplateOutlet]="m.status === 'planned' ? startTpl : waitTpl" />
+        </article>
+      }
+    </div>
+
+    <aside class="fv__side fv__fade" appScrollFade="y" [attr.aria-label]="'participant.side' | t">
+      @if (m.status === 'planned') {
+        @if (me(); as row) {
+          <app-participant-attendance
+            [member]="row"
+            [meetingStatus]="m.status"
+            [saving]="savingAttendance()"
+            [delegated]="delegated()"
+            (change)="reportAttendance($event)"
+          >
+            <ng-container [ngTemplateOutlet]="rosterButtonTpl" />
+          </app-participant-attendance>
+        } @else {
+          <ng-container [ngTemplateOutlet]="rosterButtonTpl" />
+        }
+      }
+      @if (wide()) {
+        <app-participant-vote />
+      }
+      <ng-container [ngTemplateOutlet]="votesTpl" />
+      <!-- Below the wide layout the delegation of a running meeting sits in the dock. -->
+      @if (wide() || m.status === 'planned') {
+        <ng-container [ngTemplateOutlet]="delegationTpl" [ngTemplateOutletContext]="{ variant: 'box' }" />
+      }
+    </aside>
+  </div>
+
+  @if (m.status !== 'planned') {
+    <footer class="fv__dock" [class.fv__dock--narrow]="!wide()" [attr.aria-label]="'participant.dock.label' | t">
+      @if (!wide()) {
+        <ng-container [ngTemplateOutlet]="delegationTpl" [ngTemplateOutletContext]="{ variant: 'inline' }" />
+      }
+      @if (m.status === 'closed') {
+        <span class="fv__dockState">
+          <span class="fv__muted">{{ closedLine() }}</span>
+          <strong>{{ agenda().length === 1 ? ('meetings.dock.topsOne' | t) : ('meetings.dock.tops' | t: { n: agenda().length }) }}</strong>
+        </span>
+      } @else if (nowElsewhere(); as now) {
+        <span class="fv__dockNow ell" [title]="now">{{ 'meetings.dock.nowRunning' | t: { top: now } }}</span>
+        <app-button size="sm" variant="tonal" (click)="backToNow()">{{ 'meetings.dock.backToNow' | t }}</app-button>
+      } @else if (top && (wide() || !dockDelegation())) {
+        <span class="fv__dockTop">
+          <app-icon name="list" [size]="18" />
+          <span class="ell" [title]="top.title ?? ''">
+            <strong>{{ 'meetings.agenda.top' | t: { n: shownIndex() + 1 } }}</strong>
+            {{ 'participant.dock.of' | t: { m: agenda().length } }} · {{ top.title || ('meetings.agenda.untitled' | t) }}
+          </span>
+        </span>
+      }
+
+      <span class="fv__spacer"></span>
+
+      <!-- Below the wide layout the strip above the text shows the ballots. -->
+      @if (wide() && ownBallot(); as own) {
+        <span class="fv__dockItem" [attr.data-kind]="own.kind">
+          <app-icon name="vote" [size]="18" />
+          <span>{{ 'meetings.dock.yourVote' | t }}: <strong>{{ own.text }}</strong></span>
+        </span>
+        <span class="fv__vr" aria-hidden="true"></span>
+      }
+      @if (wide() && proxyBallot(); as proxy) {
+        <span class="fv__dockItem" [attr.data-kind]="proxy.kind">
+          <app-icon name="repeat" [size]="18" />
+          <span>{{ proxy.key | t }}</span>
+        </span>
+        <span class="fv__vr" aria-hidden="true"></span>
+      }
+      @if (me()) {
+        <button type="button" class="fv__chip" [attr.aria-label]="('participant.attendance.title' | t) + ': ' + (attendanceChip() | t)" (click)="attendanceOpen.set(true)">
+          @if (me()?.status === 'present') {
+            <app-icon name="check" [size]="15" />
+          }
+          {{ attendanceChip() | t }}
+        </button>
+      }
+    </footer>
+
+    <app-side-sheet side="end" [heading]="'participant.attendance.title' | t" [(open)]="attendanceOpen">
+      @if (attendanceOpen() && me(); as row) {
+        <div class="fv__sheetStack">
+          <app-participant-attendance
+            [member]="row"
+            [meetingStatus]="m.status"
+            [saving]="savingAttendance()"
+            [delegated]="delegated()"
+            (change)="reportAttendance($event)"
+          />
+          <app-participant-roster [rows]="attendance()" [protokollantId]="m.protokollantId" />
+        </div>
+      }
+    </app-side-sheet>
+  }
+}
+
+<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'participant.roster.all' | t" [(open)]="rosterOpen">
+  @if (rosterOpen()) {
+    <app-participant-roster [rows]="attendance()" [protokollantId]="m.protokollantId" />
+  }
+</app-side-sheet>
+
+<ng-template #rosterButtonTpl>
+  @if (attendance().length) {
+    <app-button class="fv__roster" variant="text" size="sm" (click)="rosterOpen.set(true)">
+      <app-icon name="users" [size]="18" />
+      {{ 'participant.roster.show' | t }}
+    </app-button>
+  }
+</ng-template>
+
+<!-- The earlier results of the shown item, and the votes without an agenda item. -->
+<ng-template #votesTpl>
+  @if (moreVotes().length) {
+    <section class="fv__votes" [attr.aria-label]="'participant.votes.more' | t">
+      <h2 class="fv__cap cap">{{ 'participant.votes.more' | t }}</h2>
+      @for (v of moreVotes(); track v.id) {
+        <app-vote-card [vote]="v" [meetingStatus]="m.status" />
+      }
+    </section>
+  }
+  @if (looseVotes().length) {
+    <section class="fv__votes" [attr.aria-label]="'participant.votes.loose' | t">
+      <h2 class="fv__cap cap">{{ 'participant.votes.loose' | t }}</h2>
+      @for (v of looseVotes(); track v.id) {
+        <app-vote-card [vote]="v" [meetingStatus]="m.status" />
+      }
+    </section>
+  }
+</ng-template>
+
+<ng-template #startTpl>
+  <span class="fv__cap cap">{{ 'participant.start.cap' | t }}</span>
+  <h2 class="fv__startTitle">{{ startText() }}</h2>
+  <p class="fv__muted">{{ 'participant.start.lead' | t }}</p>
+  <button
+    type="button"
+    class="fv__calendar"
+    [attr.aria-expanded]="abo.isOpen()"
+    (click)="abo.toggle($event.currentTarget)"
+  >
+    <app-icon name="cal" [size]="17" />
+    {{ 'participant.start.calendar' | t }}
+  </button>
+  <app-calendar-subscribe #abo />
+</ng-template>
+
+<!-- A running meeting before the lead calls an item, or a closed meeting without items. -->
+<ng-template #waitTpl>
+  @if (m.status === 'live') {
+    <span class="fv__cap cap">{{ 'participant.start.cap' | t }}</span>
+    <h2 class="fv__startTitle">{{ 'participant.wait.live' | t }}</h2>
+    <p class="fv__muted">{{ (agenda().length ? 'participant.wait.liveLead' : 'participant.wait.liveEmpty') | t }}</p>
+    @if (!wide() && agenda().length) {
+      <app-button variant="tonal" size="sm" (click)="agendaOpen.set(true)">
+        <app-icon name="list" [size]="18" />
+        {{ 'meetings.dock.agenda' | t }}
+      </app-button>
+    }
+  } @else {
+    <h2 class="fv__startTitle">{{ 'participant.wait.closedEmpty' | t }}</h2>
+  }
+</ng-template>
+
+<ng-template #delegationTpl let-variant="variant">
+  <app-meeting-delegation-card
+    [class.fv__dockDeleg]="variant === 'inline'"
+    [variant]="variant"
+    [meetingId]="m.id"
+    [subtitle]="dialogLine()"
+    (contextChange)="delegationContext.set($event)"
+  />
+</ng-template>
+
+<ng-template #agendaTpl let-inSheet="inSheet">
+  <app-agenda-pane
+    [inSheet]="inSheet === true"
+    [meeting]="m"
+    [agenda]="agenda()"
+    [selectedId]="top?.id ?? null"
+    [locked]="true"
+    (pick)="pick($event)"
+  />
+</ng-template>

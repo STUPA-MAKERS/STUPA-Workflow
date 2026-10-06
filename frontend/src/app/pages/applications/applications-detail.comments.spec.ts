@@ -14,6 +14,8 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { render, screen } from '@testing-library/angular';
 import { BehaviorSubject } from 'rxjs';
 import { ApplicationsDetailComponent } from './applications-detail.component';
+import { ApplicationsPageService } from './applications-page.service';
+import { RailStatusService } from '../../layout/rail-status.service';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ToastService } from '@stupa-makers/ui-kit';
@@ -67,6 +69,13 @@ function fakeAuth(permissions: string[]): Partial<AuthService> {
   };
 }
 
+/** The page link of the side-by-side layout. */
+function splitPage(): ApplicationsPageService {
+  const page = new ApplicationsPageService();
+  page.split.set(true);
+  return page;
+}
+
 async function setup(
   permissions: string[] = ['application.read', 'application.manage'],
   paramMap$ = new BehaviorSubject(convertToParamMap({ id: 'app-1' })),
@@ -78,7 +87,11 @@ async function setup(
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
       { provide: AuthService, useValue: fakeAuth(permissions) },
+      // The real service polls; the page only asks it to refresh.
+      { provide: RailStatusService, useValue: { refresh: jest.fn() } },
       { provide: ActivatedRoute, useValue: { paramMap: paramMap$ } },
+      // Side by side with the list: every section shows at once, no tabs.
+      { provide: ApplicationsPageService, useFactory: splitPage },
     ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
@@ -103,6 +116,7 @@ function flushForm(http: HttpTestingController, id = 'app-1') {
 
 /** Answer every request of one page load. */
 function flushAll(http: HttpTestingController, id = 'app-1') {
+  flushTypes(http);
   http.expectOne(url('', id)).flush({ ...appWire(), id });
   http.expectOne(url('/versions', id)).flush(VERSIONS);
   http.expectOne(url('/comments', id)).flush(COMMENTS);
@@ -114,7 +128,8 @@ function flushAll(http: HttpTestingController, id = 'app-1') {
 
 /** The attachments panel loads on render. An empty answer is fine. */
 function flushAttachments(http: HttpTestingController) {
-  for (const req of http.match((r) => r.method === 'GET' && /\/attachments$/.test(r.url))) {
+  flushTypes(http);
+  for (const req of http.match((r) => r.method === 'GET' && /\/(attachments|timeline)$/.test(r.url))) {
     req.flush([]);
   }
   for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
@@ -123,6 +138,18 @@ function flushAttachments(http: HttpTestingController) {
 }
 
 // --- comment edit / delete -------------------------------------------------
+
+/** The application types load once, for "<Typ> · Version n" above the title. */
+function flushTypes(http: HttpTestingController) {
+  for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/application-types')) {
+    req.flush({
+      items: [{ id: 't1', name: 'Finanzantrag', hasBudget: true, active: true, activeFormVersionId: 'v1' }],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
+  }
+}
 
 describe('ApplicationsDetailComponent — comment edit and delete', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));

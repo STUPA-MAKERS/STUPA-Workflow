@@ -1,0 +1,104 @@
+<div class="hist">
+  @for (day of days(); track day.key) {
+    <div class="hist__day">
+      <p class="cap hist__date" [id]="id + '-' + day.key">{{ day.label }}</p>
+      <ol
+        class="rowgroup hist__list"
+        [class.rowgroup--bg1]="surface() === 1"
+        [class.rowgroup--bg3]="surface() === 3"
+        [attr.aria-labelledby]="id + '-' + day.key"
+      >
+        @for (e of day.entries; track $index; let ei = $index) {
+          <li class="hist__row">
+            <app-icon class="hist__icon" [name]="e.icon" [size]="18" />
+            <div class="hist__text">
+              <span class="hist__title">
+                @if (e.kind) {
+                  <app-status-text [kind]="e.kind">{{ e.title }}</app-status-text>
+                } @else {
+                  {{ e.title }}
+                }
+              </span>
+              @if (e.body) {
+                <span class="hist__body">{{ e.body }}</span>
+              }
+              @if (e.changes?.length) {
+                <ul class="hist__changes">
+                  @for (c of e.changes; track $index; let ci = $index) {
+                    <li>
+                      <app-status-text [kind]="c.kind">{{ c.tag }}</app-status-text>
+                      {{ c.label }}@if (has(c.old) || has(c.new)) {:
+                        @if (has(c.old)) {
+                          <del>{{ c.old }}</del>
+                        }
+                        @if (has(c.old) && has(c.new)) {
+                          <span class="hist__arrow" aria-hidden="true">→</span>
+                        }
+                        @if (has(c.new)) {
+                          <ins>{{ c.new }}</ins>
+                        }
+                      }
+                      @if (c.detail; as detail) {
+                        @let key = day.key + ':' + ei + ':' + ci;
+                        @let open = isOpen(key);
+                        @let valuesId = id + '-v-' + day.key + '-' + ei + '-' + ci;
+                        <!-- The values are not in the DOM while closed, so the button
+                             points at them only when open. -->
+                        <button
+                          type="button"
+                          class="hist__more"
+                          [attr.aria-expanded]="open"
+                          [attr.aria-controls]="open ? valuesId : null"
+                          (click)="toggle(key)"
+                        >
+                          <app-icon
+                            class="hist__chev"
+                            [class.hist__chev--open]="open"
+                            name="down"
+                            [size]="16"
+                          />
+                          {{ (open ? 'ui.history.hideValues' : 'ui.history.showValues') | t }}
+                        </button>
+                        @if (open) {
+                          <div class="hist__values" [id]="valuesId">
+                            @if (has(detail.old)) {
+                              <span class="hist__valuesCap">{{ 'ui.history.before' | t }}</span>
+                              <del class="hist__block">
+                                @for (l of lines(detail.old); track $index) {
+                                  <span class="hist__line" [style.padding-inline-start.ch]="l.indent">{{
+                                    l.text
+                                  }}</span>
+                                }
+                              </del>
+                            }
+                            @if (has(detail.new)) {
+                              <span class="hist__valuesCap">{{ 'ui.history.after' | t }}</span>
+                              <ins class="hist__block">
+                                @for (l of lines(detail.new); track $index) {
+                                  <span class="hist__line" [style.padding-inline-start.ch]="l.indent">{{
+                                    l.text
+                                  }}</span>
+                                }
+                              </ins>
+                            }
+                          </div>
+                        }
+                      }
+                    </li>
+                  }
+                </ul>
+              }
+              @if (day.key === 'none') {
+                @if (e.meta) {
+                  <span class="hist__meta">{{ e.meta }}</span>
+                }
+              } @else {
+                <time class="hist__meta" [attr.datetime]="e.at">{{ e.meta }}</time>
+              }
+            </div>
+          </li>
+        }
+      </ol>
+    </div>
+  }
+</div>

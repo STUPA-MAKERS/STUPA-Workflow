@@ -1,98 +1,69 @@
-<app-page-header [title]="('admin.gremien.membersOf' | t) + ': ' + (gremium()?.name ?? '…')" />
-
-<p class="text-muted text-sm m-0" role="note">
-  {{ 'admin.gremien.membersHint' | t }}
-  @if (canManageMappings()) {
-    <a routerLink="/admin/group-mappings">{{ 'admin.users.manageGroupMappings' | t }}</a>
-  }
-</p>
-
-<!-- Read-only. The OIDC group sync writes the memberships, not the admin. -->
-<app-data-table
-    [loading]="loading()"
-    [loadingText]="'common.loading' | t" [columns]="columns()" [rows]="members()" [rowKey]="rowId" [emptyText]="'admin.gremien.membersEmpty' | t">
-  <ng-template appCell="email" let-m>{{ $any(m).email || '—' }}</ng-template>
-  <ng-template appCell="roleLabel" let-m><app-badge variant="primary">{{ $any(m).roleLabel }}</app-badge></ng-template>
-</app-data-table>
-
-<!-- Substitute pool: elected or appointed substitutes. A delegation to a substitute has
-     no lead-time deadline and stays possible until meeting start. A substitute does not
-     need to be a member, for example a faculty representative. -->
-<section class="gm__pool" [attr.aria-label]="'admin.substitutes.title' | t">
-  <header class="flex items-center justify-between gap-4 flex-wrap">
-    <div>
-      <h2 class="m-0">{{ 'admin.substitutes.title' | t }}</h2>
-      <p class="text-muted mt-1">{{ 'admin.substitutes.hint' | t }}</p>
-    </div>
-    <app-button size="sm" (click)="openAddSub()">{{ 'admin.substitutes.add' | t }}</app-button>
-  </header>
-  <app-data-table
-    [columns]="subColumns()"
-    [rows]="substitutes()"
-    [rowKey]="subRowId"
-    [emptyText]="'admin.substitutes.empty' | t"
+<section class="gmm">
+  <app-page-header
+    [flush]="true"
+    [title]="('admin.gremien.membersOf' | t) + ': ' + (gremium()?.name ?? '…')"
   >
-    <ng-template appCell="substitute" let-s>{{ $any(s).substituteName || $any(s).substituteId }}</ng-template>
-    <ng-template appCell="member" let-s>
-      @if ($any(s).memberId) {
-        {{ $any(s).memberName || $any(s).memberId }}
-      } @else {
-        <span class="text-muted text-sm">{{ 'admin.substitutes.allMembers' | t }}</span>
-      }
-    </ng-template>
-    <ng-template appCell="actions" let-s>
-      <app-button variant="ghost" size="sm" [iconOnly]="true" [ariaLabel]="'admin.substitutes.remove' | t" (click)="removeSub($any(s).id)">
-        <app-icon name="delete" />
-      </app-button>
-    </ng-template>
-  </app-data-table>
-</section>
-
-<!-- The typeahead searches every user, not only members of the gremium. -->
-<app-dialog
-  [open]="addSubOpen()"
-  [title]="'admin.substitutes.add' | t"
-  [closeLabel]="'admin.gremien.cancel' | t"
-  (closed)="addSubOpen.set(false)"
->
-  <div class="flex flex-col gap-4">
-    <div class="relative flex flex-col gap-1">
-      <label class="gm__lbl" for="gm-sub-search">{{ 'admin.substitutes.search' | t }}</label>
-      <input
-        id="gm-sub-search"
-        class="gm__control"
-        autocomplete="off"
-        [placeholder]="'admin.gremien.memberSearchPlaceholder' | t"
-        [ngModel]="subQuery()"
-        (ngModelChange)="onSubSearch($event)"
-        (focus)="onSubSearch(subQuery())"
-      />
-      @if (subCandidates().length) {
-        <ul class="gm__suggest" role="listbox">
-          @for (c of subCandidates(); track c.id) {
-            <li>
-              <button type="button" class="gm__suggest-item" [class.gm__suggest-item--sel]="subSelected()?.id === c.id" (click)="pickSub(c)">
-                <span class="font-medium">{{ c.displayName || c.email || c.sub }}</span>
-                @if (c.email) { <span class="text-xs text-muted">{{ c.email }}</span> }
-              </button>
-            </li>
-          }
-        </ul>
-      }
-    </div>
-    @if (subSelected(); as s) {
-      <p class="m-0 text-sm">{{ 'admin.gremien.memberPicked' | t }}: <strong>{{ s.displayName || s.email || s.sub }}</strong></p>
+    @if (!loading() && !failed()) {
+      <span actions class="gmm__total">{{ countLabel(members().length) }}</span>
     }
-    <app-select
-      [label]="'admin.substitutes.forMember' | t"
-      [options]="memberOptions()"
-      [ngModel]="subMemberId()"
-      (ngModelChange)="subMemberId.set($event)"
-      name="subMember"
-    />
-  </div>
-  <div dialog-footer class="flex gap-3">
-    <app-button size="sm" variant="ghost" (click)="addSubOpen.set(false)">{{ 'admin.gremien.cancel' | t }}</app-button>
-    <app-button size="sm" [disabled]="!subSelected()" (click)="addSub()">{{ 'admin.substitutes.addAction' | t }}</app-button>
-  </div>
-</app-dialog>
+  </app-page-header>
+
+  <app-note>
+    <span>{{ 'admin.gremien.membersHint' | t }}</span>
+    @if (canManageMappings()) {
+      <a class="gmm__noteLink" routerLink="/admin/group-mappings">{{
+        'admin.users.manageGroupMappings' | t
+      }}</a>
+    }
+  </app-note>
+
+  <!-- Read-only. The OIDC group sync writes the memberships, not the admin. -->
+  <section class="gmm__section" aria-labelledby="gmm-members-title">
+    <header class="gmm__head">
+      <h2 class="sec" id="gmm-members-title">{{ 'admin.gremien.members' | t }}</h2>
+      @if (!loading() && members().length > preview) {
+        <span class="gmm__shown">{{
+          'admin.gremien.shownOf' | t: { shown: visible().length, total: members().length }
+        }}</span>
+      }
+    </header>
+
+    @if (loading()) {
+      <app-skeleton variant="rows" [count]="5" [label]="'common.loading' | t" />
+    } @else if (failed()) {
+      <p class="gmm__error" role="alert">{{ 'admin.gremien.membersLoadFailed' | t }}</p>
+    } @else {
+      <ul class="rowgroup gmm__list" [attr.aria-label]="'admin.gremien.members' | t">
+        @for (m of visible(); track m.id) {
+          <li class="gmm__row">
+            <app-avatar size="sm" [name]="m.name" [principalId]="m.id" [decorative]="true" />
+            <span class="gmm__name ell" [title]="m.name">{{ m.name }}</span>
+            <span class="gmm__mail mono">{{ m.email ?? '—' }}</span>
+            <span class="gmm__role">{{ m.role | capitalize }}</span>
+          </li>
+        } @empty {
+          <li class="gmm__empty">{{ 'admin.gremien.membersEmpty' | t }}</li>
+        }
+      </ul>
+      @if (members().length > preview) {
+        <!-- A native button: the disclosure needs aria-expanded on the button itself. -->
+        <button
+          type="button"
+          class="gmm__more"
+          [attr.aria-expanded]="showAll()"
+          (click)="showAll.set(!showAll())"
+        >
+          {{
+            showAll()
+              ? ('admin.gremien.showLess' | t)
+              : ('admin.gremien.showAll' | t: { count: members().length })
+          }}
+        </button>
+      }
+    }
+  </section>
+
+  @if (canPool()) {
+    <app-substitute-pool [gremiumId]="gremiumId" [members]="poolMembers()" />
+  }
+</section>

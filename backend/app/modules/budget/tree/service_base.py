@@ -13,7 +13,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
@@ -89,6 +89,34 @@ class BudgetTreeServiceBase:
             target_id=target_id,
             data=data or {},
         )
+
+    async def visible_budget_ids(self, member_gremium_ids: set[UUID]) -> set[UUID]:
+        """Return the ids of the cost centres that a gremium-scoped reader may see.
+
+        A node is visible when the node itself or an ancestor carries a
+        ``view_gremium_id`` of a member Gremium. This is the set form of
+        `TreeViewOps.can_view_node`: the root paths with a matching
+        ``view_gremium_id`` open their whole subtree through the ``path_key`` prefix.
+        A holder of the full budget view needs no filter and does not call this.
+        """
+        if not member_gremium_ids:
+            return set()
+        root_paths = (
+            await self.session.scalars(
+                select(Budget.path_key).where(Budget.view_gremium_id.in_(member_gremium_ids))
+            )
+        ).all()
+        if not root_paths:
+            return set()
+        # A path segment is alphanumeric (`tree_rules.is_valid_key`), so the prefix
+        # holds no LIKE wildcard.
+        scoped = or_(
+            *[
+                or_(Budget.path_key == rp, Budget.path_key.like(f"{rp}{_SEP}%"))
+                for rp in root_paths
+            ]
+        )
+        return set((await self.session.scalars(select(Budget.id).where(scoped))).all())
 
     async def _get_node(self, budget_id: UUID) -> Budget:
         node = (

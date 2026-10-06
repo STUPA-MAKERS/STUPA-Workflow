@@ -12,18 +12,18 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
+import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
+import { type StatusView, webhookDeliveryStatus } from '@shared/status-kind.util';
 import {
-  BadgeComponent,
-  type BadgeVariant,
   ButtonComponent,
-  CellDirective,
   CheckboxComponent,
-  type ColumnDef,
-  DataTableComponent,
   DialogComponent,
   IconComponent,
   InputComponent,
+  SwitchComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
@@ -39,22 +39,17 @@ function emptyHook(): WebhookConfig {
   return { id: '', name: '', url: '', events: [], active: true };
 }
 
-/** Badge colour per delivery state. A dead letter reads as danger. */
-const STATE_VARIANTS: Record<WebhookDeliveryState, BadgeVariant> = {
-  never: 'neutral',
-  pending: 'info',
-  sent: 'success',
-  dead: 'danger',
-};
-
 /**
- * Webhook config UI at `/admin/webhooks`. The header holds a create button. The list uses the
- * shared {@link DataTableComponent}. Create and edit run in a dialog. The client validation
- * asks for a valid http or https URL. The event selection stays optional.
+ * Webhook config UI at `/admin/webhooks` (board Admin-Webhooks). One card per webhook:
+ * the name with the state of its newest delivery as status text (Zugestellt,
+ * Fehlgeschlagen, Läuft, Noch nie), the whole target URL, the real event keys as tags,
+ * the "Aktiv" switch (it saves at once), "Zustellstatus" (the diagnosis below the card:
+ * state, HTTP code, attempts, last attempt, failure class and the dead-letter note),
+ * edit and delete.
  *
- * Each row also shows the delivery state of its newest attempt. A click on that badge opens
- * the diagnosis dialog with the failure class, the HTTP code and the attempt count. Delete
- * runs through a confirm dialog. Both need P(`webhook.manage`), which the backend enforces.
+ * Create and edit run in a dialog. The client validation asks for a valid http or https
+ * URL. The event selection stays optional. Delete runs through a confirm dialog. Every
+ * change needs P(`webhook.manage`), which the backend enforces.
  */
 @Component({
   selector: 'app-webhooks',
@@ -66,16 +61,17 @@ const STATE_VARIANTS: Record<WebhookDeliveryState, BadgeVariant> = {
     LocalizedDatePipe,
     ButtonComponent,
     CheckboxComponent,
-    BadgeComponent,
-    DataTableComponent,
-    CellDirective,
     DialogComponent,
     IconComponent,
     InputComponent,
+    NoteComponent,
     PageHeaderComponent,
+    SkeletonComponent,
+    StatusTextComponent,
+    SwitchComponent,
   ],
   templateUrl: './webhooks.component.html',
-  styleUrl: './config.shared.scss',
+  styleUrl: './webhooks.component.scss',
 })
 export class WebhooksComponent {
   private readonly api = inject(AdminApiService);
@@ -97,6 +93,11 @@ export class WebhooksComponent {
   protected readonly confirmDelete = signal<WebhookConfig | null>(null);
   /** The webhook whose delivery diagnosis is open. */
   protected readonly statusDetail = signal<WebhookConfig | null>(null);
+  /**
+   * The webhooks whose active flag is being saved. Each webhook saves on its own, so a
+   * switch stays usable while the save of another webhook runs.
+   */
+  protected readonly toggling = signal<ReadonlySet<string>>(new Set());
   /** Delivery state per webhook id, from `GET /admin/webhooks/delivery-status`. */
   protected readonly delivery = signal<ReadonlyMap<string, WebhookDeliveryStatus>>(new Map());
 
@@ -105,30 +106,6 @@ export class WebhooksComponent {
   protected readonly canManage = computed(() => this.auth.can('webhook.manage'));
   /** The delivery status loads one time, as soon as the permission is known. */
   private statusRequested = false;
-
-  protected readonly columns = computed<ColumnDef[]>(() => {
-    const cols: ColumnDef[] = [
-      { key: 'name', label: this.i18n.translate('admin.webhook.name') },
-      { key: 'url', label: this.i18n.translate('admin.webhook.url') },
-      { key: 'events', label: this.i18n.translate('admin.webhook.events'), align: 'start', width: '7rem' },
-      { key: 'active', label: this.i18n.translate('admin.webhook.active'), align: 'start', width: '6rem' },
-    ];
-    if (this.canManage()) {
-      cols.push({
-        key: 'delivery',
-        label: this.i18n.translate('admin.webhook.delivery'),
-        align: 'start',
-        width: '9rem',
-      });
-    }
-    cols.push({
-      key: 'actions',
-      label: this.i18n.translate('admin.common.actions'),
-      align: 'end',
-      width: '7rem',
-    });
-    return cols;
-  });
 
   protected readonly errors = computed(() => {
     const d = this.draft();
@@ -173,12 +150,9 @@ export class WebhooksComponent {
     return this.delivery().get(id) ?? null;
   }
 
-  protected stateVariant(state: WebhookDeliveryState): BadgeVariant {
-    return STATE_VARIANTS[state] ?? 'neutral';
-  }
-
-  protected stateLabel(state: WebhookDeliveryState): string {
-    return this.tr(`admin.webhook.delivery.state.${state}`);
+  /** The delivery state as status text: sent accent, dead error, the rest neutral. */
+  protected deliveryStatus(state: WebhookDeliveryState): StatusView {
+    return webhookDeliveryStatus(state);
   }
 
   /** Localized failure class. An unknown class from a newer backend reads raw. */
@@ -226,6 +200,20 @@ export class WebhooksComponent {
         this.hooks.update((list) =>
           idx === null ? [...list, saved] : list.map((h, i) => (i === idx ? saved : h)),
         );
+        // A new webhook has no delivery yet. The backend reports it as "never", so show
+        // that state at once instead of waiting for a reload.
+        if (idx === null && !this.delivery().has(saved.id)) {
+          this.delivery.update((m) =>
+            new Map(m).set(saved.id, {
+              webhookId: saved.id,
+              lastState: 'never',
+              reasonClass: 'no_deliveries',
+              responseCode: null,
+              attempts: 0,
+              lastAt: null,
+            }),
+          );
+        }
         this.toast.success(this.i18n.translate('admin.common.saved'));
         this.close();
       },
@@ -233,12 +221,46 @@ export class WebhooksComponent {
     });
   }
 
-  protected openStatus(hook: WebhookConfig): void {
-    this.statusDetail.set(hook);
+  /** Open the diagnosis of a webhook below its card, or close it again. */
+  protected toggleStatus(hook: WebhookConfig): void {
+    this.statusDetail.update((cur) => (cur?.id === hook.id ? null : hook));
   }
 
-  protected closeStatus(): void {
-    this.statusDetail.set(null);
+  /** True while the active flag of this webhook is being saved. */
+  protected isToggling(id: string): boolean {
+    return this.toggling().has(id);
+  }
+
+  private setToggling(id: string, on: boolean): void {
+    this.toggling.update((cur) => {
+      const next = new Set(cur);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  /**
+   * The "Aktiv" switch saves the webhook at once; a failure puts the switch back. The
+   * switch of a webhook is disabled while its own save runs. Other webhooks save in
+   * parallel.
+   */
+  protected setActive(hook: WebhookConfig, active: boolean): void {
+    if (this.isToggling(hook.id)) return;
+    const before = hook.active;
+    this.setToggling(hook.id, true);
+    this.hooks.update((list) => list.map((h) => (h.id === hook.id ? { ...h, active } : h)));
+    this.api.saveWebhook({ ...hook, events: [...hook.events], active }).subscribe({
+      next: (saved) => {
+        this.setToggling(hook.id, false);
+        this.hooks.update((list) => list.map((h) => (h.id === saved.id ? saved : h)));
+      },
+      error: () => {
+        this.setToggling(hook.id, false);
+        this.hooks.update((list) => list.map((h) => (h.id === hook.id ? { ...h, active: before } : h)));
+        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+      },
+    });
   }
 
   protected askDelete(hook: WebhookConfig): void {

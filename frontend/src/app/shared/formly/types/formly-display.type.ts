@@ -14,7 +14,7 @@ import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
   template: `
     @if (isHeading) {
       <div class="display__heading">
-        <h3 class="display__headingTitle">{{ props.label || text }}</h3>
+        <h3 class="sec display__headingTitle">{{ props.label || text }}</h3>
         @if (props.description) {
           <p class="display__headingSub">{{ props.description }}</p>
         }
@@ -30,14 +30,13 @@ import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
   `,
   styles: [
     `
+      /* A section heading: the accent heading of the global \`.sec\` class. */
       .display__heading {
-        margin-top: var(--space-2);
-        padding-bottom: var(--space-2);
-        border-bottom: var(--border-width) solid var(--color-border);
+        margin-top: var(--space-3);
+        padding: 0 var(--space-1);
       }
       .display__headingTitle {
         margin: 0;
-        font-size: var(--fs-md);
       }
       .display__headingSub {
         margin: var(--space-1) 0 0;

@@ -14,6 +14,7 @@ types.
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Mapping
 from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
@@ -442,14 +443,37 @@ class Quorum(_CamelModel):
     value: float = Field(ge=0)
 
 
+# Keys that an old vote row can still hold. VoteConfig.from_stored drops them.
+_LEGACY_VOTE_KEYS = frozenset({"allowChange", "allow_change"})
+
+
 class VoteConfig(_CamelModel):
+    """The rules of one vote, stored as JSONB in ``vote.config``.
+
+    A ballot can never change after the cast (O11), so the config has no
+    ``allowChange``. Migration ``vote_closed_at`` removes the key from the old rows,
+    because ``extra=forbid`` refuses it. The API still refuses the key on create. To
+    read a stored row, use ``from_stored``: an old container can write the key during a
+    deploy, after the migration ran.
+    """
+
     options: list[str] = Field(min_length=2)
     majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(alias="majorityRule")
     quorum: Quorum | None = None
     abstain_counts_quorum: bool = Field(default=True, alias="abstainCountsQuorum")
     secret: bool = False
-    allow_change: bool = Field(default=True, alias="allowChange")
     tie_break: Literal["passed", "rejected", "tie"] = Field(default="rejected", alias="tieBreak")
+    # Public meeting (#17): the admitted guests vote too. Such a vote has no quorum,
+    # only the majority of the cast ballots counts. Only a meeting vote in a meeting
+    # with ``guests_mode = vote`` sets it, never on a non-public agenda item.
+    guests_vote: bool = Field(default=False, alias="guestsVote")
+
+    @model_validator(mode="after")
+    def _guests_vote_has_no_quorum(self) -> VoteConfig:
+        """A vote with guests has no quorum (#17): only the majority of the cast ballots."""
+        if self.guests_vote and self.quorum is not None:
+            raise ValueError("a vote with guests (guestsVote) has no quorum")
+        return self
 
     @field_validator("options")
     @classmethod
@@ -457,6 +481,18 @@ class VoteConfig(_CamelModel):
         if len(set(v)) != len(v):
             raise ValueError("vote options must be unique")
         return v
+
+    @classmethod
+    def from_stored(cls, data: Mapping[str, Any] | VoteConfig) -> VoteConfig:
+        """Validate a stored ``vote.config`` row.
+
+        The method drops the legacy ``allowChange`` key (and only that key) before the
+        validation. ``extra=forbid`` still refuses every other unknown key. A
+        ``VoteConfig`` instance passes as it is.
+        """
+        if isinstance(data, VoteConfig):
+            return data
+        return cls.model_validate({k: v for k, v in data.items() if k not in _LEGACY_VOTE_KEYS})
 
 
 # Notification rule

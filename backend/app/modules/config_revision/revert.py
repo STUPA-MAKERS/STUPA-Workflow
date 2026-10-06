@@ -12,6 +12,7 @@ is revertable where that makes sense.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import select
@@ -28,6 +29,9 @@ from app.modules.config_revision.service import (
     ConfigRevisionService,
 )
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError
+
+if TYPE_CHECKING:
+    from app.modules.livevote.publisher import MeetingPublisher
 
 # Permission per entity that the original config change needed. This is the same gate
 # as the sidebar restore. A revert is an equally strong mutation, so it must require
@@ -61,8 +65,12 @@ class RevertResult:
 class RevertService:
     """Run the audit-log revert, bound to an ``AsyncSession``."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self, session: AsyncSession, publisher: MeetingPublisher | None = None
+    ) -> None:
         self.session = session
+        # Sends `vote_cancelled` when a status revert cancels the votes of a state.
+        self.publisher = publisher
 
     async def revert(
         self,
@@ -178,7 +186,11 @@ class RevertService:
     async def _revert_status(
         self, entry: AuditEntry, actor: str, principal: Principal | None
     ) -> RevertResult:
-        """Revert an application status transition back to the prior state."""
+        """Revert an application status transition back to the prior state.
+
+        The application leaves its current state, so the flow cancels the votes of
+        that state (F22) and the publisher sends ``vote_cancelled``.
+        """
         from app.modules.flow.service import FlowService
 
         # A status reset is a state transition, so it needs the same permission as a
@@ -193,7 +205,7 @@ class RevertService:
             raise ConflictError(
                 "This status change is not revertable.", code="not_revertable"
             )
-        await FlowService(self.session).revert_status(
+        await FlowService(self.session, publisher=self.publisher).revert_status(
             UUID(app_id),
             from_state_id=UUID(from_raw),
             to_state_id=UUID(to_raw),

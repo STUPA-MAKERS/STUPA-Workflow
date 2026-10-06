@@ -19,11 +19,12 @@ from app.modules.applications.models import (
     Applicant,
     Application,
     Comment,
+    GuestApplicationSettings,
     MagicLink,
     StatusEvent,
     SubmissionVersion,
 )
-from app.modules.audit.models import AuditEntry
+from app.modules.audit.models import AuditEntry, AuditVerification
 from app.modules.auth.models import (
     AuthSession,
     GroupMapping,
@@ -42,11 +43,20 @@ from app.modules.budget.tree_models import (
 )
 from app.modules.config_revision.models import ConfigRevision
 from app.modules.deadlines.models import Deadline, DeadlinePolicy
-from app.modules.delegations.models import DelegationSubstitute, MeetingDelegation
-from app.modules.files.models import Attachment
+from app.modules.delegations.models import (
+    DelegationSubstitute,
+    MeetingDelegation,
+)
+from app.modules.files.models import Attachment, AttachmentDraftToken
 from app.modules.flow.models import FlowVersion, State, Transition
 from app.modules.forms.models import FormField, FormVersion
-from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
+from app.modules.livevote.models import (
+    Meeting,
+    MeetingAgendaItem,
+    MeetingAttendance,
+    MeetingGuest,
+    ProtocolKeeperPeriod,
+)
 from app.modules.notifications.models import (
     MailTemplate,
     NotificationPreference,
@@ -62,7 +72,9 @@ __all__ = [
     "Application",
     "ApplicationType",
     "Attachment",
+    "AttachmentDraftToken",
     "AuditEntry",
+    "AuditVerification",
     "AuthSession",
     "Ballot",
     "Base",
@@ -81,6 +93,7 @@ __all__ = [
     "FormVersion",
     "Gremium",
     "GroupMapping",
+    "GuestApplicationSettings",
     "MagicLink",
     "MailList",
     "MailTemplate",
@@ -90,6 +103,8 @@ __all__ = [
     "Meeting",
     "MeetingAgendaItem",
     "MeetingAttendance",
+    "MeetingGuest",
+    "ProtocolKeeperPeriod",
     "OAuthAuthorizationCode",
     "OAuthToken",
     "ErasureRequest",

@@ -4,9 +4,11 @@ import { TestBed } from '@angular/core/testing';
 import { firstValueFrom } from 'rxjs';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { I18nService } from '@core/i18n/i18n.service';
+import { SKIP_LOADING } from '@core/loading/loading.interceptor';
 import type { FormFieldDef } from '@core/api/models';
 import { AdminApiService } from './admin-api.service';
-import type { Branding, WebhookConfig } from './admin.models';
+import { MOCK_GREMIUM_STUPA_ID } from './admin.mock';
+import type { AdminPrincipal, Branding, WebhookConfig } from './admin.models';
 
 describe('AdminApiService — mock mode', () => {
   function svc(): AdminApiService {
@@ -35,14 +37,14 @@ describe('AdminApiService — mock mode', () => {
     });
   });
 
-  it('deletes a webhook and reports no delivery status in mock mode', async () => {
+  it('deletes a webhook and reports one delivery status per state in mock mode', async () => {
     const s = svc();
     const before = await firstValueFrom(s.listWebhooks());
     await firstValueFrom(s.deleteWebhook(before[0].id));
     const after = await firstValueFrom(s.listWebhooks());
     expect(after.some((h) => h.id === before[0].id)).toBe(false);
-    // The mock backend records no deliveries.
-    expect(await firstValueFrom(s.listWebhookDeliveryStatus())).toEqual([]);
+    const status = await firstValueFrom(s.listWebhookDeliveryStatus());
+    expect(status.map((x) => x.lastState)).toEqual(['sent', 'dead', 'pending', 'never']);
   });
 
   it('covers schemas, versions, gremien, roles and rule upsert in mock mode', async () => {
@@ -338,8 +340,40 @@ describe('AdminApiService — real mode (contract)', () => {
       { id: 't1', nameI18n: { de: 'X' }, gremiumId: 'g1', hasBudget: true, retentionMonths: 12, activeFormVersionId: 'fv' },
       { id: 't2' },
     ]);
-    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, retentionMonths: 12, activeFormVersionId: 'fv' });
-    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, retentionMonths: null, activeFormVersionId: null });
+    expect(out![0]).toEqual({ id: 't1', name: { de: 'X' }, gremiumId: 'g1', hasBudget: true, retentionMonths: 12, activeFormVersionId: 'fv', activeFormVersion: null });
+    expect(out![1]).toEqual({ id: 't2', name: {}, gremiumId: null, hasBudget: false, retentionMonths: null, activeFormVersionId: null, activeFormVersion: null });
+  });
+
+  it('maps the number of the active form version', () => {
+    let out: { activeFormVersion?: number | null }[] | undefined;
+    s.listApplicationTypesFull().subscribe((o) => (out = o));
+    http.expectOne('/api/admin/application-types').flush([{ id: 't1', activeFormVersionId: 'fv', activeFormVersion: 7 }]);
+    expect(out![0].activeFormVersion).toBe(7);
+  });
+
+  it('lists, diffs and restores the config revisions of an entity', () => {
+    let list: unknown;
+    s.listConfigRevisions('site_config', 'global').subscribe((v) => (list = v));
+    const req = http.expectOne((r) => r.url === '/api/admin/config-revisions');
+    expect(req.request.params.get('entityType')).toBe('site_config');
+    expect(req.request.params.get('entityId')).toBe('global');
+    req.flush([{ id: 'r1' }]);
+    expect(list).toEqual([{ id: 'r1' }]);
+    s.restoreConfigRevision('r1').subscribe();
+    http.expectOne({ method: 'POST', url: '/api/admin/config-revisions/r1/restore' }).flush(null);
+  });
+
+  it('reads and replaces the guest settings', () => {
+    let read: unknown;
+    s.getGuestSettings().subscribe((v) => (read = v));
+    http.expectOne({ method: 'GET', url: '/api/admin/guest-settings' }).flush({ confirmTtlHours: 12, linkTtlDays: null });
+    expect(read).toEqual({ confirmTtlHours: 12, linkTtlDays: null });
+    let saved: unknown;
+    s.putGuestSettings({ confirmTtlHours: 24, linkTtlDays: 30 }).subscribe((v) => (saved = v));
+    const req = http.expectOne({ method: 'PUT', url: '/api/admin/guest-settings' });
+    expect(req.request.body).toEqual({ confirmTtlHours: 24, linkTtlDays: 30 });
+    req.flush({ confirmTtlHours: 24, linkTtlDays: 30 });
+    expect(saved).toEqual({ confirmTtlHours: 24, linkTtlDays: 30 });
   });
 
   it('POSTs a new application type and maps the wire response', () => {
@@ -512,6 +546,19 @@ describe('AdminApiService — real mode (contract)', () => {
     http.expectOne('/api/admin/audit/actors').flush([]);
   });
 
+  it('wires the audit chain checks', () => {
+    s.latestAuditVerification().subscribe();
+    http.expectOne('/api/admin/audit/verify/latest').flush(null);
+    s.runAuditVerification().subscribe();
+    const run = http.expectOne('/api/admin/audit/verify');
+    expect(run.request.method).toBe('POST');
+    run.flush({});
+    s.verifyAuditChain().subscribe();
+    const live = http.expectOne('/api/admin/audit/verify');
+    expect(live.request.method).toBe('GET');
+    live.flush({ valid: true, checked: 1, brokenAt: null, reason: null });
+  });
+
   it('GETs/PUTs notification settings', () => {
     s.getNotificationSettings().subscribe();
     http.expectOne('/api/admin/notification-settings').flush({ taskReminderEnabled: true, taskReminderAfterDays: 5, taskReminderRepeatDays: 7 });
@@ -531,7 +578,14 @@ describe('AdminApiService — real mode (contract)', () => {
     s.listErasures('open').subscribe();
     const filtered = http.expectOne((r) => r.url === '/api/admin/privacy/erasures');
     expect(filtered.request.params.get('status')).toBe('open');
+    expect(filtered.request.context.get(SKIP_LOADING)).toBe(false);
     filtered.flush([]);
+
+    // A caller with its own loading state (the health tiles) skips the overlay.
+    s.listErasures('open', { quiet: true }).subscribe();
+    const quiet = http.expectOne((r) => r.url === '/api/admin/privacy/erasures');
+    expect(quiet.request.context.get(SKIP_LOADING)).toBe(true);
+    quiet.flush([]);
 
     s.executeErasure('e-1').subscribe();
     expect(http.expectOne('/api/admin/privacy/erasures/e-1/execute').request.method).toBe('POST');
@@ -560,6 +614,17 @@ describe('AdminApiService — real mode (contract)', () => {
     const cr = http.expectOne('/api/admin/roles');
     expect(cr.request.method).toBe('POST');
     cr.flush({ id: 'r-new', key: 'k', label: { de: 'K' }, permissions: ['x'] });
+
+    s.previewPrincipalMerge('p-old', 'p-new').subscribe();
+    const pv = http.expectOne('/api/admin/principals/p-old/merge-preview?targetId=p-new');
+    expect(pv.request.method).toBe('GET');
+    pv.flush({});
+
+    s.mergePrincipal('p-old', 'p-new').subscribe();
+    const mg = http.expectOne('/api/admin/principals/p-old/merge');
+    expect(mg.request.method).toBe('POST');
+    expect(mg.request.body).toEqual({ targetId: 'p-new' });
+    mg.flush({});
 
     s.setPrincipalActive('p-9', false).subscribe();
     const sp = http.expectOne('/api/admin/principals/p-9');
@@ -594,7 +659,14 @@ describe('AdminApiService — real mode (contract)', () => {
   describe('backups', () => {
     it('lists the catalogue', () => {
       s.listBackups().subscribe();
-      expect(http.expectOne('/api/admin/backups').request.method).toBe('GET');
+      const req = http.expectOne('/api/admin/backups');
+      expect(req.request.method).toBe('GET');
+      expect(req.request.context.get(SKIP_LOADING)).toBe(false);
+    });
+
+    it('lists the catalogue without the overlay for a quiet caller', () => {
+      s.listBackups({ quiet: true }).subscribe();
+      expect(http.expectOne('/api/admin/backups').request.context.get(SKIP_LOADING)).toBe(true);
     });
 
     it('polls one row without raising the global loading overlay', () => {
@@ -675,17 +747,21 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
   it('pages, filters and revokes OAuth grants in the mock store', async () => {
     const s = svc();
     const all = await firstValueFrom(s.listOAuthGrants());
-    expect(all.total).toBe(2);
+    expect(all.total).toBe(3);
     expect(all.items[0].principalName).toBe('Alex Admin');
-    // The second stub carries no owner name and no expiry.
+    // The second stub carries no owner name. Every stub has real scope keys and an expiry.
     expect(all.items[1].principalName).toBeNull();
-    expect(all.items[1].accessExpiresAt).toBeNull();
+    const known = new Set(['read', 'applications:write', 'votes:write', 'meetings:write', 'budget:write', 'forms:write', 'flows:write', 'admin:write']);
+    for (const g of all.items) {
+      expect(g.scope.split(' ').every((x) => known.has(x))).toBe(true);
+      expect(g.accessExpiresAt).not.toBeNull();
+    }
 
     // Paging slices the store.
     const secondPage = await firstValueFrom(s.listOAuthGrants({ limit: 1, offset: 1 }));
     expect(secondPage.items).toHaveLength(1);
     expect(secondPage.offset).toBe(1);
-    expect(secondPage.total).toBe(2);
+    expect(secondPage.total).toBe(3);
 
     // The owner filter narrows the list.
     const mine = await firstValueFrom(s.listOAuthGrants({ principalId: 'p-1' }));
@@ -694,7 +770,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     await firstValueFrom(s.revokeOAuthGrant('grant-1'));
     const after = await firstValueFrom(s.listOAuthGrants());
     expect(after.items.some((g) => g.id === 'grant-1')).toBe(false);
-    expect(after.total).toBe(1);
+    expect(after.total).toBe(2);
   });
 
   it('deletes a gremium and returns empty mail recipients', async () => {
@@ -739,6 +815,43 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     // An unknown id returns store[0] and does not crash.
     const fallback = await firstValueFrom(s.setPrincipalActive('nope', true));
     expect(fallback.id).toBe(all[0].id);
+  });
+
+  it('previews and merges accounts in mock mode', async () => {
+    const s = svc();
+    // The Keycloak account of Robin into Alex Admin conflicts.
+    const blocked = await firstValueFrom(s.previewPrincipalMerge('p-old-1', 'p-1'));
+    expect(blocked.canMerge).toBe(false);
+    expect(blocked.conflicts.map((c) => c.kind)).toContain('ballot_same_vote');
+    const err = await firstValueFrom(s.mergePrincipal('p-old-1', 'p-1')).catch((e) => e);
+    expect(err.status).toBe(409);
+    expect(err.error.code).toBe('merge_conflict');
+    expect(err.error.errors).toContainEqual({ field: 'erasure_open', msg: '' });
+    // Into Robin Mitglied it merges, and the list then marks the old account.
+    const clean = await firstValueFrom(s.previewPrincipalMerge('p-old-1', 'p-2'));
+    expect(clean.canMerge).toBe(true);
+    expect(clean.areas.find((a) => a.area === 'votes')?.rewritten).toBe(9);
+    expect(clean.areas.find((a) => a.area === 'backups')?.rewritten).toBe(0);
+    const done = await firstValueFrom(s.mergePrincipal('p-old-1', 'p-2'));
+    expect(done.mergedAt).toBeTruthy();
+    expect(done.target.displayName).toBe('Robin Mitglied');
+    const old = (await firstValueFrom(s.listPrincipals())).find((p) => p.id === 'p-old-1')!;
+    expect(old.mergedIntoId).toBe('p-2');
+    expect(old.mergedIntoName).toBe('Robin Mitglied');
+    expect(old.active).toBe(false);
+    // Unknown accounts give 404.
+    const missing = await firstValueFrom(s.previewPrincipalMerge('nope', 'p-2')).catch((e) => e);
+    expect(missing.status).toBe(404);
+    const missing2 = await firstValueFrom(s.mergePrincipal('p-2', 'nope')).catch((e) => e);
+    expect(missing2.status).toBe(404);
+  });
+
+  it('mock preview copes with accounts without a name or a login', async () => {
+    const s = svc();
+    const store = (s as unknown as { store: { principals: AdminPrincipal[] } }).store;
+    store.principals.push({ id: 'p-bare', sub: 'x', assignments: [], oidcGroups: [] });
+    const p = await firstValueFrom(s.previewPrincipalMerge('p-bare', 'p-2'));
+    expect(p.source).toEqual({ id: 'p-bare', displayName: null, email: null, lastLogin: null });
   });
 
   it('returns an empty principal list when search matches nothing', async () => {
@@ -841,17 +954,19 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(stub).toEqual({ applicationTypeId: 'no-draft-type', active: true, fields: [] });
   });
 
-  it('returns null global flow and a deterministic mock flow id in mock mode', async () => {
+  it('serves the mock flow, stores a saved flow and returns a deterministic id in mock mode', async () => {
     const s = svc();
-    expect(await firstValueFrom(s.getGlobalFlow())).toBeNull();
+    const seeded = await firstValueFrom(s.getGlobalFlow());
+    expect(seeded?.states.some((st) => st.isInitial)).toBe(true);
     const created = await firstValueFrom(s.createGlobalFlowVersion({ states: [{ key: 's', label: {} }], transitions: [] }));
     expect(created.id).toBe('gflow-1');
+    expect((await firstValueFrom(s.getGlobalFlow()))?.states.map((st) => st.key)).toEqual(['s']);
   });
 
   it('CRUDs gremium-roles in the mock store', async () => {
     const s = svc();
     // The seed gives each mock gremium its forced roles.
-    expect((await firstValueFrom(s.listGremiumRoles('g-stupa'))).map((r) => r.key)).toEqual(['board', 'manager', 'member']);
+    expect((await firstValueFrom(s.listGremiumRoles(MOCK_GREMIUM_STUPA_ID))).map((r) => r.key)).toEqual(['vorstand', 'manager', 'member', 'protokoll']);
     expect(await firstValueFrom(s.listGremiumRoles('g-empty'))).toEqual([]);
     const created = await firstValueFrom(s.createGremiumRole('g-empty', { key: 'chair', name: { de: 'Vorsitz' } }));
     expect(created.gremiumId).toBe('g-empty');
@@ -882,27 +997,54 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     store.gremiumRoles = undefined;
     await firstValueFrom(s.deleteGremiumRole('any'));
     // The store re-initializes to an array. Nothing crashes and the list is empty.
-    expect(await firstValueFrom(s.listGremiumRoles('g-stupa'))).toEqual([]);
+    expect(await firstValueFrom(s.listGremiumRoles(MOCK_GREMIUM_STUPA_ID))).toEqual([]);
   });
 
   it('CRUDs deadline policies in the mock store', async () => {
     const s = svc();
-    expect(await firstValueFrom(s.listDeadlinePolicies())).toEqual([]);
+    const seeded = await firstValueFrom(s.listDeadlinePolicies());
+    expect(seeded.map((p) => p.kind)).toEqual(['relative_changed', 'relative_submitted', 'absolute', 'recurring']);
     const created = await firstValueFrom(s.createDeadlinePolicy({ key: 'sem', label: { de: 'Semester' }, kind: 'absolute' }));
-    expect(created.id).toBe('dp-1');
+    expect(created.id).toBe('dp-5');
     const updated = await firstValueFrom(s.updateDeadlinePolicy(created.id, { offsetDays: 5 }));
     expect(updated.offsetDays).toBe(5);
     // An unknown id gives a synthesized fallback.
     const fallback = await firstValueFrom(s.updateDeadlinePolicy('ghost', { offsetDays: 1 }));
     expect(fallback.id).toBe('ghost');
     await firstValueFrom(s.deleteDeadlinePolicy(created.id));
-    expect(await firstValueFrom(s.listDeadlinePolicies())).toEqual([]);
+    expect(await firstValueFrom(s.listDeadlinePolicies())).toEqual(seeded);
+  });
+
+  it('keeps the guest settings in the mock store', async () => {
+    const s = svc();
+    expect(await firstValueFrom(s.getGuestSettings())).toEqual({ confirmTtlHours: 12, linkTtlDays: null });
+    await firstValueFrom(s.putGuestSettings({ confirmTtlHours: 48, linkTtlDays: 14 }));
+    expect(await firstValueFrom(s.getGuestSettings())).toEqual({ confirmTtlHours: 48, linkTtlDays: 14 });
+  });
+
+  it('serves the CD variants, the site versions and the notification save in mock mode', async () => {
+    const s = svc();
+    const variants = await firstValueFrom(s.listCdVariants());
+    expect(variants.map((v) => v.key)).toEqual(['stupa', 'asta', 'bericht']);
+    expect((await firstValueFrom(s.listConfigRevisions('site_config', 'global'))).map((r) => r.version)).toEqual([3, 2, 1]);
+    expect((await firstValueFrom(s.listConfigRevisions('flow', 'global'))).map((r) => r.version)).toEqual([12, 11]);
+    expect((await firstValueFrom(s.listConfigRevisions('form', 'f-foerderung'))).map((r) => r.version)).toEqual([3, 2]);
+    expect(await firstValueFrom(s.listConfigRevisions('form', 'unknown'))).toEqual([]);
+    expect(await firstValueFrom(s.putNotificationSettings({ taskReminderAfterDays: 9 }))).toEqual({
+      taskReminderEnabled: true,
+      taskReminderAfterDays: 9,
+      taskReminderRepeatDays: 7,
+    });
   });
 
   it('returns the seeded memberships of one gremium in mock mode', async () => {
     const s = svc();
-    expect((await firstValueFrom(s.listGremiumMemberships('g-stupa'))).length).toBe(2);
-    expect(await firstValueFrom(s.listGremiumMemberships('g-asta'))).toEqual([]);
+    const stupa = await firstValueFrom(s.listGremiumMemberships(MOCK_GREMIUM_STUPA_ID));
+    expect(stupa.length).toBe(9);
+    // The server joins the name and the e-mail of each member.
+    expect(stupa.find((m) => m.principalId === 'p-1')).toMatchObject({ displayName: 'Alex Admin', email: 'alex@stupa.example' });
+    expect((await firstValueFrom(s.listGremiumMemberships('g-asta'))).map((m) => m.principalId)).toEqual(['p-4', 'p-7']);
+    expect(await firstValueFrom(s.listGremiumMemberships('g-none'))).toEqual([]);
   });
 
   it('CRUDs the global group mappings in the mock store', async () => {
@@ -927,34 +1069,106 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const s = svc();
     expect((await firstValueFrom(s.listMembershipMappings())).length).toBe(2);
     const created = await firstValueFrom(s.createMembershipMapping({ oidcGroup: 'x', gremiumId: 'g-asta' }));
-    const updated = await firstValueFrom(s.updateMembershipMapping(created.id, { gremiumId: 'g-stupa' }));
-    expect(updated.gremiumId).toBe('g-stupa');
+    const updated = await firstValueFrom(s.updateMembershipMapping(created.id, { gremiumId: MOCK_GREMIUM_STUPA_ID }));
+    expect(updated.gremiumId).toBe(MOCK_GREMIUM_STUPA_ID);
     await firstValueFrom(s.deleteMembershipMapping(created.id));
     expect((await firstValueFrom(s.listMembershipMappings())).length).toBe(2);
   });
 
   it('CRUDs the role mappings in the mock store and derives the gremium from the role', async () => {
     const s = svc();
-    expect((await firstValueFrom(s.listRoleMappings())).length).toBe(1);
-    const created = await firstValueFrom(s.createRoleMapping({ oidcGroup: 'x', gremiumRoleId: 'gr-asta-board' }));
+    expect((await firstValueFrom(s.listRoleMappings())).length).toBe(4);
+    const created = await firstValueFrom(s.createRoleMapping({ oidcGroup: 'x', gremiumRoleId: 'gr-asta-vorstand' }));
     expect(created.gremiumId).toBe('g-asta');
     const moved = await firstValueFrom(s.updateRoleMapping(created.id, { gremiumRoleId: 'gr-stupa-member' }));
-    expect(moved.gremiumId).toBe('g-stupa');
+    expect(moved.gremiumId).toBe(MOCK_GREMIUM_STUPA_ID);
     // A change of the group only keeps the gremium.
     const renamed = await firstValueFrom(s.updateRoleMapping(created.id, { oidcGroup: 'y' }));
-    expect(renamed).toMatchObject({ oidcGroup: 'y', gremiumId: 'g-stupa' });
+    expect(renamed).toMatchObject({ oidcGroup: 'y', gremiumId: MOCK_GREMIUM_STUPA_ID });
     // An unknown role gives no gremium.
     const orphan = await firstValueFrom(s.createRoleMapping({ oidcGroup: 'z', gremiumRoleId: 'ghost' }));
     expect(orphan.gremiumId).toBe('');
     await firstValueFrom(s.deleteRoleMapping(created.id));
     await firstValueFrom(s.deleteRoleMapping(orphan.id));
-    expect((await firstValueFrom(s.listRoleMappings())).length).toBe(1);
+    expect((await firstValueFrom(s.listRoleMappings())).length).toBe(4);
   });
 
-  it('returns empty audit page/actors in mock mode', async () => {
+  it('pages and filters the mock audit log', async () => {
     const s = svc();
-    expect(await firstValueFrom(s.listAuditLog())).toEqual({ items: [], nextCursor: null, hasMore: false });
-    expect(await firstValueFrom(s.listAuditActors())).toEqual([]);
+    const all = await firstValueFrom(s.listAuditLog());
+    expect(all.items.length).toBeGreaterThan(3);
+    expect(all.hasMore).toBe(false);
+    expect(all.nextCursor).toBeNull();
+    // Newest first, keyset paging on the id.
+    const first = await firstValueFrom(s.listAuditLog({ limit: 2 }));
+    expect(first.items).toHaveLength(2);
+    expect(first.hasMore).toBe(true);
+    expect(first.nextCursor).toBe(first.items[1].id);
+    const next = await firstValueFrom(s.listAuditLog({ limit: 2, before: first.nextCursor! }));
+    expect(next.items.every((e) => e.id < first.nextCursor!)).toBe(true);
+    // Action and actor filter.
+    const byAction = await firstValueFrom(s.listAuditLog({ action: 'role_change' }));
+    expect(byAction.items.map((e) => e.action)).toEqual(['role_change']);
+    const byActor = await firstValueFrom(s.listAuditLog({ actor: 'kc|kim.kasse' }));
+    expect(byActor.items.every((e) => e.actor === 'kc|kim.kasse')).toBe(true);
+    expect((await firstValueFrom(s.listAuditActors())).length).toBeGreaterThan(0);
+  });
+
+  it('reverts a mock audit entry once and answers for an unknown id', async () => {
+    const s = svc();
+    const res = await firstValueFrom(s.revertAuditEntry(7));
+    expect(res).toEqual({ revertedAuditId: 7, entityType: 'flow', entityId: 'global' });
+    const entry = (await firstValueFrom(s.listAuditLog())).items.find((e) => e.id === 7);
+    expect(entry?.revertable).toBe(false);
+    expect(await firstValueFrom(s.revertAuditEntry(999))).toEqual({
+      revertedAuditId: 999,
+      entityType: '',
+      entityId: '',
+    });
+  });
+
+  it('serves the chain checks and a config diff in mock mode', async () => {
+    const s = svc();
+    const latest = await firstValueFrom(s.latestAuditVerification());
+    expect(latest?.valid).toBe(true);
+    expect(latest?.trigger).toBe('cron');
+    const run = await firstValueFrom(s.runAuditVerification());
+    expect(run.trigger).toBe('manual');
+    // The manual check is the newest stored one now.
+    expect((await firstValueFrom(s.latestAuditVerification()))?.id).toBe(run.id);
+    const live = await firstValueFrom(s.verifyAuditChain());
+    expect(live.valid).toBe(true);
+    const diff = await firstValueFrom(s.getConfigRevisionDiff('rev-12'));
+    expect(diff.diff?.changed.length).toBe(2);
+    expect(diff.entityType).toBe('flow');
+    const none = await firstValueFrom(s.getConfigRevisionDiff('rev-x'));
+    expect(none.diff).toBeNull();
+  });
+
+  it('counts the members and roles of each mock gremium', async () => {
+    const s = svc();
+    const gremien = await firstValueFrom(s.listGremien());
+    const stupa = gremien.find((g) => g.id === MOCK_GREMIUM_STUPA_ID);
+    expect(stupa?.memberCount).toBe(9);
+    expect(stupa?.roleCount).toBe(4);
+  });
+
+  it('keeps the extra protocol recipients per gremium in the mock store', async () => {
+    const s = svc();
+    expect((await firstValueFrom(s.getGremiumMailRecipients(MOCK_GREMIUM_STUPA_ID))).recipients).toHaveLength(2);
+    expect((await firstValueFrom(s.getGremiumMailRecipients('g-asta'))).recipients).toEqual([]);
+    await firstValueFrom(s.setGremiumMailRecipients('g-asta', ['a@x.de']));
+    expect((await firstValueFrom(s.getGremiumMailRecipients('g-asta'))).recipients).toEqual(['a@x.de']);
+  });
+
+  it('gives a new mock gremium the forced roles', async () => {
+    const s = svc();
+    const created = await firstValueFrom(
+      s.createGremium({ name: 'Neu', slug: 'neu', cdVariantId: null, defaultLang: 'de' }),
+    );
+    const roles = await firstValueFrom(s.listGremiumRoles(created.id));
+    expect(roles.map((r) => r.key)).toEqual(['vorstand', 'manager', 'member']);
+    expect(roles.every((r) => r.forced && r.gremiumId === created.id)).toBe(true);
   });
 
   it('returns default notification settings in mock mode', async () => {
@@ -968,8 +1182,8 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
 
   it('manages erasures and privacy settings in the mock store (DSGVO)', async () => {
     const s = svc();
-    expect(await firstValueFrom(s.listErasures())).toEqual([]);
-    expect(await firstValueFrom(s.listErasures('open'))).toEqual([]);
+    expect((await firstValueFrom(s.listErasures())).length).toBe(4);
+    expect((await firstValueFrom(s.listErasures('open'))).map((r) => r.id)).toEqual(['e-1', 'e-2']);
 
     // Execute or reject on an unknown id gives a synthesized {id} fallback and no crash.
     const exec = await firstValueFrom(s.executeErasure('e-x'));
@@ -996,6 +1210,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     const s = svc();
     // Seed the private store directly to reach the status-filter branch.
     const store = (s as unknown as { store: { erasures: { id: string; status: string }[] } }).store;
+    store.erasures.length = 0;
     store.erasures.push(
       { id: 'e-open', status: 'open' } as never,
       { id: 'e-done', status: 'executed' } as never,
@@ -1043,12 +1258,44 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(after.items.some((b) => b.id === created.id)).toBe(false);
   });
 
-  it('mail-templates always hit HTTP even in mock mode', () => {
-    // These methods have no mock branch. They always call HttpClient.
+  it('edits, resets and previews the mail templates in the mock store', async () => {
     const s = svc();
     const http = TestBed.inject(HttpTestingController);
-    s.listMailTemplates().subscribe();
-    http.expectOne('/api/admin/mail-templates').flush([]);
+    const list = await firstValueFrom(s.listMailTemplates());
+    expect(list.find((t) => t.key === 'status_update')?.source).toBe('override');
+    const saved = await firstValueFrom(
+      s.upsertMailTemplate({ key: 'magic_link', subjectI18n: { de: 'Neu' }, bodyI18n: { de: 'Text' }, bodyHtmlI18n: {} }),
+    );
+    expect(saved).toMatchObject({ key: 'magic_link', source: 'override', id: 'mt-magic_link', subjectI18n: { de: 'Neu' } });
+    expect(saved.placeholders).toEqual({ link: expect.any(String) });
+    // An override keeps its id.
+    const again = await firstValueFrom(
+      s.upsertMailTemplate({ key: 'status_update', subjectI18n: { de: 'S' }, bodyI18n: {}, bodyHtmlI18n: {} }),
+    );
+    expect(again.id).toBe('mt-1');
+    // A key that is not in the store gets no placeholders.
+    const unknown = await firstValueFrom(
+      s.upsertMailTemplate({ key: 'ghost', subjectI18n: {}, bodyI18n: {}, bodyHtmlI18n: {} }),
+    );
+    expect(unknown.placeholders).toEqual({});
+    const reset = await firstValueFrom(s.resetMailTemplate('magic_link'));
+    expect(reset).toMatchObject({ key: 'magic_link', source: 'builtin', id: null, subjectI18n: { de: 'Dein Link zur Antragsplattform' } });
+    // An unknown key falls back to the first seed template.
+    expect((await firstValueFrom(s.resetMailTemplate('ghost'))).source).toBe('builtin');
+    const pv = await firstValueFrom(
+      s.previewMailPayload({
+        subjectI18n: { de: 'Hallo {{ name }}' },
+        bodyI18n: { de: 'Status: {{status}} {{ missing }}' },
+        bodyHtmlI18n: { de: '<p>{{ name }}</p>' },
+        lang: 'de',
+        context: { name: 'Mara', status: 'offen' },
+      }),
+    );
+    expect(pv).toEqual({ subject: 'Hallo Mara', text: 'Status: offen ', html: '<p>Mara</p>', lang: 'de' });
+    const plain = await firstValueFrom(
+      s.previewMailPayload({ subjectI18n: {}, bodyI18n: {}, bodyHtmlI18n: {}, lang: 'en', context: {} }),
+    );
+    expect(plain).toEqual({ subject: '', text: '', html: null, lang: 'en' });
     http.verify();
   });
 });

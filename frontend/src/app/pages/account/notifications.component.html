@@ -1,30 +1,32 @@
-<section class="notif">
+<section class="nt">
   <app-page-header
+    [flush]="true"
     [title]="'account.notifications.title' | t"
     [subtitle]="'account.notifications.intro' | t"
   />
 
-  @if (error()) {
-    <p class="text-danger m-0" role="alert">{{ $any(error()) | t }}</p>
+  @if (error(); as e) {
+    <app-note kind="error" icon="alert" role="alert">{{ e | t }}</app-note>
   }
 
-  <section class="border border-solid border-line rounded-lg py-4 px-5 bg-surface">
-    @if (loading()) {
-      <app-skeleton variant="rows" [count]="4" [label]="'admin.audit.loading' | t" />
-    } @else {
-      <ul class="notif__list">
-        @for (p of prefs(); track p.kind) {
-          <li class="notif__item">
-            <app-checkbox
-              [ngModel]="p.enabled"
-              (ngModelChange)="toggle(p.kind, $event)"
-              [hint]="kindHint(p.kind)"
-            >
-              {{ kindLabel(p.kind) }}
-            </app-checkbox>
-          </li>
-        }
-      </ul>
-    }
-  </section>
+  @if (loading()) {
+    <app-skeleton variant="rows" [count]="6" [label]="'common.loading' | t" />
+  } @else if (rows().length > 0) {
+    <ul class="rowgroup nt__list" [attr.aria-label]="'account.notifications.title' | t">
+      @for (p of rows(); track p.kind) {
+        <li class="nt__row">
+          <app-switch [checked]="p.enabled" (checkedChange)="toggle(p.kind, $event)">
+            <span class="nt__text">
+              <span class="nt__label">{{ kindLabel(p.kind) }}</span>
+              @if (kindHint(p.kind); as hint) {
+                <span class="nt__hint">{{ hint }}</span>
+              }
+            </span>
+          </app-switch>
+        </li>
+      }
+    </ul>
+  } @else if (!error()) {
+    <p class="nt__empty">{{ 'account.notifications.empty' | t }}</p>
+  }
 </section>

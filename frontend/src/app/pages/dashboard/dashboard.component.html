@@ -1,185 +1,352 @@
+<!-- One DOM order for every width: the head, the greeting, "Heute", the work list. Wide,
+     the grid of the host puts "Heute" into a sheet at the end edge (variant B). -->
+<div class="dash__top">
+  @if (phone()) {
+    <app-search-pill
+      class="dash__search"
+      mode="button"
+      [placeholder]="'dashboard.search.short' | t"
+      [label]="'search.title' | t"
+      (activate)="palette.open()"
+    >
+      <button
+        trail
+        type="button"
+        class="dash__me"
+        aria-haspopup="dialog"
+        [attr.aria-expanded]="accountOpen()"
+        [attr.aria-label]="'shell.account.open' | t: { name: auth.displayName() }"
+        (click)="openAccount()"
+      >
+        <app-avatar [name]="auth.displayName()" principalId="me" size="sm" [decorative]="true" />
+      </button>
+    </app-search-pill>
+  } @else {
+    <app-search-pill
+      class="dash__search"
+      mode="button"
+      [shortcut]="true"
+      [placeholder]="'search.placeholder' | t"
+      [label]="'search.title' | t"
+      (activate)="palette.open()"
+    />
+    <a class="dash__btn dash__btn--fill" routerLink="/apply">
+      <app-icon name="plus" [size]="18" />
+      {{ 'dashboard.apply.title' | t }}
+    </a>
+  }
+</div>
+
 <app-page-header
-  [title]="'dashboard.greeting' | t: { name: auth.displayName() }"
+  class="dash__head"
+  [flush]="true"
+  [title]="'dashboard.greeting' | t: { name: firstName() }"
+  [subtitle]="gremienLine() || null"
 />
 
-<!-- Below the greeting, not beside it. In the actions slot the chips read as controls
-     glued to the right of a heading; on their own line they read as what they are, the
-     Gremien this person's work belongs to. Roles are still NOT shown: an RBAC role name
-     says nothing a member acts on. -->
-@if (gremien().length) {
-  <div class="dash__gremien">
-    @for (g of gremien(); track g.id) {
-      <app-badge variant="neutral">{{ g.name }}</app-badge>
+<!-- "Heute": the live meeting, the next meetings, the budget. -->
+<aside class="dash__today" aria-labelledby="dash-today-h">
+  <header class="dash__todayHead">
+    <div class="dash__todayTitle">
+      <span class="dash__todayDate">{{ todayLabel() }}</span>
+      <h2 id="dash-today-h" class="dash__todayH">{{ 'dashboard.today.title' | t }}</h2>
+    </div>
+    @if (canSeeMeetings()) {
+      <a
+        class="dash__iconBtn"
+        routerLink="/meetings"
+        [attr.aria-label]="'dashboard.today.meetings' | t"
+        [title]="'dashboard.today.meetings' | t"
+      >
+        <app-icon name="cal" [size]="20" />
+      </a>
     }
-  </div>
-}
+  </header>
 
-<!-- A primary button, not a banner and not a muted text link. A signed-in member came
-     for their tasks and meetings, so this does not lead the page — but it is the one
-     action they take from here, and an outlined button on the same surface as the panels
-     around it read as part of the furniture. -->
-<a class="dash__apply" routerLink="/apply">
-  <app-icon name="form" [size]="20" />
-  {{ 'dashboard.apply.title' | t }}
-</a>
+  <div class="dash__todayBody" appScrollFade="y">
+    @if (meetingsLoading()) {
+      <app-skeleton variant="rows" [count]="2" [label]="'dashboard.loading' | t" />
+    }
 
-@if (sessionShortcuts().length) {
-  <section class="flex flex-col gap-3" aria-labelledby="dash-sessions-h">
-    <h2 id="dash-sessions-h" class="dash__quick-h">{{ 'dashboard.sessions.title' | t }}</h2>
-    <div class="dash__grid">
-      @for (s of sessionShortcuts(); track s.id) {
-        <a class="dash__tile dash__session" [class.dash__session--live]="s.status === 'live'" [routerLink]="['/meetings', s.id]">
-          <span class="dash__session-badge">
-            <app-badge [variant]="sessionVariant(s.status)">{{ sessionStatusKey(s.status) | t }}</app-badge>
-          </span>
-          <span class="dash__session-title">{{ s.title }}</span>
-          @if (s.date) {
-            <time class="dash__session-date" [attr.datetime]="s.date">{{ s.date | ldate: 'mediumDate' }}{{ sessionTimeSuffix(s.startTime) }}</time>
-          }
-          <span class="dash__link">
-            {{ (s.status === 'live' ? 'dashboard.sessions.join' : 'dashboard.sessions.inspect') | t }} →
-          </span>
-        </a>
-      }
-    </div>
-  </section>
-}
-
-<!-- Active meeting-bound delegations. Outgoing means another person represents the
-     user. Incoming means the user represents another person. -->
-@if (delegations().length) {
-  <section class="dash__delegations flex flex-col gap-4 p-5 bg-surface border border-solid border-line rounded-lg shadow-sm" aria-labelledby="dash-deleg-h">
-    <div class="flex items-start justify-between gap-3">
-      <div>
-        <h2 id="dash-deleg-h" class="m-0 text-lg">{{ 'delegation.dash.title' | t }}</h2>
-        <p class="mt-1 text-muted text-sm">{{ 'delegation.dash.subtitle' | t }}</p>
-      </div>
-    </div>
-    <ul class="list-none m-0 p-0 flex flex-col">
-      @for (d of delegations(); track d.id) {
-        <li class="dash__row">
-          <a class="dash__row-link" [routerLink]="['/meetings', d.meetingId]">
-            <span class="dash__row-title">
-              {{ (isOutgoing(d) ? 'delegation.dash.outgoing' : 'delegation.dash.incoming')
-                | t: { name: (isOutgoing(d) ? d.delegateName : d.delegatorName) || '?' } }}
+    @for (c of live(); track c.meeting.id) {
+      <section class="dash__live" [attr.aria-label]="'dashboard.today.liveRegion' | t">
+        <div class="dash__liveHead">
+          <app-date-block [date]="c.meeting.date" [live]="true" />
+          <div class="dash__liveText">
+            <span class="dash__liveTitle">
+              <span class="dash__name" [title]="c.meeting.title">{{ c.meeting.title }}</span>
+              <app-status-text kind="accent">{{ 'meetings.status.live' | t }}</app-status-text>
             </span>
-            <span class="text-muted text-xs">
-              {{ d.meetingTitle }}@if (d.meetingDate) {, {{ d.meetingDate | ldate: 'mediumDate' }}}
+            @if (c.sub) {
+              <span class="dash__sub">{{ c.sub }}</span>
+            }
+          </div>
+        </div>
+        @if (c.now; as now) {
+          <div class="dash__progress">
+            <div class="dash__progressLine">
+              <span class="dash__progressLabel">{{ 'dashboard.sessions.progress' | t: { n: now.position, count: now.count } }}</span>
+              <span class="mono dash__progressCount" aria-hidden="true">{{ now.position }} / {{ now.count }}</span>
+            </div>
+            <app-seg-bar
+              size="thin"
+              [segments]="[{ value: now.position, tone: 'filled' }]"
+              [total]="now.count"
+              [label]="'dashboard.sessions.progress' | t: { n: now.position, count: now.count }"
+            />
+            @if (now.title) {
+              <span class="dash__sub ell" [title]="now.title">{{ now.title }}</span>
+            }
+          </div>
+        }
+        @if (c.vote; as v) {
+          <p class="dash__voteLine">
+            <app-status-text kind="accent">{{ 'meetings.overview.voteOpen' | t }}</app-status-text>
+            @if (v.ballot) {
+              <span class="dash__dot" aria-hidden="true">·</span>
+              <span>{{ (v.ballot === 'cast' ? 'dashboard.today.voted' : 'dashboard.today.voteMissing') | t }}</span>
+            }
+          </p>
+        }
+        <a class="dash__btn dash__btn--fill dash__btn--block" [routerLink]="['/meetings', c.meeting.id]">
+          <app-icon name="play" [size]="14" />
+          {{ 'dashboard.sessions.join' | t }}
+        </a>
+      </section>
+    }
+
+    @if (upcoming().length) {
+      <section class="dash__block" aria-labelledby="dash-upcoming-h">
+        <div class="dash__blockHead">
+          <h3 id="dash-upcoming-h" class="sec">{{ 'dashboard.today.upcoming' | t: { n: plannedCount() } }}</h3>
+          @if (canSeeMeetings()) {
+            <a class="dash__more" routerLink="/meetings">{{ 'dashboard.today.all' | t }}</a>
+          }
+        </div>
+        <div class="rowgroup">
+          @for (u of upcoming(); track u.meeting.id) {
+            <app-list-item [title]="u.meeting.title" [link]="['/meetings', u.meeting.id]" [wrap]="true">
+              <app-date-block lead [date]="u.meeting.date" />
+              <span sub>
+                @if (u.note) {
+                  <span class="dash__note">{{ u.note }}</span>
+                } @else if (u.meeting.gremiumName) {
+                  <span>{{ u.meeting.gremiumName }}</span>
+                }
+                @if ((u.note || u.meeting.gremiumName) && u.when) {
+                  <span class="dash__dot" aria-hidden="true">·</span>
+                }
+                @if (u.when) {
+                  <span class="mono">{{ u.when }}</span>
+                }
+              </span>
+            </app-list-item>
+          }
+        </div>
+      </section>
+    }
+
+    @if (noMeetings()) {
+      <app-empty-state
+        class="dash__emptyBox dash__emptyBox--today"
+        icon="users"
+        [heading]="'dashboard.today.none' | t"
+        [body]="(auth.gremien().length ? 'dashboard.today.noneBody' : 'dashboard.today.noGremiumBody') | t"
+      />
+    }
+
+    @if (budgets().length) {
+      <section class="dash__block" aria-labelledby="dash-finance-h">
+        <div class="dash__blockHead">
+          <h3 id="dash-finance-h" class="sec">{{ 'dashboard.today.finance' | t }}</h3>
+        </div>
+        @for (b of budgets(); track b.id; let first = $first) {
+          <a class="dash__budget" routerLink="/budget" [queryParams]="{ budget: b.id, fy: b.fyId }">
+            <span class="dash__budgetHead">
+              <span class="dash__budgetTitle">{{ b.title }}</span>
+              <span class="mono dash__budgetSum">{{ b.available }}</span>
+            </span>
+            <app-seg-bar
+              size="thin"
+              [segments]="[{ value: b.committed, tone: 'filled' }]"
+              [total]="b.allocated"
+              [label]="'dashboard.today.used' | t: { n: b.used }"
+            />
+            <span class="dash__sub">
+              {{ 'dashboard.today.available' | t }}<span class="dash__dot" aria-hidden="true">·</span>{{ 'dashboard.today.used' | t: { n: b.used } }}
+              @if (first && openInvoices()) {
+                <span class="dash__dot" aria-hidden="true">·</span>{{ (openInvoices() === 1 ? 'dashboard.today.invoicesOne' : 'dashboard.today.invoices') | t: { n: openInvoices() } }}
+              }
             </span>
           </a>
-          <span class="dash__row-meta">
-            @if (d.delegateVoting) {
-              <app-badge variant="info">{{ 'delegation.card.votingBadge' | t }}</app-badge>
-            }
-            <a class="dash__row-cta" [routerLink]="['/meetings', d.meetingId]">{{ 'dashboard.open' | t }} →</a>
-          </span>
-        </li>
-      }
-    </ul>
-  </section>
-}
-
-@if (canReadApplications()) {
-  <div class="dash__panels">
-    <section class="flex flex-col gap-4 p-5 bg-surface border border-solid border-line rounded-lg shadow-sm" aria-labelledby="dash-tasks-h">
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <h2 id="dash-tasks-h" class="m-0 text-lg">{{ 'dashboard.tasks.title' | t }}</h2>
-          <p class="mt-1 text-muted text-sm">{{ 'dashboard.tasks.subtitle' | t }}</p>
-        </div>
-        @if (!loading() && !error() && openTasks().length) {
-          <app-badge variant="warning">{{ openTasks().length }}</app-badge>
         }
-      </div>
-
-      @if (loading()) {
-        <!-- Rows in outline, not a sentence. Each panel is a list, so the placeholder
-             holds the height of one and the card does not resize under the reader when
-             the real rows land. -->
-        <div class="dash__skel" aria-busy="true">
-          <span class="skel skel--line"></span>
-          <span class="skel skel--line"></span>
-          <span class="skel skel--line"></span>
-          <span class="sr-only" role="status">{{ 'dashboard.loading' | t }}</span>
-        </div>
-      } @else if (error()) {
-        <p class="dash__state dash__state--error" role="alert">{{ 'dashboard.error' | t }}</p>
-      } @else if (taskRows().length === 0) {
-        <p class="dash__state">{{ 'dashboard.tasks.empty' | t }}</p>
-      } @else {
-        <ul class="list-none m-0 p-0 flex flex-col">
-          @for (item of taskRows(); track item.id) {
-            <li class="dash__row">
-              <a class="dash__row-link" [routerLink]="['/applications', item.id]">
-                <span class="dash__row-title">{{ titleOf(item) }}</span>
-                @if (item.title?.trim()) {
-                  <span class="text-muted text-xs">{{ name(item) }}</span>
-                }
-              </a>
-              <span class="dash__row-meta">
-                @if (item.state) {
-                  <app-badge [color]="item.state.color">{{ item.state.label }}</app-badge>
-                }
-                <a class="dash__row-cta" [routerLink]="['/applications', item.id]">{{ 'dashboard.open' | t }} →</a>
-              </span>
-            </li>
-          }
-        </ul>
-        <a class="dash__more" routerLink="/applications">{{ 'dashboard.viewAll' | t }} →</a>
-      }
-    </section>
-
-    <section class="flex flex-col gap-4 p-5 bg-surface border border-solid border-line rounded-lg shadow-sm" aria-labelledby="dash-apps-h">
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <h2 id="dash-apps-h" class="m-0 text-lg">{{ 'dashboard.applications.title' | t }}</h2>
-          <p class="mt-1 text-muted text-sm">{{ 'dashboard.applications.subtitle' | t }}</p>
-        </div>
-        @if (!loading() && !error() && total()) {
-          <app-badge variant="primary">{{ total() }}</app-badge>
-        }
-      </div>
-
-      @if (loading()) {
-        <!-- Rows in outline, not a sentence. Each panel is a list, so the placeholder
-             holds the height of one and the card does not resize under the reader when
-             the real rows land. -->
-        <div class="dash__skel" aria-busy="true">
-          <span class="skel skel--line"></span>
-          <span class="skel skel--line"></span>
-          <span class="skel skel--line"></span>
-          <span class="sr-only" role="status">{{ 'dashboard.loading' | t }}</span>
-        </div>
-      } @else if (error()) {
-        <p class="dash__state dash__state--error" role="alert">{{ 'dashboard.error' | t }}</p>
-      } @else if (applicationRows().length === 0) {
-        <div class="flex flex-col gap-2 items-start">
-          <p class="dash__state">{{ 'dashboard.applications.empty' | t }}</p>
-          <a class="dash__empty-cta" routerLink="/apply">{{ 'dashboard.applications.emptyCta' | t }} →</a>
-        </div>
-      } @else {
-        <ul class="list-none m-0 p-0 flex flex-col">
-          @for (item of applicationRows(); track item.id) {
-            <li class="dash__row">
-              <a class="dash__row-link" [routerLink]="['/applications', item.id]">
-                <span class="dash__row-title">{{ titleOf(item) }}</span>
-                @if (item.title?.trim()) {
-                  <span class="text-muted text-xs">{{ name(item) }}</span>
-                }
-              </a>
-              <span class="dash__row-meta">
-                @if (item.state) {
-                  <app-badge [color]="item.state.color">{{ item.state.label }}</app-badge>
-                }
-                @if (created(item); as c) {
-                  <time class="dash__row-date" [attr.datetime]="c">{{ c | ldate: 'mediumDate' }}</time>
-                }
-              </span>
-            </li>
-          }
-        </ul>
-        <a class="dash__more" routerLink="/applications">{{ 'dashboard.viewAll' | t }} →</a>
-      }
-    </section>
+      </section>
+    }
   </div>
+</aside>
+
+<!-- The work list: one table, three tabs. -->
+<section class="dash__work" [attr.aria-label]="'dashboard.work.label' | t">
+  <div class="dash__tabbar">
+    <app-tabs
+      #tabBar
+      class="dash__tabs"
+      idPrefix="dash"
+      [ariaLabel]="'dashboard.work.label' | t"
+      [tabs]="tabs()"
+      [active]="tab()"
+      (activeChange)="setTab($event)"
+    />
+    <!-- Phone: the link goes under the rows, so the three tabs keep the width. -->
+    @if (!phone()) {
+      <ng-container *ngTemplateOutlet="allLinkTpl" />
+    }
+  </div>
+
+  <div
+    class="dash__panel"
+    role="tabpanel"
+    appScrollFade="y"
+    [id]="tabBar.panelId(tab())"
+    [attr.aria-labelledby]="tabBar.tabId(tab())"
+  >
+    <!-- While the tab loads, the table draws its own skeleton rows (a phone: the skeleton). -->
+    @if (tabError()) {
+      <p class="dash__state dash__state--error" role="alert">{{ 'dashboard.error' | t }}</p>
+    } @else if (tabEmpty()) {
+      <div class="dash__emptyGrid" [class.dash__emptyGrid--two]="newUser() && applyTypes().length">
+        @switch (tab()) {
+          @case ('mine') {
+            <app-empty-state class="dash__emptyBox" icon="file" [heading]="'dashboard.empty.mine' | t" [body]="'dashboard.empty.mineBody' | t" />
+          }
+          @case ('votes') {
+            <app-empty-state class="dash__emptyBox" icon="vote" [heading]="'dashboard.empty.votes' | t" [body]="'dashboard.empty.votesBody' | t" />
+          }
+          @default {
+            <app-empty-state class="dash__emptyBox" icon="check" [heading]="'dashboard.empty.tasks' | t" [body]="'dashboard.empty.tasksBody' | t" />
+          }
+        }
+        @if (newUser() && applyTypes().length) {
+          <section class="dash__apply" aria-labelledby="dash-apply-h">
+            <h3 id="dash-apply-h" class="dash__applyH">{{ 'dashboard.apply.title' | t }}</h3>
+            <div class="rowgroup">
+              @for (type of applyTypes(); track type.id) {
+                <app-list-item [title]="type.name" link="/apply" [linkQueryParams]="{ type: type.id }">
+                  <span lead class="dash__typeIcon"><app-icon name="fileplus" [size]="20" /></span>
+                  <app-icon trail class="dash__chev" name="right" [size]="17" />
+                </app-list-item>
+              }
+            </div>
+          </section>
+        }
+      </div>
+    } @else if (phone() && tabLoading()) {
+      <app-skeleton variant="rows" [count]="4" [label]="'dashboard.loading' | t" />
+    } @else if (phone()) {
+      <div class="rowgroup">
+        @if (tab() === 'votes') {
+          @for (r of voteRows(); track r.id) {
+            <app-list-item [title]="r.title" [link]="r.link" [wrap]="true">
+              <span sub>
+                <app-status-text [kind]="r.statusKind">{{ r.statusKey | t }}</app-status-text>
+                @if (r.ballot) {
+                  <span class="dash__dot" aria-hidden="true">·</span>
+                  <span>{{ (r.ballot === 'cast' ? 'voting.list.ballot.cast' : 'voting.list.ballot.pending') | t }}</span>
+                }
+              </span>
+              <app-icon trail class="dash__chev" name="right" [size]="17" />
+            </app-list-item>
+          }
+        } @else {
+          @for (r of tab() === 'mine' ? mineRows() : taskRows(); track r.id) {
+            <app-list-item [title]="r.title" [link]="r.link" [wrap]="true">
+              <span sub>
+                @if (r.statusLabel) {
+                  <app-status-text [kind]="r.statusKind">{{ r.statusLabel }}</app-status-text>
+                }
+                @if (r.statusLabel && r.amount) {
+                  <span class="dash__dot" aria-hidden="true">·</span>
+                }
+                @if (r.amount) {
+                  <span class="mono">{{ r.amount }}</span>
+                }
+              </span>
+              <span trail class="dash__date num" [attr.title]="r.sinceTitle">{{ r.since }}</span>
+            </app-list-item>
+          }
+        }
+      </div>
+    } @else if (tab() === 'votes') {
+      <app-data-table
+        surface="rowgroup"
+        [columns]="voteColumns()"
+        [rows]="voteRows()"
+        [loading]="tabLoading()"
+        [skeletonRowCount]="4"
+        [loadingText]="'dashboard.loading' | t"
+        [rowKey]="rowKey"
+        [clickable]="true"
+        (rowClick)="openRow($event)"
+      >
+        <ng-template appCell="title" let-r><span class="dash__cellTitle" [title]="$any(r).title">{{ $any(r).title }}</span></ng-template>
+        <ng-template appCell="where" let-r><span class="dash__muted">{{ $any(r).where ?? '—' }}</span></ng-template>
+        <ng-template appCell="status" let-r><app-status-text [kind]="$any(r).statusKind">{{ $any(r).statusKey | t }}</app-status-text></ng-template>
+        <ng-template appCell="ballot" let-r>
+          @switch ($any(r).ballot) {
+            @case ('cast') {
+              <span class="dash__ballot"><app-icon name="check" [size]="14" />{{ 'voting.list.ballot.cast' | t }}</span>
+            }
+            @case ('pending') {
+              <span class="dash__ballot dash__ballot--pending">{{ 'voting.list.ballot.pending' | t }}</span>
+            }
+            @default {
+              <span class="dash__muted">—</span>
+            }
+          }
+        </ng-template>
+        <ng-template appCell="go"><app-icon class="dash__chev" name="right" [size]="17" /></ng-template>
+      </app-data-table>
+    } @else {
+      <app-data-table
+        surface="rowgroup"
+        [columns]="workColumns()"
+        [rows]="tab() === 'mine' ? mineRows() : taskRows()"
+        [loading]="tabLoading()"
+        [skeletonRowCount]="4"
+        [loadingText]="'dashboard.loading' | t"
+        [rowKey]="rowKey"
+        [clickable]="true"
+        (rowClick)="openRow($event)"
+      >
+        <ng-template appCell="title" let-r><span class="dash__cellTitle" [title]="$any(r).title">{{ $any(r).title }}</span></ng-template>
+        <ng-template appCell="type" let-r><span class="dash__muted">{{ $any(r).type || '—' }}</span></ng-template>
+        <ng-template appCell="status" let-r><app-status-text [kind]="$any(r).statusKind">{{ $any(r).statusLabel }}</app-status-text></ng-template>
+        <ng-template appCell="since" let-r><span class="dash__muted num" [attr.title]="$any(r).sinceTitle">{{ $any(r).since }}</span></ng-template>
+        <ng-template appCell="amount" let-r><span class="mono dash__amount">{{ $any(r).amount ?? '—' }}</span></ng-template>
+        <ng-template appCell="go"><app-icon class="dash__chev" name="right" [size]="17" /></ng-template>
+      </app-data-table>
+    }
+  </div>
+  @if (phone()) {
+    <ng-container *ngTemplateOutlet="allLinkTpl" />
+  }
+</section>
+
+<ng-template #allLinkTpl>
+  @if (allLink(); as all) {
+    @if (!tabEmpty() && !tabLoading() && !tabError()) {
+      <a class="dash__more dash__all" [routerLink]="all.link" [queryParams]="all.query">{{ all.key | t }}</a>
+    }
+  }
+</ng-template>
+
+@if (phone()) {
+  <a class="dash__fab" routerLink="/apply">
+    <app-icon name="plus" [size]="22" />
+    {{ 'dashboard.apply.short' | t }}
+  </a>
+
+  <app-side-sheet side="bottom" [heading]="'shell.account.region' | t" [(open)]="accountOpen">
+    <app-account-menu variant="sheet" (navigated)="closeAccount()" />
+  </app-side-sheet>
 }

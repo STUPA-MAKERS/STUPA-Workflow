@@ -6,7 +6,7 @@ import { BudgetTreeApi, type Expense } from '../budget/budget-tree.api';
 import type { ExpensesListState } from './expenses-list.state';
 
 /**
- * Sub-bookings: expanded parents, the child cache and the manual create dialog.
+ * Sub-bookings: the child cache of the open booking and the manual create dialog.
  * The server keeps the amount of a parent equal to the sum of its children, so
  * the list reloads after every change to a child.
  */
@@ -15,7 +15,6 @@ export class ExpenseSubBookingsState {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
-  readonly expandedSub = signal<ReadonlySet<string>>(new Set());
   readonly subRows = signal<ReadonlyMap<string, Expense[]>>(new Map());
   readonly loadingSub = signal<ReadonlySet<string>>(new Set());
   readonly subParent = signal<Expense | null>(null);
@@ -26,28 +25,12 @@ export class ExpenseSubBookingsState {
 
   constructor(private readonly list: ExpensesListState) {}
 
-  isSubExpanded(id: string): boolean {
-    return this.expandedSub().has(id);
-  }
-
   subOf(id: string): Expense[] {
     return this.subRows().get(id) ?? [];
   }
 
   isLoadingSub(id: string): boolean {
     return this.loadingSub().has(id);
-  }
-
-  toggleSub(e: Expense): void {
-    const open = new Set(this.expandedSub());
-    if (open.has(e.id)) {
-      open.delete(e.id);
-      this.expandedSub.set(open);
-      return;
-    }
-    open.add(e.id);
-    this.expandedSub.set(open);
-    if (!this.subRows().has(e.id)) this.loadSub(e.id);
   }
 
   loadSub(id: string): void {
@@ -104,7 +87,6 @@ export class ExpenseSubBookingsState {
         next: () => {
           this.list.saving.set(false);
           this.closeCreateSub();
-          this.expandedSub.update((s) => new Set(s).add(parent.id));
           this.loadSub(parent.id);
           this.toast.success(this.i18n.translate('expenses.sub.added'));
           this.list.refresh();

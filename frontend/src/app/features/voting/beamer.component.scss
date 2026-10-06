@@ -1,54 +1,47 @@
-// Beamer/projector: maximum contrast through the semantic tokens (Text 900 on
-// Bg 50 in light, Text 50 on Bg 950 in dark) plus large type. This keeps the
-// screen readable at a distance.
+/* The route has no chrome (route data `chrome: false`): the page is the screen. */
 :host {
-  display: block;
-  min-height: calc(100vh - var(--layout-header-height));
-}
-
-.beamer {
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
-  max-width: 64rem;
-  margin: 0 auto;
-  padding: var(--space-6) var(--space-4);
+  min-height: 100dvh;
+  background: var(--color-bg);
 }
 
-.beamer__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-  border-bottom: 3px solid var(--color-border-strong);
-  padding-bottom: var(--space-4);
-}
+/* Hidden on the projector. A pointer movement (`--shown`), a hover or the keyboard
+   shows it in the top start corner; it fades out again when the pointer rests. */
+.beamer__exit {
+  position: fixed;
+  inset-block-start: var(--space-3);
+  inset-inline-start: var(--space-3);
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+  padding: 0 var(--space-4) 0 var(--space-3);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+  box-shadow: var(--shadow-elevated);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-base) var(--ease-standard);
 
-.beamer__title {
-  margin: 0;
-  font-size: var(--fs-3xl);
-  font-weight: var(--fw-bold);
-  letter-spacing: var(--tracking-tight);
-}
+  &--shown,
+  &:hover,
+  &:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
 
-.beamer__phase--done {
-  color: var(--color-accent);
-}
+  &:hover {
+    background: var(--color-surface-4);
+  }
 
-.beamer__count {
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-}
-
-.beamer__quorum--met {
-  color: var(--color-success);
-}
-
-.beamer__quorum--missed {
-  color: var(--color-danger);
-}
-
-.beamer__result--passed {
-  color: var(--color-success);
+  &:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+  }
 }

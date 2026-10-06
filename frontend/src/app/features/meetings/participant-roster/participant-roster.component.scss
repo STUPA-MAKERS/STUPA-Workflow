@@ -1,0 +1,46 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.pr {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pr__cap {
+  margin: 0;
+}
+.pr__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pr__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: var(--space-2) 14px;
+}
+.pr__row app-avatar {
+  flex: none;
+}
+.pr__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.pr__sub {
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+}
+.pr__muted {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+.pr__state {
+  flex: none;
+}

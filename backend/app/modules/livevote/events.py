@@ -22,6 +22,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.modules.livevote.schemas import GuestsMode, MeetingGuestOut
+
 if TYPE_CHECKING:
     from app.modules.voting.schemas import VoteOut
 
@@ -77,6 +79,10 @@ class VoteOpenedEvent(_CamelModel):
     closes_at: datetime | None = Field(default=None, alias="closesAt")
     # A secret vote hides the live bars in the frontend (showBars = !secret || isClosed).
     secret: bool = False
+    # True when the server sends the frame as part of the state on a connect or on a
+    # `subscribe`, and not because the vote opened now. A client then knows that the
+    # vote did not open while it watched.
+    replay: bool = False
 
 
 class VoteTallyEvent(_CamelModel):
@@ -102,6 +108,11 @@ class VoteTallyEvent(_CamelModel):
     leading: str | None = None
     # A secret vote hides the live bars in the frontend (showBars = !secret || isClosed).
     secret: bool = False
+    # #17: counts of the attendance, never names. ``guestsVote`` marks a vote with
+    # guests (no quorum).
+    present_members: int | None = Field(default=None, alias="presentMembers")
+    present_guests: int | None = Field(default=None, alias="presentGuests")
+    guests_vote: bool = Field(default=False, alias="guestsVote")
 
     @classmethod
     def from_vote(cls, vote: VoteOut) -> VoteTallyEvent:
@@ -122,6 +133,9 @@ class VoteTallyEvent(_CamelModel):
             quorumMet=vote.tally.quorum_met,
             leading=vote.tally.leading if revealed else None,
             secret=vote.secret,
+            presentMembers=vote.tally.present_members,
+            presentGuests=vote.tally.present_guests,
+            guestsVote=vote.guests_vote,
         )
 
 
@@ -144,6 +158,53 @@ class VoteCancelledEvent(_CamelModel):
 
     type: Literal["vote_cancelled"] = "vote_cancelled"
     vote_id: UUID = Field(alias="voteId")
+
+
+GuestEventReason = Literal["public_off", "rotated", "meeting_closed"]
+
+
+class GuestRequestedEvent(_CamelModel):
+    """A guest asks to join (#17). Only a connection of the meeting lead gets it."""
+
+    type: Literal["guest_requested"] = "guest_requested"
+    guest: MeetingGuestOut
+
+
+class GuestUpdatedEvent(_CamelModel):
+    """A guest changed (#17). Only a connection of the meeting lead gets it.
+
+    ``guest.status == "expired"`` means the row is gone: a voided request. ``reason``
+    tells why a change happened without a decision of the lead.
+    """
+
+    type: Literal["guest_updated"] = "guest_updated"
+    guest: MeetingGuestOut
+    reason: GuestEventReason | None = None
+
+
+class GuestCountsEvent(_CamelModel):
+    """Public participation and the guest counts (#17), never names.
+
+    The member connections without ``canManage`` get ``joinCode`` as None and
+    ``pendingGuests`` as 0. A guest connection gets ``admittedGuests`` only.
+    """
+
+    type: Literal["guest_counts"] = "guest_counts"
+    public_join: bool = Field(alias="publicJoin")
+    guests_mode: GuestsMode = Field(alias="guestsMode")
+    join_code: str | None = Field(default=None, alias="joinCode")
+    admitted_guests: int = Field(alias="admittedGuests")
+    pending_guests: int = Field(default=0, alias="pendingGuests")
+
+
+class GuestStatusEvent(_CamelModel):
+    """The own state of a guest on the guest channel (#17)."""
+
+    type: Literal["guest_status"] = "guest_status"
+    status: Literal["pending", "admitted", "rejected", "removed", "left", "expired"]
+    display_name: str | None = Field(default=None, alias="displayName")
+    number: int
+    reason: GuestEventReason | None = None
 
 
 class ErrorEvent(_CamelModel):

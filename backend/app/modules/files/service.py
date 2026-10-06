@@ -23,20 +23,22 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.exc import StaleDataError
 
 from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.files.mime import MimeRejected, sanitize_filename, validate_upload
-from app.modules.files.models import MAX_ATTACHMENT_BYTES, Attachment
+from app.modules.files.models import BOUND, MAX_ATTACHMENT_BYTES, Attachment
 from app.modules.files.queue import ScanQueue
 from app.modules.files.scanner import ScanVerdict
 from app.modules.files.schemas import AttachmentOut, SignedUrlOut
 from app.modules.files.storage import ObjectStorage, StorageError
+from app.modules.flow.models import State
 from app.settings import Settings, get_settings
 from app.shared.errors import (
     ConflictError,
@@ -77,6 +79,47 @@ class FilesService:
     def max_bytes(self) -> int:
         return min(self.settings.attachment_max_bytes, MAX_ATTACHMENT_BYTES)
 
+    def validate(self, filename: str | None, data: bytes) -> tuple[str, str]:
+        """Check the size, the content and the storage of an upload.
+
+        The application upload and the draft upload share this check.
+
+        Returns:
+            The sniffed MIME type and the sanitized file name.
+
+        Raises:
+            PayloadTooLargeError: The file is larger than ``max_bytes`` (HTTP 413).
+            UnsupportedMediaTypeError: The file is empty, or its content does not match
+                the allowlist or the extension (HTTP 415).
+            ServiceUnavailableError: Object storage is off (HTTP 503).
+        """
+        if len(data) > self.max_bytes:
+            raise PayloadTooLargeError(
+                f"Attachment exceeds {self.max_bytes} bytes."
+            )
+        if not data:
+            raise UnsupportedMediaTypeError("Empty file.")
+        try:
+            mime = validate_upload(filename, data)
+        except MimeRejected as exc:
+            raise UnsupportedMediaTypeError(str(exc)) from exc
+        if self.storage is None:
+            raise ServiceUnavailableError("Object storage unavailable.")
+        return mime, sanitize_filename(filename)
+
+    async def put_object(self, storage_key: str, data: bytes, mime: str) -> None:
+        """Write the object to storage.
+
+        Raises:
+            ServiceUnavailableError: Storage is off or the write failed (HTTP 503).
+        """
+        if self.storage is None:
+            raise ServiceUnavailableError("Object storage unavailable.")
+        try:
+            await self.storage.put(storage_key, data, mime)
+        except StorageError as exc:
+            raise ServiceUnavailableError("Object storage write failed.") from exc
+
     async def upload(
         self,
         application_id: uuid.UUID,
@@ -87,7 +130,12 @@ class FilesService:
         field_key: str | None = None,
         is_comparison_offer: bool = False,
     ) -> AttachmentOut:
-        """Validate the file, store in MinIO, create the row, enqueue the scan."""
+        """Validate the file, store in MinIO, create the row, enqueue the scan.
+
+        The upload writes an ``attachment_upload`` audit entry in the same transaction
+        (F12). It holds the application, the field key, the MIME type and the size,
+        never the file name, because a file name can hold PII.
+        """
         if len(data) > self.max_bytes:
             raise PayloadTooLargeError(
                 f"Attachment exceeds {self.max_bytes} bytes."
@@ -104,22 +152,13 @@ class FilesService:
         # invoice or a receipt after the decision. The PATCH lock still protects the form
         # data. The RBAC and applicant check in the router still guards access.
 
-        try:
-            mime = validate_upload(filename, data)
-        except MimeRejected as exc:
-            raise UnsupportedMediaTypeError(str(exc)) from exc
-
-        if self.storage is None:
-            raise ServiceUnavailableError("Object storage unavailable.")
-
-        safe_name = sanitize_filename(filename)
+        mime, safe_name = self.validate(filename, data)
         storage_key = f"{application_id}/{uuid.uuid4().hex}/{safe_name}"
-        try:
-            await self.storage.put(storage_key, data, mime)
-        except StorageError as exc:
-            raise ServiceUnavailableError("Object storage write failed.") from exc
+        await self.put_object(storage_key, data, mime)
 
         attachment = Attachment(
+            # A client-side id: the audit entry below needs it before the commit.
+            id=uuid.uuid4(),
             application_id=application_id,
             field_key=field_key,
             filename=safe_name,
@@ -131,10 +170,22 @@ class FilesService:
             is_comparison_offer=is_comparison_offer,
         )
         self.session.add(attachment)
+        await audit_record(
+            self.session,
+            actor=by,
+            action=AuditAction.ATTACHMENT_UPLOAD,
+            target_type="attachment",
+            target_id=str(attachment.id),
+            data=upload_audit_data(attachment),
+        )
         await self.session.commit()
 
         await self._enqueue_scan(attachment.id, actor=by)
         return _attachment_out(attachment)
+
+    async def enqueue_scan(self, attachment_id: uuid.UUID, *, actor: str) -> None:
+        """Enqueue the scan job of an attachment (best effort, see ``_enqueue_scan``)."""
+        await self._enqueue_scan(attachment_id, actor=actor)
 
     async def _enqueue_scan(self, attachment_id: uuid.UUID, *, actor: str) -> None:
         """Enqueue the scan job as best effort.
@@ -178,7 +229,11 @@ class FilesService:
             raise NotFoundError(f"application {application_id} not found")
 
     async def list_for_application(
-        self, application_id: uuid.UUID, *, allow_unconfirmed: bool = True
+        self,
+        application_id: uuid.UUID,
+        *,
+        allow_unconfirmed: bool = True,
+        hidden: Callable[[Attachment], bool] | None = None,
     ) -> list[AttachmentOut]:
         """Return all attachments of an application, oldest first.
 
@@ -187,6 +242,9 @@ class FilesService:
         A read by a principal or a member of the Gremium passes
         ``allow_unconfirmed=False``. The method then hides the attachments of an
         unconfirmed guest submission with a 404. This mirrors the list semantics.
+
+        ``hidden`` removes each attachment for which it returns true. The router
+        uses it for the attachments of the ``isPII`` fields (O21).
         """
         await self._assert_app_visible(
             application_id, allow_unconfirmed=allow_unconfirmed
@@ -194,15 +252,24 @@ class FilesService:
         rows = (
             await self.session.scalars(
                 select(Attachment)
-                .where(Attachment.application_id == application_id)
+                .where(BOUND, Attachment.application_id == application_id)
                 .order_by(Attachment.created_at)
             )
         ).all()
-        return [_attachment_out(a) for a in rows]
+        return [_attachment_out(a) for a in rows if hidden is None or not hidden(a)]
 
     async def get_attachment(self, attachment_id: uuid.UUID) -> Attachment:
+        """Load a bound attachment for an application path.
+
+        A draft (Z4) has no application and gives 404 here, so no application route
+        reads, streams or deletes it. ``application_id_of`` narrows the type of the
+        result.
+
+        Raises:
+            NotFoundError: No bound attachment has this id (HTTP 404).
+        """
         attachment = await self.session.get(Attachment, attachment_id)
-        if attachment is None:
+        if attachment is None or attachment.application_id is None:
             raise NotFoundError(f"attachment {attachment_id} not found")
         return attachment
 
@@ -249,7 +316,7 @@ class FilesService:
         """
         attachment = await self.get_attachment(attachment_id)
         await self._assert_app_visible(
-            attachment.application_id, allow_unconfirmed=allow_unconfirmed
+            application_id_of(attachment), allow_unconfirmed=allow_unconfirmed
         )
         await self._ready_attachment(attachment_id)
         return SignedUrlOut(
@@ -275,7 +342,7 @@ class FilesService:
         """
         loaded = await self.get_attachment(attachment_id)
         await self._assert_app_visible(
-            loaded.application_id, allow_unconfirmed=allow_unconfirmed
+            application_id_of(loaded), allow_unconfirmed=allow_unconfirmed
         )
         attachment = await self._ready_attachment(attachment_id)
         # _ready_attachment guarantees both values, else it raises 410 or 503. The
@@ -307,7 +374,7 @@ class FilesService:
         """
         loaded = await self.get_attachment(attachment_id)
         await self._assert_app_visible(
-            loaded.application_id, allow_unconfirmed=allow_unconfirmed
+            application_id_of(loaded), allow_unconfirmed=allow_unconfirmed
         )
         attachment = await self._ready_attachment(attachment_id)
         # _ready_attachment guarantees both values, else it raises 410 or 503. The
@@ -320,11 +387,30 @@ class FilesService:
             raise ServiceUnavailableError("Attachment temporarily unavailable.") from exc
         return stream, attachment.filename, attachment.mime, attachment.size
 
+    async def assert_editable(self, application_id: uuid.UUID) -> None:
+        """Make sure that the current state of the application allows data edits.
+
+        The router calls this before an applicant or a creator deletes an attachment.
+        A delete is a data change, like a PATCH. An upload is not, so the upload route
+        does not call it (Z1, O4). An application without a state passes.
+
+        Raises:
+            ConflictError: The current state has ``edit_allowed = false`` (HTTP 409).
+        """
+        edit_allowed = await self.session.scalar(
+            select(State.edit_allowed)
+            .join(Application, Application.current_state_id == State.id)
+            .where(Application.id == application_id)
+        )
+        if edit_allowed is False:
+            raise ConflictError("Application is locked for editing in its current state.")
+
     async def delete(self, attachment_id: uuid.UUID, *, actor: str) -> None:
         """Delete an attachment: the database row, the storage object and an audit entry.
 
-        A missing attachment gives 404. The router checks access (A/P, edit scope). The
-        method removes the storage object as best effort. If the object is already gone,
+        A missing attachment gives 404. The router checks access (A/P, edit scope) and,
+        for an applicant or a creator, the state lock (``assert_editable``). The method
+        removes the storage object as best effort. If the object is already gone,
         the deletion still stands.
         """
         attachment = await self.get_attachment(attachment_id)
@@ -360,7 +446,9 @@ class FilesService:
         """
         rows = (
             await self.session.scalars(
-                select(Attachment).where(Attachment.application_id == application_id)
+                select(Attachment).where(
+                    BOUND, Attachment.application_id == application_id
+                )
             )
         ).all()
         for attachment in rows:
@@ -390,27 +478,45 @@ class FilesService:
         verdict: ScanVerdict,
         *,
         actor: str = "system",
-    ) -> None:
+    ) -> bool:
         """Persist the scan result.
 
         On a finding the method deletes the object and writes an audit entry
-        (quarantine).
+        (quarantine). The entry names the application of a bound file. For a draft
+        (Z4) it carries ``draft: true`` instead.
+
+        The method loads the row again by id. A row that a delete, a draft purge or
+        an anonymization removed during the scan is no error: the method skips it and
+        returns False.
+
+        Returns:
+            True when the result was stored, False when the row is gone.
         """
-        attachment = await self.session.get(Attachment, attachment_id)
+        attachment = await self.session.get(
+            Attachment, attachment_id, populate_existing=True
+        )
         if attachment is None:
             logger.info("scan result for unknown attachment %s — skipped", attachment_id)
-            return
+            return False
 
         attachment.scanned = True
         if verdict.clean:
             attachment.scan_result = SCAN_RESULT_CLEAN
-            await self.session.commit()
-            return
+            return await self._commit_scan(attachment_id)
 
         signature = verdict.signature or "unknown"
         attachment.scan_result = signature
         storage_key = attachment.storage_key
         attachment.storage_key = None
+        owner: dict[str, object] = (
+            {"application_id": str(attachment.application_id)}
+            if attachment.application_id is not None
+            else {"draft": True}
+        )
+        if not await self._commit_scan(
+            attachment_id, actor=actor, quarantine={**owner, "signature": signature}
+        ):
+            return False
         if self.storage is not None and storage_key is not None:
             try:
                 await self.storage.remove(storage_key)
@@ -418,18 +524,77 @@ class FilesService:
                 # The object may already be gone. The quarantine still stands, because
                 # storage_key is NULL now.
                 logger.warning("could not remove infected object for %s", attachment_id)
-        await audit_record(
-            self.session,
-            actor=actor,
-            action=AuditAction.ATTACHMENT_QUARANTINE,
-            target_type="attachment",
-            target_id=str(attachment_id),
-            data={
-                "application_id": str(attachment.application_id),
-                "signature": signature,
-            },
-        )
-        await self.session.commit()
+        return True
+
+    async def _commit_scan(
+        self,
+        attachment_id: uuid.UUID,
+        *,
+        actor: str = "system",
+        quarantine: dict[str, object] | None = None,
+    ) -> bool:
+        """Commit the scan result, and tolerate a row that is gone since the load.
+
+        With ``quarantine`` the method first writes the quarantine audit entry with
+        this data. The audit write flushes the attachment UPDATE, so the same guard
+        covers it: a row that a parallel delete, purge or anonymization removed gives
+        False there too, and the rollback also drops the audit entry.
+
+        Returns:
+            True after the commit, False when the UPDATE found no row.
+        """
+        try:
+            if quarantine is not None:
+                await audit_record(
+                    self.session,
+                    actor=actor,
+                    action=AuditAction.ATTACHMENT_QUARANTINE,
+                    target_type="attachment",
+                    target_id=str(attachment_id),
+                    data=quarantine,
+                )
+            await self.session.commit()
+        except StaleDataError:
+            await self.session.rollback()
+            logger.info("attachment %s removed during the scan — skipped", attachment_id)
+            return False
+        return True
+
+
+def application_id_of(attachment: Attachment) -> uuid.UUID:
+    """Return the application of a bound attachment.
+
+    ``get_attachment`` loads bound rows only. This helper narrows the type for the
+    callers and fails closed with 404 if a draft ever reaches an application path.
+
+    Raises:
+        NotFoundError: The attachment is a draft (HTTP 404).
+    """
+    if attachment.application_id is None:
+        raise NotFoundError(f"attachment {attachment.id} not found")
+    return attachment.application_id
+
+
+def upload_audit_data(attachment: Attachment) -> dict[str, object]:
+    """Build the ``attachment_upload`` audit data.
+
+    The audit chain is append-only, and anonymization cannot remove a row from it.
+    Thus the data holds no client text: not the file name (PII) and not the raw
+    ``field_key``. The caller sends ``field_key`` as free text, so the data records
+    only whether the upload has one (``hasFieldKey``).
+    """
+    owner: dict[str, object] = (
+        {"application_id": str(attachment.application_id)}
+        if attachment.application_id is not None
+        else {"draft": True}
+    )
+    return {
+        **owner,
+        "hasFieldKey": attachment.field_key is not None,
+        "isComparisonOffer": attachment.is_comparison_offer,
+        "mime": attachment.mime,
+        "size": attachment.size,
+    }
 
 
 def _attachment_out(attachment: Attachment) -> AttachmentOut:

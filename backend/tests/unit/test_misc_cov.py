@@ -935,7 +935,15 @@ class _CreateServiceFake:
     def __init__(self) -> None:
         self.created = False
 
-    async def create(self, payload: Any, *, actor: str = "applicant") -> Any:
+    async def create(
+        self,
+        payload: Any,
+        *,
+        actor: str = "applicant",
+        dispatcher: Any = None,
+        email_confirmed: bool | None = None,
+        draft_pepper: str | None = None,
+    ) -> Any:
         self.created = True
         return SimpleNamespace(id=uuid4()), str(payload.applicant_email)
 

@@ -6,19 +6,23 @@ import asyncio
 import logging
 import uuid
 from decimal import Decimal
+from typing import cast
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import ColumnElement, case, exists, func, not_, select
 
 from app.modules.audit.actions import AuditAction
 from app.modules.budget.invoice_import import parse_zugferd_pdf
 from app.modules.budget.tree.service_base import BudgetTreeServiceBase
-from app.modules.budget.tree_models import Invoice
+from app.modules.budget.tree_models import Budget, BudgetExpense, Invoice
 from app.modules.budget.tree_schemas import (
+    InvoiceBookingOut,
     InvoiceCreate,
     InvoiceFileResult,
     InvoiceOut,
+    InvoicePage,
     InvoiceParseResult,
+    InvoiceSegmentCounts,
     InvoiceUpdate,
 )
 from app.modules.files.mime import MimeRejected, sanitize_filename, validate_upload
@@ -32,7 +36,6 @@ from app.shared.errors import (
     UnsupportedMediaTypeError,
     ValidationProblem,
 )
-from app.shared.paging import Page
 
 logger = logging.getLogger("app.budget")
 
@@ -49,10 +52,17 @@ def _validate_invoice_file_token(token: str) -> str:
 
 
 class InvoiceOps(BudgetTreeServiceBase):
-    """Invoice CRUD plus ZUGFeRD parse/import and file streaming."""
+    """Invoice CRUD plus ZUGFeRD parse/import and file streaming.
+
+    The read paths take ``visible_gremium_ids``. ``None`` means the full budget view
+    and shows every linked booking. A set limits ``linkedBookings`` to the cost
+    centres that `visible_budget_ids` opens for those Gremien (A6).
+    """
 
     @staticmethod
-    def _invoice_out(inv: Invoice) -> InvoiceOut:
+    def _invoice_out(
+        inv: Invoice, linked: list[InvoiceBookingOut] | None = None
+    ) -> InvoiceOut:
         return InvoiceOut(
             id=inv.id,
             number=inv.number,
@@ -69,7 +79,82 @@ class InvoiceOps(BudgetTreeServiceBase):
             hasFile=inv.file_object_key is not None,
             actor=inv.actor,
             createdAt=inv.created_at,
+            linkedBookings=linked or [],
         )
+
+    async def _visible_ids(self, visible_gremium_ids: set[UUID] | None) -> set[UUID] | None:
+        """Return the cost centres a gremium-scoped reader sees, or None for the full view."""
+        if visible_gremium_ids is None:
+            return None
+        return await self.visible_budget_ids(visible_gremium_ids)
+
+    async def _linked_bookings(
+        self, invoice_ids: list[UUID], visible: set[UUID] | None
+    ) -> dict[UUID, list[InvoiceBookingOut]]:
+        """Load the bookings that reference the invoices, in one query.
+
+        Sub-bookings count as well, because a sub-booking can carry its own receipt.
+        The bookings come in booking order. ``visible`` holds the cost centres of a
+        gremium-scoped reader (see `_visible_ids`); None is the full view.
+
+        Returns:
+            The bookings per invoice id. An invoice without a visible booking is
+            absent from the map.
+        """
+        if not invoice_ids:
+            return {}
+        stmt = (
+            select(BudgetExpense, Budget.path_key, Budget.name)
+            .join(Budget, Budget.id == BudgetExpense.budget_id)
+            .where(BudgetExpense.invoice_id.in_(invoice_ids))
+        )
+        if visible is not None:
+            if not visible:
+                return {}
+            stmt = stmt.where(BudgetExpense.budget_id.in_(visible))
+        rows = (
+            await self.session.execute(
+                stmt.order_by(BudgetExpense.created_at, BudgetExpense.id)
+            )
+        ).all()
+        linked: dict[UUID, list[InvoiceBookingOut]] = {}
+        for booking, path_key, budget_name in rows:
+            # The WHERE clause excludes a booking without an invoice.
+            linked.setdefault(cast("UUID", booking.invoice_id), []).append(
+                InvoiceBookingOut(
+                    id=booking.id,
+                    budgetId=booking.budget_id,
+                    pathKey=path_key,
+                    budgetName=budget_name,
+                    fiscalYearId=booking.fiscal_year_id,
+                    kind=booking.kind,  # type: ignore[arg-type]
+                    amount=booking.amount,
+                    description=booking.description,
+                    paymentDate=booking.payment_date,
+                    parentExpenseId=booking.parent_expense_id,
+                    createdAt=booking.created_at,
+                )
+            )
+        return linked
+
+    async def _invoice_with_bookings(
+        self, inv: Invoice, visible_gremium_ids: set[UUID] | None
+    ) -> InvoiceOut:
+        visible = await self._visible_ids(visible_gremium_ids)
+        linked = await self._linked_bookings([inv.id], visible)
+        return self._invoice_out(inv, linked.get(inv.id))
+
+    @staticmethod
+    def _booked_clause(visible: set[UUID] | None) -> ColumnElement[bool]:
+        """Return the condition "the invoice has a booking that the reader can see".
+
+        A booking on a cost centre outside the scope of a gremium-scoped reader does not
+        count, so that the segment of an invoice matches the ``linkedBookings`` it shows.
+        """
+        conditions: list[ColumnElement[bool]] = [BudgetExpense.invoice_id == Invoice.id]
+        if visible is not None:
+            conditions.append(BudgetExpense.budget_id.in_(visible))
+        return exists().where(*conditions)
 
     async def list_invoices(self) -> list[InvoiceOut]:
         """List all invoices, newest issue date first.
@@ -85,15 +170,17 @@ class InvoiceOps(BudgetTreeServiceBase):
         invoice_id: UUID | None = None,
         q: str | None = None,
         status: str | None = None,
+        booked: bool | None = None,
         gross_min: Decimal | None = None,
         gross_max: Decimal | None = None,
         issue_from: str | None = None,
         issue_to: str | None = None,
         due_from: str | None = None,
         due_to: str | None = None,
+        visible_gremium_ids: set[UUID] | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> Page[InvoiceOut]:
+    ) -> InvoicePage:
         """List invoices with filters, fuzzy search and offset pagination.
 
         This mirrors `expenses.ExpenseOps.list_expenses_paged`. The search and
@@ -101,6 +188,14 @@ class InvoiceOps(BudgetTreeServiceBase):
         the count query and into the row query, so the total and the hits do not
         drift on infinite scroll. With `q` the trigram rank orders the hits by
         relevance before the usual "newest issue date first".
+
+        ``visible_gremium_ids`` filters only ``linkedBookings``, not the invoices.
+        An invoice is not bound to a cost centre.
+
+        ``booked`` keeps the invoices with (``True``) or without (``False``) a booking
+        that the reader can see. Together with ``status`` it gives the segments of the
+        list: "Eingang" is ``open`` without a booking, "Verbucht" is ``open`` with one.
+        ``counts`` holds the size of each segment under the other filters.
         """
         filters = []
         # The exact invoice for a deep link, such as a global-search hit. It stands
@@ -118,8 +213,6 @@ class InvoiceOps(BudgetTreeServiceBase):
                 dialect=dialect_of(self.session),
             )
             filters.append(where)
-        if status is not None:
-            filters.append(Invoice.status == status)
         if gross_min is not None:
             filters.append(Invoice.gross_amount >= gross_min)
         if gross_max is not None:
@@ -137,6 +230,16 @@ class InvoiceOps(BudgetTreeServiceBase):
         if due_to:
             filters.append(Invoice.due_date <= func.date(due_to))
 
+        visible = await self._visible_ids(visible_gremium_ids)
+        booked_clause = self._booked_clause(visible)
+        counts = await self._segment_counts(filters, booked_clause)
+        # The segment filters come after the counts: a count covers its own segment
+        # under every other filter.
+        if status is not None:
+            filters.append(Invoice.status == status)
+        if booked is not None:
+            filters.append(booked_clause if booked else not_(booked_clause))
+
         total = await self.session.scalar(
             select(func.count()).select_from(Invoice).where(*filters)
         )
@@ -147,18 +250,47 @@ class InvoiceOps(BudgetTreeServiceBase):
                 select(Invoice).where(*filters).order_by(*order_by).limit(limit).offset(offset)
             )
         ).all()
-        return Page(
-            items=[self._invoice_out(i) for i in rows],
+        linked = await self._linked_bookings([i.id for i in rows], visible)
+        return InvoicePage(
+            items=[self._invoice_out(i, linked.get(i.id)) for i in rows],
             total=total or 0,
             limit=limit,
             offset=offset,
+            counts=counts,
         )
 
-    async def get_invoice(self, invoice_id: UUID) -> InvoiceOut:
+    async def _segment_counts(
+        self, filters: list[ColumnElement[bool]], booked_clause: ColumnElement[bool]
+    ) -> InvoiceSegmentCounts:
+        """Count the invoices of each list segment in one query."""
+        is_open = Invoice.status == "open"
+
+        def count_if(condition: ColumnElement[bool]) -> ColumnElement[int]:
+            return func.coalesce(func.sum(case((condition, 1), else_=0)), 0)
+
+        row = (
+            await self.session.execute(
+                select(
+                    func.count(),
+                    count_if(is_open & not_(booked_clause)),
+                    count_if(is_open & booked_clause),
+                    count_if(Invoice.status == "paid"),
+                )
+                .select_from(Invoice)
+                .where(*filters)
+            )
+        ).one()
+        return InvoiceSegmentCounts(
+            all=int(row[0]), inbox=int(row[1]), booked=int(row[2]), paid=int(row[3])
+        )
+
+    async def get_invoice(
+        self, invoice_id: UUID, *, visible_gremium_ids: set[UUID] | None = None
+    ) -> InvoiceOut:
         inv = await self.session.get(Invoice, invoice_id)
         if inv is None:
             raise NotFoundError(f"invoice {invoice_id} not found")
-        return self._invoice_out(inv)
+        return await self._invoice_with_bookings(inv, visible_gremium_ids)
 
     async def create_invoice(self, payload: InvoiceCreate, *, actor: str) -> InvoiceOut:
         inv = Invoice(
@@ -365,7 +497,8 @@ class InvoiceOps(BudgetTreeServiceBase):
             data={"fields": sorted(fields)},
         )
         await self.session.commit()
-        return self._invoice_out(inv)
+        # The write needs budget.book, which is a full-view permission.
+        return await self._invoice_with_bookings(inv, None)
 
     async def delete_invoice(self, invoice_id: UUID) -> None:
         inv = await self.session.get(Invoice, invoice_id)

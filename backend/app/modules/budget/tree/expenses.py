@@ -39,19 +39,11 @@ class ExpenseOps(BudgetTreeServiceBase):
             The display name per `sub`. The name falls back to the email, then
             to the `sub` itself.
         """
-        from app.modules.auth.models import Principal as PrincipalRow
+        from app.modules.auth.identity import refs_by_sub
 
-        wanted = {s for s in subs if s}
-        if not wanted:
-            return {}
-        rows = (
-            await self.session.execute(
-                select(PrincipalRow.sub, PrincipalRow.display_name, PrincipalRow.email).where(
-                    PrincipalRow.sub.in_(wanted)
-                )
-            )
-        ).all()
-        return {sub: (dn or em or sub) for sub, dn, em in rows}
+        # A merged account shows the name of the account it was merged into.
+        refs = await refs_by_sub(self.session, subs)
+        return {sub: (ref.name or sub) for sub, ref in refs.items()}
 
     @staticmethod
     def _expense_out(
@@ -168,7 +160,7 @@ class ExpenseOps(BudgetTreeServiceBase):
             },
         )
         if payload.invoice_id is not None:
-            await self._mark_invoice_paid(payload.invoice_id)
+            await self._require_invoice(payload.invoice_id)
         # With commit=False the caller bundles the booking and its follow-up
         # mutations in one transaction.
         if commit:
@@ -181,29 +173,20 @@ class ExpenseOps(BudgetTreeServiceBase):
             actor_name=names.get(expense.actor or ""),
         )
 
-    async def _mark_invoice_paid(self, invoice_id: UUID) -> None:
-        """Set the linked invoice to `paid` when a booking references it.
+    async def _require_invoice(self, invoice_id: UUID) -> None:
+        """Make sure that the invoice of a booking exists.
 
-        An invoice that is already paid stays unchanged. The method does not
-        commit. It runs inside the transaction of the booking.
+        A booking does not change the status of its invoice. The invoice stays
+        `open` ("Verbucht" in the list) until a user marks it `paid` with an
+        invoice update. A part booking thus does not close the invoice.
 
         Raises:
             NotFoundError: The invoice does not exist. The check happens here so
                 the request fails with 404 instead of on the foreign key at
                 commit time.
         """
-        inv = await self.session.get(Invoice, invoice_id)
-        if inv is None:
+        if await self.session.get(Invoice, invoice_id) is None:
             raise NotFoundError(f"invoice {invoice_id} not found")
-        if inv.status == "paid":
-            return
-        inv.status = "paid"
-        await self._audit(
-            AuditAction.BUDGET_INVOICE_UPDATE,
-            target_type="invoice",
-            target_id=str(inv.id),
-            data={"status": "paid", "reason": "expense_booked"},
-        )
 
     async def update_expense(self, expense_id: UUID, payload: ExpenseUpdate) -> ExpenseOut:
         """Update a booking.
@@ -270,7 +253,7 @@ class ExpenseOps(BudgetTreeServiceBase):
         if "invoice_id" in fields:
             expense.invoice_id = payload.invoice_id
             if payload.invoice_id is not None:
-                await self._mark_invoice_paid(payload.invoice_id)
+                await self._require_invoice(payload.invoice_id)
         # Capture the new values too. Revert uses them to detect a later edit
         # and answers 409 instead of overwriting the changes of another user.
         after: dict[str, object] = {f: _json_safe(getattr(expense, f)) for f in fields}

@@ -1,496 +1,271 @@
+<!-- Boards Fin-Rechnungen and the other Fin-Rechnung* boards. A PDF dropped anywhere on
+     the page imports too; the drop zone in the list is the visible place for it and the
+     keyboard path. -->
 <div
   class="inv"
+  [class.inv--split]="split()"
   (dragenter)="onDragEnter($event)"
   (dragover)="onDragOver($event)"
   (dragleave)="onDragLeave($event)"
   (drop)="onDrop($event)"
 >
-  <app-page-header [title]="'invoices.title' | t" [subtitle]="'invoices.subtitle' | t">
-    <div actions class="flex items-center gap-2 flex-wrap">
-      <input
-        class="inv__search"
-        type="search"
-        [placeholder]="'invoices.search' | t"
-        [ngModel]="q()"
-        (ngModelChange)="onSearch($event)"
-        [attr.aria-label]="'invoices.search' | t"
-      />
-      <!-- These filters drive the server query. -->
-      <app-filter-bar [live]="true" [activeCount]="activeFilterCount()" (reset)="resetFilters()">
-        <!-- `group`: three controls, not one. A plain field wraps its content in a
-             label, which would bind to the first button and take its name away. -->
-        <app-filter-field [label]="'invoices.filter.status' | t" [group]="true">
-          <div class="inline-flex gap-2 flex-wrap">
-            <app-button
-              [variant]="statusFilter() === '' ? 'primary' : 'ghost'"
-              size="sm"
-              [ariaPressed]="statusFilter() === ''"
-              (click)="setStatus('')"
-              >{{ 'invoices.filter.all' | t }}</app-button
-            >
-            <app-button
-              [variant]="statusFilter() === 'open' ? 'primary' : 'ghost'"
-              size="sm"
-              [ariaPressed]="statusFilter() === 'open'"
-              (click)="setStatus('open')"
-              >{{ 'invoices.status.open' | t }}</app-button
-            >
-            <app-button
-              [variant]="statusFilter() === 'paid' ? 'primary' : 'ghost'"
-              size="sm"
-              [ariaPressed]="statusFilter() === 'paid'"
-              (click)="setStatus('paid')"
-              >{{ 'invoices.status.paid' | t }}</app-button
-            >
-          </div>
-        </app-filter-field>
-        <app-filter-field [label]="'invoices.filter.grossRange' | t">
-          <app-filter-range>
-            <app-currency-input
-              start
-              [placeholder]="'invoices.filter.amountMin' | t"
-              [ariaLabel]="'invoices.filter.amountMin' | t"
-              [ngModel]="grossMin()"
-              (ngModelChange)="onGrossFilter('min', $event)"
-            />
-            <app-currency-input
-              end
-              [placeholder]="'invoices.filter.amountMax' | t"
-              [ariaLabel]="'invoices.filter.amountMax' | t"
-              [ngModel]="grossMax()"
-              (ngModelChange)="onGrossFilter('max', $event)"
-            />
-          </app-filter-range>
-        </app-filter-field>
-        <app-filter-field [label]="'invoices.filter.issueRange' | t">
-          <app-filter-range>
-            <app-datepicker
-              start
-              [ariaLabel]="'invoices.filter.issueFrom' | t"
-              [ngModel]="issueFrom()"
-              (ngModelChange)="onDateFilter('issueFrom', $event)"
-            />
-            <app-datepicker
-              end
-              [ariaLabel]="'invoices.filter.issueTo' | t"
-              [ngModel]="issueTo()"
-              (ngModelChange)="onDateFilter('issueTo', $event)"
-            />
-          </app-filter-range>
-        </app-filter-field>
-        <app-filter-field [label]="'invoices.filter.dueRange' | t">
-          <app-filter-range>
-            <app-datepicker
-              start
-              [ariaLabel]="'invoices.filter.dueFrom' | t"
-              [ngModel]="dueFrom()"
-              (ngModelChange)="onDateFilter('dueFrom', $event)"
-            />
-            <app-datepicker
-              end
-              [ariaLabel]="'invoices.filter.dueTo' | t"
-              [ngModel]="dueTo()"
-              (ngModelChange)="onDateFilter('dueTo', $event)"
-            />
-          </app-filter-range>
-        </app-filter-field>
-      </app-filter-bar>
-      @if (canManage()) {
-        <input
-          #fileInput
-          type="file"
-          accept="application/pdf,.pdf"
-          class="hidden"
-          (change)="onFilePicked($event)"
-          [attr.aria-label]="'invoices.import' | t"
+  <input #fileInput type="file" accept="application/pdf,.pdf" hidden (change)="onFilePicked($event)" />
+  <app-list-detail [detailOpen]="detailOpen()" (back)="closeDetail()">
+    <section list class="ld-pane" aria-labelledby="inv-title">
+      <app-page-header [pane]="true" titleId="inv-title" [title]="'invoices.title' | t">
+        <ng-container ngProjectAs="[actions]">
+          @if (canManage()) {
+            @if (phone()) {
+              <app-button size="sm" data-testid="inv-add" (click)="openCreate()">
+                <span class="inv__btn"><app-icon name="add" [size]="16" />{{ 'invoices.addShort' | t }}</span>
+              </app-button>
+              <app-row-menu [label]="'invoices.moreActions' | t" [sections]="phoneMenu()" (selected)="onHeaderMenu($event)" />
+            } @else {
+              <app-button
+                variant="text"
+                [iconOnly]="true"
+                [loading]="importing()"
+                [ariaLabel]="'invoices.import' | t"
+                [title]="'invoices.import' | t"
+                (click)="fileInput.click()"
+              ><app-icon name="upload" [size]="21" /></app-button>
+            }
+          }
+        </ng-container>
+      </app-page-header>
+
+      <app-sticky-bar class="ld-pane__filters">
+        <app-search-pill
+          [placeholder]="'invoices.search' | t"
+          [label]="'invoices.searchLabel' | t"
+          [value]="q()"
+          (valueChange)="onSearch($event)"
         />
-        <app-button
-          variant="secondary"
-          size="sm"
-          [loading]="importing()"
-          (click)="fileInput.click()"
-        >
-          <span class="inline-flex items-center gap-2"
-            ><app-icon name="upload" [size]="16" /> {{ 'invoices.import' | t }}</span
-          >
-        </app-button>
-        <app-button size="sm" (click)="openCreate()">
-          <span class="inline-flex items-center gap-2"
-            ><app-icon name="add" [size]="16" /> {{ 'invoices.add' | t }}</span
-          >
-        </app-button>
-      }
-    </div>
-  </app-page-header>
+        <div class="inv__chips" role="group" appScrollFade="x" [attr.aria-label]="'invoices.filter.group' | t">
+          <app-range-chip
+            kind="date"
+            [label]="'invoices.filter.issueRange' | t"
+            [from]="issueFrom()"
+            [to]="issueTo()"
+            (applied)="onIssueRange($event)"
+          />
+          <app-range-chip
+            kind="date"
+            [label]="'invoices.filter.due' | t"
+            [from]="dueFrom()"
+            [to]="dueTo()"
+            (applied)="onDueRange($event)"
+          />
+          <app-range-chip
+            kind="amount"
+            [label]="'invoices.filter.amount' | t"
+            [from]="grossMin()"
+            [to]="grossMax()"
+            (applied)="onGrossRange($event)"
+          />
+          <span class="inv__count" role="status">{{ 'invoices.count' | t: { count: items().length, total: total() } }}</span>
+        </div>
+        <app-segmented
+          class="inv__seg"
+          width="fill"
+          [check]="false"
+          [ariaLabel]="'invoices.segment.label' | t"
+          [options]="segmentOptions()"
+          [value]="segment()"
+          (valueChange)="setSegment($event ?? 'all')"
+        />
+      </app-sticky-bar>
 
-  <!-- The table stays on screen while a filter, a search or a page load runs: it keeps
-       its header and column widths and draws skeleton rows, instead of collapsing to a
-       line of text and then jumping back. The actions column is pinned, so edit and
-       delete stay reachable while the wide table scrolls sideways. -->
-  <app-data-table
-    class="inv__table"
-    [columns]="columns()"
-    [rows]="items()"
-    [rowKey]="rowId"
-    [loading]="loading()"
-    [loadingText]="'invoices.loading' | t"
-    [skeletonRowCount]="8"
-    [emptyText]="'invoices.empty' | t"
-  >
-    <ng-template appCell="issueDate" let-i>
-      <span class="inv__date">{{
-        $any(i).issueDate ? ($any(i).issueDate | ldate: 'mediumDate') : '—'
-      }}</span>
-    </ng-template>
-    <ng-template appCell="dueDate" let-i>
-      <span class="inv__date">{{
-        $any(i).dueDate ? ($any(i).dueDate | ldate: 'mediumDate') : '—'
-      }}</span>
-    </ng-template>
-    <ng-template appCell="number" let-i>
-      <span class="inv__number">{{ $any(i).number || '—' }}</span>
-    </ng-template>
-    <ng-template appCell="supplier" let-i>
-      <span class="inv__supplier">{{ $any(i).supplier || '—' }}</span>
-    </ng-template>
-    <ng-template appCell="net" let-i>
-      <span class="inv__mono">{{ $any(i).netAmount ? money($any(i).netAmount) : '—' }}</span>
-    </ng-template>
-    <ng-template appCell="tax" let-i>
-      <span class="inv__mono">{{ $any(i).taxAmount ? money($any(i).taxAmount) : '—' }}</span>
-    </ng-template>
-    <ng-template appCell="gross" let-i>
-      <span class="inv__amount">{{ money($any(i).grossAmount) }}</span>
-    </ng-template>
-    <ng-template appCell="status" let-i>
-      <app-badge [variant]="$any(i).status === 'paid' ? 'success' : 'warning'">{{
-        statusLabel($any(i).status)
-      }}</app-badge>
-    </ng-template>
-    <ng-template appCell="file" let-i>
-      <span class="inv__file">
-        @if ($any(i).hasFile) {
-          <button
-            type="button"
-            class="inv__fileLink"
-            [title]="$any(i).fileName || ('invoices.openFile' | t)"
-            (click)="openFile($any(i))"
-          >
-            <app-icon name="export" [size]="14" />
-            <span class="dt__truncate">{{ $any(i).fileName || ('invoices.openFile' | t) }}</span>
-          </button>
+      <!-- A phone has no drag and drop: the import sits in the menu of the title row. -->
+      @if (canManage() && !phone()) {
+        <app-file-drop-zone
+          class="inv__zone"
+          accept="application/pdf,.pdf"
+          [multiple]="false"
+          [disabled]="importing()"
+          [label]="'invoices.drop' | t"
+          [buttonLabel]="'invoices.dropButton' | t"
+          (files)="onZoneFiles($event)"
+          (rejected)="onZoneRejected()"
+        />
+      }
+
+      <div #scroller class="inv__scroll" appScrollFade="y">
+        @if (loading()) {
+          <app-skeleton variant="rows" [count]="6" [label]="'invoices.loading' | t" />
+        } @else if (!items().length) {
+          <app-empty-state icon="search" [heading]="'invoices.empty' | t">
+            @if (activeFilterCount() > 0) {
+              <app-button variant="tonal" size="sm" (click)="resetFilters()">{{ 'invoices.filter.reset' | t }}</app-button>
+            }
+          </app-empty-state>
         } @else {
-          —
+          @for (group of groups(); track group.key + $index) {
+            <section class="inv__group" [attr.aria-label]="group.label || null">
+              @if (group.label) {
+                <h2 class="sec inv__month">{{ group.label }}</h2>
+              }
+              <div class="inv__rows" [class.rowgroup]="!split()" role="list">
+                @for (i of group.items; track i.id) {
+                  @let st = invoiceStatus(i.status);
+                  @let menu = rowMenu(i);
+                  <app-list-item
+                    role="listitem"
+                    class="inv__row"
+                    [title]="titleOf(i)"
+                    [link]="[]"
+                    [linkQueryParams]="{ id: i.id }"
+                    linkQueryParamsHandling="merge"
+                    [selected]="i.id === selectedId()"
+                  >
+                    <span sub class="inv__sub">
+                      <span class="inv__parts">
+                        <span class="inv__part">
+                          <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+                        </span>
+                        @if (i.number) {
+                          <span class="inv__part mono inv__no">{{ i.number }}</span>
+                        }
+                        @if (i.status === 'open' && i.dueDate) {
+                          <span class="inv__part mono">{{ 'invoices.dueShort' | t: { date: day(i.dueDate) } }}</span>
+                        } @else if (i.issueDate) {
+                          <span class="inv__part mono">{{ day(i.issueDate) }}</span>
+                        }
+                      </span>
+                    </span>
+                    <span trail class="inv__trail">
+                      <span class="mono inv__amount">{{ money(i.grossAmount) }}</span>
+                      @if (menu.length || !split()) {
+                        <span class="inv__menuSlot">
+                          @if (!split()) {
+                            <span class="inv__chev" aria-hidden="true">
+                              <app-icon name="chevron-right" [size]="17" />
+                            </span>
+                          }
+                          @if (menu.length) {
+                            <app-row-menu
+                              class="inv__menu"
+                              [label]="rowMenuLabel(i)"
+                              [sections]="menu"
+                              (selected)="onRowMenu($event, i)"
+                            />
+                          }
+                        </span>
+                      }
+                    </span>
+                  </app-list-item>
+                }
+              </div>
+            </section>
+          }
+          @if (hasMore()) {
+            <div #sentinel class="inv__sentinel" aria-hidden="true"></div>
+            <div class="inv__more">
+              <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">{{
+                'invoices.loadMore' | t
+              }}</app-button>
+            </div>
+          }
         }
-      </span>
-    </ng-template>
-    <ng-template appCell="actions" let-i>
-      <span class="inv__actions">
-        <app-button
-          variant="ghost"
-          size="sm"
-          [iconOnly]="true"
-          [ariaLabel]="'action.edit' | t"
-          [title]="'action.edit' | t"
-          (click)="openEdit($any(i))"
-          ><app-icon name="edit"
-        /></app-button>
-        <app-button
-          variant="ghost"
-          size="sm"
-          [iconOnly]="true"
-          [ariaLabel]="'action.delete' | t"
-          [title]="'action.delete' | t"
-          (click)="askDelete($any(i))"
-          ><app-icon name="delete"
-        /></app-button>
-      </span>
-    </ng-template>
-  </app-data-table>
+      </div>
 
-  @if (hasMore()) {
-    <div #sentinel class="inv__sentinel" aria-hidden="true"></div>
-    <div class="flex justify-center mt-4">
-      @if (loadingMore()) {
-        <span class="inv__status">{{ 'invoices.loadingMore' | t }}</span>
-      } @else {
-        <app-button variant="secondary" size="sm" (click)="loadMore()">{{
-          'invoices.loadMore' | t
-        }}</app-button>
+      <!-- The form in the detail has its own primary action, so the FAB hides while it is open. -->
+      @if (canManage() && !phone() && formMode() === null) {
+        <button type="button" class="inv__fab" (click)="openCreate()">
+          <app-icon name="plus" [size]="22" />
+          {{ 'invoices.add' | t }}
+        </button>
+      }
+    </section>
+
+    <div detail class="inv__detail">
+      @switch (detailView()) {
+        @case ('form') {
+          <ng-container *ngTemplateOutlet="form; context: { $implicit: split() ? 'pane' : 'page' }" />
+        }
+        @case ('invoice') {
+          @let inv = selectedInvoice()!;
+          <app-invoice-detail
+            [invoice]="inv"
+            [costCentres]="costCentres()"
+            [canManage]="canManage()"
+            [split]="split()"
+            [phone]="phone()"
+            [markingPaid]="markingPaid() === inv.id"
+            (edit)="openEdit(inv)"
+            (remove)="askDelete(inv)"
+            (markPaid)="markPaid(inv)"
+            (createBooking)="createBooking(inv)"
+            (openFile)="openFile(inv)"
+          />
+        }
+        @case ('missing') {
+          <div class="inv__none">
+            <app-empty-state
+              [fill]="true"
+              icon="search"
+              [heading]="'invoices.notFound' | t"
+              [body]="'invoices.notFoundBody' | t"
+            />
+          </div>
+        }
+        @default {
+          @if (split()) {
+            @if (!loading() && !items().length) {
+              <!-- Board Fin-Rechnungen-Leer: an empty list leaves a neutral sheet. -->
+              <div class="inv__none inv__none--skeleton" aria-hidden="true">
+                <span class="inv__ghost inv__ghost--title"></span>
+                <span class="inv__ghost inv__ghost--meta"></span>
+                <span class="inv__ghost inv__ghost--rule"></span>
+                <div class="inv__ghostCols">
+                  <span class="inv__ghost inv__ghost--card"></span>
+                  <span class="inv__ghost inv__ghost--card"></span>
+                </div>
+              </div>
+            } @else {
+              <div class="inv__none">
+                <app-empty-state [fill]="true" icon="receipt" [heading]="'invoices.none' | t" />
+              </div>
+            }
+          }
+        }
       }
     </div>
-  }
-  @if (total() > 0) {
-    <p class="text-center text-muted text-sm mt-3">
-      {{ 'invoices.count' | t: { count: items().length, total: total() } }}
-    </p>
-  }
+  </app-list-detail>
 
   @if (dragActive()) {
+    <!-- Board Fin-Rechnung-Ablegen: the whole page is the drop target. -->
     <div class="inv__dropOverlay" aria-hidden="true">
       <div class="inv__dropInner">
-        <app-icon name="upload" [size]="32" />
-        <span>{{ 'invoices.drop' | t }}</span>
+        <span class="inv__dropIcon"><app-icon name="upload" [size]="24" /></span>
+        <span class="inv__dropTitle">{{ 'invoices.drop' | t }}</span>
+        <span class="inv__dropHint">{{ 'invoices.dropHint' | t }}</span>
       </div>
     </div>
   }
 </div>
 
-<app-dialog
-  [open]="createOpen()"
-  [title]="(importToken() ? 'invoices.importReview' : 'invoices.add') | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="createOpen.set(false)"
->
-  <form id="inv-create" class="flex flex-col gap-2" (submit)="create($event)">
-    @if (importToken()) {
-      <div
-        class="flex items-center gap-2 py-2 px-3 border border-solid border-line rounded-md bg-surface-sunken"
-      >
-        <app-icon name="document" [size]="16" />
-        <span class="inv__fileChipName">{{ importFileName() }}</span>
-        <button
-          type="button"
-          class="inv__fileChipRemove"
-          [attr.aria-label]="'invoices.removeBeleg' | t"
-          [title]="'invoices.removeBeleg' | t"
-          (click)="clearAttachment()"
-        >
-          ✕
-        </button>
-      </div>
-    } @else {
-      <input
-        #createFile
-        type="file"
-        accept="application/pdf,.pdf"
-        class="hidden"
-        (change)="onCreateFilePicked($event)"
-        [attr.aria-label]="'invoices.attachBeleg' | t"
-      />
-      <app-button
-        type="button"
-        variant="secondary"
-        size="sm"
-        [loading]="attaching()"
-        (click)="createFile.click()"
-      >
-        <span class="inline-flex items-center gap-2"
-          ><app-icon name="upload" [size]="16" /> {{ 'invoices.attachBeleg' | t }}</span
-        >
-      </app-button>
-    }
+<ng-template #form let-layout>
+  <app-invoice-form
+    [mode]="formMode() === 'edit' ? 'edit' : 'create'"
+    [host]="this"
+    [layout]="layout"
+    (remove)="askDelete(editing()!)"
+    (openDuplicate)="openDuplicate()"
+  />
+</ng-template>
 
-    <div class="inv__grid2">
-      <div class="inv__field">
-        <label class="text-sm font-medium mt-2" for="inv-number">{{
-          'invoices.field.number' | t
-        }}</label>
-        <input
-          id="inv-number"
-          class="inv__input"
-          name="number"
-          [ngModel]="newNumber()"
-          (ngModelChange)="newNumber.set($event)"
-        />
-      </div>
-      <div class="inv__field">
-        <label class="text-sm font-medium mt-2" for="inv-supplier">{{
-          'invoices.field.supplier' | t
-        }}</label>
-        <input
-          id="inv-supplier"
-          class="inv__input"
-          name="supplier"
-          [ngModel]="newSupplier()"
-          (ngModelChange)="newSupplier.set($event)"
-        />
-      </div>
-    </div>
-
-    <div class="inv__grid2">
-      <app-datepicker
-        name="issue"
-        [label]="'invoices.field.issueDate' | t"
-        [ngModel]="newIssueDate()"
-        (ngModelChange)="newIssueDate.set($event)"
-      />
-      <app-datepicker
-        name="due"
-        [label]="'invoices.field.dueDate' | t"
-        [ngModel]="newDueDate()"
-        (ngModelChange)="newDueDate.set($event)"
-      />
-    </div>
-
-    <div class="inv__grid3">
-      <div class="inv__field">
-        <label class="text-sm font-medium mt-2">{{ 'invoices.field.net' | t }}</label>
-        <app-currency-input
-          name="net"
-          [ngModel]="newNet()"
-          (ngModelChange)="newNet.set($event)"
-          [ariaLabel]="'invoices.field.net' | t"
-        />
-      </div>
-      <div class="inv__field">
-        <label class="text-sm font-medium mt-2">{{ 'invoices.field.tax' | t }}</label>
-        <app-currency-input
-          name="tax"
-          [ngModel]="newTax()"
-          (ngModelChange)="newTax.set($event)"
-          [ariaLabel]="'invoices.field.tax' | t"
-        />
-      </div>
-      <div class="inv__field">
-        <label class="text-sm font-medium mt-2">{{ 'invoices.field.gross' | t }} *</label>
-        <app-currency-input
-          name="gross"
-          [ngModel]="newGross()"
-          (ngModelChange)="newGross.set($event)"
-          [ariaLabel]="'invoices.field.gross' | t"
-        />
-      </div>
-    </div>
-
-    <app-select
-      name="status"
-      [label]="'invoices.field.status' | t"
-      [options]="statusOptions()"
-      [ngModel]="newStatus()"
-      (ngModelChange)="newStatus.set($event)"
-    />
-
-    <label class="text-sm font-medium mt-2" for="inv-note">{{ 'invoices.field.note' | t }}</label>
-    <textarea
-      id="inv-note"
-      class="inv__input inv__textarea"
-      name="note"
-      rows="3"
-      [ngModel]="newNote()"
-      (ngModelChange)="newNote.set($event)"
-    ></textarea>
-  </form>
-  <div dialog-footer class="flex justify-end gap-3">
-    <app-button size="sm" variant="ghost" (click)="createOpen.set(false)">{{
-      'action.cancel' | t
-    }}</app-button>
-    <app-button
-      size="sm"
-      [disabled]="!canSubmitCreate()"
-      [loading]="saving()"
-      (click)="create($event)"
-      >{{ 'invoices.add' | t }}</app-button
-    >
-  </div>
-</app-dialog>
-
-<app-dialog
-  [open]="!!editing()"
-  [title]="'invoices.edit' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="editing.set(null)"
->
-  <form id="inv-edit" class="flex flex-col gap-2" (submit)="saveEdit($event)">
-    <div class="inv__grid2">
-      <div class="inv__field">
-        <label class="text-sm font-medium mt-2" for="inv-enumber">{{
-          'invoices.field.number' | t
-        }}</label>
-        <input
-          id="inv-enumber"
-          class="inv__input"
-          name="enumber"
-          [ngModel]="editNumber()"
-          (ngModelChange)="editNumber.set($event)"
-        />
-      </div>
-      <div class="inv__field">
-        <label class="text-sm font-medium mt-2" for="inv-esupplier">{{
-          'invoices.field.supplier' | t
-        }}</label>
-        <input
-          id="inv-esupplier"
-          class="inv__input"
-          name="esupplier"
-          [ngModel]="editSupplier()"
-          (ngModelChange)="editSupplier.set($event)"
-        />
-      </div>
-    </div>
-    <div class="inv__grid2">
-      <app-datepicker
-        name="eissue"
-        [label]="'invoices.field.issueDate' | t"
-        [ngModel]="editIssueDate()"
-        (ngModelChange)="editIssueDate.set($event)"
-      />
-      <app-datepicker
-        name="edue"
-        [label]="'invoices.field.dueDate' | t"
-        [ngModel]="editDueDate()"
-        (ngModelChange)="editDueDate.set($event)"
-      />
-    </div>
-    <div class="inv__grid3">
-      <div class="inv__field">
-        <label class="text-sm font-medium mt-2">{{ 'invoices.field.net' | t }}</label>
-        <app-currency-input
-          name="enet"
-          [ngModel]="editNet()"
-          (ngModelChange)="editNet.set($event)"
-          [ariaLabel]="'invoices.field.net' | t"
-        />
-      </div>
-      <div class="inv__field">
-        <label class="text-sm font-medium mt-2">{{ 'invoices.field.tax' | t }}</label>
-        <app-currency-input
-          name="etax"
-          [ngModel]="editTax()"
-          (ngModelChange)="editTax.set($event)"
-          [ariaLabel]="'invoices.field.tax' | t"
-        />
-      </div>
-      <div class="inv__field">
-        <label class="text-sm font-medium mt-2">{{ 'invoices.field.gross' | t }} *</label>
-        <app-currency-input
-          name="egross"
-          [ngModel]="editGross()"
-          (ngModelChange)="editGross.set($event)"
-          [ariaLabel]="'invoices.field.gross' | t"
-        />
-      </div>
-    </div>
-    <app-select
-      name="estatus"
-      [label]="'invoices.field.status' | t"
-      [options]="statusOptions()"
-      [ngModel]="editStatus()"
-      (ngModelChange)="editStatus.set($event)"
-    />
-    <label class="text-sm font-medium mt-2" for="inv-enote">{{ 'invoices.field.note' | t }}</label>
-    <textarea
-      id="inv-enote"
-      class="inv__input inv__textarea"
-      name="enote"
-      rows="3"
-      [ngModel]="editNote()"
-      (ngModelChange)="editNote.set($event)"
-    ></textarea>
-  </form>
-  <div dialog-footer class="flex justify-end gap-3">
-    <app-button size="sm" variant="ghost" (click)="editing.set(null)">{{
-      'action.cancel' | t
-    }}</app-button>
-    <app-button
-      size="sm"
-      [disabled]="!editGrossValid()"
-      [loading]="saving()"
-      (click)="saveEdit($event)"
-      >{{ 'action.save' | t }}</app-button
-    >
-  </div>
-</app-dialog>
+@if (phone()) {
+  <app-side-sheet
+    side="bottom"
+    [contentScrolls]="true"
+    [heading]="formTitle()"
+    [open]="formMode() !== null"
+    (openChange)="$event ? null : closeForms()"
+  >
+    <ng-container *ngTemplateOutlet="form; context: { $implicit: 'sheet' }" />
+  </app-side-sheet>
+}
 
 <app-dialog
   [open]="!!confirmDelete()"
@@ -498,13 +273,11 @@
   [closeLabel]="'action.cancel' | t"
   (closed)="confirmDelete.set(null)"
 >
-  <p>{{ 'invoices.delete.body' | t: { number: confirmDelete()?.number ?? '' } }}</p>
-  <div dialog-footer class="flex justify-end gap-3">
-    <app-button size="sm" variant="ghost" (click)="confirmDelete.set(null)">{{
-      'action.cancel' | t
-    }}</app-button>
-    <app-button size="sm" variant="danger" [loading]="saving()" (click)="doDelete()">{{
-      'invoices.delete.confirm' | t
-    }}</app-button>
+  <p class="inv__confirm">
+    {{ 'invoices.delete.body' | t: { number: confirmDelete()?.number || confirmDelete()?.supplier || '' } }}
+  </p>
+  <div dialog-footer class="inv__footer">
+    <app-button variant="text" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="danger" [loading]="saving()" (click)="doDelete()">{{ 'invoices.delete.confirm' | t }}</app-button>
   </div>
 </app-dialog>

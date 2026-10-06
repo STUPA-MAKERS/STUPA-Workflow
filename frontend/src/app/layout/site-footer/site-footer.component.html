@@ -1,0 +1,36 @@
+<footer class="ft" [attr.aria-label]="'nav.footer' | t">
+  @if (columns().length > 0) {
+    <div class="ft__cols">
+      @for (col of columns(); track $index) {
+        <div class="ft__col">
+          @if (col.label) {
+            <h2 class="ft__colTitle">{{ col.label }}</h2>
+          }
+          @for (link of col.links; track $index) {
+            <a class="ft__link" [href]="link.url">{{ link.label }}</a>
+          }
+        </div>
+      }
+    </div>
+  }
+  <!-- The separator dot is CSS (::before of every part). The clip hides the dot of the
+       part that starts a line, so a dot only shows between two visible parts. -->
+  <div class="ft__line ft__clip">
+    <div class="ft__sep ft__parts">
+      <p class="ft__copy">{{ copyright() || ('footer.coBranding' | t) }}</p>
+      @if (legalLinks().length > 0) {
+        <div class="ft__legal">
+          <div class="ft__clip">
+            <ul class="ft__sep ft__links">
+              @for (link of legalLinks(); track link.url) {
+                <li>
+                  <a class="ft__link" [href]="link.url">{{ link.label }}</a>
+                </li>
+              }
+            </ul>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</footer>

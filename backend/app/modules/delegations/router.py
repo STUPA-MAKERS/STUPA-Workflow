@@ -7,9 +7,11 @@ pool of a gremium.
 
 The server is authoritative for RBAC. Every route needs a session. The service
 checks the domain rules: gates, deadline, recipient circle and chains. A holder
-of `admin.delegations` sees and revokes every delegation. A holder of
-`admin.delegations` or of the gremium role with `session.manage` manages the
-pool. The routes report errors as `ProblemDetail`.
+of `admin.delegations` sees and revokes every delegation. During a live meeting
+the meeting lead (`session.manage` in the gremium) enters a substitution for a
+missing member and revokes a delegation (O6). A holder of `admin.delegations`
+or of the gremium role with `session.manage` manages the pool. The routes
+report errors as `ProblemDetail`.
 """
 
 from __future__ import annotations
@@ -81,6 +83,12 @@ async def create_delegation(
     request: Request,
     mailer: AutoMailerDep,
 ) -> DelegationOut:
+    """Create a delegation for one meeting.
+
+    Without `delegatorId` the caller delegates for themselves while the meeting is
+    planned. With `delegatorId` the meeting lead enters a substitution for a
+    missing member while the meeting is live (O6).
+    """
     out = await service.create(payload, principal)
     # Notify the delegate. The mail kind is "delegation" and the user can opt out.
     info = await meeting_delegation_mail_info(getattr(service, "session", None), out.id)
@@ -103,6 +111,7 @@ async def revoke_delegation(
     request: Request,
     mailer: AutoMailerDep,
 ) -> Response:
+    """Revoke a delegation: the delegator before the start, the lead while live (O6)."""
     # Collect the mail data before the revoke. The row is gone afterwards.
     info = await meeting_delegation_mail_info(getattr(service, "session", None), delegation_id)
     await service.revoke(delegation_id, principal)
@@ -126,16 +135,21 @@ async def meeting_context(
 @router.get(
     "/meetings/{meeting_id}/recipients",
     response_model=list[RecipientOut],
-    responses=_errors(401, 404),
+    responses=_errors(401, 403, 404),
 )
 async def recipients(
     meeting_id: UUID,
     service: ServiceDep,
     principal: Member,
     q: Annotated[str, Query(max_length=100)] = "",
+    delegator_id: Annotated[UUID | None, Query(alias="delegatorId")] = None,
 ) -> list[RecipientOut]:
-    """List the recipients for the typeahead: members, pool and maybe external users."""
-    return await service.recipients(meeting_id, q, principal)
+    """List the recipients for the typeahead: members, pool and maybe external users.
+
+    With `delegatorId` the meeting lead gets the pool substitutes of that member
+    for the lead entry during a live meeting (O6).
+    """
+    return await service.recipients(meeting_id, q, principal, delegator_id)
 
 
 @router.get(

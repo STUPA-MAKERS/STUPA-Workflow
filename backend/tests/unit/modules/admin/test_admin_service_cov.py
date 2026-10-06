@@ -55,6 +55,7 @@ from app.shared.errors import (
     NotFoundError,
     ValidationProblem,
 )
+from tests._support.identity_rows import sub_ref
 
 
 class FakeResult:
@@ -225,6 +226,8 @@ def principal_row(**kw: Any) -> Any:
         "last_login": None,
         "active": True,
         "oidc_groups": ["stupa"],
+        "merged_into": None,
+        "merged_at": None,
     }
     base.update(kw)
     return Row(**base)
@@ -312,6 +315,24 @@ async def test_list_gremien() -> None:
     s, _ = svc([res(gremium_row(name="A"), gremium_row(name="B"))])
     out = await s.list_gremien()
     assert len(out) == 2
+
+
+async def test_list_gremien_admin_counts() -> None:
+    a = gremium_row(name="A")
+    b = gremium_row(name="B")
+    # Queue: the gremien, then the member counts, then the role counts. B has no member.
+    s, session = svc([res(a, b), res((a.id, 3)), res((a.id, 4), (b.id, 3))])
+    out = await s.list_gremien_admin()
+    assert [(g.name, g.member_count, g.role_count) for g in out] == [
+        ("A", 3, 4),
+        ("B", 0, 3),
+    ]
+    # The member count keeps current memberships of active principals only.
+    member_sql = str(session.statements[1])
+    assert "valid_until" in member_sql
+    assert "valid_from" in member_sql
+    assert "principal.active" in member_sql
+    assert out[0].model_dump(by_alias=True)["memberCount"] == 3
 
 
 async def test_create_gremium_ok() -> None:
@@ -457,9 +478,22 @@ async def test_set_gremium_mail_recipients_not_found() -> None:
 
 
 async def test_list_application_types() -> None:
-    s, _ = svc([res(type_row(), type_row(key="b"))])
+    s, _ = svc(
+        [res((type_row(), None), (type_row(key="b", active_form_version_id=uuid.uuid4()), 7))]
+    )
     out = await s.list_application_types()
     assert len(out) == 2
+    assert out[0].active_form_version is None
+    assert out[1].active_form_version == 7
+    dumped = out[1].model_dump(by_alias=True)
+    assert dumped["activeFormVersion"] == 7
+
+
+async def test_update_application_type_returns_active_version() -> None:
+    row = type_row(active_form_version_id=uuid.uuid4())
+    s, _ = svc([*audit_results()], gets=[row], scalars=[3])
+    out = await s.update_application_type(row.id, ApplicationTypeUpdate(), "admin")
+    assert out.active_form_version == 3
 
 
 async def test_create_application_type_with_comparison_offers() -> None:
@@ -710,7 +744,7 @@ async def test_create_global_flow_version_new_version_remaps_apps() -> None:
     """
     graph = _two_state_graph()
     app_id = uuid.uuid4()
-    s, sess = svc([res((app_id, "legacy"))], scalars=[3])
+    s, sess = svc([res((app_id, "legacy", {}))], scalars=[3])
     out = await s.create_global_flow_version(FlowVersionCreate(graph=graph), "admin")
     assert out.version == 4
     assert out.active is True
@@ -808,33 +842,33 @@ async def test_update_role_label_and_permissions() -> None:
     role = role_row()
     # Queue: the role, the permission delete, two audit results, the permissions after.
     s, _ = svc(
-        [res(), *audit_results(), res("application.read", "application.create")],
+        [res(), *audit_results(), res("application.read", "application.archive")],
         gets=[role],
     )
     out = await s.update_role(
         role.id,
         RoleUpdate(
             label={"de": "Neu"},
-            permissions=["application.read", "application.create"],
+            permissions=["application.read", "application.archive"],
         ),
         "admin",
     )
     assert role.name_i18n == {"de": "Neu"}
-    assert out.permissions == ["application.create", "application.read"]
+    assert out.permissions == ["application.archive", "application.read"]
 
 
 async def test_update_role_permissions_only_label_none() -> None:
     # A None label skips the branch 572->574. The payload sets the permissions.
     role = role_row(name_i18n={"de": "Alt"})
     s, _ = svc(
-        [res(), *audit_results(), res("application.create")],
+        [res(), *audit_results(), res("application.archive")],
         gets=[role],
     )
     out = await s.update_role(
-        role.id, RoleUpdate(permissions=["application.create"]), "admin"
+        role.id, RoleUpdate(permissions=["application.archive"]), "admin"
     )
     assert role.name_i18n == {"de": "Alt"}  # unchanged
-    assert out.permissions == ["application.create"]
+    assert out.permissions == ["application.archive"]
 
 
 async def test_update_role_no_permissions_change() -> None:
@@ -923,6 +957,27 @@ async def test_set_principal_active_self_deactivate_blocked() -> None:
     s, _ = svc(gets=[principal])
     with pytest.raises(ConflictError):
         await s.set_principal_active(principal.id, False, "me")
+
+
+async def test_set_principal_active_merged_cannot_be_activated() -> None:
+    principal = principal_row(active=False, sub="old", merged_into=uuid.uuid4())
+    s, _ = svc(gets=[principal])
+    with pytest.raises(ConflictError) as exc:
+        await s.set_principal_active(principal.id, True, "admin")
+    assert exc.value.code == "principal_merged"
+    assert principal.active is False
+
+
+async def test_set_principal_active_merged_names_the_target() -> None:
+    target = uuid.uuid4()
+    principal = principal_row(active=True, sub="old", merged_into=target)
+    # Queue: the audit results, the assignments, then the merge-aware name lookup.
+    s, _ = svc(
+        [*audit_results(), res(), res(sub_ref("new", "Neu", None, target))], gets=[principal]
+    )
+    out = await s.set_principal_active(principal.id, False, "admin")
+    assert out.merged_into_id == target
+    assert out.merged_into_name == "Neu"
 
 
 async def test_set_principal_active_not_found() -> None:
@@ -1201,9 +1256,9 @@ def test_role_create_rejects_unknown_permission() -> None:
 def test_role_create_accepts_known_and_dedups() -> None:
     role = RoleCreate(
         key="r",
-        permissions=["application.read", "application.read", "application.create"],
+        permissions=["application.read", "application.read", "application.archive"],
     )
-    assert role.permissions == ["application.read", "application.create"]
+    assert role.permissions == ["application.read", "application.archive"]
 
 
 def test_role_update_rejects_unknown_permission() -> None:

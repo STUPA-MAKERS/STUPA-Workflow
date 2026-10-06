@@ -8,6 +8,10 @@ not drop such an action and does not enqueue it.
 `DispatchedAction.idempotency_key` is stable over the application, the status
 event, the position and the type. A worker retry therefore never sends a
 duplicate.
+
+An unconfirmed guest application rests in the flow: this dispatcher sends no
+`notify` and no `taskNotify` mail for it. The magic-link mail is no flow action
+and still goes out.
 """
 
 from __future__ import annotations
@@ -19,17 +23,15 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.db import get_sessionmaker
 from app.modules.applications.models import Application
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.models import State
-from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.service import (
     NotificationService,
     resolve_application_lang,
 )
-from app.settings import Settings, get_settings
+from app.settings import Settings
 
 logger = logging.getLogger("app.notifications")
 
@@ -46,6 +48,15 @@ def _applicant_only(raw: object) -> bool:
         return False
     specs = [r for r in raw if isinstance(r, dict)]
     return bool(specs) and all(s.get("kind") == "applicant" for s in specs)
+
+
+def _log_unconfirmed(action: DispatchedAction) -> None:
+    """Log a mail that the dispatcher holds back for an unconfirmed application."""
+    logger.info(
+        "flow mail skipped: application not confirmed (type=%s key=%s)",
+        action.type,
+        action.idempotency_key,
+    )
 
 
 @dataclass(slots=True)
@@ -74,15 +85,19 @@ class NotificationActionDispatcher:
 
     async def _dispatch_notify(self, action: DispatchedAction) -> None:
         async with self.sessionmaker() as session:
-            app_type_id, current_state_id, app_data = (
+            app_type_id, current_state_id, app_data, confirmed = (
                 await session.execute(
                     select(
                         Application.type_id,
                         Application.current_state_id,
                         Application.data,
+                        Application.email_confirmed_at.is_not(None),
                     ).where(Application.id == action.application_id)
                 )
-            ).first() or (None, None, None)
+            ).first() or (None, None, None, True)
+            if not confirmed:
+                _log_unconfirmed(action)
+                return
             title = (app_data or {}).get("title")
             context: dict[str, object] = {
                 "applicationId": str(action.application_id),
@@ -147,12 +162,16 @@ class NotificationActionDispatcher:
                     select(
                         Application.data,
                         Application.current_state_id,
+                        Application.email_confirmed_at.is_not(None),
                     ).where(Application.id == action.application_id)
                 )
             ).first()
             if row is None:
                 return
-            data, state_id = row
+            data, state_id, confirmed = row
+            if not confirmed:
+                _log_unconfirmed(action)
+                return
             state = (
                 await session.scalar(select(State).where(State.id == state_id))
                 if state_id is not None
@@ -214,12 +233,3 @@ _BUILTIN_TASK_BODY = {
     "step where you can act"
     "{% if status %} (status: {{ status }}){% endif %}.\n",
 }
-
-
-def build_notify_dispatcher(pool: object) -> NotificationActionDispatcher:
-    """Build the dispatcher from the optional arq pool (app wiring)."""
-    return NotificationActionDispatcher(
-        get_sessionmaker(),
-        mail_queue_from_pool(pool),  # type: ignore[arg-type]
-        get_settings(),
-    )

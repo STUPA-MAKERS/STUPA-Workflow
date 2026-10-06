@@ -43,26 +43,29 @@ test('@gating Magic-Link bearbeiten → Flow-Transition → read-only', async ({
   const applicant = await browser.newContext();
   const ap = await applicant.newPage();
   await ap.goto(`/status?t=${token}&app=${appId}`);
-  await expect(ap.getByRole('heading', { name: 'Antragsstatus' })).toBeVisible();
-  await expect(ap.locator('ol.timeline')).toBeVisible();
-  await expect(ap.getByRole('button', { name: 'Änderungen speichern' })).toBeVisible();
+  await expect(ap.getByRole('heading', { level: 1, name: 'Magic-Link Antrag' })).toBeVisible();
+  await expect(ap.getByRole('heading', { name: 'Verlauf' })).toBeVisible();
+  await expect(ap.getByRole('button', { name: /Angaben bearbeiten/ })).toBeEnabled();
 
   // 3) Admin context: move the application to review with a flow transition.
   const admin = await browser.newContext({ storageState: ADMIN_STATE });
   const ad = await admin.newPage();
   await ad.goto(`/applications/${appId}`);
-  await expect(ad.getByRole('button', { name: 'Zur Prüfung' })).toBeVisible();
+  // The page shows the list beside the detail; the detail is the article of the open
+  // application, so the checks look there and not at its row in the list.
+  const detail = ad.locator('app-applications-detail');
+  await expect(detail.getByRole('button', { name: 'Zur Prüfung' })).toBeVisible();
   // A transition fires straight from its own button — `fire(t)` posts and reloads. The
   // confirmation dialog this used to click through ("Ausführen", with an optional note)
   // is gone; waiting for it hung the whole test until the 60s budget ran out, which read
   // as a magic-link failure rather than as the one obsolete step it was.
-  await ad.getByRole('button', { name: 'Zur Prüfung' }).click();
-  await expect(ad.getByText('In Prüfung')).toBeVisible();
+  await detail.getByRole('button', { name: 'Zur Prüfung' }).click();
+  await expect(detail.locator('.ad__line').getByText('In Prüfung')).toBeVisible();
 
   // 4) The applicant loads again with the cookie session. The view is now read-only.
   await ap.goto(`/status?app=${appId}`);
-  await expect(ap.getByText('Gesperrt')).toBeVisible();
-  await expect(ap.getByRole('button', { name: 'Änderungen speichern' })).toHaveCount(0);
+  await expect(ap.getByText('Im aktuellen Status gesperrt')).toBeVisible();
+  await expect(ap.getByRole('button', { name: /Angaben bearbeiten/ })).toBeDisabled();
 
   await applicant.close();
   await admin.close();

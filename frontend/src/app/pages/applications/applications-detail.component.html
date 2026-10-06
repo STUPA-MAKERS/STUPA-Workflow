@@ -1,373 +1,407 @@
 @if (loading()) {
-  <!-- The shape of the page, not a sentence. This is the view a reader opens most often,
-       and a bare line gives them nothing to anticipate while the whole layout arrives at
-       once underneath it. -->
-  <div class="det__layout" aria-busy="true">
-    <aside class="det__rail det__rail--left" aria-hidden="true">
-      <span class="skel skel--line"></span>
-      <span class="skel skel--line"></span>
-      <span class="skel skel--line"></span>
-    </aside>
-    <div>
-      <span class="skel skel--panel"></span>
-      <span class="sr-only" role="status">{{ 'applications.detail.loading' | t }}</span>
-    </div>
-    <aside class="det__rail det__rail--right" aria-hidden="true">
-      <span class="skel skel--line"></span>
-      <span class="skel skel--line"></span>
-    </aside>
+  <!-- The shape of the sheet, not a sentence: the reader opens this view most often. -->
+  <div class="ad ad--busy" aria-busy="true">
+    <span class="skel skel--line ad__skelMeta"></span>
+    <span class="skel skel--line ad__skelTitle"></span>
+    <span class="skel skel--panel"></span>
+    <span class="sr-only" role="status">{{ 'applications.detail.loading' | t }}</span>
   </div>
 } @else if (notFound()) {
-  <app-empty-state
-    [heading]="'applications.detail.notFound' | t"
-    [body]="'applications.detail.notFoundBody' | t"
-  >
-    <a routerLink="/applications" class="det__backLink">
-      {{ 'applications.detail.backToList' | t }}
-    </a>
-  </app-empty-state>
+  <div class="ad ad--center">
+    <app-empty-state
+      [heading]="'applications.detail.notFound' | t"
+      [body]="'applications.detail.notFoundBody' | t"
+    >
+      <a [routerLink]="listPath()" class="ad__backLink">
+        {{ 'applications.detail.backToList' | t }}
+      </a>
+    </app-empty-state>
+  </div>
 } @else if (error()) {
-  <p class="text-muted py-5 text-danger" role="alert">
-    {{ 'applications.detail.error' | t }}
-  </p>
+  <div class="ad">
+    <p class="ad__error" role="alert">{{ 'applications.detail.error' | t }}</p>
+  </div>
 } @else if (app(); as application) {
-  <app-page-header [title]="title()" [rail]="true" [flush]="true">
-    <div actions class="det__ownerActions">
-      <!-- Also outside the edit guard: `application.share` is a decision about who may
-           read the record, not about editing it. -->
-      @if (canShare() && !editing()) {
-        <app-button variant="secondary" size="sm" (click)="openShareDialog()">
-          <span class="inline-flex items-center gap-2">
-            <app-icon name="link" [size]="15" />
-            {{ 'applications.share.action' | t }}
+  @if (editing()) {
+    <!-- Edit mode (board Anträge-Bearbeiten): the same sheet holds the form. -->
+    <article class="ad ad--edit" [class.ad--split]="split()" aria-labelledby="ad-edit-title">
+      <header class="ad__editBar">
+        <!-- A phone keeps the title and one action on the line: "Abbrechen" becomes the
+             close button at the start. -->
+        @if (phone()) {
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'applications.detail.cancel' | t"
+            (click)="cancelEdit()"
+          ><app-icon name="x" [size]="19" /></app-button>
+        } @else {
+          <app-icon class="ad__editIcon" name="edit" [size]="18" />
+        }
+        <p class="ad__editText ell">
+          <strong id="ad-edit-title">{{ 'applications.edit.title' | t }}</strong>
+          <span class="ad__editHint">
+            · {{ 'applications.edit.versionHint' | t: { version: application.version + 1 } }}
           </span>
+        </p>
+        @if (!phone()) {
+          <app-button variant="text" (click)="cancelEdit()">{{ 'applications.detail.cancel' | t }}</app-button>
+        }
+        <app-button variant="fill" [loading]="savingEdit()" (click)="saveEdit()">
+          <app-icon name="check" [size]="16" />
+          {{ 'applications.detail.save' | t }}
         </app-button>
-      }
-      <!-- Outside the edit guard on purpose. `application.archive` is its own permission,
-           and a holder who cannot edit the application still decides whether it stays in
-           the working list. No confirmation: it is reversible with one click on the same
-           button, which is exactly what separates it from the delete and the erasure
-           request below. -->
-      @if (canArchive() && !editing()) {
-        <app-button
-          variant="secondary"
-          size="sm"
-          [loading]="archiving()"
-          (click)="toggleArchived()"
-        >
-          {{ (application.archivedAt ? 'applications.detail.unarchive' : 'applications.detail.archive') | t }}
-        </app-button>
-      }
-      @if ((application.canEdit || canForceStatus()) && !editing()) {
-        @if (application.canEdit && application.state?.editAllowed) {
-          <app-button variant="secondary" size="sm" (click)="startEdit(application)">{{ 'applications.detail.edit' | t }}</app-button>
-        }
-        @if (canForceStatus()) {
-          <app-button variant="secondary" size="sm" (click)="openForceDialog()">{{ 'applications.detail.forceStatus' | t }}</app-button>
-        }
-        @if (canDelete()) {
-          <app-button variant="danger" size="sm" (click)="confirmDelete.set(true)">{{ 'applications.detail.delete' | t }}</app-button>
-        }
-        @if (application.isOwner && !application.applicant?.anonymized) {
-          <app-button variant="danger" size="sm" (click)="confirmErase.set(true)">{{ 'applications.detail.eraseRequest' | t }}</app-button>
-        }
-      }
-    </div>
-  </app-page-header>
-
-  <!-- Status, budget and the fact grid. They sit below the page header and keep
-       the body width of the center column. -->
-  @if (application.archivedAt) {
-    <!-- Said plainly, because an archived application looks exactly like an active one
-         and someone arriving from a link has no other way to know. -->
-    <p class="det__archived" role="status">
-      {{ 'applications.detail.archivedNotice' | t: { at: (application.archivedAt | ldate) } }}
-    </p>
-  }
-
-  <section class="det__summary">
-    <div class="det__meta">
-      @if (application.state) {
-        <app-badge [color]="application.state.color">
-          {{ application.state.label }}
-        </app-badge>
-      }
-      @if (application.budgetId && budgetLabel(application.budgetId)) {
-        <app-badge variant="neutral">{{ budgetLabel(application.budgetId) }}</app-badge>
-      }
-      @if (application.fiscalYearId && fiscalLabel(application.fiscalYearId)) {
-        <app-badge variant="neutral">{{ fiscalLabel(application.fiscalYearId) }}</app-badge>
-      }
-      <span class="text-muted text-sm">
-        {{ 'applications.detail.version' | t: { version: application.version } }}
-      </span>
-      @if (canManage()) {
-        <app-button class="det__ccBtn" variant="ghost" size="sm" (click)="openBudgetDialog()">
-          <span class="inline-flex items-center gap-2">
-            <app-icon name="euro" [size]="15" />
-            {{ application.budgetId ? ('applications.budget.change' | t) : ('applications.budget.assign' | t) }}
-          </span>
-        </app-button>
-      }
-    </div>
-    <dl class="det__facts">
-      <div>
-        <dt>{{ 'applications.detail.created' | t }}</dt>
-        <dd><time [attr.datetime]="application.createdAt">{{ application.createdAt | ldate: 'medium' }}</time></dd>
+        <span class="ad__editFade" aria-hidden="true"></span>
+      </header>
+      <!-- No form element: Enter in a field must not save the whole application. -->
+      <div class="ad__edit fe-form">
+        <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
       </div>
-      <div>
-        <dt>{{ 'applications.detail.updated' | t }}</dt>
-        <dd><time [attr.datetime]="application.updatedAt">{{ application.updatedAt | ldate: 'medium' }}</time></dd>
+    </article>
+  } @else {
+    <article class="ad" [class.ad--split]="split()" aria-labelledby="ad-title">
+      <header class="ad__head">
+        <app-sheet-bar [bleed]="split()" [kicker]="metaLine()">
+          @if (!phone()) {
+            <!-- Outside the edit right: `application.share` decides who may read the
+                 record, not who may edit it. -->
+            @if (canShare()) {
+              <app-button
+                variant="text"
+                [iconOnly]="true"
+                [ariaLabel]="'applications.row.share' | t"
+                (click)="openShareDialog()"
+              ><app-icon name="link" [size]="19" /></app-button>
+            }
+            @if (canEditData()) {
+              <app-button
+                variant="text"
+                [iconOnly]="true"
+                [ariaLabel]="'applications.detail.edit' | t"
+                (click)="startEdit(application)"
+              ><app-icon name="edit" [size]="19" /></app-button>
+            }
+            <!-- `application.archive` is its own right. No confirmation: the same button
+                 brings the application back. -->
+            @if (canArchive()) {
+              <app-button
+                variant="text"
+                [iconOnly]="true"
+                [loading]="archiving()"
+                [ariaLabel]="(application.archivedAt ? 'applications.row.unarchive' : 'applications.row.archive') | t"
+                (click)="toggleArchived()"
+              ><app-icon name="archive" [size]="19" /></app-button>
+            }
+          }
+          @if (menuSections().length) {
+            <app-row-menu
+              [label]="'applications.detail.menu' | t"
+              [sections]="menuSections()"
+              (selected)="onMenu($event)"
+            />
+          }
+        </app-sheet-bar>
+
+        <h2 id="ad-title" class="ad__title">{{ title() }}</h2>
+        <!-- Every part draws its dot before it (CSS). The line clips the dot of the first
+             part on each line, so a dot shows only between two items, also after a wrap. -->
+        <p class="ad__line ad__seps">
+          <span class="ad__parts">
+            @if (application.state) {
+              <span class="ad__part">
+                <app-status-text [kind]="stateKind()">{{ application.state.label }}</app-status-text>
+              </span>
+            }
+            @if (gremiumName(); as gremium) {
+              <span class="ad__part ell" [title]="gremium">{{ gremium }}</span>
+            }
+            @if (application.amount !== null) {
+              <span class="ad__part"><span class="mono ad__amount">{{ amount(application) }}</span></span>
+            }
+          </span>
+        </p>
+
+        @if (captureParts(); as parts) {
+          <!-- #11: a subtle note for an application that a member captured on behalf of
+               the applicant. The dots sit between the parts only (as in the line above). -->
+          <p class="ad__line ad__seps ad__capture" data-testid="ad-capture">
+            <span class="ad__parts">
+              @for (part of parts; track $index) {
+                <span class="ad__part">{{ part }}</span>
+              }
+            </span>
+          </p>
+        }
+
+        @if (canTransition() && transitions().length) {
+          <div class="ad__transitions" role="group" [attr.aria-label]="'applications.transitions.title' | t">
+            @for (t of transitions(); track t.id) {
+              <app-button
+                [variant]="looks().get(t.id) ?? 'tonal'"
+                [loading]="firing() === t.id"
+                [disabled]="firing() !== null && firing() !== t.id"
+                (click)="fire(t)"
+              >
+                @if (t.addsToAgenda) {
+                  <app-icon name="cal" [size]="17" />
+                }
+                {{ t.label || ('applications.transitions.fallback' | t) }}
+              </app-button>
+            }
+          </div>
+        }
+
+        @if (application.archivedAt) {
+          <!-- An archived application looks like an active one, and someone arriving from a
+               link has no other way to know. -->
+          <app-note class="ad__archived" icon="archive" role="status">
+            {{ 'applications.detail.archivedNotice' | t: { at: (application.archivedAt | ldate) } }}
+          </app-note>
+        }
+      </header>
+
+      @if (split()) {
+        <div class="ad__cols">
+          <div class="ad__col">
+            <ng-container *ngTemplateOutlet="answers; context: { $implicit: application }" />
+            <ng-container *ngTemplateOutlet="files; context: { $implicit: application }" />
+          </div>
+          <div class="ad__col">
+            <ng-container *ngTemplateOutlet="details; context: { $implicit: application }" />
+            <ng-container *ngTemplateOutlet="history" />
+            <ng-container *ngTemplateOutlet="chat" />
+          </div>
+        </div>
+      } @else {
+        <app-tabs
+          #tabBar
+          class="ad__tabs"
+          idPrefix="ad"
+          [ariaLabel]="title()"
+          [tabs]="tabs()"
+          [active]="tab()"
+          (activeChange)="selectTab($event)"
+        />
+        <!-- Every panel stays in the DOM, so the attachment count, a comment draft and the
+             scroll of a list survive a tab change. -->
+        <section
+          class="ad__panel"
+          role="tabpanel"
+          [id]="tabBar.panelId('app')"
+          [attr.aria-labelledby]="tabBar.tabId('app')"
+          [hidden]="tab() !== 'app'"
+        >
+          <ng-container *ngTemplateOutlet="details; context: { $implicit: application }" />
+          <ng-container *ngTemplateOutlet="answers; context: { $implicit: application }" />
+        </section>
+        <section
+          class="ad__panel"
+          role="tabpanel"
+          [id]="tabBar.panelId('history')"
+          [attr.aria-labelledby]="tabBar.tabId('history')"
+          [hidden]="tab() !== 'history'"
+        >
+          <ng-container *ngTemplateOutlet="history" />
+        </section>
+        <section
+          class="ad__panel"
+          role="tabpanel"
+          [id]="tabBar.panelId('comments')"
+          [attr.aria-labelledby]="tabBar.tabId('comments')"
+          [hidden]="tab() !== 'comments'"
+        >
+          <ng-container *ngTemplateOutlet="chat" />
+        </section>
+        <section
+          class="ad__panel"
+          role="tabpanel"
+          [id]="tabBar.panelId('files')"
+          [attr.aria-labelledby]="tabBar.tabId('files')"
+          [hidden]="tab() !== 'files'"
+        >
+          <ng-container *ngTemplateOutlet="files; context: { $implicit: application }" />
+        </section>
+      }
+    </article>
+  }
+}
+
+<!-- "Details": receipt, last change, applicant, cost centre. -->
+<ng-template #details let-application>
+  <section class="ad__sec" aria-labelledby="ad-details">
+    <h3 id="ad-details" class="sec ad__secTitle">{{ 'applications.detail.details' | t }}</h3>
+    <app-field-group>
+      <div class="ad__pair">
+        <app-field-row [label]="'applications.detail.created' | t">
+          <time [attr.datetime]="application.createdAt">{{ application.createdAt | ldate: 'medium' }}</time>
+        </app-field-row>
+        <app-field-row [label]="'applications.detail.updated' | t">
+          <time [attr.datetime]="application.updatedAt">{{ application.updatedAt | ldate: 'medium' }}</time>
+        </app-field-row>
       </div>
       @if (application.applicant) {
-        <div>
-          <dt>{{ 'applications.detail.applicant' | t }}</dt>
-          <dd>
+        <div class="ad__pair">
+          <app-field-row [label]="'applications.detail.applicant' | t">
             @if (application.applicant.anonymized) {
               {{ 'applications.detail.anonymized' | t }}
             } @else {
               {{ application.applicant.name || ('applications.detail.notProvided' | t) }}
             }
-          </dd>
-        </div>
-        @if (!application.applicant.anonymized && application.applicant.email) {
-          <div>
-            <dt>{{ 'applications.detail.email' | t }}</dt>
-            <dd><a [attr.href]="'mailto:' + application.applicant.email">{{ application.applicant.email }}</a></dd>
-          </div>
-        }
-      }
-      <div>
-        <dt>{{ 'applications.detail.amount' | t }}</dt>
-        <dd>{{ amount(application) }}</dd>
-      </div>
-    </dl>
-  </section>
-
-  <div class="det__layout" [class.det__layout--editing]="editing()">
-  <aside class="det__rail det__rail--left">
-    @if (canTransition() && transitions().length) {
-      <app-card [heading]="'applications.transitions.title' | t">
-        <div class="flex flex-col gap-2">
-          @for (t of transitions(); track t.id) {
-            <app-button size="sm"
-              [color]="t.color"
-              [block]="true"
-              [loading]="firing() === t.id"
-              [disabled]="firing() !== null && firing() !== t.id"
-              (click)="fire(t)"
-            >
-              {{ t.label || ('applications.transitions.fallback' | t) }}
-            </app-button>
+          </app-field-row>
+          @if (!application.applicant.anonymized && application.applicant.email) {
+            <app-field-row [label]="'applications.detail.email' | t">
+              <a class="ad__mail" [attr.href]="'mailto:' + application.applicant.email">{{ application.applicant.email }}</a>
+            </app-field-row>
           }
         </div>
-      </app-card>
-    }
-  </aside>
-
-  <div class="det__center">
-  <app-card [heading]="'applications.detail.data.title' | t">
-    @if (editing()) {
-      <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
-      <div class="flex justify-end gap-2 mt-3">
-        <app-button variant="ghost" size="sm" (click)="cancelEdit()">{{ 'applications.detail.cancel' | t }}</app-button>
-        <app-button size="sm" [disabled]="editForm.invalid" [loading]="savingEdit()" (click)="saveEdit()">{{ 'applications.detail.save' | t }}</app-button>
-      </div>
-    } @else if (dataEntries(application).length || positionEntries(application).length) {
-      @if (dataEntries(application).length) {
-        <dl class="det__data">
-          @for (entry of dataEntries(application); track entry.key) {
-            <div class="det__dataRow">
-              <dt>{{ entry.label }}</dt>
-              <dd>
-                @if (entry.md) {
-                  <app-markdown-view [src]="entry.value" />
-                } @else {
-                  {{ entry.value }}
-                }
-              </dd>
-            </div>
-          }
-        </dl>
       }
-      @for (pf of positionEntries(application); track pf.key) {
-        <section class="flex flex-col gap-3 mt-4">
-          <h3 class="m-0 text-base">{{ pf.label }}</h3>
-          @for (p of pf.positions; track $index) {
-            <div class="flex flex-col gap-2 p-3 border border-solid border-line rounded-md">
-              <div class="flex justify-between gap-3">
-                <strong>{{ p.label || ('applications.detail.positionUntitled' | t) }}</strong>
-                <span class="det__pos-val">{{ money(positionValue(p)) }}</span>
-              </div>
-              <ul class="det__offers">
-                @for (o of p.offers; track $index) {
-                  <li class="flex items-center gap-3 text-sm" [class.det__offer--pref]="o.preferred">
-                    <span class="det__offer-label">{{ o.label || '—' }}</span>
-                    @if (o.preferred) {
-                      <app-badge variant="success">{{ 'apply.positions.preferred' | t }}</app-badge>
-                    }
-                    <span class="det__offer-val">{{ money(o.value) }}</span>
-                  </li>
-                }
-              </ul>
-              @if (p.noOffers) {
-                <p class="m-0 text-sm text-muted">
-                  <app-badge variant="warning">{{ 'apply.positions.noOffersBadge' | t }}</app-badge>
-                  {{ p.noOffersReason }}
-                </p>
-              }
-            </div>
-          }
-          <p class="det__pos-total"><strong>{{ 'apply.positions.total' | t }}: {{ money(positionsTotal(pf.positions)) }}</strong></p>
-        </section>
-      }
-    } @else {
-      <p class="text-muted">{{ 'applications.detail.data.empty' | t }}</p>
-    }
-  </app-card>
-
-  <app-card>
-    <button
-      card-header
-      type="button"
-      class="det__historyToggle"
-      [attr.aria-expanded]="historyOpen()"
-      (click)="historyOpen.set(!historyOpen())"
-    >
-      <span class="text-lg font-semibold">{{ 'applications.history.title' | t }}</span>
-      <span class="det__historyMeta">
-        @if (versions().length > 1) {
-          <span class="det__historyCount">{{ versions().length }}</span>
+      <app-field-row
+        [label]="application.fiscalYearId && fiscalLabel(application.fiscalYearId)
+          ? ('applications.detail.budgetWithYear' | t: { year: fiscalLabel(application.fiscalYearId) })
+          : ('applications.budget.field' | t)"
+      >
+        <!-- "Keine" only without a cost centre. A cost centre outside the tree of this
+             reader (or a tree that did not load) shows a dash, never "Keine". -->
+        @if (!application.budgetId) {
+          {{ 'applications.budget.none' | t }}
+        } @else {
+          {{ budgetLabel(application.budgetId) || '—' }}
         }
-        <app-icon [name]="historyOpen() ? 'chevron-up' : 'chevron-down'" [size]="13" />
-      </span>
-    </button>
-    @if (historyOpen()) {
-    @if (versions().length > 1) {
-      <ol class="det__history">
-        @for (version of versions(); track version.version) {
-          <li class="det__version-item">
-            <div class="flex items-baseline gap-3 flex-wrap mb-2">
-              <strong>{{ 'applications.history.version' | t: { version: version.version } }}</strong>
-              @if (version.changedBy) {
-                <span class="text-muted">{{ 'applications.history.by' | t: { actor: version.changedBy === 'applicant' ? ('applications.comments.author.applicant' | t) : version.changedBy } }}</span>
-              }
-              <time class="text-muted" [attr.datetime]="version.at">{{ version.at | ldate: 'short' }}</time>
-            </div>
-            @if (version.version === 1) {
-              <p class="text-muted">{{ 'applications.history.initial' | t }}</p>
-            } @else if (!version.diff || isEmptyDiff(version)) {
-              <p class="text-muted">{{ 'applications.history.diff.none' | t }}</p>
-            } @else {
-              <ul class="det__diff">
-                @for (change of version.diff.changed; track change.key) {
-                  <li>
-                    <app-badge variant="warning">{{ 'applications.history.diff.changed' | t }}</app-badge>
-                    <code>{{ change.key }}</code>:
-                    <del>{{ fmt(change.old, change.key) }}</del> → <ins>{{ fmt(change.new, change.key) }}</ins>
-                  </li>
-                }
-                @for (added of version.diff.added; track added.key) {
-                  <li>
-                    <app-badge variant="success">{{ 'applications.history.diff.added' | t }}</app-badge>
-                    <code>{{ added.key }}</code>: <ins>{{ fmt(added.value, added.key) }}</ins>
-                  </li>
-                }
-                @for (removed of version.diff.removed; track removed.key) {
-                  <li>
-                    <app-badge variant="danger">{{ 'applications.history.diff.removed' | t }}</app-badge>
-                    <code>{{ removed.key }}</code>: <del>{{ fmt(removed.value, removed.key) }}</del>
-                  </li>
-                }
-              </ul>
-            }
-          </li>
-        }
-      </ol>
-    } @else {
-      <p class="text-muted">{{ 'applications.history.empty' | t }}</p>
-    }
-    }
-  </app-card>
-
-  <app-attachments-panel [applicationId]="application.id" [canUpload]="canManage()" />
-  </div><!-- /det__center -->
-
-  <aside class="det__rail det__rail--right">
-    <section class="det__chat" [attr.aria-label]="'applications.comments.title' | t">
-      <header class="py-3 px-4 font-semibold border-0 border-b border-solid border-line">{{ 'applications.comments.title' | t }}</header>
-      <div class="det__chatScroll">
-        @for (comment of comments(); track comment.id) {
-          <article
-            class="det__msg"
-            [class.det__msg--own]="comment.isOwn"
-          >
-            <span class="det__avatar" aria-hidden="true">{{ initial(authorName(comment)) }}</span>
-            <div class="det__msgBody">
-              <div class="flex items-baseline gap-2 text-xs text-muted">
-                <span class="font-semibold text-text">{{ authorName(comment) }}</span>
-                <time class="det__msgTime" [attr.datetime]="comment.at">{{ comment.at | ldate: 'short' }}</time>
-                @if (canEditComment(comment)) {
-                  <span class="det__msgActions">
-                    <app-button
-                      variant="ghost"
-                      size="sm"
-                      [iconOnly]="true"
-                      [ariaLabel]="'applications.comments.edit' | t"
-                      [title]="'applications.comments.edit' | t"
-                      (click)="openEditComment(comment)"
-                    >
-                      <app-icon name="edit" [size]="13" />
-                    </app-button>
-                    <app-button
-                      variant="ghost"
-                      size="sm"
-                      [iconOnly]="true"
-                      [ariaLabel]="'applications.comments.delete' | t"
-                      [title]="'applications.comments.delete' | t"
-                      (click)="askDeleteComment(comment)"
-                    >
-                      <app-icon name="delete" [size]="13" />
-                    </app-button>
-                  </span>
-                }
-              </div>
-              <div class="det__bubble">{{ comment.body }}</div>
-            </div>
-          </article>
-        } @empty {
-          <p class="text-muted m-auto text-center text-sm py-4">{{ 'applications.comments.empty' | t }}</p>
-        }
-      </div>
-
-      <form class="flex flex-col gap-2 py-3 px-4 border-0 border-t border-solid border-line" (submit)="submitComment($event)">
-        <div class="flex items-end gap-2">
-          <textarea
-            class="det__composerInput"
-            rows="1"
-            [placeholder]="'applications.comments.placeholder' | t"
-            [ngModel]="newComment()"
-            (ngModelChange)="newComment.set($event)"
-            (keydown.enter)="onComposerEnter($event)"
-            name="comment"
-            [attr.aria-label]="'applications.comments.add' | t"
-          ></textarea>
+        @if (canManage()) {
           <app-button
-            type="submit"
+            trail
+            variant="text"
             size="sm"
-            [iconOnly]="true"
-            [ariaLabel]="'applications.comments.send' | t"
-            [disabled]="!newComment().trim()"
-            [loading]="posting()"
+            [ariaLabel]="(application.budgetId ? 'applications.budget.change' : 'applications.budget.assign') | t"
+            (click)="openBudgetDialog()"
           >
-            <app-icon name="send" [size]="15" />
+            {{ (application.budgetId ? 'applications.detail.budgetChange' : 'applications.detail.budgetAssign') | t }}
           </app-button>
-        </div>
+        }
+      </app-field-row>
+    </app-field-group>
+  </section>
+</ng-template>
+
+<!-- The answers of the form by section (O19). -->
+<ng-template #answers let-application>
+  @if (formLoading()) {
+    <span class="skel skel--panel" aria-hidden="true"></span>
+  } @else {
+    <app-answer-view
+      [sections]="sections()"
+      [data]="application.data"
+      [context]="formContext()"
+      [emptyText]="'applications.detail.data.empty' | t"
+    />
+  }
+</ng-template>
+
+<ng-template #files let-application>
+  <app-attachments-panel
+    [applicationId]="application.id"
+    [canUpload]="canManage()"
+    (countChange)="attachmentCount.set($event)"
+  />
+</ng-template>
+
+<!-- "Verlauf": the status changes and the versions with their changes, by day. -->
+<ng-template #history>
+  <section id="ad-history" class="ad__sec" tabindex="-1" [attr.aria-labelledby]="split() ? 'ad-history-title' : null">
+    <!-- In a tab the tab names the section. -->
+    @if (split()) {
+      <h3 id="ad-history-title" class="sec ad__secTitle">{{ 'applications.detail.tab.history' | t }}</h3>
+    }
+    @if (historyEntries().length) {
+      <app-history [entries]="historyEntries()" />
+    } @else {
+      <p class="ad__none">{{ 'applications.history.empty' | t }}</p>
+    }
+  </section>
+</ng-template>
+
+<!-- "Kommentare": the thread and the composer. -->
+<ng-template #chat>
+  <section class="ad__sec" [attr.aria-labelledby]="split() ? 'ad-comments' : null">
+    @if (split()) {
+      <div class="ad__secHead">
+        <h3 id="ad-comments" class="sec ad__secTitle">{{ 'applications.comments.title' | t }}</h3>
+        <span class="ad__count">{{ comments().length }}</span>
+      </div>
+    }
+    <div class="rowgroup ad__thread">
+      @for (comment of comments(); track comment.id) {
+        <article class="ad__msg" [class.ad__msg--own]="comment.isOwn">
+          <app-avatar [name]="authorName(comment)" [principalId]="comment.authorInfo?.principalId" size="sm" [decorative]="true" />
+          <div class="ad__msgBody">
+            <div class="ad__msgHead">
+              <span class="ad__msgAuthor ell">{{ authorName(comment) }}</span>
+              @if (canEditComment(comment)) {
+                <span class="ad__msgActions">
+                  <app-button
+                    variant="text"
+                    size="sm"
+                    [iconOnly]="true"
+                    [ariaLabel]="'applications.comments.edit' | t"
+                    (click)="openEditComment(comment)"
+                  ><app-icon name="edit" [size]="16" /></app-button>
+                  <app-button
+                    variant="text"
+                    size="sm"
+                    [iconOnly]="true"
+                    [ariaLabel]="'applications.comments.delete' | t"
+                    (click)="askDeleteComment(comment)"
+                  ><app-icon name="trash" [size]="16" /></app-button>
+                </span>
+              }
+            </div>
+            <span class="ad__msgMeta">
+              <time [attr.datetime]="comment.at">{{ comment.at | ldate: 'short' }}</time>
+              <span class="ad__msgDot" aria-hidden="true">·</span>
+              @if (comment.visibility === 'internal') {
+                <span>{{ 'applications.comments.internal' | t }}</span>
+              } @else {
+                <span class="ad__msgPublic">{{ 'applications.comments.public' | t }}</span>
+              }
+            </span>
+            <p class="ad__msgText">{{ comment.body }}</p>
+          </div>
+        </article>
+      } @empty {
+        <p class="ad__none ad__none--row">{{ 'applications.comments.empty' | t }}</p>
+      }
+      <form class="ad__composer" (submit)="submitComment($event)">
+        <textarea
+          class="ad__composerInput"
+          rows="1"
+          [placeholder]="'applications.comments.placeholder' | t"
+          [ngModel]="newComment()"
+          (ngModelChange)="newComment.set($event)"
+          (keydown.enter)="onComposerEnter($event)"
+          name="comment"
+          [attr.aria-label]="'applications.comments.add' | t"
+        ></textarea>
+        @if (canManage()) {
+          <app-segmented width="equal"
+            class="ad__composerVis"
+            [ariaLabel]="'applications.comments.visibility' | t"
+            [options]="visibilityOptions()"
+            [value]="visibility()"
+            (valueChange)="setVisibility($event)"
+          />
+        }
+        <app-button
+          type="submit"
+          variant="text"
+          [iconOnly]="true"
+          [ariaLabel]="'applications.comments.send' | t"
+          [disabled]="!newComment().trim()"
+          [loading]="posting()"
+        ><app-icon name="send" [size]="19" /></app-button>
       </form>
-    </section>
-  </aside>
-  </div><!-- /det__layout -->
-}
+    </div>
+  </section>
+</ng-template>
 
 <app-dialog
   [open]="confirmDelete()"
@@ -377,7 +411,7 @@
 >
   <p>{{ 'applications.detail.deleteConfirm' | t }}</p>
   <div dialog-footer>
-    <app-button variant="ghost" size="sm" (click)="confirmDelete.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
+    <app-button variant="text" size="sm" (click)="confirmDelete.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
     <app-button variant="danger" size="sm" [loading]="deleting()" (click)="doDelete()">{{ 'applications.detail.delete' | t }}</app-button>
   </div>
 </app-dialog>
@@ -390,7 +424,7 @@
 >
   <p>{{ 'applications.detail.eraseConfirm' | t }}</p>
   <div dialog-footer>
-    <app-button variant="ghost" size="sm" (click)="confirmErase.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
+    <app-button variant="text" size="sm" (click)="confirmErase.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
     <app-button variant="danger" size="sm" [loading]="requestingErasure()" (click)="doRequestErasure()">{{ 'applications.detail.eraseRequest' | t }}</app-button>
   </div>
 </app-dialog>
@@ -401,8 +435,8 @@
   [closeLabel]="'applications.detail.cancel' | t"
   (closed)="budgetDialogOpen.set(false)"
 >
-  <p class="text-muted">{{ 'applications.budget.lead' | t }}</p>
-  <div class="det__ccTree">
+  <p class="ad__dlgLead">{{ 'applications.budget.lead' | t }}</p>
+  <div class="ad__ccTree" appScrollFade="y">
     <app-cost-centre-tree
       [nodes]="budgetTree()"
       [selectedId]="budgetChoice()"
@@ -413,7 +447,7 @@
   </div>
   @if (budgetChoice()) {
     <app-select
-      class="det__ccFy"
+      class="ad__ccFy"
       [label]="'applications.budget.fiscalYear' | t"
       [options]="fiscalOptions()"
       [ngModel]="fiscalChoice()"
@@ -421,8 +455,9 @@
     />
   }
   <div dialog-footer>
-    <app-button variant="ghost" size="sm" (click)="budgetDialogOpen.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
+    <app-button variant="text" size="sm" (click)="budgetDialogOpen.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
     <app-button
+      variant="fill"
       size="sm"
       [loading]="assigningBudget()"
       [disabled]="budgetChoice() === (app()?.budgetId ?? '') && fiscalChoice() === (app()?.fiscalYearId ?? '')"
@@ -431,52 +466,22 @@
   </div>
 </app-dialog>
 
-<!-- Force status is a privileged override. It bypasses the flow. -->
-<app-dialog
-  [open]="forceDialogOpen()"
-  [title]="'applications.detail.forceStatusTitle' | t"
-  [closeLabel]="'applications.detail.cancel' | t"
-  (closed)="forceDialogOpen.set(false)"
->
-  <p class="text-muted">{{ 'applications.detail.forceStatusLead' | t }}</p>
-  <app-select
-    [label]="'applications.detail.forceStatusField' | t"
-    [placeholder]="'applications.detail.forceStatusPlaceholder' | t"
-    [options]="forceStateOptions()"
-    [ngModel]="forceStateChoice()"
-    (ngModelChange)="forceStateChoice.set($event)"
-  />
-  <label class="det__forceReason">
-    <span>{{ 'applications.detail.forceStatusReason' | t }}</span>
-    <textarea
-      rows="3"
-      name="forceReason"
-      [placeholder]="'applications.detail.forceStatusReasonPlaceholder' | t"
-      [ngModel]="forceNote()"
-      (ngModelChange)="forceNote.set($event)"
-    ></textarea>
-  </label>
-  <div dialog-footer>
-    <app-button variant="ghost" size="sm" (click)="forceDialogOpen.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
-    <app-button
-      variant="danger"
-      size="sm"
-      [loading]="forcingStatus()"
-      [disabled]="!forceStateChoice() || !forceNote().trim()"
-      (click)="doForceStatus()"
-    >{{ 'applications.detail.forceStatusConfirm' | t }}</app-button>
-  </div>
-</app-dialog>
+<app-force-status-dialog
+  [applicationId]="app()?.id ?? null"
+  [currentStateId]="app()?.state?.id ?? null"
+  [(open)]="forceDialogOpen"
+  (done)="onForced()"
+/>
 
-<!-- Comment edit. Only the body changes. The visibility stays as written, so a
-     public comment cannot silently turn internal after the applicant read it. -->
+<!-- Comment edit. Only the body changes. The visibility stays as written, so a public
+     comment cannot silently turn internal after the applicant read it. -->
 <app-dialog
   [open]="editingComment() !== null"
   [title]="'applications.comments.editTitle' | t"
   [closeLabel]="'applications.detail.cancel' | t"
   (closed)="closeEditComment()"
 >
-  <label class="det__commentEdit">
+  <label class="ad__commentEdit">
     <span>{{ 'applications.comments.body' | t }}</span>
     <textarea
       rows="5"
@@ -486,10 +491,11 @@
       [attr.aria-label]="'applications.comments.body' | t"
     ></textarea>
   </label>
-  <p class="text-muted text-sm m-0">{{ 'applications.comments.visibilityLocked' | t }}</p>
+  <p class="ad__dlgLead">{{ 'applications.comments.visibilityLocked' | t }}</p>
   <div dialog-footer>
-    <app-button variant="ghost" size="sm" (click)="closeEditComment()">{{ 'applications.detail.cancel' | t }}</app-button>
+    <app-button variant="text" size="sm" (click)="closeEditComment()">{{ 'applications.detail.cancel' | t }}</app-button>
     <app-button
+      variant="fill"
       size="sm"
       [loading]="savingComment()"
       [disabled]="!commentDraft().trim()"
@@ -506,102 +512,19 @@
 >
   <p>{{ 'applications.comments.deleteConfirm' | t }}</p>
   <div dialog-footer>
-    <app-button variant="ghost" size="sm" (click)="deletingComment.set(null)">{{ 'applications.detail.cancel' | t }}</app-button>
+    <app-button variant="text" size="sm" (click)="deletingComment.set(null)">{{ 'applications.detail.cancel' | t }}</app-button>
     <app-button variant="danger" size="sm" [loading]="removingComment()" (click)="doDeleteComment()">
       {{ 'applications.comments.delete' | t }}
     </app-button>
   </div>
 </app-dialog>
 
-<!-- Public share links. The dialog is where a link is minted, read once and revoked;
-     the token itself exists in the response and nowhere else. -->
-<app-dialog
-  [open]="shareDialogOpen()"
-  [title]="'applications.share.title' | t"
-  [closeLabel]="'applications.detail.cancel' | t"
-  (closed)="shareDialogOpen.set(false)"
->
-  <p class="text-muted">{{ 'applications.share.lead' | t }}</p>
+<app-share-links-dialog [applicationId]="app()?.id ?? null" [(open)]="shareDialogOpen" />
 
-  @if (freshShareUrl(); as url) {
-    <!-- Shown once. The server keeps a hash, so closing this dialog loses the token. -->
-    <div class="det__shareFresh">
-      <p class="det__shareFreshHint">{{ 'applications.share.onceHint' | t }}</p>
-      <div class="det__shareFreshRow">
-        <input
-          class="det__shareUrl"
-          type="text"
-          readonly
-          [value]="url"
-          [attr.aria-label]="'applications.share.url' | t"
-        />
-        <app-button variant="secondary" size="sm" (click)="copyShareUrl()">
-          {{ (shareCopied() ? 'applications.share.copied' : 'applications.share.copy') | t }}
-        </app-button>
-      </div>
-    </div>
-  }
-
-  <div class="det__shareForm">
-    <app-select
-      [label]="'applications.share.ttl' | t"
-      [options]="shareTtlOptions"
-      [ngModel]="shareTtl()"
-      (ngModelChange)="shareTtl.set($event)"
-    />
-    <label class="det__shareLabel">
-      <span>{{ 'applications.share.label' | t }}</span>
-      <input
-        type="text"
-        name="shareLabel"
-        maxlength="200"
-        [placeholder]="'applications.share.labelPlaceholder' | t"
-        [ngModel]="shareLabel()"
-        (ngModelChange)="shareLabel.set($event)"
-      />
-    </label>
-  </div>
-
-  @if (sharesLoading()) {
-    <div class="det__shareList" aria-busy="true">
-      <span class="skel skel--line"></span>
-      <span class="skel skel--line"></span>
-    </div>
-  } @else if (shares().length) {
-    <ul class="det__shareList">
-      @for (share of shares(); track share.id) {
-        <li class="det__shareRow" [class.det__shareRow--dead]="!shareIsLive(share)">
-          <div class="det__shareRowMain">
-            <span class="det__shareRowLabel">{{ share.label || ('applications.share.unlabelled' | t) }}</span>
-            <span class="text-muted text-sm">
-              @if (share.revokedAt) {
-                {{ 'applications.share.revokedAt' | t: { at: (share.revokedAt | ldate) } }}
-              } @else if (shareIsLive(share)) {
-                {{ 'applications.share.expiresAt' | t: { at: (share.expiresAt | ldate) } }}
-              } @else {
-                {{ 'applications.share.expired' | t: { at: (share.expiresAt | ldate) } }}
-              }
-            </span>
-          </div>
-          @if (shareIsLive(share)) {
-            <app-button
-              variant="danger"
-              size="sm"
-              [loading]="revokingShare() === share.id"
-              (click)="revokeShare(share.id)"
-            >{{ 'applications.share.revoke' | t }}</app-button>
-          }
-        </li>
-      }
-    </ul>
-  } @else {
-    <p class="text-muted text-sm m-0">{{ 'applications.share.none' | t }}</p>
-  }
-
-  <div dialog-footer>
-    <app-button variant="ghost" size="sm" (click)="shareDialogOpen.set(false)">{{ 'applications.share.close' | t }}</app-button>
-    <app-button size="sm" [loading]="creatingShare()" (click)="createShare()">
-      {{ 'applications.share.create' | t }}
-    </app-button>
-  </div>
-</app-dialog>
+<app-agenda-dialog
+  [applicationId]="app()?.id ?? null"
+  [applicationTitle]="title()"
+  [transition]="agendaTransition()"
+  [(open)]="agendaOpen"
+  (done)="onAgendaDone()"
+/>

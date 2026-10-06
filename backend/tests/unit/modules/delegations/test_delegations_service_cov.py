@@ -977,7 +977,7 @@ async def test_revoke_not_found() -> None:
 async def test_revoke_foreign_non_admin_forbidden() -> None:
     row = SimpleNamespace(id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=uuid4())
     db = fake_session(result(_me()))  # me is not the delegator
-    db.get_results = [row]
+    db.get_results = [row, _meeting()]  # planned: no lead path
     with pytest.raises(ForbiddenError, match="delegator"):
         await _svc(db).revoke(row.id, _actor())
 
@@ -985,8 +985,8 @@ async def test_revoke_foreign_non_admin_forbidden() -> None:
 async def test_revoke_owner_after_start_validation() -> None:
     me = _me()
     row = SimpleNamespace(id=uuid4(), meeting_id=MEETING_ID, delegator_principal_id=me.id)
-    db = fake_session(result(me))
-    db.get_results = [row, _meeting(status="live")]  # live meeting: _revocable False (line 302)
+    db = fake_session(result(), result(me))  # no session.manage role, then me
+    db.get_results = [row, _meeting(status="live")]  # live meeting: _revocable False
     with pytest.raises(ValidationProblem, match="started"):
         await _svc(db).revoke(row.id, _actor())
 
@@ -1180,3 +1180,34 @@ async def test_create_acquires_meeting_advisory_lock() -> None:
 def test_recipient_out_is_camel_model() -> None:
     r = RecipientOut(principal_id=uuid4(), via_pool=False, is_member=True)
     assert isinstance(r.principal_id, UUID)
+
+
+async def test_view_gremium_admin_with_read_scope_passes() -> None:
+    # The `read` scope carries `meeting.view_all`, so the admin passes without a query.
+    admin = Principal(
+        sub="admin",
+        roles=["admin"],
+        permissions=set(),
+        scope_permissions=frozenset({"application.read", "meeting.view_all"}),
+    )
+    db = fake_session()
+    await _svc(db)._assert_can_view_gremium(GREMIUM_ID, admin)
+    assert db.statements == []
+
+
+async def test_view_gremium_admin_token_without_read_scope_denied() -> None:
+    # A `budget:write` token of an admin holds neither `meeting.view_all` nor
+    # `admin.delegations`. Without a membership or a pool place it cannot read the
+    # roster of a foreign gremium, which carries names and email addresses.
+    admin = Principal(
+        sub="admin",
+        roles=["admin"],
+        permissions=set(),
+        scope_permissions=frozenset({"budget.structure", "budget.book"}),
+    )
+    db = fake_session(
+        result(),  # gremium_member_ids: no membership
+        result(),  # _pool_member_gremium_ids: no pool place
+    )
+    with pytest.raises(ForbiddenError):
+        await _svc(db)._assert_can_view_gremium(GREMIUM_ID, admin)

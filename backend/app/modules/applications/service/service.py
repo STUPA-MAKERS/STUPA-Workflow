@@ -4,6 +4,7 @@
 exactly this class. The implementation lives in the ops classes:
 
 * `create.CreateOps`: application creation, public and managed
+* `on_behalf.OnBehalfOps`: capture on behalf of an applicant (#11), applicant search
 * `edits.EditOps`: versioned data edits with diff, version history, deletion
 * `reads.ReadOps`: detail view, pinned effective form, status timeline
 * `listing.ListingOps`: filtered listing, Gremium scope, tasks, name maps
@@ -18,10 +19,12 @@ from app.modules.applications.service.comments import CommentOps
 from app.modules.applications.service.create import CreateOps
 from app.modules.applications.service.edits import EditOps
 from app.modules.applications.service.listing import ListingOps
+from app.modules.applications.service.on_behalf import OnBehalfOps
 from app.modules.applications.service.reads import ReadOps
 
 
 class ApplicationsService(
+    OnBehalfOps,
     CreateOps,
     EditOps,
     ReadOps,

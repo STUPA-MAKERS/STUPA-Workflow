@@ -2,6 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import type { MeetingChannel } from './ws.service';
 import { LIVE_VOTE_SOURCE, type LiveVoteSource } from './live-vote.source';
 import type {
+  GuestCountsMsg,
   MeetingStateMsg,
   ServerMessage,
   VoteClosedMsg,
@@ -24,6 +25,8 @@ export class LiveVoteSession {
   readonly tally = signal<VoteTallyMsg | null>(null);
   readonly result = signal<VoteClosedMsg | null>(null);
   readonly errorCode = signal<string | null>(null);
+  /** The public participation of the meeting (`guest_counts`): the code and the guests. */
+  readonly guestCounts = signal<GuestCountsMsg | null>(null);
 
   private channel: MeetingChannel | null = null;
   private closedByUser = false;
@@ -96,17 +99,32 @@ export class LiveVoteSession {
           this.result.set(null);
         }
         break;
+      case 'guest_counts':
+        this.guestCounts.set(m);
+        break;
       case 'error':
         this.errorCode.set(m.code);
         break;
     }
   }
 
-  /** Cast a ballot over the live channel. In beamer mode this does nothing. */
-  cast(choice: string): void {
+  /**
+   * Cast a ballot over the live channel. In beamer mode this does nothing.
+   *
+   * `asDelegation` casts the ballot of the member that the caller represents. The own
+   * ballot and the represented ballot are two separate casts. The server answers a
+   * refused cast with an `error` frame (`already_voted`, `not_eligible`), which
+   * `errorCode` shows. The ballot pages cast over REST (`POST /votes/{id}/ballot`),
+   * because that call gives a definite answer per ballot.
+   */
+  cast(choice: string, asDelegation = false): void {
     const vote = this.openVote();
     if (this.beamer || !vote) return;
-    this.channel?.send({ type: 'cast', voteId: vote.voteId, choice });
+    this.channel?.send(
+      asDelegation
+        ? { type: 'cast', voteId: vote.voteId, choice, asDelegation: true }
+        : { type: 'cast', voteId: vote.voteId, choice },
+    );
   }
 
   private onClosed(): void {

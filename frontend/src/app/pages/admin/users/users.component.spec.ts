@@ -74,10 +74,13 @@ const MAPPINGS: GroupMapping[] = [
   { id: 'gm-3', oidcGroup: 'vote:g-1', roleId: 'r-member' },
 ];
 
-function makeAuth(sub: string | null, canMappings = true) {
+function makeAuth(sub: string | null, canMappings = true, canMerge = false) {
   return {
     principal: () => (sub === null ? null : { sub }),
-    can: (p: string) => p === 'admin.users' || (canMappings && p === 'admin.group_mappings'),
+    can: (p: string) =>
+      p === 'admin.users' ||
+      (canMappings && p === 'admin.group_mappings') ||
+      (canMerge && p === 'admin.users.merge'),
   } as unknown as AuthService;
 }
 
@@ -89,6 +92,8 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
     ),
     listGroupMappings: jest.fn(() => of(MAPPINGS.map((m) => ({ ...m })))),
     setPrincipalActive: jest.fn(() => of({ id: 'p-1', active: true })),
+    previewPrincipalMerge: jest.fn(() => of(null)),
+    mergePrincipal: jest.fn(() => of(null)),
     ...over,
   };
 }
@@ -132,23 +137,26 @@ describe('UsersComponent', () => {
     const api = makeApi();
     const { inst } = await setup(api, makeAuth(null), makeToast(), { q: 'kc|alex' });
     expect(api.listPrincipals).toHaveBeenCalledWith('kc|alex');
-    expect(inst.query()).toBe('kc|alex');
+    expect(inst.search.text()).toBe('kc|alex');
+    expect(api.listPrincipals).toHaveBeenCalledTimes(1);
   });
 
-  it('lists principals with capitalized, read-only role tags', async () => {
+  it('lists principals with the capitalized, read-only roles on one line', async () => {
     await setup();
     expect(screen.getByText('Alex Admin')).toBeInTheDocument();
-    expect(screen.getAllByText('Administrator').length).toBeGreaterThan(0);
-    expect(screen.getByText('Referent')).toBeInTheDocument();
-    expect(screen.queryByText('administrator')).not.toBeInTheDocument();
+    expect(screen.getByText('Administrator, Referent')).toBeInTheDocument();
+    expect(screen.queryByText(/administrator/)).not.toBeInTheDocument();
     expect(screen.getByText('Keine Rollen zugewiesen.')).toBeInTheDocument();
+    // The e-mail address shows in full; a principal without one shows none.
+    expect(screen.getByText('alex@x.de')).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
     // No role editing is left: no assign, edit or revoke control.
     expect(screen.queryByRole('button', { name: /Entziehen|Zuweisung|Rolle \+/ })).toBeNull();
   });
 
   it('shows the OIDC groups of each user, or a placeholder', async () => {
     await setup();
-    expect(screen.getByRole('columnheader', { name: 'OIDC-Gruppen' })).toBeInTheDocument();
+    expect(screen.getAllByText('OIDC-Gruppen')).toHaveLength(2);
     expect(screen.getByText('stupa-referat')).toBeInTheDocument();
     expect(screen.getByText('unmapped')).toBeInTheDocument();
     expect(screen.getByText('Keine Gruppen.')).toBeInTheDocument();
@@ -167,7 +175,7 @@ describe('UsersComponent', () => {
     expect(
       screen.getByText(/Die Rollen kommen aus den OIDC-Gruppen/),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Gruppen-Mappings verwalten' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Gruppen-Zuordnung' })).toHaveAttribute(
       'href',
       '/admin/group-mappings',
     );
@@ -177,7 +185,7 @@ describe('UsersComponent', () => {
     const api = makeApi();
     const { inst } = await setup(api, makeAuth(null, false));
     expect(api.listGroupMappings).not.toHaveBeenCalled();
-    expect(screen.queryByRole('link', { name: 'Gruppen-Mappings verwalten' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Gruppen-Zuordnung' })).toBeNull();
     expect(inst.roleIds(PRINCIPALS[0])).toEqual(['r-admin']);
   });
 
@@ -195,11 +203,6 @@ describe('UsersComponent', () => {
   it('mySub is set when a principal is logged in', async () => {
     const { inst } = await setup(makeApi(), makeAuth('kc|alex'));
     expect(inst.mySub()).toBe('kc|alex');
-  });
-
-  it('rowId exposes the principal id', async () => {
-    const { inst } = await setup();
-    expect(inst.rowId(PRINCIPALS[0])).toBe('p-1');
   });
 
   it('roleLabel resolves locale→de→key, raw id when unknown', async () => {
@@ -234,11 +237,45 @@ describe('UsersComponent', () => {
     expect(inst.isSelf(PRINCIPALS[0])).toBe(false);
   });
 
-  it('searches by query', async () => {
-    const { api } = await setup();
-    await userEvent.type(screen.getByRole('searchbox', { name: 'Benutzer suchen' }), 'alex');
-    await userEvent.click(screen.getByRole('button', { name: 'Suchen' }));
-    expect(api.listPrincipals).toHaveBeenLastCalledWith('alex');
+  describe('live search', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    it('searches while the user types, without a "Suchen" button', async () => {
+      const { api } = await setup();
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      expect(screen.queryByRole('button', { name: 'Suchen' })).toBeNull();
+      api.listPrincipals.mockClear();
+      await user.type(screen.getByRole('searchbox', { name: 'Benutzer suchen' }), 'alex');
+      // The debounce folds the four key presses into one request.
+      expect(api.listPrincipals).not.toHaveBeenCalled();
+      jest.advanceTimersByTime(260);
+      expect(api.listPrincipals).toHaveBeenCalledTimes(1);
+      expect(api.listPrincipals).toHaveBeenLastCalledWith('alex');
+    });
+
+    it('sends no request for one character and runs at once on Enter', async () => {
+      const { api } = await setup();
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      api.listPrincipals.mockClear();
+      const box = screen.getByRole('searchbox', { name: 'Benutzer suchen' });
+      await user.type(box, 'a');
+      jest.advanceTimersByTime(260);
+      expect(api.listPrincipals).not.toHaveBeenCalled();
+      await user.type(box, 'l{Enter}');
+      expect(api.listPrincipals).toHaveBeenCalledWith('al');
+    });
+
+    it('lists every user again when the × clears the field', async () => {
+      const { api } = await setup();
+      const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
+      await user.type(screen.getByRole('searchbox', { name: 'Benutzer suchen' }), 'alex');
+      jest.advanceTimersByTime(260);
+      api.listPrincipals.mockClear();
+      await user.click(screen.getByRole('button', { name: 'Suche leeren' }));
+      expect(api.listPrincipals).toHaveBeenCalledWith('');
+      expect(screen.getByRole('searchbox', { name: 'Benutzer suchen' })).toHaveValue('');
+    });
   });
 
   it('search error path shows an error toast', async () => {
@@ -263,9 +300,92 @@ describe('UsersComponent', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  it('renders the principals as a table without the oidc-subject column', async () => {
+  it('deactivates from the row, and the own account only with a reason', async () => {
+    const { api } = await setup(makeApi(), makeAuth('kc|sam'));
+    const own = screen.getAllByRole('button', { name: /^Deaktivieren: / });
+    // Alex can be deactivated; Sam is the signed-in user.
+    expect(own[0]).toBeEnabled();
+    expect(own[1]).toBeDisabled();
+    expect(own[1]).toHaveAttribute('title', 'Du kannst dein eigenes Konto nicht deaktivieren.');
+    // The button names its person, so a list of the buttons tells the rows apart.
+    expect(own[0]).toHaveAccessibleName('Deaktivieren: Alex Admin');
+    await userEvent.click(own[0]);
+    expect(api.setPrincipalActive).toHaveBeenCalledWith('p-1', false);
+  });
+
+  it('greys out an inactive principal and offers "Aktivieren"', async () => {
+    const api = makeApi({
+      listPrincipals: jest.fn(() => of([{ ...PRINCIPALS[1], active: false }])),
+    });
+    const { container } = await setup(api);
+    expect(container.querySelector('.au__row--off')).not.toBeNull();
+    expect(screen.getByText('deaktiviert')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Aktivieren: / }));
+    expect(api.setPrincipalActive).toHaveBeenCalledWith('p-3', true);
+  });
+
+  it('shows the last login as a date, else "nie"', async () => {
     await setup();
-    expect(screen.getByRole('table')).toBeInTheDocument();
-    expect(screen.queryByRole('columnheader', { name: 'OIDC-Subject' })).not.toBeInTheDocument();
+    expect(screen.getByText('nie')).toBeInTheDocument();
+    expect(screen.getByText(/06\.06\.2026/)).toBeInTheDocument();
+  });
+
+  it('shows the empty state when the search finds nobody', async () => {
+    await setup(makeApi({ listPrincipals: jest.fn(() => of([])) }));
+    expect(screen.getByText('Keine Benutzer gefunden.')).toBeInTheDocument();
+  });
+
+  describe('account merge', () => {
+    const MERGED: AdminPrincipal = {
+      id: 'p-9',
+      sub: 'e03ad7d7',
+      email: 'alt@x.de',
+      displayName: 'Alex Alt',
+      lastLogin: null,
+      assignments: [],
+      oidcGroups: [],
+      active: false,
+      mergedIntoId: 'p-1',
+      mergedIntoName: 'Alex Admin',
+      mergedAt: '2026-10-05T09:00:00+00:00',
+    };
+
+    it('a merged account shows "zusammengeführt in" and no action', async () => {
+      const api = makeApi({ listPrincipals: jest.fn(() => of([MERGED, { ...MERGED, id: 'p-8', mergedIntoName: null }])) });
+      const { container } = await setup(api, makeAuth(null, true, true));
+      expect(screen.getByText('zusammengeführt in Alex Admin')).toBeInTheDocument();
+      expect(screen.getByText('zusammengeführt in Konto ohne Namen')).toBeInTheDocument();
+      expect(screen.queryByText('deaktiviert')).toBeNull();
+      expect(container.querySelectorAll('.au__row--off')).toHaveLength(2);
+      expect(screen.queryByRole('button', { name: /Aktivieren|Deaktivieren|Weitere Aktionen/ })).toBeNull();
+    });
+
+    it('without admin.users.merge the row has no menu', async () => {
+      await setup(makeApi(), makeAuth(null));
+      expect(screen.queryByRole('button', { name: /^Weitere Aktionen/ })).toBeNull();
+    });
+
+    it('the row menu opens the merge dialog; the own account cannot be merged', async () => {
+      const { inst } = await setup(makeApi(), makeAuth('kc|alex', true, true));
+      const menus = screen.getAllByRole('button', { name: /^Weitere Aktionen: / });
+      expect(menus).toHaveLength(2);
+      const own = inst.menuFor(PRINCIPALS[0])[0].items[0];
+      expect(own.disabledReason).toBe(
+        'Dein eigenes Konto kannst du nicht in ein anderes Konto zusammenführen.',
+      );
+      const other = inst.menuFor(PRINCIPALS[1])[0].items[0];
+      expect(other).toMatchObject({ id: 'merge', danger: true, disabledReason: null });
+      inst.onMenu({ id: 'other', label: 'x' }, PRINCIPALS[1]);
+      expect(inst.mergeSource()).toBeNull();
+      inst.onMenu(other, PRINCIPALS[1]);
+      expect(inst.mergeSource()).toEqual(PRINCIPALS[1]);
+    });
+
+    it('a merge reloads the list', async () => {
+      const { api, inst } = await setup(makeApi(), makeAuth(null, true, true));
+      api.listPrincipals.mockClear();
+      inst.onMerged();
+      expect(api.listPrincipals).toHaveBeenCalled();
+    });
   });
 });

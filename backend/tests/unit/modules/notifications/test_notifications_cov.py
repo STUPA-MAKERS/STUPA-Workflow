@@ -18,10 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.notifications import auto, privacy, recipients
 from app.modules.notifications import service as service_mod
 from app.modules.notifications.auto import (
-    AssignmentMailInfo,
     AutoMailer,
     DelegationMailInfo,
-    assignment_mail_info,
     get_auto_mailer,
     meeting_delegation_mail_info,
 )
@@ -485,11 +483,11 @@ async def test_get_preferences_merges_stored_disable() -> None:
     session = FakeSession(
         scalar=[pid],
         # The execute call returns the (kind, enabled) pairs of the user.
-        executes=[[("comment", False), ("vote", False)]],
+        executes=[[("comment", False), ("meeting", False)]],
     )
     prefs = dict(await _svc(session).get_preferences("u"))
     assert prefs["comment"] is False
-    assert prefs["vote"] is False
+    assert prefs["meeting"] is False
     assert prefs["status_update"] is True  # not stored, so the default stays on
 
 
@@ -507,7 +505,7 @@ async def test_set_preferences_principal_not_found_404() -> None:
 async def test_set_preferences_all_branches() -> None:
     pid = uuid.uuid4()
     # There is an opt-out row for 'comment'. The test enables it again, which deletes
-    # the row. 'vote' gets a new opt-out (add). 'task' has a row and stays off (update).
+    # the row. 'meeting' gets a new opt-out (add). 'task' has a row and stays off (update).
     existing_comment = NotificationPreference(
         principal_id=pid, kind="comment", enabled=False
     )
@@ -529,14 +527,14 @@ async def test_set_preferences_all_branches() -> None:
         [
             ("comment", True),  # row present + enabled → delete
             ("status_update", True),  # row None + enabled → nothing
-            ("vote", False),  # row None + disabled → add
+            ("meeting", False),  # row None + disabled → add
             ("task", False),  # row present + disabled → update
         ],
     )
     assert existing_comment in session.deleted
     assert existing_task.enabled is False
     added_kinds = {p.kind for p in session.added}
-    assert "vote" in added_kinds
+    assert "meeting" in added_kinds
     assert isinstance(out, list)
 
 
@@ -861,52 +859,6 @@ async def test_state_actionable_no_manual_transitions_false() -> None:
 
 
 # Tests for auto.py
-async def test_assignment_mail_info_query_fails_returns_none(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    class BoomSession:
-        async def execute(self, _stmt: Any) -> Any:
-            raise RuntimeError("db down")
-
-    out = await assignment_mail_info(BoomSession(), uuid.uuid4())
-    assert out is None
-
-
-async def test_assignment_mail_info_row_none() -> None:
-    session = FakeSession(executes=[[]])  # .first() → None
-    out = await assignment_mail_info(session, uuid.uuid4())
-    assert out is None
-
-
-async def test_assignment_mail_info_label_from_i18n() -> None:
-    aid = uuid.uuid4()
-    row = ("a@x.de", {"de": "Manager", "en": "Manager"}, "manager", "AStA", None)
-    session = FakeSession(executes=[[row]])
-    out = await assignment_mail_info(session, aid)
-    assert out is not None
-    assert out.role_label == "Manager"
-    assert out.email == "a@x.de"
-    assert out.gremium_name == "AStA"
-
-
-async def test_assignment_mail_info_label_fallback_to_key() -> None:
-    # name_i18n is empty or not a dict, so label = key.
-    row = ("a@x.de", {}, "manager", None, None)
-    session = FakeSession(executes=[[row]])
-    out = await assignment_mail_info(session, uuid.uuid4())
-    assert out is not None
-    assert out.role_label == "manager"
-
-
-async def test_assignment_mail_info_label_first_value_when_no_de() -> None:
-    # name_i18n has no 'de', so next(iter(...)) applies.
-    row = ("a@x.de", {"en": "Chair"}, "chair", None, None)
-    session = FakeSession(executes=[[row]])
-    out = await assignment_mail_info(session, uuid.uuid4())
-    assert out is not None
-    assert out.role_label == "Chair"
-
-
 async def test_meeting_delegation_mail_info_query_fails_returns_none() -> None:
     class BoomSession:
         async def execute(self, _stmt: Any) -> Any:
@@ -1018,83 +970,6 @@ async def test_auto_mailer_meeting_created_swallows_exception(
     monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: FakeQueue())
     # The code logs the exception and swallows it. It does not re-raise.
     await AutoMailer().meeting_created(SETTINGS, uuid.uuid4(), pool=object())
-
-
-async def test_auto_mailer_assignment_granted(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    session = FakeSession(scalars=[[], []])  # filter, then no database template
-    monkeypatch.setattr(auto, "get_sessionmaker", _sessionmaker_for(session))
-    queue = FakeQueue()
-    monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: queue)
-    info = AssignmentMailInfo(
-        assignment_id=uuid.uuid4(),
-        email="a@x.de",
-        role_label="Manager",
-        gremium_name="AStA",
-        delegated_by=None,
-    )
-    await AutoMailer().assignment_changed(SETTINGS, info, granted=True, pool=object())
-    assert queue.messages
-    assert "Manager" in queue.messages[0].subject
-
-
-async def test_auto_mailer_assignment_revoked(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    session = FakeSession(scalars=[[], []])
-    monkeypatch.setattr(auto, "get_sessionmaker", _sessionmaker_for(session))
-    queue = FakeQueue()
-    monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: queue)
-    info = AssignmentMailInfo(
-        assignment_id=uuid.uuid4(),
-        email="a@x.de",
-        role_label="Manager",
-        gremium_name=None,
-        delegated_by=None,
-    )
-    await AutoMailer().assignment_changed(SETTINGS, info, granted=False, pool=object())
-    assert queue.messages
-
-
-async def test_auto_mailer_assignment_info_none_skips(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: FakeQueue())
-    # info None returns early, so the code needs no sessionmaker.
-    await AutoMailer().assignment_changed(SETTINGS, None, granted=True, pool=object())
-
-
-async def test_auto_mailer_assignment_no_email_skips(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: FakeQueue())
-    info = AssignmentMailInfo(
-        assignment_id=uuid.uuid4(),
-        email=None,  # no mail address, so the code returns
-        role_label="Manager",
-        gremium_name=None,
-        delegated_by=None,
-    )
-    await AutoMailer().assignment_changed(SETTINGS, info, granted=True, pool=object())
-
-
-async def test_auto_mailer_assignment_swallows_exception(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    def boom() -> Any:
-        raise RuntimeError("boom")
-
-    monkeypatch.setattr(auto, "get_sessionmaker", boom)
-    monkeypatch.setattr(auto, "mail_queue_from_pool", lambda _pool: FakeQueue())
-    info = AssignmentMailInfo(
-        assignment_id=uuid.uuid4(),
-        email="a@x.de",
-        role_label="Manager",
-        gremium_name=None,
-        delegated_by=None,
-    )
-    await AutoMailer().assignment_changed(SETTINGS, info, granted=True, pool=object())
 
 
 async def test_auto_mailer_delegation_granted(

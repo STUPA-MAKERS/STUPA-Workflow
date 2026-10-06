@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -12,7 +13,7 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oidc import OidcClaims
 from app.modules.flow.models import State
 from app.settings import Settings, load_settings
-from app.shared.errors import GoneError
+from app.shared.errors import ForbiddenError, GoneError
 from tests._support.auth_fakes import fake_session, result
 
 NOW = datetime(2026, 6, 5, 12, 0, tzinfo=UTC)
@@ -45,9 +46,9 @@ async def test_request_magic_link_no_match_is_silent() -> None:
     assert db.added == []
 
 
-async def test_request_magic_link_edit_scope_no_state() -> None:
+async def test_request_magic_link_edit_scope_unlimited_by_default() -> None:
     settings = _settings()
-    db = fake_session(result(_app()))  # current_state_id is None, so the scope is edit
+    db = fake_session(result(_app()))
     sent: list[tuple[str, str]] = []
     await service.request_magic_link(
         db, settings, email="x@y.de", deliver=lambda e, link: sent.append((e, link))
@@ -57,20 +58,19 @@ async def test_request_magic_link_edit_scope_no_state() -> None:
     assert "/antrag/aid-1#t=" in link  # the token sits in the fragment, not in the query
     assert db.added[0].scope == "edit"
     assert db.added[0].single_use is False
+    assert db.added[0].expires_at is None  # no settings row: no expiry
 
 
-async def test_request_magic_link_view_scope_when_locked() -> None:
-    settings = _settings()
-    locked = State()
-    locked.edit_allowed = False  # type: ignore[assignment]
-    db = fake_session(result(_app(state_id="s1")), result(locked))
+async def test_request_magic_link_filters_by_application_id() -> None:
+    """With an application id, the lookup also filters on that id."""
+    db = fake_session(result(_app()))
     sent: list[tuple[str, str]] = []
     await service.request_magic_link(
-        db, settings, email="x@y.de", application_id="aid-1",
+        db, _settings(), email="x@y.de", application_id="aid-1",
         deliver=lambda e, link: sent.append((e, link)),
     )
-    assert db.added[0].scope == "view"
-    assert db.added[0].single_use is True
+    assert len(sent) == 1
+    assert db.added[0].application_id == "aid-1"
 
 
 async def test_request_magic_link_default_deliver_runs() -> None:
@@ -79,15 +79,6 @@ async def test_request_magic_link_default_deliver_runs() -> None:
     # Without `deliver`, `_default_deliver` runs. It logs the recipient domain, no token.
     await service.request_magic_link(db, settings, email="x@y.de")
     assert len(db.added) == 1
-
-
-async def test_request_magic_link_edit_scope_when_open_state() -> None:
-    settings = _settings()
-    open_state = State()
-    open_state.edit_allowed = True  # type: ignore[assignment]
-    db = fake_session(result(_app(state_id="s1")), result(open_state))
-    await service.request_magic_link(db, settings, email="x@y.de", deliver=lambda e, link: None)
-    assert db.added[0].scope == "edit"
 
 
 async def test_request_magic_link_awaits_async_deliver() -> None:
@@ -158,7 +149,7 @@ async def test_verify_magic_link_single_use_ok(monkeypatch: pytest.MonkeyPatch) 
     db = fake_session(result(row), result("claimed-id"))
     app_id, scope, token = await service.verify_magic_link(db, settings, token="tok")
     assert app_id == "aid-1"
-    assert scope == "view"
+    assert scope == "edit"  # O4: an old view link opens an edit session too
     assert token  # a signed applicant token
 
 
@@ -169,6 +160,95 @@ async def test_verify_magic_link_edit_not_marked_used(monkeypatch: pytest.Monkey
     db = fake_session(result(row))  # no UPDATE for a link that is not single use
     _, scope, _ = await service.verify_magic_link(db, settings, token="tok")
     assert scope == "edit"
+
+
+class _FakeFlow:
+    """Stand-in for `FlowService` that records `start_confirmed` calls."""
+
+    started: list[tuple[object, object]] = []
+
+    def __init__(self, _db: object, dispatcher: object = None) -> None:
+        self.dispatcher = dispatcher
+
+    async def start_confirmed(self, application_id: object) -> None:
+        _FakeFlow.started.append((application_id, self.dispatcher))
+
+
+async def test_verify_magic_link_first_confirmation_starts_the_flow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F18/O14: the verify that confirms the email starts the resting flow."""
+    settings = _settings()
+    monkeypatch.setattr(service, "_now", lambda: NOW)
+    monkeypatch.setattr(service, "FlowService", _FakeFlow)
+    _FakeFlow.started = []
+    row = _link("tok", settings, scope="edit", single_use=False)
+    dispatcher = object()
+    # The confirmation UPDATE matches the row and returns its id.
+    db = fake_session(result(row), result("aid-1"))
+    await service.verify_magic_link(db, settings, token="tok", dispatcher=dispatcher)  # pyright: ignore[reportArgumentType]
+    assert _FakeFlow.started == [("aid-1", dispatcher)]
+
+
+async def test_verify_magic_link_second_click_starts_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The email is already confirmed: no second start, so no second mail."""
+    settings = _settings()
+    monkeypatch.setattr(service, "_now", lambda: NOW)
+    monkeypatch.setattr(service, "FlowService", _FakeFlow)
+    _FakeFlow.started = []
+    row = _link("tok", settings, scope="edit", single_use=False)
+    db = fake_session(result(row), result())  # the UPDATE matches no row
+    await service.verify_magic_link(db, settings, token="tok")
+    assert _FakeFlow.started == []
+
+
+class _FailingDispatcher:
+    async def dispatch(self, _actions: object) -> None:
+        raise RuntimeError("mail queue down")
+
+
+async def test_verify_magic_link_survives_a_failed_flow_start(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed flow start after the commit does not fail the verify.
+
+    The confirmation and the applicant session are already committed. The verify must
+    still return the session token, else the cookie is lost and a second click starts
+    nothing.
+    """
+    from app.modules.flow.service import FlowService
+
+    settings = _settings()
+    monkeypatch.setattr(service, "_now", lambda: NOW)
+
+    async def _schedule(_self: object, _app: object, _state: object) -> None:
+        return None
+
+    async def _advance(_self: object, _application_id: object, _principal: object) -> None:
+        return None
+
+    monkeypatch.setattr(FlowService, "schedule_state_deadline", _schedule)
+    monkeypatch.setattr(FlowService, "auto_advance", _advance)
+    row = _link("tok", settings, scope="view", single_use=True)
+    app = _app(state_id="s1")
+    app.email_confirmed_at = NOW  # type: ignore[assignment]
+    db = fake_session(
+        result(row),  # the magic link
+        result("claimed-id"),  # the single-use claim
+        result("aid-1"),  # the confirmation UPDATE
+        result(),  # the UPDATE that expires the older links
+        result(app),  # FlowService._load_app
+        result(State()),  # FlowService._load_state
+        result("event-1"),  # the latest status event of the task mail
+    )
+    app_id, scope, token = await service.verify_magic_link(
+        db, settings, token="tok", dispatcher=_FailingDispatcher()  # pyright: ignore[reportArgumentType]
+    )
+    assert (app_id, scope) == ("aid-1", "edit")
+    assert token
+    assert db.rolled_back == 1
 
 
 # The OIDC login path.
@@ -190,6 +270,21 @@ async def test_upsert_principal_existing() -> None:
     assert row is existing
     assert row.email == "new@x.de"
     assert db.added == []  # no insert
+
+
+async def test_upsert_principal_merged_is_refused() -> None:
+    """A merged (old) account never logs in again, and the refusal changes nothing."""
+    existing = PrincipalRow(sub="old", email="old@x.de", display_name="Alt")
+    existing.merged_into = uuid.uuid4()
+    db = fake_session(result(existing))
+    claims = OidcClaims(sub="old", email="new@x.de", name="New", groups=["g"])
+    with pytest.raises(ForbiddenError) as exc:
+        await service.upsert_principal(db, claims)
+    assert exc.value.code == "account_merged"
+    assert existing.email == "old@x.de"
+    assert existing.oidc_groups is None
+    assert db.added == []
+    assert db.flushed == 0
 
 
 async def test_oidc_callback_happy(monkeypatch: pytest.MonkeyPatch) -> None:

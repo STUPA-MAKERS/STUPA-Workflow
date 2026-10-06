@@ -1,0 +1,49 @@
+// The filled field of the ui-kit: a grey box with the label inside it, as `app-input`.
+@use 'field' as f;
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.field__box {
+  @include f.box;
+  @include f.box-labelled;
+  // The text area grows downwards, so the label stays at the top of the box.
+  & {
+    align-items: stretch;
+  }
+}
+.field__box--invalid {
+  @include f.box-invalid;
+}
+.field__label {
+  @include f.label;
+}
+.field__box:focus-within .field__label {
+  @include f.label-focus;
+}
+.field__req {
+  color: var(--color-danger);
+}
+.field__control {
+  @include f.control;
+  & {
+    height: auto;
+    min-height: var(--field-height);
+    padding-top: 24px;
+    padding-bottom: 8px;
+    resize: vertical;
+  }
+}
+.field__hint,
+.field__error {
+  @include f.message;
+}
+.field__hint {
+  color: var(--color-text-muted);
+}
+.field__error {
+  color: var(--color-danger);
+}

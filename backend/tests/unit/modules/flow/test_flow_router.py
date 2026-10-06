@@ -28,8 +28,17 @@ from app.modules.flow.service import FlowService
 class _FakeService:
     def __init__(self) -> None:
         self.fired: dict[str, object] | None = None
+        # The `allow_unconfirmed` value of each call. Every route passes False (F15).
+        self.allow_unconfirmed: list[bool] = []
 
-    async def available_transitions(self, application_id, principal):  # noqa: ANN001
+    async def available_transitions(  # noqa: ANN201
+        self,
+        application_id,  # noqa: ANN001
+        principal,  # noqa: ANN001
+        *,
+        allow_unconfirmed=True,  # noqa: ANN001
+    ):
+        self.allow_unconfirmed.append(allow_unconfirmed)
         return [
             TransitionOut(
                 id=uuid4(),
@@ -39,25 +48,52 @@ class _FakeService:
             )
         ]
 
-    async def fire(self, application_id, transition_id, principal, *, note=None):  # noqa: ANN001
+    async def fire(  # noqa: ANN201
+        self,
+        application_id,  # noqa: ANN001
+        transition_id,  # noqa: ANN001
+        principal,  # noqa: ANN001
+        *,
+        note=None,  # noqa: ANN001
+        meeting_id=None,  # noqa: ANN001
+        non_public=False,  # noqa: ANN001
+        allow_unconfirmed=True,  # noqa: ANN001
+    ):
+        self.allow_unconfirmed.append(allow_unconfirmed)
         self.fired = {
             "application_id": application_id,
             "transition_id": transition_id,
             "principal": principal,
             "note": note,
+            "meeting_id": meeting_id,
+            "non_public": non_public,
         }
         return TransitionResult(
             newStateId=uuid4(), statusEventId=uuid4(), dispatchedActions=["notify"]
         )
 
-    async def available_applicant_transitions(self, application_id):  # noqa: ANN001
+    async def available_applicant_transitions(  # noqa: ANN201
+        self,
+        application_id,  # noqa: ANN001
+        *,
+        allow_unconfirmed=True,  # noqa: ANN001
+    ):
+        self.allow_unconfirmed.append(allow_unconfirmed)
         return [
             TransitionOut(
                 id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={"de": "OK"}
             )
         ]
 
-    async def fire_as_applicant(self, application_id, transition_id, *, note=None):  # noqa: ANN001
+    async def fire_as_applicant(  # noqa: ANN201
+        self,
+        application_id,  # noqa: ANN001
+        transition_id,  # noqa: ANN001
+        *,
+        note=None,  # noqa: ANN001
+        allow_unconfirmed=True,  # noqa: ANN001
+    ):
+        self.allow_unconfirmed.append(allow_unconfirmed)
         self.fired = {
             "application_id": application_id,
             "transition_id": transition_id,
@@ -65,6 +101,25 @@ class _FakeService:
         }
         return TransitionResult(
             newStateId=uuid4(), statusEventId=uuid4(), dispatchedActions=[]
+        )
+
+
+    async def list_states(self, application_id, *, allow_unconfirmed=True):  # noqa: ANN001, ANN201
+        self.allow_unconfirmed.append(allow_unconfirmed)
+        return []
+
+    async def force_status(  # noqa: ANN201
+        self,
+        application_id,  # noqa: ANN001
+        target_state_id,  # noqa: ANN001
+        principal,  # noqa: ANN001
+        *,
+        note,  # noqa: ANN001
+        allow_unconfirmed=True,  # noqa: ANN001
+    ):
+        self.allow_unconfirmed.append(allow_unconfirmed)
+        return TransitionResult(
+            newStateId=target_state_id, statusEventId=uuid4(), dispatchedActions=[]
         )
 
 
@@ -103,11 +158,15 @@ def test_list_transitions_missing_perm_403(app: FastAPI, client: TestClient) -> 
     assert r.headers["content-type"] == "application/problem+json"
 
 
-def test_list_transitions_ok(app: FastAPI, client: TestClient) -> None:
+def test_list_transitions_ok(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
     _as_principal(app, "application.transition")
     r = client.get(f"/api/applications/{uuid4()}/transitions")
     assert r.status_code == 200
     assert len(r.json()) == 1
+    # F15: the route hides an unconfirmed guest application.
+    assert fake_service.allow_unconfirmed == [False]
 
 
 def test_fire_requires_auth_401(client: TestClient) -> None:
@@ -132,6 +191,40 @@ def test_fire_ok_passes_note(
     assert fake_service.fired["application_id"] == app_id
     assert fake_service.fired["transition_id"] == transition_id
     assert fake_service.fired["note"] == "freigegeben"
+    assert fake_service.allow_unconfirmed == [False]
+
+
+def test_fire_passes_meeting_and_visibility(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _as_principal(app, "application.transition")
+    meeting_id = uuid4()
+    r = client.post(
+        f"/api/applications/{uuid4()}/transition",
+        json={
+            "transitionId": str(uuid4()),
+            "meetingId": str(meeting_id),
+            "nonPublic": True,
+        },
+    )
+    assert r.status_code == 200
+    assert fake_service.fired is not None
+    assert fake_service.fired["meeting_id"] == meeting_id
+    assert fake_service.fired["non_public"] is True
+
+
+def test_fire_without_meeting_defaults(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _as_principal(app, "application.transition")
+    r = client.post(
+        f"/api/applications/{uuid4()}/transition",
+        json={"transitionId": str(uuid4())},
+    )
+    assert r.status_code == 200
+    assert fake_service.fired is not None
+    assert fake_service.fired["meeting_id"] is None
+    assert fake_service.fired["non_public"] is False
 
 
 def test_fire_rejects_bad_body_422(app: FastAPI, client: TestClient) -> None:
@@ -144,7 +237,7 @@ def test_fire_rejects_bad_body_422(app: FastAPI, client: TestClient) -> None:
 
 # Applicant transitions: access through a magic link.
 def test_list_applicant_transitions_ok(
-    app: FastAPI, client: TestClient
+    app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     app_id = uuid4()
     app.dependency_overrides[require_app_read] = lambda: SimpleNamespace(
@@ -153,6 +246,7 @@ def test_list_applicant_transitions_ok(
     r = client.get(f"/api/applications/{app_id}/applicant-transitions")
     assert r.status_code == 200
     assert len(r.json()) == 1
+    assert fake_service.allow_unconfirmed == [False]
 
 
 def test_fire_applicant_transition_ok(
@@ -170,14 +264,36 @@ def test_fire_applicant_transition_ok(
     assert fake_service.fired is not None
     assert fake_service.fired["application_id"] == app_id
     assert fake_service.fired["note"] == "los"
+    assert fake_service.allow_unconfirmed == [False]
+
+
+def test_force_routes_hide_unconfirmed(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """F15: the force-status picker and the force call pass `allow_unconfirmed=False`."""
+    _as_principal(app, "application.force_status")
+    app_id = uuid4()
+    assert client.get(f"/api/applications/{app_id}/flow-states").status_code == 200
+    r = client.post(
+        f"/api/applications/{app_id}/force-status",
+        json={"stateId": str(uuid4()), "note": "Korrektur"},
+    )
+    assert r.status_code == 200
+    assert fake_service.allow_unconfirmed == [False, False]
 
 
 def test_di_factories_build_real_objects() -> None:
     assert isinstance(get_action_dispatcher(), NullActionDispatcher)
     dispatcher = NullActionDispatcher()
-    service = get_flow_service(session=object(), dispatcher=dispatcher)  # type: ignore[arg-type]
+    publisher = object()
+    service = get_flow_service(
+        session=object(),  # type: ignore[arg-type]
+        dispatcher=dispatcher,
+        publisher=publisher,  # type: ignore[arg-type]
+    )
     assert isinstance(service, FlowService)
     assert service.dispatcher is dispatcher
+    assert service.publisher is publisher
 
 
 def test_openapi_declares_flow_error_responses(client: TestClient) -> None:

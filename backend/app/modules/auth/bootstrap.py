@@ -143,7 +143,10 @@ async def ensure_bootstrap_admins(db: AsyncSession, settings: Settings) -> int:
         logger.warning("bootstrap admin sweep: role %r missing", _ADMIN_ROLE_KEY)
         return 0
     res = await db.execute(
-        select(PrincipalRow).where(PrincipalRow.sub.in_(subjects))
+        # A merged principal is a locked reference. It never gets a role again.
+        select(PrincipalRow).where(
+            PrincipalRow.sub.in_(subjects), PrincipalRow.merged_into.is_(None)
+        )
     )
     granted = 0
     for row in res.scalars().all():

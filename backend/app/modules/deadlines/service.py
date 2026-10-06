@@ -17,9 +17,10 @@ from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.applications.models import Application
 from app.modules.deadlines.models import Deadline, DeadlinePolicy
 from app.modules.voting.models import Vote
 from app.settings import get_settings
@@ -38,6 +39,23 @@ def _is_relative(kind: str) -> bool:
     return kind in _RELATIVE_KINDS
 
 
+def _not_resting() -> ColumnElement[bool]:
+    """Match a deadline whose application is confirmed, or that has no application.
+
+    An unconfirmed guest application (`email_confirmed_at IS NULL`) rests in the
+    flow. Its deadlines get no reminder and fire no transition. The magic-link verify
+    schedules the deadline again, and the discard deletes the row with the
+    application.
+    """
+    return or_(
+        Deadline.application_id.is_(None),
+        exists().where(
+            Application.id == Deadline.application_id,
+            Application.email_confirmed_at.is_not(None),
+        ),
+    )
+
+
 class DeadlineService:
     """Deadline operations bound to an `AsyncSession`."""
 
@@ -52,10 +70,12 @@ class DeadlineService:
         application_id: UUID | None = None,
         type_id: UUID | None = None,
         action_on_pass: dict | None = None,
+        commit: bool = True,
     ) -> Deadline:
         """Create and store a deadline.
 
-        This is a programmatic API. No HTTP route creates a deadline.
+        This is a programmatic API. No HTTP route creates a deadline. `commit=False`
+        only flushes the row and leaves the commit to the caller.
         """
         deadline = Deadline(
             kind=kind,
@@ -66,7 +86,8 @@ class DeadlineService:
         )
         self.session.add(deadline)
         await self.session.flush()
-        await self.session.commit()
+        if commit:
+            await self.session.commit()
         return deadline
 
     async def due_action_deadline_ids(
@@ -75,8 +96,9 @@ class DeadlineService:
         """List the ids of the due auto-deadlines.
 
         A deadline is due when `due_at` is at or before `now` and
-        `action_on_pass` is set. The scan returns the oldest rows first and
-        stops at `limit` rows.
+        `action_on_pass` is set. The scan skips the deadlines of unconfirmed
+        guest applications. It returns the oldest rows first and stops at
+        `limit` rows.
         """
         rows = (
             await self.session.execute(
@@ -84,6 +106,7 @@ class DeadlineService:
                 .where(
                     Deadline.action_on_pass.isnot(None),
                     Deadline.due_at <= now,
+                    _not_resting(),
                 )
                 .order_by(Deadline.due_at)
                 .limit(limit)
@@ -102,7 +125,8 @@ class DeadlineService:
         would never match the row again. The reminder would never go out and the
         row would leak in the partial index. With one bound the worker sends
         exactly one reminder, possibly late. `reminded_at` then takes the row
-        out of the scan. The scan stops at `limit` rows.
+        out of the scan. The scan skips the deadlines of unconfirmed guest
+        applications. It stops at `limit` rows.
         """
         rows = (
             await self.session.execute(
@@ -110,6 +134,7 @@ class DeadlineService:
                 .where(
                     Deadline.reminded_at.is_(None),
                     Deadline.due_at <= now + lead,
+                    _not_resting(),
                 )
                 .order_by(Deadline.due_at)
                 .limit(limit)
@@ -227,6 +252,25 @@ async def flow_deadline_passed(session: AsyncSession, application_id: UUID) -> b
     return row is not None
 
 
+async def state_deadline_follows_edits(
+    session: AsyncSession, state_config: object
+) -> bool:
+    """Return whether the deadline of a state moves with every edit.
+
+    That is the case when the `deadlinePolicyKey` in `state_config` names a
+    `relative_changed` policy: its due time is `updated_at + offset_days`. An
+    unknown key, a missing key or another policy kind gives `False`.
+    """
+    cfg = state_config if isinstance(state_config, dict) else {}
+    key = cfg.get("deadlinePolicyKey")
+    if not isinstance(key, str) or not key:
+        return False
+    kind = await session.scalar(
+        select(DeadlinePolicy.kind).where(DeadlinePolicy.key == key)
+    )
+    return kind == "relative_changed"
+
+
 _HHMM_RE = re.compile(r"^(\d{2}):(\d{2})$")
 
 
@@ -307,6 +351,25 @@ def _recurring_due(policy: DeadlinePolicy, now: datetime | None) -> datetime | N
         if due > now:
             upcoming.append(due)
     return min(upcoming) if upcoming else None
+
+
+def submission_anchor(
+    created_at: datetime | None, received_on: date | None, tz_name: str
+) -> datetime | None:
+    """Return the reference time of `relative_submitted` ("ab Einreichung").
+
+    An application captured on behalf of the applicant (#11) carries `received_on`,
+    the day on which it reached the Gremium. The deadline then counts from that day,
+    at the local time of day of `created_at` (so a capture on the same day changes
+    nothing). Without `received_on` the anchor is `created_at` (user decision
+    2026-10-06).
+    """
+    if received_on is None or created_at is None:
+        return created_at
+    zone = ZoneInfo(tz_name)
+    local = created_at.astimezone(zone)
+    anchored = datetime.combine(received_on, local.timetz().replace(tzinfo=None), zone)
+    return anchored.astimezone(created_at.tzinfo or UTC)
 
 
 def resolve_due_at(

@@ -2,7 +2,22 @@ import { Pipe, type PipeTransform, inject } from '@angular/core';
 import { I18nService } from './i18n.service';
 
 /** Format presets for the localized date output. */
-export type LocalDateFormat = 'short' | 'medium' | 'mediumDate' | 'long' | 'time';
+export type LocalDateFormat =
+  | 'short'
+  | 'medium'
+  | 'mediumDate'
+  | 'long'
+  | 'time'
+  | 'weekdayDate'
+  | 'weekdayShort';
+
+/** "Di., 13.10.2026": the date with a short weekday, as the meeting pages show it. */
+const WEEKDAY_DATE: Intl.DateTimeFormatOptions = {
+  weekday: 'short',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+};
 
 const OPTIONS: Record<LocalDateFormat, Intl.DateTimeFormatOptions> = {
   short: { dateStyle: 'short', timeStyle: 'short' },
@@ -10,6 +25,9 @@ const OPTIONS: Record<LocalDateFormat, Intl.DateTimeFormatOptions> = {
   mediumDate: { dateStyle: 'medium' },
   long: { dateStyle: 'long', timeStyle: 'short' },
   time: { timeStyle: 'short' },
+  weekdayDate: WEEKDAY_DATE,
+  /** "Di., 13.10.2026, 17:00", always 24 h. */
+  weekdayShort: { ...WEEKDAY_DATE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' },
 };
 
 /**

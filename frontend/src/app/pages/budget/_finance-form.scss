@@ -1,0 +1,459 @@
+// The form sheet of the finance pages (booking, transfer, invoice): it replaces the
+// detail sheet. A fixed head (title, subtitle, close), a body that scrolls in two
+// columns of sections, and a fixed foot (delete on the left; cancel and save on the
+// right). In the bottom sheet of a phone the sheet brings the head, so the form leaves
+// out its own. The form components `@use` this file.
+@use 'field' as f;
+@use 'breakpoints' as bp;
+
+:host {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.ff {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+}
+.ff--pane {
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.ff--sheet {
+  /* The fields sit on the sheet (surface 2): one step up, so they stand out from it. */
+  --color-surface-sunken: var(--color-surface-3);
+}
+
+.ff__head {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0 var(--space-6);
+  padding: var(--space-5) 0 var(--space-4);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.ff__titles {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ff__title {
+  margin: 0;
+  font-size: var(--fs-xl);
+  line-height: 1.3;
+  font-weight: var(--fw-semibold);
+}
+.ff__subtitle {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  overflow-wrap: anywhere;
+}
+
+.ff__body {
+  --ff-fade: var(--space-5);
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-4) var(--space-6) var(--space-6);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* In the bottom sheet, the sheet body gives the side gutter. The form adds no second
+   gutter, so the fields go from 16px to 16px of a phone screen. */
+.ff--sheet .ff__body {
+  padding: var(--space-2) 0 var(--space-5);
+}
+.ff__body.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--ff-fade));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--ff-fade));
+}
+.ff__body.is-fade-end {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--ff-fade));
+  mask-image: linear-gradient(to top, transparent, #000 var(--ff-fade));
+}
+.ff__body.is-fade-start.is-fade-end {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--ff-fade),
+    #000 calc(100% - var(--ff-fade)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--ff-fade),
+    #000 calc(100% - var(--ff-fade)),
+    transparent
+  );
+}
+
+.ff__cols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5) 28px;
+  align-items: flex-start;
+}
+.ff__col {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: min(100%, 19rem);
+}
+.ff__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.ff__secTitle {
+  margin: 0 0 2px;
+  padding: 0 var(--space-1);
+}
+.ff__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.ff__grid--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@include bp.phone {
+  .ff__grid--3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Fields this form builds itself (a picker, a locked value, the note, the application
+   search) take the look of the kit fields: a filled box with the label inside. */
+.ff__box {
+  @include f.box;
+  @include f.box-labelled;
+  position: relative;
+}
+.ff__label {
+  @include f.label;
+}
+.ff__box:focus-within .ff__label {
+  @include f.label-focus;
+}
+.ff__control {
+  @include f.control;
+  @include f.control-labelled;
+}
+.ff__control::-webkit-search-cancel-button {
+  display: none;
+}
+/* A field that opens a picker: the whole box is the button. */
+.ff__pick {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--field-height);
+  margin: 0;
+  padding: 24px var(--space-3) 8px var(--space-4);
+  border: 0;
+  border-radius: var(--radius-field);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-md);
+  line-height: 1.375rem;
+  text-align: start;
+  cursor: pointer;
+}
+.ff__pick:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.ff__pick > .ell {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ff__pick app-icon {
+  flex: none;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+.ff__placeholder {
+  color: var(--color-text-subtle);
+}
+.ff__swatch {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.ff__mono {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+/* The tree of a picker field, open below the field. */
+.ff__tree {
+  max-height: 18rem;
+  overflow-y: auto;
+  padding: var(--space-2);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.ff--sheet .ff__tree {
+  background: var(--color-surface-3);
+}
+
+/* A fixed value: dashed outline, a lock before the label. */
+.ff__box--locked {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 26px var(--space-4) 8px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--color-border);
+  border: 1px dashed var(--color-border);
+}
+.ff__box--locked .ff__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ff__locked {
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+.ff__box--static {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 26px var(--space-4) 8px;
+}
+.ff__static {
+  color: var(--color-text);
+}
+.ff__hintLine {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* The note: a textarea in the look of the kit fields. */
+.ff__box--area {
+  flex-direction: column;
+  align-items: stretch;
+  padding-top: 26px;
+  cursor: text;
+}
+.ff__area {
+  display: block;
+  width: 100%;
+  min-height: 3.75rem;
+  margin: 0;
+  padding: 0 var(--space-4) 10px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-md);
+  line-height: 1.375rem;
+  resize: vertical;
+}
+@media (max-width: 768px) {
+  .ff__area {
+    font-size: 1rem;
+  }
+}
+
+/* An info line: an icon and a short text. */
+.ff__info {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.ff--sheet .ff__info {
+  background: var(--color-surface-3);
+}
+.ff__info app-icon {
+  flex: none;
+  margin-top: 1px;
+}
+.ff__error {
+  margin: 0;
+  padding: 0 var(--space-4);
+  color: var(--color-danger);
+  font-size: var(--fs-small);
+}
+
+/* One choice of a few fixed values as chips (the payment method). */
+.ff__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.ff__chips .chip app-icon {
+  pointer-events: none;
+}
+
+/* The application search: its hits below the field. */
+.ff__app {
+  position: relative;
+  min-width: 0;
+}
+.ff__app .ff__control {
+  padding-inline-end: 2.5rem;
+}
+.ff__searchIcon {
+  position: absolute;
+  right: var(--space-4);
+  bottom: 14px;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+.ff__picked {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  padding: 26px var(--space-2) 8px var(--space-4);
+  color: var(--color-text);
+}
+.ff__picked > .ell {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ff__iconBtn {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.ff__iconBtn:hover {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+.ff__iconBtn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+}
+.ff__suggest {
+  position: absolute;
+  z-index: 10;
+  inset-inline: 0;
+  top: calc(100% + var(--space-1));
+  max-height: 14rem;
+  margin: 0;
+  padding: var(--space-1);
+  overflow-y: auto;
+  list-style: none;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-3);
+  box-shadow: var(--shadow-elevated);
+}
+.ff__option {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.ff__option:hover,
+.ff__option:focus-visible {
+  background: var(--color-surface-4);
+  outline: 0;
+}
+
+/* Rows in the form (sub-bookings). */
+.ff__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3.5rem;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+}
+.ff__rowBody {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.ff__rowMeta {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.ff__sum {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+
+/* The foot: delete on the left, cancel and save on the right. Balanced on one axis. */
+.ff__foot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 4.25rem;
+  padding: var(--space-3) var(--space-6);
+  border-top: var(--border-width) solid var(--color-border);
+  border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
+  background: var(--color-surface-2);
+}
+.ff--sheet .ff__foot {
+  padding: var(--space-3) 0;
+  border-radius: 0;
+}
+.ff__footEnd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-inline-start: auto;
+}
+.ff__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* One pane at a time the page scrolls: the foot sticks to the end of the viewport. */
+.ff--page .ff__body {
+  overflow: visible;
+}
+.ff--page .ff__foot {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-sticky);
+}

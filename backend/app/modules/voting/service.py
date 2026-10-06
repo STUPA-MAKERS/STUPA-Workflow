@@ -1,30 +1,36 @@
-"""Voting service: create -> open -> cast -> close.
+"""Voting service: create -> open -> cast -> close (or cancel).
 
-Race safety: the DB enforces one ballot per voter.
+Race safety: the DB enforces one ballot per voter. A ballot never changes after the
+cast (O11).
 
-* open (``secret=false``): ``INSERT ... ON CONFLICT (vote_id, voter_sub)``. With
-  ``allowChange`` the statement runs ``DO UPDATE`` for an idempotent update. Without
-  it the statement runs ``DO NOTHING`` and returns an empty ``RETURNING`` -> 409
-  (double vote).
+* open (``secret=false``): ``INSERT ... ON CONFLICT (vote_id, voter_sub) DO NOTHING``.
+  An empty ``RETURNING`` means a second cast -> 409 ``already_voted``.
 * secret (``secret=true``): ``voted_marker`` (UNIQUE) records 'has voted'. The ballot
-  lands without an identity in ``secret_ballot``. ``allowChange`` has no effect here,
-  because nobody can re-link an anonymous ballot. A second cast gives 409.
+  lands without an identity in ``secret_ballot``. A second cast gives 409
+  ``already_voted`` too.
 
-RBAC is fail-closed. A ``cast`` needs membership in ``vote.eligible_group``. For a
-gremium vote that membership IS the ``vote.cast`` right, because only an active gremium
-role with ``vote.cast`` writes the namespaced group key. The quorum denominator
-(``MeetingService.vote_eligible_count``) reads the same roster, so the counted set and
-the admitted set stay equal. Otherwise the call gets 403.
+Close and cancel set ``closed_at``. Open, close and cancel write an audit entry
+(F12). A close always ends the vote: when the pass or fail transition of the
+application cannot fire, the close still commits, writes ``vote_branch_blocked`` and
+returns ``branchFired=false`` (F20).
+
+RBAC is fail-closed and gremium-scoped. ``vote.eligible_group`` holds the UUID of the
+gremium that votes. A ``cast`` needs the gremium permission ``vote.cast`` there: only an
+active gremium role with ``vote.cast`` writes the namespaced group key
+``vote:<gremium_id>``. No global permission grants a vote right. The quorum denominator
+(``MeetingService.vote_eligible_count``) reads the same roster, and ``create`` stores it
+as ``eligible_count``, so the counted set and the admitted set stay equal. A vote with a
+free group key (an old row) admits nobody: the call gets 403.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import func, literal_column, select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,18 +41,34 @@ from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.delegations.service import voting_delegation_check
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
-from app.modules.flow.service import FlowService
+from app.modules.flow.service import FlowService, StagedFire
 from app.modules.voting import tally as tally_mod
 from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
 from app.modules.voting.schemas import (
     BallotAccepted,
+    MyBallot,
     TallyOut,
     VoteClosed,
     VoteCreate,
+    VoteCreateInternal,
+    VoteListItem,
     VoteOut,
+    VoteStatus,
 )
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
+from app.shared.paging import DEFAULT_LIMIT, Page
+
+# The problem code of a second cast (REST 409 and the live-vote error frame).
+ALREADY_VOTED = "already_voted"
+# The voter key of a guest of a public meeting (#17): ``guest:<meeting_guest.id>``. A
+# guest is not a principal, so the key never collides with an OIDC ``sub``.
+GUEST_VOTER_PREFIX = "guest:"
+
+
+def guest_voter_sub(guest_id: UUID) -> str:
+    """Return the ``voter_sub`` of a guest ballot (#17)."""
+    return f"{GUEST_VOTER_PREFIX}{guest_id}"
 
 
 def open_tally_revealed(present: int, voted: int, expected: int) -> bool:
@@ -82,27 +104,151 @@ class VotingService:
         """
         stmt = select(Vote).where(Vote.id == vote_id)
         if for_update:
-            stmt = stmt.with_for_update()
+            # A locked read must see the committed values, not a stale identity-map
+            # copy from an earlier unlocked read in this transaction.
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
         vote = (await self.session.execute(stmt)).scalar_one_or_none()
         if vote is None:
             raise NotFoundError(f"vote {vote_id} not found")
         return vote
 
-    async def delete(self, vote_id: UUID, *, meeting_id: UUID) -> None:
-        """Delete a meeting-bound vote.
+    async def _lock_live_meeting(
+        self, meeting_id: UUID, *, agenda_item_id: UUID | None = None
+    ) -> None:
+        """Lock the meeting row and require a ``live`` meeting (O12, O25).
+
+        The meeting close, the meeting delete and the agenda-item remove take the
+        same lock. Thus a vote cannot open in a meeting that closes or is deleted at
+        the same time, and it cannot bind to an agenda item that is removed at the
+        same time. Take this lock BEFORE a vote
+        row lock: the close locks the meeting first and the draft votes after it.
+
+        Raises:
+            NotFoundError: The meeting does not exist, or ``agenda_item_id`` is not
+                an agenda item of the meeting.
+            ConflictError: The meeting is not ``live`` (``meeting_not_started`` or
+                ``meeting_closed``).
+        """
+        # Local import: the livevote models import this module.
+        from app.modules.livevote.models import Meeting, MeetingAgendaItem
+
+        status = await self.session.scalar(
+            select(Meeting.status).where(Meeting.id == meeting_id).with_for_update()
+        )
+        if status is None:
+            raise NotFoundError(f"meeting {meeting_id} not found")
+        if status == "planned":
+            raise ConflictError(
+                "The meeting has not started. Start it before opening a vote.",
+                code="meeting_not_started",
+            )
+        if status != "live":
+            raise ConflictError(
+                "The meeting is closed. A vote can no longer open.",
+                code="meeting_closed",
+            )
+        if agenda_item_id is not None:
+            found = await self.session.scalar(
+                select(MeetingAgendaItem.id).where(
+                    MeetingAgendaItem.id == agenda_item_id,
+                    MeetingAgendaItem.meeting_id == meeting_id,
+                )
+            )
+            if found is None:
+                raise NotFoundError(f"agenda item {agenda_item_id} not found")
+
+    async def delete(self, vote_id: UUID, *, meeting_id: UUID, actor: str) -> None:
+        """Delete a meeting-bound vote and write a ``vote_delete`` audit entry (O24).
 
         The ballots cascade through the foreign key. The method deletes only a vote of
-        this meeting. The caller (router) checks the authorization.
+        this meeting, and only a ``draft`` or ``cancelled`` vote. An open or closed
+        vote is part of the record of the meeting, and a closed result may already
+        have fired a flow branch. The same rule keeps an agenda item with such a vote
+        (O25), so two deletes cannot get around it. The caller cancels an open vote
+        first. The caller (router) checks the authorization and the meeting status:
+        only a ``planned`` or ``live`` meeting deletes a vote.
 
         Raises:
             NotFoundError: The vote does not belong to this meeting.
+            ConflictError: The vote is open or closed (``vote_not_deletable``).
         """
-        vote = await self._get_vote(vote_id)
+        vote = await self._get_vote(vote_id, for_update=True)
         if vote.meeting_id != meeting_id:
             raise NotFoundError(f"vote {vote_id} not found in this meeting")
+        if vote.status in ("open", "closed"):
+            raise ConflictError(
+                "An open or closed vote is part of the record of the meeting and "
+                "cannot be deleted. Cancel an open vote instead.",
+                code="vote_not_deletable",
+            )
+        await self._delete_audited(vote, actor=actor)
+        await self.session.commit()
+
+    async def delete_for_agenda_item(
+        self, agenda_item_id: UUID, *, actor: str, may_delete: bool
+    ) -> list[UUID]:
+        """Delete the draft and cancelled votes of an agenda item, without a commit.
+
+        The agenda-item remove calls this first (F24, O25). The foreign key
+        ``vote.agenda_item_id`` no longer cascades, so the remove deletes these votes
+        itself, each with a ``vote_delete`` audit entry. An open or closed vote is part
+        of the record of the meeting and blocks the remove.
+
+        ``may_delete`` tells if the caller may delete a vote of the meeting. The
+        agenda right alone (``protocol.write``) does not delete a vote: that needs
+        ``canManageVotes``, as on ``DELETE /meetings/{id}/votes/{voteId}``.
+
+        Returns:
+            The ids of the deleted votes.
+
+        Raises:
+            ConflictError: The agenda item has an open or closed vote
+                (``agenda_item_has_vote``). The method then deletes nothing.
+            ForbiddenError: The agenda item has a draft or cancelled vote and
+                ``may_delete`` is false. The method then deletes nothing.
+        """
+        rows = (
+            (
+                await self.session.execute(
+                    select(Vote)
+                    .where(Vote.agenda_item_id == agenda_item_id)
+                    .order_by(Vote.created_at)
+                    .with_for_update()
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if any(vote.status in ("open", "closed") for vote in rows):
+            raise ConflictError(
+                "This agenda item has an open or closed vote and cannot be removed.",
+                code="agenda_item_has_vote",
+            )
+        if rows and not may_delete:
+            raise ForbiddenError(
+                "This agenda item has votes. Only a person who manages the votes of "
+                "the meeting can remove it."
+            )
+        for vote in rows:
+            await self._delete_audited(vote, actor=actor)
+        return [vote.id for vote in rows]
+
+    async def _delete_audited(self, vote: Vote, *, actor: str) -> None:
+        """Write ``vote_delete`` for a loaded vote and delete it, without a commit."""
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.VOTE_DELETE,
+            target_type="vote",
+            target_id=str(vote.id),
+            data={
+                **self._audit_refs(vote),
+                "agendaItemId": str(vote.agenda_item_id) if vote.agenda_item_id else None,
+                "status": vote.status,
+            },
+        )
         await self.session.delete(vote)
         await self.session.flush()
-        await self.session.commit()
 
     async def _ballot_count(self, vote_id: UUID) -> int:
         """Count every recorded participation of a vote, open and secret.
@@ -130,8 +276,8 @@ class VotingService:
         meeting-scoped ``canManageVotes`` check. Duplicating it here would give
         a second, weaker path to the same row.
 
-        The caller (router) runs the gremium-scoped ``vote.manage`` check, like
-        open, close and cancel.
+        The caller (router) runs the gremium-scoped manage check
+        (``assert_can_manage_vote``), like open, close and cancel.
 
         Raises:
             NotFoundError: No vote has this id (404).
@@ -154,32 +300,38 @@ class VotingService:
                 "This vote already holds ballots and cannot be deleted.",
                 code="vote_has_ballots",
             )
-        await audit_record(
-            self.session,
-            actor=actor,
-            action=AuditAction.VOTE_DELETE,
-            target_type="vote",
-            target_id=str(vote_id),
-            data={
-                "applicationId": str(vote.application_id) if vote.application_id else None,
-                "eligibleGroup": vote.eligible_group,
-            },
-        )
-        await self.session.delete(vote)
-        await self.session.flush()
+        await self._delete_audited(vote, actor=actor)
         await self.session.commit()
 
-    async def _get_application(self, application_id: UUID) -> Application:
-        app = (
-            await self.session.execute(select(Application).where(Application.id == application_id))
-        ).scalar_one_or_none()
+    async def _get_application(
+        self, application_id: UUID, *, confirmed_only: bool = False
+    ) -> Application:
+        """Load the application, or raise 404.
+
+        `confirmed_only=True` also gives 404 for an unconfirmed guest application
+        (`email_confirmed_at IS NULL`). Such an application rests in the flow and stays
+        invisible, as on the flow routes.
+        """
+        stmt = select(Application).where(Application.id == application_id)
+        if confirmed_only:
+            stmt = stmt.where(Application.email_confirmed_at.is_not(None))
+        app = (await self.session.execute(stmt)).scalar_one_or_none()
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
         return app
 
     @staticmethod
     def _config(vote: Vote) -> VoteConfig:
-        return VoteConfig.model_validate(vote.config)
+        return VoteConfig.from_stored(vote.config)
+
+    @staticmethod
+    def _audit_refs(vote: Vote) -> dict[str, str | None]:
+        """Return the id references of a vote for its audit entries (no voter)."""
+        return {
+            "applicationId": str(vote.application_id) if vote.application_id else None,
+            "meetingId": str(vote.meeting_id) if vote.meeting_id else None,
+            "eligibleGroup": vote.eligible_group,
+        }
 
     async def _aggregate(self, vote: Vote, config: VoteConfig) -> dict[str, int]:
         """Count the votes per option: open from ``ballot``, secret from ``secret_ballot``."""
@@ -217,6 +369,66 @@ class VotingService:
                 )
             )
         ) or 0
+
+    async def _admitted_guest_count(self, vote: Vote) -> int:
+        """Count the admitted guests of the meeting of the vote (#17), or 0 without one."""
+        if vote.meeting_id is None:
+            return 0
+        from app.modules.livevote.models import MeetingGuest
+
+        return (
+            await self.session.scalar(
+                select(func.count())
+                .select_from(MeetingGuest)
+                .where(
+                    MeetingGuest.meeting_id == vote.meeting_id,
+                    MeetingGuest.status == "admitted",
+                )
+            )
+        ) or 0
+
+    async def _guest_attendance(self, vote: Vote, config: VoteConfig) -> int:
+        """Count the guests of a vote (#17).
+
+        A members vote counts the admitted guests (display only). A vote with guests
+        counts the admitted guests plus the guests who left or were removed after
+        their ballot: the ballot stays counted, so the guest stays part of the base.
+        Without this the turnout could reach the expected ballots before every
+        present person voted and reveal the running tally too early, and the number
+        fixed at the close could be smaller than the cast ballots.
+        """
+        if not config.guests_vote:
+            return await self._admitted_guest_count(vote)
+        from app.modules.livevote.models import MeetingGuest
+
+        admitted = {
+            guest_voter_sub(gid)
+            for gid in (
+                await self.session.execute(
+                    select(MeetingGuest.id).where(
+                        MeetingGuest.meeting_id == vote.meeting_id,
+                        MeetingGuest.status == "admitted",
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        }
+        voters: set[str] = set()
+        for model in (Ballot, VotedMarker):
+            voters.update(
+                (
+                    await self.session.execute(
+                        select(model.voter_sub).where(
+                            model.vote_id == vote.id,
+                            model.voter_sub.startswith(GUEST_VOTER_PREFIX),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        return len(admitted | voters)
 
     async def _absent_delegated_count(self, vote: Vote) -> int:
         """Count the active vote delegations whose delegator is NOT present.
@@ -268,25 +480,37 @@ class VotingService:
         have voted. An open non-secret vote without a meeting stays visible, because
         there is no notion of 'present'. When the tally is hidden, only ``voted`` and
         ``present`` travel.
+
+        A vote with guests (#17) counts the admitted guests as present too: they are
+        expected ballots. ``presentMembers`` and ``presentGuests`` give the attendance
+        of a meeting vote, live while it runs and fixed after the close.
         """
         voted = sum(counts.values())
         outcome = tally_mod.result(config, counts, eligible)
+        members: int | None = None
+        guests: int | None = None
         # Query the present denominator only when it changes the reveal decision, that
         # is for an open vote with a meeting. A closed vote or a vote without a meeting
         # needs no query.
         if vote.status == "closed":
             present, revealed = 0, True
-        elif config.secret:
-            present = await self._present_count(vote)
-            revealed = False
+            members = getattr(vote, "present_members", None)
+            guests = getattr(vote, "present_guests", None)
         elif vote.meeting_id is None:
-            present, revealed = 0, True
+            # A secret vote never reveals a running tally, with or without a meeting.
+            present, revealed = 0, not config.secret
         else:
-            present = await self._present_count(vote)
-            # The expected votes are the present members plus the represented votes of
-            # absent delegators. Without them the interim count leaks too early.
-            expected = present + await self._absent_delegated_count(vote)
-            revealed = open_tally_revealed(present, voted, expected)
+            members = await self._present_count(vote)
+            guests = await self._guest_attendance(vote, config)
+            present = members + guests if config.guests_vote else members
+            if config.secret:
+                revealed = False
+            else:
+                # The expected votes are the present members (and guests) plus the
+                # represented votes of absent delegators. Without them the interim
+                # count leaks too early.
+                expected = present + await self._absent_delegated_count(vote)
+                revealed = open_tally_revealed(present, voted, expected)
         return TallyOut(
             counts=counts if revealed else {},
             eligible=eligible,
@@ -296,6 +520,8 @@ class VotingService:
             quorumMet=outcome.quorum_met,
             leading=outcome.leading if revealed else None,
             result=None,
+            presentMembers=members,
+            presentGuests=guests,
         )
 
     def _to_out(self, vote: Vote, config: VoteConfig, tally_out: TallyOut) -> VoteOut:
@@ -312,31 +538,161 @@ class VotingService:
             closesAt=vote.closes_at,
             result=vote.result,  # type: ignore[arg-type]
             secret=config.secret,
+            majorityRule=config.majority_rule,
+            quorum=config.quorum,
+            openedAt=vote.opens_at,
+            closedAt=vote.closed_at,
             tally=tally_out,
+            guestsVote=config.guests_vote,
         )
 
     async def create(
+        self, application_id: UUID, payload: VoteCreate, principal: Principal
+    ) -> VoteOut:
+        """Create a draft application vote from the API body.
+
+        ``eligibleGroup`` must name an existing gremium. The vote must also belong to
+        the gremium of the application: the ``gremiumId`` of the current vote state
+        when the state sets one, else ``application.gremium_id``. Without that check a
+        vote manager of another gremium could run the vote and fire the pass or fail
+        branch of the application.
+
+        When neither names a gremium, no gremium can decide on the application. Then
+        only the admin role (``admin_bypass`` with ``vote.manage``) creates the vote.
+        Otherwise a vote manager of any gremium could fire the branch.
+
+        The caller must also pass ``assert_can_manage_group`` for ``eligibleGroup``.
+        This method does not do that check.
+
+        The server sets ``eligible_count`` from the roster of the gremium (members
+        with ``vote.cast``). The client cannot send it.
+
+        Raises:
+            NotFoundError: No application has this id, or its email is not confirmed
+                (404).
+            ForbiddenError: The application has no gremium and the principal is not
+                the admin role (403).
+            ValidationProblem: The gremium does not exist (``eligible_group_invalid``)
+                or is not the gremium of the application
+                (``eligible_group_mismatch``) (422).
+        """
+        from app.modules.admin.gremium_roles import admin_bypass
+
+        if payload.config.guests_vote:
+            # Only a meeting vote of a public meeting has guests (#17).
+            raise ValidationProblem(
+                "Only a vote of a public meeting can include guests.",
+                code="guests_vote_unavailable",
+                errors=[{"field": "config.guestsVote", "msg": "not a public meeting vote"}],
+            )
+        gremium_id = payload.eligible_group
+        if not await self._gremium_exists(gremium_id):
+            raise ValidationProblem(
+                "eligibleGroup is not the id of a gremium.",
+                code="eligible_group_invalid",
+                errors=[{"field": "eligibleGroup", "msg": "unknown gremium"}],
+            )
+        # An unconfirmed guest application rests in the flow. A vote on it could fire
+        # its pass or fail branch on close, so it gets 404 as on the flow routes.
+        application = await self._get_application(application_id, confirmed_only=True)
+        expected = await self._application_gremium_id(application)
+        if expected is None and not admin_bypass(principal, "vote.manage"):
+            raise ForbiddenError(
+                "the application has no gremium; only the admin role can create a vote"
+            )
+        if expected is not None and expected != gremium_id:
+            raise ValidationProblem(
+                "eligibleGroup must be the gremium of the application.",
+                code="eligible_group_mismatch",
+                errors=[{"field": "eligibleGroup", "msg": "not the gremium of the application"}],
+            )
+        # Local import: `app.modules.livevote.service` imports this module.
+        from app.modules.livevote.service import MeetingService
+
+        eligible = await MeetingService(self.session).vote_eligible_count(gremium_id)
+        internal = VoteCreateInternal(
+            config=payload.config,
+            eligibleGroup=gremium_id,
+            question=payload.question,
+            eligibleCount=eligible,
+            opensStateId=payload.opens_state_id,
+            closesAt=payload.closes_at,
+            resultBranchTransitionId=payload.result_branch_transition_id,
+        )
+        return await self._insert(application_id, internal)
+
+    async def _gremium_exists(self, gremium_id: UUID) -> bool:
+        from app.modules.admin.models import Gremium
+
+        found = await self.session.scalar(select(Gremium.id).where(Gremium.id == gremium_id))
+        return found is not None
+
+    async def _application_gremium_id(self, application: Application) -> UUID | None:
+        """Return the gremium that decides on the application.
+
+        The ``gremiumId`` of the current state wins when it is a valid UUID. Otherwise
+        the method returns ``application.gremium_id``, which can be None.
+        """
+        if application.current_state_id is not None:
+            from app.modules.flow.models import State
+
+            config = await self.session.scalar(
+                select(State.config).where(State.id == application.current_state_id)
+            )
+            ref = config.get("gremiumId") if isinstance(config, dict) else None
+            if isinstance(ref, str) and ref:
+                try:
+                    return UUID(ref)
+                except ValueError:
+                    pass
+        return application.gremium_id
+
+    async def create_internal(
         self,
         application_id: UUID | None,
-        payload: VoteCreate,
+        payload: VoteCreateInternal,
         *,
         meeting_id: UUID | None = None,
         agenda_item_id: UUID | None = None,
     ) -> VoteOut:
-        """Create a draft vote.
+        """Create a draft vote from a server-side payload.
 
         ``application_id`` is optional. ``None`` marks a generic resolution question of
         a free-text agenda item. Such a vote has no application and fires no flow
         branch on close. ``meeting_id`` binds the vote to a meeting (live vote).
-        ``agenda_item_id`` binds it to the agenda item.
+        ``agenda_item_id`` binds it to the agenda item. The caller supplies the
+        ``eligible_count`` from the roster and runs the checks.
+
+        A meeting vote locks the meeting row and needs a ``live`` meeting that still
+        has the agenda item (see ``_lock_live_meeting``).
+
+        Raises:
+            NotFoundError: No application has this id, or the agenda item is not in
+                the meeting (404).
+            ConflictError: The meeting is not ``live`` (409).
         """
+        if meeting_id is not None:
+            await self._lock_live_meeting(meeting_id, agenda_item_id=agenda_item_id)
         if application_id is not None:
             await self._get_application(application_id)
+        return await self._insert(
+            application_id, payload, meeting_id=meeting_id, agenda_item_id=agenda_item_id
+        )
+
+    async def _insert(
+        self,
+        application_id: UUID | None,
+        payload: VoteCreateInternal,
+        *,
+        meeting_id: UUID | None = None,
+        agenda_item_id: UUID | None = None,
+    ) -> VoteOut:
+        """Write the draft vote and return it with an empty tally."""
         vote = Vote(
             application_id=application_id,
             meeting_id=meeting_id,
             agenda_item_id=agenda_item_id,
-            eligible_group=payload.eligible_group,
+            eligible_group=str(payload.eligible_group),
             question=payload.question,
             config=payload.config.model_dump(by_alias=True),
             eligible_count=payload.eligible_count,
@@ -354,23 +710,44 @@ class VotingService:
             vote, config, await self._tally_out(vote, config, empty, vote.eligible_count or 0)
         )
 
-    async def open(self, vote_id: UUID, *, now: datetime) -> VoteOut:
+    async def open(
+        self, vote_id: UUID, *, now: datetime, actor: str | None = None
+    ) -> VoteOut:
         """Move the vote from ``draft`` to ``open`` and open the time window.
+
+        ``opens_at`` records the real open time (``openedAt`` in the DTO). The method
+        writes a ``vote_open`` audit entry for ``actor``.
 
         The quorum denominator ``eligible_count`` comes from the authoritative roster.
         The create call sets it. It does NOT come from the logged-in users, because
         that would be fail-open. Without it a percent quorum stays fail-closed and
         never counts as met.
 
+        A meeting vote opens only in a ``live`` meeting. The method locks the meeting
+        row before the vote row, as the meeting close does (O12).
+
         Raises:
-            ConflictError: The vote is not in ``draft``.
+            ConflictError: The vote is not in ``draft``, or its meeting is not
+                ``live``.
         """
-        vote = await self._get_vote(vote_id)
+        meeting_id = await self.session.scalar(select(Vote.meeting_id).where(Vote.id == vote_id))
+        if meeting_id is not None:
+            await self._lock_live_meeting(meeting_id)
+        vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "draft":
             raise ConflictError(f"vote is {vote.status}, cannot open.", code="conflict")
         config = self._config(vote)
         vote.opens_at = now
         vote.status = "open"
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.VOTE_OPEN,
+            target_type="vote",
+            target_id=str(vote.id),
+            # #17: a vote with guests has no quorum; the log keeps that rule.
+            data={**self._audit_refs(vote), "guestsVote": config.guests_vote},
+        )
         await self.session.flush()
         await self.session.commit()
         empty = {opt: 0 for opt in config.options}
@@ -447,7 +824,58 @@ class VotingService:
             )
         if config.secret:
             return await self._cast_secret(vote.id, voter_sub, choice)
-        return await self._cast_open(vote.id, voter_sub, choice, config.allow_change)
+        return await self._cast_open(vote.id, voter_sub, choice)
+
+    async def cast_guest(
+        self, vote_id: UUID, guest_id: UUID, choice: str, *, now: datetime
+    ) -> BallotAccepted:
+        """Cast the ballot of an admitted guest of a public meeting (#17).
+
+        This is the second, separate eligibility path of ``cast``. A guest is not a
+        principal: no ``vote.cast``, no gremium role and no delegation. The caller (the
+        public guest service) checks that the guest is admitted, that the meeting lets
+        guests vote, and that the vote belongs to a public agenda item of the meeting
+        of the guest. This method checks the vote itself: open, in its window, and
+        ``guestsVote``. The ballot runs under ``guest:<id>``. The same rules as for a
+        member apply: one ballot, never changed after the cast (O11), and a secret
+        vote keeps the identity (``voted_marker``) apart from the choice
+        (``secret_ballot``). The audit entry ``vote_cast`` names the guest id as the
+        actor and carries no choice.
+
+        Raises:
+            ConflictError: 409 - the vote is not open, or the guest already voted.
+            ForbiddenError: 403 - the vote is for members only (``vote_members_only``).
+            ValidationProblem: 422 - the choice is not a configured option.
+        """
+        vote = await self._get_vote(vote_id, for_update=True)
+        if vote.status != "open":
+            raise ConflictError("vote is not open.", code="conflict")
+        if vote.closes_at is not None and now >= vote.closes_at:
+            raise ConflictError("voting window has closed.", code="conflict")
+        config = self._config(vote)
+        if not config.guests_vote:
+            raise ForbiddenError(
+                "Only the members vote in this ballot.", code="vote_members_only"
+            )
+        if choice not in config.options:
+            raise ValidationProblem(
+                "Unknown vote option.",
+                errors=[{"field": "choice", "msg": "not in vote options"}],
+            )
+        voter_sub = guest_voter_sub(guest_id)
+        # Ids only, never the choice: a secret vote must not link a choice to the
+        # guest, and the chain is append-only.
+        await audit_record(
+            self.session,
+            actor=voter_sub,
+            action=AuditAction.VOTE_CAST,
+            target_type="vote",
+            target_id=str(vote.id),
+            data=self._audit_refs(vote),
+        )
+        if config.secret:
+            return await self._cast_secret(vote.id, voter_sub, choice)
+        return await self._cast_open(vote.id, voter_sub, choice)
 
     @staticmethod
     def _is_gremium_group(eligible_group: str) -> bool:
@@ -459,65 +887,41 @@ class VotingService:
         return True
 
     @staticmethod
-    def _eligible_group_member(principal: Principal, eligible_group: str) -> bool:
-        """Check voting eligibility against ``eligible_group``.
-
-        If ``eligible_group`` is a gremium UUID, the cast MUST go through the
-        namespaced ``vote:<uuid>`` key. Meeting votes and application votes use such a
-        UUID. Only an active ``vote.cast`` membership sets that key. A matching OIDC
-        group claim can therefore not satisfy gremium eligibility. A free group key
-        (not a UUID) keeps the direct OIDC group check.
-        """
-        if not VotingService._is_gremium_group(eligible_group):
-            return principal.in_group(eligible_group)
-        return principal.in_group(vote_group_key(eligible_group))
-
-    @staticmethod
     def _may_cast(principal: Principal, eligible_group: str) -> bool:
         """Tell whether the principal may cast an OWN ballot in this vote.
 
-        For a gremium vote the namespaced key decides on its own. `resolve_principal`
-        writes ``vote:<gremium_id>`` for an active membership whose gremium role carries
-        ``vote.cast``, and for nothing else, so the key already proves the right. A
-        second check on the GLOBAL ``vote.cast`` permission would lock out a member who
-        holds the right through the gremium role alone, for example a Sachbearbeitung or
-        a Protokoll role. `MeetingService.vote_eligible_count` builds the quorum
-        denominator from exactly that roster, so both sides MUST use the same rule.
-        Otherwise the vote counts a member who cannot cast, and a percent quorum can
-        become unreachable.
+        Only the namespaced key ``vote:<gremium_id>`` decides. `resolve_principal`
+        writes it for an active membership whose gremium role carries ``vote.cast``,
+        and for nothing else, so the key proves the right. A matching OIDC group claim
+        cannot satisfy it. `MeetingService.vote_eligible_count` builds the quorum
+        denominator from exactly that roster, so both sides use the same rule.
 
-        A free group key is a raw OIDC group claim. It proves no membership and feeds no
-        server-side roster, so it keeps the global ``vote.cast`` permission next to it.
+        A free group key (not a UUID) is an old row. No global permission grants a
+        vote right any more, so such a vote admits nobody.
         """
-        if not VotingService._eligible_group_member(principal, eligible_group):
+        if not VotingService._is_gremium_group(eligible_group):
             return False
-        return VotingService._is_gremium_group(eligible_group) or principal.has("vote.cast")
+        return principal.in_group(vote_group_key(eligible_group))
 
-    async def _cast_open(
-        self, vote_id: UUID, voter_sub: str, choice: str, allow_change: bool
-    ) -> BallotAccepted:
-        values = {"vote_id": vote_id, "voter_sub": voter_sub, "choice": choice}
-        if allow_change:
-            # ``xmax = 0`` separates an INSERT (first vote -> "cast") from the ON
-            # CONFLICT UPDATE (change -> "changed"). A fresh tuple has a deleting
-            # txid of 0.
-            stmt = (
-                pg_insert(Ballot)
-                .values(**values)
-                .on_conflict_do_update(
-                    constraint="uq_ballot_vote_voter",
-                    set_={"choice": choice, "at": func.now()},
-                )
-                .returning(literal_column("(xmax = 0)").label("inserted"))
-            )
-            row = (await self.session.execute(stmt)).first()
-            await self.session.commit()
-            inserted = bool(row.inserted) if row is not None else False
-            return BallotAccepted(status="cast" if inserted else "changed")
+    def can_cast_own(self, vote: Vote, principal: Principal) -> bool:
+        """Tell whether the principal may cast an own ballot (the ``canCast`` flag).
 
+        The rule is the roster side of ``cast``: a human session (no OAuth token) and
+        ``vote.cast`` in the gremium of the vote. A delegated ballot has its own check.
+        """
+        return principal.scope_permissions is None and self._may_cast(
+            principal, vote.eligible_group
+        )
+
+    async def _cast_open(self, vote_id: UUID, voter_sub: str, choice: str) -> BallotAccepted:
+        """Insert the open ballot. A second cast of the same voter gives 409.
+
+        ``ON CONFLICT DO NOTHING`` keeps the first ballot. An empty ``RETURNING``
+        means the voter already voted. A ballot never changes after the cast (O11).
+        """
         stmt = (
             pg_insert(Ballot)
-            .values(**values)
+            .values(vote_id=vote_id, voter_sub=voter_sub, choice=choice)
             .on_conflict_do_nothing(constraint="uq_ballot_vote_voter")
             .returning(Ballot.id)
         )
@@ -525,15 +929,14 @@ class VotingService:
         if inserted is None:
             # ON CONFLICT DO NOTHING wrote nothing, so no rollback is needed. The
             # session dependency ``get_session`` ends the transaction on the exception.
-            raise ConflictError("Already voted.", code="conflict")
+            raise ConflictError("Already voted.", code=ALREADY_VOTED)
         await self.session.commit()
         return BallotAccepted(status="cast")
 
     async def _cast_secret(self, vote_id: UUID, voter_sub: str, choice: str) -> BallotAccepted:
         # `voted_marker` (UNIQUE) is the 'has voted' identity anchor. The code writes
         # the identity-less ballot only when the marker is new. There is no link from
-        # choice to voter. allowChange cannot work on an anonymous ballot, so a second
-        # cast gives 409.
+        # choice to voter. A second cast gives 409, as on the open path.
         marker = (
             pg_insert(VotedMarker)
             .values(vote_id=vote_id, voter_sub=voter_sub)
@@ -542,7 +945,7 @@ class VotingService:
         )
         inserted = (await self.session.execute(marker)).first()
         if inserted is None:
-            raise ConflictError("Already voted.", code="conflict")
+            raise ConflictError("Already voted.", code=ALREADY_VOTED)
         self.session.add(SecretBallot(vote_id=vote_id, choice=choice))
         await self.session.commit()
         return BallotAccepted(status="cast")
@@ -552,12 +955,14 @@ class VotingService:
 
         A meeting-bound vote follows the meeting visibility rules of
         ``MeetingService.assert_can_read``: member, participant, or delegation
-        recipient. A vote without a meeting (application or draft vote) needs a global
-        read or manage permission. Without this check any logged-in user could read the
-        tally of another gremium through ``GET /api/votes/{id}``, including closed
-        SECRET votes.
+        recipient. A vote without a meeting (application vote) is readable with
+        ``application.read`` or ``application.read_all`` (the admin role holds both),
+        for an eligible voter of the vote, and for a holder of the gremium permission
+        ``vote.manage`` or ``session.manage`` in the gremium of the vote. Without this
+        check any logged-in user could read the tally of another gremium through
+        ``GET /api/votes/{id}``, including closed SECRET votes.
 
-        The admin role reaches this through `Principal.has` below, not through a
+        The admin role reaches this through `Principal.has`, not through a
         `principal.roles` read: `has` is where the OAuth scope cap applies.
 
         Raises:
@@ -568,19 +973,87 @@ class VotingService:
 
             await MeetingService(self.session).assert_can_read(vote.meeting_id, principal)
             return
-        if (
-            principal.has("vote.manage")
-            or principal.has("application.read")
-            or principal.has("application.read_all")
-        ):
+        if principal.has("application.read") or principal.has("application.read_all"):
+            return
+        if self._may_cast(principal, vote.eligible_group):
+            return
+        gremium_id = await self._vote_gremium_id(
+            meeting_id=None, eligible_group=vote.eligible_group
+        )
+        if gremium_id is not None and await self._manages_in_gremium(gremium_id, principal):
             return
         raise ForbiddenError("not allowed to view this vote")
 
     async def get_scoped(self, vote_id: UUID, principal: Principal) -> VoteOut:
-        """Like ``get`` but fail-closed scoped to the vote's read audience."""
+        """Like ``get`` but fail-closed scoped to the vote's read audience.
+
+        The result carries the ``canManage`` and ``canCast`` flags of the principal,
+        the own ballot (``myBallot``) and ``representedCast``.
+        """
         vote = await self._get_vote(vote_id)
         await self.assert_can_read(vote, principal)
-        return await self.get(vote_id)
+        out = await self.get(vote_id)
+        return out.model_copy(
+            update={
+                "can_manage": await self.can_manage(vote, principal),
+                "can_cast": self.can_cast_own(vote, principal),
+                "my_ballot": await self.my_ballot(vote, principal.sub, secret=out.secret),
+                "represented_cast": await self.represented_cast(
+                    vote, principal.sub, secret=out.secret
+                ),
+            }
+        )
+
+    async def my_ballot(self, vote: Vote, voter_sub: str, *, secret: bool) -> MyBallot:
+        """Return the ballot that ``voter_sub`` cast in this vote.
+
+        An open vote reads the ``ballot`` row and returns its choice. A secret vote
+        reads only the ``voted_marker``: the choice has no link to the voter, so
+        ``choice`` stays None.
+        """
+        if secret:
+            marker = await self.session.scalar(
+                select(VotedMarker.id).where(
+                    VotedMarker.vote_id == vote.id, VotedMarker.voter_sub == voter_sub
+                )
+            )
+            return MyBallot(cast=marker is not None)
+        row = (
+            await self.session.execute(
+                select(Ballot.choice).where(
+                    Ballot.vote_id == vote.id, Ballot.voter_sub == voter_sub
+                )
+            )
+        ).first()
+        if row is None:
+            return MyBallot(cast=False)
+        return MyBallot(cast=True, choice=row.choice)
+
+    async def represented_cast(self, vote: Vote, sub: str, *, secret: bool) -> bool:
+        """Tell whether ``sub`` holds a voting delegation and cast the represented ballot.
+
+        The represented ballot runs under the ``sub`` of the delegator
+        (``voting_delegation_check``). The method returns False without an incoming
+        voting delegation for the meeting of the vote.
+        """
+        _, delegator_sub = await voting_delegation_check(
+            self.session, sub, vote.meeting_id, vote.eligible_group, datetime.now(UTC)
+        )
+        if delegator_sub is None:
+            return False
+        return (await self.my_ballot(vote, delegator_sub, secret=secret)).cast
+
+    async def _manages_in_gremium(self, gremium_id: UUID, principal: Principal) -> bool:
+        """Tell whether a gremium role gives ``vote.manage`` or ``session.manage`` here.
+
+        Both go through ``gremium_ids_for``, so the OAuth scope cap applies (F16).
+        """
+        from app.modules.admin.gremium_roles import gremium_ids_for
+
+        for perm in ("vote.manage", "session.manage"):
+            if gremium_id in await gremium_ids_for(self.session, principal, perm):
+                return True
+        return False
 
     async def _vote_gremium_id(
         self, *, meeting_id: UUID | None, eligible_group: str
@@ -590,8 +1063,8 @@ class VotingService:
         A meeting-bound vote inherits the gremium of the meeting. A vote without a
         meeting (application vote) carries the gremium in ``eligible_group`` as the
         gremium UUID in text form. If ``eligible_group`` is a free group key and not a
-        UUID, no gremium resolves and the method returns ``None``. Only a global
-        ``vote.manage`` or ``admin`` then grants access.
+        UUID (an old row), no gremium resolves and the method returns ``None``. Only
+        the admin role then grants access.
         """
         if meeting_id is not None:
             from app.modules.livevote.models import Meeting
@@ -632,47 +1105,54 @@ class VotingService:
             return False
         return await MeetingService(self.session).can_manage_votes(meeting, principal)
 
+    async def can_manage_group(
+        self, eligible_group: str, meeting_id: UUID | None, principal: Principal
+    ) -> bool:
+        """Tell whether the principal may manage a vote of this group and meeting.
+
+        The rule is fail-closed and gremium-scoped, symmetric to ``assert_can_read``.
+        It covers create, open, close, cancel and delete. The checks run in this
+        order:
+
+        1. The admin role (``admin_bypass`` with ``vote.manage``). The OAuth scope cap
+           applies, so an admin token with only the ``read`` scope cannot manage.
+        2. For a meeting-bound vote, the meeting rule. It keeps the enforced right
+           equal to the advertised ``canManageVotes`` flag.
+        3. The gremium permission ``vote.manage`` OR ``session.manage`` in the gremium
+           of the vote. This covers the application vote that no meeting holds.
+
+        No global permission grants the right. A vote with a free group key resolves
+        no gremium, so only the admin role passes.
+        """
+        from app.modules.admin.gremium_roles import admin_bypass
+
+        if admin_bypass(principal, "vote.manage"):
+            return True
+        if meeting_id is not None and await self._meeting_grants_vote_management(
+            meeting_id, principal
+        ):
+            return True
+        gremium_id = await self._vote_gremium_id(
+            meeting_id=meeting_id, eligible_group=eligible_group
+        )
+        if gremium_id is None:
+            return False
+        return await self._manages_in_gremium(gremium_id, principal)
+
     async def assert_can_manage_group(
         self, eligible_group: str, meeting_id: UUID | None, principal: Principal
     ) -> None:
-        """Guard the write and lifecycle access to a vote.
-
-        The check is fail-closed and gremium-scoped, symmetric to
-        ``assert_can_read``. It covers create, open, close and cancel. Access goes to
-        an admin or to a holder of the GLOBAL ``vote.manage`` permission. For a
-        meeting-bound vote the meeting rule decides next, which keeps the enforced
-        right equal to the advertised ``canManageVotes`` flag. A gremium role with
-        ``vote.manage`` for the gremium of the vote also grants access. The last case
-        covers the application vote that no meeting holds. It unblocks a legitimate
-        per-gremium manager. At the same time it stops an org-wide ``vote.manage``
-        holder from opening or closing votes of OTHER gremien without membership. That
-        would be a cross-tenant mutation.
-
-        The admin case runs through `principal.has("vote.manage")`, which grants the
-        admin role the right AND applies the OAuth scope cap. It used to read
-        `principal.roles` directly and return before that check, so a token issued to
-        an admin with only the `read` scope could open, close and cancel votes.
+        """Guard the write and lifecycle access to a vote (``can_manage_group``).
 
         Raises:
             ForbiddenError: The principal cannot manage this vote.
         """
-        if principal.has("vote.manage"):
-            return
-        if meeting_id is not None and await self._meeting_grants_vote_management(
-            meeting_id, principal
-        ):
-            return
-        gremium_id = await self._vote_gremium_id(
-            meeting_id=meeting_id, eligible_group=eligible_group
-        )
-        if gremium_id is not None:
-            from app.modules.admin.gremium_roles import gremium_ids_with_permission
+        if not await self.can_manage_group(eligible_group, meeting_id, principal):
+            raise ForbiddenError("not allowed to manage this vote")
 
-            if gremium_id in await gremium_ids_with_permission(
-                self.session, principal.sub, "vote.manage"
-            ):
-                return
-        raise ForbiddenError("not allowed to manage this vote")
+    async def can_manage(self, vote: Vote, principal: Principal) -> bool:
+        """Like ``can_manage_group`` but for an already-loaded vote."""
+        return await self.can_manage_group(vote.eligible_group, vote.meeting_id, principal)
 
     async def assert_can_manage(self, vote: Vote, principal: Principal) -> None:
         """Like ``assert_can_manage_group`` but for an already-loaded vote."""
@@ -692,6 +1172,33 @@ class VotingService:
         """
         vote = await self._get_vote(vote_id)
         await self.assert_can_manage(vote, principal)
+
+    async def list_visible(
+        self,
+        principal: Principal,
+        *,
+        statuses: Sequence[VoteStatus] | None = None,
+        gremium_id: UUID | None = None,
+        q: str | None = None,
+        limit: int = DEFAULT_LIMIT,
+        offset: int = 0,
+    ) -> Page[VoteListItem]:
+        """Return one page of the votes that the principal can read (``GET /votes``).
+
+        The read rule is the rule of ``assert_can_read``, applied in SQL. See
+        ``app.modules.voting.listing``.
+        """
+        from app.modules.voting.listing import list_votes
+
+        return await list_votes(
+            self.session,
+            principal,
+            statuses=statuses,
+            gremium_id=gremium_id,
+            q=q,
+            limit=limit,
+            offset=offset,
+        )
 
     async def get(self, vote_id: UUID) -> VoteOut:
         """Return the vote state and the aggregated tally.
@@ -715,12 +1222,15 @@ class VotingService:
             )
         return self._to_out(vote, config, tally_out)
 
-    async def cancel(self, vote_id: UUID) -> VoteOut:
+    async def cancel(
+        self, vote_id: UUID, *, now: datetime | None = None, actor: str | None = None
+    ) -> VoteOut:
         """Move the vote from ``open`` to ``cancelled`` without a result or a branch.
 
         The application stays in the ``vote`` state. An operator can then create a new
         vote or fire a manual exit. This is the only way out when the vote does not
-        reach the quorum, because ``close`` is then blocked.
+        reach the quorum, because ``close`` is then blocked. The method sets
+        ``closed_at`` and writes a ``vote_cancel`` audit entry for ``actor``.
 
         Raises:
             ConflictError: The vote is not open.
@@ -728,7 +1238,9 @@ class VotingService:
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "open":
             raise ConflictError(f"vote is {vote.status}, cannot cancel.", code="conflict")
-        vote.status = "cancelled"
+        await self._mark_cancelled(
+            vote, now=now or datetime.now(UTC), actor=actor, reason="manual"
+        )
         await self.session.commit()
         config = self._config(vote)
         counts = await self._aggregate(vote, config)
@@ -738,30 +1250,167 @@ class VotingService:
             await self._tally_out(vote, config, counts, vote.eligible_count or 0),
         )
 
+    async def _mark_cancelled(
+        self, vote: Vote, *, now: datetime, actor: str | None, reason: str
+    ) -> None:
+        """Set a loaded vote to ``cancelled`` and audit it, without a commit."""
+        previous = vote.status
+        vote.status = "cancelled"
+        vote.closed_at = now
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.VOTE_CANCEL,
+            target_type="vote",
+            target_id=str(vote.id),
+            data={**self._audit_refs(vote), "reason": reason, "previousStatus": previous},
+        )
+
+    async def cancel_for_application(
+        self,
+        application_id: UUID,
+        *,
+        now: datetime,
+        actor: str | None = None,
+        left_state_id: UUID | None = None,
+        entered_state_id: UUID | None = None,
+    ) -> list[Vote]:
+        """Cancel the votes that a state change of the application orphans (F19).
+
+        The flow calls this when the application leaves its state without a vote
+        branch: a transition without a branch, a forced status, or an audit revert.
+
+        * Every ``open`` vote of the application is cancelled.
+        * A ``draft`` vote is cancelled only when it belongs to the state that the
+          application leaves (``left_state_id``). That is a draft whose
+          ``opens_state_id`` is the left state, or a draft without ``opens_state_id``
+          when the left state is a vote state.
+        * Every other draft stays. Examples: a draft without ``opens_state_id`` that
+          was prepared before the application enters its vote state, or a draft for a
+          later vote state. A transition back into the same state keeps every draft.
+
+        Each cancelled vote gets ``closed_at`` and a ``vote_cancel`` audit entry.
+
+        The method does not commit. The caller commits together with the state change
+        and then sends ``vote_cancelled`` for the returned votes.
+
+        Returns:
+            The cancelled votes.
+        """
+        rows = (
+            (
+                await self.session.execute(
+                    select(Vote)
+                    .where(
+                        Vote.application_id == application_id,
+                        Vote.status.in_(("open", "draft")),
+                    )
+                    .order_by(Vote.created_at)
+                    .with_for_update()
+                )
+            )
+            .scalars()
+            .all()
+        )
+        left_is_vote: bool | None = None
+        cancelled: list[Vote] = []
+        for vote in rows:
+            if vote.status == "draft":
+                if left_state_id is None or left_state_id == entered_state_id:
+                    continue
+                if vote.opens_state_id is None:
+                    if left_is_vote is None:
+                        left_is_vote = await self._is_vote_state(left_state_id)
+                    if not left_is_vote:
+                        continue
+                elif vote.opens_state_id != left_state_id:
+                    continue
+            await self._mark_cancelled(vote, now=now, actor=actor, reason="state_left")
+            cancelled.append(vote)
+        await self.session.flush()
+        return cancelled
+
+    async def _is_vote_state(self, state_id: UUID) -> bool:
+        """Tell if the state is a vote state.
+
+        A vote state has ``kind == 'vote'`` or at least one ``pass``/``fail`` branch
+        exit.
+        """
+        from app.modules.flow.models import State, Transition
+
+        kind = await self.session.scalar(select(State.kind).where(State.id == state_id))
+        if kind == "vote":
+            return True
+        branch = await self.session.scalar(
+            select(Transition.id)
+            .where(Transition.from_state_id == state_id, Transition.branch.is_not(None))
+            .limit(1)
+        )
+        return branch is not None
+
+    async def cancel_drafts_for_meeting(
+        self,
+        meeting_id: UUID,
+        *,
+        now: datetime,
+        actor: str | None = None,
+        reason: str = "meeting_closed",
+    ) -> list[Vote]:
+        """Cancel the ``draft`` votes of a meeting, without a commit.
+
+        The meeting close and the meeting delete use this: a draft of a closed or
+        deleted meeting can never open. Each vote gets ``closed_at`` and a
+        ``vote_cancel`` audit entry with ``reason`` (``meeting_closed`` or
+        ``meeting_deleted``).
+
+        Returns:
+            The cancelled votes.
+        """
+        rows = (
+            (
+                await self.session.execute(
+                    select(Vote)
+                    .where(Vote.meeting_id == meeting_id, Vote.status == "draft")
+                    .order_by(Vote.created_at)
+                    .with_for_update()
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for vote in rows:
+            await self._mark_cancelled(vote, now=now, actor=actor, reason=reason)
+        await self.session.flush()
+        return list(rows)
+
     async def close(
         self, vote_id: UUID, principal: Principal, *, now: datetime | None = None
     ) -> VoteClosed:
         """Close an open vote, compute the tally and the result, then fire the branch.
 
-        The close calls ``flow.fire(result_branch)``. It is atomic. The vote change
-        (``status=closed`` plus ``result``) and the ``voteResult`` transition commit in
-        one transaction. ``fire`` commits the staged vote changes. If ``fire`` fails on
-        a guard or a race, the session dependency rolls everything back. The vote then
-        stays open and the caller can retry, instead of ending 'closed but branch never
-        fired'.
+        One transaction, one commit (F20). The method stages the tally result,
+        ``status=closed`` and ``closed_at``, and a ``vote_close`` audit entry. It then
+        stages the ``pass`` or ``fail`` transition of the application in a SAVEPOINT.
+        The commit writes the close and the transition together.
+
+        A blocked branch does not block the close. When the guard of the transition
+        fails, another transition wins the race, or the current state has no such
+        transition, only the SAVEPOINT rolls back. The vote stays closed, the audit log
+        gets ``vote_branch_blocked`` (vote, branch, reason), and the application stays
+        in its state. ``branchFired`` is then False, and a person must move the
+        application by hand. The cron therefore never retries a closed vote.
 
         An expired quorum vote is a special case. Such a vote is time-bound and
         quorum-gated, and its window ``closes_at`` passed with the quorum unmet. It has
         finally failed, because no more ballots are possible. On a manual close
-        (``now=None``) the earlier fail-closed 409 applies. If the caller (cron) passes
-        ``now`` and the window already expired, the close is different. It marks the
-        vote as terminal QUORUM-MISSED and fires the ``fail`` branch. Without that rule
-        the application would hang in the ``vote`` state forever. The cron would also
-        re-grab the same unclosable vote on each tick.
+        (``now=None``) the fail-closed 409 applies. If the caller (cron) passes ``now``
+        and the window already expired, the close marks the vote as terminal
+        QUORUM-MISSED and fires the ``fail`` branch. Without that rule the application
+        would hang in the ``vote`` state forever.
 
         Raises:
-            ConflictError: The vote is not open, the quorum is not met, or the flow has
-                no matching branch transition.
+            ConflictError: The vote is not open, or the quorum is not met before the
+                window expired.
         """
         # The row lock serializes this call against cast(). No last-second ballot can
         # land between the tally and ``status=closed``.
@@ -794,6 +1443,40 @@ class VotingService:
         result_value: tally_mod.VoteResult = (
             outcome.result if outcome.quorum_met else "rejected"
         )
+        closed_at = now or datetime.now(UTC)
+
+        # #17: fix the attendance of a meeting vote at the close. For a vote with
+        # guests the number of eligible voters is the present members plus the admitted
+        # guests at this moment: a guest admitted while the vote ran voted too. It is a
+        # display value only, because such a vote has no quorum.
+        if vote.meeting_id is not None:
+            members = await self._present_count(vote)
+            guests = await self._guest_attendance(vote, config)
+            vote.present_members = members
+            vote.present_guests = guests
+            if config.guests_vote:
+                eligible = members + guests
+                vote.eligible_count = eligible
+
+        # Stage the vote state. The commit at the end writes it together with the
+        # transition, or alone when the branch is blocked.
+        vote.status = "closed"
+        vote.result = result_value
+        vote.closed_at = closed_at
+        await audit_record(
+            self.session,
+            actor=principal.sub,
+            action=AuditAction.VOTE_CLOSE,
+            target_type="vote",
+            target_id=str(vote.id),
+            # Aggregates only, never a voter.
+            data={
+                **self._audit_refs(vote),
+                "result": result_value,
+                "counts": dict(counts),
+                "quorumMet": outcome.quorum_met,
+            },
+        )
 
         # A ``vote`` state has two fixed exits with ``branch`` ``pass`` and ``fail``.
         # ``passed`` fires pass. ``rejected`` and ``tie`` are fail-closed and fire fail.
@@ -801,37 +1484,26 @@ class VotingService:
         # holds the result for the protocol.
         branch_name = "pass" if result_value == "passed" else "fail"
         flow = FlowService(self.session, self.dispatcher)
-        branch = (
-            await flow.branch_transition(vote.application_id, branch_name)
-            if vote.application_id is not None
-            else None
-        )
-        # An application-bound vote WITHOUT a matching branch transition is fail-closed.
-        # This happens on a misconfigured flow, or on a vote in a non-``vote`` state.
-        # A silent close would fix the result but leave the application in the pre-vote
-        # state.
-        if vote.application_id is not None and branch is None:
-            raise ConflictError(
-                f"no '{branch_name}' branch transition for the vote's current state; "
-                "flow is misconfigured.",
-                code="conflict",
+        staged: StagedFire | None = None
+        if vote.application_id is not None:
+            staged = await self._stage_branch(
+                flow,
+                vote,
+                vote.application_id,
+                branch_name,
+                principal,
+                note=f"vote:{result_value}",
             )
-
-        # Stage the vote state and do NOT commit it here. `fire` writes it atomically
-        # with the transition and the status_event. Without a branch the code below
-        # commits.
-        vote.status = "closed"
-        vote.result = result_value
-        vote.result_branch_transition_id = branch.id if branch is not None else None
+        if staged is not None:
+            vote.result_branch_transition_id = staged.transition.id
+            # The deadline of the new state joins the same commit.
+            await flow.schedule_staged_deadline(staged, commit=False)
+        await self.session.commit()
 
         new_state_id: UUID | None = None
-        if branch is not None and vote.application_id is not None:
-            fired = await flow.fire_branch(
-                vote.application_id, branch_name, principal, note=f"vote:{result_value}"
-            )
+        if staged is not None:
+            fired = await flow.after_commit(staged, schedule_deadline=False)
             new_state_id = fired.new_state_id
-        else:
-            await self.session.commit()
 
         tally_out = TallyOut(
             counts=counts,
@@ -840,12 +1512,54 @@ class VotingService:
             leading=outcome.leading,
             result=result_value,
             failedReason=tally_mod.failed_reason(result_value, outcome.quorum_met),
+            presentMembers=getattr(vote, "present_members", None),
+            presentGuests=getattr(vote, "present_guests", None),
         )
         return VoteClosed(
             id=vote.id,
             meetingId=vote.meeting_id,
+            applicationId=vote.application_id,
             result=result_value,
             tally=tally_out,
-            firedTransitionId=branch.id if branch is not None else None,
+            closedAt=closed_at,
+            firedTransitionId=staged.transition.id if staged is not None else None,
             newStateId=new_state_id,
+            branchFired=staged is not None,
         )
+
+    async def _stage_branch(
+        self,
+        flow: FlowService,
+        vote: Vote,
+        application_id: UUID,
+        branch_name: str,
+        principal: Principal,
+        *,
+        note: str,
+    ) -> StagedFire | None:
+        """Stage the result branch in a SAVEPOINT, or audit why it is blocked.
+
+        The SAVEPOINT keeps the staged vote close safe: a guard failure, a lost race or
+        a missing branch transition rolls back only the branch. The method then writes
+        ``vote_branch_blocked`` and returns None.
+        """
+        try:
+            async with self.session.begin_nested():
+                return await flow.stage_branch(
+                    application_id, branch_name, principal, note=note
+                )
+        except ConflictError as exc:
+            reason = exc.code
+        except NotFoundError:
+            # The current state has no such branch: a misconfigured flow, or a vote
+            # outside its vote state.
+            reason = "no_branch"
+        await audit_record(
+            self.session,
+            actor=principal.sub,
+            action=AuditAction.VOTE_BRANCH_BLOCKED,
+            target_type="vote",
+            target_id=str(vote.id),
+            data={**self._audit_refs(vote), "branch": branch_name, "reason": reason},
+        )
+        return None

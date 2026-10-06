@@ -1,0 +1,54 @@
+// Shared blocks of the inspector panels of the flow editor (state, transition, group,
+// guard and actions). Each panel component `@use`s this file; the rules stay scoped to
+// that component.
+
+/* The head of a panel: the caption, then the destructive action at the end. */
+.ins__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.25rem;
+}
+.ins__title {
+  flex: 1 1 auto;
+  margin: 0;
+  color: var(--color-accent-text);
+}
+
+/* A caption above a block of the panel. */
+.ins__cap {
+  margin: 0;
+}
+
+/* Two fields side by side (DE and EN, from and to). */
+.ins__pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+/* Switches with their labels, one under the other. */
+.ins__switches {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ins__hint {
+  margin: 0;
+  font-size: var(--fs-small);
+  line-height: var(--lh-small);
+  color: var(--color-text-muted);
+}
+
+.ins__rule {
+  height: 0;
+  margin: 0;
+  border: 0;
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+/* Keys in the mono face (the value only, not the label). */
+.ins__mono ::ng-deep input {
+  font-family: var(--font-mono);
+}

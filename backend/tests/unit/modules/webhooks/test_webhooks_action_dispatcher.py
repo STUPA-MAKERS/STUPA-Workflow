@@ -113,11 +113,3 @@ async def test_webhook_action_inactive_hook_skipped() -> None:
     await _disp(session, queue).dispatch([_action("webhook", webhookId=str(hook.id))])
     assert queue.enqueued == []
     assert session.added == []
-
-
-def test_build_webhook_dispatcher_without_pool() -> None:
-    from app.modules.webhooks.action_dispatcher import build_webhook_dispatcher
-
-    disp = build_webhook_dispatcher(None)
-    assert disp.queue is None
-    assert disp.settings is not None

@@ -29,8 +29,7 @@ NOW = datetime(2026, 6, 7, 12, 0, tzinfo=UTC)
 class FakeResult:
     def __init__(self, items: list[Any]) -> None:
         self._items = items
-        # `rowcount` feeds DELETE and UPDATE statements, such as the guest application
-        # discard.
+        # `rowcount` feeds DELETE and UPDATE statements.
         self.rowcount = len(items)
 
     def scalars(self) -> FakeResult:
@@ -56,6 +55,9 @@ class FakeSession:
 
     async def scalar(self, _stmt: Any) -> Any:
         return self._scalar
+
+    async def get(self, _model: Any, _ident: Any) -> Any:
+        return None  # no guest settings row: the defaults apply
 
     async def commit(self) -> None:
         self.committed += 1
@@ -105,7 +107,7 @@ class _VotingFake:
 
     async def close(self, vote_id: Any, principal: Any, *, now: Any = None) -> Any:
         _VotingFake.calls.append(vote_id)
-        return SimpleNamespace()
+        return SimpleNamespace(application_id=None, branch_fired=False)
 
 
 class _NotifyFake:
@@ -131,7 +133,7 @@ def patched(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(wd, "FlowService", _FlowFake)
     monkeypatch.setattr(wd, "VotingService", _VotingFake)
     monkeypatch.setattr(wd, "NotificationService", _NotifyFake)
-    monkeypatch.setattr(wd, "build_notify_dispatcher", lambda _pool: object())
+    monkeypatch.setattr(wd, "build_worker_dispatcher", lambda *_a: object())
 
 
 def _ctx(sessions: list[FakeSession]) -> dict[str, Any]:
@@ -230,6 +232,8 @@ async def test_close_meeting_vote_broadcasts_vote_closed(
         meeting_id=meeting_id,
         result="passed",
         tally=SimpleNamespace(counts={"yes": 1}, failed_reason=None),
+        application_id=None,
+        branch_fired=False,
     )
 
     class _Closing(_VotingFake):
@@ -264,6 +268,8 @@ async def test_close_standalone_vote_no_broadcast(
         meeting_id=None,
         result="passed",
         tally=SimpleNamespace(counts={"yes": 1}, failed_reason=None),
+        application_id=None,
+        branch_fired=False,
     )
 
     class _Closing(_VotingFake):
@@ -296,6 +302,8 @@ async def test_close_broadcast_failure_does_not_fail_close(
         meeting_id=uuid4(),
         result="passed",
         tally=SimpleNamespace(counts={"yes": 1}, failed_reason=None),
+        application_id=None,
+        branch_fired=False,
     )
 
     class _Closing(_VotingFake):
@@ -333,14 +341,73 @@ async def test_close_conflict_skips(patched: None, monkeypatch: pytest.MonkeyPat
 
 
 @freeze_time(FROZEN)
-async def test_close_notfound_skips(patched: None, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_close_with_blocked_branch_counts_as_closed(
+    patched: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """F20: a blocked result branch still closes the vote. The cron does not retry it."""
+    closed = SimpleNamespace(
+        id=uuid4(),
+        meeting_id=None,
+        result="passed",
+        tally=SimpleNamespace(counts={"yes": 1}, failed_reason=None),
+        application_id=uuid4(),
+        branch_fired=False,
+    )
+
+    class _Blocked(_VotingFake):
+        async def close(self, vote_id: Any, principal: Any, *, now: Any = None) -> Any:
+            _VotingFake.calls.append(vote_id)
+            return closed
+
+    monkeypatch.setattr(wd, "VotingService", _Blocked)
+    # Another test may disable the app loggers (alembic `fileConfig`), so record the
+    # warning call itself instead of the log output.
+    warnings: list[str] = []
+    monkeypatch.setattr(wd.logger, "warning", lambda msg, *_a: warnings.append(msg))
+    vote = SimpleNamespace(id=uuid4())
+    assert await wd._close_one(_ctx([FakeSession([[vote]])]), vote.id, NOW) is True
+    assert any("result branch blocked" in w for w in warnings)
+
+
+@freeze_time(FROZEN)
+async def test_close_with_fired_branch_logs_info(
+    patched: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    closed = SimpleNamespace(
+        id=uuid4(),
+        meeting_id=None,
+        result="passed",
+        tally=SimpleNamespace(counts={"yes": 1}, failed_reason=None),
+        application_id=uuid4(),
+        branch_fired=True,
+    )
+
+    class _Fired(_VotingFake):
+        async def close(self, vote_id: Any, principal: Any, *, now: Any = None) -> Any:
+            return closed
+
+    monkeypatch.setattr(wd, "VotingService", _Fired)
+    vote = SimpleNamespace(id=uuid4())
+    assert await wd._close_one(_ctx([FakeSession([[vote]])]), vote.id, NOW) is True
+
+
+@freeze_time(FROZEN)
+async def test_close_notfound_propagates(
+    patched: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The close no longer raises NotFoundError for a missing branch (F20).
+
+    A missing vote after the row lock is a real fault: the cycle logs it.
+    """
+
     class _Gone(_VotingFake):
         async def close(self, *_a: Any, **_k: Any) -> Any:
-            raise NotFoundError("app gone")
+            raise NotFoundError("vote gone")
 
     monkeypatch.setattr(wd, "VotingService", _Gone)
     vote = SimpleNamespace(id=uuid4())
-    assert await wd._close_one(_ctx([FakeSession([[vote]])]), vote.id, NOW) is False
+    with pytest.raises(NotFoundError):
+        await wd._close_one(_ctx([FakeSession([[vote]])]), vote.id, NOW)
 
 
 @freeze_time(FROZEN)
@@ -529,3 +596,21 @@ def test_sessionmaker_default_falls_back() -> None:
 
 def test_now_is_tz_aware() -> None:
     assert wd._now().tzinfo is not None
+
+
+def test_flow_dispatcher_prefers_the_ctx_and_falls_back_to_the_full_chain() -> None:
+    from app.modules.flow.dispatch import ChainActionDispatcher
+
+    sentinel = object()
+    assert wd._flow_dispatcher({"flow_dispatcher": sentinel}) is sentinel
+    chain = wd._flow_dispatcher(
+        {"settings": SETTINGS, "deadlines_sessionmaker": _maker([])}
+    )
+    assert isinstance(chain, ChainActionDispatcher)
+    assert len(chain.dispatchers) == 3
+
+
+def test_publisher_needs_redis() -> None:
+    """The flow gets a live-vote publisher only with Redis (F19 `vote_cancelled`)."""
+    assert wd._publisher({}) is None
+    assert isinstance(wd._publisher({"redis": object()}), wd.BrokerPublisher)

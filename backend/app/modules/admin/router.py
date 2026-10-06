@@ -8,7 +8,7 @@ branding read.
 RBAC is server-side authoritative. ``require_principal`` answers 401 or 403.
 The frontend is only a UX gate. Per-area permissions: ``admin.gremien``,
 ``admin.types``, ``admin.site``, ``admin.roles``, ``admin.cd_variants``,
-``webhook.manage``.
+``admin.deadlines`` (guest settings), ``webhook.manage``.
 
 ``notification-rules`` and ``mail-templates`` live in the notifications module.
 ``/admin/audit`` lives in audit and the form versions live in forms. This
@@ -41,6 +41,7 @@ from app.modules.admin.branding import Branding
 from app.modules.admin.cd_logos import LogoSlot
 from app.modules.admin.gremium_roles import GremiumRoleService
 from app.modules.admin.oidc_mappings import OidcMappingService
+from app.modules.admin.principal_merge import PrincipalMergeService
 from app.modules.admin.schemas import (
     ApplicationTypeCreate,
     ApplicationTypeOut,
@@ -54,6 +55,7 @@ from app.modules.admin.schemas import (
     CdVariantUpdate,
     FlowVersionCreate,
     FlowVersionOut,
+    GremiumAdminOut,
     GremiumCreate,
     GremiumMailRecipients,
     GremiumMembershipMappingCreate,
@@ -71,6 +73,11 @@ from app.modules.admin.schemas import (
     GroupMappingCreate,
     GroupMappingOut,
     GroupMappingUpdate,
+    GuestSettingsOut,
+    GuestSettingsUpdate,
+    MergePreviewOut,
+    MergeResultOut,
+    PrincipalMergeIn,
     PrincipalOut,
     PrincipalUpdate,
     PublicSiteConfigOut,
@@ -86,6 +93,7 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service import CdVariantService, ConfigService
 from app.modules.admin.site_config_service import SiteConfigService
+from app.modules.applications.guest_settings import GuestSettingsService
 from app.shared.antiabuse import body_cap
 from app.shared.config_schemas import FlowGraph, export_json_schemas
 from app.shared.errors import ProblemDetail
@@ -120,6 +128,10 @@ def get_oidc_mapping_service(session: DbSession) -> OidcMappingService:
     return OidcMappingService(session)
 
 
+def get_principal_merge_service(session: DbSession) -> PrincipalMergeService:
+    return PrincipalMergeService(session)
+
+
 def get_cd_variant_service(session: DbSession, request: Request) -> CdVariantService:
     # Only the logo upload and download touch the object storage. Without MinIO
     # (development, contract CI) those two routes answer 503.
@@ -132,6 +144,7 @@ SiteServiceDep = Annotated[SiteConfigService, Depends(get_site_config_service)]
 GremiumRoleServiceDep = Annotated[GremiumRoleService, Depends(get_gremium_role_service)]
 OidcMappingServiceDep = Annotated[OidcMappingService, Depends(get_oidc_mapping_service)]
 CdVariantServiceDep = Annotated[CdVariantService, Depends(get_cd_variant_service)]
+MergeServiceDep = Annotated[PrincipalMergeService, Depends(get_principal_merge_service)]
 
 # Body cap on Content-Length for a logo upload, applied before FastAPI buffers
 # the body. It adds defense in depth next to the nginx cap and the authoritative
@@ -151,6 +164,9 @@ WebhookAdmin = Annotated[Principal, Depends(require_principal("webhook.manage"))
 # ``admin.roles`` covers /admin/roles with the role definitions. The write
 # operations of the other pages gate on their own keys.
 UsersAdmin = Annotated[Principal, Depends(require_principal("admin.users"))]
+# Account merge. A separate key: the merge rewrites the history of two accounts and
+# cannot be undone, so the user page alone does not grant it.
+MergeAdmin = Annotated[Principal, Depends(require_principal("admin.users.merge"))]
 GroupMappingsAdmin = Annotated[Principal, Depends(require_principal("admin.group_mappings"))]
 GremiumRolesAdmin = Annotated[Principal, Depends(require_principal("admin.gremium_roles"))]
 CdVariantsAdmin = Annotated[Principal, Depends(require_principal("admin.cd_variants"))]
@@ -193,7 +209,14 @@ _ANY_ADMIN_AREA = Depends(require_any_permission(*_ALL_ADMIN_AREAS))
 _GREMIEN_OR_GREMIUM_ROLES = Depends(
     require_any_permission("admin.gremien", "admin.gremium_roles", "admin.group_mappings")
 )
-_GREMIEN_OR_USERS = Depends(require_any_permission("admin.gremien", "admin.users"))
+# The principal search serves the user page, the gremium members and the person picker
+# of the substitute pool on the delegations page (admin.delegations).
+_PRINCIPAL_READERS = Depends(
+    require_any_permission("admin.gremien", "admin.users", "admin.delegations")
+)
+# The members of a gremium: the members page (admin.gremien) and the "represents" choice
+# of the substitute pool on the delegations page (admin.delegations).
+_MEMBERSHIP_READERS = Depends(require_any_permission("admin.gremien", "admin.delegations"))
 # Read gates for pages that need the data of another area only as a selection
 # source or a display source. The writes stay on the strict permission. The flow
 # editor reads the global flow, the roles, the webhooks and the deadlines. The
@@ -230,12 +253,13 @@ async def get_config_schemas() -> dict[str, dict[str, Any]]:
 
 @router.get(
     "/gremien",
-    response_model=list[GremiumOut],
+    response_model=list[GremiumAdminOut],
     dependencies=[_GREMIEN],
     responses=_errors(401, 403),
 )
-async def list_gremien(service: ServiceDep) -> list[GremiumOut]:
-    return await service.list_gremien()
+async def list_gremien(service: ServiceDep) -> list[GremiumAdminOut]:
+    """List the gremien with their member and role counts (admin overview)."""
+    return await service.list_gremien_admin()
 
 
 @router.post(
@@ -356,7 +380,7 @@ async def delete_gremium_role(
 @router.get(
     "/gremien/{gremium_id}/memberships",
     response_model=list[GremiumMembershipOut],
-    dependencies=[_GREMIEN],
+    dependencies=[_MEMBERSHIP_READERS],
     responses=_errors(401, 403),
 )
 async def list_gremium_memberships(
@@ -632,7 +656,7 @@ async def create_global_flow(
 @router.get(
     "/principals",
     response_model=list[PrincipalOut],
-    dependencies=[_GREMIEN_OR_USERS],
+    dependencies=[_PRINCIPAL_READERS],
     responses=_errors(401, 403),
 )
 async def list_principals(
@@ -652,6 +676,46 @@ async def patch_principal(
 ) -> PrincipalOut:
     """Activate or deactivate a user."""
     return await service.set_principal_active(principal_id, payload.active, principal.sub)
+
+
+@router.get(
+    "/principals/{principal_id}/merge-preview",
+    response_model=MergePreviewOut,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def preview_principal_merge(
+    principal_id: UUID,
+    service: MergeServiceDep,
+    admin: MergeAdmin,
+    target_id: Annotated[UUID, Query(alias="targetId")],
+) -> MergePreviewOut:
+    """Show what a merge of this (old) account into `targetId` would do.
+
+    The answer counts per area the rows that the merge rewrites, combines and removes,
+    and lists the real conflicts that block it. It writes nothing.
+    """
+    return await service.preview(principal_id, target_id, actor=admin.sub)
+
+
+@router.post(
+    "/principals/{principal_id}/merge",
+    response_model=MergeResultOut,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def merge_principal(
+    principal_id: UUID,
+    payload: PrincipalMergeIn,
+    service: MergeServiceDep,
+    admin: MergeAdmin,
+) -> MergeResultOut:
+    """Merge this (old) account into `targetId` in one transaction.
+
+    The merge rewrites the references, combines harmless duplicates and locks the old
+    account as a reference to the new one. A real conflict gives 409 `merge_conflict`
+    and changes nothing. The audit log stays as it is; the merge itself is the audit
+    action `principal_merge`.
+    """
+    return await service.merge(principal_id, payload.target_id, actor=admin.sub)
 
 
 @router.get(
@@ -941,6 +1005,56 @@ async def list_webhook_delivery_status(
     no response body.
     """
     return await service.list_webhook_delivery_status()
+
+
+# Applications without an account (Z1): the confirmation window and the link
+# lifetime. The deadlines page (admin.deadlines) maintains them.
+DeadlinesAdmin = Annotated[Principal, Depends(require_principal("admin.deadlines"))]
+
+
+def get_guest_settings_service(session: DbSession) -> GuestSettingsService:
+    return GuestSettingsService(session)
+
+
+GuestSettingsServiceDep = Annotated[GuestSettingsService, Depends(get_guest_settings_service)]
+
+
+@router.get(
+    "/guest-settings",
+    response_model=GuestSettingsOut,
+    dependencies=[Depends(require_principal("admin.deadlines"))],
+    responses=_errors(401, 403),
+)
+async def get_guest_settings(service: GuestSettingsServiceDep) -> GuestSettingsOut:
+    """Return the confirmation window (hours) and the magic-link lifetime (days)."""
+    row = await service.get()
+    await service.session.commit()
+    return GuestSettingsOut.model_validate(row, from_attributes=True)
+
+
+@router.put(
+    "/guest-settings",
+    response_model=GuestSettingsOut,
+    responses=_errors(400, 401, 403, 422),
+)
+async def put_guest_settings(
+    payload: GuestSettingsUpdate,
+    service: GuestSettingsServiceDep,
+    principal: DeadlinesAdmin,
+) -> GuestSettingsOut:
+    """Replace both values. ``linkTtlDays: null`` gives magic links without an expiry.
+
+    A new ``confirmTtlHours`` applies to the waiting applications at the next
+    worker run. A new ``linkTtlDays`` applies to the links requested from now on;
+    the existing links keep their expiry. The change writes a ``config_change``
+    audit entry that the audit log cannot revert.
+    """
+    row = await service.update(
+        confirm_ttl_hours=payload.confirm_ttl_hours,
+        link_ttl_days=payload.link_ttl_days,
+        actor=principal.sub,
+    )
+    return GuestSettingsOut.model_validate(row, from_attributes=True)
 
 
 # Site config and branding with draft and activate semantics.

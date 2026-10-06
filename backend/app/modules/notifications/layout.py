@@ -24,6 +24,12 @@ _REASONS: dict[str, dict[str, str]] = {
         "en": "You are receiving this email because an access link was "
         "requested for your address.",
     },
+    "application_captured": {
+        "de": "Sie erhalten diese E-Mail, weil für Sie ein Antrag auf der "
+        "Antragsplattform erfasst wurde.",
+        "en": "You are receiving this email because an application was entered "
+        "for you on the application platform.",
+    },
     "status_update": {
         "de": "Sie erhalten diese E-Mail, weil sich der Status eines Antrags "
         "geändert hat, der Sie betrifft.",
@@ -59,18 +65,6 @@ _REASONS: dict[str, dict[str, str]] = {
         "Gremien angesetzt oder geändert wurde.",
         "en": "You are receiving this email because a meeting of one of "
         "your committees was scheduled or changed.",
-    },
-    "vote": {
-        "de": "Sie erhalten diese E-Mail, weil eine Abstimmung geöffnet "
-        "oder geschlossen wurde, die Sie betrifft.",
-        "en": "You are receiving this email because a vote that concerns "
-        "you was opened or closed.",
-    },
-    "role_change": {
-        "de": "Sie erhalten diese E-Mail, weil sich Ihre Rollen auf der "
-        "Plattform geändert haben.",
-        "en": "You are receiving this email because your roles on the "
-        "platform changed.",
     },
     "delegation": {
         "de": "Sie erhalten diese E-Mail, weil eine Stimm-Delegation "

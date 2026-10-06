@@ -6,9 +6,20 @@ export type ResolvedTheme = 'light' | 'dark';
 const STORAGE_KEY = 'ap.theme';
 
 /**
+ * Page background per theme (`--color-bg` of the ui-kit tokens). The browser and the
+ * installed PWA colour their bars with the `theme-color` meta tag, so the bars follow the
+ * theme. Keep the values in step with `tokens.scss` and `index.html`.
+ */
+export const THEME_COLOR: Record<ResolvedTheme, string> = {
+  light: '#f6f7f5',
+  dark: '#101211',
+};
+
+/**
  * Theme control:
  * - The preference is `system` (follows the OS), `light` or `dark`. It is persisted.
- * - The service writes the effective theme to `data-theme` on <html>.
+ * - The service writes the effective theme to `data-theme` on <html> and its page
+ *   background to every `<meta name="theme-color">`.
  * - In `system` mode a matchMedia listener picks up an OS change live.
  */
 @Injectable({ providedIn: 'root' })
@@ -16,13 +27,15 @@ export class ThemeService {
   private readonly media = window.matchMedia('(prefers-color-scheme: dark)');
   private readonly _preference = signal<ThemePreference>(this.readStored());
   private readonly _systemDark = signal<boolean>(this.media.matches);
+  /** The theme of a page that sets its own default (the beamer), or `null`. */
+  private readonly _pageDefault = signal<ResolvedTheme | null>(null);
 
   readonly preference = this._preference.asReadonly();
 
   /** The theme that is in effect (`light` or `dark`). */
   readonly resolved = computed<ResolvedTheme>(() => {
     const pref = this._preference();
-    if (pref === 'system') return this._systemDark() ? 'dark' : 'light';
+    if (pref === 'system') return this._pageDefault() ?? (this._systemDark() ? 'dark' : 'light');
     return pref;
   });
 
@@ -38,6 +51,17 @@ export class ThemeService {
     this.apply();
   }
 
+  /**
+   * Set the theme that `system` gives while one page shows, for example dark for the
+   * beamer. An explicit choice of the person (`light` or `dark`) still wins. The page
+   * calls it again with `null` when it goes, and the OS theme applies again. The
+   * service does not persist this value.
+   */
+  setPageDefault(theme: ResolvedTheme | null): void {
+    this._pageDefault.set(theme);
+    this.apply();
+  }
+
   /** Switch between light and dark, based on the theme that is visible now. */
   toggle(): void {
     this.setPreference(this.resolved() === 'dark' ? 'light' : 'dark');
@@ -49,7 +73,13 @@ export class ThemeService {
   };
 
   private apply(): void {
-    document.documentElement.setAttribute('data-theme', this.resolved());
+    const theme = this.resolved();
+    document.documentElement.setAttribute('data-theme', theme);
+    // index.html carries one tag per OS scheme. An explicit choice in the app overrides
+    // the OS, so both tags take the colour of the theme in effect.
+    document
+      .querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
+      .forEach((meta) => meta.setAttribute('content', THEME_COLOR[theme]));
   }
 
   private readStored(): ThemePreference {

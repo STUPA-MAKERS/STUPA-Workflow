@@ -1,0 +1,68 @@
+/* Centred in the free space of the page; the text inside stays left-aligned. The shell
+   main is a flex column that fills the height between the bars and the footer, so
+   `flex: 1` takes exactly the free space of any frame and never pushes the footer past
+   the fold. */
+:host {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.err {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  width: min(560px, 100%);
+}
+
+.err__code {
+  margin: 0;
+  font-size: 64px;
+  line-height: 64px;
+  color: var(--color-text-subtle);
+}
+
+.err__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.err__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+/* A section-size heading: the page has nothing else to title. */
+.err__heading {
+  margin: 0;
+  font-size: var(--fs-h1);
+  line-height: var(--lh-h1);
+}
+
+.err__body {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+/* The way out, in the look of a filled button. */
+.err__action {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-height);
+  margin-top: 6px;
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+.err__action:hover {
+  filter: brightness(1.06);
+}
+.err__action:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}

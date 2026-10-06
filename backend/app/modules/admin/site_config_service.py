@@ -18,7 +18,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.branding import Branding
 from app.modules.admin.models import SiteConfigVersion
-from app.modules.admin.schemas import PublicSiteConfigOut, SiteConfigOut
+from app.modules.admin.schemas import (
+    AttachmentLimitsOut,
+    PublicSiteConfigOut,
+    SiteConfigOut,
+)
+from app.modules.applications.guest_settings import load_guest_settings
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.config_revision.service import (
@@ -26,6 +31,7 @@ from app.modules.config_revision.service import (
     GLOBAL_ID,
     ConfigRevisionService,
 )
+from app.settings import get_settings
 from app.shared.errors import ConflictError
 
 # Fallback app names for the case where the config leaves them empty. They match the
@@ -44,8 +50,10 @@ _MANIFEST_BASE: dict = {
     "display": "standalone",
     "scope": "./",
     "start_url": "./",
-    "theme_color": "#004225",
-    "background_color": "#ffffff",
+    # The light page background of the design system. The theme-color meta tags in
+    # index.html colour the browser bars per theme; the manifest takes one value.
+    "theme_color": "#f6f7f5",
+    "background_color": "#f6f7f5",
     "icons": [
         {"src": "icons/icon-72x72.png", "sizes": "72x72", "type": "image/png", "purpose": "any"},
         {"src": "icons/icon-96x96.png", "sizes": "96x96", "type": "image/png", "purpose": "any"},
@@ -230,10 +238,26 @@ class SiteConfigService:
         return await self.get()
 
     async def public(self) -> PublicSiteConfigOut:
-        """Return the public active branding config (auth-free)."""
+        """Return the public active branding config (auth-free).
+
+        The response also holds ``confirmTtlHours`` and ``linkTtlDays`` from the
+        guest settings, so the wizard can tell a guest how long the confirmation
+        waits and how long the link works. ``attachmentLimits`` comes from the
+        settings of the draft upload (Z4).
+        """
         active = await self._active()
+        guest = await load_guest_settings(self.session)
+        settings = get_settings()
         return PublicSiteConfigOut(
-            version=active.version if active else 0, branding=_branding(active)
+            version=active.version if active else 0,
+            branding=_branding(active),
+            confirm_ttl_hours=guest.confirm_ttl_hours,
+            link_ttl_days=guest.link_ttl_days,
+            attachment_limits=AttachmentLimitsOut(
+                max_file_bytes=settings.attachment_max_bytes,
+                max_draft_files=settings.attachment_draft_max_files,
+                max_draft_bytes=settings.attachment_draft_max_bytes,
+            ),
         )
 
     async def manifest(self) -> dict:

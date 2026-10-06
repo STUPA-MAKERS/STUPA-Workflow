@@ -203,6 +203,29 @@ export interface Invoice {
   hasFile: boolean;
   actor: string | null;
   createdAt: string;
+  /**
+   * The bookings that reference this invoice (A6), in booking order. The server sends
+   * only the bookings on cost centres the reader may see. A backend before A6 sends no
+   * field at all: the list then hides its bookings column instead of asking for the
+   * bookings of each invoice one by one.
+   */
+  linkedBookings?: InvoiceBooking[];
+}
+
+/** One booking on an invoice, as the invoice list shows it. */
+export interface InvoiceBooking {
+  id: Uuid;
+  budgetId: Uuid;
+  pathKey: string;
+  budgetName: string;
+  fiscalYearId: Uuid;
+  kind: ExpenseKind;
+  amount: string;
+  description: string;
+  paymentDate: string | null;
+  /** Set when the booking is a sub-booking of another booking. */
+  parentExpenseId: Uuid | null;
+  createdAt: string;
 }
 
 /** Create an invoice. ``grossAmount`` is required and the rest is optional. On
@@ -271,6 +294,11 @@ export interface InvoiceQuery {
   id?: string;
   q?: string;
   status?: InvoiceStatus;
+  /**
+   * With (`true`) or without (`false`) a booking the reader can see. With `status: 'open'`
+   * this gives the list segments "Verbucht" and "Eingang".
+   */
+  booked?: boolean;
   grossMin?: number;
   grossMax?: number;
   issueFrom?: string;
@@ -281,12 +309,25 @@ export interface InvoiceQuery {
   offset?: number;
 }
 
+/**
+ * The size of each segment of the invoice list under the other filters of the request:
+ * all, "Eingang" (open, no booking), "Verbucht" (open, with a booking) and "Bezahlt".
+ */
+export interface InvoiceSegmentCounts {
+  all: number;
+  inbox: number;
+  booked: number;
+  paid: number;
+}
+
 /** Offset page of invoices. */
 export interface InvoicePage {
   items: Invoice[];
   total: number;
   limit: number;
   offset: number;
+  /** The segment counts. A backend before FE10c sends none. */
+  counts?: InvoiceSegmentCounts;
 }
 
 /** Filter/paging of the bookings list. */

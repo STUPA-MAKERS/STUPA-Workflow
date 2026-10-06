@@ -1,21 +1,79 @@
-<app-page-header [title]="'tasks.title' | t" />
+<div class="tasks" [class.tasks--split]="split()">
+  <app-list-detail [detailOpen]="selectedId() !== null" (back)="closeDetail()">
+    <section list class="ld-pane" aria-labelledby="tasks-title">
+      <app-page-header
+        [pane]="true"
+        titleId="tasks-title"
+        [title]="'tasks.title' | t"
+      />
 
-<app-data-table
-  [loading]="loading()"
-  [loadingText]="'tasks.loading' | t"
-  [columns]="columns()"
-  [rows]="tasks()"
-  [emptyText]="'tasks.empty' | t"
-  [clickable]="true"
-  (rowClick)="open($any($event).id)"
->
-  <ng-template appCell="title" let-r>{{ titleOf($any(r)) }}</ng-template>
-  <ng-template appCell="type" let-r>{{ typeName($any(r).typeId) }}</ng-template>
-  <ng-template appCell="state" let-r>
-    <app-badge [color]="$any(r).state?.color">{{ $any(r).state?.label }}</app-badge>
-  </ng-template>
-  <ng-template appCell="amount" let-r>{{ $any(r).amount ? ($any(r).amount + ' ' + ($any(r).currency ?? '')) : '—' }}</ng-template>
-  <ng-template appCell="waiting" let-r>
-    <span class="text-muted" [attr.title]="$any(r).createdAt">{{ waitingSince($any(r).createdAt) }}</span>
-  </ng-template>
-</app-data-table>
+      <div class="tasks__scroll" appScrollFade="y">
+        @if (error()) {
+          <p class="tasks__status tasks__status--error" role="alert">{{ 'tasks.error' | t }}</p>
+        } @else if (loading()) {
+          <app-skeleton variant="rows" [count]="6" [label]="'tasks.loading' | t" />
+        } @else if (!rows().length) {
+          @if (split()) {
+            <!-- Side by side the detail pane shows the empty state; one is enough. -->
+            <p class="tasks__status">{{ 'tasks.empty' | t }}</p>
+          } @else {
+            <app-empty-state
+              class="tasks__empty"
+              icon="check"
+              [heading]="'tasks.empty' | t"
+              [body]="'tasks.emptyBody' | t"
+            />
+          }
+        } @else {
+          @for (group of groups(); track group.key + $index) {
+            <section class="tasks__group" [attr.aria-label]="group.label || null">
+              @if (group.label) {
+                <h2 class="sec tasks__month">{{ group.label }}</h2>
+              }
+              <div class="tasks__rows" [class.rowgroup]="!split()" role="list">
+                @for (row of group.items; track row.item.id) {
+                  <app-list-item
+                    role="listitem"
+                    class="tasks__row"
+                    [title]="row.title"
+                    [link]="['/tasks', row.item.id]"
+                    [selected]="row.item.id === selectedId()"
+                  >
+                    <span sub>
+                      @if (row.stateLabel) {
+                        <app-status-text [kind]="row.stateKind">{{ row.stateLabel }}</app-status-text>
+                      }
+                      @if (row.stateLabel && row.typeLabel) {
+                        <span class="tasks__dot" aria-hidden="true">·</span>
+                      }
+                      @if (row.typeLabel) {
+                        <span>{{ row.typeLabel }}</span>
+                      }
+                    </span>
+                    <span trail class="tasks__trail">
+                      <span class="tasks__facts">
+                        @if (row.amount) {
+                          <span class="mono tasks__amount">{{ row.amount }}</span>
+                        }
+                        <span class="tasks__waiting" [attr.title]="sinceTitle(row.since)">{{
+                          waitingSince(row.since)
+                        }}</span>
+                      </span>
+                      @if (!split()) {
+                        <app-icon class="tasks__chev" name="chevron-right" [size]="17" />
+                      }
+                    </span>
+                  </app-list-item>
+                }
+              </div>
+            </section>
+          }
+        }
+      </div>
+    </section>
+
+    <div detail class="tasks__detail">
+      <router-outlet />
+    </div>
+  </app-list-detail>
+</div>

@@ -1,9 +1,9 @@
-<div class="sk" aria-busy="true">
+<div class="sk" [class.sk--rows]="variant() === 'rows'" aria-busy="true">
   @if (variant() === 'panel') {
     <span class="skel skel--panel" aria-hidden="true"></span>
   } @else if (variant() === 'rows') {
     @for (_ of items(); track $index) {
-      <span class="sk__row" aria-hidden="true">
+      <span class="sk__row" [class.sk__row--last]="$last" aria-hidden="true">
         <span class="skel skel--bar sk__row-lead"></span>
         <span class="skel skel--bar"></span>
       </span>

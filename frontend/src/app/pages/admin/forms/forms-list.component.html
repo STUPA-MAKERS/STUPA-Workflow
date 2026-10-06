@@ -1,43 +1,70 @@
-<!-- Create posts an application type, so the button needs admin.types. -->
-<app-page-header [title]="'admin.forms.listTitle' | t" [subtitle]="'admin.forms.listSubtitle' | t">
-  @if (canCreate()) {
-    <app-button actions size="sm" (click)="openCreate()">{{ 'admin.forms.add' | t }}</app-button>
-  }
-</app-page-header>
+<section class="fl">
+  <!-- Create posts an application type, so the button needs admin.types. -->
+  <app-page-header [flush]="true" [title]="'admin.forms.listTitle' | t" [subtitle]="'admin.forms.listSubtitle' | t">
+    @if (canCreate()) {
+      <app-button actions variant="fill" (click)="openCreate()">
+        <app-icon name="plus" [size]="18" /> {{ 'admin.forms.add' | t }}
+      </app-button>
+    }
+  </app-page-header>
 
-<section class="fl__list" [attr.aria-label]="'admin.forms.listTitle' | t">
   @if (loadError()) {
-    <p class="text-muted py-4 text-danger" role="alert">{{ 'admin.forms.overviewError' | t }}</p>
+    <app-note kind="error" icon="alert" role="alert">{{ 'admin.forms.overviewError' | t }}</app-note>
   } @else {
     <app-data-table
+      surface="rowgroup"
       [loading]="loading()"
       [loadingText]="'admin.forms.overviewLoading' | t"
-      [columns]="columns()" [rows]="types()" [rowKey]="rowId" [emptyText]="'admin.forms.overviewEmpty' | t">
+      [columns]="columns()"
+      [rows]="types()"
+      [rowKey]="rowId"
+      [emptyText]="'admin.forms.overviewEmpty' | t"
+    >
       <ng-template appCell="name" let-t>
-        <a class="fl__name" [routerLink]="['/admin/forms', $any(t).id]">{{ name($any(t)) }}</a>
+        <a class="fl__name ell" [routerLink]="['/admin/forms', $any(t).id]" [title]="name($any(t))">{{ name($any(t)) }}</a>
       </ng-template>
-      <ng-template appCell="gremium" let-t>{{ gremiumName($any(t).gremiumId) }}</ng-template>
+      <ng-template appCell="gremium" let-t>
+        <span class="fl__muted">{{ gremiumName($any(t).gremiumId) }}</span>
+      </ng-template>
       <ng-template appCell="budget" let-t>
-        @if ($any(t).hasBudget) {
-          <span class="fl__yes" [attr.title]="'admin.forms.hasBudget' | t" aria-label="✓">✓</span>
-        } @else {
-          <span class="fl__no" [attr.title]="'admin.forms.hasBudget' | t" aria-label="✗">✗</span>
-        }
+        <span [class.fl__muted]="!$any(t).hasBudget">{{ ($any(t).hasBudget ? 'admin.forms.withBudget' : 'admin.forms.withoutBudget') | t }}</span>
       </ng-template>
       <ng-template appCell="status" let-t>
-        <app-badge [variant]="$any(t).activeFormVersionId ? 'success' : 'warning'">
-          {{ ($any(t).activeFormVersionId ? 'admin.forms.status.active' : 'admin.forms.status.draft') | t }}
-        </app-badge>
+        @if ($any(t).activeFormVersionId) {
+          <app-status-text kind="accent">{{ 'admin.forms.status.active' | t }}</app-status-text>
+        } @else {
+          <app-status-text kind="warn">{{ 'admin.forms.status.draft' | t }}</app-status-text>
+        }
+      </ng-template>
+      <ng-template appCell="version" let-t>
+        <span class="fl__version mono">{{ versionLabel($any(t)) }}</span>
       </ng-template>
       <ng-template appCell="actions" let-t>
-        <span class="inline-flex items-center gap-2 justify-end w-full">
-          <a class="fl__icon-link" [routerLink]="['/admin/forms', $any(t).id]" [attr.aria-label]="'admin.forms.edit' | t" [attr.title]="'admin.forms.edit' | t"><app-icon name="edit" /></a>
+        <span class="fl__actions">
+          <a
+            class="fl__iconLink"
+            [routerLink]="['/admin/forms', $any(t).id]"
+            [attr.aria-label]="('admin.forms.edit' | t) + ': ' + name($any(t))"
+            [attr.title]="'admin.forms.edit' | t"
+            ><app-icon name="edit" [size]="18"
+          /></a>
           @if (canDelete()) {
-            <app-button variant="ghost" size="sm" [iconOnly]="true" [attr.aria-label]="'admin.forms.delete' | t" [title]="'admin.forms.delete' | t" (click)="askDelete($any(t))"><app-icon name="delete" /></app-button>
+            <app-button
+              variant="text"
+              size="sm"
+              [iconOnly]="true"
+              [ariaLabel]="('admin.forms.delete' | t) + ': ' + name($any(t))"
+              [title]="'admin.forms.delete' | t"
+              (click)="askDelete($any(t))"
+            >
+              <app-icon name="trash" />
+            </app-button>
           }
         </span>
       </ng-template>
     </app-data-table>
+
+    <app-note>{{ 'admin.forms.draftNote' | t }}</app-note>
   }
 </section>
 
@@ -47,18 +74,16 @@
   [closeLabel]="'admin.common.cancel' | t"
   (closed)="closeDialog()"
 >
-  <form id="fl-form" class="flex flex-col gap-4" (submit)="submit($event)">
-    <div class="flex flex-col gap-1">
-      <app-input
-        [id]="'fl-name-de'"
-        [label]="'admin.forms.nameDe' | t"
-        [required]="true"
-        name="nameDe"
-        [ngModel]="form().nameDe"
-        (ngModelChange)="patch('nameDe', $event)"
-      />
-      <p class="m-0 text-xs text-muted">{{ 'admin.common.key' | t }}: <span class="fl__mono">{{ keyPreview() }}</span></p>
-    </div>
+  <form id="fl-form" class="fl__form" (submit)="submit($event)">
+    <app-input
+      [id]="'fl-name-de'"
+      [label]="'admin.forms.nameDe' | t"
+      [required]="true"
+      [hint]="('admin.common.key' | t) + ': ' + keyPreview()"
+      name="nameDe"
+      [ngModel]="form().nameDe"
+      (ngModelChange)="patch('nameDe', $event)"
+    />
     <app-input
       [id]="'fl-name-en'"
       [label]="'admin.forms.nameEn' | t"
@@ -73,9 +98,9 @@
       name="hasBudget"
     >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
   </form>
-  <div dialog-footer class="fl__dialog-foot">
-    <app-button size="sm" variant="ghost" (click)="closeDialog()">{{ 'admin.common.cancel' | t }}</app-button>
-    <app-button size="sm" [disabled]="!form().nameDe.trim()" [loading]="saving()" (click)="submit($event)">
+  <div dialog-footer class="fl__foot">
+    <app-button variant="text" (click)="closeDialog()">{{ 'admin.common.cancel' | t }}</app-button>
+    <app-button variant="fill" [disabled]="!form().nameDe.trim()" [loading]="saving()" (click)="submit($event)">
       {{ 'admin.forms.add' | t }}
     </app-button>
   </div>
@@ -88,10 +113,10 @@
   [closeLabel]="'admin.common.cancel' | t"
   (closed)="cancelDelete()"
 >
-  <p>{{ 'admin.forms.deleteConfirm' | t: { name: confirmDeleteName() } }}</p>
-  <div dialog-footer class="fl__dialog-foot">
-    <app-button size="sm" variant="ghost" (click)="cancelDelete()">{{ 'admin.common.cancel' | t }}</app-button>
-    <app-button size="sm" variant="danger" [loading]="deleting()" (click)="confirmDeleteType()">
+  <p class="fl__confirm">{{ 'admin.forms.deleteConfirm' | t: { name: confirmDeleteName() } }}</p>
+  <div dialog-footer class="fl__foot">
+    <app-button variant="text" (click)="cancelDelete()">{{ 'admin.common.cancel' | t }}</app-button>
+    <app-button variant="danger" [loading]="deleting()" (click)="confirmDeleteType()">
       {{ 'admin.forms.delete' | t }}
     </app-button>
   </div>

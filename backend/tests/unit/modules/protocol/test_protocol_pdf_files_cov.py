@@ -120,7 +120,6 @@ def _vote_row(**over: Any) -> SimpleNamespace:
             "options": ["yes", "no", "abstain"],
             "majorityRule": "simple",
             "secret": False,
-            "allowChange": True,
             "tieBreak": "rejected",
             "abstainCountsQuorum": True,
             "quorum": None,
@@ -128,6 +127,7 @@ def _vote_row(**over: Any) -> SimpleNamespace:
         "eligible_count": 10,
         "opens_at": None,
         "closes_at": None,
+        "closed_at": None,
         "status": "closed",
         "result": "passed",
     }
@@ -394,7 +394,7 @@ async def test_quorate_with_explicit_percent_threshold() -> None:
     session.scalar_results = [10]  # 10 members
     gremium = _gremium(quorum_percent=50)
     # 5 present, 50% of 10 is 5, so 500 >= 500 is true.
-    assert await svc._quorate(gremium, present_count=5) is True
+    assert await svc._quorate(gremium, None, present_count=5) is True
 
 
 async def test_quorate_percent_not_met() -> None:
@@ -403,7 +403,7 @@ async def test_quorate_percent_not_met() -> None:
     session.scalar_results = [10]
     gremium = _gremium(quorum_percent=60)
     # 5 present, 60% of 10 is 6, so 500 >= 600 is false.
-    assert await svc._quorate(gremium, present_count=5) is False
+    assert await svc._quorate(gremium, None, present_count=5) is False
 
 
 async def test_quorate_default_majority_rule() -> None:
@@ -412,49 +412,51 @@ async def test_quorate_default_majority_rule() -> None:
     svc = _service(session)
     session.scalar_results = [10]
     gremium = _gremium(quorum_percent=None)
-    assert await svc._quorate(gremium, present_count=6) is True
+    assert await svc._quorate(gremium, None, present_count=6) is True
     session.scalar_results = [10]
-    assert await svc._quorate(gremium, present_count=5) is False
+    assert await svc._quorate(gremium, None, present_count=5) is False
 
 
 async def test_quorate_none_without_gremium() -> None:
     svc = _service(FakeSession())
-    assert await svc._quorate(None, present_count=3) is None
+    assert await svc._quorate(None, None, present_count=3) is None
 
 
 async def test_quorate_none_without_members() -> None:
     session = FakeSession()
     svc = _service(session)
     session.scalar_results = [0]  # no members
-    assert await svc._quorate(_gremium(), present_count=3) is None
+    assert await svc._quorate(_gremium(), None, present_count=3) is None
 
 
 async def test_quorate_none_when_member_count_query_returns_none() -> None:
     """`session.scalar` returns None, so `or 0` makes members 0 and the result None."""
     svc = _service(FakeSession())
     # An empty scalar_results makes scalar() return None, so the `or 0` applies.
-    assert await svc._quorate(_gremium(), present_count=3) is None
+    assert await svc._quorate(_gremium(), None, present_count=3) is None
 
 
 async def test_header_meta_returns_empty_without_meeting() -> None:
     svc = _service(FakeSession())
-    protokollant, present, absent, count, datalines = await svc._header_meta(None)
-    assert protokollant is None and present == [] and absent == []
-    assert count == 0 and datalines == []
+    header = await svc._header_meta(None)
+    assert header.protokollant is None and header.present == [] and header.absent == []
+    assert header.excused == [] and header.keepers == []
+    assert header.present_count == 0 and header.datalines == []
 
 
 async def test_header_meta_resolves_protokollant_name() -> None:
-    """A set protokollant_id resolves the name through `session.scalar`."""
+    """Without keeper periods, protokollant_id resolves the name through `session.scalar`."""
     session = FakeSession()
     svc = _service(session)
-    session.scalar_results = ["Frau Schmidt"]
+    # The guest count of #17 comes first (no guests).
+    session.scalar_results = [0, "Frau Schmidt"]
     meeting = _meeting(protokollant_id=uuid4())
-    protokollant, present, absent, count, datalines = await svc._header_meta(
-        cast("Any", meeting)
-    )
-    assert protokollant == "Frau Schmidt"
+    header = await svc._header_meta(cast("Any", meeting))
+    assert header.protokollant == "Frau Schmidt"
+    assert header.keepers == []
     # The FakeSession short circuits the attendance query, so it stays empty.
-    assert present == [] and absent == [] and count == 0 and datalines == []
+    assert header.present == [] and header.absent == [] and header.present_count == 0
+    assert header.datalines == []
 
 
 async def test_header_meta_public_redacts_names_keeps_counts() -> None:
@@ -464,16 +466,15 @@ async def test_header_meta_public_redacts_names_keeps_counts() -> None:
     """
     session = FakeSession()
     svc = _service(session)
-    session.scalar_results = ["Frau Schmidt"]
+    # The guest count of #17 comes first (no guests).
+    session.scalar_results = [0, "Frau Schmidt"]
     meeting = _meeting(protokollant_id=uuid4())
-    protokollant, present, absent, count, datalines = await svc._header_meta(
-        cast("Any", meeting), public=True
-    )
-    assert protokollant is None
-    assert present == [] and absent == []
-    # The fake attendance is empty, so both counters are 0.
-    assert count == 0
-    assert datalines == ["Anwesend: 0", "Abwesend: 0"]
+    header = await svc._header_meta(cast("Any", meeting), public=True)
+    assert header.protokollant is None and header.keepers == []
+    assert header.present == [] and header.absent == [] and header.excused == []
+    # The fake attendance is empty, so all counters are 0.
+    assert header.present_count == 0
+    assert header.datalines == ["Anwesend: 0", "Entschuldigt: 0", "Abwesend: 0"]
 
 
 def test_local_end_time_none_when_not_datetime() -> None:
@@ -552,7 +553,7 @@ async def test_send_subject_and_body_include_gremium_and_date() -> None:
     )
     # has_non_public is false, then the quorate member count, then gremium_name for
     # _send. _meeting sets protokollant_id to None, so no protokollant scalar is read.
-    session.scalar_results = [0, 5, "StuPa"]
+    session.scalar_results = [0, 0, 5, "StuPa"]  # #17: the guest count first
     await _service(
         session, storage=ProtoStorage(), typst=FakeTypst(), mail_queue=mail
     ).finalize(PID, now=NOW)
@@ -853,8 +854,17 @@ def test_max_bytes_clamps_to_model_cap() -> None:
     assert svc.max_bytes == min(SETTINGS.attachment_max_bytes, MAX_ATTACHMENT_BYTES)
 
 
-async def test_upload_with_field_key_and_comparison_offer() -> None:
+async def test_upload_with_field_key_and_comparison_offer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """An upload with field_key and is_comparison_offer sets both on the row."""
+    audits: list[dict[str, object]] = []
+
+    async def _record(session: object, **kw: object) -> None:
+        audits.append(kw)
+
+    # The upload writes an audit entry (F12). `NotifSession` cannot run the hash chain.
+    monkeypatch.setattr(files_service, "audit_record", _record)
     session = NotifSession()
     app = Application()
     app.id = uuid.uuid4()
@@ -872,3 +882,7 @@ async def test_upload_with_field_key_and_comparison_offer() -> None:
     added = [a for a in session.added if isinstance(a, Attachment)]
     assert added and added[0].field_key == "kostenaufstellung"
     assert len(queue.enqueued) == 1
+    # The audit records only that a field key exists, never the client text.
+    assert audits[0]["data"]["hasFieldKey"] is True  # type: ignore[index]
+    assert "fieldKey" not in audits[0]["data"]  # type: ignore[operator]
+    assert audits[0]["data"]["isComparisonOffer"] is True  # type: ignore[index]

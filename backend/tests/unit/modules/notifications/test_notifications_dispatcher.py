@@ -54,7 +54,7 @@ async def test_dispatch_notify_calls_service(monkeypatch: pytest.MonkeyPatch) ->
 
     monkeypatch.setattr(mod, "NotificationService", FakeService)
     app_type_id = uuid.uuid4()
-    session = FakeSession(executes=[[(app_type_id, None, {"title": "Beamer"})]])
+    session = FakeSession(executes=[[(app_type_id, None, {"title": "Beamer"}, True)]])
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
 
     action = _action("notify", {"event": "status_changed", "lang": "en"})
@@ -99,19 +99,13 @@ async def test_dispatch_notify_merges_context(monkeypatch: pytest.MonkeyPatch) -
             return 1
 
     monkeypatch.setattr(mod, "NotificationService", FakeService)
-    session = FakeSession(executes=[[(None, None, None)]])
+    session = FakeSession(executes=[[(None, None, None, True)]])
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     action = _action("notify", {"templateKey": "t", "context": {"status": "X"}})
     await disp.dispatch([action])
     ctx = captured["kw"]["context"]  # type: ignore[index]
     assert ctx["status"] == "X"
     assert "applicationId" in ctx
-
-
-def test_build_notify_dispatcher_uses_settings() -> None:
-    disp = mod.build_notify_dispatcher(None)
-    assert isinstance(disp, NotificationActionDispatcher)
-    assert disp.queue is None
 
 
 async def test_dispatch_task_notify_sends_kind_mail(
@@ -144,7 +138,7 @@ async def test_dispatch_task_notify_sends_kind_mail(
     )
     monkeypatch.setattr(recipients_mod, "state_actionable", fake_state_actionable)
     session = FakeSession(
-        executes=[[({"title": "Beamer"}, uuid.uuid4())]],
+        executes=[[({"title": "Beamer"}, uuid.uuid4(), True)]],
         scalar=[None],  # the state lookup needs no hit
     )
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
@@ -181,7 +175,7 @@ async def test_dispatch_task_notify_skips_non_actionable_state(
     monkeypatch.setattr(mod, "NotificationService", FakeService)
     monkeypatch.setattr(recipients_mod, "state_actionable", fake_state_actionable)
     session = FakeSession(
-        executes=[[({"title": "Beamer"}, uuid.uuid4())]],
+        executes=[[({"title": "Beamer"}, uuid.uuid4(), True)]],
         scalar=[None],
     )
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
@@ -237,7 +231,7 @@ async def test_applicant_only_notify_uses_the_application_language(
     state_id = uuid.uuid4()
     session = FakeSession(
         executes=[
-            [(uuid.uuid4(), state_id, {"title": "Beamer"})],  # the application row
+            [(uuid.uuid4(), state_id, {"title": "Beamer"}, True)],  # the application row
             [("en", None)],  # resolve_application_lang: application.lang is en
         ],
         scalar=[{"de": "Genehmigt", "en": "Approved"}],  # the state label
@@ -270,7 +264,7 @@ async def test_applicant_only_notify_without_a_state_label(
     captured = _capture(monkeypatch)
     session = FakeSession(
         executes=[
-            [(uuid.uuid4(), uuid.uuid4(), None)],  # the application row, with a state
+            [(uuid.uuid4(), uuid.uuid4(), None, True)],  # the application row, with a state
             [("en", None)],  # resolve_application_lang
         ],
         scalar=[None],  # the state carries no label
@@ -286,7 +280,7 @@ async def test_explicit_lang_param_wins_over_the_application_language(
 ) -> None:
     """A `lang` param on the action stays as it is, so no resolve runs."""
     captured = _capture(monkeypatch)
-    session = FakeSession(executes=[[(uuid.uuid4(), None, None)]])
+    session = FakeSession(executes=[[(uuid.uuid4(), None, None, True)]])
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     await disp.dispatch(
         [_applicant_notify({"lang": "de", "recipients": [{"kind": "applicant"}]})]
@@ -299,7 +293,7 @@ async def test_mixed_recipients_keep_the_default_language(
 ) -> None:
     """Applicant and team in one action share one message, so the default stays."""
     captured = _capture(monkeypatch)
-    session = FakeSession(executes=[[(uuid.uuid4(), None, None)]])
+    session = FakeSession(executes=[[(uuid.uuid4(), None, None, True)]])
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     await disp.dispatch(
         [
@@ -321,7 +315,7 @@ async def test_team_only_recipients_keep_the_default_language(
 ) -> None:
     """A mail without an applicant recipient keeps the configured default language."""
     captured = _capture(monkeypatch)
-    session = FakeSession(executes=[[(uuid.uuid4(), None, None)]])
+    session = FakeSession(executes=[[(uuid.uuid4(), None, None, True)]])
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     await disp.dispatch(
         [_applicant_notify({"recipients": [{"kind": "gremium", "value": "stupa"}]})]
@@ -334,7 +328,7 @@ async def test_notify_without_recipients_keeps_the_default_language(
 ) -> None:
     """An action without a recipient list resolves no language."""
     captured = _capture(monkeypatch)
-    session = FakeSession(executes=[[(uuid.uuid4(), None, None)]])
+    session = FakeSession(executes=[[(uuid.uuid4(), None, None, True)]])
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     await disp.dispatch([_applicant_notify({"templateKey": "status_update"})])
     assert captured["lang"] is None
@@ -345,7 +339,62 @@ async def test_notify_with_non_dict_recipients_keeps_the_default_language(
 ) -> None:
     """The service drops the non-dict JSONB entries, so no applicant stays."""
     captured = _capture(monkeypatch)
-    session = FakeSession(executes=[[(uuid.uuid4(), None, None)]])
+    session = FakeSession(executes=[[(uuid.uuid4(), None, None, True)]])
     disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
     await disp.dispatch([_applicant_notify({"recipients": ["applicant"]})])
     assert captured["lang"] is None
+
+
+# --- O14: an unconfirmed guest application gets no flow mail -------------------
+
+
+@pytest.mark.parametrize(
+    ("action_type", "row"),
+    [
+        ("notify", (uuid.uuid4(), None, {"title": "Beamer"}, False)),
+        ("taskNotify", ({"title": "Beamer"}, uuid.uuid4(), False)),
+    ],
+)
+async def test_unconfirmed_application_gets_no_flow_mail(
+    monkeypatch: pytest.MonkeyPatch, action_type: str, row: tuple[object, ...]
+) -> None:
+    sent: list[str] = []
+
+    class FakeService:
+        def __init__(self, *a, **k) -> None:  # noqa: ANN002, ANN003
+            pass
+
+        async def handle_notify_action(self, *a, **k) -> int:  # noqa: ANN002, ANN003
+            sent.append("notify")
+            return 1
+
+        async def send_kind_mail(self, *a, **k) -> bool:  # noqa: ANN002, ANN003
+            sent.append("task")
+            return True
+
+    monkeypatch.setattr(mod, "NotificationService", FakeService)
+    session = FakeSession(executes=[[row]])
+    disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
+    await disp.dispatch([_action(action_type)])
+    assert sent == []
+
+
+async def test_notify_for_a_missing_application_still_runs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A deleted application has no row. The team mail still goes out, as before."""
+    sent: list[object] = []
+
+    class FakeService:
+        def __init__(self, *a, **k) -> None:  # noqa: ANN002, ANN003
+            pass
+
+        async def handle_notify_action(self, action, **kw) -> int:  # noqa: ANN001, ANN003
+            sent.append(kw["application_type_id"])
+            return 1
+
+    monkeypatch.setattr(mod, "NotificationService", FakeService)
+    session = FakeSession(executes=[[]])
+    disp = NotificationActionDispatcher(_sessionmaker(session), None, SETTINGS)
+    await disp.dispatch([_action("notify", {"recipients": [{"kind": "email"}]})])
+    assert sent == [None]

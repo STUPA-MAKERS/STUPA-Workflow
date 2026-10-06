@@ -1,4 +1,4 @@
-import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, catchError, map, of, throwError } from 'rxjs';
 import { listContext } from '@core/cache/cache.interceptor';
@@ -23,6 +23,8 @@ import {
   toApplicationCreateBody,
 } from './mappers';
 import type {
+  ApplicantCandidate,
+  OnBehalfApplication,
   CalendarFeed,
   ConsentRequest,
   McpSetup,
@@ -46,7 +48,10 @@ import type {
   CommentCreateBody,
   CommentOutWire,
   CommentVisibility,
+  DraftAttachmentOutWire,
+  DraftUpload,
   EffectiveForm,
+  HandoverMode,
   LogoutOut,
   MagicLinkVerifyResult,
   Meeting,
@@ -57,11 +62,17 @@ import type {
   AssignableApplication,
   Attendance,
   AttendanceStatus,
+  SelfAttendanceStatus,
   MeetingOutWire,
   MeetingPage,
   SearchResults,
   MeetingPageWire,
   MeetingPatchBody,
+  MeetingGuest,
+  MeetingDefaults,
+  JoinLink,
+  PublicMeetingHead,
+  GuestMe,
   NewApplication,
   Page,
   Principal,
@@ -83,8 +94,17 @@ import type {
   Uuid,
   VersionOutWire,
   Vote,
+  VoteClosed,
+  VoteListItem,
+  VoteListQuery,
   BallotResult,
 } from './models';
+
+/**
+ * Header of the draft token of the wizard uploads (Z4). A header keeps the token out of
+ * the URL and out of the access log.
+ */
+export const DRAFT_TOKEN_HEADER = 'X-Draft-Token';
 
 /**
  * Typed REST client for the OpenAPI contracts.
@@ -176,10 +196,7 @@ export class ApiClient {
   }
 
   listApplications(query: ApplicationListQuery = {}): Observable<Page<ApplicationListItem>> {
-    let params = new HttpParams();
-    for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== null) params = params.set(key, String(value));
-    }
+    const params = listParams(query, false);
     const lang = this.i18n.locale();
     return this.http
       .get<Page<ApplicationListItemWire>>(`${this.base}/applications`, {
@@ -196,12 +213,7 @@ export class ApiClient {
 
   /** GET /applications/export.xlsx — filtered list as Excel (P(`application.export`)). */
   exportApplicationsXlsx(query: ApplicationListQuery = {}): Observable<Blob> {
-    let params = new HttpParams();
-    for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== null && key !== 'limit' && key !== 'offset') {
-        params = params.set(key, String(value));
-      }
-    }
+    const params = listParams(query, true);
     return this.http.get(`${this.base}/applications/export.xlsx`, {
       params,
       responseType: 'blob',
@@ -248,6 +260,27 @@ export class ApiClient {
     return this.http
       .post<ApplicationCreatedWire>(`${this.base}/applications`, toApplicationCreateBody(input))
       .pipe(map(mapApplicationCreated));
+  }
+
+  /**
+   * POST /applications/on-behalf — capture and submit an application for an applicant
+   * (#11). Needs `application.create_on_behalf`. The response is `{ applicationId }`.
+   */
+  createApplicationOnBehalf(input: OnBehalfApplication): Observable<ApplicationCreated> {
+    return this.http
+      .post<ApplicationCreatedWire>(`${this.base}/applications/on-behalf`, input)
+      .pipe(map(mapApplicationCreated));
+  }
+
+  /**
+   * GET /applications/on-behalf/applicants — the accounts that match `q` by name or
+   * e-mail (#11). The server answers at most 20 and needs two characters.
+   */
+  searchOnBehalfApplicants(q: string): Observable<ApplicantCandidate[]> {
+    return this.http.get<ApplicantCandidate[]>(`${this.base}/applications/on-behalf/applicants`, {
+      params: new HttpParams().set('q', q),
+      context: skipLoading(),
+    });
   }
 
   /** PATCH /applications/{id} — update `data` (only when state.editAllowed). */
@@ -448,6 +481,48 @@ export class ApiClient {
       .pipe(map(mapAttachment));
   }
 
+  /**
+   * POST /apply/attachments — a file of the wizard before the application exists (Z4).
+   *
+   * The first upload of a draft has no token: an anonymous caller then sends an ALTCHA
+   * solution (`altcha`), a logged-in caller none. The response carries the token; every
+   * later upload sends it in the `X-Draft-Token` header (never in the URL), and needs no
+   * ALTCHA. Errors: 400 (ALTCHA), 413 (file or draft too large), 415 (type), 422 (token
+   * unknown or expired), 429 (rate limit), 503 (storage off).
+   */
+  uploadDraftAttachment(
+    file: File,
+    opts: {
+      token?: string | null;
+      altcha?: string | null;
+      fieldKey?: string | null;
+      isComparisonOffer?: boolean;
+    } = {},
+  ): Observable<DraftUpload> {
+    const form = new FormData();
+    form.append('file', file);
+    if (opts.fieldKey) form.append('field_key', opts.fieldKey);
+    if (opts.isComparisonOffer) form.append('is_comparison_offer', 'true');
+    if (!opts.token && opts.altcha) form.append('altcha', opts.altcha);
+    const headers = opts.token ? new HttpHeaders({ [DRAFT_TOKEN_HEADER]: opts.token }) : undefined;
+    return this.http
+      .post<DraftAttachmentOutWire>(`${this.base}/apply/attachments`, form, { headers })
+      .pipe(
+        map((wire) => ({
+          attachment: mapAttachment(wire),
+          draftToken: wire.draftToken,
+          draftExpiresAt: wire.draftExpiresAt,
+        })),
+      );
+  }
+
+  /** DELETE /apply/attachments/{id} — remove a draft file; the token must own it (Z4). */
+  deleteDraftAttachment(attachmentId: Uuid, token: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/apply/attachments/${attachmentId}`, {
+      headers: new HttpHeaders({ [DRAFT_TOKEN_HEADER]: token }),
+    });
+  }
+
   /** GET /applications/{id}/attachments — existing attachments (panel hydration). */
   listAttachments(id: Uuid): Observable<Attachment[]> {
     return this.http
@@ -488,11 +563,30 @@ export class ApiClient {
   }
 
   /**
+   * GET /votes — the votes the caller can read, the open ones first, with the own
+   * ballot state of each row and no tally. The server applies the read rule of
+   * `GET /votes/{id}`. The page shows its own placeholder, so the call skips the global
+   * overlay.
+   */
+  listVotes(query: VoteListQuery = {}): Observable<Page<VoteListItem>> {
+    let params = new HttpParams();
+    for (const status of query.status ?? []) params = params.append('status', status);
+    if (query.gremiumId) params = params.set('gremiumId', query.gremiumId);
+    if (query.q) params = params.set('q', query.q);
+    if (query.limit !== undefined) params = params.set('limit', String(query.limit));
+    if (query.offset !== undefined) params = params.set('offset', String(query.offset));
+    return this.http.get<Page<VoteListItem>>(`${this.base}/votes`, {
+      params,
+      context: skipLoading(),
+    });
+  }
+
+  /**
    * POST /votes/{id}/ballot — cast a ballot (`choice` ∈ config.options).
    *
-   * The call is idempotent. The same choice again stays `cast`. A different
-   * choice returns `changed`, but only when `config.allowChange` is set. 409 =
-   * duplicate or closed, 403 = not eligible. The components evaluate the status.
+   * A ballot never changes after the cast. A second cast gives 409 with the code
+   * `already_voted`. Another 409 means that the vote is not open. 403 = not
+   * eligible. The components evaluate the status.
    */
   castBallot(id: Uuid, choice: string, asDelegation = false): Observable<BallotResult> {
     return this.http.post<BallotResult>(`${this.base}/votes/${id}/ballot`, {
@@ -501,7 +595,7 @@ export class ApiClient {
     });
   }
 
-  /** POST /meetings — create a meeting (P(meeting.manage)). */
+  /** POST /meetings — create a meeting (gremium `session.manage`, or admin). */
   createMeeting(body: MeetingCreateBody): Observable<Meeting> {
     return this.http.post<MeetingOutWire>(`${this.base}/meetings`, body).pipe(map(mapMeeting));
   }
@@ -513,10 +607,17 @@ export class ApiClient {
     });
   }
 
-  /** GET /meetings — list meetings (newest first), optionally gremium-filtered. */
-  listMeetings(gremiumId?: Uuid): Observable<Meeting[]> {
+  /**
+   * GET /meetings — list meetings (newest first), optionally gremium-filtered.
+   *
+   * `range` limits the list to the meetings with a planned date from `from` to `to`
+   * (`YYYY-MM-DD`, both included). The calendar view reads one month this way; a
+   * meeting without a date is then not in the list.
+   */
+  listMeetings(gremiumId?: Uuid, range?: { from: string; to: string }): Observable<Meeting[]> {
     let params = new HttpParams();
     if (gremiumId) params = params.set('gremiumId', gremiumId);
+    if (range) params = params.set('dateFrom', range.from).set('dateTo', range.to);
     return this.http
       .get<MeetingOutWire[]>(`${this.base}/meetings`, { params, context: skipLoading() })
       .pipe(map((items) => items.map(mapMeeting)));
@@ -595,6 +696,26 @@ export class ApiClient {
       .pipe(map(mapMeeting));
   }
 
+  /**
+   * POST /meetings/{id}/protokollant-handover — hand the minutes of a live meeting
+   * over (Z3). `now` at once, `next_item` with the next agenda item.
+   */
+  handOverProtokollant(id: Uuid, principalId: Uuid, mode: HandoverMode): Observable<Meeting> {
+    return this.http
+      .post<MeetingOutWire>(`${this.base}/meetings/${id}/protokollant-handover`, {
+        principalId,
+        mode,
+      })
+      .pipe(map(mapMeeting));
+  }
+
+  /** DELETE /meetings/{id}/protokollant-handover — discard the planned handover. */
+  cancelProtokollantHandover(id: Uuid): Observable<Meeting> {
+    return this.http
+      .delete<MeetingOutWire>(`${this.base}/meetings/${id}/protokollant-handover`)
+      .pipe(map(mapMeeting));
+  }
+
   /** DELETE /meetings/{id} — delete a meeting (P(session.manage)/admin). */
   deleteMeeting(id: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/meetings/${id}`);
@@ -608,11 +729,20 @@ export class ApiClient {
     });
   }
 
-  /** PUT /meetings/{id}/attendance/me — mark own attendance. */
-  setOwnAttendance(meetingId: Uuid, status: AttendanceStatus): Observable<Attendance[]> {
-    return this.http.put<Attendance[]>(`${this.base}/meetings/${meetingId}/attendance/me`, {
-      status,
-    });
+  /**
+   * PUT /meetings/{id}/attendance/me — report the own attendance (present or excused).
+   * `note` is the reason of an excuse. Leave it out to keep the stored reason; `null`
+   * removes it.
+   */
+  setOwnAttendance(
+    meetingId: Uuid,
+    status: SelfAttendanceStatus,
+    note?: string | null,
+  ): Observable<Attendance[]> {
+    return this.http.put<Attendance[]>(
+      `${this.base}/meetings/${meetingId}/attendance/me`,
+      attendanceBody(status, note),
+    );
   }
 
   /** PUT /meetings/{id}/attendance/{principalId} — set a member (meeting lead). */
@@ -620,10 +750,18 @@ export class ApiClient {
     meetingId: Uuid,
     principalId: Uuid,
     status: AttendanceStatus,
+    note?: string | null,
   ): Observable<Attendance[]> {
     return this.http.put<Attendance[]>(
       `${this.base}/meetings/${meetingId}/attendance/${principalId}`,
-      { status },
+      attendanceBody(status, note),
+    );
+  }
+
+  /** DELETE /meetings/{id}/attendance/{principalId} — reset a member to "open" (meeting lead). */
+  resetMemberAttendance(meetingId: Uuid, principalId: Uuid): Observable<Attendance[]> {
+    return this.http.delete<Attendance[]>(
+      `${this.base}/meetings/${meetingId}/attendance/${principalId}`,
     );
   }
 
@@ -643,17 +781,25 @@ export class ApiClient {
     );
   }
 
-  /** POST /meetings/{id}/agenda — put an application on the agenda (meeting lead). */
-  addAgendaItem(meetingId: Uuid, applicationId: Uuid): Observable<AgendaItem[]> {
+  /**
+   * POST /meetings/{id}/agenda — put an application on the agenda (meeting lead).
+   * `nonPublic` marks the new item as non-public (NÖ) at once.
+   */
+  addAgendaItem(meetingId: Uuid, applicationId: Uuid, nonPublic = false): Observable<AgendaItem[]> {
     return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
       applicationId,
+      nonPublic,
     });
   }
 
-  /** POST /meetings/{id}/agenda — create a free-text agenda item (no application). */
-  addAgendaFreetext(meetingId: Uuid, title: string): Observable<AgendaItem[]> {
+  /**
+   * POST /meetings/{id}/agenda — create a free-text agenda item (no application).
+   * `nonPublic` marks the new item as non-public (NÖ) at once.
+   */
+  addAgendaFreetext(meetingId: Uuid, title: string, nonPublic = false): Observable<AgendaItem[]> {
     return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
       title,
+      nonPublic,
     });
   }
 
@@ -702,13 +848,112 @@ export class ApiClient {
       options?: string[];
       majorityRule?: 'simple' | 'absolute' | 'two_thirds';
       secret?: boolean;
-      eligibleCount?: number | null;
       quorumPercent?: number | null;
+      /** Admitted guests vote too (no quorum). `undefined` lets the server choose. */
+      guestsVote?: boolean | null;
     },
   ): Observable<Meeting> {
     return this.http
       .post<MeetingOutWire>(`${this.base}/meetings/${meetingId}/votes`, body)
       .pipe(map(mapMeeting));
+  }
+
+  /** GET /meetings/{id}/guests — the join requests and guests (`session.manage`). */
+  listMeetingGuests(meetingId: Uuid): Observable<MeetingGuest[]> {
+    return this.http.get<MeetingGuest[]>(`${this.base}/meetings/${meetingId}/guests`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** POST /meetings/{id}/guests/{guestId}/{admit|reject|remove} — decide on a guest. */
+  decideMeetingGuest(
+    meetingId: Uuid,
+    guestId: Uuid,
+    action: 'admit' | 'reject' | 'remove',
+  ): Observable<MeetingGuest> {
+    return this.http.post<MeetingGuest>(
+      `${this.base}/meetings/${meetingId}/guests/${guestId}/${action}`,
+      {},
+      { context: skipLoading() },
+    );
+  }
+
+  /** POST /meetings/{id}/guests/{guestId}/rename — the lead corrects the name of a guest. */
+  renameMeetingGuest(meetingId: Uuid, guestId: Uuid, displayName: string): Observable<MeetingGuest> {
+    return this.http.post<MeetingGuest>(
+      `${this.base}/meetings/${meetingId}/guests/${guestId}/rename`,
+      { displayName },
+    );
+  }
+
+  /** POST /meetings/{id}/guests/admit-all — admit every open request. */
+  admitAllMeetingGuests(meetingId: Uuid): Observable<MeetingGuest[]> {
+    return this.http.post<MeetingGuest[]>(
+      `${this.base}/meetings/${meetingId}/guests/admit-all`,
+      {},
+    );
+  }
+
+  /** GET /gremien/{id}/meeting-defaults — the defaults of a new meeting (`session.manage`). */
+  meetingDefaults(gremiumId: Uuid): Observable<MeetingDefaults> {
+    return this.http.get<MeetingDefaults>(`${this.base}/gremien/${gremiumId}/meeting-defaults`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** GET /meetings/{id}/join-link — the join code, URL and QR matrix (`session.manage`). */
+  getJoinLink(meetingId: Uuid): Observable<JoinLink> {
+    return this.http.get<JoinLink>(`${this.base}/meetings/${meetingId}/join-link`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** POST /meetings/{id}/join-code/rotate — a new code; the open requests become void. */
+  rotateJoinCode(meetingId: Uuid): Observable<JoinLink> {
+    return this.http.post<JoinLink>(`${this.base}/meetings/${meetingId}/join-code/rotate`, {});
+  }
+
+  /** GET /public/meetings/{code} — the head of a public meeting (no login). */
+  publicMeeting(code: string): Observable<PublicMeetingHead> {
+    return this.http.get<PublicMeetingHead>(`${this.base}/public/meetings/${code}`, {
+      context: skipLoading(),
+    });
+  }
+
+  /**
+   * POST /public/meetings/join/{code} — ask to join. The server sets the HttpOnly device
+   * cookie; the page never sees the token.
+   */
+  joinPublicMeeting(code: string, displayName: string, altcha: string | null): Observable<GuestMe> {
+    return this.http.post<GuestMe>(`${this.base}/public/meetings/join/${code}`, {
+      displayName,
+      altcha,
+    });
+  }
+
+  /** GET /public/meetings/{code}/me — the own request or participation of this device. */
+  guestMe(code: string): Observable<GuestMe> {
+    return this.http.get<GuestMe>(`${this.base}/public/meetings/${code}/me`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** PATCH /public/meetings/{code}/me — change the name of an open request. */
+  renameGuestMe(code: string, displayName: string): Observable<GuestMe> {
+    return this.http.patch<GuestMe>(`${this.base}/public/meetings/${code}/me`, { displayName });
+  }
+
+  /** DELETE /public/meetings/{code}/me — withdraw the request or leave the meeting. */
+  leavePublicMeeting(code: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/public/meetings/${code}/me`);
+  }
+
+  /** POST /public/meetings/{code}/votes/{voteId}/ballot — the ballot of an admitted guest. */
+  castGuestBallot(code: string, voteId: Uuid, choice: string): Observable<BallotResult> {
+    return this.http.post<BallotResult>(
+      `${this.base}/public/meetings/${code}/votes/${voteId}/ballot`,
+      { choice },
+    );
   }
 
   /** DELETE /meetings/{id}/votes/{voteId} — delete a motion (incl. ballots). */
@@ -718,14 +963,17 @@ export class ApiClient {
       .pipe(map(mapMeeting));
   }
 
-  /** POST /votes/{id}/open — open a vote, a live one too (P(vote.manage)). */
+  /** POST /votes/{id}/open — open a vote, a live one too (gremium `vote.manage` or
+   *  `session.manage`). */
   openVote(voteId: Uuid): Observable<void> {
     return this.http.post<void>(`${this.base}/votes/${voteId}/open`, {});
   }
 
-  /** POST /votes/{id}/close — close a vote → result → flow branch. */
-  closeVote(voteId: Uuid): Observable<void> {
-    return this.http.post<void>(`${this.base}/votes/${voteId}/close`, {});
+  /** POST /votes/{id}/close — close a vote → result → flow branch. The close
+   *  always ends the vote. `branchFired: false` means that the pass or fail
+   *  transition is blocked and a person must fire it by hand. */
+  closeVote(voteId: Uuid): Observable<VoteClosed> {
+    return this.http.post<VoteClosed>(`${this.base}/votes/${voteId}/close`, {});
   }
 
   /** POST /votes/{id}/cancel — cancel a vote: no result, no branch. */
@@ -847,4 +1095,33 @@ export class ApiClient {
   downloadMcpPackage(): Observable<Blob> {
     return this.http.get(`${this.base}/mcp/package`, { responseType: 'blob' });
   }
+}
+
+/** Build an attendance body. It sends `note` only when the caller gives one (or `null`). */
+function attendanceBody(
+  status: AttendanceStatus,
+  note: string | null | undefined,
+): { status: AttendanceStatus; note?: string | null } {
+  return note === undefined ? { status } : { status, note };
+}
+
+/**
+ * The query of the application list and of its XLSX export as HTTP params.
+ *
+ * An array value repeats its key once per entry (`?state=a&state=b`, A4). An empty
+ * array, `undefined` and `null` add nothing. The export (`forExport`) leaves out the
+ * paging keys, because the file holds every matching row.
+ */
+function listParams(query: ApplicationListQuery, forExport: boolean): HttpParams {
+  let params = new HttpParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null) continue;
+    if (forExport && (key === 'limit' || key === 'offset')) continue;
+    if (Array.isArray(value)) {
+      for (const entry of value) params = params.append(key, String(entry));
+    } else {
+      params = params.set(key, String(value));
+    }
+  }
+  return params;
 }

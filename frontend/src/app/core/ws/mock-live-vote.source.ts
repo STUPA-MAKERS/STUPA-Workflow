@@ -55,7 +55,20 @@ export class MockLiveVoteSource implements LiveVoteSource {
       tally.quorumMet = cast * 2 >= tally.eligible;
     };
 
-    const emitTally = (): void => subject.next({ ...tally, counts: { ...tally.counts } });
+    // Like the server: the turnout is always visible, the counts only once every present
+    // member voted.
+    const emitTally = (): void => {
+      const cast = Object.values(tally.counts).reduce((a, b) => a + b, 0);
+      const revealed = cast >= tally.eligible;
+      subject.next({
+        ...tally,
+        counts: revealed ? { ...tally.counts } : {},
+        leading: revealed ? tally.leading : null,
+        cast,
+        present: tally.eligible,
+        revealed,
+      });
+    };
 
     const bump = (choice: string): void => {
       if (!vote.options.includes(choice)) return;
@@ -80,12 +93,18 @@ export class MockLiveVoteSource implements LiveVoteSource {
       bump(rotation[i++ % rotation.length]);
     }, this.tickMs);
 
+    // Dev hook for screenshots and manual checks: push any frame into the channel, for
+    // example a `vote_closed`. Mock mode only, so it never reaches a real backend.
+    (globalThis as { __stupaMockLive?: { push(msg: ServerMessage): void } }).__stupaMockLive = {
+      push: (msg) => subject.next(msg),
+    };
+
     return {
       messages$: subject.asObservable(),
       send: (msg) => {
         if (msg.type === 'subscribe') {
           subject.next(meeting);
-          subject.next(vote);
+          subject.next({ ...vote, replay: true });
           emitTally();
         } else if (msg.type === 'cast' && !beamer) {
           bump(msg.choice);

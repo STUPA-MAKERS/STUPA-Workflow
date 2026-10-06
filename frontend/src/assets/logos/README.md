@@ -15,9 +15,10 @@ ImageMagick renders `favicon.ico` (`frontend/public/`) from `stupa-mark.svg` at 
 and 64 px.
 
 **Theme, light and dark (#43):** the theme selects the wordmark. The computed
-`ShellComponent.logoSrc` reads `ThemeService.resolved()` and picks either
-`stupa-wordmark-light.svg` (black text) or `stupa-wordmark-dark.svg` (white text). The header
-**and** the footer bind it through `[src]`. The text keeps a strong contrast in both modes.
-The multi-color mark (CD signal colors) reads well on a light and on a dark background. The
-earlier neutral `gray-text` variant (`stupa-wordmark.svg`) looked washed out in both modes.
-The shell no longer loads it.
+`PublicHeaderComponent.logoSrc` (the top bar of the public pages) reads
+`ThemeService.resolved()` and picks either `stupa-wordmark-light.svg` (black text) or
+`stupa-wordmark-dark.svg` (white text). The text keeps a strong contrast in both modes. The
+navigation rail of the signed-in app and the public bar on a phone show `stupa-mark.svg`
+alone: the multi-color mark (CD signal colors) reads well on a light and on a dark background.
+The earlier neutral `gray-text` variant (`stupa-wordmark.svg`) looked washed out in both modes.
+The app no longer loads it.

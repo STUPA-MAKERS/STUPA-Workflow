@@ -1,110 +1,154 @@
-<app-page-header [title]="'admin.privacy.title' | t" [subtitle]="'admin.privacy.subtitle' | t" />
+<section class="pv">
+  <app-page-header [flush]="true" [title]="'admin.privacy.title' | t" [subtitle]="'admin.privacy.subtitle' | t" />
 
-<!-- Erasure-request queue (GDPR Art. 17) -->
-<app-card [heading]="'admin.privacy.queueTitle' | t" [headingLevel]="2">
-  <app-data-table
-    [loading]="loading()"
-    [loadingText]="'common.loading' | t"
-    [columns]="columns()"
-    [rows]="erasures()"
-    [emptyText]="'admin.privacy.queueEmpty' | t"
-  >
-    <ng-template appCell="status" let-r>{{ statusLabel($any(r).status) }}</ng-template>
-    <ng-template appCell="subjectType" let-r>{{ subjectLabel($any(r).subjectType) }}</ng-template>
-    <ng-template appCell="email" let-r>{{ $any(r).email || '—' }}</ng-template>
-    <ng-template appCell="createdAt" let-r>{{ $any(r).createdAt | ldate: 'medium' }}</ng-template>
-    <ng-template appCell="actions" let-r>
-      @if ($any(r).status === 'open') {
-        <span class="inline-flex items-center gap-1 justify-end">
-          <app-button variant="ghost" size="sm" (click)="askExecute($any(r))">{{ 'admin.privacy.execute' | t }}</app-button>
-          <app-button variant="ghost" size="sm" (click)="openReject($any(r))">{{ 'admin.privacy.reject' | t }}</app-button>
-        </span>
-      }
-    </ng-template>
-  </app-data-table>
-</app-card>
+  <!-- Erasure requests (GDPR Art. 17) -->
+  <section class="pv__queue" aria-labelledby="pv-queue">
+    <h2 class="sec pv__secTitle" id="pv-queue">{{ 'admin.privacy.queueTitle' | t }}</h2>
+    <app-data-table
+      surface="rowgroup"
+      [loading]="loading()"
+      [loadingText]="'common.loading' | t"
+      [columns]="columns()"
+      [rows]="erasures()"
+      [emptyText]="'admin.privacy.queueEmpty' | t"
+    >
+      <ng-template appCell="status" let-r>
+        @let st = erasureStatus($any(r).status);
+        <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+      </ng-template>
+      <ng-template appCell="subjectType" let-r>{{ subjectLabel($any(r).subjectType) }}</ng-template>
+      <ng-template appCell="email" let-r>
+        @if ($any(r).email) {
+          <span class="pv__mail mono">{{ $any(r).email }}</span>
+        } @else if ($any(r).status === 'executed') {
+          <span class="pv__muted">{{ 'admin.privacy.noEmail' | t }}</span>
+        } @else {
+          <span class="pv__muted">—</span>
+        }
+      </ng-template>
+      <ng-template appCell="createdAt" let-r>
+        <span class="mono pv__date">{{ $any(r).createdAt | ldate: 'mediumDate' }}</span>
+      </ng-template>
+      <ng-template appCell="actions" let-r>
+        @if ($any(r).status === 'open') {
+          <span class="pv__rowActions">
+            <!-- Each button names its request, so a list of the buttons tells the rows apart. -->
+            @let who = $any(r).email || subjectLabel($any(r).subjectType);
+            <app-button
+              variant="tonal"
+              size="sm"
+              [ariaLabel]="('admin.privacy.reject' | t) + ': ' + who"
+              (click)="openReject($any(r))"
+              >{{ 'admin.privacy.reject' | t }}</app-button
+            >
+            <app-button
+              variant="danger"
+              size="sm"
+              [ariaLabel]="('admin.privacy.execute' | t) + ': ' + who"
+              (click)="askExecute($any(r))"
+              >{{ 'admin.privacy.execute' | t }}</app-button
+            >
+          </span>
+        }
+      </ng-template>
+    </app-data-table>
+  </section>
 
-<!-- Access export (GDPR Art. 15) -->
-<app-card [heading]="'admin.privacy.auskunftTitle' | t" [headingLevel]="2">
-  <p class="text-muted text-sm mt-0">{{ 'admin.privacy.auskunftHint' | t }}</p>
-  <div class="pv__row">
-    <app-input
-      class="pv__grow"
-      type="email"
-      [label]="'admin.privacy.email' | t"
-      [placeholder]="'admin.privacy.email' | t"
-      [ngModel]="auskunftEmail()"
-      (ngModelChange)="auskunftEmail.set($event)"
-    />
-    <app-button size="sm" [disabled]="!auskunftEmail().trim()" (click)="exportAuskunft()">
-      <app-icon name="export" /> {{ 'admin.privacy.auskunftExport' | t }}
-    </app-button>
+  <div class="pv__cards">
+    <!-- Access export (GDPR Art. 15) -->
+    <section class="pv__card" aria-labelledby="pv-auskunft">
+      <h2 class="pv__cardTitle" id="pv-auskunft">{{ 'admin.privacy.auskunftTitle' | t }}</h2>
+      <p class="pv__hint">{{ 'admin.privacy.auskunftHint' | t }}</p>
+      <form class="pv__form" (submit)="$event.preventDefault(); exportAuskunft()">
+        <app-input
+          type="email"
+          [label]="'admin.privacy.email' | t"
+          [ngModel]="auskunftEmail()"
+          (ngModelChange)="auskunftEmail.set($event)"
+          name="auskunftEmail"
+        />
+        <div>
+          <app-button type="submit" variant="tonal" [disabled]="!auskunftEmail().trim()">
+            <app-icon name="download" [size]="16" /> {{ 'admin.privacy.auskunftExport' | t }}
+          </app-button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Account erasure (GDPR Art. 17) -->
+    <section class="pv__card" aria-labelledby="pv-principal">
+      <h2 class="pv__cardTitle" id="pv-principal">{{ 'admin.privacy.principalTitle' | t }}</h2>
+      <p class="pv__hint">{{ 'admin.privacy.principalHint' | t }}</p>
+      <form class="pv__form" (submit)="$event.preventDefault(); askPrincipalErase()">
+        <app-input
+          class="pv__idInput"
+          [label]="'admin.privacy.principalId' | t"
+          [ngModel]="principalId()"
+          (ngModelChange)="principalId.set($event)"
+          name="principalId"
+        />
+        <div>
+          <app-button type="submit" variant="danger" [disabled]="!principalId().trim()">
+            {{ 'admin.privacy.principalErase' | t }}
+          </app-button>
+        </div>
+      </form>
+    </section>
   </div>
-</app-card>
 
-<!-- Principal erasure (GDPR Art. 17) -->
-<app-card [heading]="'admin.privacy.principalTitle' | t" [headingLevel]="2">
-  <p class="text-muted text-sm mt-0">{{ 'admin.privacy.principalHint' | t }}</p>
-  <div class="pv__row">
-    <app-input
-      class="pv__grow"
-      [label]="'admin.privacy.principalId' | t"
-      [placeholder]="'admin.privacy.principalId' | t"
-      [ngModel]="principalId()"
-      (ngModelChange)="principalId.set($event)"
-    />
-    <app-button variant="danger" size="sm" [disabled]="!principalId().trim()" (click)="askPrincipalErase()">
-      {{ 'admin.privacy.principalErase' | t }}
-    </app-button>
-  </div>
-</app-card>
-
-<!-- Retention (GDPR Art. 5(1)(e)) -->
-<app-card [heading]="'admin.privacy.retentionTitle' | t" [headingLevel]="2">
-  <p class="text-muted text-sm mt-0">{{ 'admin.privacy.retentionHint' | t }}</p>
-  <div class="pv__row">
-    <app-input
-      class="pv__retention"
-      type="number"
-      [label]="'admin.privacy.retentionMonths' | t"
-      [ngModel]="retentionMonths()"
-      (ngModelChange)="retentionMonths.set($event === '' || $event === null || $event === undefined ? null : +$event)"
-    />
-    <app-button size="sm" [disabled]="(retentionMonths() ?? 0) < 1" (click)="saveRetention()">{{ 'action.save' | t }}</app-button>
-  </div>
-</app-card>
+  <!-- Retention (GDPR Art. 5(1)(e)) -->
+  <section class="pv__card pv__retention" aria-labelledby="pv-retention">
+    <div class="pv__retentionText">
+      <h2 class="pv__cardTitle" id="pv-retention">{{ 'admin.privacy.retentionTitle' | t }}</h2>
+      <p class="pv__hint">{{ 'admin.privacy.retentionHint' | t }}</p>
+    </div>
+    <form class="pv__retentionForm" (submit)="$event.preventDefault(); saveRetention()">
+      <app-input
+        class="pv__months"
+        type="number"
+        [label]="'admin.privacy.retentionMonths' | t"
+        [ngModel]="retentionMonths()"
+        (ngModelChange)="retentionMonths.set($event === '' || $event === null || $event === undefined ? null : +$event)"
+        name="retentionMonths"
+      />
+      <app-button type="submit" variant="fill" [disabled]="(retentionMonths() ?? 0) < 1">{{ 'action.save' | t }}</app-button>
+    </form>
+  </section>
+</section>
 
 <app-dialog
   [open]="confirmExecute() !== null"
   [title]="'admin.privacy.executeTitle' | t"
+  [subtitle]="confirmExecute()?.email ?? ''"
   [closeLabel]="'action.cancel' | t"
   (closed)="confirmExecute.set(null)"
 >
-  <p>{{ 'admin.privacy.executeConfirm' | t }}</p>
-  <div dialog-footer class="flex justify-end gap-3">
-    <app-button size="sm" variant="ghost" (click)="confirmExecute.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button size="sm" variant="danger" (click)="doExecute()">{{ 'admin.privacy.execute' | t }}</app-button>
+  <p class="pv__dialogText">{{ 'admin.privacy.executeConfirm' | t }}</p>
+  <div dialog-footer class="pv__dialogFoot">
+    <app-button variant="text" (click)="confirmExecute.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="danger" (click)="doExecute()">{{ 'admin.privacy.execute' | t }}</app-button>
   </div>
 </app-dialog>
 
 <app-dialog
   [open]="rejecting() !== null"
   [title]="'admin.privacy.rejectTitle' | t"
+  [subtitle]="rejecting()?.email ?? ''"
   [closeLabel]="'action.cancel' | t"
   (closed)="rejecting.set(null)"
 >
-  <label class="flex flex-col gap-2">
-    <span class="text-sm font-medium">{{ 'admin.privacy.rejectReason' | t }}</span>
+  <label class="pv__reason">
+    <span class="pv__reasonLabel">{{ 'admin.privacy.rejectReason' | t }}</span>
     <textarea
-      class="field__control"
+      class="pv__textarea"
       rows="3"
       [ngModel]="rejectReason()"
       (ngModelChange)="rejectReason.set($event)"
     ></textarea>
   </label>
-  <div dialog-footer class="flex justify-end gap-3">
-    <app-button size="sm" variant="ghost" (click)="rejecting.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button size="sm" variant="danger" (click)="doReject()">{{ 'admin.privacy.reject' | t }}</app-button>
+  <div dialog-footer class="pv__dialogFoot">
+    <app-button variant="text" (click)="rejecting.set(null)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="fill" (click)="doReject()">{{ 'admin.privacy.reject' | t }}</app-button>
   </div>
 </app-dialog>
 
@@ -114,9 +158,10 @@
   [closeLabel]="'action.cancel' | t"
   (closed)="confirmPrincipal.set(false)"
 >
-  <p>{{ 'admin.privacy.principalConfirm' | t }}</p>
-  <div dialog-footer class="flex justify-end gap-3">
-    <app-button size="sm" variant="ghost" (click)="confirmPrincipal.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button size="sm" variant="danger" (click)="doPrincipalErase()">{{ 'admin.privacy.principalErase' | t }}</app-button>
+  <p class="pv__dialogText">{{ 'admin.privacy.principalConfirm' | t }}</p>
+  <p class="pv__dialogText mono pv__mail">{{ principalId().trim() }}</p>
+  <div dialog-footer class="pv__dialogFoot">
+    <app-button variant="text" (click)="confirmPrincipal.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="danger" (click)="doPrincipalErase()">{{ 'admin.privacy.principalErase' | t }}</app-button>
   </div>
 </app-dialog>

@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import type { Observable } from 'rxjs';
@@ -8,19 +7,16 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { PageHeaderComponent, SkeletonComponent } from '@shared/ui';
 import {
-  BadgeComponent,
   ButtonComponent,
-  CellDirective,
-  type ColumnDef,
-  DataTableComponent,
   DialogComponent,
   IconComponent,
+  InputComponent,
   SelectComponent,
   type SelectOption,
+  ToastService,
 } from '@stupa-makers/ui-kit';
-import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type {
   Gremium,
@@ -53,11 +49,28 @@ interface RoleRow {
   roleLabel: string;
 }
 
+/** One row of a section: "group → target", for a gremium role "gremium · role". */
+export interface MappingRow {
+  id: string;
+  oidcGroup: string;
+  target: string;
+  /** The gremium role, set in bold after the gremium. */
+  role: string | null;
+}
+
+/** One section of the page. */
+export interface MappingSection {
+  kind: MappingKind;
+  rows: MappingRow[];
+  loading: boolean;
+}
+
 /** The RBAC resolver reserves this group prefix. The backend refuses it with 422. */
 const RESERVED_GROUP_PREFIX = 'vote:';
 
 /**
- * OIDC group mappings at `/admin/group-mappings` (P `admin.group_mappings`).
+ * OIDC group mappings at `/admin/group-mappings` (P `admin.group_mappings`, board
+ * Admin-Gruppen-Zuordnung): three sections of rows "group → target".
  *
  * At each login the platform reads the OIDC groups of the person. Three separate
  * mappings use them, and they do not depend on each other:
@@ -76,17 +89,15 @@ const RESERVED_GROUP_PREFIX = 'vote:';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    NgTemplateOutlet,
     FormsModule,
     RouterLink,
     TranslatePipe,
     PageHeaderComponent,
-    BadgeComponent,
+    SkeletonComponent,
     ButtonComponent,
+    InputComponent,
     SelectComponent,
     DialogComponent,
-    DataTableComponent,
-    CellDirective,
     IconComponent,
   ],
   templateUrl: './group-mappings.component.html',
@@ -140,6 +151,11 @@ export class GroupMappingsComponent {
     this.oidcGroup().trim().startsWith(RESERVED_GROUP_PREFIX),
   );
 
+  /** The error text under the group field. */
+  readonly groupError = computed(() =>
+    this.groupReserved() ? this.i18n.translate('admin.groupMappings.reserved') : '',
+  );
+
   readonly valid = computed(() => {
     const kind = this.dialog();
     if (!kind || !this.oidcGroup().trim() || this.groupReserved()) return false;
@@ -148,40 +164,7 @@ export class GroupMappingsComponent {
     return !!this.gremiumRoleId();
   });
 
-  // --- tables ------------------------------------------------------------------
-
-  private readonly groupCol = computed<ColumnDef>(() => ({
-    key: 'oidcGroup',
-    label: this.i18n.translate('admin.groupMappings.oidcGroup'),
-    card: 'title',
-  }));
-  private readonly gremiumCol = computed<ColumnDef>(() => ({
-    key: 'gremiumLabel',
-    label: this.i18n.translate('admin.groupMappings.gremium'),
-  }));
-  private readonly actionsCol = computed<ColumnDef>(() => ({
-    key: 'actions',
-    label: this.i18n.translate('admin.users.col.actions'),
-    align: 'end',
-  }));
-
-  readonly globalColumns = computed<ColumnDef[]>(() => [
-    this.groupCol(),
-    { key: 'roleLabel', label: this.i18n.translate('admin.groupMappings.role') },
-    this.actionsCol(),
-  ]);
-  readonly membershipColumns = computed<ColumnDef[]>(() => [
-    this.groupCol(),
-    this.gremiumCol(),
-    this.actionsCol(),
-  ]);
-  readonly roleColumns = computed<ColumnDef[]>(() => [
-    this.groupCol(),
-    this.gremiumCol(),
-    { key: 'roleLabel', label: this.i18n.translate('admin.groupMappings.gremiumRole') },
-    this.actionsCol(),
-  ]);
-  readonly rowId = (r: unknown): string => (r as { id: string }).id;
+  // --- rows --------------------------------------------------------------------
 
   private readonly gremienById = computed(
     () => new Map(this.gremien().map((g) => [g.id, g.name])),
@@ -219,6 +202,25 @@ export class GroupMappingsComponent {
       };
     });
   });
+
+  /** The three sections in page order. */
+  readonly sections = computed<MappingSection[]>(() => [
+    {
+      kind: 'global',
+      loading: this.loading().global,
+      rows: this.globalRows().map((r) => ({ id: r.id, oidcGroup: r.oidcGroup, target: r.roleLabel, role: null })),
+    },
+    {
+      kind: 'membership',
+      loading: this.loading().membership,
+      rows: this.membershipRows().map((r) => ({ id: r.id, oidcGroup: r.oidcGroup, target: r.gremiumLabel, role: null })),
+    },
+    {
+      kind: 'role',
+      loading: this.loading().role,
+      rows: this.roleRows().map((r) => ({ id: r.id, oidcGroup: r.oidcGroup, target: r.gremiumLabel, role: r.roleLabel })),
+    },
+  ]);
 
   // --- dialog options ----------------------------------------------------------
 
@@ -319,7 +321,10 @@ export class GroupMappingsComponent {
   }
 
   /** The i18n key of one text of one section, e.g. `admin.groupMappings.role.add`. */
-  private key(kind: MappingKind, suffix: 'add' | 'editTitle' | 'deleteBody'): TranslationKey {
+  protected key(
+    kind: MappingKind,
+    suffix: 'title' | 'hint' | 'add' | 'empty' | 'editTitle' | 'deleteBody',
+  ): TranslationKey {
     return `admin.groupMappings.${kind}.${suffix}` as TranslationKey;
   }
 

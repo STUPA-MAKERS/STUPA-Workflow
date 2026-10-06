@@ -18,3 +18,8 @@ export function searchShortcutLabel(locale: string, nav: Navigator = navigator):
   if (isApplePlatform(nav)) return '⌘K';
   return locale === 'de' ? 'Strg+K' : 'Ctrl+K';
 }
+
+/** The shortcut in `aria-keyshortcuts` syntax: `Meta+K` on Apple hardware, else `Control+K`. */
+export function searchShortcutKeys(nav: Navigator = navigator): string {
+  return isApplePlatform(nav) ? 'Meta+K' : 'Control+K';
+}

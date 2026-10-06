@@ -3,28 +3,47 @@
 `AuditService.record` takes a transaction advisory lock before it reads the
 predecessor hash. Concurrent appends therefore serialize and the chain has no
 ``prev_hash`` race. `AuditService.verify_chain` recomputes the chain from genesis.
-It catches both a tampered field and a removed or inserted row. The module-level
-`record` hook is the standard entry point for other modules.
+It catches both a tampered field and a removed or inserted row.
+`AuditService.verify_and_store` runs the same check and stores the result in
+``audit_verification`` (Z6/O8). The prune keeps the first failed check of each
+break and the newest check of each trigger. `AuditService.run_manual_verification` is the
+manual entry point. It refuses a run while another run is in progress, and a second
+manual run inside the cooldown. The module-level `record` hook is the standard entry
+point for other modules.
 """
 
 from __future__ import annotations
 
+import logging
+import time
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import Select, func, select, text
+from sqlalchemy import Select, delete, func, select, text
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.actions import REVERTABLE_BUDGET_ACTIONS, AuditAction
 from app.modules.audit.hashing import canonical_payload, compute_hash
-from app.modules.audit.models import AuditEntry
+from app.modules.audit.models import (
+    MANUAL_VERIFICATION_COOLDOWN,
+    VERIFICATION_KEEP,
+    AuditEntry,
+    AuditVerification,
+    VerificationTrigger,
+)
+from app.shared.errors import ConflictError, RateLimitedError
 from app.shared.paging import Page
+
+logger = logging.getLogger("app.audit")
 
 # Fixed advisory-lock key. It serializes chain appends across processes.
 _CHAIN_LOCK_KEY = 0x4155_4449_5400  # "AUDIT\0"
+# Fixed advisory-lock key. It lets only one chain check run at a time.
+_VERIFY_LOCK_KEY = 0x4155_4449_5601  # "AUDIV\1"
 
 
 def data_uuid_strings(data: object) -> set[str]:
@@ -185,8 +204,12 @@ class AuditService:
         """
         prev_hash: bytes | None = None
         checked = 0
+        # `populate_existing`: the check must read the rows as the database holds
+        # them, never a copy that the identity map of this session still caches.
         stream = await self.session.stream_scalars(
-            select(AuditEntry).order_by(AuditEntry.id.asc())
+            select(AuditEntry)
+            .order_by(AuditEntry.id.asc())
+            .execution_options(populate_existing=True)
         )
         async for entry in stream:
             if entry.prev_hash != prev_hash:
@@ -214,6 +237,183 @@ class AuditService:
             prev_hash = entry.hash
             checked += 1
         return ChainVerification(valid=True, checked=checked)
+
+    async def verify_and_store(
+        self,
+        *,
+        trigger: VerificationTrigger,
+        triggered_by: str | None = None,
+        keep: int = VERIFICATION_KEEP,
+    ) -> AuditVerification:
+        """Verify the whole chain, store the result and commit.
+
+        The method first waits for the check lock, so only one check runs at a
+        time. It writes one ``audit_verification`` row with the start, the end and
+        the result of `verify_chain`. It then prunes the stored checks (see
+        `prune_verifications`). It logs the duration, because the check reads the
+        whole ``audit_entry`` table and its run time grows with the log.
+
+        Args:
+            trigger: ``cron``, ``manual`` or ``restore``.
+            triggered_by: The principal ``sub`` that started the check. ``None``
+                for the cron.
+            keep: The number of stored checks to keep.
+
+        Returns:
+            The stored row.
+        """
+        # The key is a fixed integer constant and not user input.
+        await self.session.execute(text(f"SELECT pg_advisory_xact_lock({_VERIFY_LOCK_KEY})"))
+        return await self._verify_and_store_locked(
+            trigger=trigger, triggered_by=triggered_by, keep=keep
+        )
+
+    async def run_manual_verification(
+        self,
+        *,
+        triggered_by: str,
+        cooldown: timedelta = MANUAL_VERIFICATION_COOLDOWN,
+    ) -> AuditVerification:
+        """Run a manual chain check (``trigger = manual``) and store the result.
+
+        The check reads the whole log inside the API request. The method therefore
+        refuses a run that it cannot do now. It does not wait for the check lock.
+
+        Raises:
+            ConflictError: Another check (cron, restore or manual) is in progress.
+            RateLimitedError: A manual check started less than ``cooldown`` ago.
+        """
+        locked = (
+            await self.session.execute(
+                text(f"SELECT pg_try_advisory_xact_lock({_VERIFY_LOCK_KEY})")
+            )
+        ).scalar_one()
+        if not locked:
+            await self.session.rollback()
+            raise ConflictError(
+                "an audit chain check is in progress", code="audit_verify_running"
+            )
+        last_manual = (
+            await self.session.execute(
+                select(func.max(AuditVerification.started_at)).where(
+                    AuditVerification.trigger == "manual"
+                )
+            )
+        ).scalar_one_or_none()
+        if last_manual is not None:
+            wait = last_manual + cooldown - datetime.now(UTC)
+            if wait > timedelta(0):
+                # Release the lock now, not when the request session closes.
+                await self.session.rollback()
+                raise RateLimitedError(
+                    "a manual audit chain check ran a short time ago",
+                    retry_after=int(wait.total_seconds()) + 1,
+                    code="audit_verify_cooldown",
+                )
+        return await self._verify_and_store_locked(
+            trigger="manual", triggered_by=triggered_by, keep=VERIFICATION_KEEP
+        )
+
+    async def _verify_and_store_locked(
+        self,
+        *,
+        trigger: VerificationTrigger,
+        triggered_by: str | None,
+        keep: int,
+    ) -> AuditVerification:
+        """Do the work of `verify_and_store`. The caller holds the check lock."""
+        started_at = datetime.now(UTC)
+        clock = time.monotonic()
+        result = await self.verify_chain()
+        duration_ms = int((time.monotonic() - clock) * 1000)
+        row = AuditVerification(
+            started_at=started_at,
+            finished_at=datetime.now(UTC),
+            valid=result.valid,
+            checked=result.checked,
+            broken_at=result.broken_at,
+            reason=result.reason,
+            trigger=trigger,
+            triggered_by=triggered_by,
+        )
+        self.session.add(row)
+        await self.session.flush()
+        await self.prune_verifications(keep=keep)
+        await self.session.commit()
+        log = logger.info if result.valid else logger.error
+        log(
+            "audit chain check: trigger=%s valid=%s checked=%d broken_at=%s "
+            "reason=%s duration_ms=%d",
+            trigger,
+            result.valid,
+            result.checked,
+            result.broken_at,
+            result.reason,
+            duration_ms,
+        )
+        return row
+
+    async def prune_verifications(self, *, keep: int = VERIFICATION_KEEP) -> None:
+        """Delete the old checks. No commit.
+
+        The prune keeps the newest ``keep`` rows. Past them, it keeps:
+
+        - the first failed check of each break, that is the oldest row of each
+          distinct ``(broken_at, reason)``. A failed check is evidence of
+          tampering. A series of new checks must not push it out of the store.
+          The later checks of the same break repeat that evidence, so the prune
+          deletes them like valid rows. Because ``audit_entry`` is append-only,
+          a break stays until a restore. Thus the table stays bounded also when
+          every check fails.
+        - the newest check of each trigger. Many manual checks thus do not push
+          out the last cron or restore result.
+        """
+        newest = (
+            select(AuditVerification.id)
+            .order_by(AuditVerification.started_at.desc(), AuditVerification.id.desc())
+            .limit(keep)
+        )
+        newest_per_trigger = (
+            select(AuditVerification.id)
+            .ext(distinct_on(AuditVerification.trigger))
+            .order_by(
+                AuditVerification.trigger,
+                AuditVerification.started_at.desc(),
+                AuditVerification.id.desc(),
+            )
+        )
+        first_per_break = (
+            select(AuditVerification.id)
+            .where(AuditVerification.valid.is_(False))
+            .ext(distinct_on(AuditVerification.broken_at, AuditVerification.reason))
+            .order_by(
+                AuditVerification.broken_at,
+                AuditVerification.reason,
+                AuditVerification.started_at.asc(),
+                AuditVerification.id.asc(),
+            )
+        )
+        await self.session.execute(
+            delete(AuditVerification)
+            .where(
+                AuditVerification.id.not_in(newest),
+                AuditVerification.id.not_in(newest_per_trigger),
+                AuditVerification.id.not_in(first_per_break),
+            )
+            .execution_options(synchronize_session=False)
+        )
+
+    async def latest_verification(self) -> AuditVerification | None:
+        """Return the newest stored chain check, or ``None`` before the first one."""
+        return (
+            await self.session.execute(
+                select(AuditVerification)
+                .order_by(
+                    AuditVerification.started_at.desc(), AuditVerification.id.desc()
+                )
+                .limit(1)
+            )
+        ).scalar_one_or_none()
 
     async def query(
         self,
@@ -312,22 +512,13 @@ class AuditService:
         """Resolve each ``sub`` to a display name.
 
         The lookup prefers ``display_name`` and falls back to ``email``. It reads the
-        ``principal`` table in one batch. An unknown sub and a None sub are absent
-        from the map.
+        ``principal`` table in one batch. A ``sub`` of a merged account gives the
+        name of the account it was merged into: the log keeps the old ``sub``. An
+        unknown sub and a None sub are absent from the map.
         """
-        from app.modules.auth.models import Principal
+        from app.modules.auth.identity import refs_by_sub
 
-        wanted = {s for s in subs if s}
-        if not wanted:
-            return {}
-        rows = (
-            await self.session.execute(
-                select(Principal.sub, Principal.display_name, Principal.email).where(
-                    Principal.sub.in_(wanted)
-                )
-            )
-        ).all()
-        return {sub: (display_name or email) for sub, display_name, email in rows}
+        return {sub: ref.name for sub, ref in (await refs_by_sub(self.session, subs)).items()}
 
     async def resolve_target_labels(
         self, targets: Sequence[tuple[str | None, str | None]]
@@ -422,17 +613,13 @@ class AuditService:
                 if label := i18n_label(name_i18n) or key:
                     labels[("role", str(row_id))] = label
         if ids := by_type.get("principal"):
-            from app.modules.auth.models import Principal
+            from app.modules.auth.identity import refs_by_id
 
-            rows = (
-                await self.session.execute(
-                    select(
-                        Principal.id, Principal.display_name, Principal.email
-                    ).where(Principal.id.in_(ids))
-                )
-            ).all()
-            for row_id, display_name, email in rows:
-                if label := display_name or email:
+            # A target names the account itself: the merge entry names the old
+            # account. Only an account without a name of its own shows the name of
+            # the account it was merged into.
+            for row_id, ref in (await refs_by_id(self.session, ids)).items():
+                if label := ref.label:
                     labels[("principal", str(row_id))] = label
         if ids := by_type.get("webhook"):
             from app.modules.admin.models import Webhook
@@ -449,8 +636,10 @@ class AuditService:
 
             await fill(
                 "attachment",
+                # A draft (Z4) has no application yet. Its file name stays out of
+                # the log view until the create binds it.
                 select(Attachment.id, Attachment.filename).where(
-                    Attachment.id.in_(ids)
+                    Attachment.id.in_(ids), Attachment.application_id.is_not(None)
                 ),
             )
         if ids := by_type.get("cd_variant"):
@@ -510,7 +699,8 @@ class AuditService:
 
         from app.modules.admin.models import ApplicationType, Gremium, Webhook
         from app.modules.applications.models import Application
-        from app.modules.auth.models import Principal, Role
+        from app.modules.auth.identity import refs_by_id
+        from app.modules.auth.models import Role
         from app.modules.budget.tree_models import Budget, FiscalYear
         from app.modules.files.models import Attachment
         from app.modules.livevote.models import Meeting
@@ -535,20 +725,15 @@ class AuditService:
         await fill(select(Vote.id, Vote.question).where(Vote.id.in_(candidates)))
         await fill(
             select(Attachment.id, Attachment.filename).where(
-                Attachment.id.in_(candidates)
+                Attachment.id.in_(candidates), Attachment.application_id.is_not(None)
             )
         )
 
         # Multi-column and derived labels. The order does not matter, because ``fill``
         # never overwrites an entry.
-        for row_id, display_name, email in (
-            await self.session.execute(
-                select(Principal.id, Principal.display_name, Principal.email).where(
-                    Principal.id.in_(candidates)
-                )
-            )
-        ).all():
-            if (label := display_name or email) and str(row_id) not in labels:
+        # An id names the account itself (``sourceId`` of a merge names the old one).
+        for row_id, ref in (await refs_by_id(self.session, candidates)).items():
+            if (label := ref.label) and str(row_id) not in labels:
                 labels[str(row_id)] = label
         for row_id, name_i18n, key in (
             await self.session.execute(

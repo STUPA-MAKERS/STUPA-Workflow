@@ -1,0 +1,13 @@
+@if (part() === 'visual') {
+  @if (count() > 0) {
+    <span class="mark__count" aria-hidden="true">{{ countLabel() }}</span>
+  } @else if (live()) {
+    <span class="mark__live" aria-hidden="true"></span>
+  }
+} @else {
+  @if (count() > 0) {
+    <span class="sr-only">{{ 'shell.nav.tasksOpen' | t: { count: count() } }}</span>
+  } @else if (live()) {
+    <span class="sr-only">{{ 'shell.nav.live' | t }}</span>
+  }
+}

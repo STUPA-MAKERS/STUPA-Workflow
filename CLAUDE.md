@@ -60,6 +60,8 @@ Backend domain modules (`backend/app/modules/<module>`):
   longer render a PDF)
 - **be-privacy** — DSGVO/GDPR anonymization, export/erasure
 - **be-calendar** — calendar/ICS feed for meetings
+- **be-avatars** — Gravatar proxy for person avatars (`/principals/{id}/avatar`), Redis cache,
+  admin switch
 - **be-antiabuse** — ALTCHA captcha + rate-limiting + body-cap for public endpoints
 
 Components:
@@ -68,7 +70,8 @@ Components:
   browser grant
 - **typst** — internal Markdown→PDF render service (`typst/`), data-driven Typst template,
   calibrated pytex layout, variants
-- **deploy** — docker-compose production stack (`deploy/`), services, networking
+- **deploy** — docker-compose production stack (`deploy/`) behind an external Caddy reverse
+  proxy (the TLS edge), services, networking
 
 ## Memory (`.claude/memory/`)
 

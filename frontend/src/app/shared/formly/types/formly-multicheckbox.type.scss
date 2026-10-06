@@ -1,0 +1,50 @@
+// A list of choices of the form engine with the box of the ui-kit (`app-checkbox`).
+@use 'check' as c;
+@use 'field' as f;
+
+.multi {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+.multi__legend {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--color-text);
+  padding: 0 var(--space-1);
+  margin-bottom: var(--space-1);
+}
+.multi__req {
+  color: var(--color-danger);
+}
+.multi__row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-inline: var(--space-1);
+  cursor: pointer;
+}
+.multi__box {
+  @include c.box;
+}
+.multi__label {
+  font-size: var(--fs-md);
+  color: var(--color-text);
+}
+.multi__hint,
+.multi__error {
+  @include f.message;
+  & {
+    padding-inline: var(--space-1) 0;
+  }
+}
+.multi__hint {
+  color: var(--color-text-muted);
+}
+.multi__error {
+  color: var(--color-danger);
+}

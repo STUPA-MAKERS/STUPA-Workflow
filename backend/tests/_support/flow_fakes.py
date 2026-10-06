@@ -36,6 +36,26 @@ class FakeResult:
         return self._items[0] if self._items else None
 
 
+class FakeSavepoint:
+    """Stand-in for the `session.begin_nested()` context manager (a SAVEPOINT).
+
+    The session counts the savepoints and the savepoint rollbacks. An exception in the
+    block counts as a rollback and travels on, as with SQLAlchemy.
+    """
+
+    def __init__(self, session: FakeSession) -> None:
+        self.session = session
+
+    async def __aenter__(self) -> FakeSavepoint:
+        self.session.savepoints += 1
+        return self
+
+    async def __aexit__(self, exc_type: object, _exc: object, _tb: object) -> bool:
+        if exc_type is not None:
+            self.session.savepoint_rollbacks += 1
+        return False
+
+
 class FakeSession:
     """Stub for `AsyncSession` where `execute` returns the results in order."""
 
@@ -52,6 +72,12 @@ class FakeSession:
         self.flushed = 0
         self.committed = 0
         self.rolled_back = 0
+        self.savepoints = 0
+        self.savepoint_rollbacks = 0
+
+    def begin_nested(self) -> FakeSavepoint:
+        """Stand-in for `session.begin_nested`. The vote close stages its branch here."""
+        return FakeSavepoint(self)
 
     async def execute(self, stmt: Any) -> FakeResult:
         self.statements.append(stmt)
@@ -59,7 +85,7 @@ class FakeSession:
             return FakeResult()
         return self._results.pop(0)
 
-    async def get(self, _model: Any, _ident: Any) -> Any:
+    async def get(self, _model: Any, _ident: Any, **_kw: Any) -> Any:
         """Stand-in for `session.get` that returns the `get_results` queue in order."""
         if self.get_results:
             return self.get_results.pop(0)

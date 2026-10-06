@@ -1,0 +1,8 @@
+<div class="vp__line">
+  <span class="vp__text">{{ label() }}</span>
+  <span class="vp__pct mono">{{ percent() }} %</span>
+</div>
+<app-seg-bar [segments]="[{ value: voted(), tone: 'filled' }]" [total]="total()" [label]="label()" />
+@if (hidden()) {
+  <p class="vp__hint">{{ hintKey() | t }}</p>
+}

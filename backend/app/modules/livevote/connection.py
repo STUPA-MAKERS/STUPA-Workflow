@@ -6,16 +6,19 @@ is the broker fan-out from the server to the client.
 
 Authentication at the handshake: the session cookie resolves to a principal.
 Without a valid cookie the handler closes with `4401`. The voter channel needs
-Gremium membership. The beamer channel needs `meeting.manage`. On a violation
-the handler sends `not_eligible` and closes with `4403`.
+Gremium membership. The beamer channel needs `session.manage` in the Gremium
+of the meeting, or the admin role. On a violation the handler sends
+`not_eligible` and closes with `4403`.
 
 The beamer is read-only. It receives only `meeting_state`, `vote_opened`,
 `vote_tally` and `vote_closed` through the filtered fan-out. A cast from the
 beamer gets `read_only`.
 
 Cast: the distributed lock `vote:{id}:cast:{sub}` serializes the casts of one
-voter. `VotingService.cast` then runs. The cast is idempotent, because a unique
-constraint in the database backs it. The handler broadcasts `vote_tally`.
+voter. `VotingService.cast` then runs. A unique constraint in the database backs
+the cast. A ballot never changes after the cast (O11): a second cast gets the error
+frame `already_voted`, the same code as the REST 409. The handler broadcasts
+`vote_tally`.
 
 Disconnect: `WebSocketDisconnect` tears both tasks down. The broker context
 manager closes the subscription.
@@ -32,7 +35,7 @@ from uuid import UUID
 
 from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth import rbac, sessions
@@ -56,10 +59,13 @@ from app.shared.errors import AppError, ForbiddenError
 
 logger = logging.getLogger("app.livevote")
 
-# Events the read-only beamer stream lets through.
+# Events the read-only beamer stream lets through. `guest_counts` carries counts and
+# the join code only, never a name (#17).
 _BEAMER_EVENTS = frozenset(
-    {"meeting_state", "vote_opened", "vote_tally", "vote_closed"}
+    {"meeting_state", "vote_opened", "vote_tally", "vote_closed", "guest_counts"}
 )
+# #17: guest events with names. Only a connection of the meeting lead gets them.
+_LEAD_EVENTS = frozenset({"guest_requested", "guest_updated"})
 # Application-defined close codes (4000–4999).
 WS_UNAUTHENTICATED = 4401
 WS_FORBIDDEN = 4403
@@ -167,6 +173,20 @@ async def resolve_ws_principal(
     return await rbac.resolve_principal(db, row, now)
 
 
+async def account_can_act(db: AsyncSession, sub: str) -> bool:
+    """Tell whether the account of ``sub`` is still active and not merged."""
+    count = await db.scalar(
+        select(func.count())
+        .select_from(PrincipalRow)
+        .where(
+            PrincipalRow.sub == sub,
+            PrincipalRow.active.is_not(False),
+            PrincipalRow.merged_into.is_(None),
+        )
+    )
+    return bool(count)
+
+
 class LiveVoteConnection:
     """One WebSocket session, voter or beamer, on the `meeting:{id}` channel."""
 
@@ -181,8 +201,11 @@ class LiveVoteConnection:
         voting: VotingService,
         broker: MeetingBroker,
         locker: Locker,
+        can_manage: bool = False,
     ) -> None:
         self.ws = websocket
+        # #17: the meeting lead gets the guest events with names and the join code.
+        self.can_manage = can_manage
         self.meeting_id = meeting_id
         self.beamer = beamer
         self.principal = principal
@@ -242,6 +265,7 @@ class LiveVoteConnection:
                 options=vote_out.config.options,
                 closesAt=vote_out.closes_at,
                 secret=vote_out.secret,
+                replay=True,
             ).dump()
         )
         # `from_vote` applies the rule that a secret vote reveals the counts
@@ -276,6 +300,13 @@ class LiveVoteConnection:
             if not acquired:
                 await self._send_error("locked")
                 return
+            # The socket resolved the principal at the handshake. Since then an admin
+            # may have deactivated the account or merged it into another one, whose
+            # ballots now carry this vote. Check the row again before every cast, so an
+            # open socket cannot vote for a locked account (or vote twice for a person).
+            if not await account_can_act(self.voting.session, self.principal.sub):
+                await self._send_error("account_inactive")
+                return
             try:
                 await self.voting.cast(
                     msg.vote_id,
@@ -304,11 +335,27 @@ class LiveVoteConnection:
         else:
             await self._send_error("unknown_type")
 
+    def _filter(self, message: dict[str, object]) -> dict[str, object] | None:
+        """Return the message as this connection may see it, or None to drop it.
+
+        The beamer gets its fixed event set. A guest event with names goes to the
+        meeting lead only. A member without ``canManage`` gets the guest counts
+        without the join code and without the open requests (#17).
+        """
+        kind = message.get("type")
+        if self.beamer:
+            return message if kind in _BEAMER_EVENTS else None
+        if kind in _LEAD_EVENTS:
+            return message if self.can_manage else None
+        if kind == "guest_counts" and not self.can_manage:
+            return {**message, "joinCode": None, "pendingGuests": 0}
+        return message
+
     async def _pump(self, subscription: object) -> None:
         async for message in subscription:  # type: ignore[attr-defined]
-            if self.beamer and message.get("type") not in _BEAMER_EVENTS:
-                continue
-            await self._send(message)
+            filtered = self._filter(message)
+            if filtered is not None:
+                await self._send(filtered)
 
     async def _receive(self) -> None:
         while True:

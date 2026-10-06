@@ -108,11 +108,11 @@ describe('Formly field types', () => {
 
     // Use single `input` events. A full re-render per keystroke would lose characters.
     // Re-query after each event because the re-render replaces the previous elements.
-    fireEvent.input(screen.getByLabelText('Bezeichnung der Position'), { target: { value: 'Catering' } });
-    fireEvent.input(screen.getAllByLabelText('Vergleichsangebot')[0], { target: { value: 'Anbieter A' } });
-    fireEvent.input(screen.getAllByLabelText('Vergleichsangebot')[1], { target: { value: 'Anbieter B' } });
-    fireEvent.input(screen.getAllByLabelText('Wert (€)')[0], { target: { value: '500' } });
-    fireEvent.input(screen.getAllByLabelText('Wert (€)')[1], { target: { value: '600' } });
+    fireEvent.input(screen.getByLabelText('Position'), { target: { value: 'Catering' } });
+    fireEvent.input(screen.getAllByLabelText('Anbieter')[0], { target: { value: 'Anbieter A' } });
+    fireEvent.input(screen.getAllByLabelText('Anbieter')[1], { target: { value: 'Anbieter B' } });
+    fireEvent.input(screen.getAllByLabelText(/^Betrag/)[0], { target: { value: '500' } });
+    fireEvent.input(screen.getAllByLabelText(/^Betrag/)[1], { target: { value: '600' } });
 
     // First offer is preferred → position value 500 → total 500.
     expect(form.valid).toBe(true);

@@ -42,7 +42,8 @@ class AnonymizeOps(ApplicationsServiceBase):
         """Blank the PII of one application and keep the application itself.
 
         The method sets ``email`` and ``name`` to NULL and writes
-        ``anonymized_at``. It also blanks every ``data`` field marked ``isPII``.
+        ``anonymized_at``. It also blanks every ``data`` field marked ``isPII`` and the
+        free-text intake note of a capture (``capture_intake``, #11).
         It removes the magic links and the attachments (GDPR Art. 17).
 
         With a ``files`` service the method also removes the storage objects. With
@@ -60,6 +61,9 @@ class AnonymizeOps(ApplicationsServiceBase):
             applicant.email = None
             applicant.name = None
             applicant.anonymized_at = datetime.now(UTC)
+        # The free-text intake note of a capture (#11) can name a person ("per Mail von
+        # Frau X"), so it goes too. The capture date and the capturing member stay.
+        app.capture_intake = None
 
         fields = await self._pinned_fields(app)
         pii_keys = {f.key for f in fields if f.is_pii}
@@ -96,7 +100,9 @@ class AnonymizeOps(ApplicationsServiceBase):
             )
             .values(body="[anonymisiert]")
         )
-        # A magic link is a direct access path to the PII through the mail.
+        # A magic link is a direct access path to the PII through the mail. A link
+        # can live without an expiry, so delete them all (Z1). Deleting is stronger
+        # than expiring them, and the retention would purge them anyway.
         await self.session.execute(
             delete(MagicLink).where(MagicLink.application_id == application_id)
         )
@@ -112,7 +118,10 @@ class AnonymizeOps(ApplicationsServiceBase):
             await files.delete_for_application(application_id, actor=actor)
         else:
             await self.session.execute(
-                delete(Attachment).where(Attachment.application_id == application_id)
+                delete(Attachment).where(
+                    Attachment.application_id.is_not(None),
+                    Attachment.application_id == application_id,
+                )
             )
         if commit:
             await self.session.commit()

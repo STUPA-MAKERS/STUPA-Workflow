@@ -1,0 +1,237 @@
+@use 'breakpoints' as bp;
+
+/* The same two panes as the applications page (applications-list.component.scss). */
+
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* One pane at a time the host takes at least the free height of the shell main. Side by
+   side it is a pane page (`.pane-page`), which sets its own flex. */
+:host(:not(.pane-page)) {
+  flex: 1 0 auto;
+}
+
+.vl {
+  min-width: 0;
+}
+/* One pane at a time the column passes the free height down, so a short pane (the empty
+   state, a vote that is gone) centres in the page. A long pane still grows the page. */
+.vl:not(.vl--split) {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
+.vl:not(.vl--split) > app-list-detail {
+  flex: 1 0 auto;
+}
+.vl--split {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* ------------------------------------------------------------------ list pane */
+.vl:not(.vl--split) .vl__pane {
+  flex: 1 0 auto;
+}
+/* The column, its header and the search bar are the shared list geometry: `.ld-pane`
+   (styles.scss) and `app-page-header` with `pane`. */
+.vl__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.vl__chip {
+  max-width: 100%;
+}
+
+/* ------------------------------------------------------------------ rows */
+.vl__scroll {
+  --vl-fade: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.vl:not(.vl--split) .vl__scroll {
+  flex: 1 0 auto;
+}
+.vl--split .vl__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--vl-fade);
+}
+.vl--split .vl__scroll > * {
+  flex: none;
+}
+/* An end fades only while more rows lie past it (`appScrollFade` sets the classes). */
+.vl__scroll.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--vl-fade));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--vl-fade));
+}
+.vl__scroll.is-fade-end {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--vl-fade));
+  mask-image: linear-gradient(to top, transparent, #000 var(--vl-fade));
+}
+.vl__scroll.is-fade-start.is-fade-end {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--vl-fade),
+    #000 calc(100% - var(--vl-fade)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--vl-fade),
+    #000 calc(100% - var(--vl-fade)),
+    transparent
+  );
+}
+
+.vl__group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.vl__month {
+  padding: 18px var(--space-4) 6px;
+}
+.vl__group:first-child .vl__month {
+  padding-top: var(--space-2);
+}
+.vl__rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The status, then the meeting or the gremium. A dot stands only between two parts. */
+.vl__sub {
+  display: inline;
+}
+.vl__part + .vl__part::before {
+  content: '·';
+  margin-inline: 6px;
+  color: var(--color-text-subtle);
+}
+
+/* The own ballot over the time, both at the end of the row. */
+.vl__trail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.vl__facts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.vl__ballot {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.75rem; /* 12px */
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+}
+.vl__ballot--cast {
+  color: var(--color-text-muted);
+}
+.vl__ballot--pending {
+  color: var(--color-accent-text);
+}
+.vl__when {
+  color: var(--color-text-muted);
+  font-size: 0.75rem; /* 12px */
+  white-space: nowrap;
+}
+.vl__chev {
+  display: inline-flex;
+  margin-inline-end: calc(-1 * var(--space-2));
+  color: var(--color-text-muted);
+}
+
+.vl__status {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.vl__status--error {
+  color: var(--color-danger);
+}
+.vl__more {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+.vl__count {
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ detail pane */
+.vl__detail {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+/* Side by side the detail is as high as the pane, so the vote sheet can scroll inside
+   itself under its bar. */
+.vl--split .vl__detail {
+  min-height: 0;
+}
+
+@include bp.phone {
+  /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
+  .vl__chips {
+    --vl-chip-fade: var(--space-6);
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .vl__chips::-webkit-scrollbar {
+    display: none;
+  }
+  .vl__chips.is-fade-start {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--vl-chip-fade));
+    mask-image: linear-gradient(to right, transparent, #000 var(--vl-chip-fade));
+  }
+  .vl__chips.is-fade-end {
+    -webkit-mask-image: linear-gradient(to left, transparent, #000 var(--vl-chip-fade));
+    mask-image: linear-gradient(to left, transparent, #000 var(--vl-chip-fade));
+  }
+  .vl__chips.is-fade-start.is-fade-end {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--vl-chip-fade),
+      #000 calc(100% - var(--vl-chip-fade)),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--vl-chip-fade),
+      #000 calc(100% - var(--vl-chip-fade)),
+      transparent
+    );
+  }
+  .vl__month {
+    padding-inline: var(--space-1);
+  }
+  /* The whole row is the target; the title needs the room more than the chevron. */
+  .vl__chev {
+    display: none;
+  }
+}

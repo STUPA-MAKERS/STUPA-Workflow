@@ -1,0 +1,234 @@
+@use 'breakpoints' as bp;
+
+/* The dock: one elevated bar with rounded corners at the foot of the page. The popovers
+   hang above it; the host is their anchor. */
+:host {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.sd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 72px;
+  padding: var(--space-2) var(--space-5) var(--space-2) var(--space-2);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+}
+.sd__small {
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+  color: var(--color-text-muted);
+}
+.sd__strong {
+  font-size: var(--fs-h3);
+  line-height: 1.375rem;
+  font-weight: var(--fw-semibold);
+}
+.sd__muted {
+  color: var(--color-text-muted);
+}
+.sd__state {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-inline-start: var(--space-3);
+}
+.sd__nav {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+.sd__pos {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 84px;
+  padding: 0 var(--space-1);
+}
+.sd__vr {
+  flex: none;
+  align-self: stretch;
+  width: var(--border-width);
+  margin: var(--space-3) 10px;
+  background: var(--color-border);
+}
+.sd__vr--end {
+  margin-inline: 6px;
+}
+.sd__mid {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.sd__now {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--fw-medium);
+}
+.sd__vote {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-accent-text);
+  font-size: var(--fs-body);
+  white-space: nowrap;
+}
+.sd__spacer {
+  flex: 1 1 auto;
+}
+.sd__chips {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.sd__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 var(--space-4);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.84375rem; /* 13.5px */
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sd__chip:hover {
+  background: var(--color-surface-3);
+}
+.sd__chip:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.sd__chip--open {
+  border-color: transparent;
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.sd__chip--warn {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+.sd__chip--static {
+  cursor: default;
+}
+.sd__chip--static:hover {
+  background: transparent;
+}
+.sd__chipText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sd__words {
+  flex: none;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* The minute-taker menu above the dock: the menu surface of the app (surface 3). */
+.sd__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+.sd__pop {
+  position: absolute;
+  bottom: calc(100% + var(--space-2));
+  /* The end edge of the minute-taker chip (set by the component when it opens). */
+  inset-inline-end: var(--sd-pop-end, 0px);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  max-width: calc(100vw - 2 * var(--space-4));
+  max-height: calc(100dvh - 9rem);
+  padding: 10px 0;
+  overflow-y: auto;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  box-shadow: var(--shadow-elevated);
+}
+.sd__chev {
+  pointer-events: none;
+}
+
+/* Narrow and phone: the chips may wrap below the step. */
+@include bp.below-wide {
+  .sd {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+  .sd__words {
+    display: none;
+  }
+  .sd__vr--end {
+    display: none;
+  }
+}
+
+/* Phone: one row for the step and the vote, one row for the chips. */
+@include bp.phone {
+  .sd {
+    min-height: 0;
+    padding: var(--space-2) var(--space-3);
+    border-radius: 0;
+  }
+  .sd__nav {
+    flex: 1 1 auto;
+    justify-content: space-between;
+  }
+  .sd__vr {
+    display: none;
+  }
+  .sd__mid {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+  .sd__mid:empty,
+  .sd__spacer {
+    display: none;
+  }
+  .sd__chips {
+    flex: 1 1 100%;
+  }
+  .sd__chip {
+    flex: 1 1 0;
+    justify-content: center;
+    padding: 0 var(--space-3);
+  }
+}
+
+/* The open join requests on the attendance chip (#17). */
+.sd__badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 0.75rem;
+  font-weight: var(--fw-semibold);
+}

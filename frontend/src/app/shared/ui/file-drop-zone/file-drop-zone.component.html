@@ -1,0 +1,36 @@
+<!-- The area takes drops and mouse clicks; the button is the keyboard path. -->
+<div
+  class="fdz"
+  [class.fdz--over]="over()"
+  [class.fdz--disabled]="disabled()"
+  (click)="onAreaClick($event)"
+  (dragenter)="onDragEnter($event)"
+  (dragover)="onDragOver($event)"
+  (dragleave)="onDragLeave()"
+  (drop)="onDrop($event)"
+>
+  <app-icon class="fdz__icon" name="upload" [size]="20" />
+  <div class="fdz__text">
+    <span class="fdz__label" [id]="id + '-label'">{{ label() }}</span>
+    @if (hint(); as h) {
+      <span class="fdz__hint" [id]="id + '-hint'">{{ h }}</span>
+    }
+  </div>
+  <button
+    type="button"
+    class="fdz__button"
+    [disabled]="disabled()"
+    [attr.aria-describedby]="hint() ? id + '-label ' + id + '-hint' : id + '-label'"
+    (click)="openPicker()"
+  >
+    {{ buttonLabel() }}
+  </button>
+  <input
+    #picker
+    type="file"
+    hidden
+    [accept]="accept()"
+    [multiple]="multiple()"
+    (change)="onPick()"
+  />
+</div>

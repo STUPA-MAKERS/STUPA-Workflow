@@ -22,6 +22,7 @@ from app.modules.notifications.queue import ArqMailQueue
 from app.modules.protocol.router import _mail_queue, get_protocol_service
 from app.modules.protocol.schemas import ProtocolOut
 from app.settings import get_settings
+from app.shared.errors import ConflictError
 
 MEETING_ID = uuid4()
 PROTOCOL_ID = uuid4()
@@ -95,12 +96,12 @@ class _FakeService:
         self.calls.append(f"embed:{protocol_id}:{len(vote_ids)}")
         return self._out()
 
-    async def start_finalize(self, protocol_id: UUID) -> tuple[ProtocolOut, bool]:
+    async def start_finalize(self, protocol_id: UUID, *, actor: str) -> ProtocolOut:
         self.calls.append(f"start_finalize:{protocol_id}")
         if self.status in ("rendering", "final"):
-            return self._out(status=self.status), False
+            raise ConflictError("not a draft", code="protocol_not_draft")
         self.status = "rendering"
-        return self._out(status="rendering"), True
+        return self._out(status="rendering")
 
     async def finalize(self, protocol_id: UUID, *, now: datetime) -> ProtocolOut:
         self.calls.append(f"finalize:{protocol_id}")
@@ -183,7 +184,7 @@ def test_finalize_requires_auth_401(client: TestClient) -> None:
 def test_create_or_load_protocol(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    _writer(app, "meeting.manage")
+    _writer(app)
     r = client.post(f"/api/meetings/{MEETING_ID}/protocol")
     assert r.status_code == 200
     assert r.json()["meetingId"] == str(MEETING_ID)
@@ -194,7 +195,7 @@ def test_get_protocol_read_only(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     """Reload and poll path: GET reads and creates no protocol."""
-    _writer(app, "meeting.manage")
+    _writer(app)
     fake_service.status = "rendering"
     r = client.get(f"/api/meetings/{MEETING_ID}/protocol")
     assert r.status_code == 200
@@ -207,7 +208,7 @@ def test_get_protocol_requires_auth_401(client: TestClient) -> None:
 
 
 def test_update_protocol(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:
-    _writer(app, "meeting.manage")
+    _writer(app)
     r = client.patch(f"/api/protocols/{PROTOCOL_ID}", json={"markdown": "# Neu"})
     assert r.status_code == 200
     assert r.json()["markdown"] == "# Neu"
@@ -215,7 +216,7 @@ def test_update_protocol(app: FastAPI, client: TestClient, fake_service: _FakeSe
 
 
 def test_update_protocol_rejects_empty_body_422(app: FastAPI, client: TestClient) -> None:
-    _writer(app, "meeting.manage")
+    _writer(app)
     assert client.patch(f"/api/protocols/{PROTOCOL_ID}", json={}).status_code == 422
 
 
@@ -223,7 +224,7 @@ def test_update_protocol_rejects_oversized_markdown_422(
     app: FastAPI, client: TestClient
 ) -> None:
     """AUD-060: the API caps the Markdown at 512 kB and answers 422 in any deployment."""
-    _writer(app, "meeting.manage")
+    _writer(app)
     oversized = "x" * (512_000 + 1)
     r = client.patch(f"/api/protocols/{PROTOCOL_ID}", json={"markdown": oversized})
     assert r.status_code == 422
@@ -233,7 +234,7 @@ def test_update_protocol_rejects_oversized_markdown_422(
 
 
 def test_embed_votes(app: FastAPI, client: TestClient, fake_service: _FakeService) -> None:
-    _writer(app, "meeting.manage")
+    _writer(app)
     body = {"voteIds": [str(VOTE_ID), str(uuid4())]}
     r = client.post(f"/api/protocols/{PROTOCOL_ID}/votes", json=body)
     assert r.status_code == 200
@@ -241,7 +242,7 @@ def test_embed_votes(app: FastAPI, client: TestClient, fake_service: _FakeServic
 
 
 def test_embed_votes_rejects_empty_list_422(app: FastAPI, client: TestClient) -> None:
-    _writer(app, "meeting.manage")
+    _writer(app)
     r = client.post(f"/api/protocols/{PROTOCOL_ID}/votes", json={"voteIds": []})
     assert r.status_code == 422
 
@@ -250,7 +251,7 @@ def test_finalize_protocol_sync_fallback_without_pool(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     """Without Redis (no `arq_pool`) finalize renders synchronously, as it did before."""
-    _writer(app, "protocol.finalize")
+    _writer(app)
     r = client.post(f"/api/protocols/{PROTOCOL_ID}/finalize")
     assert r.status_code == 200
     body = r.json()
@@ -267,7 +268,7 @@ def test_finalize_protocol_enqueues_with_pool(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     """With Redis: return `rendering` and enqueue the `render_protocol` job."""
-    _writer(app, "protocol.finalize")
+    _writer(app)
     pool = _FakePool()
     app.state.arq_pool = pool
     r = client.post(f"/api/protocols/{PROTOCOL_ID}/finalize")
@@ -277,17 +278,17 @@ def test_finalize_protocol_enqueues_with_pool(
     assert fake_service.calls == [f"start_finalize:{PROTOCOL_ID}"]  # no sync render
 
 
-def test_finalize_protocol_idempotent_while_rendering(
+def test_finalize_protocol_refused_while_rendering(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    """A second finalize during the render does not enqueue again."""
-    _writer(app, "protocol.finalize")
+    """A second finalize during the render gives 409 and does not enqueue again (O2)."""
+    _writer(app)
     fake_service.status = "rendering"
     pool = _FakePool()
     app.state.arq_pool = pool
     r = client.post(f"/api/protocols/{PROTOCOL_ID}/finalize")
-    assert r.status_code == 200
-    assert r.json()["status"] == "rendering"
+    assert r.status_code == 409
+    assert r.json()["code"] == "protocol_not_draft"
     assert pool.jobs == []
     assert fake_service.calls == [f"start_finalize:{PROTOCOL_ID}"]
 
@@ -319,7 +320,7 @@ def test_delete_protocol_requires_auth_401(client: TestClient) -> None:
 def test_delete_draft_protocol_204(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
-    _writer(app, "meeting.manage")
+    _writer(app)
     r = client.delete(f"/api/protocols/{PROTOCOL_ID}")
     assert r.status_code == 204
     # The gate is the write scope of the PATCH, not the finalize scope.
@@ -341,7 +342,7 @@ def test_delete_protocol_without_finalize_permission_still_works(
 
 def test_delete_final_protocol_409(app: FastAPI, client: TestClient) -> None:
     app.dependency_overrides[get_protocol_service] = lambda: _FakeService(status="final")
-    _writer(app, "meeting.manage")
+    _writer(app)
     r = client.delete(f"/api/protocols/{PROTOCOL_ID}")
     assert r.status_code == 409
     assert r.headers["content-type"].startswith("application/problem+json")

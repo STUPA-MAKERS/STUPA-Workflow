@@ -12,6 +12,7 @@ import {
 } from '@angular/router';
 import { isObservable, type Observable } from 'rxjs';
 import { authGuard } from './auth.guard';
+import { routes } from '../../app.routes';
 import { USE_MOCK_API } from '../api/api.config';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { Principal } from '../api/models';
@@ -115,16 +116,39 @@ describe('authGuard', () => {
       permissions: [],
       gremien: [{ id: 'g1', name: 'StuPa', slug: 'stupa' }],
     };
-    // Mirrors the real /meetings route data. `protocol.write` is a gremium-role
-    // permission and is deliberately not listed there.
-    const data = { permission: ['meeting.manage'], allowCommitteeMember: true };
+    // Mirrors the real /meetings route data.
+    const data = { gremiumPermission: ['session.manage'], allowCommitteeMember: true };
     expect(run(data, inCommittee)).toBe(true);
   });
 
   it('still forbids allowCommitteeMember routes when the user is in no committee', () => {
     const noCommittee: Principal = { ...MEMBER, permissions: [], gremien: [] };
-    const data = { permission: ['meeting.manage'], allowCommitteeMember: true };
+    const data = { gremiumPermission: ['session.manage'], allowCommitteeMember: true };
     expect(run(data, noCommittee)).toBeInstanceOf(UrlTree);
+  });
+
+  it('allows gremiumPermission routes with the permission in any gremium', () => {
+    const chair: Principal = {
+      ...MEMBER,
+      gremium_permissions: { g1: ['session.manage'] },
+    };
+    expect(run({ gremiumPermission: 'session.manage' }, chair)).toBe(true);
+  });
+
+  it('forbids gremiumPermission routes without the permission in any gremium', () => {
+    const member: Principal = { ...MEMBER, gremium_permissions: { g1: ['vote.cast'] } };
+    expect(run({ gremiumPermission: 'session.manage' }, member)).toBeInstanceOf(UrlTree);
+  });
+
+  it('lets the admin onto gremiumPermission routes', () => {
+    const admin: Principal = { ...MEMBER, roles: ['admin'] };
+    expect(run({ gremiumPermission: 'session.manage' }, admin)).toBe(true);
+  });
+
+  it('accepts either a global or a gremium permission when a route names both', () => {
+    const viewer: Principal = { ...MEMBER, permissions: ['meeting.view_all'] };
+    const data = { permission: ['meeting.view_all'], gremiumPermission: ['session.manage'] };
+    expect(run(data, viewer)).toBe(true);
   });
 
   it('allows scoped-budget-view members onto allowScopedBudgetView routes', () => {
@@ -152,4 +176,27 @@ describe('authGuard', () => {
     const data = { permission: ['budget.view'], allowAuthenticated: true };
     expect(run(data, anyUser)).toBe(true);
   });
+
+  describe('the vote routes, for a reader of one vote', () => {
+    // A reader with `application.read` and no gremium voting right opens a vote at
+    // /voting/:id. Every way back goes to /voting, so the list child must let them in
+    // too. The empty-path child inherits the data of its parent (`emptyOnly`).
+    const shell = routes.find((r) => r.children?.some((c) => c.path === 'voting'));
+    const voting = shell!.children!.find((c) => c.path === 'voting')!;
+    const child = (path: string) => voting.children!.find((c) => c.path === path)!;
+    const reader: Principal = { ...MEMBER, gremien: [] };
+
+    it('lets them onto the list (/voting)', () => {
+      expect(run({ ...voting.data, ...child('').data }, reader)).toBe(true);
+    });
+
+    it('lets them onto the vote (/voting/:id)', () => {
+      expect(run({ ...child(':id').data }, reader)).toBe(true);
+    });
+
+    it('keeps the gate of the parent data, which the navigation entry reads', () => {
+      expect(run({ ...voting.data }, reader)).toBeInstanceOf(UrlTree);
+    });
+  });
+
 });

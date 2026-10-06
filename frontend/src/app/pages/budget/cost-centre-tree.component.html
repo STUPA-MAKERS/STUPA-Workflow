@@ -17,7 +17,7 @@
 
 <ng-template #branch let-list let-depth="depth">
   @for (n of list; track n.id) {
-    <div class="cct__branch" [style.--line-color]="depth === 0 ? dotColor(n) : null">
+    <div class="cct__branch" [style.--line-color]="depth === 0 ? dotColor(n) : ownColor(n)">
       <button
         type="button"
         class="cct__node"
@@ -28,9 +28,11 @@
       >
         @if (depth === 0) {
           <span class="cct__dot" [style.background]="dotColor(n)"></span>
+        } @else if (ownColor(n); as c) {
+          <span class="cct__dot" [style.background]="c"></span>
         }
         <span class="cct__key">{{ n.key }}</span>
-        <span class="cct__label">{{ n.name }}</span>
+        <span class="cct__label" [title]="n.name">{{ n.name }}</span>
       </button>
       @if (n.children?.length) {
         <div class="cct__children">

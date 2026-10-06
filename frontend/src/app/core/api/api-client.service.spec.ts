@@ -120,14 +120,15 @@ describe('ApiClient', () => {
   });
 
   it('serialises list query params and maps the page items', (done) => {
-    api.listApplications({ state: 'draft', q: 'foo', limit: 10 }).subscribe((page) => {
+    api.listApplications({ state: ['draft', 'review'], q: 'foo', limit: 10 }).subscribe((page) => {
       expect(page.total).toBe(1);
       expect(page.items[0].typeId).toBe('t1');
       expect(page.items[0].state?.label).toBe('Eingereicht');
       done();
     });
     const req = http.expectOne((r) => r.url === '/api/applications');
-    expect(req.request.params.get('state')).toBe('draft');
+    // A4: one `state` per chosen state, repeated.
+    expect(req.request.params.getAll('state')).toEqual(['draft', 'review']);
     expect(req.request.params.get('q')).toBe('foo');
     expect(req.request.params.get('limit')).toBe('10');
     req.flush({ items: [appWire()], total: 1, limit: 10, offset: 0 });
@@ -168,6 +169,31 @@ describe('ApiClient', () => {
       altcha: 'sol',
     });
     req.flush({ applicationId: 'app-9' }, { status: 201, statusText: 'Created' });
+  });
+
+  it('#11: POSTs a capture on behalf and searches the applicants', () => {
+    let created: unknown;
+    api
+      .createApplicationOnBehalf({
+        typeId: 't1',
+        data: { title: 'X' },
+        applicantPrincipalId: 'p1',
+        receivedOn: '2026-10-01',
+        lang: 'de',
+      })
+      .subscribe((c) => (created = c));
+    const req = http.expectOne('/api/applications/on-behalf');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toMatchObject({ applicantPrincipalId: 'p1', receivedOn: '2026-10-01' });
+    req.flush({ applicationId: 'app-9' }, { status: 201, statusText: 'Created' });
+    expect(created).toEqual({ applicationId: 'app-9' });
+
+    let hits: unknown;
+    api.searchOnBehalfApplicants('an').subscribe((h) => (hits = h));
+    const search = http.expectOne((r) => r.url === '/api/applications/on-behalf/applicants');
+    expect(search.request.params.get('q')).toBe('an');
+    search.flush([{ id: 'p1', displayName: 'Anna', email: 'a@b.de' }]);
+    expect(hits).toEqual([{ id: 'p1', displayName: 'Anna', email: 'a@b.de' }]);
   });
 
   it('POSTs a transition with the camelCase transitionId', () => {
@@ -244,6 +270,61 @@ describe('ApiClient', () => {
       },
       { status: 201, statusText: 'Created' },
     );
+  });
+
+  it('uploads the first draft file with ALTCHA and no token header (Z4)', (done) => {
+    const file = new File(['hello'], 'Angebot.pdf', { type: 'application/pdf' });
+    api
+      .uploadDraftAttachment(file, { altcha: 'sol', fieldKey: 'offer', isComparisonOffer: true })
+      .subscribe((res) => {
+        expect(res.attachment).toMatchObject({ id: 'd1', isComparisonOffer: true, scanState: 'scanning' });
+        expect(res.draftToken).toBe('tok');
+        expect(res.draftExpiresAt).toBe('2026-10-12T00:00:00Z');
+        done();
+      });
+    const req = http.expectOne('/api/apply/attachments');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.headers.has('X-Draft-Token')).toBe(false);
+    const form = req.request.body as FormData;
+    expect(form.get('altcha')).toBe('sol');
+    expect(form.get('field_key')).toBe('offer');
+    expect(form.get('is_comparison_offer')).toBe('true');
+    req.flush(
+      {
+        id: 'd1',
+        filename: 'Angebot.pdf',
+        mime: 'application/pdf',
+        size: 5,
+        scanned: false,
+        is_comparison_offer: true,
+        draftToken: 'tok',
+        draftExpiresAt: '2026-10-12T00:00:00Z',
+      },
+      { status: 201, statusText: 'Created' },
+    );
+  });
+
+  it('sends the draft token in the header, never ALTCHA or the token in the URL', () => {
+    const file = new File(['x'], 'b.pdf', { type: 'application/pdf' });
+    api.uploadDraftAttachment(file, { token: 'tok', altcha: 'ignored' }).subscribe();
+    const req = http.expectOne('/api/apply/attachments');
+    expect(req.request.headers.get('X-Draft-Token')).toBe('tok');
+    const form = req.request.body as FormData;
+    expect(form.has('altcha')).toBe(false);
+    expect(form.has('field_key')).toBe(false);
+    expect(form.has('is_comparison_offer')).toBe(false);
+    expect(req.request.urlWithParams).not.toContain('tok');
+    req.flush({});
+    api.uploadDraftAttachment(file).subscribe();
+    http.expectOne('/api/apply/attachments').flush({});
+  });
+
+  it('deletes a draft file with the token header', () => {
+    api.deleteDraftAttachment('d1', 'tok').subscribe();
+    const req = http.expectOne('/api/apply/attachments/d1');
+    expect(req.request.method).toBe('DELETE');
+    expect(req.request.headers.get('X-Draft-Token')).toBe('tok');
+    req.flush(null, { status: 204, statusText: 'No Content' });
   });
 
   it('GETs a signed download URL for an attachment', (done) => {
@@ -327,7 +408,7 @@ describe('ApiClient', () => {
       id: 'v1',
       applicationId: 'app-1',
       eligibleGroup: 'stupa',
-      config: { options: ['yes', 'no', 'abstain'], majorityRule: 'two_thirds', allowChange: true },
+      config: { options: ['yes', 'no', 'abstain'], majorityRule: 'two_thirds' },
       status: 'open',
       opensAt: null,
       closesAt: null,
@@ -335,6 +416,30 @@ describe('ApiClient', () => {
       secret: false,
       tally: { counts: { yes: 5, no: 2, abstain: 1 }, eligible: 12, quorumMet: true, leading: 'yes' },
     });
+  });
+
+  it('GETs the vote list from /votes with repeated status and the filters', (done) => {
+    api
+      .listVotes({ status: ['closed', 'cancelled'], gremiumId: 'g1', q: 'Haus', limit: 30, offset: 60 })
+      .subscribe((page) => {
+        expect(page.total).toBe(0);
+        done();
+      });
+    const req = http.expectOne((r) => r.url === '/api/votes');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.getAll('status')).toEqual(['closed', 'cancelled']);
+    expect(req.request.params.get('gremiumId')).toBe('g1');
+    expect(req.request.params.get('q')).toBe('Haus');
+    expect(req.request.params.get('limit')).toBe('30');
+    expect(req.request.params.get('offset')).toBe('60');
+    req.flush({ items: [], total: 0, limit: 30, offset: 60 });
+  });
+
+  it('GETs the vote list without any filter', () => {
+    api.listVotes().subscribe();
+    const req = http.expectOne((r) => r.url === '/api/votes');
+    expect(req.request.params.keys()).toEqual([]);
+    req.flush({ items: [], total: 0, limit: 50, offset: 0 });
   });
 
   it('POSTs a ballot choice to /votes/{id}/ballot', (done) => {
@@ -352,7 +457,23 @@ describe('ApiClient', () => {
     api.castBallot('v1', 'no', true).subscribe();
     const req = http.expectOne('/api/votes/v1/ballot');
     expect(req.request.body).toEqual({ choice: 'no', asDelegation: true });
-    req.flush({ status: 'changed' });
+    req.flush({ status: 'cast' });
+  });
+
+  it('propagates a 409 already_voted on a second ballot', (done) => {
+    api.castBallot('v1', 'yes').subscribe({
+      error: (err: { status: number; error: { code: string } }) => {
+        expect(err.status).toBe(409);
+        expect(err.error.code).toBe('already_voted');
+        done();
+      },
+    });
+    http
+      .expectOne('/api/votes/v1/ballot')
+      .flush(
+        { title: 'Already voted.', status: 409, code: 'already_voted' },
+        { status: 409, statusText: 'Conflict' },
+      );
   });
 
   it('POSTs an empty body to /auth/logout', () => {
@@ -412,6 +533,13 @@ describe('ApiClient', () => {
     req.flush(new Blob(['x']));
   });
 
+  it('sends no state for an empty state list', () => {
+    api.listApplications({ state: [] }).subscribe();
+    const req = http.expectOne((r) => r.url === '/api/applications');
+    expect(req.request.params.has('state')).toBe(false);
+    req.flush({ items: [], total: 0, limit: 20, offset: 0 });
+  });
+
   it('skips null/undefined query values when serialising the list query', () => {
     api.listApplications({ state: undefined, q: null as unknown as string, limit: 5 }).subscribe();
     const req = http.expectOne((r) => r.url === '/api/applications');
@@ -423,14 +551,14 @@ describe('ApiClient', () => {
 
   it('exports xlsx as a Blob, dropping limit/offset but keeping filters', (done) => {
     api
-      .exportApplicationsXlsx({ state: 'draft', q: 'x', limit: 50, offset: 10 })
+      .exportApplicationsXlsx({ state: ['draft', 'review'], q: 'x', limit: 50, offset: 10 })
       .subscribe((blob) => {
         expect(blob).toBeInstanceOf(Blob);
         done();
       });
     const req = http.expectOne((r) => r.url === '/api/applications/export.xlsx');
     expect(req.request.responseType).toBe('blob');
-    expect(req.request.params.get('state')).toBe('draft');
+    expect(req.request.params.getAll('state')).toEqual(['draft', 'review']);
     expect(req.request.params.get('q')).toBe('x');
     expect(req.request.params.has('limit')).toBe(false);
     expect(req.request.params.has('offset')).toBe(false);
@@ -639,6 +767,15 @@ describe('ApiClient', () => {
     req.flush([]);
   });
 
+  it('lists the meetings of a date range for the calendar', () => {
+    api.listMeetings(undefined, { from: '2026-08-31', to: '2026-10-04' }).subscribe();
+    const req = http.expectOne((r) => r.url === '/api/meetings');
+    expect(req.request.params.has('gremiumId')).toBe(false);
+    expect(req.request.params.get('dateFrom')).toBe('2026-08-31');
+    expect(req.request.params.get('dateTo')).toBe('2026-10-04');
+    req.flush([]);
+  });
+
   it('fetches the meetings timeline with only the direction (minimal opts)', (done) => {
     api.listMeetingsTimeline({ direction: 'upcoming' }).subscribe((page) => {
       expect(page.items).toEqual([]);
@@ -733,6 +870,26 @@ describe('ApiClient', () => {
     req.flush([]);
   });
 
+  it('PUTs the reason of an excuse only when given', () => {
+    api.setOwnAttendance('m-1', 'excused', 'Krank').subscribe();
+    expect(http.expectOne('/api/meetings/m-1/attendance/me').request.body).toEqual({
+      status: 'excused',
+      note: 'Krank',
+    });
+    api.setMemberAttendance('m-1', 'p-2', 'excused', null).subscribe();
+    expect(http.expectOne('/api/meetings/m-1/attendance/p-2').request.body).toEqual({
+      status: 'excused',
+      note: null,
+    });
+  });
+
+  it('DELETEs a member attendance (reset to open)', () => {
+    api.resetMemberAttendance('m-1', 'p-2').subscribe();
+    const req = http.expectOne('/api/meetings/m-1/attendance/p-2');
+    expect(req.request.method).toBe('DELETE');
+    req.flush([]);
+  });
+
   it('lists the agenda', () => {
     api.listAgenda('m-1').subscribe();
     const req = http.expectOne('/api/meetings/m-1/agenda');
@@ -751,7 +908,14 @@ describe('ApiClient', () => {
     api.addAgendaItem('m-1', 'app-1').subscribe();
     const req = http.expectOne('/api/meetings/m-1/agenda');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ applicationId: 'app-1' });
+    expect(req.request.body).toEqual({ applicationId: 'app-1', nonPublic: false });
+    req.flush([]);
+  });
+
+  it('adds a non-public application agenda item', () => {
+    api.addAgendaItem('m-1', 'app-1', true).subscribe();
+    const req = http.expectOne('/api/meetings/m-1/agenda');
+    expect(req.request.body).toEqual({ applicationId: 'app-1', nonPublic: true });
     req.flush([]);
   });
 
@@ -759,7 +923,14 @@ describe('ApiClient', () => {
     api.addAgendaFreetext('m-1', 'Sonstiges').subscribe();
     const req = http.expectOne('/api/meetings/m-1/agenda');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ title: 'Sonstiges' });
+    expect(req.request.body).toEqual({ title: 'Sonstiges', nonPublic: false });
+    req.flush([]);
+  });
+
+  it('adds a non-public freetext agenda item', () => {
+    api.addAgendaFreetext('m-1', 'Personal', true).subscribe();
+    const req = http.expectOne('/api/meetings/m-1/agenda');
+    expect(req.request.body).toEqual({ title: 'Personal', nonPublic: true });
     req.flush([]);
   });
 
@@ -830,11 +1001,18 @@ describe('ApiClient', () => {
     req.flush(null);
   });
 
-  it('closes a vote', () => {
-    api.closeVote('v-1').subscribe();
+  it('closes a vote and returns branchFired', () => {
+    let fired: boolean | undefined;
+    api.closeVote('v-1').subscribe((closed) => (fired = closed.branchFired));
     const req = http.expectOne('/api/votes/v-1/close');
     expect(req.request.method).toBe('POST');
-    req.flush(null);
+    req.flush({
+      id: 'v-1',
+      result: 'passed',
+      tally: { counts: {}, eligible: 0, quorumMet: true, leading: null },
+      branchFired: false,
+    });
+    expect(fired).toBe(false);
   });
 
   it('cancels a vote', () => {

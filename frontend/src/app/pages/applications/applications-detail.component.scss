@@ -1,588 +1,481 @@
+@use 'breakpoints' as bp;
+
 :host {
   display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* The sheet the application sits on (surface 1, large radius). One pane at a time it
+   loses the sheet and sits on the page, like the other single views. */
+.ad {
+  display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--space-5);
+  min-width: 0;
 }
-/* Summary block below the page header. It carries the centering itself, so the
-   status line and the fact grid align with the center column. */
-.det__summary {
+.ad--split {
+  padding: 0 var(--space-6) var(--space-6);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.ad--busy {
+  gap: var(--space-3);
+}
+.ad__skelMeta {
+  width: 30%;
+}
+.ad__skelTitle {
+  width: 60%;
+  height: 2rem;
+}
+.ad--center {
+  align-items: center;
+  justify-content: center;
+}
+.ad__error {
+  margin: 0;
+  padding: var(--space-5) 0;
+  color: var(--color-danger);
+}
+
+/* ------------------------------------------------------------------ header */
+.ad__head {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  width: 100%;
-  max-width: var(--layout-max-width);
-  margin-inline: auto;
+  gap: var(--sheet-head-gap);
+  padding-bottom: 22px;
+  border-bottom: var(--border-width) solid var(--color-border);
 }
-.det__ownerActions {
-  display: flex;
-  gap: var(--space-2);
-}
-.det__meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-.det__facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: var(--space-3) var(--space-5);
+.ad__title {
   margin: 0;
+  font-size: var(--fs-d2);
+  line-height: var(--lh-d2);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-tight);
+  overflow-wrap: anywhere;
 }
-.det__facts dt {
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.ad__line {
+  --ad-sep: 24px;
+  margin: 0;
   color: var(--color-text-muted);
+  font-size: var(--fs-md);
+  min-width: 0;
 }
-.det__facts dd {
-  margin: 0;
+/* #11: the capture note is quieter than the status line above it. */
+.ad__capture {
+  --ad-sep: 20px;
+  margin-top: var(--space-1);
+  font-size: var(--fs-small);
+}
+/* Items with a dot between two of them, also after a wrap (DECISIONS: never a dot at a
+   line start or a line end).
+
+   Every part draws its dot before it, in a box of `--ad-sep`. The parts start
+   `--ad-sep` before the clip box, so the dot of the first part on each line falls
+   outside it. `overflow-x: clip` leaves the line height alone. */
+.ad__seps {
+  overflow-x: clip;
+}
+.ad__parts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin-inline-start: calc(-1 * var(--ad-sep));
+  min-width: 0;
+}
+/* A part never breaks inside, so a wrap takes its dot to the line start, where the
+   clip hides it. */
+.ad__part {
+  min-width: 0;
+  white-space: nowrap;
+}
+.ad__part::before {
+  display: inline-block;
+  width: var(--ad-sep);
+  color: var(--color-text-subtle);
+  text-align: center;
+  content: '·';
+  content: '·' / '';
+}
+.ad__amount {
   color: var(--color-text);
 }
-.det__data,
-.det__history,
-.det__comments {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.ad__transitions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
-.det__dataRow {
+.ad__transitions app-icon {
+  margin-inline-end: 6px;
+}
+.ad__archived {
+  margin-top: var(--space-2);
+}
+
+/* ------------------------------------------------------------------ body */
+/* Two columns in the ratio 1.4 : 1, as on the board. Each column has a floor: the
+   right one fits the two dates of the Details pair, the left one the attachment rows.
+   When the sheet cannot give both floors (below about 740px), the columns wrap and
+   stack. The floors use `min(100%, …)`, so a column never overflows the sheet. */
+.ad__cols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+  align-items: flex-start;
+}
+.ad__col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.ad__col:first-child {
+  flex: 1.4 1 0;
+  min-width: min(100%, 22.5rem);
+}
+.ad__col:last-child {
+  flex: 1 1 0;
+  min-width: min(100%, 22rem);
+}
+.ad__tabs {
+  margin-top: calc(-1 * var(--space-5));
+}
+.ad__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.ad__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.ad__sec:focus {
+  outline: none;
+}
+.ad__secTitle {
+  padding: 0 var(--space-1);
+}
+.ad__secHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.ad__count {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.ad__none {
+  margin: 0;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.ad__none--row {
+  padding: var(--space-4);
+}
+
+/* Two fields in one row of a field group (Eingegangen | Aktualisiert). A cell is at
+   least 11rem wide, which holds a medium date in DE and EN on one line. A narrower pair
+   puts the fields one below the other. */
+.ad__pair {
   display: grid;
-  grid-template-columns: minmax(8rem, 14rem) 1fr;
-  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+}
+/* A date never breaks inside a word. */
+.ad__pair time {
+  white-space: nowrap;
+}
+.ad__mail {
+  display: inline;
+  color: inherit;
+  /* An e-mail address is never cut: it wraps and stays selectable. */
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------ edit */
+.ad--edit {
+  /* The height of the edit bar. A field that scrolls into view (an error, the focus)
+     stops below the bar, not under it. */
+  --ad-edit-bar: 60px;
+  /* The side padding of the page (`.page-shell`): one pane at a time, the bar reaches
+     over it to the edges of the page. */
+  --ad-gutter: var(--layout-gutter);
+}
+/* The bar of the edit mode takes the place of the header (board Anträge-Bearbeiten).
+   It stays at the top while the form scrolls below it, so Abbrechen and Speichern are
+   always in reach (DECISIONS: the header controls of a pane stay fixed). Side by side
+   the pane scrolls, one pane at a time the page scrolls; `top: 0` holds the bar at the
+   top of either. */
+.ad__editBar {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--ad-edit-bar);
   padding: var(--space-2) 0;
   border-bottom: var(--border-width) solid var(--color-border);
 }
-.det__dataRow dt {
+/* On the sheet: the top of the sheet in surface 2. The detail pane of the list/detail
+   layout is a window with round corners, so its corners clip the bar while it is stuck
+   and the sheet scrolls under it. */
+.ad--split .ad__editBar {
+  margin-inline: calc(-1 * var(--space-6));
+  padding-inline: var(--space-6);
+  background: var(--color-surface-2);
+}
+/* One pane at a time: fixed chrome on its own raised surface (surface 3, as the phone
+   bottom bar), from edge to edge of the page, so no field shows beside it. */
+.ad--edit:not(.ad--split) .ad__editBar {
+  margin-inline: calc(-1 * var(--ad-gutter));
+  padding-inline: var(--ad-gutter);
+  background: var(--color-surface-3);
+}
+/* The fade below the bar: the form fades out as it scrolls under the bar (the shared
+   top fade of a scroll area). At rest it lies over the gap above the first field, in the
+   colour of the ground, so nothing shows. */
+.ad__editFade {
+  position: absolute;
+  inset: 100% 0 auto;
+  height: var(--space-5);
+  background: linear-gradient(to bottom, var(--ad-edit-ground), transparent);
+  pointer-events: none;
+}
+.ad--edit {
+  --ad-edit-ground: var(--color-bg);
+}
+.ad--edit.ad--split {
+  --ad-edit-ground: var(--color-surface-1);
+}
+/* The page side padding of a phone (`.page-shell`). */
+@include bp.phone {
+  .ad--edit {
+    --ad-gutter: var(--space-4);
+  }
+}
+.ad__edit ::ng-deep :is(input, textarea, select, button, a, [tabindex], [role='alert']) {
+  scroll-margin-top: calc(var(--ad-edit-bar) + var(--space-4));
+  scroll-margin-bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
+}
+.ad__editIcon {
+  flex: none;
   color: var(--color-text-muted);
-  font-weight: var(--fw-medium);
 }
-.det__dataRow dd {
+/* The buttons keep their width; the title gives way. */
+.ad__editBar app-button {
+  flex: none;
+}
+.ad__editText {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
-  word-break: break-word;
+  font-size: var(--fs-md);
 }
-formly-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+.ad__editHint {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
 }
-.det__pos-val {
-  font-variant-numeric: tabular-nums;
-}
-.det__offers {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-.det__offer-label {
-  flex: 1;
+/* The fields of the form: the global `.fe-form` grid (styles.scss). */
+.ad__edit {
   min-width: 0;
 }
-.det__offer-val {
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted);
-}
-.det__offer--pref .det__offer-val {
-  color: var(--color-text);
-  font-weight: var(--fw-medium);
-}
-.det__pos-total {
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-}
-.det__actions {
+
+/* ------------------------------------------------------------------ comments */
+.ad__msg {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-.det__ccTree {
-  max-height: 50vh;
-  overflow-y: auto;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-2);
-}
-.det__history {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-/* The whole header row of the version history acts as the toggle. */
-.det__historyToggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
+  padding: 12px var(--space-3) 12px var(--space-4);
 }
-.det__historyMeta {
-  display: inline-flex;
+.ad__msgBody {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.ad__msgHead {
+  display: flex;
   align-items: center;
   gap: var(--space-2);
-  color: var(--color-text-muted);
+  min-height: 24px;
 }
-.det__historyCount {
-  background: var(--color-surface-sunken);
-  border-radius: var(--radius-pill);
-  padding: 0 var(--space-2);
-  font-size: var(--fs-xs);
-  line-height: 1.6;
+.ad__msgAuthor {
+  flex: 1 1 auto;
+  font-weight: var(--fw-semibold);
 }
-.det__diff {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  font-size: var(--fs-sm);
+.ad__msgActions {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  margin-block: -6px;
 }
-/* The template writes the badge and the field name on separate lines, but Angular
-   strips that whitespace (`preserveWhitespaces` is off), so the two boxes touched and
-   the row read "Changedtermin". Measured gap was 0px. The margin restores the word
-   break the source already implies. */
-.det__diff app-badge {
-  margin-right: var(--space-1);
-}
-.det__diff code {
-  background: var(--color-surface-sunken);
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-sm);
-}
-.det__diff del {
-  color: var(--color-danger);
-}
-.det__diff ins {
-  color: var(--color-success);
-  text-decoration: none;
-}
-.det__comments {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  margin-bottom: var(--space-5);
-}
-.det__comment-head {
+.ad__msgMeta {
   display: flex;
   align-items: baseline;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  margin-bottom: var(--space-1);
-}
-.det__comment-body {
-  margin: 0;
-  white-space: pre-wrap;
-}
-.field__control {
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-bg);
-  color: var(--color-text);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  font-size: var(--fs-md);
-  font-family: inherit;
-}
-.field__control:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 1px;
-}
-.det__textarea {
-  resize: vertical;
-}
-
-/* Breakout layout: the transitions and the chat float in the margins. The content stays
-   centered at body width, like the tree and the charts of the budget tab. */
-.det__layout {
-  display: grid;
-  grid-template-columns:
-    minmax(11rem, 1fr)
-    minmax(0, var(--layout-max-width))
-    minmax(16rem, 1fr);
-  gap: var(--space-5);
-  align-items: start;
-}
-.det__center {
-  min-width: 0;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-.det__rail {
-  position: sticky;
-  top: calc(var(--layout-header-height) + var(--space-4));
-  min-width: 0;
-  width: 100%;
-}
-.det__rail--left {
-  justify-self: end;
-  max-width: 15rem;
-}
-.det__rail--right {
-  justify-self: start;
-  max-width: 24rem;
-}
-.det__railLead {
-  font-size: var(--fs-sm);
-  margin: 0 0 var(--space-3);
-}
-.det__layout--editing {
-  grid-template-columns: 1fr;
-}
-.det__layout--editing .det__rail {
-  display: none;
-}
-@media (max-width: 70rem) {
-  .det__layout {
-    grid-template-columns: 1fr;
-  }
-  .det__rail {
-    position: static;
-  }
-}
-
-.det__chat {
-  display: flex;
-  flex-direction: column;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  overflow: hidden;
-  max-height: calc(100vh - var(--layout-header-height) - 6rem);
-}
-.det__chatScroll {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  overflow-y: auto;
-  padding: var(--space-4);
-  min-height: 5rem;
-}
-.det__msg {
-  display: flex;
-  gap: var(--space-2);
-  max-width: 90%;
-  align-self: flex-start;
-}
-.det__msg--own {
-  align-self: flex-end;
-  flex-direction: row-reverse;
-}
-.det__avatar {
-  flex: 0 0 auto;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  background: var(--color-surface-sunken);
+  gap: 6px;
   color: var(--color-text-muted);
+  font-size: 0.75rem;
 }
-.det__msg--own .det__avatar {
-  background: var(--color-primary-subtle);
+.ad__msgDot {
+  color: var(--color-text-subtle);
+}
+.ad__msgPublic {
   color: var(--color-primary);
 }
-.det__msgBody {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-}
-.det__msg--own .det__msgBody {
-  align-items: flex-end;
-}
-.det__intern {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  color: var(--color-warning, #c08a2a);
-}
-.det__msgTime {
-  white-space: nowrap;
-}
-.det__bubble {
-  padding: var(--space-2) var(--space-3);
-  border-radius: 0 var(--radius-lg) var(--radius-lg) var(--radius-lg);
-  background: var(--color-surface-sunken);
+.ad__msgText {
+  margin: 4px 0 0;
   white-space: pre-wrap;
-  word-break: break-word;
-  font-size: var(--fs-sm);
-  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
-.det__msg--own .det__bubble {
-  border-radius: var(--radius-lg) 0 var(--radius-lg) var(--radius-lg);
-  background: var(--color-primary-subtle);
+.ad__composer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
 }
-.det__msg--internal .det__bubble {
-  background: transparent;
-  border: var(--border-width) dashed var(--color-border-strong);
-}
-.det__visToggle {
-  display: inline-flex;
-  align-self: flex-start;
-  padding: 2px;
-  gap: 2px;
-  background: var(--color-surface-sunken);
-  border-radius: var(--radius-pill);
-}
-.det__visToggle button {
+.ad__composerInput {
+  /* Below 14rem the toggle and the send button wrap to a second line. */
+  flex: 1 1 14rem;
+  min-width: 0;
+  min-height: var(--control-height);
+  max-height: 12rem;
+  padding: 10px 0;
   border: 0;
   background: transparent;
-  color: var(--color-text-muted);
-  font: inherit;
-  font-size: var(--fs-xs);
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-}
-.det__visToggle button.is-active {
-  background: var(--color-surface);
   color: var(--color-text);
-  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.2));
-}
-.det__composerInput {
-  flex: 1;
-  min-width: 0;
-  resize: none;
-  max-height: 8rem;
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-bg);
-  color: var(--color-text);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-lg);
   font: inherit;
-  font-size: var(--fs-sm);
   line-height: 1.4;
+  /* A plain field as on the board: no resize grip. It grows with its text where the
+     browser can (`field-sizing`), up to the max height, and then scrolls. */
+  resize: none;
+  field-sizing: content;
+  overflow-y: auto;
 }
-.det__composerInput:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 1px;
+.ad__composerVis {
+  flex: none;
+  /* On the second line the toggle and the send button align right. */
+  margin-left: auto;
+  /* Center the 36px toggle on the 40px send button. */
+  margin-bottom: 2px;
+}
+.ad__composerInput:focus-visible {
+  outline: none;
+}
+/* The ring marks the text field. The toggle draws its own focus ring. */
+.ad__composer:has(.ad__composerInput:focus-visible) {
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
 }
 
-/* Edit and delete of one comment. The buttons stay in the message meta line, so
-   a row with actions keeps the height of a row without them. */
-.det__msgActions {
-  display: inline-flex;
-  gap: 2px;
-  margin-inline-start: auto;
+/* ------------------------------------------------------------------ dialogs */
+.ad__dlgLead {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
 }
-
-.det__commentEdit,
-.det__forceReason {
+/* The tree scrolls here, below the lead and above the fiscal year. An end fades only
+   when more rows are past it (`appScrollFade` sets the classes). */
+.ad__ccTree {
+  max-height: 50vh;
+  max-height: 50dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-5);
+}
+.ad__ccTree.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--space-5));
+}
+.ad__ccTree.is-fade-end {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--space-5));
+  mask-image: linear-gradient(to top, transparent, #000 var(--space-5));
+}
+.ad__ccTree.is-fade-start.is-fade-end {
+  --ad-fade: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--space-5),
+    #000 calc(100% - var(--space-5)),
+    transparent
+  );
+  -webkit-mask-image: var(--ad-fade);
+  mask-image: var(--ad-fade);
+}
+.ad__ccFy {
+  display: block;
+  margin-top: var(--space-3);
+}
+.ad__commentEdit {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
 
   span {
-    font-size: var(--fs-sm);
-    font-weight: var(--fw-medium);
     color: var(--color-text-muted);
+    font-size: var(--fs-small);
+    font-weight: var(--fw-medium);
   }
 
   textarea {
     width: 100%;
     resize: vertical;
     padding: var(--space-2) var(--space-3);
-    background: var(--color-bg);
+    border: 0;
+    border-radius: var(--radius-field);
+    background: var(--color-surface-3);
     color: var(--color-text);
-    border: var(--border-width) solid var(--color-border-strong);
-    border-radius: var(--radius-lg);
     font: inherit;
-    font-size: var(--fs-sm);
     line-height: 1.4;
   }
 
   textarea:focus-visible {
-    outline: 2px solid var(--color-primary);
+    outline: 2px solid var(--color-focus-ring);
     outline-offset: 1px;
   }
-}
-
-formly-form formly-field {
-  display: block;
-}
-formly-form formly-field + formly-field {
-  margin-top: var(--space-4);
-}
-
-@media (max-width: 768px) {
-  .det__meta {
-    flex-wrap: wrap;
-  }
-  .det__ownerActions {
-    flex-wrap: wrap;
-  }
-  .det__rail--left,
-  .det__rail--right {
-    max-width: none;
-    justify-self: stretch;
-  }
-  .det__dataRow {
-    grid-template-columns: 1fr;
-    gap: var(--space-1);
-  }
-  .det__diff li {
-    word-break: break-word;
-  }
-  .det__chat {
-    max-height: 70vh;
-  }
-}
-formly-form formly-group > formly-field + formly-field {
-  margin-top: var(--space-3);
 }
 
 /* Same affordance as the 404 page: a way out, styled as a button. */
-.det__backLink {
+.ad__backLink {
   display: inline-flex;
-  padding: var(--space-3) var(--space-5);
-  font-weight: var(--fw-semibold);
+  align-items: center;
+  height: var(--control-height);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
   color: var(--color-text);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-md);
+  font-weight: var(--fw-semibold);
   text-decoration: none;
 }
-.det__backLink:hover {
-  background: var(--color-surface-sunken);
+.ad__backLink:hover {
+  background: var(--color-surface-4);
 }
 
-/* An archived application looks exactly like an active one, and someone arriving from a
-   link has no other way to tell. Muted rather than alarming: nothing is wrong with it,
-   it has only left the working list. */
-.det__archived {
-  width: 100%;
-  max-width: var(--layout-max-width);
-  margin-inline: auto;
-  padding: var(--space-2) var(--space-3);
-  border-inline-start: 3px solid var(--color-border-strong);
-  background: var(--color-surface-sunken);
-  border-radius: var(--radius-md);
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-}
-
-/* -- share links ---------------------------------------------------------- */
-
-/* The token appears here once and never again, so the block is set apart from the
-   form below it rather than reading as one more field. */
-.det__shareFresh {
-  padding: var(--space-3);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-muted, var(--color-bg));
-}
-
-.det__shareFreshHint {
-  margin: 0 0 var(--space-2);
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
-
-.det__shareFreshRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.det__shareUrl {
-  flex: 1 1 auto;
-  /* A long token must not push the copy button out of the dialog. */
-  min-width: 0;
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-bg);
-  color: var(--color-text);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-lg);
-  font-family: var(--font-mono, monospace);
-  font-size: var(--fs-sm);
-  text-overflow: ellipsis;
-}
-
-.det__shareForm {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-3);
-}
-
-.det__shareLabel {
-  display: flex;
-  flex: 1 1 14rem;
-  flex-direction: column;
-  gap: var(--space-1);
-
-  span {
-    font-size: var(--fs-sm);
-    font-weight: var(--fw-medium);
-    color: var(--color-text-muted);
+@include bp.phone {
+  .ad__title {
+    font-size: var(--fs-h1);
+    line-height: var(--lh-h1);
   }
-
-  input {
-    width: 100%;
-    padding: var(--space-2) var(--space-3);
-    background: var(--color-bg);
-    color: var(--color-text);
-    border: var(--border-width) solid var(--color-border-strong);
-    border-radius: var(--radius-lg);
-    font: inherit;
-    font-size: var(--fs-sm);
+  .ad__pair {
+    grid-template-columns: minmax(0, 1fr);
   }
-
-  input:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 1px;
+  /* The bar keeps the title and the two buttons on one line. */
+  .ad__editHint {
+    display: none;
   }
 }
-
-.det__shareList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin: var(--space-4) 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.det__shareRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-lg);
-}
-
-/* A revoked or expired link stays in the list — that is the record of who published
-   what — but it must not read as one that still opens. */
-.det__shareRow--dead {
-  opacity: 0.6;
-}
-
-.det__shareRowMain {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.det__shareRowLabel {
-  overflow: hidden;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* A long intake note wraps inside its part instead of running out of the sheet. */
+.ad__capture .ad__part {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }

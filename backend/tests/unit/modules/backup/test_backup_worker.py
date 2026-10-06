@@ -196,6 +196,19 @@ def _silence_audit(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     return written
 
 
+@pytest.fixture(autouse=True)
+def _verify_calls(monkeypatch: pytest.MonkeyPatch) -> list[tuple[object, str | None]]:
+    """Record the chain check after a restore instead of reading a hash chain (Z6)."""
+    calls: list[tuple[object, str | None]] = []
+
+    async def _verify(maker: object, actor: str | None) -> str:
+        calls.append((maker, actor))
+        return "valid checked=0"
+
+    monkeypatch.setattr(task, "verify_after_restore", _verify)
+    return calls
+
+
 # -------------------------------------------------------------------- create_backup
 
 
@@ -345,6 +358,29 @@ async def test_restore_puts_the_backup_catalogue_back() -> None:
     assert await task.restore_backup(ctx, str(BACKUP_ID), "sub") == "done"
     assert service.snapshots == 1, "the catalogue was never captured"
     assert service.reseeded, "the catalogue was never put back"
+
+
+@pytest.mark.asyncio
+async def test_restore_verifies_the_restored_chain(
+    _verify_calls: list[tuple[object, str | None]],
+) -> None:
+    """Z6: a finished restore checks the chain of the restored database, as its actor."""
+    service = _FakeService(_row(status="done", storage_key="k"))
+    maker = _Sessionmaker()
+    ctx = _ctx(service, archives=_FakeArchives(), maker=maker)
+    assert await task.restore_backup(ctx, str(BACKUP_ID), "sub-7") == "done"
+    assert _verify_calls == [(maker, "sub-7")]
+
+
+@pytest.mark.asyncio
+async def test_failed_restore_runs_no_chain_check(
+    _verify_calls: list[tuple[object, str | None]],
+) -> None:
+    service = _FakeService(_row(status="done", storage_key="k"))
+    service.apply_error = BackupError("pg_restore failed")
+    ctx = _ctx(service, archives=_FakeArchives())
+    assert await task.restore_backup(ctx, str(BACKUP_ID), "sub") == "failed"
+    assert _verify_calls == []
 
 
 @pytest.mark.asyncio

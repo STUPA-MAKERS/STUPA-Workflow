@@ -7,14 +7,27 @@ also holds the pure module-level field and data helpers.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import Subquery, func, select
 
-from app.modules.applications.models import Applicant, Application, SubmissionVersion
-from app.modules.applications.schemas import ApplicantOut, ApplicationOut, StateOut
+from app.modules.applications.models import (
+    Applicant,
+    Application,
+    StatusEvent,
+    SubmissionVersion,
+)
+from app.modules.applications.schemas import (
+    ActorOut,
+    ApplicantOut,
+    ApplicationOut,
+    CaptureOut,
+    StateOut,
+)
 from app.modules.flow.models import FlowVersion, State
 from app.modules.forms.validation import extract_promoted
 from app.shared.config_schemas import FormFieldDef
@@ -72,6 +85,87 @@ def _state_out(state: State | None, color_override: str | None = None) -> StateO
         editAllowed=state.edit_allowed,
         kind=state.kind,
     )
+
+
+def state_since_subquery() -> Subquery:
+    """Build the grouped subquery ``(app_id, since)`` of the last status change (A9).
+
+    ``since`` is the time of the newest ``status_event`` of each application. The
+    creation writes the first event, so every application has one. A caller joins
+    the subquery with an outer join and falls back to ``created_at``.
+    """
+    return (
+        select(
+            StatusEvent.application_id.label("app_id"),
+            func.max(StatusEvent.at).label("since"),
+        )
+        .group_by(StatusEvent.application_id)
+        .subquery("state_since")
+    )
+
+
+# Actor value of a magic-link applicant in `status_event`, `submission_version` and
+# the audit log.
+APPLICANT_ACTOR = "applicant"
+
+# Actor value of an automatic action. The plain value is ``system``; a source adds a
+# suffix, for example ``system:deadlines``.
+SYSTEM_ACTOR = "system"
+_SYSTEM_PREFIX = SYSTEM_ACTOR + ":"
+# The key of the plain ``system`` actor in `ActorOut.key`.
+SYSTEM_AUTO_KEY = "auto"
+
+
+def system_actor_key(value: str) -> str | None:
+    """Return the system key of an actor value, or None for another actor.
+
+    ``system`` gives ``auto``. ``system:deadlines`` gives ``deadlines``.
+    """
+    if value == SYSTEM_ACTOR:
+        return SYSTEM_AUTO_KEY
+    if value.startswith(_SYSTEM_PREFIX):
+        return value[len(_SYSTEM_PREFIX) :] or SYSTEM_AUTO_KEY
+    return None
+
+
+async def gremium_actor_name(session: AsyncSession, gremium_id: UUID | None) -> str | None:
+    """Return the name of a Gremium, as the applicant view shows it for a member.
+
+    The applicant view and the comment mail to the applicant show this name
+    instead of a member name (A12, O16). Without a Gremium the result is None, so
+    no member name leaks either.
+    """
+    if gremium_id is None:
+        return None
+    from app.modules.admin.models import Gremium
+
+    return await session.scalar(select(Gremium.name).where(Gremium.id == gremium_id))
+
+
+async def pii_keys_for_type(session: AsyncSession, type_id: UUID) -> set[str]:
+    """Collect the `isPII` field keys across all form versions of a type.
+
+    Anonymization uses this set. An application is pinned to its `form_version_id`.
+    A field that only a later version marks as PII is unknown to the pinned row.
+    GDPR erasure follows the current intent, so the function takes the union. The
+    O21 strip of the detail, the versions and the attachments uses the same set.
+    """
+    from app.modules.forms.models import FormField, FormVersion
+
+    rows = await session.scalars(
+        select(FormField.key)
+        .join(FormVersion, FormVersion.id == FormField.form_version_id)
+        .where(
+            FormVersion.application_type_id == type_id,
+            FormField.is_pii.is_(True),
+        )
+    )
+    return set(rows)
+
+
+def _without_keys(data: dict[str, Any] | None, keys: set[str]) -> dict[str, Any]:
+    """Return a copy of ``data`` without ``keys``."""
+    return {k: v for k, v in (data or {}).items() if k not in keys}
 
 
 def _whitelist(fields: list[FormFieldDef], data: dict[str, Any]) -> dict[str, Any]:
@@ -189,23 +283,65 @@ class ApplicationsServiceBase:
         return [_field_from_row(r) for r in rows]
 
     async def _pii_keys_for_type(self, type_id: UUID) -> set[str]:
-        """Collect the `isPII` field keys across all form versions of a type.
+        """Collect the `isPII` field keys of a type (see `pii_keys_for_type`)."""
+        return await pii_keys_for_type(self.session, type_id)
 
-        Anonymization uses this set. An application is pinned to its `form_version_id`.
-        A field that only a later version marks as PII is unknown to the pinned row.
-        GDPR erasure follows the current intent, so the function takes the union.
+    async def _state_since_map(self, app_ids: Iterable[UUID]) -> dict[UUID, datetime]:
+        """Map each application id to the time of its last status change (A9).
+
+        One grouped query for all ids. An id without a status event is missing from
+        the map; the caller falls back to ``created_at``.
         """
-        from app.modules.forms.models import FormField, FormVersion
+        ids = set(app_ids)
+        if not ids:
+            return {}
+        sq = state_since_subquery()
+        rows = (
+            await self.session.execute(select(sq.c.app_id, sq.c.since).where(sq.c.app_id.in_(ids)))
+        ).all()
+        return {app_id: since for app_id, since in rows}
 
-        rows = await self.session.scalars(
-            select(FormField.key)
-            .join(FormVersion, FormVersion.id == FormField.form_version_id)
-            .where(
-                FormVersion.application_type_id == type_id,
-                FormField.is_pii.is_(True),
-            )
+    async def _gremium_actor(self, app: Application) -> str | None:
+        """Return the name of the Gremium of the application.
+
+        The applicant view shows this name instead of a member name (A12, O16).
+        Without a Gremium the result is None, so no member name leaks either.
+        """
+        return await gremium_actor_name(self.session, app.gremium_id)
+
+    async def _applicant_actors(self, app: Application, *, magic_link_view: bool) -> set[str]:
+        """Return the actor values that name the applicant of one application.
+
+        The applicant view keeps these actors and shows the Gremium for all others
+        (A12, O16). The magic-link actor is always one of them.
+
+        The ``sub`` of the logged-in creator is one of them in two cases: the viewer
+        is that creator, or the creator submitted with the own account email. A
+        creator can submit for another email (F23), for example a member who
+        submits for a student. The magic-link view then belongs to a different
+        person, and the creator is a member like any other. The comparison ignores
+        case, as the create route does.
+        """
+        own = {APPLICANT_ACTOR}
+        if app.created_by is None:
+            return own
+        if not magic_link_view:
+            return own | {app.created_by}
+        from app.modules.auth.models import Principal as PrincipalRow
+
+        creator_email = await self.session.scalar(
+            select(PrincipalRow.email).where(PrincipalRow.sub == app.created_by)
         )
-        return set(rows)
+        applicant_email = await self.session.scalar(
+            select(Applicant.email).where(Applicant.application_id == app.id)
+        )
+        if (
+            creator_email
+            and applicant_email
+            and creator_email.casefold() == applicant_email.casefold()
+        ):
+            own.add(app.created_by)
+        return own
 
     async def _to_out(
         self,
@@ -214,9 +350,24 @@ class ApplicationsServiceBase:
         include_pii: bool,
         can_edit: bool = False,
         is_owner: bool = False,
+        strip_pii_fields: bool = False,
+        applicant_view: bool = False,
+        magic_link_view: bool = False,
     ) -> ApplicationOut:
+        """Serialize one application.
+
+        ``include_pii`` adds the applicant block (email, name). ``strip_pii_fields``
+        removes the ``isPII`` form fields from ``data`` (O21) and lists their keys in
+        ``hiddenKeys``, so the client can tell a removed field from an empty one.
+
+        ``applicant_view`` and ``magic_link_view`` resolve the capturing person of a
+        capture (#11) like a timeline actor: the applicant sees the Gremium.
+        """
         state = await self._get_state(app.current_state_id)
         version = await self._current_version(app.id)
+        since = (await self._state_since_map([app.id])).get(app.id, app.created_at)
+        hidden = await self._pii_keys_for_type(app.type_id) if strip_pii_fields else set()
+        data = _without_keys(app.data, hidden) if hidden else app.data
         applicant_out: ApplicantOut | None = None
         if include_pii:
             applicant = (
@@ -239,7 +390,7 @@ class ApplicationsServiceBase:
             fiscalYearId=app.fiscal_year_id,
             amount=app.amount,
             currency=app.currency,
-            data=app.data,
+            data=data,
             version=version,
             lang=app.lang,
             createdAt=app.created_at,
@@ -248,20 +399,92 @@ class ApplicationsServiceBase:
             canEdit=can_edit,
             isOwner=is_owner,
             archivedAt=app.archived_at,
+            stateSince=since,
+            hiddenKeys=sorted(hidden),
+            capture=await self._capture_out(
+                app, applicant_view=applicant_view, magic_link_view=magic_link_view
+            ),
         )
 
-    async def _author_names(self, subs: set[str]) -> dict[str, str]:
-        """Map an author `principal.sub` to `display_name`, `email` or the `sub`."""
-        from app.modules.auth.models import Principal as PrincipalRow
+    async def _capture_out(
+        self, app: Application, *, applicant_view: bool, magic_link_view: bool
+    ) -> CaptureOut | None:
+        """Return the capture block of an application, or None without a capture."""
+        if app.captured_by is None:
+            return None
+        actors = await self._resolve_actors(
+            app,
+            [app.captured_by],
+            applicant_view=applicant_view,
+            magic_link_view=magic_link_view,
+        )
+        return CaptureOut(
+            capturedBy=actors.get(app.captured_by),
+            capturedAt=app.created_at,
+            receivedOn=app.received_on,
+            intake=app.capture_intake,
+        )
 
-        wanted = {s for s in subs if s}
+    async def _author_refs(self, subs: set[str]) -> dict[str, tuple[str, UUID]]:
+        """Map a `principal.sub` to its name and its principal id.
+
+        The name is the `display_name`, else the `email`. The id serves the avatar
+        (`GET /principals/{id}/avatar`). One query for all subs. A sub of a merged
+        account gives the name and the id of the account it was merged into. A sub
+        without a row, or a row without a name and an email (an anonymized account),
+        is missing from the map. The caller must never show the raw sub instead.
+        """
+        from app.modules.auth.identity import refs_by_sub
+
+        out: dict[str, tuple[str, UUID]] = {}
+        for sub, ref in (await refs_by_sub(self.session, subs)).items():
+            if ref.name:
+                out[sub] = (ref.name, ref.id)
+        return out
+
+    async def _resolve_actors(
+        self,
+        app: Application,
+        values: Iterable[str | None],
+        *,
+        applicant_view: bool,
+        magic_link_view: bool,
+    ) -> dict[str, ActorOut]:
+        """Resolve the stored actor values of one application to `ActorOut`.
+
+        The function reads all principal names in one query (no N+1). In the
+        ``applicant_view`` every actor that is not the applicant becomes the
+        Gremium of the application (A12, O16), so the applicant never sees a
+        member name. See `_applicant_actors` for ``magic_link_view``.
+        """
+        wanted = {v for v in values if v}
         if not wanted:
             return {}
-        rows = (
-            await self.session.execute(
-                select(PrincipalRow.sub, PrincipalRow.display_name, PrincipalRow.email).where(
-                    PrincipalRow.sub.in_(wanted)
-                )
+        own = await self._applicant_actors(app, magic_link_view=magic_link_view)
+        gremium: ActorOut | None = None
+        if applicant_view and any(v not in own for v in wanted):
+            gremium = ActorOut(
+                kind="gremium", displayName=await self._gremium_actor(app)
             )
-        ).all()
-        return {sub: (dn or em or sub) for sub, dn, em in rows}
+        subs = {
+            v
+            for v in wanted
+            if v != APPLICANT_ACTOR
+            and system_actor_key(v) is None
+            and not (gremium is not None and v not in own)
+        }
+        refs = await self._author_refs(subs)
+        out: dict[str, ActorOut] = {}
+        for v in wanted:
+            if gremium is not None and v not in own:
+                out[v] = gremium
+            elif v == APPLICANT_ACTOR:
+                out[v] = ActorOut(kind="applicant")
+            elif (key := system_actor_key(v)) is not None:
+                out[v] = ActorOut(kind="system", key=key)
+            elif v in refs:
+                name, pid = refs[v]
+                out[v] = ActorOut(kind="principal", displayName=name, principalId=pid)
+            else:
+                out[v] = ActorOut(kind="deleted")
+        return out

@@ -1,24 +1,35 @@
-<section class="fe__transLists" [attr.aria-label]="'admin.flow.list.heading' | t">
-  <div class="fe__transCol">
-    <h3 class="m-0 text-md">{{ 'admin.flow.list.incoming' | t }} ({{ lists().incoming.length }})</h3>
-    @for (r of lists().incoming; track r.index) {
-      <button type="button" class="fe__transRow" (click)="selectTransition.emit(r.index)">
-        <span class="fe__transMain">@if (r.automatic) {<span aria-hidden="true">⚡ </span>}{{ r.label || (r.from + ' → ' + r.to) }}</span>
-        <span class="fe__transMeta">{{ r.from }} → {{ r.to }}@if (r.branch) { · {{ r.branch }}} · {{ r.guard }}</span>
-      </button>
-    } @empty {
-      <p class="text-muted text-sm m-0">{{ 'admin.flow.list.empty' | t }}</p>
-    }
-  </div>
-  <div class="fe__transCol">
-    <h3 class="m-0 text-md">{{ 'admin.flow.list.outgoing' | t }} ({{ lists().outgoing.length }})</h3>
-    @for (r of lists().outgoing; track r.index) {
-      <button type="button" class="fe__transRow" (click)="selectTransition.emit(r.index)">
-        <span class="fe__transMain">@if (r.automatic) {<span aria-hidden="true">⚡ </span>}{{ r.label || (r.from + ' → ' + r.to) }}</span>
-        <span class="fe__transMeta">{{ r.from }} → {{ r.to }}@if (r.branch) { · {{ r.branch }}} · {{ r.guard }}</span>
-      </button>
-    } @empty {
-      <p class="text-muted text-sm m-0">{{ 'admin.flow.list.empty' | t }}</p>
-    }
-  </div>
+<hr class="ins__rule" />
+<section class="tl" [attr.aria-label]="'admin.flow.list.heading' | t">
+  @for (col of columns(); track col.key) {
+    <div class="tl__col">
+      <h3 class="cap ins__cap">{{ col.title | t }} ({{ col.rows.length }})</h3>
+      @if (col.rows.length) {
+        <ul class="rowgroup rowgroup--bg3 tl__list">
+          @for (r of col.rows; track r.index) {
+            <li>
+              <button type="button" class="tl__row" (click)="selectTransition.emit(r.index)">
+                <span class="tl__main">
+                  @if (r.automatic) {
+                    <app-icon class="tl__bolt" name="bolt" [size]="13" />
+                    <span class="sr-only">{{ 'admin.flow.legendAutomatic' | t }}:</span>
+                  }
+                  <span class="ell">{{ r.label || r.from + ' → ' + r.to }}</span>
+                </span>
+                <!-- A separator ends the part before it, so it never starts a line. -->
+                <span class="tl__meta">
+                  <span><span class="mono">{{ r.from }} → {{ r.to }}</span><span aria-hidden="true"> ·</span></span>
+                  @if (r.branch) {
+                    <span>{{ r.branch }}<span aria-hidden="true"> ·</span></span>
+                  }
+                  <span>{{ r.guard }}</span>
+                </span>
+              </button>
+            </li>
+          }
+        </ul>
+      } @else {
+        <p class="ins__hint">{{ 'admin.flow.list.empty' | t }}</p>
+      }
+    </div>
+  }
 </section>

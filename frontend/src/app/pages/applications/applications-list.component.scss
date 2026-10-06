@@ -1,115 +1,370 @@
-/* The body (table) stays centered at normal width. The tree sits in the left
-   margin outside the body (breakout), like the budget tab. */
-.apps__layout {
-  display: grid;
-  grid-template-columns:
-    minmax(12rem, 1fr)
-    minmax(0, var(--layout-max-width))
-    minmax(0, 1fr);
-  gap: var(--space-5);
-  align-items: start;
-}
-.apps__main {
+@use 'breakpoints' as bp;
+
+:host {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
 }
-.apps__tree {
-  justify-self: end;
-  width: 100%;
-  max-width: 16rem;
-  position: sticky;
-  top: calc(var(--layout-header-height) + var(--space-4));
-  /* 3/4 of the viewport, so a tall tree scrolls inside itself and keeps floating. */
-  max-height: 75vh;
-  overflow-y: auto;
+/* One pane at a time the host takes at least the free height of the shell main. Side by
+   side it is a pane page (`.pane-page`), which sets its own flex. */
+:host(:not(.pane-page)) {
+  flex: 1 0 auto;
 }
-@media (max-width: 60rem) {
-  .apps__layout {
-    grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
-  }
+
+/* Side by side the page does not scroll: the host is a pane page (`.pane-page` in
+   styles.scss) that takes the free height of the main column of the shell, and each pane
+   scrolls inside itself. One pane at a time, the page scrolls. */
+.apps {
+  min-width: 0;
 }
-@media (max-width: 40rem) {
-  .apps__layout {
-    grid-template-columns: 1fr;
-  }
-  .apps__tree {
-    position: static;
-    max-height: none;
-  }
-}
-/* Mobile (max 768px): the tree sits behind a collapsible toggle in one column.
-   The toggle starts closed. On desktop the toggle exists but stays hidden. */
-.apps__treeToggle {
-  display: none;
-}
-@media (max-width: 48rem) {
-  .apps__layout {
-    grid-template-columns: 1fr;
-  }
-  .apps__tree {
-    position: static;
-    max-height: none;
-    max-width: none;
-    justify-self: stretch;
-  }
-  .apps__treeToggle {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    width: 100%;
-    min-height: 2.5rem;
-    padding: var(--space-2) var(--space-3);
-    font: inherit;
-    font-weight: var(--fw-medium);
-    color: var(--color-text);
-    background: var(--color-surface);
-    border: var(--border-width) solid var(--color-border);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-  }
-  .apps__treeBody {
-    display: none;
-    padding-top: var(--space-3);
-  }
-  .apps__treeBody--open {
-    display: block;
-  }
-}
-.apps__headActions {
+/* One pane at a time the column takes at least the free height of the shell main and
+   passes it down to the pane. A short pane, such as "application not found", then
+   centres in the page instead of sitting at the top. A long pane still grows the page. */
+.apps:not(.apps--split) {
   display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
+.apps:not(.apps--split) > app-list-detail {
+  flex: 1 0 auto;
+}
+.apps--split {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* ------------------------------------------------------------------ list pane */
+/* The column, its header and the search bar are the shared list geometry: `.ld-pane`
+   (styles.scss) and `app-page-header` with `pane`. */
+.apps__chips {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
 }
-/* Header live search: same look and height as the /expenses search input. */
-.apps__search {
-  padding: var(--space-2) var(--space-3);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: inherit;
-  min-width: 14rem;
-  height: 2.25rem;
-  box-sizing: border-box;
+.apps__chip {
+  max-width: 100%;
 }
-.apps__status {
+/* "Weitere Filter" at the end of the search pill. The count says how many are set. */
+.apps__tune {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--control-height);
+  height: var(--control-height);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
   color: var(--color-text-muted);
-  padding: var(--space-5) 0;
+  cursor: pointer;
+}
+.apps__tune:hover {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+.apps__tune:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.apps__tune--on {
+  color: var(--color-accent-text);
+}
+.apps__tuneCount {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 0.6875rem;
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+}
+
+/* ------------------------------------------------------------------ rows */
+.apps__scroll {
+  --apps-fade: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* The FAB covers the end of the list: room to scroll the last row above it. */
+  padding-bottom: calc(56px + var(--space-6));
+}
+.apps--split .apps__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--apps-fade);
+}
+.apps--split .apps__scroll > * {
+  flex: none;
+}
+/* An end fades only while more rows lie past it (`appScrollFade` sets the classes). */
+.apps__scroll.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--apps-fade));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--apps-fade));
+}
+.apps__scroll.is-fade-end {
+  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--apps-fade));
+  mask-image: linear-gradient(to top, transparent, #000 var(--apps-fade));
+}
+.apps__scroll.is-fade-start.is-fade-end {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--apps-fade),
+    #000 calc(100% - var(--apps-fade)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--apps-fade),
+    #000 calc(100% - var(--apps-fade)),
+    transparent
+  );
+}
+
+.apps__group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.apps__month {
+  padding: 18px var(--space-4) 6px;
+}
+.apps__group:first-child .apps__month {
+  padding-top: var(--space-2);
+}
+.apps__rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.apps__row--busy {
+  opacity: 0.6;
+}
+.apps__dot {
+  margin-inline: 6px;
+  color: var(--color-text-subtle);
+}
+.apps__archived {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: bottom;
+}
+.apps__trail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-end: calc(-1 * var(--space-2));
+}
+.apps__amount {
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+/* With a pointer, the row menu shows on hover, on focus and while it is open, so a calm
+   list reads as titles and amounts. It keeps its place, so nothing shifts. The full-width
+   list shows a chevron in that place while the menu is hidden (board
+   Schmal-Antraege-Liste). Keyboard users reach the menu through :focus-within. Without
+   hover (touch), the menu always shows. */
+.apps__menuSlot {
+  position: relative;
+  display: inline-flex;
+}
+.apps__chev {
+  display: none;
+}
+@media (hover: hover) {
+  .apps__menu,
+  .apps__chev {
+    transition: opacity var(--motion-fast) var(--ease-standard);
+  }
+  .apps__menu {
+    opacity: 0;
+  }
+  .apps__chev {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted);
+    pointer-events: none;
+  }
+  .apps__row:hover .apps__menu,
+  .apps__row:focus-within .apps__menu,
+  .apps__menu:has([aria-expanded='true']) {
+    opacity: 1;
+  }
+  .apps__row:hover .apps__chev,
+  .apps__row:focus-within .apps__chev,
+  .apps__menuSlot:has([aria-expanded='true']) .apps__chev {
+    opacity: 0;
+  }
+}
+
+.apps__status {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
 }
 .apps__status--error {
   color: var(--color-danger);
 }
-/* Infinite-scroll trigger: invisible, and it sits before the list end. The
-   observer (rootMargin 400px) therefore loads the next page early. */
+.apps__empty {
+  margin: var(--space-4) 0;
+}
 .apps__sentinel {
   height: 1px;
 }
-@media (max-width: 768px) {
-  .apps__headActions {
-    flex-wrap: wrap;
+.apps__more {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+.apps__count {
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  text-align: center;
+}
+
+/* "Antrag stellen": at the end of the list pane side by side, else fixed at the end of
+   the screen (above the bottom bar on a phone). */
+.apps__fab {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
+  z-index: var(--z-sticky);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 56px;
+  padding: 0 var(--space-5) 0 var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+  box-shadow: var(--shadow-elevated);
+}
+.apps__fab:hover {
+  filter: brightness(1.08);
+}
+.apps__fab:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.apps--split .apps__fab {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-4);
+}
+
+/* ------------------------------------------------------------------ detail pane */
+.apps__detail {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+/* "Antrag erfassen" (#11) fills the pane; the routed detail waits behind it. */
+.apps__detail--capture {
+  min-height: 0;
+}
+/* The routed component comes from the router, so it carries no content attribute of
+   this component: `::ng-deep` reaches it, and the class keeps the rule local. */
+.apps__detail--capture > ::ng-deep :not(app-application-capture) {
+  display: none;
+}
+.apps__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ sheets */
+.apps__moreForm {
+  /* The fields sit on the sheet (surface 2): one step up, so they stand out from it. */
+  --color-surface-sunken: var(--color-surface-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.apps__range {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.apps__legend {
+  grid-column: 1 / -1;
+  margin-bottom: var(--space-2);
+  padding: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+}
+.apps__moreActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+@include bp.phone {
+  /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
+  .apps__chips {
+    --apps-chip-fade: var(--space-6);
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
-  .apps__search {
-    flex: 1 1 100%;
-    min-width: 0;
+  .apps__chips::-webkit-scrollbar {
+    display: none;
+  }
+  .apps__chips.is-fade-start {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--apps-chip-fade));
+    mask-image: linear-gradient(to right, transparent, #000 var(--apps-chip-fade));
+  }
+  .apps__chips.is-fade-end {
+    -webkit-mask-image: linear-gradient(to left, transparent, #000 var(--apps-chip-fade));
+    mask-image: linear-gradient(to left, transparent, #000 var(--apps-chip-fade));
+  }
+  .apps__chips.is-fade-start.is-fade-end {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--apps-chip-fade),
+      #000 calc(100% - var(--apps-chip-fade)),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 var(--apps-chip-fade),
+      #000 calc(100% - var(--apps-chip-fade)),
+      transparent
+    );
+  }
+  .apps__month {
+    padding-inline: var(--space-1);
   }
 }

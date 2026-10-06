@@ -1,16 +1,21 @@
 """Voting tables: Vote, Ballot, VotedMarker, SecretBallot.
 
 * Vote - a vote on an application. ``config`` (JSONB) holds a VoteConfig
-  (options/majority/quorum/secret/allowChange/tieBreak). ``eligible_group`` is the
-  group key (OIDC group or gremium scope) that ``require_group`` checks.
+  (options/majority/quorum/secret/tieBreak). ``eligible_group`` holds the UUID of the
+  gremium that votes, as text.
 * Ballot - one cast vote. ``UNIQUE(vote_id, voter_sub)`` blocks a double vote
-  atomically in the DB. ``allowChange`` updates the existing row until close.
+  atomically in the DB. A ballot never changes after the cast: a second cast gives
+  409 ``already_voted`` (O11).
 * VotedMarker / SecretBallot - the secret path (``secret=true``). The identity goes to
   ``voted_marker`` and the choice to ``secret_ballot`` without an identity. Nobody can
   trace ``choice`` back to the voter.
 
 ``eligible_count`` is the authoritative eligible-voter count (roster). The create call
 sets it.
+
+Two time columns are easy to mix up. ``closes_at`` is the planned end of the cast
+window (the deadline that the cron watches). ``closed_at`` is the real moment when the
+vote ended: ``close`` and ``cancel`` set it (Z9).
 """
 
 from __future__ import annotations
@@ -50,10 +55,13 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     meeting_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("meeting.id", ondelete="SET NULL"), nullable=True
     )
-    # The agenda item that the vote belongs to (live vote). CASCADE: a delete of the
-    # agenda item also removes the generic resolution question.
+    # The agenda item that the vote belongs to (live vote). SET NULL (F21): a meeting
+    # delete cascades to its agenda items, and the votes and their ballots must survive
+    # it, as ``meeting_id`` does. An agenda item with an open or closed vote cannot be
+    # removed (O25), and its remove deletes the draft and cancelled votes explicitly
+    # with a ``vote_delete`` audit entry.
     agenda_item_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("meeting_agenda_item.id", ondelete="CASCADE"), nullable=True
+        ForeignKey("meeting_agenda_item.id", ondelete="SET NULL"), nullable=True
     )
     eligible_group: Mapped[str] = mapped_column(Text)
     # The vote question that the protocol snippet shows. NULL means no explicit question.
@@ -72,11 +80,22 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     closes_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # The real end of the vote. ``close`` and ``cancel`` set it. NULL while the vote
+    # runs, and for old rows that migration ``vote_closed_at`` could not backfill.
+    closed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     status: Mapped[str] = mapped_column(Text, server_default="draft")
     result: Mapped[str | None] = mapped_column(Text, nullable=True)
     result_branch_transition_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("transition.id", ondelete="SET NULL"), nullable=True
     )
+    # The attendance when a meeting vote closed (#17): the present members and the
+    # admitted guests. The close of a meeting vote sets both. NULL for an open vote, a
+    # vote without a meeting, and a vote that closed before the columns existed. The
+    # protocol and the result cards show them as counts, never as names.
+    present_members: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    present_guests: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
         # ``cancelled``: the application left the vote state manually, so the vote ends

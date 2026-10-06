@@ -11,7 +11,8 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import APIRouter, FastAPI
+from starlette.requests import HTTPConnection
 
 from app.db import dispose_engine, get_sessionmaker
 from app.logging_config import configure_logging
@@ -34,6 +35,7 @@ from app.modules.auth.oauth_admin_router import router as oauth_admin_router
 from app.modules.auth.oauth_router import router as oauth_router
 from app.modules.auth.oauth_router import well_known_router as oauth_well_known_router
 from app.modules.auth.router import router as auth_router
+from app.modules.avatars.router import router as avatars_router
 from app.modules.backup.router import router as backup_router
 from app.modules.budget.tree_router import router as budget_tree_router
 from app.modules.calendar.router import router as calendar_router
@@ -42,16 +44,15 @@ from app.modules.deadlines.router import router as deadline_policies_router
 from app.modules.delegations.router import router as delegations_router
 from app.modules.files.router import router as files_router
 from app.modules.files.storage import build_object_storage
-from app.modules.flow.dispatch import ActionDispatcher, ChainActionDispatcher
-from app.modules.flow.extras_dispatcher import build_flow_extras_dispatcher
+from app.modules.flow.dispatch import ActionDispatcher, build_worker_dispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.flow.router import router as flow_router
 from app.modules.forms.router import router as forms_router
 from app.modules.livevote.broker import RedisBroker
 from app.modules.livevote.locks import RedisLocker
+from app.modules.livevote.public_router import router as public_meeting_router
 from app.modules.livevote.router import router as livevote_router
 from app.modules.livevote.service import BrokerPublisher
-from app.modules.notifications.action_dispatcher import build_notify_dispatcher
 from app.modules.notifications.provider import close_mail_pool, create_mail_pool
 from app.modules.notifications.router import (
     admin_router as notification_settings_router,
@@ -64,7 +65,6 @@ from app.modules.privacy.router import router as privacy_router
 from app.modules.protocol.router import router as protocol_router
 from app.modules.search.router import router as search_router
 from app.modules.voting.router import router as voting_router
-from app.modules.webhooks.action_dispatcher import build_webhook_dispatcher
 from app.settings import Settings, get_settings
 from app.shared.errors import register_exception_handlers, use_problem_json_contract
 
@@ -93,12 +93,14 @@ api_router.include_router(applications_router)
 api_router.include_router(flow_router)
 api_router.include_router(voting_router)
 api_router.include_router(livevote_router)
+api_router.include_router(public_meeting_router)
 api_router.include_router(protocol_router)
 api_router.include_router(notifications_router)
 api_router.include_router(notification_settings_router)
 api_router.include_router(mail_templates_router)
 api_router.include_router(budget_tree_router)
 api_router.include_router(calendar_router)
+api_router.include_router(avatars_router)
 api_router.include_router(antiabuse_router)
 api_router.include_router(files_router)
 api_router.include_router(audit_router)
@@ -166,21 +168,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await livevote_redis.aclose()
 
 
-def _flow_action_dispatcher(request: Request) -> ActionDispatcher:
+def _flow_action_dispatcher(conn: HTTPConnection) -> ActionDispatcher:
     """Build the flow action dispatcher: notify, webhook, addToNextSession, assignBudget.
 
     The dispatcher reads the arq pool from the app state. Without a pool it logs the
     notify mails and the webhook deliveries and keeps them pending. The API never
-    blocks.
+    blocks. The override on `get_action_dispatcher` reaches every route that fires a
+    transition: the flow routes, `POST /votes/{id}/close` and the live-vote routes.
+
+    The parameter is an `HTTPConnection`, not a `Request`. FastAPI injects an
+    `HTTPConnection` for HTTP routes and for WebSocket routes. The live-vote sockets
+    (`/ws/meetings/{id}` and the beamer) also resolve this override. A `Request`
+    parameter makes these sockets fail with `TypeError` before the handshake.
     """
-    pool = getattr(request.app.state, "arq_pool", None)
-    return ChainActionDispatcher(
-        [
-            build_notify_dispatcher(pool),
-            build_webhook_dispatcher(pool),
-            build_flow_extras_dispatcher(pool),
-        ]
-    )
+    pool = getattr(conn.app.state, "arq_pool", None)
+    return build_worker_dispatcher(pool, get_sessionmaker())
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

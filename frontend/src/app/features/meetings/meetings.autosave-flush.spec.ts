@@ -32,6 +32,7 @@ const MEETING: MeetingOutWire = {
   canWrite: true,
   canManageVotes: true,
   canVote: false,
+  canFinalize: true,
   votes: [],
   createdAt: '2026-06-12T17:00:00Z',
 };
@@ -66,6 +67,7 @@ function fakeAuth(perms: string[]): Partial<AuthService> {
   return {
     can: (p: string) => set.has(p),
     canAny: (...p: string[]) => p.some((x) => set.has(x)),
+    isAdmin: (() => set.has('admin')) as unknown as AuthService['isAdmin'],
     userId: (() => 'pr-1') as unknown as AuthService['userId'],
     gremien: (() => []) as unknown as AuthService['gremien'],
     sessionManageGremien: (() => []) as unknown as AuthService['sessionManageGremien'],
@@ -74,6 +76,18 @@ function fakeAuth(perms: string[]): Partial<AuthService> {
 }
 
 type Cmp = InstanceType<typeof MeetingsComponent>;
+
+/** A member who can take the minutes over. */
+const MIKA = {
+  principalId: 'pr-2',
+  displayName: 'Mika Mitglied',
+  email: null,
+  status: 'present' as const,
+  source: 'self' as const,
+  note: null,
+  isSelf: false,
+  canKeepProtocol: true,
+};
 
 /**
  * Router double. `navigate` is the only method the component calls. The rest is
@@ -94,7 +108,7 @@ async function loaded() {
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
-      { provide: AuthService, useValue: fakeAuth(['meeting.manage', 'protocol.write']) },
+      { provide: AuthService, useValue: fakeAuth(['admin', 'protocol.write']) },
       { provide: WsService, useValue: new FakeWs() },
       { provide: Router, useValue: routerStub() },
       {
@@ -110,7 +124,6 @@ async function loaded() {
   http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
   http.expectOne('/api/meetings/m-1/attendance').flush([]);
   http.expectOne('/api/meetings/m-1/agenda').flush([]);
-  http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
   http
     .match((r) => r.url.endsWith('/api/delegations/meetings/m-1/context'))
     .forEach((req) =>
@@ -163,6 +176,53 @@ describe('MeetingsComponent — AUD-012 autosave flush on TOP switch', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('sends the handover only after the pending TOP body is saved (Z3)', async () => {
+    jest.useFakeTimers();
+    try {
+      const { cmp, http } = await loaded();
+      cmp.agenda.set([AGENDA_ITEM()] as never);
+      cmp.onTopBodyChange('t-1', 'Letzter Satz');
+      cmp.attendance.set([MIKA]);
+      cmp.askHandover('pr-2');
+      cmp.handOver(cmp.meeting()!, 'now');
+      const save = http.expectOne('/api/meetings/m-1/agenda/t-1');
+      expect(save.request.body).toEqual({ body: 'Letzter Satz' });
+      // The write right can move with the handover, so the POST waits for the save.
+      http.expectNone('/api/meetings/m-1/protokollant-handover');
+      save.flush([AGENDA_ITEM({ body: 'Letzter Satz' })]);
+      const handover = http.expectOne('/api/meetings/m-1/protokollant-handover');
+      expect(handover.request.body).toEqual({ principalId: 'pr-2', mode: 'now' });
+      handover.flush({ ...MEETING, protokollantId: 'pr-2' });
+      jest.advanceTimersByTime(5000);
+      http.verify();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('sends no handover without a picked member', async () => {
+    const { cmp, http } = await loaded();
+    cmp.askHandover('nobody');
+    cmp.handOver(cmp.meeting()!, 'now');
+    http.expectNone('/api/meetings/m-1/protokollant-handover');
+    http.verify();
+  });
+
+  it('sends the handover also when the TOP body save fails', async () => {
+    const { cmp, http } = await loaded();
+    cmp.agenda.set([AGENDA_ITEM()] as never);
+    cmp.onTopBodyChange('t-1', 'Text');
+    cmp.attendance.set([MIKA]);
+    cmp.askHandover('pr-2');
+    cmp.handOver(cmp.meeting()!, 'next_item');
+    http
+      .expectOne('/api/meetings/m-1/agenda/t-1')
+      .flush(null, { status: 403, statusText: 'Forbidden' });
+    expect(cmp.saveState()).toBe('error');
+    http.expectOne('/api/meetings/m-1/protokollant-handover').flush(MEETING);
+    http.verify();
   });
 
   it('switching TOPs without a pending edit fires no extra save', async () => {

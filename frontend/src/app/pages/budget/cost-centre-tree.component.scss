@@ -1,24 +1,9 @@
-/* Constrain the host here. Do not rely on the sidebar container. Without a display
-   value the host is inline, and tall content escapes the overflow:auto of the parent.
-   Block plus 75vh plus an internal scroll keeps the tree floating and not too tall. */
+/* The tree has no height and no scroll of its own. The container that holds it (a sheet
+   body, a dialog body or a pane) scrolls it and fades an end only when more rows are
+   past it. A fixed height here does not agree with the height that the container has
+   free, and leaves an empty band below the list or a second scroll bar. */
 :host {
   display: block;
-  max-height: 75vh;
-  overflow-y: auto;
-  // The inner padding equals the fade height. The first and the last item start
-  // BELOW the fade, so the fade does not hide them at rest. The edge fades only
-  // during a scroll.
-  padding-block: var(--space-5);
-  // Fade the top and the bottom into the background, like the meeting timeline.
-  --fade: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--space-5),
-    #000 calc(100% - var(--space-5)),
-    transparent
-  );
-  -webkit-mask-image: var(--fade);
-  mask-image: var(--fade);
 }
 .cct__node {
   display: inline-flex;
@@ -29,13 +14,17 @@
   background: transparent;
   border: 0;
   padding: 2px var(--space-2);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   color: var(--color-text);
   font: inherit;
   cursor: pointer;
 }
 .cct__node:hover {
-  background: var(--color-surface-sunken);
+  background: var(--color-surface-2);
+}
+.cct__node:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
 }
 .cct__node--top {
   font-weight: var(--fw-semibold);
@@ -45,9 +34,9 @@
   font-size: var(--fs-xs);
 }
 .cct__dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
   flex: 0 0 auto;
   align-self: center;
 }
@@ -64,7 +53,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Dotted, light-green connector lines. The last row carries no line that continues
+/* Dotted connector lines in the colour of the branch. The last row carries no line that continues
    downward. */
 .cct__children {
   padding-left: calc(var(--space-3) + 4px);
@@ -81,7 +70,7 @@
   left: calc(var(--space-2) - var(--space-3));
   top: 0;
   bottom: 0;
-  border-left: 1px dotted var(--line-color, var(--color-success, #5fb37a));
+  border-left: 1px dotted var(--line-color, var(--color-border-strong));
 }
 /* First child: extend the line up to the dot (connected). */
 .cct__children > .cct__branch:first-child::before {
@@ -105,10 +94,11 @@
   left: calc(var(--space-2) - var(--space-3));
   top: 0.8em;
   width: var(--space-3);
-  border-top: 1px dotted var(--line-color, var(--color-success, #5fb37a));
+  border-top: 1px dotted var(--line-color, var(--color-border-strong));
 }
-.cct__node--active {
-  background: color-mix(in srgb, var(--color-success, #5fb37a) 22%, transparent);
-  color: var(--color-text);
+.cct__node--active,
+.cct__node--active:hover {
+  background: var(--color-selected);
+  color: var(--color-on-selected);
   font-weight: var(--fw-medium);
 }

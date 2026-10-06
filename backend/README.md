@@ -28,16 +28,23 @@ app/
     delegations/     meeting-bound delegations + substitute pool
     deadlines/       named deadline policies (the flow references them)
     budget/          cost center tree, fiscal years, allocation, bookings, invoices (ZUGFeRD)
-    files/           upload, MIME sniff, ClamAV scan, MinIO/S3, signed URLs
+    files/           upload, wizard drafts, MIME sniff, ClamAV scan, MinIO/S3, download route
     pdf/             HTTP client of the typst render service (protocol PDFs)
     notifications/   mail templates and rules, per-user preferences, arq dispatch
     webhooks/        outgoing event webhooks (SSRF guard, HMAC signature)
-    audit/           append-only hash chain + verification
+    audit/           append-only hash chain + verification (live and stored)
+    config_revision/ versioned config snapshots, diff, restore, audit-log revert
+    privacy/         GDPR erasure queue, anonymization, subject-access export, retention
+    backup/          age-encrypted platform backups and in-app restore (/admin/backups)
+    calendar/        personal ICS feed of the meetings
+    avatars/         Gravatar proxy for person avatars
+    search/          global search over every record the caller may see
     antiabuse/       ALTCHA challenge/verify, rate limit, payload cap
     admin/           config CRUD (Gremien, roles, application types, branding, …),
                      one permission per /admin/ page
-migrations/          Alembic (0001–0048)
-worker/              arq WorkerSettings: mail/PDF/scan tasks + nightly budget cron
+migrations/          Alembic (0001–0048, then hash revision ids; one head)
+worker/              arq WorkerSettings: mail/PDF/scan/webhook tasks and the crons (deadlines,
+                     reminders, budget rollup, retention, draft purge, backup, audit check)
 tests/
 ```
 
@@ -73,5 +80,6 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-OpenAPI sits at `/openapi.json`. Swagger UI sits at `/docs`. For configuration, see the
+OpenAPI sits at `/openapi.json` and Swagger UI at `/docs` of the api process (port 8000).
+The `web` nginx routes only `/api/`, so the compose stack does not expose them. For configuration, see the
 [Configuration wiki](https://github.com/STUPA-MAKERS/STUPA-Workflow/wiki/Configuration).

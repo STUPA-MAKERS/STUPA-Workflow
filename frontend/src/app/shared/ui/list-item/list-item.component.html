@@ -1,0 +1,37 @@
+<div class="li" [class.li--on]="selected()" [class.li--wrap]="wrap()" (pointerenter)="measureSub()">
+  <span class="li__lead"><ng-content select="[lead]" /></span>
+  <span class="li__body">
+    <span class="li__head">
+      @if (link(); as target) {
+        <a
+          class="li__title"
+          [routerLink]="target"
+          [queryParams]="linkQueryParams()"
+          [queryParamsHandling]="linkQueryParamsHandling()"
+          [title]="tooltip()"
+          [attr.aria-current]="selected() ? 'true' : null"
+          (click)="activate.emit()"
+          ><span class="li__titleText">{{ title() }}</span></a
+        >
+      } @else {
+        <button
+          type="button"
+          class="li__title"
+          [title]="tooltip()"
+          [attr.aria-current]="selected() ? 'true' : null"
+          (click)="activate.emit()"
+        >
+          <span class="li__titleText">{{ title() }}</span>
+        </button>
+      }
+      <ng-content select="[status]" />
+    </span>
+    <span #subLine class="li__sub">
+      @if (sub(); as text) {
+        <span class="li__subText">{{ text }}</span>
+      }
+      <ng-content select="[sub]" />
+    </span>
+  </span>
+  <span class="li__trail"><ng-content select="[trail]" /></span>
+</div>
