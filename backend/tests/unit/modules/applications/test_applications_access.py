@@ -12,7 +12,12 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.applications.access import require_app_edit, require_app_read
+from app.modules.applications.access import (
+    principal_reads_all,
+    require_app_applicant,
+    require_app_edit,
+    require_app_read,
+)
 from app.modules.auth.principal import Applicant, Principal
 from app.shared.errors import ForbiddenError, UnauthorizedError
 
@@ -146,3 +151,39 @@ def test_edit_applicant_edit_scope_ok() -> None:
     applicant = Applicant(application_id=str(app_id), scope="edit")
     access = asyncio.run(require_app_edit(app_id, _db(), None, applicant))
     assert access.applicant is not None
+
+
+# The applicant-transition access: only the applicant and the creator.
+def test_applicant_access_magic_link_edit_ok() -> None:
+    app_id = uuid4()
+    applicant = Applicant(application_id=str(app_id), scope="edit")
+    access = asyncio.run(require_app_applicant(app_id, _db(), None, applicant))
+    assert access.applicant is not None
+
+
+def test_applicant_access_creator_ok_also_with_manage() -> None:
+    """The creator passes, with or without `application.manage`."""
+    app_id = uuid4()
+    for perms in ((), ("application.manage",)):
+        access = asyncio.run(
+            require_app_applicant(app_id, _db(created_by="p"), _principal(*perms), None)
+        )
+        assert access.principal is not None
+
+
+def test_applicant_access_manager_not_creator_403() -> None:
+    """`application.manage` edits the data, but it does not act as the applicant."""
+    app_id = uuid4()
+    for perm in ("application.manage", "application.edit_any"):
+        with pytest.raises(ForbiddenError, match="applicant"):
+            asyncio.run(
+                require_app_applicant(
+                    app_id, _db(created_by="someone-else"), _principal(perm), None
+                )
+            )
+
+
+def test_principal_reads_all() -> None:
+    assert principal_reads_all(_principal("application.read"))
+    assert principal_reads_all(_principal("application.read_all"))
+    assert not principal_reads_all(_principal("application.transition"))

@@ -1,7 +1,8 @@
 """Flow API router: list the available transitions and fire one.
 
 RBAC is fail-closed. A request without a session gets 401. A request without the
-permission gets 403. Every error is declared as `ProblemDetail` (problem+json contract).
+permission gets 403. A principal who cannot read the application (`resolve_app_read`)
+also gets 403. Every error is declared as `ProblemDetail` (problem+json contract).
 
 An unconfirmed guest application rests in the flow until the magic link confirms it.
 Every route here passes `allow_unconfirmed=False` and answers 404 for it.
@@ -15,7 +16,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 
 from app.deps import DbSession, require_principal
-from app.modules.applications.access import Access, require_app_edit, require_app_read
+from app.modules.applications.access import (
+    Access,
+    require_app_applicant,
+    require_app_read,
+    resolve_app_read,
+)
 from app.modules.applications.schemas import StateOut
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
@@ -67,8 +73,38 @@ def get_flow_service(
 
 
 ServiceDep = Annotated[FlowService, Depends(get_flow_service)]
-PrincipalDep = Annotated[Principal, Depends(require_principal(MANAGE_PERMISSION))]
-ForcePrincipalDep = Annotated[Principal, Depends(require_principal(FORCE_PERMISSION))]
+
+
+async def require_transition_principal(
+    application_id: UUID,
+    db: DbSession,
+    principal: Annotated[Principal, Depends(require_principal(MANAGE_PERMISSION))],
+) -> Principal:
+    """Admit a principal with `application.transition` who can read the application.
+
+    The permission is global. The read check (`resolve_app_read`) limits it to the
+    applications that the principal may open: `application.read`, the Gremium read
+    scope or the own application. Without the check a holder of the permission lists
+    and fires transitions of applications that the holder cannot open. The task list
+    (`ListingOps.list_tasks`) applies the same two checks, so a task is always a
+    transition that this route accepts.
+    """
+    await resolve_app_read(db, application_id, principal, None)
+    return principal
+
+
+async def require_force_principal(
+    application_id: UUID,
+    db: DbSession,
+    principal: Annotated[Principal, Depends(require_principal(FORCE_PERMISSION))],
+) -> Principal:
+    """Admit a principal with `application.force_status` who can read the application."""
+    await resolve_app_read(db, application_id, principal, None)
+    return principal
+
+
+PrincipalDep = Annotated[Principal, Depends(require_transition_principal)]
+ForcePrincipalDep = Annotated[Principal, Depends(require_force_principal)]
 
 
 @router.get(
@@ -183,12 +219,14 @@ async def fire_applicant_transition(
     application_id: UUID,
     payload: TransitionRequest,
     service: ServiceDep,
-    access: Annotated[Access, Depends(require_app_edit)],
+    access: Annotated[Access, Depends(require_app_applicant)],
 ) -> TransitionResult:
     """Fire a transition as the applicant.
 
-    The caller is the magic-link holder or the creator, without `application.manage`.
-    A transition that `actorIsApplicant` does not open gives 403.
+    The caller is the magic-link holder or the logged-in creator. The creator does
+    not need `application.manage`. A principal who is not the creator gets 403, also
+    with `application.manage` or `application.edit_any`. A transition that
+    `actorIsApplicant` does not open gives 403.
     """
     return await service.fire_as_applicant(
         access.application_id,

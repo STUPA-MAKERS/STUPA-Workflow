@@ -1081,23 +1081,12 @@ async def test_name_maps_en_missing_falls_to_de() -> None:
     assert types[tid] == "X"
 
 
-async def test_in_gremium_true() -> None:
-    session = _Session(scalar_results=[uuid4()])
-    svc = ApplicationsService(session)  # type: ignore[arg-type]
-    assert await svc._in_gremium("sub", uuid4()) is True
-
-
-async def test_in_gremium_false() -> None:
-    session = _Session(scalar_results=[None])
-    svc = ApplicationsService(session)  # type: ignore[arg-type]
-    assert await svc._in_gremium("sub", uuid4()) is False
-
-
 def _principal(**over: Any) -> SimpleNamespace:
     base: dict[str, Any] = {
         "sub": "me",
         "roles": [],
         "groups": set(),
+        "scope_permissions": None,
     }
     base.update(over)
     ns = SimpleNamespace(**base)
@@ -1110,172 +1099,162 @@ def _principal(**over: Any) -> SimpleNamespace:
     return ns
 
 
-async def test_list_tasks_no_apps_returns_empty(_patch_flow: type[_FakeFlow]) -> None:
-    session = _Session(scalars_results=[[]])  # no applications
-    svc = ApplicationsService(session)  # type: ignore[arg-type]
-    out = await svc.list_tasks(_principal(roles=["admin"]))
-    assert out == []
+def _sql(clause: Any) -> str:
+    return str(clause.compile(compile_kwargs={"literal_binds": True}))
 
 
-async def test_list_tasks_vote_state_cast_right_in_app_gremium(
-    _patch_flow: type[_FakeFlow],
+@pytest.fixture
+def _task_checks(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
+    """Fake the two per-row checks of `list_tasks` and the state output."""
+    checks = SimpleNamespace(casts=set(), fires=set(), filters_for=[])
+
+    async def _filters(_self: Any, principal: Any, *, can_transition: bool) -> list[Any]:
+        checks.filters_for.append((principal.sub, can_transition))
+        return []
+
+    async def _casts(_self: Any, app_id: Any, _principal: Any, _now: Any) -> bool:
+        return app_id in checks.casts
+
+    async def _fires(_flow: Any, app: Any, _principal: Any, *, can_transition: bool) -> bool:
+        return app.id in checks.fires
+
+    async def _state_out(_self: Any, _state: Any) -> None:
+        return None
+
+    async def _since(_self: Any, _ids: Any) -> dict[Any, Any]:
+        return {}
+
+    monkeypatch.setattr(ApplicationsService, "_task_filters", _filters)
+    monkeypatch.setattr(ApplicationsService, "_casts_in_open_vote", _casts)
+    monkeypatch.setattr(ApplicationsService, "_fires_task_transition", staticmethod(_fires))
+    monkeypatch.setattr(ApplicationsService, "_state_out_resolved", _state_out)
+    monkeypatch.setattr(ApplicationsService, "_state_since_map", _since)
+    return checks
+
+
+async def test_list_tasks_no_rows_returns_empty(
+    _patch_flow: type[_FakeFlow], _task_checks: SimpleNamespace
 ) -> None:
-    """The gremium permission `vote.cast` in the gremium of the application makes a task."""
-    gid = uuid4()
-    app = _app(current_state_id=uuid4(), gremium_id=gid)
-    vote_state = _state(kind="vote")
-    vote_state.id = app.current_state_id
-    _FakeFlow.cast_gids = {gid}
-    session = _Session(
-        execute_results=[[("draft", "#z")]],  # _resolve_state_colors
-        scalars_results=[[app], [vote_state]],
-    )
-    svc = ApplicationsService(session)  # type: ignore[arg-type]
-    out = await svc.list_tasks(_principal())
-    assert len(out) == 1
-
-
-async def test_list_tasks_vote_state_cast_right_elsewhere_is_no_task(
-    _patch_flow: type[_FakeFlow],
-) -> None:
-    """`vote.cast` in another gremium, or the admin role, makes no vote task."""
-    app = _app(current_state_id=uuid4(), created_by="other")
-    vote_state = _state(kind="vote")
-    vote_state.id = app.current_state_id
-    _FakeFlow.cast_gids = {uuid4()}
-    _FakeFlow.available = []
-    session = _Session(scalars_results=[[app], [vote_state]])
-    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    svc = ApplicationsService(_Session(execute_results=[[]]))  # type: ignore[arg-type]
     assert await svc.list_tasks(_principal(roles=["admin"])) == []
+    assert _task_checks.filters_for == [("me", True)]
 
 
-async def test_list_tasks_vote_state_app_without_gremium(
-    _patch_flow: type[_FakeFlow],
+async def test_list_tasks_keeps_ballot_and_transition_rows_only(
+    _patch_flow: type[_FakeFlow], _task_checks: SimpleNamespace
 ) -> None:
-    """An application without a gremium never matches the cast set."""
-    app = _app(current_state_id=uuid4(), gremium_id=None, created_by="other")
-    vote_state = _state(kind="vote")
-    vote_state.id = app.current_state_id
-    _FakeFlow.cast_gids = {uuid4()}
-    _FakeFlow.available = []
-    session = _Session(scalars_results=[[app], [vote_state]])
-    svc = ApplicationsService(session)  # type: ignore[arg-type]
-    assert await svc.list_tasks(_principal()) == []
+    """A row is a task when the principal casts in it or fires a task transition."""
+    ballot, transition, nothing = _app(), _app(), _app()
+    _task_checks.casts = {ballot.id}
+    _task_checks.fires = {transition.id}
+    rows = [(ballot, _state()), (transition, _state()), (nothing, _state())]
+    svc = ApplicationsService(_Session(execute_results=[rows]))  # type: ignore[arg-type]
+    out = await svc.list_tasks(_principal(_perms=set()))
+    assert [t.id for t in out] == [ballot.id, transition.id]
+    assert _task_checks.filters_for == [("me", False)]
+    assert out[0].state_since == ballot.created_at
 
 
-async def test_list_tasks_vote_state_member_in_gremium(
-    _patch_flow: type[_FakeFlow],
-) -> None:
-    gid = uuid4()
-    app = _app(current_state_id=uuid4())
-    vote_state = _state(kind="vote", config={"gremiumId": str(gid)})
-    vote_state.id = app.current_state_id
-    session = _Session(
-        execute_results=[[("draft", "#z")]],
-        scalars_results=[[app], [vote_state]],
-        scalar_results=[uuid4()],  # _in_gremium → membership row exists
+async def test_task_filters_full_reader_with_transition() -> None:
+    """A full reader gets no read-scope clause; any manual task exit counts."""
+    svc = ApplicationsService(_Session())  # type: ignore[arg-type]
+    filters = await svc._task_filters(
+        _principal(_perms={"application.read"}), can_transition=True
     )
-    svc = ApplicationsService(session)  # type: ignore[arg-type]
-    out = await svc.list_tasks(_principal())
-    assert len(out) == 1
+    assert len(filters) == 3
+    sql = _sql(filters[-1])
+    assert "vote.status = 'open'" in sql
+    assert "transition.requires_action IS true" in sql
+    assert "created_by" not in sql
 
 
-async def test_list_tasks_vote_state_member_not_in_gremium_no_transition(
-    _patch_flow: type[_FakeFlow],
+async def test_task_filters_scoped_reader_without_transition(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    gid = uuid4()
-    app = _app(current_state_id=uuid4(), created_by="someone")
-    vote_state = _state(kind="vote", config={"gremiumId": str(gid)})
-    vote_state.id = app.current_state_id
-    _FakeFlow.available = []  # no manual transitions
-    session = _Session(
-        execute_results=[[("draft", "#z")]],
-        scalars_results=[[app], [vote_state]],
-        scalar_results=[None],  # not in the Gremium
-    )
-    # The principal may transition, so the manual path runs. available is empty, so
-    # no task appears.
-    svc = ApplicationsService(session)  # type: ignore[arg-type]
-    out = await svc.list_tasks(_principal(_perms={"application.transition"}))
-    assert out == []
+    """Without a read right the read scope applies; the exit path needs the creator."""
+
+    async def _no_committee(_self: Any, _sub: str) -> list[Any]:
+        return []
+
+    monkeypatch.setattr(ApplicationsService, "_committee_read_clauses", _no_committee)
+    svc = ApplicationsService(_Session())  # type: ignore[arg-type]
+    filters = await svc._task_filters(_principal(sub="me"), can_transition=False)
+    assert len(filters) == 4
+    assert _sql(filters[2]) == "application.created_by = 'me'"
+    assert "application.created_by = 'me'" in _sql(filters[3])
 
 
-async def test_list_tasks_vote_state_invalid_gremium_config(
-    _patch_flow: type[_FakeFlow],
-) -> None:
-    """A missing or empty gremiumId keeps ok False on the vote path and skips _in_gremium."""
-    app = _app(current_state_id=uuid4(), created_by="other")
-    vote_state = _state(kind="vote", config={"gremiumId": ""})
-    vote_state.id = app.current_state_id
-    _FakeFlow.available = []
-    session = _Session(
-        execute_results=[[("draft", "#z")]],
-        scalars_results=[[app], [vote_state]],
-    )
-    svc = ApplicationsService(session)  # type: ignore[arg-type]
-    out = await svc.list_tasks(_principal(_perms=set()))  # no transition right, not owner
-    assert out == []
+async def test_read_scope_for(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def _no_committee(_self: Any, _sub: str) -> list[Any]:
+        return []
+
+    monkeypatch.setattr(ApplicationsService, "_committee_read_clauses", _no_committee)
+    svc = ApplicationsService(_Session())  # type: ignore[arg-type]
+    assert await svc.read_scope_for(_principal(_perms={"application.read_all"})) is None
+    assert await svc.read_scope_for(_principal(roles=["admin"])) is None
+    scope = await svc.read_scope_for(_principal(sub="x"))
+    assert scope is not None and _sql(scope) == "application.created_by = 'x'"
 
 
-async def test_list_tasks_manual_transition_requires_action(
-    _patch_flow: type[_FakeFlow],
-) -> None:
-    app = _app(current_state_id=uuid4())
-    normal = _state(kind="normal")
-    normal.id = app.current_state_id
-    _FakeFlow.available = [
-        _Obj(requires_action=False),
-        _Obj(requires_action=True),
-    ]
-    session = _Session(
-        execute_results=[[("draft", "#z")]],
-        scalars_results=[[app], [normal]],
-    )
-    svc = ApplicationsService(session)  # type: ignore[arg-type]
-    out = await svc.list_tasks(_principal(_perms={"application.transition"}))
-    assert len(out) == 1
+async def test_casts_in_open_vote(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Any open vote that takes a ballot makes the row a ballot task."""
+    from app.modules.voting.service import VotingService
+
+    seen: list[Any] = []
+    yes = _Obj(id=uuid4(), ok=True)
+    no = _Obj(id=uuid4(), ok=False)
+
+    async def _can(_self: Any, vote: Any, _principal: Any, *, now: Any) -> bool:
+        seen.append(vote.id)
+        return vote.ok
+
+    monkeypatch.setattr(VotingService, "can_still_cast", _can)
+    svc = ApplicationsService(_Session(scalars_results=[[no, yes], [no], []]))  # type: ignore[arg-type]
+    assert await svc._casts_in_open_vote(uuid4(), _principal(), NOW) is True
+    assert seen == [no.id, yes.id]
+    assert await svc._casts_in_open_vote(uuid4(), _principal(), NOW) is False
+    assert await svc._casts_in_open_vote(uuid4(), _principal(), NOW) is False
 
 
-async def test_list_tasks_owner_only_no_perm(_patch_flow: type[_FakeFlow]) -> None:
-    """The creator without the transition permission still enters the manual path."""
-    app = _app(current_state_id=uuid4(), created_by="me")
-    normal = _state(kind="normal")
-    normal.id = app.current_state_id
-    _FakeFlow.available = [_Obj(requires_action=True)]
-    session = _Session(
-        execute_results=[[("draft", "#z")]],
-        scalars_results=[[app], [normal]],
-    )
-    svc = ApplicationsService(session)  # type: ignore[arg-type]
-    out = await svc.list_tasks(_principal(sub="me", _perms=set()))
-    assert len(out) == 1
+class _TaskFlow:
+    def __init__(self, member: list[Any], applicant: list[Any]) -> None:
+        self.member = member
+        self.applicant = applicant
+        self.calls: list[str] = []
+
+    async def available_transitions(self, _app_id: Any, _principal: Any) -> list[Any]:
+        self.calls.append("member")
+        return self.member
+
+    async def available_applicant_transitions(self, _app_id: Any) -> list[Any]:
+        self.calls.append("applicant")
+        return self.applicant
 
 
-async def test_list_tasks_state_missing_in_map_skipped(
-    _patch_flow: type[_FakeFlow],
-) -> None:
-    """An application that points to a state outside the by_id map is skipped."""
-    app = _app(current_state_id=uuid4())
-    other_state = _state()  # a different id
-    session = _Session(scalars_results=[[app], [other_state]])
-    svc = ApplicationsService(session)  # type: ignore[arg-type]
-    out = await svc.list_tasks(_principal(roles=["admin"]))
-    assert out == []
+async def test_fires_task_transition_member_route() -> None:
+    fires: Any = ApplicationsService._fires_task_transition
+    flow = _TaskFlow([_Obj(requires_action=False), _Obj(requires_action=True)], [])
+    assert await fires(flow, _app(created_by="x"), _principal(), can_transition=True)
+    assert flow.calls == ["member"]
+    # Only optional transitions: no task, and a non-creator has no applicant route.
+    flow = _TaskFlow([_Obj(requires_action=False)], [_Obj(requires_action=True)])
+    assert not await fires(flow, _app(created_by="x"), _principal(), can_transition=True)
+    assert flow.calls == ["member"]
 
 
-async def test_list_tasks_current_state_none_skipped(
-    _patch_flow: type[_FakeFlow],
-) -> None:
-    """A None current_state_id hits the defensive guard in the loop and is skipped.
-
-    The query filters with `is_not(None)`. The fake still returns an application with
-    `current_state_id=None`, so the loop guard runs.
-    """
-    app = _app(current_state_id=None)
-    session = _Session(scalars_results=[[app], []])
-    svc = ApplicationsService(session)  # type: ignore[arg-type]
-    out = await svc.list_tasks(_principal(roles=["admin"]))
-    assert out == []
+async def test_fires_task_transition_applicant_route() -> None:
+    """The creator gets the applicant transitions, with or without the transition right."""
+    fires: Any = ApplicationsService._fires_task_transition
+    flow = _TaskFlow([_Obj(requires_action=True)], [_Obj(requires_action=True)])
+    assert await fires(flow, _app(created_by="me"), _principal(), can_transition=False)
+    assert flow.calls == ["applicant"]
+    flow = _TaskFlow([], [_Obj(requires_action=False)])
+    assert not await fires(flow, _app(created_by="me"), _principal(), can_transition=True)
+    assert flow.calls == ["member", "applicant"]
+    # An anonymous application has no creator.
+    flow = _TaskFlow([], [_Obj(requires_action=True)])
+    assert not await fires(flow, _app(created_by=None), _principal(), can_transition=False)
+    assert flow.calls == []
 
 
 async def test_author_names_empty_set_short_circuits() -> None:

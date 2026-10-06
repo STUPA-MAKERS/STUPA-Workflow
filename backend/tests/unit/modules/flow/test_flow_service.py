@@ -148,6 +148,19 @@ async def test_fire_branch_transition_manually_409() -> None:
     assert db.committed == 0
 
 
+async def test_fire_automatic_transition_manually_409() -> None:
+    """The list hides an automatic transition, so the manual fire refuses it too."""
+    app = _app(uuid4(), uuid4())
+    transition = _transition(
+        flow_id=app.flow_version_id, from_id=app.current_state_id, to_id=uuid4()
+    )
+    transition.automatic = True
+    db = fake_session(result(app), result(transition))
+    with pytest.raises(ConflictError, match="Automatic"):
+        await FlowService(db).fire(app.id, transition.id, _principal())
+    assert db.committed == 0
+
+
 async def test_applicant_transitions_only_actor_is_applicant_gated() -> None:
     flow_id, draft = uuid4(), uuid4()
     app = _app(draft, flow_id)

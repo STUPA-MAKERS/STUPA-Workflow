@@ -196,8 +196,9 @@ async def list_comments(application_id: str) -> dict:
 async def list_tasks() -> dict:
     """List the open tasks of the logged-in user.
 
-    A task is an application in a vote state of one of the Gremien of the user. A task
-    is also an application with at least one firable transition that requires action.
+    A task is an application that the user can read and act on now: an open vote that
+    takes a ballot of the user, or a transition with `requiresAction` that the user may
+    fire. An agent token never gets a ballot task, because voting stays human.
     """
     return await api().get("/applications/tasks")
 

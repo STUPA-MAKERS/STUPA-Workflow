@@ -913,6 +913,36 @@ class VotingService:
             principal, vote.eligible_group
         )
 
+    async def can_still_cast(self, vote: Vote, principal: Principal, *, now: datetime) -> bool:
+        """Tell whether `cast` takes a ballot of the principal now, own or represented.
+
+        The rule mirrors the gate of `cast` without a write: the vote is open and its
+        window has not ended, the session is human (no OAuth token), and either the
+        own ballot (``vote.cast`` in the gremium of the vote, the right not delegated
+        away) or the represented ballot (a voting delegation for the meeting) is still
+        missing. A ballot that is already in counts as done, because `cast` answers
+        409 for it. The task list (`ListingOps.list_tasks`) reads this method.
+        """
+        if vote.status != "open":
+            return False
+        if vote.closes_at is not None and now >= vote.closes_at:
+            return False
+        if principal.scope_permissions is not None:
+            return False
+        blocked, delegator_sub = await voting_delegation_check(
+            self.session, principal.sub, vote.meeting_id, vote.eligible_group, now
+        )
+        secret = self._config(vote).secret
+        if (
+            not blocked
+            and self._may_cast(principal, vote.eligible_group)
+            and not (await self.my_ballot(vote, principal.sub, secret=secret)).cast
+        ):
+            return True
+        if delegator_sub is None:
+            return False
+        return not (await self.my_ballot(vote, delegator_sub, secret=secret)).cast
+
     async def _cast_open(self, vote_id: UUID, voter_sub: str, choice: str) -> BallotAccepted:
         """Insert the open ballot. A second cast of the same voter gives 409.
 
