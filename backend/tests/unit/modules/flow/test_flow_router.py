@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 from app.deps import get_current_applicant, get_current_principal
 from app.main import create_app
-from app.modules.applications.access import require_app_applicant, require_app_read
+from app.modules.applications.access import require_app_applicant
 from app.modules.auth.principal import Principal
 from app.modules.flow import router as flow_router
 from app.modules.flow.dispatch import NullActionDispatcher
@@ -267,7 +267,7 @@ def test_list_applicant_transitions_ok(
     app: FastAPI, client: TestClient, fake_service: _FakeService
 ) -> None:
     app_id = uuid4()
-    app.dependency_overrides[require_app_read] = lambda: SimpleNamespace(
+    app.dependency_overrides[require_app_applicant] = lambda: SimpleNamespace(
         application_id=app_id
     )
     r = client.get(f"/api/applications/{app_id}/applicant-transitions")

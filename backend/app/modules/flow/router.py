@@ -19,7 +19,6 @@ from app.deps import DbSession, require_principal
 from app.modules.applications.access import (
     Access,
     require_app_applicant,
-    require_app_read,
     resolve_app_read,
 )
 from app.modules.applications.schemas import StateOut
@@ -202,9 +201,14 @@ async def force_status(
 async def list_applicant_transitions(
     application_id: UUID,
     service: ServiceDep,
-    access: Annotated[Access, Depends(require_app_read)],
+    access: Annotated[Access, Depends(require_app_applicant)],
 ) -> list[TransitionOut]:
-    """List the transitions the applicant may fire. Only `actorIsApplicant` opens one."""
+    """List the transitions the applicant may fire. Only `actorIsApplicant` opens one.
+
+    The route admits the same callers as the fire route: the magic-link applicant and
+    the logged-in creator. Another principal gets 403, also with `application.read`,
+    so the list never offers an action that the fire route refuses.
+    """
     return await service.available_applicant_transitions(
         access.application_id, allow_unconfirmed=False
     )

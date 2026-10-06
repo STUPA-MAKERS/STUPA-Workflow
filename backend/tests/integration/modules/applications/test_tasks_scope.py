@@ -148,7 +148,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:  # noqa: PLR
                 tag,
             ),
         }
-        for key in ("mitglied", "admin", "owner", "other"):
+        for key in ("mitglied", "admin", "owner", "other", "token"):
             rows[key] = PrincipalRow(sub=f"{key}-{tag}", display_name=key)
             session.add(rows[key])
         await session.flush()
@@ -290,6 +290,12 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:  # noqa: PLR
             sub=rows["mitglied"].sub, roles=["member"], permissions={"application.read"}
         )
         world.principals["admin"] = Principal(sub=rows["admin"].sub, roles=["admin"])
+        # An OAuth agent token with `application.transition` but without the read right.
+        world.principals["token"] = Principal(
+            sub=rows["token"].sub,
+            permissions={"application.transition"},
+            scope_permissions=frozenset({"application.transition"}),
+        )
     return world
 
 
@@ -367,6 +373,8 @@ async def test_tasks_per_principal(
         "admin": {apps["draft_a"], apps["draft_b"], apps["own"]},
         # The applicant account: the applicant transition of the own application.
         "owner": {apps["own"]},
+        # The agent token reads nothing and never casts.
+        "token": set(),
     }
     for key, principal in world.principals.items():
         assert await _tasks(api, db_engine, principal) == expected[key], key
@@ -441,6 +449,25 @@ async def test_transition_routes_refuse_an_unreadable_application(
     }
 
 
+async def test_token_without_read_right_is_refused(
+    world: _World, api: FastAPI, db_engine: AsyncEngine
+) -> None:
+    """An agent token with `application.transition` alone gets no task and no transition."""
+    token = world.principals["token"]
+    assert await _tasks(api, db_engine, token) == set()
+    for key in ("draft_a", "draft_b", "own"):
+        app_id = world.apps[key]
+        r = await _call(
+            api, db_engine, token, "GET", f"/api/applications/{app_id}/transitions"
+        )
+        assert r.status_code == 403, key
+        r = await _call(
+            api, db_engine, token, "POST", f"/api/applications/{app_id}/transition",
+            {"transitionId": str(world.transitions[0].id)},
+        )
+        assert r.status_code == 403, key
+
+
 async def test_applicant_route_refuses_a_non_creator(
     world: _World, api: FastAPI, db_engine: AsyncEngine
 ) -> None:
@@ -451,5 +478,10 @@ async def test_applicant_route_refuses_a_non_creator(
     body = {"transitionId": str(applicant_t.id)}
     admin = world.principals["admin"]
     assert (await _call(api, db_engine, admin, "POST", url, body)).status_code == 403
+    # The list route admits the same callers, so it offers nothing to the admin.
+    assert (await _call(api, db_engine, admin, "GET", f"{url}s")).status_code == 403
     owner = world.principals["owner"]
+    r = await _call(api, db_engine, owner, "GET", f"{url}s")
+    assert r.status_code == 200
+    assert [t["id"] for t in r.json()] == [str(applicant_t.id)]
     assert (await _call(api, db_engine, owner, "POST", url, body)).status_code == 200
