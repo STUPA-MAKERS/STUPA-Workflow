@@ -11,3 +11,6 @@ frontend/.angular
 **/.env
 **/.env.*
 !**/.env.example
+# Private Schlüssel aus deploy/secrets/ (z. B. backup-age.key) nie in den
+# Build-Context ziehen. Der Container bekommt sie als Mount zur Laufzeit.
+**/secrets
