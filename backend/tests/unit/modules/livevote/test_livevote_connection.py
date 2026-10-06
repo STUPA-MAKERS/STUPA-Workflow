@@ -298,9 +298,17 @@ class _MeetingBoundVoting:
     cross-meeting frame must NEVER reach ``cast``.
     """
 
-    def __init__(self, vote_meeting_id: UUID) -> None:
+    def __init__(self, vote_meeting_id: UUID, *, account_ok: bool = True) -> None:
         self._vote_meeting_id = vote_meeting_id
         self.cast_calls = 0
+        self.account_ok = account_ok
+        # The connection re-reads the account through the session of the service.
+        self.session = self
+        self.statements: list[object] = []
+
+    async def scalar(self, stmt: object) -> int:
+        self.statements.append(stmt)
+        return 1 if self.account_ok else 0
 
     async def get(self, vote_id: UUID) -> Any:
         return SimpleNamespace(id=vote_id, meeting_id=self._vote_meeting_id)
@@ -390,3 +398,17 @@ async def test_send_state_marks_the_open_vote_as_replay() -> None:
     assert [m["type"] for m in sent] == ["meeting_state", "vote_opened", "vote_tally"]
     assert sent[1]["voteId"] == str(vote_id)
     assert sent[1]["replay"] is True
+
+
+# An open socket must not cast for an account that an admin deactivated or merged
+# after the handshake: the connection re-reads the account before each cast.
+@pytest.mark.asyncio
+async def test_cast_refused_when_the_account_is_no_longer_active() -> None:
+    conn = _conn(beamer=False)
+    voting = _MeetingBoundVoting(conn.meeting_id, account_ok=False)
+    conn.voting = voting  # type: ignore[assignment]
+    await conn._handle_cast({"type": "cast", "voteId": str(uuid4()), "choice": "yes"})
+    assert voting.cast_calls == 0
+    assert conn.ws.sent == [{"type": "error", "code": "account_inactive"}]  # type: ignore[attr-defined]
+    stmt = str(voting.statements[0])
+    assert "principal.active" in stmt and "principal.merged_into IS NULL" in stmt

@@ -2908,7 +2908,7 @@ export const de = {
   'admin.users.merge.understood':
     'Ich habe die Vorschau geprüft. Beide Konten gehören derselben Person.',
   'admin.users.merge.confirm': 'Konten zusammenführen',
-  'admin.users.merge.blocked': 'Löse zuerst die Konflikte.',
+  'admin.users.merge.blocked': 'So nicht möglich: siehe Konflikte und Rechte oben.',
   'admin.users.merge.back': 'Zurück',
   'admin.users.merge.retry': 'Erneut versuchen',
   'admin.users.merge.finish': 'Fertig',
@@ -2918,6 +2918,28 @@ export const de = {
   'admin.users.merge.conflictToast': 'Die Daten haben sich geändert. Prüfe die Konflikte.',
   'admin.users.merge.failed': 'Zusammenführen fehlgeschlagen.',
   'admin.users.merge.mergedInto': 'zusammengeführt in {name}',
+  'admin.users.merge.rightsTitle': 'Rechte des alten Kontos',
+  'admin.users.merge.rightsLead':
+    'Das alte Konto hat diese Rechte, {name} hat sie nicht. Rechte gehen beim Zusammenführen nicht über: {name} bekommt die eigenen Rollen bei der nächsten Anmeldung aus den OIDC-Gruppen. Du hast diese Rechte selbst, also darfst du zusammenführen.',
+  'admin.users.merge.rightsBlocked':
+    'Das alte Konto hat diese Rechte, {name} und du habt sie nicht. Das Zusammenführen würde Anträge und Vertretungen eines Kontos mit mehr Rechten übertragen. Bitte eine Person mit diesen Rechten, die Konten zusammenzuführen.',
+  'admin.users.merge.adminRole': 'Administration (alle Rechte)',
+  'admin.users.merge.error.principal_already_merged':
+    'Dieses Konto ist schon in ein anderes Konto zusammengeführt.',
+  'admin.users.merge.error.merge_target_merged':
+    'Das gewählte Konto ist selbst schon zusammengeführt. Wähle das Konto, in das es zusammengeführt wurde.',
+  'admin.users.merge.error.merge_own_account':
+    'Dein eigenes Konto kannst du nicht in ein anderes Konto zusammenführen.',
+  'admin.users.merge.error.merge_privileges':
+    'Das alte Konto hat Rechte, die das bleibende Konto und du nicht habt.',
+  'admin.users.merge.error.principal_erased':
+    'Eines der Konten wurde nach DSGVO gelöscht. Gelöschte Konten lassen sich nicht zusammenführen.',
+  'admin.users.merge.error.merge_target_inactive':
+    'Das gewählte Konto ist deaktiviert. Aktiviere es zuerst oder wähle ein anderes Konto.',
+  'admin.users.merge.error.merge_retry':
+    'Gleichzeitig hat sich etwas an den Daten geändert. Versuche es noch einmal.',
+  'home.loginError.account_merged':
+    'Dieses Konto wurde zusammengeführt und ist gesperrt. Melde dich mit deinem aktuellen Konto an.',
   'admin.roles.loading': 'Rollen werden geladen …',
   'admin.roles.title': 'Rollen & Rechte',
   'admin.roles.subtitle': 'Globale Rollen und ihre Rechte. Aufklappen zeigt die Berechtigungen.',
@@ -5980,7 +6002,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'The old account is locked and cannot log in again. History, comments and the audit log then show {name}. The audit log itself stays as it is. You cannot undo the merge.',
   'admin.users.merge.understood': 'I checked the preview. Both accounts belong to the same person.',
   'admin.users.merge.confirm': 'Merge accounts',
-  'admin.users.merge.blocked': 'Resolve the conflicts first.',
+  'admin.users.merge.blocked': 'Not possible as it is: see the conflicts and rights above.',
   'admin.users.merge.back': 'Back',
   'admin.users.merge.retry': 'Try again',
   'admin.users.merge.finish': 'Done',
@@ -5989,6 +6011,27 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.users.merge.conflictToast': 'The data changed. Check the conflicts.',
   'admin.users.merge.failed': 'Could not merge the accounts.',
   'admin.users.merge.mergedInto': 'merged into {name}',
+  'admin.users.merge.rightsTitle': 'Rights of the old account',
+  'admin.users.merge.rightsLead':
+    'The old account has these rights and {name} does not. Rights do not move in a merge: {name} gets its own roles from the OIDC groups at the next login. You hold these rights yourself, so you may merge.',
+  'admin.users.merge.rightsBlocked':
+    'The old account has these rights, and neither {name} nor you have them. The merge would move applications and delegations of an account with more rights. Ask a person who holds these rights to merge the accounts.',
+  'admin.users.merge.adminRole': 'Administration (every right)',
+  'admin.users.merge.error.principal_already_merged':
+    'This account is already merged into another account.',
+  'admin.users.merge.error.merge_target_merged':
+    'The selected account is merged itself. Select the account it was merged into.',
+  'admin.users.merge.error.merge_own_account':
+    'You cannot merge your own account into another account.',
+  'admin.users.merge.error.merge_privileges':
+    'The old account has rights that neither the account that stays nor you have.',
+  'admin.users.merge.error.principal_erased':
+    'One of the accounts was erased under the GDPR. Erased accounts cannot be merged.',
+  'admin.users.merge.error.merge_target_inactive':
+    'The selected account is deactivated. Activate it first or select another account.',
+  'admin.users.merge.error.merge_retry': 'The data changed at the same time. Try again.',
+  'home.loginError.account_merged':
+    'This account was merged and is locked. Log in with your current account.',
   'admin.roles.loading': 'Loading roles …',
   'admin.roles.title': 'Roles & permissions',
   'admin.roles.subtitle': 'Global roles and their rights. Expand a role to see its permissions.',

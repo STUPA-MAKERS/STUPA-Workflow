@@ -615,9 +615,11 @@ class AuditService:
         if ids := by_type.get("principal"):
             from app.modules.auth.identity import refs_by_id
 
-            # A merged account shows the name of the account it was merged into.
+            # A target names the account itself: the merge entry names the old
+            # account. Only an account without a name of its own shows the name of
+            # the account it was merged into.
             for row_id, ref in (await refs_by_id(self.session, ids)).items():
-                if label := ref.name:
+                if label := ref.label:
                     labels[("principal", str(row_id))] = label
         if ids := by_type.get("webhook"):
             from app.modules.admin.models import Webhook
@@ -729,9 +731,9 @@ class AuditService:
 
         # Multi-column and derived labels. The order does not matter, because ``fill``
         # never overwrites an entry.
-        # A merged account shows the name of the account it was merged into.
+        # An id names the account itself (``sourceId`` of a merge names the old one).
         for row_id, ref in (await refs_by_id(self.session, candidates)).items():
-            if (label := ref.name) and str(row_id) not in labels:
+            if (label := ref.label) and str(row_id) not in labels:
                 labels[str(row_id)] = label
         for row_id, name_i18n, key in (
             await self.session.execute(

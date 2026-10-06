@@ -25,7 +25,7 @@ description: DSGVO/GDPR backend — erasure-request queue (Art. 17), application
 - `POST /api/admin/privacy/erasures/{id}/execute` — run erasure (anonymize/erase), atomic with status flip.
 - `POST /api/admin/privacy/erasures/{id}/reject` — reject with `reason`.
 - `POST /api/admin/privacy/principals/{id}/erase` — direct principal erasure (204).
-- `GET /api/admin/privacy/auskunft?email=` — Art. 15 personal-data export as XLSX (applicants, applications+`data`, submission-version history, principal row, visible comments, attachment metadata, and the sheet `Anwesenheit`: the meeting attendance of the principal with status, source and the reason of an excuse). The `pii_export` audit entry counts the rows per kind (`attendance` included).
+- `GET /api/admin/privacy/auskunft?email=` — Art. 15 personal-data export as XLSX (the principal sheet takes the live account of the address: not merged, then active, then the newest login; a merged old account keeps its email) (applicants, applications+`data`, submission-version history, principal row, visible comments, attachment metadata, and the sheet `Anwesenheit`: the meeting attendance of the principal with status, source and the reason of an excuse). The `pii_export` audit entry counts the rows per kind (`attendance` included).
 - `GET|PUT /api/admin/privacy/settings` — global retention default.
 - The public entry point lives in **be-applications**: `POST /api/applications/{id}/erasure-request` (202). Applicant self-service (magic-link, creator, or authorized reader) creates an `open` queue row. `require_app_read` gates it, not `privacy.manage`.
 

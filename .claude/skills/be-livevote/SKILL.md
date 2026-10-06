@@ -65,3 +65,4 @@ description: Meetings — planned→live→closed lifecycle, agenda items, atten
 - The broker and the locker come from `app.state`, with in-memory fallbacks for tests. Both are `Protocol`s, so you override them via `dependency_overrides`.
 
 **Related:** be-voting, be-protocol, be-delegations, be-admin, be-auth, be-audit
+- **WebSocket cast re-checks the account:** `LiveVoteConnection._handle_cast` calls `account_can_act` (active and not merged, read from the DB) after the cast lock and before `VotingService.cast`. An open socket of an account that was deactivated or merged after the handshake gets the error frame `account_inactive`.

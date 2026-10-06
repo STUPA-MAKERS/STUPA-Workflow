@@ -31,6 +31,7 @@ import type {
   MergeAreaCount,
   MergeConflict,
   MergeConflictKind,
+  MergePermission,
   MergePreview,
   MergeResult,
 } from '../../admin.models';
@@ -40,6 +41,25 @@ type MergeStep = 'pick' | 'preview' | 'done';
 
 /** At most this many accounts in the pick list. */
 const PICK_LIMIT = 50;
+
+/**
+ * The refusals of the server with their own message. Every other error gives the
+ * generic "Zusammenführen fehlgeschlagen.".
+ */
+export const MERGE_ERROR_CODES = [
+  'principal_already_merged',
+  'merge_target_merged',
+  'merge_own_account',
+  'merge_privileges',
+  'principal_erased',
+  'merge_target_inactive',
+  'merge_retry',
+] as const;
+export type MergeErrorCode = (typeof MERGE_ERROR_CODES)[number];
+
+function isMergeErrorCode(code: string | undefined): code is MergeErrorCode {
+  return (MERGE_ERROR_CODES as readonly string[]).includes(code ?? '');
+}
 
 /** The problem body of a 409 `merge_conflict`. */
 interface ConflictProblem {
@@ -115,6 +135,8 @@ export class UserMergeComponent {
   protected readonly preview = signal<MergePreview | null>(null);
   protected readonly loadingPreview = signal(false);
   protected readonly previewFailed = signal(false);
+  /** The message of a refused preview (a known code of the server), else the generic one. */
+  protected readonly previewError = signal<TranslationKey>('admin.users.merge.previewFailed');
   protected readonly understood = signal(false);
   protected readonly merging = signal(false);
   protected readonly result = signal<MergeResult | null>(null);
@@ -158,6 +180,16 @@ export class UserMergeComponent {
     return p?.displayName || p?.email || this.i18n.translate('admin.users.merge.unnamed');
   }
 
+  protected errorKey(code: MergeErrorCode): TranslationKey {
+    return `admin.users.merge.error.${code}`;
+  }
+
+  /** "session.manage (StuPa)", or the admin role as "Administration (alle Rechte)". */
+  protected permissionLabel(p: MergePermission): string {
+    const key = p.key === 'admin' ? this.i18n.translate('admin.users.merge.adminRole') : p.key;
+    return p.gremium ? `${key} (${p.gremium})` : key;
+  }
+
   protected areaKey(area: MergeArea): TranslationKey {
     return `admin.users.merge.area.${area}`;
   }
@@ -198,7 +230,11 @@ export class UserMergeComponent {
         this.preview.set(p);
         this.loadingPreview.set(false);
       },
-      error: () => {
+      error: (err: { error?: ConflictProblem }) => {
+        const code = err?.error?.code;
+        this.previewError.set(
+          isMergeErrorCode(code) ? this.errorKey(code) : 'admin.users.merge.previewFailed',
+        );
         this.previewFailed.set(true);
         this.loadingPreview.set(false);
       },
@@ -247,7 +283,16 @@ export class UserMergeComponent {
           this.toast.error(this.i18n.translate('admin.users.merge.conflictToast'));
           return;
         }
-        this.toast.error(this.i18n.translate('admin.users.merge.failed'));
+        const code = err?.error?.code;
+        if (code === 'merge_privileges') {
+          // The rights changed since the preview: load it again, it lists them.
+          this.loadPreview(p.source.id, p.target.id);
+        }
+        this.toast.error(
+          this.i18n.translate(
+            isMergeErrorCode(code) ? this.errorKey(code) : 'admin.users.merge.failed',
+          ),
+        );
       },
     });
   }

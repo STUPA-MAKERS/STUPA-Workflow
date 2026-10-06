@@ -30,11 +30,20 @@ class PrincipalRef:
     id: UUID
     display_name: str | None
     email: str | None
+    # The name of the stored principal itself, before the merge step. A display that
+    # names the account as a target (the audit target label, an id in the audit data)
+    # uses it, so the merge entry names the old account and not the new one.
+    own_name: str | None = None
 
     @property
     def name(self) -> str | None:
         """The display name, else the email. None for an anonymized account."""
         return self.display_name or self.email
+
+    @property
+    def label(self) -> str | None:
+        """The own name of the stored account, else the name it was merged into."""
+        return self.own_name or self.name
 
 
 _RefSelect = Select[str, UUID, str | None, str | None, UUID, str | None, str | None]
@@ -57,9 +66,10 @@ def _ref(
     row: Row[str, UUID, str | None, str | None, UUID, str | None, str | None],
 ) -> PrincipalRef:
     _sub, pid, dn, em, tid, tdn, tem = row
+    own = dn or em
     if tid is not None:
-        return PrincipalRef(id=tid, display_name=tdn, email=tem)
-    return PrincipalRef(id=pid, display_name=dn, email=em)
+        return PrincipalRef(id=tid, display_name=tdn, email=tem, own_name=own)
+    return PrincipalRef(id=pid, display_name=dn, email=em, own_name=own)
 
 
 async def refs_by_sub(

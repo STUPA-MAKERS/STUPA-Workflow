@@ -110,6 +110,7 @@ addopts = "-m 'not integration and not e2e'"
 markers = [
     "integration: braucht testcontainers (PG/Redis/MinIO) — Docker erforderlich",
     "e2e: End-to-End gegen ephemeren Compose-Stack",
+    "real_rules: the account-merge unit test runs the real erasure and privilege checks",
 ]
 
 [tool.coverage.run]

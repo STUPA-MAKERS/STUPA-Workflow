@@ -464,12 +464,29 @@ export interface MergePrincipal {
   lastLogin: string | null;
 }
 
+/**
+ * A right of the old account that the target lacks. `key` is a permission key, or
+ * `admin` for the admin role (every right); `gremium` names the gremium of a gremium
+ * right.
+ */
+export interface MergePermission {
+  key: string;
+  gremium?: string | null;
+}
+
 /** GET /admin/principals/{id}/merge-preview?targetId= */
 export interface MergePreview {
   source: MergePrincipal;
   target: MergePrincipal;
   areas: MergeAreaCount[];
   conflicts: MergeConflict[];
+  /**
+   * The rights of the old account that the target lacks. The merge moves no right, but
+   * it moves ownership, so they block it unless the admin holds them all
+   * (`actorHoldsExtra`).
+   */
+  extraPermissions?: MergePermission[];
+  actorHoldsExtra?: boolean;
   canMerge: boolean;
 }
 

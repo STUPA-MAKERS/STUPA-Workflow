@@ -515,6 +515,17 @@ class MergeConflictOut(_CamelModel):
     label: str | None = None
 
 
+class MergePermissionOut(_CamelModel):
+    """A right of the old account that the target lacks.
+
+    ``key`` is a permission key, or ``admin`` for the admin role (every right).
+    ``gremium`` names the gremium of a gremium permission, else null.
+    """
+
+    key: str
+    gremium: str | None = None
+
+
 class MergePreviewOut(_CamelModel):
     """``GET /admin/principals/{id}/merge-preview``: what a merge would do."""
 
@@ -522,6 +533,12 @@ class MergePreviewOut(_CamelModel):
     target: MergePrincipalOut
     areas: list[MergeAreaOut]
     conflicts: list[MergeConflictOut]
+    # The rights of the old account that the target lacks. The merge moves no right,
+    # but it moves ownership, so these block it unless the admin holds them all.
+    extra_permissions: list[MergePermissionOut] = Field(
+        default_factory=list, serialization_alias="extraPermissions"
+    )
+    actor_holds_extra: bool = Field(default=True, serialization_alias="actorHoldsExtra")
     can_merge: bool = Field(serialization_alias="canMerge")
 
 

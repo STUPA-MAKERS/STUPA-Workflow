@@ -63,7 +63,7 @@
           <app-skeleton variant="rows" [count]="4" [label]="'admin.users.merge.loadingPreview' | t" />
         } @else if (previewFailed() || !p) {
           <app-note kind="error" icon="alert">
-            <span>{{ 'admin.users.merge.previewFailed' | t }}</span>
+            <span>{{ previewError() | t }}</span>
           </app-note>
         } @else {
           <!-- From the old account into the account that stays. -->
@@ -120,6 +120,23 @@
                     }
                     <span class="um__muted">{{ fixKey(c.kind) | t }}</span>
                   </li>
+                }
+              </ul>
+            </section>
+          }
+
+          @if (p.extraPermissions?.length) {
+            <section class="um__sec" aria-labelledby="um-rights">
+              <h3 class="sec um__secTitle" id="um-rights">{{ 'admin.users.merge.rightsTitle' | t }}</h3>
+              <app-note [kind]="p.actorHoldsExtra === false ? 'error' : 'warn'" icon="shield">
+                <span>{{
+                  (p.actorHoldsExtra === false ? 'admin.users.merge.rightsBlocked' : 'admin.users.merge.rightsLead')
+                    | t: { name: name(p.target) }
+                }}</span>
+              </app-note>
+              <ul class="um__rights" [attr.aria-label]="'admin.users.merge.rightsTitle' | t">
+                @for (r of p.extraPermissions; track $index) {
+                  <li class="um__right mono">{{ permissionLabel(r) }}</li>
                 }
               </ul>
             </section>
@@ -194,7 +211,7 @@
             variant="danger"
             [disabled]="!canMerge()"
             [loading]="merging()"
-            [title]="conflicts().length ? ('admin.users.merge.blocked' | t) : ''"
+            [title]="preview() && !preview()!.canMerge ? ('admin.users.merge.blocked' | t) : ''"
             (click)="confirm()"
             >{{ 'admin.users.merge.confirm' | t }}</app-button
           >

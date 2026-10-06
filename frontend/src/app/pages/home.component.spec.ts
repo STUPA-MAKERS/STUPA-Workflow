@@ -1,5 +1,5 @@
 import { signal } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
@@ -65,5 +65,33 @@ describe('HomeComponent', () => {
       screen.getByRole('button', { name: /Sign in as a committee member/ }),
     ).toBeInTheDocument();
     expect(screen.getByText(/confirmation email/)).toBeInTheDocument();
+  });
+
+  describe('refused login', () => {
+    async function withQuery(q: Record<string, string>) {
+      return render(HomeComponent, {
+        providers: [
+          provideRouter([]),
+          { provide: AuthService, useValue: { login: jest.fn() } },
+          { provide: BrandingService, useValue: { freetexts: signal({}) } },
+          {
+            provide: ActivatedRoute,
+            useValue: { snapshot: { queryParamMap: convertToParamMap(q) } },
+          },
+        ],
+      });
+    }
+
+    it('says why the login of a merged account was refused', async () => {
+      await withQuery({ loginError: 'account_merged' });
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Dieses Konto wurde zusammengeführt und ist gesperrt.',
+      );
+    });
+
+    it('ignores an unknown reason', async () => {
+      await withQuery({ loginError: 'anything' });
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
   });
 });

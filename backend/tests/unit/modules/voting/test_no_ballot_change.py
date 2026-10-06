@@ -115,6 +115,10 @@ class _AlreadyVoted:
     async def rollback(self) -> None:
         self.rolled_back += 1
 
+    async def scalar(self, _stmt: object) -> int:
+        # The account check of the WebSocket cast: the account is active.
+        return 1
+
 
 class _FakeWS:
     def __init__(self) -> None:

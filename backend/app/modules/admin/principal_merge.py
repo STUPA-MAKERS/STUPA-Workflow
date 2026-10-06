@@ -18,18 +18,28 @@ What the merge does with each reference:
   pool, attendance, meetings (creator, minute-taker, keeper periods), protocols, budget
   bookings and invoices, config versions, role assignments, privacy requests, backups
   and the stored audit checks.
-- It combines harmless duplicates: a notification preference, a role assignment, a pool
-  entry, a faculty-group row or an equal attendance that the target already has. The row
+- It combines harmless duplicates: a notification preference, a pool entry, a
+  faculty-group row or an equal attendance that the target already has. The row
   of the target wins, the row of the source goes. A pool entry in which one account
   substitutes for the other goes too, because a person never substitutes for themselves.
 - It removes the sessions and the OAuth codes and tokens of the source, its feed token,
-  and its gremium memberships. The memberships come from the OIDC groups only, so the
+  its role assignments and its gremium memberships. Rights never move: the roles come
+  from the OIDC group mappings and the bootstrap, so the target gets its own at its
+  next login. The memberships come from the OIDC groups only, so the
   target keeps its own and the next login of the target syncs them again.
 - It never touches the audit log (append-only and hash-chained) or the config
   revisions (append-only). Their displays resolve the old ``sub`` through
   ``principal.merged_into`` (``auth/identity.py``).
 - It never reads ``secret_ballot``. A secret ballot has no identity, and the merge must
   not link one to a voter. Only the voted marker (the identity, no choice) moves.
+
+Privileges: the merge moves ownership (applications, delegations, the pool). It
+therefore refuses with 409 ``merge_privileges`` when the source holds an effective
+right (global role, or gremium role per gremium) that the target does not hold, unless
+the acting admin holds every such right. Without this rule a holder of
+``admin.users.merge`` could merge the old account of an admin into their own account.
+It also refuses an erased account (``principal_erased``) and a deactivated target
+(``merge_target_inactive``).
 
 The source stays as a locked reference: ``merged_into`` names the target, ``active`` is
 false, and a login with its ``sub`` fails (``auth/service.upsert_principal``). Earlier
@@ -57,18 +67,24 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.engine import CursorResult
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute, aliased
 
 from app.db import Base
 from app.modules.admin.membership_sync import sync_principal_memberships
-from app.modules.admin.models import GremiumMembership, SiteConfigVersion
+from app.modules.admin.models import (
+    Gremium,
+    GremiumMembership,
+    GremiumRole,
+    SiteConfigVersion,
+)
 from app.modules.admin.schemas import (
     MergeArea,
     MergeAreaOut,
     MergeConflictKind,
     MergeConflictOut,
+    MergePermissionOut,
     MergePreviewOut,
     MergePrincipalOut,
     MergeResultOut,
@@ -82,11 +98,12 @@ from app.modules.applications.models import (
     SubmissionVersion,
 )
 from app.modules.audit.actions import AuditAction
-from app.modules.audit.models import AuditVerification
+from app.modules.audit.models import AuditEntry, AuditVerification
 from app.modules.audit.service import AuditService
 from app.modules.auth.models import AuthSession, RoleAssignment
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oauth_models import OAuthAuthorizationCode, OAuthToken
+from app.modules.auth.rbac import resolve_principal
 from app.modules.backup.models import Backup
 from app.modules.budget.tree_models import BudgetExpense, Invoice
 from app.modules.delegations.models import (
@@ -102,6 +119,12 @@ from app.modules.privacy.models import ErasureRequest
 from app.modules.protocol.models import Protocol
 from app.modules.voting.models import Ballot, Vote, VotedMarker
 from app.shared.errors import ConflictError, FieldError, NotFoundError, ValidationProblem
+
+# The key of the admin role in an effective-rights set: it holds every right.
+ALL_RIGHTS = "*"
+
+# SQLSTATE deadlock_detected and serialization_failure: a retry can succeed.
+_RETRY_SQLSTATES = frozenset({"40P01", "40001"})
 
 # The display order of the areas. It matches the ``MergeArea`` literal.
 AREAS: tuple[MergeArea, ...] = (
@@ -177,10 +200,34 @@ ID_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
 
 # The rows of the source that the merge deletes, by area.
 REMOVED_ROWS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
+    # Rights never move to the target (privilege escalation). The target gets its own
+    # roles from the OIDC group mappings and the bootstrap at its next login.
+    ("roles", RoleAssignment.principal_id),
     ("sessions", AuthSession.principal_id),
     ("sessions", OAuthAuthorizationCode.principal_id),
     ("sessions", OAuthToken.principal_id),
 )
+
+
+# The principal columns with a uniqueness rule. `_combined_tables` drops the duplicates
+# of the source and rewrites the rest.
+COMBINED_COLUMNS: tuple[InstrumentedAttribute[Any], ...] = (
+    NotificationPreference.principal_id,
+    MeetingAttendance.principal_id,
+    DelegationSubstitute.member_principal_id,
+    DelegationSubstitute.substitute_principal_id,
+    SubstituteGroupMember.principal_id,
+)
+
+# The principal columns that the merge leaves alone on purpose, with the reason. A guard
+# test fails when a model gains a principal column that no list above or here names.
+EXCLUDED_COLUMNS: dict[str, str] = {
+    "principal.merged_into": "the merge reference itself; `_source_row` re-points it",
+    "audit_entry.actor": "append-only hash chain; the display follows merged_into",
+    "config_revision.created_by": "append-only (trigger); the display follows merged_into",
+    "erasure_request.principal_id": "the proof of the request; an open one blocks",
+    "gremium_membership.principal_id": "derived from OIDC; the sync deletes the rows",
+}
 
 
 @dataclass
@@ -294,7 +341,121 @@ class PrincipalMergeService:
                 "The target account is merged into another account.",
                 code="merge_target_merged",
             )
+        if target.active is False:
+            raise ConflictError(
+                "The target account is deactivated.", code="merge_target_inactive"
+            )
+        if await self._erased([source.id, target.id]):
+            raise ConflictError(
+                "An erased account cannot be merged.", code="principal_erased"
+            )
         return source, target
+
+    async def _erased(self, ids: list[UUID]) -> bool:
+        """Tell whether one of the principals was erased (GDPR Art. 17).
+
+        Two marks count: an executed erasure request for the principal, and the audit
+        entry ``principal_erased`` that ``PrincipalService.erase`` writes (also for a
+        direct erasure without a request).
+        """
+        requests = await self._count(
+            select(func.count())
+            .select_from(ErasureRequest)
+            .where(
+                ErasureRequest.status == "executed",
+                ErasureRequest.subject_type == "principal",
+                ErasureRequest.principal_id.in_(ids),
+            )
+        )
+        if requests:
+            return True
+        entries = await self._count(
+            select(func.count())
+            .select_from(AuditEntry)
+            .where(
+                AuditEntry.action == AuditAction.PRINCIPAL_ERASED.value,
+                AuditEntry.target_type == "principal",
+                AuditEntry.target_id.in_([str(i) for i in ids]),
+            )
+        )
+        return bool(entries)
+
+    # -- Privileges --------------------------------------------------------------------
+
+    async def _effective(self, row: PrincipalRow | None, now: datetime) -> frozenset[str]:
+        """The effective rights of a principal as the RBAC resolver sees them today.
+
+        A global permission is its key. A gremium permission is ``key@<gremium id>``.
+        The ``admin`` role holds every right and gives the single key ``*``.
+        """
+        if row is None:
+            return frozenset()
+        principal = await resolve_principal(self.session, row, now)
+        if "admin" in principal.roles:
+            return frozenset({ALL_RIGHTS})
+        keys = set(principal.permissions)
+        rows = (
+            await self.session.execute(
+                select(GremiumMembership.gremium_id, GremiumRole.permissions)
+                .join(GremiumRole, GremiumRole.id == GremiumMembership.gremium_role_id)
+                .where(
+                    GremiumMembership.principal_id == row.id,
+                    or_(
+                        GremiumMembership.valid_from.is_(None),
+                        GremiumMembership.valid_from <= now,
+                    ),
+                    or_(
+                        GremiumMembership.valid_until.is_(None),
+                        GremiumMembership.valid_until > now,
+                    ),
+                )
+            )
+        ).all()
+        for gremium_id, perms in rows:
+            keys.update(f"{p}@{gremium_id}" for p in perms or [])
+        return frozenset(keys)
+
+    async def _privileges(
+        self, source: PrincipalRow, target: PrincipalRow, actor: str
+    ) -> tuple[list[MergePermissionOut], bool]:
+        """The rights of the source that the target lacks, and whether the actor holds them.
+
+        Returns:
+            The extra rights (sorted, with the gremium name), and True when the acting
+            admin holds every one of them (or there is none).
+        """
+        now = datetime.now(UTC)
+        have_source = await self._effective(source, now)
+        have_target = await self._effective(target, now)
+        if ALL_RIGHTS in have_target:
+            return [], True
+        extra = sorted(have_source - have_target)
+        if not extra:
+            return [], True
+        actor_row = await self.session.scalar(
+            select(PrincipalRow).where(PrincipalRow.sub == actor)
+        )
+        have_actor = await self._effective(actor_row, now)
+        covered = ALL_RIGHTS in have_actor or set(extra) <= have_actor
+        gremium_ids = {UUID(k.split("@", 1)[1]) for k in extra if "@" in k}
+        names: dict[UUID, str] = {}
+        if gremium_ids:
+            names = {
+                gid: name
+                for gid, name in (
+                    await self.session.execute(
+                        select(Gremium.id, Gremium.name).where(Gremium.id.in_(gremium_ids))
+                    )
+                ).all()
+            }
+        out: list[MergePermissionOut] = []
+        for key in extra:
+            if "@" in key:
+                perm, gid = key.split("@", 1)
+                out.append(MergePermissionOut(key=perm, gremium=names.get(UUID(gid))))
+            else:
+                out.append(MergePermissionOut(key="admin" if key == ALL_RIGHTS else key))
+        return out, covered
 
     # -- Conflicts ---------------------------------------------------------------------
 
@@ -403,10 +564,7 @@ class PrincipalMergeService:
     async def _plain_columns(
         self, source: PrincipalRow, target: PrincipalRow, tally: _Tally, *, apply: bool
     ) -> None:
-        for area, column in SUB_COLUMNS:
-            await self._rewrite(area, column, source.sub, target.sub, tally, apply=apply)
-        for area, column in ID_COLUMNS:
-            await self._rewrite(area, column, source.id, target.id, tally, apply=apply)
+        # Delete first: a removed row (an own role assignment) is never rewritten.
         for area, column in REMOVED_ROWS:
             table = _table(column)
             if apply:
@@ -418,6 +576,10 @@ class PrincipalMergeService:
                     select(func.count()).select_from(table).where(column == source.id)
                 )
             tally.add(area, removed=n)
+        for area, column in SUB_COLUMNS:
+            await self._rewrite(area, column, source.sub, target.sub, tally, apply=apply)
+        for area, column in ID_COLUMNS:
+            await self._rewrite(area, column, source.id, target.id, tally, apply=apply)
 
     async def _rewrite(
         self,
@@ -498,22 +660,6 @@ class PrincipalMergeService:
             new,
             exists().where(
                 np.principal_id == new, np.kind == NotificationPreference.kind
-            ),
-            tally,
-            apply=apply,
-        )
-
-        # Role assignments: the same role in the same scope is a duplicate.
-        ra = aliased(RoleAssignment)
-        await self._combine(
-            "roles",
-            RoleAssignment.principal_id,
-            old,
-            new,
-            exists().where(
-                ra.principal_id == new,
-                ra.role_id == RoleAssignment.role_id,
-                ra.gremium_id.is_not_distinct_from(RoleAssignment.gremium_id),
             ),
             tally,
             apply=apply,
@@ -655,10 +801,17 @@ class PrincipalMergeService:
 
     # -- Public API --------------------------------------------------------------------
 
-    async def preview(self, source_id: UUID, target_id: UUID) -> MergePreviewOut:
-        """Count what a merge would do and list the conflicts. Write nothing."""
+    async def preview(
+        self, source_id: UUID, target_id: UUID, *, actor: str
+    ) -> MergePreviewOut:
+        """Count what a merge would do and list the conflicts. Write nothing.
+
+        ``actor`` is the ``sub`` of the admin. The extra rights of the source block the
+        merge (``canMerge`` false) unless the admin holds them all.
+        """
         source, target = await self._load(source_id, target_id, lock=False)
         conflicts = await self._conflicts(source, target)
+        extra, covered = await self._privileges(source, target, actor)
         tally = _Tally()
         await self._plain_columns(source, target, tally, apply=False)
         await self._combined_tables(source, target, tally, apply=False)
@@ -668,7 +821,9 @@ class PrincipalMergeService:
             target=_principal_out(target),
             areas=tally.out(),
             conflicts=conflicts,
-            can_merge=not conflicts,
+            extra_permissions=extra,
+            actor_holds_extra=covered,
+            can_merge=not conflicts and covered,
         )
 
     async def merge(
@@ -696,6 +851,16 @@ class PrincipalMergeService:
             conflicts = await self._conflicts(source, target)
             if conflicts:
                 raise _conflict_error(conflicts)
+            extra, covered = await self._privileges(source, target, actor)
+            if not covered:
+                raise ConflictError(
+                    "The old account holds rights that the target and you lack.",
+                    code="merge_privileges",
+                    errors=[
+                        FieldError(field="permission", msg=_permission_label(p))
+                        for p in extra
+                    ],
+                )
             tally = _Tally()
             await self._combined_tables(source, target, tally, apply=True)
             await self._plain_columns(source, target, tally, apply=True)
@@ -710,6 +875,8 @@ class PrincipalMergeService:
                     "sourceId": str(source.id),
                     "targetId": str(target.id),
                     "counts": tally.data(),
+                    # The rights of the source that the target did not hold. Keys only.
+                    "extraPermissions": [_permission_label(p) for p in extra],
                 },
             )
             await self.session.commit()
@@ -721,6 +888,15 @@ class PrincipalMergeService:
                 "The data changed during the merge. Check the preview again.",
                 code="merge_conflict",
             ) from exc
+        except DBAPIError as exc:
+            await self.session.rollback()
+            if _sqlstate(exc) in _RETRY_SQLSTATES:
+                # A deadlock or a serialization failure against a parallel write.
+                # Nothing is written; the same merge can run again.
+                raise ConflictError(
+                    "The merge met a parallel change. Try again.", code="merge_retry"
+                ) from exc
+            raise
         except BaseException:
             await self.session.rollback()
             raise
@@ -730,6 +906,19 @@ class PrincipalMergeService:
             areas=tally.out(),
             merged_at=merged_at.isoformat(),
         )
+
+
+def _sqlstate(exc: DBAPIError) -> str | None:
+    """The SQLSTATE of a driver error (psycopg ``pgcode``, asyncpg ``sqlstate``)."""
+    for err in (exc.orig, getattr(exc.orig, "__cause__", None)):
+        code = getattr(err, "pgcode", None) or getattr(err, "sqlstate", None)
+        if isinstance(code, str):
+            return code
+    return None
+
+
+def _permission_label(p: MergePermissionOut) -> str:
+    return f"{p.key} ({p.gremium})" if p.gremium else p.key
 
 
 def _conflict_error(conflicts: Sequence[MergeConflictOut]) -> ConflictError:

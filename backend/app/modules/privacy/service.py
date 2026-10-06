@@ -429,8 +429,18 @@ class AuskunftService:
                 for at in arows
             ]
 
+        # Several rows can share the address: an account that was merged into a newer
+        # one keeps its email (account merge). The live account comes first: not
+        # merged, then active, then the newest login.
         principal_row = await self.session.scalar(
-            select(Principal).where(Principal.email == email)
+            select(Principal)
+            .where(Principal.email == email)
+            .order_by(
+                Principal.merged_into.is_not(None),
+                Principal.active.is_(False),
+                Principal.last_login.desc().nulls_last(),
+            )
+            .limit(1)
         )
         attendance: list[dict[str, Any]] = []
         if principal_row is not None:

@@ -712,7 +712,8 @@ export const MOCK_FLOW: FlowGraph = {
 /**
  * The mock answer of `GET /admin/principals/{id}/merge-preview`. A merge of the
  * Keycloak account of Robin into Alex Admin conflicts (both voted in the same vote, both
- * delegated their seat in the same meeting); every other pair merges cleanly. Null when
+ * delegated their seat in the same meeting); every other pair merges cleanly. Into Sam
+ * Neu it lists two extra rights that the demo admin holds. Null when
  * one of the accounts is unknown.
  */
 export function mockMergePreview(
@@ -761,6 +762,12 @@ export function mockMergePreview(
       return { area, rewritten, combined, removed };
     }),
     conflicts,
+    // Sam Neu lacks two rights of the old account; the demo admin holds them.
+    extraPermissions:
+      targetId === 'p-3'
+        ? [{ key: 'vote.cast', gremium: 'StuPa' }, { key: 'budget.view', gremium: null }]
+        : [],
+    actorHoldsExtra: true,
     canMerge: conflicts.length === 0,
   };
 }

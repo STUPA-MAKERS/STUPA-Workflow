@@ -199,7 +199,7 @@ describe('UserMergeComponent', () => {
     expect(screen.queryByLabelText(/Ich habe die Vorschau geprüft/)).toBeNull();
     const go = screen.getByRole('button', { name: 'Konten zusammenführen' });
     expect(go).toBeDisabled();
-    expect(go).toHaveAttribute('title', 'Löse zuerst die Konflikte.');
+    expect(go).toHaveAttribute('title', 'So nicht möglich: siehe Konflikte und Rechte oben.');
   });
 
   it('a 409 merge_conflict shows the conflicts of the server', async () => {
@@ -310,5 +310,94 @@ describe('UserMergeComponent', () => {
     await rerender({ inputs: { source: { ...OLD, id: 'p-other' } } });
     fixture.detectChanges();
     expect(screen.getByRole('list', { name: 'Konten zur Auswahl' })).toBeInTheDocument();
+  });
+
+  it('lists the extra rights of the old account that the actor holds', async () => {
+    const api = makeApi({
+      previewPrincipalMerge: jest.fn(() =>
+        of(
+          preview({
+            extraPermissions: [
+              { key: 'admin', gremium: null },
+              { key: 'vote.cast', gremium: 'StuPa' },
+            ],
+            actorHoldsExtra: true,
+          }),
+        ),
+      ),
+    });
+    await setup(api);
+    await pickNew();
+    expect(screen.getByText('Rechte des alten Kontos')).toBeInTheDocument();
+    expect(screen.getByText('Administration (alle Rechte)')).toBeInTheDocument();
+    expect(screen.getByText('vote.cast (StuPa)')).toBeInTheDocument();
+    expect(screen.getByText(/Du hast diese Rechte selbst/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Ich habe die Vorschau geprüft/)).toBeInTheDocument();
+  });
+
+  it('extra rights that the actor lacks block the merge', async () => {
+    const api = makeApi({
+      previewPrincipalMerge: jest.fn(() =>
+        of(
+          preview({
+            extraPermissions: [{ key: 'budget.book' }],
+            actorHoldsExtra: false,
+            canMerge: false,
+          }),
+        ),
+      ),
+    });
+    await setup(api);
+    await pickNew();
+    expect(screen.getByText(/Erika Neu und du habt sie nicht/)).toBeInTheDocument();
+    expect(screen.getByText('budget.book')).toBeInTheDocument();
+    const go = screen.getByRole('button', { name: 'Konten zusammenführen' });
+    expect(go).toBeDisabled();
+    expect(go).toHaveAttribute('title', 'So nicht möglich: siehe Konflikte und Rechte oben.');
+  });
+
+  it('a refused preview says why', async () => {
+    const api = makeApi({
+      previewPrincipalMerge: jest.fn(() =>
+        throwError(() => ({ status: 409, error: { code: 'principal_erased' } })),
+      ),
+    });
+    await setup(api);
+    await pickNew();
+    expect(screen.getByText(/wurde nach DSGVO gelöscht/)).toBeInTheDocument();
+  });
+
+  it.each([
+    ['principal_already_merged', 'Dieses Konto ist schon in ein anderes Konto zusammengeführt.'],
+    ['merge_target_merged', /selbst schon zusammengeführt/],
+    ['merge_own_account', 'Dein eigenes Konto kannst du nicht in ein anderes Konto zusammenführen.'],
+    ['merge_target_inactive', /Das gewählte Konto ist deaktiviert/],
+    ['merge_retry', 'Gleichzeitig hat sich etwas an den Daten geändert. Versuche es noch einmal.'],
+  ])('a refused merge %s gives its own message', async (code, text) => {
+    const api = makeApi({
+      mergePrincipal: jest.fn(() => throwError(() => ({ status: 409, error: { code } }))),
+    });
+    const { toast } = await setup(api);
+    await pickNew();
+    await userEvent.click(screen.getByLabelText(/Ich habe die Vorschau geprüft/));
+    await userEvent.click(screen.getByRole('button', { name: 'Konten zusammenführen' }));
+    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(text));
+    expect(api.previewPrincipalMerge).toHaveBeenCalledTimes(1);
+  });
+
+  it('merge_privileges gives its message and loads the preview again', async () => {
+    const api = makeApi({
+      mergePrincipal: jest.fn(() =>
+        throwError(() => ({ status: 409, error: { code: 'merge_privileges' } })),
+      ),
+    });
+    const { toast } = await setup(api);
+    await pickNew();
+    await userEvent.click(screen.getByLabelText(/Ich habe die Vorschau geprüft/));
+    await userEvent.click(screen.getByRole('button', { name: 'Konten zusammenführen' }));
+    expect(toast.error).toHaveBeenCalledWith(
+      'Das alte Konto hat Rechte, die das bleibende Konto und du nicht habt.',
+    );
+    expect(api.previewPrincipalMerge).toHaveBeenCalledTimes(2);
   });
 });

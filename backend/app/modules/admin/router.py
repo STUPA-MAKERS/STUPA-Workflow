@@ -686,7 +686,7 @@ async def patch_principal(
 async def preview_principal_merge(
     principal_id: UUID,
     service: MergeServiceDep,
-    _admin: MergeAdmin,
+    admin: MergeAdmin,
     target_id: Annotated[UUID, Query(alias="targetId")],
 ) -> MergePreviewOut:
     """Show what a merge of this (old) account into `targetId` would do.
@@ -694,7 +694,7 @@ async def preview_principal_merge(
     The answer counts per area the rows that the merge rewrites, combines and removes,
     and lists the real conflicts that block it. It writes nothing.
     """
-    return await service.preview(principal_id, target_id)
+    return await service.preview(principal_id, target_id, actor=admin.sub)
 
 
 @router.post(

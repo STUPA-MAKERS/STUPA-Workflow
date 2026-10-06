@@ -51,7 +51,7 @@ from app.modules.applications.service import ApplicationsService
 from app.modules.audit.models import AuditEntry, AuditVerification
 from app.modules.audit.service import AuditService
 from app.modules.auth import oidc
-from app.modules.auth.models import AuthSession, Role, RoleAssignment
+from app.modules.auth.models import AuthSession, Role, RoleAssignment, RolePermission
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oauth_models import OAuthAuthorizationCode, OAuthToken
 from app.modules.auth.principal import Principal
@@ -138,6 +138,8 @@ def _cleanup(engine: Engine) -> Iterator[None]:
                     "DELETE FROM budget WHERE id = :b",
                 ):
                     conn.execute(text(stmt), {"b": budget_id})
+        # The roles of `_plain_actor` (their permissions go by CASCADE).
+        conn.execute(text("DELETE FROM role WHERE key LIKE 'merger\\_%'"))
     _CREATED.clear()
 
 
@@ -181,6 +183,32 @@ async def _people(
         session.add_all([old, new, other])
         await session.commit()
         return old, new, other
+
+
+async def _role(session: AsyncSession, key: str) -> Role:
+    role = (await session.scalars(select(Role).where(Role.key == key))).first()
+    if role is None:
+        role = Role(key=key, name_i18n={"de": key})
+        session.add(role)
+        await session.flush()
+    return role
+
+
+async def _admin_actor(session: AsyncSession) -> uuid.UUID:
+    """The acting admin: a principal row with the global role ``admin``.
+
+    The privilege rule compares the rights of the source with the rights of the actor,
+    so the actor needs a real row.
+    """
+    actor = await session.scalar(select(PrincipalRow).where(PrincipalRow.sub == ADMIN_SUB))
+    if actor is None:
+        actor = PrincipalRow(sub=ADMIN_SUB, display_name="Admin")
+        session.add(actor)
+        await session.flush()
+    admin = await _role(session, "admin")
+    session.add(RoleAssignment(principal_id=actor.id, role_id=admin.id, granted_by="bootstrap"))
+    await session.flush()
+    return actor.id
 
 
 async def _meeting(session: AsyncSession, gremium_id: uuid.UUID, title: str) -> Meeting:
@@ -337,11 +365,8 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
         )
 
         # Config, roles, privacy, backups, stored audit checks.
-        role = (await session.scalars(select(Role).where(Role.key == "member"))).first()
-        if role is None:
-            role = Role(key="member", name_i18n={"de": "Mitglied"})
-            session.add(role)
-            await session.flush()
+        role = await _role(session, "member")
+        admin_id = await _admin_actor(session)
         session.add_all(
             [
                 SiteConfigVersion(
@@ -351,8 +376,14 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
                     entity_type="flow", entity_id=f"merge-{tag}", version=1, created_by=old.sub
                 ),
                 FormVersion(application_type_id=seed.type_id, version=99, created_by=old.id),
+                # The own assignment of the old account goes; the one it granted to a
+                # third person keeps its marks, rewritten to the new account.
+                RoleAssignment(principal_id=old.id, role_id=role.id, granted_by="bootstrap"),
                 RoleAssignment(
-                    principal_id=old.id, role_id=role.id, granted_by=old.sub, delegated_by=old.sub
+                    principal_id=other.id,
+                    role_id=role.id,
+                    granted_by=old.sub,
+                    delegated_by=old.sub,
                 ),
                 ErasureRequest(
                     subject_type="applicant",
@@ -409,7 +440,9 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             actor=old.sub, action="login", target_type="principal", target_id=str(old.id)
         )
         await session.commit()
-        _CREATED.append(([old.id, new.id, other.id], [old.sub, new.sub, other.sub], budget.id))
+        _CREATED.append(
+            ([old.id, new.id, other.id, admin_id], [old.sub, new.sub, other.sub], budget.id)
+        )
         return World(
             seed=seed,
             old_id=old.id,
@@ -448,7 +481,7 @@ async def test_merge_rewrites_every_area(maker: async_sessionmaker[AsyncSession]
     w = await _seed(maker)
 
     async with maker() as session:
-        preview = await PrincipalMergeService(session).preview(w.old_id, w.new_id)
+        preview = await PrincipalMergeService(session).preview(w.old_id, w.new_id, actor=ADMIN_SUB)
     assert preview.can_merge is True
     assert preview.conflicts == []
     assert preview.source.display_name == OLD_NAME
@@ -491,7 +524,9 @@ async def test_merge_rewrites_every_area(maker: async_sessionmaker[AsyncSession]
         ):
             assert await _count(session, column, w.old_id) == 0, str(column)
         assert await _count(session, NotificationPreference.principal_id, w.new_id) == 1
-        assert await _count(session, RoleAssignment.principal_id, w.new_id) == 1
+        # Rights never move: the role assignments of the old account are gone.
+        assert await _count(session, RoleAssignment.principal_id, w.new_id) == 0
+        assert await _count(session, RoleAssignment.principal_id, w.old_id) == 0
         assert await _count(session, MeetingAttendance.principal_id, w.new_id) == 1
         assert await _count(session, DelegationSubstitute.substitute_principal_id, w.new_id) == 1
         assert await _count(session, SubstituteGroupMember.principal_id, w.new_id) == 1
@@ -613,13 +648,15 @@ async def test_duplicates_are_combined(maker: async_sessionmaker[AsyncSession]) 
         await session.commit()
 
     async with maker() as session:
-        preview = await PrincipalMergeService(session).preview(w.old_id, w.new_id)
+        preview = await PrincipalMergeService(session).preview(w.old_id, w.new_id, actor=ADMIN_SUB)
     assert preview.conflicts == []
     async with maker() as session:
         result = await PrincipalMergeService(session).merge(w.old_id, w.new_id, actor=ADMIN_SUB)
     counts = _areas(result)
     assert counts["notifications"] == {"rewritten": 0, "combined": 1, "removed": 0}
-    assert counts["roles"]["combined"] == 1
+    # The assignment of the old account goes; the one of the new account stays.
+    assert counts["roles"]["removed"] == 1
+    assert counts["roles"]["combined"] == 0
     assert counts["attendance"] == {"rewritten": 0, "combined": 1, "removed": 0}
     # Self entry + the same substitute for `other` + the member entry for `other`
     # + the faculty group member row.
@@ -826,7 +863,7 @@ async def test_each_conflict_blocks_the_merge(
     w, label = await _conflict_world(maker, case)
     kind = _CONFLICTS[case]
     async with maker() as session:
-        preview = await PrincipalMergeService(session).preview(w.old_id, w.new_id)
+        preview = await PrincipalMergeService(session).preview(w.old_id, w.new_id, actor=ADMIN_SUB)
     assert preview.can_merge is False
     assert [(c.kind, c.label) for c in preview.conflicts] == [(kind, label)]
 
@@ -899,12 +936,12 @@ async def test_preconditions(maker: async_sessionmaker[AsyncSession]) -> None:
     async with maker() as session:
         svc = PrincipalMergeService(session)
         with pytest.raises(ValidationProblem) as same:
-            await svc.preview(w.old_id, w.old_id)
+            await svc.preview(w.old_id, w.old_id, actor=ADMIN_SUB)
         assert same.value.code == "merge_same_principal"
         with pytest.raises(NotFoundError):
-            await svc.preview(uuid.uuid4(), w.new_id)
+            await svc.preview(uuid.uuid4(), w.new_id, actor=ADMIN_SUB)
         with pytest.raises(NotFoundError):
-            await svc.preview(w.old_id, uuid.uuid4())
+            await svc.preview(w.old_id, uuid.uuid4(), actor=ADMIN_SUB)
     async with maker() as session:
         with pytest.raises(ConflictError) as own:
             await PrincipalMergeService(session).merge(w.old_id, w.new_id, actor=w.old_sub)
@@ -914,10 +951,10 @@ async def test_preconditions(maker: async_sessionmaker[AsyncSession]) -> None:
     async with maker() as session:
         svc = PrincipalMergeService(session)
         with pytest.raises(ConflictError) as again:
-            await svc.preview(w.old_id, w.other_id)
+            await svc.preview(w.old_id, w.other_id, actor=ADMIN_SUB)
         assert again.value.code == "principal_already_merged"
         with pytest.raises(ConflictError) as target:
-            await svc.preview(w.other_id, w.old_id)
+            await svc.preview(w.other_id, w.old_id, actor=ADMIN_SUB)
         assert target.value.code == "merge_target_merged"
 
 
@@ -1062,9 +1099,11 @@ async def test_routes_and_display_follow_the_merge(
         login = next(e for e in audit if e["action"] == "login")
         assert login["actor"] == w.old_sub
         assert login["actorName"] == NEW_NAME
-        assert login["targetLabel"] == NEW_NAME
+        # The actor follows the merge; the target names the old account itself.
+        assert login["targetLabel"] == OLD_NAME
         merge_row = next(e for e in audit if e["action"] == "principal_merge")
         assert merge_row["actor"] == ADMIN_SUB
+        assert merge_row["targetLabel"] == OLD_NAME
         actors = client.get("/api/admin/audit/actors").json()
         assert {"sub": w.old_sub, "name": NEW_NAME} in actors
 
@@ -1169,3 +1208,185 @@ async def test_merged_principal_gets_no_membership_and_no_bootstrap_admin(
             text("DELETE FROM gremium_membership_mapping WHERE oidc_group = :g"), {"g": group}
         )
         await session.commit()
+
+
+# -- Security review: rights, erasure, inactive target, Art. 15 ------------------------
+
+
+async def _plain_actor(maker: async_sessionmaker[AsyncSession], perms: set[str]) -> str:
+    """A principal without the admin role; its global rights come from one role."""
+    tag = _tag()
+    async with maker() as session:
+        actor = PrincipalRow(sub=f"merger-{tag}", display_name="Merger")
+        role = Role(key=f"merger_{tag}", name_i18n={"de": "Merger"})
+        session.add_all([actor, role])
+        await session.flush()
+        session.add(RoleAssignment(principal_id=actor.id, role_id=role.id))
+        for perm in perms:
+            session.add(RolePermission(role_id=role.id, permission=perm))
+        await session.commit()
+        _CREATED.append(([actor.id], [actor.sub], None))
+        return actor.sub
+
+
+async def _give_old_admin(maker: async_sessionmaker[AsyncSession], w: World) -> None:
+    async with maker() as session:
+        admin = await _role(session, "admin")
+        session.add(RoleAssignment(principal_id=w.old_id, role_id=admin.id))
+        await session.commit()
+
+
+async def test_extra_rights_of_the_source_block_a_merge_by_a_weaker_actor(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """D1: a holder of the merge right cannot take over the admin role of another account."""
+    w = await _seed(maker)
+    actor = await _plain_actor(maker, {"admin.users", "admin.users.merge"})
+    # Without the admin role: the gremium right of the membership of the old account.
+    async with maker() as session:
+        preview = await PrincipalMergeService(session).preview(w.old_id, w.new_id, actor=actor)
+    assert preview.can_merge is False
+    assert preview.actor_holds_extra is False
+    assert ("vote.cast", "StuPa") in {(p.key, p.gremium) for p in preview.extra_permissions}
+    # With the admin role the old account holds every right: one entry says so.
+    await _give_old_admin(maker, w)
+    async with maker() as session:
+        preview = await PrincipalMergeService(session).preview(w.old_id, w.new_id, actor=actor)
+    assert [(p.key, p.gremium) for p in preview.extra_permissions] == [("admin", None)]
+    async with maker() as session:
+        with pytest.raises(ConflictError) as exc:
+            await PrincipalMergeService(session).merge(w.old_id, w.new_id, actor=actor)
+    assert exc.value.code == "merge_privileges"
+    assert exc.value.errors is not None
+    assert [e.msg for e in exc.value.errors] == ["admin"]
+    async with maker() as session:
+        old = await session.get(PrincipalRow, w.old_id)
+        assert old is not None and old.merged_into is None
+        assert await _count(session, RoleAssignment.principal_id, w.old_id) == 2
+
+
+async def test_an_admin_actor_may_merge_extra_rights_but_no_role_moves(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """D1: the admin may merge; the role assignments of the source never move."""
+    w = await _seed(maker)
+    await _give_old_admin(maker, w)
+    async with maker() as session:
+        result = await PrincipalMergeService(session).merge(w.old_id, w.new_id, actor=ADMIN_SUB)
+    assert _areas(result)["roles"]["removed"] == 2
+    async with maker() as session:
+        assert await _count(session, RoleAssignment.principal_id, w.new_id) == 0
+        entry = (
+            await session.scalars(
+                select(AuditEntry).where(AuditEntry.action == "principal_merge")
+            )
+        ).one()
+        assert entry.data["counts"]["roles"]["removed"] == 2
+        assert "admin" in entry.data["extraPermissions"]
+
+
+async def test_the_own_old_account_merges_when_the_target_holds_its_rights(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """The main use case: an admin merges their own old account into their account."""
+    w = await _seed(maker)
+    async with maker() as session:
+        member = (
+            await session.scalars(
+                select(GremiumRole).where(
+                    GremiumRole.gremium_id == w.gremium_id, GremiumRole.key == "member"
+                )
+            )
+        ).one()
+        role = await _role(session, "member")
+        session.add_all(
+            [
+                GremiumMembership(
+                    principal_id=w.new_id, gremium_id=w.gremium_id, gremium_role_id=member.id
+                ),
+                RoleAssignment(principal_id=w.new_id, role_id=role.id),
+            ]
+        )
+        new = await session.get(PrincipalRow, w.new_id)
+        assert new is not None
+        await session.commit()
+        new_sub = new.sub
+    # The new account itself is the actor and holds no merge-relevant extra right.
+    async with maker() as session:
+        preview = await PrincipalMergeService(session).preview(
+            w.old_id, w.new_id, actor=new_sub
+        )
+    assert preview.extra_permissions == []
+    assert preview.can_merge is True
+    async with maker() as session:
+        await PrincipalMergeService(session).merge(w.old_id, w.new_id, actor=new_sub)
+
+
+@pytest.mark.parametrize("mark", ["request", "audit"])
+@pytest.mark.parametrize("side", ["source", "target"])
+async def test_an_erased_account_cannot_be_merged(
+    maker: async_sessionmaker[AsyncSession], mark: str, side: str
+) -> None:
+    """D2: an executed erasure request or the erasure audit entry blocks the merge."""
+    w = await _seed(maker)
+    pid = w.old_id if side == "source" else w.new_id
+    async with maker() as session:
+        if mark == "request":
+            session.add(
+                ErasureRequest(subject_type="principal", principal_id=pid, status="executed")
+            )
+        else:
+            await AuditService(session).record(
+                actor="admin",
+                action="principal_erased",
+                target_type="principal",
+                target_id=str(pid),
+            )
+        await session.commit()
+    for call in ("preview", "merge"):
+        async with maker() as session:
+            svc = PrincipalMergeService(session)
+            with pytest.raises(ConflictError) as exc:
+                if call == "preview":
+                    await svc.preview(w.old_id, w.new_id, actor=ADMIN_SUB)
+                else:
+                    await svc.merge(w.old_id, w.new_id, actor=ADMIN_SUB)
+            assert exc.value.code == "principal_erased"
+    async with maker() as session:
+        old = await session.get(PrincipalRow, w.old_id)
+        assert old is not None and old.merged_into is None
+
+
+async def test_a_deactivated_target_is_refused(maker: async_sessionmaker[AsyncSession]) -> None:
+    w = await _seed(maker)
+    async with maker() as session:
+        new = await session.get(PrincipalRow, w.new_id)
+        assert new is not None
+        new.active = False
+        await session.commit()
+    async with maker() as session:
+        with pytest.raises(ConflictError) as exc:
+            await PrincipalMergeService(session).merge(w.old_id, w.new_id, actor=ADMIN_SUB)
+    assert exc.value.code == "merge_target_inactive"
+
+
+async def test_auskunft_names_the_live_account_of_a_shared_address(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """D3: an old account that keeps the address never hides the live account."""
+    from app.modules.privacy.service import AuskunftService
+
+    w = await _seed(maker)
+    shared = f"geteilt-{_tag()}@example.org"
+    async with maker() as session:
+        for pid in (w.old_id, w.new_id):
+            row = await session.get(PrincipalRow, pid)
+            assert row is not None
+            row.email = shared
+        await session.commit()
+    async with maker() as session:
+        await PrincipalMergeService(session).merge(w.old_id, w.new_id, actor=ADMIN_SUB)
+    async with maker() as session:
+        result = await AuskunftService(session).collect(shared)
+    assert result["principal"]["sub"] == w.new_sub
+    assert result["principal"]["displayName"] == NEW_NAME
