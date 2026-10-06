@@ -43,14 +43,21 @@ export interface CrumbMetrics {
   widths: readonly number[];
   /** The width of the whole trail. */
   available: number;
-  /** The key of the current cost centre, with the space before it. */
+  /** The key of the current cost centre, with the space before it (gap and margin). */
   key: number;
+  /** The text of the key alone, without the space before it. Only the text shortens. */
+  keyText: number;
   /** A shortened crumb or key keeps at least this width. */
   min: number;
   /** A separator with the gaps on both sides of it. */
   sep: number;
   /** The "…" button. */
   more: number;
+  /**
+   * How far the "…" moves to the start when it leads the trail (its negative margin, so
+   * that its text lines up with the title). The trail gets this width back.
+   */
+  lead: number;
 }
 
 /**
@@ -74,8 +81,10 @@ export function fitCrumbs(m: CrumbMetrics): CrumbFit {
   const current = m.widths[parents];
   const need = (hidden: number, squeeze: CrumbSqueeze): number => {
     let total = squeeze === 'name' ? short(current) : current;
-    total += squeeze === 'none' ? m.key : short(m.key);
+    // A short key keeps the space before it; only its text shortens.
+    total += squeeze === 'none' ? m.key : m.key - m.keyText + short(m.keyText);
     if (hidden > 0) total += m.more + m.sep;
+    if (hidden >= parents && parents > 0) total -= m.lead;
     const shortParents = squeeze === 'parents' || squeeze === 'name';
     for (const i of visibleParents(parents, hidden)) total += (shortParents ? short(m.widths[i]) : m.widths[i]) + m.sep;
     return total;
@@ -238,18 +247,27 @@ export class BudgetCrumbsComponent {
     const gap = parseFloat(style.columnGap) || 0;
     // The padding is the room for hover and focus (`--crumb-bleed`), not for the items.
     const padding = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
-    // The copy of the key holds the space before it as padding.
-    const key = Math.ceil(width(box.querySelector('[data-key]')));
+    // The copy of the key holds the space before it as padding; the key on screen has it
+    // as a margin. Only the text shortens (`--key-w` is the text width).
+    const keyEl = box.querySelector<HTMLElement>('[data-key]');
+    const key = Math.ceil(width(keyEl));
+    const keyPad = keyEl ? parseFloat(getComputedStyle(keyEl).paddingLeft) || 0 : 0;
+    const keyText = Math.max(0, key - keyPad);
+    // The leading "…" moves to the start by the padding of its button.
+    const moreEl = box.querySelector<HTMLElement>('[data-more]');
+    const lead = moreEl ? parseFloat(getComputedStyle(moreEl).paddingLeft) || 0 : 0;
     this.widths.set(widths);
-    this.keyWidth.set(`${key}px`);
+    this.keyWidth.set(`${keyText}px`);
     this.fit.set(
       fitCrumbs({
         widths,
         available: nav.clientWidth - padding,
         key: key + gap,
+        keyText,
         min: Math.ceil(width(box.querySelector('[data-min]'))),
         sep: SEP_ICON + 2 * gap,
-        more: Math.ceil(width(box.querySelector('[data-more]'))),
+        more: Math.ceil(width(moreEl)),
+        lead,
       }),
     );
   }

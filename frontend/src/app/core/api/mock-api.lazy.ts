@@ -1,7 +1,7 @@
 import type { HttpInterceptorFn } from '@angular/common/http';
 import { EnvironmentInjector, inject, isDevMode, runInInjectionContext } from '@angular/core';
-import { from } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { from, of } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
 import { USE_MOCK_API } from './api.config';
 
 /**
@@ -17,6 +17,14 @@ export const lazyMockApiInterceptor: HttpInterceptorFn = (req, next) => {
   if (!isDevMode() || !inject(USE_MOCK_API) || !req.url.includes('/api/')) return next(req);
   const injector = inject(EnvironmentInjector);
   return from(import('./mock-api.interceptor')).pipe(
-    switchMap((m) => runInInjectionContext(injector, () => m.mockApiInterceptor(req, next))),
+    // Dev only: a mock that does not load (for example a stale chunk after a rebuild)
+    // does not break the app. The request goes on to the real backend.
+    catchError((err: unknown) => {
+      console.error('The mock API did not load; the request goes to the backend.', err);
+      return of(null);
+    }),
+    switchMap((m) =>
+      m ? runInInjectionContext(injector, () => m.mockApiInterceptor(req, next)) : next(req),
+    ),
   );
 };

@@ -14,7 +14,10 @@ jest.mock('@angular/core', () => {
 });
 
 describe('lazyMockApiInterceptor', () => {
-  afterEach(() => TestBed.resetTestingModule());
+  afterEach(() => {
+    jest.restoreAllMocks();
+    TestBed.resetTestingModule();
+  });
 
   function setup(useMock: boolean): { http: HttpTestingController; client: HttpClient } {
     TestBed.configureTestingModule({
@@ -54,9 +57,26 @@ describe('lazyMockApiInterceptor', () => {
   it('loads the mock and lets it answer an API request', async () => {
     isDevModeMock.mockReturnValue(true);
     const { http, client } = setup(true);
-    const types = await firstValueFrom(client.get<unknown[]>('/api/application-types'));
-    expect(Array.isArray(types) || typeof types === 'object').toBe(true);
+    const types = await firstValueFrom(client.get<{ items: { id: string }[] }>('/api/application-types'));
+    // The demo type of the mock answers, not a backend.
+    expect(types.items[0].id).toBe('11111111-1111-1111-1111-111111111111');
     http.expectNone('/api/application-types');
     http.verify();
+  });
+
+  it('lets the request through and logs the error when the mock does not load', async () => {
+    isDevModeMock.mockReturnValue(true);
+    const error = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    jest.resetModules();
+    jest.doMock('./mock-api.interceptor', () => {
+      throw new Error('chunk failed');
+    });
+    const { http, client } = setup(true);
+    const reply = firstValueFrom(client.get<unknown[]>('/api/application-types'));
+    await new Promise((r) => setTimeout(r));
+    http.expectOne('/api/application-types').flush([]);
+    expect(await reply).toEqual([]);
+    expect(error).toHaveBeenCalled();
+    jest.dontMock('./mock-api.interceptor');
   });
 });

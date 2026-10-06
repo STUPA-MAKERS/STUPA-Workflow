@@ -1,7 +1,13 @@
 import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { runAxe } from '../../../testing/a11y';
-import { BudgetCrumbsComponent, fitCrumbs, visibleParents } from './budget-crumbs.component';
+import {
+  BudgetCrumbsComponent,
+  type CrumbFit,
+  type CrumbMetrics,
+  fitCrumbs,
+  visibleParents,
+} from './budget-crumbs.component';
 import type { BudgetTreeNode } from './budget-tree.api';
 
 function node(id: string, name: string, key: string): BudgetTreeNode {
@@ -37,15 +43,34 @@ const PATH = [
 
 const base = { min: 88, sep: 21, more: 28, key: 0 };
 
+/** The fit with the key text as wide as the whole key and no lead, unless a test sets them. */
+const fit = (m: Omit<CrumbMetrics, 'keyText' | 'lead'> & Partial<Pick<CrumbMetrics, 'keyText' | 'lead'>>) =>
+  fitCrumbs({ keyText: m.key, lead: 0, ...m });
+
+/**
+ * What the trail draws for a fit, as the stylesheet lays it out: the key keeps the gap and
+ * its margin before it, and only its text shortens; the leading "…" moves to the start.
+ */
+function drawn(m: CrumbMetrics, f: CrumbFit): number {
+  const parents = m.widths.length - 1;
+  const short = (w: number) => Math.min(w, m.min);
+  const shortParents = f.squeeze === 'parents' || f.squeeze === 'name';
+  let total = f.squeeze === 'name' ? short(m.widths[parents]) : m.widths[parents];
+  total += m.key - m.keyText + (f.squeeze === 'none' ? m.keyText : short(m.keyText));
+  if (f.hidden > 0) total += m.more + m.sep - (f.hidden >= parents ? m.lead : 0);
+  for (const i of visibleParents(parents, f.hidden)) total += (shortParents ? short(m.widths[i]) : m.widths[i]) + m.sep;
+  return total;
+}
+
 describe('fitCrumbs', () => {
   it('shows every crumb when the natural widths fit', () => {
-    expect(fitCrumbs({ ...base, widths: [200, 90, 60], available: 392 })).toEqual({ hidden: 0, squeeze: 'none' });
+    expect(fit({ ...base, widths: [200, 90, 60], available: 392 })).toEqual({ hidden: 0, squeeze: 'none' });
   });
 
   it('goes through the steps in order, at their exact boundaries', () => {
     // Five levels: root 200, two levels between (150, 120), parent 100, current 60, key 150.
     const m = { ...base, key: 150, widths: [200, 150, 120, 100, 60] };
-    const at = (available: number) => fitCrumbs({ ...m, available });
+    const at = (available: number) => fit({ ...m, available });
     // 1. All at full width: 630 + 4 × 21 + key 150 = 864.
     expect(at(864)).toEqual({ hidden: 0, squeeze: 'none' });
     // 2. Root 200+21, … 28+21, parent 100+21, current 60, key 150 = 601: the two levels
@@ -70,26 +95,62 @@ describe('fitCrumbs', () => {
   it('has nothing between to hide for root › parent › current', () => {
     const m = { ...base, key: 150, widths: [200, 100, 60] };
     // 200+21 + 100+21 + 60 + 150 = 552.
-    expect(fitCrumbs({ ...m, available: 552 })).toEqual({ hidden: 0, squeeze: 'none' });
-    expect(fitCrumbs({ ...m, available: 551 })).toEqual({ hidden: 0, squeeze: 'key' });
+    expect(fit({ ...m, available: 552 })).toEqual({ hidden: 0, squeeze: 'none' });
+    expect(fit({ ...m, available: 551 })).toEqual({ hidden: 0, squeeze: 'key' });
     // 88+21 + 88+21 + 60 + 88 = 366.
-    expect(fitCrumbs({ ...m, available: 366 })).toEqual({ hidden: 0, squeeze: 'parents' });
-    expect(fitCrumbs({ ...m, available: 365 })).toEqual({ hidden: 2, squeeze: 'none' });
+    expect(fit({ ...m, available: 366 })).toEqual({ hidden: 0, squeeze: 'parents' });
+    expect(fit({ ...m, available: 365 })).toEqual({ hidden: 2, squeeze: 'none' });
   });
 
   it('keeps a parent or a key that is shorter than the minimum at its own width', () => {
     // Root 50 and key 40 are below the minimum: 50+21 + 300+21 + 60 + 40 = 492, and the
     // shortened step only shortens the long parent: 50+21 + 88+21 + 60 + 40 = 280.
     const m = { ...base, key: 40, widths: [50, 300, 60] };
-    expect(fitCrumbs({ ...m, available: 491 })).toEqual({ hidden: 0, squeeze: 'parents' });
-    expect(fitCrumbs({ ...m, available: 280 })).toEqual({ hidden: 0, squeeze: 'parents' });
-    expect(fitCrumbs({ ...m, available: 279 })).toEqual({ hidden: 2, squeeze: 'none' });
+    expect(fit({ ...m, available: 491 })).toEqual({ hidden: 0, squeeze: 'parents' });
+    expect(fit({ ...m, available: 280 })).toEqual({ hidden: 0, squeeze: 'parents' });
+    expect(fit({ ...m, available: 279 })).toEqual({ hidden: 2, squeeze: 'none' });
   });
 
   it('has nothing to hide for a root alone, and nothing at all for an empty path', () => {
-    expect(fitCrumbs({ ...base, widths: [100], key: 50, available: 150 })).toEqual({ hidden: 0, squeeze: 'none' });
-    expect(fitCrumbs({ ...base, widths: [100], key: 50, available: 149 })).toEqual({ hidden: 0, squeeze: 'name' });
-    expect(fitCrumbs({ ...base, widths: [], available: 10 })).toEqual({ hidden: 0, squeeze: 'none' });
+    expect(fit({ ...base, widths: [100], key: 50, available: 150 })).toEqual({ hidden: 0, squeeze: 'none' });
+    expect(fit({ ...base, widths: [100], key: 50, available: 149 })).toEqual({ hidden: 0, squeeze: 'name' });
+    expect(fit({ ...base, widths: [], available: 10 })).toEqual({ hidden: 0, squeeze: 'none' });
+  });
+});
+
+describe('fitCrumbs against the drawn trail', () => {
+  // As in the browser: gap 4, key margin 8 and key text 120 (key 132), minimum 72, a
+  // separator 13 + 2 × 4, the "…" 28 with a lead of 8.
+  const m: Omit<CrumbMetrics, 'available'> = {
+    widths: [216, 96, 344, 72, 72],
+    key: 132,
+    keyText: 120,
+    min: 72,
+    sep: 21,
+    more: 28,
+    lead: 8,
+  };
+
+  it('counts the short key with the space before it, at the step 3/4 boundary', () => {
+    // Step 3: root 216+21, … 28+21, parent 72+21, current 72, key 4+8+72 = 535.
+    expect(fitCrumbs({ ...m, available: 535 })).toEqual({ hidden: 2, squeeze: 'key' });
+    expect(drawn({ ...m, available: 535 }, fitCrumbs({ ...m, available: 535 }))).toBe(535);
+    expect(fitCrumbs({ ...m, available: 534 })).toEqual({ hidden: 2, squeeze: 'parents' });
+  });
+
+  it('gets the lead of the "…" back when it leads the trail', () => {
+    // "… › current" with the full key: 28+21 − 8 + 72 + 132 = 245.
+    expect(fitCrumbs({ ...m, available: 245 })).toEqual({ hidden: 4, squeeze: 'none' });
+    expect(fitCrumbs({ ...m, available: 244 })).toEqual({ hidden: 4, squeeze: 'key' });
+  });
+
+  it('never draws more than the bar holds, from a narrow bar to a wide one', () => {
+    for (let available = 190; available <= 1200; available++) {
+      const f = fitCrumbs({ ...m, available });
+      // The last step shortens the name as far as it must; the stylesheet does the rest.
+      if (f.squeeze === 'name') continue;
+      expect(drawn({ ...m, available }, f)).toBeLessThanOrEqual(available);
+    }
   });
 });
 
