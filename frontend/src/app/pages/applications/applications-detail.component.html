@@ -381,23 +381,27 @@
           name="comment"
           [attr.aria-label]="'applications.comments.add' | t"
         ></textarea>
-        @if (canManage()) {
-          <app-segmented width="equal"
-            class="ad__composerVis"
-            [ariaLabel]="'applications.comments.visibility' | t"
-            [options]="visibilityOptions()"
-            [value]="visibility()"
-            (valueChange)="setVisibility($event)"
-          />
-        }
-        <app-button
-          type="submit"
-          variant="text"
-          [iconOnly]="true"
-          [ariaLabel]="'applications.comments.send' | t"
-          [disabled]="!newComment().trim()"
-          [loading]="posting()"
-        ><app-icon name="send" [size]="19" /></app-button>
+        <!-- One group, so the toggle and the send button wrap together and the button
+             never sits alone on a second line. -->
+        <div class="ad__composerActions">
+          @if (canManage()) {
+            <app-segmented width="equal"
+              class="ad__composerVis"
+              [ariaLabel]="'applications.comments.visibility' | t"
+              [options]="visibilityOptions()"
+              [value]="visibility()"
+              (valueChange)="setVisibility($event)"
+            />
+          }
+          <app-button
+            type="submit"
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'applications.comments.send' | t"
+            [disabled]="!newComment().trim()"
+            [loading]="posting()"
+          ><app-icon name="send" [size]="19" /></app-button>
+        </div>
       </form>
     </div>
   </section>

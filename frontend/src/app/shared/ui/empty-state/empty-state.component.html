@@ -2,7 +2,7 @@
   @if (code(); as c) {
     <p class="es__code">{{ c }}</p>
   } @else {
-    <app-icon class="es__icon" [name]="icon()" [size]="32" />
+    <app-icon class="es__icon" [name]="icon()" [size]="iconSize()" />
   }
   <h1 class="es__heading">{{ heading() }}</h1>
   @if (body(); as text) {
