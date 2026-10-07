@@ -31,6 +31,8 @@ export class EmptyStateComponent {
   readonly body = input<string | null>(null);
   /** Large muted glyph above the heading. */
   readonly icon = input<IconName>('document');
+  /** Glyph size in px. A block-level empty state (a card, a tab) passes a smaller one. */
+  readonly iconSize = input(32);
   /** Displayed above the heading, for a code such as 404. */
   readonly code = input<string | null>(null);
   /**

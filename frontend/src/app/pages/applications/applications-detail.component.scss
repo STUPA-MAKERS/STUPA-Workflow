@@ -346,8 +346,8 @@
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
 }
 .ad__composerInput {
-  /* Below 14rem the toggle and the send button wrap to a second line. */
-  flex: 1 1 14rem;
+  /* Below 10rem the toggle and the send button wrap to a second line. */
+  flex: 1 1 10rem;
   min-width: 0;
   min-height: var(--control-height);
   max-height: 12rem;
@@ -363,12 +363,17 @@
   field-sizing: content;
   overflow-y: auto;
 }
+/* The toggle and the send button. They never split: on the second line they align
+   right as one group. */
+.ad__composerActions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
 .ad__composerVis {
   flex: none;
-  /* On the second line the toggle and the send button align right. */
-  margin-left: auto;
-  /* Center the 36px toggle on the 40px send button. */
-  margin-bottom: 2px;
 }
 .ad__composerInput:focus-visible {
   outline: none;
