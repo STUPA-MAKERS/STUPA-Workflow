@@ -51,7 +51,10 @@ def get_public_protocol_service(session: DbSession, request: Request) -> PublicP
 
 ServiceDep = Annotated[PublicProtocolService, Depends(get_public_protocol_service)]
 GremiumQuery = Annotated[list[UUID] | None, Query(alias="gremium", max_length=50)]
-SearchQuery = Annotated[str | None, Query(min_length=1, max_length=100)]
+# No control characters: a NUL byte would make Postgres fail on the LIKE pattern.
+SearchQuery = Annotated[
+    str | None, Query(min_length=1, max_length=100, pattern=r"^[^\x00-\x1f\x7f]*$")
+]
 
 
 def _filter(

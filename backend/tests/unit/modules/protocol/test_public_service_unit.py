@@ -101,7 +101,9 @@ async def test_assemble_collects_public_tops(monkeypatch: pytest.MonkeyPatch) ->
     assert "Geheim" not in md
     assert [t.number for t in tops] == [1, 2, 3]
     assert tops[0].title == "Haushalt"
-    assert [d.question for d in tops[0].decisions] == ["Annehmen?"]
+    # A vote already in the text as a snippet still shows its result in the list.
+    assert [d.question for d in tops[0].decisions] == ["Annehmen?", "Schon im Text?"]
+    assert md.count("Schon im Text?") == 1
     assert tops[0].decisions[0].counts == {"ja": 4, "nein": 1}
     assert tops[1].non_public is True and tops[1].title is None and tops[1].markdown is None
     assert tops[2].title == "Tagesordnungspunkt" and tops[2].markdown is None
@@ -175,9 +177,7 @@ async def test_set_public_withheld_audits_a_change_only(
     assert len(entries) == 1
 
 
-async def test_start_finalize_stores_the_withhold_option(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def _finalize_fakes(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
 
     async def _record(_session: Any, **kw: Any) -> None:
@@ -190,12 +190,69 @@ async def test_start_finalize_stores_the_withhold_option(
 
     monkeypatch.setattr(protocol_service_mod, "audit_record", _record)
     monkeypatch.setattr("app.modules.livevote.guests.GuestService", _Guests)
-    proto = _protocol(status="draft")
+    return entries
+
+
+async def _start(withheld_before: bool, option: bool | None) -> Protocol:
+    proto = _protocol(status="draft", public_withheld=withheld_before)
     meeting = SimpleNamespace(id=MID, status="closed")
     session = FakeSession(store={MID: meeting}, results=[result(proto)])
-    out = await _service(session).start_finalize(PID, actor="a", public_withheld=True)
-    assert out.public_withheld is True
+    await _service(session).start_finalize(PID, actor="a", public_withheld=option)
+    return proto
+
+
+async def test_start_finalize_sets_and_audits_the_withhold_option(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    entries = _finalize_fakes(monkeypatch)
+    proto = await _start(False, True)
+    assert proto.public_withheld is True
+    actions = [e["action"] for e in entries]
+    assert actions == [AuditAction.PROTOCOL_PUBLICATION, AuditAction.PROTOCOL_FINALIZE]
+    assert (entries[0]["data"]["old"], entries[0]["data"]["new"]) == (False, True)
+    assert entries[1]["data"]["publicWithheld"] is True
+
+
+async def test_start_finalize_without_option_keeps_a_withheld_draft(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A draft held back earlier stays held back on a plain finalize (no option)."""
+    entries = _finalize_fakes(monkeypatch)
+    proto = await _start(True, None)
+    assert proto.public_withheld is True
+    assert [e["action"] for e in entries] == [AuditAction.PROTOCOL_FINALIZE]
     assert entries[0]["data"]["publicWithheld"] is True
+    # The same value again writes no publication entry either.
+    entries.clear()
+    proto = await _start(True, True)
+    assert [e["action"] for e in entries] == [AuditAction.PROTOCOL_FINALIZE]
+
+
+async def test_start_finalize_can_release_a_withheld_draft(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    entries = _finalize_fakes(monkeypatch)
+    proto = await _start(True, False)
+    assert proto.public_withheld is False
+    assert (entries[0]["data"]["old"], entries[0]["data"]["new"]) == (True, False)
+
+
+async def test_gremien_missing_public_lists_the_gremien() -> None:
+    gid = uuid4()
+    statements: list[str] = []
+    session = FakeSession(results=[result(gid), result()])
+    original = session.scalars
+
+    async def _scalars(stmt: Any) -> Any:
+        statements.append(str(stmt))
+        return await original(stmt)
+
+    session.scalars = _scalars  # type: ignore[method-assign]
+    with_storage = _service(session, storage=FakeStorage(), typst=object())
+    assert await with_storage.gremien_missing_public() == [gid]
+    assert "public_pdf_storage_key" in statements[0]
+    assert await _service(session).gremien_missing_public() == []
+    assert "public_pdf_storage_key" not in statements[1]
 
 
 async def test_backfill_counts_each_outcome(monkeypatch: pytest.MonkeyPatch) -> None:

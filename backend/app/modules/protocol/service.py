@@ -506,7 +506,7 @@ class ProtocolService:
         return await self._to_out(protocol)
 
     async def start_finalize(
-        self, protocol_id: UUID, *, actor: str, public_withheld: bool = False
+        self, protocol_id: UUID, *, actor: str, public_withheld: bool | None = None
     ) -> ProtocolOut:
         """Start the finalization and move the protocol from `draft` to `rendering`.
 
@@ -520,9 +520,11 @@ class ProtocolService:
         parallel calls run one after the other: the second call sees `rendering`
         and gets 409.
 
-        `public_withheld` holds back the protocol from the public protocols page.
-        The finalization renders the public version anyway, so a later release
-        needs no render.
+        `public_withheld` holds back the protocol from the public protocols page
+        (`True`) or releases it (`False`). `None` keeps the stored value, so a
+        protocol held back as a draft stays held back. A change writes
+        `protocol_publication`. The finalization renders the public version
+        anyway, so a later release needs no render.
 
         Raises:
             ConflictError: The meeting is not closed (`meeting_not_closed`), or the
@@ -541,7 +543,10 @@ class ProtocolService:
                 code="protocol_not_draft",
             )
         protocol.status = "rendering"
-        protocol.public_withheld = public_withheld
+        old_withheld = bool(protocol.public_withheld)
+        if public_withheld is not None and public_withheld != old_withheld:
+            protocol.public_withheld = public_withheld
+            await self._audit_publication(protocol, actor, old_withheld, public_withheld)
         # #17: the finalization pseudonymizes the guests ("Gast 1 … n"). The protocol
         # carries them as a count only.
         from app.modules.livevote.guests import GuestService
@@ -556,12 +561,30 @@ class ProtocolService:
             data={
                 "meetingId": str(protocol.meeting_id),
                 "gremiumId": str(protocol.gremium_id),
-                "publicWithheld": public_withheld,
+                "publicWithheld": bool(protocol.public_withheld),
             },
         )
         await self.session.flush()
         await self.session.commit()
         return await self._to_out(protocol)
+
+    async def _audit_publication(
+        self, protocol: Protocol, actor: str, old: bool, new: bool
+    ) -> None:
+        """Write `protocol_publication` with the old and the new hold-back value."""
+        await audit_record(
+            self.session,
+            actor=actor,
+            action=AuditAction.PROTOCOL_PUBLICATION,
+            target_type="protocol",
+            target_id=str(protocol.id),
+            data={
+                "meetingId": str(protocol.meeting_id),
+                "gremiumId": str(protocol.gremium_id),
+                "old": old,
+                "new": new,
+            },
+        )
 
     async def set_public_withheld(
         self, protocol_id: UUID, withheld: bool, *, actor: str
@@ -576,19 +599,7 @@ class ProtocolService:
         old = bool(protocol.public_withheld)
         if old != withheld:
             protocol.public_withheld = withheld
-            await audit_record(
-                self.session,
-                actor=actor,
-                action=AuditAction.PROTOCOL_PUBLICATION,
-                target_type="protocol",
-                target_id=str(protocol_id),
-                data={
-                    "meetingId": str(protocol.meeting_id),
-                    "gremiumId": str(protocol.gremium_id),
-                    "old": old,
-                    "new": withheld,
-                },
-            )
+            await self._audit_publication(protocol, actor, old, withheld)
             await self.session.flush()
         await self.session.commit()
         return await self._to_out(protocol)
@@ -695,6 +706,29 @@ class ProtocolService:
             else:
                 result.done += 1
         return result
+
+    async def gremien_missing_public(self) -> list[UUID]:
+        """List the public gremien with a final, not held back protocol that lacks
+        its public version (no snapshot, or no public PDF while storage is on).
+
+        The hourly heal job runs the backfill for them, so a protocol whose build
+        failed or raced appears without a new switch of the gremium flag.
+        """
+        cond = Protocol.public_content.is_(None)
+        if self.storage is not None and self.typst is not None:
+            cond = or_(cond, Protocol.public_pdf_storage_key.is_(None))
+        rows = await self.session.scalars(
+            select(Protocol.gremium_id)
+            .join(Gremium, Gremium.id == Protocol.gremium_id)
+            .where(
+                Gremium.protocols_public.is_(True),
+                Protocol.status == "final",
+                Protocol.public_withheld.is_(False),
+                cond,
+            )
+            .distinct()
+        )
+        return list(rows.all())
 
     async def _backfill_one(self, protocol_id: UUID) -> None:
         protocol = await self._get(protocol_id, for_update=True)
@@ -1027,11 +1061,13 @@ class ProtocolService:
                 )
                 # The protokollant may have put the result into the text already,
                 # with the same snippet. One box per vote.
+                if getattr(view, "status", None) == "closed":
+                    # The public list shows the result also when the protokollant
+                    # put the snippet into the text already.
+                    top.decisions.append(PublicDecision.from_vote(view))
                 if vote_in_body(body, snippet):
                     continue
                 block.append(snippet)
-                if getattr(view, "status", None) == "closed":
-                    top.decisions.append(PublicDecision.from_vote(view))
             blocks.append("\n\n".join(block))
             if tops is not None:
                 tops.append(top)

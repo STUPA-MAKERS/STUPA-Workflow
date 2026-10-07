@@ -97,7 +97,7 @@ class _FakeService:
         return self._out()
 
     async def start_finalize(
-        self, protocol_id: UUID, *, actor: str, public_withheld: bool = False
+        self, protocol_id: UUID, *, actor: str, public_withheld: bool | None = None
     ) -> ProtocolOut:
         self.calls.append(f"start_finalize:{protocol_id}")
         self.withheld_at_finalize = public_withheld
@@ -393,6 +393,28 @@ def test_finalize_passes_the_withhold_option(
     r = client.post(f"/api/protocols/{PROTOCOL_ID}/finalize", json={"publicWithheld": True})
     assert r.status_code == 200
     assert fake_service.withheld_at_finalize is True
+
+
+def test_finalize_without_option_keeps_the_stored_value(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _writer(app)
+    assert client.post(f"/api/protocols/{PROTOCOL_ID}/finalize").status_code == 200
+    assert fake_service.withheld_at_finalize is None
+    fake_service.status = "draft"
+    assert client.post(f"/api/protocols/{PROTOCOL_ID}/finalize", json={}).status_code == 200
+    assert fake_service.withheld_at_finalize is None
+
+
+async def test_schedule_public_backfill_survives_an_enqueue_error() -> None:
+    from app.modules.protocol.router import schedule_public_backfill
+
+    class _Down:
+        async def enqueue_job(self, *_a: object, **_kw: object) -> object:
+            raise ConnectionError("redis down")
+
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(arq_pool=_Down())))
+    await schedule_public_backfill(request, object(), get_settings(), uuid4())  # type: ignore[arg-type]
 
 
 async def test_schedule_public_backfill_enqueues_with_a_pool() -> None:

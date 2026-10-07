@@ -32,6 +32,8 @@ export class FinalizeProtocolDialogComponent {
   /** The title of the meeting, as the subtitle of the dialog. */
   readonly meetingTitle = input('');
   readonly finalizing = input(false);
+  /** The stored hold-back of the protocol: the switch starts from it. */
+  readonly initialWithheld = input(false);
 
   readonly closed = output<void>();
   readonly confirmed = output<{ publicWithheld: boolean }>();
@@ -40,9 +42,10 @@ export class FinalizeProtocolDialogComponent {
   protected readonly withheld = signal(false);
 
   constructor() {
-    // Each opening starts with "publish": that is the rule of a public gremium.
+    // Each opening starts from the stored value: a protocol held back as a draft
+    // stays held back unless the reader switches it.
     effect(() => {
-      if (this.open()) untracked(() => this.withheld.set(false));
+      if (this.open()) untracked(() => this.withheld.set(this.initialWithheld()));
     });
   }
 

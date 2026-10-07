@@ -187,6 +187,31 @@ async def backfill_public_protocols(ctx: dict[str, Any], gremium_id: str) -> str
     return summary
 
 
+async def heal_public_protocols(ctx: dict[str, Any]) -> str:
+    """Build the missing public versions of all public gremien (hourly cron).
+
+    A backfill job can fail (Redis down at enqueue time, a render error that ran out
+    of tries) or race with a finalize. This job finds every public gremium with a
+    final, not held back protocol without its public version and runs the backfill
+    for it. Errors of one gremium only log.
+
+    Returns:
+        A short summary: `"gremien=<n> done=<n> failed=<n>"`.
+    """
+    maker = _sessionmaker(ctx)
+    async with maker() as session:
+        gremien = await _service(ctx, session).gremien_missing_public()
+    done = failed = 0
+    for gremium_id in gremien:
+        async with maker() as session:
+            result = await _service(ctx, session).backfill_public(gremium_id)
+        done += result.done
+        failed += result.transient + result.failed
+    if failed:
+        logger.warning("public heal left %s protocols without a public version", failed)
+    return f"gremien={len(gremien)} done={done} failed={failed}"
+
+
 async def on_startup(ctx: dict[str, Any]) -> None:
     """Build the render dependencies once per worker.
 

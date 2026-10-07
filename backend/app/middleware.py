@@ -25,6 +25,7 @@ from starlette.responses import JSONResponse, Response
 
 from app.settings import Settings, get_settings
 from app.shared.antiabuse import client_ip, get_rate_limiter
+from app.shared.errors import PUBLIC_API_PREFIX
 from app.shared.ratelimit import RateLimiter
 
 TRACE_HEADER = "X-Trace-Id"
@@ -43,8 +44,6 @@ _SECURITY_HEADERS = {
 }
 
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
-# All public routes without login. Their answers carry `X-Robots-Tag: noindex`.
-PUBLIC_API_PREFIX = "/api/public/"
 # The public meeting routes (#17). They apply their own rate limits.
 PUBLIC_MEETING_PREFIX = "/api/public/meetings/"
 

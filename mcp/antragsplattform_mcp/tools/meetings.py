@@ -470,7 +470,7 @@ async def embed_protocol_votes(protocol_id: str, vote_ids: list[str]) -> dict:
 
 
 @group.tool
-async def finalize_protocol(protocol_id: str, public_withheld: bool = False) -> dict:
+async def finalize_protocol(protocol_id: str, public_withheld: bool | None = None) -> dict:
     """Finalize the protocol.
 
     Only after the meeting is CLOSED (409 `meeting_not_closed` before), and only
@@ -485,11 +485,12 @@ async def finalize_protocol(protocol_id: str, public_withheld: bool = False) -> 
 
     In a Gremium that publishes its protocols, the final protocol appears on the
     public protocols page (public TOPs only, attendance as counts). Pass
-    `public_withheld=True` to hold it back; `update_protocol` can change that later.
+    `public_withheld=True` to hold it back or `False` to release it; leave it out to
+    keep the stored value (a draft held back with `update_protocol` stays held back).
+    `update_protocol` can change it later.
     """
-    return await api().post(
-        f"/protocols/{protocol_id}/finalize", json={"publicWithheld": public_withheld}
-    )
+    body = {} if public_withheld is None else {"publicWithheld": public_withheld}
+    return await api().post(f"/protocols/{protocol_id}/finalize", json=body)
 
 
 @group.tool

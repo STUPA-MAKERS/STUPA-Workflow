@@ -46,8 +46,10 @@ class ProtocolPatch(_CamelModel):
 class ProtocolFinalizeBody(_CamelModel):
     """`POST /protocols/{id}/finalize`: the optional finalize options."""
 
-    # Hold back this protocol from the public protocols page.
-    public_withheld: bool = Field(default=False, alias="publicWithheld")
+    # Hold back this protocol from the public protocols page (True) or release it
+    # (False). Absent or null keeps the stored value, so a draft held back earlier
+    # stays held back.
+    public_withheld: bool | None = Field(default=None, alias="publicWithheld")
 
 
 class ProtocolVotesBody(_CamelModel):

@@ -48,9 +48,11 @@ def test_update_gremium_sends_only_the_flag(fake_api: _FakeApi) -> None:
 def test_finalize_passes_the_withhold_option(fake_api: _FakeApi) -> None:
     asyncio.run(meetings.finalize_protocol("p1"))
     asyncio.run(meetings.finalize_protocol("p2", public_withheld=True))
+    asyncio.run(meetings.finalize_protocol("p3", public_withheld=False))
     assert fake_api.calls == [
-        ("POST", "/protocols/p1/finalize", {"publicWithheld": False}),
+        ("POST", "/protocols/p1/finalize", {}),
         ("POST", "/protocols/p2/finalize", {"publicWithheld": True}),
+        ("POST", "/protocols/p3/finalize", {"publicWithheld": False}),
     ]
 
 

@@ -314,6 +314,10 @@ def test_router_lists_with_filters_and_noindex(
     http.get("/api/public/protocols", params={"q": "   "})
     assert fake.filters[-1].q is None
     assert http.get("/api/public/protocols", params={"semester": "x"}).status_code == 422
+    nul = http.get("/api/public/protocols?q=%00")
+    assert nul.status_code == 422
+    assert nul.headers["X-Robots-Tag"] == "noindex"
+    assert http.get("/api/public/protocols/semesters?q=a%00b").status_code == 422
     assert http.get("/api/public/protocols", params={"limit": 51}).status_code == 422
     sem = http.get("/api/public/protocols/semesters", params={"q": "a"})
     assert sem.json() == [{"key": "ws-2026", "count": 1}]
@@ -366,3 +370,19 @@ async def test_public_protocol_rate_limits() -> None:
     await antiabuse.rate_limit_public_protocol_pdf(_request(), settings, limiter)
     with pytest.raises(RateLimitedError):
         await antiabuse.rate_limit_public_protocol_pdf(_request(), settings, limiter)
+
+
+def test_unhandled_error_on_a_public_route_keeps_noindex() -> None:
+    app: FastAPI = create_app(get_settings())
+
+    class _Broken(_FakeService):
+        async def list_gremien(self) -> list[pub.PublicGremiumOut]:
+            raise RuntimeError("db down")
+
+    app.dependency_overrides[get_public_protocol_service] = _Broken
+    app.dependency_overrides[antiabuse.get_rate_limiter] = InMemoryRateLimiter
+    http = TestClient(app, raise_server_exceptions=False)
+    res = http.get("/api/public/gremien")
+    assert res.status_code == 500
+    assert res.headers["X-Robots-Tag"] == "noindex"
+    assert res.headers["content-type"].startswith("application/problem+json")

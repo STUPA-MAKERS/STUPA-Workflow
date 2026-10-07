@@ -197,6 +197,7 @@
   [open]="finalizeDialogOpen()"
   [meetingTitle]="meeting()?.title ?? ''"
   [finalizing]="finalizing()"
+  [initialWithheld]="protocol()?.publicWithheld ?? false"
   (closed)="finalizeDialogOpen.set(false)"
   (confirmed)="confirmFinalize($event)"
 />

@@ -91,7 +91,11 @@ async def schedule_public_backfill(
     """
     pool = getattr(request.app.state, "arq_pool", None)
     if pool is not None:
-        await enqueue_public_backfill(pool, gremium_id)
+        try:
+            await enqueue_public_backfill(pool, gremium_id)
+        except Exception:  # noqa: BLE001 - the gremium save already succeeded
+            # The hourly heal job builds the missing versions later.
+            logger.exception("public backfill enqueue failed (gremium=%s)", gremium_id)
         return
     storage: ObjectStorage | None = getattr(request.app.state, "object_storage", None)
     service = ProtocolService(
@@ -240,7 +244,7 @@ async def finalize_protocol(
     synchronously as a fallback, so a protocol never stays stuck in `rendering`.
     """
     await service.authorize_finalize(protocol_id, principal)
-    withheld = payload.public_withheld if payload is not None else False
+    withheld = payload.public_withheld if payload is not None else None
     out = await service.start_finalize(protocol_id, actor=principal.sub, public_withheld=withheld)
     pool = getattr(request.app.state, "arq_pool", None)
     queue = protocol_render_queue_from_pool(pool)

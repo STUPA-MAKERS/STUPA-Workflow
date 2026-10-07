@@ -2,11 +2,11 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { FinalizeProtocolDialogComponent } from './finalize-protocol-dialog.component';
 
-async function setup() {
+async function setup(initialWithheld = false) {
   const closed = jest.fn();
   const confirmed = jest.fn();
   const view = await render(FinalizeProtocolDialogComponent, {
-    inputs: { open: true, meetingTitle: '34. Sitzung', finalizing: false },
+    inputs: { open: true, meetingTitle: '34. Sitzung', finalizing: false, initialWithheld },
     on: { closed, confirmed },
   });
   return { ...view, closed, confirmed };
@@ -46,6 +46,16 @@ describe('FinalizeProtocolDialogComponent', () => {
       'aria-checked',
       'false',
     );
+  });
+
+  it('starts from a stored hold-back, so a withheld draft stays withheld', async () => {
+    const { confirmed } = await setup(true);
+    expect(screen.getByRole('switch', { name: /Nicht veröffentlichen/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
+    expect(confirmed).toHaveBeenCalledWith({ publicWithheld: true });
   });
 
   it('cancels', async () => {

@@ -427,7 +427,8 @@ async def test_withhold_toggle_and_finalize_option(
     finalize = [e for e in entries if e.action == "protocol_finalize"]
     assert finalize[0].data["publicWithheld"] is True
     publication = [e for e in entries if e.action == "protocol_publication"]
-    assert [(e.data["old"], e.data["new"]) for e in publication] == [(True, False)]
+    # The finalize option and the later release each write one entry.
+    assert [(e.data["old"], e.data["new"]) for e in publication] == [(False, True), (True, False)]
 
 
 async def test_draft_patch_with_markdown_and_withheld(
@@ -476,3 +477,24 @@ async def test_free_text_protocol_without_storage(
         assert data["hasPdf"] is False
         assert data["date"] == datetime.now(UTC).date().isoformat()
         assert client.get(f"/api/public/protocols/{protocol_id}/pdf").status_code == 404
+
+
+async def test_withheld_draft_stays_withheld_on_plain_finalize(
+    api: FastAPI, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    """A draft held back with PATCH stays held back when finalize sends no option."""
+    _, _, protocol_id = await _seed(maker)
+    with TestClient(api) as client:
+        _enter(client, api, _Storage())
+        held = client.patch(f"/api/protocols/{protocol_id}", json={"publicWithheld": True})
+        assert held.json()["publicWithheld"] is True
+        fin = client.post(f"/api/protocols/{protocol_id}/finalize")
+        assert fin.status_code == 200, fin.text
+        assert fin.json()["publicWithheld"] is True
+        assert client.get(f"/api/public/protocols/{protocol_id}").status_code == 404
+        nul = client.get("/api/public/protocols?q=%00")
+        assert nul.status_code == 422
+        assert nul.headers["X-Robots-Tag"] == "noindex"
+    entries = await _audit(maker, protocol_id)
+    assert [e.data["publicWithheld"] for e in entries if e.action == "protocol_finalize"] == [True]
+    assert len([e for e in entries if e.action == "protocol_publication"]) == 1
