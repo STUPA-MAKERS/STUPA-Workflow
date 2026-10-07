@@ -16,13 +16,16 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, TimestampMixin, UUIDPkMixin
@@ -56,6 +59,17 @@ class Protocol(UUIDPkMixin, TimestampMixin, Base):
     # CD-variant key of the gremium, snapshotted at creation. `stupa` and `asta`
     # select the render variant `protocol-stupa` and `protocol-asta`.
     cd_variant: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Public protocols page. `public_withheld` holds back this one protocol, also
+    # when its gremium publishes its protocols. `public_content` is the snapshot of
+    # the public version (public TOPs, decisions, attendance counts, never a name)
+    # that the public API serves. It is set together with the public PDF, so a
+    # protocol without it never appears publicly. `public_search_text` is the
+    # plain text of the public TOPs for the search. `public_pdf_size` is the byte
+    # size of the public PDF.
+    public_withheld: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    public_content: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    public_search_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    public_pdf_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
         CheckConstraint(

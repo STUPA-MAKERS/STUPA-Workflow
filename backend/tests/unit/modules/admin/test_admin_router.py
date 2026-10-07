@@ -34,6 +34,7 @@ from app.modules.admin.schemas import (
     GremiumMembershipMappingOut,
     GremiumMembershipOut,
     GremiumOut,
+    GremiumPublicPreview,
     GremiumRoleMappingOut,
     GremiumRoleOut,
     GroupMappingOut,
@@ -98,6 +99,17 @@ class _FakeConfig:
             allow_vote_delegation=payload.allow_vote_delegation,
         )
 
+    session = None
+    was_public = False
+
+    async def gremium_protocols_public(self, gremium_id):  # noqa: ANN001
+        return self.was_public
+
+    async def gremium_public_preview(self, gremium_id):  # noqa: ANN001
+        if str(gremium_id).startswith("00000000"):
+            raise NotFoundError("nope")
+        return GremiumPublicPreview(final_count=6, missing_count=5)
+
     async def update_gremium(self, gremium_id, payload, actor):  # noqa: ANN001
         if str(gremium_id).startswith("00000000"):
             raise NotFoundError("nope")
@@ -108,6 +120,7 @@ class _FakeConfig:
             cd_variant_id=None,
             default_lang="de",
             allow_vote_delegation=False,
+            protocols_public=bool(payload.protocols_public),
         )
 
     async def get_gremium_mail_recipients(self, gremium_id):  # noqa: ANN001
@@ -908,3 +921,32 @@ def test_privacy_admin_reads_principals_for_the_erasure_picker(
     assert client.get("/api/admin/principals?q=max").status_code == 200
     patched = client.patch(f"/api/admin/principals/{uuid4()}", json={"active": False})
     assert patched.status_code == 403
+
+
+def test_gremium_switch_on_schedules_the_backfill(
+    app: FastAPI, client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Off to on schedules the public backfill once; on to on and off do not."""
+    from app.modules.protocol import router as protocol_router
+
+    seen: list[object] = []
+
+    async def _schedule(request, session, settings, gremium_id):  # noqa: ANN001
+        seen.append(gremium_id)
+
+    monkeypatch.setattr(protocol_router, "schedule_public_backfill", _schedule)
+    _as_admin(app)
+    gid = uuid4()
+    r = client.patch(f"/api/admin/gremien/{gid}", json={"protocolsPublic": True})
+    assert r.status_code == 200 and r.json()["protocolsPublic"] is True
+    assert seen == [gid]
+    client.patch(f"/api/admin/gremien/{gid}", json={"protocolsPublic": False})
+    assert seen == [gid]
+
+
+def test_gremium_public_preview(app: FastAPI, client: TestClient) -> None:
+    _as_admin(app)
+    r = client.get(f"/api/admin/gremien/{uuid4()}/public-preview")
+    assert r.json() == {"finalCount": 6, "missingCount": 5}
+    r = client.get("/api/admin/gremien/00000000-0000-0000-0000-000000000000/public-preview")
+    assert r.status_code == 404

@@ -21,6 +21,7 @@ const GREMIEN: Gremium[] = [
     quorumPercent: 50,
     memberCount: 23,
     roleCount: 4,
+    protocolsPublic: true,
   },
   {
     id: 'g-2',
@@ -124,6 +125,15 @@ describe('AdminGremienComponent', () => {
     expect(screen.getByRole('button', { name: /^AStA/ })).toHaveAttribute('aria-expanded', 'false');
     expect(api.listGremiumRoles).toHaveBeenCalledWith('g-1', { quiet: true });
     expect(api.listGremiumRoles).not.toHaveBeenCalledWith('g-2', expect.anything());
+  });
+
+  it('tags a gremium that publishes its protocols and names the setting', async () => {
+    await setup();
+    expect(within(item('Studierendenparlament')).getByText('Öffentlich', { selector: '.grem__tag' })).toBeInTheDocument();
+    expect(within(item('AStA')).queryByText('Öffentlich', { selector: '.grem__tag' })).toBeNull();
+    const first = item('Studierendenparlament');
+    const dt = within(first).getByText('Öffentlich', { selector: 'dt' });
+    expect(dt.nextElementSibling).toHaveTextContent('Ja');
   });
 
   it('shows every setting of an open row; the recipients wrap in full', async () => {

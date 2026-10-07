@@ -344,6 +344,11 @@ class Settings(BaseSettings):
     rl_public_join_code_per_hour: int = 400
     rl_public_meeting_read_ip_per_hour: int = 3000
     rl_public_guest_write_per_hour: int = 120
+    # Public protocols page: the reads of the list and the detail, and the PDF
+    # downloads, per IP. Many readers share the campus NAT, so the limits stay
+    # generous; they stop a scraper that walks every protocol.
+    rl_public_protocols_ip_per_hour: int = 3000
+    rl_public_protocol_pdf_ip_per_hour: int = 600
 
     # Gravatar proxy (GET /principals/{id}/avatar). The API fetches the image from the
     # fixed host gravatar.com and keeps the result in Redis. A found image and a missing

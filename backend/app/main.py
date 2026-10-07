@@ -62,6 +62,7 @@ from app.modules.notifications.router import (
     templates_router as mail_templates_router,
 )
 from app.modules.privacy.router import router as privacy_router
+from app.modules.protocol.public_router import router as public_protocol_router
 from app.modules.protocol.router import router as protocol_router
 from app.modules.search.router import router as search_router
 from app.modules.voting.router import router as voting_router
@@ -95,6 +96,7 @@ api_router.include_router(voting_router)
 api_router.include_router(livevote_router)
 api_router.include_router(public_meeting_router)
 api_router.include_router(protocol_router)
+api_router.include_router(public_protocol_router)
 api_router.include_router(notifications_router)
 api_router.include_router(notification_settings_router)
 api_router.include_router(mail_templates_router)

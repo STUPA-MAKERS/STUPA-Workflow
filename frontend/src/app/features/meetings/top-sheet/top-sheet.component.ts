@@ -17,6 +17,7 @@ import {
   type MarkdownFormat,
 } from '@stupa-makers/ui-kit/markdown-editor';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 import type { StatusKind } from '@shared/status-kind.util';
 import { resolveI18n } from '../meetings-display.util';
 import { meetingKeeperLine } from '../keepers.util';
@@ -67,6 +68,7 @@ const TOOLS: readonly FormatTool[] = [
     TranslatePipe,
     IconComponent,
     MarkdownEditorComponent,
+    NoteComponent,
     ProtocolBarComponent,
     StatusTextComponent,
   ],

@@ -357,6 +357,32 @@ async def rate_limit_public_read(
     )
 
 
+async def rate_limit_public_protocols(
+    request: Request, settings: SettingsDep, limiter: RateLimiterDep
+) -> None:
+    """The reads of the public protocols page: a generous limit per IP."""
+    await _enforce(
+        limiter,
+        f"public-protocols:ip:{client_ip(request)}",
+        limit=settings.rl_public_protocols_ip_per_hour,
+        window=_HOUR,
+        detail="Too many requests from this IP. Try again later.",
+    )
+
+
+async def rate_limit_public_protocol_pdf(
+    request: Request, settings: SettingsDep, limiter: RateLimiterDep
+) -> None:
+    """The PDF downloads of the public protocols page: a limit per IP."""
+    await _enforce(
+        limiter,
+        f"public-protocol-pdf:ip:{client_ip(request)}",
+        limit=settings.rl_public_protocol_pdf_ip_per_hour,
+        window=_HOUR,
+        detail="Too many downloads from this IP. Try again later.",
+    )
+
+
 def require_altcha(field: str = "altcha") -> Callable[..., Awaitable[None]]:
     """Dependency factory: verify the ALTCHA solution field from the JSON body.
 

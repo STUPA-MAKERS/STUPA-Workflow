@@ -18,11 +18,13 @@ from the settings. The endpoints declare their errors as `ProblemDetail`
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import (
     DbSession,
@@ -34,12 +36,19 @@ from app.modules.files.storage import ObjectStorage
 from app.modules.livevote.service import BrokerPublisher, MeetingService
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
 from app.modules.pdf.typst_client import build_typst_client
-from app.modules.protocol.queue import protocol_render_queue_from_pool
-from app.modules.protocol.schemas import ProtocolOut, ProtocolPatch, ProtocolVotesBody
+from app.modules.protocol.queue import enqueue_public_backfill, protocol_render_queue_from_pool
+from app.modules.protocol.schemas import (
+    ProtocolFinalizeBody,
+    ProtocolOut,
+    ProtocolPatch,
+    ProtocolVotesBody,
+)
 from app.modules.protocol.service import ProtocolService
+from app.settings import Settings
 from app.shared.errors import ProblemDetail
 
 router = APIRouter(tags=["protocol"])
+logger = logging.getLogger("app.protocol")
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 
@@ -69,6 +78,31 @@ def get_protocol_service(
 
 
 ServiceDep = Annotated[ProtocolService, Depends(get_protocol_service)]
+
+
+async def schedule_public_backfill(
+    request: Request, session: AsyncSession, settings: Settings, gremium_id: UUID
+) -> None:
+    """Start the build of the missing public versions after a gremium went public.
+
+    With Redis the arq worker runs the job. Without Redis (development, contract
+    CI) the request runs it inline. The gremium change is already committed, so an
+    error here only logs: the protocols without a public version stay hidden.
+    """
+    pool = getattr(request.app.state, "arq_pool", None)
+    if pool is not None:
+        await enqueue_public_backfill(pool, gremium_id)
+        return
+    storage: ObjectStorage | None = getattr(request.app.state, "object_storage", None)
+    service = ProtocolService(
+        session, storage=storage, typst=build_typst_client(settings), settings=settings
+    )
+    try:
+        await service.backfill_public(gremium_id)
+    except Exception:  # noqa: BLE001 - the gremium save already succeeded
+        logger.exception("inline public backfill failed (gremium=%s)", gremium_id)
+
+
 # This dependency only requires authentication. Each endpoint checks the
 # per-gremium authorization through ProtocolService and MeetingService.
 PrincipalDep = Annotated[Principal, Depends(require_principal())]
@@ -116,9 +150,24 @@ async def update_protocol(
     service: ServiceDep,
     principal: PrincipalDep,
 ) -> ProtocolOut:
-    """Update the editor body. The endpoint returns 409 when the protocol is final."""
-    await service.authorize_write(protocol_id, principal)
-    return await service.update_markdown(protocol_id, payload.markdown)
+    """Update the editor body or the publication of the protocol.
+
+    `markdown` needs write access and a draft (409 when the protocol is final or
+    under render). `publicWithheld` holds back the protocol from the public
+    protocols page or releases it. It needs the right to finalize (the publishing
+    right) and works in every status. It writes `protocol_publication`.
+    """
+    if payload.public_withheld is not None:
+        await service.authorize_finalize(protocol_id, principal)
+    if payload.markdown is not None:
+        await service.authorize_write(protocol_id, principal)
+        out = await service.update_markdown(protocol_id, payload.markdown)
+        if payload.public_withheld is None:
+            return out
+    # The schema requires one of the two fields, so `publicWithheld` is set here.
+    return await service.set_public_withheld(
+        protocol_id, bool(payload.public_withheld), actor=principal.sub
+    )
 
 
 @router.delete(
@@ -167,7 +216,11 @@ async def embed_votes(
     responses=_errors(400, 401, 403, 404, 409, 503),
 )
 async def finalize_protocol(
-    protocol_id: UUID, service: ServiceDep, request: Request, principal: PrincipalDep
+    protocol_id: UUID,
+    service: ServiceDep,
+    request: Request,
+    principal: PrincipalDep,
+    payload: ProtocolFinalizeBody | None = None,
 ) -> ProtocolOut:
     """Start the finalization: set `status=rendering` and enqueue `render_protocol`.
 
@@ -178,7 +231,8 @@ async def finalize_protocol(
     The meeting must be closed (409 `meeting_not_closed`, F8, O13), and the
     protocol must be a draft (409 `protocol_not_draft`): a protocol is finalized
     once, also when several members kept the minutes (O2). The start writes
-    `protocol_finalize`.
+    `protocol_finalize`. The optional body `{publicWithheld}` holds back the
+    protocol from the public protocols page.
 
     The call does not block, because the typst render runs in the arq worker.
     The worker sets `final` and sends the mail. A permanent failure falls back
@@ -186,7 +240,8 @@ async def finalize_protocol(
     synchronously as a fallback, so a protocol never stays stuck in `rendering`.
     """
     await service.authorize_finalize(protocol_id, principal)
-    out = await service.start_finalize(protocol_id, actor=principal.sub)
+    withheld = payload.public_withheld if payload is not None else False
+    out = await service.start_finalize(protocol_id, actor=principal.sub, public_withheld=withheld)
     pool = getattr(request.app.state, "arq_pool", None)
     queue = protocol_render_queue_from_pool(pool)
     if queue is None:

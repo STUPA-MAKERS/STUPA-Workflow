@@ -505,6 +505,33 @@ describe('MeetingsComponent', () => {
     expect(await screen.findByText('Final')).toBeInTheDocument();
   });
 
+  it('asks before it finalizes the protocol of a public gremium, and can hold it back', async () => {
+    const { http } = await setup();
+    http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'closed' });
+    http
+      .expectOne('/api/meetings/m-1/protocol')
+      .flush({ ...PROTOCOL, gremiumProtocolsPublic: true });
+    http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([]);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Finalisieren & versenden' }));
+    http.expectNone('/api/protocols/p-1/finalize');
+    const dialog = await screen.findByRole('dialog', { name: 'Protokoll finalisieren?' });
+    expect(dialog).toHaveTextContent('Dieses Protokoll wird öffentlich. Keine Namen Dritter im Freitext.');
+    // "Abbrechen" closes without a finalize.
+    await userEvent.click(within(dialog).getAllByRole('button', { name: 'Abbrechen' })[0]);
+    http.expectNone('/api/protocols/p-1');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
+    const again = await screen.findByRole('dialog', { name: 'Protokoll finalisieren?' });
+    await userEvent.click(within(again).getByRole('switch', { name: /Nicht veröffentlichen/ }));
+    await userEvent.click(within(again).getByRole('button', { name: 'Finalisieren & versenden' }));
+    http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
+    const finReq = http.expectOne('/api/protocols/p-1/finalize');
+    expect(finReq.request.body).toEqual({ publicWithheld: true });
+    finReq.flush({ ...PROTOCOL, status: 'final' });
+  });
+
   it('applies live vote_tally updates from the WebSocket', async () => {
     const { http, ws, fixture } = await setup();
     flushLoad(http);

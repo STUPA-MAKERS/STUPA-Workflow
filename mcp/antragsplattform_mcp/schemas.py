@@ -230,6 +230,13 @@ class GremiumCreate(WireModel):
     delegationLeadMinutes: int = 0
     delegationAllowExternal: bool = False
     quorumPercent: int | None = Field(default=None, ge=0, le=100)
+    protocolsPublic: bool = Field(
+        default=False,
+        description=(
+            "Show the final protocols of this Gremium without login on the public "
+            "protocols page (public version only)."
+        ),
+    )
 
 
 class GremiumUpdate(WireModel):
@@ -241,6 +248,14 @@ class GremiumUpdate(WireModel):
     delegationLeadMinutes: int | None = None
     delegationAllowExternal: bool | None = None
     quorumPercent: int | None = None
+    protocolsPublic: bool | None = Field(
+        default=None,
+        description=(
+            "Switch the public protocols page for this Gremium. Switching it on "
+            "publishes ALL final protocols that are not held back; a job builds the "
+            "missing public versions first."
+        ),
+    )
 
 
 class CdVariantCreate(WireModel):

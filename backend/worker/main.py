@@ -34,8 +34,8 @@ from worker.deadlines import process_deadlines
 from worker.files_drafts import purge_draft_attachments
 from worker.mail import on_startup as mail_on_startup
 from worker.mail import send_mail
+from worker.protocol import backfill_public_protocols, render_protocol
 from worker.protocol import on_startup as protocol_on_startup
-from worker.protocol import render_protocol
 from worker.retention import process_retention
 from worker.scan import on_startup as scan_on_startup
 from worker.scan import scan_attachment
@@ -129,6 +129,7 @@ class WorkerSettings:
         send_mail,
         scan_attachment,
         render_protocol,
+        backfill_public_protocols,
         func(deliver_webhook, timeout=_WEBHOOK_JOB_TIMEOUT_SECONDS),
         process_deadlines,
         process_task_reminders,

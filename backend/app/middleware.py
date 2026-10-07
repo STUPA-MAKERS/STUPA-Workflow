@@ -43,6 +43,8 @@ _SECURITY_HEADERS = {
 }
 
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE"})
+# All public routes without login. Their answers carry `X-Robots-Tag: noindex`.
+PUBLIC_API_PREFIX = "/api/public/"
 # The public meeting routes (#17). They apply their own rate limits.
 PUBLIC_MEETING_PREFIX = "/api/public/meetings/"
 
@@ -69,6 +71,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         for key, value in _SECURITY_HEADERS.items():
             response.headers.setdefault(key, value)
+        if request.url.path.startswith(PUBLIC_API_PREFIX):
+            # The public routes (protocols page, QR join) are never for search
+            # engines: every answer, an error included, carries noindex.
+            response.headers["X-Robots-Tag"] = "noindex"
         return response
 
 

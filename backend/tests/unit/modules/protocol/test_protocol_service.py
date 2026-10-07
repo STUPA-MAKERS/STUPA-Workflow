@@ -511,7 +511,11 @@ async def test_start_finalize_marks_rendering_and_audits(
     assert entry["action"].value == "protocol_finalize"
     assert entry["actor"] == "lead"
     assert entry["target_id"] == str(PID)
-    assert entry["data"] == {"meetingId": str(MID), "gremiumId": str(GID)}
+    assert entry["data"] == {
+        "meetingId": str(MID),
+        "gremiumId": str(GID),
+        "publicWithheld": False,
+    }
 
 
 @pytest.mark.parametrize("status", ["planned", "live"])

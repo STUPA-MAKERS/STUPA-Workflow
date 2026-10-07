@@ -6,16 +6,16 @@
     }
   </div>
 
-  <!-- Two ways in, side by side and weighted the same. A visitor is either an applicant
-       or a Gremium member, and the page has no way to tell which, so it must not guess
-       by making one of them the primary action. -->
+  <!-- The ways in, side by side and weighted the same. The page has no way to tell
+       which kind of visitor it has, so it must not guess by making one of them the
+       primary action. The protocol card shows only when a public protocol exists. -->
   @if (loginError(); as reason) {
     <app-note class="home__loginError" kind="error" icon="lock" role="alert">
       <span>{{ reason | t }}</span>
     </app-note>
   }
 
-  <div class="home__choices">
+  <div class="home__choices" [class.home__choices--three]="protocolTotal() > 0">
     <a routerLink="/apply" class="home__choice">
       <app-icon class="home__icon" name="form" [size]="24" />
       <span class="home__choice-title">{{ 'home.choice.apply.title' | t }}</span>
@@ -24,6 +24,17 @@
         {{ 'home.choice.go' | t }} <app-icon name="arrow" [size]="15" />
       </span>
     </a>
+
+    @if (protocolTotal() > 0) {
+      <a routerLink="/protokolle" class="home__choice">
+        <app-icon class="home__icon" name="archive" [size]="24" />
+        <span class="home__choice-title">{{ 'home.choice.protocols.title' | t }}</span>
+        <span class="home__choice-desc">{{ 'home.choice.protocols.desc' | t }}</span>
+        <span class="home__go" aria-hidden="true">
+          {{ 'home.choice.go' | t }} <app-icon name="arrow" [size]="15" />
+        </span>
+      </a>
+    }
 
     <button type="button" class="home__choice" (click)="login()">
       <app-icon class="home__icon" name="user" [size]="24" />
@@ -36,4 +47,29 @@
   </div>
 
   <p class="home__note">{{ 'home.statusNote' | t }}</p>
+
+  @if (protocolTotal() > 0) {
+    <section class="home__latest" aria-labelledby="home-latest">
+      <h2 class="home__latestTitle" id="home-latest">{{ 'home.latest.title' | t }}</h2>
+      <ul class="home__latestList">
+        @for (p of latest(); track p.id) {
+          <li>
+            <a class="home__latestItem" [routerLink]="['/protokolle', p.id]">
+              <app-date-block [date]="dateOf(p)" />
+              <span class="home__latestText">
+                <span class="home__latestName">{{ p.title }}</span>
+                <span class="home__latestMeta">{{
+                  'home.latest.meta' | t: { gremium: p.gremium.name, n: publicTops(p) }
+                }}</span>
+              </span>
+            </a>
+          </li>
+        }
+      </ul>
+      <a class="home__latestAll" routerLink="/protokolle">
+        {{ 'home.latest.all' | t: { n: protocolTotal() } }}
+        <app-icon name="arrow" [size]="15" />
+      </a>
+    </section>
+  }
 </section>

@@ -96,8 +96,11 @@ class _FakeService:
         self.calls.append(f"embed:{protocol_id}:{len(vote_ids)}")
         return self._out()
 
-    async def start_finalize(self, protocol_id: UUID, *, actor: str) -> ProtocolOut:
+    async def start_finalize(
+        self, protocol_id: UUID, *, actor: str, public_withheld: bool = False
+    ) -> ProtocolOut:
         self.calls.append(f"start_finalize:{protocol_id}")
+        self.withheld_at_finalize = public_withheld
         if self.status in ("rendering", "final"):
             raise ConflictError("not a draft", code="protocol_not_draft")
         self.status = "rendering"
@@ -107,6 +110,12 @@ class _FakeService:
         self.calls.append(f"finalize:{protocol_id}")
         self.status = "final"
         return self._out(status="final")
+
+    async def set_public_withheld(
+        self, protocol_id: UUID, withheld: bool, *, actor: str
+    ) -> ProtocolOut:
+        self.calls.append(f"withheld:{protocol_id}:{withheld}:{actor}")
+        return self._out(status=self.status)
 
     async def revert_to_draft(self, protocol_id: UUID) -> None:
         self.calls.append(f"revert:{protocol_id}")
@@ -346,3 +355,74 @@ def test_delete_final_protocol_409(app: FastAPI, client: TestClient) -> None:
     r = client.delete(f"/api/protocols/{PROTOCOL_ID}")
     assert r.status_code == 409
     assert r.headers["content-type"].startswith("application/problem+json")
+
+
+# Publication on the public protocols page.
+def test_patch_withheld_needs_finalize_right(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _writer(app)
+    fake_service.status = "final"
+    r = client.patch(f"/api/protocols/{PROTOCOL_ID}", json={"publicWithheld": True})
+    assert r.status_code == 200
+    assert fake_service.authz == [f"finalize:{PROTOCOL_ID}"]
+    assert fake_service.calls == [f"withheld:{PROTOCOL_ID}:True:p"]
+
+
+def test_patch_markdown_and_withheld_together(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _writer(app)
+    r = client.patch(
+        f"/api/protocols/{PROTOCOL_ID}", json={"markdown": "x", "publicWithheld": False}
+    )
+    assert r.status_code == 200
+    assert fake_service.authz == [f"finalize:{PROTOCOL_ID}", f"write:{PROTOCOL_ID}"]
+    assert fake_service.calls == [f"update:{PROTOCOL_ID}", f"withheld:{PROTOCOL_ID}:False:p"]
+
+
+def test_patch_without_fields_is_422(app: FastAPI, client: TestClient) -> None:
+    _writer(app)
+    assert client.patch(f"/api/protocols/{PROTOCOL_ID}", json={}).status_code == 422
+
+
+def test_finalize_passes_the_withhold_option(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    _writer(app)
+    r = client.post(f"/api/protocols/{PROTOCOL_ID}/finalize", json={"publicWithheld": True})
+    assert r.status_code == 200
+    assert fake_service.withheld_at_finalize is True
+
+
+async def test_schedule_public_backfill_enqueues_with_a_pool() -> None:
+    from app.modules.protocol.router import schedule_public_backfill
+
+    pool = _FakePool()
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(arq_pool=pool)))
+    gid = uuid4()
+    await schedule_public_backfill(request, object(), get_settings(), gid)  # type: ignore[arg-type]
+    assert pool.jobs == [("backfill_public_protocols", str(gid))]
+
+
+async def test_schedule_public_backfill_runs_inline_without_a_pool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.protocol import router as router_mod
+
+    seen: list[UUID] = []
+
+    async def _ok(self: object, gremium_id: UUID) -> None:
+        seen.append(gremium_id)
+
+    async def _boom(self: object, gremium_id: UUID) -> None:
+        raise RuntimeError("render down")
+
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace()))
+    gid = uuid4()
+    monkeypatch.setattr(router_mod.ProtocolService, "backfill_public", _ok)
+    await router_mod.schedule_public_backfill(request, object(), get_settings(), gid)  # type: ignore[arg-type]
+    assert seen == [gid]
+    # An error only logs: the gremium save already succeeded.
+    monkeypatch.setattr(router_mod.ProtocolService, "backfill_public", _boom)
+    await router_mod.schedule_public_backfill(request, object(), get_settings(), gid)  # type: ignore[arg-type]

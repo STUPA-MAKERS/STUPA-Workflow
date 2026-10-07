@@ -407,7 +407,11 @@ export class MeetingSessionService implements OnDestroy {
     }, 4000);
   }
 
-  finalize(): void {
+  /**
+   * Finalize the protocol. `publicWithheld` keeps the protocol of a public gremium off
+   * the public protocol page (the finalize dialog asks for it).
+   */
+  finalize(opts: { publicWithheld?: boolean } = {}): void {
     const proto = this.protocol();
     // `isLocked` also covers `rendering`: no second start, no 409 on PATCH.
     if (!proto || proto.isLocked || this.finalizing() || this.agendaSvc.savingTop()) return;
@@ -419,7 +423,7 @@ export class MeetingSessionService implements OnDestroy {
     this.api.updateProtocol(proto.id, assembleProtocolMarkdown(this.agendaSvc.agenda())).subscribe({
       next: (saved) => {
         this.protocol.set(saved);
-        this.doFinalize(saved.id);
+        this.doFinalize(saved.id, opts);
       },
       error: () => {
         this.finalizing.set(false);
@@ -428,8 +432,38 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
-  private doFinalize(protocolId: Uuid): void {
-    this.api.finalizeProtocol(protocolId).subscribe({
+  /** A change of the publication of a final protocol runs. */
+  readonly publicationSaving = signal(false);
+
+  /**
+   * Hold the protocol back from the public protocol page, or publish it again. The
+   * server checks the right to finalize in the gremium.
+   */
+  setPublicWithheld(withheld: boolean): void {
+    const proto = this.protocol();
+    if (!proto || this.publicationSaving()) return;
+    this.publicationSaving.set(true);
+    this.api.setProtocolWithheld(proto.id, withheld).subscribe({
+      next: (updated) => {
+        this.publicationSaving.set(false);
+        this.protocol.set(updated);
+        this.toast.success(
+          this.i18n.translate(
+            withheld ? 'meetings.toast.protocolWithheld' : 'meetings.toast.protocolPublished',
+          ),
+        );
+      },
+      error: (err: unknown) => {
+        this.publicationSaving.set(false);
+        const detail = errorDetail(err);
+        const base = this.i18n.translate('meetings.toast.actionFailed');
+        this.toast.error(detail ? `${base}: ${detail}` : base);
+      },
+    });
+  }
+
+  private doFinalize(protocolId: Uuid, opts: { publicWithheld?: boolean } = {}): void {
+    this.api.finalizeProtocol(protocolId, opts).subscribe({
       next: (updated) => {
         this.finalizing.set(false);
         this.protocol.set(updated);

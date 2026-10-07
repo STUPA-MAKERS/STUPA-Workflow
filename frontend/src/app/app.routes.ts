@@ -67,6 +67,25 @@ export const routes: Routes = [
           ),
       },
       {
+        // The public protocols (no login): the final protocols of the gremien that publish
+        // them, in the public version. The pages set `noindex` themselves.
+        path: 'protokolle',
+        data: { title: 'publicProtocols.title', footer: true },
+        loadComponent: () =>
+          import('./features/public-protocols/public-protocols.component').then(
+            (m) => m.PublicProtocolsComponent,
+          ),
+      },
+      {
+        // The id is a UUID and appears only in the URL, never in the page.
+        path: 'protokolle/:id',
+        data: { title: 'publicProtocols.title', footer: true },
+        loadComponent: () =>
+          import('./features/public-protocols/public-protocol-detail.component').then(
+            (m) => m.PublicProtocolDetailComponent,
+          ),
+      },
+      {
         // #17: the join page of a public meeting (the QR code of the beamer). Public: a
         // device cookie, not a login, carries the participation.
         path: 'j/:code',

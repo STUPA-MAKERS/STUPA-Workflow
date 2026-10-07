@@ -241,6 +241,16 @@ export interface Gremium {
   memberCount?: number;
   /** Number of gremium roles, the forced roles included. Admin list only. */
   roleCount?: number;
+  /** The final protocols of the gremium show on the public protocol page. */
+  protocolsPublic?: boolean;
+}
+
+/** `GET /admin/gremien/{id}/public-preview`: what a switch to "public" publishes. */
+export interface GremiumPublicPreview {
+  /** The final protocols that are not held back. */
+  finalCount: number;
+  /** Of them, the protocols without a public version yet (a job makes it). */
+  missingCount: number;
 }
 
 /** Body for `POST /admin/gremien` (`GremiumCreate`). */
@@ -253,6 +263,7 @@ export interface GremiumCreateBody {
   delegationLeadMinutes?: number;
   delegationAllowExternal?: boolean;
   quorumPercent?: number | null;
+  protocolsPublic?: boolean;
 }
 
 /** Body for `PATCH /admin/gremien/{id}` (`GremiumUpdate`) — all fields optional. */
@@ -265,6 +276,7 @@ export interface GremiumUpdateBody {
   delegationLeadMinutes?: number;
   delegationAllowExternal?: boolean;
   quorumPercent?: number | null;
+  protocolsPublic?: boolean;
 }
 
 // Corporate-design variants — mirror of `admin/cd_logos.py` and the CD schemas.

@@ -10,12 +10,14 @@ import {
   untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
   DialogComponent,
+  IconComponent,
   InputComponent,
   SelectComponent,
   type SelectOption,
@@ -26,6 +28,7 @@ import {
   type CdVariantOption,
   type Gremium,
   type GremiumCreateBody,
+  type GremiumPublicPreview,
   type GremiumUpdateBody,
   slugify,
 } from '../../admin.models';
@@ -48,6 +51,8 @@ export interface GremiumForm {
   quorumPercent: number | null;
   /** Extra protocol recipients, one address per line. */
   mailRecipients: string;
+  /** The final protocols show on the public protocol page. */
+  protocolsPublic: boolean;
 }
 
 export function emptyGremiumForm(): GremiumForm {
@@ -60,6 +65,7 @@ export function emptyGremiumForm(): GremiumForm {
     delegationAllowExternal: false,
     quorumPercent: null,
     mailRecipients: '',
+    protocolsPublic: false,
   };
 }
 
@@ -81,6 +87,11 @@ export function parseRecipients(raw: string): string[] {
  * If the dialog cannot read the recipients, the field stays locked and a save sends only
  * the base data: the PUT replaces the list, so an empty field would delete it.
  * There is no switch for changing a ballot after casting: a ballot never changes (O11).
+ *
+ * The switch "Öffentlich" puts the final protocols on the public protocol page. Turning
+ * it on for a gremium that has it off asks first ("Protokolle veröffentlichen?", in the
+ * same dialog): it names how many final protocols become readable without a login and
+ * how many still need their public version, which a job of the server makes.
  */
 @Component({
   selector: 'app-gremium-dialog',
@@ -88,9 +99,11 @@ export function parseRecipients(raw: string): string[] {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    RouterLink,
     TranslatePipe,
     ButtonComponent,
     DialogComponent,
+    IconComponent,
     InputComponent,
     SelectComponent,
     SwitchComponent,
@@ -136,6 +149,21 @@ export class GremiumDialogComponent {
    */
   private created: Gremium | null = null;
 
+  /** The question before the switch to "public" is saved. */
+  protected readonly confirmPublic = signal(false);
+  /** The counts of the question; `null` while they load or when the read failed. */
+  protected readonly preview = signal<GremiumPublicPreview | null>(null);
+  protected readonly previewLoading = signal(false);
+
+  /** The implications of a public gremium ("Was das bedeutet"). */
+  protected readonly implications = [
+    { icon: 'check', key: 'admin.gremien.publicImplies.final' },
+    { icon: 'file', key: 'admin.gremien.publicImplies.version' },
+    { icon: 'lock', key: 'admin.gremien.publicImplies.nonPublic' },
+    { icon: 'history', key: 'admin.gremien.publicImplies.retro' },
+    { icon: 'cal', key: 'admin.gremien.publicImplies.meetings' },
+  ] as const;
+
   protected readonly isNew = computed(() => this.gremium() === null);
   protected readonly slug = computed(
     () => this.gremium()?.slug ?? (slugify(this.form().name) || '—'),
@@ -160,6 +188,9 @@ export class GremiumDialogComponent {
 
   private reset(g: Gremium | null): void {
     this.created = null;
+    this.confirmPublic.set(false);
+    this.preview.set(null);
+    this.previewLoading.set(false);
     this.error.set('');
     this.saving.set(false);
     this.recipientsLoadFailed.set(false);
@@ -177,6 +208,7 @@ export class GremiumDialogComponent {
       delegationAllowExternal: g.delegationAllowExternal ?? false,
       quorumPercent: g.quorumPercent ?? null,
       mailRecipients: '',
+      protocolsPublic: g.protocolsPublic ?? false,
     });
     this.recipientsLoading.set(true);
     this.api.getGremiumMailRecipients(g.id).subscribe({
@@ -219,9 +251,43 @@ export class GremiumDialogComponent {
     this.closed.emit();
   }
 
+  /** "Abbrechen" in the question: back to the form, nothing saved. */
+  protected backFromConfirm(): void {
+    this.confirmPublic.set(false);
+  }
+
+  /**
+   * Save. Turning "public" on for a stored gremium asks first: the question loads the
+   * counts of the protocols that the switch publishes.
+   */
   protected submit(): void {
-    const f = this.form();
     if (!this.canSave() || this.recipientsLoading()) return;
+    const g = this.gremium();
+    if (g && this.form().protocolsPublic && !g.protocolsPublic && !this.confirmPublic()) {
+      this.confirmPublic.set(true);
+      this.preview.set(null);
+      this.previewLoading.set(true);
+      this.api.getGremiumPublicPreview(g.id).subscribe({
+        next: (p) => {
+          this.previewLoading.set(false);
+          this.preview.set(p);
+        },
+        // Without the counts the question still asks, in general words.
+        error: () => this.previewLoading.set(false),
+      });
+      return;
+    }
+    this.save();
+  }
+
+  /** "Veröffentlichen" in the question. */
+  protected confirmAndSave(): void {
+    this.confirmPublic.set(false);
+    this.save();
+  }
+
+  private save(): void {
+    const f = this.form();
     this.saving.set(true);
     this.error.set('');
     const base = {
@@ -232,6 +298,7 @@ export class GremiumDialogComponent {
       delegationLeadMinutes: f.delegationLeadMinutes,
       delegationAllowExternal: f.delegationAllowExternal,
       quorumPercent: f.quorumPercent,
+      protocolsPublic: f.protocolsPublic,
     } satisfies GremiumUpdateBody;
     const isNew = this.isNew();
     const g = this.gremium() ?? this.created;

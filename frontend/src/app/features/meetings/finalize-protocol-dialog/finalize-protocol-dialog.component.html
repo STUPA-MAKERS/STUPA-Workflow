@@ -1,0 +1,22 @@
+<app-dialog
+  [open]="open()"
+  [title]="'meetings.finalizeDialog.title' | t"
+  [subtitle]="meetingTitle()"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="cancel()"
+>
+  <div class="fpd">
+    <p class="fpd__text">{{ 'meetings.finalizeDialog.body' | t }}</p>
+    <app-note icon="globe">{{ 'meetings.protocol.publicNotice' | t }}</app-note>
+    <app-switch
+      [checked]="withheld()"
+      (checkedChange)="withheld.set($event)"
+      [hint]="'meetings.finalizeDialog.withheldHint' | t"
+      >{{ 'meetings.finalizeDialog.withheld' | t }}</app-switch
+    >
+  </div>
+  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="fill" [loading]="finalizing()" (click)="confirm()">
+    {{ 'meetings.protocol.finalize' | t }}
+  </app-button>
+</app-dialog>

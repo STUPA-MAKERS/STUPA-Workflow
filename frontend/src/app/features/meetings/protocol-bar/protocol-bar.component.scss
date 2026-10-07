@@ -35,6 +35,9 @@
   font-size: var(--fs-small);
   color: var(--color-text-muted);
 }
+.pb__pub--on {
+  color: var(--color-accent-text);
+}
 .pb__actions {
   display: flex;
   flex: none;

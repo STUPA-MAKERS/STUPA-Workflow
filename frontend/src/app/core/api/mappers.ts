@@ -311,6 +311,8 @@ export function mapProtocol(wire: ProtocolOutWire): Protocol {
     pdfUrl: wire.pdfUrl ?? null,
     publicPdfUrl: wire.publicPdfUrl ?? null,
     sentAt: wire.sentAt ?? null,
+    publicWithheld: wire.publicWithheld ?? false,
+    gremiumProtocolsPublic: wire.gremiumProtocolsPublic ?? false,
   };
 }
 

@@ -53,3 +53,19 @@ def protocol_render_queue_from_pool(
 ) -> ProtocolRenderQueue | None:
     """Wrap a pool as a `ProtocolRenderQueue`, or return `None` without a pool."""
     return ArqProtocolRenderQueue(pool) if pool is not None else None
+
+
+PUBLIC_BACKFILL_TASK_NAME = "backfill_public_protocols"
+
+
+async def enqueue_public_backfill(pool: object, gremium_id: UUID) -> None:
+    """Enqueue the job that builds the missing public versions of a gremium.
+
+    The call passes no `_job_id`, for the same reason as the render job: arq
+    keeps the result of a finished job, and an equal id would then never run
+    again. Two jobs of one gremium do no harm, because each protocol is locked
+    and only a protocol without a public version is built.
+    """
+    await pool.enqueue_job(  # type: ignore[attr-defined]
+        PUBLIC_BACKFILL_TASK_NAME, str(gremium_id)
+    )

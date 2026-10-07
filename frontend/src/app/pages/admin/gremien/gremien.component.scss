@@ -94,6 +94,19 @@
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
 }
+.grem__tag {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  align-self: center;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-container);
+  color: var(--color-on-accent-container);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+}
 .grem__counts {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
