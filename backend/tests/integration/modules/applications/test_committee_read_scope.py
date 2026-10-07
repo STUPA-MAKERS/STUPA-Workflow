@@ -4,7 +4,7 @@ The tests run against a real schema. A Gremium **member** without the global
 `application.read` permission reads the OWN applications. That member also reads an
 application in a cost center whose `view_gremium_id` names one of the Gremien of that
 member (#budget-scope). The cost center node itself OR an ancestor may carry that id.
-The member also reads an application in a `vote` state whose `config.gremiumId` names
+The member also reads an application in a `vote` state whose snapshot `vote_gremium_id` names
 one of those Gremien.
 
 The list (`ApplicationsService.list_applications`) and the detail view
@@ -194,11 +194,14 @@ async def _seed(session: AsyncSession) -> _Scenario:
     app_vote_other, _ = await svc.create(_payload(), actor=sc.other_sub)
     app_unrelated, _ = await svc.create(_payload(), actor=sc.other_sub)
 
-    # Set the links (cost center and vote state) directly on the model.
+    # Set the links (cost center and vote state) directly on the model. A vote state
+    # carries the snapshot of its Gremium, as the flow engine sets it on entry.
     app_cost.budget_id = leaf_m.id
     app_vote.current_state_id = vote_member.id
+    app_vote.vote_gremium_id = g_member.id
     app_cost_other.budget_id = leaf_o.id
     app_vote_other.current_state_id = vote_other.id
+    app_vote_other.vote_gremium_id = g_other.id
     await session.commit()
 
     sc.app_cost = app_cost.id

@@ -38,10 +38,10 @@ from app.modules.deadlines.service import (
 from app.modules.flow import context as flow_context
 from app.modules.flow.context import (
     _budget_fits,
-    _committees_for_sub,
     _compare_type,
     _field_types,
     build_context,
+    committee_ids_for_sub,
 )
 from app.shared.guards import GuardContext
 from tests._support.flow_fakes import fake_session, result
@@ -565,18 +565,18 @@ def test_compare_type_mapping(field_type: str, expected: str) -> None:
     assert _compare_type(field_type) == expected
 
 
-async def test_committees_for_sub_empty_sub_short_circuits() -> None:
+async def testcommittee_ids_for_sub_empty_sub_short_circuits() -> None:
     # A falsy sub returns frozenset() without a DB read.
     session = fake_session()
-    assert await _committees_for_sub(session, None) == frozenset()
-    assert await _committees_for_sub(session, "") == frozenset()
+    assert await committee_ids_for_sub(session, None) == frozenset()
+    assert await committee_ids_for_sub(session, "") == frozenset()
     assert session.statements == []  # no execute
 
 
-async def test_committees_for_sub_maps_rows_to_str() -> None:
+async def testcommittee_ids_for_sub_maps_rows_to_str() -> None:
     g1, g2 = uuid4(), uuid4()
     session = fake_session(result(g1, g2))
-    out = await _committees_for_sub(session, "sub-1")
+    out = await committee_ids_for_sub(session, "sub-1")
     assert out == frozenset({str(g1), str(g2)})
 
 
@@ -653,6 +653,7 @@ def _ctx_app(
         data=data,
         created_by=created_by,
         budget_id=budget_id,
+        vote_gremium_id=None,
         fiscal_year_id=fiscal,
         amount=amount,
         form_version_id=uuid4(),
@@ -687,12 +688,12 @@ def _principal(**over: object) -> Principal:
 
 @pytest.fixture
 def _no_committees(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Make `_committees_for_sub` return frozenset() without a DB."""
+    """Make `committee_ids_for_sub` return frozenset() without a DB."""
 
     async def _cs(_session: object, _sub: str | None) -> frozenset[str]:
         return frozenset()
 
-    monkeypatch.setattr(flow_context, "_committees_for_sub", _cs)
+    monkeypatch.setattr(flow_context, "committee_ids_for_sub", _cs)
 
 
 @pytest.fixture
@@ -807,7 +808,7 @@ async def test_build_context_deadline_passed_propagates(monkeypatch: pytest.Monk
     async def _cs(_session: object, _sub: str | None) -> frozenset[str]:
         return frozenset({"g-1"})
 
-    monkeypatch.setattr(flow_context, "_committees_for_sub", _cs)
+    monkeypatch.setattr(flow_context, "committee_ids_for_sub", _cs)
     app = _ctx_app(data={}, created_by="actor-1")
     ctx = await build_context(
         fake_session(), cast("Any", app), _principal(), manual=True, deadline_passed=True

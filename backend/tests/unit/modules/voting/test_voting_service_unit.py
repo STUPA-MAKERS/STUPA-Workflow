@@ -87,7 +87,7 @@ def _create_body(**over: Any) -> VoteCreate:
 
 async def test_create_ok() -> None:
     """The gremium exists and matches the application; the roster sets the count."""
-    app = SimpleNamespace(id=uuid4(), current_state_id=None, gremium_id=GID)
+    app = SimpleNamespace(id=uuid4(), current_state_id=None, gremium_id=GID, vote_gremium_id=None)
     roster = [(uuid4(), ["vote.cast"]), (uuid4(), ["vote.cast"]), (uuid4(), ["session.manage"])]
     db = fake_session(result(app), result(*roster))
     db.scalar_results = [GID]  # the gremium exists
@@ -1330,3 +1330,52 @@ async def test_delete_standalone_with_secret_marker_409() -> None:
     db.scalar_results = [0, 0, 2]
     with pytest.raises(ConflictError):
         await VotingService(db).delete_standalone(vote.id, actor="mgr")
+
+
+# Flow variant B: the vote must belong to the Gremium of the current vote state.
+
+
+async def test_vote_gremium_mismatch_rules() -> None:
+    svc = VotingService(fake_session())
+    assert await svc.vote_gremium_mismatch(_vote(application_id=None)) is False  # type: ignore[arg-type]
+    # No application row, or not in a vote state: nothing to compare.
+    assert await VotingService(fake_session(result())).vote_gremium_mismatch(_vote()) is False  # type: ignore[arg-type]
+    db = fake_session(result((GID, "normal")))
+    assert await VotingService(db).vote_gremium_mismatch(_vote()) is False  # type: ignore[arg-type]
+    # The vote of the snapshot Gremium matches.
+    db = fake_session(result((GID, "vote")))
+    assert await VotingService(db).vote_gremium_mismatch(_vote()) is False  # type: ignore[arg-type]
+    # Another Gremium, or no snapshot, is a mismatch.
+    db = fake_session(result((uuid4(), "vote")))
+    assert await VotingService(db).vote_gremium_mismatch(_vote()) is True  # type: ignore[arg-type]
+    db = fake_session(result((None, "vote")))
+    assert await VotingService(db).vote_gremium_mismatch(_vote()) is True  # type: ignore[arg-type]
+
+
+async def test_open_refuses_a_vote_of_another_gremium() -> None:
+    vote = _vote(status="draft")
+    db = fake_session(result(vote), result((uuid4(), "vote")))
+    with pytest.raises(ConflictError) as ei:
+        await VotingService(db).open(vote.id, now=NOW)
+    assert ei.value.code == "vote_gremium_mismatch"
+    assert vote.status == "draft"
+
+
+async def test_close_blocks_the_branch_of_another_gremium(
+    _patch_flow: type[_FakeFlow], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _patch_flow.branch = TransitionOut(
+        id=uuid4(), fromStateId=uuid4(), toStateId=uuid4(), label={}
+    )
+
+    async def _mismatch(_self: object, _vote: object) -> bool:
+        return True
+
+    monkeypatch.setattr(VotingService, "vote_gremium_mismatch", _mismatch)
+    vote = _vote()
+    db = fake_session(result(vote), result("yes", "yes", "no"))
+    out = await VotingService(db).close(vote.id, _voter(), now=NOW)
+    assert out.branch_fired is False
+    assert _patch_flow.branch_calls == []  # the flow never ran
+    blocked = [a for a in _audits(db) if a.action == "vote_branch_blocked"]
+    assert blocked[0].data["reason"] == "vote_gremium_mismatch"

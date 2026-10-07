@@ -3,7 +3,8 @@
 `eval_guard` is a pure function over a `GuardContext` (`app.shared.guards`). This module
 fills that context from the application, the triggering principal, and derived facts.
 The facts are actor roles and Gremien (manual transitions only), applicant roles and
-Gremien, budget fit, and form field values and types for `compare`.
+Gremien, budget fit, the Gremium of the current vote, whether the cost center has a
+deciding Gremium, and form field values and types for `compare`.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from app.modules.admin.models import ApplicationType, GremiumMembership
 from app.modules.applications.models import Application
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.budget.decision import effective_decision_gremium
 from app.modules.budget.tree_models import BudgetAllocation, BudgetExpense
 from app.modules.files.models import Attachment
 from app.modules.forms.models import FormField
@@ -40,7 +42,7 @@ def _compare_type(field_type: str) -> str:
     return _FIELD_TYPE_MAP.get(field_type, "text")
 
 
-async def _committees_for_sub(session: AsyncSession, sub: str | None) -> frozenset[str]:
+async def committee_ids_for_sub(session: AsyncSession, sub: str | None) -> frozenset[str]:
     """Return the Gremium ids where `sub` is a member now, inside the term window."""
     if not sub:
         return frozenset()
@@ -162,7 +164,7 @@ async def build_base_context(
     """
     raw_roles = app.data.get("_applicantRoles") if isinstance(app.data, dict) else None
     applicant_roles = frozenset(raw_roles) if isinstance(raw_roles, list) else frozenset()
-    applicant_committees = await _committees_for_sub(session, app.created_by)
+    applicant_committees = await committee_ids_for_sub(session, app.created_by)
     application_type_key = await _application_type_key(session, app)
     has_attachment = await _has_attachment(session, app)
     field_values: dict[str, Any] = dict(app.data) if isinstance(app.data, dict) else {}
@@ -180,6 +182,12 @@ async def build_base_context(
         has_attachment=has_attachment,
         field_values=field_values,
         field_types=field_types,
+        vote_gremium_id=(
+            str(app.vote_gremium_id) if app.vote_gremium_id is not None else None
+        ),
+        budget_has_decision_gremium=(
+            await effective_decision_gremium(session, app.budget_id) is not None
+        ),
     )
 
 
@@ -228,7 +236,7 @@ async def build_context(
         session, app, manual=manual, deadline_passed=deadline_passed
     )
     actor_committees = (
-        await _committees_for_sub(session, principal.sub) if manual else frozenset()
+        await committee_ids_for_sub(session, principal.sub) if manual else frozenset()
     )
     return with_actor(
         base,

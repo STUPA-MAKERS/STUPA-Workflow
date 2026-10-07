@@ -54,6 +54,9 @@ export interface CanvasNode {
   isInitial: boolean;
   /** A terminal state: the node carries the tag "Endzustand" under its label. */
   isTerminal: boolean;
+  /** A vote state that takes its gremium from the cost center: the node carries the
+   *  tag "Gremium: aus Kostenstelle" under its label. */
+  gremiumFromBudget: boolean;
   selected: boolean;
   multi: boolean;
   x: number;
@@ -256,6 +259,7 @@ export function createFlowCanvasView(deps: FlowCanvasViewDeps): FlowCanvasView {
         color: s.color ?? null,
         isInitial: !!s.isInitial,
         isTerminal: !!s.isTerminal,
+        gremiumFromBudget: s.kind === 'vote' && s.config?.gremiumSource === 'budget',
         selected: sel?.kind === 'state' && sel.key === s.key,
         multi: multi.has(s.key),
         x: pos[s.key]?.x ?? 0,

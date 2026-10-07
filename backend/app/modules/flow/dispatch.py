@@ -30,6 +30,8 @@ WORKER_ACTION_TYPES: frozenset[str] = frozenset(
         "addToNextSession",
         "assignBudget",
         "assignBudgetFromField",
+        "assignBudgetFromApplicantGremium",
+        "assignBudgetFromMap",
     }
 )
 

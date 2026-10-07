@@ -62,6 +62,18 @@ from app.shared.paging import DEFAULT_LIMIT, Page
 
 # The problem code of a second cast (REST 409 and the live-vote error frame).
 ALREADY_VOTED = "already_voted"
+
+# 409 code and audit reason: the Gremium of a vote does not decide the current vote
+# state of its application (`application.vote_gremium_id`).
+VOTE_GREMIUM_MISMATCH = "vote_gremium_mismatch"
+
+
+def vote_gremium_mismatch_error() -> ConflictError:
+    """Build the 409 for a vote of a Gremium that does not decide the application."""
+    return ConflictError(
+        "The Gremium of this vote does not decide the current vote of the application.",
+        code=VOTE_GREMIUM_MISMATCH,
+    )
 # The voter key of a guest of a public meeting (#17): ``guest:<meeting_guest.id>``. A
 # guest is not a principal, so the key never collides with an OIDC ``sub``.
 GUEST_VOTER_PREFIX = "guest:"
@@ -613,8 +625,9 @@ class VotingService:
         """Create a draft application vote from the API body.
 
         ``eligibleGroup`` must name an existing gremium. The vote must also belong to
-        the gremium of the application: the ``gremiumId`` of the current vote state
-        when the state sets one, else ``application.gremium_id``. Without that check a
+        the gremium of the application: the gremium that decides the current vote state
+        (``application.vote_gremium_id``) when set, else the ``gremiumId`` of the
+        current state, else ``application.gremium_id``. Without that check a
         vote manager of another gremium could run the vote and fire the pass or fail
         branch of the application.
 
@@ -691,15 +704,26 @@ class VotingService:
     async def _application_gremium_id(self, application: Application) -> UUID | None:
         """Return the gremium that decides on the application.
 
-        The ``gremiumId`` of the current state wins when it is a valid UUID. Otherwise
-        the method returns ``application.gremium_id``, which can be None.
+        In a vote state only the snapshot ``vote_gremium_id`` counts. It can be None
+        (a vote state with ``gremiumSource: "budget"`` whose Gremium went away); then
+        no gremium decides and only the admin role creates a vote. There is no
+        fall back to ``application.gremium_id``: that Gremium does not decide here.
+        Outside a vote state the ``gremiumId`` of the current state counts when it is
+        a valid UUID, else ``application.gremium_id``, which can be None.
         """
         if application.current_state_id is not None:
             from app.modules.flow.models import State
 
-            config = await self.session.scalar(
-                select(State.config).where(State.id == application.current_state_id)
-            )
+            row = (
+                await self.session.execute(
+                    select(State.kind, State.config).where(
+                        State.id == application.current_state_id
+                    )
+                )
+            ).first()
+            if row is not None and row[0] == "vote":
+                return application.vote_gremium_id
+            config = row[1] if row is not None else None
             ref = config.get("gremiumId") if isinstance(config, dict) else None
             if isinstance(ref, str) and ref:
                 try:
@@ -787,9 +811,14 @@ class VotingService:
         A meeting vote opens only in a ``live`` meeting. The method locks the meeting
         row before the vote row, as the meeting close does (O12).
 
+        A vote on an application in a vote state opens only when its Gremium is the
+        Gremium that decides that state (``application.vote_gremium_id``). A draft
+        made before the application entered the state, or for another Gremium, gives
+        409 ``vote_gremium_mismatch``.
+
         Raises:
-            ConflictError: The vote is not in ``draft``, or its meeting is not
-                ``live``.
+            ConflictError: The vote is not in ``draft``, its meeting is not ``live``,
+                or its Gremium does not decide the vote state of the application.
         """
         meeting_id = await self.session.scalar(select(Vote.meeting_id).where(Vote.id == vote_id))
         if meeting_id is not None:
@@ -797,6 +826,8 @@ class VotingService:
         vote = await self._get_vote(vote_id, for_update=True)
         if vote.status != "draft":
             raise ConflictError(f"vote is {vote.status}, cannot open.", code="conflict")
+        if await self.vote_gremium_mismatch(vote):
+            raise vote_gremium_mismatch_error()
         config = self._config(vote)
         vote.opens_at = now
         vote.status = "open"
@@ -1633,18 +1664,27 @@ class VotingService:
         The SAVEPOINT keeps the staged vote close safe: a guard failure, a lost race or
         a missing branch transition rolls back only the branch. The method then writes
         ``vote_branch_blocked`` and returns None.
+
+        Defence in depth: a vote whose Gremium does not decide the current vote state
+        of the application (``application.vote_gremium_id``) never fires the branch,
+        reason ``vote_gremium_mismatch``. An example is a stale agenda item of a
+        meeting of another Gremium.
         """
-        try:
-            async with self.session.begin_nested():
-                return await flow.stage_branch(
-                    application_id, branch_name, principal, note=note, vote_id=vote.id
-                )
-        except ConflictError as exc:
-            reason = exc.code
-        except NotFoundError:
-            # The current state has no such branch: a misconfigured flow, or a vote
-            # outside its vote state.
-            reason = "no_branch"
+        reason: str | None = None
+        if await self.vote_gremium_mismatch(vote):
+            reason = VOTE_GREMIUM_MISMATCH
+        else:
+            try:
+                async with self.session.begin_nested():
+                    return await flow.stage_branch(
+                        application_id, branch_name, principal, note=note, vote_id=vote.id
+                    )
+            except ConflictError as exc:
+                reason = exc.code
+            except NotFoundError:
+                # The current state has no such branch: a misconfigured flow, or a
+                # vote outside its vote state.
+                reason = "no_branch"
         await audit_record(
             self.session,
             actor=principal.sub,
@@ -1654,3 +1694,30 @@ class VotingService:
             data={**self._audit_refs(vote), "branch": branch_name, "reason": reason},
         )
         return None
+
+    async def vote_gremium_mismatch(self, vote: Vote) -> bool:
+        """Tell whether the Gremium of ``vote`` does not decide its application now.
+
+        The check applies only while the application sits in a ``vote`` state. The
+        Gremium of the vote (the meeting Gremium, else ``eligible_group``) must be the
+        snapshot ``application.vote_gremium_id``. A missing snapshot counts as a
+        mismatch (fail closed). A vote without an application, and an application
+        outside a vote state, give False: nothing fires a branch there.
+        """
+        if vote.application_id is None:
+            return False
+        from app.modules.flow.models import State
+
+        row = (
+            await self.session.execute(
+                select(Application.vote_gremium_id, State.kind)
+                .join(State, State.id == Application.current_state_id)
+                .where(Application.id == vote.application_id)
+            )
+        ).first()
+        if row is None or row[1] != "vote":
+            return False
+        actual = await self._vote_gremium_id(
+            meeting_id=vote.meeting_id, eligible_group=vote.eligible_group
+        )
+        return row[0] is None or actual != row[0]

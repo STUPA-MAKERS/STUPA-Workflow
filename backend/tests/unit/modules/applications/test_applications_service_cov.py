@@ -171,6 +171,7 @@ def _app(**over: Any) -> _Obj:
         "flow_version_id": uuid4(),
         "current_state_id": uuid4(),
         "gremium_id": uuid4(),
+        "vote_gremium_id": None,
         "budget_id": None,
         "fiscal_year_id": None,
         "amount": None,

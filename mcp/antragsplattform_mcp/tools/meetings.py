@@ -52,7 +52,8 @@ async def open_vote(vote_id: str) -> dict:
     """Open a vote for balloting.
 
     Requires the gremium permission `vote.manage` or `session.manage` in the gremium of
-    the vote (or admin).
+    the vote (or admin). A vote on an application in a vote state opens only when its
+    gremium decides that state (`voteGremiumId`), else 409 `vote_gremium_mismatch`.
     """
     return await api().post(f"/votes/{vote_id}/open")
 
@@ -317,7 +318,9 @@ async def create_meeting_vote(meeting_id: str, vote: S.MeetingVoteOpenBody) -> d
 
     The agenda item can be a free-text item or an application item. The gremium of the
     meeting votes, and the server counts its eligible voters. Requires the lead of the
-    meeting, the minute-taker, or the gremium permission `vote.manage`.
+    meeting, the minute-taker, or the gremium permission `vote.manage`. An application
+    item needs the application in a vote state that the gremium of the meeting decides
+    (`voteGremiumId`), else 409 `vote_gremium_mismatch`.
 
     In a public meeting where guests vote, `guestsVote` (default on for a public item)
     lets the admitted guests vote too: such a vote has no quorum, the majority of the

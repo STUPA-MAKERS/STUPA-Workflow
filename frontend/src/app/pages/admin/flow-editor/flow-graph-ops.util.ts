@@ -24,6 +24,7 @@ import {
   defaultGuard,
   groupsOf,
   guardOpOf,
+  recipientNeedsRef,
   recipientsOf,
 } from './flow-guard.util';
 import {
@@ -155,6 +156,33 @@ function patchConfig(g: FlowGraph, key: string, patch: Partial<StateConfig>): Fl
 
 export function setStateGremium(g: FlowGraph, key: string, gremiumId: string): FlowGraph {
   return patchConfig(g, key, { gremiumId: gremiumId || undefined });
+}
+
+/**
+ * Switch the gremium source of a vote state. `budget` takes the deciding gremium of the
+ * cost center on entry and drops a fixed `gremiumId`; `fixed` drops the source. The
+ * backend accepts exactly one of the two keys.
+ */
+export function setStateGremiumSource(
+  g: FlowGraph,
+  key: string,
+  source: 'fixed' | 'budget',
+): FlowGraph {
+  return {
+    ...g,
+    states: g.states.map((s) => {
+      if (s.key !== key) return s;
+      const rest: StateConfig = { ...(s.config ?? {}) };
+      const gremiumId = rest.gremiumId;
+      delete rest.gremiumId;
+      delete rest.gremiumSource;
+      const config: StateConfig =
+        source === 'budget'
+          ? { ...rest, gremiumSource: 'budget' }
+          : { ...rest, ...(gremiumId ? { gremiumId } : {}) };
+      return { ...s, config };
+    }),
+  };
 }
 
 export function setStateDeadlinePolicy(g: FlowGraph, key: string, policyKey: string): FlowGraph {
@@ -317,7 +345,9 @@ export function addAction(g: FlowGraph, index: number, type: string): FlowGraph 
   const initial: ActionDef =
     type === 'notify'
       ? { type: 'notify', recipients: [] }
-      : ({ type: type as ActionType } as ActionDef);
+      : type === 'assignBudgetFromMap'
+        ? { type: 'assignBudgetFromMap', field: '', map: {} }
+        : ({ type: type as ActionType } as ActionDef);
   return patchTransition(g, index, (t) => ({ ...t, actions: [...(t.actions ?? []), initial] }));
 }
 
@@ -335,9 +365,30 @@ export function setActionParam(
   key: string,
   value: string,
 ): FlowGraph {
+  // An empty value drops the key: an optional parameter (`gremiumId` of
+  // addToNextSession, `parentId`) is then absent, as the backend expects.
   return patchTransition(g, index, (t) => ({
     ...t,
-    actions: (t.actions ?? []).map((a, k) => (k === ai ? { ...a, [key]: value } : a)),
+    actions: (t.actions ?? []).map((a, k) => {
+      if (k !== ai) return a;
+      if (value) return { ...a, [key]: value };
+      const rest: ActionDef = { ...a };
+      delete rest[key];
+      return rest;
+    }),
+  }));
+}
+
+/** Replace the value → cost center map of an `assignBudgetFromMap` action. */
+export function setActionMap(
+  g: FlowGraph,
+  index: number,
+  ai: number,
+  map: Record<string, string>,
+): FlowGraph {
+  return patchTransition(g, index, (t) => ({
+    ...t,
+    actions: (t.actions ?? []).map((a, k) => (k === ai ? { ...a, map: { ...map } } : a)),
   }));
 }
 
@@ -375,7 +426,7 @@ export function setRecipientKind(
       i === ri
         ? {
             kind: kind as NotifyRecipientKind,
-            ref: kind === 'applicant' ? undefined : (r.ref ?? ''),
+            ref: recipientNeedsRef(kind) ? (r.ref ?? '') : undefined,
           }
         : r,
     ),

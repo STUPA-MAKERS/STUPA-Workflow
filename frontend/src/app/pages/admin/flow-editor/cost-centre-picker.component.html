@@ -1,0 +1,29 @@
+<div class="ccp__box">
+  <span class="ccp__label" [id]="uid + '-l'">{{ label() }}</span>
+  <button
+    type="button"
+    class="ccp__pick"
+    [attr.aria-labelledby]="uid + '-l ' + uid + '-v'"
+    [attr.aria-expanded]="open()"
+    (click)="toggle()"
+  >
+    @if (display(); as text) {
+      <span class="ccp__value" [id]="uid + '-v'">{{ text }}</span>
+    } @else {
+      <span class="ccp__value ccp__placeholder" [id]="uid + '-v'">{{ placeholder() }}</span>
+    }
+    <app-icon [name]="open() ? 'chevron-up' : 'chevron-down'" [size]="18" />
+  </button>
+</div>
+@if (open()) {
+  <div class="ccp__tree">
+    <app-cost-centre-tree
+      [nodes]="nodes()"
+      [selectedId]="value()"
+      [allLabel]="allLabel()"
+      [ariaLabel]="label()"
+      [emptyLabel]="emptyLabel()"
+      (picked)="pick($event)"
+    />
+  </div>
+}

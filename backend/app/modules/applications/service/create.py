@@ -27,6 +27,7 @@ from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.files.drafts import DRAFT_ATTACHMENTS_MISSING, bind_drafts, check_drafts
 from app.modules.flow.models import FlowVersion, State
+from app.modules.flow.vote_gremium import resolve_vote_gremium
 from app.modules.forms.service import FormsService
 from app.modules.forms.validation import AnswerValidationError, validate_answers
 from app.settings import get_settings
@@ -146,6 +147,9 @@ class CreateOps(ApplicationsServiceBase):
             form_version_id=effective.form_version_id,
             flow_version_id=flow_version_id,
             current_state_id=initial.id,
+            # A vote state as the initial state has a fixed Gremium (the validator
+            # forbids `gremiumSource` there), so the snapshot starts at once.
+            vote_gremium_id=await resolve_vote_gremium(self.session, initial, None),
             gremium_id=app_type.gremium_id,
             amount=amount,
             currency=currency,

@@ -20,9 +20,17 @@ import type {
 export type StateKind = 'normal' | 'vote';
 
 /** Per-state config depending on `kind`. Empty object for `normal`. */
+/** Where a vote state takes its gremium from, besides a fixed `gremiumId`. */
+export type GremiumSource = 'budget';
+
 export interface StateConfig {
-  /** vote: the gremium that votes. */
+  /** vote: the fixed gremium that votes. Exactly one of `gremiumId` and `gremiumSource`. */
   gremiumId?: string;
+  /**
+   * vote: `budget` takes the deciding gremium of the cost center of the application when
+   * the application enters the state (`decisionGremiumId` of the node or an ancestor).
+   */
+  gremiumSource?: GremiumSource;
   /**
    * Key of a named deadline policy: on entering the state the server creates a
    * deadline that the state's `deadlinePassed` transition fires.
@@ -106,10 +114,11 @@ export type GuardConditionOp =
   | 'attachmentPresent'
   | 'budgetIs'
   | 'budgetFitsApplication'
+  | 'budgetHasDecisionGremium'
   | 'hasField'
   | 'compare';
 /** Actor gates — only on manual transitions. */
-export type GuardActorOp = 'roleIs' | 'isInCommittee' | 'actorIsApplicant';
+export type GuardActorOp = 'roleIs' | 'isInCommittee' | 'isInVoteGremium' | 'actorIsApplicant';
 export type GuardLeafOperator = GuardConditionOp | GuardActorOp;
 export type GuardCombinator = 'and' | 'or' | 'not';
 
@@ -124,12 +133,14 @@ export const GUARD_CONDITION_OPERATORS: readonly GuardConditionOp[] = [
   'attachmentPresent',
   'budgetIs',
   'budgetFitsApplication',
+  'budgetHasDecisionGremium',
   'hasField',
   'compare',
 ] as const;
 export const GUARD_ACTOR_OPERATORS: readonly GuardActorOp[] = [
   'roleIs',
   'isInCommittee',
+  'isInVoteGremium',
   'actorIsApplicant',
 ] as const;
 export const GUARD_LEAF_OPERATORS: readonly GuardLeafOperator[] = [
@@ -144,22 +155,60 @@ export type ActionType =
   | 'notify'
   | 'addToNextSession'
   | 'assignBudget'
-  | 'assignBudgetFromField';
+  | 'assignBudgetFromField'
+  | 'assignBudgetFromApplicantGremium'
+  | 'assignBudgetFromMap';
 export const ACTION_TYPES: readonly ActionType[] = [
   'webhook',
   'notify',
   'addToNextSession',
   'assignBudget',
   'assignBudgetFromField',
+  'assignBudgetFromApplicantGremium',
+  'assignBudgetFromMap',
 ] as const;
 
-/** Recipient kind of a `notify` action. */
-export type NotifyRecipientKind = 'gremium' | 'role' | 'applicant' | 'email';
+/**
+ * The actions that set the cost center. None of them may sit on a transition into a vote
+ * state with `gremiumSource: 'budget'`: the state takes its gremium on entry, before the
+ * action runs.
+ */
+export const ASSIGN_BUDGET_ACTIONS: readonly ActionType[] = [
+  'assignBudget',
+  'assignBudgetFromField',
+  'assignBudgetFromApplicantGremium',
+  'assignBudgetFromMap',
+] as const;
+
+/** Bool-valued guard operators. Mirrors `_BOOL_VALUE_OPERATORS` of the backend. */
+export const GUARD_BOOL_OPERATORS: readonly GuardLeafOperator[] = [
+  'deadlinePassed',
+  'budgetFitsApplication',
+  'budgetHasDecisionGremium',
+  'actorIsApplicant',
+  'attachmentPresent',
+  'isInVoteGremium',
+] as const;
+
+/**
+ * Recipient kind of a `notify` action. `voteGremium` is the gremium that decides the
+ * current vote; `budgetGremium` is the deciding gremium of the cost center. Both take
+ * no `ref`.
+ */
+export type NotifyRecipientKind =
+  | 'gremium'
+  | 'role'
+  | 'applicant'
+  | 'email'
+  | 'voteGremium'
+  | 'budgetGremium';
 export const NOTIFY_RECIPIENT_KINDS: readonly NotifyRecipientKind[] = [
   'gremium',
   'role',
   'applicant',
   'email',
+  'voteGremium',
+  'budgetGremium',
 ] as const;
 export interface NotifyRecipient {
   kind: NotifyRecipientKind;

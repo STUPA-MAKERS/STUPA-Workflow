@@ -156,7 +156,9 @@ describe('validateAction (mirror of backend validate_action)', () => {
     expect(
       reason(() => validateAction({ type: 'notify', recipients: [{ kind: 'gremium' }] })),
     ).toEqual({ key: 'admin.flow.err.notifyRecipientValue', params: { kind: 'gremium' } });
-    expect(reason(() => validateAction({ type: 'addToNextSession' })).key).toBe(
+    // The gremium of addToNextSession is optional; a present but empty one is wrong.
+    expect(() => validateAction({ type: 'addToNextSession' })).not.toThrow();
+    expect(reason(() => validateAction({ type: 'addToNextSession', gremiumId: '' })).key).toBe(
       'admin.flow.err.actionGremium',
     );
     expect(reason(() => validateAction({ type: 'assignBudget' })).key).toBe(
@@ -206,6 +208,83 @@ describe('validateAction (mirror of backend validate_action)', () => {
     expect(reason(() => validateAction({ type: 'notify', recipients: 'x' })).key).toBe(
       'admin.flow.err.notifyRecipients',
     );
+  });
+});
+
+describe('flow variant B (gremium from the cost center)', () => {
+  it('accepts the new guard operators with a boolean only', () => {
+    expect(() => validateGuard({ budgetHasDecisionGremium: true }, false)).not.toThrow();
+    expect(() => validateGuard({ budgetHasDecisionGremium: false }, false)).not.toThrow();
+    expect(() => validateGuard({ isInVoteGremium: true })).not.toThrow();
+    expect(reason(() => validateGuard({ isInVoteGremium: 'yes' }))).toEqual({
+      key: 'admin.flow.err.guardNeedsBool',
+      params: { op: 'isInVoteGremium' },
+    });
+    expect(reason(() => validateGuard({ deadlinePassed: 1 })).key).toBe(
+      'admin.flow.err.guardNeedsBool',
+    );
+  });
+
+  it('allows isInVoteGremium on manual transitions only (actor gate)', () => {
+    expect(reason(() => validateGuard({ isInVoteGremium: true }, false))).toEqual({
+      key: 'admin.flow.err.guardActorManualOnly',
+      params: { op: 'isInVoteGremium' },
+    });
+  });
+
+  it('checks assignBudgetFromApplicantGremium: parentId optional, never empty', () => {
+    expect(() => validateAction({ type: 'assignBudgetFromApplicantGremium' })).not.toThrow();
+    expect(() =>
+      validateAction({ type: 'assignBudgetFromApplicantGremium', parentId: 'b1' }),
+    ).not.toThrow();
+    expect(
+      reason(() => validateAction({ type: 'assignBudgetFromApplicantGremium', parentId: ' ' }))
+        .key,
+    ).toBe('admin.flow.err.actionParent');
+  });
+
+  it('checks assignBudgetFromMap: a field and a non-empty value → cost center map', () => {
+    expect(() =>
+      validateAction({ type: 'assignBudgetFromMap', field: 'fs', map: { a: 'b1', b: 'b2' } }),
+    ).not.toThrow();
+    expect(reason(() => validateAction({ type: 'assignBudgetFromMap', map: { a: 'b1' } })).key).toBe(
+      'admin.flow.err.actionField',
+    );
+    expect(reason(() => validateAction({ type: 'assignBudgetFromMap', field: 'fs' })).key).toBe(
+      'admin.flow.err.actionMapEmpty',
+    );
+    expect(
+      reason(() => validateAction({ type: 'assignBudgetFromMap', field: 'fs', map: {} })).key,
+    ).toBe('admin.flow.err.actionMapEmpty');
+    expect(
+      reason(() => validateAction({ type: 'assignBudgetFromMap', field: 'fs', map: ['b1'] })).key,
+    ).toBe('admin.flow.err.actionMapEmpty');
+    expect(
+      reason(() => validateAction({ type: 'assignBudgetFromMap', field: 'fs', map: { ' ': 'b1' } }))
+        .key,
+    ).toBe('admin.flow.err.actionMapValue');
+    expect(
+      reason(() => validateAction({ type: 'assignBudgetFromMap', field: 'fs', map: { a: '' } })),
+    ).toEqual({ key: 'admin.flow.err.actionMapBudget', params: { value: 'a' } });
+  });
+
+  it('takes the recipient kinds voteGremium and budgetGremium without a ref', () => {
+    expect(() =>
+      validateAction({
+        type: 'notify',
+        recipients: [{ kind: 'voteGremium' }, { kind: 'budgetGremium' }],
+      }),
+    ).not.toThrow();
+    expect(
+      reason(() =>
+        validateAction({ type: 'notify', recipients: [{ kind: 'voteGremium', ref: 'g1' }] }),
+      ),
+    ).toEqual({ key: 'admin.flow.err.notifyRecipientNoRef', params: { kind: 'voteGremium' } });
+    expect(
+      reason(() =>
+        validateAction({ type: 'notify', recipients: [{ kind: 'applicant', ref: 'x' }] }),
+      ).key,
+    ).toBe('admin.flow.err.notifyRecipientNoRef');
   });
 });
 

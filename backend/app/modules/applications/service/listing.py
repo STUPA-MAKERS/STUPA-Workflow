@@ -275,7 +275,8 @@ class ListingOps(ApplicationsServiceBase):
 
         * a cost center (the node or an ancestor) with `view_gremium_id` in a member
           Gremium, which opens the whole subtree through the `path_key` prefix,
-        * the current `vote` state with `config.gremiumId` in a member Gremium, and
+        * the current `vote` state decided by a member Gremium (the snapshot
+          `application.vote_gremium_id`), and
         * legacy: a vote in a meeting of a member Gremium, found over `vote` and
           `meeting.gremium_id`.
 
@@ -313,20 +314,10 @@ class ListingOps(ApplicationsServiceBase):
             )
             clauses.append(Application.budget_id.in_(scoped))
 
-        # (b) The current `vote` state belongs to a member Gremium. Python evaluates the
-        #     JSONB `config` to stay dialect-neutral. The set of `vote` states is
-        #     small.
-        member_str = {str(g) for g in member_ids}
-        vote_state_ids = [
-            s.id
-            for s in (
-                await self.session.scalars(select(State).where(State.kind == "vote"))
-            ).all()
-            if isinstance(s.config, dict)
-            and str(s.config.get("gremiumId") or "") in member_str
-        ]
-        if vote_state_ids:
-            clauses.append(Application.current_state_id.in_(vote_state_ids))
+        # (b) A member Gremium decides the current `vote` state. The flow engine keeps
+        #     the snapshot `vote_gremium_id` in sync with the state, so a plain filter
+        #     suffices.
+        clauses.append(Application.vote_gremium_id.in_(member_ids))
 
         # (c) Legacy: the application has a `Vote` in a meeting of a member Gremium.
         #     This mirrors `access._committee_can_read` (c).

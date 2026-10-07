@@ -36,7 +36,12 @@ async def set_global_flow(graph: dict[str, Any], activate: bool = True) -> dict:
     """REPLACE the whole global flow with `graph`.
 
     The `graph` holds `states`, `transitions` and `layout`. Use this for a full rebuild
-    only. For a small change, prefer the atomic `flow_*` operations.
+    only. For a small change, prefer the atomic `flow_*` operations. The graph passes
+    through unchanged, so every key of `StateDef` / `TransitionDef` works here: a vote
+    state with `config.gremiumSource: "budget"`, `addToNextSession` without
+    `gremiumId`, the recipient kinds `voteGremium` / `budgetGremium`, the guards
+    `isInVoteGremium` / `budgetHasDecisionGremium` and the actions
+    `assignBudgetFromApplicantGremium` / `assignBudgetFromMap`.
     Requires admin.types.
     """
     return await api().post(
@@ -69,7 +74,8 @@ async def flow_add_state(
 ) -> dict:
     """ATOMIC: add one state to the global flow and activate the result.
 
-    You can also give an editor position. Requires admin.types.
+    You can also give an editor position. A vote state takes exactly one of
+    `config.gremiumId` or `config.gremiumSource: "budget"`. Requires admin.types.
     """
     graph = graphops.add_state(await _flow_graph(), dump_create(state), x, y)
     return await _save_flow(graph)
