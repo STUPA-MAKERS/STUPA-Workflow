@@ -613,8 +613,9 @@ class VotingService:
         """Create a draft application vote from the API body.
 
         ``eligibleGroup`` must name an existing gremium. The vote must also belong to
-        the gremium of the application: the ``gremiumId`` of the current vote state
-        when the state sets one, else ``application.gremium_id``. Without that check a
+        the gremium of the application: the gremium that decides the current vote state
+        (``application.vote_gremium_id``) when set, else the ``gremiumId`` of the
+        current state, else ``application.gremium_id``. Without that check a
         vote manager of another gremium could run the vote and fire the pass or fail
         branch of the application.
 
@@ -691,9 +692,12 @@ class VotingService:
     async def _application_gremium_id(self, application: Application) -> UUID | None:
         """Return the gremium that decides on the application.
 
-        The ``gremiumId`` of the current state wins when it is a valid UUID. Otherwise
-        the method returns ``application.gremium_id``, which can be None.
+        The snapshot ``vote_gremium_id`` of the current vote state wins. Then the
+        ``gremiumId`` of the current state when it is a valid UUID. Otherwise the method
+        returns ``application.gremium_id``, which can be None.
         """
+        if application.vote_gremium_id is not None:
+            return application.vote_gremium_id
         if application.current_state_id is not None:
             from app.modules.flow.models import State
 

@@ -799,9 +799,10 @@ async def test_resolve_explicit_now_passed() -> None:
 async def test_actionable_vote_state_with_gremium() -> None:
     from app.modules.flow.models import State
 
-    gid = str(uuid.uuid4())
-    state = State(kind="vote", config={"gremiumId": gid})
-    session = FakeSession(scalars=[["v@x.de"]])
+    gid = uuid.uuid4()
+    state = State(kind="vote", config={"gremiumId": str(gid)})
+    # The snapshot `vote_gremium_id`, then the member mails.
+    session = FakeSession(scalar=[gid], scalars=[["v@x.de"]])
     out = await actionable_principal_emails(
         cast(AsyncSession, session), application_id=uuid.uuid4(), state=state
     )

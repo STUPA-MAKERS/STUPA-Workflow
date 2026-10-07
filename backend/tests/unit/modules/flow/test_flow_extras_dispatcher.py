@@ -214,7 +214,8 @@ async def test_assign_budget_sets_single_active_fiscal_year(
 ) -> None:
     _stub_audit(monkeypatch)
     app_id, node_id, fy_id = uuid4(), uuid4(), uuid4()
-    app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None)
+    app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None,
+        current_state_id=None)
     node = SimpleNamespace(id=node_id, parent_id=None)  # top-level node
     session = _Session(store={app_id: app, node_id: node}, active_fy=(fy_id,))
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
@@ -230,7 +231,8 @@ async def test_assign_budget_ambiguous_fiscal_year_left_open(
 ) -> None:
     _stub_audit(monkeypatch)
     app_id, node_id = uuid4(), uuid4()
-    app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None)
+    app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None,
+        current_state_id=None)
     node = SimpleNamespace(id=node_id, parent_id=None)
     session = _Session(store={app_id: app, node_id: node}, active_fy=(uuid4(), uuid4()))
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
@@ -250,7 +252,8 @@ async def test_assign_budget_writes_audit_entry(monkeypatch: pytest.MonkeyPatch)
 
     calls = _stub_audit(monkeypatch)
     app_id, node_id, fy_id = uuid4(), uuid4(), uuid4()
-    app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None)
+    app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None,
+        current_state_id=None)
     node = SimpleNamespace(id=node_id, parent_id=None)
     session = _Session(store={app_id: app, node_id: node}, active_fy=(fy_id,))
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
@@ -272,7 +275,8 @@ async def test_assign_budget_node_missing_no_commit(monkeypatch: pytest.MonkeyPa
     # The application exists but the node is missing. _assign_node returns False.
     _stub_audit(monkeypatch)
     app_id, node_id = uuid4(), uuid4()
-    app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None)
+    app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None,
+        current_state_id=None)
     session = _Session(store={app_id: app})  # node not in the store
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("assignBudget", budgetId=str(node_id), application_id=app_id)]
@@ -302,7 +306,8 @@ async def test_assign_from_field_value_absent_or_invalid_skipped() -> None:
     # value is not a UUID.
     app_id = uuid4()
     for data in ({}, "not-a-dict", {"ziel": "garbage"}):
-        app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None, data=data)
+        app = SimpleNamespace(id=app_id, budget_id=None, fiscal_year_id=None,
+        current_state_id=None, data=data)
         session = _Session(store={app_id: app})
         await FlowExtrasActionDispatcher(_maker(session)).dispatch(
             [_action("assignBudgetFromField", field="ziel", application_id=app_id)]
@@ -315,7 +320,8 @@ async def test_assign_from_field_assigns_from_data(monkeypatch: pytest.MonkeyPat
     calls = _stub_audit(monkeypatch)
     app_id, node_id, fy_id = uuid4(), uuid4(), uuid4()
     app = SimpleNamespace(
-        id=app_id, budget_id=None, fiscal_year_id=None, data={"ziel": str(node_id)}
+        id=app_id, budget_id=None, fiscal_year_id=None,
+        current_state_id=None, data={"ziel": str(node_id)}
     )
     node = SimpleNamespace(id=node_id, parent_id=None, active=True)
     session = _Session(store={app_id: app, node_id: node}, active_fy=(fy_id,))
@@ -333,7 +339,8 @@ async def test_assign_from_field_node_missing_no_commit(monkeypatch: pytest.Monk
     _stub_audit(monkeypatch)
     app_id, node_id = uuid4(), uuid4()
     app = SimpleNamespace(
-        id=app_id, budget_id=None, fiscal_year_id=None, data={"ziel": str(node_id)}
+        id=app_id, budget_id=None, fiscal_year_id=None,
+        current_state_id=None, data={"ziel": str(node_id)}
     )
     session = _Session(store={app_id: app})  # node not in the store
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
@@ -349,7 +356,8 @@ async def test_assign_from_field_inactive_node_skipped(monkeypatch: pytest.Monke
     calls = _stub_audit(monkeypatch)
     app_id, node_id = uuid4(), uuid4()
     app = SimpleNamespace(
-        id=app_id, budget_id=None, fiscal_year_id=None, data={"ziel": str(node_id)}
+        id=app_id, budget_id=None, fiscal_year_id=None,
+        current_state_id=None, data={"ziel": str(node_id)}
     )
     node = SimpleNamespace(id=node_id, parent_id=None, active=False)
     session = _Session(store={app_id: app, node_id: node}, active_fy=(uuid4(),))

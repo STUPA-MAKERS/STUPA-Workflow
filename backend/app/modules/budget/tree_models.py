@@ -74,6 +74,15 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
     view_gremium_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("gremium.id", ondelete="SET NULL"), nullable=True
     )
+    # Deciding Gremium: this Gremium decides on spending from this cost center and its
+    # subtree. A node without an own value inherits the value of the nearest ancestor
+    # (``tree_rules.effective_decision_gremium``). A vote state with
+    # ``gremiumSource: "budget"`` takes the effective value of the assigned cost center.
+    # It is independent of ``gremium_id`` (classification) and ``view_gremium_id``
+    # (visibility).
+    decision_gremium_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("gremium.id", ondelete="SET NULL"), nullable=True
+    )
     # Fiscal-year cutoff, the day and the month of the period start. Top level
     # only. The default is Jan 1. A different cutoff renders a fiscal year as
     # "YYYY/YY". A fiscal year stores only the year. Start and end derive from
@@ -93,6 +102,7 @@ class Budget(UUIDPkMixin, CreatedAtMixin, Base):
         ),
         Index("ix_budget_parent_id", "parent_id"),
         Index("ix_budget_gremium_id", "gremium_id"),
+        Index("ix_budget_decision_gremium_id", "decision_gremium_id"),
     )
 
 

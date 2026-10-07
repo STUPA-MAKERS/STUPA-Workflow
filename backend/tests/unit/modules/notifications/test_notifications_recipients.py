@@ -367,14 +367,41 @@ def _app_ns(**over: Any) -> SimpleNamespace:
 
 
 async def test_actionable_vote_state_unchanged() -> None:
-    gid = str(uuid.uuid4())
-    session = FakeSession(scalars=[["v@x.de"]])
+    gid = uuid.uuid4()
+    # The vote state reads the snapshot `vote_gremium_id`, not the state config.
+    session = FakeSession(scalar=[gid], scalars=[["v@x.de"]])
     out = await actionable_principal_emails(
         cast(AsyncSession, session),
         application_id=uuid.uuid4(),
-        state=State(kind="vote", config={"gremiumId": gid}),
+        state=State(kind="vote", config={"gremiumId": str(uuid.uuid4())}),
     )
     assert out == ["v@x.de"]
+
+
+async def test_resolver_vote_and_budget_gremium(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`voteGremium` reads the snapshot; `budgetGremium` the cost center's Gremium."""
+    from app.modules.notifications import recipients as rec_mod
+
+    gid, budget = uuid.uuid4(), uuid.uuid4()
+
+    async def _eff(_s: object, budget_id: object) -> object:
+        return gid if budget_id == budget else None
+
+    monkeypatch.setattr(rec_mod, "effective_decision_gremium", _eff)
+    resolver = RecipientResolver(cast(AsyncSession, FakeSession(
+        scalar=[gid, budget, None, None], scalars=[["a@x.de"], ["b@x.de"]]
+    )))
+    app_id = uuid.uuid4()
+    assert await resolver.resolve([{"kind": "voteGremium"}], application_id=app_id) == ["a@x.de"]
+    assert await resolver.resolve([{"kind": "budgetGremium"}], application_id=app_id) == [
+        "b@x.de"
+    ]
+    # No snapshot and no cost center: nobody.
+    assert await resolver.resolve(
+        [{"kind": "voteGremium"}, {"kind": "budgetGremium"}], application_id=app_id
+    ) == []
+    # Without an application both kinds resolve to nobody.
+    assert await resolver.resolve([{"kind": "voteGremium"}]) == []
 
 
 async def test_actionable_missing_application_empty() -> None:

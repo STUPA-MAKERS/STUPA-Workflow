@@ -26,6 +26,14 @@ Unconfirmed guest applications (`email_confirmed_at IS NULL`) rest in the flow: 
 no deadline, no automatic transition and no mail until the magic link confirms them. The
 routes pass `allow_unconfirmed=False`, so such an application gives 404 there.
 
+Vote Gremium (flow variant B): every state change stores the Gremium that decides the
+target vote state in `application.vote_gremium_id` and clears it for a non-vote target,
+in the same `UPDATE` as the state. A vote state with `gremiumSource: "budget"` takes the
+effective deciding Gremium of the cost center. Without one it refuses the application
+(fail closed): the manual fire, the force and the audit revert give 409
+`no_vote_gremium`, the transition list hides the transition, and an automatic or
+branch transition does not fire. See `app.modules.flow.vote_gremium`.
+
 Edit lock: it comes from `state.edit_allowed` of the target state. The `patch` path
 checks the lock and returns 409. The engine handles this inline and dispatches nothing.
 """
@@ -64,6 +72,11 @@ from app.modules.flow.dispatch import (
 )
 from app.modules.flow.models import State, Transition
 from app.modules.flow.schemas import TransitionOut, TransitionResult
+from app.modules.flow.vote_gremium import (
+    gremium_from_budget,
+    resolve_vote_gremium,
+    snapshot_for_entry,
+)
 from app.settings import get_settings
 from app.shared.errors import (
     ConflictError,
@@ -103,34 +116,41 @@ def _guard_fires_on_deadline(guard: Any, *, negated: bool = False) -> bool:
     return False
 
 
-def agenda_gremium_id(actions: Any) -> UUID | None:
-    """Return the Gremium of the first `addToNextSession` action, or `None`.
-
-    `None` also comes back when the action holds no valid Gremium UUID. The
-    transition then does not count as an agenda transition.
-    """
+def _agenda_action(actions: Any) -> dict[str, Any] | None:
+    """Return the first `addToNextSession` action, or `None`."""
     if not isinstance(actions, list):
         return None
     for action in actions:
         if isinstance(action, dict) and action.get("type") == "addToNextSession":
-            try:
-                return UUID(str(action.get("gremiumId")))
-            except ValueError:
-                return None
+            return cast("dict[str, Any]", action)
     return None
 
 
-def _transition_out(t: Transition, vote_state_ids: set[UUID]) -> TransitionOut:
+def agenda_gremium_id(actions: Any) -> UUID | None:
+    """Return the explicit `gremiumId` of the first `addToNextSession` action, or `None`.
+
+    `None` also comes back when the action has no `gremiumId` (then the Gremium of the
+    vote applies, see `FlowService._agenda_gremium`) or holds no valid Gremium UUID.
+    """
+    action = _agenda_action(actions)
+    if action is None:
+        return None
+    try:
+        return UUID(str(action.get("gremiumId")))
+    except ValueError:
+        return None
+
+
+def _transition_out(t: Transition, gremium_id: UUID | None) -> TransitionOut:
     """Map a transition to its API shape.
 
-    `addsToAgenda` and `agendaGremiumId` are set only when the transition carries an
-    `addToNextSession` action and its target is a vote state. Only then does a fire
-    accept a `meetingId` (see `_check_agenda_meeting`), so the UI asks for a meeting
-    only when the server can take one. A transition with the action into a normal
-    state fires without a meeting, and the action picks the next planned meeting after
-    the commit.
+    `gremium_id` is the agenda Gremium (`FlowService._agenda_gremium`). It is set only
+    when the transition carries an `addToNextSession` action, its target is a vote
+    state and a Gremium resolves. Only then does a fire accept a `meetingId` (see
+    `_check_agenda_meeting`), so the UI asks for a meeting only when the server can
+    take one. A transition with the action into a normal state fires without a
+    meeting, and the action picks the next planned meeting after the commit.
     """
-    gremium_id = agenda_gremium_id(t.actions) if t.to_state_id in vote_state_ids else None
     return TransitionOut(
         id=t.id,
         fromStateId=t.from_state_id,
@@ -221,21 +241,50 @@ class FlowService:
             await self.session.execute(select(State).where(State.id == state_id))
         ).scalar_one_or_none()
 
-    async def _vote_state_ids(self, transitions: list[Transition]) -> set[UUID]:
-        """Return the vote states among the targets of the agenda transitions.
+    async def _agenda_gremium(
+        self, transition: Transition, target: State | None, budget_id: UUID | None
+    ) -> UUID | None:
+        """Return the Gremium whose meeting a transition puts the application on.
 
-        Only a transition with an `addToNextSession` action needs the kind of its
-        target. Without such a transition the method does not query.
+        The transition needs an `addToNextSession` action and a vote state as its
+        target. An explicit `gremiumId` of the action wins. Without it the Gremium of
+        the vote applies: the fixed `gremiumId` of the target state, or the effective
+        deciding Gremium of the cost center for `gremiumSource: "budget"`.
         """
-        targets = {
-            t.to_state_id for t in transitions if agenda_gremium_id(t.actions) is not None
-        }
-        if not targets:
-            return set()
-        rows = await self.session.execute(
-            select(State.id).where(State.id.in_(targets), State.kind == "vote")
-        )
-        return set(rows.scalars().all())
+        action = _agenda_action(transition.actions)
+        if action is None or target is None or target.kind != "vote":
+            return None
+        if "gremiumId" in action:
+            return agenda_gremium_id(transition.actions)
+        return await resolve_vote_gremium(self.session, target, budget_id)
+
+    async def _enterable(self, target: State | None, budget_id: UUID | None) -> bool:
+        """Tell whether an application with cost center `budget_id` may enter `target`.
+
+        Fail closed: a vote state with `gremiumSource: "budget"` takes the application
+        only when its Gremium resolves. Every other state takes it.
+        """
+        if not gremium_from_budget(target):
+            return True
+        return await resolve_vote_gremium(self.session, target, budget_id) is not None
+
+    async def _transitions_out(
+        self, app: Application, transitions: list[Transition]
+    ) -> list[TransitionOut]:
+        """Map the firable transitions to their API shape and drop the blocked ones.
+
+        A transition into a vote state whose Gremium does not resolve stays hidden
+        (fail closed, the fire would give 409 `no_vote_gremium`).
+        """
+        out: list[TransitionOut] = []
+        for t in transitions:
+            target = await self.session.get(State, t.to_state_id)
+            if not await self._enterable(target, app.budget_id):
+                continue
+            out.append(
+                _transition_out(t, await self._agenda_gremium(t, target, app.budget_id))
+            )
+        return out
 
     async def _outgoing(self, app: Application) -> list[Transition]:
         return list(
@@ -415,8 +464,7 @@ class FlowService:
             for t in await self._outgoing(app)
             if not t.automatic and not t.branch and eval_guard(t.guard, ctx)
         ]
-        vote_ids = await self._vote_state_ids(visible)
-        return [_transition_out(t, vote_ids) for t in visible]
+        return await self._transitions_out(app, visible)
 
     _APPLICANT = Principal(sub="applicant", roles=[], permissions=set())
 
@@ -443,8 +491,7 @@ class FlowService:
             and guard_requires_applicant(t.guard)
             and eval_guard(t.guard, ctx)
         ]
-        vote_ids = await self._vote_state_ids(visible)
-        return [_transition_out(t, vote_ids) for t in visible]
+        return await self._transitions_out(app, visible)
 
     async def fire_as_applicant(
         self,
@@ -505,8 +552,15 @@ class FlowService:
             self.session, app, principal, manual=False, deadline_passed=deadline_passed
         )
         for t in await self._outgoing(app):
-            if t.automatic and eval_guard(t.guard, ctx):
-                return await self.fire(
+            if not (t.automatic and eval_guard(t.guard, ctx)):
+                continue
+            # Fail closed: an automatic transition into a vote state without a
+            # resolvable Gremium does not fire. The next candidate may still fire.
+            if not await self._enterable(
+                await self.session.get(State, t.to_state_id), app.budget_id
+            ):
+                continue
+            return await self.fire(
                     application_id,
                     t.id,
                     principal,
@@ -759,7 +813,8 @@ class FlowService:
 
         Raises:
             NotFoundError: The application or the transition does not exist (404).
-            ConflictError: The state does not match, the guard fails, or another
+            ConflictError: The state does not match, the guard fails, the target vote
+                state has no resolvable Gremium (`no_vote_gremium`), or another
                 transition won the race (409).
             ValidationProblem: `meeting_id` does not fit the transition (422).
         """
@@ -843,8 +898,18 @@ class FlowService:
         )
         if not eval_guard(transition.guard, ctx):
             raise ConflictError("Transition guard not satisfied.", code="guard_failed")
+        # The snapshot of the deciding Gremium for the target state. A vote state with
+        # `gremiumSource: "budget"` and no resolvable Gremium refuses the application
+        # (409 `no_vote_gremium`, fail closed). A non-vote target clears the snapshot.
+        vote_gremium = await snapshot_for_entry(
+            self.session,
+            await self.session.get(State, transition.to_state_id),
+            app.budget_id,
+        )
         if meeting_id is not None:
-            await self._check_agenda_meeting(transition, meeting_id, principal)
+            await self._check_agenda_meeting(
+                transition, meeting_id, principal, vote_gremium=vote_gremium
+            )
 
         # Optimistic locking through the `from`-state condition. A concurrent transition
         # has already moved `current_state_id`, so rowcount is 0 and the caller gets 409.
@@ -858,7 +923,7 @@ class FlowService:
                     Application.id == app.id,
                     Application.current_state_id == from_state_id,
                 )
-                .values(current_state_id=to_state_id)
+                .values(current_state_id=to_state_id, vote_gremium_id=vote_gremium)
             ),
         )
         if result.rowcount != 1:
@@ -979,9 +1044,18 @@ class FlowService:
         )
 
     async def _check_agenda_meeting(
-        self, transition: Transition, meeting_id: UUID, principal: Principal
+        self,
+        transition: Transition,
+        meeting_id: UUID,
+        principal: Principal,
+        *,
+        vote_gremium: UUID | None = None,
     ) -> None:
         """Check the meeting that a manual fire picks for the agenda item.
+
+        The Gremium of the meeting must be the explicit `gremiumId` of the
+        `addToNextSession` action, or without one `vote_gremium`, the Gremium that the
+        target vote state gives the application.
 
         Raises:
             ValidationProblem: The transition has no `addToNextSession` action, its
@@ -993,8 +1067,13 @@ class FlowService:
         from app.modules.livevote.models import Meeting
         from app.modules.livevote.service import MeetingService
 
-        gremium_id = agenda_gremium_id(transition.actions)
-        if gremium_id is None:
+        action = _agenda_action(transition.actions)
+        gremium_id = (
+            agenda_gremium_id(transition.actions)
+            if action is not None and "gremiumId" in action
+            else vote_gremium
+        )
+        if action is None or gremium_id is None:
             raise _meeting_problem("This transition does not add to an agenda.")
         to_state = await self._load_state(transition.to_state_id)
         if to_state is None or to_state.kind != "vote":
@@ -1052,6 +1131,10 @@ class FlowService:
         side effect of the original change: a cancelled vote stays cancelled, and fired
         webhooks and mails stay sent.
 
+        The restored state gets its vote Gremium snapshot like a transition. A restored
+        vote state with `gremiumSource: "budget"` and no resolvable Gremium gives 409
+        `no_vote_gremium`.
+
         Returns:
             The id of the new status event.
         """
@@ -1061,6 +1144,11 @@ class FlowService:
                 "A newer status change exists; revert that first.",
                 code="stale_revert",
             )
+        # The restored state may be a vote state. It gets its snapshot as on a
+        # transition, and it refuses the application (409) without a Gremium.
+        vote_gremium = await snapshot_for_entry(
+            self.session, await self.session.get(State, from_state_id), app.budget_id
+        )
         # Optimistic locking as in `fire`. A concurrent transition has already moved the
         # state, so rowcount is 0 and the caller gets 409.
         result = cast(
@@ -1071,7 +1159,7 @@ class FlowService:
                     Application.id == app.id,
                     Application.current_state_id == to_state_id,
                 )
-                .values(current_state_id=from_state_id)
+                .values(current_state_id=from_state_id, vote_gremium_id=vote_gremium)
             ),
         )
         if result.rowcount != 1:
@@ -1186,7 +1274,8 @@ class FlowService:
             NotFoundError: The target state does not belong to the flow of the
                 application (404).
             ConflictError: The application has no current state, already sits in the
-                target state, or a concurrent change moved it first (409).
+                target state, the target vote state has no resolvable Gremium
+                (`no_vote_gremium`), or a concurrent change moved it first (409).
         """
         app = await self._load_app(application_id, allow_unconfirmed=allow_unconfirmed)
         from_state_id = app.current_state_id
@@ -1203,6 +1292,10 @@ class FlowService:
             raise ConflictError(
                 "Application is already in the target state.", code="conflict"
             )
+        # A forced vote state gets its snapshot as on a transition. A vote state with
+        # `gremiumSource: "budget"` and no resolvable Gremium refuses the force too
+        # (409 `no_vote_gremium`): nobody could vote on the application there.
+        vote_gremium = await snapshot_for_entry(self.session, target, app.budget_id)
         # Optimistic locking as in fire() and revert_status. A concurrent transition has
         # already moved the state, so rowcount is 0 and the caller gets 409.
         result = cast(
@@ -1213,7 +1306,7 @@ class FlowService:
                     Application.id == app.id,
                     Application.current_state_id == from_state_id,
                 )
-                .values(current_state_id=target_state_id)
+                .values(current_state_id=target_state_id, vote_gremium_id=vote_gremium)
             ),
         )
         if result.rowcount != 1:

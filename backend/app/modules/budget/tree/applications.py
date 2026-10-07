@@ -19,7 +19,8 @@ from app.modules.budget.tree_schemas import (
     MoveFiscalYearRequest,
 )
 from app.modules.flow.models import State
-from app.shared.errors import NotFoundError, ValidationProblem
+from app.modules.flow.vote_gremium import in_budget_vote_state
+from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
 class AssignmentOps(BudgetTreeServiceBase):
@@ -95,11 +96,21 @@ class AssignmentOps(BudgetTreeServiceBase):
         one, the method takes the single open active fiscal year.
 
         Raises:
+            ConflictError: `budget_locked_by_vote` (409) while the application sits in
+                a vote state whose Gremium comes from the cost center.
             ValidationProblem: The fiscal year is ambiguous or missing. The
                 method fails with a 422 instead of leaving ``fiscal_year_id``
                 NULL. This mirrors the behavior of bookings.
         """
         app = await self._get_application(application_id)
+        # The deciding Gremium of a running vote came from this cost center. A change
+        # now would contradict the snapshot (`application.vote_gremium_id`).
+        if await in_budget_vote_state(self.session, app):
+            raise ConflictError(
+                "The application is in a vote whose Gremium comes from the cost center. "
+                "Change the cost center after the vote.",
+                code="budget_locked_by_vote",
+            )
         if payload.budget_id is None:
             app.budget_id = None
             app.fiscal_year_id = None

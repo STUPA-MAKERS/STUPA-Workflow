@@ -156,6 +156,7 @@ export class FlowEditorComponent {
   protected readonly gremiumOptions = this.opts.gremiumOptions;
   protected readonly globalRoleOptions = this.opts.globalRoleOptions;
   protected readonly webhookOptions = this.opts.webhookOptions;
+  protected readonly budgetTree = this.opts.budgetTree;
   protected readonly deadlinePolicyOptions = this.opts.deadlinePolicyOptions;
 
   protected readonly graph = signal<FlowGraph>(autoLayout(emptyFlowGraph()));
@@ -504,8 +505,18 @@ export class FlowEditorComponent {
     this.graph.update((g) => ops.setStateGremium(g, key, gremiumId));
   }
 
+  protected setStateGremiumSource(key: string, source: 'fixed' | 'budget'): void {
+    this.graph.update((g) => ops.setStateGremiumSource(g, key, source));
+  }
+
   protected setStateDeadlinePolicy(key: string, policyKey: string): void {
     this.graph.update((g) => ops.setStateDeadlinePolicy(g, key, policyKey));
+  }
+
+  /** The state takes its gremium from the cost center (a dynamic vote state). */
+  protected targetIsBudgetVote(key: string): boolean {
+    const s = this.stateByKey(key);
+    return s?.kind === 'vote' && s.config?.gremiumSource === 'budget';
   }
 
   private stateByKey(key: string): StateDef | undefined {
@@ -602,6 +613,10 @@ export class FlowEditorComponent {
 
   protected setActionParam(index: number, ai: number, key: string, value: string): void {
     this.graph.update((g) => ops.setActionParam(g, index, ai, key, value));
+  }
+
+  protected setActionMap(index: number, ai: number, map: Record<string, string>): void {
+    this.graph.update((g) => ops.setActionMap(g, index, ai, map));
   }
 
   protected actionParam(act: ActionDef, key: string): string {

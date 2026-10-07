@@ -44,13 +44,25 @@
 />
 
 @if (state().kind === 'vote') {
+  <!-- Who decides: a fixed gremium, or the deciding gremium of the cost center that the
+       application carries when it enters the state. -->
   <app-select
-    [label]="'admin.flow.cfgGremium' | t"
-    [placeholder]="'admin.flow.cfgGremiumPh' | t"
-    [options]="gremiumOptions()"
-    [ngModel]="state().config?.gremiumId ?? ''"
-    (ngModelChange)="gremiumChange.emit($event)"
+    [label]="'admin.flow.cfgGremiumSource' | t"
+    [options]="gremiumSourceOptions()"
+    [ngModel]="gremiumSource()"
+    (ngModelChange)="gremiumSourceChange.emit($event)"
   />
+  @if (gremiumSource() === 'budget') {
+    <p class="ins__hint">{{ 'admin.flow.cfgGremiumSourceBudgetHint' | t }}</p>
+  } @else {
+    <app-select
+      [label]="'admin.flow.cfgGremium' | t"
+      [placeholder]="'admin.flow.cfgGremiumPh' | t"
+      [options]="gremiumOptions()"
+      [ngModel]="state().config?.gremiumId ?? ''"
+      (ngModelChange)="gremiumChange.emit($event)"
+    />
+  }
   <p class="ins__hint">{{ 'admin.flow.branchHint' | t }}</p>
 }
 

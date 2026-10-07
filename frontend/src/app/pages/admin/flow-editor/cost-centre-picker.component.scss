@@ -1,0 +1,66 @@
+// A picker field in the look of the ui-kit fields: the whole box is the button.
+@use 'field' as f;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ccp__box {
+  @include f.box;
+  @include f.box-labelled;
+}
+.ccp__label {
+  @include f.label;
+}
+.ccp__box:focus-within .ccp__label {
+  @include f.label-focus;
+}
+
+.ccp__pick {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--field-height);
+  margin: 0;
+  padding: 24px var(--space-3) 8px var(--space-4);
+  border: 0;
+  border-radius: var(--radius-field);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-md);
+  text-align: left;
+  cursor: pointer;
+}
+.ccp__pick:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.ccp__pick app-icon {
+  flex: none;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+/* A path key with a name wraps instead of an ellipsis: the whole value stays readable. */
+.ccp__value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ccp__placeholder {
+  color: var(--color-text-subtle);
+}
+
+.ccp__tree {
+  max-height: 18rem;
+  overflow-y: auto;
+  padding: var(--space-2);
+  border-radius: var(--radius-lg);
+  /* One step above the surface that holds the field, like the field itself. */
+  background: var(--color-surface-sunken);
+}

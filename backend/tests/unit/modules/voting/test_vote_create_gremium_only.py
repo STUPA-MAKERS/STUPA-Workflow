@@ -52,7 +52,9 @@ def _body(**over: Any) -> VoteCreate:
 
 
 def _application(**over: Any) -> SimpleNamespace:
-    base: dict[str, Any] = {"id": uuid4(), "current_state_id": None, "gremium_id": GID}
+    base: dict[str, Any] = {
+        "id": uuid4(), "current_state_id": None, "gremium_id": GID, "vote_gremium_id": None,
+    }
     base.update(over)
     return SimpleNamespace(**base)
 
@@ -315,3 +317,18 @@ async def test_get_scoped_token_never_casts(monkeypatch: pytest.MonkeyPatch) -> 
     )
     out = await VotingService(db).get_scoped(vote.id, agent)
     assert out.can_cast is False
+
+
+async def test_create_follows_the_vote_gremium_snapshot() -> None:
+    """Flow variant B: the snapshot of the vote state decides, before the type Gremium."""
+    app = _application(vote_gremium_id=OTHER, current_state_id=uuid4())
+    db = fake_session(result(app))
+    db.scalar_results = [GID]  # the gremium exists
+    with pytest.raises(ValidationProblem) as err:
+        await VotingService(db).create(app.id, _body(), MANAGER)
+    assert err.value.code == "eligible_group_mismatch"
+    app = _application(vote_gremium_id=GID, gremium_id=OTHER, current_state_id=uuid4())
+    db = fake_session(result(app), result(*_roster(2)))
+    db.scalar_results = [GID]
+    out = await VotingService(db).create(app.id, _body(), MANAGER)
+    assert out.tally.eligible == 2

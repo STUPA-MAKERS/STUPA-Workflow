@@ -87,7 +87,8 @@ async def test_assign_from_field_runs_once_per_idempotency_key(
     monkeypatch.setattr(extras_mod, "audit_record", _audit)
     app_id, node_id, fy_id = uuid4(), uuid4(), uuid4()
     app = SimpleNamespace(
-        id=app_id, budget_id=None, fiscal_year_id=None, data={"ziel": str(node_id)}
+        id=app_id, budget_id=None, fiscal_year_id=None,
+        current_state_id=None, data={"ziel": str(node_id)}
     )
     node = SimpleNamespace(id=node_id, parent_id=None, active=True)
     session = _Session({app_id: app, node_id: node}, (fy_id,))

@@ -584,6 +584,8 @@ export interface Application {
   typeId: Uuid;
   state: ApplicationState | null;
   gremiumId: Uuid | null;
+  /** The gremium that decides the current vote (snapshot on entry of a vote state). */
+  voteGremiumId?: Uuid | null;
   budgetId: Uuid | null;
   fiscalYearId: Uuid | null;
   amount: string | null;

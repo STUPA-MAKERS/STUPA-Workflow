@@ -236,8 +236,6 @@ def test_validate_action_required_fields() -> None:
         validate_action({"type": "notify", "recipients": [{"kind": "nope"}]})
     with pytest.raises(GuardError, match="requires 'ref'"):
         validate_action({"type": "notify", "recipients": [{"kind": "gremium"}]})
-    with pytest.raises(GuardError, match="gremiumId"):
-        validate_action({"type": "addToNextSession"})
     with pytest.raises(GuardError, match="budgetId"):
         validate_action({"type": "assignBudget"})
     with pytest.raises(GuardError, match="field"):
@@ -258,7 +256,9 @@ def test_whitelists_exact() -> None:
         "deadlinePassed", "applicantRoleIs", "applicantCommitteeIs", "applicationTypeIs",
         "attachmentPresent", "budgetIs", "budgetFitsApplication", "hasField", "compare",
         "roleIs", "isInCommittee", "actorIsApplicant", "and", "or", "not",
+        "isInVoteGremium", "budgetHasDecisionGremium",
     } == GUARD_OPERATORS
     assert {
         "webhook", "notify", "addToNextSession", "assignBudget", "assignBudgetFromField",
+        "assignBudgetFromApplicantGremium", "assignBudgetFromMap",
     } == ACTION_TYPES

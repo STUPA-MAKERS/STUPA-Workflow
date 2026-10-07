@@ -6,16 +6,19 @@ whitelist. It never calls `eval`.
 The catalog splits into conditions and actor gates. Conditions apply to automatic and
 manual transitions: `deadlinePassed`, `applicantRoleIs`, `applicantCommitteeIs`,
 `applicationTypeIs` (the application type key), `attachmentPresent` (one attachment or
-more), `budgetIs`, `budgetFitsApplication`, `hasField`. `compare` adds a typed
+more), `budgetIs`, `budgetFitsApplication`, `budgetHasDecisionGremium` (the cost center
+has an effective deciding Gremium), `hasField`. `compare` adds a typed
 comparison over a promoted or form field. The combinators `and`, `or` and `not` join
 conditions.
 
-Actor gates apply to manual transitions only: `roleIs` (a global role) and
-`isInCommittee` (Gremium membership). `validate_guard(..., allow_actor_ops=False)`
+Actor gates apply to manual transitions only: `roleIs` (a global role),
+`isInCommittee` (Gremium membership), `actorIsApplicant` and `isInVoteGremium` (member
+of the Gremium that decides the current vote). `validate_guard(..., allow_actor_ops=False)`
 forbids them on automatic transitions.
 
 An action has one whitelisted type: `webhook`, `notify`, `addToNextSession`,
-`assignBudget` or `assignBudgetFromField`. The engine dispatches the action. This module
+`assignBudget`, `assignBudgetFromField`, `assignBudgetFromApplicantGremium` or
+`assignBudgetFromMap`. The engine dispatches the action. This module
 only validates it. An unknown operator or action type raises `GuardError` when the flow
 version is SAVED, not at runtime. See `validate_guard` and `validate_action`.
 """
@@ -40,11 +43,16 @@ GUARD_CONDITION_OPERATORS: frozenset[str] = frozenset(
         "budgetFitsApplication",
         "hasField",
         "compare",
+        "budgetHasDecisionGremium",
     }
 )
 # Actor gates apply to manual transitions only. `actorIsApplicant` is true when the
 # actor that triggers the transition is the applicant.
-GUARD_ACTOR_OPERATORS: frozenset[str] = frozenset({"roleIs", "isInCommittee", "actorIsApplicant"})
+# `isInVoteGremium` is true when the actor is a member of the Gremium that decides the
+# current vote (`application.vote_gremium_id`).
+GUARD_ACTOR_OPERATORS: frozenset[str] = frozenset(
+    {"roleIs", "isInCommittee", "actorIsApplicant", "isInVoteGremium"}
+)
 GUARD_LEAF_OPERATORS: frozenset[str] = GUARD_CONDITION_OPERATORS | GUARD_ACTOR_OPERATORS
 GUARD_COMBINATORS: frozenset[str] = frozenset({"and", "or", "not"})
 GUARD_OPERATORS: frozenset[str] = GUARD_LEAF_OPERATORS | GUARD_COMBINATORS
@@ -74,23 +82,67 @@ _STRING_VALUE_OPERATORS: frozenset[str] = frozenset(
     }
 )
 _BOOL_VALUE_OPERATORS: frozenset[str] = frozenset(
-    {"deadlinePassed", "budgetFitsApplication", "actorIsApplicant", "attachmentPresent"}
+    {
+        "deadlinePassed",
+        "budgetFitsApplication",
+        "actorIsApplicant",
+        "attachmentPresent",
+        "isInVoteGremium",
+        "budgetHasDecisionGremium",
+    }
 )
 
 ACTION_TYPES: frozenset[str] = frozenset(
-    {"webhook", "notify", "addToNextSession", "assignBudget", "assignBudgetFromField"}
+    {
+        "webhook",
+        "notify",
+        "addToNextSession",
+        "assignBudget",
+        "assignBudgetFromField",
+        "assignBudgetFromApplicantGremium",
+        "assignBudgetFromMap",
+    }
 )
 
-# Required string field per action type. `notify` has a separate check.
-# `assignBudgetFromField` reads the cost center id from the named form field.
+# `config.gremiumSource` of a vote state that takes its Gremium from the cost center.
+GREMIUM_SOURCE_BUDGET = "budget"
+
+# The actions that set the cost center of the application.
+ASSIGN_BUDGET_ACTION_TYPES: frozenset[str] = frozenset(
+    {
+        "assignBudget",
+        "assignBudgetFromField",
+        "assignBudgetFromApplicantGremium",
+        "assignBudgetFromMap",
+    }
+)
+
+# Required string field per action type. `notify` and `assignBudgetFromMap` have a
+# separate check. `assignBudgetFromField` reads the cost center id from the named form
+# field.
 _ACTION_REQUIRED_FIELD: dict[str, str] = {
     "webhook": "webhookId",
-    "addToNextSession": "gremiumId",
     "assignBudget": "budgetId",
     "assignBudgetFromField": "field",
 }
 
-NOTIFY_RECIPIENT_KINDS: frozenset[str] = frozenset({"gremium", "role", "applicant", "email"})
+# Optional string field per action type. When the key is present, it must hold a
+# non-empty string. `addToNextSession` without `gremiumId` takes the Gremium of the
+# vote. `assignBudgetFromApplicantGremium` without `parentId` searches the whole tree.
+_ACTION_OPTIONAL_FIELD: dict[str, str] = {
+    "addToNextSession": "gremiumId",
+    "assignBudgetFromApplicantGremium": "parentId",
+}
+
+# `voteGremium` is the Gremium of the current vote (`application.vote_gremium_id`).
+# `budgetGremium` is the effective deciding Gremium of the cost center.
+NOTIFY_RECIPIENT_KINDS: frozenset[str] = frozenset(
+    {"gremium", "role", "applicant", "email", "voteGremium", "budgetGremium"}
+)
+# Recipient kinds that take no `ref`.
+_NOTIFY_KINDS_WITHOUT_REF: frozenset[str] = frozenset(
+    {"applicant", "voteGremium", "budgetGremium"}
+)
 
 
 class GuardError(Exception):
@@ -124,6 +176,10 @@ class GuardContext:
         field_values: The promoted and form field values for `compare` and `hasField`.
         field_types: The type of each field, including the built-in `amount` of type
             `currency`.
+        vote_gremium_id: The Gremium of the current vote (the snapshot
+            `application.vote_gremium_id`), as a string. It serves `isInVoteGremium`.
+        budget_has_decision_gremium: True when the assigned cost center has an
+            effective deciding Gremium. It serves `budgetHasDecisionGremium`.
     """
 
     manual: bool = True
@@ -139,6 +195,8 @@ class GuardContext:
     has_attachment: bool = False
     field_values: Mapping[str, Any] = field(default_factory=dict)
     field_types: Mapping[str, str] = field(default_factory=dict)
+    vote_gremium_id: str | None = None
+    budget_has_decision_gremium: bool = False
 
 
 def _to_decimal(value: Any) -> Decimal | None:
@@ -278,6 +336,12 @@ _LEAF_EVALUATORS: dict[str, Callable[[Any, GuardContext], bool]] = {
     "budgetFitsApplication": lambda value, ctx: ctx.budget_fits == bool(value),
     "attachmentPresent": lambda value, ctx: ctx.has_attachment == bool(value),
     "deadlinePassed": lambda value, ctx: ctx.deadline_passed == bool(value),
+    "isInVoteGremium": lambda value, ctx: (
+        ctx.vote_gremium_id is not None and ctx.vote_gremium_id in ctx.actor_committees
+    )
+    == bool(value),
+    "budgetHasDecisionGremium": lambda value, ctx: ctx.budget_has_decision_gremium
+    == bool(value),
     "hasField": _has_field,
     "compare": _eval_compare,
 }
@@ -403,8 +467,11 @@ def validate_action(action: dict[str, Any]) -> None:
     """Check that `action.type` is whitelisted and that the required fields are present.
 
     `webhook` needs `webhookId`. `notify` needs a recipient list with valid kinds.
-    `addToNextSession` needs a `gremiumId`. The flow-graph validator checks the
-    target-state constraint, because it knows the transition.
+    `addToNextSession` takes an optional `gremiumId` (without it, the Gremium of the
+    vote). `assignBudgetFromApplicantGremium` takes an optional `parentId`.
+    `assignBudgetFromMap` needs `field` and a non-empty `map` of field value to budget
+    id. The flow-graph validator checks the target-state constraints, because it knows
+    the transition. The admin service checks that the budget ids exist.
 
     Raises:
         GuardError: The action type is unknown or a required field is missing.
@@ -419,9 +486,49 @@ def validate_action(action: dict[str, Any]) -> None:
     if action_type == "notify":
         _validate_notify_recipients(action.get("recipients"))
         return
+    if action_type == "assignBudgetFromMap":
+        _validate_budget_map(action)
+        return
+    optional = _ACTION_OPTIONAL_FIELD.get(action_type)
+    if optional is not None:
+        if optional in action and (
+            not isinstance(action[optional], str) or not action[optional]
+        ):
+            raise GuardError(f"{action_type} '{optional}' must be a non-empty string")
+        return
     field = _ACTION_REQUIRED_FIELD[action_type]
     if not isinstance(action.get(field), str) or not action[field]:
         raise GuardError(f"{action_type} action requires '{field}'")
+
+
+def _validate_budget_map(action: dict[str, Any]) -> None:
+    """Check the shape of `assignBudgetFromMap`: a field key and a value-to-budget map."""
+    fld = action.get("field")
+    if not isinstance(fld, str) or not fld:
+        raise GuardError("assignBudgetFromMap action requires 'field'")
+    mapping = action.get("map")
+    if not isinstance(mapping, dict) or not mapping:
+        raise GuardError("assignBudgetFromMap action requires a non-empty 'map'")
+    for key, value in mapping.items():
+        if not key or not isinstance(value, str) or not value:
+            raise GuardError(
+                "assignBudgetFromMap 'map' needs non-empty field values and budget ids"
+            )
+
+
+def budget_ids_of_action(action: dict[str, Any]) -> list[str]:
+    """Return the budget ids that an action references, for the save check.
+
+    `assignBudgetFromMap` references the values of its `map`.
+    `assignBudgetFromApplicantGremium` references its optional `parentId`. Every other
+    action gives an empty list.
+    """
+    action_type = action.get("type")
+    if action_type == "assignBudgetFromMap" and isinstance(action.get("map"), dict):
+        return [str(v) for v in action["map"].values()]
+    if action_type == "assignBudgetFromApplicantGremium" and action.get("parentId"):
+        return [str(action["parentId"])]
+    return []
 
 
 def _validate_notify_recipients(recipients: Any) -> None:
@@ -435,5 +542,5 @@ def _validate_notify_recipients(recipients: Any) -> None:
             raise GuardError(f"unknown notify recipient kind: {kind!r}")
         if kind in {"gremium", "role", "email"} and not r.get("ref"):
             raise GuardError(f"notify recipient kind {kind!r} requires 'ref'")
-        if kind == "applicant" and r.get("ref") is not None:
-            raise GuardError("notify recipient kind 'applicant' must not have 'ref'")
+        if kind in _NOTIFY_KINDS_WITHOUT_REF and r.get("ref") is not None:
+            raise GuardError(f"notify recipient kind {kind!r} must not have 'ref'")

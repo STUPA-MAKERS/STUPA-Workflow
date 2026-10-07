@@ -386,6 +386,7 @@ class ApplicationsServiceBase:
             typeId=app.type_id,
             state=await self._state_out_resolved(state),
             gremiumId=app.gremium_id,
+            voteGremiumId=app.vote_gremium_id,
             budgetId=app.budget_id,
             fiscalYearId=app.fiscal_year_id,
             amount=app.amount,

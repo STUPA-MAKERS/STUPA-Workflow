@@ -24,6 +24,7 @@ import {
   type Guard,
   type GuardLeafOperator,
 } from '../admin.models';
+import { defaultGuard, guardValueKind } from './flow-guard.util';
 
 type ValueKind = 'none' | 'role' | 'committee' | 'compare' | 'text';
 
@@ -191,29 +192,10 @@ export class GuardEditorComponent {
   }
 
   private kindForOp(op: string): ValueKind {
-    if (
-      op === 'deadlinePassed' ||
-      op === 'budgetFitsApplication' ||
-      op === 'actorIsApplicant' ||
-      op === 'attachmentPresent' ||
-      !op
-    )
-      return 'none';
-    if (op === 'roleIs' || op === 'applicantRoleIs') return 'role';
-    if (op === 'isInCommittee' || op === 'applicantCommitteeIs') return 'committee';
-    if (op === 'compare') return 'compare';
-    return 'text';
+    return guardValueKind(op);
   }
 
   private defaultLeaf(op: GuardLeafOperator): Guard {
-    if (
-      op === 'deadlinePassed' ||
-      op === 'budgetFitsApplication' ||
-      op === 'actorIsApplicant' ||
-      op === 'attachmentPresent'
-    )
-      return { [op]: true };
-    if (op === 'compare') return { compare: { field: '', op: '==', value: '' } };
-    return { [op]: '' };
+    return defaultGuard(op);
   }
 }

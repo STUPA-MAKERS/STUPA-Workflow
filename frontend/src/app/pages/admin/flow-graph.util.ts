@@ -9,7 +9,13 @@
  * check only gives the user instant feedback.
  */
 import { type TranslationKey } from '../../core/i18n/translations';
-import { type FlowGraph, type FlowGroup, type StateDef, type TransitionDef } from './admin.models';
+import {
+  ASSIGN_BUDGET_ACTIONS,
+  type FlowGraph,
+  type FlowGroup,
+  type StateDef,
+  type TransitionDef,
+} from './admin.models';
 import { type GuardError, validateAction, validateGuard } from './guard-builder.util';
 
 /** Keys of a field or a state. Mirrors `KEY_PATTERN` in `config_schemas`. */
@@ -72,16 +78,26 @@ export function validateFlowGraph(graph: FlowGraph): FlowValidationResult {
     try {
       // Actor gates (roleIs/isInCommittee) apply to manual transitions only.
       validateGuard(t.guard, !t.automatic);
+      const target = states.find((s) => s.key === t.to);
       for (const a of t.actions ?? []) {
         validateAction(a);
-        if (a.type === 'addToNextSession') {
-          const target = states.find((s) => s.key === t.to);
-          if ((target?.kind ?? 'normal') !== 'vote') {
-            errors.push({
-              key: 'admin.flow.err.sessionNeedsVote',
-              params: { from: String(t.from), to: String(t.to) },
-            });
-          }
+        if (a.type === 'addToNextSession' && (target?.kind ?? 'normal') !== 'vote') {
+          errors.push({
+            key: 'admin.flow.err.sessionNeedsVote',
+            params: { from: String(t.from), to: String(t.to) },
+          });
+        }
+        // A vote state with `gremiumSource: 'budget'` takes its gremium on entry, before
+        // the action runs. A cost-center action on the way in would come too late.
+        if (
+          ASSIGN_BUDGET_ACTIONS.includes(a.type) &&
+          target?.kind === 'vote' &&
+          target.config?.gremiumSource === 'budget'
+        ) {
+          errors.push({
+            key: 'admin.flow.err.assignIntoBudgetVote',
+            params: { from: String(t.from), to: String(t.to) },
+          });
         }
       }
     } catch (err) {
@@ -109,7 +125,14 @@ export function validateFlowGraph(graph: FlowGraph): FlowValidationResult {
       .map((t) => t.branch as string)
       .sort();
     if (s.kind === 'vote') {
-      if (!s.config?.gremiumId) {
+      // Exactly one of a fixed `gremiumId` and `gremiumSource: 'budget'`.
+      const source = s.config?.gremiumSource;
+      const fixed = !!s.config?.gremiumId;
+      if (source != null && source !== 'budget') {
+        errors.push({ key: 'admin.flow.err.voteGremiumSource', params: { key: s.key } });
+      } else if (fixed && source === 'budget') {
+        errors.push({ key: 'admin.flow.err.voteGremiumBoth', params: { key: s.key } });
+      } else if (!fixed && source !== 'budget') {
         errors.push({ key: 'admin.flow.err.voteNeedsGremium', params: { key: s.key } });
       }
       if (outBranches.join(',') !== 'fail,pass') {

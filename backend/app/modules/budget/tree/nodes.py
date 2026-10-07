@@ -11,6 +11,7 @@ from app.modules.admin.models import Gremium
 from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.budget import tree_rules
+from app.modules.budget.decision import decision_gremium_of
 from app.modules.budget.tree.service_base import BudgetTreeServiceBase, _json_safe
 from app.modules.budget.tree_models import Budget, BudgetExpense
 from app.modules.budget.tree_rules import _SEP
@@ -18,7 +19,14 @@ from app.modules.budget.tree_schemas import BudgetNodeCreate, BudgetNodeOut, Bud
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
-def _node_out(b: Budget) -> BudgetNodeOut:
+def _node_out(
+    b: Budget, decision: tuple[UUID | None, UUID | None] = (None, None)
+) -> BudgetNodeOut:
+    """Map a node to its API shape.
+
+    `decision` is the effective deciding Gremium and the node that holds it (see
+    `NodeOps._decision_view`).
+    """
     return BudgetNodeOut(
         id=b.id,
         parentId=b.parent_id,
@@ -33,6 +41,9 @@ def _node_out(b: Budget) -> BudgetNodeOut:
         deniedStateKeys=list(b.denied_state_keys or []),
         hiddenInBudget=bool(b.hidden_in_budget),
         viewGremiumId=b.view_gremium_id,
+        decisionGremiumId=b.decision_gremium_id,
+        effectiveDecisionGremiumId=decision[0],
+        decisionGremiumSourceId=decision[1],
         fiscalStartMonth=b.fiscal_start_month,
         fiscalStartDay=b.fiscal_start_day,
     )
@@ -40,6 +51,34 @@ def _node_out(b: Budget) -> BudgetNodeOut:
 
 class NodeOps(BudgetTreeServiceBase):
     """Create, update (with key rename) and delete cost-center nodes."""
+
+    async def _check_decision_gremium(self, gremium_id: UUID | None) -> None:
+        """Refuse a deciding Gremium that does not exist.
+
+        Raises:
+            ValidationProblem: `decision_gremium_invalid` (422).
+        """
+        if gremium_id is None:
+            return
+        found = await self.session.scalar(select(Gremium.id).where(Gremium.id == gremium_id))
+        if found is None:
+            raise ValidationProblem(
+                "decisionGremiumId is not the id of a Gremium.",
+                code="decision_gremium_invalid",
+                errors=[{"field": "decisionGremiumId", "msg": "unknown gremium"}],
+            )
+
+    async def _decision_view(self, node: Budget) -> tuple[UUID | None, UUID | None]:
+        """Return the effective deciding Gremium of `node` and the node that holds it.
+
+        The own value wins. Otherwise the parent chain decides. The method reads the
+        parent chain from the database, so it does not depend on a flush of `node`.
+        """
+        if node.decision_gremium_id is not None:
+            return node.decision_gremium_id, node.id
+        if node.parent_id is None:
+            return None, None
+        return await decision_gremium_of(self.session, node.parent_id)
 
     async def create_node(self, payload: BudgetNodeCreate) -> BudgetNodeOut:
         """Create a cost center. A child inherits the Gremium of its parent."""
@@ -70,6 +109,7 @@ class NodeOps(BudgetTreeServiceBase):
 
         if await self._sibling_exists(payload.parent_id, payload.key):
             raise ConflictError(f"budget key {payload.key!r} already exists under this parent")
+        await self._check_decision_gremium(payload.decision_gremium_id)
 
         node = Budget(
             id=uuid.uuid4(),
@@ -81,6 +121,7 @@ class NodeOps(BudgetTreeServiceBase):
             currency=payload.currency,
             active=payload.active,
             color=payload.color,
+            decision_gremium_id=payload.decision_gremium_id,
             # The fiscal start date counts only on the top level. A child keeps
             # the defaults.
             fiscal_start_month=payload.fiscal_start_month,
@@ -94,10 +135,14 @@ class NodeOps(BudgetTreeServiceBase):
             data={
                 "pathKey": node.path_key,
                 "gremiumId": str(gremium_id) if gremium_id else None,
+                "decisionGremiumId": (
+                    str(payload.decision_gremium_id) if payload.decision_gremium_id else None
+                ),
             },
         )
+        decision = await self._decision_view(node)
         await self.session.commit()
-        return _node_out(node)
+        return _node_out(node, decision)
 
     async def _sibling_exists(self, parent_id: UUID | None, key: str) -> bool:
         existing = (
@@ -124,6 +169,8 @@ class NodeOps(BudgetTreeServiceBase):
         node = await self._get_node(budget_id)
         provided = payload.model_dump(exclude_unset=True)
         new_key = provided.pop("key", None)
+        if "decision_gremium_id" in provided:
+            await self._check_decision_gremium(provided["decision_gremium_id"])
         stichtag_changed = (
             "fiscal_start_month" in provided
             and provided["fiscal_start_month"] != node.fiscal_start_month
@@ -161,8 +208,9 @@ class NodeOps(BudgetTreeServiceBase):
                 "after": after,
             },
         )
+        decision = await self._decision_view(node)
         await self.session.commit()
-        return _node_out(node)
+        return _node_out(node, decision)
 
     async def _rename_key(self, node: Budget, new_key: str) -> None:
         """Rename the `key` of a node and re-derive the `path_key` of its subtree.

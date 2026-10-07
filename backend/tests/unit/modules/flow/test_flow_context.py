@@ -2,7 +2,7 @@
 
 The actor-free base context and the pure actor overlay come from `build_context`
 (#task-recipients). This suite covers every branch of the two extracted functions
-and the recomposed `build_context` semantics. The DB helpers (`_committees_for_sub`,
+and the recomposed `build_context` semantics. The DB helpers (`committee_ids_for_sub`,
 `_field_types` and `_budget_fits`) keep their own branch coverage in
 `test_deadlines_flow_cov`.
 """
@@ -37,6 +37,7 @@ def _app(**over: Any) -> SimpleNamespace:
         "data": {},
         "created_by": None,
         "budget_id": None,
+        "vote_gremium_id": None,
         "fiscal_year_id": None,
         "amount": Decimal("5"),
         "form_version_id": uuid4(),
@@ -71,7 +72,7 @@ def _pure_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _ha(_session: object, _app: object) -> bool:
         return False
 
-    monkeypatch.setattr(flow_context, "_committees_for_sub", _cs)
+    monkeypatch.setattr(flow_context, "committee_ids_for_sub", _cs)
     monkeypatch.setattr(flow_context, "_field_types", _ft)
     monkeypatch.setattr(flow_context, "_budget_fits", _bf)
     monkeypatch.setattr(flow_context, "_application_type_key", _atk)

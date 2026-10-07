@@ -63,6 +63,15 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     fiscal_year_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("fiscal_year.id"), nullable=True
     )
+    # Snapshot of the Gremium that decides the current vote state. The flow engine sets
+    # it when the application enters a ``vote`` state (the fixed ``gremiumId`` of the
+    # state, or the effective deciding Gremium of the cost center for
+    # ``gremiumSource: "budget"``) and clears it when the application leaves the vote
+    # state, in the same transaction as the state change. Every reader of "the Gremium
+    # of the vote" (read scope, tasks, agenda, vote create, task mail) reads this column.
+    vote_gremium_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("gremium.id", ondelete="SET NULL"), nullable=True
+    )
     amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     currency: Mapped[str | None] = mapped_column(CHAR(3), nullable=True)
     data: Mapped[dict] = mapped_column(JSONB, server_default="{}")
@@ -118,6 +127,7 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
         Index("ix_application_gremium_id", "gremium_id"),
         Index("ix_application_budget_id", "budget_id"),
         Index("ix_application_fiscal_year_id", "fiscal_year_id"),
+        Index("ix_application_vote_gremium_id", "vote_gremium_id"),
         Index("ix_application_type_id", "type_id"),
         Index("ix_application_created_at", "created_at"),
         # The default list filters archived rows out, so every listing query touches

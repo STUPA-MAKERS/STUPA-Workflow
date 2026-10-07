@@ -76,6 +76,8 @@ def _app(state_id: object, flow_id: object) -> SimpleNamespace:
         type_id=uuid4(),
         form_version_id=uuid4(),
         data={},
+        budget_id=None,
+        vote_gremium_id=None,
     )
 
 
@@ -797,7 +799,7 @@ async def test_revert_status_reschedules_restored_state_deadline() -> None:
 
 # Tests for force_status: a privileged direct override.
 def _target_state(state_id: object, flow_id: object) -> SimpleNamespace:
-    return SimpleNamespace(id=state_id, flow_version_id=flow_id, config={})
+    return SimpleNamespace(id=state_id, flow_version_id=flow_id, kind="normal", config={})
 
 
 def _vote_cancel_stmts(db) -> list:
@@ -956,8 +958,11 @@ async def test_available_flags_the_agenda_only_into_a_vote_state() -> None:
     to_vote = _transition(flow_id=flow_id, from_id=draft, to_id=voting, actions=action)
     to_done = _transition(flow_id=flow_id, from_id=draft, to_id=done, actions=action)
     plain = _transition(flow_id=flow_id, from_id=draft, to_id=voting)
-    # _load_app, _outgoing, the vote states among the agenda targets.
-    db = fake_session(result(app), result(to_vote, to_done, plain), result(voting))
+    # _load_app, _outgoing; the target states come through `get`.
+    db = fake_session(result(app), result(to_vote, to_done, plain))
+    vote_state = SimpleNamespace(id=voting, kind="vote", config={"gremiumId": str(gid)})
+    done_state = SimpleNamespace(id=done, kind="normal", config={})
+    db.get_results = [vote_state, done_state, vote_state]
 
     out = {t.id: t for t in await FlowService(db).available_transitions(app.id, _principal())}
     assert (out[to_vote.id].adds_to_agenda, out[to_vote.id].agenda_gremium_id) == (True, gid)
@@ -989,7 +994,9 @@ async def test_fire_with_meeting_adds_in_tx_and_skips_the_action(
     )
     calls: list[tuple[str, object]] = []
 
-    async def _check(_self: object, transition: object, mid: object, _p: object) -> None:
+    async def _check(
+        _self: object, transition: object, mid: object, _p: object, **_kw: object
+    ) -> None:
         calls.append(("check", mid))
 
     async def _add(

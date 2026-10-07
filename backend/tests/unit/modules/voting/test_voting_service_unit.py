@@ -87,7 +87,7 @@ def _create_body(**over: Any) -> VoteCreate:
 
 async def test_create_ok() -> None:
     """The gremium exists and matches the application; the roster sets the count."""
-    app = SimpleNamespace(id=uuid4(), current_state_id=None, gremium_id=GID)
+    app = SimpleNamespace(id=uuid4(), current_state_id=None, gremium_id=GID, vote_gremium_id=None)
     roster = [(uuid4(), ["vote.cast"]), (uuid4(), ["vote.cast"]), (uuid4(), ["session.manage"])]
     db = fake_session(result(app), result(*roster))
     db.scalar_results = [GID]  # the gremium exists

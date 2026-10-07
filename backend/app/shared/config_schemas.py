@@ -21,7 +21,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 
-from app.shared.guards import GuardError, validate_action, validate_guard
+from app.shared.guards import (
+    ASSIGN_BUDGET_ACTION_TYPES,
+    GREMIUM_SOURCE_BUDGET,
+    GuardError,
+    validate_action,
+    validate_guard,
+)
 from app.shared.i18n import I18nMap
 from app.shared.jsonlogic import JsonLogicError, validate_jsonlogic
 
@@ -306,6 +312,11 @@ def validate_flow_graph(graph: FlowGraph) -> None:
         raise FlowValidationError(f"flow graph has multiple initial states: {initials}")
 
     kind_by_key = {s.key: s.kind for s in states}
+    budget_vote_keys = {
+        s.key
+        for s in states
+        if s.kind == "vote" and s.config.get("gremiumSource") == GREMIUM_SOURCE_BUDGET
+    }
     for t in graph.transitions:
         if t.from_ not in key_set:
             raise FlowValidationError(f"transition references unknown from-state: {t.from_!r}")
@@ -328,6 +339,19 @@ def validate_flow_graph(graph: FlowGraph) -> None:
                     raise GuardError(
                         "addToNextSession action is only valid on a transition into a vote state"
                     )
+                # A vote state with `gremiumSource: "budget"` takes its Gremium from the
+                # cost center on entry, before the post-commit actions run. A cost
+                # center that an action of the same transition sets would come too
+                # late, and the vote would run under the old cost center.
+                if (
+                    action.get("type") in ASSIGN_BUDGET_ACTION_TYPES
+                    and t.to in budget_vote_keys
+                ):
+                    raise GuardError(
+                        f"{action.get('type')} action is not valid on a transition into "
+                        "a vote state whose Gremium comes from the cost center; assign "
+                        "the cost center on an earlier transition"
+                    )
         except GuardError as exc:
             raise FlowValidationError(str(exc)) from exc
 
@@ -339,9 +363,10 @@ def validate_flow_graph(graph: FlowGraph) -> None:
 def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
     """Check the structure of the ``vote`` states.
 
-    Only the kinds ``normal`` and ``vote`` exist. A ``vote`` state needs
-    ``config.gremiumId``. It also needs exactly two outgoing transitions, one with
-    branch ``pass`` and one with branch ``fail``.
+    Only the kinds ``normal`` and ``vote`` exist. A ``vote`` state needs exactly one
+    of ``config.gremiumId`` (a fixed Gremium) or ``config.gremiumSource: "budget"``
+    (the deciding Gremium of the cost center). It also needs exactly two outgoing
+    transitions, one with branch ``pass`` and one with branch ``fail``.
     """
     outgoing: dict[str, list[TransitionDef]] = {k: [] for k in key_set}
     for t in graph.transitions:
@@ -351,8 +376,7 @@ def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
     for s in graph.states:
         branches = sorted(t.branch for t in outgoing[s.key] if t.branch)
         if s.kind == "vote":
-            if not isinstance(s.config.get("gremiumId"), str):
-                raise FlowValidationError(f"vote state {s.key!r} requires config.gremiumId")
+            _validate_vote_gremium(s)
             if branches != ["fail", "pass"]:
                 raise FlowValidationError(
                     f"vote state {s.key!r} needs exactly two outgoing transitions "
@@ -375,6 +399,42 @@ def _validate_state_kinds(graph: FlowGraph, key_set: set[str]) -> None:
             raise FlowValidationError(
                 f"state {s.key!r} (kind={s.kind!r}) must not have branch transitions"
             )
+
+
+def _validate_vote_gremium(state: StateDef) -> None:
+    """Check that a vote state names its Gremium in exactly one way.
+
+    Raises:
+        FlowValidationError: The state sets both ``gremiumId`` and ``gremiumSource``,
+            neither of them, an empty ``gremiumId``, or an unknown ``gremiumSource``.
+            The initial state cannot use ``gremiumSource``.
+    """
+    has_id = "gremiumId" in state.config
+    has_source = "gremiumSource" in state.config
+    if has_id and has_source:
+        raise FlowValidationError(
+            f"vote state {state.key!r} must set either config.gremiumId or "
+            "config.gremiumSource, not both"
+        )
+    if has_source:
+        if state.config["gremiumSource"] != GREMIUM_SOURCE_BUDGET:
+            raise FlowValidationError(
+                f"vote state {state.key!r}: config.gremiumSource must be "
+                f"{GREMIUM_SOURCE_BUDGET!r}"
+            )
+        # A new application has no cost center yet, so no Gremium could resolve.
+        if state.is_initial:
+            raise FlowValidationError(
+                f"vote state {state.key!r}: the initial state cannot take its Gremium "
+                "from the cost center"
+            )
+        return
+    gremium_id = state.config.get("gremiumId")
+    if not isinstance(gremium_id, str) or not gremium_id:
+        raise FlowValidationError(
+            f"vote state {state.key!r} requires config.gremiumId or "
+            "config.gremiumSource 'budget'"
+        )
 
 
 def _assert_all_reachable(

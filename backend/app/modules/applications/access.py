@@ -173,8 +173,8 @@ async def _committee_can_read(
 
     1. The application sits in a cost center whose ``view_gremium_id`` is one of
        the Gremien of the principal. The node or an ancestor may carry the value.
-    2. The application is in a ``vote`` state whose ``config.gremiumId`` matches
-       one of those Gremien.
+    2. The application is in a ``vote`` state decided by one of those Gremien
+       (the snapshot ``application.vote_gremium_id``).
     3. A meeting of one of those Gremien voted on the application.
 
     This mirrors ``ApplicationsService._committee_read_clauses``, the list query.
@@ -187,32 +187,25 @@ async def _committee_can_read(
     if not gremien:
         return False
 
+    row = (
+        await db.execute(
+            select(Application.budget_id, Application.vote_gremium_id).where(
+                Application.id == application_id
+            )
+        )
+    ).first()
+    budget_id = row[0] if row is not None else None
+    # Case 2: the snapshot of the deciding Gremium of the current vote state. The
+    # flow engine sets it on entry into a vote state and clears it on exit.
+    if row is not None and row[1] is not None and row[1] in gremien:
+        return True
+
     # Case 1 reuses the canonical ancestor logic of the budget tree instead of a
     # second prefix query.
-    budget_id = await db.scalar(
-        select(Application.budget_id).where(Application.id == application_id)
-    )
     if budget_id is not None:
         from app.modules.budget.tree.service import BudgetTreeService
 
         if await BudgetTreeService(db).can_view_node(budget_id, gremien):
-            return True
-
-    # Case 2 evaluates the JSONB config in Python. This stays dialect-neutral,
-    # like ``ApplicationsService._committee_read_clauses``.
-    from app.modules.flow.models import State
-
-    row = (
-        await db.execute(
-            select(State.kind, State.config)
-            .join(Application, Application.current_state_id == State.id)
-            .where(Application.id == application_id)
-        )
-    ).first()
-    if row is not None and row.kind == "vote":
-        cfg = row.config if isinstance(row.config, dict) else {}
-        gid = cfg.get("gremiumId")
-        if isinstance(gid, str) and gid and UUID(gid) in gremien:
             return True
 
     # Case 3 covers the history: a meeting of a member Gremium voted on it.

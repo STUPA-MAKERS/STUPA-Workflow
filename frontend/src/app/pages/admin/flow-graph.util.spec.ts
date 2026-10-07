@@ -473,3 +473,61 @@ describe('validateFlowGraph defensive defaults', () => {
     expect(keys(r)).toContain('admin.flow.err.noStates');
   });
 });
+
+describe('validateFlowGraph — vote state with the gremium from the cost center', () => {
+  function voteGraph(config: Record<string, unknown>, actions: FlowGraph['transitions'][number]['actions'] = []): FlowGraph {
+    return {
+      states: [
+        { key: 'draft', label: { de: 'E' }, isInitial: true },
+        { key: 'vote', label: { de: 'V' }, kind: 'vote', config },
+        { key: 'ok', label: { de: 'O' } },
+        { key: 'no', label: { de: 'N' } },
+      ],
+      transitions: [
+        { from: 'draft', to: 'vote', actions },
+        { from: 'vote', to: 'ok', branch: 'pass' },
+        { from: 'vote', to: 'no', branch: 'fail' },
+      ],
+    };
+  }
+
+  it('accepts gremiumSource "budget" alone and a fixed gremiumId alone', () => {
+    expect(validateFlowGraph(voteGraph({ gremiumSource: 'budget' })).valid).toBe(true);
+    expect(validateFlowGraph(voteGraph({ gremiumId: 'g1' })).valid).toBe(true);
+  });
+
+  it('rejects both, neither and an unknown source', () => {
+    expect(keys(validateFlowGraph(voteGraph({ gremiumId: 'g1', gremiumSource: 'budget' })))).toEqual([
+      'admin.flow.err.voteGremiumBoth',
+    ]);
+    expect(keys(validateFlowGraph(voteGraph({})))).toEqual(['admin.flow.err.voteNeedsGremium']);
+    expect(keys(validateFlowGraph(voteGraph({ gremiumSource: 'meeting' })))).toEqual([
+      'admin.flow.err.voteGremiumSource',
+    ]);
+  });
+
+  it('takes addToNextSession without a gremium into a vote state', () => {
+    expect(
+      validateFlowGraph(voteGraph({ gremiumSource: 'budget' }, [{ type: 'addToNextSession' }])).valid,
+    ).toBe(true);
+  });
+
+  it('rejects a cost-center action on a transition into a budget vote state', () => {
+    for (const action of [
+      { type: 'assignBudget' as const, budgetId: 'b1' },
+      { type: 'assignBudgetFromField' as const, field: 'ks' },
+      { type: 'assignBudgetFromApplicantGremium' as const },
+      { type: 'assignBudgetFromMap' as const, field: 'fs', map: { a: 'b1' } },
+    ]) {
+      const r = validateFlowGraph(voteGraph({ gremiumSource: 'budget' }, [action]));
+      expect(r.errors).toEqual([
+        { key: 'admin.flow.err.assignIntoBudgetVote', params: { from: 'draft', to: 'vote' } },
+      ]);
+    }
+    // Into a vote state with a fixed gremium the action stays allowed (unchanged).
+    expect(
+      validateFlowGraph(voteGraph({ gremiumId: 'g1' }, [{ type: 'assignBudget', budgetId: 'b1' }]))
+        .valid,
+    ).toBe(true);
+  });
+});

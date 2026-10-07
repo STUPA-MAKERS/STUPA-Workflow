@@ -168,6 +168,7 @@ class TreeViewOps(BudgetTreeServiceBase):
                 n.fiscal_start_day,
                 bool(n.hidden_in_budget),
                 n.view_gremium_id,
+                n.decision_gremium_id,
             )
             for n in nodes
         ]

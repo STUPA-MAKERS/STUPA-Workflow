@@ -21,6 +21,10 @@ group = ToolGroup()
 async def list_budgets(gremium: str | None = None) -> dict:
     """List the cost center (budget) tree with its allocations and rollups.
 
+    Each node carries `decisionGremiumId` (its own deciding Gremium),
+    `effectiveDecisionGremiumId` (own value, else the nearest ancestor's) and
+    `decisionGremiumSourceId` (the node that supplies the effective value).
+
     Args:
         gremium: Limit the tree to one Gremium.
     """
@@ -38,7 +42,8 @@ async def create_budget(node: S.BudgetNodeCreate) -> dict:
     """Create a cost center (budget) node.
 
     Set `gremiumId` on a top-level node only. After creation, `parentId` and
-    `gremiumId` stay fixed. Requires budget.manage.
+    `gremiumId` stay fixed. `decisionGremiumId` names the Gremium that decides on
+    spending from the node and its subtree. Requires budget.manage.
     """
     return await api().post("/budgets", json=dump_create(node))
 
@@ -48,7 +53,9 @@ async def update_budget(budget_id: str, patch: S.BudgetNodeUpdate) -> dict:
     """Patch a cost center node.
 
     You can change `key`, `name`, `color`, `active`, `acceptedStateKeys` and more.
-    Requires budget.manage.
+    `decisionGremiumId` sets the deciding Gremium (null clears it; the node then
+    inherits from its ancestors). An unknown Gremium gives 422
+    `decision_gremium_invalid`. Requires budget.manage.
     """
     return await api().patch(f"/budgets/{budget_id}", json=dump_patch(patch))
 
@@ -182,7 +189,9 @@ async def assign_application_budget(
     """Bind an application to a cost center.
 
     Pass null to remove the binding. The fiscal year comes from the single active year
-    of the top-level node. Requires budget.manage.
+    of the top-level node. While the application sits in a vote state whose Gremium
+    comes from the cost center, the server refuses the change with 409
+    `budget_locked_by_vote`. Requires budget.manage.
     """
     return await api().post(
         f"/applications/{application_id}/assign-budget", json={"budgetId": budget_id}

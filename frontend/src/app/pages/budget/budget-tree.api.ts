@@ -369,6 +369,12 @@ export interface BudgetTreeNode {
   /** Visibility gremium: its members see this subtree in the budget tab as a root.
    *  They need no global budget.* permissions. */
   viewGremiumId: Uuid | null;
+  /** The gremium that decides on spending from this node (its OWN value). */
+  decisionGremiumId?: Uuid | null;
+  /** The own value, else the value of the nearest ancestor, else `null` (read only). */
+  effectiveDecisionGremiumId?: Uuid | null;
+  /** The node that supplies the effective value: this node, an ancestor, or `null`. */
+  decisionGremiumSourceId?: Uuid | null;
   /** Fiscal-year cutoff: the day and month of the period start. Only the top level
    *  uses it. */
   fiscalStartMonth: number;
@@ -390,6 +396,9 @@ export interface BudgetNode {
   acceptedStateKeys?: string[];
   deniedStateKeys?: string[];
   hiddenInBudget?: boolean;
+  decisionGremiumId?: Uuid | null;
+  effectiveDecisionGremiumId?: Uuid | null;
+  decisionGremiumSourceId?: Uuid | null;
   fiscalStartMonth?: number;
   fiscalStartDay?: number;
 }
@@ -411,6 +420,7 @@ export interface BudgetNodeCreate {
   name: string;
   parentId?: Uuid | null;
   gremiumId?: Uuid | null;
+  decisionGremiumId?: Uuid | null;
   currency?: string;
   color?: string | null;
   fiscalStartMonth?: number;
@@ -428,6 +438,8 @@ export interface BudgetNodeUpdate {
   hiddenInBudget?: boolean;
   /** Visibility gremium. `null` clears the assignment. */
   viewGremiumId?: Uuid | null;
+  /** Deciding gremium of the node. `null` clears it; the node then inherits. */
+  decisionGremiumId?: Uuid | null;
   fiscalStartMonth?: number;
   fiscalStartDay?: number;
 }
