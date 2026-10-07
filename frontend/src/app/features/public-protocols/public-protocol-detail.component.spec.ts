@@ -84,6 +84,20 @@ describe('PublicProtocolDetailComponent', () => {
     expect(screen.queryByText(/^PDF ·/)).toBeNull();
   });
 
+  it('shows no second box for a vote that is already in the TOP text', async () => {
+    const p = detailFixture();
+    p.tops[1].markdown = '> [!abstimmung] **Im Text?**';
+    p.tops[1].decisions = [
+      { question: 'Im Text?', counts: { ja: 4 }, result: 'passed', majorityRule: 'simple', secret: false, inText: true },
+      { question: 'Separat?', counts: { ja: 2 }, result: 'passed', majorityRule: 'simple', secret: false },
+    ];
+    await setup(of(p));
+    const second = screen.getByRole('heading', { level: 3, name: /Haushalt 2027/ }).closest('li') as HTMLElement;
+    const figures = within(second).getAllByRole('figure');
+    expect(figures).toHaveLength(1);
+    expect(figures[0]).toHaveTextContent('Separat?');
+  });
+
   it('shows the free text of a meeting without agenda items, and no PDF without one', async () => {
     await setup(
       of(

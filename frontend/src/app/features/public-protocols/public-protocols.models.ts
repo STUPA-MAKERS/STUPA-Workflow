@@ -56,6 +56,8 @@ export interface PublicDecision {
   result: PublicVoteResult | null;
   majorityRule: 'simple' | 'absolute' | 'two_thirds';
   secret: boolean;
+  /** The vote is already in the TOP text as a callout: the page shows no second box. */
+  inText?: boolean;
 }
 
 /** One agenda item in the detail. A non-public item has no title, text or decision. */

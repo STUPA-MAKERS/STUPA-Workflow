@@ -83,6 +83,7 @@
                       <app-markdown-view class="pd__md" [src]="top.markdown" />
                     }
                     @for (d of top.decisions; track $index) {
+                      @if (!d.inText) {
                       <figure class="pd__decision" [attr.aria-label]="'publicProtocols.decision.label' | t">
                         <div class="pd__decHead">
                           <app-icon name="vote" [size]="16" />
@@ -107,6 +108,7 @@
                         </div>
                         <p class="pd__rule">{{ ruleLine(d) }}</p>
                       </figure>
+                      }
                     }
                     @if (!top.markdown && top.decisions.length === 0) {
                       <p class="pd__muted">{{ 'publicProtocols.detail.noTopText' | t }}</p>

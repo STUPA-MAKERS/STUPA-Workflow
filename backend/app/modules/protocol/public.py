@@ -57,6 +57,9 @@ class PublicDecision(_CamelModel):
     result: VoteResult | None = None
     majority_rule: MajorityRule = Field(default="simple", alias="majorityRule")
     secret: bool = False
+    # The vote is already in the TOP text as a callout: the detail page shows the
+    # text only, the list keeps the result.
+    in_text: bool = Field(default=False, alias="inText")
 
     @classmethod
     def from_vote(cls, view: object) -> PublicDecision:

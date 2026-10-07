@@ -35,7 +35,7 @@ from datetime import time as _time
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import ColumnElement, and_, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -102,6 +102,10 @@ from app.shared.errors import (
 )
 
 logger = logging.getLogger("app.protocol")
+
+# Permanent failures of the public build after which the hourly heal job skips a
+# protocol. A switch of the gremium flag tries it again.
+PUBLIC_RENDER_MAX_FAILURES = 3
 
 
 def protocol_storage_key(protocol_id: UUID) -> str:
@@ -669,7 +673,16 @@ class ProtocolService:
         await self._send(protocol, mail_pdf)
         return await self._to_out(protocol)
 
-    async def backfill_public(self, gremium_id: UUID) -> BackfillResult:
+    def _missing_public_clause(self) -> ColumnElement[bool]:
+        """Return the rule "final, and the public version is missing"."""
+        cond = Protocol.public_content.is_(None)
+        if self.storage is not None and self.typst is not None:
+            cond = or_(cond, Protocol.public_pdf_storage_key.is_(None))
+        return and_(Protocol.status == "final", cond)
+
+    async def backfill_public(
+        self, gremium_id: UUID, *, retry_failed: bool = True
+    ) -> BackfillResult:
         """Build the missing public versions of the final protocols of a gremium.
 
         The job runs after a gremium switched `protocols_public` on. A final
@@ -677,21 +690,18 @@ class ProtocolService:
         on, gets both, with the same renderer and variant as the finalization. Each
         protocol commits on its own. A failure of one protocol does not stop the
         others: the protocol stays hidden (fail closed) and the result counts it.
+
+        A permanent failure (for example a render error in the text) counts up
+        `public_render_failures`. With `retry_failed=False` (the hourly heal job),
+        a protocol at `PUBLIC_RENDER_MAX_FAILURES` is skipped, so the same error does
+        not run every hour. A switch of the gremium flag retries it.
         """
-        cond = Protocol.public_content.is_(None)
-        if self.storage is not None and self.typst is not None:
-            cond = or_(cond, Protocol.public_pdf_storage_key.is_(None))
-        ids = (
-            await self.session.scalars(
-                select(Protocol.id)
-                .where(
-                    Protocol.gremium_id == gremium_id,
-                    Protocol.status == "final",
-                    cond,
-                )
-                .order_by(Protocol.created_at)
-            )
-        ).all()
+        stmt = select(Protocol.id).where(
+            Protocol.gremium_id == gremium_id, self._missing_public_clause()
+        )
+        if not retry_failed:
+            stmt = stmt.where(Protocol.public_render_failures < PUBLIC_RENDER_MAX_FAILURES)
+        ids = (await self.session.scalars(stmt.order_by(Protocol.created_at))).all()
         result = BackfillResult()
         for protocol_id in ids:
             try:
@@ -702,6 +712,7 @@ class ProtocolService:
             except Exception:  # noqa: BLE001 - one bad protocol must not stop the job
                 logger.exception("public backfill failed (protocol=%s)", protocol_id)
                 await self.session.rollback()
+                await self._count_render_failure(protocol_id)
                 result.failed += 1
             else:
                 result.done += 1
@@ -714,21 +725,37 @@ class ProtocolService:
         The hourly heal job runs the backfill for them, so a protocol whose build
         failed or raced appears without a new switch of the gremium flag.
         """
-        cond = Protocol.public_content.is_(None)
-        if self.storage is not None and self.typst is not None:
-            cond = or_(cond, Protocol.public_pdf_storage_key.is_(None))
         rows = await self.session.scalars(
             select(Protocol.gremium_id)
             .join(Gremium, Gremium.id == Protocol.gremium_id)
             .where(
                 Gremium.protocols_public.is_(True),
-                Protocol.status == "final",
                 Protocol.public_withheld.is_(False),
-                cond,
+                Protocol.public_render_failures < PUBLIC_RENDER_MAX_FAILURES,
+                self._missing_public_clause(),
             )
             .distinct()
         )
         return list(rows.all())
+
+    async def _count_render_failure(self, protocol_id: UUID) -> None:
+        """Count a permanent failure of the public build, in its own commit.
+
+        At `PUBLIC_RENDER_MAX_FAILURES` the method logs a warning once; the hourly
+        heal job then skips the protocol.
+        """
+        protocol = await self.session.get(Protocol, protocol_id)
+        if protocol is None:
+            return
+        protocol.public_render_failures = int(protocol.public_render_failures or 0) + 1
+        if protocol.public_render_failures == PUBLIC_RENDER_MAX_FAILURES:
+            logger.warning(
+                "public version of protocol %s failed %s times; the heal job skips it "
+                "until the gremium flag is switched again",
+                protocol_id,
+                PUBLIC_RENDER_MAX_FAILURES,
+            )
+        await self.session.commit()
 
     async def _backfill_one(self, protocol_id: UUID) -> None:
         protocol = await self._get(protocol_id, for_update=True)
@@ -752,6 +779,7 @@ class ProtocolService:
             except StorageError:
                 pdf = None
         apply_public_snapshot(protocol, snapshot, pdf)
+        protocol.public_render_failures = 0
         await self.session.flush()
         await self.session.commit()
         await self._store(uploads)
@@ -1061,11 +1089,15 @@ class ProtocolService:
                 )
                 # The protokollant may have put the result into the text already,
                 # with the same snippet. One box per vote.
+                in_text = vote_in_body(body, snippet)
                 if getattr(view, "status", None) == "closed":
                     # The public list shows the result also when the protokollant
-                    # put the snippet into the text already.
-                    top.decisions.append(PublicDecision.from_vote(view))
-                if vote_in_body(body, snippet):
+                    # put the snippet into the text already. `inText` tells the
+                    # detail page to show no second box for it.
+                    decision = PublicDecision.from_vote(view)
+                    decision.in_text = in_text
+                    top.decisions.append(decision)
+                if in_text:
                     continue
                 block.append(snippet)
             blocks.append("\n\n".join(block))

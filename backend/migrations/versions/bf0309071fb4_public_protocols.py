@@ -11,6 +11,9 @@ The upgrade adds:
    version that the public API serves. They stay NULL until the finalization or
    the backfill job writes them, so no existing protocol becomes public by this
    migration.
+4. `protocol.public_render_failures` (integer, default 0). It counts the
+   permanent failures of the public build, so the hourly heal job can skip a
+   protocol that always fails.
 
 All statements are idempotent (`ADD COLUMN IF NOT EXISTS`). A fresh database
 already gets the columns from the `create_all` baseline (0001).
@@ -46,9 +49,14 @@ def upgrade() -> None:
     op.execute("ALTER TABLE protocol ADD COLUMN IF NOT EXISTS public_content jsonb")
     op.execute("ALTER TABLE protocol ADD COLUMN IF NOT EXISTS public_search_text text")
     op.execute("ALTER TABLE protocol ADD COLUMN IF NOT EXISTS public_pdf_size integer")
+    op.execute(
+        "ALTER TABLE protocol ADD COLUMN IF NOT EXISTS public_render_failures "
+        "integer NOT NULL DEFAULT 0"
+    )
 
 
 def downgrade() -> None:
+    op.execute("ALTER TABLE protocol DROP COLUMN IF EXISTS public_render_failures")
     op.execute("ALTER TABLE protocol DROP COLUMN IF EXISTS public_pdf_size")
     op.execute("ALTER TABLE protocol DROP COLUMN IF EXISTS public_search_text")
     op.execute("ALTER TABLE protocol DROP COLUMN IF EXISTS public_content")

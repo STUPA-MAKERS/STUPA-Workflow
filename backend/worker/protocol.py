@@ -203,8 +203,15 @@ async def heal_public_protocols(ctx: dict[str, Any]) -> str:
         gremien = await _service(ctx, session).gremien_missing_public()
     done = failed = 0
     for gremium_id in gremien:
-        async with maker() as session:
-            result = await _service(ctx, session).backfill_public(gremium_id)
+        try:
+            async with maker() as session:
+                result = await _service(ctx, session).backfill_public(
+                    gremium_id, retry_failed=False
+                )
+        except Exception:  # noqa: BLE001 - one gremium must not stop the others
+            logger.exception("public heal failed (gremium=%s)", gremium_id)
+            failed += 1
+            continue
         done += result.done
         failed += result.transient + result.failed
     if failed:

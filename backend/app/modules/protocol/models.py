@@ -70,6 +70,9 @@ class Protocol(UUIDPkMixin, TimestampMixin, Base):
     public_content: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     public_search_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     public_pdf_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Permanent failures of the public build. The hourly heal job skips a protocol
+    # after a few of them; a successful build resets the count.
+    public_render_failures: Mapped[int] = mapped_column(Integer, server_default="0")
 
     __table_args__ = (
         CheckConstraint(
