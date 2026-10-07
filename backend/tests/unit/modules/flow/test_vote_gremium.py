@@ -108,16 +108,35 @@ async def test_snapshot_for_entry(effective: dict[str, UUID | None]) -> None:
 
 async def test_in_budget_vote_state() -> None:
     db = fake_session()
-    no_state = cast(Any, SimpleNamespace(current_state_id=None))
-    assert await vg.in_budget_vote_state(db, no_state) is False
+
+    def _a(state: object, snap: object) -> Any:
+        return cast(Any, SimpleNamespace(current_state_id=state, vote_gremium_id=snap))
+
+    assert await vg.in_budget_vote_state(db, _a(None, uuid4())) is False
+    # Without a snapshot the cost center stays open for a repair.
+    assert await vg.in_budget_vote_state(db, _a(uuid4(), None)) is False
     db.get_results = [_state(config=BUDGET)]
-    assert await vg.in_budget_vote_state(
-        db, cast(Any, SimpleNamespace(current_state_id=uuid4()))
-    ) is True
+    assert await vg.in_budget_vote_state(db, _a(uuid4(), uuid4())) is True
     db.get_results = [_state(config={"gremiumId": "x"})]
-    assert await vg.in_budget_vote_state(
-        db, cast(Any, SimpleNamespace(current_state_id=uuid4()))
-    ) is False
+    assert await vg.in_budget_vote_state(db, _a(uuid4(), uuid4())) is False
+
+
+async def test_fill_snapshot(effective: dict[str, UUID | None]) -> None:
+    effective["value"] = gid = uuid4()
+    db = fake_session()
+    app = cast(Any, SimpleNamespace(current_state_id=None, vote_gremium_id=None, budget_id=uuid4()))
+    await vg.fill_snapshot(db, app)
+    assert app.vote_gremium_id is None
+    app.current_state_id = uuid4()
+    db.get_results = [_state(kind="normal")]
+    await vg.fill_snapshot(db, app)
+    assert app.vote_gremium_id is None
+    db.get_results = [_state(config=BUDGET)]
+    await vg.fill_snapshot(db, app)
+    assert app.vote_gremium_id == gid
+    # An existing snapshot stays.
+    await vg.fill_snapshot(db, app)
+    assert app.vote_gremium_id == gid
 
 
 # --- FlowService -------------------------------------------------------------------
@@ -282,3 +301,26 @@ async def test_check_agenda_meeting_uses_the_vote_gremium(
         await FlowService(fake_session())._check_agenda_meeting(  # noqa: SLF001
             t, uuid4(), _principal()
         )
+
+
+async def test_entry_snapshot_keeps_it_on_a_move_inside_the_vote_state(
+    effective: dict[str, UUID | None],
+) -> None:
+    effective["value"] = uuid4()
+    app = _app(uuid4(), budget_id=uuid4())
+    app.vote_gremium_id = kept = uuid4()
+    gvote = _state(config=BUDGET, state_id=app.current_state_id)
+    svc = FlowService(fake_session())
+    assert await svc._entry_snapshot(app, gvote.id, gvote) == kept  # noqa: SLF001
+    # A move from another state resolves again.
+    assert await svc._entry_snapshot(app, uuid4(), gvote) == effective["value"]  # noqa: SLF001
+
+
+def test_budget_unchanged_pins_the_cost_center() -> None:
+    app = _app(uuid4())
+    assert FlowService._budget_unchanged(app, _state(kind="normal")) == []  # noqa: SLF001
+    (clause,) = FlowService._budget_unchanged(app, _state(config=BUDGET))  # noqa: SLF001
+    assert "IS NULL" in str(clause)
+    app.budget_id = uuid4()
+    (clause,) = FlowService._budget_unchanged(app, _state(config=BUDGET))  # noqa: SLF001
+    assert "budget_id =" in str(clause)

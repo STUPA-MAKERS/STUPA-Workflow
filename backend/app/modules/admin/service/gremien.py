@@ -154,7 +154,8 @@ class GremiumOps(ConfigServiceBase):
         Raises:
             NotFoundError: No gremium has this id (404).
             ConflictError: An application type of this gremium still has
-                applications (409).
+                applications, or the gremium decides the running vote of an
+                application (`gremium_decides_vote`) (409).
         """
         row = await self.session.get(Gremium, gremium_id)
         if row is None:
@@ -175,6 +176,17 @@ class GremiumOps(ConfigServiceBase):
             raise ConflictError(
                 "gremium has application types with existing applications "
                 "and cannot be deleted"
+            )
+        # The Gremium decides a running vote (`application.vote_gremium_id`). A delete
+        # would leave the application in its vote state without a deciding Gremium.
+        deciding = await self.session.scalar(
+            select(Application.id).where(Application.vote_gremium_id == gremium_id).limit(1)
+        )
+        if deciding is not None:
+            raise ConflictError(
+                "The Gremium decides a running vote of an application. Move the "
+                "application out of its vote state first.",
+                code="gremium_decides_vote",
             )
         await self.session.delete(row)
         await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", gremium_id)

@@ -620,6 +620,15 @@ async def open_meeting_vote(
                 "decision state before opening the vote.",
                 code="conflict",
             )
+        # Only the Gremium that decides the current vote state votes. A stale agenda
+        # item (the application left the state and came back for another Gremium)
+        # must not let this meeting decide.
+        if await service.application_vote_gremium(item.application_id) != meeting.gremium_id:
+            raise ConflictError(
+                "The Gremium of this meeting does not decide the current vote of the "
+                "application.",
+                code="vote_gremium_mismatch",
+            )
     config_data: dict[str, object] = {
         "options": payload.options,
         "majorityRule": payload.majority_rule,

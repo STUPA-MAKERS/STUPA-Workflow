@@ -530,4 +530,47 @@ describe('validateFlowGraph — vote state with the gremium from the cost center
         .valid,
     ).toBe(true);
   });
+
+  it('decides "both" by key presence and needs a non-empty fixed id, as the backend', () => {
+    expect(keys(validateFlowGraph(voteGraph({ gremiumId: '', gremiumSource: 'budget' })))).toEqual([
+      'admin.flow.err.voteGremiumBoth',
+    ]);
+    expect(keys(validateFlowGraph(voteGraph({ gremiumId: '' })))).toEqual([
+      'admin.flow.err.voteNeedsGremium',
+    ]);
+    expect(keys(validateFlowGraph(voteGraph({ gremiumId: 7 })))).toEqual([
+      'admin.flow.err.voteNeedsGremium',
+    ]);
+  });
+
+  it('rejects gremiumSource "budget" on the initial state', () => {
+    const graph = voteGraph({ gremiumSource: 'budget' });
+    graph.states[0].isInitial = false;
+    graph.states[1].isInitial = true;
+    graph.transitions.push({ from: 'vote', to: 'draft' });
+    expect(keys(validateFlowGraph(graph))).toEqual(['admin.flow.err.voteGremiumInitial']);
+  });
+
+  it('rejects a fixed agenda gremium into a budget vote state', () => {
+    const r = validateFlowGraph(
+      voteGraph({ gremiumSource: 'budget' }, [{ type: 'addToNextSession', gremiumId: 'g1' }]),
+    );
+    expect(r.errors).toEqual([
+      { key: 'admin.flow.err.sessionGremiumIntoBudgetVote', params: { from: 'draft', to: 'vote' } },
+    ]);
+    expect(
+      validateFlowGraph(voteGraph({ gremiumId: 'g1' }, [{ type: 'addToNextSession', gremiumId: 'g1' }]))
+        .valid,
+    ).toBe(true);
+  });
+
+  it('allows the voteGremium recipient only into a vote state', () => {
+    const notify = { type: 'notify' as const, recipients: [{ kind: 'voteGremium' as const }] };
+    expect(validateFlowGraph(voteGraph({ gremiumSource: 'budget' }, [notify])).valid).toBe(true);
+    const graph = voteGraph({ gremiumSource: 'budget' });
+    graph.transitions[1].actions = [notify];
+    expect(validateFlowGraph(graph).errors).toEqual([
+      { key: 'admin.flow.err.voteGremiumRecipientNeedsVote', params: { from: 'vote', to: 'ok' } },
+    ]);
+  });
 });

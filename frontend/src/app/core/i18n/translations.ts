@@ -2055,6 +2055,12 @@ export const de = {
   'admin.flow.err.voteGremiumBoth':
     'Der Abstimmungs-Status „{key}“ hat ein festes Gremium und das Gremium aus der Kostenstelle. Wähle eins.',
   'admin.flow.err.voteGremiumSource': 'Der Abstimmungs-Status „{key}“ hat eine unbekannte Gremiumsquelle.',
+  'admin.flow.err.voteGremiumInitial':
+    'Der Start-Status „{key}“ kann das Gremium nicht aus der Kostenstelle nehmen: ein neuer Antrag hat noch keine Kostenstelle.',
+  'admin.flow.err.sessionGremiumIntoBudgetVote':
+    'Der Übergang „{from}“ → „{to}“ setzt die Tagesordnung mit festem Gremium, aber „{to}“ nimmt das Gremium aus der Kostenstelle. Lass das Gremium leer.',
+  'admin.flow.err.voteGremiumRecipientNeedsVote':
+    'Der Übergang „{from}“ → „{to}“ benachrichtigt das Gremium der Abstimmung, aber „{to}“ ist kein Abstimmungs-Status.',
   'admin.flow.err.assignIntoBudgetVote':
     'Der Übergang „{from}“ → „{to}“ setzt die Kostenstelle, aber „{to}“ nimmt das Gremium schon beim Eintritt aus der Kostenstelle. Setze die Kostenstelle vorher.',
   'admin.flow.list.heading': 'Übergänge des gewählten Schritts',
@@ -5380,6 +5386,12 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.err.voteGremiumBoth':
     'The vote state "{key}" has a fixed committee and the committee from the cost centre. Choose one.',
   'admin.flow.err.voteGremiumSource': 'The vote state "{key}" has an unknown committee source.',
+  'admin.flow.err.voteGremiumInitial':
+    'The initial state "{key}" cannot take its committee from the cost centre: a new application has no cost centre yet.',
+  'admin.flow.err.sessionGremiumIntoBudgetVote':
+    'The transition "{from}" → "{to}" puts the application on the agenda of a fixed committee, but "{to}" takes its committee from the cost centre. Leave the committee empty.',
+  'admin.flow.err.voteGremiumRecipientNeedsVote':
+    'The transition "{from}" → "{to}" notifies the committee of the vote, but "{to}" is no vote state.',
   'admin.flow.err.assignIntoBudgetVote':
     'The transition "{from}" → "{to}" sets the cost centre, but "{to}" takes its committee from the cost centre on entry. Set the cost centre earlier.',
   'admin.flow.list.heading': 'Transitions of the selected step',

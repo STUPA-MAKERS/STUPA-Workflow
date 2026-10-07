@@ -149,7 +149,8 @@ async def test_update_node_sets_and_clears_the_gremium() -> None:
 
 def _app_in(state_id: uuid.UUID | None) -> Any:
     return SimpleNamespace(
-        id=uuid.uuid4(), current_state_id=state_id, budget_id=None, fiscal_year_id=None
+        id=uuid.uuid4(), current_state_id=state_id, budget_id=None, fiscal_year_id=None,
+        vote_gremium_id=uuid.uuid4(),
     )
 
 

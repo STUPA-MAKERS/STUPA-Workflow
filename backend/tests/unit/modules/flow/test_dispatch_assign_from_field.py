@@ -41,7 +41,7 @@ class _Session:
         self.active_fy = list(active_fy)
         self.committed = 0
 
-    async def get(self, _model: Any, ident: UUID) -> Any:
+    async def get(self, _model: Any, ident: UUID, **_kw: Any) -> Any:
         return self.store.get(ident)
 
     async def scalars(self, _stmt: Any) -> _Result:

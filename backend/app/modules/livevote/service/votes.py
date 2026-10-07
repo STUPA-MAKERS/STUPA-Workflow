@@ -400,6 +400,14 @@ class VoteReadOps(MeetingServiceBase):
             .where(Application.id == application_id)
         )
 
+    async def application_vote_gremium(self, application_id: UUID) -> UUID | None:
+        """Return the Gremium that decides the current vote state (the snapshot)."""
+        from app.modules.applications.models import Application
+
+        return await self.session.scalar(
+            select(Application.vote_gremium_id).where(Application.id == application_id)
+        )
+
     async def gremium_quorum_percent(self, gremium_id: UUID) -> int | None:
         """Return the default quorum of this gremium in percent of eligible voters.
 

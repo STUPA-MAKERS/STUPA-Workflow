@@ -100,11 +100,27 @@ async def snapshot_for_entry(
 
 
 async def in_budget_vote_state(session: AsyncSession, app: Application) -> bool:
-    """Tell whether the application sits in a vote state whose Gremium comes from the budget.
+    """Tell whether the cost center of the application is locked by its vote.
 
-    The cost center of such an application is locked: a change would contradict the
-    snapshot of the deciding Gremium.
+    The lock holds while the application sits in a vote state whose Gremium comes from
+    the cost center and a snapshot exists: a change would contradict the snapshot of
+    the deciding Gremium. Without a snapshot (its Gremium went away) the cost center
+    stays open, so a person can repair the application; `fill_snapshot` then takes
+    the Gremium of the new cost center.
     """
-    if app.current_state_id is None:
+    if app.current_state_id is None or app.vote_gremium_id is None:
         return False
     return gremium_from_budget(await session.get(State, app.current_state_id))
+
+
+async def fill_snapshot(session: AsyncSession, app: Application) -> None:
+    """Take the snapshot from the new cost center of an application without one.
+
+    The call follows a cost-center change in the same transaction. It changes
+    nothing outside a vote state with `gremiumSource: "budget"`, and nothing when a
+    snapshot exists.
+    """
+    if app.current_state_id is None or app.vote_gremium_id is not None:
+        return
+    if gremium_from_budget(await session.get(State, app.current_state_id)):
+        app.vote_gremium_id = await effective_decision_gremium(session, app.budget_id)

@@ -46,7 +46,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
-from sqlalchemy import CursorResult, delete, select, update
+from sqlalchemy import ColumnElement, CursorResult, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.models import Application, StatusEvent
@@ -257,6 +257,33 @@ class FlowService:
         if "gremiumId" in action:
             return agenda_gremium_id(transition.actions)
         return await resolve_vote_gremium(self.session, target, budget_id)
+
+    async def _entry_snapshot(
+        self, app: Application, from_state_id: UUID | None, target: State | None
+    ) -> UUID | None:
+        """Return the vote Gremium snapshot for a move from `from_state_id` into `target`.
+
+        A move that stays in the same vote state keeps the snapshot that the
+        application took on its entry. Every other move resolves it again (see
+        `snapshot_for_entry`, 409 `no_vote_gremium`).
+        """
+        if target is not None and target.kind == "vote" and target.id == from_state_id:
+            return app.vote_gremium_id
+        return await snapshot_for_entry(self.session, target, app.budget_id)
+
+    @staticmethod
+    def _budget_unchanged(app: Application, target: State | None) -> list[ColumnElement[bool]]:
+        """Build the WHERE clause that pins the cost center the snapshot came from.
+
+        Only a vote state with `gremiumSource: "budget"` needs it. A cost-center change
+        that commits between the read and the `UPDATE` then gives rowcount 0, and the
+        caller gets the 409 of a concurrent change.
+        """
+        if not gremium_from_budget(target):
+            return []
+        if app.budget_id is None:
+            return [Application.budget_id.is_(None)]
+        return [Application.budget_id == app.budget_id]
 
     async def _enterable(self, target: State | None, budget_id: UUID | None) -> bool:
         """Tell whether an application with cost center `budget_id` may enter `target`.
@@ -901,11 +928,8 @@ class FlowService:
         # The snapshot of the deciding Gremium for the target state. A vote state with
         # `gremiumSource: "budget"` and no resolvable Gremium refuses the application
         # (409 `no_vote_gremium`, fail closed). A non-vote target clears the snapshot.
-        vote_gremium = await snapshot_for_entry(
-            self.session,
-            await self.session.get(State, transition.to_state_id),
-            app.budget_id,
-        )
+        target = await self.session.get(State, transition.to_state_id)
+        vote_gremium = await self._entry_snapshot(app, transition.from_state_id, target)
         if meeting_id is not None:
             await self._check_agenda_meeting(
                 transition, meeting_id, principal, vote_gremium=vote_gremium
@@ -922,6 +946,7 @@ class FlowService:
                 .where(
                     Application.id == app.id,
                     Application.current_state_id == from_state_id,
+                    *self._budget_unchanged(app, target),
                 )
                 .values(current_state_id=to_state_id, vote_gremium_id=vote_gremium)
             ),
@@ -1146,9 +1171,8 @@ class FlowService:
             )
         # The restored state may be a vote state. It gets its snapshot as on a
         # transition, and it refuses the application (409) without a Gremium.
-        vote_gremium = await snapshot_for_entry(
-            self.session, await self.session.get(State, from_state_id), app.budget_id
-        )
+        restored = await self.session.get(State, from_state_id)
+        vote_gremium = await self._entry_snapshot(app, to_state_id, restored)
         # Optimistic locking as in `fire`. A concurrent transition has already moved the
         # state, so rowcount is 0 and the caller gets 409.
         result = cast(
@@ -1158,6 +1182,7 @@ class FlowService:
                 .where(
                     Application.id == app.id,
                     Application.current_state_id == to_state_id,
+                    *self._budget_unchanged(app, restored),
                 )
                 .values(current_state_id=from_state_id, vote_gremium_id=vote_gremium)
             ),
@@ -1295,7 +1320,7 @@ class FlowService:
         # A forced vote state gets its snapshot as on a transition. A vote state with
         # `gremiumSource: "budget"` and no resolvable Gremium refuses the force too
         # (409 `no_vote_gremium`): nobody could vote on the application there.
-        vote_gremium = await snapshot_for_entry(self.session, target, app.budget_id)
+        vote_gremium = await self._entry_snapshot(app, from_state_id, target)
         # Optimistic locking as in fire() and revert_status. A concurrent transition has
         # already moved the state, so rowcount is 0 and the caller gets 409.
         result = cast(
@@ -1305,6 +1330,7 @@ class FlowService:
                 .where(
                     Application.id == app.id,
                     Application.current_state_id == from_state_id,
+                    *self._budget_unchanged(app, target),
                 )
                 .values(current_state_id=target_state_id, vote_gremium_id=vote_gremium)
             ),

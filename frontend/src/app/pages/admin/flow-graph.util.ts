@@ -89,11 +89,29 @@ export function validateFlowGraph(graph: FlowGraph): FlowValidationResult {
         }
         // A vote state with `gremiumSource: 'budget'` takes its gremium on entry, before
         // the action runs. A cost-center action on the way in would come too late.
+        const budgetVote = target?.kind === 'vote' && target.config?.gremiumSource === 'budget';
+        // Such a state takes the gremium of the cost center: a fixed agenda gremium
+        // could name another one.
+        if (a.type === 'addToNextSession' && budgetVote && 'gremiumId' in a) {
+          errors.push({
+            key: 'admin.flow.err.sessionGremiumIntoBudgetVote',
+            params: { from: String(t.from), to: String(t.to) },
+          });
+        }
+        // `voteGremium` reads the gremium of the vote, which exists only in a vote state.
         if (
-          ASSIGN_BUDGET_ACTIONS.includes(a.type) &&
-          target?.kind === 'vote' &&
-          target.config?.gremiumSource === 'budget'
+          a.type === 'notify' &&
+          (target?.kind ?? 'normal') !== 'vote' &&
+          (Array.isArray(a['recipients']) ? (a['recipients'] as { kind?: unknown }[]) : []).some(
+            (r) => r?.kind === 'voteGremium',
+          )
         ) {
+          errors.push({
+            key: 'admin.flow.err.voteGremiumRecipientNeedsVote',
+            params: { from: String(t.from), to: String(t.to) },
+          });
+        }
+        if (ASSIGN_BUDGET_ACTIONS.includes(a.type) && budgetVote) {
           errors.push({
             key: 'admin.flow.err.assignIntoBudgetVote',
             params: { from: String(t.from), to: String(t.to) },
@@ -125,14 +143,21 @@ export function validateFlowGraph(graph: FlowGraph): FlowValidationResult {
       .map((t) => t.branch as string)
       .sort();
     if (s.kind === 'vote') {
-      // Exactly one of a fixed `gremiumId` and `gremiumSource: 'budget'`.
-      const source = s.config?.gremiumSource;
-      const fixed = !!s.config?.gremiumId;
-      if (source != null && source !== 'budget') {
-        errors.push({ key: 'admin.flow.err.voteGremiumSource', params: { key: s.key } });
-      } else if (fixed && source === 'budget') {
+      // Exactly one of a fixed `gremiumId` and `gremiumSource: 'budget'`. The rules
+      // mirror `_validate_vote_gremium`: key presence decides "both", the fixed id must
+      // be a non-empty string, and the initial state cannot use the cost center.
+      const config = s.config ?? {};
+      const hasId = 'gremiumId' in config;
+      const hasSource = 'gremiumSource' in config;
+      if (hasId && hasSource) {
         errors.push({ key: 'admin.flow.err.voteGremiumBoth', params: { key: s.key } });
-      } else if (!fixed && source !== 'budget') {
+      } else if (hasSource) {
+        if (config['gremiumSource'] !== 'budget') {
+          errors.push({ key: 'admin.flow.err.voteGremiumSource', params: { key: s.key } });
+        } else if (s.isInitial) {
+          errors.push({ key: 'admin.flow.err.voteGremiumInitial', params: { key: s.key } });
+        }
+      } else if (typeof config['gremiumId'] !== 'string' || config['gremiumId'] === '') {
         errors.push({ key: 'admin.flow.err.voteNeedsGremium', params: { key: s.key } });
       }
       if (outBranches.join(',') !== 'fail,pass') {

@@ -352,6 +352,31 @@ def validate_flow_graph(graph: FlowGraph) -> None:
                         "a vote state whose Gremium comes from the cost center; assign "
                         "the cost center on an earlier transition"
                     )
+                # The Gremium of such a state is the one of the cost center. A fixed
+                # `gremiumId` on the agenda action could name another Gremium.
+                if (
+                    action.get("type") == "addToNextSession"
+                    and "gremiumId" in action
+                    and t.to in budget_vote_keys
+                ):
+                    raise GuardError(
+                        "addToNextSession must not name a gremiumId on a transition into "
+                        "a vote state whose Gremium comes from the cost center"
+                    )
+                # `voteGremium` resolves the snapshot of the vote state. The engine
+                # clears it on every other target before the mail goes out.
+                if (
+                    action.get("type") == "notify"
+                    and kind_by_key.get(t.to) != "vote"
+                    and any(
+                        isinstance(r, dict) and r.get("kind") == "voteGremium"
+                        for r in action.get("recipients") or []
+                    )
+                ):
+                    raise GuardError(
+                        "notify recipient kind 'voteGremium' is only valid on a "
+                        "transition into a vote state"
+                    )
         except GuardError as exc:
             raise FlowValidationError(str(exc)) from exc
 

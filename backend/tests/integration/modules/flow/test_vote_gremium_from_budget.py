@@ -45,7 +45,7 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.budget.tree.service import BudgetTreeService
-from app.modules.budget.tree_models import Budget
+from app.modules.budget.tree_models import Budget, FiscalYear
 from app.modules.budget.tree_schemas import AssignBudgetRequest
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.extras_dispatcher import FlowExtrasActionDispatcher
@@ -127,6 +127,10 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:
         top = Budget(parent_id=None, key=f"T{tag}", path_key=f"T{tag}", name="Top")
         session.add(top)
         await session.flush()
+        session.add(
+            FiscalYear(budget_id=top.id, year=2026, start_date=date(2026, 1, 1),
+                       end_date=date(2026, 12, 31), active=True)
+        )
         decider = Budget(
             parent_id=top.id, key="C", path_key=f"T{tag}-C", name="Ressort",
             decision_gremium_id=g_a.id,
@@ -440,3 +444,85 @@ async def test_fixed_gremium_vote_state_still_works(
             app_id, AssignBudgetRequest.model_validate({"budgetId": None})
         )
         assert out.budget_id is None
+
+
+async def test_a_stale_vote_of_another_gremium_never_decides(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """HIGH 1: the application left the vote of Gremium A and came back for Gremium B.
+
+    The agenda item and a vote of the meeting of Gremium A remain. Neither the open of
+    such a draft nor the close of such an open vote may decide the application.
+    """
+    from app.modules.admin.service import ConfigService
+    from app.modules.voting.models import Vote
+
+    world = await _seed(maker)
+    async with maker() as session:
+        app_id = await _app(session, world, budget=world.leaf)
+        meeting_a = await _meeting(session, world.g_a, 0)
+        flow = FlowService(session)
+        await flow.fire(app_id, world.to_vote, ADMIN)
+        await AgendaService(session).add(meeting_a, application_id=app_id)
+        # The application leaves the vote; the cost center now names Gremium B; a
+        # force puts the application back into the vote state, now for Gremium B.
+        await flow.fire(app_id, world.escalate, world.member_a)
+        await session.execute(
+            update(Budget).where(Budget.id == world.decider).values(
+                decision_gremium_id=world.g_b
+            )
+        )
+        await session.execute(
+            update(Meeting).where(Meeting.id == meeting_a).values(status="live")
+        )
+        await session.commit()
+        await flow.force_status(app_id, world.states["gvote"], ADMIN, note="back")
+        assert await _snapshot(session, app_id) == world.g_b
+
+        config = VoteConfig.model_validate(
+            {"options": ["yes", "no", "abstain"], "majorityRule": "simple"}
+        ).model_dump(by_alias=True)
+        draft = Vote(application_id=app_id, meeting_id=meeting_a, eligible_group=str(world.g_a),
+                     config=config, status="draft", eligible_count=1)
+        stale = Vote(application_id=app_id, eligible_group=str(world.g_a),
+                     config=config, status="open", eligible_count=1)
+        session.add_all([draft, stale])
+        await session.commit()
+
+        voting = VotingService(session)
+        with pytest.raises(ConflictError) as opened:
+            await voting.open(draft.id, now=datetime.now(UTC))
+        assert opened.value.code == "vote_gremium_mismatch"
+        closed = await voting.close(stale.id, ADMIN, now=datetime.now(UTC))
+        assert closed.branch_fired is False
+        state = await session.scalar(
+            select(Application.current_state_id)
+            .where(Application.id == app_id)
+            .execution_options(populate_existing=True)
+        )
+        assert state == world.states["gvote"]
+
+        # MEDIUM 2: the Gremium that decides the running vote cannot be deleted.
+        with pytest.raises(ConflictError) as deleted:
+            await ConfigService(session).delete_gremium(world.g_b, "admin")
+        assert deleted.value.code == "gremium_decides_vote"
+
+
+async def test_a_vote_state_without_snapshot_takes_the_new_cost_center(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """LOW 3: without a snapshot the cost center stays open and fills the snapshot."""
+    world = await _seed(maker)
+    async with maker() as session:
+        app_id = await _app(session, world, budget=world.no_gremium, state="gvote")
+        assert await _snapshot(session, app_id) is None
+        await BudgetTreeService(session).assign_budget(
+            app_id, AssignBudgetRequest.model_validate({"budgetId": str(world.leaf)})
+        )
+        assert await _snapshot(session, app_id) == world.g_a
+        # Now the snapshot exists, so the cost center is locked again.
+        with pytest.raises(ConflictError) as locked:
+            await BudgetTreeService(session).assign_budget(
+                app_id, AssignBudgetRequest.model_validate({"budgetId": None})
+            )
+        assert locked.value.code == "budget_locked_by_vote"

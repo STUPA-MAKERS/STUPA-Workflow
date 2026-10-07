@@ -19,17 +19,25 @@ from app.modules.budget.tree_schemas import (
     MoveFiscalYearRequest,
 )
 from app.modules.flow.models import State
-from app.modules.flow.vote_gremium import in_budget_vote_state
+from app.modules.flow.vote_gremium import fill_snapshot, in_budget_vote_state
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
 class AssignmentOps(BudgetTreeServiceBase):
     """Assign applications to cost centers and fiscal years, and list them."""
 
-    async def _get_application(self, application_id: UUID) -> Application:
-        app = (
-            await self.session.execute(select(Application).where(Application.id == application_id))
-        ).scalar_one_or_none()
+    async def _get_application(
+        self, application_id: UUID, *, for_update: bool = False
+    ) -> Application:
+        """Load the application, or raise 404.
+
+        `for_update` locks the row. The cost-center change uses it, so a concurrent
+        state change into a vote state waits (and then finds another cost center).
+        """
+        stmt = select(Application).where(Application.id == application_id)
+        if for_update:
+            stmt = stmt.with_for_update()
+        app = (await self.session.execute(stmt)).scalar_one_or_none()
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
         return app
@@ -102,7 +110,7 @@ class AssignmentOps(BudgetTreeServiceBase):
                 method fails with a 422 instead of leaving ``fiscal_year_id``
                 NULL. This mirrors the behavior of bookings.
         """
-        app = await self._get_application(application_id)
+        app = await self._get_application(application_id, for_update=True)
         # The deciding Gremium of a running vote came from this cost center. A change
         # now would contradict the snapshot (`application.vote_gremium_id`).
         if await in_budget_vote_state(self.session, app):
@@ -120,6 +128,7 @@ class AssignmentOps(BudgetTreeServiceBase):
                 target_id=str(app.id),
                 data={"budgetId": None, "fiscalYearId": None},
             )
+            await fill_snapshot(self.session, app)
             await self.session.commit()
             return AssignBudgetOut(applicationId=app.id, budgetId=None, fiscalYearId=None)
 
@@ -133,6 +142,7 @@ class AssignmentOps(BudgetTreeServiceBase):
             target_id=str(app.id),
             data={"budgetId": str(node.id), "fiscalYearId": str(fy_id)},
         )
+        await fill_snapshot(self.session, app)
         await self.session.commit()
         return AssignBudgetOut(applicationId=app.id, budgetId=node.id, fiscalYearId=fy_id)
 

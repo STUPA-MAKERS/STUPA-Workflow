@@ -47,7 +47,7 @@ class _Session:
     async def scalars(self, _stmt: Any) -> _Result:
         return _Result(self._scalars.pop(0) if self._scalars else [])
 
-    async def get(self, _model: Any, ident: UUID) -> Any:
+    async def get(self, _model: Any, ident: UUID, **_kw: Any) -> Any:
         return self.store.get(ident)
 
     async def commit(self) -> None:
@@ -75,7 +75,7 @@ def _action(action_type: str, app_id: UUID, **params: Any) -> DispatchedAction:
 def _app(**kw: Any) -> Any:
     base = {
         "id": uuid4(), "created_by": "sub-1", "budget_id": None, "fiscal_year_id": None,
-        "current_state_id": None, "data": {},
+        "current_state_id": None, "data": {}, "vote_gremium_id": None,
     }
     base.update(kw)
     return SimpleNamespace(**base)
@@ -262,13 +262,37 @@ async def test_map_guards() -> None:
 async def test_assign_skipped_in_a_budget_vote_state(audit: list[dict[str, Any]]) -> None:
     state = SimpleNamespace(kind="vote", config={"gremiumSource": "budget"})
     node = SimpleNamespace(id=uuid4(), parent_id=None)
-    app = _app(current_state_id=uuid4())
+    app = _app(current_state_id=uuid4(), vote_gremium_id=uuid4())
     session = _Session(store={app.id: app, node.id: node, app.current_state_id: state})
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("assignBudget", app.id, budgetId=str(node.id))]
     )
     assert app.budget_id is None
     assert audit == []
+
+
+async def test_assign_without_snapshot_fills_it(
+    audit: list[dict[str, Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A budget vote state without a snapshot accepts the cost center and takes its Gremium."""
+    from app.modules.flow import vote_gremium as vg
+
+    gid = uuid4()
+
+    async def _eff(_s: Any, _budget: Any) -> UUID:
+        return gid
+
+    monkeypatch.setattr(vg, "effective_decision_gremium", _eff)
+    state = SimpleNamespace(kind="vote", config={"gremiumSource": "budget"})
+    node = SimpleNamespace(id=uuid4(), parent_id=None)
+    app = _app(current_state_id=uuid4())
+    store = {app.id: app, node.id: node, app.current_state_id: state}
+    session = _Session(store=store)
+    await FlowExtrasActionDispatcher(_maker(session)).dispatch(
+        [_action("assignBudget", app.id, budgetId=str(node.id))]
+    )
+    assert app.budget_id == node.id
+    assert app.vote_gremium_id == gid
 
 
 async def test_missing_target_node_assigns_nothing(gremien: list[str]) -> None:

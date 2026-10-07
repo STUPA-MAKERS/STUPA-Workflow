@@ -294,7 +294,7 @@ async def update_gremium(
 @router.delete(
     "/gremien/{gremium_id}",
     status_code=204,
-    responses=_errors(401, 403, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def delete_gremium(gremium_id: UUID, service: ServiceDep, principal: GremienAdmin) -> None:
     await service.delete_gremium(gremium_id, principal.sub)

@@ -43,7 +43,7 @@ async def create_budget(node: S.BudgetNodeCreate) -> dict:
 
     Set `gremiumId` on a top-level node only. After creation, `parentId` and
     `gremiumId` stay fixed. `decisionGremiumId` names the Gremium that decides on
-    spending from the node and its subtree. Requires budget.manage.
+    spending from the node and its subtree. Requires budget.structure.
     """
     return await api().post("/budgets", json=dump_create(node))
 
@@ -55,7 +55,7 @@ async def update_budget(budget_id: str, patch: S.BudgetNodeUpdate) -> dict:
     You can change `key`, `name`, `color`, `active`, `acceptedStateKeys` and more.
     `decisionGremiumId` sets the deciding Gremium (null clears it; the node then
     inherits from its ancestors). An unknown Gremium gives 422
-    `decision_gremium_invalid`. Requires budget.manage.
+    `decision_gremium_invalid`. Requires budget.structure.
     """
     return await api().patch(f"/budgets/{budget_id}", json=dump_patch(patch))
 
@@ -65,14 +65,14 @@ async def delete_budget(budget_id: str) -> dict:
     """Delete a cost center node.
 
     The call fails with a conflict when the node has children.
-    Requires budget.manage.
+    Requires budget.structure.
     """
     return await api().delete(f"/budgets/{budget_id}")
 
 
 @group.tool
 async def list_fiscal_years(budget_id: str) -> dict:
-    """List the fiscal years of a top-level budget. Requires budget.manage."""
+    """List the fiscal years of a top-level budget. Needs a logged-in principal."""
     return await api().get(f"/budgets/{budget_id}/fiscal-years")
 
 
@@ -81,7 +81,7 @@ async def create_fiscal_year(budget_id: str, year: int, active: bool = True) -> 
     """Create a fiscal year on a top-level budget.
 
     The bounds come from the fiscal start day and month of the budget. A year that
-    overlaps another year gives a 422. Requires budget.manage.
+    overlaps another year gives a 422. Requires budget.structure.
     """
     return await api().post(
         f"/budgets/{budget_id}/fiscal-years", json={"year": year, "active": active}
@@ -92,7 +92,7 @@ async def create_fiscal_year(budget_id: str, year: int, active: bool = True) -> 
 async def update_fiscal_year(
     budget_id: str, fiscal_year_id: str, year: int | None = None, active: bool | None = None
 ) -> dict:
-    """Patch the year or the active flag of a fiscal year. Requires budget.manage."""
+    """Patch the year or the active flag of a fiscal year. Requires budget.structure."""
     return await api().patch(
         f"/budgets/{budget_id}/fiscal-years/{fiscal_year_id}",
         json=params(year=year, active=active),
@@ -104,7 +104,7 @@ async def set_allocation(budget_id: str, fiscal_year_id: str, allocated: str) ->
     """Set the top-down allocation of a cost center for one fiscal year.
 
     The call gives a 422 when the sum of the children is more than the parent.
-    Requires budget.manage.
+    Requires budget.structure.
 
     Args:
         allocated: The allocated amount as a decimal string.
@@ -136,7 +136,7 @@ async def book_expense(
 
     You can link the booking to an application and to an invoice. You can also give a
     correspondent, a note, a reference number, a payment method, a category and the
-    invoice and payment dates. Requires budget.manage.
+    invoice and payment dates. Requires budget.book.
 
     Args:
         amount: The amount as a decimal string.
@@ -163,13 +163,13 @@ async def list_budget_expenses(budget_id: str) -> dict:
 
 @group.tool
 async def update_expense(expense_id: str, patch: S.ExpenseUpdate) -> dict:
-    """Patch the amount or the description of a booking. Requires budget.manage."""
+    """Patch the amount or the description of a booking. Requires budget.book."""
     return await api().patch(f"/budget-expenses/{expense_id}", json=dump_patch(patch))
 
 
 @group.tool
 async def delete_expense(expense_id: str) -> dict:
-    """Delete a booking. Requires budget.manage."""
+    """Delete a booking. Requires budget.book."""
     return await api().delete(f"/budget-expenses/{expense_id}")
 
 
@@ -177,7 +177,7 @@ async def delete_expense(expense_id: str) -> dict:
 async def create_budget_transfer(transfer: S.TransferCreate) -> dict:
     """Transfer budget between two cost centers inside one fiscal year.
 
-    Requires budget.manage.
+    Requires budget.book.
     """
     return await api().post("/budget-transfers", json=dump_create(transfer))
 
@@ -191,7 +191,7 @@ async def assign_application_budget(
     Pass null to remove the binding. The fiscal year comes from the single active year
     of the top-level node. While the application sits in a vote state whose Gremium
     comes from the cost center, the server refuses the change with 409
-    `budget_locked_by_vote`. Requires budget.manage.
+    `budget_locked_by_vote`. Requires application.manage.
     """
     return await api().post(
         f"/applications/{application_id}/assign-budget", json={"budgetId": budget_id}
@@ -202,7 +202,7 @@ async def assign_application_budget(
 async def move_application_fiscal_year(application_id: str, fiscal_year_id: str) -> dict:
     """Move the budget binding of an application to another fiscal year.
 
-    Requires budget.manage.
+    Requires application.manage.
     """
     return await api().post(
         f"/applications/{application_id}/move-fiscal-year",

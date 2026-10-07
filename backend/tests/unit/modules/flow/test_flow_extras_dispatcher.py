@@ -50,7 +50,7 @@ class _Session:
     async def scalar(self, _stmt: Any) -> Any:
         return self.meeting
 
-    async def get(self, _model: Any, ident: UUID) -> Any:
+    async def get(self, _model: Any, ident: UUID, **_kw: Any) -> Any:
         if self.raise_on_get:
             raise RuntimeError("boom")
         return self.store.get(ident)

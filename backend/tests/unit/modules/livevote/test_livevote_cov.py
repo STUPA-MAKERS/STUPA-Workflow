@@ -2257,6 +2257,10 @@ class _FakeMeetingService:
     async def application_state_kind(self, application_id: UUID) -> str | None:
         return "vote"
 
+    async def application_vote_gremium(self, application_id: UUID) -> UUID | None:
+        # The snapshot names the Gremium of the meeting unless a test overrides it.
+        return self._meeting_out.gremium_id
+
     async def gremium_quorum_percent(self, gremium_id: UUID) -> int | None:
         return None
 
@@ -2846,6 +2850,33 @@ def test_open_vote_application_not_in_vote_state_conflict(
         f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())}
     )
     assert r.status_code == 409
+
+
+def test_open_vote_stale_agenda_item_of_another_gremium_conflict(
+    app: FastAPI, client: TestClient, fakes
+) -> None:
+    """A meeting of a Gremium that does not decide the vote state cannot vote (409)."""
+    from types import SimpleNamespace
+
+    fakes["agenda"].item_row = SimpleNamespace(id=uuid4(), application_id=uuid4())
+    fakes["meeting"]._meeting_out = _meeting_out(status="live", can_manage_votes=True)
+
+    async def _other(application_id: UUID) -> UUID | None:
+        return uuid4()
+
+    fakes["meeting"].application_vote_gremium = _other  # type: ignore[assignment]
+    _login(app)
+    r = client.post(
+        f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())}
+    )
+    assert r.status_code == 409
+    assert r.json()["code"] == "vote_gremium_mismatch"
+
+
+async def test_application_vote_gremium() -> None:
+    gid = uuid4()
+    svc = MeetingService(_QueueSession(scalar_q=[gid]))  # type: ignore[arg-type]
+    assert await svc.application_vote_gremium(uuid4()) == gid
 
 
 def test_open_vote_default_quorum_from_gremium(

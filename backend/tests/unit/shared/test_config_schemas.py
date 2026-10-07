@@ -522,3 +522,21 @@ def test_assign_budget_into_a_budget_vote_state_rejected(action: dict) -> None:
     # Into a vote state with a fixed Gremium the action stays valid.
     g["states"][1]["config"] = {"gremiumId": "g-1"}
     validate_flow_graph(FlowGraph.model_validate(g))
+
+
+def test_add_to_next_session_with_gremium_into_a_budget_vote_state_rejected() -> None:
+    g = _vote_graph_dict()
+    g["states"][1]["config"] = {"gremiumSource": "budget"}
+    g["transitions"][0]["actions"] = [{"type": "addToNextSession", "gremiumId": "g-1"}]
+    with pytest.raises(FlowValidationError, match="must not name a gremiumId"):
+        validate_flow_graph(FlowGraph.model_validate(g))
+
+
+def test_vote_gremium_recipient_only_into_a_vote_state() -> None:
+    notify = {"type": "notify", "recipients": [{"kind": "voteGremium"}]}
+    g = _vote_graph_dict()
+    g["transitions"][0]["actions"] = [notify]  # draft -> voting: fine
+    validate_flow_graph(FlowGraph.model_validate(g))
+    g["transitions"][1]["actions"] = [notify]  # voting -> passed: the snapshot is gone
+    with pytest.raises(FlowValidationError, match="voteGremium"):
+        validate_flow_graph(FlowGraph.model_validate(g))

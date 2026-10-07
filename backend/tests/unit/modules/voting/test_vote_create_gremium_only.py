@@ -155,18 +155,18 @@ async def test_create_other_gremium_than_the_application_422() -> None:
 
 
 async def test_create_state_gremium_wins_over_the_application_gremium() -> None:
-    """The `gremiumId` of the current vote state decides when it is set."""
+    """Outside a vote state the `gremiumId` of the current state decides when it is set."""
     app = _application(current_state_id=uuid4(), gremium_id=OTHER)
-    db = fake_session(result(app), result(*_roster(1)))
-    db.scalar_results = [GID, {"gremiumId": str(GID)}]
+    db = fake_session(result(app), result(("normal", {"gremiumId": str(GID)})), result(*_roster(1)))
+    db.scalar_results = [GID]
     out = await VotingService(db).create(app.id, _body(), MANAGER)
     assert out.eligible_group == str(GID)
 
 
 async def test_create_state_gremium_mismatch_422() -> None:
     app = _application(current_state_id=uuid4(), gremium_id=GID)
-    db = fake_session(result(app))
-    db.scalar_results = [GID, {"gremiumId": str(OTHER)}]
+    db = fake_session(result(app), result(("normal", {"gremiumId": str(OTHER)})))
+    db.scalar_results = [GID]
     with pytest.raises(ValidationProblem) as err:
         await VotingService(db).create(app.id, _body(), MANAGER)
     assert err.value.code == "eligible_group_mismatch"
@@ -177,10 +177,18 @@ async def test_create_state_gremium_mismatch_422() -> None:
     [None, {}, {"gremiumId": ""}, {"gremiumId": 7}, {"gremiumId": "not-a-uuid"}],
 )
 async def test_create_state_without_usable_gremium_falls_back(state_config: Any) -> None:
-    """A state config without a valid `gremiumId` falls back to the application."""
+    """Outside a vote state a config without a valid `gremiumId` falls back."""
     app = _application(current_state_id=uuid4(), gremium_id=GID)
-    db = fake_session(result(app), result(*_roster(2)))
-    db.scalar_results = [GID, state_config]
+    db = fake_session(result(app), result(("normal", state_config)), result(*_roster(2)))
+    db.scalar_results = [GID]
+    out = await VotingService(db).create(app.id, _body(), MANAGER)
+    assert out.tally.eligible == 2
+
+
+async def test_create_unknown_state_falls_back() -> None:
+    app = _application(current_state_id=uuid4(), gremium_id=GID)
+    db = fake_session(result(app), result(), result(*_roster(2)))
+    db.scalar_results = [GID]
     out = await VotingService(db).create(app.id, _body(), MANAGER)
     assert out.tally.eligible == 2
 
@@ -320,15 +328,24 @@ async def test_get_scoped_token_never_casts(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 async def test_create_follows_the_vote_gremium_snapshot() -> None:
-    """Flow variant B: the snapshot of the vote state decides, before the type Gremium."""
+    """Flow variant B: in a vote state only the snapshot decides."""
     app = _application(vote_gremium_id=OTHER, current_state_id=uuid4())
-    db = fake_session(result(app))
+    db = fake_session(result(app), result(("vote", {})))
     db.scalar_results = [GID]  # the gremium exists
     with pytest.raises(ValidationProblem) as err:
         await VotingService(db).create(app.id, _body(), MANAGER)
     assert err.value.code == "eligible_group_mismatch"
     app = _application(vote_gremium_id=GID, gremium_id=OTHER, current_state_id=uuid4())
-    db = fake_session(result(app), result(*_roster(2)))
+    db = fake_session(result(app), result(("vote", {})), result(*_roster(2)))
     db.scalar_results = [GID]
     out = await VotingService(db).create(app.id, _body(), MANAGER)
     assert out.tally.eligible == 2
+
+
+async def test_create_in_a_vote_state_without_snapshot_needs_the_admin() -> None:
+    """A vote state without a snapshot never falls back to the type Gremium."""
+    app = _application(vote_gremium_id=None, gremium_id=GID, current_state_id=uuid4())
+    db = fake_session(result(app), result(("vote", {"gremiumSource": "budget"})))
+    db.scalar_results = [GID]
+    with pytest.raises(ForbiddenError):
+        await VotingService(db).create(app.id, _body(), MANAGER)

@@ -71,13 +71,14 @@ def upgrade() -> None:
         )
         op.execute(f"CREATE INDEX IF NOT EXISTS {ix} ON {table} ({column})")
     # Backfill: an application in a vote state gets the fixed Gremium of that state.
-    # Only an existing Gremium qualifies, so the foreign key holds.
+    # Only an existing Gremium qualifies, so the foreign key holds. The compare ignores
+    # the case, because a config can hold the UUID in upper case.
     op.execute(
         """
         UPDATE application AS a
            SET vote_gremium_id = g.id
           FROM state AS s
-          JOIN gremium AS g ON g.id::text = s.config ->> 'gremiumId'
+          JOIN gremium AS g ON lower(g.id::text) = lower(s.config ->> 'gremiumId')
          WHERE a.current_state_id = s.id
            AND s.kind = 'vote'
            AND a.vote_gremium_id IS NULL

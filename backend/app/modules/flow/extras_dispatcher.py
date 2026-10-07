@@ -35,7 +35,7 @@ from app.modules.budget.tree_models import Budget, FiscalYear
 from app.modules.budget.tree_rules import _SEP
 from app.modules.flow.context import committee_ids_for_sub
 from app.modules.flow.dispatch import DispatchedAction
-from app.modules.flow.vote_gremium import in_budget_vote_state
+from app.modules.flow.vote_gremium import fill_snapshot, in_budget_vote_state
 from app.modules.livevote.agenda_service import AgendaService
 from app.modules.livevote.models import Meeting
 from app.settings import get_settings
@@ -334,6 +334,11 @@ class FlowExtrasActionDispatcher:
         if node is None:
             logger.warning("assignBudget: budget %s missing — skipped", budget_id)
             return False
+        # Lock and re-read the row: a concurrent state change into a vote state then
+        # waits for this commit, or this read sees it.
+        await session.get(
+            Application, app.id, with_for_update=True, populate_existing=True
+        )
         if await in_budget_vote_state(session, app):
             # The deciding Gremium of the running vote came from the current cost
             # center (`application.vote_gremium_id`). The manual route gives 409 here.
@@ -378,6 +383,7 @@ class FlowExtrasActionDispatcher:
                 "source": source,
             },
         )
+        await fill_snapshot(session, app)
         return True
 
     @staticmethod

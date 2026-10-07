@@ -28,9 +28,9 @@ class _FakeSession:
     The test proves that a conflict writes *no* audit row and runs *no* commit.
     """
 
-    def __init__(self, *, gremium: Any, in_use: Any) -> None:
+    def __init__(self, *, gremium: Any, in_use: Any, deciding: Any = None) -> None:
         self._gremium = gremium
-        self._in_use = in_use
+        self._scalars = [in_use, deciding]
         self.deleted: list[Any] = []
         self.execute_calls = 0
         self.committed = 0
@@ -39,7 +39,7 @@ class _FakeSession:
         return self._gremium
 
     async def scalar(self, _stmt: Any) -> Any:
-        return self._in_use
+        return self._scalars.pop(0)
 
     async def execute(self, _stmt: Any) -> Any:  # pragma: no cover - guarded path
         self.execute_calls += 1
@@ -70,5 +70,19 @@ async def test_delete_gremium_with_in_use_type_raises_conflict() -> None:
 
     # A doomed delete writes no audit row, deletes nothing and commits nothing.
     assert session.execute_calls == 0
+    assert session.deleted == []
+    assert session.committed == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_gremium_that_decides_a_vote_raises_conflict() -> None:
+    """Flow variant B: a Gremium that decides a running vote cannot go away."""
+    gid = uuid.uuid4()
+    session = _FakeSession(gremium=_Row(id=gid), in_use=None, deciding=uuid.uuid4())
+    svc = ConfigService(session)  # type: ignore[arg-type]
+
+    with pytest.raises(ConflictError) as err:
+        await svc.delete_gremium(gid, "admin")
+    assert err.value.code == "gremium_decides_vote"
     assert session.deleted == []
     assert session.committed == 0
