@@ -41,6 +41,12 @@
                   <span class="grem__name">
                     <span class="grem__label ell" [title]="g.name">{{ g.name }}</span>
                     <span class="grem__slug mono">{{ g.slug }}</span>
+                    @if (g.protocolsPublic) {
+                      <span class="grem__tag">
+                        <app-icon name="globe" [size]="13" />
+                        {{ 'admin.gremien.publicTag' | t }}
+                      </span>
+                    }
                   </span>
                   @if (counts(g); as c) {
                     <span class="grem__counts">{{ c }}</span>

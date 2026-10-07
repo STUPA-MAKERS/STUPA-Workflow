@@ -5,6 +5,11 @@
   <app-icon class="pb__icon" [class.pb__icon--accent]="s.tone === 'accent'" [name]="s.icon" [size]="18" />
   <p class="pb__text">
     <strong>{{ s.label | t }}</strong> · {{ s.text | t }}
+    @if (publication(); as pub) {
+      <span class="pb__hint pb__pub" [class.pb__pub--on]="pub === 'public'">
+        {{ (pub === 'public' ? 'meetings.protocolBar.public' : 'meetings.protocolBar.withheld') | t }}
+      </span>
+    }
     @if (needsRight()) {
       <span class="pb__hint">{{ 'meetings.protocolBar.needsRight' | t }}</span>
     }
@@ -14,6 +19,12 @@
       <app-button variant="fill" size="sm" [loading]="finalizing()" (click)="finalize.emit()">
         <app-icon name="send" [size]="15" />
         {{ 'meetings.protocol.finalize' | t }}
+      </app-button>
+    }
+    @if (canPublish()) {
+      <app-button variant="text" size="sm" [loading]="publicationSaving()" (click)="togglePublication()">
+        <app-icon [name]="publication() === 'withheld' ? 'globe' : 'eyeslash'" [size]="15" />
+        {{ (publication() === 'withheld' ? 'meetings.protocolBar.publish' : 'meetings.protocolBar.withhold') | t }}
       </app-button>
     }
     @if (p.isFinal) {

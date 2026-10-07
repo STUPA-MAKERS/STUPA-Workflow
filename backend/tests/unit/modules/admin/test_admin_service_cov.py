@@ -176,6 +176,7 @@ def gremium_row(**kw: Any) -> Any:
         "delegation_lead_minutes": 0,
         "delegation_allow_external": False,
         "quorum_percent": None,
+        "protocols_public": False,
     }
     base.update(kw)
     return Row(**base)
@@ -1268,3 +1269,67 @@ def test_role_update_rejects_unknown_permission() -> None:
 
 def test_role_update_none_permissions_ok() -> None:
     assert RoleUpdate(permissions=None).permissions is None
+
+
+async def test_update_gremium_protocols_public_audits_old_and_new(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.admin.service import service_base
+
+    entries: list[dict[str, Any]] = []
+
+    async def _record(_session: Any, **kw: Any) -> None:
+        entries.append(kw)
+
+    monkeypatch.setattr(service_base, "audit_record", _record)
+    row = gremium_row()
+    s, _ = svc([], gets=[row])
+    out = await s.update_gremium(row.id, GremiumUpdate(protocolsPublic=True), "admin")
+    assert out.protocols_public is True
+    assert entries[-1]["data"] == {"field": "protocolsPublic", "old": False, "new": True}
+    # The same value again changes nothing and names no field.
+    s, _ = svc([], gets=[row])
+    await s.update_gremium(row.id, GremiumUpdate(protocolsPublic=True), "admin")
+    assert entries[-1]["data"] == {}
+
+
+async def test_create_public_gremium_audits_the_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.modules.admin.service import service_base
+
+    entries: list[dict[str, Any]] = []
+
+    async def _record(_session: Any, **kw: Any) -> None:
+        entries.append(kw)
+
+    async def _roles(self: Any, gremium_id: Any) -> None: ...
+
+    monkeypatch.setattr(service_base, "audit_record", _record)
+    monkeypatch.setattr(
+        "app.modules.admin.service.gremien.GremiumRoleService.ensure_forced_roles", _roles
+    )
+    s, _ = svc([res()])
+    out = await s.create_gremium(
+        GremiumCreate(name="FS", slug="fs", protocolsPublic=True), "admin"
+    )
+    assert out.protocols_public is True
+    assert entries[-1]["data"] == {"protocolsPublic": True}
+
+
+async def test_gremium_public_preview_counts() -> None:
+    row = gremium_row()
+    s, _ = svc([], scalars=[6, 5], gets=[row])
+    out = await s.gremium_public_preview(row.id)
+    assert (out.final_count, out.missing_count) == (6, 5)
+    s, _ = svc([], scalars=[None, None], gets=[row])
+    out = await s.gremium_public_preview(row.id)
+    assert (out.final_count, out.missing_count) == (0, 0)
+    s, _ = svc([], gets=[None])
+    with pytest.raises(NotFoundError):
+        await s.gremium_public_preview(row.id)
+
+
+async def test_gremium_protocols_public_reads_the_flag() -> None:
+    s, _ = svc([], scalars=[True])
+    assert await s.gremium_protocols_public(uuid.uuid4()) is True
+    s, _ = svc([], scalars=[None])
+    assert await s.gremium_protocols_public(uuid.uuid4()) is False

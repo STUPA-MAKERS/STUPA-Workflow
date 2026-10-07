@@ -1,0 +1,152 @@
+<section class="pp">
+  <header class="pp__head">
+    <nav class="pp__crumbs" [attr.aria-label]="'publicProtocols.crumbs' | t">
+      <a routerLink="/">{{ 'publicProtocols.crumbHome' | t }}</a>
+      <app-icon name="right" [size]="13" />
+      <span aria-current="page">{{ 'publicProtocols.title' | t }}</span>
+    </nav>
+    <h1 class="pp__title">{{ 'publicProtocols.title' | t }}</h1>
+    <p class="pp__lede">{{ 'publicProtocols.lede' | t }}</p>
+  </header>
+
+  @if (!loading() && !error() && total() === 0 && !hasFilters()) {
+    <div class="pp__none">
+      <app-empty-state
+        icon="archive"
+        [heading]="'publicProtocols.empty.none' | t"
+        [body]="'publicProtocols.empty.noneBody' | t"
+      >
+        <a class="pp__btn pp__btn--tonal" routerLink="/">
+          <app-icon name="back" [size]="16" />
+          {{ 'publicProtocols.empty.home' | t }}
+        </a>
+      </app-empty-state>
+    </div>
+  } @else {
+    <div class="pp__toolbar">
+      <app-search-pill
+        size="md"
+        [clearable]="true"
+        [placeholder]="'publicProtocols.search' | t"
+        [value]="query()"
+        (valueChange)="onQuery($event)"
+        (commit)="applyQuery()"
+      />
+      <div class="pp__chips">
+        <app-filter-select
+          [label]="'publicProtocols.filter.gremium' | t"
+          [multiple]="true"
+          [options]="gremiumOptions()"
+          [values]="gremiumFilter()"
+          (valuesChange)="onGremien($event)"
+          [text]="gremiumText()"
+          [active]="gremiumFilter().length > 0"
+          [resetLabel]="'publicProtocols.filter.reset' | t"
+        />
+        <app-filter-select
+          [label]="'publicProtocols.filter.semester' | t"
+          [options]="semesterOptions()"
+          [value]="semesterFilter()"
+          (valueChange)="onSemester($event)"
+          [text]="semesterText()"
+          [active]="semesterFilter() !== ''"
+        />
+        <span class="pp__spacer"></span>
+        @if (!loading()) {
+          <span class="pp__count" aria-live="polite">{{ countText() }}</span>
+        }
+      </div>
+    </div>
+
+    @if (loading()) {
+      <app-skeleton variant="rows" [count]="4" [label]="'publicProtocols.loading' | t" />
+    } @else if (error() && items().length === 0) {
+      <app-note kind="error" icon="alert" role="alert">{{ 'publicProtocols.error' | t }}</app-note>
+    } @else if (items().length === 0) {
+      <div class="pp__none">
+        <app-empty-state
+          icon="search"
+          [heading]="'publicProtocols.empty.filtered' | t"
+          [body]="'publicProtocols.empty.filteredBody' | t"
+        >
+          <app-button variant="outlined" (click)="resetFilters()">{{ 'publicProtocols.filter.resetAll' | t }}</app-button>
+        </app-empty-state>
+      </div>
+    } @else {
+      @for (group of groups(); track group.key) {
+        <h2 class="pp__group">
+          <span>{{ group.label }}</span>
+          <span class="pp__groupCount num">{{ group.count }}</span>
+        </h2>
+        @for (p of group.items; track p.id) {
+          <article class="pp__card">
+            <app-date-block class="pp__date" [date]="dateOf(p)" />
+            <div class="pp__main">
+              <div class="pp__titles">
+                <span class="pp__meta">{{ p.gremium.name }} · {{ when(p) }}</span>
+                <h3 class="pp__cardTitle">
+                  <a [routerLink]="['/protokolle', p.id]">
+                    @for (part of parts(p.title); track $index) {
+                      @if (part.hit) { <mark>{{ part.text }}</mark> } @else { {{ part.text }} }
+                    }
+                  </a>
+                </h3>
+              </div>
+              <ol class="pp__tops">
+                @for (top of p.tops; track top.number) {
+                  <li class="pp__top" [class.pp__top--np]="top.nonPublic">
+                    <span class="pp__topNo mono">{{ top.number }}</span>
+                    @if (top.nonPublic || !top.title) {
+                      <span class="pp__topNp">
+                        <app-icon name="lock" [size]="14" />
+                        {{ 'publicProtocols.top.nonPublicShort' | t }}
+                      </span>
+                    } @else {
+                      <span class="pp__topTitle">
+                        @for (part of parts(top.title); track $index) {
+                          @if (part.hit) { <mark>{{ part.text }}</mark> } @else { {{ part.text }} }
+                        }
+                        @for (r of top.results; track $index) {
+                          <span class="pp__result" [class.pp__result--no]="r !== 'passed'">{{ resultLabel(r) | t }}</span>
+                        }
+                      </span>
+                    }
+                  </li>
+                }
+              </ol>
+              <p class="pp__counts">
+                @for (c of countsLine(p); track $index) {
+                  <span>{{ c }}</span>
+                }
+              </p>
+            </div>
+            <div class="pp__side">
+              @if (p.hasPdf) {
+                <a class="pp__btn" [href]="pdfUrl(p)" download>
+                  <app-icon name="download" [size]="16" />
+                  {{ 'publicProtocols.pdf' | t }}
+                </a>
+              }
+              <span class="pp__pdfMeta">{{ pdfMeta(p) }}</span>
+              <a class="pp__view" [routerLink]="['/protokolle', p.id]">
+                {{ 'publicProtocols.card.view' | t }}
+                <app-icon name="right" [size]="15" />
+              </a>
+            </div>
+          </article>
+        }
+      }
+      @if (error()) {
+        <app-note kind="error" icon="alert" role="alert">{{ 'publicProtocols.error' | t }}</app-note>
+      }
+      @if (hasMore()) {
+        <app-button class="pp__more" variant="tonal" [loading]="loadingMore()" (click)="loadMore()">
+          {{ 'publicProtocols.more' | t }}
+        </app-button>
+      }
+      @if (appliedQuery()) {
+        <p class="pp__hint">{{ 'publicProtocols.searchHint' | t }}</p>
+      }
+    }
+  }
+</section>

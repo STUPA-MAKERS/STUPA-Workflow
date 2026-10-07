@@ -157,6 +157,7 @@ const BACKEND_AUDIT_ACTIONS = [
   'comment_delete',
   'protocol_delete',
   'protocol_finalize',
+  'protocol_publication',
   'protokollant_handover',
   'vote_delete',
   'vote_open',

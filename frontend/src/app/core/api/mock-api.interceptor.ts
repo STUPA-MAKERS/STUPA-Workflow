@@ -1431,6 +1431,9 @@ const MOCK_ACCOUNT_PATH =
 const PUBLIC_MEETING_PATH =
   /\/public\/meetings\/|\/meetings\/[^/]+\/(guests(\/[^/]+)*|join-link|join-code\/rotate)$/;
 
+/** The public protocol routes (`mock-public-protocols.ts`). */
+const PUBLIC_PROTOCOLS_PATH = /\/public\/(gremien|protocols)(\/|$)/;
+
 function path(url: string): string {
   return url.split('?')[0];
 }
@@ -1475,6 +1478,17 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
           ).pipe(delay(120));
         }
         return ok(reply.body, reply.status);
+      }),
+    );
+  }
+
+  // The public protocols (no login). The data loads on first use.
+  if (PUBLIC_PROTOCOLS_PATH.test(p)) {
+    return from(import('./mock-public-protocols')).pipe(
+      mergeMap((m) => {
+        const reply = m.mockPublicProtocols(req.method, p);
+        if (!reply) return throwError(() => new HttpErrorResponse({ status: 404, url: req.url }));
+        return ok(reply.body);
       }),
     );
   }

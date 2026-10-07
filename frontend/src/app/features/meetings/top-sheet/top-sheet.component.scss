@@ -137,6 +137,12 @@
   background: var(--color-border);
 }
 
+/* The note of a public gremium sits above the editor, in line with the text. */
+.ts__public {
+  flex: none;
+  margin: var(--space-4) 28px 0;
+}
+
 /* The editor is the page: its own frame goes, the sheet is the surface. */
 .ts__editor {
   display: block;
@@ -225,6 +231,9 @@
   }
   .ts__editor {
     padding: var(--space-4);
+  }
+  .ts__public {
+    margin-inline: var(--space-4);
   }
   .ts__foot,
   .ts__keepers {

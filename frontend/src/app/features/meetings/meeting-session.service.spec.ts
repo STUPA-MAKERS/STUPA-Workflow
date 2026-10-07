@@ -78,6 +78,43 @@ describe('MeetingSessionService', () => {
   });
 
 
+  it('finalizes a protocol held back from the public page', () => {
+    const { http, session } = setup();
+    session.meeting.set(M({ status: 'closed' }));
+    session.protocol.set(PROTOCOL);
+    session.finalize({ publicWithheld: true });
+    http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
+    const req = http.expectOne('/api/protocols/p-1/finalize');
+    expect(req.request.body).toEqual({ publicWithheld: true });
+    req.flush({ ...PROTOCOL, status: 'rendering' });
+  });
+
+  it('holds a final protocol back and publishes it again', () => {
+    const { http, session, toasts } = setup();
+    session.setPublicWithheld(true); // no protocol yet
+    http.verify();
+    session.protocol.set({ ...PROTOCOL, status: 'final', isFinal: true, isLocked: true });
+    session.setPublicWithheld(true);
+    session.setPublicWithheld(false); // ignored while the first one runs
+    const req = http.expectOne('/api/protocols/p-1');
+    expect(req.request.body).toEqual({ publicWithheld: true });
+    expect(session.publicationSaving()).toBe(true);
+    req.flush({ ...PROTOCOL, status: 'final', publicWithheld: true, gremiumProtocolsPublic: true });
+    expect(session.protocol()?.publicWithheld).toBe(true);
+    expect(toasts()).toContain('Das Protokoll ist nicht mehr öffentlich.');
+
+    session.setPublicWithheld(false);
+    http.expectOne('/api/protocols/p-1').flush({ ...PROTOCOL, status: 'final', publicWithheld: false });
+    expect(toasts()).toContain('Das Protokoll ist jetzt öffentlich.');
+
+    session.setPublicWithheld(true);
+    http
+      .expectOne('/api/protocols/p-1')
+      .flush({ detail: 'Kein Recht' }, { status: 403, statusText: 'Forbidden' });
+    expect(session.publicationSaving()).toBe(false);
+    expect(toasts().some((t) => t.startsWith('Aktion fehlgeschlagen.'))).toBe(true);
+  });
+
   it('passes the lead events to the guest list and takes the guest counts (#17)', () => {
     TestBed.configureTestingModule({
       providers: [

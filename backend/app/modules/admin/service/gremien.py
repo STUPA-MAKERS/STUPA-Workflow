@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import delete, distinct, func, select
+from sqlalchemy import delete, distinct, func, or_, select
 
 from app.modules.admin.gremium_roles import GremiumRoleService, _time_valid_clause
 from app.modules.admin.models import (
@@ -21,6 +21,7 @@ from app.modules.admin.schemas import (
     GremiumCreate,
     GremiumMailRecipients,
     GremiumOut,
+    GremiumPublicPreview,
     GremiumUpdate,
 )
 from app.modules.admin.service.service_base import ConfigServiceBase
@@ -40,6 +41,7 @@ def _gremium_out(row: Gremium) -> GremiumOut:
         delegation_lead_minutes=row.delegation_lead_minutes,
         delegation_allow_external=row.delegation_allow_external,
         quorum_percent=row.quorum_percent,
+        protocols_public=bool(row.protocols_public),
     )
 
 
@@ -105,14 +107,61 @@ class GremiumOps(ConfigServiceBase):
             delegation_lead_minutes=payload.delegation_lead_minutes,
             delegation_allow_external=payload.delegation_allow_external,
             quorum_percent=payload.quorum_percent,
+            protocols_public=payload.protocols_public,
         )
         self.session.add(row)
         await self.session.flush()
         # Every new gremium gets the forced roles chair and secretary.
         await GremiumRoleService(self.session).ensure_forced_roles(row.id)
-        await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", row.id)
+        await self._audit(
+            actor,
+            AuditAction.CONFIG_CHANGE,
+            "gremium",
+            row.id,
+            {"protocolsPublic": row.protocols_public} if row.protocols_public else None,
+        )
         await self.session.commit()
         return _gremium_out(row)
+
+    async def gremium_protocols_public(self, gremium_id: UUID) -> bool:
+        """Return the flag ``protocols_public`` of a gremium, False when it is missing."""
+        value = await self.session.scalar(
+            select(Gremium.protocols_public).where(Gremium.id == gremium_id)
+        )
+        return bool(value)
+
+    async def gremium_public_preview(self, gremium_id: UUID) -> GremiumPublicPreview:
+        """Count the protocols that a switch to public would publish.
+
+        Raises:
+            NotFoundError: No gremium has this id (404).
+        """
+        if await self.session.get(Gremium, gremium_id) is None:
+            raise NotFoundError(f"gremium {gremium_id} not found")
+        from app.modules.protocol.models import Protocol
+
+        base = (
+            select(func.count())
+            .select_from(Protocol)
+            .where(
+                Protocol.gremium_id == gremium_id,
+                Protocol.status == "final",
+                Protocol.public_withheld.is_(False),
+            )
+        )
+        final_count = int(await self.session.scalar(base) or 0)
+        missing_count = int(
+            await self.session.scalar(
+                base.where(
+                    or_(
+                        Protocol.public_content.is_(None),
+                        Protocol.public_pdf_storage_key.is_(None),
+                    )
+                )
+            )
+            or 0
+        )
+        return GremiumPublicPreview(final_count=final_count, missing_count=missing_count)
 
     async def update_gremium(
         self, gremium_id: UUID, payload: GremiumUpdate, actor: str
@@ -142,7 +191,20 @@ class GremiumOps(ConfigServiceBase):
         # "not sent" from the case "set to null".
         if "quorum_percent" in payload.model_fields_set:
             row.quorum_percent = payload.quorum_percent
-        await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", row.id)
+        data: dict[str, object] | None = None
+        if (
+            payload.protocols_public is not None
+            and payload.protocols_public != bool(row.protocols_public)
+        ):
+            # The audit entry names the old and the new value of the publication
+            # flag, because the switch publishes or hides protocols at once.
+            data = {
+                "field": "protocolsPublic",
+                "old": bool(row.protocols_public),
+                "new": payload.protocols_public,
+            }
+            row.protocols_public = payload.protocols_public
+        await self._audit(actor, AuditAction.CONFIG_CHANGE, "gremium", row.id, data)
         await self.session.commit()
         return _gremium_out(row)
 

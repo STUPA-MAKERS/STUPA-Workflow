@@ -47,6 +47,13 @@ describe('AdminApiService — mock mode', () => {
     expect(status.map((x) => x.lastState)).toEqual(['sent', 'dead', 'pending', 'never']);
   });
 
+  it('serves a public preview in mock mode', async () => {
+    expect(await firstValueFrom(svc().getGremiumPublicPreview('g-1'))).toEqual({
+      finalCount: 6,
+      missingCount: 5,
+    });
+  });
+
   it('covers schemas, versions, gremien, roles and rule upsert in mock mode', async () => {
     const s = svc();
     const schemas = await firstValueFrom(s.configSchemas());
@@ -135,6 +142,15 @@ describe('AdminApiService — real mode (contract)', () => {
 
     s.saveWebhook({ id: 'wh-9', name: 'n', url: 'https://h', events: ['vote_opened'], active: true }).subscribe();
     expect(http.expectOne('/api/admin/webhooks/wh-9').request.method).toBe('PATCH');
+  });
+
+  it('GETs the public preview of a gremium', () => {
+    let got: unknown;
+    s.getGremiumPublicPreview('g-1').subscribe((p) => (got = p));
+    const req = http.expectOne('/api/admin/gremien/g-1/public-preview');
+    expect(req.request.method).toBe('GET');
+    req.flush({ finalCount: 3, missingCount: 1 });
+    expect(got).toEqual({ finalCount: 3, missingCount: 1 });
   });
 
   it('DELETEs a webhook and GETs the delivery status', () => {

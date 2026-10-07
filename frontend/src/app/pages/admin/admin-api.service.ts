@@ -48,6 +48,7 @@ import {
   type FormStatus,
   type Gremium,
   type GremiumCreateBody,
+  type GremiumPublicPreview,
   type GremiumMembership,
   type GremiumMembershipMapping,
   type GremiumMembershipMappingBody,
@@ -236,6 +237,14 @@ export class AdminApiService {
       return of(void 0);
     }
     return this.http.delete<void>(`${this.base}/admin/gremien/${id}`);
+  }
+
+  /** GET /admin/gremien/{id}/public-preview — what the switch to "public" publishes. */
+  getGremiumPublicPreview(id: Uuid): Observable<GremiumPublicPreview> {
+    if (this.mock) return of({ finalCount: 6, missingCount: 5 });
+    return this.http.get<GremiumPublicPreview>(`${this.base}/admin/gremien/${id}/public-preview`, {
+      context: skipLoading(),
+    });
   }
 
   /** GET /admin/gremien/{id}/mail-recipients — extra protocol recipients. */

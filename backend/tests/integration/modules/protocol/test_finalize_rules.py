@@ -53,7 +53,11 @@ async def test_finalize_only_after_the_close_and_only_once(
     ]
     assert len(entries) == 1
     assert entries[0].actor == ADMIN_SUB
-    assert entries[0].data == {"meetingId": str(s.meeting_id), "gremiumId": str(s.gremium_id)}
+    assert entries[0].data == {
+        "meetingId": str(s.meeting_id),
+        "gremiumId": str(s.gremium_id),
+        "publicWithheld": False,
+    }
 
 
 async def test_planned_meeting_cannot_finalize(

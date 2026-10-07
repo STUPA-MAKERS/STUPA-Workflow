@@ -136,6 +136,8 @@ class GremiumOut(_CamelModel):
     quorum_percent: int | None = Field(
         default=None, serialization_alias="quorumPercent"
     )
+    # The final protocols of the gremium appear on the public protocols page.
+    protocols_public: bool = Field(default=False, serialization_alias="protocolsPublic")
 
 
 class GremiumAdminOut(GremiumOut):
@@ -165,6 +167,7 @@ class GremiumCreate(_CamelModel):
     quorum_percent: int | None = Field(
         default=None, alias="quorumPercent", ge=0, le=100
     )
+    protocols_public: bool = Field(default=False, alias="protocolsPublic")
 
 
 class GremiumUpdate(_CamelModel):
@@ -183,6 +186,19 @@ class GremiumUpdate(_CamelModel):
     quorum_percent: int | None = Field(
         default=None, alias="quorumPercent", ge=0, le=100
     )
+    protocols_public: bool | None = Field(default=None, alias="protocolsPublic")
+
+
+class GremiumPublicPreview(_CamelModel):
+    """The counts for the confirm dialog before the protocols of a gremium go public.
+
+    ``finalCount`` is the number of final protocols that are not held back.
+    ``missingCount`` is the part of them without a public version yet. The
+    backfill job builds those after the save, and they appear only then.
+    """
+
+    final_count: int = Field(serialization_alias="finalCount")
+    missing_count: int = Field(serialization_alias="missingCount")
 
 
 class GremiumMailRecipients(_CamelModel):

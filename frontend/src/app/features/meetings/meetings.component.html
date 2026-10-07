@@ -193,6 +193,15 @@
   (saved)="dialogs.settingsSaved($event)"
 />
 
+<app-finalize-protocol-dialog
+  [open]="finalizeDialogOpen()"
+  [meetingTitle]="meeting()?.title ?? ''"
+  [finalizing]="finalizing()"
+  [initialWithheld]="protocol()?.publicWithheld ?? false"
+  (closed)="finalizeDialogOpen.set(false)"
+  (confirmed)="confirmFinalize($event)"
+/>
+
 <app-delete-meeting-dialog
   [meeting]="dialogs.deleteMeeting()"
   (closed)="dialogs.cancelDelete()"

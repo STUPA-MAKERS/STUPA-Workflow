@@ -1,10 +1,31 @@
 <app-dialog
   size="lg"
   [open]="open()"
-  [title]="(isNew() ? 'admin.gremien.create' : 'admin.gremien.edit') | t"
+  [title]="(confirmPublic() ? 'admin.gremien.publicConfirm.title' : isNew() ? 'admin.gremien.create' : 'admin.gremien.edit') | t"
   [closeLabel]="'action.cancel' | t"
   (closed)="close()"
 >
+  @if (confirmPublic()) {
+    <!-- The question before the switch to "public" is saved, in the same dialog. -->
+    <div class="gd gd--confirm" aria-live="polite">
+      @if (previewLoading()) {
+        <p class="gd__text">{{ 'admin.gremien.publicConfirm.loading' | t }}</p>
+      } @else if (preview(); as pv) {
+        <p class="gd__text">
+          {{ 'admin.gremien.publicConfirm.count' | t: { n: pv.finalCount, name: gremium()?.name ?? '' } }}
+        </p>
+        @if (pv.missingCount > 0) {
+          <div class="gd__box gd__box--row">
+            <app-icon name="file" [size]="16" />
+            <span>{{ 'admin.gremien.publicConfirm.missing' | t: { n: pv.missingCount } }}</span>
+          </div>
+        }
+      } @else {
+        <p class="gd__text">{{ 'admin.gremien.publicConfirm.generic' | t: { name: gremium()?.name ?? '' } }}</p>
+      }
+      <p class="gd__hint">{{ 'admin.gremien.publicConfirm.nonPublicHint' | t }}</p>
+    </div>
+  } @else {
   <form class="gd" (submit)="$event.preventDefault(); submit()">
     <div class="gd__cols">
       <div class="gd__col">
@@ -99,12 +120,55 @@
       <p class="gd__hint" id="gd-mail-hint">{{ 'admin.gremien.mailRecipientsHint' | t }}</p>
     </div>
 
+    <!-- The public protocol page. Independent of the public participation (QR) of a
+         meeting: that one is set per meeting and makes nothing visible. -->
+    <div class="gd__public">
+      <app-switch
+        class="gd__switch"
+        name="protocolsPublic"
+        [hint]="'admin.gremien.publicHint' | t"
+        [ngModel]="form().protocolsPublic"
+        (ngModelChange)="patch('protocolsPublic', $event)"
+        >{{ 'admin.gremien.public' | t }}</app-switch
+      >
+      @if (form().protocolsPublic) {
+        <div class="gd__box">
+          <span class="gd__boxLabel">{{ 'admin.gremien.publicImplies.title' | t }}</span>
+          <ul class="gd__implies">
+            @for (item of implications; track item.key) {
+              <li>
+                <app-icon class="gd__impliesIcon" [name]="item.icon" [size]="16" />
+                <span>{{ item.key | t }}</span>
+              </li>
+            }
+          </ul>
+          <a class="gd__link" routerLink="/protokolle" target="_blank" rel="noopener">
+            {{ 'admin.gremien.publicView' | t }}
+            <app-icon name="ext" [size]="14" />
+          </a>
+        </div>
+      }
+      <p class="gd__hint gd__qr">
+        <app-icon name="info" [size]="16" />
+        <span>{{ 'admin.gremien.publicQrNote' | t }}</span>
+      </p>
+    </div>
+
     @if (error()) {
       <p class="gd__error" role="alert">{{ error() }}</p>
     }
     <button type="submit" hidden></button>
   </form>
+  }
 
+  @if (confirmPublic()) {
+    <div dialog-footer class="gd__foot">
+      <app-button variant="text" (click)="backFromConfirm()">{{ 'action.cancel' | t }}</app-button>
+      <app-button variant="fill" [disabled]="previewLoading()" [loading]="saving()" (click)="confirmAndSave()">{{
+        'admin.gremien.publicConfirm.confirm' | t
+      }}</app-button>
+    </div>
+  } @else {
   <div dialog-footer class="gd__foot">
     <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
     <app-button
@@ -115,4 +179,5 @@
       >{{ (isNew() ? 'admin.gremien.add' : 'action.save') | t }}</app-button
     >
   </div>
+  }
 </app-dialog>

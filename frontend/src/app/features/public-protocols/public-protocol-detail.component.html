@@ -1,0 +1,175 @@
+<section class="pd">
+  @if (loading()) {
+    <app-skeleton variant="rows" [count]="5" [label]="'publicProtocols.loading' | t" />
+  } @else if (notFound()) {
+    <app-empty-state
+      icon="archive"
+      code="404"
+      [heading]="'publicProtocols.detail.notFound' | t"
+      [body]="'publicProtocols.detail.notFoundBody' | t"
+    >
+      <a class="pd__btn pd__btn--tonal" routerLink="/protokolle">
+        <app-icon name="back" [size]="16" />
+        {{ 'publicProtocols.detail.back' | t }}
+      </a>
+    </app-empty-state>
+  } @else if (error()) {
+    <app-note kind="error" icon="alert" role="alert">{{ 'publicProtocols.error' | t }}</app-note>
+  } @else if (protocol(); as p) {
+    <nav class="pd__crumbs" [attr.aria-label]="'publicProtocols.crumbs' | t">
+      <a routerLink="/">{{ 'publicProtocols.crumbHome' | t }}</a>
+      <app-icon name="right" [size]="13" />
+      <a routerLink="/protokolle">{{ 'publicProtocols.title' | t }}</a>
+      <app-icon name="right" [size]="13" />
+      <span class="ell" aria-current="page" [title]="p.title">{{ p.title }}</span>
+    </nav>
+
+    <header class="pd__head">
+      <div class="pd__titles">
+        <span class="cap pd__gremium">{{ p.gremium.name }}</span>
+        <h1 class="pd__title">{{ p.title }}</h1>
+        <p class="pd__dates">
+          <span>{{ 'publicProtocols.detail.meetingOn' | t: { date: when(p) } }}</span>
+          @if (finalized(p)) {
+            <span>{{ 'publicProtocols.detail.finalizedOn' | t: { date: finalized(p) } }}</span>
+          }
+        </p>
+      </div>
+      @if (p.hasPdf) {
+        <a class="pd__btn pd__btn--fill" [href]="pdfUrl(p)" download>
+          <app-icon name="download" [size]="17" />
+          {{ 'publicProtocols.pdf' | t }}
+        </a>
+      }
+    </header>
+
+    <div class="pd__cols">
+      <div class="pd__main">
+        <h2 class="pd__h2">{{ 'publicProtocols.detail.agenda' | t }}</h2>
+        @if (p.tops.length === 0) {
+          <div class="pd__free">
+            @if (p.markdown) {
+              <app-markdown-view [src]="p.markdown" />
+            } @else {
+              <p class="pd__muted">{{ 'publicProtocols.detail.noText' | t }}</p>
+            }
+          </div>
+        } @else {
+          <ol class="pd__tops">
+            @for (top of p.tops; track top.number) {
+              @if (top.nonPublic || !top.title) {
+                <li class="pd__top pd__top--np">
+                  <span class="pd__no pd__no--np" aria-hidden="true">{{ top.number }}</span>
+                  <div class="pd__topBody">
+                    <h3 class="pd__topTitle">
+                      <span class="sr-only">{{ 'publicProtocols.detail.top' | t: { n: top.number } }}</span>
+                      {{ 'publicProtocols.top.nonPublic' | t }}
+                    </h3>
+                    <span class="pd__npNote">
+                      <app-icon name="lock" [size]="14" />
+                      {{ 'publicProtocols.top.nonPublicNote' | t }}
+                    </span>
+                  </div>
+                </li>
+              } @else {
+                <li class="pd__top">
+                  <span class="pd__no" aria-hidden="true">{{ top.number }}</span>
+                  <div class="pd__topBody">
+                    <h3 class="pd__topTitle">
+                      <span class="sr-only">{{ 'publicProtocols.detail.top' | t: { n: top.number } }}</span>
+                      {{ top.title }}
+                    </h3>
+                    @if (top.markdown) {
+                      <app-markdown-view class="pd__md" [src]="top.markdown" />
+                    }
+                    @for (d of top.decisions; track $index) {
+                      @if (!d.inText) {
+                      <figure class="pd__decision" [attr.aria-label]="'publicProtocols.decision.label' | t">
+                        <div class="pd__decHead">
+                          <app-icon name="vote" [size]="16" />
+                          <span class="cap">{{ 'publicProtocols.decision.label' | t }}</span>
+                        </div>
+                        @if (d.question) {
+                          <p class="pd__question">{{ d.question }}</p>
+                        }
+                        <div class="pd__tally">
+                          @for (c of counts(d); track c.label) {
+                            <span class="pd__cell">
+                              <span class="pd__cellLabel">{{ c.label }}</span>
+                              <span class="pd__cellNo mono">{{ c.count }}</span>
+                            </span>
+                          }
+                          @if (resultKey(d); as rk) {
+                            <span class="pd__cell pd__cell--result">
+                              <span class="pd__cellLabel">{{ 'publicProtocols.decision.result' | t }}</span>
+                              <span class="pd__res" [class.pd__res--no]="d.result !== 'passed'">{{ rk | t }}</span>
+                            </span>
+                          }
+                        </div>
+                        <p class="pd__rule">{{ ruleLine(d) }}</p>
+                      </figure>
+                      }
+                    }
+                    @if (!top.markdown && top.decisions.length === 0) {
+                      <p class="pd__muted">{{ 'publicProtocols.detail.noTopText' | t }}</p>
+                    }
+                  </div>
+                </li>
+              }
+            }
+          </ol>
+        }
+      </div>
+
+      <aside class="pd__aside">
+        <section class="pd__box">
+          <h2 class="pd__h3">{{ 'publicProtocols.attendance.title' | t }}</h2>
+          <div class="pd__att">
+            <div class="pd__attCell">
+              <span class="pd__cellLabel">{{ 'publicProtocols.attendance.present' | t }}</span>
+              <span class="pd__attNo mono">{{ p.attendance.present }}</span>
+            </div>
+            <div class="pd__attCell">
+              <span class="pd__cellLabel">{{ 'publicProtocols.attendance.excused' | t }}</span>
+              <span class="pd__attNo mono">{{ p.attendance.excused }}</span>
+            </div>
+            <div class="pd__attCell">
+              <span class="pd__cellLabel">{{ 'publicProtocols.attendance.absent' | t }}</span>
+              <span class="pd__attNo mono">{{ p.attendance.absent }}</span>
+            </div>
+            @if (p.attendance.guests > 0) {
+              <div class="pd__attCell">
+                <span class="pd__cellLabel">{{ 'publicProtocols.attendance.guests' | t }}</span>
+                <span class="pd__attNo mono">{{ p.attendance.guests }}</span>
+              </div>
+            }
+          </div>
+          <p class="pd__muted">{{ 'publicProtocols.attendance.noNames' | t }}</p>
+        </section>
+        <section class="pd__box">
+          <h2 class="pd__h3">{{ 'publicProtocols.version.title' | t }}</h2>
+          <ul class="pd__facts">
+            <li>{{ 'publicProtocols.version.samePdf' | t }}</li>
+            <li>{{ 'publicProtocols.version.nonPublic' | t }}</li>
+            <li>{{ 'publicProtocols.version.internal' | t }}</li>
+          </ul>
+        </section>
+        <section class="pd__box pd__box--pdf">
+          @if (p.hasPdf) {
+            <a class="pd__btn" [href]="pdfUrl(p)" download>
+              <app-icon name="download" [size]="16" />
+              {{ 'publicProtocols.pdf' | t }}
+            </a>
+            @if (pdfSize(p)) {
+              <span class="pd__muted">PDF · {{ pdfSize(p) }}</span>
+            }
+          }
+          <a class="pd__more" routerLink="/protokolle" [queryParams]="{ gremium: p.gremium.id }">
+            {{ 'publicProtocols.detail.allOf' | t: { name: p.gremium.name } }}
+            <app-icon name="arrow" [size]="14" />
+          </a>
+        </section>
+      </aside>
+    </div>
+  }
+</section>

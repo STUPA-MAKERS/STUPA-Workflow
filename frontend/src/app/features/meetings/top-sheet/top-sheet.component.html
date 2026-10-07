@@ -88,6 +88,11 @@
       </div>
       <div class="ts__rule"></div>
       }
+      <!-- The gremium publishes its final protocols: the text of a public item goes on
+           the public protocol page. -->
+      @if (!proto.isLocked && proto.gremiumProtocolsPublic && editable() && !t.nonPublic) {
+        <app-note class="ts__public" icon="globe">{{ 'meetings.protocol.publicNotice' | t }}</app-note>
+      }
       <app-markdown-editor
         #ed
         class="ts__editor"

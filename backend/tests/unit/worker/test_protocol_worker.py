@@ -98,3 +98,60 @@ async def test_render_protocol_already_final_is_noop() -> None:
     ctx = _ctx(session, typst=typst, storage=FakeStorage())
     assert await render_protocol(ctx, str(PID)) == "final"
     assert typst.calls == []
+
+
+async def test_backfill_job_reports_and_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.modules.protocol.service import BackfillResult, ProtocolService
+    from worker.protocol import backfill_public_protocols
+
+    outcome = BackfillResult(done=2)
+
+    async def _backfill(self: ProtocolService, gremium_id: object) -> BackfillResult:
+        return outcome
+
+    monkeypatch.setattr(ProtocolService, "backfill_public", _backfill)
+    ctx = _ctx(FakeSession(), typst=FakeTypst(), storage=FakeStorage())
+    gid = str(uuid4())
+    assert await backfill_public_protocols(ctx, gid) == "done=2 transient=0 failed=0"
+
+    outcome = BackfillResult(done=1, transient=1)
+    with pytest.raises(Retry):
+        await backfill_public_protocols(ctx, gid)
+    # The last try gives up and reports.
+    ctx = _ctx(FakeSession(), typst=FakeTypst(), storage=FakeStorage(), job_try=3)
+    assert await backfill_public_protocols(ctx, gid) == "done=1 transient=1 failed=0"
+
+
+async def test_heal_job_runs_the_backfill_per_gremium(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.modules.protocol.service import BackfillResult, ProtocolService
+    from worker.protocol import heal_public_protocols
+
+    g1, g2 = uuid4(), uuid4()
+    seen: list[object] = []
+
+    g3 = uuid4()
+
+    async def _backfill(
+        self: ProtocolService, gremium_id: object, *, retry_failed: bool = True
+    ) -> BackfillResult:
+        assert retry_failed is False
+        seen.append(gremium_id)
+        if gremium_id == g3:
+            raise RuntimeError("db hiccup")
+        return BackfillResult(done=1) if gremium_id == g1 else BackfillResult(failed=1)
+
+    async def _three(self: ProtocolService) -> list[object]:
+        return [g1, g3, g2]
+
+    monkeypatch.setattr(ProtocolService, "gremien_missing_public", _three)
+    monkeypatch.setattr(ProtocolService, "backfill_public", _backfill)
+    ctx = _ctx(FakeSession(), typst=FakeTypst(), storage=FakeStorage())
+    # One failing gremium does not stop the loop.
+    assert await heal_public_protocols(ctx) == "gremien=3 done=1 failed=2"
+    assert seen == [g1, g3, g2]
+
+    async def _none(self: ProtocolService) -> list[object]:
+        return []
+
+    monkeypatch.setattr(ProtocolService, "gremien_missing_public", _none)
+    assert await heal_public_protocols(ctx) == "gremien=0 done=0 failed=0"

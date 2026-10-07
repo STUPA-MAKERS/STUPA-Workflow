@@ -1227,6 +1227,10 @@ export interface ProtocolOutWire {
   /** Redacted public variant. It exists only if an agenda item is non-public. */
   publicPdfUrl?: string | null;
   sentAt?: IsoDateTime | null;
+  /** The protocol is held back from the public protocol page. */
+  publicWithheld?: boolean;
+  /** The gremium publishes its final protocols on the public protocol page. */
+  gremiumProtocolsPublic?: boolean;
 }
 
 /** Body for `POST /meetings` (`MeetingCreate`). */
@@ -1426,6 +1430,10 @@ export interface Protocol {
   /** Redacted public variant for non-public agenda items. Otherwise null. */
   publicPdfUrl: string | null;
   sentAt: IsoDateTime | null;
+  /** Held back from the public protocol page (only matters for a public gremium). */
+  publicWithheld?: boolean;
+  /** The gremium publishes its final protocols on the public protocol page. */
+  gremiumProtocolsPublic?: boolean;
 }
 
 // Notification preferences. The account popout offers them as self service.

@@ -2,6 +2,8 @@ import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { Meeting, Protocol } from '@core/api/models';
 import { meeting, protocol } from '../../../../testing/meeting-fixtures';
+import { signal } from '@angular/core';
+import { MeetingSessionService } from '../meeting-session.service';
 import { ProtocolBarComponent } from './protocol-bar.component';
 
 async function setup(m: Meeting, p: Protocol, finalizing = false) {
@@ -60,5 +62,50 @@ describe('ProtocolBarComponent', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Final · Das Protokoll ist final.');
     expect(screen.getByRole('link', { name: 'PDF' })).toHaveAttribute('href', '/p.pdf');
     expect(screen.queryByRole('link', { name: 'PDF öffentlich' })).toBeNull();
+  });
+
+  describe('public gremium', () => {
+    const final = (over: Partial<Protocol> = {}) =>
+      protocol({ status: 'final', isFinal: true, isLocked: true, gremiumProtocolsPublic: true, ...over });
+
+    async function withSession(m: Meeting, p: Protocol) {
+      const session = { publicationSaving: signal(false), setPublicWithheld: jest.fn() };
+      await render(ProtocolBarComponent, {
+        inputs: { meeting: m, protocol: p },
+        providers: [{ provide: MeetingSessionService, useValue: session }],
+      });
+      return session;
+    }
+
+    it('says that a final protocol is public and offers to hold it back', async () => {
+      const session = await withSession(closed(), final());
+      expect(screen.getByRole('status')).toHaveTextContent('Öffentlich unter „Öffentliche Protokolle“.');
+      await userEvent.click(screen.getByRole('button', { name: 'Nicht veröffentlichen' }));
+      expect(session.setPublicWithheld).toHaveBeenCalledWith(true);
+    });
+
+    it('publishes a held-back protocol again', async () => {
+      const session = await withSession(closed(), final({ publicWithheld: true }));
+      expect(screen.getByRole('status')).toHaveTextContent('Nicht veröffentlicht.');
+      await userEvent.click(screen.getByRole('button', { name: 'Veröffentlichen' }));
+      expect(session.setPublicWithheld).toHaveBeenCalledWith(false);
+    });
+
+    it('offers no switch without the right, and nothing for a private gremium', async () => {
+      await withSession(closed({ canFinalize: false }), final());
+      expect(screen.queryByRole('button', { name: 'Nicht veröffentlichen' })).toBeNull();
+      expect(screen.getByRole('status')).toHaveTextContent('Öffentlich');
+    });
+
+    it('shows no publication line for a gremium without the public page', async () => {
+      await setup(closed(), final({ gremiumProtocolsPublic: false }));
+      expect(screen.queryByText(/Öffentlich unter/)).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Nicht veröffentlichen' })).toBeNull();
+    });
+
+    it('offers no switch outside the meeting page (no session)', async () => {
+      await setup(closed(), final());
+      expect(screen.queryByRole('button', { name: 'Nicht veröffentlichen' })).toBeNull();
+    });
   });
 });

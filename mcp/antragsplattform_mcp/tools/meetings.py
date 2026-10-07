@@ -432,14 +432,28 @@ async def get_or_create_protocol(meeting_id: str) -> dict:
 
 
 @group.tool
-async def update_protocol(protocol_id: str, markdown: str) -> dict:
-    """Update the markdown body of a protocol.
+async def update_protocol(
+    protocol_id: str,
+    markdown: str | None = None,
+    public_withheld: bool | None = None,
+) -> dict:
+    """Update the markdown body of a protocol, or hold it back from the public page.
 
-    The call gives a 409 while the protocol is final or rendering.
-    Requires write access to the meeting: session.manage
-    or protocol.write in its gremium, the assigned minute-taker, or admin.
+    Send at least one of the two. `markdown` gives a 409 while the protocol is final
+    or rendering, and requires write access to the meeting: session.manage or
+    protocol.write in its gremium, the assigned minute-taker, or admin.
+
+    `public_withheld=True` holds back this protocol from the public protocols page of
+    a public Gremium; `False` releases it. It works also on a final protocol, needs
+    the gremium permission protocol.finalize (or admin), and goes into the audit log
+    (`protocol_publication`).
     """
-    return await api().patch(f"/protocols/{protocol_id}", json={"markdown": markdown})
+    body: dict[str, object] = {}
+    if markdown is not None:
+        body["markdown"] = markdown
+    if public_withheld is not None:
+        body["publicWithheld"] = public_withheld
+    return await api().patch(f"/protocols/{protocol_id}", json=body)
 
 
 @group.tool
@@ -456,7 +470,7 @@ async def embed_protocol_votes(protocol_id: str, vote_ids: list[str]) -> dict:
 
 
 @group.tool
-async def finalize_protocol(protocol_id: str) -> dict:
+async def finalize_protocol(protocol_id: str, public_withheld: bool | None = None) -> dict:
     """Finalize the protocol.
 
     Only after the meeting is CLOSED (409 `meeting_not_closed` before), and only
@@ -468,8 +482,15 @@ async def finalize_protocol(protocol_id: str) -> dict:
     content and finalize again. Requires the write access to the meeting AND the
     gremium permission protocol.finalize in its gremium (or admin). The start goes
     into the audit log (`protocol_finalize`).
+
+    In a Gremium that publishes its protocols, the final protocol appears on the
+    public protocols page (public TOPs only, attendance as counts). Pass
+    `public_withheld=True` to hold it back or `False` to release it; leave it out to
+    keep the stored value (a draft held back with `update_protocol` stays held back).
+    `update_protocol` can change it later.
     """
-    return await api().post(f"/protocols/{protocol_id}/finalize")
+    body = {} if public_withheld is None else {"publicWithheld": public_withheld}
+    return await api().post(f"/protocols/{protocol_id}/finalize", json=body)
 
 
 @group.tool

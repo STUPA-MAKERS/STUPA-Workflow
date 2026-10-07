@@ -98,6 +98,8 @@ export const AUDIT_ACTIONS = [
   'comment_delete',
   'protocol_delete',
   'protocol_finalize',
+  // A protocol held back from the public protocol page, or published again.
+  'protocol_publication',
   'vote_delete',
   // Vote lifecycle (F12). vote_branch_blocked marks an application that a person must move.
   'vote_open',
