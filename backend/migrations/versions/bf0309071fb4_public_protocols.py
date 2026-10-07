@@ -21,7 +21,7 @@ already gets the columns from the `create_all` baseline (0001).
 The downgrade drops the columns.
 
 Revision ID: bf0309071fb4
-Revises: ed7ea60b3551
+Revises: 6be7f4ffbaa2
 Create Date: 2026-10-07 12:29:08.261685
 """
 
@@ -32,7 +32,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "bf0309071fb4"
-down_revision: str | None = "ed7ea60b3551"
+down_revision: str | None = "6be7f4ffbaa2"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

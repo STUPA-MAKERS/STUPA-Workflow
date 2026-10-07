@@ -292,20 +292,24 @@ async def test_backfill_counts_each_outcome(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 async def test_count_render_failure_warns_once_at_the_limit(
-    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from app.modules.protocol.service import PUBLIC_RENDER_MAX_FAILURES
 
+    # A spy on the logger, not caplog: other suites reconfigure the log handlers.
+    warnings: list[object] = []
+    monkeypatch.setattr(
+        protocol_service_mod.logger, "warning", lambda *a, **_kw: warnings.append(a)
+    )
     proto = _protocol(public_render_failures=PUBLIC_RENDER_MAX_FAILURES - 2)
     session = FakeSession(store={PID: proto})
     svc = _service(session)
-    with caplog.at_level("WARNING", logger="app.protocol"):
-        await svc._count_render_failure(PID)
-        assert not caplog.records
-        await svc._count_render_failure(PID)
-        assert len(caplog.records) == 1
-        await svc._count_render_failure(PID)
-        assert len(caplog.records) == 1
+    await svc._count_render_failure(PID)
+    assert not warnings
+    await svc._count_render_failure(PID)
+    assert len(warnings) == 1
+    await svc._count_render_failure(PID)
+    assert len(warnings) == 1
     assert proto.public_render_failures == PUBLIC_RENDER_MAX_FAILURES + 1
     assert session.committed == 3
     # A missing protocol is a no-op.
