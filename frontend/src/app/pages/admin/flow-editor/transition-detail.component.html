@@ -36,14 +36,76 @@
               />
             }
             @case ('addToNextSession') {
+              <!-- The gremium is optional: empty takes the gremium of the vote. -->
               <app-select
                 [label]="'admin.flow.cfgGremium' | t"
-                [placeholder]="'admin.flow.cfgGremiumPh' | t"
+                [placeholder]="'admin.flow.actSessionGremiumPh' | t"
                 [options]="gremiumOptions()"
                 [ngModel]="actionParam(act, 'gremiumId')"
                 (ngModelChange)="actionParamChange.emit({ ai, key: 'gremiumId', value: $event })"
               />
+              <p class="ins__hint">{{ 'admin.flow.actSessionGremiumHint' | t }}</p>
               <p class="ins__hint">{{ 'admin.flow.actSessionHint' | t }}</p>
+            }
+            @case ('assignBudgetFromApplicantGremium') {
+              <app-cost-centre-picker
+                [label]="'admin.flow.actSubtree' | t"
+                [placeholder]="'admin.flow.actSubtreeAll' | t"
+                [allLabel]="'admin.flow.actSubtreeAll' | t"
+                [unknownLabel]="'admin.flow.ccUnknown' | t"
+                [emptyLabel]="'admin.flow.ccEmpty' | t"
+                [nodes]="budgetTree()"
+                [value]="actionParam(act, 'parentId')"
+                (picked)="actionParamChange.emit({ ai, key: 'parentId', value: $event })"
+              />
+              <p class="ins__hint">{{ 'admin.flow.actApplicantGremiumHint' | t }}</p>
+            }
+            @case ('assignBudgetFromMap') {
+              <app-input
+                class="ins__mono"
+                [label]="'admin.flow.actBudgetField' | t"
+                [placeholder]="'admin.flow.actBudgetFieldPh' | t"
+                [ngModel]="actionParam(act, 'field')"
+                (ngModelChange)="actionParamChange.emit({ ai, key: 'field', value: $event })"
+              />
+              <span class="td__sub">{{ 'admin.flow.actMapRows' | t }}</span>
+              @for (row of mapRows(act); track $index; let mi = $index) {
+                <div class="td__mapRow">
+                  <app-input
+                    class="td__mapValue"
+                    [label]="'admin.flow.actMapValue' | t"
+                    [ngModel]="row.value"
+                    (ngModelChange)="setMapValue(ai, act, mi, $event)"
+                  />
+                  <app-cost-centre-picker
+                    class="td__mapBudget"
+                    [label]="'admin.flow.actMapBudget' | t"
+                    [placeholder]="'admin.flow.ccPick' | t"
+                    [unknownLabel]="'admin.flow.ccUnknown' | t"
+                    [emptyLabel]="'admin.flow.ccEmpty' | t"
+                    [nodes]="budgetTree()"
+                    [value]="row.budgetId"
+                    (picked)="setMapBudget(ai, act, mi, $event)"
+                  />
+                  <app-button
+                    class="td__mapRemove"
+                    variant="text"
+                    size="sm"
+                    [iconOnly]="true"
+                    [ariaLabel]="'admin.flow.actMapRemove' | t"
+                    [title]="'admin.flow.actMapRemove' | t"
+                    (click)="removeMapRow(ai, act, mi)"
+                  >
+                    <app-icon name="trash" />
+                  </app-button>
+                </div>
+              } @empty {
+                <p class="ins__hint">{{ 'admin.flow.actMapEmpty' | t }}</p>
+              }
+              <app-button class="td__inlineAdd" variant="text" size="sm" [disabled]="hasBlankMapRow(act)" (click)="addMapRow(ai, act)">
+                <app-icon name="plus" [size]="15" /> {{ 'admin.flow.actMapAdd' | t }}
+              </app-button>
+              <p class="ins__hint">{{ 'admin.flow.actMapHint' | t }}</p>
             }
             @case ('assignBudget') {
               <app-input

@@ -322,6 +322,54 @@ describe('BrandingEditorComponent', () => {
     expect(c.freetext(d, 'welcome')).toBe(d.freetexts.welcome);
   });
 
+  describe('texts after the submission', () => {
+    it('shows both fields with the built-in text as placeholder and preview', async () => {
+      const { fixture } = await setupWithStub({});
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(screen.getByRole('heading', { name: 'Texte nach dem Einreichen' })).toBeInTheDocument();
+      const internal = screen.getByRole('textbox', { name: 'Intern – angemeldet mit Konto (DE)' });
+      expect(internal).toHaveAttribute('placeholder', expect.stringMatching(/^Vielen Dank! Dein Antrag ist eingereicht/));
+      expect(screen.getByRole('textbox', { name: 'Extern – Gast mit E-Mail-Bestätigung (DE)' })).toHaveAttribute(
+        'placeholder',
+        expect.stringMatching(/persönlichen Link/),
+      );
+      expect(screen.getByTestId('submitted-preview-external').textContent).toMatch(/persönlichen Link/);
+      expect(screen.getAllByText('Standardtext')).toHaveLength(2);
+    });
+
+    it('writes the Markdown of the picked language into the draft and previews it safely', async () => {
+      const { fixture, api } = await setupWithStub({});
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const internal = screen.getByRole('textbox', { name: 'Intern – angemeldet mit Konto (DE)' });
+      await userEvent.type(internal, 'Danke **sehr** <b>x</b>');
+      expect(screen.getByTestId('submitted-preview-internal').innerHTML).toContain('<strong>sehr</strong>');
+      expect(screen.getByTestId('submitted-preview-internal').querySelector('b')).toBeNull();
+      expect(screen.getAllByText('Standardtext')).toHaveLength(1);
+      await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
+      const en = screen.getByRole('textbox', { name: 'Intern – angemeldet mit Konto (EN)' });
+      expect(en).toHaveValue('');
+      expect(en).toHaveAttribute('placeholder', expect.stringMatching(/^Thank you\. Your application is submitted/));
+      await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+      const saved = api.saveBrandingDraft.mock.calls[0][0] as Branding;
+      expect(saved.freetexts.submittedInternal).toEqual({ de: 'Danke **sehr** <b>x</b>' });
+      expect(saved.freetexts.submittedExternal).toEqual({});
+    });
+
+    it('keeps a map that the config already has', async () => {
+      const { fixture } = await setup();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = fixture.componentInstance as any;
+      const d = c.draft();
+      d.freetexts.submittedExternal = { de: 'x' };
+      expect(c.submittedMap(d, 'external')).toBe(d.freetexts.submittedExternal);
+      expect(c.submittedIsDefault(d, 'external')).toBe(false);
+      delete d.freetexts.submittedInternal;
+      expect(c.submittedIsDefault(d, 'internal')).toBe(true);
+    });
+  });
+
   it('slotLabel localises the logo slot', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

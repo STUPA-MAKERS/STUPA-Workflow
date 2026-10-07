@@ -52,7 +52,8 @@ async def open_vote(vote_id: str) -> dict:
     """Open a vote for balloting.
 
     Requires the gremium permission `vote.manage` or `session.manage` in the gremium of
-    the vote (or admin).
+    the vote (or admin). A vote on an application in a vote state opens only when its
+    gremium decides that state (`voteGremiumId`), else 409 `vote_gremium_mismatch`.
     """
     return await api().post(f"/votes/{vote_id}/open")
 
@@ -110,8 +111,8 @@ async def create_meeting(meeting: S.MeetingCreate) -> dict:
 async def update_meeting(meeting_id: str, patch: S.MeetingPatch) -> dict:
     """Patch a meeting.
 
-    The fields are `status` (planned, live or closed), `date`, `startTime`,
-    `protokollantId` and `activeApplicationId`. Date, time and minute-taker need
+    The fields are `status` (planned, live or closed), `title`, `date`, `startTime`,
+    `protokollantId` and `activeApplicationId`. Title, date, time and minute-taker need
     session.manage in the meeting's gremium (or admin). Status and active application
     need write access (session.manage or protocol.write in the gremium, or the
     assigned minute-taker).
@@ -122,7 +123,7 @@ async def update_meeting(meeting_id: str, patch: S.MeetingPatch) -> dict:
     (`delete_meeting`), not closed. The start needs a minute-taker and sets
     `startedAt`. The close gives 409 `open_vote` while a vote of the meeting is open
     (close or cancel it first), and it cancels the draft votes. A closed meeting
-    keeps its date, time and minute-taker.
+    keeps its title, date, time and minute-taker.
 
     A new minute-taker needs protocol.write in the gremium (422
     `protokollant_needs_protocol_write`). While the meeting is live, a new
@@ -317,7 +318,9 @@ async def create_meeting_vote(meeting_id: str, vote: S.MeetingVoteOpenBody) -> d
 
     The agenda item can be a free-text item or an application item. The gremium of the
     meeting votes, and the server counts its eligible voters. Requires the lead of the
-    meeting, the minute-taker, or the gremium permission `vote.manage`.
+    meeting, the minute-taker, or the gremium permission `vote.manage`. An application
+    item needs the application in a vote state that the gremium of the meeting decides
+    (`voteGremiumId`), else 409 `vote_gremium_mismatch`.
 
     In a public meeting where guests vote, `guestsVote` (default on for a public item)
     lets the admitted guests vote too: such a vote has no quorum, the majority of the
@@ -429,14 +432,28 @@ async def get_or_create_protocol(meeting_id: str) -> dict:
 
 
 @group.tool
-async def update_protocol(protocol_id: str, markdown: str) -> dict:
-    """Update the markdown body of a protocol.
+async def update_protocol(
+    protocol_id: str,
+    markdown: str | None = None,
+    public_withheld: bool | None = None,
+) -> dict:
+    """Update the markdown body of a protocol, or hold it back from the public page.
 
-    The call gives a 409 while the protocol is final or rendering.
-    Requires write access to the meeting: session.manage
-    or protocol.write in its gremium, the assigned minute-taker, or admin.
+    Send at least one of the two. `markdown` gives a 409 while the protocol is final
+    or rendering, and requires write access to the meeting: session.manage or
+    protocol.write in its gremium, the assigned minute-taker, or admin.
+
+    `public_withheld=True` holds back this protocol from the public protocols page of
+    a public Gremium; `False` releases it. It works also on a final protocol, needs
+    the gremium permission protocol.finalize (or admin), and goes into the audit log
+    (`protocol_publication`).
     """
-    return await api().patch(f"/protocols/{protocol_id}", json={"markdown": markdown})
+    body: dict[str, object] = {}
+    if markdown is not None:
+        body["markdown"] = markdown
+    if public_withheld is not None:
+        body["publicWithheld"] = public_withheld
+    return await api().patch(f"/protocols/{protocol_id}", json=body)
 
 
 @group.tool
@@ -453,7 +470,7 @@ async def embed_protocol_votes(protocol_id: str, vote_ids: list[str]) -> dict:
 
 
 @group.tool
-async def finalize_protocol(protocol_id: str) -> dict:
+async def finalize_protocol(protocol_id: str, public_withheld: bool | None = None) -> dict:
     """Finalize the protocol.
 
     Only after the meeting is CLOSED (409 `meeting_not_closed` before), and only
@@ -465,8 +482,15 @@ async def finalize_protocol(protocol_id: str) -> dict:
     content and finalize again. Requires the write access to the meeting AND the
     gremium permission protocol.finalize in its gremium (or admin). The start goes
     into the audit log (`protocol_finalize`).
+
+    In a Gremium that publishes its protocols, the final protocol appears on the
+    public protocols page (public TOPs only, attendance as counts). Pass
+    `public_withheld=True` to hold it back or `False` to release it; leave it out to
+    keep the stored value (a draft held back with `update_protocol` stays held back).
+    `update_protocol` can change it later.
     """
-    return await api().post(f"/protocols/{protocol_id}/finalize")
+    body = {} if public_withheld is None else {"publicWithheld": public_withheld}
+    return await api().post(f"/protocols/{protocol_id}/finalize", json=body)
 
 
 @group.tool

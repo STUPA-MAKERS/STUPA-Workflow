@@ -1524,12 +1524,15 @@ def _agenda_item(
     )
 
 
-def _app_row(*, state_id: UUID | None, title: str | None = "App") -> Any:
+def _app_row(
+    *, state_id: UUID | None, title: str | None = "App", vote_gremium_id: UUID | None = None
+) -> Any:
     from types import SimpleNamespace
 
     return SimpleNamespace(
         id=uuid4(),
         current_state_id=state_id,
+        vote_gremium_id=vote_gremium_id,
         data={"title": title} if title else {},
         created_at=datetime(2026, 6, 8, tzinfo=UTC),
     )
@@ -1564,15 +1567,11 @@ async def test_agenda_item_found() -> None:
     assert await svc.item(uuid4(), item.id) is item
 
 
-async def test_vote_states_filters_by_gremium() -> None:
-    gid = uuid4()
-    s_match = _state_row(gremium_id=gid)
-    s_other = _state_row(gremium_id=uuid4())
-    s_nodict = _state_row(gremium_id=gid)
-    s_nodict.config = None
-    svc = AgendaService(_QueueSession(scalars_q=[[s_match, s_other, s_nodict]]))  # type: ignore[arg-type]
-    out = await svc._vote_states(gid)
-    assert list(out.keys()) == [s_match.id]
+async def test_state_labels() -> None:
+    sid = uuid4()
+    svc = AgendaService(_QueueSession(executes=[_Result([(sid, {"de": "B"})])]))  # type: ignore[arg-type]
+    assert await svc._state_labels({sid}) == {sid: {"de": "B"}}
+    assert await AgendaService(_QueueSession())._state_labels(set()) == {}  # type: ignore[arg-type]
 
 
 async def test_agenda_list_empty() -> None:
@@ -1796,47 +1795,31 @@ async def test_reorder_after_close_conflicts() -> None:
 
 async def test_assignable_no_vote_states() -> None:
     m = _meeting()
-    sess = _QueueSession(executes=[res(m)], scalars_q=[[]])  # _meeting, _vote_states empty
+    sess = _QueueSession(executes=[res(m)], scalars_q=[[], []])  # nothing on the agenda
     svc = AgendaService(sess)  # type: ignore[arg-type]
     assert await svc.assignable(m.id) == []
 
 
 async def test_assignable_filters_existing_and_maps() -> None:
+    """The candidates come from `vote_gremium_id` (the snapshot), not from the states."""
     m = _meeting()
     gid = m.gremium_id
     state = _state_row(gremium_id=gid)
-    app_in = _app_row(state_id=state.id, title="Neu")
-    app_existing = _app_row(state_id=state.id, title="Schon dran")
-    app_nostate = _app_row(state_id=None, title="Keiner")
-    app_nostate.current_state_id = None
+    app_in = _app_row(state_id=state.id, title="Neu", vote_gremium_id=gid)
+    app_existing = _app_row(state_id=state.id, title="Schon dran", vote_gremium_id=gid)
+    app_nostate = _app_row(state_id=None, title="Keiner", vote_gremium_id=gid)
     sess = _QueueSession(
-        executes=[
-            res(m),  # _meeting
-            res(app_existing.id),  # existing application_ids (scalars().all())
-        ],
+        executes=[res(m), _Result([(state.id, state.label_i18n)])],  # _meeting, labels
         scalars_q=[
-            [state],  # _vote_states
-            [app_existing.id],  # existing → set via scalars().all()
-            [app_in, app_existing, app_nostate],  # candidate apps
-        ],
-    )
-    # NOTE: existing uses session.scalars(...).all(). The assignable apps use scalars.
-    sess2 = _QueueSession(
-        executes=[res(m)],
-        scalars_q=[
-            [state],  # _vote_states
             [app_existing.id],  # existing application_ids
-            [app_in, app_existing, app_nostate],  # apps in vote-state
+            [app_in, app_existing, app_nostate],  # apps decided by the Gremium
         ],
     )
-    svc = AgendaService(sess2)  # type: ignore[arg-type]
-    out = await svc.assignable(m.id)
-    titles = [o.title for o in out]
-    assert "Neu" in titles
-    assert "Schon dran" not in titles  # already on the agenda
-    # app_nostate carries current_state_id None, which takes the state None branch.
-    assert "Keiner" in titles
-    _ = sess
+    out = await AgendaService(sess).assignable(m.id)  # type: ignore[arg-type]
+    by_title = {o.title: o for o in out}
+    assert by_title["Neu"].state_label == state.label_i18n
+    assert "Schon dran" not in by_title  # already on the agenda
+    assert by_title["Keiner"].state_label is None
 
 
 async def test_next_position_empty_and_existing() -> None:
@@ -1886,12 +1869,9 @@ async def test_add_application_not_found() -> None:
 
 async def test_add_application_not_in_vote_state() -> None:
     m = _meeting()
-    app = _app_row(state_id=uuid4())
-    sess = _QueueSession(
-        executes=[res(m)],
-        scalars_q=[[]],  # _vote_states is empty, so current_state_id misses and it conflicts
-        get_q=[app],
-    )
+    # The snapshot names another Gremium (or none), so it conflicts.
+    app = _app_row(state_id=uuid4(), vote_gremium_id=uuid4())
+    sess = _QueueSession(executes=[res(m)], get_q=[app])
     svc = AgendaService(sess)  # type: ignore[arg-type]
     with pytest.raises(ConflictError):
         await svc.add(m.id, application_id=app.id)
@@ -1901,7 +1881,7 @@ async def test_add_application_new(audit_calls: list[dict[str, Any]]) -> None:
     m = _meeting()
     gid = m.gremium_id
     state = _state_row(gremium_id=gid)
-    app = _app_row(state_id=state.id)
+    app = _app_row(state_id=state.id, vote_gremium_id=gid)
     sess = _QueueSession(
         executes=[
             res(m),  # _meeting
@@ -1910,7 +1890,6 @@ async def test_add_application_new(audit_calls: list[dict[str, Any]]) -> None:
             res(m),  # list()._meeting
         ],
         scalars_q=[
-            [state],  # _vote_states
             [],  # list() items
         ],
         get_q=[app],
@@ -1929,7 +1908,7 @@ async def test_add_application_already_present() -> None:
     m = _meeting()
     gid = m.gremium_id
     state = _state_row(gremium_id=gid)
-    app = _app_row(state_id=state.id)
+    app = _app_row(state_id=state.id, vote_gremium_id=gid)
     sess = _QueueSession(
         executes=[
             res(m),  # _meeting
@@ -1937,7 +1916,6 @@ async def test_add_application_already_present() -> None:
             res(m),  # list()._meeting
         ],
         scalars_q=[
-            [state],  # _vote_states
             [],  # list() items
         ],
         get_q=[app],
@@ -2278,6 +2256,10 @@ class _FakeMeetingService:
 
     async def application_state_kind(self, application_id: UUID) -> str | None:
         return "vote"
+
+    async def application_vote_gremium(self, application_id: UUID) -> UUID | None:
+        # The snapshot names the Gremium of the meeting unless a test overrides it.
+        return self._meeting_out.gremium_id
 
     async def gremium_quorum_percent(self, gremium_id: UUID) -> int | None:
         return None
@@ -2868,6 +2850,33 @@ def test_open_vote_application_not_in_vote_state_conflict(
         f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())}
     )
     assert r.status_code == 409
+
+
+def test_open_vote_stale_agenda_item_of_another_gremium_conflict(
+    app: FastAPI, client: TestClient, fakes
+) -> None:
+    """A meeting of a Gremium that does not decide the vote state cannot vote (409)."""
+    from types import SimpleNamespace
+
+    fakes["agenda"].item_row = SimpleNamespace(id=uuid4(), application_id=uuid4())
+    fakes["meeting"]._meeting_out = _meeting_out(status="live", can_manage_votes=True)
+
+    async def _other(application_id: UUID) -> UUID | None:
+        return uuid4()
+
+    fakes["meeting"].application_vote_gremium = _other  # type: ignore[assignment]
+    _login(app)
+    r = client.post(
+        f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())}
+    )
+    assert r.status_code == 409
+    assert r.json()["code"] == "vote_gremium_mismatch"
+
+
+async def test_application_vote_gremium() -> None:
+    gid = uuid4()
+    svc = MeetingService(_QueueSession(scalar_q=[gid]))  # type: ignore[arg-type]
+    assert await svc.application_vote_gremium(uuid4()) == gid
 
 
 def test_open_vote_default_quorum_from_gremium(

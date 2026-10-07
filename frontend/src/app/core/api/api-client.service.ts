@@ -1030,10 +1030,24 @@ export class ApiClient {
       .pipe(map(mapProtocol));
   }
 
-  /** POST /protocols/{id}/finalize — →PDF (typst) → MinIO + MAIL_LIST. */
-  finalizeProtocol(protocolId: Uuid): Observable<Protocol> {
+  /** PATCH /protocols/{id} — hold a protocol back from the public page, or publish it
+   *  again (`publicWithheld`). It works on a final protocol too; it needs the right to
+   *  finalize in the gremium. */
+  setProtocolWithheld(protocolId: Uuid, publicWithheld: boolean): Observable<Protocol> {
     return this.http
-      .post<ProtocolOutWire>(`${this.base}/protocols/${protocolId}/finalize`, {})
+      .patch<ProtocolOutWire>(`${this.base}/protocols/${protocolId}`, { publicWithheld })
+      .pipe(map(mapProtocol));
+  }
+
+  /** POST /protocols/{id}/finalize — →PDF (typst) → MinIO + MAIL_LIST.
+   *  `publicWithheld` keeps the protocol of a public gremium off the public page. */
+  finalizeProtocol(
+    protocolId: Uuid,
+    opts: { publicWithheld?: boolean } = {},
+  ): Observable<Protocol> {
+    const body = opts.publicWithheld === undefined ? {} : { publicWithheld: opts.publicWithheld };
+    return this.http
+      .post<ProtocolOutWire>(`${this.base}/protocols/${protocolId}/finalize`, body)
       .pipe(map(mapProtocol));
   }
 

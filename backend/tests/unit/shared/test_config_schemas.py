@@ -468,3 +468,75 @@ def test_export_json_schemas_keys_and_deterministic() -> None:
     assert export_json_schemas() == schemas
     # The schema carries the camelCase aliases.
     assert "isPromoted" in schemas["FormFieldDef"]["properties"]
+
+
+# Flow variant B: a vote state takes its Gremium from the cost center.
+def test_vote_state_gremium_source_budget_ok() -> None:
+    g = _vote_graph_dict()
+    g["states"][1]["config"] = {"gremiumSource": "budget"}
+    g["transitions"][0]["actions"] = [{"type": "addToNextSession"}]
+    validate_flow_graph(FlowGraph.model_validate(g))  # no raise
+
+
+@pytest.mark.parametrize(
+    ("config", "match"),
+    [
+        ({"gremiumId": "g-1", "gremiumSource": "budget"}, "not both"),
+        ({"gremiumSource": "type"}, "must be 'budget'"),
+        ({"gremiumId": ""}, "requires config.gremiumId"),
+        ({"gremiumId": 5}, "requires config.gremiumId"),
+    ],
+)
+def test_vote_state_gremium_exactly_one(config: dict, match: str) -> None:
+    g = _vote_graph_dict()
+    g["states"][1]["config"] = config
+    with pytest.raises(FlowValidationError, match=match):
+        validate_flow_graph(FlowGraph.model_validate(g))
+
+
+def test_initial_vote_state_cannot_use_the_budget() -> None:
+    g = _vote_graph_dict()
+    g["states"][0]["isInitial"] = False
+    g["states"][1]["isInitial"] = True
+    g["states"][1]["config"] = {"gremiumSource": "budget"}
+    g["transitions"].append({"from": "voting", "to": "draft"})
+    with pytest.raises(FlowValidationError, match="initial state"):
+        validate_flow_graph(FlowGraph.model_validate(g))
+
+
+@pytest.mark.parametrize(
+    "action",
+    [
+        {"type": "assignBudget", "budgetId": "b-1"},
+        {"type": "assignBudgetFromField", "field": "f"},
+        {"type": "assignBudgetFromApplicantGremium"},
+        {"type": "assignBudgetFromMap", "field": "f", "map": {"a": "b-1"}},
+    ],
+)
+def test_assign_budget_into_a_budget_vote_state_rejected(action: dict) -> None:
+    g = _vote_graph_dict()
+    g["states"][1]["config"] = {"gremiumSource": "budget"}
+    g["transitions"][0]["actions"] = [action]
+    with pytest.raises(FlowValidationError, match="earlier transition"):
+        validate_flow_graph(FlowGraph.model_validate(g))
+    # Into a vote state with a fixed Gremium the action stays valid.
+    g["states"][1]["config"] = {"gremiumId": "g-1"}
+    validate_flow_graph(FlowGraph.model_validate(g))
+
+
+def test_add_to_next_session_with_gremium_into_a_budget_vote_state_rejected() -> None:
+    g = _vote_graph_dict()
+    g["states"][1]["config"] = {"gremiumSource": "budget"}
+    g["transitions"][0]["actions"] = [{"type": "addToNextSession", "gremiumId": "g-1"}]
+    with pytest.raises(FlowValidationError, match="must not name a gremiumId"):
+        validate_flow_graph(FlowGraph.model_validate(g))
+
+
+def test_vote_gremium_recipient_only_into_a_vote_state() -> None:
+    notify = {"type": "notify", "recipients": [{"kind": "voteGremium"}]}
+    g = _vote_graph_dict()
+    g["transitions"][0]["actions"] = [notify]  # draft -> voting: fine
+    validate_flow_graph(FlowGraph.model_validate(g))
+    g["transitions"][1]["actions"] = [notify]  # voting -> passed: the snapshot is gone
+    with pytest.raises(FlowValidationError, match="voteGremium"):
+        validate_flow_graph(FlowGraph.model_validate(g))

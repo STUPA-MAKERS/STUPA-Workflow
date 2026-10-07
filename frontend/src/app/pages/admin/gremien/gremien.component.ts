@@ -161,6 +161,7 @@ export class AdminGremienComponent {
             : t('admin.gremien.percent', { value: g.quorumPercent }),
       },
       { label: t('admin.gremien.delegation'), value: yesNo(g.allowVoteDelegation) },
+      { label: t('admin.gremien.publicShort'), value: yesNo(g.protocolsPublic) },
     ];
     if (g.allowVoteDelegation) {
       list.push(

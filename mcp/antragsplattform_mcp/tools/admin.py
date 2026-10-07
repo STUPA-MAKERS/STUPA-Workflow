@@ -37,7 +37,11 @@ async def update_gremium(gremium_id: str, patch: S.GremiumUpdate) -> dict:
 
 @group.tool
 async def delete_gremium(gremium_id: str) -> dict:
-    """Delete a Gremium. Requires admin.gremien."""
+    """Delete a Gremium. Requires admin.gremien.
+
+    409 `gremium_decides_vote` while the Gremium decides the running vote of an
+    application (`voteGremiumId`).
+    """
     return await api().delete(f"/admin/gremien/{gremium_id}")
 
 

@@ -29,6 +29,7 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
     setGremiumMailRecipients: jest.fn((_id: string, recipients: string[]) => of({ recipients })),
     createGremium: jest.fn((b: Partial<Gremium>) => of({ id: 'g-new', ...b })),
     updateGremium: jest.fn((id: string, b: Partial<Gremium>) => of({ ...STUPA, id, ...b })),
+    getGremiumPublicPreview: jest.fn(() => of({ finalCount: 6, missingCount: 5 })),
     ...over,
   };
 }
@@ -86,7 +87,8 @@ describe('GremiumDialogComponent', () => {
   it('has no switch to change a ballot after casting (O11)', async () => {
     await setup(STUPA);
     expect(screen.queryByText(/Stimme nach Abgabe/)).toBeNull();
-    expect(screen.getAllByRole('switch')).toHaveLength(2);
+    // Delegation, delegation to externals, and the public protocol page.
+    expect(screen.getAllByRole('switch')).toHaveLength(3);
   });
 
   it('saves every setting and then the recipients', async () => {
@@ -106,6 +108,7 @@ describe('GremiumDialogComponent', () => {
     await userEvent.click(save());
     expect(api.updateGremium).toHaveBeenCalledWith('g-1', {
       name: 'Studierendenparlament',
+      protocolsPublic: false,
       cdVariantId: 'cd-2',
       defaultLang: 'en',
       allowVoteDelegation: true,
@@ -137,6 +140,7 @@ describe('GremiumDialogComponent', () => {
     await userEvent.click(save());
     expect(api.createGremium).toHaveBeenCalledWith({
       name: 'Finanz Ausschuss',
+      protocolsPublic: false,
       slug: 'finanz-ausschuss',
       cdVariantId: null,
       defaultLang: 'de',
@@ -289,5 +293,86 @@ describe('GremiumDialogComponent', () => {
     expect(screen.getByText('—')).toBeInTheDocument();
     await userEvent.click(save());
     expect(api.createGremium).toHaveBeenCalledWith(expect.objectContaining({ slug: '§§' }));
+  });
+
+  describe('public protocol page', () => {
+    const publicSwitch = () =>
+      screen.getByRole('switch', { name: /Öffentlich \(Protokolle auf der öffentlichen Seite zeigen\)/ });
+
+    it('explains the switch only while it is on', async () => {
+      await setup(STUPA);
+      expect(publicSwitch()).toHaveAttribute('aria-checked', 'false');
+      expect(screen.queryByText('Was das bedeutet')).toBeNull();
+      // The note on the QR participation shows always.
+      expect(screen.getByText(/öffentliche Teilnahme \(QR\)/)).toBeInTheDocument();
+      await userEvent.click(publicSwitch());
+      expect(screen.getByText('Was das bedeutet')).toBeInTheDocument();
+      expect(screen.getByText(/Sitzungen selbst erscheinen nie öffentlich/)).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Öffentliche Seite ansehen/ })).toHaveAttribute(
+        'href',
+        '/protokolle',
+      );
+    });
+
+    it('asks before it publishes, with the counts, and saves on "Veröffentlichen"', async () => {
+      const { api, saved } = await setup(STUPA);
+      await userEvent.click(publicSwitch());
+      await userEvent.click(save());
+      expect(api.updateGremium).not.toHaveBeenCalled();
+      expect(api.getGremiumPublicPreview).toHaveBeenCalledWith('g-1');
+      expect(screen.getByRole('heading', { name: 'Protokolle veröffentlichen?' })).toBeInTheDocument();
+      expect(screen.getByText(/6 finalisierte Protokolle von Studierendenparlament/)).toBeInTheDocument();
+      expect(screen.getByText(/Für 5 davon gibt es noch keine öffentliche Fassung/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Veröffentlichen' }));
+      expect(api.updateGremium).toHaveBeenCalledWith(
+        'g-1',
+        expect.objectContaining({ protocolsPublic: true }),
+      );
+      await waitFor(() => expect(saved).toHaveBeenCalled());
+    });
+
+    it('omits the missing box when every protocol has its public version', async () => {
+      const api = makeApi({
+        getGremiumPublicPreview: jest.fn(() => of({ finalCount: 2, missingCount: 0 })),
+      });
+      await setup(STUPA, api);
+      await userEvent.click(publicSwitch());
+      await userEvent.click(save());
+      expect(screen.getByText(/2 finalisierte Protokolle/)).toBeInTheDocument();
+      expect(screen.queryByText(/noch keine öffentliche Fassung/)).toBeNull();
+    });
+
+    it('asks in general words when the counts fail, and goes back on "Abbrechen"', async () => {
+      const api = makeApi({ getGremiumPublicPreview: jest.fn(() => throwError(() => new Error('x'))) });
+      await setup(STUPA, api);
+      await userEvent.click(publicSwitch());
+      await userEvent.click(save());
+      expect(screen.getByText(/alle finalisierten Protokolle von Studierendenparlament/)).toBeInTheDocument();
+      const cancels = within(dialog()).getAllByRole('button', { name: 'Abbrechen' });
+      await userEvent.click(cancels[cancels.length - 1]);
+      expect(screen.getByRole('heading', { name: 'Gremium bearbeiten' })).toBeInTheDocument();
+      expect(api.updateGremium).not.toHaveBeenCalled();
+    });
+
+    it('saves at once when the gremium is public already, or when it goes private', async () => {
+      const { api } = await setup({ ...STUPA, protocolsPublic: true });
+      expect(publicSwitch()).toHaveAttribute('aria-checked', 'true');
+      await userEvent.click(publicSwitch());
+      await userEvent.click(save());
+      expect(api.getGremiumPublicPreview).not.toHaveBeenCalled();
+      expect(api.updateGremium).toHaveBeenCalledWith(
+        'g-1',
+        expect.objectContaining({ protocolsPublic: false }),
+      );
+    });
+
+    it('creates a public gremium without a question: it has no protocols yet', async () => {
+      const { api } = await setup(null);
+      await userEvent.type(screen.getByRole('textbox', { name: /Name/ }), 'Fachschaft');
+      await userEvent.click(publicSwitch());
+      await userEvent.click(save());
+      expect(api.getGremiumPublicPreview).not.toHaveBeenCalled();
+      expect(api.createGremium).toHaveBeenCalledWith(expect.objectContaining({ protocolsPublic: true }));
+    });
   });
 });

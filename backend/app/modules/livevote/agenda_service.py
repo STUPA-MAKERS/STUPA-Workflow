@@ -1,7 +1,8 @@
 """Agenda service that binds applications to a meeting.
 
-An application is assignable when its current state is a vote state
-(`kind=='vote'`) and `config.gremiumId` points at the Gremium of the meeting.
+An application is assignable when the Gremium of the meeting decides its current
+vote state: `application.vote_gremium_id`, the snapshot that the flow engine sets on
+entry into a vote state, is the Gremium of the meeting.
 The agenda keeps an explicit order (`position`). It is the source of the agenda
 items in the protocol.
 
@@ -151,17 +152,14 @@ class AgendaService:
             },
         )
 
-    async def _vote_states(self, gremium_id: UUID) -> dict[UUID, State]:
-        """Return the vote states whose `config.gremiumId` points at this Gremium."""
-        states = (
-            await self.session.scalars(select(State).where(State.kind == "vote"))
-        ).all()
-        out: dict[UUID, State] = {}
-        for s in states:
-            cfg = s.config if isinstance(s.config, dict) else {}
-            if cfg.get("gremiumId") == str(gremium_id):
-                out[s.id] = s
-        return out
+    async def _state_labels(self, state_ids: set[UUID]) -> dict[UUID, dict]:
+        """Return the label of each state, for the assignable list."""
+        if not state_ids:
+            return {}
+        rows = await self.session.execute(
+            select(State.id, State.label_i18n).where(State.id.in_(state_ids))
+        )
+        return {sid: label for sid, label in rows.all()}
 
     async def item(self, meeting_id: UUID, item_id: UUID) -> MeetingAgendaItem:
         """Load one agenda item of the meeting.
@@ -360,9 +358,6 @@ class AgendaService:
 
     async def assignable(self, meeting_id: UUID) -> list[AssignableApplicationOut]:
         meeting = await self._meeting(meeting_id)
-        vote_states = await self._vote_states(meeting.gremium_id)
-        if not vote_states:
-            return []
         existing = set(
             (
                 await self.session.scalars(
@@ -375,24 +370,26 @@ class AgendaService:
         apps = (
             await self.session.scalars(
                 select(Application)
-                .where(Application.current_state_id.in_(list(vote_states.keys())))
+                .where(Application.vote_gremium_id == meeting.gremium_id)
                 .order_by(Application.created_at.desc())
             )
         ).all()
+        labels = await self._state_labels(
+            {a.current_state_id for a in apps if a.current_state_id is not None}
+        )
         out: list[AssignableApplicationOut] = []
         for app in apps:
             if app.id in existing:
                 continue
-            state = (
-                vote_states.get(app.current_state_id)
-                if app.current_state_id is not None
-                else None
-            )
             out.append(
                 AssignableApplicationOut(
                     applicationId=app.id,
                     title=title_of(app.data),
-                    stateLabel=state.label_i18n if state is not None else None,
+                    stateLabel=(
+                        labels.get(app.current_state_id)
+                        if app.current_state_id is not None
+                        else None
+                    ),
                 )
             )
         return out
@@ -487,8 +484,7 @@ class AgendaService:
         )
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
-        vote_states = await self._vote_states(meeting.gremium_id)
-        if app.current_state_id not in vote_states:
+        if app.vote_gremium_id is None or app.vote_gremium_id != meeting.gremium_id:
             raise ConflictError(
                 "application is not in a voting state for this committee"
             )

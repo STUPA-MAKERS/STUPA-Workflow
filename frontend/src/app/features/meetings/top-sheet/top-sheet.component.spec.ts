@@ -169,6 +169,25 @@ describe('TopSheetComponent', () => {
     expect(card.querySelector('.mde__voteResult')?.textContent).toBe('Abgelehnt');
   });
 
+  it('reminds the minute-taker of a public gremium that the text goes public', async () => {
+    const notice = 'Dieses Protokoll wird öffentlich. Keine Namen Dritter im Freitext.';
+    const view = await setup({ protocol: protocol({ gremiumProtocolsPublic: true }) });
+    expect(screen.getByText(notice)).toBeInTheDocument();
+    // A non-public item never goes public, a reader writes nothing.
+    view.fixture.componentRef.setInput('top', { ...AGENDA[0], nonPublic: true });
+    view.fixture.detectChanges();
+    expect(screen.queryByText(notice)).toBeNull();
+    view.fixture.componentRef.setInput('top', AGENDA[0]);
+    view.fixture.componentRef.setInput('editable', false);
+    view.fixture.detectChanges();
+    expect(screen.queryByText(notice)).toBeNull();
+  });
+
+  it('shows no public notice for a gremium without the public page', async () => {
+    await setup();
+    expect(screen.queryByText(/Dieses Protokoll wird öffentlich/)).toBeNull();
+  });
+
   it('explains the empty states', async () => {
     const { fixture } = await setup({ top: null, topIndex: -1 });
     expect(screen.getByText('Noch kein TOP geöffnet')).toBeInTheDocument();

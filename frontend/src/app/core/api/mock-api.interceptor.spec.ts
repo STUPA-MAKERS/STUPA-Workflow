@@ -1659,6 +1659,29 @@ describe('mockApiInterceptor', () => {
     expect(none).toEqual({ hits: [], truncated: false, failed: [] });
   });
 
+  it('serves the public protocols from the lazy mock', async () => {
+    setup(true);
+    const http = TestBed.inject(HttpClient);
+    expect(await firstValueFrom(http.get<unknown[]>('/api/public/gremien'))).toHaveLength(1);
+    const page = await firstValueFrom(
+      http.get<{ total: number; items: { tops: object[] }[] }>('/api/public/protocols?limit=3'),
+    );
+    expect(page.total).toBe(2);
+    expect(page.items[0].tops[0]).not.toHaveProperty('markdown');
+    expect(await firstValueFrom(http.get('/api/public/protocols/semesters'))).toEqual([
+      { key: 'ss-2026', count: 2 },
+    ]);
+    expect(await firstValueFrom(http.get('/api/public/protocols/pp-0001'))).toMatchObject({
+      attendance: { present: 23 },
+    });
+    await expect(firstValueFrom(http.get('/api/public/protocols/nope'))).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(firstValueFrom(http.post('/api/public/protocols', {}))).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+
   describe('public meeting (#17)', () => {
     it('serves the lead and the guest routes from the lazy mock, with problems as errors', async () => {
       const { api } = setup(true);

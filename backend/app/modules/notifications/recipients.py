@@ -7,6 +7,10 @@ Recipient kinds:
 ``{"kind":"gremium","ref":"<id>"}``: current members of Gremium ``ref``.
 ``{"kind":"applicant"}``: applicant mail of the application that triggered the rule.
 ``{"kind":"email","ref":"a@b.c"}``: one fixed literal address.
+``{"kind":"voteGremium"}``: current members of the Gremium that decides the current vote
+of the application (``application.vote_gremium_id``).
+``{"kind":"budgetGremium"}``: current members of the effective deciding Gremium of the
+cost center of the application.
 
 The resolver removes duplicates and sorts the result. It drops empty addresses.
 
@@ -35,6 +39,7 @@ from app.modules.auth.models import (
     RoleAssignment,
     RolePermission,
 )
+from app.modules.budget.decision import effective_decision_gremium
 from app.modules.deadlines.service import flow_deadline_passed
 from app.modules.flow.context import build_base_context, with_actor
 from app.modules.flow.models import State, Transition
@@ -298,6 +303,21 @@ class RecipientResolver:
                     out.add(email)
             elif kind == "email" and ref:
                 out.add(str(ref).strip())
+            elif kind == "voteGremium" and application_id is not None:
+                gid = await self.session.scalar(
+                    select(Application.vote_gremium_id).where(
+                        Application.id == application_id
+                    )
+                )
+                if gid is not None:
+                    out.update(await self._emails_for_gremium(str(gid), now))
+            elif kind == "budgetGremium" and application_id is not None:
+                budget_id = await self.session.scalar(
+                    select(Application.budget_id).where(Application.id == application_id)
+                )
+                gid = await effective_decision_gremium(self.session, budget_id)
+                if gid is not None:
+                    out.update(await self._emails_for_gremium(str(gid), now))
             elif kind == "permission" and ref:
                 out.update(await self._emails_for_permission(str(ref), now))
             # Ignore an unknown or incomplete spec. The rule stays valid.
@@ -385,21 +405,18 @@ async def actionable_principal_emails(
 ) -> list[str]:
     """Return the addresses of everyone who can act on the current state.
 
-    For a ``vote`` state the result holds the members of the voting gremium
-    (``config.gremiumId``). For every other state it holds exactly the principals for
-    which at least one manual ``requires_action`` transition fires. A transition fires
-    only when its guard passes. This mirrors the task-list semantics of ``list_tasks``
-    and ``available_transitions``. The seed holds admins like every other holder of the
-    transition permission. An admin gets mail only when a guard fires for them too.
+    For a ``vote`` state the result holds the members of the voting gremium (the
+    snapshot ``application.vote_gremium_id``). For every other state it holds exactly
+    the principals for which at least one manual ``requires_action`` transition fires.
+    A transition fires only when its guard passes. This mirrors the task-list semantics
+    of ``list_tasks`` and ``available_transitions``. The seed holds admins like every
+    other holder of the transition permission. An admin gets mail only when a guard
+    fires for them too.
     """
     if state is not None and state.kind == "vote":
-        cfg = state.config if isinstance(state.config, dict) else {}
-        gid = cfg.get("gremiumId")
-        if isinstance(gid, str) and gid:
-            return await RecipientResolver(session).resolve(
-                [{"kind": "gremium", "ref": gid}]
-            )
-        return []
+        return await RecipientResolver(session).resolve(
+            [{"kind": "voteGremium"}], application_id=application_id
+        )
 
     app = await session.scalar(
         select(Application).where(Application.id == application_id)

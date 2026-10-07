@@ -877,6 +877,107 @@ describe('BudgetTreeComponent', () => {
     expect(screen.getByLabelText('Eigene Farbe wählen')).toBeInTheDocument();
   });
 
+  describe('deciding gremium (flow variant B)', () => {
+    const ROOT = fullNode({
+      id: 'd-root',
+      key: 'VSM',
+      pathKey: 'VSM',
+      name: 'Studierendenschaft',
+      decisionGremiumId: 'g-1',
+      effectiveDecisionGremiumId: 'g-1',
+      decisionGremiumSourceId: 'd-root',
+      children: [
+        fullNode({
+          id: 'd-mid',
+          parentId: 'd-root',
+          key: '8',
+          pathKey: 'VSM-8',
+          name: 'Ressorts',
+          effectiveDecisionGremiumId: 'g-1',
+          decisionGremiumSourceId: 'd-root',
+          children: [
+            fullNode({ id: 'd-leaf', parentId: 'd-mid', key: '80', pathKey: 'VSM-8-80', name: 'AK' }),
+          ],
+        }),
+      ],
+    });
+    const LONE = fullNode({ id: 'd-lone', key: 'Q', pathKey: 'Q', name: 'QSM' });
+    const LOST = fullNode({
+      id: 'd-lost',
+      parentId: 'd-root',
+      key: 'Z',
+      pathKey: 'VSM-Z',
+      name: 'Z',
+      effectiveDecisionGremiumId: 'g-unknown',
+      decisionGremiumSourceId: 'd-mid',
+    });
+
+    it('names the ancestor that supplies the inherited gremium', async () => {
+      const { c } = await setup();
+      c.tree.set([ROOT, LONE]);
+      expect(c.decisionGremiumHint()).toBe('');
+      c.openEditNode(ROOT.children[0].children[0]);
+      expect(c.editDecisionGremium()).toBe('');
+      expect(c.decisionGremiumHint()).toBe('Geerbt von VSM · Studierendenschaft: StuPa');
+      // An own value replaces the inherited hint with the explanation.
+      c.editDecisionGremium.set('g-1');
+      expect(c.decisionGremiumHint()).toContain('Dieses Gremium entscheidet');
+    });
+
+    it('says that no gremium decides for a root or a tree without one', async () => {
+      const { c } = await setup();
+      c.tree.set([ROOT, LONE]);
+      c.openEditNode(LONE);
+      expect(c.decisionGremiumHint()).toContain('Kein Gremium hier und darüber');
+      // A root with an own value that the user clears: nothing above it.
+      c.openEditNode(ROOT);
+      expect(c.editDecisionGremium()).toBe('g-1');
+      c.editDecisionGremium.set('');
+      expect(c.decisionGremiumHint()).toContain('Kein Gremium hier und darüber');
+    });
+
+    it('names an unknown gremium without its id', async () => {
+      const { c } = await setup();
+      c.tree.set([{ ...ROOT, children: [...ROOT.children, { ...LOST, parentId: 'd-mid' }] }]);
+      c.openEditNode({ ...LOST, id: 'd-z2', parentId: 'd-lostparent' });
+      expect(c.decisionGremiumHint()).toContain('Kein Gremium');
+      c.tree.set([{ ...ROOT, children: [{ ...ROOT.children[0], effectiveDecisionGremiumId: 'g-unknown' }] }]);
+      c.openEditNode(ROOT.children[0].children[0]);
+      expect(c.decisionGremiumHint()).toBe('Geerbt von VSM · Studierendenschaft: unbekanntes Gremium');
+    });
+
+    it('PATCHes decisionGremiumId only when it changed', async () => {
+      const { c, http } = await setup();
+      c.openEditNode(TREE[0]);
+      c.editDecisionGremium.set('g-1');
+      c.saveEditNode();
+      const patch = http.expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH');
+      expect(patch.request.body.decisionGremiumId).toBe('g-1');
+      patch.flush({});
+      flushReload(http);
+      c.openEditNode(fullNode({ id: 'b-vs', key: 'VS', name: 'VS', decisionGremiumId: 'g-1' }));
+      c.editDecisionGremium.set('');
+      c.saveEditNode();
+      const clear = http.expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH');
+      expect(clear.request.body.decisionGremiumId).toBeNull();
+      clear.flush({});
+      flushReload(http);
+      c.openEditNode(TREE[0]);
+      c.saveEditNode();
+      const same = http.expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH');
+      expect('decisionGremiumId' in same.request.body).toBe(false);
+      same.flush({});
+      flushReload(http);
+    });
+
+    it('shows the deciding-gremium select in the edit dialog', async () => {
+      const { c, fixture } = await setup();
+      c.openEditNode(TREE[0].children[0]);
+      fixture.detectChanges();
+      expect(screen.getByLabelText('Entscheidendes Gremium')).toBeInTheDocument();
+    });
+  });
+
   it('openEditNode defaults the view gremium to "" when null', async () => {
     const { c } = await setup();
     c.openEditNode(fullNode({ id: 'b-x', viewGremiumId: null }));

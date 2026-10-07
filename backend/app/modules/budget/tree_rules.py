@@ -11,7 +11,7 @@ UP (roll-up of the bound sum from approved applications).
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -241,12 +241,42 @@ def fiscal_year_display(year: int, start_month: int, start_day: int) -> str:
     return f"{year}/{(year + 1) % 100:02d}"
 
 
+def resolve_decision_gremium[K, G](
+    node_id: K,
+    parent_of: Mapping[K, K | None],
+    own_of: Mapping[K, G | None],
+) -> tuple[G | None, K | None]:
+    """Resolve the effective deciding Gremium of a cost center.
+
+    The effective value is the own `decision_gremium_id` of the node, else the value
+    of the nearest ancestor, else none. `parent_of` maps a node id to its parent id,
+    and `own_of` maps a node id to its own deciding Gremium. A node that is missing
+    from `parent_of` ends the walk. A cycle in the parent chain also ends it, so bad
+    data cannot loop.
+
+    Returns:
+        `(gremium_id, source_node_id)`. `source_node_id` is the node that holds the
+        value: the node itself or an ancestor. Both are `None` when no node on the
+        path holds a value.
+    """
+    current: K | None = node_id
+    seen: set[K] = set()
+    while current is not None and current not in seen and current in parent_of:
+        seen.add(current)
+        own = own_of.get(current)
+        if own is not None:
+            return own, current
+        current = parent_of[current]
+    return None, None
+
+
 # Field order of a node tuple: id, parent_id, gremium_id, key, path_key, name,
 # currency, active, color, accepted_state_keys, denied_state_keys,
-# fiscal_start_month, fiscal_start_day, hidden_in_budget, view_gremium_id.
+# fiscal_start_month, fiscal_start_day, hidden_in_budget, view_gremium_id,
+# decision_gremium_id.
 NodeTuple = tuple[
     object, object | None, object | None, str, str, str, str, bool,
-    str | None, list, list, int, int, bool, object | None,
+    str | None, list, list, int, int, bool, object | None, object | None,
 ]
 
 
@@ -365,10 +395,14 @@ def build_forest(
     children_of: dict[object | None, list[NodeTuple]] = {}
     for n in nodes:
         children_of.setdefault(n[1], []).append(n)
+    parent_of = {n[0]: n[1] for n in nodes}
+    decision_of = {n[0]: n[15] for n in nodes}
 
     def to_dict(n: NodeTuple) -> dict:
         (nid, parent_id, n_gremium, key, path, name, currency, active, color, acc,
-         den, fy_month, fy_day, hidden_in_budget, view_gremium_id) = n
+         den, fy_month, fy_day, hidden_in_budget, view_gremium_id,
+         decision_gremium_id) = n
+        effective, source = resolve_decision_gremium(nid, parent_of, decision_of)
         return {
             "id": nid,
             "parent_id": parent_id,
@@ -383,6 +417,9 @@ def build_forest(
             "denied_state_keys": list(den or []),
             "hidden_in_budget": hidden_in_budget,
             "view_gremium_id": view_gremium_id,
+            "decision_gremium_id": decision_gremium_id,
+            "effective_decision_gremium_id": effective,
+            "decision_gremium_source_id": source,
             "fiscal_start_month": fy_month,
             "fiscal_start_day": fy_day,
             "by_fiscal_year": _views_for_node(

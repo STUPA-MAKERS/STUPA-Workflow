@@ -644,6 +644,65 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.branchesFor(key)).toEqual([]);
   });
 
+  it('takes the vote gremium from the cost center (flow variant B)', async () => {
+    const { fixture } = await setup({ tree: jest.fn(() => of(BUDGET_TREE)) });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.addState();
+    c.addState();
+    const [a, v] = c.graph().states.map((s: { key: string }) => s.key);
+    c.setStateKind(v, 'vote');
+    c.setStateGremium(v, 'g1');
+    c.setStateDeadlinePolicy(v, 'semester');
+    // "from the cost center" drops the fixed gremium and keeps the other config.
+    c.setStateGremiumSource(v, 'budget');
+    expect(c.graph().states[1].config).toEqual({ deadlinePolicyKey: 'semester', gremiumSource: 'budget' });
+    expect(c.targetIsBudgetVote(v)).toBe(true);
+    expect(c.targetIsBudgetVote(a)).toBe(false);
+    expect(c.targetIsBudgetVote('nope')).toBe(false);
+    // The canvas node carries the tag.
+    expect(c.nodes().find((n: { key: string }) => n.key === v).gremiumFromBudget).toBe(true);
+    expect(c.nodes().find((n: { key: string }) => n.key === a).gremiumFromBudget).toBe(false);
+    // The state inspector shows the source select and the hint, not the gremium select.
+    c.selection.set({ kind: 'state', key: v });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Gremium aus der Kostenstelle');
+    expect(fixture.nativeElement.textContent).toContain('Gremium: aus Kostenstelle');
+    // Back to a fixed gremium: the source goes, no gremium is set yet.
+    c.setStateGremiumSource(v, 'fixed');
+    expect(c.graph().states[1].config).toEqual({ deadlinePolicyKey: 'semester' });
+    c.setStateGremium(v, 'g1');
+    c.setStateGremiumSource(v, 'fixed');
+    expect(c.graph().states[1].config.gremiumId).toBe('g1');
+    // The budget tree reaches the cost-center pickers.
+    expect(c.budgetTree()).toEqual(BUDGET_TREE);
+  });
+
+  it('edits the value map, drops empty optional params and resets recipient refs', async () => {
+    const { fixture } = await setup({ tree: jest.fn(() => of(BUDGET_TREE)) });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    buildValid(c);
+    c.addAction(0, 'assignBudgetFromMap');
+    c.addAction(0, 'addToNextSession');
+    c.addAction(0, 'notify');
+    const acts = () => c.graph().transitions[0].actions;
+    expect(acts()[0]).toEqual({ type: 'assignBudgetFromMap', field: '', map: {} });
+    c.setActionMap(0, 0, { technik: 'b2' });
+    expect(acts()[0].map).toEqual({ technik: 'b2' });
+    c.setActionMap(0, 5, { x: 'y' }); // out of range → other actions untouched
+    expect(acts()[0].map).toEqual({ technik: 'b2' });
+    c.setActionParam(0, 1, 'gremiumId', 'g1');
+    expect(acts()[1].gremiumId).toBe('g1');
+    c.setActionParam(0, 1, 'gremiumId', '');
+    expect('gremiumId' in acts()[1]).toBe(false);
+    c.addRecipient(0, 2);
+    c.setRecipientKind(0, 2, 0, 'gremium');
+    c.setRecipientRef(0, 2, 0, 'g1');
+    c.setRecipientKind(0, 2, 0, 'voteGremium');
+    expect(acts()[2].recipients[0]).toEqual({ kind: 'voteGremium', ref: undefined });
+  });
+
   it('branchesFor returns pass/fail for vote states', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -719,8 +778,8 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.guardOpOptions(false).map((o: { value: string }) => o.value)).toContain('roleIs');
     expect(c.guardOpOptions(true).map((o: { value: string }) => o.value)).not.toContain('roleIs');
     expect(c.compareOpOptions().length).toBeGreaterThan(0);
-    expect(c.recipientKindOptions().length).toBe(4);
-    expect(c.actionOptions().length).toBe(5);
+    expect(c.recipientKindOptions().length).toBe(6);
+    expect(c.actionOptions().length).toBe(7);
     expect(c.actionLabel('notify')).toBeTruthy();
     expect(c.actionDesc('notify')).toBeTruthy();
     expect(c.kindLabel('vote')).toBeTruthy();

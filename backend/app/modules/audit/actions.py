@@ -108,6 +108,10 @@ class AuditAction(StrEnum):
     # and the gremium. A render that fails sets the protocol back to a draft, and a
     # new finalization writes a new entry.
     PROTOCOL_FINALIZE = "protocol_finalize"
+    # A protocol is held back from the public protocols page, or released again.
+    # ``data`` carries the meeting, the gremium and the old and the new value of
+    # ``publicWithheld``.
+    PROTOCOL_PUBLICATION = "protocol_publication"
     # Handover of the minutes during a live meeting (Z3, F12). ``data`` carries the
     # ``mode`` (``now``, ``next_item``, ``activate`` when a move of the agenda item
     # starts the planned period, ``cancel`` when the planned handover goes away),

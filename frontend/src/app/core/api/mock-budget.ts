@@ -45,6 +45,8 @@ interface Spec {
   key: string;
   name: string;
   color?: string;
+  /** Own deciding gremium (`decisionGremiumId`); the children inherit it. */
+  decision?: string;
   /** allocated, bound, expended, income, requested in the current year. */
   cur: [number, number, number, number?, number?];
   children?: Spec[];
@@ -60,6 +62,8 @@ const SPEC: Spec = {
       id: 'b1000000-0000-0000-0000-000000000010',
       key: '100',
       name: 'Referate',
+      // AStA decides on the Referate; Fachschaften below are decided by the StuPa.
+      decision: 'g-asta',
       cur: [40000, 6000, 15000, 0, 2400],
       children: [
         { id: 'b1000000-0000-0000-0000-000000000011', key: '110', name: 'Öffentlichkeitsarbeit', cur: [15000, 2000, 7000, 0, 900] },
@@ -70,6 +74,7 @@ const SPEC: Spec = {
       id: 'b1000000-0000-0000-0000-000000000020',
       key: '200',
       name: 'Fachschaften',
+      decision: 'g0000000-0000-0000-0000-000000000001',
       cur: [36000, 7000, 9500, 600, 5000],
       children: [
         { id: 'b1000000-0000-0000-0000-000000000021', key: '210', name: 'Fachschaft Technik', color: '#2f7fc1', cur: [12000, 2500, 3500, 0, 1800] },
@@ -124,6 +129,10 @@ function build(spec: Spec, parent: BudgetTreeNode | null): BudgetTreeNode {
     deniedStateKeys: [],
     hiddenInBudget: false,
     viewGremiumId: null,
+    decisionGremiumId: spec.decision ?? null,
+    // The own value, else the effective value of the parent (as the API serves it).
+    effectiveDecisionGremiumId: spec.decision ?? parent?.effectiveDecisionGremiumId ?? null,
+    decisionGremiumSourceId: spec.decision ? spec.id : (parent?.decisionGremiumSourceId ?? null),
     fiscalStartMonth: 1,
     fiscalStartDay: 1,
     byFiscalYear: [

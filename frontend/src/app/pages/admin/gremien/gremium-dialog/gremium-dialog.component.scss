@@ -112,3 +112,82 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* The public protocol page: the switch, what it means, and the note on the QR. */
+.gd__public {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-5);
+  border-top: var(--border-width) solid var(--color-border);
+}
+.gd__box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-3);
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
+.gd__box--row {
+  flex-direction: row;
+  align-items: flex-start;
+}
+.gd__box--row app-icon {
+  flex: none;
+  margin-top: 2px;
+}
+.gd__boxLabel {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+.gd__implies {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gd__implies li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.gd__impliesIcon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--color-accent-text);
+}
+.gd__link {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+.gd__link:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.gd__qr {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.gd__qr app-icon {
+  flex: none;
+  margin-top: 2px;
+}
+.gd--confirm {
+  gap: var(--space-4);
+}
+.gd__text {
+  margin: 0;
+  color: var(--color-text);
+}

@@ -144,6 +144,37 @@
             </label>
           }
         </section>
+
+        <!-- The texts after the submission: one card per applicant kind, with the field
+             in the picked language and a Markdown preview. Empty = built-in text. -->
+        <section class="br__sec" aria-labelledby="br-submitted">
+          <h2 class="sec br__secTitle" id="br-submitted">{{ 'admin.brand.submitted.group' | t }}</h2>
+          <p class="br__hint">{{ 'admin.brand.submitted.hint' | t }}</p>
+          @for (kind of submittedKinds; track kind) {
+            <article class="br__subm" [attr.aria-label]="submittedLabel(kind)" [attr.data-testid]="'submitted-' + kind">
+              <label class="br__area">
+                <span class="br__areaLabel">{{ withLang(submittedLabel(kind)) }}</span>
+                <textarea
+                  class="br__areaInput"
+                  rows="4"
+                  [placeholder]="submittedDefault(kind)"
+                  [ngModel]="submittedMap(d, kind)[lang()]"
+                  (ngModelChange)="setText(submittedMap(d, kind), $event)"
+                  [name]="'submitted-' + kind"
+                ></textarea>
+              </label>
+              <div class="br__submPv">
+                <span class="br__submPvHead">
+                  <span class="cap">{{ withLang('admin.brand.submitted.preview' | t) }}</span>
+                  @if (submittedIsDefault(d, kind)) {
+                    <span class="br__submPvTag">{{ 'admin.brand.submitted.default' | t }}</span>
+                  }
+                </span>
+                <div class="br__submPvBody" [attr.data-testid]="'submitted-preview-' + kind" [innerHTML]="submittedPreview(d, kind)"></div>
+              </div>
+            </article>
+          }
+        </section>
       </div>
 
       <div class="br__col">

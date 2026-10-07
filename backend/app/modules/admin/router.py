@@ -34,6 +34,7 @@ from fastapi import (
 from app.deps import (
     DbSession,
     Principal,
+    SettingsDep,
     require_any_permission,
     require_principal,
 )
@@ -63,6 +64,7 @@ from app.modules.admin.schemas import (
     GremiumMembershipMappingUpdate,
     GremiumMembershipOut,
     GremiumOut,
+    GremiumPublicPreview,
     GremiumRoleCreate,
     GremiumRoleMappingCreate,
     GremiumRoleMappingOut,
@@ -287,14 +289,43 @@ async def update_gremium(
     payload: GremiumUpdate,
     service: ServiceDep,
     principal: GremienAdmin,
+    request: Request,
+    settings: SettingsDep,
 ) -> GremiumOut:
-    return await service.update_gremium(gremium_id, payload, principal.sub)
+    """Update a gremium.
+
+    A switch of ``protocolsPublic`` from off to on publishes all final protocols
+    of the gremium: a job builds the missing public versions (public PDF and
+    snapshot). Until the job has built one, that protocol stays hidden.
+    """
+    was_public = await service.gremium_protocols_public(gremium_id)
+    out = await service.update_gremium(gremium_id, payload, principal.sub)
+    if out.protocols_public and not was_public:
+        from app.modules.protocol.router import schedule_public_backfill
+
+        await schedule_public_backfill(request, service.session, settings, out.id)
+    return out
+
+
+@router.get(
+    "/gremien/{gremium_id}/public-preview",
+    response_model=GremiumPublicPreview,
+    responses=_errors(401, 403, 404),
+)
+async def gremium_public_preview(
+    gremium_id: UUID, service: ServiceDep, _principal: GremienAdmin
+) -> GremiumPublicPreview:
+    """Count the protocols that the switch ``protocolsPublic`` would publish.
+
+    The admin dialog asks before the save with these numbers.
+    """
+    return await service.gremium_public_preview(gremium_id)
 
 
 @router.delete(
     "/gremien/{gremium_id}",
     status_code=204,
-    responses=_errors(401, 403, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def delete_gremium(gremium_id: UUID, service: ServiceDep, principal: GremienAdmin) -> None:
     await service.delete_gremium(gremium_id, principal.sub)

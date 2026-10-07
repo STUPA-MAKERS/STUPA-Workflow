@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
@@ -41,6 +42,8 @@ export interface GuardPriorityRow {
   styleUrl: './state-inspector.component.scss',
 })
 export class StateInspectorComponent {
+  private readonly i18n = inject(I18nService);
+
   readonly state = input.required<StateDef>();
   readonly kindOptions = input.required<SelectOption[]>();
   readonly gremiumOptions = input.required<SelectOption[]>();
@@ -56,6 +59,19 @@ export class StateInspectorComponent {
   readonly terminalChange = output<boolean>();
   readonly kindChange = output<string>();
   readonly gremiumChange = output<string>();
+  readonly gremiumSourceChange = output<'fixed' | 'budget'>();
+
+  /** The gremium source of a vote state: `budget`, else a fixed gremium. */
+  protected readonly gremiumSource = computed<'fixed' | 'budget'>(() =>
+    this.state().config?.gremiumSource === 'budget' ? 'budget' : 'fixed',
+  );
+
+  protected gremiumSourceOptions(): SelectOption[] {
+    return [
+      { value: 'fixed', label: this.i18n.translate('admin.flow.cfgGremiumSourceFixed') },
+      { value: 'budget', label: this.i18n.translate('admin.flow.cfgGremiumSourceBudget') },
+    ];
+  }
   readonly deadlinePolicyChange = output<string>();
   readonly guardMove = output<{ sig: string; dir: -1 | 1 }>();
   readonly remove = output<void>();

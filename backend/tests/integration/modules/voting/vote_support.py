@@ -110,6 +110,8 @@ async def seed_vote_flow(
     row = await session.get(Application, app.id)
     assert row is not None
     row.current_state_id = states[start].id
+    # The snapshot that the flow engine sets on entry into a vote state.
+    row.vote_gremium_id = gremium.id if states[start].kind == "vote" else None
     await session.commit()
     return VoteFlow(
         gremium_id=gremium.id,

@@ -61,7 +61,16 @@ export interface PublicSiteConfig {
     /** Footer columns: a heading and its links each. Empty shows no column. */
     footerColumns?: PublicFooterColumn[];
     freetexts?: Partial<
-      Record<'loginHint' | 'welcome' | 'support' | 'emailFooter' | 'applyInfo', I18nMap>
+      Record<
+        | 'loginHint'
+        | 'welcome'
+        | 'support'
+        | 'emailFooter'
+        | 'applyInfo'
+        | 'submittedInternal'
+        | 'submittedExternal',
+        I18nMap
+      >
     >;
     /** Show the Gravatar images of the avatars (through the API proxy). Missing = on. */
     gravatarEnabled?: boolean;
@@ -575,6 +584,8 @@ export interface Application {
   typeId: Uuid;
   state: ApplicationState | null;
   gremiumId: Uuid | null;
+  /** The gremium that decides the current vote (snapshot on entry of a vote state). */
+  voteGremiumId?: Uuid | null;
   budgetId: Uuid | null;
   fiscalYearId: Uuid | null;
   amount: string | null;
@@ -1216,6 +1227,10 @@ export interface ProtocolOutWire {
   /** Redacted public variant. It exists only if an agenda item is non-public. */
   publicPdfUrl?: string | null;
   sentAt?: IsoDateTime | null;
+  /** The protocol is held back from the public protocol page. */
+  publicWithheld?: boolean;
+  /** The gremium publishes its final protocols on the public protocol page. */
+  gremiumProtocolsPublic?: boolean;
 }
 
 /** Body for `POST /meetings` (`MeetingCreate`). */
@@ -1241,6 +1256,8 @@ export interface MeetingPatchBody {
   activeApplicationId?: Uuid | null;
   /** The agenda item the room handles now. `null` clears it. Protokollant or session lead. */
   currentAgendaItemId?: Uuid | null;
+  /** New title (1 to 200 characters). Planned or live only: a closed meeting gives 409. */
+  title?: string;
   /** Planned meeting date (`YYYY-MM-DD`). Use it to schedule a planned meeting. */
   date?: string | null;
   /** Planned time (`HH:mm`). */
@@ -1413,6 +1430,10 @@ export interface Protocol {
   /** Redacted public variant for non-public agenda items. Otherwise null. */
   publicPdfUrl: string | null;
   sentAt: IsoDateTime | null;
+  /** Held back from the public protocol page (only matters for a public gremium). */
+  publicWithheld?: boolean;
+  /** The gremium publishes its final protocols on the public protocol page. */
+  gremiumProtocolsPublic?: boolean;
 }
 
 // Notification preferences. The account popout offers them as self service.

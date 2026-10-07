@@ -30,6 +30,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { AgendaItemDialogComponent } from './agenda-item-dialog/agenda-item-dialog.component';
 import { CloseMeetingDialogComponent } from './close-meeting-dialog/close-meeting-dialog.component';
+import { FinalizeProtocolDialogComponent } from './finalize-protocol-dialog/finalize-protocol-dialog.component';
 import { DeleteMeetingDialogComponent } from './delete-meeting-dialog/delete-meeting-dialog.component';
 import { HandoverDialogComponent } from './handover-dialog/handover-dialog.component';
 import { MeetingAgendaService } from './meeting-agenda.service';
@@ -85,6 +86,7 @@ import { beamerUrl } from '../voting/beamer-link.util';
     MeetingSettingsDialogComponent,
     DeleteMeetingDialogComponent,
     CloseMeetingDialogComponent,
+    FinalizeProtocolDialogComponent,
     VoteOpenDialogComponent,
     AgendaItemDialogComponent,
     HandoverDialogComponent,
@@ -268,8 +270,24 @@ export class MeetingsComponent {
     return this.myChoices()[voteId] ?? null;
   }
 
+  /** "Protokoll finalisieren?": open for the protocol of a public gremium. */
+  readonly finalizeDialogOpen = signal(false);
+
+  /**
+   * Finalize the protocol. A gremium that publishes its protocols asks first: the
+   * dialog reminds of the public page and can hold this protocol back.
+   */
   finalize(): void {
+    if (this.protocol()?.gremiumProtocolsPublic) {
+      this.finalizeDialogOpen.set(true);
+      return;
+    }
     this.session.finalize();
+  }
+
+  confirmFinalize(opts: { publicWithheld: boolean }): void {
+    this.finalizeDialogOpen.set(false);
+    this.session.finalize(opts);
   }
 
   setAttendance(member: Attendance, status: AttendanceStatus, note?: string | null): void {

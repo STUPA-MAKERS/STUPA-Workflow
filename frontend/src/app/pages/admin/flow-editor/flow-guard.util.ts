@@ -1,11 +1,19 @@
 /** Guard/action read helpers shared by the flow editor and its child components. */
-import type {
-  ActionDef,
-  Guard,
-  GuardLeafOperator,
-  NotifyRecipient,
-  TransitionDef,
+import {
+  GUARD_BOOL_OPERATORS,
+  type ActionDef,
+  type Guard,
+  type GuardLeafOperator,
+  type NotifyRecipient,
+  type TransitionDef,
 } from '../admin.models';
+
+const BOOL_OPS = new Set<string>(GUARD_BOOL_OPERATORS);
+
+/** A guard operator that takes a boolean and needs no value control. */
+export function isBoolGuardOp(op: string): boolean {
+  return BOOL_OPS.has(op);
+}
 import type { GuardGroup, Point } from './flow-editor.models';
 
 /**
@@ -100,7 +108,7 @@ export function compareSpecOf(t: TransitionDef): { field: string; op: string; va
 }
 
 export function defaultGuard(op: GuardLeafOperator): Guard {
-  if (op === 'deadlinePassed' || op === 'budgetFitsApplication') return { [op]: true };
+  if (isBoolGuardOp(op)) return { [op]: true };
   if (op === 'compare') return { compare: { field: '', op: '==', value: '' } };
   return { [op]: '' };
 }
@@ -108,14 +116,15 @@ export function defaultGuard(op: GuardLeafOperator): Guard {
 /**
  * Value-control kind per guard operator.
  *
- * `none`      → the boolean operators `deadlinePassed` and `budgetFitsApplication`.
+ * `none`      → the boolean operators (`deadlinePassed`, `budgetFitsApplication`,
+ *               `budgetHasDecisionGremium`, `isInVoteGremium`, …).
  * `role`      → `roleIs` and `applicantRoleIs`, shown as a global-role dropdown.
  * `committee` → `isInCommittee` and `applicantCommitteeIs`, shown as a Gremium dropdown.
  * `compare`   → a typed comparison of field, operator and value.
  * `text`      → `budgetIs` and `hasField`, shown as free text.
  */
 export function guardValueKind(op: string): 'none' | 'role' | 'committee' | 'compare' | 'text' {
-  if (op === 'deadlinePassed' || op === 'budgetFitsApplication' || !op) return 'none';
+  if (!op || isBoolGuardOp(op)) return 'none';
   if (op === 'roleIs' || op === 'applicantRoleIs') return 'role';
   if (op === 'isInCommittee' || op === 'applicantCommitteeIs') return 'committee';
   if (op === 'compare') return 'compare';

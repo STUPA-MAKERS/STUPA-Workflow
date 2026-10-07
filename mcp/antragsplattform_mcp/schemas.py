@@ -7,14 +7,14 @@ A patch or update model dumps with `exclude_unset`. Only the keys that the calle
 go on the wire, so a partial update stays partial.
 
 Source of truth: `backend/app/shared/config_schemas.py` plus the per-module `schemas.py`
-files (state 2026-06-12).
+files (state 2026-10-07).
 """
 
 from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class WireModel(BaseModel):
@@ -24,6 +24,32 @@ class WireModel(BaseModel):
 
 
 I18nMap = dict[str, str]
+
+# Allowed values of `config.gremiumSource` on a vote state. `budget` takes the deciding
+# Gremium from the cost center of the application when it enters the state.
+VOTE_GREMIUM_SOURCES: frozenset[str] = frozenset({"budget"})
+
+
+def check_vote_config(config: dict[str, Any]) -> None:
+    """Check the Gremium keys of a vote-state config, as the backend save gate does.
+
+    A vote state takes EXACTLY ONE of `gremiumId` (a fixed Gremium) or
+    `gremiumSource: "budget"` (the deciding Gremium of the cost center).
+
+    Raises:
+        ValueError: Both keys, neither key, or an unknown `gremiumSource` value.
+    """
+    gremium_id = config.get("gremiumId")
+    source = config.get("gremiumSource")
+    if source is not None and source not in VOTE_GREMIUM_SOURCES:
+        raise ValueError(f"unknown gremiumSource {source!r}; allowed: 'budget'")
+    has_id = isinstance(gremium_id, str) and bool(gremium_id)
+    if has_id == (source is not None):
+        raise ValueError(
+            "a vote state needs exactly one of config.gremiumId or "
+            "config.gremiumSource='budget'"
+        )
+
 
 
 # Flow graph, shared by the flow tools.
@@ -36,9 +62,19 @@ class StateDef(WireModel):
     kind: Literal["normal", "vote"] = "normal"
     config: dict[str, Any] = Field(
         default_factory=dict,
-        description="Kind-specific config: vote states need {gremiumId}; any state may "
-        "set {deadlinePolicyKey} to materialise a deadline on entry.",
+        description="Kind-specific config. A vote state needs EXACTLY ONE of "
+        "{gremiumId: '<uuid>'} (fixed Gremium) or {gremiumSource: 'budget'} (the "
+        "deciding Gremium of the cost center, taken when the application enters the "
+        "state; the transition is refused with 409 no_vote_gremium when the cost center "
+        "has none). Any state may set {deadlinePolicyKey} to materialise a deadline on "
+        "entry.",
     )
+
+    @model_validator(mode="after")
+    def _vote_gremium(self) -> StateDef:
+        if self.kind == "vote":
+            check_vote_config(self.config)
+        return self
 
 
 class StateDefPatch(WireModel):
@@ -50,7 +86,18 @@ class StateDefPatch(WireModel):
     editAllowed: bool | None = None
     isInitial: bool | None = None
     kind: Literal["normal", "vote"] | None = None
-    config: dict[str, Any] | None = None
+    config: dict[str, Any] | None = Field(
+        default=None,
+        description="Replaces the whole config. For a vote state: exactly one of "
+        "{gremiumId} or {gremiumSource: 'budget'}.",
+    )
+
+    @model_validator(mode="after")
+    def _gremium_source(self) -> StateDefPatch:
+        source = (self.config or {}).get("gremiumSource")
+        if source is not None and source not in VOTE_GREMIUM_SOURCES:
+            raise ValueError(f"unknown gremiumSource {source!r}; allowed: 'budget'")
+        return self
 
 
 class TransitionDef(WireModel):
@@ -63,14 +110,27 @@ class TransitionDef(WireModel):
         description="Guard tree. Leaf operators: deadlinePassed, applicantRoleIs, "
         "applicantCommitteeIs, applicationTypeIs (application type key, e.g. 'qsm'/'vsm'), "
         "attachmentPresent (bool — >=1 attachment), budgetIs, budgetFitsApplication, "
-        "hasField, compare {field,op,value}; actor gates (manual only): roleIs, "
-        "isInCommittee, actorIsApplicant; combinators: and/or (list), not (single child).",
+        "budgetHasDecisionGremium (bool — the cost center has an own or inherited "
+        "deciding Gremium), hasField, compare {field,op,value}; actor gates (manual "
+        "only): roleIs, isInCommittee, actorIsApplicant, isInVoteGremium (bool — the "
+        "actor is a member of the Gremium that decides the current vote); combinators: "
+        "and/or (list), not (single child).",
     )
     actions: list[dict[str, Any]] = Field(
         default_factory=list,
-        description="Actions: notify {recipients}, webhook {webhookId}, "
-        "addToNextSession {gremiumId} (target must be a vote state), assignBudget {budgetId}, "
-        "assignBudgetFromField {field} (assigns the budget UUID stored in that form field).",
+        description="Actions: notify {recipients: [{kind, ref?}]} with kinds gremium/role/"
+        "email (need ref), applicant, voteGremium (members of the Gremium that decides "
+        "the vote) and budgetGremium (members of the deciding Gremium of the cost "
+        "center) — the last three without ref; webhook {webhookId}; "
+        "addToNextSession {gremiumId?} (target must be a vote state; without gremiumId "
+        "the Gremium of the vote is used); assignBudget {budgetId}; "
+        "assignBudgetFromField {field} (assigns the budget UUID stored in that form "
+        "field); assignBudgetFromApplicantGremium {parentId?} (assigns the single node, "
+        "in the subtree of parentId, whose OWN decisionGremiumId is a Gremium of the "
+        "applicant; 0 or several matches assign nothing); assignBudgetFromMap {field, "
+        "map: {fieldValue: budgetId}} (assigns the node mapped to the field value). "
+        "The assignBudget* actions are refused on a transition INTO a vote state with "
+        "gremiumSource 'budget'.",
     )
     order: int | None = None
     automatic: bool = False
@@ -170,6 +230,13 @@ class GremiumCreate(WireModel):
     delegationLeadMinutes: int = 0
     delegationAllowExternal: bool = False
     quorumPercent: int | None = Field(default=None, ge=0, le=100)
+    protocolsPublic: bool = Field(
+        default=False,
+        description=(
+            "Show the final protocols of this Gremium without login on the public "
+            "protocols page (public version only)."
+        ),
+    )
 
 
 class GremiumUpdate(WireModel):
@@ -181,6 +248,14 @@ class GremiumUpdate(WireModel):
     delegationLeadMinutes: int | None = None
     delegationAllowExternal: bool | None = None
     quorumPercent: int | None = None
+    protocolsPublic: bool | None = Field(
+        default=None,
+        description=(
+            "Switch the public protocols page for this Gremium. Switching it on "
+            "publishes ALL final protocols that are not held back; a job builds the "
+            "missing public versions first."
+        ),
+    )
 
 
 class CdVariantCreate(WireModel):
@@ -319,6 +394,11 @@ class BudgetNodeCreate(WireModel):
     color: str | None = None
     fiscalStartMonth: int = 1
     fiscalStartDay: int = 1
+    decisionGremiumId: str | None = Field(
+        default=None,
+        description="Gremium that decides on spending from this node (and from its "
+        "subtree unless a descendant sets its own)",
+    )
 
 
 class BudgetNodeUpdate(WireModel):
@@ -340,6 +420,12 @@ class BudgetNodeUpdate(WireModel):
     )
     fiscalStartMonth: int | None = None
     fiscalStartDay: int | None = None
+    decisionGremiumId: str | None = Field(
+        default=None,
+        description="Deciding Gremium of this node. A descendant without an own value "
+        "inherits it. A vote state with gremiumSource 'budget' takes it. null clears "
+        "(the node then inherits from its ancestors again)",
+    )
 
 
 class ExpenseUpdate(WireModel):
@@ -417,6 +503,10 @@ class MeetingCreate(WireModel):
 class MeetingPatch(WireModel):
     activeApplicationId: str | None = None
     status: Literal["planned", "live", "closed"] | None = None
+    title: str | None = Field(
+        default=None,
+        description="New title, 1 to 200 characters. A closed meeting keeps its title (409).",
+    )
     date: str | None = None
     startTime: str | None = None
     protokollantId: str | None = None

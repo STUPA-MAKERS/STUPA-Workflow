@@ -36,5 +36,6 @@ description: ALTCHA proof-of-work captcha + sliding-window rate-limiting + body-
 - **The app caches providers lazily on `app.state`** (`_antiabuse_redis`, `_rate_limiter`, `_altcha_verifier`) and builds them from the injected `Settings`. In tests, replace them through `dependency_overrides` or with the `InMemory*`/`Null*` implementations.
 
 - **Public meeting (#17):** `rate_limit_public_join` (`public-join:ip:<ip>` and `public-join:code:<code>`, `rl_public_join_ip_per_hour` 120, `rl_public_join_code_per_hour` 400), `rate_limit_public_read` (`public-meeting:ip:<ip>`, 3000), `rate_limit_public_guest_write` (`public-guest:<sha256(token)[:24]>`, 120). The limits per IP are generous because the guests share the campus NAT; ALTCHA guards the join. The default write limit skips `/api/public/meetings/`.
+- **Public protocols page:** `rate_limit_public_protocols` (`public-protocols:ip:<ip>`, `rl_public_protocols_ip_per_hour` 3000) on the list, semester, gremien and detail reads; `rate_limit_public_protocol_pdf` (`public-protocol-pdf:ip:<ip>`, `rl_public_protocol_pdf_ip_per_hour` 600) on the PDF download. Read-only, so no ALTCHA. Every answer under `/api/public/` carries `X-Robots-Tag: noindex`.
 
 **Related:** be-auth, be-applications, be-files, conventions

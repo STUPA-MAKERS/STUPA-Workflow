@@ -25,6 +25,7 @@ from starlette.responses import JSONResponse, Response
 
 from app.settings import Settings, get_settings
 from app.shared.antiabuse import client_ip, get_rate_limiter
+from app.shared.errors import PUBLIC_API_PREFIX
 from app.shared.ratelimit import RateLimiter
 
 TRACE_HEADER = "X-Trace-Id"
@@ -69,6 +70,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         for key, value in _SECURITY_HEADERS.items():
             response.headers.setdefault(key, value)
+        if request.url.path.startswith(PUBLIC_API_PREFIX):
+            # The public routes (protocols page, QR join) are never for search
+            # engines: every answer, an error included, carries noindex.
+            response.headers["X-Robots-Tag"] = "noindex"
         return response
 
 

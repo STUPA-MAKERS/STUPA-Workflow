@@ -272,6 +272,10 @@ async def _http_exception_handler(
     return _problem_response(problem)
 
 
+# All public routes without login (same prefix as `app.middleware`).
+PUBLIC_API_PREFIX = "/api/public/"
+
+
 async def _unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
     # Log the full detail internally. Leak nothing outward: no path, no stack trace.
     logger.exception("Unhandled exception", exc_info=exc)
@@ -283,7 +287,14 @@ async def _unhandled_handler(request: Request, exc: Exception) -> JSONResponse:
         detail="An internal error occurred.",
         traceId=_trace_id(request),
     )
-    return _problem_response(problem)
+    # The handler of `Exception` runs outside the middleware stack, so the security
+    # middleware never sees this answer. A public route keeps its noindex here.
+    extra = (
+        {"X-Robots-Tag": "noindex"}
+        if request.url.path.startswith(PUBLIC_API_PREFIX)
+        else None
+    )
+    return _problem_response(problem, extra)
 
 
 def register_exception_handlers(app: FastAPI) -> None:

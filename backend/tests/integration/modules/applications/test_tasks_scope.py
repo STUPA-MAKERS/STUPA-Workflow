@@ -236,7 +236,14 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:  # noqa: PLR
             await session.execute(
                 update(Application)
                 .where(Application.id == created.id)
-                .values(current_state_id=state.id, email_confirmed_at=datetime.now(UTC))
+                .values(
+                    current_state_id=state.id,
+                    email_confirmed_at=datetime.now(UTC),
+                    # The snapshot that the flow engine sets on entry into a vote state.
+                    vote_gremium_id=(
+                        uuid.UUID(state.config["gremiumId"]) if state.kind == "vote" else None
+                    ),
+                )
             )
             await session.commit()
             return created.id

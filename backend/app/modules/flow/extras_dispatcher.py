@@ -1,11 +1,17 @@
-"""Flow action handlers for `addToNextSession`, `assignBudget` and `assignBudgetFromField`.
+"""Flow action handlers for the agenda and the cost-center actions.
 
 `addToNextSession` appends the application as an agenda item to the earliest meeting of
 the given Gremium that is still `planned` and whose date is today or later in local time.
-A live or closed meeting never gets the item. If no such meeting exists, the handler logs
-the case and skips the action. `assignBudget` attaches a cost center. It derives the
-fiscal year from the single active fiscal year of the top-level node.
-`assignBudgetFromField` does the same with the cost center id that a form field holds.
+Without a `gremiumId` the handler takes the Gremium of the vote
+(`application.vote_gremium_id`, set by the engine before the commit). A live or closed
+meeting never gets the item. If no such meeting exists, the handler logs the case and
+skips the action. `assignBudget` attaches a cost center. It derives the fiscal year from
+the single active fiscal year of the top-level node. `assignBudgetFromField` does the
+same with the cost center id that a form field holds. `assignBudgetFromApplicantGremium`
+takes the single cost center whose own deciding Gremium is a Gremium of the applicant.
+`assignBudgetFromMap` maps the value of a form field to a cost center. No cost-center
+action changes the cost center while the application sits in a vote state whose
+Gremium comes from the cost center.
 The dispatcher logs an error of a single action and never propagates it. A failed action
 must not roll back the committed state change.
 """
@@ -19,14 +25,17 @@ from datetime import datetime
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.budget.tree_models import Budget, FiscalYear
+from app.modules.budget.tree_rules import _SEP
+from app.modules.flow.context import committee_ids_for_sub
 from app.modules.flow.dispatch import DispatchedAction
+from app.modules.flow.vote_gremium import fill_snapshot, in_budget_vote_state
 from app.modules.livevote.agenda_service import AgendaService
 from app.modules.livevote.models import Meeting
 from app.settings import get_settings
@@ -59,6 +68,10 @@ class FlowExtrasActionDispatcher:
                     await self._assign_budget(action)
                 elif action.type == "assignBudgetFromField":
                     await self._assign_budget_from_field(action)
+                elif action.type == "assignBudgetFromApplicantGremium":
+                    await self._assign_budget_from_applicant_gremium(action)
+                elif action.type == "assignBudgetFromMap":
+                    await self._assign_budget_from_map(action)
             except Exception:  # noqa: BLE001 — an action failure must not undo the
                 # committed state change nor block the transition's remaining actions.
                 logger.exception(
@@ -68,20 +81,14 @@ class FlowExtrasActionDispatcher:
                 )
 
     async def _add_to_next_session(self, action: DispatchedAction) -> None:
-        gremium_ref = action.params.get("gremiumId")
-        if not gremium_ref:
-            logger.warning("addToNextSession without 'gremiumId' — skipped")
-            return
-        try:
-            gremium_id = UUID(str(gremium_ref))
-        except ValueError:
-            logger.warning("addToNextSession invalid gremiumId %r — skipped", gremium_ref)
-            return
         # `Meeting.date` is a local calendar day, so compare it with the local date.
         # Only a `planned` meeting takes a new agenda item. A live or closed meeting
         # of today is not "the next session".
         today = datetime.now(ZoneInfo(get_settings().local_timezone)).date()
         async with self.sessionmaker() as session:
+            gremium_id = await self._agenda_gremium(session, action)
+            if gremium_id is None:
+                return
             meeting = await session.scalar(
                 select(Meeting)
                 .where(
@@ -110,6 +117,140 @@ class FlowExtrasActionDispatcher:
                     meeting.id,
                     exc,
                 )
+
+    @staticmethod
+    async def _agenda_gremium(
+        session: AsyncSession, action: DispatchedAction
+    ) -> UUID | None:
+        """Return the Gremium of an `addToNextSession` action, or `None` to skip it.
+
+        An explicit `gremiumId` wins. Without one the action takes the snapshot
+        `application.vote_gremium_id`: the engine set it in the transaction of the
+        state change, before this post-commit dispatch.
+        """
+        if "gremiumId" not in action.params:
+            gremium_id = await session.scalar(
+                select(Application.vote_gremium_id).where(
+                    Application.id == action.application_id
+                )
+            )
+            if gremium_id is None:
+                logger.warning(
+                    "addToNextSession: application %s has no vote Gremium — skipped",
+                    action.application_id,
+                )
+            return gremium_id
+        gremium_ref = action.params.get("gremiumId")
+        if not gremium_ref:
+            logger.warning("addToNextSession with an empty 'gremiumId' — skipped")
+            return None
+        try:
+            return UUID(str(gremium_ref))
+        except ValueError:
+            logger.warning("addToNextSession invalid gremiumId %r — skipped", gremium_ref)
+            return None
+
+    async def _assign_budget_from_applicant_gremium(self, action: DispatchedAction) -> None:
+        """Assign the single cost center that a Gremium of the applicant decides on.
+
+        The candidates are the active nodes whose OWN `decision_gremium_id` (not an
+        inherited one) is a Gremium where the applicant is a member now. An optional
+        `parentId` limits the search to that node and its subtree. Exactly one
+        candidate gets assigned. Zero or several candidates assign nothing and give a
+        log line: a person then assigns the cost center by hand.
+        """
+        parent_ref = action.params.get("parentId")
+        async with self.sessionmaker() as session:
+            app = await session.get(Application, action.application_id)
+            if app is None:
+                logger.warning(
+                    "assignBudgetFromApplicantGremium: application %s missing — skipped",
+                    action.application_id,
+                )
+                return
+            gremien = await _applicant_gremien(session, app.created_by)
+            if not gremien:
+                logger.info(
+                    "assignBudgetFromApplicantGremium: applicant of %s has no Gremium — "
+                    "nothing assigned",
+                    app.id,
+                )
+                return
+            stmt = select(Budget.id).where(
+                Budget.active.is_(True), Budget.decision_gremium_id.in_(gremien)
+            )
+            if parent_ref:
+                parent_id = _parse_budget_uuid(
+                    "assignBudgetFromApplicantGremium parentId", parent_ref
+                )
+                parent_path = (
+                    await session.scalar(
+                        select(Budget.path_key).where(Budget.id == parent_id)
+                    )
+                    if parent_id is not None
+                    else None
+                )
+                if parent_path is None:
+                    logger.warning(
+                        "assignBudgetFromApplicantGremium: parent %r missing — skipped",
+                        parent_ref,
+                    )
+                    return
+                stmt = stmt.where(
+                    or_(
+                        Budget.path_key == parent_path,
+                        Budget.path_key.like(parent_path + _SEP + "%"),
+                    )
+                )
+            matches = list((await session.scalars(stmt)).all())
+            if len(matches) != 1:
+                logger.info(
+                    "assignBudgetFromApplicantGremium: %d matching cost centers for "
+                    "application %s — nothing assigned",
+                    len(matches),
+                    app.id,
+                )
+                return
+            if await self._assign_node(
+                session, app, matches[0], source="flow:applicantGremium"
+            ):
+                await session.commit()
+
+    async def _assign_budget_from_map(self, action: DispatchedAction) -> None:
+        """Assign the cost center that `map` gives for the value of a form field.
+
+        The admin maintains the map, so the target is always a curated node. A field
+        value without an entry, an empty value or a list value assigns nothing.
+        """
+        field = action.params.get("field")
+        mapping = action.params.get("map")
+        if not field or not isinstance(mapping, dict):
+            logger.warning("assignBudgetFromMap without 'field' or 'map' — skipped")
+            return
+        async with self.sessionmaker() as session:
+            app = await session.get(Application, action.application_id)
+            if app is None:
+                logger.warning(
+                    "assignBudgetFromMap: application %s missing — skipped",
+                    action.application_id,
+                )
+                return
+            raw = app.data.get(str(field)) if isinstance(app.data, dict) else None
+            if raw is None or isinstance(raw, (list, dict)) or str(raw) not in mapping:
+                logger.info(
+                    "assignBudgetFromMap: no map entry for field %r of application %s — "
+                    "nothing assigned",
+                    field,
+                    app.id,
+                )
+                return
+            budget_id = _parse_budget_uuid(
+                f"assignBudgetFromMap field {field!r}", mapping[str(raw)]
+            )
+            if budget_id is None:
+                return
+            if await self._assign_node(session, app, budget_id, source="flow:map"):
+                await session.commit()
 
     async def _assign_budget(self, action: DispatchedAction) -> None:
         budget_id = _parse_budget_uuid("assignBudget", action.params.get("budgetId"))
@@ -193,6 +334,20 @@ class FlowExtrasActionDispatcher:
         if node is None:
             logger.warning("assignBudget: budget %s missing — skipped", budget_id)
             return False
+        # Lock and re-read the row: a concurrent state change into a vote state then
+        # waits for this commit, or this read sees it.
+        await session.get(
+            Application, app.id, with_for_update=True, populate_existing=True
+        )
+        if await in_budget_vote_state(session, app):
+            # The deciding Gremium of the running vote came from the current cost
+            # center (`application.vote_gremium_id`). The manual route gives 409 here.
+            logger.warning(
+                "assignBudget: application %s is in a vote whose Gremium comes from "
+                "the cost center — no change",
+                app.id,
+            )
+            return False
         if app.budget_id == node.id:
             logger.info(
                 "assignBudget: application %s already has budget %s — no change",
@@ -228,6 +383,7 @@ class FlowExtrasActionDispatcher:
                 "source": source,
             },
         )
+        await fill_snapshot(session, app)
         return True
 
     @staticmethod
@@ -242,6 +398,11 @@ class FlowExtrasActionDispatcher:
                 break
             current = parent
         return current
+
+
+async def _applicant_gremien(session: AsyncSession, sub: str | None) -> list[UUID]:
+    """Return the Gremien where the applicant is a member now (as `applicantCommitteeIs`)."""
+    return [UUID(g) for g in await committee_ids_for_sub(session, sub)]
 
 
 def _parse_budget_uuid(label: str, ref: object) -> UUID | None:

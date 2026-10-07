@@ -13,6 +13,7 @@ import {
   type ActionDef,
   COMPARE_OPS,
   GUARD_ACTOR_OPERATORS,
+  GUARD_BOOL_OPERATORS,
   GUARD_COMBINATORS,
   GUARD_LEAF_OPERATORS,
   type Guard,
@@ -44,6 +45,10 @@ const COMBINATOR_SET = new Set<string>(GUARD_COMBINATORS);
 const ACTION_SET = new Set<string>(ACTION_TYPES);
 const COMPARE_OP_SET = new Set<string>(COMPARE_OPS);
 const RECIPIENT_SET = new Set<string>(NOTIFY_RECIPIENT_KINDS);
+const BOOL_SET = new Set<string>(GUARD_BOOL_OPERATORS);
+/** Recipient kinds that need a `ref`, and the kinds that must not have one. */
+const REF_KINDS = new Set<string>(['gremium', 'role', 'email']);
+const NO_REF_KINDS = new Set<string>(['applicant', 'voteGremium', 'budgetGremium']);
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -99,6 +104,12 @@ export function validateGuard(guard: Guard | null | undefined, allowActorOps = t
     validateCompare(value);
     return;
   }
+  if (BOOL_SET.has(op)) {
+    if (typeof value !== 'boolean') {
+      throw new GuardError('admin.flow.err.guardNeedsBool', { op });
+    }
+    return;
+  }
   // These operators need a non-empty value. The server rejects an empty one.
   if (
     op === 'roleIs' ||
@@ -148,9 +159,16 @@ export function validateAction(action: ActionDef | null | undefined): void {
   } else if (type === 'notify') {
     validateRecipients(action['recipients']);
   } else if (type === 'addToNextSession') {
-    if (typeof action['gremiumId'] !== 'string' || !action['gremiumId']) {
+    // The gremium is optional: without it the action takes the gremium of the vote.
+    if ('gremiumId' in action && !isNonEmptyString(action['gremiumId'])) {
       throw new GuardError('admin.flow.err.actionGremium');
     }
+  } else if (type === 'assignBudgetFromApplicantGremium') {
+    if ('parentId' in action && !isNonEmptyString(action['parentId'])) {
+      throw new GuardError('admin.flow.err.actionParent');
+    }
+  } else if (type === 'assignBudgetFromMap') {
+    validateBudgetMap(action);
   } else if (type === 'assignBudget') {
     if (typeof action['budgetId'] !== 'string' || !action['budgetId']) {
       throw new GuardError('admin.flow.err.actionBudget');
@@ -158,6 +176,29 @@ export function validateAction(action: ActionDef | null | undefined): void {
   } else if (type === 'assignBudgetFromField') {
     if (typeof action['field'] !== 'string' || !action['field']) {
       throw new GuardError('admin.flow.err.actionField');
+    }
+  }
+}
+
+function isNonEmptyString(v: unknown): v is string {
+  return typeof v === 'string' && v.trim() !== '';
+}
+
+/** `assignBudgetFromMap`: a form field and a non-empty map of field value → cost center. */
+function validateBudgetMap(action: Record<string, unknown>): void {
+  if (!isNonEmptyString(action['field'])) {
+    throw new GuardError('admin.flow.err.actionField');
+  }
+  const map = action['map'];
+  if (!isRecord(map) || Object.keys(map).length === 0) {
+    throw new GuardError('admin.flow.err.actionMapEmpty');
+  }
+  for (const [value, budgetId] of Object.entries(map)) {
+    if (value.trim() === '') {
+      throw new GuardError('admin.flow.err.actionMapValue');
+    }
+    if (!isNonEmptyString(budgetId)) {
+      throw new GuardError('admin.flow.err.actionMapBudget', { value });
     }
   }
 }
@@ -170,9 +211,12 @@ function validateRecipients(recipients: unknown): void {
     if (!isRecord(r) || !RECIPIENT_SET.has(String(r['kind']))) {
       throw new GuardError('admin.flow.err.notifyRecipientInvalid');
     }
-    const kind = r['kind'];
-    if ((kind === 'gremium' || kind === 'role' || kind === 'email') && !r['ref']) {
-      throw new GuardError('admin.flow.err.notifyRecipientValue', { kind: String(kind) });
+    const kind = String(r['kind']);
+    if (REF_KINDS.has(kind) && !r['ref']) {
+      throw new GuardError('admin.flow.err.notifyRecipientValue', { kind });
+    }
+    if (NO_REF_KINDS.has(kind) && r['ref'] != null) {
+      throw new GuardError('admin.flow.err.notifyRecipientNoRef', { kind });
     }
   }
 }

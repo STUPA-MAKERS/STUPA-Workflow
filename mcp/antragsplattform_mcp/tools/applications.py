@@ -45,7 +45,11 @@ async def list_applications(
 
 @group.tool
 async def get_application(application_id: str) -> dict:
-    """Get one application with its data, state, applicant and budget binding."""
+    """Get one application with its data, state, applicant and budget binding.
+
+    `voteGremiumId` names the Gremium that decides the current vote. The server sets it
+    when the application enters a vote state and clears it when the application leaves.
+    """
     return await api().get(f"/applications/{application_id}")
 
 

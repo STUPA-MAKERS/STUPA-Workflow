@@ -51,13 +51,16 @@ TYPICAL FLOWS:
   `protocol.finalize` and `vote.manage` come from your role in the meeting's gremium (or
   from admin), and the `meetings:write` / `votes:write` scope must let them through.
 - Votes are GREMIUM votes: `create_application_vote` takes the gremium UUID of the
-  application as `eligibleGroup`. There is no global vote right; `vote.manage` or
+  application as `eligibleGroup`: `voteGremiumId` of `get_application` while the
+  application sits in a vote state. There is no global vote right; `vote.manage` or
   `session.manage` in that gremium manages the vote. `get_vote` returns `canManage`.
 - Minutes (Protokoll): `get_or_create_protocol(meeting_id)` → `update_protocol(markdown)` →
   `finalize_protocol`. Finalize needs the gremium permission `protocol.finalize` on top of
   the write access (`canFinalize` on the meeting). Finalize is ASYNC: re-fetch until
   `status` is `final`, a fall back to `draft` means the render failed.
-- Budget: `list_budgets` (tree), `update_budget`, `book_expense`, `set_allocation`,
+- Budget: `list_budgets` (tree, with the own and the inherited deciding Gremium per node:
+  `decisionGremiumId`, `effectiveDecisionGremiumId`, `decisionGremiumSourceId`),
+  `update_budget` (sets `decisionGremiumId`), `book_expense`, `set_allocation`,
   `create_budget_transfer`; bind an application via `assign_application_budget`. Browse all
   bookings flat/filtered with `list_expenses`.
 - Invoices (#invoices): `list_invoices`/`get_invoice`/`create_invoice`/`update_invoice`/

@@ -41,7 +41,7 @@ class _Session:
         self.active_fy = list(active_fy)
         self.committed = 0
 
-    async def get(self, _model: Any, ident: UUID) -> Any:
+    async def get(self, _model: Any, ident: UUID, **_kw: Any) -> Any:
         return self.store.get(ident)
 
     async def scalars(self, _stmt: Any) -> _Result:
@@ -87,7 +87,8 @@ async def test_assign_from_field_runs_once_per_idempotency_key(
     monkeypatch.setattr(extras_mod, "audit_record", _audit)
     app_id, node_id, fy_id = uuid4(), uuid4(), uuid4()
     app = SimpleNamespace(
-        id=app_id, budget_id=None, fiscal_year_id=None, data={"ziel": str(node_id)}
+        id=app_id, budget_id=None, fiscal_year_id=None,
+        current_state_id=None, data={"ziel": str(node_id)}
     )
     node = SimpleNamespace(id=node_id, parent_id=None, active=True)
     session = _Session({app_id: app, node_id: node}, (fy_id,))

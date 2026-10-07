@@ -150,6 +150,75 @@ async def render_protocol(ctx: dict[str, Any], protocol_id: str) -> str:
     return "final"
 
 
+async def backfill_public_protocols(ctx: dict[str, Any], gremium_id: str) -> str:
+    """Build the missing public versions of the final protocols of a gremium.
+
+    The admin router enqueues the job when a gremium switches `protocols_public` on.
+    A protocol that hit a transient error (typst 5xx, transport, storage) makes the
+    job retry with a linear backoff up to `pdf_max_tries`. A permanent error of one
+    protocol does not retry: that protocol stays hidden.
+
+    Returns:
+        A short summary: `"done=<n> transient=<n> failed=<n>"`.
+    """
+    settings: Settings = ctx["settings"]
+    maker = _sessionmaker(ctx)
+    async with maker() as session:
+        result = await _service(ctx, session).backfill_public(UUID(gremium_id))
+    summary = f"done={result.done} transient={result.transient} failed={result.failed}"
+    if result.transient:
+        job_try = int(ctx.get("job_try", 1))
+        if job_try < settings.pdf_max_tries:
+            defer = settings.pdf_retry_backoff_seconds * job_try
+            logger.warning(
+                "public backfill incomplete (try=%s, retry in %ss, gremium=%s): %s",
+                job_try,
+                defer,
+                gremium_id,
+                summary,
+            )
+            raise Retry(defer=defer)
+        logger.error(
+            "public backfill gave up after %s tries (gremium=%s): %s",
+            job_try,
+            gremium_id,
+            summary,
+        )
+    return summary
+
+
+async def heal_public_protocols(ctx: dict[str, Any]) -> str:
+    """Build the missing public versions of all public gremien (hourly cron).
+
+    A backfill job can fail (Redis down at enqueue time, a render error that ran out
+    of tries) or race with a finalize. This job finds every public gremium with a
+    final, not held back protocol without its public version and runs the backfill
+    for it. Errors of one gremium only log.
+
+    Returns:
+        A short summary: `"gremien=<n> done=<n> failed=<n>"`.
+    """
+    maker = _sessionmaker(ctx)
+    async with maker() as session:
+        gremien = await _service(ctx, session).gremien_missing_public()
+    done = failed = 0
+    for gremium_id in gremien:
+        try:
+            async with maker() as session:
+                result = await _service(ctx, session).backfill_public(
+                    gremium_id, retry_failed=False
+                )
+        except Exception:  # noqa: BLE001 - one gremium must not stop the others
+            logger.exception("public heal failed (gremium=%s)", gremium_id)
+            failed += 1
+            continue
+        done += result.done
+        failed += result.transient + result.failed
+    if failed:
+        logger.warning("public heal left %s protocols without a public version", failed)
+    return f"gremien={len(gremien)} done={done} failed={failed}"
+
+
 async def on_startup(ctx: dict[str, Any]) -> None:
     """Build the render dependencies once per worker.
 

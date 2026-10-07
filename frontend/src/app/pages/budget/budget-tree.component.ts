@@ -196,6 +196,9 @@ export class BudgetTreeComponent {
   /** Visibility Gremium. Its members see the subtree in the budget tab as a root.
    *  An empty string means no assignment. */
   readonly editViewGremium = signal('');
+  /** Own deciding gremium of the node. An empty string means none: the node inherits
+   *  the gremium of the nearest ancestor that has one. */
+  readonly editDecisionGremium = signal('');
   readonly gremiumOptions = signal<SelectOption[]>([]);
   /** Delete a cost centre after a confirmation; a 409 names the reason in the dialog. */
   readonly nodeDelete = signal<BudgetTreeNode | null>(null);
@@ -720,7 +723,34 @@ export class BudgetTreeComponent {
     this.editActive.set(node.active);
     this.editHidden.set(node.hiddenInBudget);
     this.editViewGremium.set(node.viewGremiumId ?? '');
+    this.editDecisionGremium.set(node.decisionGremiumId ?? '');
   }
+
+  /**
+   * The hint under the deciding-gremium select. Without an own value the node takes
+   * the effective gremium of its parent (`effectiveDecisionGremiumId`, served by the
+   * API), so the hint names the node that supplies it (`decisionGremiumSourceId`):
+   * "Geerbt von …". Without one it says that no gremium decides.
+   */
+  readonly decisionGremiumHint = computed<string>(() => {
+    const node = this.editNode();
+    if (!node) return '';
+    if (this.editDecisionGremium()) return this.i18n.translate('budget.tree.decisionGremiumHint');
+    const parent = node.parentId ? this.findNode(node.parentId) : undefined;
+    const gremiumId = parent?.effectiveDecisionGremiumId;
+    const source = parent?.decisionGremiumSourceId
+      ? this.findNode(parent.decisionGremiumSourceId)
+      : undefined;
+    if (!gremiumId || !source) return this.i18n.translate('budget.tree.decisionGremiumNoneHint');
+    const gremium =
+      this.gremiumOptions().find((o) => o.value === gremiumId)?.label ??
+      this.i18n.translate('budget.tree.unknownGremium');
+    return this.i18n.translate('budget.tree.decisionGremiumInherited', {
+      path: source.pathKey,
+      name: source.name,
+      gremium,
+    });
+  });
 
   closeEditNode(): void {
     this.editNode.set(null);
@@ -755,6 +785,10 @@ export class BudgetTreeComponent {
         active: this.editActive(),
         hiddenInBudget: this.editHidden(),
         viewGremiumId: this.editViewGremium() || null,
+        // Send the deciding gremium only on a change: each sent field is audited.
+        ...(this.editDecisionGremium() !== (node.decisionGremiumId ?? '')
+          ? { decisionGremiumId: this.editDecisionGremium() || null }
+          : {}),
       })
       .subscribe({
         next: () => {

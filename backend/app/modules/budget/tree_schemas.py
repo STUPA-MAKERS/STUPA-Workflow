@@ -35,6 +35,8 @@ class BudgetNodeCreate(_CamelModel):
     name: str = Field(min_length=1, max_length=200)
     parent_id: UUID | None = Field(default=None, alias="parentId")
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+    # Deciding Gremium of the node and its subtree (flow variant B). Optional.
+    decision_gremium_id: UUID | None = Field(default=None, alias="decisionGremiumId")
     currency: str = Field(default="EUR", min_length=3, max_length=3)
     active: bool = True
     color: str | None = None
@@ -61,6 +63,9 @@ class BudgetNodeUpdate(_CamelModel):
     hidden_in_budget: bool | None = Field(default=None, alias="hiddenInBudget")
     # Visibility Gremium. `None` in the payload clears the assignment.
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
+    # Deciding Gremium. `None` in the payload clears it; the node then inherits the
+    # value of the nearest ancestor.
+    decision_gremium_id: UUID | None = Field(default=None, alias="decisionGremiumId")
     fiscal_start_month: int | None = Field(default=None, ge=1, le=12, alias="fiscalStartMonth")
     # 1..28: see `BudgetNodeCreate`. The cutoff must exist in every month.
     fiscal_start_day: int | None = Field(default=None, ge=1, le=28, alias="fiscalStartDay")
@@ -82,6 +87,16 @@ class BudgetNodeOut(_CamelModel):
     denied_state_keys: list[str] = Field(default_factory=list, alias="deniedStateKeys")
     hidden_in_budget: bool = Field(default=False, alias="hiddenInBudget")
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
+    # The own deciding Gremium, the effective one (own or nearest ancestor) and the
+    # node that holds the effective value. The UI shows "inherited from ..." when the
+    # source is an ancestor.
+    decision_gremium_id: UUID | None = Field(default=None, alias="decisionGremiumId")
+    effective_decision_gremium_id: UUID | None = Field(
+        default=None, alias="effectiveDecisionGremiumId"
+    )
+    decision_gremium_source_id: UUID | None = Field(
+        default=None, alias="decisionGremiumSourceId"
+    )
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
 
@@ -122,6 +137,16 @@ class BudgetTreeNodeOut(_CamelModel):
     denied_state_keys: list[str] = Field(default_factory=list, alias="deniedStateKeys")
     hidden_in_budget: bool = Field(default=False, alias="hiddenInBudget")
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
+    # The own deciding Gremium, the effective one (own or nearest ancestor) and the
+    # node that holds the effective value. The UI shows "inherited from ..." when the
+    # source is an ancestor.
+    decision_gremium_id: UUID | None = Field(default=None, alias="decisionGremiumId")
+    effective_decision_gremium_id: UUID | None = Field(
+        default=None, alias="effectiveDecisionGremiumId"
+    )
+    decision_gremium_source_id: UUID | None = Field(
+        default=None, alias="decisionGremiumSourceId"
+    )
     fiscal_start_month: int = Field(default=1, alias="fiscalStartMonth")
     fiscal_start_day: int = Field(default=1, alias="fiscalStartDay")
     by_fiscal_year: list[AllocationView] = Field(default_factory=list, alias="byFiscalYear")

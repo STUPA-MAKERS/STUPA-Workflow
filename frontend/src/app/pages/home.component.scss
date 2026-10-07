@@ -13,6 +13,10 @@
   align-items: center;
   gap: var(--space-6);
   width: min(55rem, 100%);
+}
+/* Three choices need the width of the protocol pages. */
+.home:has(.home__choices--three) {
+  width: min(67.5rem, 100%);
   padding-block: var(--space-8);
 }
 .home__head {
@@ -89,11 +93,83 @@
   font-size: var(--fs-sm);
   font-weight: var(--fw-semibold);
 }
+.home__choices--three {
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+}
 .home__note {
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--fs-sm);
   text-align: center;
+}
+
+/* "Zuletzt veröffentlicht": the newest public protocols, three in a row. */
+.home__latest {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  margin-top: var(--space-2);
+  padding: var(--space-5) var(--space-5) var(--space-3);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.home__latestTitle {
+  margin: 0;
+  padding: 0 var(--space-1);
+  font-size: var(--fs-h2);
+  line-height: var(--lh-h2);
+  font-weight: var(--fw-semibold);
+}
+.home__latestList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.home__latestItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  height: 100%;
+  padding: 14px var(--space-4);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  text-decoration: none;
+}
+.home__latestItem:hover {
+  background: var(--color-surface-3);
+}
+.home__latestItem:focus-visible,
+.home__latestAll:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.home__latestText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.home__latestName {
+  font-weight: var(--fw-semibold);
+}
+.home__latestMeta {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+}
+.home__latestAll {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 6px;
+  padding: var(--space-2) var(--space-1);
+  color: var(--color-accent-text);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
 }
 
 @include bp.phone {

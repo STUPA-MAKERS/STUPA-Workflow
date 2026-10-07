@@ -39,6 +39,8 @@ export class FlowEditorOptionsService {
   readonly deadlinePolicyOptions = signal<SelectOption[]>([]);
   /** Cost-center names (id maps to "name (key)") that resolve `budgetIs` guard values. */
   readonly budgetNameById = signal<ReadonlyMap<string, string>>(new Map());
+  /** The cost-center tree (roots with children) for the cost-center pickers of actions. */
+  readonly budgetTree = signal<BudgetTreeNode[]>([]);
 
   constructor() {
     this.options
@@ -87,6 +89,7 @@ export class FlowEditorOptionsService {
           };
           walk(roots);
           this.budgetNameById.set(map);
+          this.budgetTree.set(roots);
         },
         error: () => undefined,
       });

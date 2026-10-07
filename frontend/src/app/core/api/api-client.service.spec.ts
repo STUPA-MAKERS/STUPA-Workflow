@@ -1081,6 +1081,32 @@ describe('ApiClient', () => {
     req.flush({ id: 'p-1', meetingId: 'm-1', markdown: '# x', status: 'final' });
   });
 
+  it('finalizes a protocol held back from the public page', () => {
+    api.finalizeProtocol('p-1', { publicWithheld: true }).subscribe();
+    const req = http.expectOne('/api/protocols/p-1/finalize');
+    expect(req.request.body).toEqual({ publicWithheld: true });
+    req.flush({ id: 'p-1', meetingId: 'm-1', markdown: '', status: 'rendering' });
+  });
+
+  it('PATCHes the publication of a protocol', (done) => {
+    api.setProtocolWithheld('p-1', false).subscribe((p) => {
+      expect(p.publicWithheld).toBe(false);
+      expect(p.gremiumProtocolsPublic).toBe(true);
+      done();
+    });
+    const req = http.expectOne('/api/protocols/p-1');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ publicWithheld: false });
+    req.flush({
+      id: 'p-1',
+      meetingId: 'm-1',
+      markdown: '',
+      status: 'final',
+      publicWithheld: false,
+      gremiumProtocolsPublic: true,
+    });
+  });
+
   it('lists notification preferences', (done) => {
     api.listNotificationPreferences().subscribe((prefs) => {
       expect(prefs).toEqual([]);

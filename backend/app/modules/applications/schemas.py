@@ -149,6 +149,8 @@ class ApplicationOut(_CamelModel):
     type_id: UUID = Field(alias="typeId")
     state: StateOut | None = None
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
+    # The Gremium that decides the current vote state (snapshot), else null.
+    vote_gremium_id: UUID | None = Field(default=None, alias="voteGremiumId")
     budget_id: UUID | None = Field(default=None, alias="budgetId")
     fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
     amount: Decimal | None = None

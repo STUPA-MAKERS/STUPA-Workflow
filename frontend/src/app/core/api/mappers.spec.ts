@@ -621,6 +621,8 @@ describe('mapProtocol', () => {
     expect(p.isFinal).toBe(false);
     expect(p.pdfUrl).toBeNull();
     expect(p.sentAt).toBeNull();
+    expect(p.publicWithheld).toBe(false);
+    expect(p.gremiumProtocolsPublic).toBe(false);
   });
 
   it('marks a rendering protocol as locked but not final, and keeps publicPdfUrl', () => {
