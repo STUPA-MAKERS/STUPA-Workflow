@@ -10,6 +10,7 @@ import { MeetingSettingsDialogComponent } from './meeting-settings-dialog.compon
 const MEETING = {
   id: 'm-1',
   title: '35. Sitzung',
+  gremiumName: 'Studierendenparlament',
   status: 'planned',
   date: '2026-10-13',
   startTime: '18:00',
@@ -55,11 +56,12 @@ describe('MeetingSettingsDialogComponent', () => {
     http.verify();
   });
 
-  it('names the meeting and offers the members who can keep the minutes plus the current one (O20)', async () => {
+  it('names the gremium and offers the members who can keep the minutes plus the current one (O20)', async () => {
     const { http, fixture } = await setup();
     flushRoster(http, fixture);
     const dialog = screen.getByRole('dialog', { name: 'Sitzung bearbeiten' });
-    expect(dialog).toHaveAccessibleDescription('35. Sitzung');
+    expect(dialog).toHaveAccessibleDescription('Studierendenparlament');
+    expect(within(dialog).getByLabelText(/Titel/)).toHaveValue('35. Sitzung');
     const keeper = within(dialog).getByLabelText('Protokollführung') as HTMLSelectElement;
     expect(within(keeper).getAllByRole('option').map((o) => o.textContent?.trim())).toEqual([
       '— niemand —',
@@ -105,7 +107,44 @@ describe('MeetingSettingsDialogComponent', () => {
     flushRoster(http, fixture);
     expect(screen.getByText(/Sitzung ist geschlossen/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+    expect(screen.getByLabelText(/Titel/)).toBeDisabled();
     cmp.save();
+    http.verify();
+  });
+
+  it('saves a new title, without the outer blanks', async () => {
+    const { http, fixture } = await setup();
+    flushRoster(http, fixture);
+    const field = screen.getByLabelText(/Titel/);
+    await userEvent.clear(field);
+    await userEvent.type(field, '  Vollversammlung ');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    const req = http.expectOne('/api/meetings/m-1');
+    expect(req.request.body).toEqual({
+      title: 'Vollversammlung',
+      protokollantId: 'p-2',
+      date: '2026-10-13',
+      startTime: '18:00',
+      endTime: null,
+    });
+  });
+
+  it('needs a title and refuses one that is too long', async () => {
+    const { http, fixture, cmp, toasts } = await setup();
+    flushRoster(http, fixture);
+    cmp.title.set('   ');
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+    cmp.save();
+    expect(toasts()).toContain('Der Titel ist erforderlich.');
+    cmp.title.set('x'.repeat(201));
+    fixture.detectChanges();
+    expect(screen.getByText('Der Titel darf höchstens 200 Zeichen haben.')).toBeInTheDocument();
+    cmp.save();
+    expect(toasts()).toContain('Der Titel darf höchstens 200 Zeichen haben.');
+    cmp.title.set('x'.repeat(200));
+    fixture.detectChanges();
+    expect(screen.queryByText('Der Titel darf höchstens 200 Zeichen haben.')).toBeNull();
     http.verify();
   });
 

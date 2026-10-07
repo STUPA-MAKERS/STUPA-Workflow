@@ -417,6 +417,10 @@ class MeetingCreate(WireModel):
 class MeetingPatch(WireModel):
     activeApplicationId: str | None = None
     status: Literal["planned", "live", "closed"] | None = None
+    title: str | None = Field(
+        default=None,
+        description="New title, 1 to 200 characters. A closed meeting keeps its title (409).",
+    )
     date: str | None = None
     startTime: str | None = None
     protokollantId: str | None = None

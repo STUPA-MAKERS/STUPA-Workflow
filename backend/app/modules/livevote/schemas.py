@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import date as _date
 from datetime import datetime as _datetime
 from datetime import time as _time
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from app.modules.voting.schemas import MyBallot
 from app.shared.config_schemas import Quorum
@@ -16,6 +16,12 @@ from app.shared.config_schemas import Quorum
 MeetingStatus = Literal["planned", "live", "closed"]
 # #17: admitted guests of a public meeting vote (`vote`) or only follow it (`watch`).
 GuestsMode = Literal["vote", "watch"]
+# The title of a meeting. Create and patch use the same rule: the server strips the
+# outer blanks, and the rest must hold at least one character.
+MEETING_TITLE_MAX = 200
+MeetingTitle = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MEETING_TITLE_MAX)
+]
 
 
 class _CamelModel(BaseModel):
@@ -31,7 +37,7 @@ class MeetingCreate(_CamelModel):
     """``POST /api/meetings`` — create a meeting (status ``planned``)."""
 
     gremium_id: UUID = Field(alias="gremiumId")
-    title: str = Field(min_length=1)
+    title: MeetingTitle
     date: _date
     start_time: _time = Field(alias="startTime")
     # Without an end time the iCal feed assumes a duration of one hour.
@@ -60,6 +66,9 @@ class MeetingPatch(_CamelModel):
     # ``canManageVotes``: the protokollant or the session lead.
     current_agenda_item_id: UUID | None = Field(default=None, alias="currentAgendaItemId")
     status: MeetingStatus | None = None
+    # A new title. Needs ``canManage``, like the date and the time. A closed meeting
+    # keeps its title (409), because the sent protocol names the meeting.
+    title: MeetingTitle | None = None
     date: _date | None = None
     start_time: _time | None = Field(default=None, alias="startTime")
     end_time: _time | None = Field(default=None, alias="endTime")
@@ -71,7 +80,10 @@ class MeetingPatch(_CamelModel):
 
     @model_validator(mode="after")
     def _at_least_one(self) -> MeetingPatch:
+        if "title" in self.model_fields_set and self.title is None:
+            raise ValueError("title must not be null")
         managed = {
+            "title",
             "date",
             "start_time",
             "end_time",
@@ -87,7 +99,7 @@ class MeetingPatch(_CamelModel):
         ):
             raise ValueError(
                 "at least one of 'status', 'activeApplicationId', 'currentAgendaItemId', "
-                "'date', 'startTime', 'endTime', 'protokollantId', 'publicJoin' or "
+                "'title', 'date', 'startTime', 'endTime', 'protokollantId', 'publicJoin' or "
                 "'guestsMode' required"
             )
         return self

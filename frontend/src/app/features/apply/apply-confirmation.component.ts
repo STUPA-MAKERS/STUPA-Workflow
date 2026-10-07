@@ -4,10 +4,13 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
+import { submittedMarkdown } from '@core/branding/submitted-texts';
+import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { IconComponent } from '@stupa-makers/ui-kit';
+import { renderMarkdown } from '../meetings/meetings.util';
 import { shortRef } from './apply.util';
 
 /**
@@ -30,6 +33,11 @@ import { shortRef } from './apply.util';
  *
  * Both show the reference: the first 8 characters of the id (house rule
  * `no-uuids-in-ui` allows only this short form).
+ *
+ * The main text of each state comes from `/admin/branding` ("Texte nach dem
+ * Einreichen", `freetexts.submittedInternal` and `freetexts.submittedExternal`) as
+ * Markdown in the language of the page. An empty text gives the built-in text.
+ * `renderMarkdown` escapes all HTML first, and Angular sanitizes the `innerHTML`.
  */
 @Component({
   selector: 'app-apply-confirmation',
@@ -43,6 +51,7 @@ export class ApplyConfirmationComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly auth = inject(AuthService);
   private readonly branding = inject(BrandingService);
+  private readonly i18n = inject(I18nService);
 
   /**
    * True when a principal is logged in. The backend confirms such a submitter
@@ -56,6 +65,19 @@ export class ApplyConfirmationComponent {
   protected readonly linkTtlDays = this.branding.linkTtlDays;
   /** The config loaded, so `linkTtlDays` is the real setting. */
   protected readonly linkTtlLoaded = this.branding.loaded;
+
+  /** The text for a signed-in applicant, as HTML. */
+  protected readonly internalHtml = computed(() =>
+    renderMarkdown(
+      submittedMarkdown(this.branding.freetexts().submittedInternal, 'internal', this.i18n.locale()),
+    ),
+  );
+  /** The text for a guest, as HTML. */
+  protected readonly externalHtml = computed(() =>
+    renderMarkdown(
+      submittedMarkdown(this.branding.freetexts().submittedExternal, 'external', this.i18n.locale()),
+    ),
+  );
 
   readonly applicationId = toSignal(
     this.route.queryParamMap.pipe(map((p) => p.get('id'))),

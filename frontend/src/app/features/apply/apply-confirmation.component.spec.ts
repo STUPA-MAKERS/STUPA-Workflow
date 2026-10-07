@@ -4,7 +4,7 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import { AuthService } from '@core/auth/auth.service';
-import { BrandingService } from '@core/branding/branding.service';
+import { BrandingService, type FreeTexts } from '@core/branding/branding.service';
 import { ApplyConfirmationComponent } from './apply-confirmation.component';
 
 const FULL_ID = '1195a615-3a71-4cfe-9ae0-3ba0c2c4b7e9';
@@ -19,6 +19,7 @@ describe('ApplyConfirmationComponent', () => {
     id: string | null = FULL_ID,
     hours?: number,
     linkDays: number | null = null,
+    freetexts: FreeTexts = {},
   ) {
     return render(ApplyConfirmationComponent, {
       providers: [
@@ -32,6 +33,7 @@ describe('ApplyConfirmationComponent', () => {
                   confirmTtlHours: signal(hours),
                   linkTtlDays: signal(linkDays),
                   loaded: signal(true),
+                  freetexts: signal(freetexts),
                 },
               },
             ]),
@@ -155,6 +157,47 @@ describe('ApplyConfirmationComponent', () => {
     await setup(true, null);
     expect(screen.queryByText(/Vorgangsnummer/)).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Antrag öffnen' })).toBeNull();
+  });
+
+  describe('texts from /admin/branding', () => {
+    const TEXTS: FreeTexts = {
+      submittedInternal: { de: 'Danke, **intern**.', en: 'Thanks, *internal*.' },
+      submittedExternal: { de: 'Bitte [Link](https://x.de) öffnen.\n\n<img src=x onerror=alert(1)>' },
+    };
+
+    it('shows the configured internal text as Markdown', async () => {
+      const { container } = await setup(true, FULL_ID, 12, null, TEXTS);
+      const text = container.querySelector('[data-testid="submitted-text"]') as HTMLElement;
+      expect(text.innerHTML).toContain('<strong>intern</strong>');
+      expect(screen.queryByText(/E-Mail-Adresse ist über dein Konto/)).toBeNull();
+    });
+
+    it('shows the configured external text and never renders raw HTML', async () => {
+      const { container } = await setup(false, FULL_ID, 12, null, TEXTS);
+      const text = container.querySelector('[data-testid="submitted-text"]') as HTMLElement;
+      expect(screen.getByRole('link', { name: 'Link' })).toHaveAttribute('href', 'https://x.de');
+      expect(text.querySelector('img')).toBeNull();
+      expect(text.textContent).toContain('<img src=x onerror=alert(1)>');
+      expect(screen.queryByText(/persönlichen Link/)).toBeNull();
+    });
+
+    it('takes the text of the page language', async () => {
+      localStorage.setItem('ap.locale', 'en');
+      const { container } = await setup(true, FULL_ID, 12, null, TEXTS);
+      const text = container.querySelector('[data-testid="submitted-text"]') as HTMLElement;
+      expect(text.innerHTML).toContain('<em>internal</em>');
+    });
+
+    it('falls back to the built-in text when the language has no text', async () => {
+      localStorage.setItem('ap.locale', 'en');
+      await setup(false, FULL_ID, 12, null, TEXTS);
+      expect(screen.getByText(/personal link/)).toBeInTheDocument();
+    });
+
+    it('falls back to the built-in text when the text is blank', async () => {
+      await setup(true, FULL_ID, 12, null, { submittedInternal: { de: '   ' } });
+      expect(screen.getByText(/E-Mail-Adresse ist über dein Konto/)).toBeInTheDocument();
+    });
   });
 
   it('hides the reference line when the query has no id', async () => {

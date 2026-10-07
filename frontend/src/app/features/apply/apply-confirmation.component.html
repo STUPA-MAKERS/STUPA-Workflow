@@ -4,7 +4,7 @@
       <app-icon class="done__icon done__icon--ok" name="check" [size]="32" [strokeWidth]="2" />
       <app-status-text kind="accent">{{ 'apply.submitted.badge' | t }}</app-status-text>
       <h1 class="done__title" id="done-title">{{ 'apply.submitted.heading' | t }}</h1>
-      <p class="done__text">{{ 'apply.submitted.body' | t }}</p>
+      <div class="done__text" data-testid="submitted-text" [innerHTML]="internalHtml()"></div>
       @if (shortRef()) {
         <p class="done__meta">
           {{ 'apply.confirm.ref' | t }} <span class="mono done__ref">{{ shortRef() }}</span>
@@ -24,7 +24,7 @@
       <app-icon class="done__icon done__icon--warn" name="mail" [size]="32" [strokeWidth]="1.6" />
       <app-status-text kind="warn">{{ 'apply.confirm.badge' | t }}</app-status-text>
       <h1 class="done__title" id="done-title">{{ 'apply.confirm.heading' | t }}</h1>
-      <p class="done__text">{{ 'apply.confirm.body' | t }}</p>
+      <div class="done__text" data-testid="submitted-text" [innerHTML]="externalHtml()"></div>
       <app-note icon="clock" role="note">
         {{ 'apply.confirm.expiry' | t: { hours: confirmTtlHours() } }}
       </app-note>

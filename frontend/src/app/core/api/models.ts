@@ -61,7 +61,16 @@ export interface PublicSiteConfig {
     /** Footer columns: a heading and its links each. Empty shows no column. */
     footerColumns?: PublicFooterColumn[];
     freetexts?: Partial<
-      Record<'loginHint' | 'welcome' | 'support' | 'emailFooter' | 'applyInfo', I18nMap>
+      Record<
+        | 'loginHint'
+        | 'welcome'
+        | 'support'
+        | 'emailFooter'
+        | 'applyInfo'
+        | 'submittedInternal'
+        | 'submittedExternal',
+        I18nMap
+      >
     >;
     /** Show the Gravatar images of the avatars (through the API proxy). Missing = on. */
     gravatarEnabled?: boolean;
@@ -1241,6 +1250,8 @@ export interface MeetingPatchBody {
   activeApplicationId?: Uuid | null;
   /** The agenda item the room handles now. `null` clears it. Protokollant or session lead. */
   currentAgendaItemId?: Uuid | null;
+  /** New title (1 to 200 characters). Planned or live only: a closed meeting gives 409. */
+  title?: string;
   /** Planned meeting date (`YYYY-MM-DD`). Use it to schedule a planned meeting. */
   date?: string | null;
   /** Planned time (`HH:mm`). */

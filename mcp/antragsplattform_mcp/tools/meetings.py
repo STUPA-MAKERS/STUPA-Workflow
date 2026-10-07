@@ -110,8 +110,8 @@ async def create_meeting(meeting: S.MeetingCreate) -> dict:
 async def update_meeting(meeting_id: str, patch: S.MeetingPatch) -> dict:
     """Patch a meeting.
 
-    The fields are `status` (planned, live or closed), `date`, `startTime`,
-    `protokollantId` and `activeApplicationId`. Date, time and minute-taker need
+    The fields are `status` (planned, live or closed), `title`, `date`, `startTime`,
+    `protokollantId` and `activeApplicationId`. Title, date, time and minute-taker need
     session.manage in the meeting's gremium (or admin). Status and active application
     need write access (session.manage or protocol.write in the gremium, or the
     assigned minute-taker).
@@ -122,7 +122,7 @@ async def update_meeting(meeting_id: str, patch: S.MeetingPatch) -> dict:
     (`delete_meeting`), not closed. The start needs a minute-taker and sets
     `startedAt`. The close gives 409 `open_vote` while a vote of the meeting is open
     (close or cancel it first), and it cancels the draft votes. A closed meeting
-    keeps its date, time and minute-taker.
+    keeps its title, date, time and minute-taker.
 
     A new minute-taker needs protocol.write in the gremium (422
     `protokollant_needs_protocol_write`). While the meeting is live, a new

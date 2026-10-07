@@ -39,6 +39,18 @@
   margin: var(--space-1) 0 0;
   line-height: 1.55;
 }
+/* The text is Markdown from the site config: no outer gap, links in the accent colour. */
+.done__text ::ng-deep :first-child {
+  margin-top: 0;
+}
+.done__text ::ng-deep :last-child {
+  margin-bottom: 0;
+}
+/* Space between Markdown blocks (paragraphs, lists). The HTML comes from
+   `innerHTML`, so it has no view-encapsulation attribute: `::ng-deep` reaches it. */
+.done__text ::ng-deep > * + * {
+  margin-top: var(--space-2);
+}
 app-note {
   align-self: stretch;
   margin-top: var(--space-2);

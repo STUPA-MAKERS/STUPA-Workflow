@@ -178,6 +178,50 @@
   outline: none;
 }
 
+/* Texts after the submission: a card per kind on the next surface, as the footer
+   columns: the field, then the Markdown preview as the page shows it. */
+.br__subm {
+  --color-surface-sunken: var(--color-surface-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+}
+.br__submPv {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-4) var(--space-1);
+}
+.br__submPvHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 1.5rem;
+}
+.br__submPvTag {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+.br__submPvBody {
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.br__submPvBody ::ng-deep :first-child {
+  margin-top: 0;
+}
+.br__submPvBody ::ng-deep :last-child {
+  margin-bottom: 0;
+}
+/* Space between Markdown blocks (paragraphs, lists). The HTML comes from
+   `innerHTML`, so it has no view-encapsulation attribute: `::ng-deep` reaches it. */
+.br__submPvBody ::ng-deep > * + * {
+  margin-top: var(--space-2);
+}
+
 /* Footer columns: a card per column on the next surface. */
 .br__column {
   --color-surface-sunken: var(--color-surface-3);

@@ -1,7 +1,7 @@
 <app-dialog
   [open]="meeting() !== null"
   [title]="'meetings.settings.title' | t"
-  [subtitle]="meeting()?.title ?? ''"
+  [subtitle]="meeting()?.gremiumName ?? ''"
   [closeLabel]="'action.cancel' | t"
   (closed)="cancel()"
 >
@@ -11,6 +11,16 @@
     } @else if (keeperLocked()) {
       <app-note icon="lock">{{ 'meetings.protokollant.lockedHint' | t }}</app-note>
     }
+    <app-input
+      name="title"
+      [id]="'msd-title'"
+      [label]="'meetings.create.name' | t"
+      [required]="true"
+      [disabled]="locked()"
+      [error]="titleError()"
+      [ngModel]="title()"
+      (ngModelChange)="title.set($event)"
+    />
     <app-select
       name="keeper"
       [id]="'msd-keeper'"
