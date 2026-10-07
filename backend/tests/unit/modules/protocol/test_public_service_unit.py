@@ -103,6 +103,7 @@ async def test_assemble_collects_public_tops(monkeypatch: pytest.MonkeyPatch) ->
     assert tops[0].title == "Haushalt"
     # A vote already in the text as a snippet still shows its result in the list.
     assert [d.question for d in tops[0].decisions] == ["Annehmen?", "Schon im Text?"]
+    assert [d.in_text for d in tops[0].decisions] == [False, True]
     assert md.count("Schon im Text?") == 1
     assert tops[0].decisions[0].counts == {"ja": 4, "nein": 1}
     assert tops[1].non_public is True and tops[1].title is None and tops[1].markdown is None
@@ -276,10 +277,55 @@ async def test_backfill_counts_each_outcome(monkeypatch: pytest.MonkeyPatch) -> 
         if err is not None:
             raise err
 
+    counted: list[UUID] = []
+
+    async def _count(pid: UUID) -> None:
+        counted.append(pid)
+
     monkeypatch.setattr(svc, "_backfill_one", _one)
+    monkeypatch.setattr(svc, "_count_render_failure", _count)
     res = await svc.backfill_public(GID)
     assert (res.done, res.transient, res.failed) == (1, 1, 1)
     assert len(rolled) == 2
+    # Only the permanent failure counts; a transient one retries later.
+    assert counted == [ids[2]]
+
+
+async def test_count_render_failure_warns_once_at_the_limit(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    from app.modules.protocol.service import PUBLIC_RENDER_MAX_FAILURES
+
+    proto = _protocol(public_render_failures=PUBLIC_RENDER_MAX_FAILURES - 2)
+    session = FakeSession(store={PID: proto})
+    svc = _service(session)
+    with caplog.at_level("WARNING", logger="app.protocol"):
+        await svc._count_render_failure(PID)
+        assert not caplog.records
+        await svc._count_render_failure(PID)
+        assert len(caplog.records) == 1
+        await svc._count_render_failure(PID)
+        assert len(caplog.records) == 1
+    assert proto.public_render_failures == PUBLIC_RENDER_MAX_FAILURES + 1
+    assert session.committed == 3
+    # A missing protocol is a no-op.
+    await _service(FakeSession())._count_render_failure(uuid4())
+
+
+async def test_heal_backfill_skips_protocols_at_the_failure_limit() -> None:
+    session = FakeSession(results=[result(), result()])
+    statements: list[str] = []
+    original = session.scalars
+
+    async def _scalars(stmt: Any) -> Any:
+        statements.append(str(stmt))
+        return await original(stmt)
+
+    session.scalars = _scalars  # type: ignore[method-assign]
+    await _service(session).backfill_public(GID, retry_failed=False)
+    await _service(session).backfill_public(GID)
+    assert "public_render_failures" in statements[0]
+    assert "public_render_failures" not in statements[1]
 
 
 async def test_backfill_without_storage_only_needs_the_snapshot(
@@ -318,12 +364,13 @@ def _wire_build(svc: ProtocolService, monkeypatch: pytest.MonkeyPatch) -> list[s
 
 
 async def test_backfill_one_renders_a_missing_pdf(monkeypatch: pytest.MonkeyPatch) -> None:
-    proto = _protocol()
+    proto = _protocol(public_render_failures=2)
     storage = FakeStorage()
     svc = _service(FakeSession(results=[result(proto)]), storage=storage)
     rendered = _wire_build(svc, monkeypatch)
     await svc._backfill_one(PID)
     assert rendered == ["md"]
+    assert proto.public_render_failures == 0
     assert proto.public_content is not None and proto.public_content["markdown"] == "Freitext"
     assert proto.public_pdf_size == len(b"%PDF-new")
     assert storage.blobs[protocol_public_storage_key(PID)] == b"%PDF-new"
