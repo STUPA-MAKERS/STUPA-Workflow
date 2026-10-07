@@ -189,7 +189,8 @@ class FooterColumn(_CamelModel):
 
 
 class SiteFreetexts(_CamelModel):
-    """i18n freetexts (login hint, welcome, support, e-mail footer, apply info)."""
+    """i18n freetexts (login hint, welcome, support, e-mail footer, apply info,
+    texts after the submission)."""
 
     login_hint: I18nMap = Field(default_factory=dict, alias="loginHint")
     welcome: I18nMap = Field(default_factory=dict)
@@ -197,8 +198,22 @@ class SiteFreetexts(_CamelModel):
     email_footer: I18nMap = Field(default_factory=dict, alias="emailFooter")
     # Info text below the application-type selection — Markdown, per language.
     apply_info: I18nMap = Field(default_factory=dict, alias="applyInfo")
+    # The text on the page after the submission, Markdown, per language. "Internal" is
+    # for a signed-in applicant (the application is submitted at once), "external" is
+    # for a guest (the e-mail link confirms the application). An empty language falls
+    # back to the built-in text of the frontend.
+    submitted_internal: I18nMap = Field(default_factory=dict, alias="submittedInternal")
+    submitted_external: I18nMap = Field(default_factory=dict, alias="submittedExternal")
 
-    @field_validator("login_hint", "welcome", "support", "email_footer", "apply_info")
+    @field_validator(
+        "login_hint",
+        "welcome",
+        "support",
+        "email_footer",
+        "apply_info",
+        "submitted_internal",
+        "submitted_external",
+    )
     @classmethod
     def _cap_text(cls, v: I18nMap) -> I18nMap:
         return _cap_i18n(v, MAX_FREETEXT_CHARS)

@@ -48,6 +48,7 @@ _TRANSITIONS: frozenset[tuple[str, str]] = frozenset(
 # The planning fields that MEETING_UPDATE records, as (model attribute, JSON key).
 _AUDITED_FIELDS: tuple[tuple[str, str], ...] = (
     ("status", "status"),
+    ("title", "title"),
     ("date", "date"),
     ("start_time", "startTime"),
     ("end_time", "endTime"),
@@ -131,8 +132,10 @@ class LifecycleOps(HandoverOps):
         """Apply control and planning changes, then broadcast ``meeting_state``.
 
         RBAC works per field. Status and active application need ``canWrite``
-        (protokollant or manager). Date, time and the protokollant assignment need
-        ``canManage`` (meeting manager).
+        (protokollant or manager). Title, date, time and the protokollant assignment
+        need ``canManage`` (meeting manager). The title can change while the meeting
+        is ``planned`` or ``live``. A closed meeting keeps its title, because the
+        protocol that goes out names the meeting.
 
         The start (``planned`` to ``live``) sets ``started_at`` once. The close (``live``
         to ``closed``) sets ``closed_at`` and cancels the draft votes of the meeting in
@@ -155,7 +158,8 @@ class LifecycleOps(HandoverOps):
         # #17: public participation and the guest mode are planning values of the lead.
         wants_public = payload.public_join is not None or payload.guests_mode is not None
         wants_manage = (
-            "date" in payload.model_fields_set
+            "title" in payload.model_fields_set
+            or "date" in payload.model_fields_set
             or "start_time" in payload.model_fields_set
             or "end_time" in payload.model_fields_set
             or "protokollant_id" in payload.model_fields_set
@@ -215,8 +219,8 @@ class LifecycleOps(HandoverOps):
                 code="open_vote",
             )
 
-        # A closed meeting is frozen: date, time and protokollant stay immutable,
-        # because the protocol refers to this planning data.
+        # A closed meeting is frozen: title, date, time and protokollant stay
+        # immutable, because the protocol refers to this planning data.
         if meeting.status == "closed" and wants_manage:
             raise ConflictError("the session is closed — its settings can no longer be changed")
 
@@ -243,6 +247,8 @@ class LifecycleOps(HandoverOps):
                 meeting, old_item, payload.current_agenda_item_id, principal.sub, now
             ):
                 handed_over = True
+        if payload.title is not None:
+            meeting.title = payload.title
         if "date" in payload.model_fields_set:
             meeting.date = payload.date
         if "start_time" in payload.model_fields_set:

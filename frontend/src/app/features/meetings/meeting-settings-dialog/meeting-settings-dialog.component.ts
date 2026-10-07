@@ -19,6 +19,7 @@ import {
   ButtonComponent,
   DatepickerComponent,
   DialogComponent,
+  InputComponent,
   SelectComponent,
   TimeInputComponent,
   ToastService,
@@ -28,11 +29,17 @@ import { errorCode, errorDetail } from '../meetings-display.util';
 import { MeetingGuestsService } from '../meeting-guests.service';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
 
+/** The longest meeting title that the server accepts (`MEETING_TITLE_MAX`). */
+export const MEETING_TITLE_MAX = 200;
+
 /**
- * "Sitzung bearbeiten": the minute-taker, the date, the start and the end of a meeting.
+ * "Sitzung bearbeiten": the title, the minute-taker, the date, the start and the end
+ * of a meeting.
  *
- * The dialog opens from a list row and from the meeting page. A closed meeting locks
- * every field, and a final protocol also locks the minute-taker; the server refuses
+ * The dialog opens from a list row, from the detail sheet, from the calendar and from
+ * the meeting page. The title can change while the meeting is planned or live. A
+ * closed meeting locks every field, the title too, because the protocol that goes out
+ * names the meeting; a final protocol also locks the minute-taker. The server refuses
  * both with 409. Only a member with `protocol.write` can keep the minutes (O20), so the
  * list offers those members plus the current minute-taker. While the meeting is live a
  * new minute-taker is a handover "now" (Z3).
@@ -46,6 +53,7 @@ import { PublicJoinSettingsComponent } from '../public-join/public-join-settings
     TranslatePipe,
     DialogComponent,
     ButtonComponent,
+    InputComponent,
     SelectComponent,
     DatepickerComponent,
     TimeInputComponent,
@@ -70,6 +78,7 @@ export class MeetingSettingsDialogComponent {
   readonly saved = output<Meeting>();
 
   readonly roster = signal<Attendance[]>([]);
+  readonly title = signal('');
   readonly keeper = signal('');
   readonly date = signal('');
   readonly time = signal('');
@@ -109,7 +118,21 @@ export class MeetingSettingsDialogComponent {
     admitted: this.meeting()?.admittedGuests ?? 0,
   }));
 
-  readonly valid = computed(() => !!this.date().trim() && !!this.time().trim());
+  /** The title is too long for the server. An empty title only disables "Speichern". */
+  readonly titleTooLong = computed(() => this.title().trim().length > MEETING_TITLE_MAX);
+  readonly titleError = computed(() =>
+    this.titleTooLong()
+      ? this.i18n.translate('meetings.settings.titleTooLong', { max: MEETING_TITLE_MAX })
+      : '',
+  );
+
+  readonly valid = computed(
+    () =>
+      !!this.title().trim() &&
+      !this.titleTooLong() &&
+      !!this.date().trim() &&
+      !!this.time().trim(),
+  );
 
   constructor() {
     effect(() => {
@@ -119,6 +142,7 @@ export class MeetingSettingsDialogComponent {
   }
 
   private load(m: Meeting): void {
+    this.title.set(m.title ?? '');
     this.keeper.set(m.protokollantId ?? '');
     this.date.set(m.date ?? '');
     this.time.set(m.startTime ?? '');
@@ -203,10 +227,15 @@ export class MeetingSettingsDialogComponent {
     this.closed.emit();
   }
 
-  /** Save the minute-taker, the date and the times in one PATCH. */
+  /** Save the title, the minute-taker, the date and the times in one PATCH. */
   save(): void {
     const m = this.meeting();
     if (!m || this.saving() || this.locked()) return;
+    const title = this.title().trim();
+    if (!title || this.titleTooLong()) {
+      this.toast.error(this.titleError() || this.i18n.translate('meetings.toast.titleRequired'));
+      return;
+    }
     if (!this.valid()) {
       this.toast.error(this.i18n.translate('meetings.toast.dateTimeRequired'));
       return;
@@ -219,6 +248,8 @@ export class MeetingSettingsDialogComponent {
     this.saving.set(true);
     this.api
       .patchMeeting(m.id, {
+        // Only a new title goes out: the same title again would only cost an audit read.
+        ...(title !== m.title ? { title } : {}),
         // A final protocol locks the minute-taker: leave the field out, the server
         // would answer 409.
         ...(this.keeperLocked() ? {} : { protokollantId: this.keeper() || null }),

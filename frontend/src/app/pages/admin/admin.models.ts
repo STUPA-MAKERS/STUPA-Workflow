@@ -1055,6 +1055,12 @@ export interface SiteFreetexts {
   emailFooter: I18nMap;
   /** Info text below the application(-type) selection — Markdown, each i18n. */
   applyInfo?: I18nMap;
+  /**
+   * The text after the submission for a signed-in applicant ("intern") and for a guest
+   * ("extern") — Markdown, each i18n. Empty ⇒ the built-in text of the language.
+   */
+  submittedInternal?: I18nMap;
+  submittedExternal?: I18nMap;
 }
 
 export interface Branding {

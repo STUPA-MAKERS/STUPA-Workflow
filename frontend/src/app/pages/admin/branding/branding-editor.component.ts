@@ -12,6 +12,12 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { I18nMap } from '@core/api/models';
+import {
+  defaultSubmittedText,
+  SUBMITTED_FREETEXT,
+  submittedMarkdown,
+  type SubmittedKind,
+} from '@core/branding/submitted-texts';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
@@ -39,6 +45,7 @@ import {
   type LogoSlot,
 } from '../admin.models';
 import { brandingLinkErrors } from '../branding.util';
+import { renderMarkdown } from '../../../features/meetings/meetings.util';
 
 /** The language of the texts in the editor. */
 type TextLang = 'de' | 'en';
@@ -57,6 +64,10 @@ type FreetextKey = (typeof FREETEXTS)[number];
  * by the file dialog) and the free texts, including the e-mail footer (gaps N43). The
  * right column holds the footer columns with their links (gaps N43), the copyright line
  * and the legal links. A text field shows the language that "Texte in" picks.
+ *
+ * "Texte nach dem Einreichen" holds the Markdown text of the confirmation page for a
+ * signed-in applicant (intern) and for a guest (extern). The placeholder and the preview
+ * show the built-in text while the field is empty.
  *
  * A link may carry `http:`, `https:` or `mailto:` only; another scheme blocks the save.
  * The version list below restores an older version. It works against
@@ -95,6 +106,7 @@ export class BrandingEditorComponent {
   protected readonly accept = LOGO_ACCEPT_MIME.join(',');
   protected readonly logoSlots: readonly LogoSlot[] = ['wordmark', 'imagemark', 'favicon'];
   protected readonly freetexts = FREETEXTS;
+  protected readonly submittedKinds: readonly SubmittedKind[] = ['internal', 'external'];
 
   protected readonly version = signal(0);
   protected readonly hasDraftChanges = signal(false);
@@ -196,6 +208,32 @@ export class BrandingEditorComponent {
       return d.freetexts.applyInfo;
     }
     return d.freetexts[key];
+  }
+
+  protected submittedLabel(kind: SubmittedKind): string {
+    return this.i18n.translate(`admin.brand.submitted.${kind}` as TranslationKey);
+  }
+
+  /** The text map of a kind. A config from before the feature has none. */
+  protected submittedMap(d: Branding, kind: SubmittedKind): I18nMap {
+    const key = SUBMITTED_FREETEXT[kind];
+    d.freetexts[key] ??= {};
+    return d.freetexts[key];
+  }
+
+  /** The built-in text in the picked language: the placeholder of the empty field. */
+  protected submittedDefault(kind: SubmittedKind): string {
+    return defaultSubmittedText(kind, this.lang());
+  }
+
+  /** The field of the picked language is empty, so the page shows the built-in text. */
+  protected submittedIsDefault(d: Branding, kind: SubmittedKind): boolean {
+    return !(d.freetexts[SUBMITTED_FREETEXT[kind]]?.[this.lang()] ?? '').trim();
+  }
+
+  /** The preview as the confirmation page renders it (escaped Markdown). */
+  protected submittedPreview(d: Branding, kind: SubmittedKind): string {
+    return renderMarkdown(submittedMarkdown(d.freetexts[SUBMITTED_FREETEXT[kind]], kind, this.lang()));
   }
 
   /** Write the text of the picked language into a map and refresh the draft. */

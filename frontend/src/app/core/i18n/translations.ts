@@ -1091,7 +1091,8 @@ export const de = {
   'meetings.protokollant.lockedHint':
     'Protokoll ist finalisiert — die Schriftführung kann nicht mehr geändert werden.',
   'meetings.settings.closedHint':
-    'Sitzung ist geschlossen — die Einstellungen können nicht mehr geändert werden.',
+    'Sitzung ist geschlossen — Titel und Einstellungen können nicht mehr geändert werden.',
+  'meetings.settings.titleTooLong': 'Der Titel darf höchstens {max} Zeichen haben.',
   'meetings.protocol.none': 'Für diese Sitzung gibt es noch kein Protokoll.',
   'meetings.protocol.beforeStart':
     'Das Protokoll wird beim Start der Sitzung angelegt. Davor kann nicht protokolliert oder abgestimmt werden.',
@@ -1131,6 +1132,7 @@ export const de = {
   'meetings.toast.protokollantRequired':
     'Bitte zuerst einen Protokollanten zuweisen, dann die Sitzung starten.',
   'meetings.toast.dateTimeRequired': 'Datum und Uhrzeit sind erforderlich.',
+  'meetings.toast.titleRequired': 'Der Titel ist erforderlich.',
   'meetings.toast.voteOpened': 'Abstimmung geöffnet.',
   'meetings.toast.saveFailed': 'Speichern fehlgeschlagen.',
   'meetings.toast.finalized': 'Protokoll finalisiert — PDF wird erstellt und versandt.',
@@ -2114,6 +2116,13 @@ export const de = {
   'admin.brand.text.support': 'Support-Hinweis',
   'admin.brand.text.emailFooter': 'E-Mail-Fußzeile',
   'admin.brand.text.applyInfo': 'Info unter der Antrags-Auswahl (Markdown)',
+  'admin.brand.submitted.group': 'Texte nach dem Einreichen',
+  'admin.brand.submitted.hint':
+    'Markdown. Die Seite nach dem Absenden zeigt diesen Text. Ein leeres Feld zeigt den Standardtext.',
+  'admin.brand.submitted.internal': 'Intern – angemeldet mit Konto',
+  'admin.brand.submitted.external': 'Extern – Gast mit E-Mail-Bestätigung',
+  'admin.brand.submitted.preview': 'Vorschau',
+  'admin.brand.submitted.default': 'Standardtext',
   'admin.brand.saveDraft': 'Entwurf speichern',
   'admin.brand.activate': 'Entwurf aktivieren',
   'admin.brand.activated': 'Branding aktiviert (Version {n}).',
@@ -4373,7 +4382,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.vote.cancel': 'Cancel vote',
   'meetings.protokollant.lockedHint':
     'The protocol is finalized — the minute-taker can no longer be changed.',
-  'meetings.settings.closedHint': 'The session is closed — its settings can no longer be changed.',
+  'meetings.settings.closedHint':
+    'The session is closed — its title and settings can no longer be changed.',
+  'meetings.settings.titleTooLong': 'The title can have a maximum of {max} characters.',
   'meetings.protocol.none': 'There are no minutes for this meeting yet.',
   'meetings.protocol.beforeStart':
     'The minutes are created when the meeting starts. Until then you cannot take minutes or open a vote.',
@@ -4412,6 +4423,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'The chair has set your attendance. Only the chair can change it.',
   'meetings.toast.protokollantRequired': 'Assign a minute-taker first, then start the meeting.',
   'meetings.toast.dateTimeRequired': 'Date and time are required.',
+  'meetings.toast.titleRequired': 'The title is required.',
   'meetings.toast.voteOpened': 'Vote opened.',
   'meetings.toast.saveFailed': 'Saving failed.',
   'meetings.toast.finalized': 'Minutes finalized — PDF is being generated and sent.',
@@ -5380,6 +5392,13 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.brand.text.support': 'Support hint',
   'admin.brand.text.emailFooter': 'Email footer',
   'admin.brand.text.applyInfo': 'Info below the application type selection (Markdown)',
+  'admin.brand.submitted.group': 'Texts after the submission',
+  'admin.brand.submitted.hint':
+    'Markdown. The page after the submission shows this text. An empty field shows the default text.',
+  'admin.brand.submitted.internal': 'Internal – signed in with an account',
+  'admin.brand.submitted.external': 'External – guest with email confirmation',
+  'admin.brand.submitted.preview': 'Preview',
+  'admin.brand.submitted.default': 'Default text',
   'admin.brand.saveDraft': 'Save draft',
   'admin.brand.activate': 'Activate draft',
   'admin.brand.activated': 'Branding activated (version {n}).',

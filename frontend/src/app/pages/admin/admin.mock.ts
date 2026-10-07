@@ -469,6 +469,8 @@ export const MOCK_BRANDING: Branding = {
     support: { de: 'Bei Fragen: support@example.org', en: 'Questions? support@example.org' },
     emailFooter: { de: 'Automatische Nachricht – nicht antworten.', en: 'Automated message – do not reply.' },
     applyInfo: {},
+    submittedInternal: {},
+    submittedExternal: {},
   },
 };
 

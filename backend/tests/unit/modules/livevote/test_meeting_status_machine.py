@@ -14,13 +14,14 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
+from pydantic import ValidationError
 
 from app.modules.auth.principal import Principal
 from app.modules.livevote.models import Meeting
-from app.modules.livevote.schemas import MeetingCreate, MeetingPatch
+from app.modules.livevote.schemas import MEETING_TITLE_MAX, MeetingCreate, MeetingPatch
 from app.modules.livevote.service import MeetingService
 from app.modules.livevote.service import lifecycle as lifecycle_mod
-from app.shared.errors import ConflictError
+from app.shared.errors import ConflictError, ForbiddenError
 
 STATUSES = ("planned", "live", "closed")
 ALLOWED = {("planned", "live"), ("live", "closed")}
@@ -272,6 +273,67 @@ async def test_planning_change_is_audited(
     }
 
 
+async def test_title_change_is_stripped_and_audited(
+    audit: list[dict[str, Any]], voting: SimpleNamespace
+) -> None:
+    m = _meeting("live")
+    pub = _Publisher()
+    out = await _service(m, publisher=pub).patch(
+        m.id, MeetingPatch(title="  Vollversammlung  "), _admin()
+    )
+    assert m.title == "Vollversammlung"
+    assert out.title == "Vollversammlung"
+    assert len(pub.states) == 1
+    [entry] = audit
+    assert entry["action"].value == "meeting_update"
+    assert entry["data"]["changes"] == {"title": {"from": "GV", "to": "Vollversammlung"}}
+
+
+async def test_same_title_writes_no_audit(
+    audit: list[dict[str, Any]], voting: SimpleNamespace
+) -> None:
+    m = _meeting("planned")
+    await _service(m).patch(m.id, MeetingPatch(title="GV"), _admin())
+    assert audit == []
+
+
+async def test_closed_meeting_keeps_its_title(
+    audit: list[dict[str, Any]], voting: SimpleNamespace
+) -> None:
+    m = _meeting("closed")
+    with pytest.raises(ConflictError):
+        await _service(m).patch(m.id, MeetingPatch(title="Neu"), _admin())
+    assert m.title == "GV"
+    assert audit == []
+
+
+async def test_title_change_needs_can_manage(
+    audit: list[dict[str, Any]], voting: SimpleNamespace
+) -> None:
+    m = _meeting("planned")
+    with pytest.raises(ForbiddenError):
+        await _service(m).patch(m.id, MeetingPatch(title="Neu"), Principal(sub="x", roles=[]))
+    assert m.title == "GV"
+
+
+@pytest.mark.parametrize("title", ["", "   ", "x" * (MEETING_TITLE_MAX + 1)])
+def test_patch_rejects_a_bad_title(title: str) -> None:
+    with pytest.raises(ValidationError):
+        MeetingPatch(title=title)
+
+
+def test_patch_rejects_a_null_title() -> None:
+    with pytest.raises(ValidationError):
+        MeetingPatch.model_validate({"title": None})
+
+
+def test_create_strips_and_checks_the_title() -> None:
+    body = {"gremiumId": str(uuid4()), "date": "2026-06-20", "startTime": "18:00"}
+    assert MeetingCreate.model_validate({**body, "title": " GV "}).title == "GV"
+    with pytest.raises(ValidationError):
+        MeetingCreate.model_validate({**body, "title": "  "})
+
+
 async def test_current_item_change_is_not_audited(
     audit: list[dict[str, Any]], voting: SimpleNamespace
 ) -> None:
@@ -297,6 +359,7 @@ async def test_create_is_audited(audit: list[dict[str, Any]]) -> None:
     assert entry["data"]["gremiumId"] == str(gid)
     assert entry["data"]["status"] == "planned"
     assert entry["data"]["date"] == "2026-06-20"
+    assert entry["data"]["title"] == "GV"
 
 
 # A2: the agenda summary of MeetingOut
