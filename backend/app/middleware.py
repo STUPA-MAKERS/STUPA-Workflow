@@ -23,6 +23,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+from app.modules.auth.sessions import principal_sid
 from app.settings import Settings, get_settings
 from app.shared.antiabuse import client_ip, get_rate_limiter
 from app.shared.errors import PUBLIC_API_PREFIX
@@ -150,11 +151,32 @@ class CsrfMiddleware(BaseHTTPMiddleware):
         return response
 
 
+def _write_bucket(request: Request, settings: Settings) -> tuple[str, int]:
+    """Return the rate-limit key and the limit for a write request.
+
+    Returns:
+        The session key with the session limit for a signed principal session
+        cookie, else the IP key with the IP limit.
+    """
+    cookie = request.cookies.get(settings.session_cookie_name)
+    if cookie:
+        sid = principal_sid(
+            settings.session_secret, cookie, settings.session_ttl_hours * 3600
+        )
+        if sid is not None:
+            return f"write:session:{sid}", settings.rl_default_write_session_per_hour
+    return f"write:ip:{client_ip(request)}", settings.rl_default_write_per_hour
+
+
 class DefaultWriteRateLimitMiddleware(BaseHTTPMiddleware):
     """Default rate limit for all write endpoints.
 
-    The limit applies only to unsafe methods. It keys on the client IP and stays
-    generous. It is the backstop for an endpoint without its own stricter limit.
+    The limit applies only to unsafe methods. It is the backstop for an endpoint
+    without its own stricter limit. A request with a principal session cookie that
+    has a valid signature keys on that session (`rl_default_write_session_per_hour`),
+    because a campus NAT puts all users behind one IP. Any other request keys on the
+    client IP (`rl_default_write_per_hour`). Only the server can sign a cookie, so a
+    made-up cookie falls back to the IP key and cannot open a new bucket.
     The app adds it as middleware, so it runs for every HTTP route. A WebSocket
     scope passes through, because BaseHTTPMiddleware forwards a non-http scope.
     The middleware answers 429 with `Retry-After` as problem+json. With rate
@@ -179,11 +201,8 @@ class DefaultWriteRateLimitMiddleware(BaseHTTPMiddleware):
         exempt = str(request.scope.get("path", "")).startswith(PUBLIC_MEETING_PREFIX)
         if request.method not in _SAFE_METHODS and not exempt:
             limiter = self._limiter or get_rate_limiter(request, settings)
-            result = await limiter.hit(
-                f"write:ip:{client_ip(request)}",
-                limit=settings.rl_default_write_per_hour,
-                window_seconds=_HOUR,
-            )
+            key, limit = _write_bucket(request, settings)
+            result = await limiter.hit(key, limit=limit, window_seconds=_HOUR)
             if not result.allowed:
                 trace_id = getattr(request.state, "trace_id", None)
                 return JSONResponse(
@@ -195,7 +214,7 @@ class DefaultWriteRateLimitMiddleware(BaseHTTPMiddleware):
                         "title": "Too Many Requests",
                         "status": 429,
                         "code": "rate_limited",
-                        "detail": "Too many write requests from this IP. Try again later.",
+                        "detail": "Too many write requests. Try again later.",
                         "traceId": trace_id,
                     },
                 )

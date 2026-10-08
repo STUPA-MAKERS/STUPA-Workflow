@@ -149,6 +149,7 @@
     @if (noMeetings()) {
       <app-empty-state
         class="dash__emptyBox dash__emptyBox--today"
+        [iconSize]="22"
         icon="users"
         [heading]="'dashboard.today.none' | t"
         [body]="(auth.gremien().length ? 'dashboard.today.noneBody' : 'dashboard.today.noGremiumBody') | t"
@@ -217,13 +218,13 @@
       <div class="dash__emptyGrid" [class.dash__emptyGrid--two]="newUser() && applyTypes().length">
         @switch (tab()) {
           @case ('mine') {
-            <app-empty-state class="dash__emptyBox" icon="file" [heading]="'dashboard.empty.mine' | t" [body]="'dashboard.empty.mineBody' | t" />
+            <app-empty-state class="dash__emptyBox" [iconSize]="22" icon="file" [heading]="'dashboard.empty.mine' | t" [body]="'dashboard.empty.mineBody' | t" />
           }
           @case ('votes') {
-            <app-empty-state class="dash__emptyBox" icon="vote" [heading]="'dashboard.empty.votes' | t" [body]="'dashboard.empty.votesBody' | t" />
+            <app-empty-state class="dash__emptyBox" [iconSize]="22" icon="vote" [heading]="'dashboard.empty.votes' | t" [body]="'dashboard.empty.votesBody' | t" />
           }
           @default {
-            <app-empty-state class="dash__emptyBox" icon="check" [heading]="'dashboard.empty.tasks' | t" [body]="'dashboard.empty.tasksBody' | t" />
+            <app-empty-state class="dash__emptyBox" [iconSize]="22" icon="check" [heading]="'dashboard.empty.tasks' | t" [body]="'dashboard.empty.tasksBody' | t" />
           }
         }
         @if (newUser() && applyTypes().length) {

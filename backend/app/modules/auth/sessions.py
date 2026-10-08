@@ -192,6 +192,15 @@ def _unsign_sid(secret: str, value: str, max_age: int) -> str | None:
     return str(sid) if isinstance(sid, str) else None
 
 
+def principal_sid(secret: str, cookie_value: str, max_age: int) -> str | None:
+    """Return the `sid` of a principal session cookie with a valid signature.
+
+    The check needs no database. It proves that the server issued the cookie, not
+    that the session still exists. The write rate limit keys on it.
+    """
+    return _unsign_sid(secret, cookie_value, max_age)
+
+
 async def create_principal_session(
     db: AsyncSession,
     *,
