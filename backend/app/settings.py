@@ -327,6 +327,10 @@ class Settings(BaseSettings):
     # Default limit on all writing endpoints. It keys on the IP and stays generous. It
     # catches an endpoint without its own stricter limit (defense in depth).
     rl_default_write_per_hour: int = 100
+    # The same limit for a request with a signed principal session: it keys on the
+    # session, not on the IP. A campus NAT puts all users behind one IP, and the
+    # protocol editor saves on every edit, so this limit is per person and higher.
+    rl_default_write_session_per_hour: int = 3000
     # GET /principals/{id}/avatar: requests per hour per logged-in principal. A page
     # with a long member list asks for one avatar per row, so the limit stays generous.
     rl_avatar_per_hour: int = 1200

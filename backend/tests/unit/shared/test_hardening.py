@@ -20,6 +20,7 @@ from app.middleware import (
     DefaultWriteRateLimitMiddleware,
     RequestContextMiddleware,
 )
+from app.modules.auth.sessions import _sign_sid
 from app.settings import Settings, SettingsError, load_settings
 from app.shared.antiabuse import client_ip
 from app.shared.ratelimit import InMemoryRateLimiter
@@ -161,6 +162,27 @@ def test_default_write_limit_noop_for_safe_method() -> None:
     client = _wlimit_app(s, InMemoryRateLimiter())
     for _ in range(5):  # over the limit, but a GET is never throttled
         assert client.get("/r").status_code == 200
+
+
+def test_default_write_limit_keys_on_a_signed_session() -> None:
+    """Two people behind one IP each get their own bucket with the session limit."""
+    s = _settings(rl_default_write_per_hour=1, rl_default_write_session_per_hour=2)
+    client = _wlimit_app(s, InMemoryRateLimiter())
+    for sid in ("sid-a", "sid-b"):
+        client.cookies.set(s.session_cookie_name, _sign_sid(s.session_secret, sid))
+        assert client.post("/w").status_code == 200
+        assert client.post("/w").status_code == 200
+        assert client.post("/w").status_code == 429
+
+
+def test_default_write_limit_ignores_an_unsigned_session_cookie() -> None:
+    """A made-up cookie falls back to the IP key and opens no new bucket."""
+    s = _settings(rl_default_write_per_hour=1, rl_default_write_session_per_hour=100)
+    client = _wlimit_app(s, InMemoryRateLimiter())
+    client.cookies.set(s.session_cookie_name, "forged-1")
+    assert client.post("/w").status_code == 200
+    client.cookies.set(s.session_cookie_name, "forged-2")
+    assert client.post("/w").status_code == 429
 
 
 # Proxy trust and X-Forwarded spoofing (security.md §3)
