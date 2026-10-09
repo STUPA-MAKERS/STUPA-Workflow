@@ -30,6 +30,26 @@
         (commit)="search.flush()"
       />
     </div>
+    <div class="au__chips" role="group" [attr.aria-label]="'admin.users.filters' | t">
+      <app-filter-select
+        icon="clock"
+        [label]="'admin.users.filter.lastLogin' | t"
+        [text]="lastLoginText()"
+        [active]="!!lastLoginFilter()"
+        [options]="lastLoginOptions()"
+        [value]="lastLoginFilter()"
+        (valueChange)="setLastLoginFilter($event)"
+      />
+      <app-filter-select
+        icon="users"
+        [label]="'admin.users.filter.groups' | t"
+        [text]="groupText()"
+        [active]="!!groupFilter()"
+        [options]="groupOptions()"
+        [value]="groupFilter()"
+        (valueChange)="setGroupFilter($event)"
+      />
+    </div>
   </app-sticky-bar>
 
   @if (loading()) {
@@ -75,9 +95,14 @@
           </div>
           <div class="au__field au__field--login">
             <span class="au__lbl">{{ 'admin.users.col.lastLogin' | t }}</span>
-            <span class="au__val">{{
-              p.lastLogin ? (p.lastLogin | ldate: 'medium') : ('admin.users.never' | t)
-            }}</span>
+            @if (isStale(p)) {
+              <span class="au__val au__val--stale">{{ p.lastLogin | ldate: 'medium' }}</span>
+              <span class="au__staleHint">{{ 'admin.users.staleLogin' | t }}</span>
+            } @else {
+              <span class="au__val">{{
+                p.lastLogin ? (p.lastLogin | ldate: 'medium') : ('admin.users.never' | t)
+              }}</span>
+            }
           </div>
           <div class="au__act">
             @if (p.mergedIntoId) {
@@ -123,3 +148,4 @@
 </section>
 
 <app-user-merge [source]="mergeSource()" (closed)="mergeSource.set(null)" (merged)="onMerged()" />
+<app-user-revoke [source]="revokeSource()" (closed)="revokeSource.set(null)" (revoked)="onRevoked()" />

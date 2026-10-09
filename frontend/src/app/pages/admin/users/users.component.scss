@@ -21,6 +21,14 @@
   min-width: 0;
 }
 
+/* The filter chips below the search (F3). */
+.au__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
 .au__list {
   margin: 0;
   padding: 0;
@@ -98,6 +106,14 @@
 }
 .au__val--muted {
   color: var(--color-text-muted);
+}
+/* A last login older than 90 days: the account may hold rights it should not (F3). */
+.au__val--stale,
+.au__staleHint {
+  color: var(--color-warning);
+}
+.au__staleHint {
+  font-size: var(--fs-xs);
 }
 
 /* An OIDC group keeps its exact spelling from the IdP. */

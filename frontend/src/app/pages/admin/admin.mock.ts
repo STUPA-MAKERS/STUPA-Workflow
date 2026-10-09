@@ -66,6 +66,7 @@ export const MOCK_PERMISSIONS: string[] = [
   'admin.roles',
   'admin.users',
   'admin.users.merge',
+  'admin.users.revoke_groups',
   'admin.group_mappings',
   'admin.gremium_roles',
   'admin.cd_variants',

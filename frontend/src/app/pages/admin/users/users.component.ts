@@ -10,6 +10,7 @@ import { liveSearch } from '@shared/live-search';
 import {
   AvatarComponent,
   EmptyStateComponent,
+  FilterSelectComponent,
   NoteComponent,
   PageHeaderComponent,
   RowMenuComponent,
@@ -19,9 +20,40 @@ import {
 } from '@shared/ui';
 import { ButtonComponent, ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
-import type { AdminPrincipal, GroupMapping, Role } from '../admin.models';
-import type { RowMenuItem, RowMenuSection } from '@shared/ui';
+import type { AdminPrincipal, GroupMapping, PrincipalFilters, Role } from '../admin.models';
+import type { FilterSelectOption, RowMenuItem, RowMenuSection } from '@shared/ui';
 import { UserMergeComponent } from './user-merge/user-merge.component';
+import { UserRevokeComponent } from './user-revoke/user-revoke.component';
+
+/** The choices of the chip "Letzter Login" (F3): older than n days, or never. */
+export const LAST_LOGIN_FILTERS = ['', '90', '180', '365', 'never'] as const;
+export type LastLoginFilter = (typeof LAST_LOGIN_FILTERS)[number];
+/** The choices of the chip "Hat SSO-Gruppen". */
+export const GROUP_FILTERS = ['', 'yes', 'no'] as const;
+export type GroupFilter = (typeof GROUP_FILTERS)[number];
+
+/** A last login older than this many days shows in the warning colour. */
+export const STALE_LOGIN_DAYS = 90;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The server filters of the two chips. "über n Tage" also keeps the people who never
+ * logged in: they are stale too. `now` is a parameter for the tests.
+ */
+export function principalFilters(
+  lastLogin: LastLoginFilter,
+  groups: GroupFilter,
+  now = Date.now(),
+): PrincipalFilters | undefined {
+  const f: PrincipalFilters = {};
+  if (lastLogin === 'never') f.includeNever = true;
+  else if (lastLogin) {
+    f.lastLoginBefore = new Date(now - Number(lastLogin) * DAY_MS).toISOString().slice(0, 10);
+    f.includeNever = true;
+  }
+  if (groups) f.hasGroups = groups === 'yes';
+  return Object.keys(f).length ? f : undefined;
+}
 
 /**
  * Users (board Admin-Benutzer): a search and one row per principal.
@@ -50,7 +82,9 @@ import { UserMergeComponent } from './user-merge/user-merge.component';
     SearchPillComponent,
     StickyBarComponent,
     SkeletonComponent,
+    FilterSelectComponent,
     UserMergeComponent,
+    UserRevokeComponent,
   ],
   templateUrl: './users.component.html',
   styleUrl: './users.component.scss',
@@ -72,7 +106,10 @@ export class UsersComponent {
    * request). Below two characters the list shows every user.
    */
   protected readonly search = liveSearch<AdminPrincipal[]>({
-    run: (q) => this.api.listPrincipals(q),
+    run: (q) => {
+      const filters = principalFilters(this.lastLoginFilter(), this.groupFilter());
+      return filters ? this.api.listPrincipals(q, filters) : this.api.listPrincipals(q);
+    },
     result: (list) => {
       this.principals.set(list);
       this.loading.set(false);
@@ -94,10 +131,34 @@ export class UsersComponent {
   protected readonly canMerge = computed(() => this.auth.can('admin.users.merge'));
   /** "Konto löschen (DSGVO)" leads to the privacy page and needs its permission (D1). */
   protected readonly canErase = computed(() => this.auth.can('privacy.manage'));
+  /** "Rechte entziehen …" needs its own permission (admin only by default, F3). */
+  protected readonly canRevoke = computed(() => this.auth.can('admin.users.revoke_groups'));
   /** A row has a ⋮ menu when at least one of its actions is allowed. */
-  protected readonly hasMenu = computed(() => this.canMerge() || this.canErase());
+  protected readonly hasMenu = computed(() => this.canMerge() || this.canErase() || this.canRevoke());
   /** The old account of the open merge dialog. Null: the dialog is closed. */
   protected readonly mergeSource = signal<AdminPrincipal | null>(null);
+  /** The person of the open revoke dialog. Null: the dialog is closed. */
+  protected readonly revokeSource = signal<AdminPrincipal | null>(null);
+
+  /** The chip "Letzter Login". */
+  protected readonly lastLoginFilter = signal<LastLoginFilter>('');
+  /** The chip "Hat SSO-Gruppen". */
+  protected readonly groupFilter = signal<GroupFilter>('');
+  protected readonly lastLoginOptions = computed<FilterSelectOption[]>(() =>
+    LAST_LOGIN_FILTERS.map((value) => ({
+      value,
+      label: this.i18n.translate(`admin.users.filter.lastLogin.${value || 'all'}`),
+    })),
+  );
+  protected readonly groupOptions = computed<FilterSelectOption[]>(() =>
+    GROUP_FILTERS.map((value) => ({
+      value,
+      label: this.i18n.translate(`admin.users.filter.groups.${value || 'all'}`),
+    })),
+  );
+  /** The chip text: "Letzter Login: über 90 Tage", or only the name while it is off. */
+  protected readonly lastLoginText = computed(() => this.chipText('admin.users.filter.lastLogin', this.lastLoginFilter(), this.lastLoginOptions()));
+  protected readonly groupText = computed(() => this.chipText('admin.users.filter.groups', this.groupFilter(), this.groupOptions()));
 
   protected readonly rolesById = computed(() => new Map(this.roles().map((r) => [r.id, r])));
 
@@ -132,6 +193,31 @@ export class UsersComponent {
       this.search.sync(q);
       this.search.refresh();
     });
+  }
+
+  private chipText(
+    key: 'admin.users.filter.lastLogin' | 'admin.users.filter.groups',
+    value: string,
+    options: readonly FilterSelectOption[],
+  ): string {
+    const name = this.i18n.translate(key);
+    const hit = options.find((o) => o.value === value);
+    return value && hit ? `${name}: ${hit.label}` : name;
+  }
+
+  protected setLastLoginFilter(value: string): void {
+    this.lastLoginFilter.set(value as LastLoginFilter);
+    this.search.refresh();
+  }
+
+  protected setGroupFilter(value: string): void {
+    this.groupFilter.set(value as GroupFilter);
+    this.search.refresh();
+  }
+
+  /** The last login is older than {@link STALE_LOGIN_DAYS}: it shows in the warning colour. */
+  protected isStale(p: AdminPrincipal, now = Date.now()): boolean {
+    return !!p.lastLogin && now - new Date(p.lastLogin).getTime() > STALE_LOGIN_DAYS * DAY_MS;
   }
 
   /**
@@ -189,6 +275,17 @@ export class UsersComponent {
         disabledReason: this.isSelf(p) ? this.i18n.translate('admin.users.merge.notSelf') : null,
       });
     }
+    // Only for a person who still has something to take away (the server flag `hasAccess`).
+    if (this.canRevoke() && p.hasAccess) {
+      items.push({
+        id: 'revoke',
+        label: this.i18n.translate('admin.users.revoke.action'),
+        icon: 'shield',
+        danger: true,
+        // The server refuses it too (409 `revoke_own_account`).
+        disabledReason: this.isSelf(p) ? this.i18n.translate('admin.users.revoke.notSelf') : null,
+      });
+    }
     if (this.canErase()) {
       items.push({
         id: 'erase',
@@ -204,8 +301,14 @@ export class UsersComponent {
 
   protected onMenu(item: RowMenuItem, p: AdminPrincipal): void {
     if (item.id === 'merge') this.mergeSource.set(p);
+    if (item.id === 'revoke') this.revokeSource.set(p);
     // The privacy page holds the one erasure path with its confirmation (D1).
     if (item.id === 'erase') void this.router.navigate(['/admin/privacy'], { queryParams: { person: p.sub } });
+  }
+
+  /** The revoke ran: the groups and roles of the row changed. Reload the list. */
+  protected onRevoked(): void {
+    this.search.refresh();
   }
 
   /** The merge ran: the old account is now a reference. Reload the list. */

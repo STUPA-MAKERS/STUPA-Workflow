@@ -162,6 +162,10 @@ class AuditAction(StrEnum):
     # the two principal ids and the counts per area. The log rows of the old principal
     # stay unchanged; the display resolves its `sub` through `principal.merged_into`.
     PRINCIPAL_MERGE = "principal_merge"
+    # Revoke the rights of a person who no longer logs in. The data holds the gremium
+    # ids, the removed SSO group names, the ids of the deleted role assignments and pool
+    # entries, the ids of the revoked delegations and the `deactivate` flag.
+    PRINCIPAL_ACCESS_REVOKE = "principal_access_revoke"
     RETENTION_ANONYMIZE = "retention_anonymize"
     # Budget and money mutations: cost-center CRUD, top-down allocation, bookings
     # and transfers, invoices, moves of an application to another cost center or

@@ -180,6 +180,7 @@ const BACKEND_AUDIT_ACTIONS = [
   'erasure_rejected',
   'principal_erased',
   'principal_merge',
+  'principal_access_revoke',
   'retention_anonymize',
   'budget_node_create',
   'budget_node_update',

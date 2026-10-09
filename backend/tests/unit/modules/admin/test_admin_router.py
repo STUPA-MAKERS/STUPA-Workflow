@@ -203,7 +203,7 @@ class _FakeConfig:
     async def list_role_assignments(self):
         return []
 
-    async def search_principals(self, query, limit=50):  # noqa: ANN001
+    async def search_principals(self, query, limit=50, **_filters):  # noqa: ANN001, ANN003
         return [
             PrincipalOut(
                 id=uuid4(),
