@@ -199,7 +199,40 @@ describe('UserRevokeComponent', () => {
     expect(
       screen.getByText('Die SSO-Gruppe gremien-alle gilt auch für AStA. Beides wird zusammen entzogen.'),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Tobias Kern behält das Konto/)).toBeInTheDocument();
+    // The note names the effects and, without deactivation, the next login.
+    expect(screen.getByText(/Sofort wirksam: Tobias Kern gehört keinem/)).toHaveTextContent(
+      'kommen nur die Gremien und Rollen zurück',
+    );
+  });
+
+  it('with the deactivation the note names the lost login, not the next one', async () => {
+    await setup();
+    await userEvent.click(screen.getByRole('switch', { name: /Konto zusätzlich deaktivieren/ }));
+    const note = screen.getByText(/Sofort wirksam: Tobias Kern gehört keinem/);
+    expect(note).toHaveTextContent('Das Konto ist danach deaktiviert');
+    expect(note).not.toHaveTextContent('Meldet sich');
+  });
+
+  it('warns that the admin role of a bootstrap admin comes back', async () => {
+    const base = preview();
+    const role = base.globalRoles[1];
+    const api = makeApi({
+      previewPrincipalRevoke: jest.fn(() =>
+        of(
+          preview({
+            globalRoles: [
+              base.globalRoles[0],
+              {
+                ...role,
+                assignments: [{ ...role.assignments[0], grantedBy: 'bootstrap', returnsAutomatically: true }],
+              },
+            ],
+          }),
+        ),
+      ),
+    });
+    await setup(api);
+    expect(screen.getByText(/Kommt beim nächsten Start oder Login zurück/)).toBeInTheDocument();
   });
 
   it('starts with everything checked and names the count on the danger button', async () => {
@@ -248,9 +281,17 @@ describe('UserRevokeComponent', () => {
     const api = makeApi({
       revokePrincipal: jest.fn(() => throwError(() => ({ error: { code: 'revoke_incomplete' } }))),
     });
-    const { toast, inst } = await setup(api);
+    const { toast, inst, settle } = await setup(api);
+    // The admin narrows the choice: only the role Referent goes.
+    await userEvent.click(screen.getByRole('button', { name: 'Keine auswählen' }));
+    await userEvent.click(screen.getByLabelText('Referent'));
+    await settle();
     inst.submit();
     expect(api.previewPrincipalRevoke).toHaveBeenCalledTimes(2);
+    await settle();
+    // The reload keeps the narrowed choice and does not check everything again.
+    expect(screen.getByLabelText('Referent')).toBeChecked();
+    expect(screen.getByLabelText('StuPa')).not.toBeChecked();
     expect(toast.error).toHaveBeenCalledWith(
       'Eine SSO-Gruppe gilt auch für etwas, das nicht ausgewählt war. Die Auswahl wurde neu geladen.',
     );

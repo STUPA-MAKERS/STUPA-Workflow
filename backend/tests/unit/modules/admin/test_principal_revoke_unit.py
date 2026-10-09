@@ -159,6 +159,44 @@ def test_group_targets_ignore_untied_role_maps_member_and_foreign_groups() -> No
     assert "not-mine" not in group_targets(snap)
 
 
+def test_preview_marks_a_bootstrap_admin_that_comes_back() -> None:
+    out = build_preview(_snap(bootstrap_admin=True), _row(), is_self=False)
+    admin = next(r for r in out.global_roles if r.role_key == "admin")
+    assert admin.assignments[0].returns_automatically is True
+    assert admin.model_dump(by_alias=True)["assignments"][0]["returnsAutomatically"] is True
+    # A gremium assignment of the same person is no bootstrap.
+    sp = next(g for g in out.gremien if g.gremium_id == G_SP)
+    assert sp.assignments[0].returns_automatically is False
+
+
+def test_preview_never_shows_the_sub_of_a_grantor() -> None:
+    snap = _snap(grantor_names={"boss": None})
+    out = build_preview(snap, _row(), is_self=False)
+    sp = next(g for g in out.gremien if g.gremium_id == G_SP)
+    assert sp.assignments[0].granted_by is None
+    out = build_preview(_snap(grantor_names={}), _row(), is_self=False)
+    sp = next(g for g in out.gremien if g.gremium_id == G_SP)
+    assert sp.assignments[0].granted_by is None
+
+
+@pytest.mark.parametrize(
+    ("subjects", "emails", "expected"),
+    [("tk, x", "", True), ("", "Tobias.Kern@student.example", True), ("x", "y@z", False)],
+)
+def test_bootstrap_admin_by_sub_or_email(subjects: str, emails: str, expected: bool) -> None:
+    from app.settings import Settings
+
+    settings = Settings.model_construct(
+        bootstrap_admin_subjects=subjects, bootstrap_admin_emails=emails
+    )
+    svc = PrincipalRevokeService(_Session(), settings)  # type: ignore[arg-type]
+    assert svc._is_bootstrap_admin(_row()) is expected
+    assert PrincipalRevokeService(_Session())._is_bootstrap_admin(_row()) is False  # type: ignore[arg-type]
+    row = _row()
+    row.email = None
+    assert svc._is_bootstrap_admin(row) is (expected and subjects != "")
+
+
 def test_build_preview_groups_everything_by_gremium() -> None:
     out = build_preview(_snap(), _row(), is_self=False)
     assert out.principal.display_name == "Tobias Kern"
@@ -189,6 +227,8 @@ def test_build_preview_groups_everything_by_gremium() -> None:
     admin, hhb = out.global_roles
     assert admin.groups == [] and [a.granted_by for a in admin.assignments] == ["bootstrap"]
     assert admin.assignments[0].valid_from == "2025-11-04T00:00:00+00:00"
+    # Not a configured bootstrap admin: the role stays away.
+    assert admin.assignments[0].returns_automatically is False
     assert hhb.groups == ["haushalt"] and hhb.assignments == []
     assert [(g.group, g.gremium_ids, g.global_role_ids) for g in out.groups] == [
         ("fs-informatik", [G_FS], []),
@@ -320,7 +360,11 @@ async def test_principals_with_access() -> None:
     assert await principals_with_access(_Session(), []) == set()  # type: ignore[arg-type]
     db = _Session([PID, None])
     assert await principals_with_access(db, [PID, OTHER]) == {PID}  # type: ignore[arg-type]
-    assert "UNION" in _sql(db.statements[0])
+    sql = _sql(db.statements[0])
+    assert "UNION" in sql
+    # A group counts only through a mapping into a Gremium or a global role.
+    assert "principal.oidc_groups ? gremium_membership_mapping.oidc_group" in sql
+    assert "principal.oidc_groups ? group_mapping.oidc_group" in sql
 
 
 async def test_principal_not_found_and_merged() -> None:
@@ -355,10 +399,19 @@ class _Obj:
         self.__dict__.update(kw)
 
 
-def _full_queue(row: PrincipalRow) -> list[list[Any]]:
-    """The answers of a snapshot load with groups, in statement order."""
+def _full_queue(
+    row: PrincipalRow, *, as_delegator: bool = False, votes: bool = True
+) -> list[list[Any]]:
+    """The answers of a snapshot load with groups, in statement order.
+
+    The person is the delegate of the planned delegation, or with ``as_delegator``
+    the delegator.
+    """
     membership = _Obj(gremium_id=G_FS)
-    grole = _Obj(id=GR_VORSITZ.id, key="vorsitz", name_i18n={"de": "Vorsitz"})
+    grole = _Obj(
+        id=GR_VORSITZ.id, key="vorsitz", name_i18n={"de": "Vorsitz"},
+        permissions=["vote.cast"] if votes else [],
+    )
     assignment = _Obj(
         id=uuid.UUID(int=40), gremium_id=G_SP, granted_by="boss", valid_from=None,
         valid_until=None,
@@ -369,8 +422,9 @@ def _full_queue(row: PrincipalRow) -> list[list[Any]]:
         substitute_principal_id=PID,
     )
     deleg = _Obj(
-        id=uuid.UUID(int=60), gremium_id=G_FS, delegator_principal_id=OTHER,
-        delegate_principal_id=PID, delegate_voting=True,
+        id=uuid.UUID(int=60), gremium_id=G_FS,
+        delegator_principal_id=PID if as_delegator else OTHER,
+        delegate_principal_id=OTHER if as_delegator else PID, delegate_voting=True,
     )
     meeting = _Obj(
         id=uuid.UUID(int=70), title="Sitzung 1", date=date(2026, 10, 17), status="planned"
@@ -411,6 +465,16 @@ async def test_preview_loads_the_snapshot(lookups: list[set[Any]]) -> None:
     assert len(db.statements) == 10
 
 
+async def test_open_votes_count_only_where_the_role_votes(lookups: list[set[Any]]) -> None:
+    """A gremium role without `vote.cast` has no open votes: no count query."""
+    row = _row(groups=["fs-informatik", "fs-informatik-vorsitz", "haushalt"])
+    queue = _full_queue(row, votes=False)[:-1]  # no open-vote query
+    db = _Session(*queue)
+    out = await PrincipalRevokeService(db).preview(PID, actor="tk")  # type: ignore[arg-type]
+    assert out.gremien[0].open_tasks == 0
+    assert len(db.statements) == 9
+
+
 async def test_snapshot_without_groups_and_ties_skips_the_lookups(
     lookups: list[set[Any]],
 ) -> None:
@@ -447,8 +511,10 @@ def writes(monkeypatch: pytest.MonkeyPatch, lookups: list[set[Any]]) -> list[str
         calls.append(f"sync:{sorted(row.oidc_groups or [])}")
         return True
 
-    async def mail(_s: Any, delegation_id: uuid.UUID) -> DelegationMailInfo:
-        calls.append(f"mail:{delegation_id.int}")
+    async def mail(
+        _s: Any, delegation_id: uuid.UUID, *, to_delegator: bool = False
+    ) -> DelegationMailInfo:
+        calls.append(f"mail:{delegation_id.int}:{'delegator' if to_delegator else 'delegate'}")
         return DelegationMailInfo(delegation_id, "x@y.de", "Sitzung 1", None, None, None, True)
 
     monkeypatch.setattr(mod, "sync_principal_memberships", sync)
@@ -492,7 +558,9 @@ async def test_revoke_clears_the_gremium_and_deactivates(writes: list[str]) -> N
     assert out.kept_live_delegations == 0 and out.deactivated is True
     assert row.oidc_groups == [] and row.active is False
     assert [m.delegation_id if m else None for m in mails] == [uuid.UUID(int=60)]
-    assert writes == ["mail:60", "sync:[]"]
+    # The person was the delegate: the delegator loses the representation and gets
+    # the mail.
+    assert writes == ["mail:60:delegator", "sync:[]"]
     assert db.committed == 1 and db.rolled_back == 0
     deletes = [_sql(s) for s in db.statements[10:]]
     assert [d.split()[2] for d in deletes] == [
@@ -511,6 +579,19 @@ async def test_revoke_clears_the_gremium_and_deactivates(writes: list[str]) -> N
     assert data["removedGroups"] == out.removed_groups
     assert data["deactivate"] is True
     assert data["delegationIds"] == [str(uuid.UUID(int=60))]
+
+
+async def test_revoke_of_a_delegator_mails_the_delegate(writes: list[str]) -> None:
+    row = _row(groups=["fs-informatik", "fs-informatik-vorsitz", "haushalt"])
+    db = _Session(*_full_queue(row, as_delegator=True))
+    await PrincipalRevokeService(db).revoke(  # type: ignore[arg-type]
+        PID,
+        PrincipalRevokeIn.model_validate(
+            {"gremiumIds": [G_FS, G_SP], "globalRoleIds": [R_HHB.id]}
+        ),
+        actor="boss",
+    )
+    assert writes[0] == "mail:60:delegate"
 
 
 async def test_revoke_deactivate_only_on_an_inactive_account(writes: list[str]) -> None:
@@ -653,6 +734,17 @@ def test_list_principals_passes_the_filters(monkeypatch: pytest.MonkeyPatch) -> 
     assert client.get("/api/admin/principals?lastLoginBefore=gestern").status_code == 422
 
 
+async def test_set_principal_active_reports_has_access() -> None:
+    from app.modules.admin.service import ConfigService
+    from tests._support.auth_fakes import fake_session, result
+
+    row = _row(groups=None)
+    # The audit lock, the audit hash, the assignments, then the access query.
+    db = fake_session(result(), result(), result(), result(PID), gets=[row])
+    out = await ConfigService(db).set_principal_active(PID, True, "boss")
+    assert out.has_access is True
+
+
 def test_revoke_permission_is_in_no_oauth_scope() -> None:
     from app.modules.auth.oauth import FORBIDDEN_PERMISSIONS, SCOPES, scope_permissions
     from app.shared.permissions import PERMISSION_CATALOGUE
@@ -669,10 +761,13 @@ async def test_search_principals_filters_and_has_access() -> None:
     from tests._support.auth_fakes import fake_session, result
 
     with_groups, plain, tied = _row(), _row(groups=None), _row(groups=[])
-    plain.id, tied.id = OTHER, THIRD
-    db = fake_session(result(with_groups, plain, tied), result(), result(THIRD))
+    stray = _row(groups=["students"])
+    plain.id, tied.id, stray.id = OTHER, THIRD, uuid.uuid4()
+    # The access query names PID (a mapped group) and THIRD; a group without a
+    # mapping ("students") gives no access.
+    db = fake_session(result(with_groups, plain, tied, stray), result(), result(PID, THIRD))
     out = await ConfigService(db).search_principals(
         None, last_login_before=date(2026, 7, 1), include_never=True, has_groups=False
     )
-    assert [p.has_access for p in out] == [True, False, True]
+    assert [p.has_access for p in out] == [True, False, True, False]
     assert out[0].model_dump(by_alias=True)["hasAccess"] is True

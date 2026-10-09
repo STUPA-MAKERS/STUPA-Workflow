@@ -130,11 +130,15 @@
               }
             }
             @if (hasMenu() && !p.mergedIntoId) {
-              <app-row-menu
-                [sections]="menuFor(p)"
-                [label]="('admin.users.moreActions' | t) + ': ' + userLabel(p)"
-                (selected)="onMenu($event, p)"
-              />
+              @let sections = menuFor(p);
+              <!-- No empty menu: a row without an item for this user has no menu. -->
+              @if (sections[0].items.length) {
+                <app-row-menu
+                  [sections]="sections"
+                  [label]="('admin.users.moreActions' | t) + ': ' + userLabel(p)"
+                  (selected)="onMenu($event, p)"
+                />
+              }
             }
           </div>
         </li>

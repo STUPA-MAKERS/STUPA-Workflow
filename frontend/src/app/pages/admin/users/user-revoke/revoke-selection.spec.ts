@@ -2,6 +2,7 @@ import type { RevokeGremium, RevokePreview } from '../../admin.models';
 import {
   allEntries,
   gremiumEntry,
+  keptSelection,
   roleEntry,
   selectionIds,
   sharedGroups,
@@ -50,6 +51,14 @@ describe('revoke selection', () => {
     ]);
     // A group of one entry is not shared.
     expect(sharedGroups(PREVIEW, 'g:g-c')).toEqual([]);
+  });
+
+  it('keeps the choice of the admin on a reload, closed over shared groups', () => {
+    // g-c stays alone; g-a now pulls g-b and r-1 in; a gone entry drops out.
+    const kept = keptSelection(PREVIEW, new Set<RevokeEntry>(['g:g-a', 'g:gone']));
+    expect([...kept].sort()).toEqual(['g:g-a', 'g:g-b', 'r:r-1']);
+    expect([...keptSelection(PREVIEW, new Set<RevokeEntry>(['g:g-c']))]).toEqual(['g:g-c']);
+    expect(keptSelection(PREVIEW, new Set()).size).toBe(0);
   });
 
   it('checks and unchecks the whole connected set', () => {

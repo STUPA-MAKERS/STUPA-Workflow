@@ -93,9 +93,14 @@ class DelegationMailInfo:
 
 
 async def meeting_delegation_mail_info(
-    session: object, delegation_id: uuid.UUID
+    session: object, delegation_id: uuid.UUID, *, to_delegator: bool = False
 ) -> DelegationMailInfo | None:
-    """Collect the mail data of a meeting delegation (best effort)."""
+    """Collect the mail data of a meeting delegation (best effort).
+
+    The mail goes to the delegate. ``to_delegator`` sends it to the delegator
+    instead: the access revoke (F3) takes the rights of a delegate, and the delegator
+    then loses the representation.
+    """
     from app.modules.admin.models import Gremium
     from app.modules.auth.models import Principal
     from app.modules.delegations.models import MeetingDelegation
@@ -116,7 +121,12 @@ async def meeting_delegation_mail_info(
                 )
                 .join(
                     Principal,
-                    Principal.id == MeetingDelegation.delegate_principal_id,
+                    Principal.id
+                    == (
+                        MeetingDelegation.delegator_principal_id
+                        if to_delegator
+                        else MeetingDelegation.delegate_principal_id
+                    ),
                 )
                 .join(Meeting, Meeting.id == MeetingDelegation.meeting_id)
                 .outerjoin(Gremium, Gremium.id == MeetingDelegation.gremium_id)

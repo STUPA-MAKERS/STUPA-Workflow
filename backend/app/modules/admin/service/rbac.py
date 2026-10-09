@@ -71,7 +71,7 @@ def _principal_out(
             (merged_names or {}).get(row.merged_into) if row.merged_into else None
         ),
         merged_at=_iso(row.merged_at),
-        has_access=has_access or bool(row.oidc_groups),
+        has_access=has_access,
     )
 
 
@@ -278,8 +278,10 @@ class RbacOps(ConfigServiceBase):
                 )
             )
         ).all()
+        merged_names = await self._merged_names([principal])
+        access = await principals_with_access(self.session, [principal.id])
         return _principal_out(
-            principal, list(assignments), await self._merged_names([principal])
+            principal, list(assignments), merged_names, has_access=principal.id in access
         )
 
     def list_permissions(self) -> list[str]:

@@ -141,8 +141,10 @@ def get_principal_merge_service(session: DbSession) -> PrincipalMergeService:
     return PrincipalMergeService(session)
 
 
-def get_principal_revoke_service(session: DbSession) -> PrincipalRevokeService:
-    return PrincipalRevokeService(session)
+def get_principal_revoke_service(
+    session: DbSession, settings: SettingsDep
+) -> PrincipalRevokeService:
+    return PrincipalRevokeService(session, settings)
 
 
 def get_cd_variant_service(session: DbSession, request: Request) -> CdVariantService:
@@ -820,7 +822,8 @@ async def revoke_principal(
 
     One transaction. A removed SSO group that also leads to an entry that is not
     selected gives 422 `revoke_incomplete`. The own account gives 409
-    `revoke_own_account`. The delegate of each revoked delegation gets the usual mail.
+    `revoke_own_account`. The other side of each revoked delegation gets the usual
+    mail: the delegate, or the delegator when the person was the delegate.
     """
     out, mails = await service.revoke(principal_id, payload, actor=admin.sub)
     pool = getattr(request.app.state, "arq_pool", None)

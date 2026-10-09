@@ -601,10 +601,16 @@ class RevokeAssignmentOut(_CamelModel):
     role_id: UUID = Field(serialization_alias="roleId")
     role_key: str = Field(serialization_alias="roleKey")
     role_label: dict[str, str] = Field(serialization_alias="roleLabel")
-    # The name of the account that granted it, or ``bootstrap``. Never a ``sub``.
+    # The name of the account that granted it, or ``bootstrap``. Never a ``sub``:
+    # an unknown or nameless grantor gives None.
     granted_by: str | None = Field(serialization_alias="grantedBy")
     valid_from: str | None = Field(serialization_alias="validFrom")
     valid_until: str | None = Field(serialization_alias="validUntil")
+    # The bootstrap `admin` of a person who is still a configured bootstrap admin:
+    # the startup sweep or the next login grants it again.
+    returns_automatically: bool = Field(
+        default=False, serialization_alias="returnsAutomatically"
+    )
 
 
 class RevokePoolEntryOut(_CamelModel):

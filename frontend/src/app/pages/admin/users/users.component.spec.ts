@@ -474,7 +474,8 @@ describe('UsersComponent', () => {
     it('the row menu offers "Rechte entziehen …" only for a person with access', async () => {
       const api = makeApi({ listPrincipals: jest.fn(() => of(WITH_ACCESS)) });
       const { inst } = await setup(api, revokeAuth());
-      expect(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })).toHaveLength(2);
+      // A row without an item for this user has no (empty) menu.
+      expect(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })).toHaveLength(1);
       const item = inst.menuFor(WITH_ACCESS[0])[0].items[0];
       expect(item).toMatchObject({ id: 'revoke', label: 'Rechte entziehen …', danger: true, disabledReason: null });
       expect(inst.menuFor(WITH_ACCESS[1])[0].items).toEqual([]);

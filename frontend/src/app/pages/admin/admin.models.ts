@@ -500,6 +500,8 @@ export interface RevokeAssignment {
   roleKey: string;
   roleLabel: I18nMap;
   grantedBy: string | null;
+  /** The bootstrap `admin` of a configured bootstrap admin: it comes back by itself. */
+  returnsAutomatically?: boolean;
   validFrom: string | null;
   validUntil: string | null;
 }

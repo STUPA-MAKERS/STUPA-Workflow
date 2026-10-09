@@ -86,6 +86,20 @@ export function toggleEntry(
   return next;
 }
 
+/**
+ * The selection after a reload of the preview: the entries of `kept` that still exist,
+ * each checked together with the entries that now share a group with it. A new entry
+ * stays unchecked, so a stale request never widens the choice of the admin.
+ */
+export function keptSelection(preview: RevokePreview, kept: ReadonlySet<RevokeEntry>): Set<RevokeEntry> {
+  const known = new Set(allEntries(preview));
+  let next = new Set<RevokeEntry>();
+  for (const e of kept) {
+    if (known.has(e)) next = toggleEntry(preview, next, e, true);
+  }
+  return next;
+}
+
 /** Split a selection into the ids of the request body. */
 export function selectionIds(selected: ReadonlySet<RevokeEntry>): {
   gremiumIds: string[];

@@ -149,7 +149,13 @@
 
       @if (!empty()) {
         <app-note icon="info">
-          <span>{{ 'admin.users.revoke.note' | t: { name: name(p.principal) } }}</span>
+          <span
+            >{{ 'admin.users.revoke.note' | t: { name: name(p.principal) } }}
+            {{
+              (deactivate() ? 'admin.users.revoke.noteDeactivated' : 'admin.users.revoke.noteLogin')
+                | t: { name: name(p.principal) }
+            }}</span
+          >
         </app-note>
       }
 

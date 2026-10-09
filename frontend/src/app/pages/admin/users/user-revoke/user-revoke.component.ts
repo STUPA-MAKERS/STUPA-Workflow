@@ -39,6 +39,7 @@ import type {
 import {
   allEntries,
   gremiumEntry,
+  keptSelection,
   roleEntry,
   selectionIds,
   sharedGroups,
@@ -184,15 +185,19 @@ export class UserRevokeComponent {
     if (src) this.load(src.id);
   }
 
-  private load(id: string): void {
+  /**
+   * Load the preview. Without `keep` everything starts checked: the dialog is for people
+   * who lost their groups. A reload after a stale request keeps the choice of the admin
+   * (`keep`) for the entries that still exist, with the entries that share a group.
+   */
+  private load(id: string, keep?: ReadonlySet<RevokeEntry>): void {
     this.sub?.unsubscribe();
     this.loading.set(true);
     this.failed.set(false);
     this.sub = this.api.previewPrincipalRevoke(id).subscribe({
       next: (p) => {
         this.preview.set(p);
-        // Everything starts checked: the dialog is for people who lost their groups.
-        this.selected.set(new Set(allEntries(p)));
+        this.selected.set(keep ? keptSelection(p, keep) : new Set(allEntries(p)));
         this.loading.set(false);
       },
       error: () => {
@@ -291,6 +296,10 @@ export class UserRevokeComponent {
         date: this.date(a.validFrom),
       });
     } else detail = this.i18n.translate('admin.users.revoke.grantedBy', { name: a.grantedBy ?? '—' });
+    if (a.returnsAutomatically) {
+      // The bootstrap grants the role again: the revoke does not last.
+      detail = `${detail}. ${this.i18n.translate('admin.users.revoke.returnsAutomatically')}`;
+    }
     return { text: this.i18n.translate('admin.users.revoke.assignment', { role }), detail };
   }
 
@@ -382,7 +391,7 @@ export class UserRevokeComponent {
         error: (err: { error?: { code?: string } }) => {
           this.submitting.set(false);
           const code = err?.error?.code;
-          if (code && RELOAD_CODES.has(code)) this.load(p.principal.id);
+          if (code && RELOAD_CODES.has(code)) this.load(p.principal.id, this.selected());
           this.toast.error(
             this.i18n.translate(
               isRevokeErrorCode(code) ? `admin.users.revoke.error.${code}` : 'admin.users.revoke.failed',
