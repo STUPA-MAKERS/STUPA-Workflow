@@ -148,11 +148,31 @@ def test_open_election_on_an_application_item_422(setup: Any) -> None:
         {"candidates": [{"name": "A", "erased": True}, {"name": "B"}]},
         {"candidates": [{"name": "A", "erased": False}, {"name": "B"}]},
         {"candidates": [{"name": "A", "id": "c9"}, {"name": "B"}]},
+        # A name without an account repeats another name (case and spaces ignored).
+        {"candidates": [{"name": "Mara Schulz"}, {"name": " mara  SCHULZ "}]},
+        {
+            "candidates": [
+                {"name": "Mara Schulz", "principalId": "00000000-0000-0000-0000-000000000001"},
+                {"name": "Mara Schulz"},
+            ]
+        },
     ],
 )
 def test_open_body_rejects_a_bad_election(over: dict[str, Any]) -> None:
     with pytest.raises(ValidationError):
         MeetingVoteOpenBody.model_validate(_election_body(**over))
+
+
+def test_open_body_lets_two_accounts_share_a_name() -> None:
+    body = MeetingVoteOpenBody.model_validate(
+        _election_body(
+            candidates=[
+                {"name": "Anna Weber", "principalId": "00000000-0000-0000-0000-000000000001"},
+                {"name": "Anna Weber", "principalId": "00000000-0000-0000-0000-000000000002"},
+            ]
+        )
+    )
+    assert [c["name"] for c in body.election_candidates()] == ["Anna Weber", "Anna Weber"]
 
 
 def test_open_body_motion_ignores_the_election_fields() -> None:

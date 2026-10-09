@@ -1,6 +1,11 @@
 @let own = ownState();
 @let proxy = proxyState();
 @let busy = pending() !== null;
+@let sole = soleCandidate();
+
+@if (sole !== null && (own || proxy)) {
+  <p class="ballot__candidate">{{ 'election.ballot.sole' | t: { name: sole } }}</p>
+}
 
 @if (own) {
   <section class="ballot__row" [attr.aria-label]="'voting.ballot.own' | t">

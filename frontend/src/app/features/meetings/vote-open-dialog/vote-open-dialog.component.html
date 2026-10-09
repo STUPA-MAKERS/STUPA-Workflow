@@ -100,12 +100,13 @@
           class="vod__freeInput"
           [label]="'election.dialog.addFree' | t"
           [placeholder]="'election.dialog.freePlaceholder' | t"
+          [error]="freeNameTaken() ? ('election.dialog.nameTaken' | t) : ''"
           [ngModel]="freeName()"
           [ngModelOptions]="{ standalone: true }"
           (ngModelChange)="freeName.set($event)"
           (keydown.enter)="$event.preventDefault(); addFreeName()"
         />
-        <app-button variant="tonal" [disabled]="!freeName().trim()" (click)="addFreeName()">
+        <app-button variant="tonal" [disabled]="!freeName().trim() || freeNameTaken()" (click)="addFreeName()">
           <app-icon name="plus" [size]="16" />
           {{ 'election.dialog.add' | t }}
         </app-button>

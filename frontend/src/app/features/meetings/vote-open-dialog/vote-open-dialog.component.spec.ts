@@ -219,8 +219,11 @@ describe('VoteOpenDialogComponent', () => {
       cmp.submit();
       expect(http.expectOne('/api/meetings/m-1/votes').request.body).not.toHaveProperty('proposal');
       cmp.submitting.set(false);
+      const before = cmp.question();
       cmp.setDraft({ enabled: true, amount: '2000', conditions: [] });
       expect(cmp.proposalInvalid()).toBe(true);
+      // The question keeps the last valid proposal; the error shows at the field.
+      expect(cmp.question()).toBe(before);
       cmp.submit();
       http.expectNone('/api/meetings/m-1/votes');
     });

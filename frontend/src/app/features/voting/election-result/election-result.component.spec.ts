@@ -125,6 +125,12 @@ describe('ElectionResultComponent', () => {
     expect(screen.getByText('Gleichstand: das Los steht aus')).toBeInTheDocument();
     expect(screen.getByText('Gleichstand zwischen Anna, Ben. Das Los entscheidet.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Los ziehen' }));
+    // The draw cannot be undone: the first click asks again, "Abbrechen" steps back.
+    expect(screen.getByText('Das Los ist endgültig und lässt sich nicht zurücknehmen.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    http.verify();
+    await userEvent.click(screen.getByRole('button', { name: 'Los ziehen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Jetzt Los ziehen' }));
     http.expectOne({ method: 'POST', url: '/api/votes/e1/draw-lot' }).flush({ id: 'e1' });
     expect(changed).toHaveBeenCalledWith({ id: 'e1' });
     expect(toasts()).toContain('Das Los ist gezogen.');
@@ -157,6 +163,7 @@ describe('ElectionResultComponent', () => {
     };
     const { http, toasts, changed, fixture } = await setup({ result: 'tie', electionResult: tie });
     await userEvent.click(screen.getByRole('button', { name: 'Los ziehen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Jetzt Los ziehen' }));
     http
       .expectOne('/api/votes/e1/draw-lot')
       .flush({ code: 'lot_already_drawn', detail: 'lot_already_drawn' }, { status: 409, statusText: 'Conflict' });
@@ -203,6 +210,7 @@ describe('ElectionResultComponent', () => {
     const cmp = fixture.componentInstance;
     cmp.startRunoff();
     cmp.startRunoff(); // busy: no second request
+    cmp.drawLot();
     cmp.drawLot();
     http.expectOne({ method: 'POST', url: '/api/votes/e1/runoff' }).flush(null, { status: 500, statusText: 'Error' });
     http.verify();

@@ -91,6 +91,7 @@ describe('election views (F2)', () => {
     });
     expect(screen.getByText('Los steht aus')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Los ziehen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Jetzt Los ziehen' }));
     const http = view.fixture.debugElement.injector.get(HttpTestingController);
     http.expectOne('/api/votes/e1/draw-lot').flush({ id: 'e1' });
     expect(changed).toHaveBeenCalledWith({ id: 'e1' });

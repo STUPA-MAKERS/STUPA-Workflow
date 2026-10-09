@@ -51,9 +51,21 @@
       <span>{{ text }}</span>
     </p>
     @if (canManage() && voteId()) {
-      <app-button variant="fill" [loading]="busy() === 'lot'" (click)="drawLot()">
-        {{ 'election.lot.draw' | t }}
-      </app-button>
+      @if (lotArmed()) {
+        <p class="er__hint" role="status">{{ 'election.lot.confirmHint' | t }}</p>
+        <div class="er__actions">
+          <app-button variant="text" (click)="lotArmed.set(false)">
+            {{ 'election.lot.cancel' | t }}
+          </app-button>
+          <app-button variant="fill" [loading]="busy() === 'lot'" (click)="drawLot()">
+            {{ 'election.lot.confirm' | t }}
+          </app-button>
+        </div>
+      } @else {
+        <app-button variant="fill" [loading]="busy() === 'lot'" (click)="drawLot()">
+          {{ 'election.lot.draw' | t }}
+        </app-button>
+      }
     } @else {
       <p class="er__hint">{{ 'election.lot.waiting' | t }}</p>
     }

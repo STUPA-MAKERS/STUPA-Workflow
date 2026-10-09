@@ -69,6 +69,12 @@ describe('VoteOpenDialogComponent · election (F2)', () => {
     cmp.addMember('p-1'); // a person is a candidate once
     cmp.addMember('p-x'); // not on the roster
     cmp.addFreeName(); // the field is empty again
+    // A free name that is already on the list stays out (case and spaces ignored).
+    await user.type(screen.getByLabelText('Freier Name'), 'cem  AYDIN');
+    expect(screen.getByText('Dieser Name steht schon auf der Liste.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeDisabled();
+    cmp.addFreeName();
+    cmp.freeName.set('');
     fixture.detectChanges();
     view(cmp).toEqual(['Ben Ott', 'Cem Aydin', 'Anna Berg']);
     await user.click(screen.getByRole('button', { name: 'Anna Berg nach oben' }));

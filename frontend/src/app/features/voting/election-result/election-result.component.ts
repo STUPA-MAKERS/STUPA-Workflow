@@ -81,6 +81,8 @@ export class ElectionResultComponent {
   readonly changed = output<Vote>();
 
   protected readonly busy = signal<'lot' | 'runoff' | null>(null);
+  /** The first click on "Los ziehen" asks again: the draw cannot be undone. */
+  protected readonly lotArmed = signal(false);
 
   private readonly t = (key: TranslationKey, params?: Record<string, string | number>) =>
     this.i18n.translate(key, params);
@@ -160,6 +162,11 @@ export class ElectionResultComponent {
   drawLot(): void {
     const id = this.voteId();
     if (!id || this.busy()) return;
+    if (!this.lotArmed()) {
+      this.lotArmed.set(true);
+      return;
+    }
+    this.lotArmed.set(false);
     this.busy.set('lot');
     this.api.drawElectionLot(id).subscribe({
       next: (vote) => {

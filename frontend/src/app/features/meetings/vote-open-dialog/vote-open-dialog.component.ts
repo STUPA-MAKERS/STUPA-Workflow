@@ -156,6 +156,11 @@ export class VoteOpenDialogComponent {
    * an application item needs a valid decision proposal (F1).
    */
   readonly tooFew = computed(() => this.candidates().length < this.seats());
+  /** The typed free name is already on the list (case and spacing ignored). */
+  readonly freeNameTaken = computed(() => {
+    const name = sameName(this.freeName());
+    return !!name && this.candidates().some((c) => sameName(c.name) === name);
+  });
   readonly canSubmit = computed(() => {
     if (!this.isElection()) return !this.proposalInvalid();
     return !this.tooFew() && this.question().trim().length > 0;
@@ -260,7 +265,7 @@ export class VoteOpenDialogComponent {
   /** Add the typed free name as a candidate. */
   addFreeName(): void {
     const name = this.freeName().trim();
-    if (!name || this.candidates().length >= MAX_CANDIDATES) return;
+    if (!name || this.freeNameTaken() || this.candidates().length >= MAX_CANDIDATES) return;
     this.candidates.update((list) => [
       ...list,
       { key: this.nextKey++, name: name.slice(0, 200), principalId: null },
@@ -304,7 +309,11 @@ export class VoteOpenDialogComponent {
   setDraft(draft: DecisionDraft): void {
     this.draft.set(draft);
     const it = this.item();
-    if (it?.applicationId && !this.questionEdited) this.question.set(this.prefill(it));
+    // An invalid amount shows its error at the field; the question keeps the last
+    // valid proposal instead of echoing it.
+    if (it?.applicationId && !this.questionEdited && draftError(draft, it.amount ?? null) === null) {
+      this.question.set(this.prefill(it));
+    }
   }
 
   setRule(value: string | null): void {
@@ -366,4 +375,9 @@ export class VoteOpenDialogComponent {
         },
       });
   }
+}
+
+/** A candidate name for the duplicate check: trimmed, single spaces, case-folded. */
+function sameName(name: string): string {
+  return name.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
 }

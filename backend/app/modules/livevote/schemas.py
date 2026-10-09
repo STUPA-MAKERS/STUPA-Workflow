@@ -420,6 +420,11 @@ class AssignableApplicationOut(_CamelModel):
     state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
 
 
+def _same_name(name: str) -> str:
+    """Return a candidate name for the duplicate check: single spaces, case-folded."""
+    return " ".join(name.split()).casefold()
+
+
 class ElectionCandidateIn(_CamelModel):
     """One candidate of a new election (F2): an account or a name only.
 
@@ -490,6 +495,13 @@ class MeetingVoteOpenBody(_CamelModel):
             people = [c.principal_id for c in self.candidates if c.principal_id is not None]
             if len(set(people)) != len(people):
                 raise ValueError("a person can stand only once")
+            # A name without an account must not repeat any other candidate name,
+            # else the ballot shows two rows nobody can tell apart. Two accounts
+            # may share a display name: they are different people.
+            names = [_same_name(c.name) for c in self.candidates]
+            for c in self.candidates:
+                if c.principal_id is None and names.count(_same_name(c.name)) > 1:
+                    raise ValueError("a candidate name without an account can stand only once")
         return self
 
     def election_candidates(self) -> list[dict[str, object]]:

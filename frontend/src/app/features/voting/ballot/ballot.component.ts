@@ -21,7 +21,13 @@ import { NgTemplateOutlet } from '@angular/common';
 import type { ElectionConfig, MyBallot, ProblemDetail } from '@core/api/models';
 import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { voteOptionLabel } from '../../meetings/meetings-display.util';
-import { candidateNames, electionChoiceLabel, electionCountText } from '../election.util';
+import {
+  candidateLabel,
+  candidateNames,
+  electionChoiceLabel,
+  electionCountText,
+  isYesNoElection,
+} from '../election.util';
 
 /** The two ballots a person can hold in one vote: the own one, and the one of a member
  *  they represent. The server keeps them apart. */
@@ -138,6 +144,15 @@ export class BallotComponent {
 
   /** The ballot picks candidates (an election with more than one candidate). */
   protected readonly candidateMode = computed(() => (this.election()?.candidates.length ?? 0) > 1);
+  /**
+   * The name a Ja/Nein election (one candidate) asks about. The choices say only
+   * Ja/Nein/Enthaltung, so the ballot names the candidate above them.
+   */
+  protected readonly soleCandidate = computed(() => {
+    const election = this.election();
+    if (!isYesNoElection(election)) return null;
+    return candidateLabel(election!.candidates[0], (key, params) => this.i18n.translate(key, params));
+  });
   /** Several seats: check boxes and a counter. */
   protected readonly multiSeat = computed(() => (this.election()?.seats ?? 1) > 1);
   protected readonly seats = computed(() => this.election()?.seats ?? 1);

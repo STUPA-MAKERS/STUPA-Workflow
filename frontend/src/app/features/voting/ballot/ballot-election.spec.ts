@@ -68,6 +68,32 @@ describe('BallotComponent · election (F2)', () => {
     }
   });
 
+  it('names the single candidate of a Ja/Nein election above the choices', async () => {
+    const r = await render(BallotComponent, {
+      inputs: {
+        voteId: 'e1',
+        options: ['yes', 'no', 'abstain'],
+        own: { cast: false, choice: null },
+        proxyName: null,
+        secret: true,
+        caster: jest.fn(() => of({ status: 'cast' as const })),
+        election: { seats: 1, candidates: [{ id: 'c1', name: 'Mara Schulz' }], secret: true },
+      },
+    });
+    expect(screen.getByText('Zur Wahl steht: Mara Schulz')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ja' })).toBeInTheDocument();
+    r.fixture.componentRef.setInput('election', {
+      seats: 1,
+      candidates: [{ id: 'c1', name: 'Gelöscht', erased: true }],
+      secret: true,
+    });
+    r.fixture.detectChanges();
+    expect(screen.getByText('Zur Wahl steht: Gelöscht')).toBeInTheDocument();
+    r.fixture.componentRef.setInput('own', null);
+    r.fixture.detectChanges();
+    expect(screen.queryByText(/Zur Wahl steht/)).toBeNull();
+  });
+
   it('one seat: a radio list with a separate abstention row', async () => {
     const { caster, castDone, container } = await setup(1);
     const user = userEvent.setup();
