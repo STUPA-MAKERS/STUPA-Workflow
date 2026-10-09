@@ -161,9 +161,19 @@ export class VoteOpenDialogComponent {
     const name = sameName(this.freeName());
     return !!name && this.candidates().some((c) => sameName(c.name) === name);
   });
+  /**
+   * A free name repeats another candidate name, e.g. a roster member picked after a
+   * free name of the same spelling. The server refuses it (422), so the dialog does.
+   */
+  readonly nameTwice = computed(() => {
+    const names = this.candidates().map((c) => sameName(c.name));
+    return this.candidates().some(
+      (c, i) => c.principalId === null && names.some((n, j) => j !== i && n === names[i]),
+    );
+  });
   readonly canSubmit = computed(() => {
     if (!this.isElection()) return !this.proposalInvalid();
-    return !this.tooFew() && this.question().trim().length > 0;
+    return !this.tooFew() && !this.nameTwice() && this.question().trim().length > 0;
   });
 
   /** "Jede Person hat 2 Stimmen …": the rule of the election in one sentence. */
@@ -379,5 +389,5 @@ export class VoteOpenDialogComponent {
 
 /** A candidate name for the duplicate check: trimmed, single spaces, case-folded. */
 function sameName(name: string): string {
-  return name.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+  return name.trim().replace(/\s+/g, ' ').toLowerCase();
 }

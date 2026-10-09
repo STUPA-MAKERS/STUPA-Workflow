@@ -173,6 +173,11 @@ def test_open_body_lets_two_accounts_share_a_name() -> None:
         )
     )
     assert [c["name"] for c in body.election_candidates()] == ["Anna Weber", "Anna Weber"]
+    # The check lower-cases like the dialog: "Straße" and "STRASSE" are two names.
+    body = MeetingVoteOpenBody.model_validate(
+        _election_body(candidates=[{"name": "Straße"}, {"name": "STRASSE"}])
+    )
+    assert len(body.election_candidates()) == 2
 
 
 def test_open_body_motion_ignores_the_election_fields() -> None:

@@ -1,11 +1,13 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   computed,
   inject,
   input,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { switchMap } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
@@ -83,6 +85,7 @@ export class ElectionResultComponent {
   protected readonly busy = signal<'lot' | 'runoff' | null>(null);
   /** The first click on "Los ziehen" asks again: the draw cannot be undone. */
   protected readonly lotArmed = signal(false);
+  private readonly lotActions = viewChild<ElementRef<HTMLElement>>('lotActions');
 
   private readonly t = (key: TranslationKey, params?: Record<string, string | number>) =>
     this.i18n.translate(key, params);
@@ -159,13 +162,15 @@ export class ElectionResultComponent {
   }
 
   /** "Los ziehen": the server draws among the tied candidates. */
-  drawLot(): void {
+  drawLot(event?: MouseEvent): void {
     const id = this.voteId();
     if (!id || this.busy()) return;
     if (!this.lotArmed()) {
       this.lotArmed.set(true);
       return;
     }
+    // The second click of a double click is no confirmation.
+    if (event && event.detail > 1) return;
     this.lotArmed.set(false);
     this.busy.set('lot');
     this.api.drawElectionLot(id).subscribe({
@@ -176,6 +181,12 @@ export class ElectionResultComponent {
       },
       error: (err: unknown) => this.fail(err),
     });
+  }
+
+  /** Step back from the armed lot; focus returns to the lot button. */
+  cancelLot(): void {
+    this.lotArmed.set(false);
+    this.lotActions()?.nativeElement.querySelector<HTMLElement>('.er__lot button')?.focus();
   }
 
   /** "Stichwahl starten": create the runoff, then open it. */

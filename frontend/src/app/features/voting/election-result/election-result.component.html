@@ -51,21 +51,25 @@
       <span>{{ text }}</span>
     </p>
     @if (canManage() && voteId()) {
-      @if (lotArmed()) {
-        <p class="er__hint" role="status">{{ 'election.lot.confirmHint' | t }}</p>
-        <div class="er__actions">
-          <app-button variant="text" (click)="lotArmed.set(false)">
+      <div #lotActions class="er__actions">
+        @if (lotArmed()) {
+          <p class="er__hint">{{ 'election.lot.confirmHint' | t }}</p>
+          <app-button variant="text" (click)="cancelLot()">
             {{ 'election.lot.cancel' | t }}
           </app-button>
-          <app-button variant="fill" [loading]="busy() === 'lot'" (click)="drawLot()">
-            {{ 'election.lot.confirm' | t }}
-          </app-button>
-        </div>
-      } @else {
-        <app-button variant="fill" [loading]="busy() === 'lot'" (click)="drawLot()">
-          {{ 'election.lot.draw' | t }}
+        }
+        <!-- One button for both steps: focus stays on it, and the second click of
+             a double click (detail 2) does not confirm. -->
+        <app-button
+          class="er__lot"
+          variant="fill"
+          [loading]="busy() === 'lot'"
+          [ariaLabel]="lotArmed() ? ('election.lot.confirm' | t) + '. ' + ('election.lot.confirmHint' | t) : ''"
+          (click)="drawLot($event)"
+        >
+          {{ (lotArmed() ? 'election.lot.confirm' : 'election.lot.draw') | t }}
         </app-button>
-      }
+      </div>
     } @else {
       <p class="er__hint">{{ 'election.lot.waiting' | t }}</p>
     }

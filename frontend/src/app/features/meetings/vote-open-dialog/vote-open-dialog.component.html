@@ -114,6 +114,9 @@
       @if (tooFew()) {
         <p class="vod__warn" role="status">{{ 'election.dialog.tooFew' | t: { n: seats() } }}</p>
       }
+      @if (nameTwice()) {
+        <p class="vod__warn" role="status">{{ 'election.dialog.nameTwice' | t }}</p>
+      }
     </div>
 
     <app-switch

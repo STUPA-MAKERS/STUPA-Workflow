@@ -421,8 +421,12 @@ class AssignableApplicationOut(_CamelModel):
 
 
 def _same_name(name: str) -> str:
-    """Return a candidate name for the duplicate check: single spaces, case-folded."""
-    return " ".join(name.split()).casefold()
+    """Return a candidate name for the duplicate check: single spaces, lower case.
+
+    ``lower()`` and not ``casefold()``: the dialog compares with
+    ``toLowerCase()``, and both must agree ("Straße" is not "STRASSE").
+    """
+    return " ".join(name.split()).lower()
 
 
 class ElectionCandidateIn(_CamelModel):

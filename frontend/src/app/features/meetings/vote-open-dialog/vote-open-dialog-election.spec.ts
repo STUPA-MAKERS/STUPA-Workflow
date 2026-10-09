@@ -75,7 +75,19 @@ describe('VoteOpenDialogComponent · election (F2)', () => {
     expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeDisabled();
     cmp.addFreeName();
     cmp.freeName.set('');
+    // A roster member picked after a free name of the same spelling: the server
+    // refuses the pair, so the dialog blocks the submit until one entry goes.
+    cmp.removeCandidate(cmp.candidates().find((c) => c.principalId === 'p-1')!.key);
+    cmp.freeName.set('Anna Berg');
+    cmp.addFreeName();
+    cmp.addMember('p-1');
     fixture.detectChanges();
+    expect(cmp.nameTwice()).toBe(true);
+    expect(screen.getByText(/Ein freier Name steht doppelt/)).toBeInTheDocument();
+    expect(cmp.canSubmit()).toBe(false);
+    cmp.removeCandidate(cmp.candidates().find((c) => c.name === 'Anna Berg' && !c.principalId)!.key);
+    fixture.detectChanges();
+    expect(cmp.nameTwice()).toBe(false);
     view(cmp).toEqual(['Ben Ott', 'Cem Aydin', 'Anna Berg']);
     await user.click(screen.getByRole('button', { name: 'Anna Berg nach oben' }));
     view(cmp).toEqual(['Ben Ott', 'Anna Berg', 'Cem Aydin']);
