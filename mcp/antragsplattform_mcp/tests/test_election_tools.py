@@ -64,3 +64,10 @@ def test_motion_body_keeps_the_motion_defaults() -> None:
     sent = S.dump_create(S.MeetingVoteOpenBody(agendaItemId="a1"))
     assert sent["kind"] == "motion"
     assert "secret" not in sent
+
+
+@pytest.mark.parametrize("extra", [{"id": "c1"}, {"erased": True}])
+def test_candidate_rejects_keys_the_server_rejects(extra: dict[str, Any]) -> None:
+    """The backend answers 422 for any candidate key but name and principalId."""
+    with pytest.raises(ValueError):
+        S.ElectionCandidateIn.model_validate({"name": "Mara", **extra})

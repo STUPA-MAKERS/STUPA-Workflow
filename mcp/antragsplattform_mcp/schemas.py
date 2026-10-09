@@ -541,7 +541,13 @@ class DecisionProposal(WireModel):
 
 
 class ElectionCandidateIn(WireModel):
-    """One candidate of a personnel election. The server gives the ids c1..cn."""
+    """One candidate of a personnel election. The server gives the ids c1..cn.
+
+    Only `name` and `principalId`. The server rejects any other key with 422, so do
+    not copy `id` or `erased` from a vote read into a new election.
+    """
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     name: str = Field(description="Display name, 1 to 200 characters.")
     principalId: str | None = Field(
