@@ -86,6 +86,12 @@ class AuditAction(StrEnum):
     # carries the share id and the expiry, never the token.
     APPLICATION_SHARE = "application_share"
     APPLICATION_SHARE_REVOKE = "application_share_revoke"
+    # A decision on an application (F1): approval with deviations from a passed vote
+    # with a proposal or from a manual transition, or the undo of one by an audit
+    # revert of its status change (``reverted: true``). ``data`` carries the requested
+    # amount, the old and the new approved amount, the number of conditions and the
+    # vote and status-event ids, never the condition texts.
+    APPLICATION_DECISION = "application_decision"
     WEBHOOK_CONFIG = "webhook_config"
     # Attachment uploaded (F12). ``data`` names the application, or carries
     # ``draft: true`` for a draft upload of the wizard (Z4). It holds the field key,

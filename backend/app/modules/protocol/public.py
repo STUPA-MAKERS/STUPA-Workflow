@@ -49,8 +49,19 @@ class _CamelModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+def passed_conditions(view: object) -> list[str]:
+    """Return the conditions of the decision of a passed vote (F1), else none.
+
+    Only a passed vote makes its proposal the decision of the application.
+    """
+    if getattr(view, "result", None) != "passed":
+        return []
+    proposal = getattr(view, "proposal", None)
+    return list(getattr(proposal, "conditions", None) or [])
+
+
 class PublicDecision(_CamelModel):
-    """One closed vote of a public TOP: question, counts and result."""
+    """One closed vote of a public TOP: question, counts, result and conditions."""
 
     question: str | None = None
     counts: dict[str, int] = Field(default_factory=dict)
@@ -60,6 +71,8 @@ class PublicDecision(_CamelModel):
     # The vote is already in the TOP text as a callout: the detail page shows the
     # text only, the list keeps the result.
     in_text: bool = Field(default=False, alias="inText")
+    # F1: the conditions of the decision, when the vote passed with a proposal.
+    conditions: list[str] = Field(default_factory=list)
 
     @classmethod
     def from_vote(cls, view: object) -> PublicDecision:
@@ -71,6 +84,7 @@ class PublicDecision(_CamelModel):
             result=getattr(view, "result", None),
             majorityRule=getattr(view, "majority_rule", "simple"),
             secret=bool(getattr(view, "secret", False)),
+            conditions=passed_conditions(view),
         )
 
 

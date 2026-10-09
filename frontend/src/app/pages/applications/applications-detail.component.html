@@ -116,7 +116,15 @@
               <span class="ad__part ell" [title]="gremium">{{ gremium }}</span>
             }
             @if (application.amount !== null) {
-              <span class="ad__part"><span class="mono ad__amount">{{ amount(application) }}</span></span>
+              @if (approvedAmount(application); as approved) {
+                <!-- F1: the approved amount, the requested one struck through next to it. -->
+                <span class="ad__part">
+                  <span class="mono ad__amount ad__amount--approved">{{ approved }}</span>
+                  <s class="mono ad__amountStruck">{{ amount(application) }}</s>
+                </span>
+              } @else {
+                <span class="ad__part"><span class="mono ad__amount">{{ amount(application) }}</span></span>
+              }
             }
           </span>
         </p>
@@ -167,6 +175,7 @@
             <ng-container *ngTemplateOutlet="files; context: { $implicit: application }" />
           </div>
           <div class="ad__col">
+            <ng-container *ngTemplateOutlet="decision; context: { $implicit: application }" />
             <ng-container *ngTemplateOutlet="details; context: { $implicit: application }" />
             <ng-container *ngTemplateOutlet="history" />
             <ng-container *ngTemplateOutlet="chat" />
@@ -191,6 +200,7 @@
           [attr.aria-labelledby]="tabBar.tabId('app')"
           [hidden]="tab() !== 'app'"
         >
+          <ng-container *ngTemplateOutlet="decision; context: { $implicit: application }" />
           <ng-container *ngTemplateOutlet="details; context: { $implicit: application }" />
           <ng-container *ngTemplateOutlet="answers; context: { $implicit: application }" />
         </section>
@@ -225,6 +235,17 @@
     </article>
   }
 }
+
+<!-- F1 "Beschluss": the decision on the application, hidden before one. -->
+<ng-template #decision let-application>
+  @if (application.decision) {
+    <app-decision-section
+      headingId="ad-decision"
+      [decision]="application.decision"
+      [currency]="application.currency"
+    />
+  }
+</ng-template>
 
 <!-- "Details": receipt, last change, applicant, cost centre. -->
 <ng-template #details let-application>
@@ -266,6 +287,9 @@
           {{ 'applications.budget.none' | t }}
         } @else {
           {{ budgetLabel(application.budgetId) || '—' }}
+          @if (approvedAmount(application); as approved) {
+            <span class="ad__bound">{{ 'decision.bound' | t: { amount: approved } }}</span>
+          }
         }
         @if (canManage()) {
           <app-button
@@ -530,5 +554,15 @@
   [applicationTitle]="title()"
   [transition]="agendaTransition()"
   [(open)]="agendaOpen"
+  (done)="onAgendaDone()"
+/>
+
+<app-decision-dialog
+  [applicationId]="app()?.id ?? null"
+  [applicationTitle]="title()"
+  [requested]="app()?.amount ?? null"
+  [currency]="app()?.currency ?? 'EUR'"
+  [transition]="decisionTransition()"
+  [(open)]="decisionOpen"
   (done)="onAgendaDone()"
 />

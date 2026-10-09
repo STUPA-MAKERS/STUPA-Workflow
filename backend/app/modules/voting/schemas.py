@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.modules.applications.decision import DecisionIn
 from app.shared.config_schemas import Quorum, VoteConfig
 
 
@@ -36,6 +37,9 @@ class VoteCreate(_CamelModel):
     result_branch_transition_id: UUID | None = Field(
         default=None, alias="resultBranchTransitionId"
     )
+    # The decision proposal (F1): approved amount and conditions. Only an application
+    # vote takes it. A passed vote writes it as the decision of the application.
+    proposal: DecisionIn | None = None
 
 
 class VoteCreateInternal(_CamelModel):
@@ -57,6 +61,9 @@ class VoteCreateInternal(_CamelModel):
     result_branch_transition_id: UUID | None = Field(
         default=None, alias="resultBranchTransitionId"
     )
+    # The decision proposal (F1): approved amount and conditions. Only an application
+    # vote takes it. A passed vote writes it as the decision of the application.
+    proposal: DecisionIn | None = None
 
     @model_validator(mode="after")
     def _percent_quorum_needs_eligible(self) -> VoteCreateInternal:
@@ -168,6 +175,8 @@ class VoteOut(_CamelModel):
     # delegated ballot has its own check.
     can_manage: bool = Field(default=False, alias="canManage")
     can_cast: bool = Field(default=False, alias="canCast")
+    # The decision proposal of an application vote (F1), or None.
+    proposal: DecisionIn | None = None
 
 
 VoteStatus = Literal["draft", "open", "closed", "cancelled"]

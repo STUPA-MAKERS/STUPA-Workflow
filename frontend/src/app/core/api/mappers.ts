@@ -96,6 +96,8 @@ export function mapApplication(wire: ApplicationOutWire, lang: string): Applicat
     stateSince: wire.stateSince ?? null,
     hiddenKeys: wire.hiddenKeys ?? [],
     capture: wire.capture ?? null,
+    approvedAmount: wire.approvedAmount ?? null,
+    decision: wire.decision ?? null,
   };
 }
 
@@ -110,6 +112,7 @@ export function mapApplicationListItem(
     state: mapState(wire.state, lang),
     gremiumId: wire.gremiumId ?? null,
     amount: wire.amount ?? null,
+    approvedAmount: wire.approvedAmount ?? null,
     currency: wire.currency ?? null,
     createdAt: wire.createdAt,
     updatedAt: wire.updatedAt,
@@ -135,6 +138,7 @@ export function mapTimelineEvent(wire: TimelineEventOutWire, lang: string): Time
     note: wire.note ?? null,
     voteId: wire.voteId ?? null,
     voteDeleted: wire.voteDeleted ?? false,
+    decision: wire.decision ?? null,
   };
 }
 
@@ -173,6 +177,7 @@ export function mapTransition(wire: TransitionOutWire, lang: string): Transition
     color: wire.color ?? null,
     addsToAgenda: wire.addsToAgenda === true,
     agendaGremiumId: wire.agendaGremiumId ?? null,
+    allowsDecision: wire.allowsDecision === true,
   };
 }
 

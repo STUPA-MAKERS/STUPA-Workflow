@@ -41,6 +41,9 @@ async def create_application_vote(application_id: str, vote: S.VoteCreate) -> di
     the eligible voters. Requires the gremium permission `vote.manage` or
     `session.manage` in that gremium (or admin). If the application and its state name
     no gremium, only admin can create the vote (403).
+
+    `proposal` (approved amount and conditions) becomes the decision of the
+    application when the vote passes.
     """
     return await api().post(
         f"/applications/{application_id}/votes", json=dump_create(vote)
@@ -325,6 +328,9 @@ async def create_meeting_vote(meeting_id: str, vote: S.MeetingVoteOpenBody) -> d
     In a public meeting where guests vote, `guestsVote` (default on for a public item)
     lets the admitted guests vote too: such a vote has no quorum, the majority of the
     cast ballots decides.
+
+    On an application item, `proposal` (approved amount and conditions) becomes the
+    decision of the application when the vote passes.
     """
     return await api().post(f"/meetings/{meeting_id}/votes", json=dump_create(vote))
 

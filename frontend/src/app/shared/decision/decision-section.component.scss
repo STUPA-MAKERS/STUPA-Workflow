@@ -1,0 +1,83 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.dsec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.dsec__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.dsec__title {
+  padding: 0 var(--space-1);
+}
+/* A plain hint next to the heading, not a status. */
+.dsec__tag {
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+
+.dsec__pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+}
+.dsec__struck {
+  color: var(--color-text-muted);
+}
+.dsec__approved {
+  font-weight: var(--fw-semibold);
+  color: var(--color-accent-text);
+}
+.dsec__diff {
+  margin-left: var(--space-2);
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+
+.dsec__conds {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px var(--space-4);
+}
+.dsec__label {
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.dsec__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dsec__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.dsec__num {
+  flex: none;
+  width: 1.25rem;
+  padding-top: 1px;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.dsec__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+.dsec__link {
+  color: var(--color-accent-text);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+}

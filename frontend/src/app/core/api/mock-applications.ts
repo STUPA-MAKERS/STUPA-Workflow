@@ -2,17 +2,20 @@ import type { HttpParams } from '@angular/common/http';
 import type {
   ApplicantCandidate,
   ApplicationCapture,
+  ApplicationDecision,
   ApplicationCreatedWire,
   ApplicationListItemWire,
   ApplicationOutWire,
   ApplicationShareLink,
   AttachmentOutWire,
+  DecisionProposal,
   EffectiveForm,
   MeetingOutWire,
   Page,
   OnBehalfApplication,
   ProblemDetail,
   StateOutWire,
+  TimelineDecision,
   TimelineEventOutWire,
   TransitionOutWire,
   TransitionResult,
@@ -59,7 +62,10 @@ const STATES = {
 type StateKey = keyof typeof STATES;
 
 /** The manual transitions out of each state, as the flow of the demo defines them. */
-const FLOW: Record<StateKey, { id: string; to: StateKey; de: string; en: string; color?: string; agenda?: boolean }[]> = {
+const FLOW: Record<
+  StateKey,
+  { id: string; to: StateKey; de: string; en: string; color?: string; agenda?: boolean; decision?: boolean }[]
+> = {
   submitted: [
     { id: '77777777-7777-7777-7777-777777777781', to: 'review', de: 'Prüfung beginnen', en: 'Start review' },
     { id: '77777777-7777-7777-7777-777777777782', to: 'rejected', de: 'Ablehnen', en: 'Reject', color: '#c0392b' },
@@ -67,6 +73,8 @@ const FLOW: Record<StateKey, { id: string; to: StateKey; de: string; en: string;
   review: [
     { id: '77777777-7777-7777-7777-777777777783', to: 'agenda', de: 'Auf Tagesordnung setzen', en: 'Put on the agenda', color: '#72a384', agenda: true },
     { id: '77777777-7777-7777-7777-777777777784', to: 'submitted', de: 'Nachforderung stellen', en: 'Ask for more', color: '#e8a33d' },
+    // F1: a transition into an accepted state takes a decision (approval with deviations).
+    { id: '77777777-7777-7777-7777-777777777786', to: 'approved', de: 'Bewilligen', en: 'Approve', color: '#3f8f5a', decision: true },
     { id: '77777777-7777-7777-7777-777777777785', to: 'rejected', de: 'Ablehnen', en: 'Reject', color: '#c0392b' },
   ],
   agenda: [],
@@ -90,6 +98,8 @@ interface DemoApp {
   events?: TimelineEventOutWire[];
   /** Captured on behalf of the applicant (#11). */
   capture?: ApplicationCapture;
+  /** F1: the decision (approval with deviations). `approved` null means as requested. */
+  decision?: { approved: number | null; conditions: string[]; at: string; viaVote?: boolean };
 }
 
 const DEMO: DemoApp[] = [
@@ -121,7 +131,23 @@ const DEMO: DemoApp[] = [
   { n: 13, title: 'Drucker für den Fachschaftsraum', type: TYPE_FUND, state: 'approved', amount: 349, created: '2026-07-30T09:20:00Z' },
   { n: 14, title: 'Bahnfahrt zur Gremienschulung', type: TYPE_OTHER, state: 'review', amount: 187.5, created: '2026-07-22T15:30:00Z' },
   { n: 15, title: 'Infoabend zum Auslandssemester', type: TYPE_OTHER, state: 'submitted', amount: null, created: '2026-07-15T10:45:00Z' },
-  { n: 16, title: 'Beamer für den Seminarraum', type: TYPE_FUND, state: 'approved', amount: 820, created: '2026-07-03T13:05:00Z' },
+  {
+    n: 16,
+    title: 'Beamer für den Seminarraum',
+    type: TYPE_FUND,
+    state: 'approved',
+    amount: 820,
+    created: '2026-07-03T13:05:00Z',
+    decision: {
+      approved: 700,
+      conditions: [
+        'Abrechnung mit allen Belegen bis 31.12.2026 beim AStA-Finanzreferat.',
+        'Das STUPA wird auf dem Gerät als Förderer genannt.',
+      ],
+      at: '2026-07-09T14:05:00Z',
+      viaVote: true,
+    },
+  },
 ];
 
 /** The demo rows as they stand now. Transitions, archive and delete change them. */
@@ -138,6 +164,7 @@ function listItem(d: DemoApp): ApplicationListItemWire {
     state: STATES[d.state],
     gremiumId: GREMIUM,
     amount: d.amount === null ? null : d.amount.toFixed(2),
+    approvedAmount: d.decision?.approved != null ? d.decision.approved.toFixed(2) : null,
     currency: 'EUR',
     createdAt: d.created,
     updatedAt: d.created,
@@ -159,6 +186,38 @@ function detail(d: DemoApp): ApplicationOutWire {
     isOwner: false,
     hiddenKeys: [],
     capture: d.capture ?? null,
+    decision: decisionOf(d),
+  };
+}
+
+/** F1: the decision of a demo row, as the server sends it. */
+function decisionOf(d: DemoApp): ApplicationDecision | null {
+  const dec = d.decision;
+  if (!dec) return null;
+  const requested = d.amount === null ? null : d.amount.toFixed(2);
+  const approved = dec.approved === null ? null : dec.approved.toFixed(2);
+  return {
+    requestedAmount: requested,
+    approvedAmount: approved,
+    amountDeviates: approved !== null && approved !== requested,
+    conditions: dec.conditions,
+    decidedAt: dec.at,
+    voteId: dec.viaVote ? 'b1000000-0000-0000-0000-000000000016' : null,
+    gremiumName: 'Studierendenparlament',
+    meetingTitle: dec.viaVote ? '34. Sitzung' : null,
+    agendaPosition: dec.viaVote ? 6 : null,
+  };
+}
+
+/** F1: the decision of a status change, for the timeline. */
+function timelineDecision(d: DemoApp): TimelineDecision | null {
+  const full = decisionOf(d);
+  if (!full) return null;
+  return {
+    requestedAmount: full.requestedAmount,
+    approvedAmount: full.approvedAmount,
+    amountDeviates: full.amountDeviates,
+    conditionCount: full.conditions.length,
   };
 }
 
@@ -212,6 +271,7 @@ function transitions(d: DemoApp): TransitionOutWire[] {
     color: t.color ?? null,
     addsToAgenda: t.agenda === true,
     agendaGremiumId: t.agenda ? GREMIUM : null,
+    allowsDecision: t.decision === true,
   }));
 }
 
@@ -288,7 +348,13 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
     return detail(d);
   }
   if (method === 'POST' && m[2] === 'transition') {
-    const req = (body as { transitionId?: string; meetingId?: string | null; note?: string | null } | null) ?? {};
+    const req =
+      (body as {
+        transitionId?: string;
+        meetingId?: string | null;
+        note?: string | null;
+        decision?: DecisionProposal | null;
+      } | null) ?? {};
     const t = FLOW[d.state].find((x) => x.id === req.transitionId);
     if (req.meetingId && !agendaMeetings().some((mt) => mt.id === req.meetingId)) {
       return {
@@ -301,6 +367,13 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
     }
     if (t) {
       const meeting = agendaMeetings().find((mt) => mt.id === req.meetingId);
+      if (t.decision && req.decision) {
+        d.decision = {
+          approved: req.decision.approvedAmount !== null ? Number(req.decision.approvedAmount) : null,
+          conditions: req.decision.conditions,
+          at: new Date().toISOString(),
+        };
+      }
       d.events = [
         ...(d.events ?? []),
         {
@@ -312,6 +385,7 @@ export function mockApplicationsWrite(method: string, p: string, body: unknown):
           actorInfo: { kind: 'principal', displayName: 'Demo Mitglied' },
           at: new Date().toISOString(),
           note: [meeting?.title, req.note].filter(Boolean).join(' · ') || null,
+          decision: t.decision && req.decision ? timelineDecision(d) : null,
         },
       ];
       d.state = t.to;
@@ -576,6 +650,7 @@ function timelineOf(d: DemoApp): TimelineEventOutWire[] {
       ...actorOf(i),
       at: new Date(base + i * 2 * 86_400_000 + 3_600_000).toISOString(),
       note: null,
+      decision: key === 'approved' && !(d.events ?? []).length ? timelineDecision(d) : null,
     };
   });
   return [...events, ...(d.events ?? [])];

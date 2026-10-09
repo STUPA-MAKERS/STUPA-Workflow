@@ -1132,6 +1132,8 @@ interface MockAgendaItem {
   position: number;
   nonPublic?: boolean;
   stateLabel?: Record<string, string> | null;
+  /** F1: the requested amount of an application item, for the decision proposal. */
+  amount?: string | null;
 }
 
 /** The agenda of the live meeting: freetext items, two applications and a non-public item. */
@@ -1157,6 +1159,7 @@ let MOCK_AGENDA: MockAgendaItem[] = [
     body: 'Die Antragstellerin stellt den Antrag vor.\n\n## Rückfragen\n\n- Unterkunft: Jugendherberge, Preis pro Person liegt vor.\n- Anreise: Bus, ein Angebot liegt bei.\n\nDie Sitzungsleitung stellt die Beschlussfrage zur Abstimmung.',
     position: 2,
     stateLabel: { de: 'Abstimmung', en: 'Vote' },
+    amount: '1250.00',
   },
   {
     id: 'ag-s4',
@@ -1165,6 +1168,7 @@ let MOCK_AGENDA: MockAgendaItem[] = [
     body: '',
     position: 3,
     stateLabel: { de: 'Abstimmung', en: 'Vote' },
+    amount: '820.00',
   },
   { id: 'ag-s5', applicationId: null, title: 'Personalangelegenheit', body: '', position: 4, nonPublic: true },
   { id: 'ag-s6', applicationId: null, title: 'Verschiedenes', body: '', position: 5 },

@@ -58,6 +58,7 @@ import type {
   MeetingCreateBody,
   MeetingMember,
   AgendaItem,
+  DecisionProposal,
   AltchaChallenge,
   AssignableApplication,
   Attendance,
@@ -851,6 +852,8 @@ export class ApiClient {
       quorumPercent?: number | null;
       /** Admitted guests vote too (no quorum). `undefined` lets the server choose. */
       guestsVote?: boolean | null;
+      /** F1: the decision proposal of an application item. */
+      proposal?: DecisionProposal | null;
     },
   ): Observable<Meeting> {
     return this.http

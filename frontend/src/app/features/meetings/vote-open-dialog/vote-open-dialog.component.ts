@@ -14,6 +14,14 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { AgendaItem, MajorityRule, Meeting } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { DecisionEditorComponent } from '@shared/decision/decision-editor.component';
+import {
+  type DecisionDraft,
+  decisionQuestion,
+  draftError,
+  emptyDraft,
+  toProposal,
+} from '@shared/decision/decision.util';
 import {
   ButtonComponent,
   DialogComponent,
@@ -35,6 +43,10 @@ const MAJORITY_RULES: readonly MajorityRule[] = ['simple', 'absolute', 'two_thir
  * (the server counts them from the roster). A meeting vote has no tie break, a tie is
  * a rejection (O18), and a ballot never changes after the cast (O11). The options are
  * always yes, no and abstain, so the result can fire the pass or fail branch.
+ *
+ * An application item also takes a decision proposal ("Beschlussvorschlag", F1): an
+ * approved amount and conditions that apply when the vote passes. The question follows
+ * the proposal until the lead edits it by hand.
  */
 @Component({
   selector: 'app-vote-open-dialog',
@@ -48,6 +60,7 @@ const MAJORITY_RULES: readonly MajorityRule[] = ['simple', 'absolute', 'two_thir
     IconComponent,
     SegmentedComponent,
     SwitchComponent,
+    DecisionEditorComponent,
   ],
   templateUrl: './vote-open-dialog.component.html',
   styleUrl: './vote-open-dialog.component.scss',
@@ -75,6 +88,18 @@ export class VoteOpenDialogComponent {
   /** Admitted guests vote too (#17): no quorum, the majority of the cast votes. */
   readonly guestsVote = signal(false);
   readonly submitting = signal(false);
+  /** F1: the decision proposal of an application item. */
+  readonly draft = signal<DecisionDraft>(emptyDraft(null));
+  /** The lead edited the question by hand: the proposal no longer rewrites it. */
+  private questionEdited = false;
+
+  /** Only an application item takes a decision proposal. */
+  readonly forApplication = computed(() => !!this.item()?.applicationId);
+  /** The requested amount of the application item, for the proposal. */
+  readonly requested = computed(() => this.item()?.amount ?? null);
+  readonly proposalInvalid = computed(
+    () => this.forApplication() && draftError(this.draft(), this.requested()) !== null,
+  );
 
   readonly ruleOptions = computed<SegmentedOption[]>(() =>
     MAJORITY_RULES.map((v) => ({ value: v, label: this.i18n.translate(`meetings.vote.rule.${v}`) })),
@@ -124,15 +149,37 @@ export class VoteOpenDialogComponent {
    * change both.
    */
   private reset(it: AgendaItem): void {
-    this.question.set(
-      it.applicationId
-        ? this.i18n.translate('meetings.vote.questionPrefill', { name: it.title ?? '' })
-        : (it.title ?? ''),
-    );
+    this.draft.set(emptyDraft(it.amount ?? null));
+    this.questionEdited = false;
+    this.question.set(it.applicationId ? this.prefill(it) : (it.title ?? ''));
     this.majorityRule.set('simple');
     this.secret.set(false);
     this.guestsVote.set(this.guestsAllowed() && !it.nonPublic);
     this.submitting.set(false);
+  }
+
+  /** The question of an application item, from the proposal (F1). */
+  private prefill(it: AgendaItem): string {
+    return decisionQuestion(
+      it.title ?? '',
+      toProposal(this.draft(), it.amount ?? null),
+      it.amount ?? null,
+      this.i18n.formatLocale(),
+      (key, params) => this.i18n.translate(key, params),
+    );
+  }
+
+  /** The lead typed the question: it stays as typed. */
+  setQuestion(value: string): void {
+    this.questionEdited = true;
+    this.question.set(value);
+  }
+
+  /** The proposal changed: regenerate the question until the lead edits it. */
+  setDraft(draft: DecisionDraft): void {
+    this.draft.set(draft);
+    const it = this.item();
+    if (it?.applicationId && !this.questionEdited) this.question.set(this.prefill(it));
   }
 
   setRule(value: string | null): void {
@@ -147,7 +194,8 @@ export class VoteOpenDialogComponent {
 
   submit(): void {
     const it = this.item();
-    if (!it || this.submitting()) return;
+    if (!it || this.submitting() || this.proposalInvalid()) return;
+    const proposal = it.applicationId ? toProposal(this.draft(), it.amount ?? null) : null;
     this.submitting.set(true);
     this.api
       .openMeetingVote(this.meeting().id, {
@@ -158,6 +206,8 @@ export class VoteOpenDialogComponent {
         majorityRule: this.majorityRule(),
         // Only a meeting that lets guests vote carries the switch; else the server decides.
         ...(this.guestsAllowed() ? { guestsVote: this.guestsVote() && !this.guestsLocked() } : {}),
+        // F1: the decision proposal, only when it deviates.
+        ...(proposal ? { proposal } : {}),
         // No quorum: the server takes the Gremium default.
       })
       .subscribe({

@@ -69,6 +69,7 @@ import { ApplicationsPageService } from './applications-page.service';
 import { groupByMonth, type MonthGroup } from './applications.util';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
 import { AgendaDialogComponent } from './agenda-dialog/agenda-dialog.component';
+import { DecisionDialogComponent } from './decision-dialog/decision-dialog.component';
 import {
   RowTransitionsMenuComponent,
   type RowAction,
@@ -116,6 +117,8 @@ interface ListRow {
   stateLabel: string | null;
   stateKind: StatusKind;
   amount: string | null;
+  /** F1: the approved amount when it deviates; the row then strikes `amount` through. */
+  approved: string | null;
 }
 
 /** Which filter sheet is open. */
@@ -165,6 +168,7 @@ type FilterSheet = 'budget' | 'more' | null;
     ShareLinksDialogComponent,
     ForceStatusDialogComponent,
     AgendaDialogComponent,
+    DecisionDialogComponent,
     ApplicationCaptureComponent,
   ],
   providers: [ApplicationsPageService],
@@ -383,6 +387,7 @@ export class ApplicationsListComponent implements OnDestroy {
       stateLabel: item.state?.label ?? null,
       stateKind: flowColorKind(item.state?.color),
       amount: this.money(item),
+      approved: this.approvedMoney(item),
     })),
   );
 
@@ -433,6 +438,9 @@ export class ApplicationsListComponent implements OnDestroy {
   readonly forceOpen = signal(false);
   /** The row and the transition of the agenda dialog ("Auf Tagesordnung setzen"). */
   readonly agendaFor = signal<{ item: ApplicationListItem; transition: Transition } | null>(null);
+  /** F1: the row and the transition of the decision dialog. */
+  readonly decisionFor = signal<{ item: ApplicationListItem; transition: Transition } | null>(null);
+  readonly decisionOpen = signal(false);
   readonly agendaOpen = signal(false);
   /** The row that waits for the delete confirmation. */
   readonly deleteFor = signal<ApplicationListItem | null>(null);
@@ -511,6 +519,14 @@ export class ApplicationsListComponent implements OnDestroy {
   }
 
   /** The amount in the currency of the row, or null without an amount. */
+  /** F1: the approved amount as money when it deviates from the requested one, else null. */
+  private approvedMoney(item: ApplicationListItem): string | null {
+    const approved = item.approvedAmount;
+    if (approved === null || approved === undefined || item.amount === null) return null;
+    if (Number(approved) === Number(item.amount)) return null;
+    return this.money({ ...item, amount: approved });
+  }
+
   private money(item: ApplicationListItem): string | null {
     if (item.amount === null) return null;
     const value = Number(item.amount);
@@ -712,6 +728,12 @@ export class ApplicationsListComponent implements OnDestroy {
           this.agendaOpen.set(true);
           return;
         }
+        // F1: a transition into an accepted state can approve with deviations.
+        if (action.transition.allowsDecision) {
+          this.decisionFor.set({ item, transition: action.transition });
+          this.decisionOpen.set(true);
+          return;
+        }
         this.fire(item, action.transition.id);
     }
   }
@@ -775,6 +797,12 @@ export class ApplicationsListComponent implements OnDestroy {
   /** The agenda dialog fired its transition. */
   onAgendaDone(): void {
     const target = this.agendaFor();
+    if (target) this.changed(target.item.id, 'updated');
+  }
+
+  /** The decision dialog fired its transition. */
+  onDecisionDone(): void {
+    const target = this.decisionFor();
     if (target) this.changed(target.item.id, 'updated');
   }
 

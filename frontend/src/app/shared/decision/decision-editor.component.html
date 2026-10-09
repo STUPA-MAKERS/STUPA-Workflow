@@ -1,0 +1,73 @@
+<div class="dec">
+  <app-switch
+    [id]="idPrefix() + '-switch'"
+    [hint]="switchHint() | t"
+    [checked]="draft().enabled"
+    (checkedChange)="setEnabled($event)"
+    ><span class="dec__switchLabel">{{ 'decision.switch' | t }}</span></app-switch
+  >
+
+  @if (draft().enabled) {
+    <div class="dec__box">
+      <app-currency-input
+        [label]="'decision.amount' | t"
+        [name]="idPrefix() + '-amount'"
+        [hint]="amountHint()"
+        [error]="amountError()"
+        [ngModel]="draft().amount"
+        (ngModelChange)="setAmount($event)"
+      />
+
+      <div class="dec__list" role="group" [attr.aria-labelledby]="idPrefix() + '-conditions'">
+        <span [id]="idPrefix() + '-conditions'" class="dec__cap">{{ 'decision.conditions' | t }}</span>
+        @for (condition of draft().conditions; track $index; let i = $index, first = $first, last = $last) {
+          <div class="dec__row">
+            <span class="dec__num mono" aria-hidden="true">{{ i + 1 }}</span>
+            <textarea
+              class="dec__input"
+              rows="2"
+              [attr.maxlength]="maxLength"
+              [attr.aria-label]="'decision.conditionLabel' | t: { n: i + 1 }"
+              [placeholder]="'decision.conditionPlaceholder' | t"
+              [ngModel]="condition"
+              (ngModelChange)="setCondition(i, $event)"
+              [name]="idPrefix() + '-condition-' + i"
+            ></textarea>
+            <span class="dec__actions">
+              <app-button
+                variant="text"
+                size="sm"
+                [iconOnly]="true"
+                [disabled]="first"
+                [ariaLabel]="'decision.conditionUp' | t: { n: i + 1 }"
+                (click)="moveCondition(i, -1)"
+              ><app-icon name="up" [size]="16" /></app-button>
+              <app-button
+                variant="text"
+                size="sm"
+                [iconOnly]="true"
+                [disabled]="last"
+                [ariaLabel]="'decision.conditionDown' | t: { n: i + 1 }"
+                (click)="moveCondition(i, 1)"
+              ><app-icon name="down" [size]="16" /></app-button>
+              <app-button
+                variant="text"
+                size="sm"
+                [iconOnly]="true"
+                [ariaLabel]="'decision.conditionRemove' | t: { n: i + 1 }"
+                (click)="removeCondition(i)"
+              ><app-icon name="x" [size]="16" /></app-button>
+            </span>
+          </div>
+        }
+        @if (listError(); as err) {
+          <p class="dec__error" role="alert">{{ err }}</p>
+        }
+        <app-button class="dec__add" variant="text" size="sm" [disabled]="!canAdd()" (click)="addCondition()">
+          <app-icon name="plus" [size]="16" />
+          {{ 'decision.conditionAdd' | t }}
+        </app-button>
+      </div>
+    </div>
+  }
+</div>

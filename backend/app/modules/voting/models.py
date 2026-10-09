@@ -70,6 +70,9 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     # The vote question that the protocol snippet shows. NULL means no explicit question.
     question: Mapped[str | None] = mapped_column(Text, nullable=True)
     config: Mapped[dict] = mapped_column(JSONB)
+    # The decision proposal of an application vote (F1): `{approvedAmount, conditions}`.
+    # A passed vote writes it as the decision of the application. NULL = no deviation.
+    proposal: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     # Authoritative eligible-voter count (roster). It is the denominator of the percent
     # quorum. A NULL value means unknown, so the percent quorum stays fail-closed and
     # never counts as met.

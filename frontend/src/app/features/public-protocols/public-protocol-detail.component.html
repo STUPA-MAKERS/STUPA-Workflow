@@ -107,6 +107,16 @@
                           }
                         </div>
                         <p class="pd__rule">{{ ruleLine(d) }}</p>
+                        @if (d.conditions?.length) {
+                          <div class="pd__conds">
+                            <span class="cap">{{ 'decision.conditions' | t }}</span>
+                            <ol class="pd__condList">
+                              @for (c of d.conditions; track $index) {
+                                <li>{{ c }}</li>
+                              }
+                            </ol>
+                          </div>
+                        }
                       </figure>
                       }
                     }

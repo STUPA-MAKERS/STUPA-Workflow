@@ -12,6 +12,7 @@ from sqlalchemy.orm import aliased
 
 from app.modules.admin.gremium_roles import _time_valid_clause
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
+from app.modules.applications.decision import DecisionIn
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
@@ -141,6 +142,7 @@ class VoteReadOps(MeetingServiceBase):
                     guestsVote=config.guests_vote,
                     presentMembers=members,
                     presentGuests=guests,
+                    proposal=DecisionIn.from_stored(getattr(v, "proposal", None)),
                 )
             )
         return out

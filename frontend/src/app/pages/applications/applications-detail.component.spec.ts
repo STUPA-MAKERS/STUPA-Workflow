@@ -1530,6 +1530,63 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
+  it('shows the decision and opens the decision dialog for an accepted state (F1)', async () => {
+    const { http, detectChanges, cmp, container } = await setup([
+      'application.read',
+      'application.transition',
+    ]);
+    http.expectOne(url('')).flush({
+      ...appWire(),
+      budgetId: 'c1',
+      approvedAmount: '200.00',
+      decision: {
+        requestedAmount: '250.00',
+        approvedAmount: '200.00',
+        amountDeviates: true,
+        conditions: ['Belege einreichen'],
+        decidedAt: '2026-06-06T10:00:00Z',
+        voteId: null,
+        gremiumName: 'StuPa',
+        meetingTitle: null,
+        agendaPosition: null,
+      },
+    });
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush([]);
+    http.expectOne(url('/transitions')).flush([
+      {
+        id: 'tr-ok',
+        fromStateId: 's1',
+        toStateId: 's2',
+        label: { de: 'Bewilligen' },
+        color: null,
+        allowsDecision: true,
+      },
+    ]);
+    flushForm(http);
+    detectChanges();
+
+    expect(screen.getByRole('heading', { name: 'Beschluss' })).toBeInTheDocument();
+    expect(screen.getByText('Belege einreichen')).toBeInTheDocument();
+    expect(container.querySelector('.ad__amountStruck')?.textContent?.replace(/\u00a0/g, ' ')).toBe('250,00 €');
+    expect(container.querySelector('.ad__bound')?.textContent).toContain('bewilligt statt beantragt');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Bewilligen' }));
+    http.expectNone((r) => r.url === '/api/applications/app-1/transition');
+    expect(cmp.decisionOpen()).toBe(true);
+    expect(cmp.decisionTransition()?.id).toBe('tr-ok');
+  });
+
+  it('names no approved amount when it equals the requested one (F1)', async () => {
+    const { cmp } = await setup(['application.read']);
+    const base = { ...appWire(), amount: '250.00', currency: 'EUR' } as unknown as Parameters<
+      typeof cmp.approvedAmount
+    >[0];
+    expect(cmp.approvedAmount({ ...base, approvedAmount: null })).toBe('');
+    expect(cmp.approvedAmount({ ...base, approvedAmount: '250.00' })).toBe('');
+    expect(cmp.approvedAmount({ ...base, approvedAmount: '200.00' }).replace(/\u00a0/g, ' ')).toBe('200,00 €');
+  });
+
   it('opens the agenda dialog for a transition onto the agenda (A1)', async () => {
     const { http, detectChanges, cmp } = await setup([
       'application.read',

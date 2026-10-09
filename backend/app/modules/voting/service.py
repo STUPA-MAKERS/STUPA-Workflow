@@ -34,7 +34,13 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.applications.models import Application, StatusEvent
+from app.modules.applications.decision import (
+    DecisionIn,
+    check_approved_amount,
+    not_allowed_problem,
+    record_decision,
+)
+from app.modules.applications.models import Application, ApplicationDecision, StatusEvent
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
@@ -617,7 +623,19 @@ class VotingService:
             closedAt=vote.closed_at,
             tally=tally_out,
             guestsVote=config.guests_vote,
+            proposal=DecisionIn.from_stored(getattr(vote, "proposal", None)),
         )
+
+    @staticmethod
+    def _check_proposal(application: Application, proposal: DecisionIn | None) -> None:
+        """Check the approved amount of a proposal against the requested amount (F1).
+
+        Raises:
+            ValidationProblem: `approved_amount_invalid` or
+                `approved_amount_exceeds_requested` (422).
+        """
+        if proposal is not None:
+            check_approved_amount(application.amount, proposal.approved_amount)
 
     async def create(
         self, application_id: UUID, payload: VoteCreate, principal: Principal
@@ -669,6 +687,7 @@ class VotingService:
         # An unconfirmed guest application rests in the flow. A vote on it could fire
         # its pass or fail branch on close, so it gets 404 as on the flow routes.
         application = await self._get_application(application_id, confirmed_only=True)
+        self._check_proposal(application, payload.proposal)
         expected = await self._application_gremium_id(application)
         if expected is None and not admin_bypass(principal, "vote.manage"):
             raise ForbiddenError(
@@ -692,6 +711,7 @@ class VotingService:
             opensStateId=payload.opens_state_id,
             closesAt=payload.closes_at,
             resultBranchTransitionId=payload.result_branch_transition_id,
+            proposal=payload.proposal,
         )
         return await self._insert(application_id, internal)
 
@@ -751,15 +771,22 @@ class VotingService:
         A meeting vote locks the meeting row and needs a ``live`` meeting that still
         has the agenda item (see ``_lock_live_meeting``).
 
+        A decision proposal (F1) needs an application, and its amount must fit the
+        requested amount.
+
         Raises:
             NotFoundError: No application has this id, or the agenda item is not in
                 the meeting (404).
             ConflictError: The meeting is not ``live`` (409).
+            ValidationProblem: A proposal without an application
+                (``decision_not_allowed``) or with a bad amount (422).
         """
+        if application_id is None and payload.proposal is not None:
+            raise not_allowed_problem("Only an application vote takes a decision proposal.")
         if meeting_id is not None:
             await self._lock_live_meeting(meeting_id, agenda_item_id=agenda_item_id)
         if application_id is not None:
-            await self._get_application(application_id)
+            self._check_proposal(await self._get_application(application_id), payload.proposal)
         return await self._insert(
             application_id, payload, meeting_id=meeting_id, agenda_item_id=agenda_item_id
         )
@@ -784,6 +811,7 @@ class VotingService:
             opens_state_id=payload.opens_state_id,
             closes_at=payload.closes_at,
             result_branch_transition_id=payload.result_branch_transition_id,
+            proposal=payload.proposal.to_json() if payload.proposal is not None else None,
             status="draft",
         )
         self.session.add(vote)
@@ -1607,17 +1635,22 @@ class VotingService:
         branch_name = "pass" if result_value == "passed" else "fail"
         flow = FlowService(self.session, self.dispatcher)
         staged: StagedFire | None = None
+        decision: ApplicationDecision | None = None
         if vote.application_id is not None:
-            staged = await self._stage_branch(
+            staged, decision = await self._stage_branch(
                 flow,
                 vote,
                 vote.application_id,
                 branch_name,
                 principal,
                 note=f"vote:{result_value}",
+                decide=result_value == "passed",
             )
         if staged is not None:
             vote.result_branch_transition_id = staged.transition.id
+            if decision is not None:
+                # The status event of the branch carries the decision (timeline, revert).
+                decision.status_event_id = staged.status_event_id
             # The deadline of the new state joins the same commit.
             await flow.schedule_staged_deadline(staged, commit=False)
         await self.session.commit()
@@ -1649,6 +1682,32 @@ class VotingService:
             branchFired=staged is not None,
         )
 
+    async def _record_proposal(
+        self, vote: Vote, application_id: UUID, principal: Principal
+    ) -> ApplicationDecision | None:
+        """Write the proposal of a passed vote as the decision of its application (F1).
+
+        A vote without a proposal writes nothing. When the application amount went
+        below the approved amount after the vote opened, the decision binds the
+        requested amount (``approvedAmount`` null) and keeps the conditions.
+        """
+        proposal = DecisionIn.from_stored(getattr(vote, "proposal", None))
+        if proposal is None:
+            return None
+        application = await self._get_application(application_id)
+        approved = proposal.approved_amount
+        if approved is not None and (application.amount is None or approved > application.amount):
+            proposal = proposal.model_copy(update={"approved_amount": None})
+        return await record_decision(
+            self.session,
+            application,
+            proposal,
+            actor=principal.sub,
+            decided_by=None,
+            old_approved=application.approved_amount,
+            vote_id=vote.id,
+        )
+
     async def _stage_branch(
         self,
         flow: FlowService,
@@ -1658,27 +1717,37 @@ class VotingService:
         principal: Principal,
         *,
         note: str,
-    ) -> StagedFire | None:
+        decide: bool = False,
+    ) -> tuple[StagedFire | None, ApplicationDecision | None]:
         """Stage the result branch in a SAVEPOINT, or audit why it is blocked.
 
         The SAVEPOINT keeps the staged vote close safe: a guard failure, a lost race or
         a missing branch transition rolls back only the branch. The method then writes
-        ``vote_branch_blocked`` and returns None.
+        ``vote_branch_blocked`` and returns no staged fire.
 
         Defence in depth: a vote whose Gremium does not decide the current vote state
         of the application (``application.vote_gremium_id``) never fires the branch,
         reason ``vote_gremium_mismatch``. An example is a stale agenda item of a
-        meeting of another Gremium.
+        meeting of another Gremium. Such a vote also writes no decision.
+
+        ``decide`` (a passed vote) writes the proposal of the vote as the decision of
+        the application (F1) before the SAVEPOINT. The guard `budgetFitsApplication`
+        of the branch then checks the approved amount, and a blocked branch keeps the
+        decision of the vote.
         """
         reason: str | None = None
+        decision: ApplicationDecision | None = None
         if await self.vote_gremium_mismatch(vote):
             reason = VOTE_GREMIUM_MISMATCH
         else:
+            if decide:
+                decision = await self._record_proposal(vote, application_id, principal)
             try:
                 async with self.session.begin_nested():
-                    return await flow.stage_branch(
+                    staged = await flow.stage_branch(
                         application_id, branch_name, principal, note=note, vote_id=vote.id
                     )
+                    return staged, decision
             except ConflictError as exc:
                 reason = exc.code
             except NotFoundError:
@@ -1693,7 +1762,7 @@ class VotingService:
             target_id=str(vote.id),
             data={**self._audit_refs(vote), "branch": branch_name, "reason": reason},
         )
-        return None
+        return None, decision
 
     async def vote_gremium_mismatch(self, vote: Vote) -> bool:
         """Tell whether the Gremium of ``vote`` does not decide its application now.

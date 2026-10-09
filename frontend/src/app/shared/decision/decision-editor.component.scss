@@ -1,0 +1,97 @@
+@use 'field' as f;
+
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.dec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.dec__switchLabel {
+  font-weight: var(--fw-semibold);
+}
+
+/* The amount and the conditions sit on a quiet surface below the switch. */
+.dec__box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-1);
+}
+
+.dec__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.dec__cap {
+  padding: 0 2px;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+  color: var(--color-text-muted);
+}
+
+.dec__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.dec__num {
+  flex: none;
+  width: 1.5rem;
+  padding-top: 12px;
+  text-align: center;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.dec__input {
+  @include f.box;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 3rem;
+  padding: 12px var(--space-4);
+  border: 0;
+  outline: 0;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-md);
+  line-height: 1.375rem;
+  resize: vertical;
+}
+.dec__input::placeholder {
+  color: var(--color-text-subtle);
+}
+.dec__actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding-top: 4px;
+}
+.dec__add {
+  align-self: flex-start;
+  margin-left: 2rem;
+}
+.dec__error {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--color-danger);
+}
+
+@media (max-width: 599.98px) {
+  .dec__row {
+    flex-wrap: wrap;
+  }
+  .dec__actions {
+    width: 100%;
+    justify-content: flex-end;
+    padding-top: 0;
+  }
+}

@@ -1016,6 +1016,41 @@ describe('ApplicationsListComponent', () => {
       http.expectOne(LIST).flush(page(ROWS));
     });
 
+    it('opens the decision dialog for an accepted state and reloads after it (F1)', async () => {
+      const { http, cmp } = await start();
+      const transition = {
+        ...START,
+        label: 'Bewilligen',
+        color: null,
+        addsToAgenda: false,
+        agendaGremiumId: null,
+        allowsDecision: true,
+      };
+      cmp.onRowAction(cmp.items()[0], { kind: 'transition', transition });
+      http.expectNone((r) => r.method === 'POST');
+      expect(cmp.decisionOpen()).toBe(true);
+      expect(cmp.decisionFor()?.item.id).toBe('app-1');
+      cmp.onDecisionDone();
+      http.expectOne(LIST).flush(page(ROWS));
+      cmp.decisionFor.set(null);
+      cmp.onDecisionDone();
+    });
+
+    it('shows the approved amount over the struck requested one (F1)', async () => {
+      const { harness } = await start('/applications', {
+        rows: [
+          row({ amount: '1250.00', approvedAmount: '900.00' }),
+          row({ id: 'app-2', amount: '480.00', approvedAmount: '480.00' }),
+          row({ id: 'app-3', amount: null, approvedAmount: '1.00' }),
+        ],
+      });
+      harness.detectChanges();
+      const host = harness.fixture.nativeElement as HTMLElement;
+      const struck = host.querySelectorAll('.apps__amountStruck');
+      expect(struck).toHaveLength(1);
+      expect(struck[0].textContent?.replace(/\u00a0/g, ' ')).toBe('1.250,00 €');
+    });
+
     it('opens the agenda dialog for a transition onto the agenda and reloads after it', async () => {
       const { http, harness, router, cmp } = await start();
       await openRowMenu(http, 'Zuschuss Kennenlernwochenende', [{ ...AGENDA, agendaGremiumId: 'g1' }], () =>

@@ -58,6 +58,8 @@ export interface PublicDecision {
   secret: boolean;
   /** The vote is already in the TOP text as a callout: the page shows no second box. */
   inText?: boolean;
+  /** F1: the conditions of the decision of a passed vote. An older snapshot has none. */
+  conditions?: string[];
 }
 
 /** One agenda item in the detail. A non-public item has no title, text or decision. */

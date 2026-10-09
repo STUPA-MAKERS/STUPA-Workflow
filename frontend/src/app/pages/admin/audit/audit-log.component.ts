@@ -93,6 +93,8 @@ export const AUDIT_ACTIONS = [
   'application_unarchive',
   'application_share',
   'application_share_revoke',
+  // F1: the decision on an application (approval with deviations).
+  'application_decision',
   'application_delete',
   'comment_update',
   'comment_delete',

@@ -336,6 +336,7 @@ def build_vote_snippet(
     counts: dict[str, int] | None,
     question: str | None = None,
     note: str | None = None,
+    conditions: list[str] | None = None,
 ) -> str:
     """Render a vote as a protocol callout (`> [!abstimmung]`).
 
@@ -343,7 +344,8 @@ def build_vote_snippet(
     renderer turns it into the built-in tally box of the PDF. The function escapes all
     values and sets the title in bold. There is no separate result line,
     because the result reads from the tally box. The snippet stays part of the
-    editable Markdown as a blockquote callout.
+    editable Markdown as a blockquote callout. `conditions` are the conditions of
+    the decision (F1): one plain body line `Auflage n: text` each.
     """
     head = question.strip() if question and question.strip() else title
     lines = [f"> [!abstimmung] **{_md_escape(head)}**"]
@@ -352,6 +354,9 @@ def build_vote_snippet(
         # (yes/no/abstain). The ballot options carry exactly these keys.
         tally = ", ".join(f"{_md_escape(opt)}: {n}" for opt, n in counts.items())
         lines.append(f"> {tally}")
+    for index, condition in enumerate(conditions or [], start=1):
+        # A plain body line: the callout body of the renderer has no list.
+        lines.append(f"> Auflage {index}: {_md_escape(condition)}")
     if note:
         # A plain body line of the callout: the renderer keeps it below the tally box.
         lines.append(f"> {_md_escape(note)}")

@@ -521,6 +521,25 @@ class MeetingPatch(WireModel):
     )
 
 
+class DecisionProposal(WireModel):
+    """A decision: the approved amount and the conditions (approval with deviations).
+
+    When a vote with this proposal passes, the proposal becomes the decision of the
+    application. The cost center then binds the approved amount.
+    """
+
+    approvedAmount: str | None = Field(
+        default=None,
+        description="Approved amount as a decimal string, e.g. \"800.00\". Greater than 0 "
+        "and not above the requested amount (422 `approved_amount_invalid` / "
+        "`approved_amount_exceeds_requested`). null means as requested.",
+    )
+    conditions: list[str] = Field(
+        default_factory=list,
+        description="Conditions (Auflagen), at most 20, each 1 to 1000 characters.",
+    )
+
+
 class MeetingVoteOpenBody(WireModel):
     """Open a live vote. A meeting vote has no casting vote: a tie is `rejected`."""
 
@@ -536,6 +555,11 @@ class MeetingVoteOpenBody(WireModel):
         description="Public meeting: the admitted guests vote too (no quorum, majority of "
         "the cast ballots). Default: on when guests vote in the meeting and the item is "
         "public. Never on a non-public item (422).",
+    )
+    proposal: DecisionProposal | None = Field(
+        default=None,
+        description="Decision proposal of an application item. A free-text item gives "
+        "422 `decision_not_allowed`.",
     )
 
 
@@ -563,6 +587,9 @@ class VoteCreate(WireModel):
     opensStateId: str | None = None
     closesAt: str | None = Field(default=None, description="ISO datetime")
     resultBranchTransitionId: str | None = None
+    proposal: DecisionProposal | None = Field(
+        default=None, description="Decision proposal that applies when the vote passes."
+    )
 
 
 # Notification settings, delegations and substitutes.

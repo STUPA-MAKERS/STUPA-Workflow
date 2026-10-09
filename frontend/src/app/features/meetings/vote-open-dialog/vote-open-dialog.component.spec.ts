@@ -180,4 +180,57 @@ describe('VoteOpenDialogComponent', () => {
       expect(http.expectOne('/api/meetings/m-1/votes').request.body).not.toHaveProperty('guestsVote');
     });
   });
+
+  describe('decision proposal (F1)', () => {
+    const PRICED: AgendaItem = { ...APP_TOP, amount: '1250.00' };
+    const norm = (s: string) => s.replace(/\u00a0/g, ' ');
+
+    it('offers no proposal on a free-text item', async () => {
+      await setup(FREE_TOP, 8);
+      expect(screen.queryByRole('switch', { name: /Mit Abweichungen genehmigen/ })).toBeNull();
+    });
+
+    it('rewrites the question from the proposal and sends it', async () => {
+      const { http, cmp, container } = await setup(PRICED);
+      await userEvent.click(screen.getByRole('switch', { name: /Mit Abweichungen genehmigen/ }));
+      cmp.setDraft({ enabled: true, amount: '900', conditions: ['Belege', ''] });
+      expect(norm(cmp.question())).toBe(
+        'Soll der Antrag „Zuschuss Party“ mit 900,00 € (beantragt 1.250,00 €) und 1 Auflage gefördert werden?',
+      );
+      expect(screen.getByText(/Aus dem Vorschlag erzeugt/)).toBeInTheDocument();
+      expect(await runAxe(container)).toHaveNoViolations();
+      cmp.submit();
+      expect(http.expectOne('/api/meetings/m-1/votes').request.body.proposal).toEqual({
+        approvedAmount: '900',
+        conditions: ['Belege'],
+      });
+    });
+
+    it('keeps a question that the lead edited by hand', async () => {
+      const { cmp } = await setup(PRICED);
+      cmp.setQuestion('Eigene Frage?');
+      cmp.setDraft({ enabled: true, amount: '900', conditions: [] });
+      expect(cmp.question()).toBe('Eigene Frage?');
+    });
+
+    it('sends no proposal without a deviation and blocks a bad amount', async () => {
+      const { http, cmp } = await setup(PRICED);
+      cmp.setDraft({ enabled: true, amount: '1250.00', conditions: [] });
+      cmp.submit();
+      expect(http.expectOne('/api/meetings/m-1/votes').request.body).not.toHaveProperty('proposal');
+      cmp.submitting.set(false);
+      cmp.setDraft({ enabled: true, amount: '2000', conditions: [] });
+      expect(cmp.proposalInvalid()).toBe(true);
+      cmp.submit();
+      http.expectNone('/api/meetings/m-1/votes');
+    });
+
+    it('ignores a proposal on an item without an application', async () => {
+      const { cmp, fixture } = await setup(PRICED);
+      fixture.componentRef.setInput('item', FREE_TOP);
+      fixture.detectChanges();
+      cmp.setDraft({ enabled: true, amount: '1', conditions: [] });
+      expect(cmp.question()).toBe('Verschiedenes');
+    });
+  });
 });
