@@ -17,12 +17,14 @@ full aggregates arrive with `vote_closed`. This mirrors
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.modules.livevote.schemas import GuestsMode, MeetingGuestOut
+from app.modules.voting.schemas import ElectionResultOut, VoteKind, VoteResultValue
+from app.shared.config_schemas import ElectionConfig
 
 if TYPE_CHECKING:
     from app.modules.voting.schemas import VoteOut
@@ -83,6 +85,29 @@ class VoteOpenedEvent(_CamelModel):
     # `subscribe`, and not because the vote opened now. A client then knows that the
     # vote did not open while it watched.
     replay: bool = False
+    # F2: an election carries its seats and candidates (the ballot of the dock), and
+    # a runoff its round.
+    kind: VoteKind = "motion"
+    election: ElectionConfig | None = None
+    round: int = 1
+
+    @classmethod
+    def from_vote(cls, vote: VoteOut, *, replay: bool = False) -> VoteOpenedEvent:
+        """Build the event from a vote."""
+        return cls(
+            voteId=vote.id,
+            applicationId=vote.application_id,
+            agendaItemId=vote.agenda_item_id,
+            question=vote.question,
+            options=vote.config.options,
+            closesAt=vote.closes_at,
+            secret=vote.secret,
+            replay=replay,
+            kind=vote.kind,
+            # The channel reaches the beamer and the guests: names, no account ids.
+            election=vote.election.public() if vote.election is not None else None,
+            round=vote.round,
+        )
 
 
 class VoteTallyEvent(_CamelModel):
@@ -113,6 +138,9 @@ class VoteTallyEvent(_CamelModel):
     present_members: int | None = Field(default=None, alias="presentMembers")
     present_guests: int | None = Field(default=None, alias="presentGuests")
     guests_vote: bool = Field(default=False, alias="guestsVote")
+    # F2: for an election `counts` holds the votes per candidate id plus `abstain`,
+    # and `cast` the cast ballots.
+    kind: VoteKind = "motion"
 
     @classmethod
     def from_vote(cls, vote: VoteOut) -> VoteTallyEvent:
@@ -136,6 +164,7 @@ class VoteTallyEvent(_CamelModel):
             presentMembers=vote.tally.present_members,
             presentGuests=vote.tally.present_guests,
             guestsVote=vote.guests_vote,
+            kind=vote.kind,
         )
 
 
@@ -144,13 +173,26 @@ class VoteClosedEvent(_CamelModel):
 
     type: Literal["vote_closed"] = "vote_closed"
     vote_id: UUID = Field(alias="voteId")
-    result: Literal["passed", "rejected", "tie"]
+    result: VoteResultValue
     counts: dict[str, int]
     # Why the vote failed. Set for `rejected` only, when the vote missed the
     # quorum or the majority. `None` for `passed` and for `tie`.
     failed_reason: Literal["quorum", "majority"] | None = Field(
         default=None, alias="failedReason"
     )
+    # F2: the result of an election (elected, runoff, pending lot). Aggregates and
+    # candidate ids only.
+    kind: VoteKind = "motion"
+    election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
+
+
+class VoteLotDrawnEvent(_CamelModel):
+    """The lot of a tied election was drawn (F2): the beamer and the room show it."""
+
+    type: Literal["vote_lot_drawn"] = "vote_lot_drawn"
+    vote_id: UUID = Field(alias="voteId")
+    result: VoteResultValue
+    election_result: ElectionResultOut = Field(alias="electionResult")
 
 
 class VoteCancelledEvent(_CamelModel):
@@ -224,7 +266,9 @@ class CastMessage(_CamelModel):
 
     type: Literal["cast"]
     vote_id: UUID = Field(alias="voteId")
-    choice: str = Field(min_length=1)
+    # One option; for an election with several candidates the list of the chosen
+    # candidate ids (F2).
+    choice: Annotated[str, Field(min_length=1)] | list[str]
     as_delegation: bool = Field(default=False, alias="asDelegation")
 
 

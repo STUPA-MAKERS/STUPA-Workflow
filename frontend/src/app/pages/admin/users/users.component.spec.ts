@@ -6,7 +6,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { AdminPrincipal, GroupMapping, Role, RoleAssignment } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
-import { UsersComponent } from './users.component';
+import { principalFilters, UsersComponent } from './users.component';
 
 const ROLES: Role[] = [
   {
@@ -157,7 +157,7 @@ describe('UsersComponent', () => {
 
   it('shows the OIDC groups of each user, or a placeholder', async () => {
     await setup();
-    expect(screen.getAllByText('OIDC-Gruppen')).toHaveLength(2);
+    expect(screen.getAllByText('SSO-Gruppen (letzter Login)')).toHaveLength(2);
     expect(screen.getByText('stupa-referat')).toBeInTheDocument();
     expect(screen.getByText('unmapped')).toBeInTheDocument();
     expect(screen.getByText('Keine Gruppen.')).toBeInTheDocument();
@@ -423,6 +423,75 @@ describe('UsersComponent', () => {
       api.listPrincipals.mockClear();
       inst.onMerged();
       expect(api.listPrincipals).toHaveBeenCalled();
+    });
+  });
+
+  describe('revoke rights (F3)', () => {
+    function revokeAuth(sub: string | null = null) {
+      return {
+        principal: () => (sub === null ? null : { sub }),
+        can: (p: string) => p === 'admin.users' || p === 'admin.users.revoke_groups',
+      } as unknown as AuthService;
+    }
+    const WITH_ACCESS = PRINCIPALS.map((p) => ({ ...p, hasAccess: p.id === 'p-1' }));
+
+    it('principalFilters maps the chips to the query parameters', () => {
+      const now = Date.parse('2026-10-09T12:00:00Z');
+      expect(principalFilters('', '', now)).toBeUndefined();
+      expect(principalFilters('90', '', now)).toEqual({ lastLoginBefore: '2026-07-11', includeNever: true });
+      expect(principalFilters('never', 'yes', now)).toEqual({ includeNever: true, hasGroups: true });
+      expect(principalFilters('', 'no', now)).toEqual({ hasGroups: false });
+    });
+
+    it('the chips filter the list on the server', async () => {
+      const { api, inst } = await setup(makeApi(), revokeAuth());
+      expect(screen.getByRole('group', { name: 'Personen filtern' })).toBeInTheDocument();
+      expect(inst.lastLoginText()).toBe('Letzter Login');
+      api.listPrincipals.mockClear();
+      inst.setLastLoginFilter('never');
+      expect(api.listPrincipals).toHaveBeenLastCalledWith('', { includeNever: true });
+      expect(inst.lastLoginText()).toBe('Letzter Login: nie');
+      inst.setGroupFilter('yes');
+      expect(api.listPrincipals).toHaveBeenLastCalledWith('', { includeNever: true, hasGroups: true });
+      expect(inst.groupText()).toBe('Hat SSO-Gruppen: Ja');
+      expect(inst.lastLoginOptions().map((o: { label: string }) => o.label)).toEqual([
+        'Alle',
+        'über 90 Tage',
+        'über 180 Tage',
+        'über 365 Tage',
+        'nie',
+      ]);
+    });
+
+    it('an old last login shows in the warning colour', async () => {
+      const { inst } = await setup();
+      const now = Date.parse('2026-10-09T12:00:00Z');
+      expect(inst.isStale(PRINCIPALS[0], now)).toBe(true);
+      expect(inst.isStale({ ...PRINCIPALS[0], lastLogin: '2026-09-01T00:00:00Z' }, now)).toBe(false);
+      expect(inst.isStale(PRINCIPALS[1], now)).toBe(false);
+    });
+
+    it('the row menu offers "Rechte entziehen …" only for a person with access', async () => {
+      const api = makeApi({ listPrincipals: jest.fn(() => of(WITH_ACCESS)) });
+      const { inst } = await setup(api, revokeAuth());
+      // A row without an item for this user has no (empty) menu.
+      expect(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })).toHaveLength(1);
+      const item = inst.menuFor(WITH_ACCESS[0])[0].items[0];
+      expect(item).toMatchObject({ id: 'revoke', label: 'Rechte entziehen …', danger: true, disabledReason: null });
+      expect(inst.menuFor(WITH_ACCESS[1])[0].items).toEqual([]);
+      inst.onMenu(item, WITH_ACCESS[0]);
+      expect(inst.revokeSource()).toEqual(WITH_ACCESS[0]);
+      api.listPrincipals.mockClear();
+      inst.onRevoked();
+      expect(api.listPrincipals).toHaveBeenCalled();
+    });
+
+    it('the own account cannot lose its rights: the action has a reason', async () => {
+      const { inst } = await setup(makeApi(), revokeAuth('kc|alex'));
+      const own = inst.menuFor(WITH_ACCESS[0])[0].items[0];
+      expect(own.disabledReason).toBe(
+        'Deine eigenen Rechte kannst du nicht entziehen. Bitte eine andere Administratorin oder einen anderen Administrator darum.',
+      );
     });
   });
 });

@@ -1,0 +1,62 @@
+/* The tags of a candidate row and the banners of a runoff and a pending lot (F2). */
+.er__tag {
+  display: inline-block;
+  margin-inline-start: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm, 4px);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+  vertical-align: middle;
+}
+.er__tag--elected {
+  background: var(--color-accent-container);
+  color: var(--color-accent-text);
+}
+.er__tag--tie {
+  background: var(--color-warning-subtle);
+  color: var(--color-warning);
+}
+.er__row--abstain .bars__label {
+  color: var(--color-text-muted);
+  font-weight: var(--fw-regular, 400);
+}
+
+.er__banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-subtle);
+}
+.er__bannerText {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  flex: 1 1 16rem;
+  min-width: 0;
+}
+.er__hint {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+
+:host(.bars--beamer) {
+  .er__tag {
+    font-size: 1.125rem;
+  }
+  .er__bannerText {
+    font-size: 1.5rem;
+  }
+}
+
+.er__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}

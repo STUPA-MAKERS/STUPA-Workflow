@@ -1396,7 +1396,7 @@ async def test_get_tree_accepted_remaining_nonpositive_skipped() -> None:
     app_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS", accepted=["approved"])
     alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="1000")
-    app_row = (app_id, "VS", fy_id, Decimal("100"), "approved")
+    app_row = (app_id, "VS", fy_id, Decimal("100"), Decimal("100"), "approved")
     exp_row = ("VS", fy_id, Decimal("100"), "expense", app_id)  # fully spent
     sess = fake_session(result(top), result(alloc), result(app_row), result(exp_row))
     svc = BudgetTreeService(sess)
@@ -1415,7 +1415,7 @@ async def test_get_tree_requested_remaining_nonpositive_skipped() -> None:
     app_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS")  # no accepted/denied
     alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="500")
-    app_row = (app_id, "VS", fy_id, Decimal("80"), "submitted")  # in-flight
+    app_row = (app_id, "VS", fy_id, Decimal("80"), Decimal("80"), "submitted")  # in-flight
     exp_row = ("VS", fy_id, Decimal("80"), "expense", app_id)
     sess = fake_session(result(top), result(alloc), result(app_row), result(exp_row))
     svc = BudgetTreeService(sess)
@@ -1428,7 +1428,7 @@ async def test_get_tree_denied_excluded() -> None:
     fy_id = uuid.uuid4()
     top = _budget(id=uuid.uuid4(), path_key="VS", key="VS", denied=["rejected"])
     alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="1000")
-    app_row = (uuid.uuid4(), "VS", fy_id, Decimal("999"), "rejected")
+    app_row = (uuid.uuid4(), "VS", fy_id, Decimal("999"), Decimal("999"), "rejected")
     sess = fake_session(result(top), result(alloc), result(app_row), result())
     svc = BudgetTreeService(sess)
     view = (await svc.get_tree())[0].by_fiscal_year[0]

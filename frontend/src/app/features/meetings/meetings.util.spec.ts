@@ -87,6 +87,14 @@ describe('voteSnippet', () => {
     expect(snip.startsWith('> [!abstimmung] **Soll X gefördert werden?**')).toBe(true);
   });
 
+  it('names the round in the head of a runoff (F2)', () => {
+    const election = vote({ kind: 'election', question: 'Vorsitz', counts: null } as Partial<MeetingVote>);
+    expect(voteSnippetHead(election)).toBe('> [!abstimmung] **Vorsitz**');
+    expect(voteSnippetHead({ ...election, round: 2 } as MeetingVote)).toBe(
+      '> [!abstimmung] **Vorsitz (2. Wahlgang)**',
+    );
+  });
+
   it('falls back to "Beschlussfrage" and keeps the marker on one line', () => {
     expect(voteSnippet(vote({ title: '  ', question: null }))).toContain('**Beschlussfrage**');
     expect(voteSnippetHead(vote({ question: 'Zeile 1\nZeile 2' }))).toBe(

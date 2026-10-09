@@ -91,6 +91,7 @@ from app.modules.admin.schemas import (
 )
 from app.modules.applications.models import (
     Application,
+    ApplicationDecision,
     ApplicationShare,
     Comment,
     GuestApplicationSettings,
@@ -162,6 +163,8 @@ SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     # The person who captured an application on behalf of an applicant (#11).
     ("applications", Application.captured_by),
     ("applications", ApplicationShare.created_by),
+    # The person who fired a manual transition with a decision (F1). NULL for a vote.
+    ("applications", ApplicationDecision.decided_by),
     ("versions", SubmissionVersion.changed_by),
     ("timeline", StatusEvent.actor),
     ("comments", Comment.author),

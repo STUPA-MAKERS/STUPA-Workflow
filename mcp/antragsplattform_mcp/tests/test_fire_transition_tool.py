@@ -49,3 +49,23 @@ def test_fire_transition_with_meeting(fake_api: _FakeApi) -> None:
             {"transitionId": "t1", "meetingId": "m1", "nonPublic": True},
         )
     ]
+
+
+def test_fire_transition_with_decision(fake_api: _FakeApi) -> None:
+    asyncio.run(
+        applications.fire_transition("a1", "t1", approved_amount="800.00", conditions=["A"])
+    )
+    assert fake_api.calls == [
+        (
+            "/applications/a1/transition",
+            {
+                "transitionId": "t1",
+                "decision": {"approvedAmount": "800.00", "conditions": ["A"]},
+            },
+        )
+    ]
+
+
+def test_fire_transition_with_conditions_only(fake_api: _FakeApi) -> None:
+    asyncio.run(applications.fire_transition("a1", "t1", conditions=["A"]))
+    assert fake_api.calls[0][1]["decision"] == {"conditions": ["A"]}

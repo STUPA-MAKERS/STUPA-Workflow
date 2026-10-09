@@ -175,6 +175,12 @@
   margin: 0;
   font-weight: var(--fw-semibold);
 }
+/* A personnel election (F2): the elected names. */
+.pd__elected {
+  margin: 0;
+  font-weight: var(--fw-medium);
+  color: var(--color-accent-text);
+}
 .pd__tally {
   display: flex;
   flex-wrap: wrap;
@@ -298,4 +304,17 @@
   .pd__decision {
     padding: 14px;
   }
+}
+
+/* F1: the conditions of the decision, below the tally. */
+.pd__conds {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+.pd__condList {
+  margin: 0;
+  padding-left: 1.25rem;
+  overflow-wrap: anywhere;
 }

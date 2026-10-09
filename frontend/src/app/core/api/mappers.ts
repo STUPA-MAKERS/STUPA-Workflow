@@ -28,6 +28,7 @@ import type {
   Attachment,
   AttachmentOutWire,
   CommentOutWire,
+  ElectionFields,
   ApplicationComment,
   DataDiff,
   DataDiffWire,
@@ -96,6 +97,8 @@ export function mapApplication(wire: ApplicationOutWire, lang: string): Applicat
     stateSince: wire.stateSince ?? null,
     hiddenKeys: wire.hiddenKeys ?? [],
     capture: wire.capture ?? null,
+    approvedAmount: wire.approvedAmount ?? null,
+    decision: wire.decision ?? null,
   };
 }
 
@@ -110,6 +113,7 @@ export function mapApplicationListItem(
     state: mapState(wire.state, lang),
     gremiumId: wire.gremiumId ?? null,
     amount: wire.amount ?? null,
+    approvedAmount: wire.approvedAmount ?? null,
     currency: wire.currency ?? null,
     createdAt: wire.createdAt,
     updatedAt: wire.updatedAt,
@@ -135,6 +139,7 @@ export function mapTimelineEvent(wire: TimelineEventOutWire, lang: string): Time
     note: wire.note ?? null,
     voteId: wire.voteId ?? null,
     voteDeleted: wire.voteDeleted ?? false,
+    decision: wire.decision ?? null,
   };
 }
 
@@ -173,6 +178,7 @@ export function mapTransition(wire: TransitionOutWire, lang: string): Transition
     color: wire.color ?? null,
     addsToAgenda: wire.addsToAgenda === true,
     agendaGremiumId: wire.agendaGremiumId ?? null,
+    allowsDecision: wire.allowsDecision === true,
   };
 }
 
@@ -250,6 +256,22 @@ export function mapMeetingVote(wire: MeetingVoteOutWire): MeetingVote {
     guestsVote: wire.guestsVote ?? false,
     presentMembers: wire.presentMembers ?? null,
     presentGuests: wire.presentGuests ?? null,
+    ...electionFields(wire),
+  };
+}
+
+/**
+ * The election fields of a vote (F2). A motion gets none, so a motion keeps its
+ * former shape.
+ */
+export function electionFields(wire: ElectionFields): ElectionFields {
+  if (wire.kind !== 'election') return {};
+  return {
+    kind: 'election',
+    election: wire.election ?? null,
+    electionResult: wire.electionResult ?? null,
+    parentVoteId: wire.parentVoteId ?? null,
+    round: wire.round ?? 1,
   };
 }
 

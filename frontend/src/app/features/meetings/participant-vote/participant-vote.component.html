@@ -10,5 +10,6 @@
     [notice]="state.notice()"
     (castDone)="state.onCastDone()"
     (castFailed)="state.onCastFailed($event)"
+    (changed)="state.onElectionChanged()"
   />
 }

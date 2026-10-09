@@ -33,6 +33,8 @@ class MeetingPublisher(Protocol):
 
     async def vote_cancelled(self, vote: VoteOut) -> None: ...
 
+    async def vote_lot_drawn(self, vote: VoteOut) -> None: ...
+
 
 class NullPublisher:
     """Default without a broker.
@@ -50,6 +52,9 @@ class NullPublisher:
         return None
 
     async def vote_cancelled(self, vote: VoteOut) -> None:
+        return None
+
+    async def vote_lot_drawn(self, vote: VoteOut) -> None:
         return None
 
 

@@ -220,6 +220,14 @@ describe('VotingComponent', () => {
       expect(screen.getByText('20.09.2026')).toBeInTheDocument();
     });
 
+    it('shows the result of a closed election, not a rejection (F2)', async () => {
+      await start('/voting', {
+        pages: [page([item('e1', { status: 'closed', kind: 'election', result: 'elected' })])],
+      });
+      expect(screen.getByText('Gewählt')).toBeInTheDocument();
+      expect(screen.queryByText('Abgelehnt')).not.toBeInTheDocument();
+    });
+
     it('leaves out a time it cannot read', async () => {
       await start('/voting', {
         pages: [

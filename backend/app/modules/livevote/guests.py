@@ -845,7 +845,7 @@ class GuestService:
         code: str,
         token: str | None,
         vote_id: UUID,
-        choice: str,
+        choice: str | list[str],
         *,
         voting: VotingService,
         now: datetime,
@@ -1024,6 +1024,14 @@ class GuestService:
                     ),
                     myBallot=mine,
                     canCast=can_cast,
+                    kind=view.kind,
+                    # A guest sees names only: no account id, no `sub` of the lead.
+                    election=view.election.public() if view.election is not None else None,
+                    electionResult=(
+                        view.election_result.public()
+                        if view.election_result is not None
+                        else None
+                    ),
                 )
             )
         return out

@@ -15,7 +15,15 @@
     @let tx = text()!;
     <h1 class="bm__q">{{ v.question }}</h1>
 
-    @if (tx.bars && v.counts) {
+    @if (tx.bars && v.counts && v.election) {
+      <app-election-result
+        variant="beamer"
+        [election]="v.election"
+        [result]="v.status === 'closed' ? v.result : null"
+        [electionResult]="v.electionResult ?? null"
+        [counts]="v.counts"
+      />
+    } @else if (tx.bars && v.counts) {
       <app-vote-bars variant="beamer" [options]="v.options" [counts]="v.counts" />
     } @else {
       <div class="bm__turnout" role="status">
@@ -44,10 +52,17 @@
           </p>
         } @else {
           <p class="bm__outcome" role="status" [class.bm__outcome--stack]="!!tx.composition">
+            @if (v.election) {
+              <span class="bm__result" [class.bm__result--passed]="tx.passed">
+                <app-icon [name]="tx.passed ? 'check' : 'x'" [size]="30" />
+                {{ electionKey(v.result) | t }}
+              </span>
+            } @else {
             <span class="bm__result" [class.bm__result--passed]="tx.passed">
               <app-icon [name]="tx.passed ? 'check' : 'x'" [size]="30" />
               {{ (tx.passed ? 'vote.result.passed' : 'vote.result.rejected') | t }}
             </span>
+            }
             <span class="bm__note">{{ tx.outcome }}</span>
           </p>
         }

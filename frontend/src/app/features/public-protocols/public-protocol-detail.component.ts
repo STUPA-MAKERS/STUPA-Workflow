@@ -11,6 +11,7 @@ import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { IconComponent } from '@stupa-makers/ui-kit';
 import { formatSize } from '../apply/apply.util';
 import type { PublicDecision, PublicProtocolDetail } from './public-protocols.models';
+import { electionCaption } from '../voting/election.util';
 import { PublicProtocolsService } from './public-protocols.service';
 import { longDate, optionKey, orderedCounts, shortDate, useNoindex } from './public-protocols.util';
 
@@ -95,6 +96,16 @@ export class PublicProtocolDetailComponent {
 
   protected resultKey(d: PublicDecision): TranslationKey | null {
     return d.result ? (`vote.result.${d.result}` as TranslationKey) : null;
+  }
+
+  /** "Wahl · 2 Posten · geheime Abstimmung" for a personnel election (F2). */
+  protected electionLine(d: PublicDecision): string {
+    const t = (key: TranslationKey, params?: Record<string, string | number>) =>
+      this.i18n.translate(key, params);
+    return [
+      electionCaption(d.seats ? { seats: d.seats, candidates: [], secret: d.secret } : null, d.round, t),
+      t(d.secret ? 'meetings.vote.secretShort' : 'meetings.vote.publicShort'),
+    ].join(' · ');
   }
 
   /** "Einfache Mehrheit · offene Abstimmung". */

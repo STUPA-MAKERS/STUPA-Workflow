@@ -9,6 +9,8 @@
 * ``GET  /api/votes/{id}``              - vote state + tally (secret: only counts).
 * ``GET  /api/votes``                   - the votes the caller can read, with the own
   ballot state (no tally).
+* ``POST /api/votes/{id}/draw-lot``     - draw the lot of a tied election (F2).
+* ``POST /api/votes/{id}/runoff``       - create the runoff of an election (F2).
 
 The manage right is the admin role or the gremium permission ``vote.manage`` or
 ``session.manage`` in the gremium of the vote (``VotingService.can_manage_group``). The
@@ -33,6 +35,7 @@ from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.livevote.publisher import MeetingPublisher, get_meeting_publisher
+from app.modules.voting.election import ElectionService
 from app.modules.voting.schemas import (
     BallotAccepted,
     BallotIn,
@@ -233,6 +236,54 @@ async def cast_ballot(
     )
     await publisher.vote_tally(await service.get(vote_id))
     return accepted
+
+
+@router.post(
+    "/votes/{vote_id}/draw-lot",
+    response_model=VoteOut,
+    responses=_errors(401, 403, 404, 409),
+)
+async def draw_lot(
+    vote_id: UUID,
+    service: ServiceDep,
+    publisher: PublisherDep,
+    principal: ReaderDep,
+) -> VoteOut:
+    """Draw the lot of a tied election (F2).
+
+    Only a closed election with a pending lot (one seat, or a runoff round) takes the
+    call; the server draws with ``secrets.choice``, stores the lot, elects the drawn
+    candidates and audits ``vote_lot_drawn``. A second call gives 409
+    ``lot_already_drawn``, a vote without a pending lot 409 ``no_lot_pending``, a
+    motion 409 ``not_an_election``. Gremium-scoped manage right (the meeting lead).
+    The publisher sends ``vote_lot_drawn`` to the meeting and the beamer.
+    """
+    await service.assert_can_manage_vote(vote_id, principal)
+    vote = await ElectionService(service).draw_lot(vote_id, principal, now=datetime.now(UTC))
+    await publisher.vote_lot_drawn(vote)
+    return vote
+
+
+@router.post(
+    "/votes/{vote_id}/runoff",
+    response_model=VoteOut,
+    responses=_errors(401, 403, 404, 409),
+)
+async def create_runoff(
+    vote_id: UUID,
+    service: ServiceDep,
+    principal: ReaderDep,
+) -> VoteOut:
+    """Create the draft runoff of an election with a tie at the seat boundary (F2).
+
+    The runoff holds the tied candidates and the open seats, on the same agenda item,
+    one round later; the meeting lead opens it with ``POST /votes/{id}/open``. 409
+    ``no_runoff_pending`` when no runoff is due, ``runoff_exists`` when it exists,
+    ``not_an_election`` for a motion; 409 when the meeting is not live.
+    Gremium-scoped manage right.
+    """
+    await service.assert_can_manage_vote(vote_id, principal)
+    return await ElectionService(service).create_runoff(vote_id)
 
 
 @router.get(

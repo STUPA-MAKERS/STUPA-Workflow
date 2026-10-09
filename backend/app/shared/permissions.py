@@ -86,6 +86,11 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     # one. It rewrites the references of the old account and locks it. Only the admin
     # role has it by default. No OAuth scope carries it, so an agent token never merges.
     "admin.users.merge",
+    # /admin/users: revoke the rights of a person who no longer logs in ("Rechte
+    # entziehen"). It clears whole Gremien (SSO groups, gremium role assignments, pool
+    # entries, delegations in planned meetings) and global roles. Only the admin role has
+    # it by default. No OAuth scope carries it, so an agent token never revokes.
+    "admin.users.revoke_groups",
     # /admin/group-mappings: map an IdP group to a role.
     "admin.group_mappings",
     # /admin/gremien/:id/roles: Gremium role definitions.

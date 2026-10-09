@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
@@ -885,6 +886,23 @@ async def test_meeting_delegation_mail_info_with_date_and_delegator_name() -> No
     assert out.meeting_date == "16.06.2026"
     assert out.delegator_name == "Max"  # display_name wins
     assert out.voting is True
+
+
+@pytest.mark.parametrize(("to_delegator", "column"), [(False, "delegate"), (True, "delegator")])
+async def test_meeting_delegation_mail_info_picks_the_recipient(
+    to_delegator: bool, column: str
+) -> None:
+    """F3: the access revoke of a delegate mails the delegator."""
+    seen: list[Any] = []
+
+    class _Seen:
+        async def execute(self, stmt: Any) -> Any:
+            seen.append(stmt)
+            return SimpleNamespace(first=lambda: None)
+
+    await meeting_delegation_mail_info(_Seen(), uuid.uuid4(), to_delegator=to_delegator)
+    sql = str(seen[0])
+    assert f"principal.id = meeting_delegation.{column}_principal_id" in sql
 
 
 async def test_meeting_delegation_mail_info_no_date_falls_back_to_email() -> None:

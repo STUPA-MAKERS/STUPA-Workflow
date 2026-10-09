@@ -110,7 +110,26 @@ describe('mapApplication', () => {
       stateSince: null,
       hiddenKeys: [],
       capture: null,
+      approvedAmount: null,
+      decision: null,
     });
+  });
+
+  it('passes the decision and the approved amount through (F1)', () => {
+    const decision = {
+      requestedAmount: '250.00',
+      approvedAmount: '200.00',
+      amountDeviates: true,
+      conditions: ['Belege'],
+      decidedAt: '2026-09-29T19:41:00Z',
+      voteId: null,
+      gremiumName: 'StuPa',
+      meetingTitle: null,
+      agendaPosition: null,
+    };
+    const view = mapApplication({ ...wire, approvedAmount: '200.00', decision }, 'de');
+    expect(view.approvedAmount).toBe('200.00');
+    expect(view.decision).toEqual(decision);
   });
 
   it('passes the capture block through (#11)', () => {
@@ -208,6 +227,7 @@ describe('mapTimelineEvent', () => {
       note: 'ok',
       voteId: null,
       voteDeleted: false,
+      decision: null,
     });
   });
 
@@ -352,7 +372,19 @@ describe('mapTransition', () => {
       color: null,
       addsToAgenda: false,
       agendaGremiumId: null,
+      allowsDecision: false,
     });
+  });
+
+  it('passes allowsDecision through (F1)', () => {
+    const wire: TransitionOutWire = {
+      id: 'tr1',
+      fromStateId: 's1',
+      toStateId: 's2',
+      label: { de: 'Bewilligen' },
+      allowsDecision: true,
+    };
+    expect(mapTransition(wire, 'de').allowsDecision).toBe(true);
   });
 
   it('passes the agenda action through (A1)', () => {

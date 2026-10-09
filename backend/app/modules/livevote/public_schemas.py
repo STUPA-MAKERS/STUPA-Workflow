@@ -11,15 +11,15 @@ from __future__ import annotations
 from datetime import date as _date
 from datetime import datetime as _datetime
 from datetime import time as _time
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.modules.livevote.schemas import GuestsMode, GuestStatus, MeetingStatus, clean_guest_name
-from app.modules.voting.schemas import MyBallot
+from app.modules.voting.schemas import ElectionResultOut, MyBallot, VoteKind, VoteResultValue
 from app.shared.altcha import AltchaSolutionStr
-from app.shared.config_schemas import Quorum
+from app.shared.config_schemas import ElectionConfig, Quorum
 
 
 class _CamelModel(BaseModel):
@@ -46,7 +46,19 @@ class GuestBallotBody(_CamelModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
-    choice: str = Field(min_length=1, max_length=100)
+    # A motion takes one option; an election with several candidates the list of the
+    # chosen candidate ids (F2, at most 50 ids).
+    choice: (
+        Annotated[str, Field(max_length=100)]
+        | Annotated[list[Annotated[str, Field(max_length=100)]], Field(max_length=50)]
+    )
+
+    @field_validator("choice")
+    @classmethod
+    def _non_empty_option(cls, v: str | list[str]) -> str | list[str]:
+        if isinstance(v, str) and not v:
+            raise ValueError("choice must not be empty")
+        return v
 
 
 class PublicMeetingHead(_CamelModel):
@@ -101,11 +113,15 @@ class GuestVote(_CamelModel):
     quorum: Quorum | None = None
     opened_at: _datetime | None = Field(default=None, alias="openedAt")
     closed_at: _datetime | None = Field(default=None, alias="closedAt")
-    result: Literal["passed", "rejected", "tie"] | None = None
+    result: VoteResultValue | None = None
     failed_reason: Literal["quorum", "majority"] | None = Field(default=None, alias="failedReason")
     tally: GuestTally
     my_ballot: MyBallot = Field(alias="myBallot")
     can_cast: bool = Field(default=False, alias="canCast")
+    # F2: an election with its candidates and, once closed, its result.
+    kind: VoteKind = "motion"
+    election: ElectionConfig | None = None
+    election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
 
 
 class GuestView(_CamelModel):

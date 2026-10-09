@@ -92,6 +92,18 @@
                         @if (d.question) {
                           <p class="pd__question">{{ d.question }}</p>
                         }
+                        @if (d.kind === 'election') {
+                          <p class="pd__rule">{{ electionLine(d) }}</p>
+                          <p class="pd__elected">
+                            {{ (d.elected?.length ? 'election.result.elected' : 'election.result.nobody') | t: { names: (d.elected ?? []).join(', ') } }}
+                          </p>
+                          @if (d.otherCandidates) {
+                            <p class="pd__rule">{{ 'publicProtocols.decision.others' | t: { n: d.otherCandidates } }}</p>
+                          }
+                          @if (d.byLot) {
+                            <p class="pd__rule">{{ 'publicProtocols.decision.byLot' | t }}</p>
+                          }
+                        } @else {
                         <div class="pd__tally">
                           @for (c of counts(d); track c.label) {
                             <span class="pd__cell">
@@ -107,6 +119,17 @@
                           }
                         </div>
                         <p class="pd__rule">{{ ruleLine(d) }}</p>
+                        @if (d.conditions?.length) {
+                          <div class="pd__conds">
+                            <span class="cap">{{ 'decision.conditions' | t }}</span>
+                            <ol class="pd__condList">
+                              @for (c of d.conditions; track $index) {
+                                <li>{{ c }}</li>
+                              }
+                            </ol>
+                          </div>
+                        }
+                        }
                       </figure>
                       }
                     }

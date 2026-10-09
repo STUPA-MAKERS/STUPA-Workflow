@@ -282,6 +282,11 @@ export class VoteCastComponent implements OnDestroy {
   }
 
   /** The ballot says "Danke! Deine Stimme: Ja" itself, so no toast repeats it. */
+  /** The lot of an election was drawn, or its runoff opened (F2): read the vote again. */
+  onElectionChanged(): void {
+    this.reload();
+  }
+
   onCastDone(): void {
     // A ballot can close a task; the count in the navigation follows.
     this.railStatus.refresh();

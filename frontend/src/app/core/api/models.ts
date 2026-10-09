@@ -220,6 +220,47 @@ export interface ApplicationOutWire {
   hiddenKeys?: string[];
   /** Set when a person captured the application on behalf of the applicant (#11). */
   capture?: ApplicationCapture | null;
+  /** F1: the amount that the cost center binds. `null` means as requested. */
+  approvedAmount?: string | null;
+  /** F1: the valid decision, or `null` before one. */
+  decision?: ApplicationDecision | null;
+}
+
+/**
+ * `DecisionIn`. A decision proposal (F1, approval with deviations): the approved amount
+ * and the conditions. The body of a vote (`proposal`) and of a transition (`decision`).
+ */
+export interface DecisionProposal {
+  /** Decimal string with a dot (`"800.00"`). `null` means as requested. */
+  approvedAmount: string | null;
+  /** The conditions (Auflagen), at most 20, each 1 to 1000 characters. */
+  conditions: string[];
+}
+
+/**
+ * `DecisionOut`. The valid decision of an application (F1), or `null` before one. The
+ * applicant view names the Gremium only: `voteId`, `meetingTitle` and `agendaPosition`
+ * are `null` there.
+ */
+export interface ApplicationDecision {
+  requestedAmount: string | null;
+  /** `null` means as requested. */
+  approvedAmount: string | null;
+  amountDeviates: boolean;
+  conditions: string[];
+  decidedAt: IsoDateTime;
+  voteId: Uuid | null;
+  gremiumName: string | null;
+  meetingTitle: string | null;
+  agendaPosition: number | null;
+}
+
+/** `TimelineDecisionOut`. The decision that a status change carried (F1). */
+export interface TimelineDecision {
+  requestedAmount: string | null;
+  approvedAmount: string | null;
+  amountDeviates: boolean;
+  conditionCount: number;
 }
 
 /**
@@ -270,6 +311,8 @@ export interface ApplicationListItemWire {
   state?: StateOutWire | null;
   gremiumId?: Uuid | null;
   amount?: string | null;
+  /** F1: the approved amount. `null` means as requested. */
+  approvedAmount?: string | null;
   currency?: string | null;
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
@@ -335,6 +378,8 @@ export interface AgendaItem {
   /** Non-public. The public protocol PDF redacts this agenda item. */
   nonPublic?: boolean;
   stateLabel?: I18nMap | null;
+  /** F1: the requested amount of the application, for the decision proposal. */
+  amount?: string | null;
 }
 
 /** `AssignableApplicationOut`. An application in a vote state that is not on the agenda. */
@@ -388,6 +433,8 @@ export interface TimelineEventOutWire {
   voteId?: Uuid | null;
   /** A vote close fired the event, and the vote went with its meeting. */
   voteDeleted?: boolean;
+  /** F1: the decision that this status change carried. */
+  decision?: TimelineDecision | null;
 }
 
 export type CommentVisibility = 'internal' | 'public';
@@ -432,6 +479,8 @@ export interface TransitionOutWire {
   addsToAgenda?: boolean;
   /** The gremium whose planned meetings the agenda dialog offers (A1). */
   agendaGremiumId?: Uuid | null;
+  /** F1: the target is an accepted state of the cost center, so a fire takes a decision. */
+  allowsDecision?: boolean;
 }
 
 /** A field change in the version diff (`FieldChange`). */
@@ -542,6 +591,8 @@ export interface TransitionRequestBody {
   meetingId?: Uuid | null;
   /** The new agenda item is not public (NÖ). Only with `meetingId`. */
   nonPublic?: boolean;
+  /** F1: the decision. Only for a transition with `allowsDecision`, else 422. */
+  decision?: DecisionProposal | null;
 }
 
 /** `POST /applications/{id}/force-status`. A privileged direct status override.
@@ -619,6 +670,10 @@ export interface Application {
   hiddenKeys?: string[];
   /** Set when a person captured the application on behalf of the applicant (#11). */
   capture?: ApplicationCapture | null;
+  /** F1: the amount that the cost center binds. `null` means as requested. */
+  approvedAmount?: string | null;
+  /** F1: the valid decision, or `null` before one. */
+  decision?: ApplicationDecision | null;
 }
 
 /**
@@ -650,6 +705,8 @@ export interface ApplicationListItem {
   state: ApplicationState | null;
   gremiumId: Uuid | null;
   amount: string | null;
+  /** F1: the approved amount. `null` means as requested. */
+  approvedAmount?: string | null;
   currency: string | null;
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
@@ -679,6 +736,8 @@ export interface TimelineEntry {
   voteId: Uuid | null;
   /** The vote that fired the event was deleted with its meeting. */
   voteDeleted: boolean;
+  /** F1: the decision that this status change carried. */
+  decision?: TimelineDecision | null;
 }
 
 /** Comment, frontend view. `isPublic` comes from `visibility`. */
@@ -724,6 +783,11 @@ export interface Transition {
   addsToAgenda: boolean;
   /** The gremium whose planned meetings the agenda dialog offers, or null. */
   agendaGremiumId: Uuid | null;
+  /**
+   * F1: the target is an accepted state of the cost center. The detail and the row
+   * menu then open the decision dialog, which can approve with deviations.
+   */
+  allowsDecision?: boolean;
 }
 
 /** A changed field cell, frontend view. The `key` comes out of the diff map. */
@@ -907,7 +971,80 @@ export interface MagicLinkVerifyResult {
 export type MajorityRule = 'simple' | 'absolute' | 'two_thirds';
 /** `draft`: planned, not open yet. `cancelled`: the application left the vote state by hand, so the vote stopped. */
 export type VoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
-export type VoteResult = 'passed' | 'rejected' | 'tie';
+/** A motion gives `passed`, `rejected` or `tie`. A personnel election (F2) gives
+ *  `elected`, `runoff` (a runoff decides the open seats), `tie` (the lot decides) or
+ *  `rejected` (quorum missed, or nobody elected). */
+export type VoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff';
+/** `motion`: a decision (Ja/Nein/Enthaltung). `election`: a personnel election (F2). */
+export type VoteKind = 'motion' | 'election';
+
+/** One candidate of a personnel election. The server gives the ids (`c1`..`cn`). */
+export interface ElectionCandidate {
+  id: string;
+  name: string;
+  /** The account of the candidate, or `null` for a free name. */
+  principalId?: Uuid | null;
+  /** The DSGVO erasure removed the name (`name` then holds the German placeholder
+   *  "Gelöscht"): the UI shows `election.candidate.erased` instead. Only the server
+   *  sets it. */
+  erased?: boolean;
+}
+
+/**
+ * The config of a personnel election (`ElectionConfig`, F2). Each voter gives up to
+ * `seats` votes, at most one per candidate. One candidate for one seat gives a
+ * Ja/Nein/Enthaltung ballot.
+ */
+export interface ElectionConfig {
+  seats: number;
+  candidates: ElectionCandidate[];
+  secret: boolean;
+  quorum?: Quorum | null;
+  abstainCountsQuorum?: boolean;
+  guestsVote?: boolean;
+}
+
+/** The runoff that a tie at the seat boundary needs. `voteId` is set once it exists. */
+export interface ElectionRunoff {
+  candidateIds: string[];
+  seats: number;
+  voteId?: Uuid | null;
+}
+
+/** The lot of a tie. `drawn` is `null` while the lot is pending. */
+export interface ElectionLot {
+  among: string[];
+  seats: number;
+  drawn: string[] | null;
+  at?: IsoDateTime | null;
+  by?: string | null;
+  byName?: string | null;
+}
+
+/** The stored result of a closed election (`ElectionResultOut`). */
+export interface ElectionResult {
+  /** Votes per candidate id (`yes`/`no` for a single candidate). */
+  counts: Record<string, number>;
+  abstentions: number;
+  ballots: number;
+  yes?: number | null;
+  no?: number | null;
+  /** The elected candidate ids, best first. */
+  elected: string[];
+  runoff?: ElectionRunoff | null;
+  lot?: ElectionLot | null;
+}
+
+/** The election fields of a vote (F2). A motion has `kind: 'motion'` and no others. */
+export interface ElectionFields {
+  kind?: VoteKind;
+  election?: ElectionConfig | null;
+  electionResult?: ElectionResult | null;
+  /** The election that this runoff continues. */
+  parentVoteId?: Uuid | null;
+  /** 1 for the first round, 2 for the first runoff. */
+  round?: number;
+}
 
 /** Quorum threshold. */
 export interface Quorum {
@@ -939,6 +1076,8 @@ export interface VoteConfig {
 export interface MyBallot {
   cast: boolean;
   choice: string | null;
+  /** The chosen candidate ids of an open election ballot (F2). */
+  choices?: string[] | null;
 }
 
 /**
@@ -976,7 +1115,7 @@ export interface Tally {
  * label. The options are raw keys. The frontend translates them through
  * `vote.option.*`.
  */
-export interface Vote {
+export interface Vote extends ElectionFields {
   id: Uuid;
   /** `null` marks a motion on a free-text agenda item, with no application. */
   applicationId: Uuid | null;
@@ -1035,6 +1174,7 @@ export interface VoteListItem {
   status: VoteStatus;
   result: VoteResult | null;
   secret: boolean;
+  kind?: VoteKind;
   applicationId: Uuid | null;
   meetingId: Uuid | null;
   meetingTitle: string | null;
@@ -1081,6 +1221,8 @@ export interface VoteClosed {
   applicationId?: Uuid | null;
   result: VoteResult;
   tally: Tally;
+  kind?: VoteKind;
+  electionResult?: ElectionResult | null;
   closedAt?: IsoDateTime | null;
   firedTransitionId?: Uuid | null;
   newStateId?: Uuid | null;
@@ -1095,7 +1237,7 @@ export type MeetingStatus = 'planned' | 'live' | 'closed';
 export type MeetingVoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
 
 /** `MeetingVoteOut`. A vote summary in the meeting state. GET /meetings/{id}. */
-export interface MeetingVoteOutWire {
+export interface MeetingVoteOutWire extends ElectionFields {
   id: Uuid;
   /** `null` marks a generic motion on a free-text agenda item, with no application. */
   applicationId?: Uuid | null;
@@ -1134,6 +1276,8 @@ export interface MeetingVoteOutWire {
   /** Present members and admitted guests (live while open, fixed at the close). */
   presentMembers?: number | null;
   presentGuests?: number | null;
+  /** F1: the decision proposal of an application vote. */
+  proposal?: DecisionProposal | null;
 }
 
 /** `MeetingOut`. Meeting state and votes. GET /meetings/{id}. */
@@ -1290,7 +1434,7 @@ export interface CalendarFeed {
 // View models for meetings and protocol.
 
 /** Vote summary, frontend view. It normalizes the `null` defaults. */
-export interface MeetingVote {
+export interface MeetingVote extends ElectionFields {
   id: Uuid;
   /** `null` marks a generic motion on a free-text agenda item. */
   applicationId: Uuid | null;
@@ -1580,7 +1724,7 @@ export interface GuestAgendaItem {
 }
 
 /** One vote of a public item, as an admitted guest sees it. */
-export interface GuestVote {
+export interface GuestVote extends ElectionFields {
   id: Uuid;
   agendaItemId: Uuid | null;
   question: string | null;
@@ -1603,7 +1747,7 @@ export interface GuestVote {
     presentMembers: number | null;
     presentGuests: number | null;
   };
-  myBallot: { cast: boolean; choice: string | null };
+  myBallot: MyBallot;
   canCast: boolean;
 }
 

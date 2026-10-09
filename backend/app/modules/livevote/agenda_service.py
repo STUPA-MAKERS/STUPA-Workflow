@@ -231,6 +231,7 @@ class AgendaService:
                     position=r.position,
                     nonPublic=r.non_public,
                     stateLabel=state.label_i18n if state is not None else None,
+                    amount=app.amount if app is not None else None,
                 )
             )
         return out

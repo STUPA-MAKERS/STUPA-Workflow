@@ -86,6 +86,12 @@ class AuditAction(StrEnum):
     # carries the share id and the expiry, never the token.
     APPLICATION_SHARE = "application_share"
     APPLICATION_SHARE_REVOKE = "application_share_revoke"
+    # A decision on an application (F1): approval with deviations from a passed vote
+    # with a proposal or from a manual transition, or the undo of one by an audit
+    # revert of its status change (``reverted: true``). ``data`` carries the requested
+    # amount, the old and the new approved amount, the number of conditions and the
+    # vote and status-event ids, never the condition texts.
+    APPLICATION_DECISION = "application_decision"
     WEBHOOK_CONFIG = "webhook_config"
     # Attachment uploaded (F12). ``data`` names the application, or carries
     # ``draft: true`` for a draft upload of the wizard (Z4). It holds the field key,
@@ -129,6 +135,9 @@ class AuditAction(StrEnum):
     VOTE_CLOSE = "vote_close"
     VOTE_CANCEL = "vote_cancel"
     VOTE_BRANCH_BLOCKED = "vote_branch_blocked"
+    # F2: the platform drew the lot of an election tie. ``data`` carries the
+    # candidate ids of the draw (``among``, ``seats``, ``drawn``), never a voter.
+    VOTE_LOT_DRAWN = "vote_lot_drawn"
     # Public meeting with a QR code (#17). The meeting lead is the actor. ``data``
     # carries id references and counts only, NEVER the name of a guest: the chain is
     # append-only, so a name in it could never be deleted. A guest ballot writes
@@ -153,6 +162,10 @@ class AuditAction(StrEnum):
     # the two principal ids and the counts per area. The log rows of the old principal
     # stay unchanged; the display resolves its `sub` through `principal.merged_into`.
     PRINCIPAL_MERGE = "principal_merge"
+    # Revoke the rights of a person who no longer logs in. The data holds the gremium
+    # ids, the removed SSO group names, the ids of the deleted role assignments and pool
+    # entries, the ids of the revoked delegations and the `deactivate` flag.
+    PRINCIPAL_ACCESS_REVOKE = "principal_access_revoke"
     RETENTION_ANONYMIZE = "retention_anonymize"
     # Budget and money mutations: cost-center CRUD, top-down allocation, bookings
     # and transfers, invoices, moves of an application to another cost center or

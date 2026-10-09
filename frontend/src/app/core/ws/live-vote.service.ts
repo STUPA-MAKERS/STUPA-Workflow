@@ -91,6 +91,21 @@ export class LiveVoteSession {
         });
         break;
       }
+      case 'vote_lot_drawn': {
+        // The lot decides a tied election (F2): keep the counts, take the new result.
+        // A screen that joined after the close gets the result from the frame.
+        const closed = this.result();
+        this.result.set({
+          type: 'vote_closed',
+          voteId: m.voteId,
+          counts: closed?.voteId === m.voteId ? closed.counts : m.electionResult.counts,
+          failedReason: closed?.voteId === m.voteId ? closed.failedReason : null,
+          kind: 'election',
+          result: m.result,
+          electionResult: m.electionResult,
+        });
+        break;
+      }
       case 'vote_cancelled':
         // A cancellation removes the running vote without a result.
         if (this.openVote()?.voteId === m.voteId) {

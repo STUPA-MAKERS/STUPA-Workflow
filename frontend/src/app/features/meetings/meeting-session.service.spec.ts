@@ -163,4 +163,60 @@ describe('MeetingSessionService', () => {
     expect(session.meeting()?.votes[0]).toEqual(expect.objectContaining({ presentMembers: 19, presentGuests: 7 }));
     http.match(() => true).forEach((r) => r.flush([]));
   });
+  it('reloads the meeting quietly for a lot or a runoff, and only the open one (F2)', () => {
+    const { http, session } = setup();
+    session.reloadMeeting(); // no meeting
+    http.verify();
+    session.meeting.set(M({ status: 'live' }));
+    session.reloadMeeting();
+    http.expectOne('/api/meetings/m-1').flush({ ...M({ status: 'live', title: 'Neu' }), createdAt: 'x' });
+    expect(session.meeting()?.title).toBe('Neu');
+    session.reloadMeeting();
+    // The user opened another meeting meanwhile: the answer is dropped.
+    session.meeting.set(M({ id: 'm-2', title: 'Andere' }));
+    http.expectOne('/api/meetings/m-1').flush({ ...M({ title: 'Alt' }), createdAt: 'x' });
+    expect(session.meeting()?.title).toBe('Andere');
+    session.reloadMeeting();
+    http.expectOne('/api/meetings/m-2').flush(null, { status: 500, statusText: 'Error' });
+    expect(session.meeting()?.title).toBe('Andere');
+  });
+
+  it('takes the election of an opened vote, its result and the drawn lot from the live channel (F2)', () => {
+    const { session } = setup();
+    const election = { seats: 1, candidates: [{ id: 'c1', name: 'Ada', principalId: null }], secret: true };
+    session.meeting.set(
+      M({
+        status: 'live',
+        votes: [
+          { id: 'v-1', status: 'draft', secret: true, election, openedAt: '2026-01-01T10:00:00Z' },
+          { id: 'v-2', status: 'draft', secret: false },
+        ] as unknown as Meeting['votes'],
+      }),
+    );
+    const vote = (id: string) => session.meeting()!.votes.find((v) => v.id === id)!;
+    session['onLive']({ type: 'vote_opened', voteId: 'v-1', applicationId: null, options: [], closesAt: null, kind: 'election' });
+    expect(vote('v-1')).toEqual(
+      expect.objectContaining({ status: 'open', kind: 'election', election, round: 1, secret: true, openedAt: '2026-01-01T10:00:00Z' }),
+    );
+    const other = { ...election, seats: 2 };
+    session['onLive']({
+      type: 'vote_opened',
+      voteId: 'v-2',
+      applicationId: null,
+      options: [],
+      closesAt: null,
+      kind: 'election',
+      election: other,
+      round: 2,
+      secret: true,
+    });
+    expect(vote('v-2')).toEqual(expect.objectContaining({ election: other, round: 2, secret: true }));
+    expect(vote('v-2').openedAt).toBeTruthy();
+    const result = { counts: { c1: 3 }, abstentions: 0, ballots: 3, elected: ['c1'], runoff: null, lot: null };
+    session['onLive']({ type: 'vote_closed', voteId: 'v-1', result: 'elected', counts: { c1: 3 }, electionResult: result });
+    expect(vote('v-1')).toEqual(expect.objectContaining({ status: 'closed', result: 'elected', electionResult: result }));
+    const drawn = { ...result, elected: ['c1'], lot: { among: ['c1'], seats: 1, drawn: ['c1'] } };
+    session['onLive']({ type: 'vote_lot_drawn', voteId: 'v-2', result: 'elected', electionResult: drawn });
+    expect(vote('v-2')).toEqual(expect.objectContaining({ result: 'elected', electionResult: drawn }));
+  });
 });

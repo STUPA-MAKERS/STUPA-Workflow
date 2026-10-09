@@ -435,25 +435,28 @@ describe('DashboardComponent', () => {
             vote('v3', { status: 'closed', result: 'rejected', canCast: false }),
             vote('v4', { status: 'draft', meetingTitle: null, question: ' ' }),
             vote('v5', { status: 'cancelled', meetingTitle: '33. Sitzung', agendaPosition: null }),
+            vote('v6', { status: 'closed', kind: 'election', result: 'elected', canCast: false }),
           ],
-          total: 5,
+          total: 6,
           limit: 25,
           offset: 0,
         },
       });
       const table = screen.getByRole('table');
       expect(within(table).getByText('Eigener Stand')).toBeInTheDocument();
-      expect(within(table).getAllByText('34. Sitzung · TOP 3')).toHaveLength(3);
+      expect(within(table).getAllByText('34. Sitzung · TOP 3')).toHaveLength(4);
       expect(within(table).getByText('Abgestimmt')).toBeInTheDocument();
       expect(within(table).getByText('Stimme offen')).toBeInTheDocument();
       expect(within(table).getByText('33. Sitzung')).toBeInTheDocument();
       const rows = cmp(fixture).voteRows();
-      expect(rows.map((r: { ballot: string | null }) => r.ballot)).toEqual(['cast', 'pending', null, null, null]);
+      expect(rows.map((r: { ballot: string | null }) => r.ballot)).toEqual(['cast', 'pending', null, null, null, null]);
       // A vote without a meeting names its gremium.
       expect(rows[3].where).toBe('Studierendenparlament');
       expect(rows[3].statusKey).toBe('voting.list.status.draft');
       expect(rows[3].title).toBe('Beschlussfrage');
       expect(rows[2].statusKey).toBe('vote.result.rejected');
+      // A closed election shows its own result, not a rejection (F2).
+      expect(rows[5].statusKey).toBe('election.status.elected');
       expect(rows[0].link).toEqual(['/voting', 'v1']);
       expect(screen.getByRole('link', { name: 'Alle Abstimmungen öffnen' })).toHaveAttribute('href', '/voting');
     });

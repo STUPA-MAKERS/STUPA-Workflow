@@ -18,6 +18,7 @@ from app.modules.admin.models import (
 from app.modules.applications.models import (
     Applicant,
     Application,
+    ApplicationDecision,
     Comment,
     GuestApplicationSettings,
     MagicLink,
@@ -70,6 +71,7 @@ from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
 __all__ = [
     "Applicant",
     "Application",
+    "ApplicationDecision",
     "ApplicationType",
     "Attachment",
     "AttachmentDraftToken",

@@ -1,6 +1,14 @@
 /** Live-vote WebSocket protocol. */
 
-import type { GuestStatus, GuestsMode, MeetingGuest } from '../api/models';
+import type {
+  ElectionConfig,
+  ElectionResult,
+  GuestStatus,
+  GuestsMode,
+  MeetingGuest,
+  VoteKind,
+  VoteResult,
+} from '../api/models';
 
 
 export interface MeetingStateMsg {
@@ -26,6 +34,10 @@ export interface VoteOpenedMsg {
    * vote was already open, it did not open now. Older servers do not send it.
    */
   replay?: boolean;
+  /** A personnel election (F2) carries its candidates and its round. */
+  kind?: VoteKind;
+  election?: ElectionConfig | null;
+  round?: number;
 }
 export interface VoteTallyMsg {
   type: 'vote_tally';
@@ -42,6 +54,7 @@ export interface VoteTallyMsg {
   presentMembers?: number | null;
   presentGuests?: number | null;
   guestsVote?: boolean;
+  kind?: VoteKind;
 }
 export interface VoteClosedMsg {
   type: 'vote_closed';
@@ -50,6 +63,16 @@ export interface VoteClosedMsg {
   counts: Record<string, number>;
   /** Rejection reason: `quorum` for a missed quorum, `majority` for a missed majority. */
   failedReason?: 'quorum' | 'majority' | null;
+  kind?: VoteKind;
+  /** The result of a personnel election (F2). */
+  electionResult?: ElectionResult | null;
+}
+/** The lot of a tied election was drawn (F2): the room and the beamer show it. */
+export interface VoteLotDrawnMsg {
+  type: 'vote_lot_drawn';
+  voteId: string;
+  result: VoteResult;
+  electionResult: ElectionResult;
 }
 /** A cancelled vote. It has no result and fires no branch. */
 export interface VoteCancelledMsg {
@@ -103,10 +126,11 @@ export type ServerMessage =
   | VoteOpenedMsg
   | VoteTallyMsg
   | VoteClosedMsg
+  | VoteLotDrawnMsg
   | VoteCancelledMsg
   | ViewersMsg
   | ErrorMsg;
 
 export type ClientMessage =
-  | { type: 'cast'; voteId: string; choice: string; asDelegation?: boolean }
+  | { type: 'cast'; voteId: string; choice: string | string[]; asDelegation?: boolean }
   | { type: 'subscribe' };

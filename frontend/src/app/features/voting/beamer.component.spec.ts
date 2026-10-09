@@ -237,6 +237,29 @@ describe('BeamerComponent', () => {
     expect(screen.getByText('Einfache Mehrheit · Quorum nicht erreicht · 1 Stimme')).toBeInTheDocument();
   });
 
+  it('shows an election: the result of the close frame, then a runoff round from the read (F2)', async () => {
+    const election = { seats: 1, candidates: [{ id: 'c1', name: 'Anna' }, { id: 'c2', name: 'Ben' }], secret: true };
+    const open = vote({ kind: 'election', election, config: { options: ['c1', 'c2', 'abstain'], majorityRule: 'simple' }, secret: true });
+    const { push, fixture } = await setup({ votes: [open, open] });
+    push({ ...OPEN, options: ['c1', 'c2', 'abstain'] });
+    expect(screen.getByText(/^Wahl · 1 Posten/)).toBeInTheDocument();
+    push({
+      type: 'vote_closed',
+      voteId: 'v1',
+      result: 'elected',
+      counts: { c1: 3, c2: 1 },
+      electionResult: { counts: { c1: 3, c2: 1 }, abstentions: 0, ballots: 4, elected: ['c1'] },
+    });
+    expect(screen.getAllByText(/Gewählt: Anna/).length).toBeGreaterThan(0);
+    const cmp = fixture.componentInstance as unknown as { view(v: Vote, over: object): { round?: number; electionResult?: unknown } };
+    const runoff = cmp.view(
+      vote({ kind: 'election', election, round: 2, electionResult: { counts: {}, abstentions: 0, ballots: 0, elected: [] } }),
+      { status: 'closed', voted: 0 },
+    );
+    expect(runoff.round).toBe(2);
+    expect(runoff.electionResult).toEqual({ counts: {}, abstentions: 0, ballots: 0, elected: [] });
+  });
+
   it('ignores a read that arrives after the read of a newer vote', async () => {
     const { push, api, fixture } = await setup();
     const reads: { id: string; read: Subject<Vote> }[] = [];

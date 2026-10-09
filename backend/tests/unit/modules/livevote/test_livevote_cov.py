@@ -1534,6 +1534,7 @@ def _app_row(
         current_state_id=state_id,
         vote_gremium_id=vote_gremium_id,
         data={"title": title} if title else {},
+        amount=None,
         created_at=datetime(2026, 6, 8, tzinfo=UTC),
     )
 

@@ -107,6 +107,21 @@
 .ad__amount {
   color: var(--color-text);
 }
+/* F1: the approved amount, and the requested one struck through next to it. */
+.ad__amount--approved {
+  font-weight: var(--fw-semibold);
+  color: var(--color-accent-text);
+}
+.ad__amountStruck {
+  margin-left: var(--space-2);
+  color: var(--color-text-muted);
+}
+/* "gebunden 900,00 € (bewilligt statt beantragt)" under the cost centre. */
+.ad__bound {
+  display: block;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
 .ad__transitions {
   display: flex;
   flex-wrap: wrap;

@@ -18,6 +18,7 @@ from sqlalchemy import case, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import ApplicationType, GremiumMembership
+from app.modules.applications.decision import committed_amount
 from app.modules.applications.models import Application
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
@@ -64,13 +65,17 @@ async def committee_ids_for_sub(session: AsyncSession, sub: str | None) -> froze
 
 
 async def _budget_fits(session: AsyncSession, app: Application) -> bool:
-    """Return True when the requested amount fits the free remainder of the cost center.
+    """Return True when the committed amount fits the free remainder of the cost center.
 
-    The available amount is the node allocation minus expenses plus income for the
-    fiscal year. This is the same direction as `tree_rules.node_available`. A missing
-    budget, fiscal year or amount gives `False` (fail-closed).
+    The committed amount is the approved amount of the decision (F1: a vote proposal
+    or the decision of a manual transition sets it before the guard runs), else the
+    requested amount. The available amount is the node allocation minus expenses plus
+    income for the fiscal year. This is the same direction as
+    `tree_rules.node_available`. A missing budget, fiscal year or amount gives `False`
+    (fail-closed).
     """
-    if app.budget_id is None or app.fiscal_year_id is None or app.amount is None:
+    amount = committed_amount(app.amount, getattr(app, "approved_amount", None))
+    if app.budget_id is None or app.fiscal_year_id is None or amount is None:
         return False
     allocated = await session.scalar(
         select(BudgetAllocation.allocated).where(
@@ -95,7 +100,7 @@ async def _budget_fits(session: AsyncSession, app: Application) -> bool:
         )
     )
     available = (allocated or Decimal("0")) + (flow or Decimal("0"))
-    return app.amount <= available
+    return amount <= available
 
 
 async def _has_attachment(session: AsyncSession, app: Application) -> bool:

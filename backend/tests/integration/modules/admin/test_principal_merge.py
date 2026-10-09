@@ -41,6 +41,7 @@ from app.modules.admin.models import (
 from app.modules.admin.principal_merge import PrincipalMergeService
 from app.modules.applications.models import (
     Application,
+    ApplicationDecision,
     ApplicationShare,
     Comment,
     GuestApplicationSettings,
@@ -275,6 +276,8 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             )
         )
         session.add(GuestApplicationSettings(id=1, updated_by=old.sub))
+        # F1: the old account decided on the application by a manual transition.
+        session.add(ApplicationDecision(application_id=app_id, decided_by=old.sub))
 
         # Meetings, the minute-taker, a keeper period, the protocol, attendance.
         meeting = await _meeting(session, seed.gremium_id, f"Sitzung A {tag}")

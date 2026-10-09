@@ -248,6 +248,19 @@ describe('StatusTimelineComponent', () => {
     );
   });
 
+  it('F1: notes the deviations of a decision, and nothing for a decision as requested', async () => {
+    const { comp } = await setup(fakeApi({ timeline: () => of([]), versions: () => of([]) }));
+    await screen.findByRole('heading', { level: 1 });
+    const base = { toStateId: 's9', toState: null, label: 'Bewilligt', actor: null, at: '2026-06-05T10:00:00Z', note: null, voteId: null, voteDeleted: false };
+    comp.timeline.set([
+      { ...base, decision: { requestedAmount: '820.00', approvedAmount: '700.00', amountDeviates: true, conditionCount: 2 } },
+      { ...base, decision: { requestedAmount: '820.00', approvedAmount: null, amountDeviates: false, conditionCount: 0 } },
+    ]);
+    const [deviates, plain] = comp.historyEntries();
+    expect(deviates.body).toMatch(/^Mit Abweichungen: 700,00\s€ statt 820,00\s€.*2 Auflagen/);
+    expect(plain.body).toBeNull();
+  });
+
   it('translates vote notes and keeps other notes', async () => {
     const { comp } = await setup(fakeApi());
     expect(comp.noteText('vote:passed')).toBe('Abstimmungsergebnis: Angenommen');

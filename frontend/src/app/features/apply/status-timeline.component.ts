@@ -36,6 +36,8 @@ import { toFormlySections } from '@shared/forms/formly-mapper';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
 import { actorLabel } from '@shared/actor-label.util';
+import { DecisionSectionComponent } from '@shared/decision/decision-section.component';
+import { decisionHistoryLine } from '@shared/decision/decision.util';
 import { flowColorKind } from '@shared/status-kind.util';
 import { HistoryComponent, type HistoryEntry } from '@shared/ui/history/history.component';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
@@ -98,6 +100,7 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
     IconComponent,
     AttachmentsPanelComponent,
     TranslatePipe,
+    DecisionSectionComponent,
   ],
   // The field types of the form (`provideFormly`) come with the component, so Formly is not
   // part of the initial bundle.
@@ -240,6 +243,16 @@ export class StatusTimelineComponent {
         lines.push(t('applications.history.transition', { label: e.transitionLabel }));
       }
       if (e.note) lines.push(this.noteText(e.note));
+      // F1: the status change carried a decision with deviations.
+      if (e.decision) {
+        const line = decisionHistoryLine(
+          e.decision,
+          this.i18n.formatLocale(),
+          this.application()?.currency ?? 'EUR',
+          t,
+        );
+        if (line) lines.push(line);
+      }
       if (e.voteDeleted) lines.push(t('applications.history.voteDeleted'));
       return {
         at: e.at,

@@ -74,7 +74,8 @@ Applications: `list_applications`, `get_application`, `get_application_timeline`
 `create_application`, `comment_application`.
 Flow: `list_transitions`, `fire_transition`.
 Votes: `get_vote`, `create_application_vote`, `open_vote`, `close_vote`, `cancel_vote`,
-`create_meeting_vote`, `delete_meeting_vote`. There is no `cast_ballot` tool, because only
+`create_meeting_vote`, `delete_meeting_vote`, `vote_draw_lot`, `vote_runoff` (personnel
+elections). There is no `cast_ballot` tool, because only
 a human may cast a ballot.
 Budget: `list_budgets`, `get_budget_applications`, `book_expense`, `list_expenses`.
 Invoices: `list_invoices`, `get_invoice`, `create_invoice`, `update_invoice`,

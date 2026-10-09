@@ -1,0 +1,184 @@
+@let src = source();
+<app-dialog
+  size="lg"
+  [open]="!!src"
+  [title]="'admin.users.revoke.title' | t"
+  [subtitle]="'admin.users.revoke.subtitle' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="close()"
+>
+  @let p = preview();
+  <div class="ur">
+    @if (loading()) {
+      <app-skeleton variant="rows" [count]="4" [label]="'admin.users.revoke.loading' | t" />
+    } @else if (failed() || !p) {
+      <app-note kind="error" icon="alert">
+        <span>{{ 'admin.users.revoke.loadFailed' | t }}</span>
+      </app-note>
+    } @else {
+      <!-- The person and the last login. -->
+      <div class="ur__who">
+        <app-avatar size="sm" [name]="name(p.principal)" [principalId]="p.principal.id" [decorative]="true" />
+        <span class="ur__whoText">
+          <span class="ur__name">
+            {{ name(p.principal) }}
+            @if (!p.principal.active) {
+              <span class="ur__tag">{{ 'admin.users.inactive' | t }}</span>
+            }
+          </span>
+          @if (p.principal.email) {
+            <span class="ur__mail mono">{{ p.principal.email }}</span>
+          }
+          <span class="ur__muted">
+            @if (p.principal.lastLogin) {
+              {{
+                'admin.users.revoke.lastLogin'
+                  | t: { date: (p.principal.lastLogin | ldate: 'mediumDate'), age: age(p.principal.lastLogin) }
+              }}
+            } @else {
+              {{ 'admin.users.revoke.lastLoginNever' | t }}
+            }
+          </span>
+        </span>
+      </div>
+
+      @if (p.isSelf) {
+        <app-note kind="warn" icon="lock">
+          <span>{{ 'admin.users.revoke.selfNote' | t }}</span>
+        </app-note>
+      }
+
+      @if (empty()) {
+        <p class="ur__muted">{{ 'admin.users.revoke.nothing' | t }}</p>
+      }
+
+      @if (p.gremien.length) {
+        <section class="ur__sec" aria-labelledby="ur-gremien">
+          <div class="ur__secHead">
+            <h3 class="sec ur__secTitle" id="ur-gremien">
+              {{ 'admin.users.revoke.gremien' | t: { n: p.gremien.length } }}
+            </h3>
+            <app-button variant="text" size="sm" [disabled]="p.isSelf" (click)="toggleAll()">{{
+              (allSelected() ? 'admin.users.revoke.deselectAll' : 'admin.users.revoke.selectAll') | t
+            }}</app-button>
+          </div>
+          <ul class="ur__items">
+            @for (g of p.gremien; track g.gremiumId) {
+              @let e = gEntry(g);
+              <li class="ur__item" [class.ur__item--on]="isOn(e)">
+                <div class="ur__body">
+                  <app-checkbox
+                    class="ur__title"
+                    [name]="'ur-' + e"
+                    [ngModel]="isOn(e)"
+                    [disabled]="p.isSelf"
+                    (ngModelChange)="toggle(e, $event)"
+                    >{{ g.name }}</app-checkbox
+                  >
+                  <ul class="ur__lines">
+                    @for (line of gremiumLines(g); track $index) {
+                      <li class="ur__line" [class.ur__line--kept]="line.kept">
+                        <app-icon class="ur__lineIcon" name="right" [size]="14" />
+                        <span class="ur__lineText">
+                          <span>{{ line.text }}</span>
+                          @if (line.detail) {
+                            <span class="ur__muted">{{ line.detail }}</span>
+                          }
+                        </span>
+                      </li>
+                    }
+                    @for (hint of sharedHints(e); track $index) {
+                      <li class="ur__line ur__line--hint">
+                        <app-icon class="ur__lineIcon" name="link" [size]="14" />
+                        <span class="ur__lineText">{{ hint }}</span>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+
+      @if (p.globalRoles.length) {
+        <section class="ur__sec" aria-labelledby="ur-roles">
+          <div class="ur__secHead">
+            <h3 class="sec ur__secTitle" id="ur-roles">
+              {{ 'admin.users.revoke.roles' | t: { n: p.globalRoles.length } }}
+            </h3>
+          </div>
+          <ul class="ur__items">
+            @for (r of p.globalRoles; track r.roleId) {
+              @let e = rEntry(r);
+              <li class="ur__item" [class.ur__item--on]="isOn(e)">
+                <div class="ur__body">
+                  <app-checkbox
+                    class="ur__title"
+                    [name]="'ur-' + e"
+                    [ngModel]="isOn(e)"
+                    [disabled]="p.isSelf"
+                    (ngModelChange)="toggle(e, $event)"
+                    >{{ label(r.roleLabel, r.roleKey) }}</app-checkbox
+                  >
+                  <ul class="ur__lines">
+                    @for (line of roleLines(r); track $index) {
+                      <li class="ur__line">
+                        <app-icon class="ur__lineIcon" name="right" [size]="14" />
+                        <span class="ur__lineText">
+                          <span>{{ line.text }}</span>
+                          @if (line.detail) {
+                            <span class="ur__muted">{{ line.detail }}</span>
+                          }
+                        </span>
+                      </li>
+                    }
+                    @for (hint of sharedHints(e); track $index) {
+                      <li class="ur__line ur__line--hint">
+                        <app-icon class="ur__lineIcon" name="link" [size]="14" />
+                        <span class="ur__lineText">{{ hint }}</span>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+
+      @if (!empty()) {
+        <app-note icon="info">
+          <span
+            >{{ 'admin.users.revoke.note' | t: { name: name(p.principal) } }}
+            {{
+              (deactivate() ? 'admin.users.revoke.noteDeactivated' : 'admin.users.revoke.noteLogin')
+                | t: { name: name(p.principal) }
+            }}</span
+          >
+        </app-note>
+      }
+
+      @if (p.principal.active && !p.isSelf) {
+        <app-switch
+          class="ur__switch"
+          [checked]="deactivate()"
+          [hint]="'admin.users.revoke.deactivateHint' | t"
+          (checkedChange)="deactivate.set($event)"
+          >{{ 'admin.users.revoke.deactivate' | t }}</app-switch
+        >
+      }
+    }
+  </div>
+
+  <div dialog-footer class="ur__foot">
+    <app-button variant="text" [disabled]="submitting()" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+    @if (failed()) {
+      <app-button variant="tonal" (click)="retry()">{{ 'admin.users.revoke.retry' | t }}</app-button>
+    } @else {
+      <app-button variant="danger" [disabled]="!canSubmit()" [loading]="submitting()" (click)="submit()">{{
+        confirmLabel()
+      }}</app-button>
+    }
+  </div>
+</app-dialog>
