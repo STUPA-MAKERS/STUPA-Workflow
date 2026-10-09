@@ -5,11 +5,13 @@ from __future__ import annotations
 from datetime import date as _date
 from datetime import datetime as _datetime
 from datetime import time as _time
+from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
+from app.modules.applications.decision import DecisionIn
 from app.modules.voting.schemas import MyBallot
 from app.shared.config_schemas import Quorum
 
@@ -157,6 +159,8 @@ class MeetingVoteOut(_CamelModel):
     # fixed at the close. For a vote with guests ``present`` is their sum.
     present_members: int | None = Field(default=None, alias="presentMembers")
     present_guests: int | None = Field(default=None, alias="presentGuests")
+    # The decision proposal of an application vote (F1), or None.
+    proposal: DecisionIn | None = None
 
 
 class CurrentAgendaItemOut(_CamelModel):
@@ -396,6 +400,9 @@ class AgendaItemOut(_CamelModel):
     non_public: bool = Field(default=False, alias="nonPublic")
     # Current application status as an i18n label.
     state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
+    # The requested amount of the application (F1: the decision proposal of the vote
+    # dialog starts with it). None for a free-text item.
+    amount: Decimal | None = None
 
 
 class AssignableApplicationOut(_CamelModel):
@@ -437,6 +444,9 @@ class MeetingVoteOpenBody(_CamelModel):
     # #17: the admitted guests vote too. ``None`` picks the default: on in a meeting
     # where guests vote, on a public agenda item; else off. Such a vote has no quorum.
     guests_vote: bool | None = Field(default=None, alias="guestsVote")
+    # F1: the decision proposal (approved amount, conditions). Only an application
+    # agenda item takes it (422 `decision_not_allowed` otherwise).
+    proposal: DecisionIn | None = None
 
     @model_validator(mode="after")
     def _min_options(self) -> MeetingVoteOpenBody:

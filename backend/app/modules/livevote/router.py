@@ -663,6 +663,7 @@ async def open_meeting_vote(
         eligibleGroup=meeting.gremium_id,
         question=payload.question,
         eligibleCount=eligible,
+        proposal=payload.proposal,
     )
     vote = await voting.create_internal(
         item.application_id, create, meeting_id=meeting_id, agenda_item_id=item.id
