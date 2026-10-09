@@ -1,14 +1,31 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  Injector,
+  computed,
+  inject,
+  input,
+  output,
+} from '@angular/core';
+import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import type { MeetingStatus, MeetingVote, Uuid } from '@core/api/models';
-import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
+import type { MeetingStatus, MeetingVote, MyBallot, Uuid, Vote } from '@core/api/models';
+import { ButtonComponent, IconComponent, ToastService } from '@stupa-makers/ui-kit';
 import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { meetingVoteStatus, voteResultStatus, type StatusView } from '@shared/status-kind.util';
 import {
+  BallotComponent,
+  type BallotCaster,
+  type BallotFailure,
+} from '../../voting/ballot/ballot.component';
+import { ElectionResultComponent } from '../../voting/election-result/election-result.component';
+import { electionCaption, electionOf, electionStatus } from '../../voting/election.util';
+import {
   countEntries,
+  errorDetail,
   guestComposition,
   voteMetaLine,
   voteOptionLabel,
@@ -29,17 +46,31 @@ import {
  * who did not vote yet gets the options; a ballot never changes once it is cast (O11).
  * A closed vote offers to put its result into the text of the item ("Ins Protokoll
  * übernehmen"), and says "Im Protokoll" once the text holds it.
+ *
+ * A personnel election (F2) shows the election ballot (candidates, abstention) and,
+ * once closed, the bars per candidate with the runoff and lot actions of the manager.
  */
 @Component({
   selector: 'app-vote-card',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ButtonComponent, IconComponent, SegBarComponent, StatusTextComponent],
+  imports: [
+    TranslatePipe,
+    BallotComponent,
+    ButtonComponent,
+    ElectionResultComponent,
+    IconComponent,
+    SegBarComponent,
+    StatusTextComponent,
+  ],
   templateUrl: './vote-card.component.html',
   styleUrl: './vote-card.component.scss',
 })
 export class VoteCardComponent {
   private readonly i18n = inject(I18nService);
+  /** The API client, looked up on use: only an election ballot sends from the card. */
+  private readonly injector = inject(Injector);
+  private readonly toast = inject(ToastService);
 
   readonly vote = input.required<MeetingVote>();
   readonly meetingStatus = input.required<MeetingStatus>();
@@ -70,6 +101,28 @@ export class VoteCardComponent {
   readonly remove = output<Uuid>();
   readonly cast = output<{ voteId: Uuid; choice: string }>();
   readonly insertResult = output<MeetingVote>();
+  /** The lot was drawn, or the runoff opened (F2): the page reads the meeting again. */
+  readonly electionChanged = output<Vote>();
+
+  /** The personnel election of the vote (F2), or `null` for a motion. */
+  protected readonly election = computed(() => electionOf(this.vote()));
+  /** "Wahl · 2 Posten" or "Stichwahl (2. Wahlgang) · 1 Posten". */
+  protected readonly electionCap = computed(() => {
+    const el = this.election();
+    return el ? electionCaption(el, this.vote().round, (k, p) => this.i18n.translate(k, p)) : null;
+  });
+  /** The election ballot sends the list of the candidate ids. */
+  protected readonly caster: BallotCaster = (choice) =>
+    this.injector.get(ApiClient).castBallot(this.vote().id, choice);
+  protected readonly notCast: MyBallot = { cast: false, choice: null };
+
+  protected onBallotFailed(failure: BallotFailure): void {
+    const detail = failure.alreadyVoted ? '' : errorDetail(failure.error);
+    const base = this.i18n.translate(
+      failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'meetings.toast.actionFailed',
+    );
+    this.toast.error(detail ? `${base}: ${detail}` : base);
+  }
 
   protected readonly status = computed<StatusView>(() => meetingVoteStatus(this.vote().status));
   /** The caption of the card: "Abstimmung offen", "… geschlossen" and so on. */
@@ -80,6 +133,7 @@ export class VoteCardComponent {
   protected readonly result = computed<StatusView | null>(() => {
     const v = this.vote();
     if (v.status !== 'closed') return null;
+    if (this.election()) return electionStatus(v.result);
     return voteResultStatus(v.result === 'passed' ? 'passed' : 'rejected');
   });
 

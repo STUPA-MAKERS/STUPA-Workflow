@@ -17,11 +17,13 @@ module does not duplicate them.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Depends,
     File,
     Form,
@@ -43,6 +45,7 @@ from app.modules.admin.cd_logos import LogoSlot
 from app.modules.admin.gremium_roles import GremiumRoleService
 from app.modules.admin.oidc_mappings import OidcMappingService
 from app.modules.admin.principal_merge import PrincipalMergeService
+from app.modules.admin.principal_revoke import PrincipalRevokeService
 from app.modules.admin.schemas import (
     ApplicationTypeCreate,
     ApplicationTypeOut,
@@ -81,8 +84,11 @@ from app.modules.admin.schemas import (
     MergeResultOut,
     PrincipalMergeIn,
     PrincipalOut,
+    PrincipalRevokeIn,
     PrincipalUpdate,
     PublicSiteConfigOut,
+    RevokePreviewOut,
+    RevokeResultOut,
     RoleAssignmentOut,
     RoleCreate,
     RoleOut,
@@ -96,6 +102,7 @@ from app.modules.admin.schemas import (
 from app.modules.admin.service import CdVariantService, ConfigService
 from app.modules.admin.site_config_service import SiteConfigService
 from app.modules.applications.guest_settings import GuestSettingsService
+from app.modules.notifications.auto import AutoMailer, get_auto_mailer
 from app.shared.antiabuse import body_cap
 from app.shared.config_schemas import FlowGraph, export_json_schemas
 from app.shared.errors import ProblemDetail
@@ -134,6 +141,12 @@ def get_principal_merge_service(session: DbSession) -> PrincipalMergeService:
     return PrincipalMergeService(session)
 
 
+def get_principal_revoke_service(
+    session: DbSession, settings: SettingsDep
+) -> PrincipalRevokeService:
+    return PrincipalRevokeService(session, settings)
+
+
 def get_cd_variant_service(session: DbSession, request: Request) -> CdVariantService:
     # Only the logo upload and download touch the object storage. Without MinIO
     # (development, contract CI) those two routes answer 503.
@@ -147,6 +160,8 @@ GremiumRoleServiceDep = Annotated[GremiumRoleService, Depends(get_gremium_role_s
 OidcMappingServiceDep = Annotated[OidcMappingService, Depends(get_oidc_mapping_service)]
 CdVariantServiceDep = Annotated[CdVariantService, Depends(get_cd_variant_service)]
 MergeServiceDep = Annotated[PrincipalMergeService, Depends(get_principal_merge_service)]
+RevokeServiceDep = Annotated[PrincipalRevokeService, Depends(get_principal_revoke_service)]
+AutoMailerDep = Annotated[AutoMailer, Depends(get_auto_mailer)]
 
 # Body cap on Content-Length for a logo upload, applied before FastAPI buffers
 # the body. It adds defense in depth next to the nginx cap and the authoritative
@@ -169,6 +184,10 @@ UsersAdmin = Annotated[Principal, Depends(require_principal("admin.users"))]
 # Account merge. A separate key: the merge rewrites the history of two accounts and
 # cannot be undone, so the user page alone does not grant it.
 MergeAdmin = Annotated[Principal, Depends(require_principal("admin.users.merge"))]
+# Revoke the rights of a person ("Rechte entziehen"). A separate key: it clears whole
+# Gremien, the pool entries and the delegations of planned meetings. No OAuth scope
+# carries it, so it is a web-only action.
+RevokeAdmin = Annotated[Principal, Depends(require_principal("admin.users.revoke_groups"))]
 GroupMappingsAdmin = Annotated[Principal, Depends(require_principal("admin.group_mappings"))]
 GremiumRolesAdmin = Annotated[Principal, Depends(require_principal("admin.gremium_roles"))]
 CdVariantsAdmin = Annotated[Principal, Depends(require_principal("admin.cd_variants"))]
@@ -694,10 +713,24 @@ async def create_global_flow(
     responses=_errors(401, 403),
 )
 async def list_principals(
-    service: ServiceDep, q: Annotated[str | None, Query()] = None
+    service: ServiceDep,
+    q: Annotated[str | None, Query()] = None,
+    last_login_before: Annotated[date | None, Query(alias="lastLoginBefore")] = None,
+    include_never: Annotated[bool, Query(alias="includeNever")] = False,
+    has_groups: Annotated[bool | None, Query(alias="hasGroups")] = None,
 ) -> list[PrincipalOut]:
-    """List or search the users (OIDC principals) by `sub`, name or e-mail."""
-    return await service.search_principals(q)
+    """List or search the users (OIDC principals) by `sub`, name or e-mail.
+
+    `lastLoginBefore` (ISO date) keeps the people whose last login is before that day;
+    `includeNever=true` adds the people who never logged in (alone: only those).
+    `hasGroups` keeps the people with (true) or without (false) OIDC groups.
+    """
+    return await service.search_principals(
+        q,
+        last_login_before=last_login_before,
+        include_never=include_never,
+        has_groups=has_groups,
+    )
 
 
 @router.patch(
@@ -750,6 +783,53 @@ async def merge_principal(
     action `principal_merge`.
     """
     return await service.merge(principal_id, payload.target_id, actor=admin.sub)
+
+
+@router.get(
+    "/principals/{principal_id}/revoke-preview",
+    response_model=RevokePreviewOut,
+    responses=_errors(401, 403, 404, 409),
+)
+async def preview_principal_revoke(
+    principal_id: UUID, service: RevokeServiceDep, admin: RevokeAdmin
+) -> RevokePreviewOut:
+    """Show per Gremium and per global role what the person has. Writes nothing.
+
+    Per Gremium: the membership and the gremium role with the SSO groups that cause
+    them, the manual role assignments, the pool entries, the delegations in planned
+    meetings (revoked) and in live meetings (kept), and the open votes. Each SSO group
+    lists every Gremium and global role it leads to.
+    """
+    return await service.preview(principal_id, actor=admin.sub)
+
+
+@router.post(
+    "/principals/{principal_id}/revoke",
+    response_model=RevokeResultOut,
+    responses=_errors(400, 401, 403, 404, 409, 422),
+)
+async def revoke_principal(
+    principal_id: UUID,
+    payload: PrincipalRevokeIn,
+    service: RevokeServiceDep,
+    admin: RevokeAdmin,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    mailer: AutoMailerDep,
+) -> RevokeResultOut:
+    """Clear the selected Gremien completely and remove the selected global roles.
+
+    One transaction. A removed SSO group that also leads to an entry that is not
+    selected gives 422 `revoke_incomplete`. The own account gives 409
+    `revoke_own_account`. The other side of each revoked delegation gets the usual
+    mail: the delegate, or the delegator when the person was the delegate.
+    """
+    out, mails = await service.revoke(principal_id, payload, actor=admin.sub)
+    pool = getattr(request.app.state, "arq_pool", None)
+    for info in mails:
+        background.add_task(mailer.delegation_changed, settings, info, granted=False, pool=pool)
+    return out
 
 
 @router.get(

@@ -45,8 +45,8 @@ import {
   type StatusKind,
   flowColorKind,
   meetingVoteStatus,
-  voteResultStatus,
 } from '@shared/status-kind.util';
+import { closedStatus } from '../../features/voting/election.util';
 import { shortTime } from '../../features/meetings/meetings-display.util';
 import { CommandPaletteService } from '../../features/search/command-palette.service';
 import { AccountMenuComponent } from '../../layout/account-menu/account-menu.component';
@@ -456,7 +456,7 @@ export class DashboardComponent {
   private voteRow(v: VoteListItem): VoteRow {
     const status =
       v.status === 'closed' && v.result
-        ? voteResultStatus(v.result)
+        ? closedStatus(v.kind, v.result)
         : v.status === 'draft'
           ? { kind: 'neutral' as const, key: 'voting.list.status.draft' as const }
           : meetingVoteStatus(v.status);

@@ -47,8 +47,21 @@ export function topSnippet(
  * carries the vote.
  */
 export function voteSnippetHead(vote: MeetingVote): string {
-  const head = vote.question?.trim() || vote.title?.trim() || 'Beschlussfrage';
-  return `> [!abstimmung] **${head.replace(/\r\n|\r|\n/g, ' ')}**`;
+  return `> [!abstimmung] **${voteSnippetQuestion(vote).replace(/\r\n|\r|\n/g, ' ')}**`;
+}
+
+/**
+ * The question in the head line of the callout. A runoff (F2) copies the question of its
+ * election, so its head names the round: "Frage (2. Wahlgang)". Each round then has its
+ * own head line, as in the backend `build_election_snippet`.
+ */
+export function voteSnippetQuestion(vote: MeetingVote): string {
+  if (vote.kind === 'election') {
+    const head = vote.question?.trim() || 'Wahlgang';
+    const round = vote.round ?? 1;
+    return round > 1 ? `${head} (${round}. Wahlgang)` : head;
+  }
+  return vote.question?.trim() || vote.title?.trim() || 'Beschlussfrage';
 }
 
 /**
@@ -58,10 +71,53 @@ export function voteSnippetHead(vote: MeetingVote): string {
  * identical snippet, so one syntax serves the editor, the PDF and the mail.
  */
 export function voteSnippet(vote: MeetingVote): string {
+  if (vote.kind === 'election' && vote.election) return electionSnippet(vote);
   const lines = [voteSnippetHead(vote)];
   const counts = Object.entries(vote.counts ?? {});
   if (counts.length) {
     lines.push(`> ${counts.map(([option, n]) => `${option}: ${n}`).join(', ')}`);
+  }
+  return lines.join('\n');
+}
+
+/**
+ * The protocol callout of a personnel election (F2), the same text as the backend
+ * `build_election_snippet` writes: "Wahl · 2 Posten", the votes per candidate (best
+ * first) and the abstentions, "Gewählt: …" and the notes of the lot and the runoff. A
+ * single candidate writes its Ja/Nein/Enthaltung line.
+ */
+export function electionSnippet(vote: MeetingVote): string {
+  const election = vote.election;
+  const result = vote.electionResult ?? null;
+  const round = vote.round ?? 1;
+  const lines = [voteSnippetHead(vote)];
+  let meta = `Wahl · ${election?.seats ?? 1} Posten`;
+  if (round > 1) meta += ` · Stichwahl (${round}. Wahlgang)`;
+  lines.push(`> ${meta}`);
+  if (!election || !result) return lines.join('\n');
+  const names = new Map(election.candidates.map((c) => [c.id, c.name]));
+  const yesNo = typeof result.yes === 'number' && typeof result.no === 'number';
+  // Best first, as the backend writes them; the single candidate keeps its place.
+  const rows = election.candidates.map((c) => ({
+    name: c.name,
+    votes: result.counts[c.id] ?? 0,
+    elected: result.elected.includes(c.id),
+  }));
+  if (!yesNo) rows.sort((a, b) => b.votes - a.votes);
+  if (yesNo) {
+    lines.push(`> Kandidatur: ${election.candidates[0]?.name ?? ''}`);
+    lines.push(`> ja: ${result.yes}, nein: ${result.no}, enthaltung: ${result.abstentions}`);
+  } else {
+    const votes = rows.map((r) => `${r.name}: ${r.votes}`).join(' · ');
+    lines.push(`> ${votes} · Enthaltungen: ${result.abstentions}`);
+  }
+  const elected = rows.filter((r) => r.elected).map((r) => r.name);
+  lines.push(`> Gewählt: ${elected.length ? elected.join(', ') : 'niemand'}`);
+  if (result.lot?.drawn) lines.push('> Durch Los entschieden.');
+  if (result.lot && !result.lot.drawn) lines.push('> Gleichstand: das Los steht aus.');
+  if (result.runoff?.seats) {
+    const who = result.runoff.candidateIds.map((id) => names.get(id) ?? id).join(', ');
+    lines.push(`> Stichwahl (${round + 1}. Wahlgang) um ${result.runoff.seats} Posten: ${who}`);
   }
   return lines.join('\n');
 }

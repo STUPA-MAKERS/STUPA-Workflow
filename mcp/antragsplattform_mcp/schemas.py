@@ -521,14 +521,65 @@ class MeetingPatch(WireModel):
     )
 
 
+class DecisionProposal(WireModel):
+    """A decision: the approved amount and the conditions (approval with deviations).
+
+    When a vote with this proposal passes, the proposal becomes the decision of the
+    application. The cost center then binds the approved amount.
+    """
+
+    approvedAmount: str | None = Field(
+        default=None,
+        description="Approved amount as a decimal string, e.g. \"800.00\". Greater than 0 "
+        "and not above the requested amount (422 `approved_amount_invalid` / "
+        "`approved_amount_exceeds_requested`). null means as requested.",
+    )
+    conditions: list[str] = Field(
+        default_factory=list,
+        description="Conditions (Auflagen), at most 20, each 1 to 1000 characters.",
+    )
+
+
+class ElectionCandidateIn(WireModel):
+    """One candidate of a personnel election. The server gives the ids c1..cn.
+
+    Only `name` and `principalId`. The server rejects any other key with 422, so do
+    not copy `id` or `erased` from a vote read into a new election.
+    """
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    name: str = Field(description="Display name, 1 to 200 characters.")
+    principalId: str | None = Field(
+        default=None,
+        description="Account of the candidate, if the person has one (422 "
+        "`candidate_unknown` for an unknown id). One person is a candidate only once.",
+    )
+
+
 class MeetingVoteOpenBody(WireModel):
-    """Open a live vote. A meeting vote has no casting vote: a tie is `rejected`."""
+    """Open a live vote. A meeting vote has no casting vote: a tie is `rejected`.
+
+    `kind: "election"` opens a personnel election: `question` names the round,
+    `seats` the number of posts and `candidates` the persons (at least `seats`). An
+    election is only possible on a free-text item (422 `election_on_application_item`).
+    The server ignores `options` and `majorityRule` for an election: each voter gives up
+    to `seats` votes, the candidates with the most votes are elected.
+    """
 
     agendaItemId: str
+    kind: Literal["motion", "election"] = "motion"
     question: str | None = None
     options: list[str] = Field(default_factory=lambda: ["yes", "no", "abstain"])
     majorityRule: Literal["simple", "absolute", "two_thirds"] = "simple"
-    secret: bool = False
+    secret: bool | None = Field(
+        default=None,
+        description="Secret ballot. Default: off for a motion, on for an election.",
+    )
+    seats: int = Field(default=1, ge=1, le=50, description="Election only: posts.")
+    candidates: list[ElectionCandidateIn] = Field(
+        default_factory=list, description="Election only: 1 to 50 candidates."
+    )
     # The server counts the eligible voters from the roster of the gremium.
     quorumPercent: int | None = None
     guestsVote: bool | None = Field(
@@ -536,6 +587,11 @@ class MeetingVoteOpenBody(WireModel):
         description="Public meeting: the admitted guests vote too (no quorum, majority of "
         "the cast ballots). Default: on when guests vote in the meeting and the item is "
         "public. Never on a non-public item (422).",
+    )
+    proposal: DecisionProposal | None = Field(
+        default=None,
+        description="Decision proposal of an application item. A free-text item gives "
+        "422 `decision_not_allowed`.",
     )
 
 
@@ -563,6 +619,9 @@ class VoteCreate(WireModel):
     opensStateId: str | None = None
     closesAt: str | None = Field(default=None, description="ISO datetime")
     resultBranchTransitionId: str | None = None
+    proposal: DecisionProposal | None = Field(
+        default=None, description="Decision proposal that applies when the vote passes."
+    )
 
 
 # Notification settings, delegations and substitutes.

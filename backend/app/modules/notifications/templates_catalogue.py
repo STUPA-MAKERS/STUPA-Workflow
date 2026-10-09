@@ -61,12 +61,14 @@ STATUS_UPDATE_TEAM_SUBJECT: dict[str, str] = {
 STATUS_UPDATE_TEAM_BODY: dict[str, str] = {
     "de": "Hallo,\n\nder Antrag"
     "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %} ist in einen "
-    "neuen Status gewechselt{% if status %}: {{ status }}{% endif %}.\n\n"
-    "Ggf. ist eine Aktion oder Abstimmung erforderlich.\n",
+    "neuen Status gewechselt{% if status %}: {{ status }}{% endif %}."
+    + _svc.DECISION_BLOCK["de"]
+    + "\n\nGgf. ist eine Aktion oder Abstimmung erforderlich.\n",
     "en": "Hello,\n\nthe application"
     '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %} moved to a '
-    "new state{% if status %}: {{ status }}{% endif %}.\n\n"
-    "An action or vote may be required.\n",
+    "new state{% if status %}: {{ status }}{% endif %}."
+    + _svc.DECISION_BLOCK["en"]
+    + "\n\nAn action or vote may be required.\n",
 }
 
 
@@ -92,6 +94,10 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
             "applicationTitle": "Titel des Antrags",
             "status": "Neuer Status",
             "applicationId": "ID des Antrags",
+            "requestedAmount": "Beantragter Betrag",
+            "approvedAmount": "Bewilligter Betrag",
+            "amountDeviates": "Bewilligter Betrag weicht ab (ja/nein)",
+            "conditions": "Liste der Auflagen",
         },
     ),
     MailTemplateSpec(
@@ -103,6 +109,10 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
             "applicationTitle": "Titel des Antrags",
             "status": "Neuer Status",
             "applicationId": "ID des Antrags",
+            "requestedAmount": "Beantragter Betrag",
+            "approvedAmount": "Bewilligter Betrag",
+            "amountDeviates": "Bewilligter Betrag weicht ab (ja/nein)",
+            "conditions": "Liste der Auflagen",
         },
     ),
     MailTemplateSpec(

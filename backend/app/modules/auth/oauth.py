@@ -24,9 +24,10 @@ import secrets
 # `backup.manage` joins it for the same reason: a backup holds the whole database in
 # readable form, and a restore replaces it. Both stay with a human at a browser.
 # `admin.users.merge` joins them: an account merge rewrites the history of two people
-# and cannot be undone.
+# and cannot be undone. `admin.users.revoke_groups` joins them too: it changes the
+# identity data of a person (SSO groups, pool, delegations) and is a web-only action.
 FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset(
-    {"vote.cast", "backup.manage", "admin.users.merge"}
+    {"vote.cast", "backup.manage", "admin.users.merge", "admin.users.revoke_groups"}
 )
 
 # Scope key to the allowed permission keys. `read` covers every reading endpoint. The

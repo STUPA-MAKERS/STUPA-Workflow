@@ -5,13 +5,15 @@ from __future__ import annotations
 from datetime import date as _date
 from datetime import datetime as _datetime
 from datetime import time as _time
+from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
-from app.modules.voting.schemas import MyBallot
-from app.shared.config_schemas import Quorum
+from app.modules.applications.decision import DecisionIn
+from app.modules.voting.schemas import ElectionResultOut, MyBallot, VoteKind
+from app.shared.config_schemas import ELECTION_MAX_CANDIDATES, ElectionConfig, Quorum
 
 MeetingStatus = Literal["planned", "live", "closed"]
 # #17: admitted guests of a public meeting vote (`vote`) or only follow it (`watch`).
@@ -157,6 +159,15 @@ class MeetingVoteOut(_CamelModel):
     # fixed at the close. For a vote with guests ``present`` is their sum.
     present_members: int | None = Field(default=None, alias="presentMembers")
     present_guests: int | None = Field(default=None, alias="presentGuests")
+    # The decision proposal of an application vote (F1), or None.
+    proposal: DecisionIn | None = None
+    # F2: an election with its candidates and seats, its stored result once closed,
+    # and for a runoff the parent election and the round.
+    kind: VoteKind = "motion"
+    election: ElectionConfig | None = None
+    election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
+    parent_vote_id: UUID | None = Field(default=None, alias="parentVoteId")
+    round: int = 1
 
 
 class CurrentAgendaItemOut(_CamelModel):
@@ -396,6 +407,9 @@ class AgendaItemOut(_CamelModel):
     non_public: bool = Field(default=False, alias="nonPublic")
     # Current application status as an i18n label.
     state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
+    # The requested amount of the application (F1: the decision proposal of the vote
+    # dialog starts with it). None for a free-text item.
+    amount: Decimal | None = None
 
 
 class AssignableApplicationOut(_CamelModel):
@@ -404,6 +418,28 @@ class AssignableApplicationOut(_CamelModel):
     application_id: UUID = Field(alias="applicationId")
     title: str | None = None
     state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
+
+
+def _same_name(name: str) -> str:
+    """Return a candidate name for the duplicate check: single spaces, lower case.
+
+    ``lower()`` and not ``casefold()``: the dialog compares with
+    ``toLowerCase()``, and both must agree ("Straße" is not "STRASSE").
+    """
+    return " ".join(name.split()).lower()
+
+
+class ElectionCandidateIn(_CamelModel):
+    """One candidate of a new election (F2): an account or a name only.
+
+    An unknown key gives 422: the client sets neither the id nor the erasure marker
+    (``erased``) of a candidate.
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+    principal_id: UUID | None = Field(default=None, alias="principalId")
 
 
 class MeetingVoteOpenBody(_CamelModel):
@@ -425,7 +461,17 @@ class MeetingVoteOpenBody(_CamelModel):
     majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(
         default="simple", alias="majorityRule"
     )
-    secret: bool = False
+    # ``None`` picks the default: off for a motion, on for an election (F2).
+    secret: bool | None = None
+    # F2 · Personnel elections. ``kind = election`` takes ``seats`` and
+    # ``candidates`` and ignores ``options`` and ``majorityRule``. ``question`` is the
+    # name of the ballot ("Wahlgang") and is required. The server gives each
+    # candidate its id (``c1``, ``c2``, ...) in the given order.
+    kind: VoteKind = "motion"
+    seats: int = Field(default=1, ge=1, le=ELECTION_MAX_CANDIDATES)
+    candidates: list[ElectionCandidateIn] = Field(
+        default_factory=list, max_length=ELECTION_MAX_CANDIDATES
+    )
     # The server always derives the quorum denominator from the current roster
     # through ``vote_eligible_count``. It never comes from the client, so nobody can
     # manipulate it against the real roster. This field holds an explicit percent
@@ -437,12 +483,37 @@ class MeetingVoteOpenBody(_CamelModel):
     # #17: the admitted guests vote too. ``None`` picks the default: on in a meeting
     # where guests vote, on a public agenda item; else off. Such a vote has no quorum.
     guests_vote: bool | None = Field(default=None, alias="guestsVote")
+    # F1: the decision proposal (approved amount, conditions). Only an application
+    # agenda item takes it (422 `decision_not_allowed` otherwise).
+    proposal: DecisionIn | None = None
 
     @model_validator(mode="after")
     def _min_options(self) -> MeetingVoteOpenBody:
         if len(self.options) < 2:
             raise ValueError("at least two options are required")
+        if self.kind == "election":
+            if not (self.question or "").strip():
+                raise ValueError("an election needs the name of the ballot (question)")
+            if len(self.candidates) < self.seats:
+                raise ValueError("an election needs at least as many candidates as seats")
+            people = [c.principal_id for c in self.candidates if c.principal_id is not None]
+            if len(set(people)) != len(people):
+                raise ValueError("a person can stand only once")
+            # A name without an account must not repeat any other candidate name,
+            # else the ballot shows two rows nobody can tell apart. Two accounts
+            # may share a display name: they are different people.
+            names = [_same_name(c.name) for c in self.candidates]
+            for c in self.candidates:
+                if c.principal_id is None and names.count(_same_name(c.name)) > 1:
+                    raise ValueError("a candidate name without an account can stand only once")
         return self
+
+    def election_candidates(self) -> list[dict[str, object]]:
+        """Return the candidates with their server-side ids (``c1``, ``c2``, ...)."""
+        return [
+            {"id": f"c{n}", "name": c.name, "principalId": c.principal_id}
+            for n, c in enumerate(self.candidates, start=1)
+        ]
 
 
 class AgendaAddBody(_CamelModel):

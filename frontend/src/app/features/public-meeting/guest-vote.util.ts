@@ -1,4 +1,5 @@
 import type { GuestVote, Vote } from '@core/api/models';
+import { electionFields } from '@core/api/mappers';
 
 /**
  * A vote of the guest view as the `Vote` of the shared vote panel. The panel then shows a
@@ -44,5 +45,6 @@ export function guestVoteToVote(v: GuestVote): Vote {
       presentGuests: v.tally.presentGuests,
     },
     myBallot: v.myBallot,
+    ...electionFields(v),
   };
 }

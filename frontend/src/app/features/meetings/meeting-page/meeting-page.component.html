@@ -123,6 +123,7 @@
           (remove)="voteDelete.emit($event)"
           (cast)="castVote.emit($event)"
           (insertResult)="insertResult($event)"
+          (electionChanged)="electionChanged.emit()"
         />
       }
       @if (canAddVote() && top(); as t) {

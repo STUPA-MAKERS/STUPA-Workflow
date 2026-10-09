@@ -25,8 +25,14 @@ from app.modules.livevote.guests import (
     token_hash,
 )
 from app.modules.livevote.models import MeetingGuest
-from app.modules.voting.schemas import MyBallot, TallyOut, VoteOut
-from app.shared.config_schemas import VoteConfig
+from app.modules.voting.schemas import (
+    ElectionLotOut,
+    ElectionResultOut,
+    MyBallot,
+    TallyOut,
+    VoteOut,
+)
+from app.shared.config_schemas import ElectionConfig, VoteConfig
 from app.shared.errors import (
     ConflictError,
     ForbiddenError,
@@ -611,6 +617,73 @@ async def test_admitted_view_hides_non_public_content(monkeypatch: pytest.Monkey
     assert me.view.present_members == 2 and me.view.admitted_guests == 1
     [gv] = me.view.votes
     assert gv.can_cast is True and gv.guests_vote is True
+
+
+async def test_admitted_view_of_an_election_carries_no_account_ids(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F2: a guest sees the candidate names, never a principal id or the lead's sub."""
+    item = SimpleNamespace(id=uuid4(), application_id=None, title="Wahl", non_public=False, body="")
+    election = ElectionConfig.model_validate(
+        {
+            "seats": 1,
+            "candidates": [
+                {"id": "c1", "name": "Anna", "principalId": str(uuid4())},
+                {"id": "c2", "name": "Ben"},
+            ],
+        }
+    )
+    config = election.as_vote_config()
+    vote = SimpleNamespace(
+        id=uuid4(),
+        agenda_item_id=item.id,
+        question="Vorsitz",
+        config=config.model_dump(by_alias=True),
+        status="closed",
+        opens_at=NOW,
+        closed_at=NOW,
+        result="elected",
+    )
+    stored = ElectionResultOut(
+        counts={"c1": 1, "c2": 1},
+        elected=["c2"],
+        lot=ElectionLotOut(among=["c1", "c2"], drawn=["c2"], by="sub-lead", byName="Lea"),
+    )
+
+    async def fake_get(self: Any, vote_id: UUID) -> VoteOut:
+        return VoteOut(
+            id=vote_id,
+            eligibleGroup=str(GID),
+            config=config,
+            status="closed",
+            secret=True,
+            tally=TallyOut(counts={}, eligible=3, quorumMet=True),
+            kind="election",
+            election=election,
+            electionResult=stored,
+        )
+
+    async def fake_ballot(self: Any, v: Any, voter: str, *, secret: bool) -> MyBallot:
+        return MyBallot(cast=False)
+
+    monkeypatch.setattr(guests_mod.VotingService, "get", fake_get)
+    monkeypatch.setattr(guests_mod.VotingService, "my_ballot", fake_ballot)
+    session = db(
+        result(guest(status="admitted")),
+        result(meeting()),
+        result(item),
+        result(("admitted", 1)),
+        result(vote),
+        scalars=[2, "FS"],
+    )
+    me = await GuestService(session).me("7KQ4MP", "tok", now=NOW)
+    assert me.view is not None
+    [gv] = me.view.votes
+    dumped = gv.model_dump(mode="json", by_alias=True)
+    assert [c["name"] for c in dumped["election"]["candidates"]] == ["Anna", "Ben"]
+    assert all(c["principalId"] is None for c in dumped["election"]["candidates"])
+    assert dumped["electionResult"]["lot"]["by"] is None
+    assert dumped["electionResult"]["lot"]["byName"] == "Lea"
 
 
 async def test_view_without_public_items() -> None:

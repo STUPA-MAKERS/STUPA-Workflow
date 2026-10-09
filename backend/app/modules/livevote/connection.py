@@ -62,7 +62,7 @@ logger = logging.getLogger("app.livevote")
 # Events the read-only beamer stream lets through. `guest_counts` carries counts and
 # the join code only, never a name (#17).
 _BEAMER_EVENTS = frozenset(
-    {"meeting_state", "vote_opened", "vote_tally", "vote_closed", "guest_counts"}
+    {"meeting_state", "vote_opened", "vote_tally", "vote_closed", "vote_lot_drawn", "guest_counts"}
 )
 # #17: guest events with names. Only a connection of the meeting lead gets them.
 _LEAD_EVENTS = frozenset({"guest_requested", "guest_updated"})
@@ -258,16 +258,7 @@ class LiveVoteConnection:
         if vote is None:
             return
         vote_out = await self.voting.get(vote.id)
-        await self._send(
-            VoteOpenedEvent(
-                voteId=vote_out.id,
-                applicationId=vote_out.application_id,
-                options=vote_out.config.options,
-                closesAt=vote_out.closes_at,
-                secret=vote_out.secret,
-                replay=True,
-            ).dump()
-        )
+        await self._send(VoteOpenedEvent.from_vote(vote_out, replay=True).dump())
         # `from_vote` applies the rule that a secret vote reveals the counts
         # only after the close.
         await self._send(VoteTallyEvent.from_vote(vote_out).dump())

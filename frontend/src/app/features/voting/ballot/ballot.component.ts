@@ -17,20 +17,32 @@ import { take } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { MyBallot, ProblemDetail } from '@core/api/models';
+import { NgTemplateOutlet } from '@angular/common';
+import type { ElectionConfig, MyBallot, ProblemDetail } from '@core/api/models';
 import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { voteOptionLabel } from '../../meetings/meetings-display.util';
+import {
+  candidateLabel,
+  candidateNames,
+  electionChoiceLabel,
+  electionCountText,
+  isYesNoElection,
+} from '../election.util';
 
 /** The two ballots a person can hold in one vote: the own one, and the one of a member
  *  they represent. The server keeps them apart. */
 export type BallotRow = 'own' | 'proxy';
+
+/** A pick: one option, or the candidate ids of an election ballot (F2; `[]` = full
+ *  abstention). */
+export type BallotPick = string | readonly string[];
 
 /**
  * Sends one ballot to the server. The observable gives one value when the server
  * accepted the ballot, and it fails with the HTTP error otherwise. The page passes
  * `ApiClient.castBallot` here.
  */
-export type BallotCaster = (choice: string, asDelegation: boolean) => Observable<unknown>;
+export type BallotCaster = (choice: BallotPick, asDelegation: boolean) => Observable<unknown>;
 
 /** The error of a refused cast, as the HTTP client reports it. */
 export interface BallotCastError {
@@ -48,7 +60,7 @@ export interface BallotFailure {
 
 /** An accepted ballot. */
 export interface BallotCast {
-  choice: string;
+  choice: BallotPick;
   asDelegation: boolean;
 }
 
@@ -70,6 +82,12 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  * - `columns` puts the rows side by side (the strip of a narrow screen).
  * - `layout="phone"` pins the button bar to the bottom of the screen (board
  *   Telefon-Abstimmen) and always names the rows.
+ * - `election` (F2) turns the options into the candidates: one seat gives a radio list
+ *   with a separate "Enthaltung" row; several seats give check boxes with the counter
+ *   "1 von 2 Stimmen vergeben", the further boxes stay off when all votes are given, and
+ *   "Ganz enthalten" picks no candidate. A free vote is an abstention. The button
+ *   counts, "Stimmen abgeben (2 Namen, 1 Enthaltung)", and its accessible name adds the
+ *   names. One candidate keeps the Ja/Nein/Enthaltung options.
  *
  * The component calls the server through `caster`; the page owns the toasts and the
  * reload (`castDone`, `castFailed`).
@@ -78,7 +96,7 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
   selector: 'app-ballot',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonComponent, IconComponent, TranslatePipe],
+  imports: [ButtonComponent, IconComponent, NgTemplateOutlet, TranslatePipe],
   host: {
     class: 'ballot',
     '[class.ballot--phone]': "layout() === 'phone'",
@@ -115,12 +133,29 @@ export class BallotComponent {
    * represented row side by side, the confirm bar in one line below them.
    */
   readonly columns = input(false);
+  /** The personnel election of the vote (F2), or `null` for a motion. */
+  readonly election = input<ElectionConfig | null>(null);
 
   readonly castDone = output<BallotCast>();
   readonly castFailed = output<BallotFailure>();
 
   /** The pick of each row (step 1). */
-  protected readonly picked = signal<Record<BallotRow, string | null>>({ own: null, proxy: null });
+  protected readonly picked = signal<Record<BallotRow, BallotPick | null>>({ own: null, proxy: null });
+
+  /** The ballot picks candidates (an election with more than one candidate). */
+  protected readonly candidateMode = computed(() => (this.election()?.candidates.length ?? 0) > 1);
+  /**
+   * The name a Ja/Nein election (one candidate) asks about. The choices say only
+   * Ja/Nein/Enthaltung, so the ballot names the candidate above them.
+   */
+  protected readonly soleCandidate = computed(() => {
+    const election = this.election();
+    if (!isYesNoElection(election)) return null;
+    return candidateLabel(election!.candidates[0], (key, params) => this.i18n.translate(key, params));
+  });
+  /** Several seats: check boxes and a counter. */
+  protected readonly multiSeat = computed(() => (this.election()?.seats ?? 1) > 1);
+  protected readonly seats = computed(() => this.election()?.seats ?? 1);
   /** The row the button acts on: the row of the last pick. */
   protected readonly active = signal<BallotRow>('own');
   /** The row whose ballot is on its way to the server. */
@@ -156,19 +191,47 @@ export class BallotComponent {
     return open(other) ? other : null;
   });
 
-  /** The label of the button: "Stimme abgeben: Ja", "Für Jonas Weber abgeben: Nein". */
+  /**
+   * The label of the button: "Stimme abgeben: Ja", "Für Jonas Weber abgeben: Nein". A
+   * multi-seat election counts instead of naming, "Stimmen abgeben (2 Namen, 1
+   * Enthaltung)", so the label stays whole on a phone; the list above shows the names.
+   */
   protected readonly confirmLabel = computed(() => {
     const row = this.target();
     const choice = row ? this.picked()[row] : null;
+    const name = this.proxyName() ?? '';
+    if (this.multiSeat() && Array.isArray(choice)) {
+      const count = electionCountText(this.election(), choice, (key, params) =>
+        this.i18n.translate(key, params),
+      );
+      return row === 'proxy'
+        ? this.i18n.translate('voting.ballot.confirmProxyCount', { name, count })
+        : this.i18n.translate('voting.ballot.confirmCount', { count });
+    }
     if (row === 'proxy') {
-      const name = this.proxyName() ?? '';
-      return choice
-        ? this.i18n.translate('voting.ballot.confirmProxy', { name, choice: this.label(choice) })
+      return choice !== null
+        ? this.i18n.translate('voting.ballot.confirmProxy', { name, choice: this.choiceLabel(choice) })
         : this.i18n.translate('voting.ballot.confirmProxyEmpty', { name });
     }
-    return choice
-      ? this.i18n.translate('voting.ballot.confirm', { choice: this.label(choice) })
+    return choice !== null
+      ? this.i18n.translate('voting.ballot.confirm', { choice: this.choiceLabel(choice) })
       : this.i18n.translate('voting.ballot.confirmEmpty');
+  });
+
+  /**
+   * The accessible name of the button: the counter label with the chosen names, so a
+   * screen reader hears whom the ballot elects. Empty (the visible label) otherwise.
+   */
+  protected readonly confirmAria = computed(() => {
+    const row = this.target();
+    const choice = row ? this.picked()[row] : null;
+    if (!this.multiSeat() || !Array.isArray(choice) || choice.length === 0) return '';
+    return this.i18n.translate('voting.ballot.confirmNames', {
+      label: this.confirmLabel(),
+      names: candidateNames(this.election(), choice, (key, params) =>
+        this.i18n.translate(key, params),
+      ).join(', '),
+    });
   });
 
   /**
@@ -214,6 +277,72 @@ export class BallotComponent {
     return voteOptionLabel(option, (key) => this.i18n.translate(key));
   }
 
+  /** The label of a pick: an option, or the candidates with the abstentions. */
+  protected choiceLabel(pick: BallotPick): string {
+    if (typeof pick === 'string') return this.label(pick);
+    return electionChoiceLabel(this.election(), pick, (key, params) =>
+      this.i18n.translate(key, params),
+    );
+  }
+
+  /** The candidate ids that a row picked, or `[]`. */
+  protected picks(row: BallotRow): readonly string[] {
+    const pick = this.picked()[row];
+    return Array.isArray(pick) ? pick : [];
+  }
+
+  /** The candidate is chosen: the pick of an open row, or the ballot of a cast row. */
+  protected isPicked(row: BallotRow, id: string): boolean {
+    const state = row === 'own' ? this.ownState() : this.proxyState();
+    if (state?.cast) return (this.castPicks(row) ?? []).includes(id);
+    return this.picks(row).includes(id);
+  }
+
+  /** The row picked a full abstention (`[]`). */
+  protected isAbstain(row: BallotRow): boolean {
+    const state = row === 'own' ? this.ownState() : this.proxyState();
+    if (state?.cast) return this.castPicks(row)?.length === 0;
+    const pick = this.picked()[row];
+    return Array.isArray(pick) && pick.length === 0;
+  }
+
+  /** All votes of a multi-seat row are given: the further boxes stay off. */
+  protected isFull(row: BallotRow): boolean {
+    return this.picks(row).length >= this.seats();
+  }
+
+  /** Step 1 of an election: pick (one seat) or toggle (several seats) a candidate. */
+  protected toggle(row: BallotRow, id: string): void {
+    const state = row === 'own' ? this.ownState() : this.proxyState();
+    if (!state || state.cast || this.pending() !== null) return;
+    let next: readonly string[];
+    if (!this.multiSeat()) {
+      next = [id];
+    } else {
+      const current = this.picks(row);
+      if (current.includes(id)) next = current.filter((c) => c !== id);
+      else if (current.length < this.seats()) next = [...current, id];
+      else return;
+    }
+    this.picked.update((p) => ({ ...p, [row]: next }));
+    this.active.set(row);
+  }
+
+  /** "Enthaltung" / "Ganz enthalten": the row picks no candidate. */
+  protected abstainAll(row: BallotRow): void {
+    const state = row === 'own' ? this.ownState() : this.proxyState();
+    if (!state || state.cast || this.pending() !== null) return;
+    this.picked.update((p) => ({ ...p, [row]: [] }));
+    this.active.set(row);
+  }
+
+  /** The candidate ids of a cast row, or `null` (secret, or not known). */
+  private castPicks(row: BallotRow): readonly string[] | null {
+    const state = row === 'own' ? this.ownState() : this.proxyState();
+    if (!state?.cast || this.secret()) return null;
+    return state.choices ?? null;
+  }
+
   /** Step 1: pick an option of a row. A cast row takes no pick. */
   protected pick(row: BallotRow, option: string): void {
     const state = row === 'own' ? this.ownState() : this.proxyState();
@@ -248,20 +377,25 @@ export class BallotComponent {
   }
 
   /** The choice to mark as cast in a row, or `null` (secret, or not known). */
-  protected castChoice(row: BallotRow): string | null {
+  protected castChoice(row: BallotRow): BallotPick | null {
     const state = row === 'own' ? this.ownState() : this.proxyState();
-    return state?.cast && !this.secret() ? state.choice : null;
+    if (!state?.cast || this.secret()) return null;
+    return state.choices ?? state.choice;
   }
 
   /** The option looks chosen: the pick of an open row, or the choice of a cast row. */
   protected isOn(row: BallotRow, option: string): boolean {
     const state = row === 'own' ? this.ownState() : this.proxyState();
-    if (state?.cast) return this.castChoice(row) === option;
+    if (state?.cast) return state.choice === option && !this.secret();
     return this.picked()[row] === option;
   }
 
-  private lock(row: BallotRow, choice: string | null): void {
-    this.local.update((l) => ({ ...l, [row]: { cast: true, choice } }));
+  private lock(row: BallotRow, choice: BallotPick | null): void {
+    const ballot: MyBallot =
+      typeof choice === 'string' || choice === null
+        ? { cast: true, choice }
+        : { cast: true, choice: null, choices: [...choice] };
+    this.local.update((l) => ({ ...l, [row]: ballot }));
     this.picked.update((p) => ({ ...p, [row]: null }));
   }
 }

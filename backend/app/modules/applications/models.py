@@ -25,6 +25,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import CITEXT, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -74,6 +75,10 @@ class Application(UUIDPkMixin, TimestampMixin, Base):
     )
     amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     currency: Mapped[str | None] = mapped_column(CHAR(3), nullable=True)
+    # The amount of the valid decision (`application_decision`), a denormalized copy for
+    # the budget roll-up, the guard `budgetFitsApplication` and the lists. NULL means
+    # "as requested" or "no decision": the committed amount is then `amount`.
+    approved_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     data: Mapped[dict] = mapped_column(JSONB, server_default="{}")
     lang: Mapped[str | None] = mapped_column(Text, nullable=True)
     # OIDC ``sub`` of the creating principal. An anonymous submission stores ``None``.
@@ -206,6 +211,56 @@ class StatusEvent(UUIDPkMixin, Base):
     __table_args__ = (
         Index("ix_status_event_application_id_at", "application_id", "at"),
         Index("ix_status_event_vote_id", "vote_id"),
+    )
+
+
+class ApplicationDecision(UUIDPkMixin, Base):
+    """One decision on an application: approval with deviations (F1).
+
+    A passed vote with a proposal or a manual transition into an accepted state writes
+    a row. The valid decision is the newest row with `superseded_at IS NULL`. A new
+    decision supersedes the old one. Nobody edits a row: only a new decision or an
+    audit revert of its status change replaces it.
+    """
+
+    __tablename__ = "application_decision"
+
+    application_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("application.id", ondelete="CASCADE")
+    )
+    # NULL means "as requested" (`application.amount`).
+    approved_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    # The conditions (Auflagen) as a list of texts.
+    conditions: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
+    # The vote whose close made the decision. NULL for a manual transition.
+    vote_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("vote.id", ondelete="SET NULL"), nullable=True
+    )
+    # The status event of the transition that carried the decision. NULL when a passed
+    # vote could not fire its branch.
+    status_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("status_event.id", ondelete="SET NULL"), nullable=True
+    )
+    decided_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    # The OIDC `sub` of the person who fired the transition. NULL for a vote.
+    decided_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+    superseded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        Index("ix_application_decision_application_id", "application_id"),
+        Index("ix_application_decision_status_event_id", "status_event_id"),
+        # At most one valid decision per application. Two concurrent writes cannot
+        # both stay valid.
+        Index(
+            "uq_application_decision_one_valid",
+            "application_id",
+            unique=True,
+            postgresql_where=text("superseded_at IS NULL"),
+        ),
     )
 
 

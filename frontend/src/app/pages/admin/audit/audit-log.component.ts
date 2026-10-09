@@ -73,6 +73,7 @@ export const AUDIT_ACTIONS = [
   'principal_erased',
   // Account merge: an old principal merged into a new one.
   'principal_merge',
+  'principal_access_revoke',
   'retention_anonymize',
   'webhook_config',
   // attachment_upload (F12) covers the application upload and the draft upload of the
@@ -93,6 +94,8 @@ export const AUDIT_ACTIONS = [
   'application_unarchive',
   'application_share',
   'application_share_revoke',
+  // F1: the decision on an application (approval with deviations).
+  'application_decision',
   'application_delete',
   'comment_update',
   'comment_delete',
@@ -106,6 +109,7 @@ export const AUDIT_ACTIONS = [
   'vote_close',
   'vote_cancel',
   'vote_branch_blocked',
+  'vote_lot_drawn',
   // Meeting and agenda (F12). They mirror the MEETING_* and AGENDA_* values in actions.py.
   'meeting_create',
   'meeting_update',

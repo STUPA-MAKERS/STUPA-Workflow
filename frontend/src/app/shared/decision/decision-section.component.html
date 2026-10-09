@@ -1,0 +1,52 @@
+<section class="dsec" [attr.aria-labelledby]="headingId()" data-testid="decision-section">
+  <div class="dsec__head">
+    <h3 [id]="headingId()" class="sec dsec__title">{{ 'decision.title' | t }}</h3>
+    @if (deviates()) {
+      <span class="dsec__tag">{{ 'decision.tag' | t }}</span>
+    }
+  </div>
+  <app-field-group>
+    @if (decision().amountDeviates) {
+      <div class="dsec__pair">
+        <app-field-row [label]="'decision.requested' | t">
+          <s class="mono dsec__struck">{{ requested() }}</s>
+        </app-field-row>
+        <app-field-row [label]="'decision.approved' | t">
+          <span class="mono dsec__approved">{{ approved() }}</span>
+          @if (diff()) {
+            <span class="mono dsec__diff">{{ diff() }}</span>
+          }
+        </app-field-row>
+      </div>
+    } @else if (approved()) {
+      <app-field-row [label]="'decision.approved' | t">
+        <span class="mono dsec__approved">{{ approved() }}</span>
+      </app-field-row>
+    }
+    @if (decision().conditions.length) {
+      <div class="dsec__conds">
+        <span class="dsec__label">{{ 'decision.conditions' | t }}</span>
+        <ol class="dsec__list">
+          @for (condition of decision().conditions; track $index) {
+            <li class="dsec__item">
+              <span class="mono dsec__num" aria-hidden="true">{{ $index + 1 }}.</span>
+              <span class="dsec__text">{{ condition }}</span>
+            </li>
+          }
+        </ol>
+      </div>
+    }
+    <app-field-row [label]="'decision.decided' | t">
+      <time [attr.datetime]="decision().decidedAt">{{ decision().decidedAt | ldate: 'mediumDate' }}</time>
+      @if (source()) {
+        <span> · {{ source() }}</span>
+      }
+      @if (!applicant() && decision().voteId) {
+        <a trail class="dsec__link" [routerLink]="['/voting', decision().voteId]">{{ 'decision.voteLink' | t }}</a>
+      }
+    </app-field-row>
+  </app-field-group>
+  @if (applicant() && applicantNote()) {
+    <app-note icon="info">{{ applicantNote() }}</app-note>
+  }
+</section>

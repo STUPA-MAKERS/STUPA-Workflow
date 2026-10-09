@@ -10,6 +10,7 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.modules.admin.models import ApplicationType
+from app.modules.applications.decision import CODE_AMOUNT_EXCEEDS
 from app.modules.applications.diff import DataDiff, compute_diff, is_empty_diff
 from app.modules.applications.models import MagicLink, SubmissionVersion
 from app.modules.applications.schemas import ApplicationOut, VersionOut
@@ -60,6 +61,9 @@ class EditOps(ApplicationsServiceBase):
         number and the keys of the changed fields, never the values. When the
         deadline policy of the current state is ``relative_changed``, the
         deadline moves to the new ``updated_at``.
+
+        After a decision (F1) the requested amount must stay at or above the approved
+        amount; else 422 ``approved_amount_exceeds_requested``.
         """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         state = await self._get_state(app.current_state_id)
@@ -99,6 +103,17 @@ class EditOps(ApplicationsServiceBase):
                     errors=[{"field": e.field, "msg": e.msg} for e in errors],
                 ) from exc
 
+        new_amount, new_currency = _amount_currency(fields, clean)
+        # F1: the approved amount of a decision never exceeds the requested amount.
+        if app.approved_amount is not None and (
+            new_amount is None or new_amount < app.approved_amount
+        ):
+            raise ValidationProblem(
+                "The requested amount must not fall below the approved amount.",
+                code=CODE_AMOUNT_EXCEEDS,
+                errors=[{"field": "amount", "msg": "below the approved amount"}],
+            )
+
         diff: DataDiff = compute_diff(app.data, clean)
         next_version = await self._current_version(application_id) + 1
         self.session.add(
@@ -111,7 +126,7 @@ class EditOps(ApplicationsServiceBase):
             )
         )
         app.data = clean
-        app.amount, app.currency = _amount_currency(fields, clean)
+        app.amount, app.currency = new_amount, new_currency
         # Keys only: a field value can hold PII.
         await audit_record(
             self.session,

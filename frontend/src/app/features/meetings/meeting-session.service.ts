@@ -246,6 +246,18 @@ export class MeetingSessionService implements OnDestroy {
     }
   }
 
+  /** Read the meeting again (quiet): the lot of an election or its runoff (F2). */
+  reloadMeeting(): void {
+    const m = this.meeting();
+    if (!m) return;
+    this.api.getMeeting(m.id, { quiet: true }).subscribe({
+      next: (updated) => {
+        if (this.meeting()?.id === updated.id) this.meeting.set(updated);
+      },
+      error: () => {},
+    });
+  }
+
   savePlannedDate(): void {
     const m = this.meeting();
     const date = this.planDate().trim();
@@ -638,6 +650,9 @@ export class MeetingSessionService implements OnDestroy {
             // time of an own open, or of a read.
             openedAt: known.openedAt ?? nowIso(),
             secret: msg.secret ?? known.secret,
+            ...(msg.kind === 'election'
+              ? { kind: msg.kind, election: msg.election ?? known.election, round: msg.round ?? 1 }
+              : {}),
           });
         } else {
           // A vote opened live that did not exist at load time (follower).
@@ -678,7 +693,11 @@ export class MeetingSessionService implements OnDestroy {
           counts: msg.counts,
           failedReason: msg.failedReason ?? null,
           closedAt: closedAtOf(m, msg.voteId),
+          ...(msg.electionResult ? { electionResult: msg.electionResult } : {}),
         });
+        break;
+      case 'vote_lot_drawn':
+        this.patchVote(msg.voteId, { result: msg.result, electionResult: msg.electionResult });
         break;
       case 'vote_cancelled':
         this.patchVote(msg.voteId, {

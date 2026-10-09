@@ -204,7 +204,13 @@
                       }
                     </span>
                     <span trail class="apps__trail">
-                      @if (row.amount) {
+                      @if (row.approved) {
+                        <!-- F1: the approved amount, the requested one struck through below. -->
+                        <span class="apps__amounts">
+                          <span class="mono apps__amount">{{ row.approved }}</span>
+                          <s class="mono apps__amountStruck">{{ row.amount }}</s>
+                        </span>
+                      } @else if (row.amount) {
                         <span class="mono apps__amount">{{ row.amount }}</span>
                       }
                       <span class="apps__menuSlot">
@@ -358,6 +364,16 @@
   [transition]="agendaFor()?.transition ?? null"
   [(open)]="agendaOpen"
   (done)="onAgendaDone()"
+/>
+
+<app-decision-dialog
+  [applicationId]="decisionFor()?.item?.id ?? null"
+  [applicationTitle]="decisionFor() ? titleOf(decisionFor()!.item) : ''"
+  [requested]="decisionFor()?.item?.amount ?? null"
+  [currency]="decisionFor()?.item?.currency ?? 'EUR'"
+  [transition]="decisionFor()?.transition ?? null"
+  [(open)]="decisionOpen"
+  (done)="onDecisionDone()"
 />
 
 <app-force-status-dialog

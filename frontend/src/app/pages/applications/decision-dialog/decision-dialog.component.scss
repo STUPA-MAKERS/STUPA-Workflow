@@ -1,0 +1,20 @@
+/* The host adds no box; a closed dialog takes no gap in a flex column of the page. */
+:host {
+  display: contents;
+}
+
+.ddg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+}
+.ddg__cap {
+  color: var(--color-accent-text);
+}
+.ddg__refusal {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--color-danger);
+}

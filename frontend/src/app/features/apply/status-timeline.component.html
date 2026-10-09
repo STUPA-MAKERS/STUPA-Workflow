@@ -87,6 +87,15 @@
 
           <div class="sp__grid">
             <div class="sp__main">
+              @if (app.decision) {
+                <!-- F1: the decision, without the vote, with a note on the funded amount. -->
+                <app-decision-section
+                  headingId="sp-decision"
+                  [decision]="app.decision"
+                  [currency]="app.currency"
+                  [applicant]="true"
+                />
+              }
               <ul class="rowgroup sp__rows">
                 <li>
                   <button

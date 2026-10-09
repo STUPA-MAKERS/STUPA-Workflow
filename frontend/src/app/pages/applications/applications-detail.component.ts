@@ -81,6 +81,9 @@ import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { applicationTitle, transitionLooks } from './applications.util';
 import { AgendaDialogComponent } from './agenda-dialog/agenda-dialog.component';
+import { DecisionDialogComponent } from './decision-dialog/decision-dialog.component';
+import { DecisionSectionComponent } from '@shared/decision/decision-section.component';
+import { decisionHistoryLine, formatMoney } from '@shared/decision/decision.util';
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
@@ -150,6 +153,8 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
     ShareLinksDialogComponent,
     ForceStatusDialogComponent,
     AgendaDialogComponent,
+    DecisionDialogComponent,
+    DecisionSectionComponent,
   ],
   // The field types of the form (`provideFormly`) come with the component, so Formly is not
   // part of the initial bundle.
@@ -230,6 +235,9 @@ export class ApplicationsDetailComponent {
   /** The transition of the agenda dialog. */
   readonly agendaTransition = signal<Transition | null>(null);
   readonly agendaOpen = signal(false);
+  /** F1: the transition of the decision dialog (into an accepted state). */
+  readonly decisionTransition = signal<Transition | null>(null);
+  readonly decisionOpen = signal(false);
   readonly canTransition = computed(() => this.auth.can('application.transition'));
 
   protected readonly budgetTree = signal<BudgetTreeNode[]>([]);
@@ -547,6 +555,16 @@ export class ApplicationsDetailComponent {
         lines.push(t('applications.history.transition', { label: e.transitionLabel }));
       }
       if (e.note) lines.push(e.note);
+      // F1: the status change carried a decision with deviations.
+      if (e.decision) {
+        const line = decisionHistoryLine(
+          e.decision,
+          this.i18n.formatLocale(),
+          this.app()?.currency ?? 'EUR',
+          t,
+        );
+        if (line) lines.push(line);
+      }
       // The vote that decided the status: a link, or a note when the meeting delete
       // took it along (the status stays).
       if (e.voteDeleted) lines.push(t('applications.history.voteDeleted'));
@@ -946,6 +964,16 @@ export class ApplicationsDetailComponent {
     }).format(value);
   }
 
+  /**
+   * F1: the approved amount when it deviates from the requested one, else `''`. The
+   * header and the cost centre then name it next to the struck requested amount.
+   */
+  approvedAmount(app: Application): string {
+    if (app.approvedAmount === null || app.approvedAmount === undefined || app.amount === null) return '';
+    if (Number(app.approvedAmount) === Number(app.amount)) return '';
+    return formatMoney(app.approvedAmount, this.i18n.formatLocale(), app.currency);
+  }
+
   startEdit(app: Application): void {
     // A reader without the PII right gets `data` without the isPII fields (O21), and
     // the server names them in `hiddenKeys`. The form leaves them out, because the
@@ -1181,6 +1209,12 @@ export class ApplicationsDetailComponent {
     if (t.addsToAgenda) {
       this.agendaTransition.set(t);
       this.agendaOpen.set(true);
+      return;
+    }
+    // F1: a transition into an accepted state can approve with deviations.
+    if (t.allowsDecision) {
+      this.decisionTransition.set(t);
+      this.decisionOpen.set(true);
       return;
     }
     this.firing.set(t.id);

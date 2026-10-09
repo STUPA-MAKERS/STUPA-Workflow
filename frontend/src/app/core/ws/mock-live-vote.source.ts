@@ -107,7 +107,9 @@ export class MockLiveVoteSource implements LiveVoteSource {
           subject.next({ ...vote, replay: true });
           emitTally();
         } else if (msg.type === 'cast' && !beamer) {
-          bump(msg.choice);
+          // An election ballot (F2) is a list; the mock counts its first pick.
+          const choice = typeof msg.choice === 'string' ? msg.choice : (msg.choice[0] ?? 'abstain');
+          bump(choice);
         }
       },
       close: () => {

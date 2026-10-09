@@ -175,6 +175,8 @@ def _app(**over: Any) -> _Obj:
         "budget_id": None,
         "fiscal_year_id": None,
         "amount": None,
+        # No decision (F1).
+        "approved_amount": None,
         "currency": None,
         "data": {"title": "Antrag"},
         "lang": "de",
@@ -711,6 +713,58 @@ async def test_patch_app_type_missing_uses_false_context(
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     out = await svc.patch(app.id, {"title": "y"}, changed_by="u")
     assert out.data == {"title": "y"}
+
+
+@pytest.mark.parametrize("cost", ["600", None])
+async def test_patch_refuses_an_amount_below_the_approved_amount(
+    monkeypatch: pytest.MonkeyPatch, cost: str | None
+) -> None:
+    """F1: after a decision the requested amount stays at or above the approved one."""
+    app = _app(
+        data={"title": "x", "cost": "1000"},
+        amount=Decimal("1000"),
+        approved_amount=Decimal("800"),
+    )
+    state = _state(edit_allowed=True)
+    app_type = _Obj(id=app.type_id, has_budget=False)
+    _patch_pinned(
+        monkeypatch,
+        [
+            _ff("title", required=True),
+            _ff("cost", type="currency", isPromoted=True, promoteTarget="amount"),
+        ],
+    )
+    session = _Session(get_results=[app, state, app_type])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    body: dict[str, Any] = {"title": "x"}
+    if cost is not None:
+        body["cost"] = cost
+    with pytest.raises(ValidationProblem) as exc:
+        await svc.patch(app.id, body, changed_by="u")
+    assert exc.value.code == "approved_amount_exceeds_requested"
+    assert app.amount == Decimal("1000")
+    assert session.added == []
+
+
+async def test_patch_keeps_an_amount_at_the_approved_amount(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = _app(data={"title": "x"}, amount=Decimal("1000"), approved_amount=Decimal("800"))
+    state = _state(edit_allowed=True)
+    app_type = _Obj(id=app.type_id, has_budget=False)
+    _patch_pinned(
+        monkeypatch,
+        [
+            _ff("title", required=True),
+            _ff("cost", type="currency", isPromoted=True, promoteTarget="amount"),
+        ],
+    )
+    session = _Session(get_results=[app, state, app_type], scalar_results=[0])
+    session.commit_raises = RuntimeError("stop after the write")
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    with pytest.raises(RuntimeError):
+        await svc.patch(app.id, {"title": "x", "cost": "800"}, changed_by="u")
+    assert app.amount == Decimal("800")
 
 
 async def test_patch_concurrent_integrity_error_409(

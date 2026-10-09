@@ -6,8 +6,13 @@ from uuid import UUID
 
 from sqlalchemy import select
 
+from app.modules.applications.decision import amount_deviates, decisions_by_event
 from app.modules.applications.models import StatusEvent
-from app.modules.applications.schemas import ApplicationOut, TimelineEventOut
+from app.modules.applications.schemas import (
+    ApplicationOut,
+    TimelineDecisionOut,
+    TimelineEventOut,
+)
 from app.modules.applications.service.service_base import ApplicationsServiceBase
 from app.modules.flow.models import Transition
 from app.modules.forms.schemas import EffectiveFormOut
@@ -100,7 +105,10 @@ class ReadOps(ApplicationsServiceBase):
             applicant_view=applicant_view,
             magic_link_view=magic_link_view,
         )
+        # F1: the decisions that the status changes carried.
+        decisions = await decisions_by_event(self.session, application_id)
         for ev, label in rows:
+            decision = decisions.get(ev.id) if decisions else None
             to_state = await self._get_state(ev.to_state_id)
             info = actors.get(ev.actor) if ev.actor else None
             # A vote close writes the note ``vote:<result>`` and the vote id. A meeting
@@ -119,6 +127,14 @@ class ReadOps(ApplicationsServiceBase):
                     note=ev.note,
                     voteId=None if applicant_view else ev.vote_id,
                     voteDeleted=from_vote and ev.vote_id is None,
+                    decision=TimelineDecisionOut(
+                        requestedAmount=app.amount,
+                        approvedAmount=decision.approved_amount,
+                        amountDeviates=amount_deviates(app.amount, decision.approved_amount),
+                        conditionCount=len(decision.conditions or []),
+                    )
+                    if decision is not None
+                    else None,
                 )
             )
         return out

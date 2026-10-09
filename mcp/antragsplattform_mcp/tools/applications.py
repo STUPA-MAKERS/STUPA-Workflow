@@ -49,6 +49,11 @@ async def get_application(application_id: str) -> dict:
 
     `voteGremiumId` names the Gremium that decides the current vote. The server sets it
     when the application enters a vote state and clears it when the application leaves.
+
+    `decision` is the valid decision (approval with deviations): `approvedAmount`,
+    `requestedAmount`, `amountDeviates`, `conditions` and where it came from. It is
+    null before a decision. `approvedAmount` on the application is the amount that the
+    cost center binds; null means as requested.
     """
     return await api().get(f"/applications/{application_id}")
 
@@ -224,6 +229,8 @@ async def fire_transition(
     note: str | None = None,
     meeting_id: str | None = None,
     non_public: bool | None = None,
+    approved_amount: str | None = None,
+    conditions: list[str] | None = None,
 ) -> dict:
     """Decide on an application and fire a manual flow transition.
 
@@ -235,7 +242,17 @@ async def fire_transition(
     The server then adds the agenda item in the same step and answers 422 when the
     meeting does not fit. `non_public` marks that agenda item as not public. Without
     `meeting_id` the server picks the next planned meeting after the step.
+
+    A transition with `allowsDecision` (into an accepted state of the cost center)
+    takes a decision: `approved_amount` (decimal string, greater than 0 and not above
+    the requested amount; omit it for "as requested") and `conditions` (at most 20).
+    Any other transition answers 422 `decision_not_allowed` to a decision.
     """
+    decision = (
+        params(approvedAmount=approved_amount, conditions=conditions)
+        if approved_amount is not None or conditions is not None
+        else None
+    )
     return await api().post(
         f"/applications/{application_id}/transition",
         json=params(
@@ -243,6 +260,7 @@ async def fire_transition(
             note=note,
             meetingId=meeting_id,
             nonPublic=non_public,
+            decision=decision,
         ),
     )
 

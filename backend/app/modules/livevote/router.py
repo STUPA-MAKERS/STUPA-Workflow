@@ -57,7 +57,7 @@ from app.modules.notifications.auto import AutoMailer, get_auto_mailer
 from app.modules.voting.schemas import VoteCreateInternal
 from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings
-from app.shared.config_schemas import VoteConfig
+from app.shared.config_schemas import ElectionConfig, VoteConfig
 from app.shared.errors import (
     ConflictError,
     ForbiddenError,
@@ -602,10 +602,19 @@ async def open_meeting_vote(
             code="guests_vote_non_public",
             errors=[{"field": "guestsVote", "msg": "non-public agenda item"}],
         )
+    election = payload.kind == "election"
+    if election and item.application_id is not None:
+        # F2: an election never has an application and never fires a flow branch.
+        raise ValidationProblem(
+            "An election belongs to a free-text agenda item.",
+            code="election_on_application_item",
+            errors=[{"field": "kind", "msg": "an application agenda item"}],
+        )
+    # F2: guests vote in an election only when the lead switches them on.
     guests_vote = (
         payload.guests_vote
         if payload.guests_vote is not None
-        else guests_allowed and not item.non_public
+        else guests_allowed and not item.non_public and not election
     )
     if item.application_id is not None:
         if await service.agenda_item_has_vote(item.id):
@@ -629,15 +638,24 @@ async def open_meeting_vote(
                 "application.",
                 code="vote_gremium_mismatch",
             )
-    config_data: dict[str, object] = {
-        "options": payload.options,
-        "majorityRule": payload.majority_rule,
-        "secret": payload.secret,
-        # A meeting vote has no casting vote (O18): a tie is ``rejected``. The body
-        # has no ``tieBreak``, so the client cannot change this.
-        "tieBreak": "rejected",
-        "guestsVote": guests_vote,
-    }
+    config_data: dict[str, object] = (
+        {
+            "seats": payload.seats,
+            "candidates": payload.election_candidates(),
+            "secret": True if payload.secret is None else payload.secret,
+            "guestsVote": guests_vote,
+        }
+        if election
+        else {
+            "options": payload.options,
+            "majorityRule": payload.majority_rule,
+            "secret": bool(payload.secret),
+            # A meeting vote has no casting vote (O18): a tie is ``rejected``. The
+            # body has no ``tieBreak``, so the client cannot change this.
+            "tieBreak": "rejected",
+            "guestsVote": guests_vote,
+        }
+    )
     # Gremium quorum default: without an explicit percent, the vote inherits the
     # percent quorum configured on the Gremium. A vote with guests has no quorum.
     quorum_percent = (
@@ -649,7 +667,15 @@ async def open_meeting_vote(
     )
     if quorum_percent is not None:
         config_data["quorum"] = {"type": "percent", "value": quorum_percent}
-    config = VoteConfig.model_validate(config_data)
+    if election:
+        await service.assert_candidates_exist(
+            [c.principal_id for c in payload.candidates if c.principal_id is not None]
+        )
+    config: VoteConfig | ElectionConfig = (
+        ElectionConfig.model_validate(config_data)
+        if election
+        else VoteConfig.model_validate(config_data)
+    )
     # The server always derives the quorum denominator from the real roster and
     # never from the client. A holder of ``canManageVotes`` cannot manipulate it.
     # A vote with guests counts the present members and the admitted guests; the
@@ -663,6 +689,7 @@ async def open_meeting_vote(
         eligibleGroup=meeting.gremium_id,
         question=payload.question,
         eligibleCount=eligible,
+        proposal=payload.proposal,
     )
     vote = await voting.create_internal(
         item.application_id, create, meeting_id=meeting_id, agenda_item_id=item.id

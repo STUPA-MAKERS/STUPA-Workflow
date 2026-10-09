@@ -181,6 +181,37 @@ class ApplicationOut(_CamelModel):
     hidden_keys: list[str] = Field(default_factory=list, alias="hiddenKeys")
     # Set when a person captured the application on behalf of the applicant (#11).
     capture: CaptureOut | None = None
+    # F1: the approved amount of the valid decision, null = as requested.
+    approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
+    # F1: the valid decision (approval with deviations), null before any decision.
+    decision: DecisionOut | None = None
+
+
+class DecisionOut(_CamelModel):
+    """The valid decision on an application (F1, approval with deviations).
+
+    ``approvedAmount`` null means "as requested". The applicant view gets the same
+    block without ``voteId``. No view carries vote counts.
+    """
+
+    requested_amount: Decimal | None = Field(default=None, alias="requestedAmount")
+    approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
+    amount_deviates: bool = Field(default=False, alias="amountDeviates")
+    conditions: list[str] = Field(default_factory=list)
+    decided_at: datetime = Field(alias="decidedAt")
+    vote_id: UUID | None = Field(default=None, alias="voteId")
+    gremium_name: str | None = Field(default=None, alias="gremiumName")
+    meeting_title: str | None = Field(default=None, alias="meetingTitle")
+    agenda_position: int | None = Field(default=None, alias="agendaPosition")
+
+
+class TimelineDecisionOut(_CamelModel):
+    """The decision that a status event carried (F1), for the history line."""
+
+    requested_amount: Decimal | None = Field(default=None, alias="requestedAmount")
+    approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
+    amount_deviates: bool = Field(default=False, alias="amountDeviates")
+    condition_count: int = Field(default=0, alias="conditionCount")
 
 
 class ApplicationPatch(_CamelModel):
@@ -276,6 +307,9 @@ class TimelineEventOut(_CamelModel):
     # is gone: a meeting delete deleted it with its meeting. The application keeps the
     # status that the vote decided.
     vote_deleted: bool = Field(default=False, alias="voteDeleted")
+    # F1: the decision that this status change carried (approved amount, number of
+    # conditions), else null.
+    decision: TimelineDecisionOut | None = None
 
 
 class VersionOut(_CamelModel):
@@ -306,6 +340,8 @@ class ApplicationListItem(_CamelModel):
     state: StateOut | None = None
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
     amount: Decimal | None = None
+    # F1: the approved amount of the valid decision, null = as requested.
+    approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
     currency: str | None = None
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")

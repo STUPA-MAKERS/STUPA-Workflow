@@ -31,6 +31,8 @@ from app.modules.files.service import FilesService
 from app.modules.flow.models import State
 from app.modules.livevote.models import Meeting, MeetingAttendance
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
+from app.modules.protocol.erasure import erase_candidate_names
+from app.modules.voting.erasure import erase_candidacies
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
@@ -98,6 +100,10 @@ class PrincipalService:
             )
             .values(note=None)
         )
+        # F2: the name of a candidacy in an election, and its copies in the protocol
+        # text, unless the principal was elected (a documented resolution).
+        erased = await erase_candidacies(self.session, principal_id)
+        await erase_candidate_names(self.session, erased)
         await self.session.execute(
             delete(AuthSession).where(AuthSession.principal_id == principal_id)
         )

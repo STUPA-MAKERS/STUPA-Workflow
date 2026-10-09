@@ -173,6 +173,18 @@
   font-size: 0.8125rem;
   white-space: nowrap;
 }
+/* F1: the approved amount over the struck requested one. */
+.apps__amounts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.apps__amountStruck {
+  font-size: 0.71875rem;
+  line-height: 0.9375rem;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+}
 
 /* With a pointer, the row menu shows on hover, on focus and while it is open, so a calm
    list reads as titles and amounts. It keeps its place, so nothing shifts. The full-width

@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { ApiClient } from '@core/api/api-client.service';
 import type { GuestAgendaItem, GuestMe, GuestVote } from '@core/api/models';
+import { electionStatus } from '../voting/election.util';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -195,6 +196,7 @@ export class GuestViewComponent {
   }
 
   protected resultOf(v: GuestVote) {
+    if (v.kind === 'election') return electionStatus(v.result);
     return voteResultStatus(v.result === 'passed' ? 'passed' : 'rejected');
   }
 
