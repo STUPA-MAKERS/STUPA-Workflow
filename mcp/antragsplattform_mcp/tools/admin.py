@@ -286,16 +286,36 @@ async def list_role_assignments() -> dict:
 
 
 @group.tool
-async def list_principals(q: str | None = None) -> dict:
+async def list_principals(
+    q: str | None = None,
+    last_login_before: str | None = None,
+    include_never: bool | None = None,
+    has_groups: bool | None = None,
+) -> dict:
     """List the principals (users).
 
     Each item has `oidcGroups`, the OIDC groups as of the last login. These groups
-    drive the group mappings.
+    drive the group mappings. `hasAccess` tells whether the person still has a
+    membership, a role, a pool entry, a delegation or an OIDC group. The revoke of
+    these rights ("Rechte entziehen") is a web-only action and has no tool.
 
     Args:
         q: Filter by a substring of the sub or the email.
+        last_login_before: ISO date (YYYY-MM-DD). Keep the people whose last login
+            is before that day.
+        include_never: True adds the people who never logged in. Without
+            `last_login_before` it keeps only those.
+        has_groups: True keeps the people with OIDC groups, False those without.
     """
-    return await api().get("/admin/principals", params=params(q=q))
+    return await api().get(
+        "/admin/principals",
+        params=params(
+            q=q,
+            lastLoginBefore=last_login_before,
+            includeNever=include_never,
+            hasGroups=has_groups,
+        ),
+    )
 
 
 @group.tool
