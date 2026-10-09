@@ -358,6 +358,102 @@ def build_vote_snippet(
     return "\n".join(lines)
 
 
+@dataclass(frozen=True, slots=True)
+class ElectionLine:
+    """One candidate of an election snippet (F2): name, votes and the outcome."""
+
+    name: str
+    votes: int
+    elected: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ElectionSnippet:
+    """The protocol view of one election (F2), built from its stored result."""
+
+    question: str
+    seats: int
+    round: int = 1
+    candidates: list[ElectionLine] = field(default_factory=list)
+    abstentions: int = 0
+    # The single-candidate ballot (Ja/Nein/Enthaltung).
+    yes: int | None = None
+    no: int | None = None
+    by_lot: bool = False
+    lot_pending: bool = False
+    runoff_names: list[str] = field(default_factory=list)
+    runoff_seats: int = 0
+    closed: bool = True
+
+
+def build_election_snippet(view: ElectionSnippet, *, public: bool = False) -> str:
+    """Render an election as a protocol callout (`> [!abstimmung]`, F2).
+
+    The internal snippet holds the ballot, the seats, the votes per candidate, the
+    abstentions, the elected candidates and the notes „durch Los entschieden“ or
+    „Stichwahl (n. Wahlgang)“. The public snippet (`public=True`) names only the
+    elected candidates; the others appear as a count, and no vote count travels. The
+    single-candidate ballot writes its Ja/Nein/Enthaltung line, which the renderer
+    turns into the tally box (internal only).
+    """
+    lines = [f"> [!abstimmung] **{_md_escape(view.question)}**"]
+    meta = f"Wahl · {view.seats} Posten"
+    if view.round > 1:
+        meta += f" · Stichwahl ({view.round}. Wahlgang)"
+    lines.append(f"> {meta}")
+    elected = [c.name for c in view.candidates if c.elected]
+    if not public and view.closed:
+        if view.yes is not None and view.no is not None:
+            name = view.candidates[0].name if view.candidates else ""
+            lines.append(f"> Kandidatur: {_md_escape(name)}")
+            lines.append(f"> ja: {view.yes}, nein: {view.no}, enthaltung: {view.abstentions}")
+        else:
+            votes = " · ".join(f"{_md_escape(c.name)}: {c.votes}" for c in view.candidates)
+            lines.append(f"> {votes} · Enthaltungen: {view.abstentions}")
+    if view.closed:
+        names = ", ".join(_md_escape(n) for n in elected) if elected else "niemand"
+        lines.append(f"> Gewählt: {names}")
+        if public:
+            others = len(view.candidates) - len(elected)
+            if others > 0:
+                lines.append(f"> {others} weitere Kandidierende")
+        if view.by_lot:
+            lines.append("> Durch Los entschieden.")
+        if view.lot_pending:
+            lines.append("> Gleichstand: das Los steht aus.")
+        if view.runoff_seats:
+            who = ", ".join(_md_escape(n) for n in view.runoff_names)
+            target = who if not public else f"{len(view.runoff_names)} Kandidierende"
+            lines.append(
+                f"> Stichwahl ({view.round + 1}. Wahlgang) um {view.runoff_seats} Posten: {target}"
+            )
+    return "\n".join(lines)
+
+
+def replace_vote_block(body: str, snippet: str) -> str:
+    """Replace the callout of a vote in `body` with `snippet`.
+
+    The head line of `snippet` (marker and bold question) finds the block; the block
+    runs over the following `>` lines. The public protocol uses this to swap an
+    internal election callout that the protokollant put into the text for its public
+    form (F2). A body without the head stays as it is.
+    """
+    head = snippet.split("\n", 1)[0].strip()
+    lines = body.split("\n")
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        if lines[i].strip() == head:
+            out.extend(snippet.split("\n"))
+            i += 1
+            while i < len(lines) and lines[i].lstrip().startswith(">"):
+                i += 1
+            continue
+        out.append(lines[i])
+        i += 1
+    return "\n".join(out)
+
+
 def vote_in_body(body: str, snippet: str) -> bool:
     """Report whether the body already carries the vote of `snippet`.
 
