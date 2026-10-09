@@ -18,10 +18,13 @@ from app.modules.delegations.models import MeetingDelegation
 from app.modules.livevote.models import MeetingAttendance, MeetingGuest
 from app.modules.livevote.schemas import MeetingVoteOut
 from app.modules.livevote.service.service_base import MeetingServiceBase
+from app.modules.voting.election import election_config, election_fields, is_election, own_ballot
 from app.modules.voting.models import Ballot, Vote, VotedMarker
 from app.modules.voting.schemas import MyBallot
 from app.modules.voting.service import open_tally_revealed
+from app.modules.voting.tally import ElectionOutcome, tally_election
 from app.shared.config_schemas import VoteConfig
+from app.shared.errors import ValidationProblem
 
 
 class VoteReadOps(MeetingServiceBase):
@@ -50,6 +53,8 @@ class VoteReadOps(MeetingServiceBase):
         # the ballots. This is the reload path. The live WebSocket path already carries
         # these values. One batched query keeps this free of N+1.
         tallies = await self._vote_tallies(rows)
+        # F2: an election counts ballots and candidates (`tally_election`).
+        elections = await self._election_tallies([v for v in rows if is_election(v)])
         present_by_meeting = await self._present_by_meeting(meeting_ids)
         guests_by_meeting = await self.admitted_guests_by_meeting(meeting_ids)
         # #17: a vote with guests counts the guests who voted and left since then too.
@@ -87,6 +92,10 @@ class VoteReadOps(MeetingServiceBase):
             secret = config.secret
             counts, leading, reason = tallies.get(v.id, (None, None, None))
             voted = sum((counts or {}).values())
+            ev = elections.get(v.id)
+            if ev is not None:
+                counts, leading, voted = ev.display_counts(), None, ev.ballots
+                reason = "quorum" if v.status == "closed" and not ev.quorum_met else None
             members: int | None
             guests: int | None
             if v.status in ("closed", "cancelled"):
@@ -141,9 +150,61 @@ class VoteReadOps(MeetingServiceBase):
                     guestsVote=config.guests_vote,
                     presentMembers=members,
                     presentGuests=guests,
+                    **election_fields(v),
                 )
             )
         return out
+
+    async def _election_tallies(
+        self, votes: Sequence[Vote]
+    ) -> dict[UUID, ElectionOutcome]:
+        """Tally the elections of the reload path (F2), one query per ballot table."""
+        if not votes:
+            return {}
+        from app.modules.voting.models import SecretBallot
+
+        ids = [v.id for v in votes]
+        choices: dict[UUID, list[str | None]] = {}
+        for model in (Ballot, SecretBallot):
+            for vid, choice in (
+                await self.session.execute(
+                    select(model.vote_id, model.choice).where(model.vote_id.in_(ids))
+                )
+            ).all():
+                choices.setdefault(vid, []).append(choice)
+        return {
+            v.id: tally_election(
+                choices.get(v.id, []),
+                election_config(v),
+                v.eligible_count or 0,
+                round_=getattr(v, "round", 1) or 1,
+            )
+            for v in votes
+        }
+
+    async def assert_candidates_exist(self, principal_ids: list[UUID]) -> None:
+        """Check that every account of an election candidate exists (F2).
+
+        Raises:
+            ValidationProblem: An account is unknown (``candidate_unknown``).
+        """
+        if not principal_ids:
+            return
+        found = set(
+            (
+                await self.session.execute(
+                    select(PrincipalRow.id).where(PrincipalRow.id.in_(principal_ids))
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if set(principal_ids) - found:
+            raise ValidationProblem(
+                "A candidate account does not exist.",
+                code="candidate_unknown",
+                errors=[{"field": "candidates", "msg": "unknown principalId"}],
+            )
 
     async def _ballots_of(
         self, sub: str, votes: Sequence[Vote]
@@ -202,7 +263,7 @@ class VoteReadOps(MeetingServiceBase):
         represented: set[UUID] = set()
         for v in votes:
             if (v.id, sub) in choices:
-                own[v.id] = MyBallot(cast=True, choice=choices[(v.id, sub)])
+                own[v.id] = own_ballot(getattr(v, "kind", "motion"), choices[(v.id, sub)])
             elif (v.id, sub) in markers:
                 own[v.id] = MyBallot(cast=True)
             d_sub = delegator_of.get((v.meeting_id, v.eligible_group)) if v.meeting_id else None
