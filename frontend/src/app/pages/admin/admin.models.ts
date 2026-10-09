@@ -466,6 +466,119 @@ export interface AdminPrincipal {
   mergedIntoId?: Uuid | null;
   mergedIntoName?: string | null;
   mergedAt?: string | null;
+  /**
+   * Revoke rights (F3): the person still has something that "Rechte entziehen" can take
+   * away (an OIDC group, a membership, a role, a pool entry or a delegation).
+   */
+  hasAccess?: boolean;
+}
+
+/**
+ * The filters of `GET /admin/principals` (F3). `lastLoginBefore` (ISO date) keeps the
+ * people whose last login is before that day; `includeNever` adds the people who never
+ * logged in (alone: only those); `hasGroups` keeps the people with or without OIDC groups.
+ */
+export interface PrincipalFilters {
+  lastLoginBefore?: string | null;
+  includeNever?: boolean;
+  hasGroups?: boolean | null;
+}
+
+/** The person of a revoke: the header of the dialog. */
+export interface RevokePrincipal {
+  id: Uuid;
+  displayName: string | null;
+  email: string | null;
+  lastLogin: string | null;
+  active: boolean;
+}
+
+/** A manual role assignment. `grantedBy` is a name or `bootstrap`, never a `sub`. */
+export interface RevokeAssignment {
+  id: Uuid;
+  roleId: Uuid;
+  roleKey: string;
+  roleLabel: I18nMap;
+  grantedBy: string | null;
+  validFrom: string | null;
+  validUntil: string | null;
+}
+
+/** A pool entry of the person: as substitute (for a member or the whole Gremium) or as member. */
+export interface RevokePoolEntry {
+  id: Uuid;
+  asSubstitute: boolean;
+  gremiumWide: boolean;
+  memberName: string | null;
+  substituteName: string | null;
+}
+
+/** A delegation of the person in a planned or a live meeting. */
+export interface RevokeDelegation {
+  id: Uuid;
+  meetingId: Uuid;
+  meetingTitle: string;
+  meetingDate: string | null;
+  asDelegator: boolean;
+  otherName: string | null;
+  voting: boolean;
+}
+
+/** Everything that ties the person to one Gremium. A revoke clears all of it. */
+export interface RevokeGremium {
+  gremiumId: Uuid;
+  name: string;
+  membership: { roleKey: string; roleLabel: I18nMap; groups: string[] } | null;
+  groups: string[];
+  assignments: RevokeAssignment[];
+  poolEntries: RevokePoolEntry[];
+  plannedDelegations: RevokeDelegation[];
+  liveDelegations: RevokeDelegation[];
+  openTasks: number;
+}
+
+/** A global role of the person and its origin. */
+export interface RevokeGlobalRole {
+  roleId: Uuid;
+  roleKey: string;
+  roleLabel: I18nMap;
+  groups: string[];
+  assignments: RevokeAssignment[];
+}
+
+/** One SSO group of the person and every entry of the preview it leads to. */
+export interface RevokeGroup {
+  group: string;
+  gremiumIds: Uuid[];
+  globalRoleIds: Uuid[];
+}
+
+/** GET /admin/principals/{id}/revoke-preview */
+export interface RevokePreview {
+  principal: RevokePrincipal;
+  gremien: RevokeGremium[];
+  globalRoles: RevokeGlobalRole[];
+  groups: RevokeGroup[];
+  isSelf: boolean;
+}
+
+/** Body of POST /admin/principals/{id}/revoke */
+export interface RevokeRequest {
+  gremiumIds: Uuid[];
+  globalRoleIds: Uuid[];
+  deactivate: boolean;
+}
+
+/** POST /admin/principals/{id}/revoke */
+export interface RevokeResult {
+  gremiumIds: Uuid[];
+  globalRoleIds: Uuid[];
+  removedGroups: string[];
+  deletedAssignments: number;
+  deletedPoolEntries: number;
+  revokedDelegations: number;
+  keptLiveDelegations: number;
+  deactivated: boolean;
 }
 
 /**

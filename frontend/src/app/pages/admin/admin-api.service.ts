@@ -19,6 +19,10 @@ import {
   type AdminPrincipal,
   type MergePreview,
   type MergeResult,
+  type PrincipalFilters,
+  type RevokePreview,
+  type RevokeRequest,
+  type RevokeResult,
   type Backup,
   type BackupList,
   type ApplicationTypeCreateBody,
@@ -73,6 +77,15 @@ import {
   type WebhookConfig,
   type WebhookDeliveryStatus,
 } from './admin.models';
+import {
+  MOCK_REVOKE_PRINCIPAL,
+  mockApplyRevoke,
+  mockHasAccess,
+  mockMatchesFilters,
+  mockRevokeExtras,
+  mockRevokePreview,
+  type RevokeMockStore,
+} from './admin-revoke.mock';
 import {
   MOCK_APP_TYPES,
   MOCK_AUDIT_ACTORS,
@@ -157,7 +170,10 @@ export class AdminApiService {
     privacySettings: <PrivacySettings>{ defaultRetentionMonths: 24 },
     webhooks: structuredCopy(MOCK_WEBHOOKS),
     roles: structuredCopy(MOCK_ROLES),
-    principals: structuredCopy(MOCK_PRINCIPALS),
+    principals: structuredCopy([...MOCK_PRINCIPALS, MOCK_REVOKE_PRINCIPAL]),
+    // "Rechte entziehen" (F3): the Gremien cleared per person, the pool and delegations.
+    revoked: {} as Record<Uuid, Uuid[]>,
+    revokeExtras: mockRevokeExtras(),
     oauthGrants: structuredCopy(MOCK_OAUTH_GRANTS),
     site: <SiteConfig>{
       version: 1,
@@ -648,19 +664,74 @@ export class AdminApiService {
     return this.http.get<string[]>(`${this.base}/admin/permissions`);
   }
 
-  /** List/search users (OIDC principals) — GET /admin/principals?q=. */
-  listPrincipals(query?: string): Observable<AdminPrincipal[]> {
+  /**
+   * List/search users (OIDC principals) — GET /admin/principals?q=. `filters` adds the
+   * user-list filters of F3 (`lastLoginBefore`, `includeNever`, `hasGroups`).
+   */
+  listPrincipals(query?: string, filters?: PrincipalFilters): Observable<AdminPrincipal[]> {
     if (this.mock) {
       const q = (query ?? '').trim().toLowerCase();
       const hit = (p: AdminPrincipal) =>
-        !q ||
-        p.sub.toLowerCase().includes(q) ||
-        (p.email ?? '').toLowerCase().includes(q) ||
-        (p.displayName ?? '').toLowerCase().includes(q);
-      return of(structuredCopy(this.store.principals.filter(hit)));
+        (!q ||
+          p.sub.toLowerCase().includes(q) ||
+          (p.email ?? '').toLowerCase().includes(q) ||
+          (p.displayName ?? '').toLowerCase().includes(q)) &&
+        mockMatchesFilters(p, filters);
+      const store = this.revokeStore();
+      return of(
+        structuredCopy(this.store.principals.filter(hit)).map((p) => ({
+          ...p,
+          hasAccess: mockHasAccess(store, p),
+        })),
+      );
     }
-    const url = query ? `${this.base}/admin/principals?q=${encodeURIComponent(query)}` : `${this.base}/admin/principals`;
-    return this.http.get<AdminPrincipal[]>(url);
+    let params = new HttpParams();
+    if (query) params = params.set('q', query);
+    if (filters?.lastLoginBefore) params = params.set('lastLoginBefore', filters.lastLoginBefore);
+    if (filters?.includeNever) params = params.set('includeNever', 'true');
+    if (filters?.hasGroups != null) params = params.set('hasGroups', String(filters.hasGroups));
+    return this.http.get<AdminPrincipal[]>(`${this.base}/admin/principals`, { params });
+  }
+
+  /** The parts of the mock store that "Rechte entziehen" reads and writes. */
+  private revokeStore(): RevokeMockStore {
+    return {
+      principals: this.store.principals,
+      gremien: this.store.gremien,
+      gremiumRoles: this.store.gremiumRoles,
+      roles: this.store.roles,
+      groupMappings: this.store.groupMappings,
+      membershipMappings: this.store.membershipMappings,
+      roleMappings: this.store.roleMappings,
+      memberships: MOCK_GREMIUM_MEMBERSHIPS,
+      revoked: this.store.revoked,
+      extras: this.store.revokeExtras,
+    };
+  }
+
+  /**
+   * What the person has, per Gremium and per global role — GET
+   * /admin/principals/{id}/revoke-preview. Needs `admin.users.revoke_groups`.
+   */
+  previewPrincipalRevoke(principalId: Uuid): Observable<RevokePreview> {
+    if (this.mock) {
+      const preview = mockRevokePreview(this.revokeStore(), principalId, null);
+      return preview ? of(preview) : throwError(() => ({ status: 404 }));
+    }
+    return this.http.get<RevokePreview>(`${this.base}/admin/principals/${principalId}/revoke-preview`);
+  }
+
+  /**
+   * Clear the selected Gremien and remove the selected global roles — POST
+   * /admin/principals/{id}/revoke. A shared SSO group that also leads to an entry that is
+   * not selected answers 422 `revoke_incomplete`; the own account 409.
+   */
+  revokePrincipal(principalId: Uuid, body: RevokeRequest): Observable<RevokeResult> {
+    if (this.mock) {
+      const out = mockApplyRevoke(this.revokeStore(), principalId, body, null);
+      return 'status' in out ? throwError(() => out) : of(out);
+    }
+    return this.http.post<RevokeResult>(`${this.base}/admin/principals/${principalId}/revoke`, body);
   }
 
   // OAuth grants of ANY principal. Both routes need P(`admin.users`). The
