@@ -57,17 +57,22 @@ describe('BallotComponent · election (F2)', () => {
     expect(await runAxe(container)).toHaveNoViolations();
   });
 
-  it('several seats: check boxes, the counter and the abstentions in the label', async () => {
+  it('several seats: check boxes, the counter and a vote count in the label', async () => {
     const { caster } = await setup(2);
     const user = userEvent.setup();
     expect(screen.getByText('0 von 2 Stimmen vergeben')).toBeInTheDocument();
     await user.click(screen.getByRole('checkbox', { name: 'Anna Berg' }));
     expect(screen.getByText('1 von 2 Stimmen vergeben')).toBeInTheDocument();
-    expect(confirmButton()).toHaveTextContent('Stimme abgeben: Anna Berg · 1 Enthaltung');
+    // The button counts instead of naming, so it stays whole on a phone (names and abstentions).
+    expect(confirmButton()).toHaveTextContent(/^Stimmen abgeben \(1 Name, 1 Enthaltung\)$/);
+    // The accessible name keeps the names.
+    expect(confirmButton()).toHaveAccessibleName('Stimmen abgeben (1 Name, 1 Enthaltung): Anna Berg');
     await user.click(screen.getByRole('checkbox', { name: 'Cem Aydin' }));
     // All votes given: the further box stays off.
     expect(screen.getByRole('checkbox', { name: 'Ben Ott' })).toBeDisabled();
-    expect(confirmButton()).toHaveTextContent('Stimme abgeben: Anna Berg, Cem Aydin');
+    // Only names: every seat has a vote.
+    expect(confirmButton()).toHaveTextContent(/^Stimmen abgeben \(2 Namen\)$/);
+    expect(confirmButton()).toHaveAccessibleName('Stimmen abgeben (2 Namen): Anna Berg, Cem Aydin');
     // A click on a chosen box takes the vote back.
     await user.click(screen.getByRole('checkbox', { name: 'Cem Aydin' }));
     expect(screen.getByRole('checkbox', { name: 'Ben Ott' })).toBeEnabled();
@@ -83,6 +88,9 @@ describe('BallotComponent · election (F2)', () => {
     await user.click(screen.getByRole('button', { name: 'Ganz enthalten' }));
     expect(screen.getByRole('checkbox', { name: 'Anna Berg' })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('button', { name: 'Ganz enthalten' })).toHaveAttribute('aria-pressed', 'true');
+    // Only abstentions: no names to add to the accessible name.
+    expect(confirmButton()).toHaveTextContent(/^Stimmen abgeben \(2 Enthaltungen\)$/);
+    expect(confirmButton()).not.toHaveAttribute('aria-label');
     await user.click(confirmButton());
     expect(caster).toHaveBeenCalledWith([], false);
   });
@@ -115,6 +123,32 @@ describe('BallotComponent · election (F2)', () => {
     await user.click(confirmButton());
     expect(caster).toHaveBeenCalledWith(['c1'], true);
     expect(screen.getByText('Für Jonas Weber abgegeben: Anna Berg')).toBeInTheDocument();
+  });
+
+  it('counts the votes of a represented member on several seats', async () => {
+    const { caster } = await setup(3, { own: null, proxyName: 'Jonas Weber' });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('checkbox', { name: 'Anna Berg' }));
+    expect(confirmButton()).toHaveTextContent(/^Für Jonas Weber abgeben \(1 Name, 2 Enthaltungen\)$/);
+    await user.click(screen.getByRole('checkbox', { name: 'Ben Ott' }));
+    expect(confirmButton()).toHaveAccessibleName(
+      'Für Jonas Weber abgeben (2 Namen, 1 Enthaltung): Anna Berg, Ben Ott',
+    );
+    await user.click(confirmButton());
+    expect(caster).toHaveBeenCalledWith(['c1', 'c2'], true);
+  });
+
+  it('keeps the plain label and no extra accessible name before a pick', async () => {
+    await setup(2);
+    expect(confirmButton()).toHaveTextContent(/^Stimme abgeben$/);
+    expect(confirmButton()).not.toHaveAttribute('aria-label');
+  });
+
+  it('has no counter and no extra accessible name once every row is cast', async () => {
+    const { fixture } = await setup(2, { own: { cast: true, choice: null, choices: ['c1'] } });
+    const cmp = fixture.componentInstance as unknown as { confirmLabel(): string; confirmAria(): string };
+    expect(cmp.confirmLabel()).toBe('Stimme abgeben');
+    expect(cmp.confirmAria()).toBe('');
   });
 
   it('takes no pick while the row is cast or a cast runs', async () => {

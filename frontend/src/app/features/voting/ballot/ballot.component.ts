@@ -21,7 +21,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import type { ElectionConfig, MyBallot, ProblemDetail } from '@core/api/models';
 import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { voteOptionLabel } from '../../meetings/meetings-display.util';
-import { electionChoiceLabel } from '../election.util';
+import { candidateNames, electionChoiceLabel, electionCountText } from '../election.util';
 
 /** The two ballots a person can hold in one vote: the own one, and the one of a member
  *  they represent. The server keeps them apart. */
@@ -79,8 +79,9 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  * - `election` (F2) turns the options into the candidates: one seat gives a radio list
  *   with a separate "Enthaltung" row; several seats give check boxes with the counter
  *   "1 von 2 Stimmen vergeben", the further boxes stay off when all votes are given, and
- *   "Ganz enthalten" picks no candidate. A free vote is an abstention, and the button
- *   names it. One candidate keeps the Ja/Nein/Enthaltung options.
+ *   "Ganz enthalten" picks no candidate. A free vote is an abstention. The button
+ *   counts, "Stimmen abgeben (2 Namen, 1 Enthaltung)", and its accessible name adds the
+ *   names. One candidate keeps the Ja/Nein/Enthaltung options.
  *
  * The component calls the server through `caster`; the page owns the toasts and the
  * reload (`castDone`, `castFailed`).
@@ -175,12 +176,24 @@ export class BallotComponent {
     return open(other) ? other : null;
   });
 
-  /** The label of the button: "Stimme abgeben: Ja", "Für Jonas Weber abgeben: Nein". */
+  /**
+   * The label of the button: "Stimme abgeben: Ja", "Für Jonas Weber abgeben: Nein". A
+   * multi-seat election counts instead of naming, "Stimmen abgeben (2 Namen, 1
+   * Enthaltung)", so the label stays whole on a phone; the list above shows the names.
+   */
   protected readonly confirmLabel = computed(() => {
     const row = this.target();
     const choice = row ? this.picked()[row] : null;
+    const name = this.proxyName() ?? '';
+    if (this.multiSeat() && Array.isArray(choice)) {
+      const count = electionCountText(this.election(), choice, (key, params) =>
+        this.i18n.translate(key, params),
+      );
+      return row === 'proxy'
+        ? this.i18n.translate('voting.ballot.confirmProxyCount', { name, count })
+        : this.i18n.translate('voting.ballot.confirmCount', { count });
+    }
     if (row === 'proxy') {
-      const name = this.proxyName() ?? '';
       return choice !== null
         ? this.i18n.translate('voting.ballot.confirmProxy', { name, choice: this.choiceLabel(choice) })
         : this.i18n.translate('voting.ballot.confirmProxyEmpty', { name });
@@ -188,6 +201,20 @@ export class BallotComponent {
     return choice !== null
       ? this.i18n.translate('voting.ballot.confirm', { choice: this.choiceLabel(choice) })
       : this.i18n.translate('voting.ballot.confirmEmpty');
+  });
+
+  /**
+   * The accessible name of the button: the counter label with the chosen names, so a
+   * screen reader hears whom the ballot elects. Empty (the visible label) otherwise.
+   */
+  protected readonly confirmAria = computed(() => {
+    const row = this.target();
+    const choice = row ? this.picked()[row] : null;
+    if (!this.multiSeat() || !Array.isArray(choice) || choice.length === 0) return '';
+    return this.i18n.translate('voting.ballot.confirmNames', {
+      label: this.confirmLabel(),
+      names: candidateNames(this.election(), choice).join(', '),
+    });
   });
 
   /**

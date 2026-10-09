@@ -6,12 +6,14 @@ import {
   electionBars,
   electionCaption,
   electionChoiceLabel,
+  electionCountText,
   electionOf,
   electionResultLine,
   closedStatus,
   electionStatus,
   isYesNoElection,
   lotPending,
+  namesText,
   runoffPending,
   seatsText,
 } from './election.util';
@@ -55,6 +57,25 @@ describe('election.util', () => {
     expect(abstentionsText(1, t)).toBe('election.abstentions.one');
     expect(seatsText(1, t)).toBe('election.seats.one');
     expect(seatsText(4, t)).toBe('election.seats.other{"n":4}');
+  });
+
+  it('counts the names and the abstentions of a multi-seat ballot', () => {
+    const three = { ...ELECTION, seats: 3 };
+    expect(namesText(1, t)).toBe('election.names.one');
+    expect(namesText(2, t)).toBe('election.names.other{"n":2}');
+    // Only names: every seat has a vote.
+    expect(electionCountText(ELECTION, ['c1', 'c2'], t)).toBe('election.names.other{"n":2}');
+    // Names and abstentions.
+    expect(electionCountText(three, ['c1', 'c2'], t)).toBe(
+      'election.names.other{"n":2}, election.abstentions.one',
+    );
+    expect(electionCountText(three, ['c1'], t)).toBe(
+      'election.names.one, election.abstentions.other{"n":2}',
+    );
+    // Only abstentions: the full abstention.
+    expect(electionCountText(three, [], t)).toBe('election.abstentions.other{"n":3}');
+    // Without a config one seat counts.
+    expect(electionCountText(null, ['c1'], t)).toBe('election.names.one');
   });
 
   it('builds the bars best first with the tags and the abstentions', () => {

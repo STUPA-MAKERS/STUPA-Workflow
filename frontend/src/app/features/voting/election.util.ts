@@ -58,6 +58,28 @@ export function abstentionsText(n: number, t: Translate): string {
   return n === 1 ? t('election.abstentions.one') : t('election.abstentions.other', { n });
 }
 
+/** "1 Name", "2 Namen". */
+export function namesText(n: number, t: Translate): string {
+  return n === 1 ? t('election.names.one') : t('election.names.other', { n });
+}
+
+/**
+ * The counter of a multi-seat ballot: "2 Namen, 1 Enthaltung", "3 Namen" or
+ * "3 Enthaltungen" (a full abstention). It stays short, so the confirm button of a
+ * phone shows it whole; the list above shows the names.
+ */
+export function electionCountText(
+  election: ElectionConfig | null,
+  picks: readonly string[],
+  t: Translate,
+): string {
+  const free = (election?.seats ?? 1) - picks.length;
+  const parts: string[] = [];
+  if (picks.length > 0) parts.push(namesText(picks.length, t));
+  if (free > 0) parts.push(abstentionsText(free, t));
+  return parts.join(', ');
+}
+
 /** "1 Posten", "2 Posten". */
 export function seatsText(n: number, t: Translate): string {
   return n === 1 ? t('election.seats.one') : t('election.seats.other', { n });
