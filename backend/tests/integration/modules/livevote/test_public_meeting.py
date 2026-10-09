@@ -536,7 +536,7 @@ async def test_guest_votes_without_quorum_and_late_admission(
             == 200
         )
         me = b.get(f"/api/public/meetings/{code}/me").json()
-        assert me["view"]["votes"][0]["myBallot"] == {"cast": True, "choice": "yes"}
+        assert me["view"]["votes"][0]["myBallot"] == {"cast": True, "choice": "yes", "choices": None}
         assert me["view"]["votes"][0]["canCast"] is False
         # No quorum: the vote closes with 2 guest ballots although no member voted.
         closed = lead.post(f"/api/votes/{vote['id']}/close")
@@ -583,7 +583,7 @@ async def test_secret_guest_ballot_keeps_identity_apart(
         assert resp.status_code == 200, resp.text
         me = a.get(f"/api/public/meetings/{code}/me").json()
         mine = next(v for v in me["view"]["votes"] if v["id"] == vote["id"])
-        assert mine["myBallot"] == {"cast": True, "choice": None}
+        assert mine["myBallot"] == {"cast": True, "choice": None, "choices": None}
         assert mine["tally"]["revealed"] is False and mine["tally"]["counts"] == {}
     async with maker() as session:
         vid = uuid.UUID(vote["id"])

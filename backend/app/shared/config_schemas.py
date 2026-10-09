@@ -577,7 +577,100 @@ class VoteConfig(_CamelModel):
         """
         if isinstance(data, VoteConfig):
             return data
+        if "seats" in data:
+            # F2: an election row (``vote.kind = 'election'``). The readers of the motion
+            # rules (secret, guests, options) get the projection of the election.
+            return ElectionConfig.model_validate(data).as_vote_config()
         return cls.model_validate({k: v for k, v in data.items() if k not in _LEGACY_VOTE_KEYS})
+
+
+# F2 · Personnel elections. The answer keys of the single-candidate ballot (Ja/Nein/
+# Enthaltung) and of a full abstention. A candidate id never takes one of them.
+ELECTION_RESERVED_IDS = frozenset({"yes", "no", "abstain"})
+ELECTION_MAX_CANDIDATES = 50
+
+
+class ElectionCandidate(_CamelModel):
+    """One candidate of an election.
+
+    ``id`` is the key of the candidate in the ballots and in the result. The server
+    sets it (``c1``, ``c2``, ...), and a runoff keeps the ids of its parent.
+    ``principalId`` links an account; a candidate without an account has a name only.
+    """
+
+    id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    name: str = Field(min_length=1, max_length=200)
+    principal_id: UUID | None = Field(default=None, alias="principalId")
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("the candidate name is empty")
+        return stripped
+
+
+class ElectionConfig(_CamelModel):
+    """The rules of one election (F2), stored as JSONB in ``vote.config``.
+
+    ``vote.kind = 'election'`` marks the row. An election has no majority rule and no
+    tie break: the relative majority elects, a tie at the seat boundary goes to a
+    runoff (several seats) or to the lot (one seat, or a runoff round). One candidate
+    for one seat is a Ja/Nein/Enthaltung ballot: elected when Ja > Nein.
+    """
+
+    seats: int = Field(ge=1, le=ELECTION_MAX_CANDIDATES)
+    candidates: list[ElectionCandidate] = Field(
+        min_length=1, max_length=ELECTION_MAX_CANDIDATES
+    )
+    secret: bool = True
+    quorum: Quorum | None = None
+    abstain_counts_quorum: bool = Field(default=True, alias="abstainCountsQuorum")
+    guests_vote: bool = Field(default=False, alias="guestsVote")
+
+    @model_validator(mode="after")
+    def _check(self) -> ElectionConfig:
+        ids = [c.id for c in self.candidates]
+        if len(set(ids)) != len(ids):
+            raise ValueError("candidate ids must be unique")
+        if ELECTION_RESERVED_IDS & set(ids):
+            raise ValueError("a candidate id must not be yes, no or abstain")
+        principals = [c.principal_id for c in self.candidates if c.principal_id is not None]
+        if len(set(principals)) != len(principals):
+            raise ValueError("a person can stand only once")
+        if len(self.candidates) < self.seats:
+            raise ValueError("an election needs at least as many candidates as seats")
+        if self.guests_vote and self.quorum is not None:
+            raise ValueError("a vote with guests (guestsVote) has no quorum")
+        return self
+
+    @property
+    def yes_no(self) -> bool:
+        """Tell whether the ballot is Ja/Nein/Enthaltung (one candidate, one seat)."""
+        return len(self.candidates) == 1
+
+    @property
+    def candidate_ids(self) -> list[str]:
+        return [c.id for c in self.candidates]
+
+    def as_vote_config(self) -> VoteConfig:
+        """Project the election on the motion rules for the shared vote readers.
+
+        The options are the candidate ids plus ``abstain`` (or Ja/Nein/Enthaltung for
+        one candidate). The majority rule of the projection is never applied: the
+        election tally (``tally.tally_election``) decides.
+        """
+        options = ["yes", "no", "abstain"] if self.yes_no else [*self.candidate_ids, "abstain"]
+        return VoteConfig(
+            options=options,
+            majorityRule="simple",
+            quorum=self.quorum,
+            abstainCountsQuorum=self.abstain_counts_quorum,
+            secret=self.secret,
+            tieBreak="tie",
+            guestsVote=self.guests_vote,
+        )
 
 
 # Notification rule
