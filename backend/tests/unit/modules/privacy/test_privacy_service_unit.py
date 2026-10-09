@@ -370,3 +370,29 @@ async def test_auskunft_i18n_falls_back_and_handles_missing_state() -> None:
     assert data["applications"][0]["typeName"] == "Type"  # de is missing, so en wins
     assert data["applications"][0]["status"] == ""  # no state
     assert data["versions"] == []
+
+
+async def test_principal_erase_erases_the_candidacies_in_the_same_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F2: the erasure replaces the candidate names (elections and protocol text)."""
+    from app.modules.privacy import service as privacy_service
+
+    principal = _principal()
+    db = fake_session(gets=[principal])
+    marker = [object()]
+    calls: list[tuple[str, object, object]] = []
+
+    async def fake_candidacies(session: object, principal_id: UUID) -> list[object]:
+        calls.append(("candidacies", session, principal_id))
+        return marker
+
+    async def fake_names(session: object, erased: object) -> None:
+        calls.append(("names", session, erased))
+
+    monkeypatch.setattr(privacy_service, "erase_candidacies", fake_candidacies)
+    monkeypatch.setattr(privacy_service, "erase_candidate_names", fake_names)
+    await PrincipalService(db).erase(principal.id, actor="admin", commit=False)
+    assert calls == [("candidacies", db, principal.id), ("names", db, marker)]
+    # The caller (the erasure queue) commits: no commit of its own.
+    assert db.committed == 0

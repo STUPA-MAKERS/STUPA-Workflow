@@ -94,9 +94,10 @@ from app.modules.protocol.public import (
 )
 from app.modules.protocol.schemas import ProtocolOut
 from app.modules.voting.models import Vote
-from app.modules.voting.schemas import VoteOut
+from app.modules.voting.schemas import ElectionResultOut, VoteOut
 from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings
+from app.shared.config_schemas import ElectionConfig
 from app.shared.errors import (
     BadRequestError,
     ConflictError,
@@ -1335,22 +1336,38 @@ def _snippet(view: VoteOut, fallback: str, *, public: bool = False) -> str:
 def _election_snippet(view: VoteOut) -> ElectionSnippet:
     """Map an election and its stored result on the protocol view (F2)."""
     assert view.election is not None  # checked by the caller
-    result = view.election_result
+    return election_snippet_of(
+        view.election, view.election_result, question=view.question, round_=view.round
+    )
+
+
+def election_snippet_of(
+    election: ElectionConfig,
+    result: ElectionResultOut | None,
+    *,
+    question: str | None,
+    round_: int,
+) -> ElectionSnippet:
+    """Map an election config and its stored result on the protocol view (F2).
+
+    The erasure of a candidate (``protocol.erasure``) also calls it, with the config
+    before and after the change.
+    """
     elected = set(result.elected) if result is not None else set()
-    names = {c.id: c.name for c in view.election.candidates}
+    names = {c.id: c.name for c in election.candidates}
     counts = result.counts if result is not None else {}
     lines = [
         ElectionLine(name=c.name, votes=counts.get(c.id, 0), elected=c.id in elected)
-        for c in view.election.candidates
+        for c in election.candidates
     ]
     if result is not None and result.yes is None:
         lines.sort(key=lambda line: -line.votes)
     lot = result.lot if result is not None else None
     runoff = result.runoff if result is not None else None
     return ElectionSnippet(
-        question=(view.question or "Wahlgang").strip() or "Wahlgang",
-        seats=view.election.seats,
-        round=view.round,
+        question=(question or "Wahlgang").strip() or "Wahlgang",
+        seats=election.seats,
+        round=round_,
         candidates=lines,
         abstentions=result.abstentions if result is not None else 0,
         yes=result.yes if result is not None else None,
