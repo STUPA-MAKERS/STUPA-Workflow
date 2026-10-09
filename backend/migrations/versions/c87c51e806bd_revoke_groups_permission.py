@@ -10,7 +10,7 @@ No table changes. The statement is idempotent (``ON CONFLICT DO NOTHING``).
 The downgrade removes the permission rows.
 
 Revision ID: c87c51e806bd
-Revises: bf0309071fb4
+Revises: d9de5b02cbb8
 Create Date: 2026-10-09 12:00:00.000000
 """
 
@@ -21,7 +21,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "c87c51e806bd"
-down_revision: str | None = "bf0309071fb4"
+down_revision: str | None = "d9de5b02cbb8"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

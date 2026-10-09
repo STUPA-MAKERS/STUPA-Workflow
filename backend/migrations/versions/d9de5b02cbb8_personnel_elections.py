@@ -20,7 +20,7 @@ The downgrade deletes the election rows (their ballots cascade), restores the ol
 result CHECK and drops the columns.
 
 Revision ID: d9de5b02cbb8
-Revises: bf0309071fb4
+Revises: 5a67ac7644ed
 Create Date: 2026-10-09 12:06:57.659032
 """
 
@@ -31,7 +31,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "d9de5b02cbb8"
-down_revision: str | None = "bf0309071fb4"
+down_revision: str | None = "5a67ac7644ed"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
