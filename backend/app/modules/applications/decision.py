@@ -380,7 +380,7 @@ async def decision_source(
         else:
             try:
                 gremium_id = UUID(vote.eligible_group)
-            except ValueError:
+            except (TypeError, ValueError):
                 gremium_id = None
         if vote.agenda_item_id is not None and vote.meeting_id is not None:
             number = func.row_number().over(order_by=list(agenda_order())).label("n")

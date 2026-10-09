@@ -519,7 +519,7 @@ async def test_get_tree_assembles() -> None:
         result(alloc),                                          # allocations
         result(  # app rows (id, path, fy, amount, committed, state)
             (uuid.uuid4(), "VS", fy_id, Decimal("250"), Decimal("250"), "approved"),    # → bound
-            (uuid.uuid4(), "VS", fy_id, Decimal("120"), Decimal("120"), "submitted"),   # → requested
+            (uuid.uuid4(), "VS", fy_id, Decimal("120"), Decimal("120"), "submitted"),  # → requested
             (uuid.uuid4(), "VS", fy_id, Decimal("999"), Decimal("999"), "rejected"),    # → excluded
         ),
         result(),                                               # expense rows (none)
@@ -534,6 +534,27 @@ async def test_get_tree_assembles() -> None:
     assert view.committed == Decimal("250")    # bound + expended
     assert view.requested == Decimal("120")    # 'submitted', not 'rejected'
     assert view.available == Decimal("750")
+
+
+async def test_get_tree_binds_the_approved_amount() -> None:
+    """F1: an accepted application binds its approved amount, not the requested one."""
+    fy_id = uuid.uuid4()
+    top = _budget(id=uuid.uuid4(), path_key="VS", gremium_id=uuid.uuid4(), key="VS")
+    top.accepted_state_keys = ["approved"]
+    alloc = _alloc(budget_id=top.id, fy_id=fy_id, allocated="1000")
+    sess = fake_session(
+        result(top),
+        result(alloc),
+        result(
+            (uuid.uuid4(), "VS", fy_id, Decimal("250"), Decimal("200"), "approved"),
+            (uuid.uuid4(), "VS", fy_id, Decimal("120"), Decimal("120"), "submitted"),
+        ),
+        result(),
+    )
+    view = (await BudgetTreeService(sess).get_tree())[0].by_fiscal_year[0]
+    assert view.bound == Decimal("200")
+    assert view.requested == Decimal("120")
+    assert view.available == Decimal("800")
 
 
 async def test_get_tree_rolls_up_standalone_expenses() -> None:
