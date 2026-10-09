@@ -8,10 +8,16 @@ settings and the implicit ``member``). The admin API lists them but cannot write
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import date
 from uuid import UUID
 
 from sqlalchemy import delete, or_, select
 
+from app.modules.admin.principal_revoke import (
+    has_groups_filter,
+    last_login_filter,
+    principals_with_access,
+)
 from app.modules.admin.schemas import (
     GroupMappingCreate,
     GroupMappingOut,
@@ -48,6 +54,8 @@ def _principal_out(
     row: Principal,
     assignments: list[RoleAssignmentRow],
     merged_names: dict[UUID, str | None] | None = None,
+    *,
+    has_access: bool = False,
 ) -> PrincipalOut:
     return PrincipalOut(
         id=row.id,
@@ -63,6 +71,7 @@ def _principal_out(
             (merged_names or {}).get(row.merged_into) if row.merged_into else None
         ),
         merged_at=_iso(row.merged_at),
+        has_access=has_access or bool(row.oidc_groups),
     )
 
 
@@ -164,7 +173,13 @@ class RbacOps(ConfigServiceBase):
         return [_assignment_out(r) for r in rows]
 
     async def search_principals(
-        self, query: str | None, limit: int = 50
+        self,
+        query: str | None,
+        limit: int = 50,
+        *,
+        last_login_before: date | None = None,
+        include_never: bool = False,
+        has_groups: bool | None = None,
     ) -> list[PrincipalOut]:
         """Search principals (users) by OIDC ``sub``, name or e-mail.
 
@@ -172,11 +187,23 @@ class RbacOps(ConfigServiceBase):
         CITEXT and therefore case-insensitive anyway. Without ``query`` the
         search returns the first ``limit`` principals.
 
+        The filters of the user list (F3): ``last_login_before`` keeps the people
+        whose last login is before that day, ``include_never`` adds the people who
+        never logged in (alone: only those), ``has_groups`` keeps the people with
+        (true) or without (false) OIDC groups.
+
         Returns:
-            The principals with their role assignments. One follow-up query
-            loads the assignments, so there is no N+1.
+            The principals with their role assignments and ``hasAccess``. One
+            follow-up query loads the assignments and one the access ties, so there
+            is no N+1.
         """
         stmt = select(Principal)
+        for clause in (
+            last_login_filter(last_login_before, include_never),
+            has_groups_filter(has_groups),
+        ):
+            if clause is not None:
+                stmt = stmt.where(clause)
         if query:
             # Escape the LIKE metacharacters in user input. Without the escape,
             # % and _ act as wildcards and allow wildcard injection or an index
@@ -203,8 +230,14 @@ class RbacOps(ConfigServiceBase):
             ).all()
             for a in assignments:
                 by_principal.setdefault(a.principal_id, []).append(a)
+        access = await principals_with_access(self.session, ids)
         merged_names = await self._merged_names(rows)
-        return [_principal_out(r, by_principal.get(r.id, []), merged_names) for r in rows]
+        return [
+            _principal_out(
+                r, by_principal.get(r.id, []), merged_names, has_access=r.id in access
+            )
+            for r in rows
+        ]
 
     async def _merged_names(self, rows: Sequence[Principal]) -> dict[UUID, str | None]:
         """Name the accounts that the merged rows point at. One query."""

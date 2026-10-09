@@ -12,6 +12,7 @@ place.
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import ScalarSelect, Select, or_, select
@@ -62,3 +63,35 @@ async def substitute_gremien_for_sub(session: AsyncSession, sub: str) -> set[UUI
     pid = select(PrincipalRow.id).where(PrincipalRow.sub == sub).scalar_subquery()
     stmt = _substitute_gremien_stmt(pid)
     return set((await session.execute(stmt)).scalars().all())
+
+
+async def pool_entries_of(
+    session: AsyncSession, principal_id: UUID
+) -> list[DelegationSubstitute]:
+    """Return every pool entry in which `principal_id` is the substitute or the member.
+
+    The revoke of the rights of a person (`admin/principal_revoke.py`) shows these
+    entries per gremium and deletes them.
+    """
+    stmt = select(DelegationSubstitute).where(
+        or_(
+            DelegationSubstitute.substitute_principal_id == principal_id,
+            DelegationSubstitute.member_principal_id == principal_id,
+        )
+    )
+    return list((await session.scalars(stmt)).all())
+
+
+def pool_principals_stmt(ids: list[UUID]) -> list[Select[Any]]:
+    """Select the principals of `ids` that have a pool entry, as substitute or member.
+
+    The user list of the admin (`hasAccess`) puts these statements into one UNION.
+    """
+    return [
+        select(DelegationSubstitute.substitute_principal_id).where(
+            DelegationSubstitute.substitute_principal_id.in_(ids)
+        ),
+        select(DelegationSubstitute.member_principal_id).where(
+            DelegationSubstitute.member_principal_id.in_(ids)
+        ),
+    ]

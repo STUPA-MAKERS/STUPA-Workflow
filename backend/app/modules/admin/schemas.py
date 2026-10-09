@@ -454,6 +454,10 @@ class PrincipalOut(_CamelModel):
     merged_into_id: UUID | None = Field(default=None, serialization_alias="mergedIntoId")
     merged_into_name: str | None = Field(default=None, serialization_alias="mergedIntoName")
     merged_at: str | None = Field(default=None, serialization_alias="mergedAt")
+    # Revoke rights (F3): true when the person has something that "Rechte entziehen"
+    # can take away: an OIDC group, a gremium membership, a role assignment other than
+    # the implicit `member`, a pool entry or a delegation in a planned or live meeting.
+    has_access: bool = Field(default=False, serialization_alias="hasAccess")
 
 
 # Account merge (``admin/principal_merge.py``). The areas of the preview and the result,
@@ -565,6 +569,148 @@ class MergeResultOut(_CamelModel):
     target: MergePrincipalOut
     areas: list[MergeAreaOut]
     merged_at: str = Field(serialization_alias="mergedAt")
+
+
+# Revoke rights ("Rechte entziehen", ``admin/principal_revoke.py``). The preview groups
+# everything a person has by Gremium, then by global role. Each SSO group lists every
+# Gremium and global role it leads to, so the dialog can select the co-affected entries.
+
+
+class RevokePrincipalOut(_CamelModel):
+    """The person of a revoke: the header of the dialog."""
+
+    id: UUID
+    display_name: str | None = Field(serialization_alias="displayName")
+    email: str | None
+    last_login: str | None = Field(serialization_alias="lastLogin")
+    active: bool = True
+
+
+class RevokeMembershipOut(_CamelModel):
+    """The derived membership in one Gremium and the SSO groups that cause it."""
+
+    role_key: str = Field(serialization_alias="roleKey")
+    role_label: dict[str, str] = Field(serialization_alias="roleLabel")
+    groups: list[str]
+
+
+class RevokeAssignmentOut(_CamelModel):
+    """A manual role assignment (a gremium one or a global one)."""
+
+    id: UUID
+    role_id: UUID = Field(serialization_alias="roleId")
+    role_key: str = Field(serialization_alias="roleKey")
+    role_label: dict[str, str] = Field(serialization_alias="roleLabel")
+    # The name of the account that granted it, or ``bootstrap``. Never a ``sub``.
+    granted_by: str | None = Field(serialization_alias="grantedBy")
+    valid_from: str | None = Field(serialization_alias="validFrom")
+    valid_until: str | None = Field(serialization_alias="validUntil")
+
+
+class RevokePoolEntryOut(_CamelModel):
+    """A pool entry of the person in one Gremium.
+
+    ``asSubstitute`` true: the person substitutes for ``memberName`` (null with
+    ``gremiumWide``: for every member). False: the person is the member and
+    ``substituteName`` substitutes for them.
+    """
+
+    id: UUID
+    as_substitute: bool = Field(serialization_alias="asSubstitute")
+    gremium_wide: bool = Field(serialization_alias="gremiumWide")
+    member_name: str | None = Field(serialization_alias="memberName")
+    substitute_name: str | None = Field(serialization_alias="substituteName")
+
+
+class RevokeDelegationOut(_CamelModel):
+    """A delegation of the person in a planned or a live meeting."""
+
+    id: UUID
+    meeting_id: UUID = Field(serialization_alias="meetingId")
+    meeting_title: str = Field(serialization_alias="meetingTitle")
+    meeting_date: str | None = Field(serialization_alias="meetingDate")
+    # True: the person delegated; false: the person is the delegate.
+    as_delegator: bool = Field(serialization_alias="asDelegator")
+    other_name: str | None = Field(serialization_alias="otherName")
+    voting: bool
+
+
+class RevokeGremiumOut(_CamelModel):
+    """Everything that ties the person to one Gremium. A revoke clears all of it."""
+
+    gremium_id: UUID = Field(serialization_alias="gremiumId")
+    name: str
+    membership: RevokeMembershipOut | None = None
+    # Every SSO group of the person that leads into this Gremium. A revoke removes them.
+    groups: list[str] = Field(default_factory=list)
+    assignments: list[RevokeAssignmentOut] = Field(default_factory=list)
+    pool_entries: list[RevokePoolEntryOut] = Field(
+        default_factory=list, serialization_alias="poolEntries"
+    )
+    # Delegations in meetings that have not started. A revoke revokes them.
+    planned_delegations: list[RevokeDelegationOut] = Field(
+        default_factory=list, serialization_alias="plannedDelegations"
+    )
+    # Delegations in live meetings. A revoke keeps them until the meeting ends.
+    live_delegations: list[RevokeDelegationOut] = Field(
+        default_factory=list, serialization_alias="liveDelegations"
+    )
+    # Open votes of the Gremium that still wait for a ballot of the person.
+    open_tasks: int = Field(default=0, serialization_alias="openTasks")
+
+
+class RevokeGlobalRoleOut(_CamelModel):
+    """A global role of the person and its origin (SSO groups, manual assignments)."""
+
+    role_id: UUID = Field(serialization_alias="roleId")
+    role_key: str = Field(serialization_alias="roleKey")
+    role_label: dict[str, str] = Field(serialization_alias="roleLabel")
+    groups: list[str] = Field(default_factory=list)
+    assignments: list[RevokeAssignmentOut] = Field(default_factory=list)
+
+
+class RevokeGroupOut(_CamelModel):
+    """One SSO group of the person and every entry of the preview it leads to."""
+
+    group: str
+    gremium_ids: list[UUID] = Field(serialization_alias="gremiumIds")
+    global_role_ids: list[UUID] = Field(serialization_alias="globalRoleIds")
+
+
+class RevokePreviewOut(_CamelModel):
+    """``GET /admin/principals/{id}/revoke-preview``: what the person has, per Gremium."""
+
+    principal: RevokePrincipalOut
+    gremien: list[RevokeGremiumOut]
+    global_roles: list[RevokeGlobalRoleOut] = Field(serialization_alias="globalRoles")
+    groups: list[RevokeGroupOut]
+    # The own account: the revoke refuses it (409 ``revoke_own_account``).
+    is_self: bool = Field(serialization_alias="isSelf")
+
+
+class PrincipalRevokeIn(_CamelModel):
+    """Body of ``POST /admin/principals/{id}/revoke``."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    gremium_ids: list[UUID] = Field(default_factory=list, alias="gremiumIds", max_length=500)
+    global_role_ids: list[UUID] = Field(
+        default_factory=list, alias="globalRoleIds", max_length=500
+    )
+    deactivate: bool = False
+
+
+class RevokeResultOut(_CamelModel):
+    """``POST /admin/principals/{id}/revoke``: what the revoke did."""
+
+    gremium_ids: list[UUID] = Field(serialization_alias="gremiumIds")
+    global_role_ids: list[UUID] = Field(serialization_alias="globalRoleIds")
+    removed_groups: list[str] = Field(serialization_alias="removedGroups")
+    deleted_assignments: int = Field(serialization_alias="deletedAssignments")
+    deleted_pool_entries: int = Field(serialization_alias="deletedPoolEntries")
+    revoked_delegations: int = Field(serialization_alias="revokedDelegations")
+    kept_live_delegations: int = Field(serialization_alias="keptLiveDelegations")
+    deactivated: bool
 
 
 class PrincipalUpdate(_CamelModel):
