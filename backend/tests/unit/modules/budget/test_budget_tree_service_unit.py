@@ -517,10 +517,10 @@ async def test_get_tree_assembles() -> None:
     sess = fake_session(
         result(top),                                            # nodes
         result(alloc),                                          # allocations
-        result(  # app rows (id, path, fy, amount, state)
-            (uuid.uuid4(), "VS", fy_id, Decimal("250"), "approved"),    # → bound
-            (uuid.uuid4(), "VS", fy_id, Decimal("120"), "submitted"),   # → requested (in-flight)
-            (uuid.uuid4(), "VS", fy_id, Decimal("999"), "rejected"),    # → excluded
+        result(  # app rows (id, path, fy, amount, committed, state)
+            (uuid.uuid4(), "VS", fy_id, Decimal("250"), Decimal("250"), "approved"),    # → bound
+            (uuid.uuid4(), "VS", fy_id, Decimal("120"), Decimal("120"), "submitted"),   # → requested
+            (uuid.uuid4(), "VS", fy_id, Decimal("999"), Decimal("999"), "rejected"),    # → excluded
         ),
         result(),                                               # expense rows (none)
     )
@@ -584,7 +584,7 @@ async def test_get_tree_linked_expense_replaces_bound() -> None:
     sess = fake_session(
         result(top),
         result(alloc),
-        result((app_id, "VS", fy_id, Decimal("250"), "approved")),   # approved app
+        result((app_id, "VS", fy_id, Decimal("250"), Decimal("250"), "approved")),   # approved app
         result(("VS", fy_id, Decimal("100"), "expense", app_id)),    # 100 spent on it
     )
     svc = BudgetTreeService(sess)

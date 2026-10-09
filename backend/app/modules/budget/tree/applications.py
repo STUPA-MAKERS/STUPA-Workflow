@@ -82,6 +82,7 @@ class AssignmentOps(BudgetTreeServiceBase):
                 pathKey=path_key,
                 fiscalYearId=app.fiscal_year_id,
                 amount=app.amount,
+                approvedAmount=app.approved_amount,
                 currency=app.currency,
                 stateId=app.current_state_id,
                 stateLabel=state_label or None,

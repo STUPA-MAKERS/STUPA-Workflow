@@ -5,7 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.modules.applications.models import Application
 from app.modules.budget import tree_rules
@@ -59,7 +59,8 @@ class TreeViewOps(BudgetTreeServiceBase):
         Every node carries allocated, committed, requested and available. Each
         top-level budget classifies its applications. An application counts as
         committed when its current flow-state key is in `accepted_state_keys` of
-        the top budget. It counts as requested when it is neither accepted nor
+        the top budget. It then binds the approved amount of its decision (F1),
+        else the requested amount. It counts as requested when it is neither accepted nor
         denied. A denied application drops out.
         """
         nodes = list((await self.session.execute(select(Budget))).scalars().all())
@@ -75,6 +76,9 @@ class TreeViewOps(BudgetTreeServiceBase):
                     Budget.path_key,
                     Application.fiscal_year_id,
                     Application.amount,
+                    # F1: an accepted application binds the approved amount of its
+                    # decision, else the requested amount.
+                    func.coalesce(Application.approved_amount, Application.amount),
                     State.key,
                 )
                 .join(Application, Application.budget_id == Budget.id)
@@ -122,12 +126,13 @@ class TreeViewOps(BudgetTreeServiceBase):
 
         bound_rows: list[tuple[object, str, Decimal | None]] = []
         requested_rows: list[tuple[object, str, Decimal | None]] = []
-        for app_id, path, fy, amount, state_key in app_rows:
+        for app_id, path, fy, amount, committed, state_key in app_rows:
             accepted, denied = top_config.get(path.split("-")[0], (set(), set()))
             if state_key in accepted:
-                # Reduce the binding by already booked expenses.
+                # Reduce the binding (the approved amount, F1) by already booked
+                # expenses.
                 spent = spent_per_app.get(app_id, _ZERO)
-                remaining = (amount or _ZERO) - spent
+                remaining = (committed or _ZERO) - spent
                 if remaining > _ZERO:
                     bound_rows.append((fy, path, remaining))
             elif state_key in denied:
