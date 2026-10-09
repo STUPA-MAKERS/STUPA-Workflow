@@ -10,6 +10,22 @@
   @include df.switch-label;
 }
 
+/* F1: the heading of the decision proposal and the rule below it. */
+.vod__section {
+  color: var(--color-accent-text);
+}
+.vod__rule {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+}
+.vod__hint {
+  @include df.hint;
+  margin-top: calc(-1 * var(--space-2));
+  padding: 0 var(--space-4);
+}
+
 /* The decision question: a filled field like the kit inputs, with its label inside. */
 .vod__field {
   @include f.box;

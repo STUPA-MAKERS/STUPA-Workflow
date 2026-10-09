@@ -1,0 +1,32 @@
+<app-dialog
+  [open]="open()"
+  [title]="confirmLabel()"
+  [subtitle]="applicationTitle()"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="close()"
+>
+  <form class="ddg" (submit)="$event.preventDefault(); submit()">
+    <span class="ddg__cap cap">{{ 'decision.section' | t }}</span>
+    <app-decision-editor
+      idPrefix="ddg"
+      [switchHint]="'decision.switchHintTransition'"
+      [requested]="requested()"
+      [currency]="currency()"
+      [(draft)]="draft"
+    />
+    @if (refusal()) {
+      <p class="ddg__refusal" role="alert">{{ refusal() }}</p>
+    }
+    <button type="submit" hidden></button>
+  </form>
+  <app-button dialog-footer variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
+  <app-button
+    dialog-footer
+    variant="fill"
+    [disabled]="invalid()"
+    [loading]="saving()"
+    (click)="submit()"
+  >
+    {{ confirmLabel() }}
+  </app-button>
+</app-dialog>
