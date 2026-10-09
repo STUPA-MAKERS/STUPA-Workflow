@@ -29,8 +29,38 @@ async def get_vote(vote_id: str) -> dict:
     and end times; `closesAt` is the planned end of the cast window. `myBallot`
     (`cast`, `choice`) is the own ballot of the caller; a secret vote gives no choice.
     `representedCast` tells whether the caller cast the ballot of a delegator.
+
+    A personnel election has `kind: "election"`, the candidates in `election` and,
+    after the close, `electionResult` (`counts` per candidate id, `abstentions`,
+    `elected`, and `runoff` or `lot` when a tie stays open). Its `result` is
+    `elected`, `runoff`, `tie` (the lot is pending) or `rejected`. `myBallot.choices`
+    holds the own candidate ids of an open election.
     """
     return await api().get(f"/votes/{vote_id}")
+
+
+@group.tool
+async def vote_draw_lot(vote_id: str) -> dict:
+    """Draw the lot for a closed personnel election that ended in a tie.
+
+    The server draws the open seats among the tied candidates and records who drew the
+    lot. 409 `no_lot_pending` when the result is not `tie`, 409 `lot_already_drawn` on
+    a second call, 409 `not_an_election` for a motion. Requires the gremium permission
+    `vote.manage` or `session.manage` in the gremium of the vote (or admin). Audited.
+    """
+    return await api().post(f"/votes/{vote_id}/draw-lot")
+
+
+@group.tool
+async def vote_runoff(vote_id: str) -> dict:
+    """Create the runoff (Stichwahl) of a closed personnel election.
+
+    Only when the result is `runoff`: the new draft vote has the tied candidates and the
+    open seats, round + 1 and `parentVoteId`. Open it with `open_vote`. The meeting must
+    be live. 409 `no_runoff_pending` or `runoff_exists`. Requires the gremium
+    permission `vote.manage` or `session.manage` (or admin).
+    """
+    return await api().post(f"/votes/{vote_id}/runoff")
 
 
 @group.tool
@@ -325,6 +355,10 @@ async def create_meeting_vote(meeting_id: str, vote: S.MeetingVoteOpenBody) -> d
     In a public meeting where guests vote, `guestsVote` (default on for a public item)
     lets the admitted guests vote too: such a vote has no quorum, the majority of the
     cast ballots decides.
+
+    With `kind: "election"`, `seats` and `candidates` the call opens a personnel
+    election on a free-text item. It is secret by default; guests vote only when
+    `guestsVote` is true.
     """
     return await api().post(f"/meetings/{meeting_id}/votes", json=dump_create(vote))
 
