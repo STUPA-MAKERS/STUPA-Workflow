@@ -19,11 +19,14 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.modules.applications.models import Application
+from app.modules.applications.decision import amount_deviates
+from app.modules.applications.models import Application, ApplicationDecision
+from app.modules.applications.share import format_money
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.models import State
 from app.modules.notifications.queue import MailQueue
@@ -48,6 +51,64 @@ def _applicant_only(raw: object) -> bool:
         return False
     specs = [r for r in raw if isinstance(r, dict)]
     return bool(specs) and all(s.get("kind") == "applicant" for s in specs)
+
+
+async def _decision_context(
+    session: AsyncSession, action: DispatchedAction, lang: str
+) -> dict[str, object]:
+    """Return the decision placeholders of a status mail (F1).
+
+    `requestedAmount` and `approvedAmount` are formatted amounts. `amountDeviates`
+    and `conditions` come from the decision of this status change only, so a later
+    status mail does not repeat the deviation block. Without a decision on this
+    status change, `approvedAmount` is the valid approved amount, else the requested
+    amount. A missing amount gives empty strings. All keys are always set, because
+    StrictUndefined makes a render with a missing key fail.
+    """
+    row = (
+        await session.execute(
+            select(
+                Application.amount,
+                Application.currency,
+                Application.approved_amount,
+                ApplicationDecision.approved_amount,
+                ApplicationDecision.conditions,
+            )
+            .outerjoin(
+                ApplicationDecision,
+                and_(
+                    ApplicationDecision.application_id == Application.id,
+                    ApplicationDecision.status_event_id == action.status_event_id,
+                ),
+            )
+            .where(Application.id == action.application_id)
+        )
+    ).first()
+    requested, currency, valid_approved, event_approved, raw_conditions = row or (
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    conditions = (
+        [c for c in raw_conditions if isinstance(c, str)]
+        if isinstance(raw_conditions, list)
+        else []
+    )
+    approved = event_approved if event_approved is not None else valid_approved
+
+    def _fmt(value: Decimal | None) -> str:
+        if value is None:
+            return ""
+        return format_money(value, currency or "EUR", lang)
+
+    return {
+        "requestedAmount": _fmt(requested),
+        "approvedAmount": _fmt(approved if approved is not None else requested),
+        "amountDeviates": amount_deviates(requested, event_approved),
+        "conditions": conditions,
+    }
 
 
 def _log_unconfirmed(action: DispatchedAction) -> None:
@@ -130,6 +191,12 @@ class NotificationActionDispatcher:
                         label_i18n.get(lang or self.settings.mail_default_lang)
                         or next(iter(label_i18n.values()))
                     )
+            # F1: the approved amount and the conditions of the decision.
+            context.update(
+                await _decision_context(
+                    session, action, lang or self.settings.mail_default_lang
+                )
+            )
             extra = action.params.get("context")
             if isinstance(extra, dict):
                 context.update(extra)

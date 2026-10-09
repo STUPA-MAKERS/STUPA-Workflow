@@ -79,15 +79,40 @@ _BUILTIN_NOTIFY_SUBJECT = {
     "de": "Aktualisierung zu Ihrem Antrag",
     "en": "Update on your application",
 }
+# F1: the block that shows an approval with deviations. The dispatcher sets
+# `amountDeviates` and `conditions` for a flow mail. The `is defined` tests keep
+# the block safe under StrictUndefined for a caller without these keys.
+DECISION_BLOCK = {
+    "de": "{% if (amountDeviates is defined and amountDeviates)"
+    " or (conditions is defined and conditions) %}"
+    "\n\nDer Antrag wurde mit Abweichungen genehmigt."
+    "{% if amountDeviates is defined and amountDeviates %}"
+    "\nBeantragt: {{ requestedAmount }}\nBewilligt: {{ approvedAmount }}{% endif %}"
+    "{% if conditions is defined and conditions %}\nAuflagen:"
+    "{% for condition in conditions %}\n- {{ condition }}{% endfor %}{% endif %}"
+    "{% endif %}",
+    "en": "{% if (amountDeviates is defined and amountDeviates)"
+    " or (conditions is defined and conditions) %}"
+    "\n\nThe application was approved with deviations."
+    "{% if amountDeviates is defined and amountDeviates %}"
+    "\nRequested: {{ requestedAmount }}\nApproved: {{ approvedAmount }}{% endif %}"
+    "{% if conditions is defined and conditions %}\nConditions:"
+    "{% for condition in conditions %}\n- {{ condition }}{% endfor %}{% endif %}"
+    "{% endif %}",
+}
 # The body names the application title and the new status when the dispatcher
 # supplies them.
 _BUILTIN_NOTIFY_BODY = {
     "de": "Hallo,\n\nes gibt eine Aktualisierung zu Ihrem Antrag"
     "{% if applicationTitle %} „{{ applicationTitle }}“{% endif %}."
-    "{% if status %}\n\nNeuer Status: {{ status }}{% endif %}\n",
+    "{% if status %}\n\nNeuer Status: {{ status }}{% endif %}"
+    + DECISION_BLOCK["de"]
+    + "\n",
     "en": "Hello,\n\nthere is an update on your application"
     '{% if applicationTitle %} "{{ applicationTitle }}"{% endif %}.'
-    "{% if status %}\n\nNew status: {{ status }}{% endif %}\n",
+    "{% if status %}\n\nNew status: {{ status }}{% endif %}"
+    + DECISION_BLOCK["en"]
+    + "\n",
 }
 
 
