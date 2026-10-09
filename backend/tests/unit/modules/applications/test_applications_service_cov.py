@@ -175,6 +175,8 @@ def _app(**over: Any) -> _Obj:
         "budget_id": None,
         "fiscal_year_id": None,
         "amount": None,
+        # No decision (F1).
+        "approved_amount": None,
         "currency": None,
         "data": {"title": "Antrag"},
         "lang": "de",

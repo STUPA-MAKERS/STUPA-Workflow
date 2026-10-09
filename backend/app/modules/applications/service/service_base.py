@@ -15,6 +15,11 @@ from uuid import UUID
 
 from sqlalchemy import Subquery, func, select
 
+from app.modules.applications.decision import (
+    amount_deviates,
+    decision_source,
+    valid_decision,
+)
 from app.modules.applications.models import (
     Applicant,
     Application,
@@ -26,6 +31,7 @@ from app.modules.applications.schemas import (
     ApplicantOut,
     ApplicationOut,
     CaptureOut,
+    DecisionOut,
     StateOut,
 )
 from app.modules.flow.models import FlowVersion, State
@@ -405,6 +411,32 @@ class ApplicationsServiceBase:
             capture=await self._capture_out(
                 app, applicant_view=applicant_view, magic_link_view=magic_link_view
             ),
+            approvedAmount=app.approved_amount,
+            decision=await self._decision_out(app, applicant_view=applicant_view),
+        )
+
+    async def _decision_out(
+        self, app: Application, *, applicant_view: bool
+    ) -> DecisionOut | None:
+        """Return the valid decision of an application (F1), or None before one.
+
+        The applicant view names the Gremium only: no vote link, no meeting and no
+        agenda number.
+        """
+        row = await valid_decision(self.session, app.id)
+        if row is None:
+            return None
+        source = await decision_source(self.session, app, row)
+        return DecisionOut(
+            requestedAmount=app.amount,
+            approvedAmount=row.approved_amount,
+            amountDeviates=amount_deviates(app.amount, row.approved_amount),
+            conditions=list(row.conditions or []),
+            decidedAt=row.decided_at,
+            voteId=None if applicant_view else row.vote_id,
+            gremiumName=source.gremium_name,
+            meetingTitle=None if applicant_view else source.meeting_title,
+            agendaPosition=None if applicant_view else source.agenda_position,
         )
 
     async def _capture_out(
