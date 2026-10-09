@@ -984,6 +984,10 @@ export interface ElectionCandidate {
   name: string;
   /** The account of the candidate, or `null` for a free name. */
   principalId?: Uuid | null;
+  /** The DSGVO erasure removed the name (`name` then holds the German placeholder
+   *  "Gelöscht"): the UI shows `election.candidate.erased` instead. Only the server
+   *  sets it. */
+  erased?: boolean;
 }
 
 /**

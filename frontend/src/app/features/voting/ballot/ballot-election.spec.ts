@@ -1,7 +1,9 @@
 import { of, throwError } from 'rxjs';
+import { TestBed } from '@angular/core/testing';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import type { ElectionConfig, MyBallot } from '@core/api/models';
+import type { ElectionCandidate, ElectionConfig, MyBallot } from '@core/api/models';
+import { I18nService } from '@core/i18n/i18n.service';
 import { runAxe } from '../../../../testing/a11y';
 import { BallotComponent, type BallotCaster } from './ballot.component';
 
@@ -13,9 +15,19 @@ const CANDIDATES = [
 
 async function setup(
   seats: number,
-  opts: { own?: MyBallot | null; proxyName?: string; secret?: boolean; caster?: BallotCaster } = {},
+  opts: {
+    own?: MyBallot | null;
+    proxyName?: string;
+    secret?: boolean;
+    caster?: BallotCaster;
+    candidates?: ElectionCandidate[];
+  } = {},
 ) {
-  const election: ElectionConfig = { seats, candidates: CANDIDATES, secret: !!opts.secret };
+  const election: ElectionConfig = {
+    seats,
+    candidates: opts.candidates ?? CANDIDATES,
+    secret: !!opts.secret,
+  };
   const caster = jest.fn(opts.caster ?? (() => of({ status: 'cast' })));
   const castDone = jest.fn();
   const castFailed = jest.fn();
@@ -37,6 +49,25 @@ async function setup(
 const confirmButton = () => screen.getByRole('button', { name: /abgeben/ });
 
 describe('BallotComponent · election (F2)', () => {
+  it('labels an erased candidate in the language of the viewer', async () => {
+    const candidates = CANDIDATES.map((c) =>
+      c.id === 'c2' ? { ...c, name: 'Gelöscht', erased: true } : c,
+    );
+    const { fixture } = await setup(1, { candidates });
+    const user = userEvent.setup();
+    expect(screen.getByRole('radio', { name: 'Gelöscht' })).toBeInTheDocument();
+    const i18n = TestBed.inject(I18nService);
+    try {
+      i18n.setLocale('en');
+      fixture.detectChanges();
+      await user.click(screen.getByRole('radio', { name: 'Deleted' }));
+      expect(screen.queryByRole('radio', { name: 'Gelöscht' })).toBeNull();
+      expect(screen.getByRole('button', { name: /Deleted/ })).toBeInTheDocument();
+    } finally {
+      i18n.setLocale('de');
+    }
+  });
+
   it('one seat: a radio list with a separate abstention row', async () => {
     const { caster, castDone, container } = await setup(1);
     const user = userEvent.setup();

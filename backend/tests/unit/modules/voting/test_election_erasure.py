@@ -15,6 +15,7 @@ from sqlalchemy.dialects import postgresql
 
 from app.modules.voting.erasure import _MAX_PASSES, ERASED_CANDIDATE_NAME, erase_candidacies
 from app.modules.voting.models import Vote
+from app.shared.config_schemas import ElectionConfig
 from tests._support.privacy_fakes import FakeResult, FakeSession
 
 PID = uuid4()
@@ -118,8 +119,12 @@ async def test_not_elected_candidate_gets_the_placeholder() -> None:
     assert mine["principalId"] == str(PID)
     assert vote.election_result == result_before
     assert vote.config["seats"] == 1
+    # The marker tells the UI to show its own label; the others carry none.
+    assert mine["erased"] is True
+    assert [c.get("erased") for c in vote.config["candidates"][1:]] == [None, None]
     # The old config stays as it was, for the protocol rewrite.
     assert old["candidates"][0]["name"] == "Anna Erased"
+    assert "erased" not in old["candidates"][0]
 
 
 async def test_open_election_is_undecided_and_gets_the_placeholder() -> None:
@@ -252,6 +257,37 @@ async def test_second_erasure_finds_nothing_to_change() -> None:
     await _erase(vote)
     changed, _ = await _erase(vote)
     assert changed == []
+
+
+async def test_placeholder_name_without_the_marker_gets_the_marker() -> None:
+    # The marker decides, not the name: a stored placeholder without the marker
+    # (or a person really named so) gets the marker; the name stays the placeholder.
+    vote = _election(
+        elected=["c8"],
+        candidates=[
+            {"id": "c1", "name": ERASED_CANDIDATE_NAME, "principalId": str(PID)},
+            {"id": "c8", "name": "Ben", "principalId": str(OTHER)},
+        ],
+    )
+    changed, _ = await _erase(vote)
+    assert [c.vote for c in changed] == [vote]
+    assert vote.config["candidates"][0] == {
+        "id": "c1",
+        "name": ERASED_CANDIDATE_NAME,
+        "principalId": str(PID),
+        "erased": True,
+    }
+
+
+async def test_erased_config_validates_and_carries_the_marker() -> None:
+    vote = _election(elected=["c8"])
+    await _erase(vote)
+    config = ElectionConfig.model_validate(vote.config)
+    assert [c.erased for c in config.candidates] == [True, False, False]
+    # The beamer form drops the account links and keeps the marker.
+    dumped = config.public().model_dump(mode="json", by_alias=True)
+    assert [c["erased"] for c in dumped["candidates"]] == [True, False, False]
+    assert [c["principalId"] for c in dumped["candidates"]] == [None, None, None]
 
 
 async def test_multiple_elections_each_decide_on_their_own() -> None:

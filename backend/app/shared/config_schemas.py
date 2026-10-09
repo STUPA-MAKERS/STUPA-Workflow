@@ -596,11 +596,16 @@ class ElectionCandidate(_CamelModel):
     ``id`` is the key of the candidate in the ballots and in the result. The server
     sets it (``c1``, ``c2``, ...), and a runoff keeps the ids of its parent.
     ``principalId`` links an account; a candidate without an account has a name only.
+    ``erased`` marks a candidate whose name the DSGVO erasure replaced
+    (``voting.erasure``): ``name`` then holds the German placeholder and the UI shows
+    its own label. Only the erasure sets it; the create body of an election
+    (``livevote.schemas.ElectionCandidateIn``) has no such field.
     """
 
     id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
     name: str = Field(min_length=1, max_length=200)
     principal_id: UUID | None = Field(default=None, alias="principalId")
+    erased: bool = False
 
     @field_validator("name")
     @classmethod

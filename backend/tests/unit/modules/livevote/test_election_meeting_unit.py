@@ -103,6 +103,7 @@ def test_open_election_builds_the_election_config(setup: Any) -> None:
     assert isinstance(config, ElectionConfig)
     assert [c.id for c in config.candidates] == ["c1", "c2"]
     assert config.candidates[0].name == "Anna"
+    assert [c.erased for c in config.candidates] == [False, False]
     assert config.secret is True
     # Guests vote in an election only when the lead switches them on.
     assert config.guests_vote is False
@@ -143,6 +144,10 @@ def test_open_election_on_an_application_item_422(setup: Any) -> None:
             ]
         },
         {"candidates": [{"name": " "}]},
+        # The client never sets the erasure marker nor the id of a candidate.
+        {"candidates": [{"name": "A", "erased": True}, {"name": "B"}]},
+        {"candidates": [{"name": "A", "erased": False}, {"name": "B"}]},
+        {"candidates": [{"name": "A", "id": "c9"}, {"name": "B"}]},
     ],
 )
 def test_open_body_rejects_a_bad_election(over: dict[str, Any]) -> None:
@@ -269,6 +274,26 @@ def test_vote_opened_event_carries_the_election() -> None:
     assert event["round"] == 2
     assert event["replay"] is True
     assert [c["name"] for c in event["election"]["candidates"]] == ["Anna", "Ben"]
+    assert [c["erased"] for c in event["election"]["candidates"]] == [False, False]
+
+
+def test_vote_opened_event_carries_the_erasure_marker() -> None:
+    erased = ElectionConfig.model_validate(
+        {
+            "seats": 1,
+            "candidates": [
+                {"id": "c1", "name": "Gelöscht", "principalId": str(uuid4()), "erased": True},
+                {"id": "c2", "name": "Ben"},
+            ],
+        }
+    )
+    vote = _vote_out(election=erased)
+    assert [c["erased"] for c in vote.model_dump(by_alias=True)["election"]["candidates"]] == [
+        True,
+        False,
+    ]
+    event: dict[str, Any] = VoteOpenedEvent.from_vote(vote).dump()
+    assert [c["erased"] for c in event["election"]["candidates"]] == [True, False]
 
 
 def test_channel_events_carry_no_account_ids() -> None:

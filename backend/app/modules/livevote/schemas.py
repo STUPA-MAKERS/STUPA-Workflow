@@ -421,7 +421,13 @@ class AssignableApplicationOut(_CamelModel):
 
 
 class ElectionCandidateIn(_CamelModel):
-    """One candidate of a new election (F2): an account or a name only."""
+    """One candidate of a new election (F2): an account or a name only.
+
+    An unknown key gives 422: the client sets neither the id nor the erasure marker
+    (``erased``) of a candidate.
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
     principal_id: UUID | None = Field(default=None, alias="principalId")

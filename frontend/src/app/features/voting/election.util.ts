@@ -1,4 +1,5 @@
 import type {
+  ElectionCandidate,
   ElectionConfig,
   ElectionFields,
   ElectionResult,
@@ -28,14 +29,28 @@ export function isYesNoElection(election: ElectionConfig | null): boolean {
   return !!election && election.candidates.length === 1;
 }
 
-/** The name of a candidate id, or the id when the config does not know it. */
-export function candidateName(election: ElectionConfig | null, id: string): string {
-  return election?.candidates.find((c) => c.id === id)?.name ?? id;
+/**
+ * The shown name of a candidate: the label `election.candidate.erased` in the language
+ * of the viewer when the DSGVO erasure removed the name, else the stored name. The
+ * protocol snippet (`electionSnippet`) keeps the stored German name instead.
+ */
+export function candidateLabel(candidate: ElectionCandidate, t: Translate): string {
+  return candidate.erased ? t('election.candidate.erased') : candidate.name;
 }
 
-/** The names of candidate ids, in the given order. */
-export function candidateNames(election: ElectionConfig | null, ids: readonly string[]): string[] {
-  return ids.map((id) => candidateName(election, id));
+/** The shown name of a candidate id, or the id when the config does not know it. */
+export function candidateName(election: ElectionConfig | null, id: string, t: Translate): string {
+  const candidate = election?.candidates.find((c) => c.id === id);
+  return candidate ? candidateLabel(candidate, t) : id;
+}
+
+/** The shown names of candidate ids, in the given order. */
+export function candidateNames(
+  election: ElectionConfig | null,
+  ids: readonly string[],
+  t: Translate,
+): string[] {
+  return ids.map((id) => candidateName(election, id, t));
 }
 
 /**
@@ -48,7 +63,7 @@ export function electionChoiceLabel(
   t: Translate,
 ): string {
   if (picks.length === 0) return t('vote.option.abstain');
-  const names = candidateNames(election, picks).join(', ');
+  const names = candidateNames(election, picks, t).join(', ');
   const free = (election?.seats ?? 1) - picks.length;
   return free > 0 ? `${names} · ${abstentionsText(free, t)}` : names;
 }
@@ -119,7 +134,7 @@ export function electionBars(
   }
   const rows = election.candidates.map((c) => ({
     id: c.id,
-    label: c.name,
+    label: candidateLabel(c, t),
     count: result?.counts[c.id] ?? counts[c.id] ?? 0,
     elected: elected.has(c.id),
     tied: tied.has(c.id),
@@ -164,7 +179,7 @@ export function electionResultLine(
   er: ElectionResult | null,
   t: Translate,
 ): string {
-  const elected = candidateNames(election, er?.elected ?? []);
+  const elected = candidateNames(election, er?.elected ?? [], t);
   if (result === 'tie') return t('election.result.tie');
   if (result === 'rejected' || elected.length === 0) return t('election.result.nobody');
   return t('election.result.elected', { names: elected.join(', ') });

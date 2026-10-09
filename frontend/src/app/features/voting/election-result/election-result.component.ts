@@ -111,7 +111,7 @@ export class ElectionResultComponent {
     return {
       text: this.t('election.runoff.banner', {
         seats: seatsText(er.runoff.seats, this.t),
-        names: candidateNames(this.election(), er.runoff.candidateIds).join(', '),
+        names: candidateNames(this.election(), er.runoff.candidateIds, this.t).join(', '),
       }),
       pending: runoffPending(this.result(), er),
     };
@@ -122,7 +122,7 @@ export class ElectionResultComponent {
     const er = this.electionResult();
     if (!lotPending(this.result(), er) || !er?.lot) return null;
     return this.t('election.lot.pending', {
-      names: candidateNames(this.election(), er.lot.among).join(', '),
+      names: candidateNames(this.election(), er.lot.among, this.t).join(', '),
     });
   });
 
@@ -131,7 +131,7 @@ export class ElectionResultComponent {
     const drawn = this.electionResult()?.lot?.drawn;
     if (!drawn) return null;
     return this.t('election.lot.note', {
-      names: candidateNames(this.election(), drawn).join(', '),
+      names: candidateNames(this.election(), drawn, this.t).join(', '),
     });
   });
 

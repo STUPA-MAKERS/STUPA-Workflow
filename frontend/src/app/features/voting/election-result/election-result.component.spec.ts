@@ -3,7 +3,9 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { ElectionConfig, ElectionResult } from '@core/api/models';
+import { TestBed } from '@angular/core/testing';
 import { ToastService } from '@stupa-makers/ui-kit';
+import { I18nService } from '@core/i18n/i18n.service';
 import { runAxe } from '../../../../testing/a11y';
 import { ElectionResultComponent } from './election-result.component';
 
@@ -65,6 +67,28 @@ describe('ElectionResultComponent', () => {
       screen.getByText('Gleichstand an der Grenze: Stichwahl um 1 Posten zwischen Ben, Cem.'),
     ).toBeInTheDocument();
     expect(await runAxe(container)).toHaveNoViolations();
+  });
+
+  it('labels an erased candidate in the language of the viewer', async () => {
+    const erased: ElectionConfig = {
+      ...ELECTION,
+      candidates: ELECTION.candidates.map((c) =>
+        c.id === 'c2' ? { ...c, name: 'Gelöscht', erased: true } : c,
+      ),
+    };
+    const { fixture } = await setup({ election: erased });
+    const labels = () =>
+      screen.getAllByRole('listitem').map((li) => li.querySelector('.bars__label')?.textContent?.trim());
+    expect(labels()).toEqual(['Anna gewählt', 'Gelöscht Gleichstand', 'Cem Gleichstand', 'Dana', 'Enthaltungen']);
+    const i18n = TestBed.inject(I18nService);
+    try {
+      i18n.setLocale('en');
+      fixture.detectChanges();
+      expect(labels()[1]).toMatch(/^Deleted /);
+      expect(screen.getByText(/Deleted, Cem/)).toBeInTheDocument();
+    } finally {
+      i18n.setLocale('de');
+    }
   });
 
   it('starts the runoff: create, open, read', async () => {

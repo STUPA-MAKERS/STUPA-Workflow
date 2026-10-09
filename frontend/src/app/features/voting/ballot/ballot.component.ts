@@ -213,7 +213,9 @@ export class BallotComponent {
     if (!this.multiSeat() || !Array.isArray(choice) || choice.length === 0) return '';
     return this.i18n.translate('voting.ballot.confirmNames', {
       label: this.confirmLabel(),
-      names: candidateNames(this.election(), choice).join(', '),
+      names: candidateNames(this.election(), choice, (key, params) =>
+        this.i18n.translate(key, params),
+      ).join(', '),
     });
   });
 

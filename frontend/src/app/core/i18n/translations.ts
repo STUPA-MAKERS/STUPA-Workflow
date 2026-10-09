@@ -1148,6 +1148,8 @@ export const de = {
   'election.names.one': '1 Name',
   'election.names.other': '{n} Namen',
   'election.abstentionsLabel': 'Enthaltungen',
+  // A candidate whose name the DSGVO erasure removed (`erased`).
+  'election.candidate.erased': 'Gelöscht',
   'election.dialog.round': 'Wahlgang',
   'election.dialog.roundPlaceholder': 'z. B. Wahl der Sitzungsleitung',
   'election.dialog.seats': 'Zu besetzende Posten',
@@ -4773,6 +4775,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'election.names.one': '1 name',
   'election.names.other': '{n} names',
   'election.abstentionsLabel': 'Abstentions',
+  'election.candidate.erased': 'Deleted',
   'election.dialog.round': 'Election round',
   'election.dialog.roundPlaceholder': 'e.g. Election of the chair',
   'election.dialog.seats': 'Seats to fill',

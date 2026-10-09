@@ -1,8 +1,11 @@
 import type { ElectionConfig, ElectionResult } from '@core/api/models';
 import type { TranslationKey } from '@core/i18n/translations';
+import { CATALOG } from '@core/i18n/translations';
 import {
   abstentionsText,
+  candidateLabel,
   candidateName,
+  candidateNames,
   electionBars,
   electionCaption,
   electionChoiceLabel,
@@ -33,7 +36,31 @@ const ELECTION: ElectionConfig = {
 };
 const SINGLE: ElectionConfig = { seats: 1, candidates: [{ id: 'c1', name: 'Anna' }], secret: true };
 
+/** Anna's name was erased (DSGVO): the stored name is the German placeholder. */
+const ERASED: ElectionConfig = {
+  ...ELECTION,
+  candidates: [{ id: 'c1', name: 'Gelöscht', erased: true }, ...ELECTION.candidates.slice(1)],
+};
+
 describe('election.util', () => {
+  it('shows the label of the viewer for an erased candidate', () => {
+    expect(candidateLabel({ id: 'c2', name: 'Ben' }, t)).toBe('Ben');
+    expect(candidateLabel({ id: 'c2', name: 'Ben', erased: false }, t)).toBe('Ben');
+    expect(candidateLabel(ERASED.candidates[0]!, t)).toBe('election.candidate.erased');
+    expect(candidateNames(ERASED, ['c2', 'c1'], t)).toEqual(['Ben', 'election.candidate.erased']);
+    expect(electionChoiceLabel(ERASED, ['c1', 'c2'], t)).toBe('election.candidate.erased, Ben');
+    const bars = electionBars(ERASED, null, { c1: 2, c2: 1 }, t);
+    expect(bars.map((b) => b.label)).toEqual([
+      'election.candidate.erased',
+      'Ben',
+      'Cem',
+      'election.abstentionsLabel',
+    ]);
+    // The label in both languages.
+    expect(CATALOG.de['election.candidate.erased']).toBe('Gelöscht');
+    expect(CATALOG.en['election.candidate.erased']).toBe('Deleted');
+  });
+
   it('finds the election of a vote', () => {
     expect(electionOf(null)).toBeNull();
     expect(electionOf({ kind: 'motion' })).toBeNull();
@@ -45,8 +72,8 @@ describe('election.util', () => {
   });
 
   it('names candidates and ballots', () => {
-    expect(candidateName(ELECTION, 'c2')).toBe('Ben');
-    expect(candidateName(null, 'c9')).toBe('c9');
+    expect(candidateName(ELECTION, 'c2', t)).toBe('Ben');
+    expect(candidateName(null, 'c9', t)).toBe('c9');
     expect(electionChoiceLabel(ELECTION, [], t)).toBe('vote.option.abstain');
     expect(electionChoiceLabel(ELECTION, ['c1', 'c2'], t)).toBe('Anna, Ben');
     expect(electionChoiceLabel(ELECTION, ['c1'], t)).toBe('Anna · election.abstentions.one');

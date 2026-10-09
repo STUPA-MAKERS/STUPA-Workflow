@@ -165,7 +165,7 @@
             <app-icon name="check" [size]="18" />
           }
         </span>
-        <span class="choice__label">{{ c.name }}</span>
+        <span class="choice__label">{{ c.erased ? ('election.candidate.erased' | t) : c.name }}</span>
       </button>
     }
     @let abstain = isAbstain(row);

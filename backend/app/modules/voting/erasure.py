@@ -4,7 +4,10 @@ An election (``vote.kind = 'election'``) keeps the name of each candidate in
 ``vote.config.candidates``; the ballots and ``election_result`` name the candidates by
 their id only. The erasure of a principal replaces the name of each candidacy of that
 principal with ``ERASED_CANDIDATE_NAME``, unless the principal was elected: the result
-of an election is a documented resolution, so an elected candidate keeps the name.
+of an election is a documented resolution, so an elected candidate keeps the name. The
+candidate also gets the marker ``erased: true``: the UI shows a label in the language of
+the viewer, and ``ERASED_CANDIDATE_NAME`` stays the stored name for the German protocol
+and for a client that does not know the marker.
 
 A candidacy counts as elected when the closed result of a vote of the same election
 lists the candidate. An election is the first round and its runoffs: a runoff copies
@@ -36,6 +39,9 @@ from app.modules.voting.models import Vote
 
 # The name that replaces the name of an erased candidate who was not elected.
 ERASED_CANDIDATE_NAME = "Gelöscht"
+# The marker key of an erased candidate in ``vote.config.candidates[]`` (see
+# ``ElectionCandidate.erased``).
+ERASED_KEY = "erased"
 
 # The bound of the passes that look for rounds a parallel runoff added (see below).
 _MAX_PASSES = 5
@@ -125,6 +131,9 @@ async def _locked_elections(session: AsyncSession, principals: frozenset[str]) -
 async def erase_candidacies(session: AsyncSession, principal_id: UUID) -> list[ErasedCandidacy]:
     """Replace the name of each candidacy of a principal who was not elected (no commit).
 
+    The candidate gets ``ERASED_CANDIDATE_NAME`` and the marker ``erased: true``. A
+    candidate that carries the marker is not changed again.
+
     The ballots, the candidate ids and ``election_result`` stay, so the tally does not
     change. The account link (``principalId``) stays as a pseudonym, as the ``sub``
     of the principal does. A candidacy of an account merged into the principal counts
@@ -149,7 +158,7 @@ async def erase_candidacies(session: AsyncSession, principal_id: UUID) -> list[E
         mine = [
             candidate
             for candidate in _candidacies(vote, principals)
-            if candidate.get("name") != ERASED_CANDIDATE_NAME  # erased before
+            if candidate.get(ERASED_KEY) is not True  # erased before
         ]
         if not mine or _root_of(vote, by_id) in elected_roots:
             continue
@@ -158,7 +167,9 @@ async def erase_candidacies(session: AsyncSession, principal_id: UUID) -> list[E
         vote.config = {
             **old_config,
             "candidates": [
-                {**c, "name": ERASED_CANDIDATE_NAME} if any(c is m for m in mine) else c
+                {**c, "name": ERASED_CANDIDATE_NAME, ERASED_KEY: True}
+                if any(c is m for m in mine)
+                else c
                 for c in old_config["candidates"]
             ],
         }
