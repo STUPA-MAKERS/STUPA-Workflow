@@ -114,6 +114,22 @@ describe('VoteOpenDialogComponent · election (F2)', () => {
     cmp.setKind('motion');
     expect(cmp.canSubmit()).toBe(true);
   });
+
+  it('names a roster member without a name by the e-mail, else by the id', async () => {
+    const { cmp, fixture } = await setup();
+    fixture.componentRef.setInput('members', [
+      { principalId: 'p-7', displayName: null, email: 'mia@x.de', status: 'present' } as Attendance,
+      { principalId: 'p-8', displayName: null, email: null, status: 'present' } as Attendance,
+    ]);
+    expect(cmp.memberOptions()).toEqual([
+      { value: 'p-7', label: 'mia@x.de' },
+      { value: 'p-8', label: 'p-8' },
+    ]);
+    cmp.addMember('p-7');
+    cmp.addMember('p-8');
+    expect(cmp.candidates().map((c) => c.name)).toEqual(['mia@x.de', 'p-8']);
+    expect(cmp.memberOptions()).toEqual([]);
+  });
 });
 
 /** The names of the candidate list, in order. */

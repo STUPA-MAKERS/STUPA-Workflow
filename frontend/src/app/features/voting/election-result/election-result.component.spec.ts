@@ -174,4 +174,30 @@ describe('ElectionResultComponent', () => {
     expect(screen.queryByText(/Gewählt|Stichwahl|Niemand/)).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
   });
+  it('sends one action at a time, none without a vote id, and reports a bare refusal', async () => {
+    const { http, fixture, toasts, changed } = await setup({});
+    const cmp = fixture.componentInstance;
+    cmp.startRunoff();
+    cmp.startRunoff(); // busy: no second request
+    cmp.drawLot();
+    http.expectOne({ method: 'POST', url: '/api/votes/e1/runoff' }).flush(null, { status: 500, statusText: 'Error' });
+    http.verify();
+    expect(toasts()).toContain('Aktion fehlgeschlagen.');
+    expect(changed).not.toHaveBeenCalled();
+    fixture.componentRef.setInput('voteId', null);
+    cmp.startRunoff();
+    cmp.drawLot();
+    http.verify();
+  });
+
+  it('shows zero bars for a single candidate without counts or result', async () => {
+    await setup({
+      result: null,
+      electionResult: null,
+      election: { seats: 1, candidates: [{ id: 'c1', name: 'Anna' }], secret: false },
+      counts: {},
+    });
+    expect(screen.getByLabelText('Ja: 0 Stimmen, 0 %')).toBeInTheDocument();
+    expect(screen.getByLabelText('Nein: 0 Stimmen, 0 %')).toBeInTheDocument();
+  });
 });

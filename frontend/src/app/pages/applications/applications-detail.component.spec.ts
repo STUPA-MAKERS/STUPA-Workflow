@@ -1086,6 +1086,35 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
+  it('F1: notes the deviations of a decision in the history', async () => {
+    const { http, detectChanges, cmp } = await setup();
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush([]);
+    http.expectOne(url('/comments')).flush([]);
+    http.expectOne(url('/timeline')).flush([
+      { toStateId: 's1', toState: SUBMITTED, at: '2026-06-05T10:00:00Z' },
+      {
+        toStateId: 's1',
+        toState: SUBMITTED,
+        at: '2026-06-06T10:00:00Z',
+        decision: { requestedAmount: '820.00', approvedAmount: '820.00', amountDeviates: false, conditionCount: 1 },
+      },
+      {
+        toStateId: 's1',
+        toState: SUBMITTED,
+        at: '2026-06-07T10:00:00Z',
+        decision: { requestedAmount: '820.00', approvedAmount: null, amountDeviates: false, conditionCount: 0 },
+      },
+    ]);
+    flushForm(http);
+    detectChanges();
+    const [, conditions, plain] = cmp.historyEntries();
+    expect(conditions.body).toBe('Mit Abweichungen: 1 Auflage');
+    expect(plain.body).toBeNull();
+    flushAttachments(http);
+    http.verify();
+  });
+
   it('renders every resolved actor and never a raw id or key', async () => {
     const { http, detectChanges, cmp, container } = await setup();
     http.expectOne(url('')).flush(appWire());

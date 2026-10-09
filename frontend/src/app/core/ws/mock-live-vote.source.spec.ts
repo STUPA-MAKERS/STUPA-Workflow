@@ -49,6 +49,32 @@ describe('MockLiveVoteSource', () => {
     ch.close();
   });
 
+  it('counts the first pick of an election ballot, an empty one as abstain, and ignores unknown options', () => {
+    const ch = source.connectMeeting('m-1');
+    const { sink, push } = collect();
+    ch.messages$.subscribe(push);
+    ch.send({ type: 'cast', voteId: 'vote-demo', choice: ['no', 'yes'] });
+    ch.send({ type: 'cast', voteId: 'vote-demo', choice: [] });
+    expect(sink.filter((m) => m.type === 'vote_tally').map((m) => (m as VoteTallyMsg).cast)).toEqual([9, 10]);
+    ch.send({ type: 'cast', voteId: 'vote-demo', choice: 'maybe' });
+    expect(sink.filter((m) => m.type === 'vote_tally')).toHaveLength(2);
+    ch.close();
+  });
+
+  it('never counts a cast above the eligible voters and reveals the counts at the end', () => {
+    const ch = source.connectMeeting('m-1');
+    const { sink, push } = collect();
+    ch.messages$.subscribe(push);
+    for (let i = 0; i < 6; i++) ch.send({ type: 'cast', voteId: 'vote-demo', choice: 'yes' });
+    const tallies = sink.filter((m) => m.type === 'vote_tally') as VoteTallyMsg[];
+    expect(tallies).toHaveLength(4); // 8 → 12, then capped
+    const last = tallies[tallies.length - 1];
+    expect(last.revealed).toBe(true);
+    expect(last.counts).toEqual({ yes: 9, no: 2, abstain: 1 });
+    expect(last.leading).toBe('yes');
+    ch.close();
+  });
+
   it('ignores cast frames on the read-only beamer stream', () => {
     const ch = source.connectMeeting('m-1', true);
     const { sink, push } = collect();

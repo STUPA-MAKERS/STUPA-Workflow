@@ -232,6 +232,17 @@ describe('mockApiInterceptor', () => {
       expect(form.sections.length).toBeGreaterThan(0);
     });
 
+    it('GET /gremien/{id}/meeting-defaults → a quorum for the StuPa, public join elsewhere', async () => {
+      expect(await get('/api/gremien/g0000000-0000-0000-0000-000000000001/meeting-defaults')).toEqual({
+        publicJoinAllowed: false,
+        quorumPercent: 50,
+      });
+      expect(await get('/api/gremien/g-other/meeting-defaults')).toEqual({
+        publicJoinAllowed: true,
+        quorumPercent: null,
+      });
+    });
+
     it('GET …/timeline → events', async () => {
       const events = await get<unknown[]>('/api/applications/x/timeline');
       expect(events.length).toBe(3);
@@ -526,6 +537,93 @@ describe('mockApiInterceptor', () => {
         expect(await get<unknown[]>(`/api/applications/${second}/attachments`)).toEqual([]);
         expect(await get<unknown[]>(`/api/applications/${first}/shares`)).toEqual([]);
         expect((await get<unknown[]>(`/api/applications/${first}/flow-states`)).length).toBe(5);
+      });
+
+      it('F1: serves the decision of a decided row in the detail and the timeline', async () => {
+        const decided = 'a1000000-0000-0000-0000-000000000016';
+        const app = await get<{ decision: Record<string, unknown> }>(`/api/applications/${decided}`);
+        expect(app.decision).toEqual({
+          requestedAmount: '820.00',
+          approvedAmount: '700.00',
+          amountDeviates: true,
+          conditions: [
+            'Abrechnung mit allen Belegen bis 31.12.2026 beim AStA-Finanzreferat.',
+            'Das STUPA wird auf dem Gerät als Förderer genannt.',
+          ],
+          decidedAt: '2026-07-09T14:05:00Z',
+          voteId: 'b1000000-0000-0000-0000-000000000016',
+          gremiumName: 'Studierendenparlament',
+          meetingTitle: '34. Sitzung',
+          agendaPosition: 6,
+        });
+        const timeline = await get<{ decision: unknown }[]>(`/api/applications/${decided}/timeline`);
+        expect(timeline[timeline.length - 1].decision).toEqual({
+          requestedAmount: '820.00',
+          approvedAmount: '700.00',
+          amountDeviates: true,
+          conditionCount: 2,
+        });
+        // An approved row without a decision has none.
+        const plain = await get<{ decision: unknown }>('/api/applications/a1000000-0000-0000-0000-000000000013');
+        expect(plain.decision).toBeNull();
+      });
+
+      it('F1: the approval stores the decision, as requested or with another amount', async () => {
+        const approve = '77777777-7777-7777-7777-777777777786';
+        type Detail = { state: { key: string }; decision: Record<string, unknown> | null };
+        type Event = { note: string | null; decision: Record<string, unknown> | null };
+        const asked = 'a1000000-0000-0000-0000-000000000004';
+        const transitions = await get<{ id: string; allowsDecision: boolean }[]>(`/api/applications/${asked}/transitions`);
+        expect(transitions.filter((t) => t.allowsDecision).map((t) => t.id)).toEqual([approve]);
+        await firstValueFrom(
+          http.post(`/api/applications/${asked}/transition`, {
+            transitionId: approve,
+            note: 'Einstimmig',
+            decision: { approvedAmount: null, conditions: ['Belege einreichen'] },
+          }),
+        );
+        const d = await get<Detail>(`/api/applications/${asked}`);
+        expect(d.state.key).toBe('approved');
+        expect(d.decision).toMatchObject({
+          requestedAmount: '1180.00',
+          approvedAmount: null,
+          amountDeviates: false,
+          conditions: ['Belege einreichen'],
+          voteId: null,
+          meetingTitle: null,
+          agendaPosition: null,
+        });
+        const events = await get<Event[]>(`/api/applications/${asked}/timeline`);
+        expect(events[events.length - 1]).toMatchObject({
+          note: 'Einstimmig',
+          decision: { approvedAmount: null, amountDeviates: false, conditionCount: 1 },
+        });
+
+        // A row without an amount: any approved amount deviates.
+        const noAmount = 'a1000000-0000-0000-0000-000000000015';
+        const toReview = (await get<{ id: string }[]>(`/api/applications/${noAmount}/transitions`))[0];
+        await firstValueFrom(http.post(`/api/applications/${noAmount}/transition`, { transitionId: toReview.id }));
+        await firstValueFrom(
+          http.post(`/api/applications/${noAmount}/transition`, {
+            transitionId: approve,
+            decision: { approvedAmount: '50.00', conditions: [] },
+          }),
+        );
+        expect((await get<Detail>(`/api/applications/${noAmount}`)).decision).toMatchObject({
+          requestedAmount: null,
+          approvedAmount: '50.00',
+          amountDeviates: true,
+        });
+
+        // The approval without a decision stores none.
+        const without = 'a1000000-0000-0000-0000-000000000014';
+        await firstValueFrom(http.post(`/api/applications/${without}/transition`, { transitionId: approve }));
+        expect((await get<Detail>(`/api/applications/${without}`)).decision).toBeNull();
+        const last = (await get<Event[]>(`/api/applications/${without}/timeline`)).pop();
+        expect(last?.decision).toBeNull();
+        // A transition without a body changes nothing.
+        await firstValueFrom(http.post(`/api/applications/${second}/transition`, null));
+        expect((await get<Row>(`/api/applications/${second}`)).state.key).toBe('submitted');
       });
 
       it('answers 404 for an unknown demo id', async () => {

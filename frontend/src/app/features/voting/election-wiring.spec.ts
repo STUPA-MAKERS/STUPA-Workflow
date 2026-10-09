@@ -96,6 +96,29 @@ describe('election wiring (F2)', () => {
     );
   });
 
+  it('writes a vote without a round as the first one and keeps an unknown runoff id', () => {
+    const snippet = electionSnippet(
+      election({
+        round: undefined,
+        electionResult: { ...RESULT, elected: [], runoff: { candidateIds: ['c1', 'gone'], seats: 1 } },
+      }),
+    );
+    expect(snippet).toContain('> Wahl · 2 Posten\n');
+    expect(snippet).toContain('> Stichwahl (2. Wahlgang) um 1 Posten: Anna, gone');
+    // A yes/no result without a candidate names nobody.
+    const empty = electionSnippet(
+      election({
+        election: { seats: 1, candidates: [], secret: true },
+        electionResult: { counts: {}, abstentions: 0, ballots: 0, yes: 0, no: 0, elected: [] },
+      }),
+    );
+    expect(empty).toContain('> Kandidatur: \n');
+    // The editor card of a vote whose election was not read yet: one seat.
+    expect(voteResultInfo(election({ election: undefined, closedAt: null }), t, 'de').caption).toBe(
+      'election.kind · election.seats.one',
+    );
+  });
+
   it('gives the editor card of an election its caption and status', () => {
     const info = voteResultInfo(election({ closedAt: '2026-06-12T16:52:00Z' }), t, 'de');
     expect(info.caption).toMatch(/^election\.kind · election\.seats\.other\{"n":2\} · \d\d:\d\d$/);
@@ -116,6 +139,13 @@ describe('election wiring (F2)', () => {
       round: 1,
     });
     expect(mapMeetingVote({ id: 'v1', status: 'open' })).not.toHaveProperty('kind');
+    expect(electionFields({ kind: 'election', parentVoteId: 'e0' })).toEqual({
+      kind: 'election',
+      election: null,
+      electionResult: null,
+      parentVoteId: 'e0',
+      round: 1,
+    });
     const opened = liveOpenedVote({
       type: 'vote_opened',
       voteId: 'e2',

@@ -160,4 +160,53 @@ describe('election views (F2)', () => {
     view.fixture.detectChanges();
     expect(screen.getByText(/Wahl · 1 Posten · offene Abstimmung/)).toBeInTheDocument();
   });
+
+  it('the vote panel: an open election names no secrecy', async () => {
+    const v: Vote = {
+      id: 'e3',
+      applicationId: null,
+      meetingId: 'm1',
+      question: 'Wahl der Kassenprüfung',
+      eligibleGroup: 'g1',
+      config: { options: ['c1', 'c2', 'abstain'], majorityRule: 'simple', secret: false },
+      status: 'open',
+      opensAt: null,
+      closesAt: null,
+      result: null,
+      secret: false,
+      tally: { counts: {}, eligible: 9, voted: 0, quorumMet: false, leading: null },
+      kind: 'election',
+      election: { ...ELECTION, secret: false },
+    };
+    await render(VotePanelComponent, {
+      inputs: { vote: v, caster: () => of({}) },
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    expect(screen.getByText('Wahl · 1 Posten')).toBeInTheDocument();
+  });
+
+  it('the beamer: the live bars of an open election without a result yet', async () => {
+    const beamer: BeamerVote = {
+      question: 'Wahl der Sitzungsleitung',
+      options: ['c1', 'c2', 'abstain'],
+      status: 'open',
+      majorityRule: 'simple',
+      secret: false,
+      quorum: null,
+      quorumMet: true,
+      voted: 1,
+      present: 9,
+      counts: { c1: 1 },
+      result: null,
+      failedReason: null,
+      election: ELECTION,
+      round: 1,
+    };
+    const { container } = await render(MeetingBeamerComponent, {
+      inputs: { logoSrc: 'x.svg', vote: beamer },
+      providers: [provideHttpClient(), provideHttpClientTesting()],
+    });
+    expect(container.querySelector('app-election-result')).not.toBeNull();
+    expect(screen.getByLabelText('Anna: 1 Stimmen, 100 %')).toBeInTheDocument();
+  });
 });

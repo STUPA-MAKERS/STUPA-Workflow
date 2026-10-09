@@ -225,6 +225,16 @@ describe('VoteOpenDialogComponent', () => {
       http.expectNone('/api/meetings/m-1/votes');
     });
 
+    it('proposes conditions on an application item without a requested amount', async () => {
+      const { http, cmp } = await setup(APP_TOP);
+      cmp.setDraft({ enabled: true, amount: '', conditions: ['Belege'] });
+      cmp.submit();
+      expect(http.expectOne('/api/meetings/m-1/votes').request.body.proposal).toEqual({
+        approvedAmount: null,
+        conditions: ['Belege'],
+      });
+    });
+
     it('ignores a proposal on an item without an application', async () => {
       const { cmp, fixture } = await setup(PRICED);
       fixture.componentRef.setInput('item', FREE_TOP);

@@ -134,4 +134,27 @@ describe('BallotComponent · election (F2)', () => {
     cmp.abstainAll('own');
     expect(cmp.picked()['own']).toBeNull();
   });
+
+  it('takes no further candidate once every seat has a vote; the proxy row abstains on its own', async () => {
+    const { fixture } = await setup(2, { own: null, proxyName: 'Jonas Weber' });
+    const cmp = fixture.componentInstance as unknown as {
+      toggle(row: 'proxy', id: string): void;
+      abstainAll(row: 'proxy'): void;
+      picked(): Record<string, unknown>;
+      candidateMode(): boolean;
+    };
+    cmp.toggle('proxy', 'c1');
+    cmp.toggle('proxy', 'c2');
+    cmp.toggle('proxy', 'c3');
+    expect(cmp.picked()['proxy']).toEqual(['c1', 'c2']);
+    cmp.abstainAll('proxy');
+    expect(cmp.picked()['proxy']).toEqual([]);
+    expect(cmp.candidateMode()).toBe(true);
+    // A plain vote has no candidates and one seat.
+    fixture.componentRef.setInput('election', null);
+    const plain = fixture.componentInstance as unknown as { candidateMode(): boolean; multiSeat(): boolean; seats(): number };
+    expect(plain.candidateMode()).toBe(false);
+    expect(plain.multiSeat()).toBe(false);
+    expect(plain.seats()).toBe(1);
+  });
 });

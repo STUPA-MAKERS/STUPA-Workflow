@@ -345,6 +345,92 @@ describe('UserRevokeComponent', () => {
     expect(inst.age('2026-02-12T08:00:00Z', now)).toBe('vor 7 Monaten');
   });
 
+  it('names a single Gremium on the danger button and only the Gremien when no role is left', async () => {
+    const { settle } = await setup(
+      makeApi({
+        previewPrincipalRevoke: jest.fn(() =>
+          of(preview({ gremien: [preview().gremien[1]], groups: [], globalRoles: preview().globalRoles })),
+        ),
+      }),
+    );
+    await userEvent.click(screen.getByLabelText('Referent'));
+    await userEvent.click(screen.getByLabelText('extra'));
+    await settle();
+    expect(screen.getByRole('button', { name: '1 Gremium entziehen' })).toBeEnabled();
+  });
+
+  it('names the other side of a shared group: a role by its label or key, an unknown id as is', async () => {
+    const base = preview();
+    const { inst } = await setup(
+      makeApi({
+        previewPrincipalRevoke: jest.fn(() =>
+          of(
+            preview({
+              groups: [
+                { group: 'mixed', gremiumIds: ['g-asta', 'g-gone'], globalRoleIds: ['r-ref', 'r-x', 'r-gone'] },
+              ],
+              globalRoles: base.globalRoles,
+            }),
+          ),
+        ),
+      }),
+    );
+    expect(inst.sharedHints('g:g-asta')).toEqual([
+      'Die SSO-Gruppe mixed gilt auch für g-gone, Referent, extra, r-gone. Beides wird zusammen entzogen.',
+    ]);
+  });
+
+  it('describes the rarer ties: several groups, unnamed people, dated and reversed delegations', async () => {
+    const { inst } = await setup();
+    const lines = inst.gremiumLines({
+      gremiumId: 'g-x',
+      name: 'X',
+      membership: { roleKey: 'mitglied', roleLabel: { de: 'Mitglied' }, groups: [] },
+      groups: [],
+      assignments: [
+        { id: 'a', roleId: 'r', roleKey: 'k', roleLabel: { de: 'K' }, grantedBy: null, validFrom: null, validUntil: null },
+      ],
+      poolEntries: [{ id: 'ds', asSubstitute: true, gremiumWide: false, memberName: null, substituteName: null }],
+      plannedDelegations: [
+        {
+          id: 'md-p',
+          meetingId: 'm',
+          meetingTitle: '6. Sitzung',
+          meetingDate: '2026-11-03T18:00:00+00:00',
+          asDelegator: false,
+          otherName: 'Mia',
+          voting: true,
+        },
+      ],
+      liveDelegations: [
+        { id: 'md-l', meetingId: 'm', meetingTitle: '4. Sitzung', meetingDate: null, asDelegator: true, otherName: 'Ben', voting: true },
+      ],
+      openTasks: 0,
+    });
+    const texts = lines.map((l: { text: string }) => l.text);
+    expect(lines[0]).toEqual({ text: 'Mitgliedschaft als Mitglied', detail: '' });
+    expect(lines[1].detail).toBe('vergeben von —');
+    expect(texts).toContain('Vertretung für Konto ohne Namen');
+    expect(texts.some((t: string) => /^Stimme von Mia in 6\. Sitzung \(.+2026\)$/.test(t))).toBe(true);
+    expect(texts).toContain('Stimme an Ben in der laufenden Sitzung 4. Sitzung');
+    expect(lines.find((l: { kept?: boolean }) => l.kept)?.text).toContain('Ben');
+    expect(texts.some((t: string) => /offene/.test(t))).toBe(false);
+    expect(
+      inst.roleLines({ roleId: 'r', roleKey: 'k', roleLabel: {}, groups: ['a', 'b'], assignments: [] })[0].text,
+    ).toBe('über die SSO-Gruppen a, b');
+  });
+
+  it('ignores toggles and submits while no preview is loaded', async () => {
+    const api = makeApi({ previewPrincipalRevoke: jest.fn(() => throwError(() => new Error('x'))) });
+    const { inst } = await setup(api);
+    inst.toggle('g:g-stupa', true);
+    inst.toggleAll();
+    expect(inst.selected().size).toBe(0);
+    expect(inst.sharedHints('g:g-stupa')).toEqual([]);
+    inst.submit();
+    expect(api.revokePrincipal).not.toHaveBeenCalled();
+  });
+
   it('"Abbrechen" closes the dialog', async () => {
     const { closed } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
