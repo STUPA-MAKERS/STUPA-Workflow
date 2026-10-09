@@ -521,7 +521,7 @@ describe('mockApiInterceptor', () => {
         const fromReview = await get<{ addsToAgenda: boolean }[]>(
           '/api/applications/a1000000-0000-0000-0000-000000000004/transitions',
         );
-        expect(fromReview.map((t) => t.addsToAgenda)).toEqual([true, false, false]);
+        expect(fromReview.map((t) => t.addsToAgenda)).toEqual([true, false, false, false]);
         expect(await get<unknown[]>(`/api/applications/${first}/attachments`)).toHaveLength(3);
         expect(await get<unknown[]>(`/api/applications/${second}/attachments`)).toEqual([]);
         expect(await get<unknown[]>(`/api/applications/${first}/shares`)).toEqual([]);

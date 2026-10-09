@@ -416,7 +416,15 @@ export const MOCK_MAIL_TEMPLATES: MailTemplate[] = [
       en: 'Hello,\n\nthe status of your application "{{ applicationTitle }}" changed:\n{{ status }}',
     },
     bodyHtmlI18n: {},
-    placeholders: { applicationTitle: 'Erstsemester-Party', status: 'Auf Tagesordnung', applicationId: 'a1b2c3d4' },
+    placeholders: {
+      applicationTitle: 'Erstsemester-Party',
+      status: 'Auf Tagesordnung',
+      applicationId: 'a1b2c3d4',
+      requestedAmount: '1.250,00 €',
+      approvedAmount: '900,00 €',
+      amountDeviates: 'true',
+      conditions: 'Belege bis 31.12. einreichen',
+    },
     source: 'override',
   },
   {

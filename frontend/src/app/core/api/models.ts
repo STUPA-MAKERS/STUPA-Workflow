@@ -220,6 +220,47 @@ export interface ApplicationOutWire {
   hiddenKeys?: string[];
   /** Set when a person captured the application on behalf of the applicant (#11). */
   capture?: ApplicationCapture | null;
+  /** F1: the amount that the cost center binds. `null` means as requested. */
+  approvedAmount?: string | null;
+  /** F1: the valid decision, or `null` before one. */
+  decision?: ApplicationDecision | null;
+}
+
+/**
+ * `DecisionIn`. A decision proposal (F1, approval with deviations): the approved amount
+ * and the conditions. The body of a vote (`proposal`) and of a transition (`decision`).
+ */
+export interface DecisionProposal {
+  /** Decimal string with a dot (`"800.00"`). `null` means as requested. */
+  approvedAmount: string | null;
+  /** The conditions (Auflagen), at most 20, each 1 to 1000 characters. */
+  conditions: string[];
+}
+
+/**
+ * `DecisionOut`. The valid decision of an application (F1), or `null` before one. The
+ * applicant view names the Gremium only: `voteId`, `meetingTitle` and `agendaPosition`
+ * are `null` there.
+ */
+export interface ApplicationDecision {
+  requestedAmount: string | null;
+  /** `null` means as requested. */
+  approvedAmount: string | null;
+  amountDeviates: boolean;
+  conditions: string[];
+  decidedAt: IsoDateTime;
+  voteId: Uuid | null;
+  gremiumName: string | null;
+  meetingTitle: string | null;
+  agendaPosition: number | null;
+}
+
+/** `TimelineDecisionOut`. The decision that a status change carried (F1). */
+export interface TimelineDecision {
+  requestedAmount: string | null;
+  approvedAmount: string | null;
+  amountDeviates: boolean;
+  conditionCount: number;
 }
 
 /**
@@ -270,6 +311,8 @@ export interface ApplicationListItemWire {
   state?: StateOutWire | null;
   gremiumId?: Uuid | null;
   amount?: string | null;
+  /** F1: the approved amount. `null` means as requested. */
+  approvedAmount?: string | null;
   currency?: string | null;
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
@@ -335,6 +378,8 @@ export interface AgendaItem {
   /** Non-public. The public protocol PDF redacts this agenda item. */
   nonPublic?: boolean;
   stateLabel?: I18nMap | null;
+  /** F1: the requested amount of the application, for the decision proposal. */
+  amount?: string | null;
 }
 
 /** `AssignableApplicationOut`. An application in a vote state that is not on the agenda. */
@@ -388,6 +433,8 @@ export interface TimelineEventOutWire {
   voteId?: Uuid | null;
   /** A vote close fired the event, and the vote went with its meeting. */
   voteDeleted?: boolean;
+  /** F1: the decision that this status change carried. */
+  decision?: TimelineDecision | null;
 }
 
 export type CommentVisibility = 'internal' | 'public';
@@ -432,6 +479,8 @@ export interface TransitionOutWire {
   addsToAgenda?: boolean;
   /** The gremium whose planned meetings the agenda dialog offers (A1). */
   agendaGremiumId?: Uuid | null;
+  /** F1: the target is an accepted state of the cost center, so a fire takes a decision. */
+  allowsDecision?: boolean;
 }
 
 /** A field change in the version diff (`FieldChange`). */
@@ -542,6 +591,8 @@ export interface TransitionRequestBody {
   meetingId?: Uuid | null;
   /** The new agenda item is not public (NÖ). Only with `meetingId`. */
   nonPublic?: boolean;
+  /** F1: the decision. Only for a transition with `allowsDecision`, else 422. */
+  decision?: DecisionProposal | null;
 }
 
 /** `POST /applications/{id}/force-status`. A privileged direct status override.
@@ -619,6 +670,10 @@ export interface Application {
   hiddenKeys?: string[];
   /** Set when a person captured the application on behalf of the applicant (#11). */
   capture?: ApplicationCapture | null;
+  /** F1: the amount that the cost center binds. `null` means as requested. */
+  approvedAmount?: string | null;
+  /** F1: the valid decision, or `null` before one. */
+  decision?: ApplicationDecision | null;
 }
 
 /**
@@ -650,6 +705,8 @@ export interface ApplicationListItem {
   state: ApplicationState | null;
   gremiumId: Uuid | null;
   amount: string | null;
+  /** F1: the approved amount. `null` means as requested. */
+  approvedAmount?: string | null;
   currency: string | null;
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
@@ -679,6 +736,8 @@ export interface TimelineEntry {
   voteId: Uuid | null;
   /** The vote that fired the event was deleted with its meeting. */
   voteDeleted: boolean;
+  /** F1: the decision that this status change carried. */
+  decision?: TimelineDecision | null;
 }
 
 /** Comment, frontend view. `isPublic` comes from `visibility`. */
@@ -724,6 +783,11 @@ export interface Transition {
   addsToAgenda: boolean;
   /** The gremium whose planned meetings the agenda dialog offers, or null. */
   agendaGremiumId: Uuid | null;
+  /**
+   * F1: the target is an accepted state of the cost center. The detail and the row
+   * menu then open the decision dialog, which can approve with deviations.
+   */
+  allowsDecision?: boolean;
 }
 
 /** A changed field cell, frontend view. The `key` comes out of the diff map. */
@@ -1134,6 +1198,8 @@ export interface MeetingVoteOutWire {
   /** Present members and admitted guests (live while open, fixed at the close). */
   presentMembers?: number | null;
   presentGuests?: number | null;
+  /** F1: the decision proposal of an application vote. */
+  proposal?: DecisionProposal | null;
 }
 
 /** `MeetingOut`. Meeting state and votes. GET /meetings/{id}. */
