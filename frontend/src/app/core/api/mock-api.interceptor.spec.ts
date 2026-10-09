@@ -1221,9 +1221,18 @@ describe('mockApiInterceptor', () => {
       expect(res).toBeNull();
     });
 
-    it('POST /votes/{id}/close → 204 (sets a result)', async () => {
-      const res = await firstValueFrom(http.post('/api/votes/a0000000-0000-0000-0000-0000000000a1/close', {}));
-      expect(res).toBeNull();
+    it('DELETE /meetings/{id}/votes/{voteId} → the meeting without the vote', async () => {
+      const m = await firstValueFrom(
+        http.delete<{ votes: { id: string }[] }>('/api/meetings/m1/votes/a0000000-0000-0000-0000-0000000000e1'),
+      );
+      expect(m.votes.some((v) => v.id === 'a0000000-0000-0000-0000-0000000000e1')).toBe(false);
+    });
+
+    it('POST /votes/{id}/close → the closed vote (sets a result)', async () => {
+      const res = await firstValueFrom(
+        http.post<{ id: string; branchFired: boolean }>('/api/votes/a0000000-0000-0000-0000-0000000000a1/close', {}),
+      );
+      expect(res).toMatchObject({ id: 'a0000000-0000-0000-0000-0000000000a1', branchFired: true });
       const m = await get<{ votes: { id: string; result: string | null }[] }>('/api/meetings/m1');
       const v = m.votes.find((x) => x.id === 'a0000000-0000-0000-0000-0000000000a1');
       expect(v?.result).toBeTruthy();

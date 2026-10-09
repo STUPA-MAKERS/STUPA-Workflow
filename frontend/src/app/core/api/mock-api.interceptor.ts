@@ -41,6 +41,7 @@ import type {
   TransitionResult,
   VersionOutWire,
   Vote,
+  VoteClosed,
 } from './models';
 
 /**
@@ -2120,8 +2121,20 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       return ok(null, 204);
     }
     if (/\/votes\/[^/]+\/close$/.test(p)) {
-      setVoteStatus(p.split('/').slice(-2)[0], 'closed');
-      return ok(null, 204);
+      const id = p.split('/').slice(-2)[0];
+      setVoteStatus(id, 'closed');
+      // The server answers with the closed vote (VoteClosed), not with an empty body.
+      const row = MOCK_MEETING.votes.find((v) => v.id === id);
+      const closed: VoteClosed = {
+        id,
+        meetingId: MOCK_MEETING.id,
+        applicationId: row?.applicationId || null,
+        result: 'passed',
+        tally: MOCK_VOTE.tally,
+        closedAt: new Date().toISOString(),
+        branchFired: true,
+      };
+      return ok(closed);
     }
     if (/\/meetings\/[^/]+\/protocol$/.test(p)) return ok(MOCK_PROTOCOL);
     if (p.endsWith('/meetings')) {
@@ -2208,6 +2221,11 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (delegation) {
       MOCK_DELEGATIONS = MOCK_DELEGATIONS.filter((d) => d.id !== delegation[1]);
       return ok(null, 204);
+    }
+    const meetingVote = /\/meetings\/[^/]+\/votes\/([^/]+)$/.exec(p);
+    if (meetingVote) {
+      MOCK_MEETING = { ...MOCK_MEETING, votes: MOCK_MEETING.votes.filter((v) => v.id !== meetingVote[1]) };
+      return ok(MOCK_MEETING);
     }
     const agenda = /\/meetings\/[^/]+\/agenda\/([^/]+)$/.exec(p);
     if (agenda) {
