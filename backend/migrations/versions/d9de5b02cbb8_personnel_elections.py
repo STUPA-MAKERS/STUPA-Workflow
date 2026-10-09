@@ -37,8 +37,20 @@ depends_on: str | Sequence[str] | None = None
 
 _UPGRADE: tuple[str, ...] = (
     "ALTER TABLE vote ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'motion'",
-    "ALTER TABLE vote ADD COLUMN IF NOT EXISTS parent_vote_id uuid "
-    "REFERENCES vote(id) ON DELETE SET NULL",
+    "ALTER TABLE vote ADD COLUMN IF NOT EXISTS parent_vote_id uuid",
+    # Named like the metadata naming convention (a fresh install gets the same name).
+    """
+    DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+             WHERE conrelid = 'vote'::regclass AND conname = 'fk_vote_parent_vote_id_vote'
+        ) THEN
+            ALTER TABLE vote ADD CONSTRAINT fk_vote_parent_vote_id_vote
+                FOREIGN KEY (parent_vote_id) REFERENCES vote (id) ON DELETE SET NULL;
+        END IF;
+    END $$
+    """,
     "ALTER TABLE vote ADD COLUMN IF NOT EXISTS round integer NOT NULL DEFAULT 1",
     "ALTER TABLE vote ADD COLUMN IF NOT EXISTS election_result jsonb",
     "ALTER TABLE vote DROP CONSTRAINT IF EXISTS ck_vote_vote_kind",

@@ -35,16 +35,24 @@ depends_on: str | Sequence[str] | None = None
 _UPGRADE: tuple[str, ...] = (
     """
     CREATE TABLE IF NOT EXISTS application_decision (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-        application_id uuid NOT NULL
-            REFERENCES application (id) ON DELETE CASCADE,
+        id uuid DEFAULT gen_random_uuid(),
+        application_id uuid NOT NULL,
         approved_amount numeric(12, 2),
         conditions jsonb NOT NULL DEFAULT '[]'::jsonb,
-        vote_id uuid REFERENCES vote (id) ON DELETE SET NULL,
-        status_event_id uuid REFERENCES status_event (id) ON DELETE SET NULL,
+        vote_id uuid,
+        status_event_id uuid,
         decided_at timestamptz NOT NULL DEFAULT now(),
         decided_by text,
-        superseded_at timestamptz
+        superseded_at timestamptz,
+        -- Named like the metadata naming convention, so a fresh install (create_all)
+        -- and an upgraded install carry the same constraint names.
+        CONSTRAINT pk_application_decision PRIMARY KEY (id),
+        CONSTRAINT fk_application_decision_application_id_application
+            FOREIGN KEY (application_id) REFERENCES application (id) ON DELETE CASCADE,
+        CONSTRAINT fk_application_decision_vote_id_vote
+            FOREIGN KEY (vote_id) REFERENCES vote (id) ON DELETE SET NULL,
+        CONSTRAINT fk_application_decision_status_event_id_status_event
+            FOREIGN KEY (status_event_id) REFERENCES status_event (id) ON DELETE SET NULL
     )
     """,
     (
