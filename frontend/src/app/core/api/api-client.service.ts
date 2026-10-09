@@ -96,6 +96,7 @@ import type {
   VersionOutWire,
   Vote,
   VoteClosed,
+  VoteKind,
   VoteListItem,
   VoteListQuery,
   BallotResult,
@@ -587,9 +588,10 @@ export class ApiClient {
    *
    * A ballot never changes after the cast. A second cast gives 409 with the code
    * `already_voted`. Another 409 means that the vote is not open. 403 = not
-   * eligible. The components evaluate the status.
+   * eligible. The components evaluate the status. A personnel election with several
+   * candidates takes the list of the chosen candidate ids (`[]` = full abstention).
    */
-  castBallot(id: Uuid, choice: string, asDelegation = false): Observable<BallotResult> {
+  castBallot(id: Uuid, choice: string | readonly string[], asDelegation = false): Observable<BallotResult> {
     return this.http.post<BallotResult>(`${this.base}/votes/${id}/ballot`, {
       choice,
       asDelegation,
@@ -854,6 +856,10 @@ export class ApiClient {
       guestsVote?: boolean | null;
       /** F1: the decision proposal of an application item. */
       proposal?: DecisionProposal | null;
+      /** `election` opens a personnel election (F2) on a free-text item. */
+      kind?: VoteKind;
+      seats?: number;
+      candidates?: { name: string; principalId?: Uuid | null }[];
     },
   ): Observable<Meeting> {
     return this.http
@@ -952,7 +958,7 @@ export class ApiClient {
   }
 
   /** POST /public/meetings/{code}/votes/{voteId}/ballot — the ballot of an admitted guest. */
-  castGuestBallot(code: string, voteId: Uuid, choice: string): Observable<BallotResult> {
+  castGuestBallot(code: string, voteId: Uuid, choice: string | readonly string[]): Observable<BallotResult> {
     return this.http.post<BallotResult>(
       `${this.base}/public/meetings/${code}/votes/${voteId}/ballot`,
       { choice },
@@ -977,6 +983,17 @@ export class ApiClient {
    *  transition is blocked and a person must fire it by hand. */
   closeVote(voteId: Uuid): Observable<VoteClosed> {
     return this.http.post<VoteClosed>(`${this.base}/votes/${voteId}/close`, {});
+  }
+
+  /** POST /votes/{id}/draw-lot — draw the lot of a tied election (F2, vote manager). */
+  drawElectionLot(voteId: Uuid): Observable<Vote> {
+    return this.http.post<Vote>(`${this.base}/votes/${voteId}/draw-lot`, {});
+  }
+
+  /** POST /votes/{id}/runoff — create the draft runoff of an election (F2). The
+   *  answer is the new vote; open it with `openVote`. */
+  createElectionRunoff(voteId: Uuid): Observable<Vote> {
+    return this.http.post<Vote>(`${this.base}/votes/${voteId}/runoff`, {});
   }
 
   /** POST /votes/{id}/cancel — cancel a vote: no result, no branch. */

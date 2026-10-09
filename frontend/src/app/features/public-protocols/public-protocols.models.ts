@@ -7,7 +7,8 @@
  */
 
 /** The result of one decision. */
-export type PublicVoteResult = 'passed' | 'rejected' | 'tie';
+/** A personnel election (F2) gives `elected`, `runoff`, `tie` or `rejected`. */
+export type PublicVoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff';
 
 /** A gremium that publishes its protocols (`GET /public/gremien`). */
 export interface PublicGremium {
@@ -60,6 +61,14 @@ export interface PublicDecision {
   inText?: boolean;
   /** F1: the conditions of the decision of a passed vote. An older snapshot has none. */
   conditions?: string[];
+  /** A personnel election (F2): only the names of the elected persons travel; the
+   *  other candidates are a count, and an election has no counts. */
+  kind?: 'motion' | 'election';
+  seats?: number | null;
+  round?: number;
+  elected?: string[];
+  otherCandidates?: number;
+  byLot?: boolean;
 }
 
 /** One agenda item in the detail. A non-public item has no title, text or decision. */

@@ -4,6 +4,8 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { MyBallot, Vote } from '@core/api/models';
+import { ElectionResultComponent } from '../election-result/election-result.component';
+import { electionCaption, electionOf } from '../election.util';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { meetingVoteStatus, type StatusView } from '@shared/status-kind.util';
@@ -34,6 +36,7 @@ import { NO_CONTEXT, type VoteContext } from './vote-context';
     RouterLink,
     TranslatePipe,
     BallotComponent,
+    ElectionResultComponent,
     NoteComponent,
     StatusTextComponent,
     VoteBarsComponent,
@@ -76,6 +79,11 @@ export class VotePanelComponent {
 
   readonly castDone = output<BallotCast>();
   readonly castFailed = output<BallotFailure>();
+  /** The lot of an election was drawn, or its runoff opened (F2): read the vote again. */
+  readonly changed = output<Vote>();
+
+  /** The personnel election of the vote (F2), or `null` for a motion. */
+  protected readonly election = computed(() => electionOf(this.vote()));
 
   protected readonly status = computed<StatusView>(() => meetingVoteStatus(this.vote().status));
   /** The caption of the card: "Abstimmung offen", "Abstimmung geschlossen". */
@@ -113,6 +121,15 @@ export class VotePanelComponent {
   /** "Einfache Mehrheit · Quorum 12 · geheime Abstimmung". */
   protected readonly rules = computed(() => {
     const v = this.vote();
+    const election = this.election();
+    if (election) {
+      // "Wahl · 2 Posten · geheime Abstimmung".
+      const parts = [
+        electionCaption(election, v.round, (key, params) => this.i18n.translate(key, params)),
+      ];
+      if (this.secret()) parts.push(this.i18n.translate('meetings.vote.secretShort'));
+      return parts.join(' · ');
+    }
     // A vote with guests has no quorum: the majority of the cast votes decides (#17).
     const family = this.guestsVote() ? 'vote.majorityCast' : 'vote.majority';
     const parts = [

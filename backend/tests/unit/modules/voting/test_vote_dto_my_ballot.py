@@ -52,7 +52,7 @@ def test_vote_out_dumps_the_new_fields_in_camel_case() -> None:
     assert dumped["quorum"] == {"type": "count", "value": 3}
     assert dumped["openedAt"].startswith("2026-10-01T10:00")
     assert dumped["closedAt"].startswith("2026-10-01T10:05")
-    assert dumped["myBallot"] == {"cast": True, "choice": None}
+    assert dumped["myBallot"] == {"cast": True, "choice": None, "choices": None}
     assert dumped["representedCast"] is True
 
 

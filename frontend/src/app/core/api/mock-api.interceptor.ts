@@ -21,10 +21,12 @@ import type {
   BallotResult,
   CommentOutWire,
   EffectiveForm,
+  ElectionConfig,
   KeeperPeriod,
   MagicLinkVerifyResult,
   MeetingOutWire,
   MeetingPageWire,
+  MeetingVoteOutWire,
   MyBallot,
   Page,
   PublicSiteConfig,
@@ -157,14 +159,167 @@ const MOCK_VOTE: Vote = {
   canCast: true,
 };
 
+/** F2: the demo election (Wahl der Sitzungsleitung), one seat, two candidates. */
+const MOCK_ELECTION_ID = 'a0000000-0000-0000-0000-0000000000e1';
+const MOCK_ELECTION: ElectionConfig = {
+  seats: 1,
+  candidates: [
+    { id: 'c1', name: 'Mara Schulz', principalId: null },
+    { id: 'c2', name: 'Jonas Weber', principalId: null },
+    { id: 'c3', name: 'Lea Hoffmann', principalId: null },
+  ],
+  secret: true,
+  quorum: null,
+  abstainCountsQuorum: true,
+  guestsVote: false,
+};
+const MOCK_ELECTION_ROW: MeetingVoteOutWire = {
+  id: MOCK_ELECTION_ID,
+  applicationId: null,
+  agendaItemId: 'ag-s5',
+  title: null,
+  question: 'Wahl der Sitzungsleitung',
+  options: ['c1', 'c2', 'c3', 'abstain'],
+  status: 'closed',
+  result: 'tie',
+  counts: { c1: 5, c2: 5, c3: 1, abstain: 1 },
+  leading: null,
+  closesAt: null,
+  voted: 12,
+  present: 12,
+  revealed: true,
+  majorityRule: 'simple',
+  secret: true,
+  openedAt: '2026-06-12T16:30:00Z',
+  closedAt: '2026-06-12T16:36:00Z',
+  kind: 'election',
+  election: MOCK_ELECTION,
+  round: 1,
+  parentVoteId: null,
+  electionResult: {
+    counts: { c1: 5, c2: 5, c3: 1 },
+    abstentions: 1,
+    ballots: 12,
+    elected: [],
+    runoff: null,
+    lot: { among: ['c1', 'c2'], seats: 1, drawn: null },
+  },
+};
+
+/** GET /votes/{id} of an election row of the demo meeting (F2). */
+function mockElectionVote(row: MeetingVoteOutWire): Vote {
+  return {
+    ...MOCK_VOTE,
+    id: row.id,
+    applicationId: null,
+    agendaItemId: row.agendaItemId ?? null,
+    question: row.question ?? null,
+    config: {
+      options: row.options ?? [],
+      majorityRule: 'simple',
+      quorum: null,
+      abstainCountsQuorum: true,
+      secret: row.secret ?? true,
+    },
+    status: row.status,
+    result: (row.result ?? null) as Vote['result'],
+    secret: row.secret ?? true,
+    majorityRule: 'simple',
+    quorum: null,
+    openedAt: row.openedAt ?? null,
+    closedAt: row.closedAt ?? null,
+    tally: {
+      counts: row.counts ?? {},
+      eligible: 12,
+      voted: row.voted ?? 0,
+      present: row.present ?? 12,
+      revealed: row.status === 'closed',
+      quorumMet: true,
+      leading: null,
+    },
+    myBallot: electionBallot(row),
+    kind: 'election',
+    election: row.election ?? null,
+    electionResult: row.electionResult ?? null,
+    round: row.round ?? 1,
+    parentVoteId: row.parentVoteId ?? null,
+  };
+}
+
+/** The own election ballot of the mock: an open ballot keeps its candidates. */
+function electionBallot(row: MeetingVoteOutWire): MyBallot {
+  const own = MOCK_BALLOTS.get(row.id)?.own;
+  if (!own) return { cast: false, choice: null };
+  if (row.secret !== false) return { cast: true, choice: null };
+  return typeof own === 'string' ? { cast: true, choice: own } : { cast: true, choice: null, choices: own };
+}
+
+/** POST /votes/{id}/draw-lot: the mock draws the first tied candidate (F2). */
+function mockDrawLot(id: string, url: string): Observable<never> | Vote {
+  const row = MOCK_MEETING.votes.find((v) => v.id === id);
+  const lot = row?.electionResult?.lot;
+  if (!row || row.kind !== 'election') return mockProblem(409, 'not_an_election', url);
+  if (!lot || row.result !== 'tie') return mockProblem(409, 'no_lot_pending', url);
+  if (lot.drawn) return mockProblem(409, 'lot_already_drawn', url);
+  const drawn = lot.among.slice(0, lot.seats);
+  const updated: MeetingVoteOutWire = {
+    ...row,
+    result: 'elected',
+    electionResult: {
+      ...row.electionResult!,
+      elected: [...(row.electionResult?.elected ?? []), ...drawn],
+      lot: { ...lot, drawn, at: new Date().toISOString(), by: 'demo', byName: 'Demo-Nutzer:in' },
+    },
+  };
+  MOCK_MEETING = { ...MOCK_MEETING, votes: MOCK_MEETING.votes.map((v) => (v.id === id ? updated : v)) };
+  return mockElectionVote(updated);
+}
+
+/** POST /votes/{id}/runoff: a draft runoff with the tied candidates (F2). */
+function mockRunoff(id: string, url: string): Observable<never> | Vote {
+  const row = MOCK_MEETING.votes.find((v) => v.id === id);
+  const runoff = row?.electionResult?.runoff;
+  if (!row || row.kind !== 'election') return mockProblem(409, 'not_an_election', url);
+  if (!runoff || row.result !== 'runoff') return mockProblem(409, 'no_runoff_pending', url);
+  if (runoff.voteId) return mockProblem(409, 'runoff_exists', url);
+  const newId = `v-runoff-${MOCK_MEETING.votes.length + 1}`;
+  const candidates = (row.election?.candidates ?? []).filter((c) => runoff.candidateIds.includes(c.id));
+  const draft: MeetingVoteOutWire = {
+    ...row,
+    id: newId,
+    status: 'draft',
+    result: null,
+    counts: null,
+    voted: 0,
+    closedAt: null,
+    openedAt: null,
+    options: [...candidates.map((c) => c.id), 'abstain'],
+    election: { ...row.election!, seats: runoff.seats, candidates },
+    electionResult: null,
+    round: (row.round ?? 1) + 1,
+    parentVoteId: row.id,
+  };
+  const parent: MeetingVoteOutWire = {
+    ...row,
+    electionResult: { ...row.electionResult!, runoff: { ...runoff, voteId: newId } },
+  };
+  MOCK_MEETING = {
+    ...MOCK_MEETING,
+    votes: [...MOCK_MEETING.votes.map((v) => (v.id === id ? parent : v)), draft],
+  };
+  return mockElectionVote(draft);
+}
+
 /** The ballots of the demo user in this mock session, by vote id. */
-const MOCK_BALLOTS = new Map<string, { own?: string; proxy?: string }>();
+const MOCK_BALLOTS = new Map<string, { own?: string | string[]; proxy?: string | string[] }>();
 
 /** The closed votes of the closed demo meetings (`mock-meetings-closed.ts`). */
 const CLOSED_VOTE_ID = /^a0000000-0000-0000-0000-0000000001(\d\d)$/;
 
 /** GET /votes/{id}: the demo vote under the asked id, with the own ballots of the mock. */
 function mockVote(id: string): Vote {
+  const election = MOCK_MEETING.votes.find((v) => v.id === id && v.kind === 'election');
+  if (election) return mockElectionVote(election);
   const closed = CLOSED_VOTE_ID.exec(id);
   if (closed) {
     return {
@@ -188,7 +343,11 @@ function mockVote(id: string): Vote {
     ...MOCK_VOTE,
     id,
     // The demo vote is not secret, so the own ballot keeps its choice.
-    myBallot: { cast: Boolean(ballots.own), choice: ballots.own ?? null },
+    myBallot: {
+      cast: Boolean(ballots.own),
+      choice: typeof ballots.own === 'string' ? ballots.own : null,
+      ...(Array.isArray(ballots.own) ? { choices: ballots.own } : {}),
+    },
     representedCast: Boolean(ballots.proxy),
     tally: { ...MOCK_VOTE.tally, voted: (MOCK_VOTE.tally.voted ?? 0) + extra },
   };
@@ -197,7 +356,8 @@ function mockVote(id: string): Vote {
 /** The own ballot of this mock session in one vote, for the vote list. */
 function mockOwnBallot(id: string): MyBallot | null {
   const own = MOCK_BALLOTS.get(id)?.own;
-  return own ? { cast: true, choice: own } : null;
+  if (!own) return null;
+  return typeof own === 'string' ? { cast: true, choice: own } : { cast: true, choice: null, choices: own };
 }
 
 /** The standalone demo votes of `mock-votes.ts` (id prefix `b0000000-`). */
@@ -205,7 +365,7 @@ const DEMO_VOTE_PATH = /\/votes\/b0000000-[^/]+$/;
 
 /** POST /votes/{id}/ballot: a ballot never changes, so a second one is a 409. */
 function mockBallot(id: string, body: unknown, url: string): Observable<never> | BallotResult {
-  const { choice, asDelegation } = (body ?? {}) as { choice?: string; asDelegation?: boolean };
+  const { choice, asDelegation } = (body ?? {}) as { choice?: string | string[]; asDelegation?: boolean };
   const ballots = MOCK_BALLOTS.get(id) ?? {};
   const row = asDelegation ? 'proxy' : 'own';
   if (ballots[row]) return mockProblem(409, 'already_voted', url);
@@ -803,6 +963,8 @@ let MOCK_MEETING: MeetingOutWire = {
       presentGuests: 7,
       openedAt: '2026-06-12T16:48:00Z',
     },
+    // F2: a closed personnel election on the non-public item; a tie waits for the lot.
+    MOCK_ELECTION_ROW,
     {
       id: 'a0000000-0000-0000-0000-0000000000a2',
       applicationId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
@@ -1804,12 +1966,48 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       return 'id' in out ? ok(out) : out;
     }
     if (/\/meetings\/[^/]+\/votes$/.test(p)) {
-      const body = req.body as { applicationId?: string; question?: string | null; guestsVote?: boolean | null } | null;
+      const body = req.body as {
+        applicationId?: string;
+        agendaItemId?: string;
+        question?: string | null;
+        guestsVote?: boolean | null;
+        kind?: 'motion' | 'election';
+        seats?: number;
+        secret?: boolean;
+        candidates?: { name: string; principalId?: string | null }[];
+      } | null;
+      // F2: an election gets the ids c1..cn, like the server.
+      const candidates = (body?.candidates ?? []).map((c, i) => ({
+        id: `c${i + 1}`,
+        name: c.name,
+        principalId: c.principalId ?? null,
+      }));
+      const election =
+        body?.kind === 'election'
+          ? {
+              kind: 'election' as const,
+              agendaItemId: body.agendaItemId ?? null,
+              secret: body.secret ?? true,
+              options:
+                candidates.length === 1
+                  ? ['yes', 'no', 'abstain']
+                  : [...candidates.map((c) => c.id), 'abstain'],
+              election: {
+                seats: body.seats ?? 1,
+                candidates,
+                secret: body.secret ?? true,
+                guestsVote: !!body.guestsVote,
+              },
+              round: 1,
+              electionResult: null,
+            }
+          : {};
       MOCK_MEETING = {
         ...MOCK_MEETING,
         votes: [
           ...MOCK_MEETING.votes,
           {
+            ...election,
             id: `v-mock-${MOCK_MEETING.votes.length + 1}`,
             applicationId: body?.applicationId ?? '',
             title: null,
@@ -1908,6 +2106,14 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       return ok(MOCK_PROTOCOL);
     }
     if (/\/protocols\/[^/]+\/votes$/.test(p)) return ok(MOCK_PROTOCOL);
+    if (/\/votes\/[^/]+\/draw-lot$/.test(p)) {
+      const res = mockDrawLot(p.split('/').slice(-2)[0], req.url);
+      return 'id' in res ? ok(res) : res;
+    }
+    if (/\/votes\/[^/]+\/runoff$/.test(p)) {
+      const res = mockRunoff(p.split('/').slice(-2)[0], req.url);
+      return 'id' in res ? ok(res, 201) : res;
+    }
     if (/\/votes\/[^/]+\/open$/.test(p)) {
       setVoteStatus(p.split('/').slice(-2)[0], 'open');
       return ok(null, 204);

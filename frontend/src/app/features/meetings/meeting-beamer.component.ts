@@ -2,12 +2,21 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import type { MajorityRule, QrMatrix, Quorum, VoteResult } from '@core/api/models';
+import type {
+  ElectionConfig,
+  ElectionResult,
+  MajorityRule,
+  QrMatrix,
+  Quorum,
+  VoteResult,
+} from '@core/api/models';
 import { QrCodeComponent, formatJoinCode } from '@shared/ui/qr-code/qr-code.component';
 import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { IconComponent } from '@stupa-makers/ui-kit';
 import { VoteBarsComponent } from '../voting/vote-bars.component';
+import { ElectionResultComponent } from '../voting/election-result/election-result.component';
+import { electionCaption, electionResultLine, electionStatus } from '../voting/election.util';
 
 /** The vote that the beamer shows, as the page assembles it from the server data. */
 export interface BeamerVote {
@@ -31,6 +40,10 @@ export interface BeamerVote {
   /** The present members and the admitted guests, for "19 Mitglieder + 7 Gäste anwesend". */
   presentMembers?: number | null;
   presentGuests?: number | null;
+  /** A personnel election (F2): the candidates, the stored result and the round. */
+  election?: ElectionConfig | null;
+  electionResult?: ElectionResult | null;
+  round?: number;
 }
 
 /** The join code of a public meeting on the screen (#17): never a name, only the code. */
@@ -89,6 +102,7 @@ interface BeamerText {
     TranslatePipe,
     IconComponent,
     QrCodeComponent,
+    ElectionResultComponent,
     SegBarComponent,
     StatusTextComponent,
     VoteBarsComponent,
@@ -120,6 +134,11 @@ export class MeetingBeamerComponent {
     return this.i18n.translate('guests.qr.label', { url: j.url });
   }
 
+  /** The status of a closed election (F2): "Gewählt", "Stichwahl" and so on. */
+  protected electionKey(result: VoteResult | null): TranslationKey {
+    return electionStatus(result).key;
+  }
+
   /** The texts of the shown vote, or `null` while idle. */
   protected readonly text = computed<BeamerText | null>(() => {
     const v = this.vote();
@@ -129,6 +148,7 @@ export class MeetingBeamerComponent {
   private describe(v: BeamerVote): BeamerText {
     const t = (key: TranslationKey, params?: Record<string, string | number>) =>
       this.i18n.translate(key, params);
+    if (v.election) return this.describeElection(v, v.election, t);
     const guests = !!v.guestsVote;
     const majority = t(`${guests ? 'vote.majorityCast' : 'vote.majority'}.${v.majorityRule}` as TranslationKey);
     const q = v.quorum;
@@ -169,6 +189,29 @@ export class MeetingBeamerComponent {
         ? [t('guests.vote.castN', { n: v.voted }), t('guests.vote.majorityOfCast')].join(' · ')
         : outcome.join(' · '),
       composition,
+    };
+  }
+
+  /** An election (F2): "Wahl · 2 Posten · geheime Abstimmung", then "Gewählt: Anna". */
+  private describeElection(
+    v: BeamerVote,
+    election: ElectionConfig,
+    t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+  ): BeamerText {
+    const rules = [
+      electionCaption(election, v.round, t),
+      t(v.secret ? 'meetings.vote.secretShort' : 'meetings.vote.publicShort'),
+    ].join(' · ');
+    const ballots = v.voted === 1 ? t('beamer.ballotsOne') : t('beamer.ballots', { n: v.voted });
+    return {
+      bars: v.counts !== null && (v.status === 'closed' || !v.secret),
+      turnout: t('meetings.vote.progress', { voted: v.voted, present: v.present }),
+      hiddenKey: v.secret ? 'meetings.vote.hiddenSecret' : 'meetings.vote.progressHidden',
+      rules,
+      quorumWarning: null,
+      passed: v.result === 'elected',
+      outcome: [electionResultLine(election, v.result, v.electionResult ?? null, t), ballots].join(' · '),
+      composition: null,
     };
   }
 }

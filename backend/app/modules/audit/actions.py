@@ -135,6 +135,9 @@ class AuditAction(StrEnum):
     VOTE_CLOSE = "vote_close"
     VOTE_CANCEL = "vote_cancel"
     VOTE_BRANCH_BLOCKED = "vote_branch_blocked"
+    # F2: the platform drew the lot of an election tie. ``data`` carries the
+    # candidate ids of the draw (``among``, ``seats``, ``drawn``), never a voter.
+    VOTE_LOT_DRAWN = "vote_lot_drawn"
     # Public meeting with a QR code (#17). The meeting lead is the actor. ``data``
     # carries id references and counts only, NEVER the name of a guest: the chain is
     # append-only, so a name in it could never be deleted. A guest ballot writes

@@ -845,7 +845,7 @@ class GuestService:
         code: str,
         token: str | None,
         vote_id: UUID,
-        choice: str,
+        choice: str | list[str],
         *,
         voting: VotingService,
         now: datetime,
@@ -1024,6 +1024,9 @@ class GuestService:
                     ),
                     myBallot=mine,
                     canCast=can_cast,
+                    kind=view.kind,
+                    election=view.election,
+                    electionResult=view.election_result,
                 )
             )
         return out

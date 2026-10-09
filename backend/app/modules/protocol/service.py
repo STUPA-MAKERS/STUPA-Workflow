@@ -70,13 +70,17 @@ from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.service import filter_recipients_by_preference
 from app.modules.pdf.typst_client import TypstClient, TypstError
 from app.modules.protocol.markdown import (
+    ElectionLine,
+    ElectionSnippet,
     KeeperLine,
     ProtocolDoc,
+    build_election_snippet,
     build_protocol_document,
     build_vote_snippet,
     demote_headings,
     guest_vote_note,
     protocol_variant_for,
+    replace_vote_block,
     vote_in_body,
 )
 from app.modules.protocol.models import Protocol, ProtocolVoteRef
@@ -493,15 +497,7 @@ class ProtocolService:
             if inserted is None:
                 continue  # a parallel request embedded the vote already
             view = await voting.get(vote_id)
-            snippets.append(
-                build_vote_snippet(
-                    _vote_title(view.application_id, view.question),
-                    view.tally.counts,
-                    question=view.question,
-                    note=_guest_note(view),
-                    conditions=passed_conditions(view),
-                )
-            )
+            snippets.append(_snippet(view, _vote_title(view.application_id, view.question)))
 
         if snippets:
             body = protocol.markdown.rstrip("\n")
@@ -1065,10 +1061,6 @@ class ProtocolService:
                 continue
             block = [f"# {heading}"]
             body = item.body.strip() if item.body and item.body.strip() else ""
-            if body:
-                # Demote the body headings by one level. Only the item heading stays
-                # top-level. Otherwise every `#` counts as its own agenda item.
-                block.append(demote_headings(body))
             votes = (
                 await self.session.execute(
                     select(Vote)
@@ -1080,16 +1072,23 @@ class ProtocolService:
                     .order_by(Vote.created_at)
                 )
             ).scalars().all()
+            views = [await voting.get(vote.id) for vote in votes]
+            if public:
+                # F2: an election callout that the protokollant put into the text
+                # names every candidate with the votes. The public text carries the
+                # public form: the elected names only.
+                for view in views:
+                    if getattr(view, "kind", "motion") == "election":
+                        body = replace_vote_block(
+                            body, _snippet(view, "Beschlussfrage", public=True)
+                        )
+            if body:
+                # Demote the body headings by one level. Only the item heading stays
+                # top-level. Otherwise every `#` counts as its own agenda item.
+                block.append(demote_headings(body))
             top = PublicTop(number=number, title=heading, markdown=body or None)
-            for vote in votes:
-                view = await voting.get(vote.id)
-                snippet = build_vote_snippet(
-                    view.question or "Beschlussfrage",
-                    view.tally.counts,
-                    question=view.question,
-                    note=_guest_note(view),
-                    conditions=passed_conditions(view),
-                )
+            for view in views:
+                snippet = _snippet(view, "Beschlussfrage", public=public)
                 # The protokollant may have put the result into the text already,
                 # with the same snippet. One box per vote.
                 in_text = vote_in_body(body, snippet)
@@ -1318,6 +1317,50 @@ class ProtocolService:
                 code="vote_not_in_meeting",
             )
         return vote
+
+
+def _snippet(view: VoteOut, fallback: str, *, public: bool = False) -> str:
+    """Build the protocol callout of a vote: a motion or an election (F2)."""
+    if getattr(view, "kind", "motion") == "election" and view.election is not None:
+        return build_election_snippet(_election_snippet(view), public=public)
+    return build_vote_snippet(
+        view.question or fallback,
+        view.tally.counts,
+        question=view.question,
+        note=_guest_note(view),
+        conditions=passed_conditions(view),
+    )
+
+
+def _election_snippet(view: VoteOut) -> ElectionSnippet:
+    """Map an election and its stored result on the protocol view (F2)."""
+    assert view.election is not None  # checked by the caller
+    result = view.election_result
+    elected = set(result.elected) if result is not None else set()
+    names = {c.id: c.name for c in view.election.candidates}
+    counts = result.counts if result is not None else {}
+    lines = [
+        ElectionLine(name=c.name, votes=counts.get(c.id, 0), elected=c.id in elected)
+        for c in view.election.candidates
+    ]
+    if result is not None and result.yes is None:
+        lines.sort(key=lambda line: -line.votes)
+    lot = result.lot if result is not None else None
+    runoff = result.runoff if result is not None else None
+    return ElectionSnippet(
+        question=(view.question or "Wahlgang").strip() or "Wahlgang",
+        seats=view.election.seats,
+        round=view.round,
+        candidates=lines,
+        abstentions=result.abstentions if result is not None else 0,
+        yes=result.yes if result is not None else None,
+        no=result.no if result is not None else None,
+        by_lot=lot is not None and lot.drawn is not None,
+        lot_pending=lot is not None and lot.drawn is None,
+        runoff_names=[names.get(cid, cid) for cid in runoff.candidate_ids] if runoff else [],
+        runoff_seats=runoff.seats if runoff else 0,
+        closed=result is not None,
+    )
 
 
 def _guest_note(view: VoteOut) -> str | None:

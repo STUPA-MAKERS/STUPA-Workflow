@@ -971,7 +971,76 @@ export interface MagicLinkVerifyResult {
 export type MajorityRule = 'simple' | 'absolute' | 'two_thirds';
 /** `draft`: planned, not open yet. `cancelled`: the application left the vote state by hand, so the vote stopped. */
 export type VoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
-export type VoteResult = 'passed' | 'rejected' | 'tie';
+/** A motion gives `passed`, `rejected` or `tie`. A personnel election (F2) gives
+ *  `elected`, `runoff` (a runoff decides the open seats), `tie` (the lot decides) or
+ *  `rejected` (quorum missed, or nobody elected). */
+export type VoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff';
+/** `motion`: a decision (Ja/Nein/Enthaltung). `election`: a personnel election (F2). */
+export type VoteKind = 'motion' | 'election';
+
+/** One candidate of a personnel election. The server gives the ids (`c1`..`cn`). */
+export interface ElectionCandidate {
+  id: string;
+  name: string;
+  /** The account of the candidate, or `null` for a free name. */
+  principalId?: Uuid | null;
+}
+
+/**
+ * The config of a personnel election (`ElectionConfig`, F2). Each voter gives up to
+ * `seats` votes, at most one per candidate. One candidate for one seat gives a
+ * Ja/Nein/Enthaltung ballot.
+ */
+export interface ElectionConfig {
+  seats: number;
+  candidates: ElectionCandidate[];
+  secret: boolean;
+  quorum?: Quorum | null;
+  abstainCountsQuorum?: boolean;
+  guestsVote?: boolean;
+}
+
+/** The runoff that a tie at the seat boundary needs. `voteId` is set once it exists. */
+export interface ElectionRunoff {
+  candidateIds: string[];
+  seats: number;
+  voteId?: Uuid | null;
+}
+
+/** The lot of a tie. `drawn` is `null` while the lot is pending. */
+export interface ElectionLot {
+  among: string[];
+  seats: number;
+  drawn: string[] | null;
+  at?: IsoDateTime | null;
+  by?: string | null;
+  byName?: string | null;
+}
+
+/** The stored result of a closed election (`ElectionResultOut`). */
+export interface ElectionResult {
+  /** Votes per candidate id (`yes`/`no` for a single candidate). */
+  counts: Record<string, number>;
+  abstentions: number;
+  ballots: number;
+  yes?: number | null;
+  no?: number | null;
+  /** The elected candidate ids, best first. */
+  elected: string[];
+  runoff?: ElectionRunoff | null;
+  lot?: ElectionLot | null;
+}
+
+/** The election fields of a vote (F2). A motion has `kind: 'motion'` and no others. */
+export interface ElectionFields {
+  kind?: VoteKind;
+  election?: ElectionConfig | null;
+  electionResult?: ElectionResult | null;
+  /** The election that this runoff continues. */
+  parentVoteId?: Uuid | null;
+  /** 1 for the first round, 2 for the first runoff. */
+  round?: number;
+}
 
 /** Quorum threshold. */
 export interface Quorum {
@@ -1003,6 +1072,8 @@ export interface VoteConfig {
 export interface MyBallot {
   cast: boolean;
   choice: string | null;
+  /** The chosen candidate ids of an open election ballot (F2). */
+  choices?: string[] | null;
 }
 
 /**
@@ -1040,7 +1111,7 @@ export interface Tally {
  * label. The options are raw keys. The frontend translates them through
  * `vote.option.*`.
  */
-export interface Vote {
+export interface Vote extends ElectionFields {
   id: Uuid;
   /** `null` marks a motion on a free-text agenda item, with no application. */
   applicationId: Uuid | null;
@@ -1099,6 +1170,7 @@ export interface VoteListItem {
   status: VoteStatus;
   result: VoteResult | null;
   secret: boolean;
+  kind?: VoteKind;
   applicationId: Uuid | null;
   meetingId: Uuid | null;
   meetingTitle: string | null;
@@ -1145,6 +1217,8 @@ export interface VoteClosed {
   applicationId?: Uuid | null;
   result: VoteResult;
   tally: Tally;
+  kind?: VoteKind;
+  electionResult?: ElectionResult | null;
   closedAt?: IsoDateTime | null;
   firedTransitionId?: Uuid | null;
   newStateId?: Uuid | null;
@@ -1159,7 +1233,7 @@ export type MeetingStatus = 'planned' | 'live' | 'closed';
 export type MeetingVoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
 
 /** `MeetingVoteOut`. A vote summary in the meeting state. GET /meetings/{id}. */
-export interface MeetingVoteOutWire {
+export interface MeetingVoteOutWire extends ElectionFields {
   id: Uuid;
   /** `null` marks a generic motion on a free-text agenda item, with no application. */
   applicationId?: Uuid | null;
@@ -1356,7 +1430,7 @@ export interface CalendarFeed {
 // View models for meetings and protocol.
 
 /** Vote summary, frontend view. It normalizes the `null` defaults. */
-export interface MeetingVote {
+export interface MeetingVote extends ElectionFields {
   id: Uuid;
   /** `null` marks a generic motion on a free-text agenda item. */
   applicationId: Uuid | null;
@@ -1646,7 +1720,7 @@ export interface GuestAgendaItem {
 }
 
 /** One vote of a public item, as an admitted guest sees it. */
-export interface GuestVote {
+export interface GuestVote extends ElectionFields {
   id: Uuid;
   agendaItemId: Uuid | null;
   question: string | null;
@@ -1669,7 +1743,7 @@ export interface GuestVote {
     presentMembers: number | null;
     presentGuests: number | null;
   };
-  myBallot: { cast: boolean; choice: string | null };
+  myBallot: MyBallot;
   canCast: boolean;
 }
 

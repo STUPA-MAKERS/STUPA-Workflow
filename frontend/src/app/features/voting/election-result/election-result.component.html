@@ -1,0 +1,65 @@
+@if (status(); as s) {
+  <p class="bars__status">
+    <app-status-text class="bars__result" [kind]="s.kind">{{ s.text }}</app-status-text>
+  </p>
+}
+<ul class="bars" [attr.aria-label]="'voting.bars.label' | t: { cast: total() }">
+  @for (bar of bars(); track bar.id) {
+    <li class="bars__row" [class.er__row--abstain]="bar.id === 'abstain'">
+      <div class="bars__line">
+        <span class="bars__label">
+          {{ bar.label }}
+          @if (bar.elected) {
+            <span class="er__tag er__tag--elected">{{ 'election.tag.elected' | t }}</span>
+          } @else if (bar.tied) {
+            <span class="er__tag er__tag--tie">{{ 'election.tag.tie' | t }}</span>
+          }
+        </span>
+        <span class="bars__count mono">{{ bar.count }}</span>
+        <span class="bars__pct mono">{{ pct(bar) }} %</span>
+      </div>
+      <app-seg-bar
+        [size]="variant() === 'beamer' ? 'xl' : 'normal'"
+        [segments]="[{ value: bar.count, tone: tone(bar) }]"
+        [total]="total()"
+        [label]="barLabel(bar)"
+      />
+    </li>
+  }
+</ul>
+
+@if (runoff(); as r) {
+  <div class="er__banner" role="status">
+    <p class="er__bannerText">
+      <app-icon name="repeat" [size]="18" />
+      <span>{{ r.text }}</span>
+    </p>
+    @if (r.pending && canManage() && voteId()) {
+      <app-button variant="fill" [loading]="busy() === 'runoff'" (click)="startRunoff()">
+        {{ 'election.runoff.start' | t }}
+      </app-button>
+    } @else if (!r.pending) {
+      <p class="er__hint">{{ 'election.runoff.exists' | t }}</p>
+    }
+  </div>
+}
+
+@if (lot(); as text) {
+  <div class="er__banner" role="status">
+    <p class="er__bannerText">
+      <app-icon name="swap" [size]="18" />
+      <span>{{ text }}</span>
+    </p>
+    @if (canManage() && voteId()) {
+      <app-button variant="fill" [loading]="busy() === 'lot'" (click)="drawLot()">
+        {{ 'election.lot.draw' | t }}
+      </app-button>
+    } @else {
+      <p class="er__hint">{{ 'election.lot.waiting' | t }}</p>
+    }
+  </div>
+}
+
+@if (lotNote(); as note) {
+  <app-note icon="info">{{ note }}</app-note>
+}

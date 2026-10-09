@@ -35,13 +35,14 @@ from app.modules.admin.models import Gremium
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.livevote.models import Meeting
 from app.modules.protocol.models import Protocol
+from app.shared.config_schemas import ElectionConfig
 from app.shared.errors import NotFoundError, ServiceUnavailableError
 
 logger = logging.getLogger("app.protocol")
 
 SNAPSHOT_VERSION = 1
 
-VoteResult = Literal["passed", "rejected", "tie"]
+VoteResult = Literal["passed", "rejected", "tie", "elected", "runoff"]
 MajorityRule = Literal["simple", "absolute", "two_thirds"]
 
 
@@ -73,11 +74,22 @@ class PublicDecision(_CamelModel):
     in_text: bool = Field(default=False, alias="inText")
     # F1: the conditions of the decision, when the vote passed with a proposal.
     conditions: list[str] = Field(default_factory=list)
+    # F2 · Personnel elections. The public version names the elected candidates
+    # only; the other candidates appear as a count, and no vote count travels.
+    kind: Literal["motion", "election"] = "motion"
+    seats: int | None = None
+    round: int = 1
+    elected: list[str] = Field(default_factory=list)
+    other_candidates: int = Field(default=0, alias="otherCandidates")
+    by_lot: bool = Field(default=False, alias="byLot")
 
     @classmethod
     def from_vote(cls, view: object) -> PublicDecision:
         """Build a decision from a `VoteOut`. The tally holds counts only, no voter."""
         tally = getattr(view, "tally", None)
+        election = getattr(view, "election", None)
+        if getattr(view, "kind", "motion") == "election" and election is not None:
+            return cls._from_election(view, election)
         return cls(
             question=getattr(view, "question", None),
             counts=dict(getattr(tally, "counts", None) or {}),
@@ -85,6 +97,26 @@ class PublicDecision(_CamelModel):
             majorityRule=getattr(view, "majority_rule", "simple"),
             secret=bool(getattr(view, "secret", False)),
             conditions=passed_conditions(view),
+        )
+
+
+    @classmethod
+    def _from_election(cls, view: object, election: ElectionConfig) -> PublicDecision:
+        """Build the public decision of an election: elected names and a count."""
+        stored = getattr(view, "election_result", None)
+        elected_ids: list[str] = list(stored.elected) if stored is not None else []
+        names = {c.id: c.name for c in election.candidates}
+        lot = stored.lot if stored is not None else None
+        return cls(
+            question=getattr(view, "question", None),
+            result=getattr(view, "result", None),
+            secret=bool(getattr(view, "secret", False)),
+            kind="election",
+            seats=election.seats,
+            round=int(getattr(view, "round", 1) or 1),
+            elected=[names.get(cid, cid) for cid in elected_ids],
+            otherCandidates=len(election.candidates) - len(elected_ids),
+            byLot=lot is not None and lot.drawn is not None,
         )
 
 

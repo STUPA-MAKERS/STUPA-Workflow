@@ -18,6 +18,7 @@ from app.modules.livevote.events import (
     MeetingStateEvent,
     VoteCancelledEvent,
     VoteClosedEvent,
+    VoteLotDrawnEvent,
     VoteOpenedEvent,
     VoteTallyEvent,
 )
@@ -52,15 +53,7 @@ class BrokerPublisher:
     async def vote_opened(self, vote: VoteOut) -> None:
         if vote.meeting_id is None:
             return
-        event = VoteOpenedEvent(
-            voteId=vote.id,
-            applicationId=vote.application_id,
-            agendaItemId=vote.agenda_item_id,
-            question=vote.question,
-            options=vote.config.options,
-            closesAt=vote.closes_at,
-            secret=vote.secret,
-        )
+        event = VoteOpenedEvent.from_vote(vote)
         await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
 
     async def vote_tally(self, vote: VoteOut) -> None:
@@ -80,6 +73,17 @@ class BrokerPublisher:
             result=vote.result,
             counts=vote.tally.counts,
             failedReason=vote.tally.failed_reason,
+            kind=vote.kind,
+            electionResult=vote.election_result,
+        )
+        await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
+
+    async def vote_lot_drawn(self, vote: VoteOut) -> None:
+        """Send the drawn lot of an election (F2) to the room and the beamer."""
+        if vote.meeting_id is None or vote.election_result is None or vote.result is None:
+            return
+        event = VoteLotDrawnEvent(
+            voteId=vote.id, result=vote.result, electionResult=vote.election_result
         )
         await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
 

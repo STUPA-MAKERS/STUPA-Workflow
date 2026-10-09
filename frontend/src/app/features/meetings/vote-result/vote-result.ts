@@ -5,6 +5,7 @@ import type {
   VoteCalloutResolver,
 } from '@stupa-makers/ui-kit/markdown-editor';
 import { clockTime } from '../meetings-display.util';
+import { electionCaption, electionStatus } from '../../voting/election.util';
 
 /** The translate function of the I18nService. */
 type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
@@ -19,6 +20,7 @@ type Translate = (key: TranslationKey, params?: Record<string, string | number>)
  * the page. A tie is a rejection (O18), so the result is "Angenommen" or "Abgelehnt".
  */
 export function voteResultInfo(vote: MeetingVote, t: Translate, locale: string): VoteCalloutInfo {
+  if (vote.kind === 'election') return electionResultInfo(vote, t, locale);
   const parts = [t('meetings.voteResult.caption')];
   const time = clockTime(vote.closedAt, locale);
   if (time) parts.push(time);
@@ -32,6 +34,27 @@ export function voteResultInfo(vote: MeetingVote, t: Translate, locale: string):
             label: t(passed ? 'vote.result.passed' : 'vote.result.rejected'),
             tone: passed ? 'passed' : 'rejected',
           }
+        : null,
+    labels: {
+      yes: t('vote.option.yes'),
+      no: t('vote.option.no'),
+      abstain: t('vote.option.abstain'),
+      result: t('meetings.voteResult.result'),
+    },
+  };
+}
+
+/** The card of a personnel election (F2): "Wahl · 2 Posten · 18:52" and "Gewählt". */
+function electionResultInfo(vote: MeetingVote, t: Translate, locale: string): VoteCalloutInfo {
+  const parts = [electionCaption(vote.election ?? null, vote.round, t)];
+  const time = clockTime(vote.closedAt, locale);
+  if (time) parts.push(time);
+  const elected = vote.result === 'elected';
+  return {
+    caption: parts.join(' · '),
+    result:
+      vote.status === 'closed'
+        ? { label: t(electionStatus(vote.result).key), tone: elected ? 'passed' : 'rejected' }
         : null,
     labels: {
       yes: t('vote.option.yes'),

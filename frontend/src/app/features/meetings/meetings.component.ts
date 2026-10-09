@@ -254,6 +254,11 @@ export class MeetingsComponent {
     this.session.closeVote(voteId);
   }
 
+  /** The lot of an election was drawn, or its runoff opened (F2). */
+  reloadMeeting(): void {
+    this.session.reloadMeeting();
+  }
+
   cancelVote(voteId: Uuid): void {
     this.session.cancelVote(voteId);
   }

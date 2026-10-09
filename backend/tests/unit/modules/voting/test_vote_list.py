@@ -279,7 +279,7 @@ def test_router_list_passes_filters() -> None:
     body = r.json()
     assert body["total"] == 1
     assert body["items"][0]["canCast"] is True
-    assert body["items"][0]["myBallot"] == {"cast": False, "choice": None}
+    assert body["items"][0]["myBallot"] == {"cast": False, "choice": None, "choices": None}
     assert svc.kw == {
         "sub": "p",
         "statuses": ["open", "draft"],

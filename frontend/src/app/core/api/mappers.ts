@@ -28,6 +28,7 @@ import type {
   Attachment,
   AttachmentOutWire,
   CommentOutWire,
+  ElectionFields,
   ApplicationComment,
   DataDiff,
   DataDiffWire,
@@ -255,6 +256,22 @@ export function mapMeetingVote(wire: MeetingVoteOutWire): MeetingVote {
     guestsVote: wire.guestsVote ?? false,
     presentMembers: wire.presentMembers ?? null,
     presentGuests: wire.presentGuests ?? null,
+    ...electionFields(wire),
+  };
+}
+
+/**
+ * The election fields of a vote (F2). A motion gets none, so a motion keeps its
+ * former shape.
+ */
+export function electionFields(wire: ElectionFields): ElectionFields {
+  if (wire.kind !== 'election') return {};
+  return {
+    kind: 'election',
+    election: wire.election ?? null,
+    electionResult: wire.electionResult ?? null,
+    parentVoteId: wire.parentVoteId ?? null,
+    round: wire.round ?? 1,
   };
 }
 

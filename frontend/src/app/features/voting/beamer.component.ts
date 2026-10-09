@@ -253,6 +253,7 @@ export class BeamerComponent implements OnDestroy {
       voted: sum(msg.counts),
       result: msg.result as VoteResult,
       failedReason: msg.failedReason ?? null,
+      ...(msg.electionResult ? { electionResult: msg.electionResult } : {}),
     });
   }
 
@@ -271,6 +272,9 @@ export class BeamerComponent implements OnDestroy {
       guestsVote: !!v.guestsVote || !!v.config.guestsVote,
       presentMembers: v.tally.presentMembers ?? null,
       presentGuests: v.tally.presentGuests ?? null,
+      ...(v.kind === 'election'
+        ? { election: v.election ?? null, electionResult: v.electionResult ?? null, round: v.round ?? 1 }
+        : {}),
       ...over,
     };
   }

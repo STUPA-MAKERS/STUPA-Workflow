@@ -102,6 +102,18 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     # protocol and the result cards show them as counts, never as names.
     present_members: Mapped[int | None] = mapped_column(Integer, nullable=True)
     present_guests: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # F2 · Personnel elections. ``kind`` tells a motion (``config`` = VoteConfig) from
+    # an election (``config`` = ElectionConfig). An election never has an application
+    # and never fires a flow branch. A runoff points to its parent election
+    # (``parent_vote_id``) and counts the rounds (``round``, 1 for the first round).
+    # ``election_result`` holds the result of a closed election: the votes per
+    # candidate, the abstentions, the elected candidates, a pending runoff and the lot.
+    kind: Mapped[str] = mapped_column(Text, server_default="motion", default="motion")
+    parent_vote_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("vote.id", ondelete="SET NULL"), nullable=True
+    )
+    round: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
+    election_result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
         # ``cancelled``: the application left the vote state manually, so the vote ends
@@ -109,10 +121,13 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
         CheckConstraint(
             "status IN ('draft','open','closed','cancelled')", name="vote_status"
         ),
+        # ``elected`` and ``runoff`` belong to an election (F2). A motion keeps
+        # ``passed``, ``rejected`` and ``tie``.
         CheckConstraint(
-            "result IS NULL OR result IN ('passed','rejected','tie')",
+            "result IS NULL OR result IN ('passed','rejected','tie','elected','runoff')",
             name="vote_result",
         ),
+        CheckConstraint("kind IN ('motion','election')", name="vote_kind"),
         Index("ix_vote_application_id", "application_id"),
         Index("ix_vote_status_closes_at", "status", "closes_at"),
     )

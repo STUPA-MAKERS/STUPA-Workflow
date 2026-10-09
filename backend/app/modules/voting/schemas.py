@@ -6,16 +6,64 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.modules.applications.decision import DecisionIn
-from app.shared.config_schemas import Quorum, VoteConfig
+from app.shared.config_schemas import ElectionConfig, Quorum, VoteConfig
 
 
 class _CamelModel(BaseModel):
     """Give JSON the camelCase aliases. A field also accepts its Python name."""
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+# The result of a closed vote. A motion gives ``passed``/``rejected``/``tie``. An
+# election (F2) gives ``elected``, ``runoff`` (a runoff decides the open seats),
+# ``tie`` (the lot decides) or ``rejected`` (quorum missed, or nobody elected).
+VoteResultValue = Literal["passed", "rejected", "tie", "elected", "runoff"]
+VoteKind = Literal["motion", "election"]
+
+
+class ElectionRunoffOut(_CamelModel):
+    """A runoff that a tie at the seat boundary needs (F2).
+
+    ``voteId`` is the runoff vote once ``POST /votes/{id}/runoff`` created it.
+    """
+
+    candidate_ids: list[str] = Field(alias="candidateIds")
+    seats: int
+    vote_id: UUID | None = Field(default=None, alias="voteId")
+
+
+class ElectionLotOut(_CamelModel):
+    """The lot of a tie (F2). ``drawn`` is None while the lot is pending.
+
+    ``at`` is the moment of the draw and ``by`` the ``sub`` of the meeting lead who
+    triggered it; ``byName`` is the name at that moment. A tie for several open seats
+    (a runoff round) draws several candidates.
+    """
+
+    among: list[str]
+    seats: int = 1
+    drawn: list[str] | None = None
+    at: datetime | None = None
+    by: str | None = None
+    by_name: str | None = Field(default=None, alias="byName")
+
+
+class ElectionResultOut(_CamelModel):
+    """The stored result of a closed election (``vote.election_result``, F2)."""
+
+    counts: dict[str, int]
+    abstentions: int = 0
+    ballots: int = 0
+    # Only the single-candidate ballot (Ja/Nein/Enthaltung).
+    yes: int | None = None
+    no: int | None = None
+    elected: list[str] = Field(default_factory=list)
+    runoff: ElectionRunoffOut | None = None
+    lot: ElectionLotOut | None = None
 
 
 class VoteCreate(_CamelModel):
@@ -49,9 +97,13 @@ class VoteCreateInternal(_CamelModel):
     gremium. The live-vote route builds it from the meeting. No client sends it.
     """
 
-    config: VoteConfig
+    # A motion carries a VoteConfig, an election (F2) an ElectionConfig.
+    config: VoteConfig | ElectionConfig
     eligible_group: UUID = Field(alias="eligibleGroup")
     question: str | None = None
+    # F2: the election that a runoff continues, and its round.
+    parent_vote_id: UUID | None = Field(default=None, alias="parentVoteId")
+    round: int = Field(default=1, ge=1)
     # Authoritative eligible-voter count (roster basis) and the denominator of the
     # percent quorum. It does NOT come from the logged-in users, because that would be
     # fail-open. A percent quorum requires it. Without it the quorum stays fail-closed.
@@ -83,8 +135,18 @@ class BallotIn(_CamelModel):
     rights are two separate ballots.
     """
 
-    choice: str = Field(min_length=1)
+    # A motion and the single-candidate election take one option. An election with
+    # several candidates takes the list of the chosen candidate ids (F2; ``[]`` = full
+    # abstention, at most ``seats`` ids, no id twice).
+    choice: str | list[str]
     as_delegation: bool = Field(default=False, alias="asDelegation")
+
+    @field_validator("choice")
+    @classmethod
+    def _non_empty_option(cls, v: str | list[str]) -> str | list[str]:
+        if isinstance(v, str) and not v:
+            raise ValueError("choice must not be empty")
+        return v
 
 
 class TallyOut(_CamelModel):
@@ -102,7 +164,7 @@ class TallyOut(_CamelModel):
     revealed: bool = True
     quorum_met: bool = Field(alias="quorumMet")
     leading: str | None = None
-    result: Literal["passed", "rejected", "tie"] | None = None
+    result: VoteResultValue | None = None
     # Why the vote failed: ``quorum`` = quorum missed (fail-closed), ``majority`` =
     # quorum met but majority missed. It stays None while the vote is open, and on
     # passed or tie.
@@ -127,6 +189,9 @@ class MyBallot(_CamelModel):
 
     cast: bool = False
     choice: str | None = None
+    # F2: the chosen candidate ids of an open election ballot. None for a motion and
+    # for a secret vote.
+    choices: list[str] | None = None
 
 
 class VoteOut(_CamelModel):
@@ -147,8 +212,17 @@ class VoteOut(_CamelModel):
     opens_at: datetime | None = Field(default=None, alias="opensAt")
     # The planned end of the cast window (deadline). It is not the real close time.
     closes_at: datetime | None = Field(default=None, alias="closesAt")
-    result: Literal["passed", "rejected", "tie"] | None = None
+    result: VoteResultValue | None = None
     secret: bool
+    # F2: ``election`` carries the candidates and the seats (``config`` then holds
+    # the projection: the candidate ids plus ``abstain`` as options).
+    # ``electionResult`` is set once the election closed. A runoff names its parent
+    # election and its round.
+    kind: VoteKind = "motion"
+    election: ElectionConfig | None = None
+    election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
+    parent_vote_id: UUID | None = Field(default=None, alias="parentVoteId")
+    round: int = 1
     # Copies of ``config`` for the vote card, so a client needs no config parse.
     majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(
         default="simple", alias="majorityRule"
@@ -196,8 +270,9 @@ class VoteListItem(_CamelModel):
     id: UUID
     question: str | None = None
     status: VoteStatus
-    result: Literal["passed", "rejected", "tie"] | None = None
+    result: VoteResultValue | None = None
     secret: bool
+    kind: VoteKind = "motion"
     application_id: UUID | None = Field(default=None, alias="applicationId")
     meeting_id: UUID | None = Field(default=None, alias="meetingId")
     meeting_title: str | None = Field(default=None, alias="meetingTitle")
@@ -238,8 +313,11 @@ class VoteClosed(_CamelModel):
     id: UUID
     meeting_id: UUID | None = Field(default=None, alias="meetingId")
     application_id: UUID | None = Field(default=None, alias="applicationId")
-    result: Literal["passed", "rejected", "tie"]
+    result: VoteResultValue
     tally: TallyOut
+    # F2: the result of an election (None for a motion).
+    kind: VoteKind = "motion"
+    election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
     closed_at: datetime | None = Field(default=None, alias="closedAt")
     fired_transition_id: UUID | None = Field(
         default=None, alias="firedTransitionId"

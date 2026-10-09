@@ -29,6 +29,7 @@ from app.modules.admin.gremium_roles import gremium_ids_for
 from app.modules.admin.models import Gremium
 from app.modules.auth.rbac import VOTE_GROUP_PREFIX
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
+from app.modules.voting.election import own_ballot
 from app.modules.voting.models import Ballot, Vote, VotedMarker
 from app.modules.voting.schemas import MyBallot, VoteListItem, VoteStatus
 from app.search import escape_like
@@ -187,6 +188,7 @@ async def _decorate(
                 status=vote.status,  # type: ignore[arg-type]
                 result=vote.result,  # type: ignore[arg-type]
                 secret=config.secret,
+                kind=getattr(vote, "kind", "motion"),
                 applicationId=vote.application_id,
                 meetingId=vote.meeting_id,
                 meetingTitle=meeting_title,
@@ -240,7 +242,10 @@ async def _own_ballots(session: AsyncSession, sub: str, votes: list[Vote]) -> di
                 Ballot.voter_sub == sub, Ballot.vote_id.in_(plain)
             )
         )
-        out |= {vote_id: MyBallot(cast=True, choice=choice) for vote_id, choice in found.all()}
+        kinds = {v.id: getattr(v, "kind", "motion") for v in votes}
+        out |= {
+            vote_id: own_ballot(kinds[vote_id], choice) for vote_id, choice in found.all()
+        }
     if secret:
         found = await session.execute(
             select(VotedMarker.vote_id).where(

@@ -62,6 +62,7 @@
     [layout]="ballotLayout()"
     [compact]="compact()"
     [columns]="layout() === 'strip'"
+    [election]="election()"
     (castDone)="castDone.emit($event)"
     (castFailed)="castFailed.emit($event)"
   />
@@ -80,7 +81,17 @@
   />
 }
 
-@if (showBars()) {
+@if (showBars() && election(); as el) {
+  <app-election-result
+    [election]="el"
+    [result]="v.status === 'closed' ? v.result : null"
+    [electionResult]="v.electionResult ?? null"
+    [counts]="v.tally.counts"
+    [voteId]="v.id"
+    [canManage]="!!v.canManage"
+    (changed)="changed.emit($event)"
+  />
+} @else if (showBars()) {
   <app-vote-bars
     [options]="options()"
     [counts]="v.tally.counts"

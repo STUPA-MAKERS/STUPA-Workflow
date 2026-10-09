@@ -7,7 +7,12 @@
     @if (named()) {
       <h2 class="sec ballot__name">{{ 'voting.ballot.own' | t }}</h2>
     }
-    @if (compact()) {
+    @if (candidateMode()) {
+      <ng-container
+        [ngTemplateOutlet]="cands"
+        [ngTemplateOutletContext]="{ row: 'own', cast: own.cast, label: ('voting.ballot.own' | t) }"
+      />
+    } @else if (compact()) {
       <div class="ballot__proxy" role="group" [attr.aria-label]="'voting.ballot.own' | t">
         @for (opt of options(); track opt) {
           @let on = isOn('own', opt);
@@ -52,7 +57,7 @@
       @let choice = castChoice('own');
       <div class="ballot__done" role="status">
         <p class="ballot__thanks">
-          {{ choice ? ('voting.ballot.thanks' | t: { choice: label(choice) }) : ('voting.ballot.thanksSecret' | t) }}
+          {{ choice !== null ? ('voting.ballot.thanks' | t: { choice: choiceLabel(choice) }) : ('voting.ballot.thanksSecret' | t) }}
         </p>
         <p class="ballot__lock">
           <app-icon name="lock" [size]="13" />
@@ -69,6 +74,12 @@
     <h2 class="sec ballot__name ell" [title]="'voting.ballot.proxy' | t: { name }">
       {{ 'voting.ballot.proxy' | t: { name } }}
     </h2>
+    @if (candidateMode()) {
+      <ng-container
+        [ngTemplateOutlet]="cands"
+        [ngTemplateOutletContext]="{ row: 'proxy', cast: proxy.cast, label: ('voting.ballot.proxy' | t: { name }) }"
+      />
+    } @else {
     <div class="ballot__proxy" role="group" [attr.aria-label]="'voting.ballot.proxy' | t: { name }">
       @for (opt of options(); track opt) {
         @let on = isOn('proxy', opt);
@@ -84,13 +95,14 @@
         </button>
       }
     </div>
+    }
     @if (proxy.cast) {
       @let choice = castChoice('proxy');
       <p class="ballot__lock ballot__lock--start" role="status">
         <app-icon name="lock" [size]="13" />
         {{
-          choice
-            ? ('voting.ballot.proxyDone' | t: { name, choice: label(choice) })
+          choice !== null
+            ? ('voting.ballot.proxyDone' | t: { name, choice: choiceLabel(choice) })
             : ('voting.ballot.proxyDoneSecret' | t: { name })
         }}
       </p>
@@ -119,3 +131,73 @@
     </app-button>
   </div>
 }
+
+<!-- The candidates of an election (F2). One seat: radio rows and a separate
+     "Enthaltung" row. Several seats: check boxes, the counter and "Ganz enthalten". -->
+<ng-template #cands let-row="row" let-cast="cast" let-label="label">
+  @let busy = pending() !== null;
+  @let multi = multiSeat();
+  @let full = isFull(row);
+  <div
+    class="ballot__choices ballot__cands"
+    [attr.role]="multi ? 'group' : 'radiogroup'"
+    [attr.aria-label]="label"
+  >
+    @if (multi && !cast) {
+      <p class="ballot__counter" aria-live="polite">
+        {{ 'election.ballot.counter' | t: { n: picks(row).length, m: seats() } }}
+      </p>
+    }
+    @for (c of election()?.candidates ?? []; track c.id) {
+      @let on = isPicked(row, c.id);
+      <button
+        type="button"
+        class="choice"
+        [class.choice--on]="on"
+        [attr.role]="multi ? 'checkbox' : 'radio'"
+        [attr.aria-checked]="on"
+        [disabled]="cast || busy || (multi && full && !on)"
+        (click)="toggle(row, c.id)"
+      >
+        <span class="choice__mark" [class.choice__mark--box]="multi" aria-hidden="true">
+          @if (on) {
+            <app-icon name="check" [size]="18" />
+          }
+        </span>
+        <span class="choice__label">{{ c.name }}</span>
+      </button>
+    }
+    @let abstain = isAbstain(row);
+    @if (multi) {
+      @if (!cast) {
+        <app-button
+          class="ballot__abstainAll"
+          variant="text"
+          size="sm"
+          [disabled]="busy"
+          [ariaPressed]="abstain"
+          (click)="abstainAll(row)"
+        >
+          {{ 'election.ballot.abstainAll' | t }}
+        </app-button>
+      }
+    } @else {
+      <button
+        type="button"
+        class="choice choice--abstain"
+        [class.choice--on]="abstain"
+        role="radio"
+        [attr.aria-checked]="abstain"
+        [disabled]="cast || busy"
+        (click)="abstainAll(row)"
+      >
+        <span class="choice__mark" aria-hidden="true">
+          @if (abstain) {
+            <app-icon name="check" [size]="18" />
+          }
+        </span>
+        <span class="choice__label">{{ 'vote.option.abstain' | t }}</span>
+      </button>
+    }
+  </div>
+</ng-template>

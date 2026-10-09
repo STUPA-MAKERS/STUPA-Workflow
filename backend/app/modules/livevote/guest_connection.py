@@ -44,7 +44,9 @@ from app.modules.voting.service import VotingService
 logger = logging.getLogger("app.livevote.guest")
 
 # The vote events that an admitted guest gets for a public agenda item.
-_VOTE_EVENTS = frozenset({"vote_opened", "vote_tally", "vote_closed", "vote_cancelled"})
+_VOTE_EVENTS = frozenset(
+    {"vote_opened", "vote_tally", "vote_closed", "vote_cancelled", "vote_lot_drawn"}
+)
 # After these states the guest has no business on the channel any more.
 _TERMINAL = frozenset({"rejected", "removed", "left", "expired"})
 
@@ -142,18 +144,7 @@ class GuestConnection:
         await self._send(state)
         await self._send({"type": "guest_counts", "admittedGuests": admitted})
         if vote_out is not None:
-            await self._send(
-                VoteOpenedEvent(
-                    voteId=vote_out.id,
-                    applicationId=vote_out.application_id,
-                    agendaItemId=vote_out.agenda_item_id,
-                    question=vote_out.question,
-                    options=vote_out.config.options,
-                    closesAt=vote_out.closes_at,
-                    secret=vote_out.secret,
-                    replay=True,
-                ).dump()
-            )
+            await self._send(VoteOpenedEvent.from_vote(vote_out, replay=True).dump())
             await self._send(VoteTallyEvent.from_vote(vote_out).dump())
         if state["status"] == "closed":
             raise _Closed

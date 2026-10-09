@@ -146,6 +146,8 @@ export class MeetingPageComponent {
   readonly castVote = output<{ voteId: Uuid; choice: string }>();
   readonly voteOpen = output<Uuid>();
   readonly voteClose = output<Uuid>();
+  /** The lot of an election was drawn, or its runoff opened (F2). */
+  readonly electionChanged = output<void>();
   readonly voteCancel = output<Uuid>();
   readonly voteDelete = output<Uuid>();
   readonly voteDialog = output<AgendaItem>();
