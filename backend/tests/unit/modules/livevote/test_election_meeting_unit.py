@@ -271,6 +271,30 @@ def test_vote_opened_event_carries_the_election() -> None:
     assert [c["name"] for c in event["election"]["candidates"]] == ["Anna", "Ben"]
 
 
+def test_channel_events_carry_no_account_ids() -> None:
+    """F2: the channel reaches the beamer and the guests: no principal id, no sub."""
+    linked = ElectionConfig.model_validate(
+        {
+            "seats": 1,
+            "candidates": [
+                {"id": "c1", "name": "Anna", "principalId": str(uuid4())},
+                {"id": "c2", "name": "Ben"},
+            ],
+        }
+    )
+    event: dict[str, Any] = VoteOpenedEvent.from_vote(_vote_out(election=linked)).dump()
+    assert [c.get("principalId") for c in event["election"]["candidates"]] == [None, None]
+    # A config without links stays as it is.
+    assert _ELECTION.public() is _ELECTION
+    result = ElectionResultOut(counts={}, lot=ElectionLotOut(among=["c1"], by="sub", byName="L"))
+    lot = result.public().lot
+    assert lot is not None
+    assert lot.by is None
+    assert lot.by_name == "L"
+    plain = ElectionResultOut(counts={})
+    assert plain.public() is plain
+
+
 def test_cast_message_takes_a_list() -> None:
     msg = CastMessage.model_validate({"type": "cast", "voteId": str(uuid4()), "choice": []})
     assert msg.choice == []
@@ -284,7 +308,7 @@ async def test_publisher_sends_the_election_close_and_the_lot() -> None:
         electionResult=ElectionResultOut(
             counts={"c1": 1, "c2": 1},
             elected=["c2"],
-            lot=ElectionLotOut(among=["c1", "c2"], drawn=["c2"]),
+            lot=ElectionLotOut(among=["c1", "c2"], drawn=["c2"], by="sub-lead"),
         ),
     )
     closed = VoteClosed(
@@ -293,7 +317,9 @@ async def test_publisher_sends_the_election_close_and_the_lot() -> None:
         result="tie",
         tally=vote.tally,
         kind="election",
-        electionResult=ElectionResultOut(counts={"c1": 1, "c2": 1}),
+        electionResult=ElectionResultOut(
+            counts={"c1": 1, "c2": 1}, lot=ElectionLotOut(among=["c1"], by="sub-lead")
+        ),
     )
     pub = BrokerPublisher(broker)
     async with broker.subscribe(f"meeting:{vote.meeting_id}") as sub:
@@ -308,6 +334,9 @@ async def test_publisher_sends_the_election_close_and_the_lot() -> None:
     assert first["result"] == "tie"
     assert second["type"] == "vote_lot_drawn"
     assert second["electionResult"]["lot"]["drawn"] == ["c2"]
+    # No `sub` of the lead reaches the beamer or a guest.
+    assert first["electionResult"]["lot"]["by"] is None
+    assert second["electionResult"]["lot"]["by"] is None
     assert VoteClosedEvent.model_validate(first).election_result is not None
 
 

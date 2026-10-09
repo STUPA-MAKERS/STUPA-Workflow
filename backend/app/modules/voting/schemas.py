@@ -65,6 +65,16 @@ class ElectionResultOut(_CamelModel):
     runoff: ElectionRunoffOut | None = None
     lot: ElectionLotOut | None = None
 
+    def public(self) -> ElectionResultOut:
+        """Return the result without the ``sub`` of the lead who drew the lot.
+
+        The WebSocket channel of a meeting reaches the beamer and the guests, so it
+        carries this form. ``byName`` stays for the lot note.
+        """
+        if self.lot is None or self.lot.by is None:
+            return self
+        return self.model_copy(update={"lot": self.lot.model_copy(update={"by": None})})
+
 
 class VoteCreate(_CamelModel):
     """``POST /applications/{id}/votes`` - create a vote (status ``draft``).

@@ -177,3 +177,55 @@ async def test_public_assembly_replaces_the_election_in_the_text(
     session = FakeSession(results=[result(item), result(vote)])
     md = await _service(session)._assemble_from_agenda(MID)
     assert "Cem: 1" in md
+
+
+def test_runoff_head_names_the_round() -> None:
+    """A runoff copies the question; its head line names the round."""
+    text = _snippet(_view(_RESULT, round=2), "x")
+    assert text.splitlines()[0] == "> [!abstimmung] **Wahl der Referate (2. Wahlgang)**"
+
+
+_ROUND1 = _RESULT.model_copy(
+    update={
+        "elected": ["c2"],
+        "runoff": ElectionRunoffOut(candidateIds=["c1", "c3"], seats=1),
+    }
+)
+_ROUND2 = ElectionResultOut(counts={"c1": 4, "c3": 2}, abstentions=0, ballots=6, elected=["c1"])
+
+
+async def _assemble_two_rounds(
+    monkeypatch: pytest.MonkeyPatch, body_rounds: tuple[int, ...], *, public: bool
+) -> tuple[str, list[PublicTop]]:
+    first = _view(_ROUND1)
+    second = _view(_ROUND2, round=2, parentVoteId=first.id)
+    views = {1: first, 2: second}
+    body = "\n\n".join(_snippet(views[n], "x") for n in body_rounds)
+    item = SimpleNamespace(id=uuid4(), title="Wahlen", body=body, non_public=False)
+    v1, v2 = SimpleNamespace(id=uuid4()), SimpleNamespace(id=uuid4())
+    _Voting.views = {v1.id: first, v2.id: second}
+    monkeypatch.setattr(protocol_service_mod, "VotingService", _Voting)
+    session = FakeSession(results=[result(item), result(v1, v2)])
+    tops: list[PublicTop] = []
+    md = await _service(session)._assemble_from_agenda(MID, public=public, tops=tops)
+    return md, tops
+
+
+async def test_public_protocol_keeps_both_rounds_apart(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    md, tops = await _assemble_two_rounds(monkeypatch, (1, 2), public=True)
+    # Round 1 elected Ben, the runoff elected Anna; both stay in the public text.
+    assert md.count("> Gewählt: Ben") == 1
+    assert md.count("> Gewählt: Anna") == 1
+    assert "Cem" not in md
+    assert [d.in_text for d in tops[0].decisions] == [True, True]
+
+
+async def test_internal_protocol_adds_the_runoff_box_when_only_round_one_is_in_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    md, _tops = await _assemble_two_rounds(monkeypatch, (1,), public=False)
+    assert md.count("> [!abstimmung] **Wahl der Referate**") == 1
+    assert md.count("> [!abstimmung] **Wahl der Referate (2. Wahlgang)**") == 1
+    assert "> Anna: 4 · Cem: 2" in md

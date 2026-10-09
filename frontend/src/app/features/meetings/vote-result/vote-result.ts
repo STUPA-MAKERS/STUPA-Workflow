@@ -5,6 +5,7 @@ import type {
   VoteCalloutResolver,
 } from '@stupa-makers/ui-kit/markdown-editor';
 import { clockTime } from '../meetings-display.util';
+import { voteSnippetQuestion } from '../meetings.util';
 import { electionCaption, electionStatus } from '../../voting/election.util';
 
 /** The translate function of the I18nService. */
@@ -81,8 +82,8 @@ export function normalizeQuestion(text: string): string {
 
 /**
  * The resolver of the editor: find the closed vote of a card by its question. The
- * question of the snippet is the question of the vote, else its title (see
- * `voteSnippetHead`). A card of another meeting or a deleted vote stays plain.
+ * question of the snippet is the question of the vote, else its title, with the round
+ * of a runoff (see `voteSnippetQuestion`). A card of another meeting or a deleted vote stays plain.
  */
 export function voteResultResolver(
   votes: readonly MeetingVote[],
@@ -92,8 +93,10 @@ export function voteResultResolver(
   const byQuestion = new Map<string, MeetingVote>();
   for (const v of votes) {
     if (v.status !== 'closed') continue;
-    const head = v.question?.trim() || v.title?.trim();
-    if (head) byQuestion.set(normalizeQuestion(head), v);
+    if (v.kind !== 'election' && !(v.question?.trim() || v.title?.trim())) continue;
+    // A runoff names its round in the head, so the two rounds of an election
+    // keep apart (see `voteSnippetQuestion`).
+    byQuestion.set(normalizeQuestion(voteSnippetQuestion(v)), v);
   }
   return (question) => {
     const vote = byQuestion.get(normalizeQuestion(question));

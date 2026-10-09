@@ -74,7 +74,10 @@ class BrokerPublisher:
             counts=vote.tally.counts,
             failedReason=vote.tally.failed_reason,
             kind=vote.kind,
-            electionResult=vote.election_result,
+            # The channel reaches the beamer and the guests: no `sub` of the lead.
+            electionResult=(
+                vote.election_result.public() if vote.election_result is not None else None
+            ),
         )
         await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
 
@@ -83,7 +86,7 @@ class BrokerPublisher:
         if vote.meeting_id is None or vote.election_result is None or vote.result is None:
             return
         event = VoteLotDrawnEvent(
-            voteId=vote.id, result=vote.result, electionResult=vote.election_result
+            voteId=vote.id, result=vote.result, electionResult=vote.election_result.public()
         )
         await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
 

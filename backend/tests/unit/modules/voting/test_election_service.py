@@ -466,14 +466,85 @@ async def test_create_runoff_without_a_pending_runoff_409() -> None:
     assert err.value.code == "no_runoff_pending"
 
 
-async def test_create_runoff_twice_409() -> None:
+@pytest.mark.parametrize("status", ["draft", "open", "closed"])
+async def test_create_runoff_twice_409(status: str) -> None:
     parent = _runoff_parent(meeting_id=None)
     parent.election_result["runoff"]["voteId"] = str(uuid4())
+    db = fake_session(result(parent))
+    db.scalar_results = [None, status]  # the meeting id, the status of the runoff
     with pytest.raises(ConflictError) as err:
-        await ElectionService(VotingService(fake_session(result(parent)))).create_runoff(
-            parent.id
-        )
+        await ElectionService(VotingService(db)).create_runoff(parent.id)
     assert err.value.code == "runoff_exists"
+
+
+@pytest.mark.parametrize("status", ["cancelled", None])
+async def test_create_runoff_after_a_cancelled_or_deleted_runoff(status: str | None) -> None:
+    """A cancelled or deleted runoff does not block a new one."""
+    parent = _runoff_parent(meeting_id=None, config_over={"guestsVote": True}, eligible_count=3)
+    old = str(uuid4())
+    parent.election_result["runoff"]["voteId"] = old
+    db = fake_session(result(parent), result())
+    db.scalar_results = [None, status]
+    await ElectionService(VotingService(db)).create_runoff(parent.id)
+    [runoff] = [a for a in db.added if type(a).__name__ == "Vote"]
+    assert parent.election_result["runoff"]["voteId"] == str(runoff.id) != old
+
+
+def _linked_runoff(parent: SimpleNamespace, **over: Any) -> SimpleNamespace:
+    runoff = _evote(parent_vote_id=parent.id, round=2, **over)
+    parent.election_result["runoff"]["voteId"] = str(runoff.id)
+    return runoff
+
+
+async def test_cancel_of_a_runoff_releases_the_link() -> None:
+    parent = _runoff_parent(meeting_id=None)
+    runoff = _linked_runoff(parent, status="open")
+    db = fake_session(result(runoff), result(parent))
+    await VotingService(db).cancel(runoff.id, now=NOW, actor="lead")
+    assert runoff.status == "cancelled"
+    assert parent.election_result["runoff"]["voteId"] is None
+    assert parent.election_result["runoff"]["candidateIds"] == ["c2", "c3"]
+
+
+async def test_delete_of_a_runoff_releases_the_link() -> None:
+    parent = _runoff_parent()
+    runoff = _linked_runoff(parent, status="draft", meeting_id=parent.meeting_id)
+    db = fake_session(result(runoff), result(parent))
+    await VotingService(db).delete(runoff.id, meeting_id=parent.meeting_id, actor="lead")
+    assert db.deleted == [runoff]
+    assert parent.election_result["runoff"]["voteId"] is None
+
+
+async def test_release_keeps_a_link_to_another_runoff() -> None:
+    parent = _runoff_parent(meeting_id=None)
+    runoff = _linked_runoff(parent, status="open")
+    other = str(uuid4())
+    parent.election_result["runoff"]["voteId"] = other
+    db = fake_session(result(runoff), result(parent))
+    await VotingService(db).cancel(runoff.id, now=NOW, actor="lead")
+    assert parent.election_result["runoff"]["voteId"] == other
+
+
+@pytest.mark.parametrize("parent_state", ["gone", "no_result", "no_runoff"])
+async def test_release_without_a_linked_parent_does_nothing(parent_state: str) -> None:
+    parent = _runoff_parent(meeting_id=None)
+    runoff = _evote(parent_vote_id=parent.id, round=2, status="open")
+    if parent_state == "no_result":
+        parent.election_result = None
+    elif parent_state == "no_runoff":
+        parent.election_result = _stored(['["c1","c2"]'], _econfig(seats=2, n=4))
+    found = [] if parent_state == "gone" else [parent]
+    db = fake_session(result(runoff), result(*found))
+    await VotingService(db).cancel(runoff.id, now=NOW, actor="lead")
+    assert runoff.status == "cancelled"
+
+
+async def test_cancel_of_a_first_round_election_touches_no_parent() -> None:
+    vote = _evote(status="open")
+    db = fake_session(result(vote))
+    await VotingService(db).cancel(vote.id, now=NOW, actor="lead")
+    assert vote.status == "cancelled"
+    assert not any("vote.id = " in str(s) and "FOR UPDATE" in str(s) for s in db.statements[1:])
 
 
 async def test_create_runoff_needs_a_live_meeting() -> None:

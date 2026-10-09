@@ -33,7 +33,7 @@ import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.componen
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { meetingVoteStatus, voteResultStatus, type StatusView } from '@shared/status-kind.util';
+import { meetingVoteStatus, type StatusView } from '@shared/status-kind.util';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { liveSearch } from '@shared/live-search';
 import { mediaQuerySignal } from '../../../layout/media-query';
@@ -41,6 +41,7 @@ import { PageFrameService } from '../../../layout/page-frame.service';
 import { LIVE_MAX_PAGES, LIVE_PAGE_LIMIT } from '../../../layout/rail-status.service';
 import { groupByMonth } from '../../../pages/applications/applications.util';
 import { VotingPageService } from './voting-page.service';
+import { closedStatus } from '../election.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 /** The status chip: the server default, the open votes, the ended votes, the drafts. */
@@ -540,7 +541,7 @@ export class VotingComponent implements OnDestroy {
   private toRow(item: VoteListItem): VoteRow {
     const ended = item.status === 'closed' || item.status === 'cancelled';
     const status =
-      item.status === 'closed' && item.result ? voteResultStatus(item.result) : this.statusOf(item.status);
+      item.status === 'closed' && item.result ? closedStatus(item.kind, item.result) : this.statusOf(item.status);
     let where: string | null = item.gremiumName;
     if (item.meetingTitle) {
       where =

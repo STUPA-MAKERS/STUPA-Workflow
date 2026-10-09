@@ -58,6 +58,20 @@ describe('voteResultResolver', () => {
     expect(voteResultResolver([{ ...closed, question: null, title: null }], t, 'de')('Beschlussfrage')).toBeNull();
   });
 
+  it('keeps the two rounds of an election apart (F2)', () => {
+    const election = {
+      ...closed,
+      kind: 'election' as const,
+      question: 'Vorsitz',
+      result: 'runoff',
+      election: { seats: 1, candidates: [], secret: true },
+    } as unknown as typeof closed;
+    const runoff = { ...election, id: 'v-run', round: 2, result: 'elected' } as typeof closed;
+    const resolve = voteResultResolver([election, runoff], t, 'de');
+    expect(resolve('Vorsitz')?.result?.label).not.toBe(resolve('Vorsitz (2. Wahlgang)')?.result?.label);
+    expect(resolve('Vorsitz (2. Wahlgang)')).not.toBeNull();
+  });
+
   it('normalizes the text of a question', () => {
     expect(normalizeQuestion(' **A\\_b**  `c` ')).toBe('a_b c');
   });

@@ -1,6 +1,12 @@
-import type { ElectionConfig, ElectionFields, ElectionResult, VoteResult } from '@core/api/models';
+import type {
+  ElectionConfig,
+  ElectionFields,
+  ElectionResult,
+  VoteKind,
+  VoteResult,
+} from '@core/api/models';
 import type { TranslationKey } from '@core/i18n/translations';
-import type { StatusView } from '@shared/status-kind.util';
+import { voteResultStatus, type StatusView } from '@shared/status-kind.util';
 
 /** The translate function of the I18nService. */
 type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
@@ -154,6 +160,14 @@ export function electionCaption(
 }
 
 /** The status of a closed election: "Gewählt", "Stichwahl", "Los steht aus", "Niemand gewählt". */
+/**
+ * The status of a closed vote in a list row: an election (F2) reads its result with
+ * `electionStatus` ("Gewählt", "Stichwahl", "Los"), a motion with `voteResultStatus`.
+ */
+export function closedStatus(kind: VoteKind | null | undefined, result: VoteResult): StatusView {
+  return kind === 'election' ? electionStatus(result) : voteResultStatus(result);
+}
+
 export function electionStatus(result: VoteResult | string | null): StatusView {
   if (result === 'elected') return { kind: 'accent', key: 'election.status.elected' };
   if (result === 'runoff') return { kind: 'warn', key: 'election.status.runoff' };

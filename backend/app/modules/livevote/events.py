@@ -104,7 +104,8 @@ class VoteOpenedEvent(_CamelModel):
             secret=vote.secret,
             replay=replay,
             kind=vote.kind,
-            election=vote.election,
+            # The channel reaches the beamer and the guests: names, no account ids.
+            election=vote.election.public() if vote.election is not None else None,
             round=vote.round,
         )
 

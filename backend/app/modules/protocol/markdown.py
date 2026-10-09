@@ -400,8 +400,15 @@ def build_election_snippet(view: ElectionSnippet, *, public: bool = False) -> st
     elected candidates; the others appear as a count, and no vote count travels. The
     single-candidate ballot writes its Ja/Nein/Enthaltung line, which the renderer
     turns into the tally box (internal only).
+
+    A runoff copies the question of its election, so its head line names the round
+    („Frage (2. Wahlgang)“). Each round then has its own head line, which
+    `replace_vote_block` and `vote_in_body` match on.
     """
-    lines = [f"> [!abstimmung] **{_md_escape(view.question)}**"]
+    head = _md_escape(view.question)
+    if view.round > 1:
+        head += f" ({view.round}. Wahlgang)"
+    lines = [f"> [!abstimmung] **{head}**"]
     meta = f"Wahl · {view.seats} Posten"
     if view.round > 1:
         meta += f" · Stichwahl ({view.round}. Wahlgang)"

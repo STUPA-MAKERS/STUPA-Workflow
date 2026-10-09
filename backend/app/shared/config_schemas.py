@@ -629,6 +629,21 @@ class ElectionConfig(_CamelModel):
     abstain_counts_quorum: bool = Field(default=True, alias="abstainCountsQuorum")
     guests_vote: bool = Field(default=False, alias="guestsVote")
 
+    def public(self) -> ElectionConfig:
+        """Return the config without the account links of the candidates.
+
+        The beamer and the guests see the names only, never a principal id.
+        """
+        if all(c.principal_id is None for c in self.candidates):
+            return self
+        return self.model_copy(
+            update={
+                "candidates": [
+                    c.model_copy(update={"principal_id": None}) for c in self.candidates
+                ]
+            }
+        )
+
     @model_validator(mode="after")
     def _check(self) -> ElectionConfig:
         ids = [c.id for c in self.candidates]

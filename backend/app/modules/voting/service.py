@@ -319,6 +319,8 @@ class VotingService:
         }
         if reason is not None:
             data["reason"] = reason
+        # F2: a deleted runoff no longer blocks a new runoff of its election.
+        await election_mod.release_runoff_link(self.session, vote)
         await audit_record(
             self.session,
             actor=actor,
@@ -1445,6 +1447,8 @@ class VotingService:
         previous = vote.status
         vote.status = "cancelled"
         vote.closed_at = now
+        # F2: a cancelled runoff no longer blocks a new runoff of its election.
+        await election_mod.release_runoff_link(self.session, vote)
         await audit_record(
             self.session,
             actor=actor,

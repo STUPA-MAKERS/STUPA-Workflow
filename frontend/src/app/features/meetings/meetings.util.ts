@@ -47,8 +47,21 @@ export function topSnippet(
  * carries the vote.
  */
 export function voteSnippetHead(vote: MeetingVote): string {
-  const head = vote.question?.trim() || vote.title?.trim() || 'Beschlussfrage';
-  return `> [!abstimmung] **${head.replace(/\r\n|\r|\n/g, ' ')}**`;
+  return `> [!abstimmung] **${voteSnippetQuestion(vote).replace(/\r\n|\r|\n/g, ' ')}**`;
+}
+
+/**
+ * The question in the head line of the callout. A runoff (F2) copies the question of its
+ * election, so its head names the round: "Frage (2. Wahlgang)". Each round then has its
+ * own head line, as in the backend `build_election_snippet`.
+ */
+export function voteSnippetQuestion(vote: MeetingVote): string {
+  if (vote.kind === 'election') {
+    const head = vote.question?.trim() || 'Wahlgang';
+    const round = vote.round ?? 1;
+    return round > 1 ? `${head} (${round}. Wahlgang)` : head;
+  }
+  return vote.question?.trim() || vote.title?.trim() || 'Beschlussfrage';
 }
 
 /**
@@ -77,8 +90,7 @@ export function electionSnippet(vote: MeetingVote): string {
   const election = vote.election;
   const result = vote.electionResult ?? null;
   const round = vote.round ?? 1;
-  const head = vote.question?.trim() || 'Wahlgang';
-  const lines = [`> [!abstimmung] **${head.replace(/\r\n|\r|\n/g, ' ')}**`];
+  const lines = [voteSnippetHead(vote)];
   let meta = `Wahl · ${election?.seats ?? 1} Posten`;
   if (round > 1) meta += ` · Stichwahl (${round}. Wahlgang)`;
   lines.push(`> ${meta}`);

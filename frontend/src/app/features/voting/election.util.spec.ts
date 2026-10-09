@@ -8,6 +8,7 @@ import {
   electionChoiceLabel,
   electionOf,
   electionResultLine,
+  closedStatus,
   electionStatus,
   isYesNoElection,
   lotPending,
@@ -132,5 +133,9 @@ describe('election.util', () => {
     expect(electionStatus('runoff').key).toBe('election.status.runoff');
     expect(electionStatus('tie').key).toBe('election.status.tie');
     expect(electionStatus('rejected').kind).toBe('error');
+    // A list row reads an election with `electionStatus`, a motion as before.
+    expect(closedStatus('election', 'elected').key).toBe('election.status.elected');
+    expect(closedStatus('motion', 'passed').key).toBe('vote.result.passed');
+    expect(closedStatus(undefined, 'tie').key).toBe('vote.result.rejected');
   });
 });

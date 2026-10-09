@@ -1025,8 +1025,13 @@ class GuestService:
                     myBallot=mine,
                     canCast=can_cast,
                     kind=view.kind,
-                    election=view.election,
-                    electionResult=view.election_result,
+                    # A guest sees names only: no account id, no `sub` of the lead.
+                    election=view.election.public() if view.election is not None else None,
+                    electionResult=(
+                        view.election_result.public()
+                        if view.election_result is not None
+                        else None
+                    ),
                 )
             )
         return out

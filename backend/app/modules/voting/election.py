@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
@@ -153,6 +154,32 @@ def election_fields(vote: Vote) -> dict[str, Any]:
     }
 
 
+async def release_runoff_link(session: AsyncSession, vote: Vote) -> None:
+    """Clear the link of the parent election to a runoff that goes away (no commit).
+
+    A cancel or a delete of a runoff calls this. The parent then shows the runoff as
+    pending again, and ``POST /votes/{parent}/runoff`` creates a new one. The method
+    locks the parent row, as ``create_runoff`` does, and clears the link only while it
+    still names this runoff.
+    """
+    parent_id = getattr(vote, "parent_vote_id", None)
+    if not is_election(vote) or parent_id is None:
+        return
+    parent = (
+        await session.execute(select(Vote).where(Vote.id == parent_id).with_for_update())
+    ).scalar_one_or_none()
+    stored = None if parent is None else getattr(parent, "election_result", None)
+    if parent is None or not stored:
+        return
+    result = ElectionResultOut.model_validate(stored)
+    runoff = result.runoff
+    if runoff is None or runoff.vote_id != vote.id:
+        return
+    parent.election_result = dump_result(
+        result.model_copy(update={"runoff": runoff.model_copy(update={"vote_id": None})})
+    )
+
+
 class ElectionService:
     """The lot and the runoff of an election, on the session of a ``VotingService``."""
 
@@ -227,6 +254,14 @@ class ElectionService:
         await self.session.commit()
         return await self.voting.get(vote.id)
 
+    async def _runoff_alive(self, runoff_id: UUID) -> bool:
+        """Tell whether a linked runoff still exists and is not cancelled.
+
+        A cancelled or deleted runoff no longer blocks a new one.
+        """
+        status = await self.session.scalar(select(Vote.status).where(Vote.id == runoff_id))
+        return status is not None and status != "cancelled"
+
     async def create_runoff(self, vote_id: UUID) -> VoteOut:
         """Create the draft runoff of an election with a tie at the seat boundary.
 
@@ -238,8 +273,8 @@ class ElectionService:
 
         Raises:
             ConflictError: The vote is no closed election (``not_an_election``), no
-                runoff is pending (``no_runoff_pending``), a runoff exists
-                (``runoff_exists``) or the meeting is not live.
+                runoff is pending (``no_runoff_pending``), a runoff exists that is
+                not cancelled (``runoff_exists``) or the meeting is not live.
         """
         # Lock order: the meeting row first, the vote row after it (as the meeting
         # close and delete do).
@@ -252,7 +287,7 @@ class ElectionService:
             raise ConflictError(
                 "No runoff is pending for this election.", code=NO_RUNOFF_PENDING
             )
-        if runoff.vote_id is not None:
+        if runoff.vote_id is not None and await self._runoff_alive(runoff.vote_id):
             raise ConflictError("The runoff of this election exists.", code=RUNOFF_EXISTS)
         parent = election_config(vote)
         tied = set(runoff.candidate_ids)
