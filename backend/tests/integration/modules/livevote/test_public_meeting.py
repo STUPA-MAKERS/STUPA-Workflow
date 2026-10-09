@@ -536,7 +536,11 @@ async def test_guest_votes_without_quorum_and_late_admission(
             == 200
         )
         me = b.get(f"/api/public/meetings/{code}/me").json()
-        assert me["view"]["votes"][0]["myBallot"] == {"cast": True, "choice": "yes", "choices": None}
+        assert me["view"]["votes"][0]["myBallot"] == {
+            "cast": True,
+            "choice": "yes",
+            "choices": None,
+        }
         assert me["view"]["votes"][0]["canCast"] is False
         # No quorum: the vote closes with 2 guest ballots although no member voted.
         closed = lead.post(f"/api/votes/{vote['id']}/close")
