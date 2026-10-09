@@ -234,6 +234,8 @@ async def test_close_meeting_vote_broadcasts_vote_closed(
         tally=SimpleNamespace(counts={"yes": 1}, failed_reason=None),
         application_id=None,
         branch_fired=False,
+        kind="motion",
+        election_result=None,
     )
 
     class _Closing(_VotingFake):
