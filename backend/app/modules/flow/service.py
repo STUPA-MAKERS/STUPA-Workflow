@@ -43,12 +43,21 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 from sqlalchemy import ColumnElement, CursorResult, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.applications.decision import (
+    DecisionIn,
+    accepted_state_keys,
+    check_approved_amount,
+    check_decision_target,
+    record_decision,
+    revert_decision_for_event,
+)
 from app.modules.applications.models import Application, StatusEvent
 from app.modules.applications.schemas import StateOut
 from app.modules.audit.actions import AuditAction
@@ -141,8 +150,13 @@ def agenda_gremium_id(actions: Any) -> UUID | None:
         return None
 
 
-def _transition_out(t: Transition, gremium_id: UUID | None) -> TransitionOut:
+def _transition_out(
+    t: Transition, gremium_id: UUID | None, *, allows_decision: bool = False
+) -> TransitionOut:
     """Map a transition to its API shape.
+
+    `allows_decision` tells that the target is an accepted state of the top budget of
+    the application: a fire then takes a `decision` (F1).
 
     `gremium_id` is the agenda Gremium (`FlowService._agenda_gremium`). It is set only
     when the transition carries an `addToNextSession` action, its target is a vote
@@ -160,6 +174,7 @@ def _transition_out(t: Transition, gremium_id: UUID | None) -> TransitionOut:
         requiresAction=t.requires_action,
         addsToAgenda=gremium_id is not None,
         agendaGremiumId=gremium_id,
+        allowsDecision=allows_decision,
     )
 
 
@@ -301,15 +316,23 @@ class FlowService:
         """Map the firable transitions to their API shape and drop the blocked ones.
 
         A transition into a vote state whose Gremium does not resolve stays hidden
-        (fail closed, the fire would give 409 `no_vote_gremium`).
+        (fail closed, the fire would give 409 `no_vote_gremium`). A transition into an
+        accepted state of the top budget carries `allowsDecision` (F1).
         """
         out: list[TransitionOut] = []
+        accepted = await accepted_state_keys(self.session, app.budget_id)
         for t in transitions:
             target = await self.session.get(State, t.to_state_id)
             if not await self._enterable(target, app.budget_id):
                 continue
             out.append(
-                _transition_out(t, await self._agenda_gremium(t, target, app.budget_id))
+                _transition_out(
+                    t,
+                    await self._agenda_gremium(t, target, app.budget_id),
+                    allows_decision=bool(accepted)
+                    and target is not None
+                    and target.key in accepted,
+                )
             )
         return out
 
@@ -823,6 +846,7 @@ class FlowService:
         meeting_id: UUID | None = None,
         non_public: bool = False,
         allow_unconfirmed: bool = True,
+        decision: DecisionIn | None = None,
     ) -> TransitionResult:
         """Fire a transition.
 
@@ -838,12 +862,17 @@ class FlowService:
 
         `allow_unconfirmed` works as in `_load_app`.
 
+        `decision` (F1) writes the approved amount and the conditions as the decision
+        of the application. Only a transition into an accepted state of the top budget
+        of the application takes it.
+
         Raises:
             NotFoundError: The application or the transition does not exist (404).
             ConflictError: The state does not match, the guard fails, the target vote
                 state has no resolvable Gremium (`no_vote_gremium`), or another
                 transition won the race (409).
-            ValidationProblem: `meeting_id` does not fit the transition (422).
+            ValidationProblem: `meeting_id` does not fit the transition, or the
+                decision is not allowed or has a bad amount (422).
         """
         staged = await self.stage_fire(
             application_id,
@@ -856,6 +885,7 @@ class FlowService:
             meeting_id=meeting_id,
             non_public=non_public,
             allow_unconfirmed=allow_unconfirmed,
+            decision=decision,
         )
         await self.session.commit()
         return await self.after_commit(staged)
@@ -875,6 +905,7 @@ class FlowService:
         allow_unconfirmed: bool = True,
         rollback_on_conflict: bool = True,
         vote_id: UUID | None = None,
+        decision: DecisionIn | None = None,
     ) -> StagedFire:
         """Write a transition into the open transaction, without a commit.
 
@@ -917,6 +948,18 @@ class FlowService:
                 code="conflict",
             )
 
+        old_approved: Decimal | None = None
+        if decision is not None:
+            # F1: a decision needs an accepted target state and a fitting amount. It
+            # applies before the guard, so `budgetFitsApplication` checks the approved
+            # amount.
+            old_approved = app.approved_amount
+            target_state = await self._load_state(transition.to_state_id)
+            await check_decision_target(
+                self.session, app, target_state.key if target_state is not None else None
+            )
+            check_approved_amount(app.amount, decision.approved_amount)
+            app.approved_amount = decision.approved_amount
         if deadline_passed is None:
             deadline_passed = await self._deadline_passed(app)
         ctx = await flow_context.build_context(
@@ -1004,6 +1047,16 @@ class FlowService:
                 "hasNote": note is not None,
             },
         )
+        if decision is not None:
+            await record_decision(
+                self.session,
+                app,
+                decision,
+                actor=principal.sub,
+                decided_by=principal.sub,
+                old_approved=old_approved,
+                status_event_id=status_event_id,
+            )
         if meeting_id is not None:
             await self._add_to_agenda_in_tx(
                 app.id, meeting_id, non_public=non_public, actor=principal.sub
@@ -1137,6 +1190,7 @@ class FlowService:
         to_state_id: UUID,
         actor: str,
         reverted_audit_id: int,
+        reverted_status_event_id: UUID | None = None,
     ) -> UUID:
         """Undo an audited status change (audit-log revert).
 
@@ -1159,6 +1213,9 @@ class FlowService:
         The restored state gets its vote Gremium snapshot like a transition. A restored
         vote state with `gremiumSource: "budget"` and no resolvable Gremium gives 409
         `no_vote_gremium`.
+
+        A decision (F1) that the undone change wrote (`reverted_status_event_id`, the
+        status event of that change) gives way to the decision before it.
 
         Returns:
             The id of the new status event.
@@ -1209,6 +1266,9 @@ class FlowService:
             actor=actor,
             left_state_id=to_state_id,
             entered_state_id=from_state_id,
+        )
+        await revert_decision_for_event(
+            self.session, app, reverted_status_event_id, actor=actor
         )
         # Audit as a reversed status_change, so the revert is itself revertable (redo).
         await AuditService(self.session).record(

@@ -60,6 +60,7 @@ class _FakeService:
         meeting_id=None,  # noqa: ANN001
         non_public=False,  # noqa: ANN001
         allow_unconfirmed=True,  # noqa: ANN001
+        decision=None,  # noqa: ANN001
     ):
         self.allow_unconfirmed.append(allow_unconfirmed)
         self.fired = {
@@ -69,6 +70,7 @@ class _FakeService:
             "note": note,
             "meeting_id": meeting_id,
             "non_public": non_public,
+            "decision": decision,
         }
         return TransitionResult(
             newStateId=uuid4(), statusEventId=uuid4(), dispatchedActions=["notify"]
@@ -254,6 +256,36 @@ def test_fire_without_meeting_defaults(
     assert fake_service.fired["non_public"] is False
 
 
+def test_fire_passes_the_decision(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """F1: the route hands the decision of the body to the engine."""
+    _as_principal(app, "application.transition")
+    r = client.post(
+        f"/api/applications/{uuid4()}/transition",
+        json={
+            "transitionId": str(uuid4()),
+            "decision": {"approvedAmount": "900.00", "conditions": ["  Belege  "]},
+        },
+    )
+    assert r.status_code == 200
+    assert fake_service.fired is not None
+    decision = fake_service.fired["decision"]
+    assert str(decision.approved_amount) == "900.00"  # type: ignore[attr-defined]
+    assert decision.conditions == ["Belege"]  # type: ignore[attr-defined]
+
+
+def test_fire_refuses_a_bad_decision_422(app: FastAPI, client: TestClient) -> None:
+    """F1: an empty condition or an unknown key is a 422 before the engine runs."""
+    _as_principal(app, "application.transition")
+    for decision in ({"conditions": ["  "]}, {"approvedAmount": "1", "extra": 1}):
+        r = client.post(
+            f"/api/applications/{uuid4()}/transition",
+            json={"transitionId": str(uuid4()), "decision": decision},
+        )
+        assert r.status_code == 422
+
+
 def test_fire_rejects_bad_body_422(app: FastAPI, client: TestClient) -> None:
     _as_principal(app, "application.transition")
     r = client.post(
@@ -292,6 +324,23 @@ def test_fire_applicant_transition_ok(
     assert fake_service.fired["application_id"] == app_id
     assert fake_service.fired["note"] == "los"
     assert fake_service.allow_unconfirmed == [False]
+
+
+def test_fire_applicant_transition_refuses_a_decision(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    """F1: the applicant never sets a decision (422 `decision_not_allowed`)."""
+    app_id = uuid4()
+    app.dependency_overrides[require_app_applicant] = lambda: SimpleNamespace(
+        application_id=app_id
+    )
+    r = client.post(
+        f"/api/applications/{app_id}/applicant-transition",
+        json={"transitionId": str(uuid4()), "decision": {"conditions": ["x"]}},
+    )
+    assert r.status_code == 422
+    assert r.json()["code"] == "decision_not_allowed"
+    assert fake_service.fired is None
 
 
 def test_force_routes_hide_unconfirmed(

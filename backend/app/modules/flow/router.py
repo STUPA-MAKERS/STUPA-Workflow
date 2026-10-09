@@ -21,6 +21,7 @@ from app.modules.applications.access import (
     require_app_applicant,
     resolve_app_read,
 )
+from app.modules.applications.decision import not_allowed_problem
 from app.modules.applications.schemas import StateOut
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
@@ -149,6 +150,7 @@ async def fire_transition(
         meeting_id=payload.meeting_id,
         non_public=payload.non_public,
         allow_unconfirmed=False,
+        decision=payload.decision,
     )
 
 
@@ -230,8 +232,11 @@ async def fire_applicant_transition(
     The caller is the magic-link holder or the logged-in creator. The creator does
     not need `application.manage`. A principal who is not the creator gets 403, also
     with `application.manage` or `application.edit_any`. A transition that
-    `actorIsApplicant` does not open gives 403.
+    `actorIsApplicant` does not open gives 403. The applicant never sets a decision
+    (F1): a `decision` gives 422 `decision_not_allowed`.
     """
+    if payload.decision is not None:
+        raise not_allowed_problem("The applicant cannot set a decision.")
     return await service.fire_as_applicant(
         access.application_id,
         payload.transition_id,

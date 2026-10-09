@@ -205,12 +205,15 @@ class RevertService:
             raise ConflictError(
                 "This status change is not revertable.", code="not_revertable"
             )
+        event_raw = data.get("statusEventId")
         await FlowService(self.session, publisher=self.publisher).revert_status(
             UUID(app_id),
             from_state_id=UUID(from_raw),
             to_state_id=UUID(to_raw),
             actor=actor,
             reverted_audit_id=entry.id,
+            # F1: the decision that the change wrote gives way to the one before it.
+            reverted_status_event_id=UUID(event_raw) if event_raw else None,
         )
         return RevertResult(
             entity_type="application",
