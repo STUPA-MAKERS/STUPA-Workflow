@@ -9,6 +9,7 @@ from typing import Any, cast
 
 import pytest
 
+from app.modules.applications.decision import DecisionSwap
 from app.modules.audit.models import AuditEntry
 from app.modules.config_revision.revert import RevertService
 from app.modules.flow.context import _budget_fits
@@ -70,4 +71,47 @@ async def test_revert_status_passes_the_status_event(
     )
     out = await RevertService(auth_fake_session(auth_result(entry))).revert(1, "admin")
     assert out.entity_id == str(app_id)
+    assert seen == [expected]
+
+
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        (
+            {
+                "decisionUndoneId": "00000000-0000-0000-0000-000000000001",
+                "decisionRestoredId": None,
+            },
+            DecisionSwap(undone_id=None, restored_id=uuid.UUID(int=1)),
+        ),
+        (
+            {
+                "decisionUndoneId": "00000000-0000-0000-0000-000000000001",
+                "decisionRestoredId": "00000000-0000-0000-0000-000000000002",
+            },
+            DecisionSwap(undone_id=uuid.UUID(int=2), restored_id=uuid.UUID(int=1)),
+        ),
+        ({}, None),
+    ],
+)
+async def test_revert_status_passes_the_decision_swap_back(
+    monkeypatch: pytest.MonkeyPatch, data: dict[str, Any], expected: DecisionSwap | None
+) -> None:
+    """A revert of a reversed entry that swapped decisions swaps them back (redo)."""
+    seen: list[DecisionSwap | None] = []
+
+    async def _revert_status(
+        self: FlowService, _app_id: uuid.UUID, **kw: Any
+    ) -> uuid.UUID:
+        seen.append(kw["decision_swap"])
+        return uuid.uuid4()
+
+    monkeypatch.setattr(FlowService, "revert_status", _revert_status)
+    entry = AuditEntry(
+        id=2,
+        action="status_change",
+        target_id=str(uuid.uuid4()),
+        data={"fromStateId": str(uuid.uuid4()), "toStateId": str(uuid.uuid4()), **data},
+    )
+    await RevertService(auth_fake_session(auth_result(entry))).revert(2, "admin")
     assert seen == [expected]

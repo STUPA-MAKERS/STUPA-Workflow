@@ -55,6 +55,11 @@ _BUDGET_REVERT_PERM: dict[AuditAction, str] = {
 }
 
 
+def _uuid_or_none(raw: object) -> UUID | None:
+    """Read a stored UUID string; anything else gives None."""
+    return UUID(raw) if isinstance(raw, str) and raw else None
+
+
 @dataclass(frozen=True, slots=True)
 class RevertResult:
     entity_type: str
@@ -191,6 +196,7 @@ class RevertService:
         The application leaves its current state, so the flow cancels the votes of
         that state (F22) and the publisher sends ``vote_cancelled``.
         """
+        from app.modules.applications.decision import DecisionSwap
         from app.modules.flow.service import FlowService
 
         # A status reset is a state transition, so it needs the same permission as a
@@ -206,6 +212,13 @@ class RevertService:
                 "This status change is not revertable.", code="not_revertable"
             )
         event_raw = data.get("statusEventId")
+        # F1: a reverted revert that swapped decisions swaps them back (redo).
+        swap: DecisionSwap | None = None
+        if "decisionUndoneId" in data or "decisionRestoredId" in data:
+            swap = DecisionSwap(
+                undone_id=_uuid_or_none(data.get("decisionRestoredId")),
+                restored_id=_uuid_or_none(data.get("decisionUndoneId")),
+            )
         await FlowService(self.session, publisher=self.publisher).revert_status(
             UUID(app_id),
             from_state_id=UUID(from_raw),
@@ -214,6 +227,7 @@ class RevertService:
             reverted_audit_id=entry.id,
             # F1: the decision that the change wrote gives way to the one before it.
             reverted_status_event_id=UUID(event_raw) if event_raw else None,
+            decision_swap=swap,
         )
         return RevertResult(
             entity_type="application",

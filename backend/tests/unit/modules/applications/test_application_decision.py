@@ -20,6 +20,7 @@ from app.modules.applications.decision import (
     MAX_CONDITION_LENGTH,
     MAX_CONDITIONS,
     DecisionIn,
+    DecisionSwap,
     accepted_state_keys,
     amount_deviates,
     check_approved_amount,
@@ -28,6 +29,7 @@ from app.modules.applications.decision import (
     decision_source,
     decisions_by_event,
     record_decision,
+    redo_decision_swap,
     revert_decision_for_event,
     valid_decision,
 )
@@ -259,7 +261,7 @@ async def test_record_decision_supersedes_adds_and_audits(
         status_event_id=event_id,
         now=NOW,
     )
-    assert len(session.statements) == 1  # the supersede UPDATE
+    assert len(session.statements) == 2  # the row lock and the supersede UPDATE
     assert session.added == [row]
     assert row.decided_at == NOW
     assert row.conditions == ["A", "B"]
@@ -310,10 +312,12 @@ async def test_revert_without_event_does_nothing(audits: list[dict[str, Any]]) -
 async def test_revert_without_valid_decision_does_nothing(
     audits: list[dict[str, Any]],
 ) -> None:
-    session = _Session(executes=[None])
+    session = _Session(executes=[None, None])
     out = await revert_decision_for_event(_s(session), _app(), uuid.uuid4(), actor=None)
     assert out is None
     assert audits == []
+    # The first statement locks the application row.
+    assert "FOR UPDATE" in str(session.statements[0])
 
 
 async def test_revert_restores_the_previous_decision(audits: list[dict[str, Any]]) -> None:
@@ -321,14 +325,14 @@ async def test_revert_restores_the_previous_decision(audits: list[dict[str, Any]
     previous = _row(
         approved_amount=Decimal("700.00"), conditions=["X", "Y"], superseded_at=NOW
     )
-    session = _Session(executes=[undone, previous])
+    session = _Session(executes=[None, undone, previous])
     app = _app(approved_amount=Decimal("500.00"))
     event_id = uuid.uuid4()
     later = datetime(2026, 6, 1, tzinfo=UTC)
     out = await revert_decision_for_event(
         _s(session), app, event_id, actor="admin", now=later
     )
-    assert out is previous
+    assert out == DecisionSwap(undone_id=undone.id, restored_id=previous.id)
     assert undone.superseded_at == later
     assert previous.superseded_at is None
     assert app.approved_amount == Decimal("700.00")
@@ -345,16 +349,118 @@ async def test_revert_of_the_first_decision_clears_the_amount(
     audits: list[dict[str, Any]],
 ) -> None:
     undone = _row()
-    session = _Session(executes=[undone, None])
+    session = _Session(executes=[None, undone, None])
     app = _app(approved_amount=Decimal("800.00"))
     out = await revert_decision_for_event(_s(session), app, uuid.uuid4(), actor=None)
-    assert out is None
+    assert out == DecisionSwap(undone_id=undone.id, restored_id=None)
     assert undone.superseded_at is not None
     assert app.approved_amount is None
     data = audits[0]["data"]
     assert data["restoredDecisionId"] is None
     assert data["conditionCount"] == 0
     assert data["approvedAmountNew"] is None
+
+
+# --- redo (revert of a revert) --------------------------------------------------------
+
+
+async def test_redo_makes_the_undone_decision_valid_again(
+    audits: list[dict[str, Any]],
+) -> None:
+    app = _app(approved_amount=None)
+    undone = _row(application_id=app.id, approved_amount=Decimal("500.00"), superseded_at=NOW)
+    # The revert undid `undone` and restored nothing; no decision is valid now.
+    session = _Session(executes=[None, None], objects={("ApplicationDecision", undone.id): undone})
+    later = datetime(2026, 6, 1, tzinfo=UTC)
+    out = await redo_decision_swap(
+        _s(session),
+        app,
+        DecisionSwap(undone_id=undone.id, restored_id=None),
+        actor="admin",
+        now=later,
+    )
+    assert out == DecisionSwap(undone_id=None, restored_id=undone.id)
+    assert undone.superseded_at is None
+    assert app.approved_amount == Decimal("500.00")
+    data = audits[0]["data"]
+    assert data["restoredDecisionId"] == str(undone.id)
+    assert data["decisionId"] is None
+    assert data["approvedAmountNew"] == "500.00"
+
+
+async def test_redo_supersedes_the_restored_decision(audits: list[dict[str, Any]]) -> None:
+    app = _app(approved_amount=Decimal("700.00"))
+    restored = _row(application_id=app.id, approved_amount=Decimal("700.00"))
+    undone = _row(application_id=app.id, approved_amount=Decimal("500.00"), superseded_at=NOW)
+    session = _Session(
+        executes=[None, restored], objects={("ApplicationDecision", undone.id): undone}
+    )
+    later = datetime(2026, 6, 1, tzinfo=UTC)
+    out = await redo_decision_swap(
+        _s(session),
+        app,
+        DecisionSwap(undone_id=undone.id, restored_id=restored.id),
+        actor=None,
+        now=later,
+    )
+    assert out == DecisionSwap(undone_id=restored.id, restored_id=undone.id)
+    assert restored.superseded_at == later
+    assert undone.superseded_at is None
+    assert app.approved_amount == Decimal("500.00")
+    assert len(audits) == 1
+
+
+async def test_redo_skips_when_a_newer_decision_is_valid(
+    audits: list[dict[str, Any]],
+) -> None:
+    app = _app()
+    newer = _row(application_id=app.id)
+    session = _Session(executes=[None, newer])
+    out = await redo_decision_swap(
+        _s(session), app, DecisionSwap(undone_id=uuid.uuid4(), restored_id=None), actor=None
+    )
+    assert out is None
+    assert newer.superseded_at is None
+    assert audits == []
+
+
+@pytest.mark.parametrize("foreign", [True, False])
+async def test_redo_skips_a_missing_or_foreign_decision(
+    audits: list[dict[str, Any]], foreign: bool
+) -> None:
+    app = _app()
+    other = _row(application_id=uuid.uuid4(), superseded_at=NOW)
+    objects = {("ApplicationDecision", other.id): other} if foreign else {}
+    session = _Session(executes=[None, None], objects=objects)
+    out = await redo_decision_swap(
+        _s(session), app, DecisionSwap(undone_id=other.id, restored_id=None), actor=None
+    )
+    assert out is None
+    assert audits == []
+
+
+async def test_redo_without_any_decision_ids_writes_nothing_valid(
+    audits: list[dict[str, Any]],
+) -> None:
+    # A swap of (None, None) cannot occur from a revert, but stays harmless.
+    app = _app(approved_amount=None)
+    session = _Session(executes=[None, None])
+    out = await redo_decision_swap(
+        _s(session), app, DecisionSwap(undone_id=None, restored_id=None), actor=None
+    )
+    assert out == DecisionSwap(undone_id=None, restored_id=None)
+    assert app.approved_amount is None
+
+
+async def test_record_decision_locks_the_application_first(
+    audits: list[dict[str, Any]],
+) -> None:
+    session = _Session()
+    await record_decision(
+        _s(session), _app(), DecisionIn(), actor=None, decided_by=None, old_approved=None
+    )
+    assert "FOR UPDATE" in str(session.statements[0])
+    assert "UPDATE application_decision" in str(session.statements[1])
 
 
 # --- reads ----------------------------------------------------------------------------

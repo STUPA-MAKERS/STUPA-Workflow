@@ -12,6 +12,7 @@ import pytest
 from app.modules.applications.decision import (
     CODE_AMOUNT_EXCEEDS,
     DecisionIn,
+    DecisionSwap,
     not_allowed_problem,
 )
 from app.modules.flow import service as flow_service
@@ -28,6 +29,8 @@ class _Calls:
         self.checks: list[str | None] = []
         self.records: list[dict[str, Any]] = []
         self.reverts: list[UUID | None] = []
+        self.redos: list[DecisionSwap] = []
+        self.swap: DecisionSwap | None = None
         self.refuse = False
 
 
@@ -44,12 +47,22 @@ def calls(monkeypatch: pytest.MonkeyPatch) -> _Calls:
         out.records.append({"app": app, "decision": decision, **kw})
         return SimpleNamespace()
 
-    async def _revert(_session: Any, _app: Any, event_id: UUID | None, **_kw: Any) -> None:
+    async def _revert(
+        _session: Any, _app: Any, event_id: UUID | None, **_kw: Any
+    ) -> DecisionSwap | None:
         out.reverts.append(event_id)
+        return out.swap
+
+    async def _redo(
+        _session: Any, _app: Any, swap: DecisionSwap, **_kw: Any
+    ) -> DecisionSwap | None:
+        out.redos.append(swap)
+        return out.swap
 
     monkeypatch.setattr(flow_service, "check_decision_target", _check)
     monkeypatch.setattr(flow_service, "record_decision", _record)
     monkeypatch.setattr(flow_service, "revert_decision_for_event", _revert)
+    monkeypatch.setattr(flow_service, "redo_decision_swap", _redo)
     return out
 
 
@@ -168,3 +181,78 @@ async def test_revert_status_restores_the_decision_of_the_event(calls: _Calls) -
         reverted_status_event_id=event_id,
     )
     assert calls.reverts == [event_id]
+
+
+@pytest.fixture
+def audit_data(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    seen: list[dict[str, Any]] = []
+
+    class _Audit:
+        def __init__(self, _session: Any) -> None:
+            pass
+
+        async def record(self, **kw: Any) -> None:
+            seen.append(kw["data"])
+
+    monkeypatch.setattr(flow_service, "AuditService", _Audit)
+    return seen
+
+
+async def test_revert_status_records_the_decision_swap(
+    calls: _Calls, audit_data: list[dict[str, Any]]
+) -> None:
+    to_id, from_id = uuid4(), uuid4()
+    undone, restored = uuid4(), uuid4()
+    calls.swap = DecisionSwap(undone_id=undone, restored_id=restored)
+    app = _app(to_id, uuid4())
+    db = fake_session(result(app), result(rowcount=1))
+    await FlowService(db).revert_status(
+        app.id,
+        from_state_id=from_id,
+        to_state_id=to_id,
+        actor="admin",
+        reverted_audit_id=7,
+        reverted_status_event_id=uuid4(),
+    )
+    (data,) = audit_data
+    assert data["decisionUndoneId"] == str(undone)
+    assert data["decisionRestoredId"] == str(restored)
+
+
+async def test_revert_status_without_a_swap_records_no_decision_keys(
+    calls: _Calls, audit_data: list[dict[str, Any]]
+) -> None:
+    to_id, from_id = uuid4(), uuid4()
+    app = _app(to_id, uuid4())
+    db = fake_session(result(app), result(rowcount=1))
+    await FlowService(db).revert_status(
+        app.id, from_state_id=from_id, to_state_id=to_id, actor="admin", reverted_audit_id=7
+    )
+    (data,) = audit_data
+    assert "decisionUndoneId" not in data
+    assert "decisionRestoredId" not in data
+
+
+async def test_redo_swaps_the_decisions_back(
+    calls: _Calls, audit_data: list[dict[str, Any]]
+) -> None:
+    """A revert of a revert brings the undone decision back (redo)."""
+    to_id, from_id, undone = uuid4(), uuid4(), uuid4()
+    calls.swap = DecisionSwap(undone_id=None, restored_id=undone)
+    app = _app(to_id, uuid4())
+    db = fake_session(result(app), result(rowcount=1))
+    swap = DecisionSwap(undone_id=undone, restored_id=None)
+    await FlowService(db).revert_status(
+        app.id,
+        from_state_id=from_id,
+        to_state_id=to_id,
+        actor="admin",
+        reverted_audit_id=8,
+        reverted_status_event_id=uuid4(),
+        decision_swap=swap,
+    )
+    assert calls.redos == [swap]
+    assert calls.reverts == []
+    (data,) = audit_data
+    assert data["decisionUndoneId"] is None
+    assert data["decisionRestoredId"] == str(undone)

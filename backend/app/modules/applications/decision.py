@@ -11,7 +11,8 @@ The valid decision is the newest `application_decision` row with
 `superseded_at IS NULL`. `application.approved_amount` is its denormalized copy. A new
 decision supersedes the old one; nobody edits a row. An audit revert of the status
 change that wrote a decision restores the decision before it
-(`revert_decision_for_event`).
+(`revert_decision_for_event`); a revert of that revert swaps them back
+(`redo_decision_swap`).
 
 Each write records `application_decision` in the audit log (amounts and counts only,
 never the condition texts).
@@ -200,6 +201,7 @@ async def record_decision(
     guard runs).
     """
     stamp = now or datetime.now(UTC)
+    await _lock_application(session, app)
     await session.execute(
         update(ApplicationDecision)
         .where(
@@ -241,6 +243,77 @@ async def record_decision(
     return row
 
 
+@dataclass(frozen=True, slots=True)
+class DecisionSwap:
+    """The decision ids that a status revert changed (F1).
+
+    `undone_id` lost its validity, `restored_id` got it back (None: no decision before).
+    The reversed `status_change` audit entry stores both as `decisionUndoneId` and
+    `decisionRestoredId`, so that a revert of that entry (a redo) swaps them back.
+    """
+
+    undone_id: UUID | None
+    restored_id: UUID | None
+
+
+async def _lock_application(session: AsyncSession, app: Application) -> None:
+    """Lock the application row until the end of the transaction.
+
+    Two concurrent decision writes on one application then run one after the other,
+    and the second one sees and supersedes the first one.
+    """
+    await session.execute(
+        select(Application.id).where(Application.id == app.id).with_for_update()
+    )
+
+
+async def _swap(
+    session: AsyncSession,
+    app: Application,
+    undone: ApplicationDecision | None,
+    restored: ApplicationDecision | None,
+    *,
+    actor: str | None,
+    status_event_id: UUID | None,
+    stamp: datetime,
+) -> DecisionSwap:
+    """Make `restored` the valid decision instead of `undone` and audit it (no commit)."""
+    old_approved = app.approved_amount
+    if undone is not None:
+        undone.superseded_at = stamp
+        # Flush first: the partial unique index allows only one valid row.
+        await session.flush()
+    restored_amount: Decimal | None = None
+    if restored is not None:
+        restored.superseded_at = None
+        restored_amount = restored.approved_amount
+    app.approved_amount = restored_amount
+    await session.flush()
+    swap = DecisionSwap(
+        undone_id=None if undone is None else undone.id,
+        restored_id=None if restored is None else restored.id,
+    )
+    await audit_record(
+        session,
+        actor=actor,
+        action=AuditAction.APPLICATION_DECISION,
+        target_type="application",
+        target_id=str(app.id),
+        data={
+            "applicationId": str(app.id),
+            "decisionId": None if swap.undone_id is None else str(swap.undone_id),
+            "restoredDecisionId": None if swap.restored_id is None else str(swap.restored_id),
+            "requestedAmount": _money(app.amount),
+            "approvedAmountOld": _money(old_approved),
+            "approvedAmountNew": _money(restored_amount),
+            "conditionCount": 0 if restored is None else len(restored.conditions or []),
+            "statusEventId": None if status_event_id is None else str(status_event_id),
+            "reverted": True,
+        },
+    )
+    return swap
+
+
 async def revert_decision_for_event(
     session: AsyncSession,
     app: Application,
@@ -248,7 +321,7 @@ async def revert_decision_for_event(
     *,
     actor: str | None,
     now: datetime | None = None,
-) -> ApplicationDecision | None:
+) -> DecisionSwap | None:
     """Undo the decision that a reverted status change wrote (no commit).
 
     The method acts only while that decision is still the valid one. It supersedes the
@@ -258,10 +331,11 @@ async def revert_decision_for_event(
     `reverted: true`.
 
     Returns:
-        The restored decision, or None (no decision before, or nothing to undo).
+        The swapped decision ids, or None (nothing to undo).
     """
     if status_event_id is None:
         return None
+    await _lock_application(session, app)
     undone = (
         await session.execute(
             select(ApplicationDecision).where(
@@ -273,8 +347,6 @@ async def revert_decision_for_event(
     ).scalar_one_or_none()
     if undone is None:
         return None
-    stamp = now or datetime.now(UTC)
-    undone.superseded_at = stamp
     previous = (
         await session.execute(
             select(ApplicationDecision)
@@ -287,32 +359,55 @@ async def revert_decision_for_event(
             .limit(1)
         )
     ).scalar_one_or_none()
-    old_approved = app.approved_amount
-    restored_amount: Decimal | None = None
-    if previous is not None:
-        previous.superseded_at = None
-        restored_amount = previous.approved_amount
-    app.approved_amount = restored_amount
-    await session.flush()
-    await audit_record(
+    return await _swap(
         session,
+        app,
+        undone,
+        previous,
         actor=actor,
-        action=AuditAction.APPLICATION_DECISION,
-        target_type="application",
-        target_id=str(app.id),
-        data={
-            "applicationId": str(app.id),
-            "decisionId": str(undone.id),
-            "restoredDecisionId": None if previous is None else str(previous.id),
-            "requestedAmount": _money(app.amount),
-            "approvedAmountOld": _money(old_approved),
-            "approvedAmountNew": _money(restored_amount),
-            "conditionCount": 0 if previous is None else len(previous.conditions or []),
-            "statusEventId": str(status_event_id),
-            "reverted": True,
-        },
+        status_event_id=status_event_id,
+        stamp=now or datetime.now(UTC),
     )
-    return previous
+
+
+async def redo_decision_swap(
+    session: AsyncSession,
+    app: Application,
+    swap: DecisionSwap,
+    *,
+    actor: str | None,
+    now: datetime | None = None,
+) -> DecisionSwap | None:
+    """Swap back the decisions of a reverted status revert (a redo, no commit).
+
+    `swap` is the swap that the reverted entry recorded. The method makes
+    `swap.undone_id` valid again and supersedes `swap.restored_id`. It acts only while
+    `swap.restored_id` is still the valid decision (None: no valid decision); a newer
+    decision in between stays.
+
+    Returns:
+        The new swap (the reverse of `swap`), or None (nothing changed).
+    """
+    await _lock_application(session, app)
+    current = await valid_decision(session, app.id)
+    if (None if current is None else current.id) != swap.restored_id:
+        return None
+    again = (
+        await session.get(ApplicationDecision, swap.undone_id)
+        if swap.undone_id is not None
+        else None
+    )
+    if swap.undone_id is not None and (again is None or again.application_id != app.id):
+        return None
+    return await _swap(
+        session,
+        app,
+        current,
+        again,
+        actor=actor,
+        status_event_id=None,
+        stamp=now or datetime.now(UTC),
+    )
 
 
 async def valid_decision(

@@ -25,6 +25,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import CITEXT, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -252,6 +253,14 @@ class ApplicationDecision(UUIDPkMixin, Base):
     __table_args__ = (
         Index("ix_application_decision_application_id", "application_id"),
         Index("ix_application_decision_status_event_id", "status_event_id"),
+        # At most one valid decision per application. Two concurrent writes cannot
+        # both stay valid.
+        Index(
+            "uq_application_decision_one_valid",
+            "application_id",
+            unique=True,
+            postgresql_where=text("superseded_at IS NULL"),
+        ),
     )
 
 

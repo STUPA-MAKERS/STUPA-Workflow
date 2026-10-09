@@ -52,10 +52,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.applications.decision import (
     DecisionIn,
+    DecisionSwap,
     accepted_state_keys,
     check_approved_amount,
     check_decision_target,
     record_decision,
+    redo_decision_swap,
     revert_decision_for_event,
 )
 from app.modules.applications.models import Application, StatusEvent
@@ -1191,6 +1193,7 @@ class FlowService:
         actor: str,
         reverted_audit_id: int,
         reverted_status_event_id: UUID | None = None,
+        decision_swap: DecisionSwap | None = None,
     ) -> UUID:
         """Undo an audited status change (audit-log revert).
 
@@ -1215,7 +1218,10 @@ class FlowService:
         `no_vote_gremium`.
 
         A decision (F1) that the undone change wrote (`reverted_status_event_id`, the
-        status event of that change) gives way to the decision before it.
+        status event of that change) gives way to the decision before it. When the
+        undone change was itself a revert that swapped decisions (`decision_swap`, from
+        its audit entry), the method swaps them back (redo). The new audit entry records
+        the swap, so the chain of reverts stays consistent.
 
         Returns:
             The id of the new status event.
@@ -1267,8 +1273,21 @@ class FlowService:
             left_state_id=to_state_id,
             entered_state_id=from_state_id,
         )
-        await revert_decision_for_event(
-            self.session, app, reverted_status_event_id, actor=actor
+        if decision_swap is not None:
+            swap = await redo_decision_swap(self.session, app, decision_swap, actor=actor)
+        else:
+            swap = await revert_decision_for_event(
+                self.session, app, reverted_status_event_id, actor=actor
+            )
+        swap_data: dict[str, Any] = (
+            {}
+            if swap is None
+            else {
+                "decisionUndoneId": None if swap.undone_id is None else str(swap.undone_id),
+                "decisionRestoredId": (
+                    None if swap.restored_id is None else str(swap.restored_id)
+                ),
+            }
         )
         # Audit as a reversed status_change, so the revert is itself revertable (redo).
         await AuditService(self.session).record(
@@ -1285,6 +1304,7 @@ class FlowService:
                 "hasNote": True,
                 "reverted": True,
                 "revertedAuditId": reverted_audit_id,
+                **swap_data,
             },
         )
         await self.session.commit()

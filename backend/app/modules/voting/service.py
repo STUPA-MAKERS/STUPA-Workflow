@@ -693,7 +693,6 @@ class VotingService:
         # An unconfirmed guest application rests in the flow. A vote on it could fire
         # its pass or fail branch on close, so it gets 404 as on the flow routes.
         application = await self._get_application(application_id, confirmed_only=True)
-        self._check_proposal(application, payload.proposal)
         expected = await self._application_gremium_id(application)
         if expected is None and not admin_bypass(principal, "vote.manage"):
             raise ForbiddenError(
@@ -705,6 +704,9 @@ class VotingService:
                 code="eligible_group_mismatch",
                 errors=[{"field": "eligibleGroup", "msg": "not the gremium of the application"}],
             )
+        # Only after the Gremium checks: the amount check would otherwise tell a
+        # manager of another Gremium the requested amount of the application.
+        self._check_proposal(application, payload.proposal)
         # Local import: `app.modules.livevote.service` imports this module.
         from app.modules.livevote.service import MeetingService
 

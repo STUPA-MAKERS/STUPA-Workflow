@@ -101,12 +101,34 @@ async def test_create_stores_the_proposal() -> None:
 
 
 async def test_create_refuses_an_amount_above_the_requested_one() -> None:
-    app = SimpleNamespace(id=uuid4(), amount=Decimal("500"))
+    app = SimpleNamespace(
+        id=uuid4(),
+        amount=Decimal("500"),
+        current_state_id=None,
+        gremium_id=GID,
+        vote_gremium_id=None,
+    )
     db = fake_session(result(app))
     db.scalar_results = [GID]
     with pytest.raises(ValidationProblem) as exc:
         await VotingService(db).create(app.id, _create_body(proposal=PROPOSAL), Principal(sub="m"))
     assert exc.value.code == CODE_AMOUNT_EXCEEDS
+
+
+async def test_create_checks_the_gremium_before_the_proposal_amount() -> None:
+    """A manager of another Gremium cannot probe the requested amount."""
+    app = SimpleNamespace(
+        id=uuid4(),
+        amount=Decimal("500"),
+        current_state_id=None,
+        gremium_id=uuid4(),
+        vote_gremium_id=None,
+    )
+    db = fake_session(result(app))
+    db.scalar_results = [GID]
+    with pytest.raises(ValidationProblem) as exc:
+        await VotingService(db).create(app.id, _create_body(proposal=PROPOSAL), Principal(sub="m"))
+    assert exc.value.code == "eligible_group_mismatch"
 
 
 def _internal(**over: Any) -> VoteCreateInternal:

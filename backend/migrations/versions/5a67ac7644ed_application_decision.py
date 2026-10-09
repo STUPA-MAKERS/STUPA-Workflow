@@ -4,7 +4,8 @@ The upgrade:
 
 1. creates the table `application_decision`: one row per decision on an application
    (approved amount, conditions, the vote or the status event that carried it). The
-   valid decision is the newest row with `superseded_at IS NULL`.
+   valid decision is the row with `superseded_at IS NULL`; a partial unique index
+   allows at most one such row per application.
 2. adds `application.approved_amount`, the denormalized amount of the valid decision
    (NULL = as requested).
 3. adds `vote.proposal`, the decision proposal of an application vote.
@@ -53,6 +54,11 @@ _UPGRADE: tuple[str, ...] = (
     (
         "CREATE INDEX IF NOT EXISTS ix_application_decision_status_event_id "
         "ON application_decision (status_event_id)"
+    ),
+    # At most one valid decision per application.
+    (
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_application_decision_one_valid "
+        "ON application_decision (application_id) WHERE superseded_at IS NULL"
     ),
     "ALTER TABLE application ADD COLUMN IF NOT EXISTS approved_amount numeric(12, 2)",
     "ALTER TABLE vote ADD COLUMN IF NOT EXISTS proposal jsonb",
