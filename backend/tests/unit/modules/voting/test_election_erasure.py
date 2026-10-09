@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.dialects import postgresql
 
-from app.modules.voting.erasure import ERASED_CANDIDATE_NAME, erase_candidacies
+from app.modules.voting.erasure import _MAX_PASSES, ERASED_CANDIDATE_NAME, erase_candidacies
 from app.modules.voting.models import Vote
 from tests._support.privacy_fakes import FakeResult, FakeSession
 
@@ -22,10 +22,14 @@ OTHER = uuid4()
 
 
 class _Session(FakeSession):
-    """Privacy fake session that keeps the statements of ``scalars``."""
+    """Privacy fake session that keeps the statements of ``scalars``.
 
-    def __init__(self, votes: list[Vote]) -> None:
-        super().__init__(scalars=[FakeResult(votes)])
+    The first ``scalars`` call reads the merged accounts, each later one is a pass of
+    the locked election select (an empty default ends the passes).
+    """
+
+    def __init__(self, *passes: list[Vote], merged: tuple[UUID, ...] = ()) -> None:
+        super().__init__(scalars=[FakeResult(merged), *(FakeResult(p) for p in passes)])
         self.statements: list[Any] = []
 
     async def scalars(self, stmt: Any) -> FakeResult:
@@ -76,12 +80,20 @@ async def _erase(*votes: Vote) -> tuple[list[Any], _Session]:
     return changed, db
 
 
+def _sql(stmt: Any) -> str:
+    return str(stmt.compile(dialect=postgresql.dialect()))
+
+
 async def test_query_selects_the_elections_of_the_principal_by_containment() -> None:
     _, db = await _erase()
-    sql = str(db.statements[0].compile(dialect=postgresql.dialect()))
+    assert "principal.merged_into =" in _sql(db.statements[0])
+    sql = _sql(db.statements[1])
     assert "vote.kind =" in sql
-    assert "vote.config @>" in sql
+    assert sql.count("vote.config @>") == 1
+    assert "NOT IN" not in sql
     assert "FOR UPDATE" in sql
+    # The first pass found nothing, so no second pass runs.
+    assert len(db.statements) == 2
 
 
 async def test_elected_candidate_keeps_the_name() -> None:
@@ -254,3 +266,120 @@ async def test_multiple_elections_each_decide_on_their_own() -> None:
     assert _names(open_)["c1"] == ERASED_CANDIDATE_NAME
     # The candidate id of the principal differs per election; the account link decides.
     assert _names(other_id)["c4"] == "Anna Erased"
+
+
+# --- merged accounts -------------------------------------------------------------------
+
+MERGED = uuid4()
+
+
+def _merged_candidates(*, mine: str = "c1") -> list[dict[str, Any]]:
+    return [
+        {"id": mine, "name": "Anna Old Account", "principalId": str(MERGED)},
+        {"id": "c8", "name": "Ben", "principalId": str(OTHER)},
+    ]
+
+
+async def test_candidacy_of_a_merged_account_gets_the_placeholder() -> None:
+    # The merge leaves ``principalId`` of the old account in the candidate list.
+    lost = _election(elected=["c8"], candidates=_merged_candidates())
+    db = _Session([lost], merged=(MERGED,))
+    changed = await erase_candidacies(db, PID)  # pyright: ignore[reportArgumentType]
+    assert [c.vote for c in changed] == [lost]
+    assert _names(lost) == {"c1": ERASED_CANDIDATE_NAME, "c8": "Ben"}
+    assert lost.config["candidates"][0]["principalId"] == str(MERGED)
+    # One containment clause per account id, joined with OR.
+    sql = _sql(db.statements[1])
+    assert sql.count("vote.config @>") == 2
+    assert " OR " in sql
+
+
+async def test_win_of_a_merged_account_keeps_the_name() -> None:
+    won = _election(elected=["c1"], candidates=_merged_candidates())
+    before = copy.deepcopy(won.config)
+    db = _Session([won], merged=(MERGED,))
+    changed = await erase_candidacies(db, PID)  # pyright: ignore[reportArgumentType]
+    assert changed == []
+    assert won.config == before
+
+
+async def test_both_accounts_in_one_election_change_together() -> None:
+    # The old and the new account both stand in one election; neither won.
+    vote = _election(
+        elected=["c8"],
+        candidates=[
+            {"id": "c1", "name": "Anna", "principalId": str(PID)},
+            {"id": "c2", "name": "Anna Old", "principalId": str(MERGED)},
+            {"id": "c8", "name": "Ben", "principalId": str(OTHER)},
+        ],
+    )
+    db = _Session([vote], merged=(MERGED,))
+    changed = await erase_candidacies(db, PID)  # pyright: ignore[reportArgumentType]
+    assert len(changed) == 1
+    assert _names(vote) == {
+        "c1": ERASED_CANDIDATE_NAME,
+        "c2": ERASED_CANDIDATE_NAME,
+        "c8": "Ben",
+    }
+
+
+async def test_win_of_one_account_keeps_both_names_in_the_election() -> None:
+    vote = _election(
+        elected=["c2"],
+        candidates=[
+            {"id": "c1", "name": "Anna", "principalId": str(PID)},
+            {"id": "c2", "name": "Anna Old", "principalId": str(MERGED)},
+        ],
+    )
+    db = _Session([vote], merged=(MERGED,))
+    assert await erase_candidacies(db, PID) == []  # pyright: ignore[reportArgumentType]
+
+
+# --- a runoff that a parallel transaction inserted ------------------------------------
+
+
+async def test_runoff_found_in_a_later_pass_joins_the_decision() -> None:
+    # The first select waited for the parent lock of a parallel ``create_runoff``; its
+    # snapshot misses the new runoff, which the second pass finds. A win there keeps
+    # the name in the parent too.
+    parent = _election(
+        result={
+            "counts": {"c1": 2, "c8": 2},
+            "elected": [],
+            "runoff": {"candidateIds": ["c1", "c8"], "seats": 1},
+        }
+    )
+    child = _election(elected=["c1"], parent=parent.id, round_=2)
+    db = _Session([parent], [child])
+    changed = await erase_candidacies(db, PID)  # pyright: ignore[reportArgumentType]
+    assert changed == []
+    assert _names(parent)["c1"] == "Anna Erased"
+    # The second pass leaves out the rows it holds; the third finds nothing.
+    assert len(db.statements) == 4
+    second = db.statements[2]
+    assert "NOT IN" in _sql(second)
+    assert "FOR UPDATE" in _sql(second)
+
+
+async def test_draft_runoff_found_in_a_later_pass_gets_the_placeholder() -> None:
+    parent = _election(
+        result={
+            "counts": {"c1": 2, "c8": 2},
+            "elected": [],
+            "runoff": {"candidateIds": ["c1", "c8"], "seats": 1},
+        }
+    )
+    child = _election(status="draft", parent=parent.id, round_=2)
+    db = _Session([parent], [child])
+    changed = await erase_candidacies(db, PID)  # pyright: ignore[reportArgumentType]
+    assert {c.vote.id for c in changed} == {parent.id, child.id}
+    assert _names(child)["c1"] == ERASED_CANDIDATE_NAME
+
+
+async def test_passes_stop_at_the_bound() -> None:
+    rounds = [[_election(status="open")] for _ in range(_MAX_PASSES + 2)]
+    db = _Session(*rounds)
+    changed = await erase_candidacies(db, PID)  # pyright: ignore[reportArgumentType]
+    # One principal select and ``_MAX_PASSES`` election selects, no more.
+    assert len(db.statements) == 1 + _MAX_PASSES
+    assert len(changed) == _MAX_PASSES

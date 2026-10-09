@@ -14,7 +14,11 @@ decided (open, a lot that is pending, a runoff that is pending) elected nobody y
 its candidacy gets the placeholder.
 
 The function finds a candidacy by its ``principalId`` only. A candidate without an
-account link has a name only, and the function never matches a name.
+account link has a name only, and the function never matches a name. The account
+merge (``admin/principal_merge.py``) does not rewrite ``principalId`` in the stored
+candidate lists, so a candidacy of an account that was merged into the erased one
+still names the old account: the function matches the erased id and the id of each
+account whose ``merged_into`` names it (a merge chain has one step only).
 """
 
 from __future__ import annotations
@@ -23,14 +27,18 @@ from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.auth.models import Principal
 from app.modules.voting.election import ELECTION
 from app.modules.voting.models import Vote
 
 # The name that replaces the name of an erased candidate who was not elected.
 ERASED_CANDIDATE_NAME = "Gelöscht"
+
+# The bound of the passes that look for rounds a parallel runoff added (see below).
+_MAX_PASSES = 5
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,12 +49,13 @@ class ErasedCandidacy:
     old_config: dict[str, Any]
 
 
-def _candidacy(vote: Vote, principal: str) -> dict[str, Any] | None:
-    """Return the stored candidate of ``principal`` in ``vote``, or None."""
-    for candidate in vote.config.get("candidates") or []:
-        if candidate.get("principalId") == principal:
-            return candidate
-    return None
+def _candidacies(vote: Vote, principals: frozenset[str]) -> list[dict[str, Any]]:
+    """Return the stored candidates of ``vote`` that link one of ``principals``."""
+    return [
+        candidate
+        for candidate in vote.config.get("candidates") or []
+        if candidate.get("principalId") in principals
+    ]
 
 
 def _elected_in(vote: Vote, candidate_id: str) -> bool:
@@ -73,51 +82,83 @@ def _root_of(vote: Vote, by_id: dict[UUID, Vote]) -> UUID:
     return vote.id
 
 
+async def _principal_ids(session: AsyncSession, principal_id: UUID) -> frozenset[str]:
+    """Return the erased id and the ids of the accounts merged into it, as strings."""
+    merged = (
+        await session.scalars(select(Principal.id).where(Principal.merged_into == principal_id))
+    ).all()
+    return frozenset({str(principal_id), *(str(m) for m in merged)})
+
+
+async def _locked_elections(session: AsyncSession, principals: frozenset[str]) -> list[Vote]:
+    """Lock and return every election round that carries a candidacy of ``principals``.
+
+    The row lock waits for a parallel close, lot or runoff of the same election, so
+    the decision reads the final result and a later runoff copies the new name. The
+    later rounds lock first, in the order of the cancel of a runoff.
+
+    A runoff that a parallel ``create_runoff`` inserted while this select waited for
+    the lock of its parent is not in the snapshot of the select (READ COMMITTED). Its
+    transaction has committed once the lock is granted, so a new select sees it. The
+    function selects again until a pass finds no new round, at most ``_MAX_PASSES``
+    times.
+    """
+    match = or_(
+        *(Vote.config.contains({"candidates": [{"principalId": p}]}) for p in sorted(principals))
+    )
+    found: list[Vote] = []
+    seen: set[UUID] = set()
+    for _ in range(_MAX_PASSES):
+        stmt = select(Vote).where(Vote.kind == ELECTION, match)
+        if seen:
+            stmt = stmt.where(Vote.id.not_in(sorted(seen)))
+        new = (
+            await session.scalars(stmt.order_by(Vote.round.desc(), Vote.id).with_for_update())
+        ).all()
+        if not new:
+            break
+        found.extend(new)
+        seen.update(vote.id for vote in new)
+    return found
+
+
 async def erase_candidacies(session: AsyncSession, principal_id: UUID) -> list[ErasedCandidacy]:
     """Replace the name of each candidacy of a principal who was not elected (no commit).
 
     The ballots, the candidate ids and ``election_result`` stay, so the tally does not
     change. The account link (``principalId``) stays as a pseudonym, as the ``sub``
-    of the principal does.
+    of the principal does. A candidacy of an account merged into the principal counts
+    as a candidacy of the principal.
 
     Returns:
         The elections whose candidate list changed, each with its config before the
         change, so the caller can update the copies in the protocol text.
     """
-    principal = str(principal_id)
-    # The row lock waits for a parallel close, lot or runoff of the same election, so
-    # the decision below reads the final result and a new runoff copies the new name.
-    # The later rounds lock first, in the order of the cancel of a runoff.
-    votes = (
-        await session.scalars(
-            select(Vote)
-            .where(
-                Vote.kind == ELECTION,
-                Vote.config.contains({"candidates": [{"principalId": principal}]}),
-            )
-            .order_by(Vote.round.desc(), Vote.id)
-            .with_for_update()
-        )
-    ).all()
+    principals = await _principal_ids(session, principal_id)
+    votes = await _locked_elections(session, principals)
     by_id = {vote.id: vote for vote in votes}
     elected_roots: set[UUID] = set()
     for vote in votes:
-        candidate = _candidacy(vote, principal)
-        if candidate is not None and _elected_in(vote, str(candidate.get("id"))):
+        if any(
+            _elected_in(vote, str(candidate.get("id")))
+            for candidate in _candidacies(vote, principals)
+        ):
             elected_roots.add(_root_of(vote, by_id))
     changed: list[ErasedCandidacy] = []
     for vote in votes:
-        candidate = _candidacy(vote, principal)
-        if candidate is None or _root_of(vote, by_id) in elected_roots:
+        mine = [
+            candidate
+            for candidate in _candidacies(vote, principals)
+            if candidate.get("name") != ERASED_CANDIDATE_NAME  # erased before
+        ]
+        if not mine or _root_of(vote, by_id) in elected_roots:
             continue
-        if candidate.get("name") == ERASED_CANDIDATE_NAME:
-            continue  # erased before
         old_config = vote.config
         # A new dict: the JSONB column sees the change only on a new value.
         vote.config = {
             **old_config,
             "candidates": [
-                {**c, "name": ERASED_CANDIDATE_NAME} if c is candidate else c
+                {**c, "name": ERASED_CANDIDATE_NAME} if any(c is m for m in mine) else c
                 for c in old_config["candidates"]
             ],
         }

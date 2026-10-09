@@ -67,6 +67,10 @@ def _erased(vote: Vote) -> ErasedCandidacy:
     return ErasedCandidacy(vote=vote, old_config=_OLD)
 
 
+NEW_CALLOUT = OLD_CALLOUT.replace("> Ben: 5 · Anna: 2 · Enthaltungen: 1", NEW_VOTES_LINE)
+_CHANGE = (OLD_CALLOUT.split("\n"), NEW_CALLOUT.split("\n"))
+
+
 def test_rewrite_changes_only_the_lines_inside_the_matching_callout() -> None:
     text = "\n".join(
         [
@@ -77,19 +81,74 @@ def test_rewrite_changes_only_the_lines_inside_the_matching_callout() -> None:
             "> Ben: 5 · Anna: 2 · Enthaltungen: 1",
         ]
     )
-    head = "> [!abstimmung] **Wahl Kasse**"
-    swaps = {"> Ben: 5 · Anna: 2 · Enthaltungen: 1": NEW_VOTES_LINE}
-    out = rewrite_callouts(text, [(head, swaps)]).split("\n")
+    out = rewrite_callouts(text, [_CHANGE]).split("\n")
     # The plain text before and the quote after the callout stay; the indent stays.
     assert out[0] == "Intro: Ben: 5 · Anna: 2 · Enthaltungen: 1"
+    assert out[2] == "  > [!abstimmung] **Wahl Kasse**"
     assert out[4] == "  " + NEW_VOTES_LINE
     assert out[5] == "  > Gewählt: Ben"
     assert out[-1] == "> Ben: 5 · Anna: 2 · Enthaltungen: 1"
 
 
-def test_rewrite_without_the_head_returns_the_text() -> None:
-    text = "no callout here\n> Anna: 2"
-    assert rewrite_callouts(text, [("> [!abstimmung] **X**", {"> Anna: 2": "> G: 2"})]) == text
+def test_rewrite_without_the_callout_returns_the_text() -> None:
+    text = "no callout here\n> Ben: 5 · Anna: 2 · Enthaltungen: 1\n> [!note] other"
+    assert rewrite_callouts(text, [_CHANGE]) == text
+
+
+def test_edited_or_longer_callout_stays() -> None:
+    # A callout that the protokollant edited (or extended) is no copy of the election.
+    edited = OLD_CALLOUT.replace("> Gewählt: Ben", "> Gewählt: Ben (nimmt an)")
+    longer = OLD_CALLOUT + "\n> Anmerkung"
+    shorter = OLD_CALLOUT.rsplit("\n", 1)[0]
+    for text in (edited, longer, shorter):
+        assert rewrite_callouts(text, [_CHANGE]) == text
+
+
+# Two elections of one meeting with the same head line ("**Wahlgang**" when the
+# question is missing): the person lost the first and won the second.
+_LOST = "\n".join(
+    [
+        "> [!abstimmung] **Wahlgang**",
+        "> Wahl · 1 Posten",
+        "> Kandidatur: Max Muster",
+        "> ja: 1, nein: 4, enthaltung: 0",
+        "> Gewählt: niemand",
+    ]
+)
+_WON = "\n".join(
+    [
+        "> [!abstimmung] **Wahlgang**",
+        "> Wahl · 1 Posten",
+        "> Kandidatur: Max Muster",
+        "> ja: 4, nein: 1, enthaltung: 0",
+        "> Gewählt: Max Muster",
+    ]
+)
+_LOST_CHANGE = (
+    _LOST.split("\n"),
+    _LOST.replace("Max Muster", ERASED_CANDIDATE_NAME).split("\n"),
+)
+
+
+def test_two_elections_with_the_same_head_change_only_the_lost_one() -> None:
+    text = f"{_WON}\n\nText\n\n{_LOST}\n"
+    out = rewrite_callouts(text, [_LOST_CHANGE])
+    assert out == f"{_WON}\n\nText\n\n" + _LOST.replace("Max Muster", ERASED_CANDIDATE_NAME) + "\n"
+
+
+def test_adjacent_callouts_are_separate_blocks() -> None:
+    # No blank line between the callouts: the next marker line ends the first block.
+    for text, expected in (
+        (f"{_LOST}\n{_WON}", _LOST_CHANGE[1] + _WON.split("\n")),
+        (f"{_WON}\n{_LOST}", _WON.split("\n") + _LOST_CHANGE[1]),
+    ):
+        assert rewrite_callouts(text, [_LOST_CHANGE]).split("\n") == expected
+
+
+def test_first_matching_change_wins_and_other_changes_are_tried() -> None:
+    text = f"{_LOST}\n\n{OLD_CALLOUT}"
+    out = rewrite_callouts(text, [_CHANGE, _LOST_CHANGE])
+    assert out == "\n".join(_LOST_CHANGE[1]) + "\n\n" + NEW_CALLOUT
 
 
 async def test_protocol_and_agenda_copies_get_the_placeholder() -> None:
@@ -101,7 +160,7 @@ async def test_protocol_and_agenda_copies_get_the_placeholder() -> None:
         scalars=[FakeResult([protocol, untouched]), FakeResult([item, other_item])]
     )
     await erase_candidate_names(db, [_erased(_vote())])
-    expected = OLD_CALLOUT.replace("> Ben: 5 · Anna: 2 · Enthaltungen: 1", NEW_VOTES_LINE)
+    expected = NEW_CALLOUT
     assert protocol.markdown == f"# TOP\n\n{expected}\n"
     assert item.body == f"Text\n\n{expected}"
     assert "Anna" not in protocol.markdown

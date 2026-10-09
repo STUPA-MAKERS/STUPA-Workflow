@@ -7,15 +7,18 @@ the candidate list of an election, this module writes the same change into these
 copies.
 
 The module builds the internal callout of the election twice from the stored result:
-with the config before and after the change. The lines that differ carry the old name;
-only these lines change, and only inside the callout of that election (the head line
-with the question and the round finds it). A line that the protokollant edited does
-not match and stays as it is. The public callout names the elected candidates only,
-so it never carries the name of a candidate who was not elected.
+with the config before and after the change. Only a callout in the text that equals the
+old callout line for line (head, meta, votes, result, notes) changes into the new one.
+The head line alone does not identify an election: two elections of one meeting can
+share the question (or both lack one), and the person can lose the one and win the
+other. A callout that the protokollant edited does not match and stays as it is. The
+public callout names the elected candidates only, so it never carries the name of a
+candidate who was not elected.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from uuid import UUID
 
@@ -31,8 +34,11 @@ from app.modules.voting.models import Vote
 from app.modules.voting.schemas import ElectionResultOut
 from app.shared.config_schemas import ElectionConfig
 
-# The head line of a callout and the changed lines in it (old line -> new line).
-_Change = tuple[str, dict[str, str]]
+# The lines of the old callout and of the new callout of one election (same length).
+_Change = tuple[Sequence[str], Sequence[str]]
+
+# The marker that opens a callout (``> [!abstimmung]``, ``> [!note]``, ...).
+_OPENER = re.compile(r"^>\s*\[!")
 
 
 def _callout(vote: Vote, config: dict) -> list[str]:
@@ -49,32 +55,48 @@ def _callout(vote: Vote, config: dict) -> list[str]:
 
 
 def _change_of(erased: ErasedCandidacy) -> _Change:
-    """Return the head line and the changed lines of one erased candidacy."""
-    old = _callout(erased.vote, erased.old_config)
-    new = _callout(erased.vote, erased.vote.config)
-    return old[0], {o: n for o, n in zip(old, new, strict=True) if o != n}
+    """Return the old and the new callout lines of one erased candidacy."""
+    old = [line.strip() for line in _callout(erased.vote, erased.old_config)]
+    return old, [line.strip() for line in _callout(erased.vote, erased.vote.config)]
+
+
+def _block_end(lines: list[str], start: int) -> int:
+    """Return the index after the callout that opens at ``start``.
+
+    The callout runs over the following ``>`` lines and ends before a line that is no
+    quote or that opens the next callout.
+    """
+    end = start + 1
+    while end < len(lines):
+        stripped = lines[end].strip()
+        if not stripped.startswith(">") or _OPENER.match(stripped):
+            break
+        end += 1
+    return end
 
 
 def rewrite_callouts(text: str, changes: Sequence[_Change]) -> str:
-    """Write the changed lines into each callout of ``text`` whose head matches.
+    """Replace each callout of ``text`` that equals an old callout with its new form.
 
-    The callout runs from its head line over the following ``>`` lines. The indent of
-    a line stays. A text without a matching head comes back unchanged.
+    A callout matches only when all its lines (without the indent) equal the old
+    callout. The indent of a line stays. A text without a matching callout comes back
+    unchanged.
     """
     lines = text.split("\n")
-    for head, swaps in changes:
-        i = 0
-        while i < len(lines):
-            if lines[i].strip() != head:
-                i += 1
-                continue
+    i = 0
+    while i < len(lines):
+        if not _OPENER.match(lines[i].strip()):
             i += 1
-            while i < len(lines) and lines[i].lstrip().startswith(">"):
-                line = lines[i]
-                new = swaps.get(line.strip())
-                if new is not None:
-                    lines[i] = line[: len(line) - len(line.lstrip())] + new
-                i += 1
+            continue
+        end = _block_end(lines, i)
+        block = [line.strip() for line in lines[i:end]]
+        for old, new in changes:
+            if block == list(old):
+                for j, line in enumerate(new):
+                    current = lines[i + j]
+                    lines[i + j] = current[: len(current) - len(current.lstrip())] + line
+                break
+        i = end
     return "\n".join(lines)
 
 
@@ -90,7 +112,7 @@ async def erase_candidate_names(session: AsyncSession, erased: Sequence[ErasedCa
         if item.vote.meeting_id is None:
             continue
         change = _change_of(item)
-        if change[1]:
+        if change[0] != change[1]:
             by_meeting.setdefault(item.vote.meeting_id, []).append(change)
     if not by_meeting:
         return
