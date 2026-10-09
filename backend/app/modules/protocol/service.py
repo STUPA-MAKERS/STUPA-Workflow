@@ -86,6 +86,7 @@ from app.modules.protocol.public import (
     PublicSnapshot,
     PublicTop,
     apply_public_snapshot,
+    passed_conditions,
 )
 from app.modules.protocol.schemas import ProtocolOut
 from app.modules.voting.models import Vote
@@ -498,6 +499,7 @@ class ProtocolService:
                     view.tally.counts,
                     question=view.question,
                     note=_guest_note(view),
+                    conditions=passed_conditions(view),
                 )
             )
 
@@ -1086,6 +1088,7 @@ class ProtocolService:
                     view.tally.counts,
                     question=view.question,
                     note=_guest_note(view),
+                    conditions=passed_conditions(view),
                 )
                 # The protokollant may have put the result into the text already,
                 # with the same snippet. One box per vote.
