@@ -98,7 +98,8 @@ export class ParticipantVoteService {
   constructor() {
     effect(() => {
       const row = this.row();
-      const key = row ? `${row.id}:${row.status}` : null;
+      // The result is in the key: the lot of a tied election (F2) changes it after the close.
+      const key = row ? `${row.id}:${row.status}:${row.result ?? ''}` : null;
       untracked(() => {
         if (!row) {
           this.loaded.set(null);
@@ -109,6 +110,11 @@ export class ParticipantVoteService {
         }
       });
     });
+  }
+
+  /** The lot of an election was drawn, or its runoff opened (F2): read the vote again. */
+  onElectionChanged(): void {
+    this.reload();
   }
 
   onCastDone(): void {

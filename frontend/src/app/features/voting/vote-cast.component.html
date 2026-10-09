@@ -79,6 +79,7 @@
             [layout]="phone() ? 'phone' : 'page'"
             (castDone)="onCastDone()"
             (castFailed)="onCastFailed($event)"
+            (changed)="onElectionChanged()"
           />
         </div>
       </article>

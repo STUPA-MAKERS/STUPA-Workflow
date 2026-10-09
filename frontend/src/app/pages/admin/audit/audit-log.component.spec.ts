@@ -164,6 +164,7 @@ const BACKEND_AUDIT_ACTIONS = [
   'vote_close',
   'vote_cancel',
   'vote_branch_blocked',
+  'vote_lot_drawn',
   'meeting_public_join_changed',
   'meeting_join_code_rotated',
   'guest_admitted',

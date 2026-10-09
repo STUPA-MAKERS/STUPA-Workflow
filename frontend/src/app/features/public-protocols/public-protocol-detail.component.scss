@@ -175,6 +175,12 @@
   margin: 0;
   font-weight: var(--fw-semibold);
 }
+/* A personnel election (F2): the elected names. */
+.pd__elected {
+  margin: 0;
+  font-weight: var(--fw-medium);
+  color: var(--color-accent-text);
+}
 .pd__tally {
   display: flex;
   flex-wrap: wrap;

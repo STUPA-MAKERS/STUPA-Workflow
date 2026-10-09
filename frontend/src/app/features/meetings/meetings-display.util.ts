@@ -219,6 +219,9 @@ export function liveOpenedVote(
     present: 0,
     revealed: false,
     failedReason: null,
+    ...(msg.kind === 'election'
+      ? { kind: msg.kind, election: msg.election ?? null, round: msg.round ?? 1 }
+      : {}),
   };
 }
 
