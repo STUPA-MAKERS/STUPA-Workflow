@@ -14,7 +14,7 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, development]
   pull_request:
   # Opt-in trigger for the e2e job (see its `if:` gate). Start it by hand with
   # Actions → Run workflow. Without this trigger the workflow_dispatch opt-in of
