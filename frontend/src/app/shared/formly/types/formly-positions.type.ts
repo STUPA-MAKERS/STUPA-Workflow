@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, type OnInit, inject, signal } from '@angular/core';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
-import { ButtonComponent, IconComponent, SwitchComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, IconComponent, SwitchComponent, parseMoney } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 
@@ -35,6 +35,11 @@ let nextUid = 0;
  * the offers with the radio for the preferred one, and "Angebot hinzufügen". A position
  * without comparison offers keeps exactly one offer (supplier and amount) and needs a
  * reason (D12); without the offer the server answers 422.
+ *
+ * An amount cell keeps the text of the user while it has focus and parses it with
+ * `parseMoney` of the ui-kit (locale-aware, at most 2 decimals). Text that is not an
+ * amount stays in the cell after blur, the offer value becomes `null` and the cell shows
+ * an error. It never becomes 0.
  *
  * `props.serverErrors` (index → text) holds the 422 messages of the last save; the
  * position shows its message and opens. The next change clears them.
@@ -183,8 +188,8 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   protected offerLabelInvalid(o: Offer): boolean {
     return this.showError && !o.label.trim();
   }
-  protected offerValueInvalid(o: Offer): boolean {
-    return this.showError && (o.value === null || o.value <= 0);
+  protected offerValueInvalid(o: Offer, pi: number, oi: number): boolean {
+    return this.amountInvalid(pi, oi) || (this.showError && (o.value === null || o.value <= 0));
   }
   protected reasonInvalid(p: Position): boolean {
     return this.showError && p.noOffers === true && !(p.noOffersReason ?? '').trim();
@@ -195,6 +200,9 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   protected cardError(p: Position, pi = -2): string {
     const server = this.serverError(pi);
     if (server) return server;
+    if (p.offers.some((_, oi) => this.amountInvalid(pi, oi))) {
+      return this.t('apply.positions.errAmountFormat');
+    }
     if (!this.showError) return '';
     if (p.offers.length < this.requiredOffers(p)) return this.t('apply.positions.errMinOffers');
     if (p.offers.filter((o) => o.preferred).length !== 1) return this.t('apply.positions.errPreferred');
@@ -252,6 +260,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   }
 
   removePosition(pi: number): void {
+    this.remapRaw((i, k) => (i === pi ? null : [i > pi ? i - 1 : i, k]));
     this.commit(this.positions.filter((_, i) => i !== pi));
     // The positions after the removed one move up by one.
     this.open.update(
@@ -268,6 +277,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   }
 
   removeOffer(pi: number, oi: number): void {
+    this.remapRaw((i, k) => (i !== pi ? [i, k] : k === oi ? null : [i, k > oi ? k - 1 : k]));
     this.commit(
       this.positions.map((p, i) =>
         i === pi ? { ...p, offers: p.offers.filter((_, k) => k !== oi) } : p,
@@ -290,6 +300,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   }
 
   setOfferValue(pi: number, oi: number, raw: string): void {
+    this.rawValues.update((cur) => new Map(cur).set(this.cellKey(pi, oi), raw));
     const value = this.parseNum(raw);
     this.commit(
       this.positions.map((p, i) =>
@@ -300,48 +311,81 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
     );
   }
 
-  /** The value cell under edit. It shows the raw value instead of the formatted value. */
+  /** The value cell under edit. */
   protected editing: { pi: number; oi: number } | null = null;
 
-  protected beginEditValue(pi: number, oi: number): void {
-    this.editing = { pi, oi };
-  }
-  protected endEditValue(): void {
-    this.editing = null;
+  /** The text of value cells by cell key. A cell has an entry while it has focus, and
+   *  after blur while its text is not a valid amount. The entry keeps the text exactly
+   *  as typed, so "12," keeps its separator and the caret does not jump. */
+  private readonly rawValues = signal<ReadonlyMap<string, string>>(new Map());
+
+  private cellKey(pi: number, oi: number): string {
+    return `${pi}:${oi}`;
   }
 
-  /** Display text of the value input. It shows the raw text while the user types.
-   *  Otherwise it shows a localized number with 2 decimals (1.234,56). It omits the
-   *  currency symbol because the column header carries the € sign. */
+  /** Move or drop the text entries when positions or offers move. `fn` gives the new
+   *  cell of an old cell, or `null` to drop it. */
+  private remapRaw(fn: (pi: number, oi: number) => [number, number] | null): void {
+    this.rawValues.update((cur) => {
+      const next = new Map<string, string>();
+      for (const [key, text] of cur) {
+        const [pi, oi] = key.split(':').map(Number);
+        const to = fn(pi, oi);
+        if (to) next.set(this.cellKey(to[0], to[1]), text);
+      }
+      return next;
+    });
+  }
+
+  /** The cell holds text that is not an amount. */
+  protected amountInvalid(pi: number, oi: number): boolean {
+    const raw = this.rawValues().get(this.cellKey(pi, oi));
+    return raw !== undefined && parseMoney(raw, this.i18n.locale()).status === 'invalid';
+  }
+
+  /** On focus, the cell shows the value without grouping and with the decimal separator
+   *  of the locale ("1234,5"). Invalid text that is still there stays. */
+  protected beginEditValue(pi: number, oi: number): void {
+    this.editing = { pi, oi };
+    const key = this.cellKey(pi, oi);
+    if (this.rawValues().has(key)) return;
+    const v = this.positions[pi]?.offers[oi]?.value ?? null;
+    const text = v === null ? '' : String(v).replace('.', this.i18n.locale() === 'en' ? '.' : ',');
+    this.rawValues.update((cur) => new Map(cur).set(key, text));
+  }
+
+  /** On blur, a valid or empty cell shows the formatted value again. Invalid text stays,
+   *  so the user can correct it. */
+  protected endEditValue(): void {
+    const cell = this.editing;
+    this.editing = null;
+    if (!cell || this.amountInvalid(cell.pi, cell.oi)) return;
+    this.rawValues.update((cur) => {
+      const next = new Map(cur);
+      next.delete(this.cellKey(cell.pi, cell.oi));
+      return next;
+    });
+  }
+
+  /** Display text of the value input: the text of the user while the cell has an entry
+   *  (focus or invalid text), else a localized number with 2 decimals (1.234,56). It
+   *  omits the currency symbol because the column header carries the € sign. */
   protected offerValueText(pi: number, oi: number): string {
+    const raw = this.rawValues().get(this.cellKey(pi, oi));
+    if (raw !== undefined) return raw;
     const v = this.positions[pi]?.offers[oi]?.value ?? null;
     if (v === null) return '';
-    if (this.editing && this.editing.pi === pi && this.editing.oi === oi) {
-      return String(v);
-    }
     return new Intl.NumberFormat(this.i18n.formatLocale(), {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(v);
   }
 
-  /** Parse a localized money input into a `number`. It accepts "1.234,56" and
-   *  "1234.56". An empty or invalid input gives `null`. */
+  /** Parse a money input in the UI locale into a `number` (DE "1.234,56", EN
+   *  "1,234.56"). Empty or invalid text gives `null`, never 0. */
   private parseNum(raw: string): number | null {
-    const s = raw.trim();
-    if (!s) return null;
-    let cleaned = s.replace(/[^\d.,-]/g, '');
-    if (cleaned.includes(',') && cleaned.includes('.')) {
-      // The last separator is the decimal separator.
-      cleaned =
-        cleaned.lastIndexOf(',') > cleaned.lastIndexOf('.')
-          ? cleaned.replace(/\./g, '').replace(',', '.')
-          : cleaned.replace(/,/g, '');
-    } else if (cleaned.includes(',')) {
-      cleaned = cleaned.replace(',', '.');
-    }
-    const n = Number(cleaned);
-    return Number.isFinite(n) ? n : null;
+    const result = parseMoney(raw, this.i18n.locale());
+    return result.status === 'valid' ? Number(result.canonical) : null;
   }
 
   setPreferred(pi: number, oi: number): void {
@@ -361,7 +405,16 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
       this.positions.map((p, i) => {
         if (i !== pi) return p;
         if (checked) {
-          let offers = p.offers.filter((o) => o.label.trim() || o.value !== null);
+          // An offer with text in its amount cell is not blank, even when the text is
+          // not a valid amount.
+          const kept = p.offers.flatMap((o, k) =>
+            o.label.trim() || o.value !== null || this.rawValues().has(this.cellKey(pi, k))
+              ? [k]
+              : [],
+          );
+          // Every offer with an entry is kept, so each entry has a new index.
+          this.remapRaw((ri, rk) => (ri !== pi ? [ri, rk] : [ri, kept.indexOf(rk)]));
+          let offers = kept.map((k) => p.offers[k]);
           if (!offers.length) offers = [this.blankOffer(true)];
           if (!offers.some((o) => o.preferred)) {
             offers = offers.map((o, k) => ({ ...o, preferred: k === 0 }));

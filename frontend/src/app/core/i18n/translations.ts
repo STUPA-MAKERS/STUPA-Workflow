@@ -419,6 +419,8 @@ export const de = {
   'apply.positions.errPreferred': 'Genau ein Angebot muss als bevorzugt markiert sein.',
   'apply.positions.errLabel': 'Bezeichnung der Position fehlt.',
   'apply.positions.errOffers': 'Jedes Angebot braucht eine Bezeichnung und einen Wert > 0.',
+  'apply.positions.errAmountFormat':
+    'Kein gültiger Betrag. Beispiel: 1.234,56 (höchstens 2 Nachkommastellen).',
   'apply.positions.invalid':
     'Jede Position braucht eine Bezeichnung, genügend Vergleichsangebote (mit Wert > 0) und genau ein bevorzugtes Angebot.',
   'apply.positions.noOffers': 'Für diese Position sind keine Vergleichsangebote möglich',
@@ -4068,6 +4070,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.positions.errPreferred': 'Exactly one offer must be marked as preferred.',
   'apply.positions.errLabel': 'Position label is missing.',
   'apply.positions.errOffers': 'Each offer needs a label and a value > 0.',
+  'apply.positions.errAmountFormat': 'Not a valid amount. Example: 1,234.56 (at most 2 decimals).',
   'apply.positions.invalid':
     'Each position needs a label, enough comparison offers (value > 0) and exactly one preferred offer.',
   'apply.positions.noOffers': 'No comparison offers are possible for this position',
