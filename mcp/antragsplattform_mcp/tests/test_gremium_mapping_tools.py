@@ -80,6 +80,7 @@ def test_read_and_mapping_tools_are_registered() -> None:
         "list_group_mappings",
         "create_group_mapping",
         "update_group_mapping",
+        "delete_group_mapping",
         "list_gremium_membership_mappings",
         "create_gremium_membership_mapping",
         "update_gremium_membership_mapping",
@@ -122,6 +123,11 @@ def test_create_group_mapping(fake_api: _FakeApi) -> None:
 def test_update_group_mapping_sends_only_set_keys(fake_api: _FakeApi) -> None:
     asyncio.run(admin.update_group_mapping("m1", S.GroupMappingUpdate(roleId="r2")))
     assert fake_api.calls == [("PATCH", "/admin/group-mappings/m1", {"roleId": "r2"})]
+
+
+def test_delete_group_mapping(fake_api: _FakeApi) -> None:
+    asyncio.run(admin.delete_group_mapping("m1"))
+    assert fake_api.calls == [("DELETE", "/admin/group-mappings/m1", None)]
 
 
 # Membership mappings: OIDC group to the membership in a Gremium.
