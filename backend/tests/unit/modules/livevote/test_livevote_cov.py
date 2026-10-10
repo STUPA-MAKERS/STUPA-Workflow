@@ -3318,8 +3318,10 @@ async def test_delete_finalized_requires_permission(
         permissions=set(),
         scope_permissions=frozenset({"session.manage", "protocol.write", "protocol.finalize"}),
     )
-    with pytest.raises(ForbiddenError, match="delete_finalized"):
+    with pytest.raises(ForbiddenError, match="delete_finalized") as err:
         await svc.delete(m.id, admin_token)
+    # A stable code, so a client tells this refusal from a missing right.
+    assert err.value.code == "meeting_finalized"
 
 
 async def test_delete_ok_audits(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -3379,28 +3381,40 @@ async def test_delete_deletes_the_votes_and_audits_their_ids(
     assert calls[0]["data"]["deletedVoteIds"] == [str(v) for v in vote_ids]
 
 
-async def test_delete_locked_names_the_reason_and_does_not_commit(
+async def test_write_delete_names_the_reason_and_does_not_commit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The Gremium delete reuses the meeting rules; the caller commits."""
+    """The Gremium delete reuses the meeting audit; the caller commits."""
     m = _meeting(status="closed")
     calls: list[dict[str, Any]] = []
-
-    async def _final(self, _mid):  # noqa: ANN001, ANN202
-        return False
+    vote_id = uuid4()
 
     async def _record(session: Any, **kw: Any) -> None:
         calls.append(kw)
 
-    monkeypatch.setattr(MeetingService, "_protocol_final", _final)
     monkeypatch.setattr(lifecycle_mod, "audit_record", _record)
-    sess = _QueueSession(executes=[res()])
-    await MeetingService(sess).delete_locked(  # type: ignore[arg-type]
-        m, _admin(), reason="gremium_deleted"
+    sess = _QueueSession()
+    await MeetingService(sess).write_delete(  # type: ignore[arg-type]
+        m, _admin(), finalized=True, deleted_votes=[vote_id], reason="gremium_deleted"
     )
     assert sess.deleted == [m]
     assert sess.committed == 0
     assert calls[0]["data"]["reason"] == "gremium_deleted"
+    assert calls[0]["data"]["finalizedProtocol"] is True
+    assert calls[0]["data"]["deletedVoteIds"] == [str(vote_id)]
+
+
+async def test_check_deletable_writes_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The check runs the refusal rules only; it returns whether the protocol is final."""
+
+    async def _final(self, _mid):  # noqa: ANN001, ANN202
+        return True
+
+    monkeypatch.setattr(MeetingService, "_protocol_final", _final)
+    sess = _QueueSession(executes=[res()])
+    assert await MeetingService(sess).check_deletable(_meeting(), _admin()) is True  # type: ignore[arg-type]
+    assert sess.deleted == []
+    assert sess.added == []
 
 
 async def test_delete_forbidden_deletes_no_vote(monkeypatch: pytest.MonkeyPatch) -> None:

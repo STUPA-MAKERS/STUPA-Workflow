@@ -1045,44 +1045,59 @@ async def test_delete_for_meeting_refuses_an_open_vote() -> None:
     assert _audits(db) == []
 
 
-async def test_delete_for_gremium_deletes_the_votes_without_a_meeting() -> None:
-    """The Gremium delete takes its votes without a meeting along, each audited."""
-    gid = uuid4()
+async def test_lock_for_gremium_delete_locks_all_votes_in_one_statement() -> None:
+    """The meeting votes and the votes without a meeting, in id order, before any write."""
+    gid, mid = uuid4(), uuid4()
+    votes = [_vote(meeting_id=mid, status="closed"), _vote(status="cancelled")]
+    db = fake_session(result(*votes))
+    out = await VotingService(db).lock_for_gremium_delete(gid, [mid])
+    assert out == votes
+    [lock] = db.statements
+    sql = str(lock)
+    assert "vote.meeting_id IN" in sql
+    assert "vote.eligible_group = " in sql and "vote.meeting_id IS NULL" in sql
+    assert "ORDER BY vote.id" in sql and "FOR UPDATE" in sql
+    assert db.deleted == []
+    assert _audits(db) == []
+
+
+async def test_lock_for_gremium_delete_refuses_an_open_vote() -> None:
+    db = fake_session(result(_vote(status="draft"), _vote()))
+    with pytest.raises(ConflictError) as ei:
+        await VotingService(db).lock_for_gremium_delete(uuid4(), [])
+    assert ei.value.code == "open_vote"
+    assert "Gremium" in str(ei.value)
+    assert db.deleted == []
+    assert _audits(db) == []
+
+
+async def test_delete_locked_votes_deletes_with_the_reason() -> None:
     votes = [
         _vote(status="closed", result="passed"),
         _vote(status="cancelled", config=_config(secret=True)),
     ]
-    db = fake_session(result(*votes))
-    out = await VotingService(db).delete_for_gremium(gid, actor="admin")
+    db = fake_session()
+    out = await VotingService(db).delete_locked_votes(
+        votes,  # type: ignore[arg-type]
+        actor="admin",
+        reason="gremium_deleted",
+    )
     assert out == [v.id for v in votes]
     assert db.deleted == votes
     assert db.committed == 0
-    # The locking select names the Gremium as the eligible group and no meeting.
-    lock = str(db.statements[0])
-    assert "vote.eligible_group = " in lock
-    assert "vote.meeting_id IS NULL" in lock
-    assert "FOR UPDATE" in lock
+    # No lock here: the caller locked the rows. The child rows go first.
+    assert getattr(getattr(db.statements[0], "table", None), "name", None) == (
+        "protocol_vote_ref"
+    )
     entries = _audits(db)
     assert [e.action for e in entries] == ["vote_delete"] * 2
     assert {e.data["reason"] for e in entries} == {"gremium_deleted"}
 
 
-async def test_delete_for_gremium_without_votes_runs_no_delete() -> None:
-    db = fake_session(result())
-    assert await VotingService(db).delete_for_gremium(uuid4(), actor="admin") == []
-    assert len(db.statements) == 1
-    assert db.deleted == []
-    assert _audits(db) == []
-
-
-async def test_delete_for_gremium_refuses_an_open_vote() -> None:
-    db = fake_session(result(_vote(status="draft"), _vote()))
-    with pytest.raises(ConflictError) as ei:
-        await VotingService(db).delete_for_gremium(uuid4(), actor="admin")
-    assert ei.value.code == "open_vote"
-    assert "Gremium" in str(ei.value)
-    assert len(db.statements) == 1
-    assert db.deleted == []
+async def test_delete_locked_votes_without_votes_writes_nothing() -> None:
+    db = fake_session()
+    assert await VotingService(db).delete_locked_votes([], actor="a", reason="r") == []
+    assert db.statements == []
     assert _audits(db) == []
 
 

@@ -30,7 +30,7 @@ from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import Select, delete, func, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -103,6 +103,22 @@ def open_tally_revealed(present: int, voted: int, expected: int) -> bool:
     path uses this rule too.
     """
     return present > 0 and voted >= expected
+
+
+
+def _refuse_open(rows: Sequence[Vote], *, owner: str) -> None:
+    """Refuse a delete while one of the votes is open.
+
+    ``owner`` names the meeting or the Gremium in the conflict message.
+
+    Raises:
+        ConflictError: A vote is open (``open_vote``).
+    """
+    if any(vote.status == "open" for vote in rows):
+        raise ConflictError(
+            f"a vote of this {owner} is still open — close or cancel it first",
+            code="open_vote",
+        )
 
 
 class VotingService:
@@ -277,61 +293,77 @@ class VotingService:
             ConflictError: A vote of the meeting is open (``open_vote``). The method
                 then deletes nothing.
         """
-        return await self._delete_locked_votes(
-            select(Vote).where(Vote.meeting_id == meeting_id),
-            actor=actor,
-            reason="meeting_deleted",
-            owner="meeting",
-        )
-
-    async def delete_for_gremium(self, gremium_id: UUID, *, actor: str) -> list[UUID]:
-        """Delete the votes of a Gremium that have no meeting, without a commit.
-
-        The Gremium delete calls this after it deleted the meetings of the Gremium
-        (each with ``delete_for_meeting``). The votes that remain hold the Gremium id
-        in ``eligible_group`` and no meeting, for example the vote of an application
-        outside a meeting. Without this delete they would stay with a Gremium id that
-        no longer resolves. The rules are the rules of the meeting delete: an open
-        vote refuses the delete, and every other vote goes with its ballots and one
-        ``vote_delete`` audit entry (reason ``gremium_deleted``).
-
-        Returns:
-            The ids of the deleted votes, in creation order.
-
-        Raises:
-            ConflictError: A vote of the Gremium is open (``open_vote``). The method
-                then deletes nothing.
-        """
-        return await self._delete_locked_votes(
-            select(Vote).where(
-                Vote.eligible_group == str(gremium_id), Vote.meeting_id.is_(None)
-            ),
-            actor=actor,
-            reason="gremium_deleted",
-            owner="Gremium",
-        )
-
-    async def _delete_locked_votes(
-        self, stmt: Select[Vote], *, actor: str, reason: str, owner: str
-    ) -> list[UUID]:
-        """Lock the votes of ``stmt`` and delete them with their rows, without a commit.
-
-        ``owner`` names the meeting or the Gremium in the conflict message.
-
-        Raises:
-            ConflictError: A selected vote is open (``open_vote``). The method then
-                deletes nothing.
-        """
         rows = (
-            (await self.session.execute(stmt.order_by(Vote.created_at).with_for_update()))
+            (
+                await self.session.execute(
+                    select(Vote)
+                    .where(Vote.meeting_id == meeting_id)
+                    .order_by(Vote.created_at)
+                    .with_for_update()
+                )
+            )
             .scalars()
             .all()
         )
-        if any(vote.status == "open" for vote in rows):
-            raise ConflictError(
-                f"a vote of this {owner} is still open — close or cancel it first",
-                code="open_vote",
+        _refuse_open(rows, owner="meeting")
+        return await self.delete_locked_votes(rows, actor=actor, reason="meeting_deleted")
+
+    async def lock_for_gremium_delete(
+        self, gremium_id: UUID, meeting_ids: Sequence[UUID]
+    ) -> list[Vote]:
+        """Lock every vote that a Gremium delete takes along, without a commit.
+
+        These are the votes of the meetings of the Gremium (``meeting_ids``) and the
+        votes that hold the Gremium id in ``eligible_group`` and have no meeting, for
+        example the vote of an application outside a meeting. One statement locks
+        them all in id order, BEFORE the delete writes its first audit entry. The
+        audit write takes the advisory lock of the audit chain, and a vote cancel or
+        close locks its vote first and audits after it. A vote lock after the first
+        audit entry could therefore close a deadlock cycle.
+
+        Returns:
+            The locked votes, in id order.
+
+        Raises:
+            ConflictError: One of the votes is open (``open_vote``).
+        """
+        rows = (
+            (
+                await self.session.execute(
+                    select(Vote)
+                    .where(
+                        or_(
+                            Vote.meeting_id.in_(list(meeting_ids)),
+                            and_(
+                                Vote.eligible_group == str(gremium_id),
+                                Vote.meeting_id.is_(None),
+                            ),
+                        )
+                    )
+                    .order_by(Vote.id)
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
+                )
             )
+            .scalars()
+            .all()
+        )
+        _refuse_open(rows, owner="Gremium")
+        return list(rows)
+
+    async def delete_locked_votes(
+        self, rows: Sequence[Vote], *, actor: str, reason: str
+    ) -> list[UUID]:
+        """Delete votes that the caller locked, with their rows, without a commit.
+
+        The method deletes, in this order, the protocol references, the secret
+        ballots, the voted markers and the ballots of these votes, clears the vote
+        reference of the status events, and deletes each vote with a ``vote_delete``
+        audit entry with ``reason`` (``meeting_deleted``, ``gremium_deleted``).
+
+        Returns:
+            The ids of the deleted votes, in the order of ``rows``.
+        """
         ids = [vote.id for vote in rows]
         if ids:
             for model in (ProtocolVoteRef, SecretBallot, VotedMarker, Ballot):

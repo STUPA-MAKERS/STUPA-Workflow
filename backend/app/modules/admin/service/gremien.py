@@ -214,23 +214,34 @@ class GremiumOps(ConfigServiceBase):
 
         Role assignments cascade through the FK ``ON DELETE CASCADE``. The meetings
         of the gremium do not go by the cascade alone: each one goes through the
-        rules of the meeting delete (``MeetingService.delete_locked``). A meeting
-        with an open vote refuses the delete, a final protocol needs
-        ``meeting.delete_finalized``, and every vote of the meeting goes with a
-        ``vote_delete`` audit entry. The votes of the gremium without a meeting
-        follow the same rules (``VotingService.delete_for_gremium``). One refusal
-        stops the whole delete, and nothing changes.
+        rules of the meeting delete (``MeetingService.check_deletable`` and
+        ``write_delete``). A meeting with an open vote refuses the delete, a final
+        protocol needs ``meeting.delete_finalized``, and every vote of the meeting
+        goes with a ``vote_delete`` audit entry. The votes of the gremium without a
+        meeting follow the same rules. One refusal stops the whole delete, and
+        nothing changes.
+
+        The delete locks the gremium row first. A concurrent insert of a meeting
+        (or a vote of one) takes a key-share lock on that row through its foreign
+        key, so it waits for the delete and then fails on the missing gremium. It
+        never lands in the cascade without the rules.
 
         Raises:
             NotFoundError: No gremium has this id (404).
             ForbiddenError: A meeting of the gremium has a final protocol, and the
-                caller does not hold ``meeting.delete_finalized`` (403).
+                caller does not hold ``meeting.delete_finalized``
+                (``meeting_finalized``, 403).
             ConflictError: An application type of this gremium still has
                 applications, the gremium decides the running vote of an
                 application (`gremium_decides_vote`), or a vote of the gremium
                 is open (`open_vote`) (409).
         """
-        row = await self.session.get(Gremium, gremium_id)
+        row = await self.session.scalar(
+            select(Gremium)
+            .where(Gremium.id == gremium_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
         if row is None:
             raise NotFoundError(f"gremium {gremium_id} not found")
         # application_type.gremium_id cascades, but application.type_id is RESTRICT.
@@ -269,8 +280,12 @@ class GremiumOps(ConfigServiceBase):
     async def _delete_gremium_votes(self, gremium_id: UUID, principal: Principal) -> None:
         """Delete the meetings and the votes of a gremium by their own rules, without a commit.
 
-        The method locks the meeting rows first and the vote rows after them, the
-        lock order of the meeting delete.
+        The method takes every lock and runs every refusal check BEFORE its first
+        audit entry: the meeting rows, then the rules of each meeting, then all
+        affected votes in one statement in id order. The first audit write takes the
+        advisory lock of the audit chain until the commit, and a vote cancel or
+        close locks its vote first and audits after it. A row lock after the first
+        audit entry could therefore close a deadlock cycle.
         """
         # Local imports: livevote and voting import the admin models.
         from app.modules.livevote.models import Meeting
@@ -281,15 +296,37 @@ class GremiumOps(ConfigServiceBase):
             await self.session.scalars(
                 select(Meeting)
                 .where(Meeting.gremium_id == gremium_id)
-                .order_by(Meeting.created_at, Meeting.id)
+                .order_by(Meeting.id)
                 .with_for_update()
                 .execution_options(populate_existing=True)
             )
         ).all()
         meeting_service = MeetingService(self.session)
+        voting = VotingService(self.session)
+        finalized = {
+            meeting.id: await meeting_service.check_deletable(meeting, principal)
+            for meeting in meetings
+        }
+        votes = await voting.lock_for_gremium_delete(gremium_id, list(finalized))
+        # The locks are all taken: from here on, only deletes and audit entries.
         for meeting in meetings:
-            await meeting_service.delete_locked(meeting, principal, reason="gremium_deleted")
-        await VotingService(self.session).delete_for_gremium(gremium_id, actor=principal.sub)
+            deleted = await voting.delete_locked_votes(
+                [vote for vote in votes if vote.meeting_id == meeting.id],
+                actor=principal.sub,
+                reason="meeting_deleted",
+            )
+            await meeting_service.write_delete(
+                meeting,
+                principal,
+                finalized=finalized[meeting.id],
+                deleted_votes=deleted,
+                reason="gremium_deleted",
+            )
+        await voting.delete_locked_votes(
+            [vote for vote in votes if vote.meeting_id is None],
+            actor=principal.sub,
+            reason="gremium_deleted",
+        )
 
     async def _require_cd_variant(self, variant_id: UUID | None) -> None:
         """Check the CD variant server-side. The client id is untrusted.

@@ -121,8 +121,9 @@ async def test_gremium_delete_with_a_final_protocol_needs_the_permission(
     s = await seed(maker, status="closed", votes=("closed",), protocol="final")
     gremien_admin = Principal(sub="gremien-admin", permissions={"admin.gremien"})
     async with maker() as session:
-        with pytest.raises(ForbiddenError, match="delete_finalized"):
+        with pytest.raises(ForbiddenError, match="delete_finalized") as err:
             await ConfigService(session).delete_gremium(s.gremium_id, gremien_admin)
+    assert err.value.code == "meeting_finalized"
 
     async with maker() as session:
         assert await session.get(Gremium, s.gremium_id) is not None

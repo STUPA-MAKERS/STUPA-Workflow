@@ -294,7 +294,8 @@ class LiveVoteConnection:
             vote_out = await self._cast(msg)
         finally:
             # Every path of the cast reads the database: the vote, the account and
-            # the tally after the cast. End that transaction on every path.
+            # the tally after the cast. End that transaction on every path, also
+            # after a refused cast, whose partial work the rollback discards.
             await self._end_transaction()
         if vote_out is not None:
             await self.publisher.vote_tally(vote_out)
@@ -336,11 +337,9 @@ class LiveVoteConnection:
                     as_delegation=msg.as_delegation,
                 )
             except ForbiddenError:
-                await self.voting.session.rollback()
                 await self._send_error("not_eligible")
                 return None
             except AppError as exc:
-                await self.voting.session.rollback()
                 await self._send_error(exc.code or "error")
                 return None
         return await self.voting.get(msg.vote_id)

@@ -26,12 +26,18 @@ import { GremiumDialogComponent } from './gremium-dialog/gremium-dialog.componen
 /**
  * The message of a refused gremium delete. The delete applies the rules of the meeting
  * delete to every meeting of the gremium: an open vote gives 409 `open_vote`, a final
- * protocol without `meeting.delete_finalized` gives 403.
+ * protocol without `meeting.delete_finalized` gives 403 `meeting_finalized`. Any other
+ * refusal keeps the generic message.
  */
 function deleteErrorKey(err: unknown): TranslationKey {
-  if (errorCode(err) === 'open_vote') return 'admin.gremien.deleteOpenVote';
-  if ((err as { status?: number } | null)?.status === 403) return 'admin.gremien.deleteFinalized';
-  return 'admin.gremien.deleteFailed';
+  switch (errorCode(err)) {
+    case 'open_vote':
+      return 'admin.gremien.deleteOpenVote';
+    case 'meeting_finalized':
+      return 'admin.gremien.deleteFinalized';
+    default:
+      return 'admin.gremien.deleteFailed';
+  }
 }
 
 /** One setting of a gremium in the read-out of an open row. */
