@@ -14,7 +14,7 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, development]
   pull_request:
   # Opt-in trigger for the e2e job (see its `if:` gate). Start it by hand with
   # Actions → Run workflow. Without this trigger the workflow_dispatch opt-in of
@@ -208,8 +208,10 @@ jobs:
       - run: npm ci
       - name: ESLint
         run: npm run lint --if-present
-      - name: tsc
-        run: npx tsc --noEmit
+      - name: Typecheck
+        # The root tsconfig.json lists no files, so a bare `tsc --noEmit` checks
+        # nothing. `typecheck` runs tsc against tsconfig.app.json.
+        run: npm run typecheck
       - name: Jest + Coverage (Gate 80 %)
         # The threshold sits in jest.config (coverageThreshold global 80). A miss
         # breaks the build.
@@ -224,6 +226,8 @@ jobs:
   # Playwright and cleans up with `down -v`.
   e2e:
     runs-on: ubuntu-latest
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     needs: [detect, be-unit, fe-unit]
     # Three ways to opt in:
     #   - by hand:   Actions → Run workflow (workflow_dispatch)
@@ -250,6 +254,15 @@ jobs:
         run: |
           npm ci
           npx playwright install --with-deps chromium
+      # Docker Hub limits anonymous pulls per runner IP and answers 429. A login
+      # raises the limit. A fork or a pull request without the secrets skips the
+      # login and pulls anonymously.
+      - name: Docker Hub login
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v4
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: E2E (vs echtem Stack)
         run: scripts/e2e.sh
       - name: Playwright-Report (immer — Beweis >0 Tests)
@@ -288,12 +301,23 @@ jobs:
   # stays neutral (skipped). On main pushes and manual runs it still blocks.
   image-build-smoke:
     runs-on: ubuntu-latest
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     needs: coverage-gate
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
       || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v7
+      # Docker Hub limits anonymous pulls per runner IP and answers 429. A login
+      # raises the limit. A fork or a pull request without the secrets skips the
+      # login and pulls anonymously.
+      - name: Docker Hub login
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v4
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Backend-Image bauen
         run: docker build -t antrag-backend:ci backend
       - name: Container-Smoke (/api/health)
@@ -393,12 +417,23 @@ jobs:
   #   - permanent: repo variable RUN_RESTORE_SMOKE=true
   restore-smoke:
     runs-on: ubuntu-latest
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     if: >-
       github.event_name == 'workflow_dispatch'
       || contains(github.event.pull_request.labels.*.name, 'run-restore-smoke')
       || vars.RUN_RESTORE_SMOKE == 'true'
     steps:
       - uses: actions/checkout@v7
+      # Docker Hub limits anonymous pulls per runner IP and answers 429. A login
+      # raises the limit. A fork or a pull request without the secrets skips the
+      # login and pulls anonymously.
+      - name: Docker Hub login
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v4
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Restore-Smoke (backup -> wipe -> restore -> verify)
         run: scripts/restore-smoke.sh
 
@@ -414,6 +449,8 @@ jobs:
   #   - permanent: repo variable RUN_REAL_STACK_SMOKE=true
   real-stack-smoke:
     runs-on: ubuntu-latest
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     if: >-
       github.event_name == 'workflow_dispatch'
       || contains(github.event.pull_request.labels.*.name, 'run-real-stack-smoke')
@@ -425,5 +462,14 @@ jobs:
           # `@stupa-makers/ui-kit` submodule. Without this the build cannot resolve the
           # package and the job fails before it reaches a single smoke assertion.
           submodules: recursive
+      # Docker Hub limits anonymous pulls per runner IP and answers 429. A login
+      # raises the limit. A fork or a pull request without the secrets skips the
+      # login and pulls anonymously.
+      - name: Docker Hub login
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v4
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Real-Stack-Smoke (compose up -> HTTP/WS-Kernflüsse)
         run: scripts/smoke-real-stack.sh
