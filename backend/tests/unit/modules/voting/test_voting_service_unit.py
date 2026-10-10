@@ -1045,6 +1045,47 @@ async def test_delete_for_meeting_refuses_an_open_vote() -> None:
     assert _audits(db) == []
 
 
+async def test_delete_for_gremium_deletes_the_votes_without_a_meeting() -> None:
+    """The Gremium delete takes its votes without a meeting along, each audited."""
+    gid = uuid4()
+    votes = [
+        _vote(status="closed", result="passed"),
+        _vote(status="cancelled", config=_config(secret=True)),
+    ]
+    db = fake_session(result(*votes))
+    out = await VotingService(db).delete_for_gremium(gid, actor="admin")
+    assert out == [v.id for v in votes]
+    assert db.deleted == votes
+    assert db.committed == 0
+    # The locking select names the Gremium as the eligible group and no meeting.
+    lock = str(db.statements[0])
+    assert "vote.eligible_group = " in lock
+    assert "vote.meeting_id IS NULL" in lock
+    assert "FOR UPDATE" in lock
+    entries = _audits(db)
+    assert [e.action for e in entries] == ["vote_delete"] * 2
+    assert {e.data["reason"] for e in entries} == {"gremium_deleted"}
+
+
+async def test_delete_for_gremium_without_votes_runs_no_delete() -> None:
+    db = fake_session(result())
+    assert await VotingService(db).delete_for_gremium(uuid4(), actor="admin") == []
+    assert len(db.statements) == 1
+    assert db.deleted == []
+    assert _audits(db) == []
+
+
+async def test_delete_for_gremium_refuses_an_open_vote() -> None:
+    db = fake_session(result(_vote(status="draft"), _vote()))
+    with pytest.raises(ConflictError) as ei:
+        await VotingService(db).delete_for_gremium(uuid4(), actor="admin")
+    assert ei.value.code == "open_vote"
+    assert "Gremium" in str(ei.value)
+    assert len(db.statements) == 1
+    assert db.deleted == []
+    assert _audits(db) == []
+
+
 # A meeting vote reveals the counts only when every expected ballot arrived. The
 # denominator comes from the attendance roster.
 async def test_get_meeting_open_reveals_when_all_present_voted() -> None:

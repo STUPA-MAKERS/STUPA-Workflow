@@ -48,6 +48,7 @@ from app.modules.admin.service.webhooks import (
     _delivery_status_out,
     _webhook_out,
 )
+from app.modules.auth.principal import Principal
 from app.shared.config_schemas import ComparisonOffers, FlowGraph
 from app.shared.errors import (
     BadRequestError,
@@ -415,18 +416,78 @@ async def test_update_gremium_not_found() -> None:
         await s.update_gremium(uuid.uuid4(), GremiumUpdate(name="x"), "admin")
 
 
+_ADMIN = Principal(sub="admin", roles=["admin"])
+
+
 async def test_delete_gremium_ok() -> None:
     row = gremium_row()
-    s, sess = svc([*audit_results()], gets=[row])
-    await s.delete_gremium(row.id, "admin")
+    # No meeting (the locking select), no vote without a meeting, then the audit.
+    s, sess = svc([res(), res(), *audit_results()], gets=[row])
+    await s.delete_gremium(row.id, _ADMIN)
     assert row in sess.deleted
     assert sess.committed == 1
+
+
+async def test_delete_gremium_deletes_meetings_and_votes_by_their_rules(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Each meeting goes through the meeting delete, then the votes without a meeting."""
+    from app.modules.livevote.service import MeetingService
+    from app.modules.voting.service import VotingService
+
+    row = gremium_row()
+    meetings = [object(), object()]
+    calls: list[tuple[str, Any, Any]] = []
+
+    async def _delete_locked(
+        _self: Any, meeting: Any, principal: Any, *, reason: str | None = None
+    ) -> None:
+        calls.append(("meeting", meeting, reason))
+
+    async def _delete_for_gremium(_self: Any, gremium_id: Any, *, actor: str) -> list[Any]:
+        calls.append(("votes", gremium_id, actor))
+        return []
+
+    monkeypatch.setattr(MeetingService, "delete_locked", _delete_locked)
+    monkeypatch.setattr(VotingService, "delete_for_gremium", _delete_for_gremium)
+    s, sess = svc([res(*meetings), *audit_results()], gets=[row])
+    await s.delete_gremium(row.id, _ADMIN)
+    assert calls == [
+        ("meeting", meetings[0], "gremium_deleted"),
+        ("meeting", meetings[1], "gremium_deleted"),
+        ("votes", row.id, "admin"),
+    ]
+    # The meetings are locked before the votes, in a stable order.
+    lock = str(sess.statements[2])
+    assert "FOR UPDATE" in lock and "meeting.gremium_id" in lock
+    assert row in sess.deleted
+    assert sess.committed == 1
+
+
+async def test_delete_gremium_refused_by_a_meeting_changes_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An open vote (or a final protocol) of one meeting stops the whole delete."""
+    from app.modules.livevote.service import MeetingService
+
+    row = gremium_row()
+
+    async def _refuse(_self: Any, _meeting: Any, _principal: Any, **_kw: Any) -> None:
+        raise ConflictError("open", code="open_vote")
+
+    monkeypatch.setattr(MeetingService, "delete_locked", _refuse)
+    s, sess = svc([res(object())], gets=[row])
+    with pytest.raises(ConflictError) as err:
+        await s.delete_gremium(row.id, _ADMIN)
+    assert err.value.code == "open_vote"
+    assert sess.deleted == []
+    assert sess.committed == 0
 
 
 async def test_delete_gremium_not_found() -> None:
     s, _ = svc(gets=[None])
     with pytest.raises(NotFoundError):
-        await s.delete_gremium(uuid.uuid4(), "admin")
+        await s.delete_gremium(uuid.uuid4(), _ADMIN)
 
 
 async def test_get_gremium_mail_recipients_union_dedup() -> None:

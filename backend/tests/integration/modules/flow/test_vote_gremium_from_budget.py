@@ -504,7 +504,7 @@ async def test_a_stale_vote_of_another_gremium_never_decides(
 
         # MEDIUM 2: the Gremium that decides the running vote cannot be deleted.
         with pytest.raises(ConflictError) as deleted:
-            await ConfigService(session).delete_gremium(world.g_b, "admin")
+            await ConfigService(session).delete_gremium(world.g_b, ADMIN)
         assert deleted.value.code == "gremium_decides_vote"
 
 

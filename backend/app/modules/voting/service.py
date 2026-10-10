@@ -30,7 +30,7 @@ from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import Select, delete, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -277,21 +277,59 @@ class VotingService:
             ConflictError: A vote of the meeting is open (``open_vote``). The method
                 then deletes nothing.
         """
+        return await self._delete_locked_votes(
+            select(Vote).where(Vote.meeting_id == meeting_id),
+            actor=actor,
+            reason="meeting_deleted",
+            owner="meeting",
+        )
+
+    async def delete_for_gremium(self, gremium_id: UUID, *, actor: str) -> list[UUID]:
+        """Delete the votes of a Gremium that have no meeting, without a commit.
+
+        The Gremium delete calls this after it deleted the meetings of the Gremium
+        (each with ``delete_for_meeting``). The votes that remain hold the Gremium id
+        in ``eligible_group`` and no meeting, for example the vote of an application
+        outside a meeting. Without this delete they would stay with a Gremium id that
+        no longer resolves. The rules are the rules of the meeting delete: an open
+        vote refuses the delete, and every other vote goes with its ballots and one
+        ``vote_delete`` audit entry (reason ``gremium_deleted``).
+
+        Returns:
+            The ids of the deleted votes, in creation order.
+
+        Raises:
+            ConflictError: A vote of the Gremium is open (``open_vote``). The method
+                then deletes nothing.
+        """
+        return await self._delete_locked_votes(
+            select(Vote).where(
+                Vote.eligible_group == str(gremium_id), Vote.meeting_id.is_(None)
+            ),
+            actor=actor,
+            reason="gremium_deleted",
+            owner="Gremium",
+        )
+
+    async def _delete_locked_votes(
+        self, stmt: Select[Vote], *, actor: str, reason: str, owner: str
+    ) -> list[UUID]:
+        """Lock the votes of ``stmt`` and delete them with their rows, without a commit.
+
+        ``owner`` names the meeting or the Gremium in the conflict message.
+
+        Raises:
+            ConflictError: A selected vote is open (``open_vote``). The method then
+                deletes nothing.
+        """
         rows = (
-            (
-                await self.session.execute(
-                    select(Vote)
-                    .where(Vote.meeting_id == meeting_id)
-                    .order_by(Vote.created_at)
-                    .with_for_update()
-                )
-            )
+            (await self.session.execute(stmt.order_by(Vote.created_at).with_for_update()))
             .scalars()
             .all()
         )
         if any(vote.status == "open" for vote in rows):
             raise ConflictError(
-                "a vote of this meeting is still open — close or cancel it first",
+                f"a vote of this {owner} is still open — close or cancel it first",
                 code="open_vote",
             )
         ids = [vote.id for vote in rows]
@@ -302,7 +340,7 @@ class VotingService:
                 update(StatusEvent).where(StatusEvent.vote_id.in_(ids)).values(vote_id=None)
             )
         for vote in rows:
-            await self._delete_audited(vote, actor=actor, reason="meeting_deleted")
+            await self._delete_audited(vote, actor=actor, reason=reason)
         return ids
 
     async def _delete_audited(
@@ -310,7 +348,8 @@ class VotingService:
     ) -> None:
         """Write ``vote_delete`` for a loaded vote and delete it, without a commit.
 
-        ``reason`` names a delete that another delete caused (``meeting_deleted``).
+        ``reason`` names a delete that another delete caused (``meeting_deleted``,
+        ``gremium_deleted``).
         """
         data: dict[str, str | None] = {
             **self._audit_refs(vote),

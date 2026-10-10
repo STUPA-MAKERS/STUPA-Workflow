@@ -53,6 +53,7 @@ from app.modules.livevote.events import (
 from app.modules.livevote.locks import Locker
 from app.modules.livevote.presence import PRESENCE
 from app.modules.livevote.service import BrokerPublisher, MeetingService, meeting_channel
+from app.modules.voting.schemas import VoteOut
 from app.modules.voting.service import VotingService
 from app.settings import Settings
 from app.shared.errors import AppError, ForbiddenError
@@ -244,9 +245,28 @@ class LiveVoteConnection:
     async def _send_error(self, code: str) -> None:
         await self._send(ErrorEvent(code=code).dump())
 
+    async def _end_transaction(self) -> None:
+        """End the transaction of one read cycle and give the connection back.
+
+        The socket lives for the whole meeting, and so does its request session.
+        A read that does not end its transaction keeps a pool connection "idle in
+        transaction" until the disconnect, and a few sockets drain the pool. The
+        reads of a cycle write nothing (``VotingService.cast`` commits its own
+        write), so a rollback ends the transaction. The rollback also expires every
+        loaded row, so the next cycle reads the current values and not the copies
+        of the identity map (the session does not expire them on commit). Both
+        services share the request session of the socket.
+        """
+        await self.voting.session.rollback()
+
     async def _send_state(self) -> None:
         """Send the current state on connect and on a `subscribe` reconnect."""
-        meeting = await self.meetings.get(self.meeting_id)
+        try:
+            meeting = await self.meetings.get(self.meeting_id)
+            vote = await self.meetings.open_vote(self.meeting_id)
+            vote_out = None if vote is None else await self.voting.get(vote.id)
+        finally:
+            await self._end_transaction()
         await self._send(
             MeetingStateEvent(
                 activeApplicationId=meeting.active_application_id,
@@ -254,10 +274,8 @@ class LiveVoteConnection:
                 status=meeting.status,
             ).dump()
         )
-        vote = await self.meetings.open_vote(self.meeting_id)
-        if vote is None:
+        if vote_out is None:
             return
-        vote_out = await self.voting.get(vote.id)
         await self._send(VoteOpenedEvent.from_vote(vote_out, replay=True).dump())
         # `from_vote` applies the rule that a secret vote reveals the counts
         # only after the close.
@@ -272,6 +290,17 @@ class LiveVoteConnection:
         except ValidationError:
             await self._send_error("invalid_message")
             return
+        try:
+            vote_out = await self._cast(msg)
+        finally:
+            # Every path of the cast reads the database: the vote, the account and
+            # the tally after the cast. End that transaction on every path.
+            await self._end_transaction()
+        if vote_out is not None:
+            await self.publisher.vote_tally(vote_out)
+
+    async def _cast(self, msg: CastMessage) -> VoteOut | None:
+        """Run one cast and return the vote after it, or None after an error frame."""
         # Channel binding as defense in depth. The vote MUST belong to the meeting
         # of this connection. The handler rejects a vote of another meeting, and an
         # unknown vote, before the lock and the database. `VotingService.cast`
@@ -280,24 +309,24 @@ class LiveVoteConnection:
             target = await self.voting.get(msg.vote_id)
         except AppError:
             await self._send_error("not_eligible")
-            return
+            return None
         if target.meeting_id != self.meeting_id:
             await self._send_error("not_eligible")
-            return
+            return None
         # Lock the own cast and the delegated cast apart. Both casts are valid.
         suffix = ":proxy" if msg.as_delegation else ""
         lock_key = f"vote:{msg.vote_id}:cast:{self.principal.sub}{suffix}"
         async with self.locker.acquire(lock_key) as acquired:
             if not acquired:
                 await self._send_error("locked")
-                return
+                return None
             # The socket resolved the principal at the handshake. Since then an admin
             # may have deactivated the account or merged it into another one, whose
             # ballots now carry this vote. Check the row again before every cast, so an
             # open socket cannot vote for a locked account (or vote twice for a person).
             if not await account_can_act(self.voting.session, self.principal.sub):
                 await self._send_error("account_inactive")
-                return
+                return None
             try:
                 await self.voting.cast(
                     msg.vote_id,
@@ -309,13 +338,12 @@ class LiveVoteConnection:
             except ForbiddenError:
                 await self.voting.session.rollback()
                 await self._send_error("not_eligible")
-                return
+                return None
             except AppError as exc:
                 await self.voting.session.rollback()
                 await self._send_error(exc.code or "error")
-                return
-        vote_out = await self.voting.get(msg.vote_id)
-        await self.publisher.vote_tally(vote_out)
+                return None
+        return await self.voting.get(msg.vote_id)
 
     async def _handle_message(self, raw: dict[str, object]) -> None:
         kind = raw.get("type")

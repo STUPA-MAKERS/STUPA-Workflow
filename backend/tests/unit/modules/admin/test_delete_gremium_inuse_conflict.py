@@ -17,6 +17,7 @@ from typing import Any
 import pytest
 
 from app.modules.admin.service import ConfigService
+from app.modules.auth.principal import Principal
 from app.shared.errors import ConflictError
 
 
@@ -52,6 +53,9 @@ class _FakeSession:
         self.committed += 1
 
 
+_ADMIN = Principal(sub="admin", roles=["admin"])
+
+
 class _Row:
     def __init__(self, **kw: Any) -> None:
         for k, v in kw.items():
@@ -66,7 +70,7 @@ async def test_delete_gremium_with_in_use_type_raises_conflict() -> None:
     svc = ConfigService(session)  # type: ignore[arg-type]
 
     with pytest.raises(ConflictError):
-        await svc.delete_gremium(gid, "admin")
+        await svc.delete_gremium(gid, _ADMIN)
 
     # A doomed delete writes no audit row, deletes nothing and commits nothing.
     assert session.execute_calls == 0
@@ -82,7 +86,7 @@ async def test_delete_gremium_that_decides_a_vote_raises_conflict() -> None:
     svc = ConfigService(session)  # type: ignore[arg-type]
 
     with pytest.raises(ConflictError) as err:
-        await svc.delete_gremium(gid, "admin")
+        await svc.delete_gremium(gid, _ADMIN)
     assert err.value.code == "gremium_decides_vote"
     assert session.deleted == []
     assert session.committed == 0
