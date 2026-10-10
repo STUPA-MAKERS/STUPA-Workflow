@@ -23,7 +23,8 @@ export function pageReloadFactory(): () => void {
  *   `activateUpdate()`. Activation without a reload lets the old JS run against the new
  *   cache, and a lazy chunk of the old build is then missing (the flow editor showed new
  *   ops as unknown). The service sets `updateReady`, and `SwUpdatePromptComponent` shows
- *   a persistent prompt with a reload button. The reload loads the new version. The app
+ *   a persistent prompt with a reload button. `reload()` activates the update directly
+ *   before the reload, so the reload loads the new version. The app
  *   has no global record of unsaved work (no dirty or CanDeactivate guard), so the
  *   service never reloads without the consent of the user.
  * - `VERSION_INSTALLATION_FAILED`: the service ignores it. The next check tries again.
@@ -56,7 +57,7 @@ export class SwUpdateService {
     if (!this.updates.isEnabled) return;
 
     this.updates.versionUpdates.subscribe((e) => this.onVersionEvent(e));
-    this.updates.unrecoverable.subscribe(() => this.reload());
+    this.updates.unrecoverable.subscribe(() => void this.reload());
 
     // BOOTSTRAP FIX: wait 1 second, so the service worker has time to register before
     // the first update check. The registerWhenStable strategy registers the service
@@ -74,8 +75,20 @@ export class SwUpdateService {
     }, 1000);
   }
 
-  /** Reload the page, so the browser loads the version that the service worker holds. */
-  reload(): void {
+  /**
+   * Reload the page, so the browser loads the version that the service worker holds.
+   * When an update is ready, the service first activates it (the documented Angular
+   * pattern), so the reload is sure to get the new version. A failed activation is
+   * ignored: the reload still runs.
+   */
+  async reload(): Promise<void> {
+    if (this._updateReady()) {
+      try {
+        await this.updates.activateUpdate();
+      } catch {
+        // Reload anyway: the service worker serves the version it holds.
+      }
+    }
     this.reloadPage();
   }
 

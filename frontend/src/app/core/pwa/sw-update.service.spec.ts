@@ -103,9 +103,34 @@ describe('SwUpdateService', () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
-  it('reload() calls the page reload', () => {
+  it('reload() without a ready update reloads and does not activate', async () => {
     configure(true);
-    svc.reload();
+    await svc.reload();
+    expect(sw.activateUpdate).not.toHaveBeenCalled();
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('reload() with a ready update activates it first, then reloads', async () => {
+    configure(true);
+    const order: string[] = [];
+    sw.activateUpdate.mockImplementation(async () => {
+      order.push('activate');
+      return true;
+    });
+    reload.mockImplementation(() => order.push('reload'));
+    svc.init();
+    sw.versionUpdates.next({ type: 'VERSION_READY' } as VersionEvent);
+    await svc.reload();
+    expect(order).toEqual(['activate', 'reload']);
+  });
+
+  it('reload() still reloads when the activation rejects', async () => {
+    configure(true);
+    sw.activateUpdate.mockRejectedValue(new Error('activation failed'));
+    svc.init();
+    sw.versionUpdates.next({ type: 'VERSION_READY' } as VersionEvent);
+    await svc.reload();
+    expect(sw.activateUpdate).toHaveBeenCalledTimes(1);
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
