@@ -1,14 +1,17 @@
+import { DOCUMENT } from '@angular/common';
+import { Injector, runInInjectionContext } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { SwUpdate, type VersionEvent } from '@angular/service-worker';
+import { SwUpdate, type UnrecoverableStateEvent, type VersionEvent } from '@angular/service-worker';
 import { Subject } from 'rxjs';
-import { SwUpdateService } from './sw-update.service';
-import { ToastService } from '@stupa-makers/ui-kit';
-import { I18nService } from '@core/i18n/i18n.service';
+import { PAGE_RELOAD, SwUpdateService, pageReloadFactory } from './sw-update.service';
 
-/** Controllable SwUpdate stub: tests push version events and assert activation. */
+const FIVE_MINUTES = 5 * 60 * 1000;
+
+/** Controllable SwUpdate stub: tests push version events and control the update check. */
 class FakeSwUpdate {
   isEnabled = true;
   readonly versionUpdates = new Subject<VersionEvent>();
+  readonly unrecoverable = new Subject<UnrecoverableStateEvent>();
   activateUpdate = jest.fn(() => Promise.resolve(true));
   checkForUpdate = jest.fn(async () => false);
 }
@@ -16,18 +19,24 @@ class FakeSwUpdate {
 describe('SwUpdateService', () => {
   let svc: SwUpdateService;
   let sw: FakeSwUpdate;
-  let toast: ToastService;
-  let showSpy: jest.SpyInstance;
+  let reload: jest.Mock;
 
   function configure(enabled: boolean): void {
     sw = new FakeSwUpdate();
     sw.isEnabled = enabled;
+    reload = jest.fn();
     TestBed.configureTestingModule({
-      providers: [{ provide: SwUpdate, useValue: sw }],
+      providers: [
+        { provide: SwUpdate, useValue: sw },
+        { provide: PAGE_RELOAD, useValue: reload },
+      ],
     });
     svc = TestBed.inject(SwUpdateService);
-    toast = TestBed.inject(ToastService);
-    showSpy = jest.spyOn(toast, 'show');
+  }
+
+  /** Let the promise of a check settle, so concatMap takes the next tick. */
+  async function flushPromises(): Promise<void> {
+    for (let i = 0; i < 5; i++) await Promise.resolve();
   }
 
   beforeEach(() => {
@@ -41,19 +50,20 @@ describe('SwUpdateService', () => {
   it('does nothing when the service worker is not enabled', () => {
     configure(false);
     const subscribeSpy = jest.spyOn(sw.versionUpdates, 'subscribe');
+    const unrecoverableSpy = jest.spyOn(sw.unrecoverable, 'subscribe');
     svc.init();
+    jest.advanceTimersByTime(FIVE_MINUTES + 1000);
     expect(subscribeSpy).not.toHaveBeenCalled();
+    expect(unrecoverableSpy).not.toHaveBeenCalled();
     expect(sw.checkForUpdate).not.toHaveBeenCalled();
     sw.versionUpdates.next({ type: 'VERSION_READY' } as VersionEvent);
-    expect(sw.activateUpdate).not.toHaveBeenCalled();
-    expect(showSpy).not.toHaveBeenCalled();
+    expect(svc.updateReady()).toBe(false);
   });
 
-  it('activates the update and shows a persistent toast on VERSION_READY', async () => {
+  it('marks the update as ready on VERSION_READY and does not activate it', () => {
     configure(true);
-    const i18n = TestBed.inject(I18nService);
-    const translated = i18n.translate('pwa.updateReady');
     svc.init();
+    expect(svc.updateReady()).toBe(false);
 
     sw.versionUpdates.next({
       type: 'VERSION_READY',
@@ -61,47 +71,124 @@ describe('SwUpdateService', () => {
       latestVersion: { hash: 'b' },
     } as VersionEvent);
 
-    expect(sw.activateUpdate).toHaveBeenCalledTimes(1);
-    // Toast fires after the activation promise resolves.
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(showSpy).toHaveBeenCalledWith(translated, 'info', 0);
+    expect(svc.updateReady()).toBe(true);
+    // Activation without a reload lets the old JS run against the new cache.
+    expect(sw.activateUpdate).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
   });
 
-  it('ignores version events other than VERSION_READY', () => {
+  it('ignores VERSION_DETECTED, NO_NEW_VERSION_DETECTED and VERSION_INSTALLATION_FAILED', async () => {
     configure(true);
     svc.init();
     sw.versionUpdates.next({ type: 'VERSION_DETECTED' } as VersionEvent);
+    sw.versionUpdates.next({ type: 'NO_NEW_VERSION_DETECTED' } as VersionEvent);
     sw.versionUpdates.next({
-      type: 'NO_NEW_VERSION_DETECTED',
+      type: 'VERSION_INSTALLATION_FAILED',
+      error: 'download failed',
     } as VersionEvent);
-    expect(sw.activateUpdate).not.toHaveBeenCalled();
-    expect(showSpy).not.toHaveBeenCalled();
+    expect(svc.updateReady()).toBe(false);
+    expect(reload).not.toHaveBeenCalled();
+
+    // The polling continues after a failed installation.
+    jest.advanceTimersByTime(1000);
+    await flushPromises();
+    jest.advanceTimersByTime(FIVE_MINUTES);
+    expect(sw.checkForUpdate).toHaveBeenCalledTimes(2);
+  });
+
+  it('reloads the page at once when the state is unrecoverable', () => {
+    configure(true);
+    svc.init();
+    sw.unrecoverable.next({ type: 'UNRECOVERABLE_STATE', reason: 'missing chunk' });
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('reload() calls the page reload', () => {
+    configure(true);
+    svc.reload();
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 
   it('checks for updates after a delay to allow SW registration (bootstrap fix)', () => {
     configure(true);
     svc.init();
-
     expect(sw.checkForUpdate).not.toHaveBeenCalled();
-
     jest.advanceTimersByTime(1000);
-
-    expect(sw.checkForUpdate).toHaveBeenCalled();
+    expect(sw.checkForUpdate).toHaveBeenCalledTimes(1);
   });
 
-  it('sets up periodic polling after initial check', () => {
+  it('polls every five minutes after the initial check', async () => {
     configure(true);
     svc.init();
-
     jest.advanceTimersByTime(1000);
     expect(sw.checkForUpdate).toHaveBeenCalledTimes(1);
 
-    sw.checkForUpdate.mockClear();
+    jest.advanceTimersByTime(FIVE_MINUTES);
+    await flushPromises();
+    expect(sw.checkForUpdate).toHaveBeenCalledTimes(2);
 
-    // Five minutes is the polling interval.
-    jest.advanceTimersByTime(5 * 60 * 1000);
+    jest.advanceTimersByTime(FIVE_MINUTES);
+    expect(sw.checkForUpdate).toHaveBeenCalledTimes(3);
+  });
 
-    expect(sw.checkForUpdate).toHaveBeenCalled();
+  it('keeps polling after a rejected check (offline)', async () => {
+    configure(true);
+    sw.checkForUpdate.mockRejectedValue(new Error('offline'));
+    svc.init();
+    jest.advanceTimersByTime(1000);
+    await flushPromises();
+
+    jest.advanceTimersByTime(FIVE_MINUTES);
+    await flushPromises();
+    jest.advanceTimersByTime(FIVE_MINUTES);
+    await flushPromises();
+    jest.advanceTimersByTime(FIVE_MINUTES);
+    await flushPromises();
+
+    // 1 initial check + 3 polls: every rejection is ignored.
+    expect(sw.checkForUpdate).toHaveBeenCalledTimes(4);
+  });
+
+  it('keeps polling after a check that throws synchronously', async () => {
+    configure(true);
+    sw.checkForUpdate.mockImplementation(() => {
+      throw new Error('no service worker');
+    });
+    svc.init();
+    jest.advanceTimersByTime(1000);
+    jest.advanceTimersByTime(FIVE_MINUTES);
+    await flushPromises();
+    jest.advanceTimersByTime(FIVE_MINUTES);
+    expect(sw.checkForUpdate).toHaveBeenCalledTimes(3);
+  });
+
+  it('checks on window focus and keeps listening after a rejected check', async () => {
+    configure(true);
+    sw.checkForUpdate.mockRejectedValue(new Error('offline'));
+    svc.init();
+    jest.advanceTimersByTime(1000);
+    await flushPromises();
+    expect(sw.checkForUpdate).toHaveBeenCalledTimes(1);
+
+    window.dispatchEvent(new Event('focus'));
+    await flushPromises();
+    expect(sw.checkForUpdate).toHaveBeenCalledTimes(2);
+
+    window.dispatchEvent(new Event('focus'));
+    await flushPromises();
+    expect(sw.checkForUpdate).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('pageReloadFactory', () => {
+  it('reloads the location of the injected document', () => {
+    const fakeReload = jest.fn();
+    const injector = Injector.create({
+      providers: [{ provide: DOCUMENT, useValue: { location: { reload: fakeReload } } }],
+    });
+    const reload = runInInjectionContext(injector, pageReloadFactory);
+    expect(fakeReload).not.toHaveBeenCalled();
+    reload();
+    expect(fakeReload).toHaveBeenCalledTimes(1);
   });
 });

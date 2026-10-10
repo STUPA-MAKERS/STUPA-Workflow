@@ -2,6 +2,7 @@ import { Component, signal } from '@angular/core';
 import { Router, provideRouter, type Routes } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { SwUpdate } from '@angular/service-worker';
 import { render, screen, within } from '@testing-library/angular';
 import { ShellComponent } from './shell.component';
 import { AuthService } from '@core/auth/auth.service';
@@ -88,6 +89,8 @@ async function setup(
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
+      // The shell holds the update prompt, and the prompt needs SwUpdate.
+      { provide: SwUpdate, useValue: { isEnabled: false } },
       provideLocationMock(createLocationMock()),
       { provide: BrandingService, useValue: opts.branding ?? brandingStub() },
       { provide: RailStatusService, useValue: opts.status ?? railStatusStub() },
