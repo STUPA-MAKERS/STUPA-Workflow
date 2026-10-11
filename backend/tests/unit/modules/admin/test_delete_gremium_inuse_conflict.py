@@ -17,28 +17,27 @@ from typing import Any
 import pytest
 
 from app.modules.admin.service import ConfigService
+from app.modules.auth.principal import Principal
 from app.shared.errors import ConflictError
 
 
 class _FakeSession:
     """Minimal ``AsyncSession`` stub for ``delete_gremium``.
 
-    ``get`` returns the existing Gremium on the first call. ``scalar`` returns the
-    ``in_use`` hit or ``None``. ``execute``, ``commit`` and ``delete`` count their calls.
+    The first ``scalar`` returns the locked Gremium, the next ones the ``in_use`` hit
+    and the ``deciding`` hit, or ``None``. ``execute``, ``commit`` and ``delete`` count their calls.
     The test proves that a conflict writes *no* audit row and runs *no* commit.
     """
 
     def __init__(self, *, gremium: Any, in_use: Any, deciding: Any = None) -> None:
-        self._gremium = gremium
-        self._scalars = [in_use, deciding]
+        self._scalars = [gremium, in_use, deciding]
+        self.statements: list[Any] = []
         self.deleted: list[Any] = []
         self.execute_calls = 0
         self.committed = 0
 
-    async def get(self, _model: Any, _ident: Any) -> Any:
-        return self._gremium
-
-    async def scalar(self, _stmt: Any) -> Any:
+    async def scalar(self, stmt: Any) -> Any:
+        self.statements.append(stmt)
         return self._scalars.pop(0)
 
     async def execute(self, _stmt: Any) -> Any:  # pragma: no cover - guarded path
@@ -50,6 +49,9 @@ class _FakeSession:
 
     async def commit(self) -> None:  # pragma: no cover - guarded path
         self.committed += 1
+
+
+_ADMIN = Principal(sub="admin", roles=["admin"])
 
 
 class _Row:
@@ -66,8 +68,11 @@ async def test_delete_gremium_with_in_use_type_raises_conflict() -> None:
     svc = ConfigService(session)  # type: ignore[arg-type]
 
     with pytest.raises(ConflictError):
-        await svc.delete_gremium(gid, "admin")
+        await svc.delete_gremium(gid, _ADMIN)
 
+    # The Gremium row is locked first, so a concurrent meeting insert waits.
+    lock = str(session.statements[0])
+    assert "FROM gremium" in lock and "FOR UPDATE" in lock
     # A doomed delete writes no audit row, deletes nothing and commits nothing.
     assert session.execute_calls == 0
     assert session.deleted == []
@@ -82,7 +87,7 @@ async def test_delete_gremium_that_decides_a_vote_raises_conflict() -> None:
     svc = ConfigService(session)  # type: ignore[arg-type]
 
     with pytest.raises(ConflictError) as err:
-        await svc.delete_gremium(gid, "admin")
+        await svc.delete_gremium(gid, _ADMIN)
     assert err.value.code == "gremium_decides_vote"
     assert session.deleted == []
     assert session.committed == 0

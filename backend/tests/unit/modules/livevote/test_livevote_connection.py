@@ -27,6 +27,7 @@ from app.modules.livevote.connection import (
 from app.modules.livevote.locks import InMemoryLocker
 from app.modules.voting.schemas import TallyOut, VoteOut
 from app.shared.config_schemas import VoteConfig
+from app.shared.errors import ConflictError
 
 
 class _FakeWS:
@@ -44,6 +45,30 @@ class _Sub:
     async def __aiter__(self) -> AsyncIterator[dict[str, object]]:
         for item in self._items:
             yield item
+
+
+class _TxSession:
+    """Session double that tracks the open transaction.
+
+    A read opens the transaction (``begin``), ``rollback`` ends it. The connection must
+    end the transaction of every read cycle, so a socket never holds a pool connection
+    "idle in transaction" between two frames.
+    """
+
+    def __init__(self) -> None:
+        self.in_tx = False
+        self.rollbacks = 0
+
+    def begin(self) -> None:
+        self.in_tx = True
+
+    async def scalar(self, _stmt: object) -> int:
+        self.begin()
+        return 1
+
+    async def rollback(self) -> None:
+        self.in_tx = False
+        self.rollbacks += 1
 
 
 def _conn(*, beamer: bool) -> LiveVoteConnection:
@@ -272,7 +297,7 @@ async def test_run_dead_pump_tears_down_connection() -> None:
         beamer=True,  # a beamer needs no presence call and no state DB call
         principal=Principal(sub="p"),
         meetings=_StateMeetings(),  # type: ignore[arg-type]
-        voting=object(),  # type: ignore[arg-type]
+        voting=SimpleNamespace(session=_TxSession()),  # type: ignore[arg-type]
         broker=_BoomBroker(),  # type: ignore[arg-type]
         locker=InMemoryLocker(),
     )
@@ -306,9 +331,14 @@ class _MeetingBoundVoting:
         self.session = self
         self.statements: list[object] = []
 
+        self.rollbacks = 0
+
     async def scalar(self, stmt: object) -> int:
         self.statements.append(stmt)
         return 1 if self.account_ok else 0
+
+    async def rollback(self) -> None:
+        self.rollbacks += 1
 
     async def get(self, vote_id: UUID) -> Any:
         return SimpleNamespace(id=vote_id, meeting_id=self._vote_meeting_id)
@@ -364,6 +394,9 @@ class _OpenVoteMeetings(_StateMeetings):
 
 
 class _OpenVoteVoting:
+    def __init__(self) -> None:
+        self.session = _TxSession()
+
     async def get(self, vote_id: UUID) -> VoteOut:
         return VoteOut(
             id=vote_id,
@@ -412,3 +445,134 @@ async def test_cast_refused_when_the_account_is_no_longer_active() -> None:
     assert conn.ws.sent == [{"type": "error", "code": "account_inactive"}]  # type: ignore[attr-defined]
     stmt = str(voting.statements[0])
     assert "principal.active" in stmt and "principal.merged_into IS NULL" in stmt
+
+
+# B1: every read cycle of the socket ends its transaction. The socket keeps its request
+# session for the whole meeting, so an open transaction would hold a pool connection.
+class _TxMeetings:
+    """Meeting service double whose reads open the transaction of the shared session."""
+
+    def __init__(self, session: _TxSession, *, status: str = "live", fail: bool = False) -> None:
+        self.session = session
+        self.status = status
+        self.fail = fail
+        self.open: object = None
+
+    async def get(self, _meeting_id: UUID, _principal: object = None) -> Any:
+        self.session.begin()
+        if self.fail:
+            raise RuntimeError("database gone")
+        return SimpleNamespace(
+            active_application_id=None, current_agenda_item_id=None, status=self.status
+        )
+
+    async def open_vote(self, _meeting_id: UUID) -> object:
+        self.session.begin()
+        return self.open
+
+
+class _TxVoting:
+    """Voting service double on the shared session; ``cast`` commits its own write."""
+
+    def __init__(
+        self, session: _TxSession, meeting_id: UUID, *, exc: Exception | None = None
+    ) -> None:
+        self.session = session
+        self.meeting_id = meeting_id
+        self.exc = exc
+        self.casts = 0
+
+    async def get(self, vote_id: UUID) -> Any:
+        self.session.begin()
+        return SimpleNamespace(id=vote_id, meeting_id=self.meeting_id)
+
+    async def cast(self, *_args: object, **_kwargs: object) -> None:
+        self.session.begin()
+        if self.exc is not None:
+            raise self.exc
+        self.casts += 1
+        # The real cast commits, which ends the transaction.
+        self.session.in_tx = False
+
+
+def _tx_conn(**voting_kw: Any) -> tuple[LiveVoteConnection, _TxSession, _TxMeetings, _TxVoting]:
+    session = _TxSession()
+    conn = _conn(beamer=False)
+    meetings = _TxMeetings(session)
+    voting = _TxVoting(session, conn.meeting_id, **voting_kw)
+    conn.meetings = meetings  # type: ignore[assignment]
+    conn.voting = voting  # type: ignore[assignment]
+    return conn, session, meetings, voting
+
+
+@pytest.mark.asyncio
+async def test_send_state_ends_the_transaction() -> None:
+    conn, session, _meetings, _voting = _tx_conn()
+    await conn._send_state()
+    assert session.in_tx is False
+    assert session.rollbacks == 1
+    assert [m["type"] for m in conn.ws.sent] == ["meeting_state"]  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_send_state_ends_the_transaction_when_a_read_fails() -> None:
+    conn, session, meetings, _voting = _tx_conn()
+    meetings.fail = True
+    with pytest.raises(RuntimeError):
+        await conn._send_state()
+    assert session.in_tx is False
+    assert conn.ws.sent == []  # type: ignore[attr-defined]
+
+
+@pytest.mark.asyncio
+async def test_resync_reads_the_state_again() -> None:
+    """A ``subscribe`` after a change sends the new state, in a new transaction."""
+    conn, session, meetings, _voting = _tx_conn()
+    meetings.status = "planned"
+    await conn._send_state()
+    meetings.status = "live"
+    await conn._handle_message({"type": "subscribe"})
+    sent = conn.ws.sent  # type: ignore[attr-defined]
+    assert [m["status"] for m in sent] == ["planned", "live"]
+    assert session.in_tx is False
+    assert session.rollbacks == 2
+
+
+@pytest.mark.asyncio
+async def test_cast_ends_the_transaction_after_the_tally_read() -> None:
+    conn, session, _meetings, voting = _tx_conn()
+    published: list[object] = []
+
+    async def _tally(vote: object) -> None:
+        # The broadcast runs after the transaction ended.
+        assert session.in_tx is False
+        published.append(vote)
+
+    conn.publisher.vote_tally = _tally  # type: ignore[method-assign]
+    await conn._handle_cast({"type": "cast", "voteId": str(uuid4()), "choice": "yes"})
+    assert voting.casts == 1
+    assert len(published) == 1
+    assert session.in_tx is False
+
+
+@pytest.mark.asyncio
+async def test_cast_ends_the_transaction_on_an_error_frame() -> None:
+    """The early exits (foreign vote, refused cast) end the transaction too."""
+    conn, session, _meetings, voting = _tx_conn()
+    voting.meeting_id = uuid4()  # a vote of another meeting
+    await conn._handle_cast({"type": "cast", "voteId": str(uuid4()), "choice": "yes"})
+    assert conn.ws.sent == [{"type": "error", "code": "not_eligible"}]  # type: ignore[attr-defined]
+    assert session.in_tx is False
+
+    conn, session, _meetings, voting = _tx_conn(exc=ConflictError("dup", code="already_voted"))
+    await conn._handle_cast({"type": "cast", "voteId": str(uuid4()), "choice": "yes"})
+    assert conn.ws.sent == [{"type": "error", "code": "already_voted"}]  # type: ignore[attr-defined]
+    assert session.in_tx is False
+
+
+@pytest.mark.asyncio
+async def test_cast_ends_the_transaction_when_the_cast_raises() -> None:
+    conn, session, _meetings, _voting = _tx_conn(exc=RuntimeError("database gone"))
+    with pytest.raises(RuntimeError):
+        await conn._handle_cast({"type": "cast", "voteId": str(uuid4()), "choice": "yes"})
+    assert session.in_tx is False

@@ -11,6 +11,7 @@ branches through slim WS doubles.
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, time
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -3031,21 +3032,33 @@ async def test_authorize_voter_ok() -> None:
     assert out is not None
 
 
+class _HandshakeSession:
+    """Session double that counts the rollback that ends the handshake transaction."""
+
+    def __init__(self) -> None:
+        self.rollbacks = 0
+
+    async def rollback(self) -> None:
+        self.rollbacks += 1
+
+
 async def test_serve_returns_early_on_unauthorized() -> None:
     # _authorize returns None for an unauthenticated client, so _serve returns before
     # it calls accept().
     ws = _FakeWS()
+    session = _HandshakeSession()
     await _serve(
         ws,  # type: ignore[arg-type]
         uuid4(),
         None,
         _AuthMeetings(),  # type: ignore[arg-type]
-        object(),  # type: ignore[arg-type]
+        SimpleNamespace(session=session),  # type: ignore[arg-type]
         object(),  # type: ignore[arg-type]
         object(),  # type: ignore[arg-type]
         beamer=False,
     )
     assert ws.accepted is False
+    assert session.rollbacks == 1
 
 
 async def test_serve_accepts_and_runs(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -3059,17 +3072,20 @@ async def test_serve_accepts_and_runs(monkeypatch: pytest.MonkeyPatch) -> None:
             self.ran = True
 
     monkeypatch.setattr(router_mod, "LiveVoteConnection", _FakeConn)
+    session = _HandshakeSession()
     await _serve(
         ws,  # type: ignore[arg-type]
         uuid4(),
         _principal(),
         _AuthMeetings(manager=True),  # type: ignore[arg-type]
-        object(),  # type: ignore[arg-type]
+        SimpleNamespace(session=session),  # type: ignore[arg-type]
         InMemoryBroker(),
         InMemoryLocker(),
         beamer=True,
     )
     assert ws.accepted is True
+    # The handshake reads end their transaction before the socket opens.
+    assert session.rollbacks == 1
 
 
 # router.py: get_ws_principal and the WS routes meeting_socket and beamer_socket
@@ -3302,8 +3318,10 @@ async def test_delete_finalized_requires_permission(
         permissions=set(),
         scope_permissions=frozenset({"session.manage", "protocol.write", "protocol.finalize"}),
     )
-    with pytest.raises(ForbiddenError, match="delete_finalized"):
+    with pytest.raises(ForbiddenError, match="delete_finalized") as err:
         await svc.delete(m.id, admin_token)
+    # A stable code, so a client tells this refusal from a missing right.
+    assert err.value.code == "meeting_finalized"
 
 
 async def test_delete_ok_audits(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -3361,6 +3379,42 @@ async def test_delete_deletes_the_votes_and_audits_their_ids(
     assert sess.committed == 1
     assert calls[0]["data"]["deletedVotes"] == 2
     assert calls[0]["data"]["deletedVoteIds"] == [str(v) for v in vote_ids]
+
+
+async def test_write_delete_names_the_reason_and_does_not_commit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The Gremium delete reuses the meeting audit; the caller commits."""
+    m = _meeting(status="closed")
+    calls: list[dict[str, Any]] = []
+    vote_id = uuid4()
+
+    async def _record(session: Any, **kw: Any) -> None:
+        calls.append(kw)
+
+    monkeypatch.setattr(lifecycle_mod, "audit_record", _record)
+    sess = _QueueSession()
+    await MeetingService(sess).write_delete(  # type: ignore[arg-type]
+        m, _admin(), finalized=True, deleted_votes=[vote_id], reason="gremium_deleted"
+    )
+    assert sess.deleted == [m]
+    assert sess.committed == 0
+    assert calls[0]["data"]["reason"] == "gremium_deleted"
+    assert calls[0]["data"]["finalizedProtocol"] is True
+    assert calls[0]["data"]["deletedVoteIds"] == [str(vote_id)]
+
+
+async def test_check_deletable_writes_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The check runs the refusal rules only; it returns whether the protocol is final."""
+
+    async def _final(self, _mid):  # noqa: ANN001, ANN202
+        return True
+
+    monkeypatch.setattr(MeetingService, "_protocol_final", _final)
+    sess = _QueueSession(executes=[res()])
+    assert await MeetingService(sess).check_deletable(_meeting(), _admin()) is True  # type: ignore[arg-type]
+    assert sess.deleted == []
+    assert sess.added == []
 
 
 async def test_delete_forbidden_deletes_no_vote(monkeypatch: pytest.MonkeyPatch) -> None:
