@@ -25,15 +25,126 @@
   border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
 }
-.ad--busy {
-  gap: var(--space-3);
+/* ------------------------------------------------------------------ loading shapes */
+/* The busy sheet uses the classes of the loaded one (`.ad__head`, `.ad__title`,
+   `.ad__cols`, `.rowgroup`), so only the bars need a size here. */
+.ad__skelKicker {
+  width: 11rem;
 }
-.ad__skelMeta {
-  width: 30%;
+.ad__skelIcon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+}
+.ad__skelIcon .skel-box {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
 }
 .ad__skelTitle {
   width: 60%;
-  height: 2rem;
+}
+.ad__skelLine {
+  width: 6rem;
+}
+/* The size of an `app-button` of size md, and of a typical label. */
+.ad__skelButton {
+  width: 11rem;
+  height: var(--control-height);
+  border-radius: 999px;
+}
+.ad__skelButton--short {
+  width: 7rem;
+}
+.ad__skelAnswers {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+.ad__skelSec {
+  width: 4rem;
+}
+.ad__skelSec--wide {
+  width: 7.5rem;
+}
+/* The attachments panel heads its section with a row as high as its upload button. */
+.ad__skelFilesHead {
+  display: flex;
+  align-items: center;
+  min-height: var(--control-height-sm);
+  padding-inline-start: var(--space-1);
+}
+/* One `app-field-row`: 58px, a 16px label line over a 22px value line. */
+.ad__skelRow {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 3.625rem;
+  padding: 10px var(--space-4);
+}
+.ad__skelLabel {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+.ad__skelValue {
+  font-size: var(--fs-md);
+  line-height: 1.375rem;
+}
+/* One day of `app-history`: the date over its rows, 6px apart; a row is an 18px icon
+   beside a title line and two small lines. */
+.ad__skelDay {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ad__skelDate {
+  margin: 0;
+  padding: 0 4px;
+}
+.ad__skelDate .skel-text {
+  width: 7rem;
+}
+.ad__skelEntry {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: var(--space-3) 14px;
+}
+.ad__skelEntryIcon {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+}
+.ad__skelEntryText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+}
+.ad__skelEntryTitle {
+  width: 6rem;
+}
+.ad__skelEntryMeta {
+  width: 8rem;
+}
+.ad__skelSmall {
+  font-size: var(--fs-small);
+  line-height: 1.125rem;
+}
+
+/* C: the shown application while the next one loads. The sheet keeps its surface; its
+   content dims after 300ms. */
+.ad--split {
+  position: relative;
+}
+.ad--stale > :not(.skel-progress) {
+  opacity: 0.55;
+  transition: opacity 150ms var(--ease-standard, ease) 300ms;
+}
+.ad__progress {
+  inset-inline: var(--radius-2xl);
 }
 .ad--center {
   align-items: center;

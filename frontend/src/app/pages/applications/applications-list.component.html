@@ -156,82 +156,102 @@
             </app-button>
           }
         </div>
+        @if (reloading()) {
+          <!-- A filter, the search or the sort changed: the rows stay until the new ones
+               arrive; after 300ms a bar under the chips says that the list is on its way. -->
+          <span class="skel-progress apps__progress" aria-hidden="true"></span>
+        }
       </app-sticky-bar>
 
-      <div class="apps__scroll" appScrollFade="y">
+      <div class="apps__scroll" appScrollFade="y" [attr.aria-busy]="reloading() || null">
         @if (error()) {
           <p class="apps__status apps__status--error" role="alert">
             {{ 'applications.list.error' | t }}
           </p>
         } @else if (loading()) {
-          <app-skeleton variant="rows" [count]="6" [label]="'applications.list.loading' | t" />
+          <!-- The shape of the loaded list: a month heading and rows in the geometry of
+               `app-list-item`, as many as fill the pane, so nothing moves when they arrive.
+               It shows only after 300ms (`skel-in`). -->
+          <div class="apps__skel skel-in">
+            <h2 class="sec apps__month" aria-hidden="true">
+              <span class="skel-text skel-text--accent apps__skelMonth"></span>
+            </h2>
+            <app-skeleton
+              variant="items"
+              [count]="12"
+              [grouped]="!split()"
+              [label]="'applications.list.loading' | t"
+            />
+          </div>
         } @else if (!rows().length) {
           <p class="empty-state apps__empty">{{ 'applications.list.empty' | t }}</p>
         } @else {
-          @for (group of groups(); track group.key + $index) {
-            <section class="apps__group" [attr.aria-label]="group.label || null">
-              @if (group.label) {
-                <h2 class="sec apps__month">{{ group.label }}</h2>
-              }
-              <div class="apps__rows" [class.rowgroup]="!split()" role="list">
-                @for (row of group.items; track row.item.id) {
-                  <app-list-item
-                    role="listitem"
-                    class="apps__row"
-                    [class.apps__row--busy]="busyRow() === row.item.id"
-                    [title]="row.title"
-                    [link]="['/applications', row.item.id]"
-                    linkQueryParamsHandling="preserve"
-                    [selected]="row.item.id === selectedId()"
-                  >
-                    <span sub>
-                      @if (row.stateLabel) {
-                        <app-status-text [kind]="row.stateKind">{{ row.stateLabel }}</app-status-text>
-                      }
-                      @if (row.stateLabel && row.typeLabel) {
-                        <span class="apps__dot" aria-hidden="true">·</span>
-                      }
-                      @if (row.typeLabel) {
-                        <span>{{ row.typeLabel }}</span>
-                      }
-                      @if (row.item.archivedAt) {
-                        @if (row.stateLabel || row.typeLabel) {
+          <div class="apps__groups" [class.skel-stale]="reloading()" [attr.inert]="reloading() ? '' : null">
+            @for (group of groups(); track group.key + $index) {
+              <section class="apps__group" [attr.aria-label]="group.label || null">
+                @if (group.label) {
+                  <h2 class="sec apps__month">{{ group.label }}</h2>
+                }
+                <div class="apps__rows" [class.rowgroup]="!split()" role="list">
+                  @for (row of group.items; track row.item.id) {
+                    <app-list-item
+                      role="listitem"
+                      class="apps__row"
+                      [class.apps__row--busy]="busyRow() === row.item.id"
+                      [title]="row.title"
+                      [link]="['/applications', row.item.id]"
+                      linkQueryParamsHandling="preserve"
+                      [selected]="row.item.id === selectedId()"
+                    >
+                      <span sub>
+                        @if (row.stateLabel) {
+                          <app-status-text [kind]="row.stateKind">{{ row.stateLabel }}</app-status-text>
+                        }
+                        @if (row.stateLabel && row.typeLabel) {
                           <span class="apps__dot" aria-hidden="true">·</span>
                         }
-                        <span class="apps__archived">
-                          <app-icon name="archive" [size]="13" />{{ 'applications.list.archivedRow' | t }}
-                        </span>
-                      }
-                    </span>
-                    <span trail class="apps__trail">
-                      @if (row.approved) {
-                        <!-- F1: the approved amount, the requested one struck through below. -->
-                        <span class="apps__amounts">
-                          <span class="mono apps__amount">{{ row.approved }}</span>
-                          <s class="mono apps__amountStruck">{{ row.amount }}</s>
-                        </span>
-                      } @else if (row.amount) {
-                        <span class="mono apps__amount">{{ row.amount }}</span>
-                      }
-                      <span class="apps__menuSlot">
-                        @if (!split()) {
-                          <span class="apps__chev" aria-hidden="true">
-                            <app-icon name="chevron-right" [size]="17" />
+                        @if (row.typeLabel) {
+                          <span>{{ row.typeLabel }}</span>
+                        }
+                        @if (row.item.archivedAt) {
+                          @if (row.stateLabel || row.typeLabel) {
+                            <span class="apps__dot" aria-hidden="true">·</span>
+                          }
+                          <span class="apps__archived">
+                            <app-icon name="archive" [size]="13" />{{ 'applications.list.archivedRow' | t }}
                           </span>
                         }
-                        <app-row-transitions-menu
-                          class="apps__menu"
-                          [item]="row.item"
-                          [title]="row.title"
-                          (action)="onRowAction(row.item, $event)"
-                        />
                       </span>
-                    </span>
-                  </app-list-item>
-                }
-              </div>
-            </section>
-          }
+                      <span trail class="apps__trail">
+                        @if (row.approved) {
+                          <!-- F1: the approved amount, the requested one struck through below. -->
+                          <span class="apps__amounts">
+                            <span class="mono apps__amount">{{ row.approved }}</span>
+                            <s class="mono apps__amountStruck">{{ row.amount }}</s>
+                          </span>
+                        } @else if (row.amount) {
+                          <span class="mono apps__amount">{{ row.amount }}</span>
+                        }
+                        <span class="apps__menuSlot">
+                          @if (!split()) {
+                            <span class="apps__chev" aria-hidden="true">
+                              <app-icon name="chevron-right" [size]="17" />
+                            </span>
+                          }
+                          <app-row-transitions-menu
+                            class="apps__menu"
+                            [item]="row.item"
+                            [title]="row.title"
+                            (action)="onRowAction(row.item, $event)"
+                          />
+                        </span>
+                      </span>
+                    </app-list-item>
+                  }
+                </div>
+              </section>
+            }
+          </div>
 
           @if (hasMore()) {
             <div #sentinel class="apps__sentinel" aria-hidden="true"></div>

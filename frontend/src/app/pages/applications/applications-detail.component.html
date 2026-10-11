@@ -1,11 +1,39 @@
 @if (loading()) {
-  <!-- The shape of the sheet, not a sentence: the reader opens this view most often. -->
-  <div class="ad ad--busy" aria-busy="true">
-    <span class="skel skel--line ad__skelMeta"></span>
-    <span class="skel skel--line ad__skelTitle"></span>
-    <span class="skel skel--panel"></span>
+  <!-- The loaded sheet with bars in place of the text: the same header, columns and
+       sections, so nothing moves when the application arrives. The sheet itself and the
+       fixed headings show at once, the bars after 300ms (`skel-in`). -->
+  <article class="ad ad--busy" [class.ad--split]="split()" aria-busy="true">
+    <header class="ad__head" aria-hidden="true">
+      <app-sheet-bar [bleed]="split()">
+        <span appSheetBarKicker class="skel-in"><span class="skel-text skel-text--muted ad__skelKicker"></span></span>
+        <span class="ad__skelIcon skel-in"><span class="skel-box"></span></span>
+      </app-sheet-bar>
+      <h2 class="ad__title skel-in"><span class="skel-text ad__skelTitle"></span></h2>
+      <p class="ad__line skel-in"><span class="skel-text skel-text--muted ad__skelLine"></span></p>
+      @if (canTransition()) {
+        <ng-container *ngTemplateOutlet="transitionsSkel" />
+      }
+    </header>
+    @if (split()) {
+      <div class="ad__cols">
+        <div class="ad__col">
+          <ng-container *ngTemplateOutlet="answersSkel" />
+          <ng-container *ngTemplateOutlet="filesSkel" />
+        </div>
+        <div class="ad__col">
+          <ng-container *ngTemplateOutlet="detailsSkel" />
+          <ng-container *ngTemplateOutlet="historySkel" />
+        </div>
+      </div>
+    } @else {
+      <app-tabs class="ad__tabs" idPrefix="ad-busy" [tabs]="tabs()" [active]="'app'" aria-hidden="true" />
+      <div class="ad__panel">
+        <ng-container *ngTemplateOutlet="detailsSkel" />
+        <ng-container *ngTemplateOutlet="answersSkel" />
+      </div>
+    }
     <span class="sr-only" role="status">{{ 'applications.detail.loading' | t }}</span>
-  </div>
+  </article>
 } @else if (notFound()) {
   <div class="ad ad--center">
     <app-empty-state
@@ -59,7 +87,19 @@
       </div>
     </article>
   } @else {
-    <article class="ad" [class.ad--split]="split()" aria-labelledby="ad-title">
+    <!-- C: another application is on its way. This one stays, dimmed and inert after
+         300ms, and the bar on top says the next one is loading. -->
+    <article
+      class="ad"
+      [class.ad--split]="split()"
+      [class.ad--stale]="switching()"
+      [attr.inert]="switching() ? '' : null"
+      [attr.aria-busy]="switching() || null"
+      aria-labelledby="ad-title"
+    >
+      @if (switching()) {
+        <span class="skel-progress ad__progress" aria-hidden="true"></span>
+      }
       <header class="ad__head">
         <app-sheet-bar [bleed]="split()" [kicker]="metaLine()">
           @if (!phone()) {
@@ -157,6 +197,9 @@
               </app-button>
             }
           </div>
+        } @else if (canTransition() && transitionsLoading()) {
+          <!-- The buttons keep their place while the transitions load. -->
+          <ng-container *ngTemplateOutlet="transitionsSkel" />
         }
 
         @if (application.archivedAt) {
@@ -310,7 +353,7 @@
 <!-- The answers of the form by section (O19). -->
 <ng-template #answers let-application>
   @if (formLoading()) {
-    <span class="skel skel--panel" aria-hidden="true"></span>
+    <ng-container *ngTemplateOutlet="answersSkel" />
   } @else {
     <app-answer-view
       [sections]="sections()"
@@ -566,3 +609,85 @@
   [(open)]="decisionOpen"
   (done)="onAgendaDone()"
 />
+
+<!-- ---------------------------------------------------------------- loading shapes
+     Each one mirrors the section it stands for: the same heading, the same row group and
+     58px field rows. Fixed headings are real text; headings of the form are bars. -->
+<ng-template #transitionsSkel>
+  <div class="ad__transitions skel-in" aria-hidden="true">
+    <span class="skel-box ad__skelButton"></span>
+    <span class="skel-box ad__skelButton ad__skelButton--short"></span>
+  </div>
+</ng-template>
+
+<ng-template #skelRow let-label="label" let-value="value">
+  <div class="ad__skelRow">
+    <span class="ad__skelLabel"><span class="skel-text skel-text--muted" [style.width]="label"></span></span>
+    <span class="ad__skelValue"><span class="skel-text" [style.width]="value"></span></span>
+  </div>
+</ng-template>
+
+<ng-template #answersSkel>
+  <div class="ad__skelAnswers skel-in" aria-hidden="true">
+    <section class="ad__sec">
+      <h3 class="sec ad__secTitle"><span class="skel-text skel-text--accent ad__skelSec"></span></h3>
+      <div class="rowgroup">
+        <ng-container *ngTemplateOutlet="skelRow; context: { label: '5rem', value: '75%' }" />
+        <ng-container *ngTemplateOutlet="skelRow; context: { label: '4rem', value: '45%' }" />
+      </div>
+    </section>
+    <section class="ad__sec">
+      <h3 class="sec ad__secTitle"><span class="skel-text skel-text--accent ad__skelSec ad__skelSec--wide"></span></h3>
+      <div class="rowgroup">
+        <ng-container *ngTemplateOutlet="skelRow; context: { label: '3rem', value: '30%' }" />
+      </div>
+    </section>
+  </div>
+</ng-template>
+
+<ng-template #filesSkel>
+  <section class="ad__sec" aria-hidden="true">
+    <div class="ad__skelFilesHead">
+      <h3 class="sec">{{ 'applications.attachments.title' | t }}</h3>
+    </div>
+    <div class="rowgroup skel-in">
+      <ng-container *ngTemplateOutlet="skelRow; context: { label: '9rem', value: '6rem' }" />
+      <ng-container *ngTemplateOutlet="skelRow; context: { label: '7rem', value: '5rem' }" />
+    </div>
+  </section>
+</ng-template>
+
+<ng-template #detailsSkel>
+  <section class="ad__sec" aria-hidden="true">
+    <h3 class="sec ad__secTitle">{{ 'applications.detail.details' | t }}</h3>
+    <div class="rowgroup skel-in">
+      <div class="ad__pair">
+        <ng-container *ngTemplateOutlet="skelRow; context: { label: '5rem', value: '8rem' }" />
+        <ng-container *ngTemplateOutlet="skelRow; context: { label: '5rem', value: '8rem' }" />
+      </div>
+      <ng-container *ngTemplateOutlet="skelRow; context: { label: '5rem', value: '4rem' }" />
+    </div>
+  </section>
+</ng-template>
+
+<ng-template #historySkel>
+  <section class="ad__sec" aria-hidden="true">
+    <h3 class="sec ad__secTitle">{{ 'applications.detail.tab.history' | t }}</h3>
+    <!-- The shape of one day of `app-history`: the date, then its entries. -->
+    <div class="ad__skelDay skel-in">
+      <p class="cap ad__skelDate"><span class="skel-text skel-text--muted"></span></p>
+      <div class="rowgroup">
+        @for (w of ['70%', '55%']; track $index) {
+          <div class="ad__skelEntry">
+            <span class="skel-box ad__skelEntryIcon"></span>
+            <span class="ad__skelEntryText">
+              <span class="ad__skelValue"><span class="skel-text ad__skelEntryTitle"></span></span>
+              <span class="ad__skelSmall"><span class="skel-text skel-text--muted" [style.width]="w"></span></span>
+              <span class="ad__skelSmall"><span class="skel-text skel-text--muted ad__skelEntryMeta"></span></span>
+            </span>
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+</ng-template>

@@ -89,7 +89,7 @@ import { ForceStatusDialogComponent } from './force-status-dialog/force-status-d
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
 import { mediaQuerySignal } from '../../layout/media-query';
 import { RailStatusService } from '../../layout/rail-status.service';
-import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { SheetBarComponent, SheetBarKickerDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { provideFormly } from '@shared/formly/formly.providers';
 
 /** Field types whose old and new value do not fit on one line of the history. The
@@ -126,6 +126,7 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SheetBarComponent,
+    SheetBarKickerDirective,
     NgTemplateOutlet,
     RouterLink,
     FormsModule,
@@ -181,6 +182,12 @@ export class ApplicationsDetailComponent {
   readonly phone = mediaQuerySignal(MEDIA.phone);
 
   readonly loading = signal(true);
+  /**
+   * Another application is loading while one is shown (a click on another row). The shown
+   * one stays, dimmed and inert after 300ms, until the new one replaces it in one step, so
+   * a switch shows no placeholder and nothing jumps.
+   */
+  readonly switching = signal(false);
   readonly notFound = signal(false);
   readonly error = signal(false);
 
@@ -231,6 +238,8 @@ export class ApplicationsDetailComponent {
 
   /** Manual transitions that the server guard allows, plus the fire in flight. */
   readonly transitions = signal<Transition[]>([]);
+  /** The transitions are on their way: the header keeps the place of their buttons. */
+  readonly transitionsLoading = signal(false);
   readonly firing = signal<Uuid | null>(null);
   /** The transition of the agenda dialog. */
   readonly agendaTransition = signal<Transition | null>(null);
@@ -815,35 +824,30 @@ export class ApplicationsDetailComponent {
   private loadApplication(id: Uuid): void {
     this.id = id;
     const seq = ++this.loadSeq;
-    // Reset state for the (possibly new) id so nothing stale flashes through.
-    this.app.set(null);
-    this.versions.set([]);
-    this.comments.set([]);
-    this.timeline.set([]);
-    this.sections.set([]);
-    this.formLoading.set(true);
-    this.hasBudget.set(false);
-    this.newComment.set('');
-    this.visibility.set('public');
+    // The dialogs and the edit belong to the shown application: they close at once.
     this.editing.set(false);
     this.confirmDelete.set(false);
-    this.notFound.set(false);
-    this.error.set(false);
     this.editingComment.set(null);
     this.deletingComment.set(null);
-    this.transitions.set([]);
     this.agendaOpen.set(false);
-    this.attachmentCount.set(null);
-    this.tab.set('app');
+    // An application is shown: it stays until the next one arrives (`switching`). With
+    // nothing shown, the page resets now and draws its loading shape.
+    if (id && this.app() !== null && !this.notFound() && !this.error()) {
+      this.switching.set(true);
+    } else {
+      this.switching.set(false);
+      this.resetShown();
+      this.loading.set(Boolean(id));
+    }
     if (!id) {
       this.notFound.set(true);
-      this.loading.set(false);
       return;
     }
-    this.loading.set(true);
     this.api.getApplication(id, { quiet: true }).subscribe({
       next: (app) => {
         if (seq !== this.loadSeq) return;
+        this.resetShown();
+        this.switching.set(false);
         this.app.set(app);
         this.loading.set(false);
         this.resolveGremium(app);
@@ -868,11 +872,37 @@ export class ApplicationsDetailComponent {
       },
       error: (err: { status?: number }) => {
         if (seq !== this.loadSeq) return;
+        this.resetShown();
+        this.switching.set(false);
         this.loading.set(false);
         if (err.status === 404) this.notFound.set(true);
         else this.error.set(true);
       },
     });
+  }
+
+  /** Clear everything that belongs to the shown application, so nothing of it stays. */
+  private resetShown(): void {
+    this.app.set(null);
+    this.versions.set([]);
+    this.comments.set([]);
+    this.timeline.set([]);
+    this.sections.set([]);
+    this.formLoading.set(true);
+    this.hasBudget.set(false);
+    this.newComment.set('');
+    this.visibility.set('public');
+    this.editing.set(false);
+    this.confirmDelete.set(false);
+    this.notFound.set(false);
+    this.error.set(false);
+    this.editingComment.set(null);
+    this.deletingComment.set(null);
+    this.transitions.set([]);
+    this.agendaOpen.set(false);
+    this.attachmentCount.set(null);
+    this.tab.set('app');
+    this.transitionsLoading.set(false);
   }
 
   /** Load the versions, the comments and the available transitions.
@@ -899,12 +929,17 @@ export class ApplicationsDetailComponent {
       error: () => {},
     });
     if (this.canTransition()) {
+      this.transitionsLoading.set(true);
       this.api.transitions(this.id).subscribe({
         next: (t) => {
-          if (seq === this.loadSeq) this.transitions.set(t);
+          if (seq !== this.loadSeq) return;
+          this.transitions.set(t);
+          this.transitionsLoading.set(false);
         },
         error: () => {
-          if (seq === this.loadSeq) this.transitions.set([]);
+          if (seq !== this.loadSeq) return;
+          this.transitions.set([]);
+          this.transitionsLoading.set(false);
         },
       });
     }
