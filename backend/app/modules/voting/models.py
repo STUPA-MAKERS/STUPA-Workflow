@@ -53,8 +53,10 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     )
     # The meeting delete deletes every vote of the meeting itself, with its ballots and
     # one ``vote_delete`` audit entry per vote (``VotingService.delete_for_meeting``).
-    # SET NULL stays as the database rule for a delete outside the service (a gremium
-    # delete cascades to its meetings): such a vote detaches and does not cascade.
+    # The Gremium delete runs the meeting delete for each meeting of the Gremium
+    # before the cascade, so no vote of it detaches. SET NULL stays as the database
+    # rule for a delete outside the services: such a vote detaches and does not
+    # cascade.
     meeting_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("meeting.id", ondelete="SET NULL"), nullable=True
     )

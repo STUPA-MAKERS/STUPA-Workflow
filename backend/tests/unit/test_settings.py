@@ -241,3 +241,65 @@ def test_cors_allow_origins_splits_comma_list(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setenv("CORS_ALLOW_ORIGINS", "https://a.example,https://b.example")
     s = load_settings(_env_file=None)
     assert s.cors_allow_origins == ["https://a.example", "https://b.example"]
+
+
+_OIDC_ENV = {
+    "OIDC_ISSUER": "https://sso.example/application/o/antrag/",
+    "OIDC_CLIENT_ID": "antrag",
+    "OIDC_CLIENT_SECRET": "oidc-client-secret-0123456789",
+    "OIDC_REDIRECT_URL": "https://antrag.example/api/auth/callback",
+}
+
+
+def _oidc_env(monkeypatch: pytest.MonkeyPatch, **overrides: str) -> None:
+    _base_env(monkeypatch)
+    monkeypatch.delenv("OIDC_POST_LOGOUT_REDIRECT_URL", raising=False)
+    for key, value in {**_OIDC_ENV, **overrides}.items():
+        monkeypatch.setenv(key, value)
+
+
+def test_oidc_full_config_enables_oidc(monkeypatch: pytest.MonkeyPatch) -> None:
+    """All four OIDC values set: OIDC is on and the values stay as given."""
+    _oidc_env(monkeypatch)
+    s = load_settings(_env_file=None)
+    assert s.oidc_enabled is True
+    assert s.oidc_issuer == _OIDC_ENV["OIDC_ISSUER"]
+    assert s.oidc_client_secret == _OIDC_ENV["OIDC_CLIENT_SECRET"]
+
+
+@pytest.mark.parametrize("key", sorted(_OIDC_ENV))
+@pytest.mark.parametrize("empty", ["", "   "])
+def test_oidc_empty_value_means_not_configured(
+    monkeypatch: pytest.MonkeyPatch, key: str, empty: str
+) -> None:
+    """An empty or blank OIDC value is absent: boot works and OIDC stays off.
+
+    `deploy/.env.example` ships `OIDC_CLIENT_SECRET=` empty. Without the coercion the
+    16-character minimum rejects it and the app does not start.
+    """
+    _oidc_env(monkeypatch, **{key: empty})
+    s = load_settings(_env_file=None)
+    assert getattr(s, key.lower()) is None
+    assert s.oidc_enabled is False
+
+
+def test_oidc_empty_post_logout_redirect_is_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An empty post-logout redirect is absent too, not an empty URL."""
+    _oidc_env(monkeypatch, OIDC_POST_LOGOUT_REDIRECT_URL="")
+    s = load_settings(_env_file=None)
+    assert s.oidc_post_logout_redirect_url is None
+
+
+def test_oidc_explicit_none_stays_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A non-string value passes the coercion unchanged."""
+    _base_env(monkeypatch)
+    s = load_settings(_env_file=None, oidc_client_secret=None, oidc_issuer=None)
+    assert s.oidc_client_secret is None
+    assert s.oidc_enabled is False
+
+
+def test_oidc_short_client_secret_still_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The coercion touches only empty values; a short secret still fails boot."""
+    _oidc_env(monkeypatch, OIDC_CLIENT_SECRET="too-short")
+    with pytest.raises(SettingsError):
+        load_settings(_env_file=None)

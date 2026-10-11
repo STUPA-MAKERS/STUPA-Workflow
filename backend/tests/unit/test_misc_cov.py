@@ -461,7 +461,7 @@ class _AdminConfigFake:
         self.toggled: tuple[Any, bool] | None = None
         self.deleted_role: Any = None
 
-    async def delete_gremium(self, gremium_id: Any, actor: str) -> None:
+    async def delete_gremium(self, gremium_id: Any, principal: Any) -> None:
         self.deleted_gremium = gremium_id
 
     async def create_global_flow_version(self, payload: Any, actor: str) -> FlowVersionOut:

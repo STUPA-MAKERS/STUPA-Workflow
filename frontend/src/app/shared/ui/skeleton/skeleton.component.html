@@ -1,6 +1,27 @@
 <div class="sk" [class.sk--rows]="variant() === 'rows'" aria-busy="true">
   @if (variant() === 'panel') {
     <span class="skel skel--panel" aria-hidden="true"></span>
+  } @else if (variant() === 'items') {
+    <!-- The geometry of `app-list-item`: a title line and a sub line, a value at the end. -->
+    <span class="sk__items" [class.rowgroup]="grouped()" aria-hidden="true">
+      @for (_ of items(); track $index) {
+        @let w = itemWidths($index);
+        <span class="sk__item">
+          <span class="sk__itemBody">
+            <span class="sk__itemTitle"
+              ><span class="skel-text" [style.width]="w.title"></span
+            ></span>
+            <span class="sk__itemSub">
+              <span class="skel-text skel-text--muted" [style.width]="w.a"></span>
+              <span class="skel-text skel-text--muted" [style.width]="w.b"></span>
+            </span>
+          </span>
+          <span class="sk__itemTrail"
+            ><span class="skel-text skel-text--muted" [style.width]="w.trail"></span
+          ></span>
+        </span>
+      }
+    </span>
   } @else if (variant() === 'rows') {
     @for (_ of items(); track $index) {
       <span class="sk__row" [class.sk__row--last]="$last" aria-hidden="true">

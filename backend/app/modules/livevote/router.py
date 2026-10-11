@@ -346,8 +346,9 @@ async def delete_meeting(meeting_id: UUID, service: ServiceDep, principal: Reade
     """Delete a meeting.
 
     Only a meeting manager (``session.manage``) or an admin may delete a meeting.
-    A meeting with an open vote gives 409 ``open_vote``. The delete cancels the
-    draft votes of the meeting.
+    A meeting with an open vote gives 409 ``open_vote``. A final protocol needs
+    ``meeting.delete_finalized`` (403). The delete deletes every vote of the
+    meeting, each with a ``vote_delete`` audit entry.
     """
     await service.delete(meeting_id, principal)
 
@@ -1056,7 +1057,15 @@ async def _serve(
     *,
     beamer: bool,
 ) -> None:
-    authorization = await _authorize(websocket, meeting_id, principal, meetings, beamer=beamer)
+    try:
+        authorization = await _authorize(
+            websocket, meeting_id, principal, meetings, beamer=beamer
+        )
+    finally:
+        # The handshake reads the session, the principal and the meeting. End that
+        # transaction before the socket opens: the socket keeps its request session
+        # for its whole life, and an open transaction would hold a pool connection.
+        await voting.session.rollback()
     if authorization is None:
         return
     authorized, can_manage = authorization

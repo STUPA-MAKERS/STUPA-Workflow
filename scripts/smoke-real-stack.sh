@@ -65,9 +65,10 @@ fi
 cp .env.example "${ENV_FILE}"
 # Append the overrides, because the last value per key wins (docker compose env_file).
 # The throwaway secrets hold at least 16 characters. app.settings rejects a shorter one.
-# OIDC keeps the .env.example placeholders and gets no mock, so /api/auth/login answers
-# with a redirect (307). The script never follows that redirect. The bootstrap admin
-# comes from the email and the subject.
+# OIDC keeps the .env.example values and gets no mock. `.env.example` ships
+# OIDC_CLIENT_SECRET empty, app.settings reads an empty OIDC value as not set, so OIDC
+# stays off and /api/auth/login answers 404. The bootstrap admin comes from the email
+# and the subject.
 cat >> "${ENV_FILE}" <<'EOF'
 
 # --- smoke-real-stack overrides (NICHT committen; vom Skript erzeugt) -------
@@ -78,10 +79,6 @@ MINIO_SECRET_KEY=smoke-minio-secret-key
 SESSION_SECRET=smoke-session-secret-0123456789
 MAGIC_LINK_SECRET=smoke-magic-link-secret-0123456789
 ALTCHA_HMAC_SECRET=smoke-altcha-hmac-secret-0123456789
-# `.env.example` ships this EMPTY, and an empty string is not an absent one, so the
-# 16-character minimum rejects it and every app container refuses to start. The stack
-# needs no working OIDC here; it only has to satisfy the settings validation.
-OIDC_CLIENT_SECRET=smoke-oidc-client-secret-0123456789
 BOOTSTRAP_ADMIN_EMAILS=admin@smoke.example
 BOOTSTRAP_ADMIN_SUBJECTS=smoke-admin-subject
 # `.env.example` sets ENVIRONMENT=production, and production forbids a wildcard
@@ -160,12 +157,11 @@ echo "==> HTTP-Kernflüsse (${WEB})"
 check "web /healthz"          "/healthz"        200        # nginx liveness
 check "api /api/health"       "/api/health"     200        # FastAPI up
 check "public site-config"    "/api/site-config" 200       # branding read without auth
-# 307 is a redirect to the OIDC issuer, so OIDC is fully configured. 404 means OIDC is
-# off, because .env.example ships OIDC_CLIENT_SECRET empty and oidc_enabled needs all
-# four fields. login() then returns 404. The smoke test runs without a real IdP on
-# purpose, so both codes are OK. The check only proves that the route exists and answers
-# with no 5xx and no 000.
-check "auth login erreichbar" "/api/auth/login" 307 404
+# 404 means OIDC is off: .env.example ships OIDC_CLIENT_SECRET empty, app.settings
+# reads the empty value as not set, and oidc_enabled needs all four fields. The smoke
+# test runs without a real IdP on purpose. A 503 here means OIDC is on with the
+# placeholder issuer and discovery fails, which is the regression this check catches.
+check "auth login erreichbar" "/api/auth/login" 404
 check "auth me (unauth)"      "/api/auth/me"    401        # RBAC applies, problem+json
 check "unbekannt -> 404"      "/api/__nope__"   404        # the error handler answers
 

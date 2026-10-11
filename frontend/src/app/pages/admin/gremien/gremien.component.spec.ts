@@ -129,7 +129,9 @@ describe('AdminGremienComponent', () => {
 
   it('tags a gremium that publishes its protocols and names the setting', async () => {
     await setup();
-    expect(within(item('Studierendenparlament')).getByText('Öffentlich', { selector: '.grem__tag' })).toBeInTheDocument();
+    expect(
+      within(item('Studierendenparlament')).getByText('Öffentlich', { selector: '.grem__tag' }),
+    ).toBeInTheDocument();
     expect(within(item('AStA')).queryByText('Öffentlich', { selector: '.grem__tag' })).toBeNull();
     const first = item('Studierendenparlament');
     const dt = within(first).getByText('Öffentlich', { selector: 'dt' });
@@ -296,6 +298,36 @@ describe('AdminGremienComponent', () => {
     await userEvent.click(within(dialog).getByText('Löschen'));
     expect(api.deleteGremium).toHaveBeenCalledWith('g-2');
     expect(toast.success).toHaveBeenCalledWith('Gremium gelöscht.');
+  });
+
+  it.each([
+    [
+      { status: 409, error: { code: 'open_vote' } },
+      'Eine Abstimmung des Gremiums ist noch offen. Schließe sie oder brich sie zuerst ab.',
+    ],
+    [
+      { status: 403, error: { code: 'meeting_finalized' } },
+      'Eine Sitzung des Gremiums hat ein finales Protokoll. Zum Löschen fehlt dir das Recht „meeting.delete_finalized“.',
+    ],
+  ])('names the reason of a refused delete (%o)', async (err, message) => {
+    const api = makeApi({ deleteGremium: jest.fn(() => throwError(() => err)) });
+    const { toast } = await setup({ api });
+    await userEvent.click(screen.getByRole('button', { name: 'Löschen: AStA' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByText('Löschen'));
+    expect(toast.error).toHaveBeenCalledWith(message);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('keeps the generic message for another 403', async () => {
+    const api = makeApi({
+      deleteGremium: jest.fn(() =>
+        throwError(() => ({ status: 403, error: { code: 'forbidden' } })),
+      ),
+    });
+    const { toast } = await setup({ api });
+    await userEvent.click(screen.getByRole('button', { name: 'Löschen: AStA' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByText('Löschen'));
+    expect(toast.error).toHaveBeenCalledWith('Das Gremium konnte nicht gelöscht werden.');
   });
 
   it('names a failed delete and keeps the dialog', async () => {

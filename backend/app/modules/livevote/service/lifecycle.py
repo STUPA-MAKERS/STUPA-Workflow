@@ -502,27 +502,14 @@ class LifecycleOps(HandoverOps):
         """Delete a meeting.
 
         Only a meeting manager (``session.manage``) or an admin may delete a
-        meeting. A meeting with a final protocol also needs the global
-        ``meeting.delete_finalized`` permission, because the protocol is a signed
-        and mailed document. The service audits every delete.
-
-        The delete locks the meeting row, as the close and the vote open do. A
-        meeting with an open vote does not delete: the lead closes or cancels the
-        vote first.
-
-        The delete deletes every vote of the meeting in the same transaction, in
-        any status (draft, cancelled, closed, secret, with guests), together with
-        their ballots, secret ballots, voted markers and protocol references
-        (``VotingService.delete_for_meeting``, one ``vote_delete`` per vote with the
-        reason ``meeting_deleted``). An application that such a vote decided keeps
-        its status; its timeline shows the vote as deleted. The cascade then
-        removes the protocol, the agenda, the attendance, the guests and the
-        delegations. ``meeting_delete`` carries the number and the ids of the
-        deleted votes, never a choice or a name.
+        meeting. The delete locks the meeting row, as the close and the vote open
+        do, and then applies the rules of ``delete_locked``. The service audits
+        every delete.
 
         Raises:
             ForbiddenError: The caller does not manage the meeting, or the protocol
-                is final and the caller does not hold ``meeting.delete_finalized``.
+                is final and the caller does not hold ``meeting.delete_finalized``
+                (``meeting_finalized``).
             ConflictError: The meeting still has an open vote (``open_vote``).
         """
         # The lock serializes the delete with the vote open and the close. Without
@@ -530,11 +517,62 @@ class LifecycleOps(HandoverOps):
         meeting = await self._get(meeting_id, for_update=True)
         if not await self.can_manage(meeting.gremium_id, principal):
             raise ForbiddenError("not allowed to delete this meeting")
-        finalized = await self._protocol_final(meeting_id)
+        await self.delete_locked(meeting, principal)
+        await self.session.commit()
+
+    async def delete_locked(self, meeting: Meeting, principal: Principal) -> None:
+        """Delete a meeting that the caller locked, without a commit.
+
+        The caller locks the meeting row (``SELECT … FOR UPDATE``) and checks the
+        right to manage the meeting. This method applies the rules of
+        ``check_deletable``, deletes every vote of the meeting in the same
+        transaction, in any status (draft, cancelled, closed, secret, with guests),
+        together with their ballots, secret ballots, voted markers and protocol
+        references (``VotingService.delete_for_meeting``, one ``vote_delete`` per
+        vote with the reason ``meeting_deleted``), and then deletes the meeting
+        (``write_delete``). An application that such a vote decided keeps its
+        status; its timeline shows the vote as deleted.
+
+        Raises:
+            ForbiddenError: The protocol is final and the caller does not hold
+                ``meeting.delete_finalized`` (``meeting_finalized``).
+            ConflictError: The meeting still has an open vote (``open_vote``).
+        """
+        finalized = await self.check_deletable(meeting, principal)
+        # Local import: the voting service imports the flow engine, which reaches
+        # back into this module.
+        from app.modules.voting.service import VotingService
+
+        deleted_votes = await VotingService(self.session).delete_for_meeting(
+            meeting.id, actor=principal.sub
+        )
+        await self.write_delete(
+            meeting, principal, finalized=finalized, deleted_votes=deleted_votes
+        )
+
+    async def check_deletable(self, meeting: Meeting, principal: Principal) -> bool:
+        """Apply the refusal rules that every meeting delete shares, without a write.
+
+        A meeting with a final protocol needs the global ``meeting.delete_finalized``
+        permission, because the protocol is a signed and mailed document. A meeting
+        with an open vote does not delete: the lead closes or cancels the vote
+        first. The Gremium delete runs this check for all its meetings before its
+        first write.
+
+        Returns:
+            True when the protocol of the meeting is final.
+
+        Raises:
+            ForbiddenError: The protocol is final and the caller does not hold
+                ``meeting.delete_finalized`` (``meeting_finalized``).
+            ConflictError: The meeting still has an open vote (``open_vote``).
+        """
+        finalized = await self._protocol_final(meeting.id)
         if finalized and not principal.has("meeting.delete_finalized"):
             raise ForbiddenError(
                 "this meeting has a finalized protocol — deleting it requires "
-                "the meeting.delete_finalized permission"
+                "the meeting.delete_finalized permission",
+                code="meeting_finalized",
             )
         # An open vote of a deleted meeting would stay open without its meeting
         # scope: interim counts, present count and delegation checks all depend on
@@ -544,26 +582,42 @@ class LifecycleOps(HandoverOps):
                 "a vote of this meeting is still open — close or cancel it first",
                 code="open_vote",
             )
-        # Local import: the voting service imports the flow engine, which reaches
-        # back into this module.
-        from app.modules.voting.service import VotingService
+        return finalized
 
-        deleted_votes = await VotingService(self.session).delete_for_meeting(
-            meeting.id, actor=principal.sub
-        )
+    async def write_delete(
+        self,
+        meeting: Meeting,
+        principal: Principal,
+        *,
+        finalized: bool,
+        deleted_votes: list[UUID],
+        reason: str | None = None,
+    ) -> None:
+        """Audit and delete a meeting whose votes are gone, without a commit.
+
+        ``meeting_delete`` carries the number and the ids of the deleted votes,
+        never a choice or a name, and ``reason`` when another delete caused this
+        one (``gremium_deleted``). The cascade then removes the protocol, the
+        agenda, the attendance, the guests and the delegations.
+        """
+        data: dict[str, Any] = {
+            "title": meeting.title,
+            "gremiumId": str(meeting.gremium_id),
+            "finalizedProtocol": finalized,
+            "deletedVotes": len(deleted_votes),
+            "deletedVoteIds": [str(vote_id) for vote_id in deleted_votes],
+        }
+        if reason is not None:
+            data["reason"] = reason
         await audit_record(
             self.session,
             actor=principal.sub,
             action=AuditAction.MEETING_DELETE,
             target_type="meeting",
             target_id=str(meeting.id),
-            data={
-                "title": meeting.title,
-                "gremiumId": str(meeting.gremium_id),
-                "finalizedProtocol": finalized,
-                "deletedVotes": len(deleted_votes),
-                "deletedVoteIds": [str(vote_id) for vote_id in deleted_votes],
-            },
+            data=data,
         )
         await self.session.delete(meeting)
-        await self.session.commit()
+        # Flush now: a Gremium delete that follows must not cascade over a meeting
+        # row that the session still has to delete.
+        await self.session.flush()

@@ -4,6 +4,7 @@ import { ActivatedRoute, NavigationEnd, Router, RouterOutlet } from '@angular/ro
 import { filter } from 'rxjs';
 import { AuthService } from '@core/auth/auth.service';
 import { PrefetchService } from '@core/cache/prefetch.service';
+import { SwUpdatePromptComponent } from '@core/pwa/sw-update-prompt.component';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { LoadingOverlayComponent, MEDIA, ToastComponent } from '@stupa-makers/ui-kit';
 import { CommandPaletteComponent } from '../features/search/command-palette.component';
@@ -28,8 +29,8 @@ import { SiteFooterComponent } from './site-footer/site-footer.component';
 export type ShellFrame = 'rail' | 'public' | 'bare' | 'pending';
 
 /**
- * App frame: the chrome around the router outlet, the toasts, the loading overlay and
- * the search palette.
+ * App frame: the chrome around the router outlet, the toasts, the update prompt, the
+ * loading overlay and the search palette.
  *
  * There is ONE router outlet for every frame. The frame only adds or removes the chrome
  * around it, so a change of frame (sign-in, the beamer) never destroys and recreates the
@@ -43,6 +44,7 @@ export type ShellFrame = 'rail' | 'public' | 'bare' | 'pending';
     RouterOutlet,
     TranslatePipe,
     ToastComponent,
+    SwUpdatePromptComponent,
     LoadingOverlayComponent,
     CommandPaletteComponent,
     NavRailComponent,

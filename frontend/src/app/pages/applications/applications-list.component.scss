@@ -227,6 +227,20 @@
   }
 }
 
+/* The loading shape: the heading of a first group, a bar about as wide as
+   "September 2026". */
+.apps__skel .apps__month {
+  padding-top: var(--space-2);
+}
+.apps__skelMonth {
+  width: 7rem;
+}
+/* The reload bar sits on the lower edge of the sticky search bar. */
+.apps__progress {
+  top: auto;
+  bottom: 0;
+}
+
 .apps__status {
   margin: 0;
   padding: var(--space-4);
