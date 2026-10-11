@@ -4,6 +4,7 @@ import type { Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import {
   EmptyStateComponent,
   NoteComponent,
@@ -16,10 +17,28 @@ import {
   IconComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { errorCode } from '../../../features/meetings/meetings-display.util';
 import { AdminApiService } from '../admin-api.service';
 import type { CdVariantOption, Gremium } from '../admin.models';
 import { GremiumRoleMatrixComponent } from '../gremium-roles/gremium-role-matrix.component';
 import { GremiumDialogComponent } from './gremium-dialog/gremium-dialog.component';
+
+/**
+ * The message of a refused gremium delete. The delete applies the rules of the meeting
+ * delete to every meeting of the gremium: an open vote gives 409 `open_vote`, a final
+ * protocol without `meeting.delete_finalized` gives 403 `meeting_finalized`. Any other
+ * refusal keeps the generic message.
+ */
+function deleteErrorKey(err: unknown): TranslationKey {
+  switch (errorCode(err)) {
+    case 'open_vote':
+      return 'admin.gremien.deleteOpenVote';
+    case 'meeting_finalized':
+      return 'admin.gremien.deleteFinalized';
+    default:
+      return 'admin.gremien.deleteFailed';
+  }
+}
 
 /** One setting of a gremium in the read-out of an open row. */
 interface Setting {
@@ -255,9 +274,9 @@ export class AdminGremienComponent {
         this.toast.success(this.i18n.translate('admin.gremien.toast.deleted'));
         this.reload(false);
       },
-      error: () => {
+      error: (err: unknown) => {
         this.deleting.set(false);
-        this.toast.error(this.i18n.translate('admin.gremien.deleteFailed'));
+        this.toast.error(this.i18n.translate(deleteErrorKey(err)));
       },
     });
   }

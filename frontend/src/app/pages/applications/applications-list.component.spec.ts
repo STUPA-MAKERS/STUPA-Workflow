@@ -288,6 +288,62 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.groups()).toEqual([]);
     });
 
+    it('holds the place of the loaded list while it loads: a month heading and rows', async () => {
+      const { first, harness, cmp } = await start('/applications', { holdList: true });
+      const el = harness.fixture.nativeElement as HTMLElement;
+      // The heading of the first group and the rows in the geometry of `app-list-item`,
+      // shown after 300ms (`skel-in`), so a fast answer flashes nothing.
+      expect(el.querySelector('.apps__skel')).toHaveClass('skel-in');
+      expect(el.querySelector('.apps__skel h2.apps__month .skel-text')).not.toBeNull();
+      expect(el.querySelectorAll('.apps__skel .sk__item')).toHaveLength(12);
+      // One column: the rows sit in a row group, as the loaded rows do.
+      expect(el.querySelector('.sk__items')).toHaveClass('rowgroup');
+      expect(cmp.reloading()).toBe(false);
+      first!.flush(page(ROWS));
+      harness.detectChanges();
+      expect(el.querySelector('.apps__skel')).toBeNull();
+    });
+
+    it('keeps the rows on a filter change, dimmed and inert, until the new ones arrive', async () => {
+      const { http, router, harness, cmp } = await start();
+      const el = harness.fixture.nativeElement as HTMLElement;
+      await router.navigateByUrl('/applications?q=Fly');
+      const req = http.expectOne(LIST);
+      harness.detectChanges();
+      expect(cmp.loading()).toBe(false);
+      expect(cmp.reloading()).toBe(true);
+      const groups = el.querySelector('.apps__groups')!;
+      expect(groups).toHaveClass('skel-stale');
+      expect(groups).toHaveAttribute('inert');
+      expect(el.querySelector('.apps__scroll')).toHaveAttribute('aria-busy', 'true');
+      expect(el.querySelector('.apps__progress')).not.toBeNull();
+      expect(el.querySelector('.apps__skel')).toBeNull();
+      req.flush(page([ROWS[1]]));
+      harness.detectChanges();
+      expect(cmp.reloading()).toBe(false);
+      expect(el.querySelector('.apps__groups')).not.toHaveClass('skel-stale');
+      expect(el.querySelector('.apps__groups')).not.toHaveAttribute('inert');
+      expect(el.querySelector('.apps__progress')).toBeNull();
+    });
+
+    it('ends the reload also when it fails', async () => {
+      const { http, router, harness, cmp } = await start();
+      await router.navigateByUrl('/applications?q=Fly');
+      http.expectOne(LIST).flush({}, { status: 500, statusText: 'x' });
+      harness.detectChanges();
+      expect(cmp.reloading()).toBe(false);
+    });
+
+    it('loads no further page while a reload is out', async () => {
+      const { http, router, cmp } = await start('/applications', { rows: [ROWS[0]], total: 2 });
+      await router.navigateByUrl('/applications?q=Zu');
+      const req = http.expectOne(LIST);
+      cmp.loadMore();
+      // Only the reload: a page appended to the old rows would be dropped by it anyway.
+      expect(http.match(LIST)).toHaveLength(0);
+      req.flush(page([ROWS[0]], 2));
+    });
+
     it('shows the error when the list fails, and a placeholder while it loads', async () => {
       const { first, harness } = await start('/applications', { holdList: true });
       expect(screen.getByText('Anträge werden geladen …')).toBeInTheDocument();

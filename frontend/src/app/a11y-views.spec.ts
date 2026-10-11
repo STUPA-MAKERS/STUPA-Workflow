@@ -15,6 +15,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of, Subject } from 'rxjs';
+import { SwUpdate } from '@angular/service-worker';
 import { render } from '@testing-library/angular';
 import { runAxe } from '../testing/a11y';
 import { ShellComponent } from './layout/shell.component';
@@ -61,6 +62,8 @@ describe('Kern-Views a11y (axe)', () => {
           provideHttpClient(),
           provideHttpClientTesting(),
           { provide: USE_MOCK_API, useValue: false },
+          // The shell holds the update prompt, and the prompt needs SwUpdate.
+          { provide: SwUpdate, useValue: { isEnabled: false } },
         ],
       });
       const http = view.fixture.debugElement.injector.get(HttpTestingController);

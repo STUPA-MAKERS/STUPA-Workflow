@@ -1,5 +1,6 @@
 import { FormControl } from '@angular/forms';
 import { render } from '@testing-library/angular';
+import { I18nService } from '@core/i18n/i18n.service';
 import { FormlyPositionsType } from './formly-positions.type';
 
 interface Offer {
@@ -267,7 +268,8 @@ describe('FormlyPositionsType — value text & parsing', () => {
     });
     prot(cmp).beginEditValue(0, 0);
     expect(prot(cmp).editing).toEqual({ pi: 0, oi: 0 });
-    expect(prot(cmp).offerValueText(0, 0)).toBe('12.5');
+    // DE: the decimal separator of the locale, no grouping.
+    expect(prot(cmp).offerValueText(0, 0)).toBe('12,5');
     prot(cmp).endEditValue();
     expect(prot(cmp).editing).toBeNull();
   });
@@ -293,23 +295,196 @@ describe('FormlyPositionsType — value text & parsing', () => {
     expect(prot(cmp).offerValueText(5, 0)).toBe('');
   });
 
-  it('parseNum handles the common numeric formats and edge cases', async () => {
+  it('parseNum reads amounts in the UI locale and gives null for invalid text', async () => {
     const { cmp } = await setup();
     const parse = (s: string): number | null => prot(cmp).parseNum(s);
     expect(parse('')).toBeNull();
     expect(parse('   ')).toBeNull();
-    // The cleaner strips every character of a non-empty input, and Number('') gives 0.
-    expect(parse('abc')).toBe(0);
-    expect(parse('1234.56')).toBeCloseTo(1234.56);
+    // Invalid text is never 0.
+    expect(parse('abc')).toBeNull();
     expect(parse('1234,56')).toBeCloseTo(1234.56);
-    // German grouping: dot thousands, comma decimal.
     expect(parse('1.234,56')).toBeCloseTo(1234.56);
-    // US grouping: comma thousands, dot decimal.
-    expect(parse('1,234.56')).toBeCloseTo(1234.56);
+    expect(parse('1.234')).toBe(1234);
+    expect(parse('12,')).toBe(12);
     expect(parse('€ 50')).toBe(50);
-    // Cleaned but still non-numeric → Number(...) is NaN → null branch.
+    expect(parse('-5')).toBe(-5);
+    // DE: one dot with at most 2 digits after it is a decimal; 3 decimals are too many.
+    expect(parse('1234.56')).toBeCloseTo(1234.56);
+    expect(parse('12.50')).toBeCloseTo(12.5);
+    expect(parse('1.2345')).toBeNull();
+    expect(parse('12,345')).toBeNull();
     expect(parse('1.2.3')).toBeNull();
     expect(parse('--5')).toBeNull();
+  });
+
+  it('parseNum follows the EN locale', async () => {
+    const { cmp } = await setup();
+    const i18n = prot(cmp).i18n as I18nService;
+    i18n.setLocale('en');
+    const parse = (s: string): number | null => prot(cmp).parseNum(s);
+    expect(parse('12,345')).toBe(12345);
+    expect(parse('1,234.56')).toBeCloseTo(1234.56);
+    expect(parse('12.345')).toBeNull();
+    i18n.setLocale('de');
+  });
+});
+
+describe('FormlyPositionsType — typing into an amount cell', () => {
+  const one = (): Position[] => [
+    {
+      label: 'P',
+      offers: [
+        { label: 'A', value: null, preferred: true },
+        { label: 'B', value: 5, preferred: false },
+      ],
+    },
+  ];
+  const value = (control: FormControl, oi = 0): number | null =>
+    (control.value as Position[])[0].offers[oi].value;
+
+  it.each([
+    ['12,', 12],
+    ['1,5', 1.5],
+    ['1.234,56', 1234.56],
+    ['12.50', 12.5],
+    ['-5', -5],
+  ])('keeps the typed text %p while editing and stores %p', async (raw, expected) => {
+    const { cmp, control } = await setup({ value: one() });
+    prot(cmp).beginEditValue(0, 0);
+    cmp.setOfferValue(0, 0, raw);
+    expect(prot(cmp).offerValueText(0, 0)).toBe(raw);
+    expect(value(control)).toBeCloseTo(expected);
+    expect(prot(cmp).amountInvalid(0, 0)).toBe(false);
+    prot(cmp).endEditValue();
+    // On blur the cell shows the formatted value.
+    expect(prot(cmp).offerValueText(0, 0)).toBe(
+      new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2 }).format(expected),
+    );
+  });
+
+  it.each([['abc'], ['12,345'], ['1.2345']])(
+    'keeps invalid text %p after blur, stores null and shows the error',
+    async (raw) => {
+      const { cmp, control } = await setup({ value: one() });
+      prot(cmp).beginEditValue(0, 0);
+      cmp.setOfferValue(0, 0, raw);
+      prot(cmp).endEditValue();
+      expect(value(control)).toBeNull();
+      expect(prot(cmp).offerValueText(0, 0)).toBe(raw);
+      expect(prot(cmp).amountInvalid(0, 0)).toBe(true);
+      const o = (control.value as Position[])[0].offers[0];
+      expect(prot(cmp).offerValueInvalid(o, 0, 0)).toBe(true);
+      expect(prot(cmp).cardError((control.value as Position[])[0], 0)).toContain(
+        'Kein gültiger Betrag',
+      );
+      expect(control.invalid).toBe(true);
+      // Focus again: the invalid text stays for correction.
+      prot(cmp).beginEditValue(0, 0);
+      expect(prot(cmp).offerValueText(0, 0)).toBe(raw);
+      cmp.setOfferValue(0, 0, '12,5');
+      prot(cmp).endEditValue();
+      expect(value(control)).toBe(12.5);
+      expect(prot(cmp).offerValueText(0, 0)).toBe('12,50');
+      expect(prot(cmp).amountInvalid(0, 0)).toBe(false);
+    },
+  );
+
+  it('an empty cell shows nothing on focus and clears its entry on blur', async () => {
+    const { cmp } = await setup({ value: one() });
+    prot(cmp).beginEditValue(0, 0);
+    expect(prot(cmp).offerValueText(0, 0)).toBe('');
+    prot(cmp).endEditValue();
+    expect(prot(cmp).rawValues().size).toBe(0);
+    // A second blur without a cell under edit does nothing.
+    prot(cmp).endEditValue();
+    expect(prot(cmp).editing).toBeNull();
+  });
+
+  it('shows the EN editable text with a dot', async () => {
+    const { cmp } = await setup({
+      value: [{ label: 'P', offers: [{ label: 'A', value: 12.5, preferred: true }] }],
+    });
+    const i18n = prot(cmp).i18n as I18nService;
+    i18n.setLocale('en');
+    prot(cmp).beginEditValue(0, 0);
+    expect(prot(cmp).offerValueText(0, 0)).toBe('12.5');
+    i18n.setLocale('de');
+  });
+
+  it('moves the invalid text when a position or an offer is removed', async () => {
+    const { cmp } = await setup({
+      props: { minOffers: 1 },
+      value: [
+        { label: 'P0', offers: [{ label: 'A', value: 1, preferred: true }] },
+        {
+          label: 'P1',
+          offers: [
+            { label: 'B', value: 2, preferred: true },
+            { label: 'C', value: null, preferred: false },
+          ],
+        },
+      ],
+    });
+    cmp.setOfferValue(1, 1, 'abc');
+    cmp.setOfferValue(0, 0, 'xyz');
+    cmp.removePosition(0);
+    expect(prot(cmp).offerValueText(0, 1)).toBe('abc');
+    expect(prot(cmp).amountInvalid(0, 1)).toBe(true);
+    cmp.setOfferValue(0, 0, 'q');
+    cmp.removeOffer(0, 0);
+    expect(prot(cmp).offerValueText(0, 0)).toBe('abc');
+    expect(prot(cmp).rawValues().size).toBe(1);
+    cmp.removeOffer(0, 0);
+    expect(prot(cmp).rawValues().size).toBe(0);
+  });
+
+  it('keeps the entries before the removed position or offer in place', async () => {
+    const { cmp } = await setup({
+      props: { minOffers: 1 },
+      value: [
+        {
+          label: 'P0',
+          offers: [
+            { label: 'A', value: null, preferred: true },
+            { label: 'B', value: null, preferred: false },
+          ],
+        },
+        { label: 'P1', offers: [{ label: 'C', value: null, preferred: true }] },
+      ],
+    });
+    cmp.setOfferValue(0, 0, 'a');
+    cmp.setOfferValue(1, 0, 'c');
+    cmp.removePosition(1);
+    expect(prot(cmp).offerValueText(0, 0)).toBe('a');
+    cmp.addPosition();
+    cmp.setOfferValue(1, 0, 'd');
+    cmp.removeOffer(0, 1);
+    expect(prot(cmp).offerValueText(0, 0)).toBe('a');
+    expect(prot(cmp).offerValueText(1, 0)).toBe('d');
+  });
+
+  it('setNoOffers keeps an offer that holds only invalid amount text', async () => {
+    const { cmp, control } = await setup({
+      props: { minOffers: 3 },
+      value: [
+        {
+          label: 'P',
+          offers: [
+            { label: '', value: null, preferred: true },
+            { label: '', value: null, preferred: false },
+            { label: 'X', value: 3, preferred: false },
+          ],
+        },
+        { label: 'Q', offers: [{ label: '', value: null, preferred: true }] },
+      ],
+    });
+    cmp.setOfferValue(0, 1, 'abc');
+    cmp.setOfferValue(1, 0, 'zz');
+    cmp.setNoOffers(0, true);
+    const offers = (control.value as Position[])[0].offers;
+    expect(offers.map((o) => o.label)).toEqual(['', 'X']);
+    expect(prot(cmp).offerValueText(0, 0)).toBe('abc');
+    expect(prot(cmp).offerValueText(1, 0)).toBe('zz');
   });
 });
 

@@ -1,22 +1,43 @@
-import { Injectable, inject } from '@angular/core';
-import { SwUpdate, type VersionReadyEvent } from '@angular/service-worker';
-import { filter, concatMap } from 'rxjs';
-import { interval, fromEvent } from 'rxjs';
-import { I18nService } from '@core/i18n/i18n.service';
-import { ToastService } from '@stupa-makers/ui-kit';
+import { DOCUMENT } from '@angular/common';
+import { Injectable, InjectionToken, inject, signal } from '@angular/core';
+import { SwUpdate, type VersionEvent } from '@angular/service-worker';
+import { type Observable, catchError, concatMap, defer, fromEvent, interval, of } from 'rxjs';
+
+/** Reloads the page. A token, so that a test can replace the reload. */
+export const PAGE_RELOAD = new InjectionToken<() => void>('PAGE_RELOAD', {
+  providedIn: 'root',
+  factory: pageReloadFactory,
+});
+
+/** The default `PAGE_RELOAD`: `document.location.reload()` of the injected document. */
+export function pageReloadFactory(): () => void {
+  const doc = inject(DOCUMENT);
+  return () => doc.location.reload();
+}
 
 /**
- * PWA update flow. When the service worker reports a new app version
- * (`VERSION_READY`), the service activates it. A persistent toast then asks for the
- * necessary reload. Without a service worker (dev mode, old browsers) `isEnabled` is
+ * PWA update flow. Without a service worker (dev mode, old browsers) `isEnabled` is
  * false and nothing happens.
+ *
+ * - `VERSION_READY`: the new version is in the cache. The service does NOT call
+ *   `activateUpdate()`. Activation without a reload lets the old JS run against the new
+ *   cache, and a lazy chunk of the old build is then missing (the flow editor showed new
+ *   ops as unknown). The service sets `updateReady`, and `SwUpdatePromptComponent` shows
+ *   a persistent prompt with a reload button. `reload()` activates the update directly
+ *   before the reload, so the reload loads the new version. The app
+ *   has no global record of unsaved work (no dirty or CanDeactivate guard), so the
+ *   service never reloads without the consent of the user.
+ * - `VERSION_INSTALLATION_FAILED`: the service ignores it. The next check tries again.
+ * - `unrecoverable`: the cache of the running version is broken, so the page cannot load
+ *   its lazy chunks. The service reloads the page at once.
  *
  * The service looks for updates at three moments.
  * - After a short delay at app start. This breaks the bootstrap deadlock.
  * - Every 5 minutes.
  * - When the app comes to the foreground, on the focus event.
  *
- * Users therefore see the "new version available" toast soon after a deployment.
+ * A failed check (offline, a server error) is ignored. Each check catches its own error,
+ * so the polling stream and the focus stream never complete because of one failure.
  *
  * BOOTSTRAP DEADLOCK FIX: old versions do not have the new polling logic. Without an
  * update check at start they never load the new version, and so they never get the
@@ -26,51 +47,63 @@ import { ToastService } from '@stupa-makers/ui-kit';
 @Injectable({ providedIn: 'root' })
 export class SwUpdateService {
   private readonly updates = inject(SwUpdate);
-  private readonly toast = inject(ToastService);
-  private readonly i18n = inject(I18nService);
+  private readonly reloadPage = inject(PAGE_RELOAD);
+
+  private readonly _updateReady = signal(false);
+  /** True when a new version is in the cache and a reload loads it. */
+  readonly updateReady = this._updateReady.asReadonly();
 
   init(): void {
     if (!this.updates.isEnabled) return;
 
-    this.updates.versionUpdates
-      .pipe(filter((e): e is VersionReadyEvent => e.type === 'VERSION_READY'))
-      .subscribe(() => {
-        void this.updates.activateUpdate().then(() => {
-          this.toast.show(this.i18n.translate('pwa.updateReady'), 'info', 0);
-        });
-      });
+    this.updates.versionUpdates.subscribe((e) => this.onVersionEvent(e));
+    this.updates.unrecoverable.subscribe(() => void this.reload());
 
     // BOOTSTRAP FIX: wait 1 second, so the service worker has time to register before
     // the first update check. The registerWhenStable strategy registers the service
     // worker after 30 seconds or once the app is stable. This delay gives it time to
     // register before the call to checkForUpdate().
     setTimeout(() => {
-      this.checkForUpdatesOnce();
-      this.setupPeriodicPolling();
-      this.setupFocusListener();
+      this.safeCheck().subscribe();
+      interval(5 * 60 * 1000)
+        .pipe(concatMap(() => this.safeCheck()))
+        .subscribe();
+      // The app has no server-side rendering, so `window` always exists here.
+      fromEvent(window, 'focus')
+        .pipe(concatMap(() => this.safeCheck()))
+        .subscribe();
     }, 1000);
   }
 
-  private checkForUpdatesOnce(): void {
-    // Run an update check as soon as the service worker is registered. This breaks the
-    // deadlock where an old version without polling never loads the new version that
-    // carries the polling logic.
-    void this.updates.checkForUpdate().catch(() => {
-      // Ignore the error and carry on.
-    });
-  }
-
-  private setupPeriodicPolling(): void {
-    interval(5 * 60 * 1000)
-      .pipe(concatMap(() => this.updates.checkForUpdate()))
-      .subscribe();
-  }
-
-  private setupFocusListener(): void {
-    if (typeof window !== 'undefined') {
-      fromEvent(window, 'focus')
-        .pipe(concatMap(() => this.updates.checkForUpdate()))
-        .subscribe();
+  /**
+   * Reload the page, so the browser loads the version that the service worker holds.
+   * When an update is ready, the service first activates it (the documented Angular
+   * pattern), so the reload is sure to get the new version. A failed activation is
+   * ignored: the reload still runs.
+   */
+  async reload(): Promise<void> {
+    if (this._updateReady()) {
+      try {
+        await this.updates.activateUpdate();
+      } catch {
+        // Reload anyway: the service worker serves the version it holds.
+      }
     }
+    this.reloadPage();
+  }
+
+  private onVersionEvent(e: VersionEvent): void {
+    // Every other event (VERSION_DETECTED, VERSION_INSTALLATION_FAILED,
+    // NO_NEW_VERSION_DETECTED) needs no action: after a failed installation the next
+    // check tries again.
+    if (e.type === 'VERSION_READY') this._updateReady.set(true);
+  }
+
+  /**
+   * One update check that never errors. `defer` also catches a synchronous throw. A
+   * rejected check gives `false`, so the stream that runs the checks stays alive.
+   */
+  private safeCheck(): Observable<boolean> {
+    return defer(() => this.updates.checkForUpdate()).pipe(catchError(() => of(false)));
   }
 }

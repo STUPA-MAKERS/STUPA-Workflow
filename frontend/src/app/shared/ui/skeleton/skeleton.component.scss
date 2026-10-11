@@ -41,3 +41,45 @@
 .sk__row-lead {
   width: 40%;
 }
+
+/* `items`: the geometry of `app-list-item` (min-height 4rem, padding 10px 16px, a 22px
+   title line and a 19px sub line) and of the trailing slot of a list row. Keep these in
+   step with `list-item.component.scss`, or the list moves when the rows arrive. */
+.sk__items {
+  display: flex;
+  flex-direction: column;
+}
+.sk__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 4rem;
+  padding: 10px var(--space-4);
+}
+.sk__itemBody {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+}
+.sk__itemTitle {
+  font-size: var(--fs-md);
+  line-height: 1.375rem;
+}
+.sk__itemSub {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 1.1875rem;
+  font-size: 0.8125rem;
+  line-height: 1.1875rem;
+}
+/* The amount, then the place of the row menu (a 40px button, 8px into the padding). */
+.sk__itemTrail {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 4.5rem;
+  margin-inline-end: 2rem;
+  font-size: 0.8125rem;
+  line-height: 1.375rem;
+}

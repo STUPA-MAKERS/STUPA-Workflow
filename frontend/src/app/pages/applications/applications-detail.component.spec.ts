@@ -454,6 +454,152 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
+  it('draws the loaded sheet with bars while it loads: header, columns, fixed headings', async () => {
+    const { http, container } = await setup([
+      'application.read',
+      'application.manage',
+      'application.transition',
+    ]);
+    const busy = container.querySelector('article.ad--busy')!;
+    // Side by side the busy sheet is the sheet itself, with its surface (`ad--split`).
+    expect(busy).toHaveClass('ad--split');
+    expect(busy).toHaveAttribute('aria-busy', 'true');
+    expect(busy.querySelector('.ad__head .ad__title .skel-text')).not.toBeNull();
+    expect(busy.querySelector('.ad__head .ad__line .skel-text')).not.toBeNull();
+    // With the right to fire transitions, two button places in the header.
+    expect(busy.querySelectorAll('.ad__transitions .ad__skelButton')).toHaveLength(2);
+    expect(busy.querySelectorAll('.ad__cols > .ad__col')).toHaveLength(2);
+    // Fixed headings are text, headings of the form are bars.
+    expect(within(busy as HTMLElement).getByText('Details')).toBeInTheDocument();
+    expect(within(busy as HTMLElement).getByText('Verlauf')).toBeInTheDocument();
+    expect(busy.querySelector('.ad__skelAnswers h3 .skel-text')).not.toBeNull();
+    http.expectOne(url('')).flush(appWire());
+    flushAttachments(http);
+  });
+
+  it('draws the tabs while it loads in one column', async () => {
+    const view = await render(ApplicationsDetailComponent, {
+      providers: [
+        provideRouter([]),
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+        { provide: AuthService, useValue: fakeAuth(['application.read']) },
+        { provide: RailStatusService, useValue: { refresh: jest.fn() } },
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: new BehaviorSubject(convertToParamMap({ id: 'app-1' })) },
+        },
+      ],
+    });
+    view.fixture.detectChanges();
+    const busy = view.container.querySelector('article.ad--busy')!;
+    expect(busy).not.toHaveClass('ad--split');
+    expect(busy.querySelector('app-tabs')).not.toBeNull();
+    // Without the right to fire transitions the header has no button row.
+    expect(busy.querySelector('.ad__transitions')).toBeNull();
+    const http = view.fixture.debugElement.injector.get(HttpTestingController);
+    for (const req of http.match(() => true)) req.flush(null, { status: 404, statusText: 'x' });
+  });
+
+  it('keeps the shown application on a switch, dimmed and inert, until the next arrives', async () => {
+    const paramMap$ = new BehaviorSubject(convertToParamMap({ id: 'app-1' }));
+    const { http, detectChanges, cmp, container } = await setup(
+      ['application.read', 'application.manage'],
+      paramMap$,
+    );
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    cmp.editing.set(true);
+
+    paramMap$.next(convertToParamMap({ id: 'app-2' }));
+    detectChanges();
+    const req = http.expectOne(url('', 'app-2'));
+    // No placeholder: the first application stays, the edit and its dialogs close.
+    expect(cmp.switching()).toBe(true);
+    expect(cmp.loading()).toBe(false);
+    expect(cmp.editing()).toBe(false);
+    expect(cmp.app()?.id).toBe('app-1');
+    expect(container.querySelector('article.ad--busy')).toBeNull();
+    const sheet = container.querySelector('article.ad')!;
+    expect(sheet).toHaveClass('ad--stale');
+    expect(sheet).toHaveAttribute('inert');
+    expect(sheet).toHaveAttribute('aria-busy', 'true');
+    expect(sheet.querySelector('.ad__progress')).not.toBeNull();
+
+    req.flush({ ...appWire(), id: 'app-2' });
+    http.expectOne(url('/versions', 'app-2')).flush(VERSIONS);
+    http.expectOne(url('/comments', 'app-2')).flush(COMMENTS);
+    flushForm(http, 'app-2');
+    detectChanges();
+    expect(cmp.switching()).toBe(false);
+    expect(cmp.app()?.id).toBe('app-2');
+    const fresh = container.querySelector('article.ad')!;
+    expect(fresh).not.toHaveClass('ad--stale');
+    expect(fresh).not.toHaveAttribute('inert');
+    expect(fresh.querySelector('.ad__progress')).toBeNull();
+    flushAttachments(http);
+    http.verify();
+  });
+
+  it('replaces the shown application with the error when the switch fails', async () => {
+    const paramMap$ = new BehaviorSubject(convertToParamMap({ id: 'app-1' }));
+    const { http, detectChanges, cmp } = await setup(['application.read'], paramMap$);
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+
+    paramMap$.next(convertToParamMap({ id: 'app-2' }));
+    http.expectOne(url('', 'app-2')).flush({ title: 'Gone' }, { status: 404, statusText: 'Not Found' });
+    detectChanges();
+    expect(cmp.switching()).toBe(false);
+    expect(cmp.app()).toBeNull();
+    expect(cmp.notFound()).toBe(true);
+    flushAttachments(http);
+    http.verify();
+  });
+
+  it('keeps the place of the transition buttons while they load', async () => {
+    const { http, detectChanges, cmp, container } = await setup([
+      'application.read',
+      'application.manage',
+      'application.transition',
+    ]);
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush(COMMENTS);
+    flushForm(http);
+    detectChanges();
+    const req = http.expectOne(url('/transitions'));
+    expect(cmp.transitionsLoading()).toBe(true);
+    expect(container.querySelectorAll('.ad__head .ad__skelButton')).toHaveLength(2);
+    req.flush([]);
+    detectChanges();
+    expect(cmp.transitionsLoading()).toBe(false);
+    // No transition: the row goes away.
+    expect(container.querySelector('.ad__head .ad__transitions')).toBeNull();
+    flushAttachments(http);
+    http.verify();
+  });
+
+  it('ends the wait for the transitions also when they fail', async () => {
+    const { http, detectChanges, cmp } = await setup([
+      'application.read',
+      'application.manage',
+      'application.transition',
+    ]);
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush(COMMENTS);
+    flushForm(http);
+    http.expectOne(url('/transitions')).flush({}, { status: 500, statusText: 'x' });
+    detectChanges();
+    expect(cmp.transitionsLoading()).toBe(false);
+    flushAttachments(http);
+    http.verify();
+  });
+
   it('discards a stale load when a newer navigation has bumped the load sequence', async () => {
     const paramMap$ = new BehaviorSubject(convertToParamMap({ id: 'app-1' }));
     const { http, detectChanges, cmp } = await setup(['application.read'], paramMap$);
@@ -963,7 +1109,8 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
     // No raw keys flash while the form is on its way.
     expect(container.querySelector('app-answer-view')).toBeNull();
-    expect(container.querySelector('.ad .skel--panel')).not.toBeNull();
+    // The answers hold their place with field rows, the size of the loaded ones.
+    expect(container.querySelector('.ad .ad__skelAnswers .ad__skelRow')).not.toBeNull();
     flushForm(http);
     detectChanges();
     expect(container.querySelector('app-answer-view')).not.toBeNull();
@@ -1818,7 +1965,7 @@ describe('ApplicationsDetailComponent', () => {
     });
     view.fixture.detectChanges();
 
-    expect(view.container.querySelectorAll('.skel').length).toBeGreaterThan(0);
+    expect(view.container.querySelectorAll('.skel-text').length).toBeGreaterThan(0);
     expect(view.container.querySelector('[aria-busy="true"]')).toBeTruthy();
     // The wording stays for a screen reader, because the blocks are decorative.
     expect(view.container.querySelector('[role="status"]')).toHaveClass('sr-only');

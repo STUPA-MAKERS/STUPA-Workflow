@@ -94,7 +94,8 @@ export const de = {
   'account.calendar.rotateHint': 'Erzeugt eine neue URL — die bisherige wird ungültig.',
   'account.calendar.error': 'Der Abo-Link konnte nicht geladen werden.',
   'account.calendar.rotateError': 'Der Abo-Link konnte nicht erzeugt werden.',
-  'pwa.updateReady': 'Eine neue Version der App ist verfügbar — Seite neu laden, um sie zu nutzen.',
+  'pwa.updateReady': 'Eine neue Version der App ist verfügbar.',
+  'pwa.reload': 'Neu laden',
   'account.notifications.title': 'Benachrichtigungen',
   'account.notifications.intro':
     'Wähle, welche E-Mail-Benachrichtigungen du erhalten möchtest. Login-Links werden immer zugestellt.',
@@ -293,7 +294,8 @@ export const de = {
   'expenses.bulk.exportConfirm': 'Exportieren',
   'expenses.bulk.reassign': 'Umbuchen',
   'expenses.bulk.reassignTitle': 'Auswahl umbuchen',
-  'expenses.bulk.reassignHint': 'Leere Felder bleiben unverändert. Die Kostenstelle wirkt nur auf eigenständige Buchungen.',
+  'expenses.bulk.reassignHint':
+    'Leere Felder bleiben unverändert. Die Kostenstelle wirkt nur auf eigenständige Buchungen.',
   'expenses.bulk.reassignConfirm': 'Übernehmen',
   'expenses.bulk.reassignDone': '{count} Buchung(en) aktualisiert.',
   'expenses.bulk.reassignError': 'Sammel-Umbuchung fehlgeschlagen.',
@@ -378,7 +380,6 @@ export const de = {
     'Bereits eingereicht? Den Status verfolgst du über den Link in deiner Bestätigungs-E-Mail.',
   'home.choice.go': 'Weiter',
 
-
   'common.yes': 'Ja',
   'common.no': 'Nein',
   'common.unnamed': 'Ohne Namen',
@@ -419,6 +420,8 @@ export const de = {
   'apply.positions.errPreferred': 'Genau ein Angebot muss als bevorzugt markiert sein.',
   'apply.positions.errLabel': 'Bezeichnung der Position fehlt.',
   'apply.positions.errOffers': 'Jedes Angebot braucht eine Bezeichnung und einen Wert > 0.',
+  'apply.positions.errAmountFormat':
+    'Kein gültiger Betrag. Beispiel: 1.234,56 (höchstens 2 Nachkommastellen).',
   'apply.positions.invalid':
     'Jede Position braucht eine Bezeichnung, genügend Vergleichsangebote (mit Wert > 0) und genau ein bevorzugtes Angebot.',
   'apply.positions.noOffers': 'Für diese Position sind keine Vergleichsangebote möglich',
@@ -602,7 +605,8 @@ export const de = {
   'dashboard.waiting.one': '1 Tag',
   'dashboard.waiting.other': '{n} Tage',
   'dashboard.empty.tasks': 'Nichts zu tun',
-  'dashboard.empty.tasksBody': 'Hier erscheinen Anträge, bei denen du etwas tun musst, zum Beispiel Angaben ergänzen.',
+  'dashboard.empty.tasksBody':
+    'Hier erscheinen Anträge, bei denen du etwas tun musst, zum Beispiel Angaben ergänzen.',
   'dashboard.empty.mine': 'Noch keine Anträge',
   'dashboard.empty.mineBody': 'Nach dem Einreichen siehst du hier den Status deiner Anträge.',
   'dashboard.empty.votes': 'Keine Abstimmungen',
@@ -617,7 +621,8 @@ export const de = {
   'dashboard.today.all': 'Alle',
   'dashboard.today.none': 'Keine Sitzungen',
   'dashboard.today.noneBody': 'Für deine Gremien ist keine Sitzung geplant.',
-  'dashboard.today.noGremiumBody': 'Du bist in keinem Gremium. Sitzungen und Abstimmungen deiner Gremien erscheinen hier.',
+  'dashboard.today.noGremiumBody':
+    'Du bist in keinem Gremium. Sitzungen und Abstimmungen deiner Gremien erscheinen hier.',
   'dashboard.today.finance': 'Finanzen',
   'dashboard.today.budget': 'Budget HHJ {year}',
   'dashboard.today.budgetNamed': '{name} · HHJ {year}',
@@ -648,7 +653,8 @@ export const de = {
   'applications.list.archivedRow': 'Archiviert',
   'applications.list.create': 'Antrag stellen',
   'applications.list.exportError': 'Der Export ist fehlgeschlagen.',
-  'applications.list.deleteConfirm': '„{title}“ endgültig löschen? Das lässt sich nicht rückgängig machen.',
+  'applications.list.deleteConfirm':
+    '„{title}“ endgültig löschen? Das lässt sich nicht rückgängig machen.',
   'applications.list.none': 'Kein Antrag geöffnet',
   'applications.row.menu': 'Aktionen für {title}',
   'applications.row.open': 'Öffnen',
@@ -1085,7 +1091,8 @@ export const de = {
     'Soll der Antrag „{name}“ mit {approved} (beantragt {requested}) und {conditions} gefördert werden?',
   'meetings.vote.questionPrefillAmount':
     'Soll der Antrag „{name}“ mit {approved} (beantragt {requested}) gefördert werden?',
-  'meetings.vote.questionPrefillConditions': 'Soll der Antrag „{name}“ mit {conditions} gefördert werden?',
+  'meetings.vote.questionPrefillConditions':
+    'Soll der Antrag „{name}“ mit {conditions} gefördert werden?',
 
   // F1: approval with deviations (decision proposal, decision section, decision dialog).
   'decision.section': 'Beschlussvorschlag',
@@ -1107,7 +1114,8 @@ export const de = {
   'decision.conditionCount.other': '{n} Auflagen',
   'decision.questionHint':
     'Aus dem Vorschlag erzeugt. Ändert sich mit Betrag und Auflagen, solange du sie nicht von Hand bearbeitest.',
-  'decision.error.amountInvalid': 'Der Förderbetrag muss größer als 0 sein und höchstens zwei Nachkommastellen haben.',
+  'decision.error.amountInvalid':
+    'Der Förderbetrag muss größer als 0 sein und höchstens zwei Nachkommastellen haben.',
   'decision.error.amountExceeds': 'Der Förderbetrag darf den beantragten Betrag nicht übersteigen.',
   'decision.error.conditionLength': 'Eine Auflage hat höchstens {max} Zeichen.',
   'decision.error.conditionCount': 'Höchstens {count} Auflagen.',
@@ -1169,13 +1177,17 @@ export const de = {
   'election.dialog.add': 'Hinzufügen',
   'election.dialog.tooFew': 'Für {n} Posten braucht es mindestens {n} Kandidierende.',
   'election.dialog.nameTaken': 'Dieser Name steht schon auf der Liste.',
-  'election.dialog.nameTwice': 'Ein freier Name steht doppelt auf der Liste. Entferne einen der beiden Einträge.',
+  'election.dialog.nameTwice':
+    'Ein freier Name steht doppelt auf der Liste. Entferne einen der beiden Einträge.',
   'election.dialog.secret': 'Geheime Wahl',
   'election.dialog.secretHint': 'Stimmen werden ohne Namen gezählt',
   'election.dialog.submit': 'Wahl öffnen',
-  'election.rule.single': 'Jede Person hat eine Stimme. Gewählt ist, wer die meisten Stimmen erhält. Bei Gleichstand entscheidet das Los.',
-  'election.rule.multi': 'Jede Person hat {n} Stimmen, höchstens eine je Person. Gewählt sind die {n} mit den meisten Stimmen. Gleichstand an der Grenze: Stichwahl.',
-  'election.rule.yesNo': 'Eine Kandidatur: Abstimmung mit Ja, Nein und Enthaltung. Gewählt bei mehr Ja- als Nein-Stimmen.',
+  'election.rule.single':
+    'Jede Person hat eine Stimme. Gewählt ist, wer die meisten Stimmen erhält. Bei Gleichstand entscheidet das Los.',
+  'election.rule.multi':
+    'Jede Person hat {n} Stimmen, höchstens eine je Person. Gewählt sind die {n} mit den meisten Stimmen. Gleichstand an der Grenze: Stichwahl.',
+  'election.rule.yesNo':
+    'Eine Kandidatur: Abstimmung mit Ja, Nein und Enthaltung. Gewählt bei mehr Ja- als Nein-Stimmen.',
   'election.ballot.counter': '{n} von {m} Stimmen vergeben',
   'election.ballot.sole': 'Zur Wahl steht: {name}',
   'election.ballot.abstainAll': 'Ganz enthalten',
@@ -1402,7 +1414,8 @@ export const de = {
   'meetings.attendanceSheet.representedBy': 'vertreten durch {name}',
   'meetings.attendanceSheet.withVote': 'mit Stimmrecht',
   'meetings.attendanceSheet.revokeFirst': 'Erst die Vertretung widerrufen.',
-  'meetings.attendanceSheet.delegationActive': 'Vertretung aktiv: erst widerrufen, dann als anwesend erfassen.',
+  'meetings.attendanceSheet.delegationActive':
+    'Vertretung aktiv: erst widerrufen, dann als anwesend erfassen.',
   'meetings.attendanceSheet.revokeDelegation': 'Vertretung widerrufen',
   'meetings.attendanceSheet.revoke': 'Widerrufen',
   'meetings.attendanceSheet.delegations': 'Vertretungen · {n}',
@@ -1416,7 +1429,8 @@ export const de = {
   'meetings.leadSubstitute.title': 'Vertretung eintragen',
   'meetings.leadSubstitute.for': 'für {name}',
   'meetings.leadSubstitute.pool': 'Stellvertretung aus dem Pool',
-  'meetings.leadSubstitute.poolNote': 'Persönliche Stellvertretungen des Mitglieds und Stellvertretungen für das ganze Gremium.',
+  'meetings.leadSubstitute.poolNote':
+    'Persönliche Stellvertretungen des Mitglieds und Stellvertretungen für das ganze Gremium.',
   'meetings.leadSubstitute.search': 'Stellvertretung suchen',
   'meetings.leadSubstitute.loading': 'Lädt …',
   'meetings.leadSubstitute.empty': 'Für {name} ist niemand im Stellvertretungs-Pool eingetragen.',
@@ -1431,7 +1445,8 @@ export const de = {
   'meetings.protocolBar.rendering': 'Das PDF wird erstellt und versandt.',
   'meetings.protocolBar.final': 'Das Protokoll ist final.',
   'meetings.protocolBar.finalSent': 'Das Protokoll ist final und wurde versandt.',
-  'meetings.protocolBar.needsRight': 'Finalisieren braucht das Gremien-Recht „Protokoll finalisieren & versenden“.',
+  'meetings.protocolBar.needsRight':
+    'Finalisieren braucht das Gremien-Recht „Protokoll finalisieren & versenden“.',
   'meetings.protocolBar.pdf': 'PDF',
   'meetings.protocolBar.pdfInternal': 'PDF intern',
   'meetings.protocolBar.pdfPublic': 'PDF öffentlich',
@@ -1530,7 +1545,8 @@ export const de = {
   'voting.list.count': '{count} von {total} Abstimmungen',
   'voting.list.error': 'Die Abstimmungen konnten nicht geladen werden.',
   'voting.list.empty': 'Keine Abstimmungen',
-  'voting.list.emptyBody': 'Hier erscheinen die Abstimmungen deiner Gremien, sobald sie geöffnet werden.',
+  'voting.list.emptyBody':
+    'Hier erscheinen die Abstimmungen deiner Gremien, sobald sie geöffnet werden.',
   'voting.list.noMatch': 'Keine Abstimmung passt zu den Filtern.',
   'voting.list.none': 'Keine Abstimmung geöffnet',
   'voting.list.group.open': 'Offen',
@@ -1676,6 +1692,10 @@ export const de = {
   'admin.gremien.slugTaken':
     'Ein Gremium mit diesem Kürzel gibt es schon. Wähle einen anderen Namen.',
   'admin.gremien.deleteFailed': 'Das Gremium konnte nicht gelöscht werden.',
+  'admin.gremien.deleteOpenVote':
+    'Eine Abstimmung des Gremiums ist noch offen. Schließe sie oder brich sie zuerst ab.',
+  'admin.gremien.deleteFinalized':
+    'Eine Sitzung des Gremiums hat ein finales Protokoll. Zum Löschen fehlt dir das Recht „meeting.delete_finalized“.',
   'admin.gremien.unknownMember': '(ohne Namen)',
   'admin.gremien.shownOf': '{shown} von {total}',
   'admin.gremien.showAll': 'Alle {count} anzeigen',
@@ -1888,7 +1908,8 @@ export const de = {
     'Dieses Gremium entscheidet über Anträge auf diese Kostenstelle und ihre Unterstellen, wenn der Ablauf das Gremium aus der Kostenstelle nimmt.',
   'budget.tree.decisionGremiumInherited': 'Geerbt von {path} · {name}: {gremium}',
   'budget.tree.unknownGremium': 'unbekanntes Gremium',
-  'budget.tree.decisionGremiumNoneHint': 'Kein Gremium hier und darüber: Anträge auf diese Kostenstelle haben kein entscheidendes Gremium.',
+  'budget.tree.decisionGremiumNoneHint':
+    'Kein Gremium hier und darüber: Anträge auf diese Kostenstelle haben kein entscheidendes Gremium.',
   'budget.tree.viewGremium': 'Sichtbar für Gremium',
   'budget.tree.viewGremiumNone': '— kein Gremium —',
   'budget.tree.viewGremiumHint':
@@ -2138,7 +2159,8 @@ export const de = {
   'admin.flow.guardOp.compare': 'Feld-Vergleich',
   'admin.flow.guardOp.isInVoteGremium': 'Akteur im Gremium der Abstimmung',
   'admin.flow.guardOp.budgetHasDecisionGremium': 'Kostenstelle hat entscheidendes Gremium',
-  'admin.flow.actionType.assignBudgetFromApplicantGremium': 'Kostenstelle aus Gremium der Antragsteller:in',
+  'admin.flow.actionType.assignBudgetFromApplicantGremium':
+    'Kostenstelle aus Gremium der Antragsteller:in',
   'admin.flow.actionType.assignBudgetFromMap': 'Kostenstelle nach Feldwert',
   'admin.flow.recipientKind.voteGremium': 'Entscheidendes Gremium der Abstimmung',
   'admin.flow.recipientKind.budgetGremium': 'Entscheidendes Gremium der Kostenstelle',
@@ -2172,7 +2194,8 @@ export const de = {
   'admin.flow.err.notifyRecipientNoRef': 'Der Empfänger „{kind}“ nimmt keinen Wert.',
   'admin.flow.err.voteGremiumBoth':
     'Der Abstimmungs-Status „{key}“ hat ein festes Gremium und das Gremium aus der Kostenstelle. Wähle eins.',
-  'admin.flow.err.voteGremiumSource': 'Der Abstimmungs-Status „{key}“ hat eine unbekannte Gremiumsquelle.',
+  'admin.flow.err.voteGremiumSource':
+    'Der Abstimmungs-Status „{key}“ hat eine unbekannte Gremiumsquelle.',
   'admin.flow.err.voteGremiumInitial':
     'Der Start-Status „{key}“ kann das Gremium nicht aus der Kostenstelle nehmen: ein neuer Antrag hat noch keine Kostenstelle.',
   'admin.flow.err.sessionGremiumIntoBudgetVote':
@@ -2701,7 +2724,8 @@ export const de = {
   'admin.cdVariants.sourceUpload': 'Datei hochladen',
   'admin.cdVariants.sourceVendored': 'Mitgeliefertes Logo',
   'admin.cdVariants.vendoredName': 'Logo',
-  'admin.cdVariants.vendoredHint': 'Diese Logos liefert der PDF-Renderer mit. Ein Upload ist nicht nötig.',
+  'admin.cdVariants.vendoredHint':
+    'Diese Logos liefert der PDF-Renderer mit. Ein Upload ist nicht nötig.',
   'admin.cdVariants.fileHint': 'PNG, JPEG, WebP, SVG oder PDF, höchstens {mb} MB.',
   'admin.cdVariants.logoTooLarge': 'Die Datei ist zu groß.',
   'admin.cdVariants.logoType': 'Dieser Dateityp ist nicht erlaubt.',
@@ -2920,9 +2944,6 @@ export const de = {
     'Kostenstellen sind vorhanden, aber es gibt noch kein Haushaltsjahr. Alle Zahlen auf dieser Seite gehören zu einem Haushaltsjahr. Lege eines an, dann erscheinen die Kostenstellen hier.',
   'budget.empty.noFiscalYear.action': 'Haushaltsjahr anlegen',
 
-
-
-
   'budget.usage.heading': 'Auslastung je Budget',
   'budget.dash.tree': 'Kostenstellen',
   'budget.dash.search': 'Kostenstelle suchen',
@@ -2943,13 +2964,13 @@ export const de = {
   'budget.dash.distributionOf': '{metric} je Unter-Kostenstelle',
   'budget.dash.metric': 'Kennzahl',
   'budget.dash.ownShare': '{name} (nicht verteilt)',
-  'budget.dash.usageLabel': 'Ausgegeben: {expended} · Gebunden: {bound} · von {total} ({percent} % ausgelastet)',
+  'budget.dash.usageLabel':
+    'Ausgegeben: {expended} · Gebunden: {bound} · von {total} ({percent} % ausgelastet)',
   'budget.dash.apps': 'Anträge auf dieser Kostenstelle',
   'budget.dash.appsAll': 'Alle ansehen',
   'budget.dash.appsLoading': 'Anträge werden geladen …',
   'budget.dash.appsError': 'Die Anträge konnten nicht geladen werden.',
   'budget.dash.appsNone': 'Keine Anträge auf dieser Kostenstelle.',
-
 
   'admin.gremien.title': 'Gremien',
   'admin.gremien.subtitle': 'Sitzungen, Protokolle und Abstimmungen gehören zu einem Gremium.',
@@ -2970,7 +2991,7 @@ export const de = {
   'admin.gremien.deleteAction': 'Löschen',
   'admin.gremien.deleteTitle': 'Gremium löschen',
   'admin.gremien.deleteConfirm':
-    '„{name}" und alle zugehörigen Rollenzuweisungen werden unwiderruflich gelöscht.',
+    '„{name}" wird mit allen Sitzungen samt ihren Abstimmungen und mit allen Rollenzuweisungen unwiderruflich gelöscht. Abstimmungen ohne Sitzung bleiben erhalten.',
   'admin.gremien.delegation': 'Stimm-Delegation erlauben',
   'admin.gremien.delegationHint': 'Mitglieder dürfen sich für einzelne Sitzungen vertreten lassen.',
   'admin.gremien.delegationLead': 'Vorlauf für Delegationen (Minuten)',
@@ -3027,7 +3048,8 @@ export const de = {
   'admin.users.moreActions': 'Weitere Aktionen',
   'admin.users.merge.action': 'Mit anderem Konto zusammenführen',
   'admin.users.erase.action': 'Konto löschen (DSGVO)',
-  'admin.users.erase.notSelf': 'Dein eigenes Konto kannst du nicht löschen. Bitte eine andere Administratorin oder einen anderen Administrator darum.',
+  'admin.users.erase.notSelf':
+    'Dein eigenes Konto kannst du nicht löschen. Bitte eine andere Administratorin oder einen anderen Administrator darum.',
   'admin.users.filters': 'Personen filtern',
   'admin.users.filter.lastLogin': 'Letzter Login',
   'admin.users.filter.lastLogin.all': 'Alle',
@@ -3041,9 +3063,11 @@ export const de = {
   'admin.users.filter.groups.no': 'Nein',
   'admin.users.staleLogin': 'länger als 90 Tage her',
   'admin.users.revoke.action': 'Rechte entziehen …',
-  'admin.users.revoke.notSelf': 'Deine eigenen Rechte kannst du nicht entziehen. Bitte eine andere Administratorin oder einen anderen Administrator darum.',
+  'admin.users.revoke.notSelf':
+    'Deine eigenen Rechte kannst du nicht entziehen. Bitte eine andere Administratorin oder einen anderen Administrator darum.',
   'admin.users.revoke.title': 'Rechte entziehen',
-  'admin.users.revoke.subtitle': 'Für Personen, die sich nicht mehr anmelden. Wähle, welche Gremien und Rollen die Person verliert.',
+  'admin.users.revoke.subtitle':
+    'Für Personen, die sich nicht mehr anmelden. Wähle, welche Gremien und Rollen die Person verliert.',
   'admin.users.revoke.loading': 'Rechte werden geladen …',
   'admin.users.revoke.loadFailed': 'Die Rechte der Person konnten nicht geladen werden.',
   'admin.users.revoke.retry': 'Erneut versuchen',
@@ -3053,7 +3077,8 @@ export const de = {
   'admin.users.revoke.age.day': 'vor 1 Tag',
   'admin.users.revoke.age.days': 'vor {n} Tagen',
   'admin.users.revoke.age.months': 'vor {n} Monaten',
-  'admin.users.revoke.selfNote': 'Das ist dein eigenes Konto. Deine eigenen Rechte kannst du nicht entziehen.',
+  'admin.users.revoke.selfNote':
+    'Das ist dein eigenes Konto. Deine eigenen Rechte kannst du nicht entziehen.',
   'admin.users.revoke.nothing': 'Diese Person hat keine Gremien und keine globalen Rollen.',
   'admin.users.revoke.gremien': 'Gremien ({n})',
   'admin.users.revoke.roles': 'Globale Rollen ({n})',
@@ -3081,11 +3106,16 @@ export const de = {
   'admin.users.revoke.openTask': '1 offene Abstimmung',
   'admin.users.revoke.openTasks': '{n} offene Abstimmungen',
   'admin.users.revoke.openTasksDetail': 'Die Person kann dort danach nicht mehr abstimmen.',
-  'admin.users.revoke.shared': 'Die SSO-Gruppe {group} gilt auch für {others}. Beides wird zusammen entzogen.',
-  'admin.users.revoke.note': 'Sofort wirksam: {name} gehört keinem der gewählten Gremien mehr an (keine Stimmberechtigung, keine Gremium-Mails, keine Aufgaben, kein Lesezugriff über das Gremium). Das Konto und alle bisherigen Einträge bleiben.',
-  'admin.users.revoke.noteLogin': 'Meldet sich {name} wieder an, kommen nur die Gremien und Rollen zurück, die das SSO dann noch liefert.',
-  'admin.users.revoke.noteDeactivated': 'Das Konto ist danach deaktiviert: {name} kann sich nicht mehr anmelden, bis jemand es wieder aktiviert.',
-  'admin.users.revoke.returnsAutomatically': 'Kommt beim nächsten Start oder Login zurück: die Person ist als Bootstrap-Admin eingetragen (BOOTSTRAP_ADMIN_SUBJECTS / BOOTSTRAP_ADMIN_EMAILS).',
+  'admin.users.revoke.shared':
+    'Die SSO-Gruppe {group} gilt auch für {others}. Beides wird zusammen entzogen.',
+  'admin.users.revoke.note':
+    'Sofort wirksam: {name} gehört keinem der gewählten Gremien mehr an (keine Stimmberechtigung, keine Gremium-Mails, keine Aufgaben, kein Lesezugriff über das Gremium). Das Konto und alle bisherigen Einträge bleiben.',
+  'admin.users.revoke.noteLogin':
+    'Meldet sich {name} wieder an, kommen nur die Gremien und Rollen zurück, die das SSO dann noch liefert.',
+  'admin.users.revoke.noteDeactivated':
+    'Das Konto ist danach deaktiviert: {name} kann sich nicht mehr anmelden, bis jemand es wieder aktiviert.',
+  'admin.users.revoke.returnsAutomatically':
+    'Kommt beim nächsten Start oder Login zurück: die Person ist als Bootstrap-Admin eingetragen (BOOTSTRAP_ADMIN_SUBJECTS / BOOTSTRAP_ADMIN_EMAILS).',
   'admin.users.revoke.deactivate': 'Konto zusätzlich deaktivieren',
   'admin.users.revoke.deactivateHint': 'Die Person kann sich dann nicht mehr anmelden.',
   'admin.users.revoke.count.gremium': '1 Gremium',
@@ -3099,9 +3129,12 @@ export const de = {
   'admin.users.revoke.done': 'Rechte entzogen.',
   'admin.users.revoke.failed': 'Die Rechte konnten nicht entzogen werden.',
   'admin.users.revoke.error.revoke_own_account': 'Deine eigenen Rechte kannst du nicht entziehen.',
-  'admin.users.revoke.error.principal_merged': 'Dieses Konto wurde mit einem anderen zusammengeführt.',
-  'admin.users.revoke.error.revoke_incomplete': 'Eine SSO-Gruppe gilt auch für etwas, das nicht ausgewählt war. Die Auswahl wurde neu geladen.',
-  'admin.users.revoke.error.revoke_unknown_target': 'Die Rechte der Person haben sich geändert. Die Auswahl wurde neu geladen.',
+  'admin.users.revoke.error.principal_merged':
+    'Dieses Konto wurde mit einem anderen zusammengeführt.',
+  'admin.users.revoke.error.revoke_incomplete':
+    'Eine SSO-Gruppe gilt auch für etwas, das nicht ausgewählt war. Die Auswahl wurde neu geladen.',
+  'admin.users.revoke.error.revoke_unknown_target':
+    'Die Rechte der Person haben sich geändert. Die Auswahl wurde neu geladen.',
   'admin.users.revoke.error.revoke_empty': 'Wähle mindestens ein Gremium oder eine Rolle aus.',
   'admin.users.merge.notSelf':
     'Dein eigenes Konto kannst du nicht in ein anderes Konto zusammenführen.',
@@ -3315,7 +3348,8 @@ export const de = {
   'expenses.bulk.deleteCount': '{count} Buchungen löschen',
   'expenses.bulk.deleteLimit': 'Sammel-Löschen gilt für höchstens {max} Buchungen.',
   'expenses.bulk.exportLine': '{count} Buchungen als .xlsx',
-  'expenses.bulk.reassignFixed': '{names} ist mit einem Antrag verknüpft oder eine Unterbuchung und behält die Kostenstelle.',
+  'expenses.bulk.reassignFixed':
+    '{names} ist mit einem Antrag verknüpft oder eine Unterbuchung und behält die Kostenstelle.',
   'expenses.bulk.selectRow': '„{description}“ auswählen',
   'expenses.bulk.start': 'Mehrere auswählen',
   'expenses.bulk.stop': 'Auswahl beenden',
@@ -3345,7 +3379,8 @@ export const de = {
   'expenses.form.addShort': 'Hinzufügen',
   'expenses.form.editedBy': '{description} · erfasst von {name}, {date}',
   'expenses.form.fixed': 'Fest',
-  'expenses.form.fromInvoice': 'Aus der Rechnung übernommen: Empfänger/Zahler, Rechnungsdatum, Belegnummer.',
+  'expenses.form.fromInvoice':
+    'Aus der Rechnung übernommen: Empfänger/Zahler, Rechnungsdatum, Belegnummer.',
   'expenses.form.receipt': 'Beleg',
   'expenses.form.required': 'Pflichtfelder sind mit * markiert.',
   'expenses.form.what': 'Was',
@@ -3372,7 +3407,8 @@ export const de = {
   'expenses.transfers.expenseOn': 'Ausgabe auf',
   'expenses.transfers.incomeOn': 'Einnahme auf',
   'expenses.transfers.kind': 'Übertrag',
-  'expenses.transfers.later': 'Rechnungsdatum, Zahldatum und Anmerkungen lassen sich nach dem Buchen beim Bearbeiten setzen.',
+  'expenses.transfers.later':
+    'Rechnungsdatum, Zahldatum und Anmerkungen lassen sich nach dem Buchen beim Bearbeiten setzen.',
   'expenses.transfers.none': 'Kein Übertrag geöffnet',
   'expenses.transfers.pairTitle': 'Von → nach',
   'expenses.transfers.preview': 'So wird gebucht',
@@ -3424,13 +3460,16 @@ export const de = {
   'guests.pseudonym': 'Gast {n}',
   'guests.tag': 'Gast',
   'guests.settings.title': 'Öffentliche Teilnahme (QR)',
-  'guests.settings.hint': 'Personen ohne Konto treten mit dem Handy bei. Du lässt jede Person zu. Zugelassene Gäste sehen die öffentlichen TOPs wie Mitglieder.',
+  'guests.settings.hint':
+    'Personen ohne Konto treten mit dem Handy bei. Du lässt jede Person zu. Zugelassene Gäste sehen die öffentlichen TOPs wie Mitglieder.',
   'guests.settings.modeCaption': 'Gäste in dieser Sitzung',
   'guests.settings.needsNoQuorum': 'Nur in Gremien ohne Quorum möglich.',
   'guests.settings.hasQuorum': 'Dieses Gremium hat ein Quorum von {n} %.',
   'guests.toast.needsNoQuorum': 'Öffentliche Teilnahme ist nur in Gremien ohne Quorum möglich.',
-  'guests.settings.linkAfterCreate': 'Link und QR-Code gibt es nach dem Anlegen: in „Sitzung bearbeiten“, im Kopf der Sitzungsseite („QR-Code“) und auf dem Beamer.',
-  'guests.settings.perVote': 'Einzelne Abstimmungen kannst du beim Öffnen auf Mitglieder beschränken. Abstimmungen in nicht öffentlichen TOPs sind immer nur für Mitglieder.',
+  'guests.settings.linkAfterCreate':
+    'Link und QR-Code gibt es nach dem Anlegen: in „Sitzung bearbeiten“, im Kopf der Sitzungsseite („QR-Code“) und auf dem Beamer.',
+  'guests.settings.perVote':
+    'Einzelne Abstimmungen kannst du beim Öffnen auf Mitglieder beschränken. Abstimmungen in nicht öffentlichen TOPs sind immer nur für Mitglieder.',
   'guests.mode.vote': 'Gäste dürfen abstimmen',
   'guests.mode.watch': 'Gäste schauen nur zu',
   'guests.mode.voteHint': 'Gäste stimmen wie Mitglieder ab, dann ohne Quorum.',
@@ -3439,22 +3478,28 @@ export const de = {
   'guests.link.copy': 'Kopieren',
   'guests.link.copied': 'Kopiert',
   'guests.link.rotate': 'Neuen Link erzeugen',
-  'guests.link.rotateConfirm': 'Der alte Link und der alte Code gelten dann nicht mehr. Offene Beitrittsanfragen verfallen. Zugelassene Gäste bleiben.',
+  'guests.link.rotateConfirm':
+    'Der alte Link und der alte Code gelten dann nicht mehr. Offene Beitrittsanfragen verfallen. Zugelassene Gäste bleiben.',
   'guests.link.rotateYes': 'Neuen Link erzeugen',
   'guests.off.title': 'Öffentliche Teilnahme ausschalten?',
-  'guests.off.text': '{pending} offene Anfragen verfallen und {admitted} zugelassene Gäste verlassen die Sitzung. Abgegebene Stimmen bleiben gezählt. Das gilt mit „Speichern“.',
+  'guests.off.text':
+    '{pending} offene Anfragen verfallen und {admitted} zugelassene Gäste verlassen die Sitzung. Abgegebene Stimmen bleiben gezählt. Das gilt mit „Speichern“.',
   'guests.off.confirm': 'Ausschalten',
   'guests.toast.rotated': 'Neuer Beitrittslink erzeugt. Der alte gilt nicht mehr.',
   'guests.toast.admittedAll': '{n} Gäste zugelassen.',
-  'guests.toast.guestVoteOpen': 'Eine Abstimmung mit Gästen ist offen. Schließe sie, bevor Gäste nur noch zuschauen.',
+  'guests.toast.guestVoteOpen':
+    'Eine Abstimmung mit Gästen ist offen. Schließe sie, bevor Gäste nur noch zuschauen.',
   'guests.vote.switch': 'Gäste stimmen mit ab',
-  'guests.vote.switchOn': '{n} zugelassene Gäste stimmen mit. Ohne Quorum: es zählt nur die Mehrheit der abgegebenen Stimmen.',
+  'guests.vote.switchOn':
+    '{n} zugelassene Gäste stimmen mit. Ohne Quorum: es zählt nur die Mehrheit der abgegebenen Stimmen.',
   'guests.vote.switchOff': 'Aus: nur die Mitglieder stimmen ab. Quorum wie bisher.',
   'guests.vote.switchNonPublic': 'In einem nicht öffentlichen TOP stimmen nur Mitglieder ab.',
-  'guests.vote.votersWith': 'Stimmberechtigt jetzt: {n} ({members} Mitglieder + {guests} Gäste anwesend)',
+  'guests.vote.votersWith':
+    'Stimmberechtigt jetzt: {n} ({members} Mitglieder + {guests} Gäste anwesend)',
   'guests.vote.votersMembers': 'Stimmberechtigt: {n} Mitglieder ({present} anwesend)',
   'guests.vote.composition': '{members} Mitglieder + {guests} Gäste anwesend',
-  'guests.vote.lateHint': 'Gäste, die du jetzt zulässt, stimmen noch mit. Die Zahl der Stimmberechtigten steht beim Schließen fest.',
+  'guests.vote.lateHint':
+    'Gäste, die du jetzt zulässt, stimmen noch mit. Die Zahl der Stimmberechtigten steht beim Schließen fest.',
   'guests.vote.resultCaption': 'Ergebnis ohne Quorum',
   'guests.vote.cast': 'Abgegeben',
   'guests.vote.castN': 'Abgegeben {n}',
@@ -3462,10 +3507,14 @@ export const de = {
   'guests.vote.reached': 'erreicht',
   'guests.vote.notReached': 'nicht erreicht',
   'guests.vote.back': 'Zurück zur Sitzung',
-  'guests.vote.noteWatch': 'In dieser Sitzung schauen Gäste nur zu. Das Ergebnis siehst du hier nach dem Schließen.',
-  'guests.vote.noteMembersOnly': 'Bei dieser Abstimmung stimmen nur die Mitglieder der {gremium} ab. Das Ergebnis siehst du hier nach dem Schließen.',
-  'guests.vote.noteLate': 'Du bist während der Abstimmung zugelassen worden und kannst noch mitstimmen. Die Zahl der Stimmberechtigten steht beim Schließen fest.',
-  'guests.vote.noteSecret': 'Geheime Abstimmung: Deine Wahl wird ohne Namen gezählt. Die Sitzungsleitung sieht nur, dass du abgestimmt hast.',
+  'guests.vote.noteWatch':
+    'In dieser Sitzung schauen Gäste nur zu. Das Ergebnis siehst du hier nach dem Schließen.',
+  'guests.vote.noteMembersOnly':
+    'Bei dieser Abstimmung stimmen nur die Mitglieder der {gremium} ab. Das Ergebnis siehst du hier nach dem Schließen.',
+  'guests.vote.noteLate':
+    'Du bist während der Abstimmung zugelassen worden und kannst noch mitstimmen. Die Zahl der Stimmberechtigten steht beim Schließen fest.',
+  'guests.vote.noteSecret':
+    'Geheime Abstimmung: Deine Wahl wird ohne Namen gezählt. Die Sitzungsleitung sieht nur, dass du abgestimmt hast.',
   'guests.vote.progressMembers': '{voted} von {present} Mitgliedern haben abgestimmt',
   'guests.dock.present': 'Anwesend {n} + {g} Gäste',
   'guests.dock.pending': '{n} offene Beitrittsanfragen',
@@ -3492,7 +3541,8 @@ export const de = {
   'guests.list.renameTitle': 'Namen des Gasts ändern',
   'guests.list.remove': 'Gast entfernen',
   'guests.list.removeTitle': '{name} entfernen?',
-  'guests.list.removeHint': 'Die Person kann danach nicht mehr abstimmen. Stimmen in geschlossenen Abstimmungen bleiben gezählt.',
+  'guests.list.removeHint':
+    'Die Person kann danach nicht mehr abstimmen. Stimmen in geschlossenen Abstimmungen bleiben gezählt.',
   'guests.status.left': 'Hat verlassen',
   'guests.status.removed': 'Entfernt',
   'guests.status.watching': 'Schaut zu',
@@ -3514,15 +3564,19 @@ export const de = {
   'guests.page.withdraw': 'Anfrage zurückziehen',
   'guests.page.rename': 'Name ändern',
   'guests.page.waitTitle': 'Warte auf Freigabe durch die Sitzungsleitung',
-  'guests.page.waitText': 'Du hast als {name} angefragt. Lass diese Seite offen, sie aktualisiert sich von selbst.',
+  'guests.page.waitText':
+    'Du hast als {name} angefragt. Lass diese Seite offen, sie aktualisiert sich von selbst.',
   'guests.page.rejectedTitle': 'Anfrage abgelehnt',
-  'guests.page.rejectedText': 'Die Sitzungsleitung hat {name} nicht zugelassen. War das ein Versehen? Sprich die Sitzungsleitung im Raum an.',
+  'guests.page.rejectedText':
+    'Die Sitzungsleitung hat {name} nicht zugelassen. War das ein Versehen? Sprich die Sitzungsleitung im Raum an.',
   'guests.page.removedTitle': 'Du bist nicht mehr in der Sitzung',
-  'guests.page.removedText': 'Die Sitzungsleitung hat {name} aus der Sitzung entfernt. Abgegebene Stimmen bleiben gezählt.',
+  'guests.page.removedText':
+    'Die Sitzungsleitung hat {name} aus der Sitzung entfernt. Abgegebene Stimmen bleiben gezählt.',
   'guests.page.retry': 'Erneut anfragen',
   'guests.page.retryAt': 'Wieder möglich ab {time} ({n} Minuten)',
   'guests.page.notPublicTitle': 'Die Sitzung ist nicht mehr öffentlich',
-  'guests.page.notPublicText': 'Die Sitzungsleitung hat die öffentliche Teilnahme ausgeschaltet. Abgegebene Stimmen bleiben gezählt.',
+  'guests.page.notPublicText':
+    'Die Sitzungsleitung hat die öffentliche Teilnahme ausgeschaltet. Abgegebene Stimmen bleiben gezählt.',
   'guests.page.closedTitle': 'Die Sitzung ist beendet',
   'guests.page.closedText': 'Danke fürs Mitmachen. Das Protokoll veröffentlicht das Gremium.',
   'guests.page.unknownTitle': 'Dieser Link ist ungültig oder die Sitzung ist beendet.',
@@ -3531,14 +3585,16 @@ export const de = {
   'guests.page.codeGo': 'Weiter',
   'guests.page.errorTitle': 'Die Sitzung lädt gerade nicht',
   'guests.page.reload': 'Erneut laden',
-  'guests.join.introVote': 'Nimm an der Sitzung teil und stimme mit ab. Ein Konto brauchst du nicht.',
+  'guests.join.introVote':
+    'Nimm an der Sitzung teil und stimme mit ab. Ein Konto brauchst du nicht.',
   'guests.join.introWatch': 'Verfolge die Sitzung live. Ein Konto brauchst du nicht.',
   'guests.join.name': 'Dein Name',
   'guests.join.nameHint': 'Vor- und Nachname. Die Sitzungsleitung sieht ihn und lässt dich zu.',
   'guests.join.submit': 'Beitreten',
   'guests.join.member': 'Mitglied?',
   'guests.join.login': 'Mit Konto anmelden',
-  'guests.join.privacy': 'Dein Name steht in der Anwesenheitsliste dieser Sitzung. Bei offenen Abstimmungen sieht die Sitzungsleitung deine Stimme, bei geheimen nicht. Beim Verlassen und mit dem fertigen Protokoll wird er zu „Gast n“.',
+  'guests.join.privacy':
+    'Dein Name steht in der Anwesenheitsliste dieser Sitzung. Bei offenen Abstimmungen sieht die Sitzungsleitung deine Stimme, bei geheimen nicht. Beim Verlassen und mit dem fertigen Protokoll wird er zu „Gast n“.',
   'guests.join.error': 'Die Anfrage ging nicht durch. Versuch es noch einmal.',
   'guests.join.errorAltcha': 'Die Spam-Prüfung ging nicht durch. Versuch es noch einmal.',
   'guests.join.errorRate': 'Zu viele Anfragen. Warte kurz und versuch es dann noch einmal.',
@@ -3568,14 +3624,16 @@ export const de = {
   'admin.audit.action.guest_renamed': 'Gastname geändert',
   'admin.audit.action.guest_admit_all': 'Alle Anfragen zugelassen',
   'home.choice.protocols.title': 'Protokolle',
-  'home.choice.protocols.desc': 'Protokolle und Beschlüsse der öffentlichen Gremien lesen und herunterladen.',
+  'home.choice.protocols.desc':
+    'Protokolle und Beschlüsse der öffentlichen Gremien lesen und herunterladen.',
   'home.latest.title': 'Zuletzt veröffentlicht',
   'home.latest.meta': '{gremium} · {n} öffentliche TOPs',
   'home.latest.all': 'Alle {n} Protokolle',
   'publicProtocols.title': 'Öffentliche Protokolle',
   'publicProtocols.crumbs': 'Pfad',
   'publicProtocols.crumbHome': 'Start',
-  'publicProtocols.lede': 'Finalisierte Protokolle der öffentlichen Gremien als öffentliche Fassung: Anwesenheit nur als Zahl, nicht-öffentliche Tagesordnungspunkte ohne Titel und Inhalt.',
+  'publicProtocols.lede':
+    'Finalisierte Protokolle der öffentlichen Gremien als öffentliche Fassung: Anwesenheit nur als Zahl, nicht-öffentliche Tagesordnungspunkte ohne Titel und Inhalt.',
   'publicProtocols.search': 'Titel oder Text suchen',
   'publicProtocols.searchHint': 'Gesucht wird in Sitzungstiteln und im Text öffentlicher TOPs.',
   'publicProtocols.filter.gremium': 'Gremium',
@@ -3589,14 +3647,17 @@ export const de = {
   'publicProtocols.list.count': '{n} Protokolle',
   'publicProtocols.list.hits': '{n} Treffer',
   'publicProtocols.loading': 'Protokolle werden geladen …',
-  'publicProtocols.error': 'Die Protokolle konnten nicht geladen werden. Versuche es später noch einmal.',
+  'publicProtocols.error':
+    'Die Protokolle konnten nicht geladen werden. Versuche es später noch einmal.',
   'publicProtocols.more': 'Weitere Protokolle laden',
   'publicProtocols.pdf': 'PDF (öffentliche Fassung)',
   'publicProtocols.empty.none': 'Noch keine öffentlichen Protokolle',
-  'publicProtocols.empty.noneBody': 'Sobald ein Gremium seine Protokolle veröffentlicht, findest du sie hier. Bis dahin bekommst du Protokolle bei dem Gremium selbst.',
+  'publicProtocols.empty.noneBody':
+    'Sobald ein Gremium seine Protokolle veröffentlicht, findest du sie hier. Bis dahin bekommst du Protokolle bei dem Gremium selbst.',
   'publicProtocols.empty.home': 'Zur Startseite',
   'publicProtocols.empty.filtered': 'Keine Protokolle gefunden',
-  'publicProtocols.empty.filteredBody': 'Zu deiner Suche und den Filtern gibt es kein öffentliches Protokoll. Nicht-öffentliche TOPs werden nie durchsucht.',
+  'publicProtocols.empty.filteredBody':
+    'Zu deiner Suche und den Filtern gibt es kein öffentliches Protokoll. Nicht-öffentliche TOPs werden nie durchsucht.',
   'publicProtocols.card.view': 'Ansehen',
   'publicProtocols.card.noDecision': 'Ohne Beschluss',
   'publicProtocols.card.decision': '{n} Beschluss',
@@ -3608,13 +3669,15 @@ export const de = {
   'publicProtocols.top.nonPublic': 'Nicht-öffentlicher Tagesordnungspunkt',
   'publicProtocols.top.nonPublicNote': 'Titel, Inhalt und Beschlüsse sind nicht öffentlich.',
   'publicProtocols.detail.notFound': 'Protokoll nicht gefunden',
-  'publicProtocols.detail.notFoundBody': 'Dieses Protokoll gibt es nicht oder es ist nicht öffentlich.',
+  'publicProtocols.detail.notFoundBody':
+    'Dieses Protokoll gibt es nicht oder es ist nicht öffentlich.',
   'publicProtocols.detail.back': 'Alle Protokolle',
   'publicProtocols.detail.meetingOn': 'Sitzung vom {date}',
   'publicProtocols.detail.finalizedOn': 'finalisiert am {date}',
   'publicProtocols.detail.agenda': 'Tagesordnung und Beschlüsse',
   'publicProtocols.detail.top': 'TOP {n}:',
-  'publicProtocols.detail.noText': 'Zu diesem Protokoll gibt es keinen öffentlichen Text. Der Wortlaut steht im PDF.',
+  'publicProtocols.detail.noText':
+    'Zu diesem Protokoll gibt es keinen öffentlichen Text. Der Wortlaut steht im PDF.',
   'publicProtocols.detail.noTopText': 'Ohne Text und ohne Beschluss.',
   'publicProtocols.detail.allOf': 'Alle Protokolle: {name}',
   'publicProtocols.decision.label': 'Beschluss',
@@ -3629,13 +3692,18 @@ export const de = {
   'publicProtocols.attendance.noNames': 'Die öffentliche Fassung nennt keine Namen.',
   'publicProtocols.version.title': 'Öffentliche Fassung',
   'publicProtocols.version.samePdf': 'Inhalt wie im PDF der öffentlichen Fassung.',
-  'publicProtocols.version.nonPublic': 'Nicht-öffentliche TOPs ohne Titel, Inhalt und Beschlüsse; die Nummerierung bleibt.',
-  'publicProtocols.version.internal': 'Die interne Fassung gibt es nur für Mitglieder nach der Anmeldung.',
-  'meetings.protocol.publicNotice': 'Dieses Protokoll wird öffentlich. Keine Namen Dritter im Freitext.',
+  'publicProtocols.version.nonPublic':
+    'Nicht-öffentliche TOPs ohne Titel, Inhalt und Beschlüsse; die Nummerierung bleibt.',
+  'publicProtocols.version.internal':
+    'Die interne Fassung gibt es nur für Mitglieder nach der Anmeldung.',
+  'meetings.protocol.publicNotice':
+    'Dieses Protokoll wird öffentlich. Keine Namen Dritter im Freitext.',
   'meetings.finalizeDialog.title': 'Protokoll finalisieren?',
-  'meetings.finalizeDialog.body': 'Das Protokoll wird final, als PDF erstellt und an den Verteiler versandt. Danach ist es nicht mehr änderbar.',
+  'meetings.finalizeDialog.body':
+    'Das Protokoll wird final, als PDF erstellt und an den Verteiler versandt. Danach ist es nicht mehr änderbar.',
   'meetings.finalizeDialog.withheld': 'Nicht veröffentlichen',
-  'meetings.finalizeDialog.withheldHint': 'Das Protokoll erscheint nicht unter „Öffentliche Protokolle“. Du kannst es später veröffentlichen.',
+  'meetings.finalizeDialog.withheldHint':
+    'Das Protokoll erscheint nicht unter „Öffentliche Protokolle“. Du kannst es später veröffentlichen.',
   'meetings.protocolBar.public': 'Öffentlich unter „Öffentliche Protokolle“.',
   'meetings.protocolBar.withheld': 'Nicht veröffentlicht.',
   'meetings.protocolBar.publish': 'Veröffentlichen',
@@ -3645,21 +3713,32 @@ export const de = {
   'admin.gremien.public': 'Öffentlich (Protokolle auf der öffentlichen Seite zeigen)',
   'admin.gremien.publicShort': 'Öffentlich',
   'admin.gremien.publicTag': 'Öffentlich',
-  'admin.gremien.publicHint': 'Finalisierte Protokolle dieses Gremiums erscheinen ohne Anmeldung unter „Öffentliche Protokolle“. Die Startseite verlinkt die Seite.',
+  'admin.gremien.publicHint':
+    'Finalisierte Protokolle dieses Gremiums erscheinen ohne Anmeldung unter „Öffentliche Protokolle“. Die Startseite verlinkt die Seite.',
   'admin.gremien.publicImplies.title': 'Was das bedeutet',
-  'admin.gremien.publicImplies.final': 'Nur finalisierte Protokolle. Entwürfe und Protokolle im Rendern erscheinen nie.',
-  'admin.gremien.publicImplies.version': 'Nur die öffentliche Fassung: Anwesenheit als Zahl, keine Namen von Anwesenden und Protokollführung.',
-  'admin.gremien.publicImplies.nonPublic': 'Nicht-öffentliche TOPs nie: kein Titel, kein Inhalt, keine Beschlüsse, auch nicht in der Suche.',
-  'admin.gremien.publicImplies.retro': 'Gilt sofort auch für frühere finalisierte Protokolle. Ausschalten nimmt alle sofort von der Seite.',
-  'admin.gremien.publicImplies.meetings': 'Sitzungen selbst erscheinen nie öffentlich: keine Termine, keine laufenden Sitzungen. Nur Titel und Datum als Teil eines finalen Protokolls.',
+  'admin.gremien.publicImplies.final':
+    'Nur finalisierte Protokolle. Entwürfe und Protokolle im Rendern erscheinen nie.',
+  'admin.gremien.publicImplies.version':
+    'Nur die öffentliche Fassung: Anwesenheit als Zahl, keine Namen von Anwesenden und Protokollführung.',
+  'admin.gremien.publicImplies.nonPublic':
+    'Nicht-öffentliche TOPs nie: kein Titel, kein Inhalt, keine Beschlüsse, auch nicht in der Suche.',
+  'admin.gremien.publicImplies.retro':
+    'Gilt sofort auch für frühere finalisierte Protokolle. Ausschalten nimmt alle sofort von der Seite.',
+  'admin.gremien.publicImplies.meetings':
+    'Sitzungen selbst erscheinen nie öffentlich: keine Termine, keine laufenden Sitzungen. Nur Titel und Datum als Teil eines finalen Protokolls.',
   'admin.gremien.publicView': 'Öffentliche Seite ansehen',
-  'admin.gremien.publicQrNote': 'Unabhängig davon: die öffentliche Teilnahme (QR) stellt die Sitzungsleitung pro Sitzung ein. Sie macht keine Sitzung öffentlich sichtbar, und dieser Schalter erlaubt keine Gäste.',
+  'admin.gremien.publicQrNote':
+    'Unabhängig davon: die öffentliche Teilnahme (QR) stellt die Sitzungsleitung pro Sitzung ein. Sie macht keine Sitzung öffentlich sichtbar, und dieser Schalter erlaubt keine Gäste.',
   'admin.gremien.publicConfirm.title': 'Protokolle veröffentlichen?',
   'admin.gremien.publicConfirm.loading': 'Protokolle werden gezählt …',
-  'admin.gremien.publicConfirm.count': 'Nach dem Speichern sind {n} finalisierte Protokolle von {name} ohne Anmeldung lesbar, als öffentliche Fassung.',
-  'admin.gremien.publicConfirm.generic': 'Nach dem Speichern sind alle finalisierten Protokolle von {name} ohne Anmeldung lesbar, als öffentliche Fassung.',
-  'admin.gremien.publicConfirm.missing': 'Für {n} davon gibt es noch keine öffentliche Fassung. Die Plattform erzeugt sie jetzt; bis dahin erscheinen sie nicht.',
-  'admin.gremien.publicConfirm.nonPublicHint': 'Wer einen TOP nicht veröffentlichen will, markiert ihn vor dem Finalisieren als „Nicht öffentlich (NÖ)“.',
+  'admin.gremien.publicConfirm.count':
+    'Nach dem Speichern sind {n} finalisierte Protokolle von {name} ohne Anmeldung lesbar, als öffentliche Fassung.',
+  'admin.gremien.publicConfirm.generic':
+    'Nach dem Speichern sind alle finalisierten Protokolle von {name} ohne Anmeldung lesbar, als öffentliche Fassung.',
+  'admin.gremien.publicConfirm.missing':
+    'Für {n} davon gibt es noch keine öffentliche Fassung. Die Plattform erzeugt sie jetzt; bis dahin erscheinen sie nicht.',
+  'admin.gremien.publicConfirm.nonPublicHint':
+    'Wer einen TOP nicht veröffentlichen will, markiert ihn vor dem Finalisieren als „Nicht öffentlich (NÖ)“.',
   'admin.gremien.publicConfirm.confirm': 'Veröffentlichen',
   'admin.audit.action.protocol_publication': 'Protokoll-Veröffentlichung geändert',
 } as const;
@@ -3748,13 +3827,15 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'account.calendar.rotateHint': 'Creates a new URL — the old one stops working.',
   'account.calendar.error': 'Could not load the feed link.',
   'account.calendar.rotateError': 'Could not create the feed link.',
-  'pwa.updateReady': 'A new version of the app is available — reload the page to use it.',
+  'pwa.updateReady': 'A new version of the app is available.',
+  'pwa.reload': 'Reload',
   'account.notifications.title': 'Notifications',
   'account.notifications.intro':
     'Choose which email notifications you want to receive. Login links are always delivered.',
   'account.notifications.error': 'Settings could not be loaded.',
   'account.notifications.saveError': 'Saving failed — please try again.',
-  'account.notifications.empty': 'There are no notifications that you can turn off for your account.',
+  'account.notifications.empty':
+    'There are no notifications that you can turn off for your account.',
   'account.notifications.kind.status_update': 'Status updates on applications',
   'account.notifications.hint.status_update':
     'When the status of an application that concerns you changes.',
@@ -3944,7 +4025,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'expenses.bulk.exportConfirm': 'Export',
   'expenses.bulk.reassign': 'Reassign',
   'expenses.bulk.reassignTitle': 'Reassign selection',
-  'expenses.bulk.reassignHint': 'Empty fields stay unchanged. The cost centre applies to standalone bookings only.',
+  'expenses.bulk.reassignHint':
+    'Empty fields stay unchanged. The cost centre applies to standalone bookings only.',
   'expenses.bulk.reassignConfirm': 'Apply',
   'expenses.bulk.reassignDone': '{count} booking(s) updated.',
   'expenses.bulk.reassignError': 'Bulk reassignment failed.',
@@ -4027,7 +4109,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'home.statusNote': 'Already submitted? Track its status via the link in your confirmation email.',
   'home.choice.go': 'Continue',
 
-
   'common.yes': 'Yes',
   'common.no': 'No',
   'common.unnamed': 'No name',
@@ -4068,6 +4149,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.positions.errPreferred': 'Exactly one offer must be marked as preferred.',
   'apply.positions.errLabel': 'Position label is missing.',
   'apply.positions.errOffers': 'Each offer needs a label and a value > 0.',
+  'apply.positions.errAmountFormat': 'Not a valid amount. Example: 1,234.56 (at most 2 decimals).',
   'apply.positions.invalid':
     'Each position needs a label, enough comparison offers (value > 0) and exactly one preferred offer.',
   'apply.positions.noOffers': 'No comparison offers are possible for this position',
@@ -4245,7 +4327,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'dashboard.waiting.one': '1 day',
   'dashboard.waiting.other': '{n} days',
   'dashboard.empty.tasks': 'Nothing to do',
-  'dashboard.empty.tasksBody': 'Applications that need an action from you show here, for example missing details.',
+  'dashboard.empty.tasksBody':
+    'Applications that need an action from you show here, for example missing details.',
   'dashboard.empty.mine': 'No applications yet',
   'dashboard.empty.mineBody': 'After you submit an application, its status shows here.',
   'dashboard.empty.votes': 'No votes',
@@ -4260,7 +4343,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'dashboard.today.all': 'All',
   'dashboard.today.none': 'No meetings',
   'dashboard.today.noneBody': 'No meeting of your committees is planned.',
-  'dashboard.today.noGremiumBody': 'You are in no committee. The meetings and votes of your committees show here.',
+  'dashboard.today.noGremiumBody':
+    'You are in no committee. The meetings and votes of your committees show here.',
   'dashboard.today.finance': 'Finance',
   'dashboard.today.budget': 'Budget FY {year}',
   'dashboard.today.budgetNamed': '{name} · FY {year}',
@@ -4690,8 +4774,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.agenda.assignHeading': 'Assign application',
   'meetings.agenda.freetextHeading': 'Free-text item',
   'meetings.agenda.rename': 'Rename item',
-  'meetings.agenda.removeBlocked':
-    'This item has an open or closed vote and stays on the agenda.',
+  'meetings.agenda.removeBlocked': 'This item has an open or closed vote and stays on the agenda.',
   'meetings.agenda.removeNeedsVoteRight':
     'This item has votes. Only a person who manages the votes of the meeting can remove it.',
   'meetings.agenda.renamePlaceholder': 'Item title …',
@@ -4719,7 +4802,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'Should the application “{name}” be funded with {approved} (requested {requested}) and {conditions}?',
   'meetings.vote.questionPrefillAmount':
     'Should the application “{name}” be funded with {approved} (requested {requested})?',
-  'meetings.vote.questionPrefillConditions': 'Should the application “{name}” be funded with {conditions}?',
+  'meetings.vote.questionPrefillConditions':
+    'Should the application “{name}” be funded with {conditions}?',
 
   'decision.section': 'Decision proposal',
   'decision.switch': 'Approve with deviations',
@@ -4740,7 +4824,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'decision.conditionCount.other': '{n} conditions',
   'decision.questionHint':
     'Made from the proposal. It follows the amount and the conditions until you edit it by hand.',
-  'decision.error.amountInvalid': 'The funding amount must be greater than 0 with at most two decimals.',
+  'decision.error.amountInvalid':
+    'The funding amount must be greater than 0 with at most two decimals.',
   'decision.error.amountExceeds': 'The funding amount must not exceed the requested amount.',
   'decision.error.conditionLength': 'A condition has at most {max} characters.',
   'decision.error.conditionCount': 'At most {count} conditions.',
@@ -4805,9 +4890,12 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'election.dialog.secret': 'Secret election',
   'election.dialog.secretHint': 'Votes are counted without names',
   'election.dialog.submit': 'Open election',
-  'election.rule.single': 'Each person has one vote. The candidate with the most votes is elected. A tie goes to the lot.',
-  'election.rule.multi': 'Each person has {n} votes, at most one per candidate. The {n} candidates with the most votes are elected. A tie at the boundary goes to a runoff.',
-  'election.rule.yesNo': 'One candidate: a ballot with yes, no and abstain. Elected with more yes than no votes.',
+  'election.rule.single':
+    'Each person has one vote. The candidate with the most votes is elected. A tie goes to the lot.',
+  'election.rule.multi':
+    'Each person has {n} votes, at most one per candidate. The {n} candidates with the most votes are elected. A tie at the boundary goes to a runoff.',
+  'election.rule.yesNo':
+    'One candidate: a ballot with yes, no and abstain. Elected with more yes than no votes.',
   'election.ballot.counter': '{n} of {m} votes given',
   'election.ballot.sole': 'Candidate: {name}',
   'election.ballot.abstainAll': 'Abstain fully',
@@ -5031,7 +5119,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.attendanceSheet.representedBy': 'represented by {name}',
   'meetings.attendanceSheet.withVote': 'with vote',
   'meetings.attendanceSheet.revokeFirst': 'Revoke the delegation first.',
-  'meetings.attendanceSheet.delegationActive': 'Delegation active: revoke it first, then record the member as present.',
+  'meetings.attendanceSheet.delegationActive':
+    'Delegation active: revoke it first, then record the member as present.',
   'meetings.attendanceSheet.revokeDelegation': 'Revoke delegation',
   'meetings.attendanceSheet.revoke': 'Revoke',
   'meetings.attendanceSheet.delegations': 'Delegations · {n}',
@@ -5045,7 +5134,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.leadSubstitute.title': 'Enter substitute',
   'meetings.leadSubstitute.for': 'for {name}',
   'meetings.leadSubstitute.pool': 'Substitutes from the pool',
-  'meetings.leadSubstitute.poolNote': 'Personal substitutes of the member and substitutes for the whole committee.',
+  'meetings.leadSubstitute.poolNote':
+    'Personal substitutes of the member and substitutes for the whole committee.',
   'meetings.leadSubstitute.search': 'Search substitute',
   'meetings.leadSubstitute.loading': 'Loading …',
   'meetings.leadSubstitute.empty': 'Nobody is in the substitute pool for {name}.',
@@ -5060,7 +5150,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.protocolBar.rendering': 'The PDF is being made and sent.',
   'meetings.protocolBar.final': 'The minutes are final.',
   'meetings.protocolBar.finalSent': 'The minutes are final and were sent.',
-  'meetings.protocolBar.needsRight': 'Finalizing needs the committee right “Finalize & send minutes”.',
+  'meetings.protocolBar.needsRight':
+    'Finalizing needs the committee right “Finalize & send minutes”.',
   'meetings.protocolBar.pdf': 'PDF',
   'meetings.protocolBar.pdfInternal': 'Internal PDF',
   'meetings.protocolBar.pdfPublic': 'Public PDF',
@@ -5216,7 +5307,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.brand.noLegal': 'No legal links yet.',
   'admin.brand.copyrightHint': 'Leave empty for the default text.',
   'admin.brand.preview': 'Preview',
-  'admin.brand.previewHint': 'This is how the header, the texts and the footer look with this draft.',
+  'admin.brand.previewHint':
+    'This is how the header, the texts and the footer look with this draft.',
   'budget.tree.col.income': 'Income',
   'budget.tree.subtitle': 'Allocation per fiscal year, a colour per cost centre, sub cost centres.',
   'budget.tree.createTopShort': 'Budget',
@@ -5299,6 +5391,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'The committee is saved, but the minutes recipients are not. Save again.',
   'admin.gremien.slugTaken': 'A committee with this slug exists already. Choose another name.',
   'admin.gremien.deleteFailed': 'Could not delete the committee.',
+  'admin.gremien.deleteOpenVote':
+    'A vote of this committee is still open. Close or cancel it first.',
+  'admin.gremien.deleteFinalized':
+    'A meeting of this committee has a final protocol. You need the permission “meeting.delete_finalized” to delete it.',
   'admin.gremien.unknownMember': '(no name)',
   'admin.gremien.shownOf': '{shown} of {total}',
   'admin.gremien.showAll': 'Show all {count}',
@@ -5510,7 +5606,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'This committee decides on applications for this cost centre and its children when the flow takes the committee from the cost centre.',
   'budget.tree.decisionGremiumInherited': 'Inherited from {path} · {name}: {gremium}',
   'budget.tree.unknownGremium': 'unknown committee',
-  'budget.tree.decisionGremiumNoneHint': 'No committee here or above: applications for this cost centre have no deciding committee.',
+  'budget.tree.decisionGremiumNoneHint':
+    'No committee here or above: applications for this cost centre have no deciding committee.',
   'budget.tree.viewGremium': 'Visible to committee',
   'budget.tree.viewGremiumNone': '— no committee —',
   'budget.tree.viewGremiumHint':
@@ -5757,7 +5854,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.guardOp.compare': 'Field comparison',
   'admin.flow.guardOp.isInVoteGremium': 'Actor in the committee of the vote',
   'admin.flow.guardOp.budgetHasDecisionGremium': 'Cost centre has a deciding committee',
-  'admin.flow.actionType.assignBudgetFromApplicantGremium': "Cost centre from the applicant's committee",
+  'admin.flow.actionType.assignBudgetFromApplicantGremium':
+    "Cost centre from the applicant's committee",
   'admin.flow.actionType.assignBudgetFromMap': 'Cost centre by field value',
   'admin.flow.recipientKind.voteGremium': 'Deciding committee of the vote',
   'admin.flow.recipientKind.budgetGremium': 'Deciding committee of the cost centre',
@@ -5772,7 +5870,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.actSubtree': 'Limit the search to',
   'admin.flow.actSubtreeAll': 'All cost centres',
   'admin.flow.actApplicantGremiumHint':
-    "Assigns the one cost centre whose own deciding committee is a committee of the applicant. With no match or more than one, the cost centre stays open.",
+    'Assigns the one cost centre whose own deciding committee is a committee of the applicant. With no match or more than one, the cost centre stays open.',
   'admin.flow.actMapRows': 'Field value → cost centre',
   'admin.flow.actMapValue': 'Field value',
   'admin.flow.actMapBudget': 'Cost centre',
@@ -6529,9 +6627,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'Cost centres exist, but there is no fiscal year yet. Every figure on this page belongs to a fiscal year. Create one, and the cost centres show up here.',
   'budget.empty.noFiscalYear.action': 'Create a fiscal year',
 
-
-
-
   'budget.usage.heading': 'Utilisation per budget',
   'budget.dash.tree': 'Cost centres',
   'budget.dash.search': 'Search cost centres',
@@ -6559,7 +6654,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.dash.appsError': 'The applications could not be loaded.',
   'budget.dash.appsNone': 'No applications on this cost centre.',
 
-
   'admin.gremien.title': 'Committees',
   'admin.gremien.subtitle': 'Meetings, minutes and votes belong to a committee.',
   'admin.gremien.create': 'Create committee',
@@ -6579,7 +6673,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.gremien.deleteAction': 'Delete',
   'admin.gremien.deleteTitle': 'Delete committee',
   'admin.gremien.deleteConfirm':
-    '“{name}” and all its role assignments will be permanently deleted.',
+    '“{name}” and all its meetings with their votes and all its role assignments will be permanently deleted. Votes outside a meeting stay.',
   'admin.gremien.delegation': 'Allow vote delegation',
   'admin.gremien.delegationHint': 'Members may have a substitute for single meetings.',
   'admin.gremien.delegationLead': 'Lead time for delegations (minutes)',
@@ -6651,7 +6745,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.users.revoke.action': 'Revoke rights …',
   'admin.users.revoke.notSelf': 'You cannot revoke your own rights. Ask another administrator.',
   'admin.users.revoke.title': 'Revoke rights',
-  'admin.users.revoke.subtitle': 'For people who no longer log in. Select which committees and roles the person loses.',
+  'admin.users.revoke.subtitle':
+    'For people who no longer log in. Select which committees and roles the person loses.',
   'admin.users.revoke.loading': 'Loading rights …',
   'admin.users.revoke.loadFailed': 'The rights of the person could not be loaded.',
   'admin.users.revoke.retry': 'Try again',
@@ -6689,11 +6784,16 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.users.revoke.openTask': '1 open vote',
   'admin.users.revoke.openTasks': '{n} open votes',
   'admin.users.revoke.openTasksDetail': 'The person can no longer vote there.',
-  'admin.users.revoke.shared': 'The SSO group {group} also applies to {others}. Both are revoked together.',
-  'admin.users.revoke.note': 'Effective at once: {name} no longer belongs to the selected committees (no voting right, no committee mails, no tasks, no read access through the committee). The account and all past entries stay.',
-  'admin.users.revoke.noteLogin': 'When {name} logs in again, only the committees and roles that the SSO then still provides come back.',
-  'admin.users.revoke.noteDeactivated': 'The account is then deactivated: {name} can no longer log in until somebody activates it again.',
-  'admin.users.revoke.returnsAutomatically': 'Comes back at the next start or login: the person is a configured bootstrap admin (BOOTSTRAP_ADMIN_SUBJECTS / BOOTSTRAP_ADMIN_EMAILS).',
+  'admin.users.revoke.shared':
+    'The SSO group {group} also applies to {others}. Both are revoked together.',
+  'admin.users.revoke.note':
+    'Effective at once: {name} no longer belongs to the selected committees (no voting right, no committee mails, no tasks, no read access through the committee). The account and all past entries stay.',
+  'admin.users.revoke.noteLogin':
+    'When {name} logs in again, only the committees and roles that the SSO then still provides come back.',
+  'admin.users.revoke.noteDeactivated':
+    'The account is then deactivated: {name} can no longer log in until somebody activates it again.',
+  'admin.users.revoke.returnsAutomatically':
+    'Comes back at the next start or login: the person is a configured bootstrap admin (BOOTSTRAP_ADMIN_SUBJECTS / BOOTSTRAP_ADMIN_EMAILS).',
   'admin.users.revoke.deactivate': 'Also deactivate the account',
   'admin.users.revoke.deactivateHint': 'The person can then no longer log in.',
   'admin.users.revoke.count.gremium': '1 committee',
@@ -6708,8 +6808,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.users.revoke.failed': 'The rights could not be revoked.',
   'admin.users.revoke.error.revoke_own_account': 'You cannot revoke your own rights.',
   'admin.users.revoke.error.principal_merged': 'This account was merged into another one.',
-  'admin.users.revoke.error.revoke_incomplete': 'An SSO group also applies to something that was not selected. The selection was loaded again.',
-  'admin.users.revoke.error.revoke_unknown_target': 'The rights of the person changed. The selection was loaded again.',
+  'admin.users.revoke.error.revoke_incomplete':
+    'An SSO group also applies to something that was not selected. The selection was loaded again.',
+  'admin.users.revoke.error.revoke_unknown_target':
+    'The rights of the person changed. The selection was loaded again.',
   'admin.users.revoke.error.revoke_empty': 'Select at least one committee or role.',
   'admin.users.merge.notSelf': 'You cannot merge your own account into another account.',
   'admin.users.merge.title': 'Merge into another account',
@@ -6915,7 +7017,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'expenses.bulk.deleteCount': 'Delete {count} bookings',
   'expenses.bulk.deleteLimit': 'Bulk delete takes at most {max} bookings.',
   'expenses.bulk.exportLine': '{count} bookings as .xlsx',
-  'expenses.bulk.reassignFixed': '{names} is linked to an application or is a sub-booking and keeps its cost centre.',
+  'expenses.bulk.reassignFixed':
+    '{names} is linked to an application or is a sub-booking and keeps its cost centre.',
   'expenses.bulk.selectRow': 'Select “{description}”',
   'expenses.bulk.start': 'Select several',
   'expenses.bulk.stop': 'End selection',
@@ -6945,7 +7048,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'expenses.form.addShort': 'Add',
   'expenses.form.editedBy': '{description} · recorded by {name}, {date}',
   'expenses.form.fixed': 'Fixed',
-  'expenses.form.fromInvoice': 'Taken from the invoice: payee/payer, invoice date, reference number.',
+  'expenses.form.fromInvoice':
+    'Taken from the invoice: payee/payer, invoice date, reference number.',
   'expenses.form.receipt': 'Receipt',
   'expenses.form.required': 'Required fields are marked with *.',
   'expenses.form.what': 'What',
@@ -6972,7 +7076,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'expenses.transfers.expenseOn': 'Expense on',
   'expenses.transfers.incomeOn': 'Income on',
   'expenses.transfers.kind': 'Transfer',
-  'expenses.transfers.later': 'Invoice date, payment date and note can be set after booking, in the edit.',
+  'expenses.transfers.later':
+    'Invoice date, payment date and note can be set after booking, in the edit.',
   'expenses.transfers.none': 'No transfer open',
   'expenses.transfers.pairTitle': 'From → to',
   'expenses.transfers.preview': 'How it is booked',
@@ -7024,13 +7129,17 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'guests.pseudonym': 'Guest {n}',
   'guests.tag': 'Guest',
   'guests.settings.title': 'Public participation (QR)',
-  'guests.settings.hint': 'People without an account join with their phone. You admit each person. Admitted guests see the public agenda items like members.',
+  'guests.settings.hint':
+    'People without an account join with their phone. You admit each person. Admitted guests see the public agenda items like members.',
   'guests.settings.modeCaption': 'Guests in this meeting',
   'guests.settings.needsNoQuorum': 'Only for committees without a quorum.',
   'guests.settings.hasQuorum': 'This committee has a quorum of {n} %.',
-  'guests.toast.needsNoQuorum': 'Public participation is only possible in committees without a quorum.',
-  'guests.settings.linkAfterCreate': 'The link and the QR code come after the create: in "Edit meeting", in the header of the meeting page ("QR code") and on the beamer.',
-  'guests.settings.perVote': 'You can limit single votes to members when you open them. Votes in non-public agenda items are always for members only.',
+  'guests.toast.needsNoQuorum':
+    'Public participation is only possible in committees without a quorum.',
+  'guests.settings.linkAfterCreate':
+    'The link and the QR code come after the create: in "Edit meeting", in the header of the meeting page ("QR code") and on the beamer.',
+  'guests.settings.perVote':
+    'You can limit single votes to members when you open them. Votes in non-public agenda items are always for members only.',
   'guests.mode.vote': 'Guests may vote',
   'guests.mode.watch': 'Guests only watch',
   'guests.mode.voteHint': 'Guests vote like members, then without a quorum.',
@@ -7039,22 +7148,26 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'guests.link.copy': 'Copy',
   'guests.link.copied': 'Copied',
   'guests.link.rotate': 'Create a new link',
-  'guests.link.rotateConfirm': 'The old link and the old code then stop working. Open join requests lapse. Admitted guests stay.',
+  'guests.link.rotateConfirm':
+    'The old link and the old code then stop working. Open join requests lapse. Admitted guests stay.',
   'guests.link.rotateYes': 'Create a new link',
   'guests.off.title': 'Turn public participation off?',
-  'guests.off.text': '{pending} open requests lapse and {admitted} admitted guests leave the meeting. Cast votes stay counted. This applies with "Save".',
+  'guests.off.text':
+    '{pending} open requests lapse and {admitted} admitted guests leave the meeting. Cast votes stay counted. This applies with "Save".',
   'guests.off.confirm': 'Turn off',
   'guests.toast.rotated': 'New join link created. The old one no longer works.',
   'guests.toast.admittedAll': '{n} guests admitted.',
   'guests.toast.guestVoteOpen': 'A vote with guests is open. Close it before guests only watch.',
   'guests.vote.switch': 'Guests vote too',
-  'guests.vote.switchOn': '{n} admitted guests vote too. Without a quorum: only the majority of the votes cast counts.',
+  'guests.vote.switchOn':
+    '{n} admitted guests vote too. Without a quorum: only the majority of the votes cast counts.',
   'guests.vote.switchOff': 'Off: only the members vote. Quorum as before.',
   'guests.vote.switchNonPublic': 'In a non-public agenda item only members vote.',
   'guests.vote.votersWith': 'Eligible now: {n} ({members} members + {guests} guests present)',
   'guests.vote.votersMembers': 'Eligible: {n} members ({present} present)',
   'guests.vote.composition': '{members} members + {guests} guests present',
-  'guests.vote.lateHint': 'Guests that you admit now still vote. The number of voters is fixed at the close.',
+  'guests.vote.lateHint':
+    'Guests that you admit now still vote. The number of voters is fixed at the close.',
   'guests.vote.resultCaption': 'Result without quorum',
   'guests.vote.cast': 'Cast',
   'guests.vote.castN': 'Cast {n}',
@@ -7062,10 +7175,14 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'guests.vote.reached': 'reached',
   'guests.vote.notReached': 'not reached',
   'guests.vote.back': 'Back to the meeting',
-  'guests.vote.noteWatch': 'In this meeting guests only watch. You see the result here after the close.',
-  'guests.vote.noteMembersOnly': 'In this vote only the members of {gremium} vote. You see the result here after the close.',
-  'guests.vote.noteLate': 'You were admitted during the vote and can still vote. The number of voters is fixed at the close.',
-  'guests.vote.noteSecret': 'Secret vote: your choice is counted without a name. The meeting lead only sees that you voted.',
+  'guests.vote.noteWatch':
+    'In this meeting guests only watch. You see the result here after the close.',
+  'guests.vote.noteMembersOnly':
+    'In this vote only the members of {gremium} vote. You see the result here after the close.',
+  'guests.vote.noteLate':
+    'You were admitted during the vote and can still vote. The number of voters is fixed at the close.',
+  'guests.vote.noteSecret':
+    'Secret vote: your choice is counted without a name. The meeting lead only sees that you voted.',
   'guests.vote.progressMembers': '{voted} of {present} members have voted',
   'guests.dock.present': 'Present {n} + {g} guests',
   'guests.dock.pending': '{n} open join requests',
@@ -7092,7 +7209,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'guests.list.renameTitle': 'Change the name of the guest',
   'guests.list.remove': 'Remove guest',
   'guests.list.removeTitle': 'Remove {name}?',
-  'guests.list.removeHint': 'The person can no longer vote afterwards. Votes in closed votes stay counted.',
+  'guests.list.removeHint':
+    'The person can no longer vote afterwards. Votes in closed votes stay counted.',
   'guests.status.left': 'Left',
   'guests.status.removed': 'Removed',
   'guests.status.watching': 'Watching',
@@ -7116,13 +7234,16 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'guests.page.waitTitle': 'Waiting for the meeting lead to admit you',
   'guests.page.waitText': 'You asked as {name}. Keep this page open, it updates by itself.',
   'guests.page.rejectedTitle': 'Request rejected',
-  'guests.page.rejectedText': 'The meeting lead did not admit {name}. Was this a mistake? Talk to the meeting lead in the room.',
+  'guests.page.rejectedText':
+    'The meeting lead did not admit {name}. Was this a mistake? Talk to the meeting lead in the room.',
   'guests.page.removedTitle': 'You are no longer in the meeting',
-  'guests.page.removedText': 'The meeting lead removed {name} from the meeting. Cast votes stay counted.',
+  'guests.page.removedText':
+    'The meeting lead removed {name} from the meeting. Cast votes stay counted.',
   'guests.page.retry': 'Ask again',
   'guests.page.retryAt': 'Possible again from {time} ({n} minutes)',
   'guests.page.notPublicTitle': 'The meeting is no longer public',
-  'guests.page.notPublicText': 'The meeting lead turned public participation off. Cast votes stay counted.',
+  'guests.page.notPublicText':
+    'The meeting lead turned public participation off. Cast votes stay counted.',
   'guests.page.closedTitle': 'The meeting has ended',
   'guests.page.closedText': 'Thank you for taking part. The committee publishes the minutes.',
   'guests.page.unknownTitle': 'This link is invalid or the meeting has ended.',
@@ -7138,7 +7259,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'guests.join.submit': 'Join',
   'guests.join.member': 'Member?',
   'guests.join.login': 'Log in with your account',
-  'guests.join.privacy': 'Your name is on the attendance list of this meeting. In open votes the meeting lead sees your vote, in secret votes not. When you leave and with the final minutes it becomes "Guest n".',
+  'guests.join.privacy':
+    'Your name is on the attendance list of this meeting. In open votes the meeting lead sees your vote, in secret votes not. When you leave and with the final minutes it becomes "Guest n".',
   'guests.join.error': 'The request did not go through. Try again.',
   'guests.join.errorAltcha': 'The spam check did not go through. Try again.',
   'guests.join.errorRate': 'Too many requests. Wait a moment, then try again.',
@@ -7168,16 +7290,19 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.action.guest_renamed': 'Guest name changed',
   'admin.audit.action.guest_admit_all': 'All requests admitted',
   'home.choice.protocols.title': 'Minutes',
-  'home.choice.protocols.desc': 'Read and download the minutes and decisions of the public committees.',
+  'home.choice.protocols.desc':
+    'Read and download the minutes and decisions of the public committees.',
   'home.latest.title': 'Recently published',
   'home.latest.meta': '{gremium} · {n} public agenda items',
   'home.latest.all': 'All {n} minutes',
   'publicProtocols.title': 'Public minutes',
   'publicProtocols.crumbs': 'Path',
   'publicProtocols.crumbHome': 'Start',
-  'publicProtocols.lede': 'Finalized minutes of the public committees in their public version: attendance as numbers only, non-public agenda items without title and content.',
+  'publicProtocols.lede':
+    'Finalized minutes of the public committees in their public version: attendance as numbers only, non-public agenda items without title and content.',
   'publicProtocols.search': 'Search title or text',
-  'publicProtocols.searchHint': 'The search covers meeting titles and the text of public agenda items.',
+  'publicProtocols.searchHint':
+    'The search covers meeting titles and the text of public agenda items.',
   'publicProtocols.filter.gremium': 'Committee',
   'publicProtocols.filter.gremienN': '{n} committees',
   'publicProtocols.filter.semester': 'Semester',
@@ -7193,10 +7318,12 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'publicProtocols.more': 'Load more minutes',
   'publicProtocols.pdf': 'PDF (public version)',
   'publicProtocols.empty.none': 'No public minutes yet',
-  'publicProtocols.empty.noneBody': 'As soon as a committee publishes its minutes, you find them here. Until then, ask the committee itself for its minutes.',
+  'publicProtocols.empty.noneBody':
+    'As soon as a committee publishes its minutes, you find them here. Until then, ask the committee itself for its minutes.',
   'publicProtocols.empty.home': 'To the start page',
   'publicProtocols.empty.filtered': 'No minutes found',
-  'publicProtocols.empty.filteredBody': 'There are no public minutes for your search and filters. Non-public agenda items are never searched.',
+  'publicProtocols.empty.filteredBody':
+    'There are no public minutes for your search and filters. Non-public agenda items are never searched.',
   'publicProtocols.card.view': 'View',
   'publicProtocols.card.noDecision': 'No decision',
   'publicProtocols.card.decision': '{n} decision',
@@ -7229,13 +7356,17 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'publicProtocols.attendance.noNames': 'The public version names nobody.',
   'publicProtocols.version.title': 'Public version',
   'publicProtocols.version.samePdf': 'The content is the same as in the PDF of the public version.',
-  'publicProtocols.version.nonPublic': 'Non-public agenda items without title, content and decisions; the numbering stays.',
+  'publicProtocols.version.nonPublic':
+    'Non-public agenda items without title, content and decisions; the numbering stays.',
   'publicProtocols.version.internal': 'Only members see the internal version, after they sign in.',
-  'meetings.protocol.publicNotice': 'These minutes become public. Do not name third persons in the free text.',
+  'meetings.protocol.publicNotice':
+    'These minutes become public. Do not name third persons in the free text.',
   'meetings.finalizeDialog.title': 'Finalize the minutes?',
-  'meetings.finalizeDialog.body': 'The minutes become final, are made into a PDF and are sent to the mailing list. After that you cannot change them.',
+  'meetings.finalizeDialog.body':
+    'The minutes become final, are made into a PDF and are sent to the mailing list. After that you cannot change them.',
   'meetings.finalizeDialog.withheld': 'Do not publish',
-  'meetings.finalizeDialog.withheldHint': 'The minutes do not appear under “Public minutes”. You can publish them later.',
+  'meetings.finalizeDialog.withheldHint':
+    'The minutes do not appear under “Public minutes”. You can publish them later.',
   'meetings.protocolBar.public': 'Public under “Public minutes”.',
   'meetings.protocolBar.withheld': 'Not published.',
   'meetings.protocolBar.publish': 'Publish',
@@ -7245,21 +7376,32 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.gremien.public': 'Public (show the minutes on the public page)',
   'admin.gremien.publicShort': 'Public',
   'admin.gremien.publicTag': 'Public',
-  'admin.gremien.publicHint': 'Finalized minutes of this committee appear without a login under “Public minutes”. The start page links the page.',
+  'admin.gremien.publicHint':
+    'Finalized minutes of this committee appear without a login under “Public minutes”. The start page links the page.',
   'admin.gremien.publicImplies.title': 'What this means',
-  'admin.gremien.publicImplies.final': 'Only finalized minutes. Drafts and minutes that are rendering never appear.',
-  'admin.gremien.publicImplies.version': 'Only the public version: attendance as a number, no names of attendees and minute-takers.',
-  'admin.gremien.publicImplies.nonPublic': 'Never non-public agenda items: no title, no content, no decisions, also not in the search.',
-  'admin.gremien.publicImplies.retro': 'Applies at once to earlier finalized minutes too. Switching it off removes all of them from the page at once.',
-  'admin.gremien.publicImplies.meetings': 'Meetings themselves never appear in public: no dates, no running meetings. Only title and date as part of final minutes.',
+  'admin.gremien.publicImplies.final':
+    'Only finalized minutes. Drafts and minutes that are rendering never appear.',
+  'admin.gremien.publicImplies.version':
+    'Only the public version: attendance as a number, no names of attendees and minute-takers.',
+  'admin.gremien.publicImplies.nonPublic':
+    'Never non-public agenda items: no title, no content, no decisions, also not in the search.',
+  'admin.gremien.publicImplies.retro':
+    'Applies at once to earlier finalized minutes too. Switching it off removes all of them from the page at once.',
+  'admin.gremien.publicImplies.meetings':
+    'Meetings themselves never appear in public: no dates, no running meetings. Only title and date as part of final minutes.',
   'admin.gremien.publicView': 'View the public page',
-  'admin.gremien.publicQrNote': 'Separately, the meeting lead sets the public participation (QR) per meeting. It makes no meeting visible in public, and this switch allows no guests.',
+  'admin.gremien.publicQrNote':
+    'Separately, the meeting lead sets the public participation (QR) per meeting. It makes no meeting visible in public, and this switch allows no guests.',
   'admin.gremien.publicConfirm.title': 'Publish the minutes?',
   'admin.gremien.publicConfirm.loading': 'Counting the minutes …',
-  'admin.gremien.publicConfirm.count': 'After saving, {n} finalized minutes of {name} are readable without a login, in their public version.',
-  'admin.gremien.publicConfirm.generic': 'After saving, all finalized minutes of {name} are readable without a login, in their public version.',
-  'admin.gremien.publicConfirm.missing': '{n} of them have no public version yet. The platform makes it now; until then they do not appear.',
-  'admin.gremien.publicConfirm.nonPublicHint': 'To keep an agenda item off the public page, mark it as “Non-public” before the finalization.',
+  'admin.gremien.publicConfirm.count':
+    'After saving, {n} finalized minutes of {name} are readable without a login, in their public version.',
+  'admin.gremien.publicConfirm.generic':
+    'After saving, all finalized minutes of {name} are readable without a login, in their public version.',
+  'admin.gremien.publicConfirm.missing':
+    '{n} of them have no public version yet. The platform makes it now; until then they do not appear.',
+  'admin.gremien.publicConfirm.nonPublicHint':
+    'To keep an agenda item off the public page, mark it as “Non-public” before the finalization.',
   'admin.gremien.publicConfirm.confirm': 'Publish',
   'admin.audit.action.protocol_publication': 'Protocol publication changed',
 };

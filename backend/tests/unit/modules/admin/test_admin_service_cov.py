@@ -48,10 +48,12 @@ from app.modules.admin.service.webhooks import (
     _delivery_status_out,
     _webhook_out,
 )
+from app.modules.auth.principal import Principal
 from app.shared.config_schemas import ComparisonOffers, FlowGraph
 from app.shared.errors import (
     BadRequestError,
     ConflictError,
+    ForbiddenError,
     NotFoundError,
     ValidationProblem,
 )
@@ -415,18 +417,138 @@ async def test_update_gremium_not_found() -> None:
         await s.update_gremium(uuid.uuid4(), GremiumUpdate(name="x"), "admin")
 
 
+_ADMIN = Principal(sub="admin", roles=["admin"])
+
+
 async def test_delete_gremium_ok() -> None:
     row = gremium_row()
-    s, sess = svc([*audit_results()], gets=[row])
-    await s.delete_gremium(row.id, "admin")
+    # The locked Gremium, then no meeting (the locking select), no vote, the audit.
+    s, sess = svc([res(), res(), *audit_results()], scalars=[row])
+    await s.delete_gremium(row.id, _ADMIN)
+    assert row in sess.deleted
+    assert sess.committed == 1
+    lock = str(sess.statements[0])
+    assert "FROM gremium" in lock and "FOR UPDATE" in lock
+
+
+class _DeleteSpy:
+    """Record the calls of the meeting and vote rules in one ordered list."""
+
+    def __init__(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        votes: list[Any],
+        *,
+        refuse_meeting: Any = None,
+        refuse_lock: bool = False,
+    ) -> None:
+        from app.modules.livevote.service import MeetingService
+        from app.modules.voting.service import VotingService
+
+        self.calls: list[tuple[Any, ...]] = []
+        spy = self
+
+        async def _check(_self: Any, meeting: Any, _principal: Any) -> bool:
+            spy.calls.append(("check", meeting.id))
+            if meeting is refuse_meeting:
+                raise ForbiddenError("final", code="meeting_finalized")
+            return meeting.final
+
+        async def _lock(_self: Any, gremium_id: Any, meeting_ids: list[Any]) -> list[Any]:
+            spy.calls.append(("lock", gremium_id, meeting_ids))
+            if refuse_lock:
+                raise ConflictError("open", code="open_vote")
+            return votes
+
+        async def _delete_votes(
+            _self: Any, rows: list[Any], *, actor: str, reason: str
+        ) -> list[Any]:
+            spy.calls.append(("votes", [v.id for v in rows], actor, reason))
+            return [v.id for v in rows]
+
+        async def _write(_self: Any, meeting: Any, _principal: Any, **kw: Any) -> None:
+            spy.calls.append(("meeting", meeting.id, kw))
+
+        monkeypatch.setattr(MeetingService, "check_deletable", _check)
+        monkeypatch.setattr(MeetingService, "write_delete", _write)
+        monkeypatch.setattr(VotingService, "lock_for_gremium_delete", _lock)
+        monkeypatch.setattr(VotingService, "delete_locked_votes", _delete_votes)
+
+
+def _meeting_row(*, final: bool = False) -> Any:
+    from types import SimpleNamespace
+
+    return SimpleNamespace(id=uuid.uuid4(), final=final)
+
+
+def _vote_row(meeting_id: Any) -> Any:
+    from types import SimpleNamespace
+
+    return SimpleNamespace(id=uuid.uuid4(), meeting_id=meeting_id)
+
+
+async def test_delete_gremium_locks_and_checks_everything_before_the_first_write(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Locks and refusals come first; then the meeting deletes. A vote without a meeting stays."""
+    row = gremium_row()
+    m1, m2 = _meeting_row(final=True), _meeting_row()
+    v1, v2, loose = _vote_row(m1.id), _vote_row(m2.id), _vote_row(None)
+    spy = _DeleteSpy(monkeypatch, [v1, loose, v2])
+    s, sess = svc([res(m1, m2), *audit_results()], scalars=[row])
+    await s.delete_gremium(row.id, _ADMIN)
+    assert spy.calls == [
+        ("check", m1.id),
+        ("check", m2.id),
+        ("lock", row.id, [m1.id, m2.id]),
+        ("votes", [v1.id], "admin", "meeting_deleted"),
+        (
+            "meeting",
+            m1.id,
+            {"finalized": True, "deleted_votes": [v1.id], "reason": "gremium_deleted"},
+        ),
+        ("votes", [v2.id], "admin", "meeting_deleted"),
+        (
+            "meeting",
+            m2.id,
+            {"finalized": False, "deleted_votes": [v2.id], "reason": "gremium_deleted"},
+        ),
+    ]
+    assert all(loose.id not in call[1] for call in spy.calls if call[0] == "votes")
+    # The Gremium row first, then the meetings of the Gremium in id order.
+    lock = str(sess.statements[3])
+    assert "FOR UPDATE" in lock and "meeting.gremium_id" in lock
+    assert "ORDER BY meeting.id" in lock
     assert row in sess.deleted
     assert sess.committed == 1
 
 
+@pytest.mark.parametrize("refusal", ["meeting", "lock"])
+async def test_delete_gremium_refusal_writes_nothing(
+    monkeypatch: pytest.MonkeyPatch, refusal: str
+) -> None:
+    """A final protocol or an open vote stops the delete before any write."""
+    row = gremium_row()
+    m1, m2 = _meeting_row(), _meeting_row(final=True)
+    spy = _DeleteSpy(
+        monkeypatch,
+        [],
+        refuse_meeting=m2 if refusal == "meeting" else None,
+        refuse_lock=refusal == "lock",
+    )
+    s, sess = svc([res(m1, m2)], scalars=[row])
+    with pytest.raises(ForbiddenError if refusal == "meeting" else ConflictError):
+        await s.delete_gremium(row.id, _ADMIN)
+    assert all(call[0] in {"check", "lock"} for call in spy.calls)
+    assert sess.added == []
+    assert sess.deleted == []
+    assert sess.committed == 0
+
+
 async def test_delete_gremium_not_found() -> None:
-    s, _ = svc(gets=[None])
+    s, _ = svc()
     with pytest.raises(NotFoundError):
-        await s.delete_gremium(uuid.uuid4(), "admin")
+        await s.delete_gremium(uuid.uuid4(), _ADMIN)
 
 
 async def test_get_gremium_mail_recipients_union_dedup() -> None:
