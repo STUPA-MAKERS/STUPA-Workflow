@@ -100,6 +100,26 @@ class Settings(BaseSettings):
     oidc_groups_claim: str = "groups"
     oidc_post_logout_redirect_url: str | None = None
 
+    @field_validator(
+        "oidc_issuer",
+        "oidc_client_id",
+        "oidc_client_secret",
+        "oidc_redirect_url",
+        "oidc_post_logout_redirect_url",
+        mode="before",
+    )
+    @classmethod
+    def _empty_oidc_value_is_unset(cls, value: Any) -> Any:
+        """Read an empty or blank OIDC value as not set.
+
+        `deploy/.env.example` ships `OIDC_CLIENT_SECRET=` empty. Without this step the
+        16-character minimum rejects the empty string and the app does not start. With
+        it, the empty value means "OIDC is not configured" and `oidc_enabled` is False.
+        """
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
     # Bootstrap admins. Comma-separated OIDC `sub` values and/or emails. On OIDC login
     # and at startup the app grants the matched principals the `admin` role, and it
     # does so idempotently. This prevents a lockout on a fresh real OIDC install, where

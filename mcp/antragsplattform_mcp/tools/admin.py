@@ -349,6 +349,12 @@ async def update_group_mapping(mapping_id: str, patch: S.GroupMappingUpdate) -> 
 
 
 @group.tool
+async def delete_group_mapping(mapping_id: str) -> dict:
+    """Delete a mapping from an OIDC group to a global role. Requires admin.group_mappings."""
+    return await api().delete(f"/admin/group-mappings/{mapping_id}")
+
+
+@group.tool
 async def list_application_types() -> dict:
     """List the application types in the admin view."""
     return await api().get("/admin/application-types")
@@ -384,6 +390,12 @@ async def create_webhook(webhook: S.WebhookCreate) -> dict:
 async def update_webhook(webhook_id: str, patch: S.WebhookUpdate) -> dict:
     """Patch a webhook. Requires webhook.manage."""
     return await api().patch(f"/admin/webhooks/{webhook_id}", json=dump_patch(patch))
+
+
+@group.tool
+async def delete_webhook(webhook_id: str) -> dict:
+    """Delete a webhook and its delivery history. Requires webhook.manage."""
+    return await api().delete(f"/admin/webhooks/{webhook_id}")
 
 
 @group.tool

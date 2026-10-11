@@ -94,7 +94,8 @@ export const de = {
   'account.calendar.rotateHint': 'Erzeugt eine neue URL — die bisherige wird ungültig.',
   'account.calendar.error': 'Der Abo-Link konnte nicht geladen werden.',
   'account.calendar.rotateError': 'Der Abo-Link konnte nicht erzeugt werden.',
-  'pwa.updateReady': 'Eine neue Version der App ist verfügbar — Seite neu laden, um sie zu nutzen.',
+  'pwa.updateReady': 'Eine neue Version der App ist verfügbar.',
+  'pwa.reload': 'Neu laden',
   'account.notifications.title': 'Benachrichtigungen',
   'account.notifications.intro':
     'Wähle, welche E-Mail-Benachrichtigungen du erhalten möchtest. Login-Links werden immer zugestellt.',
@@ -3824,7 +3825,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'account.calendar.rotateHint': 'Creates a new URL — the old one stops working.',
   'account.calendar.error': 'Could not load the feed link.',
   'account.calendar.rotateError': 'Could not create the feed link.',
-  'pwa.updateReady': 'A new version of the app is available — reload the page to use it.',
+  'pwa.updateReady': 'A new version of the app is available.',
+  'pwa.reload': 'Reload',
   'account.notifications.title': 'Notifications',
   'account.notifications.intro':
     'Choose which email notifications you want to receive. Login links are always delivered.',
