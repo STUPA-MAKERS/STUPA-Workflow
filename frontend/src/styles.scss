@@ -244,6 +244,116 @@ td:first-child > .skel--bar {
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Load-stable placeholders. The page draws its loading state with the SAME containers
+   as its content (rows, title, sections, columns) and puts a bar where a text goes. A
+   bar is an inline block inside the real element, so the line keeps the real line
+   height and nothing moves when the text arrives.
+
+   - `.skel-text`: one line of text. Give it a width; it takes the font of its parent.
+   - `.skel-box`: a block of a fixed size (a button, an icon, a checkbox).
+   - `.skel-in`: on the container. It stays invisible for 300ms, so a fast answer
+     shows no placeholder at all.
+   - `.skel-stale`: on content that is reloading. It stays as it is for 300ms, then
+     dims; it never moves. Pair it with `inert` and `aria-busy`.
+   - `.skel-progress`: a thin bar at the top of a reloading area, also after 300ms.
+   No pulse: one slow, faint sweep, which stops under reduced motion.
+   --------------------------------------------------------------------------- */
+.skel-text,
+.skel-box {
+  --skel-fill: color-mix(in srgb, var(--color-text) 9%, transparent);
+  --skel-shine: color-mix(in srgb, var(--color-text) 5%, transparent);
+  background-color: var(--skel-fill);
+  background-image: linear-gradient(90deg, transparent 0, var(--skel-shine) 50%, transparent 100%);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  background-position: -100% 0;
+  animation: skel-sweep 1.8s var(--ease-standard, ease) infinite;
+}
+.skel-text {
+  display: inline-block;
+  max-width: 100%;
+  height: 0.75em;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+.skel-text--muted {
+  --skel-fill: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+.skel-text--accent {
+  --skel-fill: color-mix(in srgb, var(--color-accent) 28%, transparent);
+}
+.skel-box {
+  display: block;
+  flex: none;
+  border-radius: var(--radius-sm, 4px);
+}
+@keyframes skel-sweep {
+  0% {
+    background-position: -100% 0;
+  }
+  70%,
+  100% {
+    background-position: 200% 0;
+  }
+}
+.skel-in {
+  animation: skel-in 150ms var(--ease-standard, ease) 300ms both;
+}
+@keyframes skel-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.skel-stale {
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 150ms var(--ease-standard, ease) 300ms;
+}
+.skel-progress {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  z-index: 1;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--color-accent) 25%, transparent);
+  pointer-events: none;
+  animation: skel-in 150ms var(--ease-standard, ease) 300ms both;
+}
+.skel-progress::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -30%;
+  width: 30%;
+  border-radius: 2px;
+  background: var(--color-accent);
+  animation: skel-progress 1.3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes skel-progress {
+  to {
+    left: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel-text,
+  .skel-box,
+  .skel-progress::after {
+    animation: none;
+  }
+  .skel-progress::after {
+    left: 0;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
 // The edit grid of a form (`toFormlySections`): two columns, long fields (`fe-full`)
 // over both, one column below a 32rem container. The applications detail, the apply
 // wizard and the status page share it. Global, because Formly draws the fields.

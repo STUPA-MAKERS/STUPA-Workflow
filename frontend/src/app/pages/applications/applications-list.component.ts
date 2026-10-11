@@ -213,6 +213,11 @@ export class ApplicationsListComponent implements OnDestroy {
   readonly loading = signal(true);
   /** Load of more pages while scrolling. It is incremental and the list stays visible. */
   readonly loadingMore = signal(false);
+  /**
+   * Page 0 is loading again (a filter, the search or the sort changed) while the old rows
+   * are still shown. They stay, dimmed and inert after 300ms, until the new ones arrive.
+   */
+  readonly reloading = signal(false);
   readonly error = signal(false);
   /** Accumulated applications across all loaded pages so far (infinite scroll). */
   readonly items = signal<ApplicationListItem[]>([]);
@@ -695,7 +700,7 @@ export class ApplicationsListComponent implements OnDestroy {
 
   /** Append the next page. The visible sentinel or the "load more" button calls this. */
   loadMore(): void {
-    if (this.loadingMore() || this.loading() || !this.hasMore()) return;
+    if (this.loadingMore() || this.loading() || this.reloading() || !this.hasMore()) return;
     this.loadingMore.set(true);
     this.fetch('more');
   }
@@ -904,6 +909,7 @@ export class ApplicationsListComponent implements OnDestroy {
     this.nextOffset = 0;
     this.loadingMore.set(false);
     this.loading.set(this.items().length === 0);
+    this.reloading.set(this.items().length > 0);
     this.error.set(false);
     this.fetch('initial');
   }
@@ -964,12 +970,14 @@ export class ApplicationsListComponent implements OnDestroy {
         this.nextOffset = page.offset + page.items.length;
         this.collectStates(page.items);
         this.loading.set(false);
+        this.reloading.set(false);
         this.loadingMore.set(false);
       },
       error: () => {
         if (seq !== this.fetchSeq) return;
         if (mode === 'initial') this.error.set(true);
         this.loading.set(false);
+        this.reloading.set(false);
         this.loadingMore.set(false);
       },
     });
