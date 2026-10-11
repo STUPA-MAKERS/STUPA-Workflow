@@ -217,9 +217,10 @@ class GremiumOps(ConfigServiceBase):
         rules of the meeting delete (``MeetingService.check_deletable`` and
         ``write_delete``). A meeting with an open vote refuses the delete, a final
         protocol needs ``meeting.delete_finalized``, and every vote of the meeting
-        goes with a ``vote_delete`` audit entry. The votes of the gremium without a
-        meeting follow the same rules. One refusal stops the whole delete, and
-        nothing changes.
+        goes with a ``vote_delete`` audit entry. A vote of the gremium without a
+        meeting stays (user decision 2026-10-11), because it records a decision,
+        for example the vote of an application. An open one refuses the delete.
+        One refusal stops the whole delete, and nothing changes.
 
         The delete locks the gremium row first. A concurrent insert of a meeting
         (or a vote of one) takes a key-share lock on that row through its foreign
@@ -278,7 +279,7 @@ class GremiumOps(ConfigServiceBase):
         await self.session.commit()
 
     async def _delete_gremium_votes(self, gremium_id: UUID, principal: Principal) -> None:
-        """Delete the meetings and the votes of a gremium by their own rules, without a commit.
+        """Delete the meetings of a gremium and their votes by their own rules, without a commit.
 
         The method takes every lock and runs every refusal check BEFORE its first
         audit entry: the meeting rows, then the rules of each meeting, then all
@@ -307,6 +308,8 @@ class GremiumOps(ConfigServiceBase):
             meeting.id: await meeting_service.check_deletable(meeting, principal)
             for meeting in meetings
         }
+        # The lock also holds the votes without a meeting, so that an open one refuses
+        # the delete. These votes stay: only the votes of the meetings go.
         votes = await voting.lock_for_gremium_delete(gremium_id, list(finalized))
         # The locks are all taken: from here on, only deletes and audit entries.
         for meeting in meetings:
@@ -322,11 +325,6 @@ class GremiumOps(ConfigServiceBase):
                 deleted_votes=deleted,
                 reason="gremium_deleted",
             )
-        await voting.delete_locked_votes(
-            [vote for vote in votes if vote.meeting_id is None],
-            actor=principal.sub,
-            reason="gremium_deleted",
-        )
 
     async def _require_cd_variant(self, variant_id: UUID | None) -> None:
         """Check the CD variant server-side. The client id is untrusted.

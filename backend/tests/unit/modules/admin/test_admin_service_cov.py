@@ -490,7 +490,7 @@ def _vote_row(meeting_id: Any) -> Any:
 async def test_delete_gremium_locks_and_checks_everything_before_the_first_write(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Locks and refusals come first; then the meeting deletes, then the other votes."""
+    """Locks and refusals come first; then the meeting deletes. A vote without a meeting stays."""
     row = gremium_row()
     m1, m2 = _meeting_row(final=True), _meeting_row()
     v1, v2, loose = _vote_row(m1.id), _vote_row(m2.id), _vote_row(None)
@@ -513,8 +513,8 @@ async def test_delete_gremium_locks_and_checks_everything_before_the_first_write
             m2.id,
             {"finalized": False, "deleted_votes": [v2.id], "reason": "gremium_deleted"},
         ),
-        ("votes", [loose.id], "admin", "gremium_deleted"),
     ]
+    assert all(loose.id not in call[1] for call in spy.calls if call[0] == "votes")
     # The Gremium row first, then the meetings of the Gremium in id order.
     lock = str(sess.statements[3])
     assert "FOR UPDATE" in lock and "meeting.gremium_id" in lock

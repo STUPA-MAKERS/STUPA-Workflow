@@ -4,8 +4,8 @@ The meeting row cascades with the Gremium, and the votes of a meeting only detac
 (``vote.meeting_id`` SET NULL). Without the rules, a final protocol would go without
 ``meeting.delete_finalized``, an open vote would stay open without its meeting, and no
 vote would get a ``vote_delete`` audit entry. The Gremium delete therefore runs the
-meeting delete for each meeting first, and deletes its votes without a meeting by the
-same rules.
+meeting delete for each meeting first. A vote of the Gremium without a meeting stays,
+but an open one refuses the delete.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ async def _standalone_vote(
         return vote.id
 
 
-async def test_gremium_delete_deletes_meetings_and_votes_with_audit(
+async def test_gremium_delete_deletes_meetings_and_keeps_votes_without_a_meeting(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
     s = await seed(maker, status="closed", votes=("draft", "closed"), protocol="final")
@@ -65,8 +65,11 @@ async def test_gremium_delete_deletes_meetings_and_votes_with_audit(
         assert await session.get(Gremium, s.gremium_id) is None
         assert await session.get(Meeting, s.meeting_id) is None
         assert await session.get(Protocol, s.protocol_id) is None
-        for vote_id in [*s.vote_ids.values(), standalone]:
+        for vote_id in s.vote_ids.values():
             assert await session.get(Vote, vote_id) is None
+        kept = await session.get(Vote, standalone)
+        assert kept is not None
+        assert kept.status == "closed"
         ballots = await session.scalars(
             select(Ballot).where(Ballot.vote_id == s.vote_ids["closed"])
         )
@@ -83,9 +86,7 @@ async def test_gremium_delete_deletes_meetings_and_votes_with_audit(
         [entry] = await audit_actions(maker, target_id=vote_id)
         assert entry.action == "vote_delete"
         assert entry.data["reason"] == "meeting_deleted"
-    [entry] = await audit_actions(maker, target_id=standalone)
-    assert entry.action == "vote_delete"
-    assert entry.data["reason"] == "gremium_deleted"
+    assert await audit_actions(maker, target_id=standalone) == []
     [gremium_entry] = await audit_actions(maker, target_id=s.gremium_id)
     assert gremium_entry.action == "config_change"
 

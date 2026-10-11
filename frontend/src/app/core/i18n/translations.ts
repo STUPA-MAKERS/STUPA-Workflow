@@ -2988,7 +2988,7 @@ export const de = {
   'admin.gremien.deleteAction': 'Löschen',
   'admin.gremien.deleteTitle': 'Gremium löschen',
   'admin.gremien.deleteConfirm':
-    '„{name}" wird mit allen Sitzungen, Abstimmungen und Rollenzuweisungen unwiderruflich gelöscht.',
+    '„{name}" wird mit allen Sitzungen samt ihren Abstimmungen und mit allen Rollenzuweisungen unwiderruflich gelöscht. Abstimmungen ohne Sitzung bleiben erhalten.',
   'admin.gremien.delegation': 'Stimm-Delegation erlauben',
   'admin.gremien.delegationHint': 'Mitglieder dürfen sich für einzelne Sitzungen vertreten lassen.',
   'admin.gremien.delegationLead': 'Vorlauf für Delegationen (Minuten)',
@@ -6668,7 +6668,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.gremien.deleteAction': 'Delete',
   'admin.gremien.deleteTitle': 'Delete committee',
   'admin.gremien.deleteConfirm':
-    '“{name}” and all its meetings, votes and role assignments will be permanently deleted.',
+    '“{name}” and all its meetings with their votes and all its role assignments will be permanently deleted. Votes outside a meeting stay.',
   'admin.gremien.delegation': 'Allow vote delegation',
   'admin.gremien.delegationHint': 'Members may have a substitute for single meetings.',
   'admin.gremien.delegationLead': 'Lead time for delegations (minutes)',

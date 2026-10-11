@@ -311,11 +311,13 @@ class VotingService:
     async def lock_for_gremium_delete(
         self, gremium_id: UUID, meeting_ids: Sequence[UUID]
     ) -> list[Vote]:
-        """Lock every vote that a Gremium delete takes along, without a commit.
+        """Lock every vote that a Gremium delete checks, without a commit.
 
         These are the votes of the meetings of the Gremium (``meeting_ids``) and the
         votes that hold the Gremium id in ``eligible_group`` and have no meeting, for
-        example the vote of an application outside a meeting. One statement locks
+        example the vote of an application outside a meeting. The delete takes only
+        the meeting votes along; a vote without a meeting stays, but an open one
+        refuses the delete. One statement locks
         them all in id order, BEFORE the delete writes its first audit entry. The
         audit write takes the advisory lock of the audit chain, and a vote cancel or
         close locks its vote first and audits after it. A vote lock after the first
@@ -359,7 +361,7 @@ class VotingService:
         The method deletes, in this order, the protocol references, the secret
         ballots, the voted markers and the ballots of these votes, clears the vote
         reference of the status events, and deletes each vote with a ``vote_delete``
-        audit entry with ``reason`` (``meeting_deleted``, ``gremium_deleted``).
+        audit entry with ``reason`` (``meeting_deleted``).
 
         Returns:
             The ids of the deleted votes, in the order of ``rows``.
@@ -380,8 +382,7 @@ class VotingService:
     ) -> None:
         """Write ``vote_delete`` for a loaded vote and delete it, without a commit.
 
-        ``reason`` names a delete that another delete caused (``meeting_deleted``,
-        ``gremium_deleted``).
+        ``reason`` names a delete that another delete caused (``meeting_deleted``).
         """
         data: dict[str, str | None] = {
             **self._audit_refs(vote),
