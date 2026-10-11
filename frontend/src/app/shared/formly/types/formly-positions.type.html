@@ -110,14 +110,14 @@
                     (input)="setOfferLabel(pi, oi, $any($event.target).value)"
                   />
                 </label>
-                <label class="pf pos__money" [class.pf--invalid]="offerValueInvalid(o)">
+                <label class="pf pos__money" [class.pf--invalid]="offerValueInvalid(o, pi, oi)">
                   <span class="pf__label">{{ t('forms.positions.amount') }}</span>
                   <input
                     class="pf__control mono"
                     type="text"
                     inputmode="decimal"
                     [value]="offerValueText(pi, oi)"
-                    [attr.aria-invalid]="offerValueInvalid(o) ? 'true' : null"
+                    [attr.aria-invalid]="offerValueInvalid(o, pi, oi) ? 'true' : null"
                     (focus)="beginEditValue(pi, oi)"
                     (blur)="endEditValue()"
                     (input)="setOfferValue(pi, oi, $any($event.target).value)"
