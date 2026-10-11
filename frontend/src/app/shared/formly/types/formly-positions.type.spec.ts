@@ -308,8 +308,10 @@ describe('FormlyPositionsType — value text & parsing', () => {
     expect(parse('12,')).toBe(12);
     expect(parse('€ 50')).toBe(50);
     expect(parse('-5')).toBe(-5);
-    // DE: "." is the thousands separator, and 3 decimals are too many.
-    expect(parse('1234.56')).toBeNull();
+    // DE: one dot with at most 2 digits after it is a decimal; 3 decimals are too many.
+    expect(parse('1234.56')).toBeCloseTo(1234.56);
+    expect(parse('12.50')).toBeCloseTo(12.5);
+    expect(parse('1.2345')).toBeNull();
     expect(parse('12,345')).toBeNull();
     expect(parse('1.2.3')).toBeNull();
     expect(parse('--5')).toBeNull();
@@ -344,6 +346,7 @@ describe('FormlyPositionsType — typing into an amount cell', () => {
     ['12,', 12],
     ['1,5', 1.5],
     ['1.234,56', 1234.56],
+    ['12.50', 12.5],
     ['-5', -5],
   ])('keeps the typed text %p while editing and stores %p', async (raw, expected) => {
     const { cmp, control } = await setup({ value: one() });
@@ -359,7 +362,7 @@ describe('FormlyPositionsType — typing into an amount cell', () => {
     );
   });
 
-  it.each([['abc'], ['12,345'], ['1234.5']])(
+  it.each([['abc'], ['12,345'], ['1.2345']])(
     'keeps invalid text %p after blur, stores null and shows the error',
     async (raw) => {
       const { cmp, control } = await setup({ value: one() });
