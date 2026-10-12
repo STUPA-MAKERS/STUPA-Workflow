@@ -69,6 +69,7 @@ from app.modules.livevote.models import (
     Meeting,
     MeetingAttendance,
     MeetingGuest,
+    MeetingSettings,
     ProtocolKeeperPeriod,
 )
 from app.modules.notifications.models import NotificationPreference
@@ -276,6 +277,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             )
         )
         session.add(GuestApplicationSettings(id=1, updated_by=old.sub))
+        session.add(MeetingSettings(id=1, updated_by=old.sub))
         # F1: the old account decided on the application by a manual transition.
         session.add(ApplicationDecision(application_id=app_id, decided_by=old.sub))
 
