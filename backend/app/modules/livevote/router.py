@@ -570,23 +570,26 @@ async def open_meeting_vote(
     broker: BrokerRestDep,
     principal: ReaderDep,
 ) -> MeetingOut:
-    """Open a live vote on an agenda item of this meeting.
+    """Open a live vote on an agenda item of this meeting, or prepare it as a draft.
 
-    The route creates the vote and opens it in one step. The caller must be the
-    manager, the protokollant, or hold the gremium permission ``vote.manage``. An
-    application agenda item allows exactly one vote, because that vote fires the pass
-    or fail branch on close. A free-text agenda item allows several generic questions.
+    The route creates the vote and opens it in one step. With ``draft`` it only
+    creates the vote: the question waits as a ``draft`` until
+    ``POST /meetings/{id}/votes/{voteId}/open`` opens it. A draft can be prepared in a
+    planned or a live meeting, an open vote needs a live meeting (409
+    ``meeting_not_started`` / ``meeting_closed``). The caller must be the manager, the
+    protokollant, or hold the gremium permission ``vote.manage``. An application
+    agenda item allows exactly one vote, because that vote fires the pass or fail
+    branch on close. A free-text agenda item allows several generic questions.
     ``eligibleGroup`` is the Gremium of the meeting. The server derives the quorum
     denominator from the roster (members with ``vote.cast``) and never from client
-    input. The route broadcasts ``vote_opened``.
+    input. The route broadcasts ``vote_opened``, or ``meeting_state`` for a draft.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:
         raise ForbiddenError("not allowed to open a vote in this meeting")
-    # A vote needs a started meeting. Before ``live`` there is no protocol to
-    # record the result in.
-    if meeting.status != "live":
-        raise ConflictError("the meeting has not started — start it before opening a vote")
+    # An open vote needs a started meeting. Before ``live`` there is no protocol to
+    # record the result in. A prepared draft only waits for the start.
+    _assert_vote_window(meeting, draft=payload.draft)
     item = await agenda.item(meeting_id, payload.agenda_item_id)
     # #17: the admitted guests vote too when the meeting lets them and the item is
     # public. Such a vote has no quorum: only the majority of the cast ballots counts.
@@ -620,25 +623,7 @@ async def open_meeting_vote(
     if item.application_id is not None:
         if await service.agenda_item_has_vote(item.id):
             raise ConflictError("this application TOP already has a decision vote")
-        # Fail fast: an application vote fires the pass or fail branch of the
-        # current state on close. If the application is not in a vote state, nobody
-        # can close the vote, and the cast ballots are lost.
-        kind = await service.application_state_kind(item.application_id)
-        if kind != "vote":
-            raise ConflictError(
-                "The application is not in a vote state — move it into its "
-                "decision state before opening the vote.",
-                code="conflict",
-            )
-        # Only the Gremium that decides the current vote state votes. A stale agenda
-        # item (the application left the state and came back for another Gremium)
-        # must not let this meeting decide.
-        if await service.application_vote_gremium(item.application_id) != meeting.gremium_id:
-            raise ConflictError(
-                "The Gremium of this meeting does not decide the current vote of the "
-                "application.",
-                code="vote_gremium_mismatch",
-            )
+        await _assert_application_votable(service, meeting, item.application_id)
     config_data: dict[str, object] = (
         {
             "seats": payload.seats,
@@ -677,14 +662,7 @@ async def open_meeting_vote(
         if election
         else VoteConfig.model_validate(config_data)
     )
-    # The server always derives the quorum denominator from the real roster and
-    # never from the client. A holder of ``canManageVotes`` cannot manipulate it.
-    # A vote with guests counts the present members and the admitted guests; the
-    # close fixes the number again (a display value, there is no quorum).
-    if guests_vote:
-        eligible = await service.present_member_count(meeting_id) + meeting.admitted_guests
-    else:
-        eligible = await service.vote_eligible_count(meeting.gremium_id)
+    eligible = await _eligible_count(service, meeting, guests_vote=guests_vote)
     create = VoteCreateInternal(
         config=config,
         eligibleGroup=meeting.gremium_id,
@@ -693,11 +671,139 @@ async def open_meeting_vote(
         proposal=payload.proposal,
     )
     vote = await voting.create_internal(
-        item.application_id, create, meeting_id=meeting_id, agenda_item_id=item.id
+        item.application_id,
+        create,
+        meeting_id=meeting_id,
+        agenda_item_id=item.id,
+        planned_ok=payload.draft,
     )
+    if payload.draft:
+        # The other managers of the meeting see the prepared question at once.
+        await service.broadcast_state(meeting_id, principal)
+        return await service.get(meeting_id, principal)
     opened = await voting.open(vote.id, now=datetime.now(UTC), actor=principal.sub)
     await BrokerPublisher(broker).vote_opened(opened)
     return await service.get(meeting_id, principal)
+
+
+@router.post(
+    "/meetings/{meeting_id}/votes/{vote_id}/open",
+    response_model=MeetingOut,
+    responses=_errors(401, 403, 404, 409),
+)
+async def open_prepared_meeting_vote(
+    meeting_id: UUID,
+    vote_id: UUID,
+    service: ServiceDep,
+    voting: VotingDep,
+    agenda: AgendaDep,
+    broker: BrokerRestDep,
+    principal: ReaderDep,
+) -> MeetingOut:
+    """Open a prepared draft vote of this meeting.
+
+    The caller must hold ``canManageVotes``, as for the create. The meeting must be
+    live. The draft can wait a long time, so the route runs the checks of the create
+    again: the application must still be in a vote state that the Gremium of the
+    meeting decides, and a vote with guests needs a meeting where guests vote and a
+    public agenda item (409 ``guests_vote_unavailable``). The quorum denominator comes
+    from the current roster, not from the roster at the create. The route broadcasts
+    ``vote_opened``. 404 when the meeting has no such vote, 409 when the vote is no
+    longer a draft.
+    """
+    meeting = await service.get(meeting_id, principal)
+    if not meeting.can_manage_votes:
+        raise ForbiddenError("not allowed to open a vote in this meeting")
+    _assert_vote_window(meeting, draft=False)
+    vote = next((v for v in meeting.votes if v.id == vote_id), None)
+    if vote is None:
+        raise NotFoundError(f"vote {vote_id} not found in this meeting")
+    if vote.status != "draft":
+        raise ConflictError(f"vote is {vote.status}, cannot open.", code="conflict")
+    if vote.guests_vote:
+        guests_allowed = meeting.public_join and meeting.guests_mode == "vote"
+        non_public = (
+            vote.agenda_item_id is not None
+            and (await agenda.item(meeting_id, vote.agenda_item_id)).non_public
+        )
+        if not guests_allowed or non_public:
+            raise ConflictError(
+                "Guests no longer vote on this question. Delete it and prepare it again.",
+                code="guests_vote_unavailable",
+            )
+    if vote.application_id is not None:
+        await _assert_application_votable(service, meeting, vote.application_id)
+    eligible = await _eligible_count(service, meeting, guests_vote=vote.guests_vote)
+    opened = await voting.open(
+        vote_id, now=datetime.now(UTC), actor=principal.sub, eligible_count=eligible
+    )
+    await BrokerPublisher(broker).vote_opened(opened)
+    return await service.get(meeting_id, principal)
+
+
+def _assert_vote_window(meeting: MeetingOut, *, draft: bool) -> None:
+    """Refuse a vote outside the state of the meeting that allows it.
+
+    A vote opens only in a ``live`` meeting. A ``draft`` also waits in a ``planned``
+    one.
+
+    Raises:
+        ConflictError: The meeting has not started (``meeting_not_started``) or is
+            closed (``meeting_closed``).
+    """
+    if meeting.status == "closed":
+        raise ConflictError(
+            "the meeting is closed — a vote can no longer open", code="meeting_closed"
+        )
+    if meeting.status == "planned" and not draft:
+        raise ConflictError(
+            "the meeting has not started — start it before opening a vote",
+            code="meeting_not_started",
+        )
+
+
+async def _assert_application_votable(
+    service: MeetingService, meeting: MeetingOut, application_id: UUID
+) -> None:
+    """Refuse a vote on an application that this meeting cannot decide now.
+
+    An application vote fires the pass or fail branch of the current state on close.
+    If the application is not in a vote state, nobody can close the vote, and the cast
+    ballots are lost. Only the Gremium that decides the current vote state votes: a
+    stale agenda item (the application left the state and came back for another
+    Gremium) must not let this meeting decide.
+
+    Raises:
+        ConflictError: The application is not in a vote state (``conflict``), or the
+            Gremium of the meeting does not decide it (``vote_gremium_mismatch``).
+    """
+    if await service.application_state_kind(application_id) != "vote":
+        raise ConflictError(
+            "The application is not in a vote state — move it into its "
+            "decision state before opening the vote.",
+            code="conflict",
+        )
+    if await service.application_vote_gremium(application_id) != meeting.gremium_id:
+        raise ConflictError(
+            "The Gremium of this meeting does not decide the current vote of the "
+            "application.",
+            code="vote_gremium_mismatch",
+        )
+
+
+async def _eligible_count(
+    service: MeetingService, meeting: MeetingOut, *, guests_vote: bool
+) -> int:
+    """Return the quorum denominator of a meeting vote from the current roster.
+
+    The server always derives it from the real roster and never from the client. A
+    holder of ``canManageVotes`` cannot manipulate it. A vote with guests counts the
+    present members and the admitted guests; the close fixes the number again (a
+    display value, there is no quorum).
+    """
+    if guests_vote:
+        return await service.present_member_count(meeting.id) + meeting.admitted_guests
+    return await service.vote_eligible_count(meeting.gremium_id)
 
 
 @router.delete(
@@ -844,9 +950,10 @@ async def set_agenda_body(
     """Set the markdown body or the title of an agenda item.
 
     The per-item editor calls this route. Only the meeting lead or an admin may
-    edit the agenda (``canWrite``). The body needs a live meeting, or a closed
-    meeting whose protocol is still a draft (O22). A rename needs a planned or live
-    meeting (O25). The service answers 409 otherwise.
+    edit the agenda (``canWrite``). The body needs a planned or live meeting, or a
+    closed meeting whose protocol is still a draft (O22): the minute-taker can write
+    the minutes before the start. A rename needs a planned or live meeting (O25). The
+    service answers 409 otherwise.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:

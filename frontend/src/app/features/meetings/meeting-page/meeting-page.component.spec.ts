@@ -331,24 +331,43 @@ describe('MeetingPageComponent', () => {
       expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Tagesordnung · 3 TOPs' }));
     });
 
-    it('changes no current item on a pick in the preparation pane', async () => {
+    it('opens a picked item of the preparation pane to prepare it, and goes back', async () => {
       const { on } = await setup({ meeting: planned({ canManageVotes: true }), protocol: null }, [MEDIA.wide]);
+      expect(screen.getByText('Wähle einen TOP, um seinen Text und seine Abstimmungen vorzubereiten.')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Bericht des Finanzreferats' }));
-      expect(on.selectTop).not.toHaveBeenCalled();
+      expect(on.selectTop).toHaveBeenCalledWith('t-2');
+      expect(screen.queryByRole('heading', { name: 'Sitzung vorbereiten' })).toBeNull();
+      // The text of the item can be written before the start, without a protocol.
+      expect(screen.getByText(/Den Text kannst du schon jetzt vorbereiten/)).toBeInTheDocument();
+      expect(screen.getByRole('toolbar', { name: 'Format' })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Zurück zur Vorbereitung' }));
+      expect(screen.getByRole('heading', { name: 'Sitzung vorbereiten' })).toBeInTheDocument();
     });
 
-    it('changes no current item on a pick in the preparation sheet', async () => {
+    it('opens a picked item of the preparation sheet', async () => {
       const { on } = await setup({ meeting: planned({ canManageVotes: true }), protocol: null });
       await userEvent.click(screen.getByTitle('Tagesordnung öffnen'));
       const sheet = await screen.findByRole('dialog', { name: 'Tagesordnung' });
       await userEvent.click(within(sheet).getByRole('button', { name: 'Bericht des Finanzreferats' }));
-      expect(on.selectTop).not.toHaveBeenCalled();
+      expect(on.selectTop).toHaveBeenCalledWith('t-2');
+      expect(screen.queryByRole('dialog', { name: 'Tagesordnung' })).toBeNull();
+    });
+
+    it('prepares a vote of a planned meeting', async () => {
+      const { on } = await setup(
+        { meeting: planned({ canManageVotes: true }), protocol: null, top: AGENDA[2], topIndex: 2 },
+        [MEDIA.wide],
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Antrag Kulturfestival' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Abstimmung vorbereiten' }));
+      expect(on.voteDialog).toHaveBeenCalledWith(AGENDA[2]);
     });
 
     it('shows a reader without session rights the sheet instead of the checklist', async () => {
       await setup({ meeting: planned({ canControl: false, canManage: false }), protocol: null });
       expect(screen.queryByRole('heading', { name: 'Sitzung vorbereiten' })).toBeNull();
-      expect(screen.getByText(/beim Start der Sitzung angelegt/)).toBeInTheDocument();
+      expect(screen.getByText(/Den Text kannst du schon jetzt vorbereiten/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Zurück zur Vorbereitung' })).toBeNull();
     });
   });
 
@@ -544,8 +563,8 @@ describe('MeetingPageComponent', () => {
       expect(on.castVote).toHaveBeenCalledWith({ voteId: 'v-1', choice: 'yes' });
       await userEvent.click(screen.getByRole('button', { name: 'Beschlussfrage löschen' }));
       expect(on.voteDelete).toHaveBeenCalledWith('v-0');
-      // A second vote waits until the open one ends.
-      expect(screen.queryByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeNull();
+      // A second vote can be prepared while the open one runs.
+      expect(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeEnabled();
     });
 
     it('opens a planned vote', async () => {
@@ -565,12 +584,11 @@ describe('MeetingPageComponent', () => {
       expect(open).toHaveAttribute('title', 'Erst die offene Abstimmung schließen oder abbrechen.');
       await userEvent.click(open);
       expect(on.voteOpen).not.toHaveBeenCalled();
-      // A free-text item offers no new question either, and an empty item no vote column.
-      expect(screen.queryByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeNull();
+      // A free-text item can still prepare a new question.
+      expect(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeEnabled();
       fixture.componentRef.setInput('meeting', meeting({ votes: [votes[1]] }));
       fixture.detectChanges();
-      expect(screen.queryByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeNull();
-      expect(screen.queryByRole('complementary', { name: 'Abstimmungen' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Beschlussfrage hinzufügen' })).toBeEnabled();
       // Once the other vote ends, both come back.
       fixture.componentRef.setInput(
         'meeting',

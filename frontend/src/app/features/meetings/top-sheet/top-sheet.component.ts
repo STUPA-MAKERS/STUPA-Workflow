@@ -45,6 +45,9 @@ const TOOLS: readonly FormatTool[] = [
  * The sheet of the open agenda item: "TOP 3 · Antrag", the title, "Antrag öffnen", the
  * format bar with the save state, and the Markdown editor of the text.
  *
+ * A planned meeting has no protocol yet, but the text of its items can be prepared
+ * (`editable`); the start creates the protocol around it.
+ *
  * In a live meeting only the minute-taker types (`editable`); everybody else with write
  * access reads the same sheet, and its foot says who keeps the minutes and the state of
  * the protocol.
@@ -84,8 +87,9 @@ export class TopSheetComponent {
   /** The 0-based index of the open item. */
   readonly topIndex = input.required<number>();
   /**
-   * The minutes may be written here: a protocol exists, it is not locked, and the viewer
-   * keeps the minutes (or nobody does and the viewer may write).
+   * The minutes may be written here: a protocol exists (or the meeting is planned), it
+   * is not locked, and the viewer keeps the minutes (or nobody does and the viewer may
+   * write).
    */
   readonly editable = input.required<boolean>();
   /** The viewer may write the protocol in principle (`canEditProtocol`). */

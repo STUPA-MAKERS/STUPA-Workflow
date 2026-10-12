@@ -61,8 +61,10 @@ type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'de
  * The header carries the title, the status, "Gremium · date · seit HH:MM", the people
  * who have the meeting open, the beamer, the session menu and the one main action (open
  * or close). Below it the agenda pane, the sheet of the open item and the cards of its
- * votes; a planned meeting shows the preparation instead of the sheet. The dock at the
- * foot steps through the agenda and holds the attendance and the minute-taker.
+ * votes. A planned meeting shows the preparation instead of the sheet until the lead
+ * picks an agenda item: then the sheet and the vote cards of that item show, so the
+ * text and the votes can be prepared before the start. The dock at the foot steps
+ * through the agenda and holds the attendance and the minute-taker.
  *
  * A closed meeting finalizes its protocol from the protocol bar of the sheet (O13). The
  * attendance opens as a side sheet. A minute-taker picked in the dock of a live meeting
@@ -188,6 +190,8 @@ export class MeetingPageComponent {
   readonly agendaOpen = signal(false);
   /** The list of the people who have the meeting open. */
   protected readonly presenceOpen = signal(false);
+  /** A planned meeting shows an agenda item instead of the preparation. */
+  protected readonly prepItem = signal(false);
 
   /** Raised by an insert from outside the editor, so the editor loads the new text. */
   protected readonly revision = signal(0);
@@ -209,17 +213,32 @@ export class MeetingPageComponent {
 
   protected readonly status = computed(() => meetingStatus(this.meeting().status));
   protected readonly locked = computed(() => this.protocol()?.isLocked ?? false);
+  /**
+   * The text of the item can be written. A planned meeting has no protocol yet, but its
+   * text can be prepared; the start creates the protocol around it.
+   */
   protected readonly editable = computed(
-    () => this.protocol() !== null && !this.locked() && this.canEdit(),
+    () =>
+      (this.protocol() !== null || this.meeting().status === 'planned') &&
+      !this.locked() &&
+      this.canEdit(),
   );
 
   /** "TOP hinzufügen" in the header of the agenda sheet. */
   protected readonly canAddTop = computed(() => canChangeAgenda(this.meeting(), this.locked()));
 
-  /** The planned meeting shows what the opening needs instead of the sheet. */
+  /**
+   * The planned meeting shows what the opening needs instead of the sheet, until the
+   * lead picks an agenda item to prepare.
+   */
   protected readonly preparing = computed(() => {
     const m = this.meeting();
-    return m.status === 'planned' && (m.canControl || m.canManage);
+    return m.status === 'planned' && (m.canControl || m.canManage) && !this.prepItem();
+  });
+  /** "Zurück zur Vorbereitung" above the sheet of a planned meeting. */
+  protected readonly canBackToPrep = computed(() => {
+    const m = this.meeting();
+    return m.status === 'planned' && (m.canControl || m.canManage) && this.prepItem();
   });
 
   /** "Studierendenparlament · Di, 29.09.2026 · seit 18:04". */
@@ -334,15 +353,22 @@ export class MeetingPageComponent {
 
   /**
    * "Beschlussfrage hinzufügen": an application item holds one vote, free text any number.
-   * A new vote waits while a vote on any item of the meeting is open.
+   * A planned meeting prepares the vote as a draft; so does a live meeting while another
+   * vote is open (the dialog then only prepares).
    */
   protected readonly canAddVote = computed(() => {
     const m = this.meeting();
     const t = this.top();
-    if (!t || !m.canManageVotes || this.locked() || m.status !== 'live') return false;
-    if (this.anyOpenVote()) return false;
+    if (!t || !m.canManageVotes || this.locked() || m.status === 'closed') return false;
     return !t.applicationId || this.votes().length === 0;
   });
+
+  /** The add button of an application item: open the vote, or only prepare it. */
+  protected readonly addVoteKey = computed<'meetings.vote.openFor' | 'meetings.vote.prepareTitle'>(() =>
+    this.meeting().status === 'live' && !this.anyOpenVote()
+      ? 'meetings.vote.openFor'
+      : 'meetings.vote.prepareTitle',
+  );
 
   /** The column of the vote cards shows when there is a vote or one can be added. */
   protected readonly showVotes = computed(
@@ -382,11 +408,10 @@ export class MeetingPageComponent {
 
   /**
    * Open an agenda item and, for the room lead, make it the item the room handles now.
-   * The preparation shows the checklist and no item, and a planned meeting has no
-   * "now", so a pick there does nothing.
+   * A planned meeting has no "now": a pick there opens the item to prepare it.
    */
   jump(id: Uuid): void {
-    if (this.preparing()) return;
+    if (this.meeting().status === 'planned') this.prepItem.set(true);
     this.panel.set('none');
     this.agendaOpen.set(false);
     this.selectTop.emit(id);

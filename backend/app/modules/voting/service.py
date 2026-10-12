@@ -149,9 +149,17 @@ class VotingService:
         return vote
 
     async def _lock_live_meeting(
-        self, meeting_id: UUID, *, agenda_item_id: UUID | None = None
+        self,
+        meeting_id: UUID,
+        *,
+        agenda_item_id: UUID | None = None,
+        planned_ok: bool = False,
     ) -> None:
         """Lock the meeting row and require a ``live`` meeting (O12, O25).
+
+        ``planned_ok`` also accepts a ``planned`` meeting. The create of a prepared
+        draft vote uses it: a draft can wait in a planned meeting, but it opens only
+        in a live one.
 
         The meeting close, the meeting delete and the agenda-item remove take the
         same lock. Thus a vote cannot open in a meeting that closes or is deleted at
@@ -173,12 +181,12 @@ class VotingService:
         )
         if status is None:
             raise NotFoundError(f"meeting {meeting_id} not found")
-        if status == "planned":
+        if status == "planned" and not planned_ok:
             raise ConflictError(
                 "The meeting has not started. Start it before opening a vote.",
                 code="meeting_not_started",
             )
-        if status != "live":
+        if status == "closed":
             raise ConflictError(
                 "The meeting is closed. A vote can no longer open.",
                 code="meeting_closed",
@@ -841,6 +849,7 @@ class VotingService:
         *,
         meeting_id: UUID | None = None,
         agenda_item_id: UUID | None = None,
+        planned_ok: bool = False,
     ) -> VoteOut:
         """Create a draft vote from a server-side payload.
 
@@ -851,7 +860,8 @@ class VotingService:
         ``eligible_count`` from the roster and runs the checks.
 
         A meeting vote locks the meeting row and needs a ``live`` meeting that still
-        has the agenda item (see ``_lock_live_meeting``).
+        has the agenda item (see ``_lock_live_meeting``). ``planned_ok`` also accepts
+        a ``planned`` meeting, for a vote that is prepared before the start.
 
         A decision proposal (F1) needs an application, and its amount must fit the
         requested amount.
@@ -859,14 +869,17 @@ class VotingService:
         Raises:
             NotFoundError: No application has this id, or the agenda item is not in
                 the meeting (404).
-            ConflictError: The meeting is not ``live`` (409).
+            ConflictError: The meeting is not ``live``, or not ``planned`` either
+                with ``planned_ok`` (409).
             ValidationProblem: A proposal without an application
                 (``decision_not_allowed``) or with a bad amount (422).
         """
         if application_id is None and payload.proposal is not None:
             raise not_allowed_problem("Only an application vote takes a decision proposal.")
         if meeting_id is not None:
-            await self._lock_live_meeting(meeting_id, agenda_item_id=agenda_item_id)
+            await self._lock_live_meeting(
+                meeting_id, agenda_item_id=agenda_item_id, planned_ok=planned_ok
+            )
         if application_id is not None:
             self._check_proposal(await self._get_application(application_id), payload.proposal)
         return await self._insert(
@@ -925,7 +938,12 @@ class VotingService:
         )
 
     async def open(
-        self, vote_id: UUID, *, now: datetime, actor: str | None = None
+        self,
+        vote_id: UUID,
+        *,
+        now: datetime,
+        actor: str | None = None,
+        eligible_count: int | None = None,
     ) -> VoteOut:
         """Move the vote from ``draft`` to ``open`` and open the time window.
 
@@ -935,7 +953,9 @@ class VotingService:
         The quorum denominator ``eligible_count`` comes from the authoritative roster.
         The create call sets it. It does NOT come from the logged-in users, because
         that would be fail-open. Without it a percent quorum stays fail-closed and
-        never counts as met.
+        never counts as met. A prepared meeting vote waits as a draft while the roster
+        can change, so its caller counts the roster again and gives
+        ``eligible_count``, which replaces the count of the create.
 
         A meeting vote opens only in a ``live`` meeting. The method locks the meeting
         row before the vote row, as the meeting close does (O12).
@@ -958,6 +978,8 @@ class VotingService:
         if await self.vote_gremium_mismatch(vote):
             raise vote_gremium_mismatch_error()
         config = self._config(vote)
+        if eligible_count is not None:
+            vote.eligible_count = eligible_count
         vote.opens_at = now
         vote.status = "open"
         await audit_record(

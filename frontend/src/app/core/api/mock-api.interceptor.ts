@@ -1967,9 +1967,15 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       const out = mockHandover(req.body as { principalId?: string; mode?: string } | null, req.url);
       return 'id' in out ? ok(out) : out;
     }
+    if (/\/meetings\/[^/]+\/votes\/[^/]+\/open$/.test(p)) {
+      // A prepared draft opens; the server answers with the meeting.
+      setVoteStatus(p.split('/').slice(-2)[0], 'open');
+      return ok(MOCK_MEETING);
+    }
     if (/\/meetings\/[^/]+\/votes$/.test(p)) {
       const body = req.body as {
         applicationId?: string;
+        draft?: boolean;
         agendaItemId?: string;
         question?: string | null;
         guestsVote?: boolean | null;
@@ -2011,13 +2017,15 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
           {
             ...election,
             id: `v-mock-${MOCK_MEETING.votes.length + 1}`,
+            agendaItemId: body?.agendaItemId ?? null,
             applicationId: body?.applicationId ?? '',
             title: null,
             question: body?.question ?? null,
             guestsVote: !!body?.guestsVote,
             presentMembers: body?.guestsVote ? 5 : null,
             presentGuests: body?.guestsVote ? 7 : null,
-            status: 'open',
+            // A prepared question stays a draft until it opens.
+            status: body?.draft ? 'draft' : 'open',
             result: null,
             counts: null,
             leading: null,

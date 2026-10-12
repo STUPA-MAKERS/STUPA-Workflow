@@ -1702,15 +1702,16 @@ async def test_set_body_title_ignored_for_application_top() -> None:
     assert item.title == "orig"  # an application agenda item inherits its title
 
 
-async def test_set_body_on_planned_meeting_conflicts() -> None:
-    """The minutes need a started meeting."""
+async def test_set_body_on_planned_meeting_ok(audit_calls: list[dict[str, Any]]) -> None:
+    """The minutes of an item can be written before the meeting starts."""
     m = _meeting(status="planned")
     item = _agenda_item()
-    sess = _QueueSession(executes=[res(m), res(item)])
-    with pytest.raises(ConflictError) as ei:
-        await AgendaService(sess).set_body(m.id, item.id, body="x")  # type: ignore[arg-type]
-    assert ei.value.code == "meeting_not_started"
-    assert sess.committed == 0
+    sess = _QueueSession(executes=[res(m), res(item), res(m)], scalars_q=[[]])
+    await AgendaService(sess).set_body(m.id, item.id, body="x")  # type: ignore[arg-type]
+    assert item.body == "x"
+    assert sess.committed == 1
+    # The preparation is not a correction of the minutes: no audit entry.
+    assert audit_calls == []
 
 
 async def test_set_non_public_on_planned_meeting_ok() -> None:
@@ -2360,12 +2361,16 @@ class _FakeVotingService:
         self.deleted: list[Any] = []
         self._vote = SimpleNamespace(id=uuid4(), meeting_id=None)
 
-    async def create_internal(self, application_id, payload, *, meeting_id, agenda_item_id):  # noqa: ANN001
+    async def create_internal(  # noqa: ANN201
+        self, application_id, payload, *, meeting_id, agenda_item_id, planned_ok=False  # noqa: ANN001
+    ):
         self.created.append((application_id, meeting_id, agenda_item_id))
+        self.planned_ok = planned_ok
         self.last_payload = payload
         return self._vote
 
-    async def open(self, vote_id, *, now, actor=None):  # noqa: ANN001
+    async def open(self, vote_id, *, now, actor=None, eligible_count=None):  # noqa: ANN001
+        self.opened_eligible = eligible_count
         from app.modules.voting.schemas import TallyOut, VoteOut
         from app.shared.config_schemas import VoteConfig
 
@@ -2778,6 +2783,7 @@ def test_open_vote_not_live_conflict(app: FastAPI, client: TestClient, fakes) ->
         f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())}
     )
     assert r.status_code == 409
+    assert r.json()["code"] == "meeting_not_started"
 
 
 def test_open_vote_freetext_top_ok(app: FastAPI, client: TestClient, fakes) -> None:
@@ -2895,6 +2901,198 @@ def test_open_vote_default_quorum_from_gremium(
         f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())}
     )
     assert r.status_code == 200
+
+
+@pytest.mark.parametrize("status", ["planned", "live"])
+def test_prepare_vote_creates_a_draft_without_open(
+    app: FastAPI, client: TestClient, fakes, status: str
+) -> None:
+    """A prepared question waits as a draft, also before the meeting starts."""
+    fakes["meeting"]._meeting_out = _meeting_out(status=status, can_manage_votes=True)
+    fakes["voting"].opened_eligible = "not called"
+    _login(app)
+    r = client.post(
+        f"/api/meetings/{uuid4()}/votes",
+        json={"agendaItemId": str(uuid4()), "question": "Pass?", "draft": True},
+    )
+    assert r.status_code == 200, r.text
+    assert fakes["voting"].created
+    assert fakes["voting"].planned_ok is True
+    assert fakes["voting"].opened_eligible == "not called"
+    assert fakes["meeting"].broadcasts == 1
+
+
+def test_prepare_vote_closed_meeting_conflict(app: FastAPI, client: TestClient, fakes) -> None:
+    fakes["meeting"]._meeting_out = _meeting_out(status="closed", can_manage_votes=True)
+    _login(app)
+    r = client.post(
+        f"/api/meetings/{uuid4()}/votes",
+        json={"agendaItemId": str(uuid4()), "draft": True},
+    )
+    assert r.status_code == 409
+    assert r.json()["code"] == "meeting_closed"
+    assert fakes["voting"].created == []
+
+
+def _with_vote(
+    *,
+    status: str = "live",
+    vote_status: str = "draft",
+    guests_vote: bool = False,
+    application_id: UUID | None = None,
+    agenda_item_id: UUID | None = None,
+    public_join: bool = False,
+    guests_mode: str = "vote",
+    can_manage_votes: bool = True,
+) -> tuple[Any, UUID]:
+    """A meeting with one vote, and the id of the vote."""
+    from app.modules.livevote.schemas import MeetingVoteOut
+
+    vote_id = uuid4()
+    meeting = _meeting_out(status=status, can_manage_votes=can_manage_votes)
+    vote = MeetingVoteOut(
+        id=vote_id,
+        applicationId=application_id,
+        agendaItemId=agenda_item_id,
+        status=vote_status,  # type: ignore[arg-type]
+        guestsVote=guests_vote,
+    )
+    out = meeting.model_copy(
+        update={
+            "votes": [vote],
+            "public_join": public_join,
+            "guests_mode": guests_mode,
+            "admitted_guests": 2,
+        }
+    )
+    return out, vote_id
+
+
+def test_open_prepared_vote_recounts_the_roster(app: FastAPI, client: TestClient, fakes) -> None:
+    out, vote_id = _with_vote(application_id=uuid4())
+    fakes["meeting"]._meeting_out = out
+    _login(app)
+    r = client.post(f"/api/meetings/{out.id}/votes/{vote_id}/open")
+    assert r.status_code == 200, r.text
+    # The roster at the open counts, not the roster at the create.
+    assert fakes["voting"].opened_eligible == 7
+
+
+def test_open_prepared_guest_vote_counts_present_and_guests(
+    app: FastAPI, client: TestClient, fakes
+) -> None:
+    from types import SimpleNamespace
+
+    item_id = uuid4()
+    fakes["agenda"].item_row = SimpleNamespace(id=item_id, application_id=None, non_public=False)
+    out, vote_id = _with_vote(guests_vote=True, agenda_item_id=item_id, public_join=True)
+    fakes["meeting"]._meeting_out = out
+
+    async def _present(meeting_id: UUID) -> int:
+        return 3
+
+    fakes["meeting"].present_member_count = _present  # type: ignore[attr-defined]
+    _login(app)
+    r = client.post(f"/api/meetings/{out.id}/votes/{vote_id}/open")
+    assert r.status_code == 200, r.text
+    assert fakes["voting"].opened_eligible == 5
+
+
+@pytest.mark.parametrize(
+    ("public_join", "guests_mode", "non_public"),
+    [(False, "vote", False), (True, "watch", False), (True, "vote", True)],
+)
+def test_open_prepared_guest_vote_refused_when_guests_no_longer_vote(
+    app: FastAPI,
+    client: TestClient,
+    fakes,
+    public_join: bool,
+    guests_mode: str,
+    non_public: bool,
+) -> None:
+    from types import SimpleNamespace
+
+    item_id = uuid4()
+    fakes["agenda"].item_row = SimpleNamespace(
+        id=item_id, application_id=None, non_public=non_public
+    )
+    out, vote_id = _with_vote(
+        guests_vote=True,
+        agenda_item_id=item_id,
+        public_join=public_join,
+        guests_mode=guests_mode,
+    )
+    fakes["meeting"]._meeting_out = out
+    fakes["voting"].opened_eligible = "not called"
+    _login(app)
+    r = client.post(f"/api/meetings/{out.id}/votes/{vote_id}/open")
+    assert r.status_code == 409
+    assert r.json()["code"] == "guests_vote_unavailable"
+    assert fakes["voting"].opened_eligible == "not called"
+
+
+def test_open_prepared_loose_guest_vote_ok(app: FastAPI, client: TestClient, fakes) -> None:
+    """A vote without an agenda item has no item visibility to check."""
+    out, vote_id = _with_vote(guests_vote=True, public_join=True)
+    fakes["meeting"]._meeting_out = out
+
+    async def _present(meeting_id: UUID) -> int:
+        return 0
+
+    fakes["meeting"].present_member_count = _present  # type: ignore[attr-defined]
+    _login(app)
+    assert client.post(f"/api/meetings/{out.id}/votes/{vote_id}/open").status_code == 200
+
+
+def test_open_prepared_vote_application_left_vote_state(
+    app: FastAPI, client: TestClient, fakes
+) -> None:
+    out, vote_id = _with_vote(application_id=uuid4())
+    fakes["meeting"]._meeting_out = out
+
+    async def _kind(application_id: UUID) -> str | None:
+        return "normal"
+
+    fakes["meeting"].application_state_kind = _kind  # type: ignore[assignment]
+    _login(app)
+    r = client.post(f"/api/meetings/{out.id}/votes/{vote_id}/open")
+    assert r.status_code == 409
+    assert r.json()["code"] == "conflict"
+
+
+@pytest.mark.parametrize(
+    ("status", "code"), [("planned", "meeting_not_started"), ("closed", "meeting_closed")]
+)
+def test_open_prepared_vote_needs_a_live_meeting(
+    app: FastAPI, client: TestClient, fakes, status: str, code: str
+) -> None:
+    out, vote_id = _with_vote(status=status)
+    fakes["meeting"]._meeting_out = out
+    _login(app)
+    r = client.post(f"/api/meetings/{out.id}/votes/{vote_id}/open")
+    assert r.status_code == 409
+    assert r.json()["code"] == code
+
+
+def test_open_prepared_vote_forbidden(app: FastAPI, client: TestClient, fakes) -> None:
+    out, vote_id = _with_vote(can_manage_votes=False)
+    fakes["meeting"]._meeting_out = out
+    _login(app)
+    assert client.post(f"/api/meetings/{out.id}/votes/{vote_id}/open").status_code == 403
+
+
+def test_open_prepared_vote_unknown_vote(app: FastAPI, client: TestClient, fakes) -> None:
+    out, _vote_id = _with_vote()
+    fakes["meeting"]._meeting_out = out
+    _login(app)
+    assert client.post(f"/api/meetings/{out.id}/votes/{uuid4()}/open").status_code == 404
+
+
+def test_open_prepared_vote_not_a_draft(app: FastAPI, client: TestClient, fakes) -> None:
+    out, vote_id = _with_vote(vote_status="open")
+    fakes["meeting"]._meeting_out = out
+    _login(app)
+    assert client.post(f"/api/meetings/{out.id}/votes/{vote_id}/open").status_code == 409
 
 
 def test_delete_meeting_vote_forbidden(app: FastAPI, client: TestClient, fakes) -> None:

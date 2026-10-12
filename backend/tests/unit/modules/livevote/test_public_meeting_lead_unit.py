@@ -507,7 +507,7 @@ async def test_agenda_refuses_non_public_on_a_guest_vote_item(
     async def _item(meeting_id: UUID, item_id: UUID) -> Any:
         return row
 
-    async def _open(meeting: Any, *, planned_ok: bool) -> None:
+    async def _open(meeting: Any) -> None:
         return None
 
     async def _has(item_id: UUID) -> bool:
