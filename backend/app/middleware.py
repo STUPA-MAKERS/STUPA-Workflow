@@ -23,7 +23,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from app.modules.auth.sessions import principal_sid
+from app.modules.auth.sessions import SESSION_COOKIE_MAX_AGE, principal_sid
 from app.settings import Settings, get_settings
 from app.shared.antiabuse import client_ip, get_rate_limiter
 from app.shared.errors import PUBLIC_API_PREFIX
@@ -137,12 +137,13 @@ class CsrfMiddleware(BaseHTTPMiddleware):
 
         # Issue the CSRF cookie when it is missing. It is non-HttpOnly because the
         # frontend must read it. SameSite=Lax gives base protection. Secure follows
-        # the auth cookies.
+        # the auth cookies. It lives as long as the longest session, so a tab that
+        # stays open does not lose it before its session ends.
         if settings.csrf_enabled and not request.cookies.get(settings.csrf_cookie_name):
             response.set_cookie(
                 settings.csrf_cookie_name,
                 secrets.token_urlsafe(32),
-                max_age=settings.session_ttl_hours * 3600,
+                max_age=SESSION_COOKIE_MAX_AGE,
                 secure=settings.cookie_secure,
                 httponly=False,
                 samesite="lax",
@@ -161,7 +162,7 @@ def _write_bucket(request: Request, settings: Settings) -> tuple[str, int]:
     cookie = request.cookies.get(settings.session_cookie_name)
     if cookie:
         sid = principal_sid(
-            settings.session_secret, cookie, settings.session_ttl_hours * 3600
+            settings.session_secret, cookie, SESSION_COOKIE_MAX_AGE
         )
         if sid is not None:
             return f"write:session:{sid}", settings.rl_default_write_session_per_hour

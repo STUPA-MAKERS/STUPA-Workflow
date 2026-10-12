@@ -25,6 +25,7 @@ from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
 from app.modules.livevote.guests import GuestEvents, GuestService
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
+from app.modules.livevote.open_window import check_open
 from app.modules.livevote.schemas import MeetingCreate, MeetingOut, MeetingPatch
 from app.modules.livevote.service.handover import HandoverOps
 from app.modules.voting.models import Vote
@@ -152,8 +153,10 @@ class LifecycleOps(HandoverOps):
         Raises:
             ConflictError: The status change is not ``planned`` to ``live`` or ``live``
                 to ``closed`` (``invalid_status_transition``), the meeting still has an
-                open vote on close (``open_vote``), the start has no protokollant, or
-                the meeting is closed and the patch changes its planning.
+                open vote on close (``open_vote``), the start has no protokollant, the
+                start is before the open window (``meeting_too_early``) or early and not
+                confirmed (``early_open_unconfirmed``), or the meeting is closed and
+                the patch changes its planning.
         """
         # #17: public participation and the guest mode are planning values of the lead.
         wants_public = payload.public_join is not None or payload.guests_mode is not None
@@ -226,6 +229,13 @@ class LifecycleOps(HandoverOps):
 
         before = _snapshot(meeting)
         now = datetime.now(UTC)
+        if status_change and payload.status == "live":
+            # The open window: at the earliest ``open_lead_minutes`` before the planned
+            # start, and an early open needs ``confirmEarly``. The window reads the
+            # stored planning, before this patch changes it, so a date change in the
+            # same patch cannot move the window.
+            window = (await self._open_windows([meeting]))[meeting.id]
+            check_open(window, now=now, confirmed=payload.confirm_early)
         guest_events = (
             await self._apply_public(meeting, payload, principal, now) if wants_public else None
         )

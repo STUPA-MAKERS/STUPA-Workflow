@@ -21,8 +21,10 @@ of that group. An admin with ``admin.users.revoke_groups`` takes them away here:
 
 A group that also leads to another Gremium or global role is removed for all of them.
 The request must therefore name every co-affected entry, else 422 ``revoke_incomplete``
-(the dialog selects them automatically). The next login sets ``oidc_groups`` from the
-IdP again; manual roles, pool entries and delegations do not come back.
+(the dialog selects them automatically). The revoke ends every session of the person,
+because a session renews itself at the IdP and would set the groups again. The next
+login sets ``oidc_groups`` from the IdP again; manual roles, pool entries and
+delegations do not come back.
 
 The implicit global role ``member`` (every person holds it) is never listed and never
 deleted.
@@ -65,6 +67,7 @@ from app.modules.audit.service import AuditService
 from app.modules.auth.identity import refs_by_id, refs_by_sub
 from app.modules.auth.models import GroupMapping, Role, RoleAssignment
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.sessions import end_principal_sessions
 from app.modules.delegations.models import DelegationSubstitute, MeetingDelegation
 from app.modules.delegations.pool import pool_entries_of, pool_principals_stmt
 from app.modules.livevote.models import Meeting
@@ -809,6 +812,9 @@ class PrincipalRevokeService:
             )
         await s.flush()
         await sync_principal_memberships(s, row)
+        # A session renews itself at the IdP every few hours and would put the removed
+        # groups back. Ending the sessions makes a new login the only way back.
+        await end_principal_sessions(s, row.id)
         deactivated = deactivate and row.active is not False
         if deactivated:
             # The existing deactivation path (`set_principal_active`) writes this entry.

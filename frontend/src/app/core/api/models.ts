@@ -1357,6 +1357,10 @@ export interface MeetingOutWire {
   pendingGuests?: number;
   /** Public participation is possible: only a gremium without a quorum allows it. */
   publicJoinAllowed?: boolean;
+  /** The earliest open of a planned meeting with a date (UTC), else `null`. */
+  opensAt?: IsoDateTime | null;
+  /** Before this point the open needs `confirmEarly` (UTC), else `null`. */
+  confirmUntil?: IsoDateTime | null;
 }
 
 /** `ProtocolOut`. Meeting protocol. POST /meetings/{id}/protocol, PATCH /protocols/{id}. */
@@ -1414,6 +1418,8 @@ export interface MeetingPatchBody {
   publicJoin?: boolean;
   /** Guests vote or only follow. `watch` gives 409 `guest_vote_open` while a guest vote runs. */
   guestsMode?: GuestsMode;
+  /** Confirms an early open (`status: 'live'` before `confirmUntil`). */
+  confirmEarly?: boolean;
 }
 
 /** Body for `PATCH /protocols/{id}`. It updates the markdown. */
@@ -1544,6 +1550,10 @@ export interface Meeting {
   pendingGuests: number;
   /** Public participation is possible: only a gremium without a quorum allows it. */
   publicJoinAllowed: boolean;
+  /** The earliest open of a planned meeting with a date (ISO, UTC), else `null`. */
+  opensAt: IsoDateTime | null;
+  /** Before this point the open is early and needs a confirmation (ISO, UTC), else `null`. */
+  confirmUntil: IsoDateTime | null;
 }
 
 /** Direction of the meeting timeline relative to *now*. */

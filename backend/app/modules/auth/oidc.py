@@ -255,6 +255,76 @@ async def _signing_key(settings: Settings, id_token: str) -> Any:
     return RSAAlgorithm.from_jwk(json.dumps(jwk))
 
 
+async def refresh_tokens(settings: Settings, *, refresh_token: str) -> dict[str, str]:
+    """Run the refresh token grant and return the new token set.
+
+    The session renewal uses it to check the account at the IdP. The IdP refuses the
+    grant when it revoked the token or disabled the account.
+
+    Raises:
+        OidcUnavailableError: The discovery document or the token endpoint is
+            unreachable, or the token endpoint answers with a server error.
+        OidcError: The IdP refuses the grant, or the response carries no `id_token`.
+    """
+    endpoints = await discover(settings.oidc_issuer or "")
+    data = {
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": settings.oidc_client_id or "",
+        "client_secret": settings.oidc_client_secret or "",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
+            resp = await client.post(endpoints.token, data=data)
+    except httpx.HTTPError as exc:
+        raise OidcUnavailableError(f"token endpoint unreachable: {exc}") from exc
+    if resp.status_code >= httpx.codes.INTERNAL_SERVER_ERROR:
+        raise OidcUnavailableError(f"token endpoint failed: {resp.status_code}")
+    if resp.status_code != httpx.codes.OK:
+        raise OidcError(f"refresh grant refused: {resp.status_code}")
+    try:
+        payload = resp.json()
+    except ValueError as exc:
+        # A 200 that is not JSON is a proxy or maintenance page, not a refusal.
+        raise OidcUnavailableError("token endpoint answered without JSON") from exc
+    if not isinstance(payload, dict) or "id_token" not in payload:
+        raise OidcError("refresh response without id_token")
+    return cast("dict[str, str]", payload)
+
+
+async def _decode_id_token(settings: Settings, id_token: str) -> dict[str, Any]:
+    """Verify the signature, `aud`, `iss` and `exp` of an `id_token`.
+
+    Raises:
+        OidcError: The token is malformed or invalid.
+    """
+    key = await _signing_key(settings, id_token)
+    try:
+        return jwt.decode(
+            id_token,
+            key=key,
+            algorithms=["RS256"],
+            audience=settings.oidc_client_id,
+            issuer=settings.oidc_issuer,
+            options={"require": ["exp", "iat", "sub"]},
+        )
+    except jwt.PyJWTError as exc:
+        raise OidcError(f"id_token invalid: {exc}") from exc
+
+
+def _claims_of(settings: Settings, claims: dict[str, Any]) -> OidcClaims:
+    groups = claims.get(settings.oidc_groups_claim) or []
+    if not isinstance(groups, list):
+        groups = []
+    return OidcClaims(
+        sub=str(claims["sub"]),
+        email=claims.get("email"),
+        name=claims.get("name") or claims.get("preferred_username"),
+        groups=[str(g) for g in groups],
+        email_verified=claims.get("email_verified") is True,
+    )
+
+
 async def verify_id_token(settings: Settings, *, id_token: str, nonce: str) -> OidcClaims:
     """Verify the signature and the claims of the `id_token`.
 
@@ -265,29 +335,38 @@ async def verify_id_token(settings: Settings, *, id_token: str, nonce: str) -> O
     Raises:
         OidcError: The token is malformed or invalid, or the nonce does not match.
     """
-    key = await _signing_key(settings, id_token)
-    try:
-        claims = jwt.decode(
-            id_token,
-            key=key,
-            algorithms=["RS256"],
-            audience=settings.oidc_client_id,
-            issuer=settings.oidc_issuer,
-            options={"require": ["exp", "iat", "sub"]},
-        )
-    except jwt.PyJWTError as exc:
-        raise OidcError(f"id_token invalid: {exc}") from exc
+    claims = await _decode_id_token(settings, id_token)
     if claims.get("nonce") != nonce:
         raise OidcError("nonce mismatch")
-    groups = claims.get(settings.oidc_groups_claim) or []
-    if not isinstance(groups, list):
-        groups = []
+    return _claims_of(settings, claims)
+
+
+async def verify_refreshed_id_token(
+    settings: Settings, *, id_token: str, cached: OidcClaims
+) -> OidcClaims:
+    """Verify the `id_token` of a refresh grant and merge it with the cached claims.
+
+    The checks are those of `verify_id_token`, but without the nonce: OIDC Core
+    12.2 lets the IdP leave it out of a refreshed token. Instead, `sub` must equal
+    `cached.sub`, the `sub` of the session, so a token of another account cannot take
+    the session over. The same section lets the IdP send a minimal token, so a claim
+    that the token leaves out (email, name, groups) keeps its cached value.
+
+    Raises:
+        OidcError: The token is malformed or invalid, or `sub` does not match.
+    """
+    claims = await _decode_id_token(settings, id_token)
+    if str(claims["sub"]) != cached.sub:
+        raise OidcError("sub mismatch")
+    fresh = _claims_of(settings, claims)
     return OidcClaims(
-        sub=str(claims["sub"]),
-        email=claims.get("email"),
-        name=claims.get("name") or claims.get("preferred_username"),
-        groups=[str(g) for g in groups],
-        email_verified=claims.get("email_verified") is True,
+        sub=fresh.sub,
+        email=fresh.email if "email" in claims else cached.email,
+        name=fresh.name
+        if ("name" in claims or "preferred_username" in claims)
+        else cached.name,
+        groups=fresh.groups if settings.oidc_groups_claim in claims else cached.groups,
+        email_verified=fresh.email_verified,
     )
 
 

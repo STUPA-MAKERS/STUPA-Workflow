@@ -292,6 +292,7 @@ class ListingOps(PermissionOps, VoteReadOps):
         agenda_by_meeting = await self._agenda_summaries(meetings)
         keepers_by_meeting = await keeper_summaries(self.session, [m.id for m in meetings])
         guests_by_meeting = await self._guest_counts([m.id for m in meetings])
+        windows = await self._open_windows(meetings)
         out: list[MeetingOut] = []
         for m in meetings:
             is_prot = m.protokollant_id is not None and m.protokollant_id == my_id
@@ -315,6 +316,7 @@ class ListingOps(PermissionOps, VoteReadOps):
                     keepers=keepers_by_meeting[m.id],
                     guests=guests_by_meeting.get(m.id, (0, 0)),
                     public_join_allowed=m.gremium_id not in quorum_gids,
+                    window=windows[m.id],
                 )
             )
         return out

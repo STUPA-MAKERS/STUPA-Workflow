@@ -138,6 +138,8 @@ async def test_pg_dump_writes_the_custom_format_to_the_target(
     assert argv[0] == "pg_dump"
     assert "--format=custom" in argv
     assert "--file=/tmp/x.dump" in argv
+    # Sessions with their IdP refresh tokens never enter an archive.
+    assert "--exclude-table-data=auth_session" in argv
     assert "postgresql://u:p@db/antrag" in argv
     assert (what, tolerate) == ("pg_dump", False)
 

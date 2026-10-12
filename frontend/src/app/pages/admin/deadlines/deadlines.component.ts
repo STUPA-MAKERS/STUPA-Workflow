@@ -21,6 +21,7 @@ import {
 import { AdminApiService } from '../admin-api.service';
 import type { DeadlineKind, DeadlinePolicy } from '../admin.models';
 import { GuestSettingsComponent } from './guest-settings/guest-settings.component';
+import { MeetingWindowSettingsComponent } from './meeting-window/meeting-window.component';
 
 /** The text of the "Frist" cell, with a tooltip and the muted look for a past schedule. */
 export interface DeadlineValue {
@@ -96,8 +97,10 @@ function emptyDraft(): PolicyDraft {
  * stay correct over a DST switch. The dialog creates, updates and deletes policies
  * through the admin API.
  *
- * Below the table, `app-guest-settings` holds the settings for applications without an
- * account (Z1): the discard window and the lifetime of the personal link.
+ * Below the table, `app-meeting-window-settings` holds the open window of meetings (the
+ * earliest open and the early open that asks first), and `app-guest-settings` holds the
+ * settings for applications without an account (Z1): the discard window and the
+ * lifetime of the personal link.
  */
 @Component({
   selector: 'app-admin-deadlines',
@@ -117,6 +120,7 @@ function emptyDraft(): PolicyDraft {
     TimeInputComponent,
     PageHeaderComponent,
     GuestSettingsComponent,
+    MeetingWindowSettingsComponent,
   ],
   templateUrl: './deadlines.component.html',
   styleUrl: './deadlines.component.scss',

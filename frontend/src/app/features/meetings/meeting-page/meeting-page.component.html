@@ -60,7 +60,11 @@
   @if (!phone()) {
     @switch (mainAction()) {
       @case ('open') {
-        <app-button variant="fill" [disabled]="!m.protokollantId" [title]="(m.protokollantId ? 'meetings.control.open' : 'meetings.control.needProtokollant') | t" (click)="startSession.emit()">
+        <!-- Visible, not only a tooltip: a disabled button takes no focus and no touch. -->
+        @if (opensAtText()) {
+          <span class="mp__blocked">{{ opensAtText() }}</span>
+        }
+        <app-button variant="fill" [disabled]="!m.protokollantId || !!opensAtText()" [title]="m.protokollantId ? (opensAtText() || ('meetings.control.open' | t)) : ('meetings.control.needProtokollant' | t)" (click)="startSession.emit()">
           <app-icon name="play" [size]="16" />
           {{ 'meetings.control.open' | t }}
         </app-button>

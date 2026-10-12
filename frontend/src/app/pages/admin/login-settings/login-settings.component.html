@@ -1,0 +1,51 @@
+<section class="ls">
+  <app-page-header [flush]="true" [title]="'admin.loginSettings.title' | t" [subtitle]="'admin.loginSettings.subtitle' | t">
+    @if (loadState() === 'ok' && !loading()) {
+      <app-button actions variant="fill" [disabled]="!canSave()" [loading]="saving()" (click)="save()">
+        {{ 'action.save' | t }}
+      </app-button>
+    }
+  </app-page-header>
+
+  @if (loading()) {
+    <app-skeleton variant="lines" [count]="3" [label]="'common.loading' | t" />
+  } @else if (loadState() === 'forbidden') {
+    <app-note kind="warn" icon="lock" role="alert">{{ 'admin.loginSettings.forbidden' | t }}</app-note>
+  } @else if (loadState() === 'error') {
+    <app-note kind="error" icon="alert" role="alert">{{ 'admin.loginSettings.loadError' | t }}</app-note>
+  } @else {
+    <form class="ls__grid" (submit)="$event.preventDefault(); save()">
+      <div class="ls__unitBox">
+        <app-input
+          type="number"
+          [label]="'admin.loginSettings.web' | t"
+          [error]="webError()"
+          [hint]="'admin.loginSettings.webHint' | t"
+          name="webSessionDays"
+          [ngModel]="draft().web"
+          (ngModelChange)="patch({ web: $event })"
+        />
+        <span class="ls__unit" aria-hidden="true">{{ 'admin.loginSettings.daysUnit' | t }}</span>
+      </div>
+
+      <div class="ls__unitBox">
+        <app-input
+          type="number"
+          [label]="'admin.loginSettings.pwa' | t"
+          [error]="pwaError()"
+          [hint]="'admin.loginSettings.pwaHint' | t"
+          name="pwaSessionDays"
+          [ngModel]="draft().pwa"
+          (ngModelChange)="patch({ pwa: $event })"
+        />
+        <span class="ls__unit" aria-hidden="true">{{ 'admin.loginSettings.daysUnit' | t }}</span>
+      </div>
+    </form>
+
+    <app-note icon="info">{{ 'admin.loginSettings.note' | t: { max: maxDays } }}</app-note>
+
+    @if (saved()?.updatedAt; as at) {
+      <p class="ls__meta">{{ 'admin.loginSettings.updatedAt' | t: { date: (at | ldate: 'medium') } }}</p>
+    }
+  }
+</section>

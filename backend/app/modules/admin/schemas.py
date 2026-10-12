@@ -20,6 +20,8 @@ from app.modules.applications.models import (
     DEFAULT_CONFIRM_TTL_HOURS,
     MAX_CONFIRM_TTL_HOURS,
 )
+from app.modules.auth.models import MAX_SESSION_DAYS
+from app.modules.livevote.models import MAX_LEAD_MINUTES
 from app.shared.config_schemas import ComparisonOffers, EventName, FlowGraph
 from app.shared.i18n import I18nMap
 from app.shared.permissions import PERMISSION_CATALOGUE
@@ -849,6 +851,24 @@ class PublicSiteConfigOut(_CamelModel):
 MAX_LINK_TTL_DAYS = 3650
 
 
+class LoginSettingsOut(_CamelModel):
+    """Lifetimes of an OIDC login in days after the last use (browser and app)."""
+
+    web_session_days: int = Field(serialization_alias="webSessionDays")
+    pwa_session_days: int = Field(serialization_alias="pwaSessionDays")
+    updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
+    updated_by: str | None = Field(default=None, serialization_alias="updatedBy")
+
+
+class LoginSettingsUpdate(_CamelModel):
+    """Full replacement of both lifetimes, each 1 to 400 days."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    web_session_days: int = Field(alias="webSessionDays", ge=1, le=MAX_SESSION_DAYS)
+    pwa_session_days: int = Field(alias="pwaSessionDays", ge=1, le=MAX_SESSION_DAYS)
+
+
 class GuestSettingsOut(_CamelModel):
     """Settings for applications without an account (Z1).
 
@@ -859,6 +879,27 @@ class GuestSettingsOut(_CamelModel):
     link_ttl_days: int | None = Field(serialization_alias="linkTtlDays")
     updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
     updated_by: str | None = Field(default=None, serialization_alias="updatedBy")
+
+
+class MeetingSettingsOut(_CamelModel):
+    """The open window of meetings, in minutes before the planned start."""
+
+    open_lead_minutes: int = Field(serialization_alias="openLeadMinutes")
+    confirm_lead_minutes: int = Field(serialization_alias="confirmLeadMinutes")
+    updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
+    updated_by: str | None = Field(default=None, serialization_alias="updatedBy")
+
+
+class MeetingSettingsUpdate(_CamelModel):
+    """Full replacement of the meeting settings.
+
+    ``confirmLeadMinutes`` must not be larger than ``openLeadMinutes`` (422).
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    open_lead_minutes: int = Field(alias="openLeadMinutes", ge=0, le=MAX_LEAD_MINUTES)
+    confirm_lead_minutes: int = Field(alias="confirmLeadMinutes", ge=0, le=MAX_LEAD_MINUTES)
 
 
 class GuestSettingsUpdate(_CamelModel):
