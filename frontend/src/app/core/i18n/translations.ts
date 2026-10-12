@@ -1316,6 +1316,7 @@ export const de = {
     'Das Protokoll finalisiert danach, wer das Recht „Protokoll finalisieren“ hat',
   'meetings.earlyOpen.title': 'Sitzung schon eröffnen?',
   'meetings.earlyOpen.body': 'Die Sitzung ist erst für {time} Uhr geplant.',
+  'meetings.earlyOpen.bodyDay': 'Die Sitzung ist erst für {day}, {time} Uhr geplant.',
   'meetings.earlyOpen.bodyNoTime': 'Die Sitzung beginnt laut Planung noch nicht.',
   'meetings.earlyOpen.question': 'Willst du sie trotzdem schon jetzt eröffnen?',
   'meetings.earlyOpen.confirm': 'Jetzt eröffnen',
@@ -1681,7 +1682,7 @@ export const de = {
     'Vorher lässt sich die Sitzung nicht eröffnen. 0 bis {max} Minuten vor dem geplanten Beginn.',
   'admin.meetingWindow.confirmLead': 'Ohne Rückfrage eröffnen ab',
   'admin.meetingWindow.confirmLeadHint':
-    'Davor fragt ein zusätzlicher Dialog, ob die Sitzung wirklich schon beginnen soll. 0 = immer ohne Rückfrage.',
+    'Davor fragt ein zusätzlicher Dialog, ob die Sitzung wirklich schon beginnen soll. 0 = vor dem Beginn immer mit Rückfrage; derselbe Wert wie bei „Frühestens eröffnen“ = nie mit Rückfrage.',
   'admin.meetingWindow.unit': 'Min. vorher',
   'admin.meetingWindow.range': 'Eine ganze Zahl von 0 bis {max} Minuten.',
   'admin.meetingWindow.order': 'Höchstens so viele Minuten wie bei „Frühestens eröffnen“.',
@@ -5046,6 +5047,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'Afterwards a holder of the right “Finalize minutes” finalizes the minutes',
   'meetings.earlyOpen.title': 'Open the session already?',
   'meetings.earlyOpen.body': 'The session is planned for {time}.',
+  'meetings.earlyOpen.bodyDay': 'The session is planned for {day}, {time}.',
   'meetings.earlyOpen.bodyNoTime': 'The session has not started yet according to the plan.',
   'meetings.earlyOpen.question': 'Do you want to open it now anyway?',
   'meetings.earlyOpen.confirm': 'Open now',
@@ -5406,7 +5408,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'Before this point the session cannot be opened. 0 to {max} minutes before the planned start.',
   'admin.meetingWindow.confirmLead': 'Open without a question from',
   'admin.meetingWindow.confirmLeadHint':
-    'Before this point an extra dialog asks whether the session should really start. 0 = never ask.',
+    'Before this point an extra dialog asks whether the session should really start. 0 = always ask before the start; the same value as "Open at the earliest" = never ask.',
   'admin.meetingWindow.unit': 'min before',
   'admin.meetingWindow.range': 'A whole number from 0 to {max} minutes.',
   'admin.meetingWindow.order': 'At most as many minutes as "Open at the earliest".',

@@ -492,7 +492,9 @@ def _soon(minutes: int) -> Meeting:
     from zoneinfo import ZoneInfo
 
     m = _meeting("planned")
-    local = datetime.now(ZoneInfo("Europe/Berlin")) + timedelta(minutes=minutes)
+    # Add real minutes in UTC: aware arithmetic in one zone adds wall-clock time,
+    # which is wrong across a DST switch.
+    local = (datetime.now(UTC) + timedelta(minutes=minutes)).astimezone(ZoneInfo("Europe/Berlin"))
     m.date = local.date()
     m.start_time = local.time().replace(second=0, microsecond=0)
     return m
@@ -544,3 +546,17 @@ async def test_planned_meeting_out_carries_the_window(
 def test_confirm_early_alone_is_no_patch() -> None:
     with pytest.raises(ValidationError):
         MeetingPatch(confirmEarly=True)
+
+
+async def test_date_change_in_the_start_patch_does_not_move_the_window(
+    audit: list[dict[str, Any]], voting: SimpleNamespace
+) -> None:
+    m = _soon(180)
+    for patch in (
+        MeetingPatch.model_validate({"status": "live", "date": None}),
+        MeetingPatch(status="live", date=date(2020, 1, 1)),
+    ):
+        with pytest.raises(ConflictError) as ei:
+            await _service(m).patch(m.id, patch, _admin())
+        assert ei.value.code == "meeting_too_early"
+        assert m.status == "planned"

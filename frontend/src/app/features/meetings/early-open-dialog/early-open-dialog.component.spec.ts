@@ -18,7 +18,9 @@ describe('EarlyOpenDialogComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('names the planned start and confirms the early open', async () => {
-    const { confirmed, closed } = await setup({ startTime: '18:00:00' });
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const { confirmed, closed } = await setup({ date: today, startTime: '18:00:00' });
     expect(screen.getByText('Sitzung schon eröffnen?')).toBeInTheDocument();
     expect(screen.getByText('Die Sitzung ist erst für 18:00 Uhr geplant.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Jetzt eröffnen' }));
@@ -33,5 +35,10 @@ describe('EarlyOpenDialogComponent', () => {
     await userEvent.click(cancel[cancel.length - 1]);
     expect(closed).toHaveBeenCalled();
     expect(confirmed).not.toHaveBeenCalled();
+  });
+
+  it('names the day when the meeting is on another day', async () => {
+    await setup({ date: '2099-06-02', startTime: '18:00:00' });
+    expect(screen.getByText('Die Sitzung ist erst für Di., 02.06.2099, 18:00 Uhr geplant.')).toBeInTheDocument();
   });
 });

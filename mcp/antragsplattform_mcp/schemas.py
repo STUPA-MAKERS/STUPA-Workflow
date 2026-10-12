@@ -519,8 +519,8 @@ class MeetingPatch(WireModel):
         default=None,
         description="`watch` gives 409 `guest_vote_open` while a vote with guests is open.",
     )
-    confirmEarly: bool | None = Field(
-        default=None,
+    confirmEarly: bool = Field(
+        default=False,
         description="Confirm an early open: `status: live` before `confirmUntil` of the "
         "meeting gives 409 `early_open_unconfirmed` without it.",
     )

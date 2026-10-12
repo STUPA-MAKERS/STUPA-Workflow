@@ -380,7 +380,10 @@ async def patch_meeting(
 
     The status runs only planned, live, closed (409 ``invalid_status_transition``
     otherwise). The close answers 409 ``open_vote`` while a vote of the meeting is
-    open, and it cancels the draft votes of the meeting.
+    open, and it cancels the draft votes of the meeting. The start has an open window
+    (``opensAt``/``confirmUntil`` of the meeting): before ``opensAt`` it answers 409
+    ``meeting_too_early``, and before ``confirmUntil`` it needs ``confirmEarly``, else
+    409 ``early_open_unconfirmed``.
     """
     updated = await service.patch(meeting_id, payload, principal)
     if payload.status == "live" and updated.status == "live":

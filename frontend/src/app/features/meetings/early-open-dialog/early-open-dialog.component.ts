@@ -4,7 +4,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { ButtonComponent, DialogComponent, IconComponent } from '@stupa-makers/ui-kit';
-import { shortTime } from '../meetings-display.util';
+import { shortTime, weekdayDate } from '../meetings-display.util';
 
 /**
  * "Sitzung schon eröffnen?": the extra question before an early open.
@@ -32,11 +32,24 @@ export class EarlyOpenDialogComponent {
   /** The lead confirmed the early open. */
   readonly confirmed = output<void>();
 
-  /** "Die Sitzung ist erst für 18:00 Uhr geplant." */
+  /**
+   * "Die Sitzung ist erst für 18:00 Uhr geplant." The early part can span days (the
+   * admin sets up to a week), so a start on another day names the day too.
+   */
   protected readonly body = computed(() => {
-    const time = shortTime(this.meeting().startTime);
-    return time
-      ? this.i18n.translate('meetings.earlyOpen.body', { time })
-      : this.i18n.translate('meetings.earlyOpen.bodyNoTime');
+    const m = this.meeting();
+    const time = shortTime(m.startTime);
+    if (!time) return this.i18n.translate('meetings.earlyOpen.bodyNoTime');
+    if (m.date && m.date !== localIsoDate(new Date())) {
+      const day = weekdayDate(m.date, this.i18n.formatLocale());
+      return this.i18n.translate('meetings.earlyOpen.bodyDay', { day, time });
+    }
+    return this.i18n.translate('meetings.earlyOpen.body', { time });
   });
+}
+
+/** `YYYY-MM-DD` of a date in local time. */
+function localIsoDate(d: Date): string {
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }

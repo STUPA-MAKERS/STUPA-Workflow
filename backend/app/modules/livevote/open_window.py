@@ -57,9 +57,9 @@ def _defaults() -> MeetingSettings:
 async def load_meeting_settings(session: AsyncSession) -> MeetingSettings:
     """Return the settings row, or a transient row with the defaults.
 
-    The migration inserts the row. A schema built from the metadata alone (tests,
-    a fresh baseline) can lack it. The defaults then apply: 60 minutes and 10
-    minutes. The function writes nothing.
+    The migration inserts the row. A schema built with ``create_all`` alone (tests)
+    can lack it, and so can a test database after the truncate between tests. The
+    defaults then apply: 60 minutes and 10 minutes. The function writes nothing.
     """
     row = await session.get(MeetingSettings, 1)
     return row if row is not None else _defaults()

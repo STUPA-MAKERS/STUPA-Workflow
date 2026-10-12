@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -28,7 +28,8 @@ async def _starts_in(
     maker: async_sessionmaker[AsyncSession], minutes: int
 ) -> str:
     s = await seed(maker, status="planned")
-    local = datetime.now(ZoneInfo("Europe/Berlin")) + timedelta(minutes=minutes)
+    # Real minutes in UTC, then local: correct across a DST switch.
+    local = (datetime.now(UTC) + timedelta(minutes=minutes)).astimezone(ZoneInfo("Europe/Berlin"))
     async with maker() as session:
         meeting = await session.get(Meeting, s.meeting_id)
         assert meeting is not None

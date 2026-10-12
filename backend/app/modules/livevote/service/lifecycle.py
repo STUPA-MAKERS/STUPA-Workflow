@@ -229,6 +229,13 @@ class LifecycleOps(HandoverOps):
 
         before = _snapshot(meeting)
         now = datetime.now(UTC)
+        if status_change and payload.status == "live":
+            # The open window: at the earliest ``open_lead_minutes`` before the planned
+            # start, and an early open needs ``confirmEarly``. The window reads the
+            # stored planning, before this patch changes it, so a date change in the
+            # same patch cannot move the window.
+            window = (await self._open_windows([meeting]))[meeting.id]
+            check_open(window, now=now, confirmed=payload.confirm_early)
         guest_events = (
             await self._apply_public(meeting, payload, principal, now) if wants_public else None
         )
@@ -304,12 +311,6 @@ class LifecycleOps(HandoverOps):
         # writes the protocol that the start creates.
         if going_live and meeting.protokollant_id is None:
             raise ConflictError("assign a protokollant before starting the meeting")
-        if going_live:
-            # The open window: at the earliest ``open_lead_minutes`` before the planned
-            # start, and an early open needs ``confirmEarly``. The window reads the
-            # planning of this patch, so a new date counts at once.
-            window = (await self._open_windows([meeting]))[meeting.id]
-            check_open(window, now=now, confirmed=payload.confirm_early)
         cancelled: list[Vote] = []
         if going_live and meeting.started_at is None:
             # Z7: the real start, set once. The protocol header and the UI read it.

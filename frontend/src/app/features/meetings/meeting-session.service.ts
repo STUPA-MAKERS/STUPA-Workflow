@@ -213,7 +213,8 @@ export class MeetingSessionService implements OnDestroy {
    * says so at once instead of showing the server 409 after the click.
    *
    * The open window: before `opensAt` the page refuses at once (the button is off
-   * anyway). Before `confirmUntil` the open is early: the first call opens "Sitzung
+   * anyway) and reads the meeting again, because the window may have moved. The
+   * server 409 `meeting_too_early` (the clocks differ) does the same. Before `confirmUntil` the open is early: the first call opens "Sitzung
    * schon eröffnen?" (`earlyOpenAsk`), and the dialog calls again with
    * `confirmEarly`. When the server still finds the open early (the clocks differ),
    * its 409 `early_open_unconfirmed` opens the dialog too.
@@ -231,7 +232,8 @@ export class MeetingSessionService implements OnDestroy {
     }
     const phase = openWindowState(m, Date.now());
     if (phase === 'tooEarly') {
-      this.toast.error(this.i18n.translate('meetings.toast.tooEarly'));
+      // The window may have moved (settings, a date change in another tab): read again.
+      this.tooEarly();
       return;
     }
     if (phase === 'early' && !confirmEarly) {
@@ -248,8 +250,13 @@ export class MeetingSessionService implements OnDestroy {
         }
       },
       error: (err: unknown) => {
-        if (errorCode(err) === 'early_open_unconfirmed') {
+        const code = errorCode(err);
+        if (code === 'early_open_unconfirmed') {
           this.earlyOpenAsk.set(true);
+          return;
+        }
+        if (code === 'meeting_too_early') {
+          this.tooEarly();
           return;
         }
         this.statusChangeFailed(err);
@@ -272,6 +279,12 @@ export class MeetingSessionService implements OnDestroy {
         error: () => {},
       });
     }
+  }
+
+  /** The open is too early: say so and read the meeting again for a fresh window. */
+  private tooEarly(): void {
+    this.toast.error(this.i18n.translate('meetings.toast.tooEarly'));
+    this.reloadMeeting();
   }
 
   /** Read the meeting again (quiet): the lot of an election or its runoff (F2). */
