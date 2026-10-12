@@ -1,0 +1,53 @@
+@if (loadState() !== 'forbidden') {
+  <section class="gs" aria-labelledby="mw-title">
+    <header class="gs__head">
+      <div class="gs__text">
+        <h2 class="gs__title" id="mw-title">{{ 'admin.meetingWindow.title' | t }}</h2>
+        <p class="gs__sub">{{ 'admin.meetingWindow.subtitle' | t }}</p>
+      </div>
+      @if (loadState() === 'ok' && !loading()) {
+        <app-button variant="tonal" [disabled]="!canSave()" [loading]="saving()" (click)="save()">
+          {{ 'action.save' | t }}
+        </app-button>
+      }
+    </header>
+
+    @if (loading()) {
+      <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
+    } @else if (loadState() === 'error') {
+      <app-note kind="error" icon="alert" role="alert">{{ 'admin.guest.loadError' | t }}</app-note>
+    } @else {
+      <form class="gs__grid" (submit)="$event.preventDefault(); save()">
+        <div class="gs__field">
+          <div class="gs__unitBox">
+            <app-input
+              type="number"
+              [label]="'admin.meetingWindow.openLead' | t"
+              [error]="openError()"
+              [hint]="'admin.meetingWindow.openLeadHint' | t: { max: max }"
+              name="openLeadMinutes"
+              [ngModel]="draft().open"
+              (ngModelChange)="patch({ open: $event })"
+            />
+            <span class="gs__unit" aria-hidden="true">{{ 'admin.meetingWindow.unit' | t }}</span>
+          </div>
+        </div>
+
+        <div class="gs__field">
+          <div class="gs__unitBox">
+            <app-input
+              type="number"
+              [label]="'admin.meetingWindow.confirmLead' | t"
+              [error]="confirmError()"
+              [hint]="'admin.meetingWindow.confirmLeadHint' | t"
+              name="confirmLeadMinutes"
+              [ngModel]="draft().confirm"
+              (ngModelChange)="patch({ confirm: $event })"
+            />
+            <span class="gs__unit" aria-hidden="true">{{ 'admin.meetingWindow.unit' | t }}</span>
+          </div>
+        </div>
+      </form>
+    }
+  </section>
+}

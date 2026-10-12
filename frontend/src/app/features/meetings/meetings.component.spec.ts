@@ -1316,6 +1316,23 @@ describe('MeetingsComponent — methods', () => {
       http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
     });
 
+    it('asks before an early open and opens with confirmEarly from the dialog', async () => {
+      const { cmp, http, fixture } = await loaded();
+      const at = (min: number): string => new Date(Date.now() + min * 60_000).toISOString();
+      cmp.meeting.set({ ...cmp.meeting()!, status: 'planned', protokollantId: 'pr-9', opensAt: at(-20), confirmUntil: at(30) });
+      cmp.startMeeting();
+      fixture.detectChanges();
+      http.verify();
+      expect(cmp.earlyOpenAsk()).toBe(true);
+      expect(await screen.findByText('Sitzung schon eröffnen?')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Jetzt eröffnen' }));
+      const req = http.expectOne('/api/meetings/m-1');
+      expect(req.request.body).toEqual({ status: 'live', confirmEarly: true });
+      req.flush({ ...MEETING, status: 'live', protocolId: 'p-1' });
+      http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+      expect(cmp.earlyOpenAsk()).toBe(false);
+    });
+
     it('refuses to start without a protokollant', async () => {
       const { cmp, http } = await loaded();
       cmp.meeting.set({ ...cmp.meeting()!, status: 'planned', protokollantId: null });

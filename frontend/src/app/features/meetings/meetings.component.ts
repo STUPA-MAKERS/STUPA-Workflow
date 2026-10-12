@@ -30,6 +30,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { AgendaItemDialogComponent } from './agenda-item-dialog/agenda-item-dialog.component';
 import { CloseMeetingDialogComponent } from './close-meeting-dialog/close-meeting-dialog.component';
+import { EarlyOpenDialogComponent } from './early-open-dialog/early-open-dialog.component';
 import { FinalizeProtocolDialogComponent } from './finalize-protocol-dialog/finalize-protocol-dialog.component';
 import { DeleteMeetingDialogComponent } from './delete-meeting-dialog/delete-meeting-dialog.component';
 import { HandoverDialogComponent } from './handover-dialog/handover-dialog.component';
@@ -86,6 +87,7 @@ import { beamerUrl } from '../voting/beamer-link.util';
     MeetingSettingsDialogComponent,
     DeleteMeetingDialogComponent,
     CloseMeetingDialogComponent,
+    EarlyOpenDialogComponent,
     FinalizeProtocolDialogComponent,
     VoteOpenDialogComponent,
     AgendaItemDialogComponent,
@@ -122,6 +124,7 @@ export class MeetingsComponent {
   readonly viewers = this.session.viewers;
   readonly savingAttendance = this.session.savingAttendance;
   readonly finalizing = this.session.finalizing;
+  readonly earlyOpenAsk = this.session.earlyOpenAsk;
   /** O23: the member whose "present" the server refused (409 `delegation_active`). */
   readonly attendanceConflict = this.session.attendanceConflict;
   readonly casting = this.session.casting;
@@ -232,8 +235,9 @@ export class MeetingsComponent {
     this.dialogs.cancelHandover(m);
   }
 
-  startMeeting(): void {
-    this.session.startMeeting();
+  /** "Sitzung eröffnen". An early open asks first (`EarlyOpenDialogComponent`). */
+  startMeeting(confirmEarly = false): void {
+    this.session.startMeeting(confirmEarly);
   }
 
   /** "Sitzung schließen": save the open text first, then ask. */

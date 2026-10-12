@@ -535,6 +535,7 @@ describe('AuditLogComponent', () => {
       cmp.targetLink(entry(1, { targetType: 'guest_application_settings', targetId: '1' })),
     ).toEqual(['/admin/deadlines']);
     expect(cmp.targetTypeLabel('guest_application_settings')).toBe('Anträge ohne Konto');
+    expect(cmp.targetTypeLabel('meeting_settings')).toBe('Sitzung eröffnen');
   });
 
   it('targetLink resolves the admin-list routes for the remaining target types', async () => {

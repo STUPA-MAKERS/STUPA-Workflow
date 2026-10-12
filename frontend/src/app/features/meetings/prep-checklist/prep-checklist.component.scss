@@ -84,6 +84,14 @@ app-button ::ng-deep .btn:not(.btn--icon) .btn__label > app-icon:first-child {
 }
 .pc__start {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+/* Before the open window: when the open becomes possible, next to the disabled button. */
+.pc__hint {
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
 }
 
 @include bp.phone {

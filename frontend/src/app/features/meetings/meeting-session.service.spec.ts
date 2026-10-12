@@ -64,6 +64,46 @@ describe('MeetingSessionService', () => {
     expect(toasts()).toContain('Bitte zuerst einen Protokollanten zuweisen, dann die Sitzung starten.');
   });
 
+  it('refuses an open before the window and asks before an early open', () => {
+    const { http, session, toasts } = setup();
+    const at = (min: number): string => new Date(Date.now() + min * 60_000).toISOString();
+    session.meeting.set(M({ opensAt: at(60), confirmUntil: at(110) }));
+    session.startMeeting();
+    http.verify();
+    expect(toasts()).toContain('Die Sitzung lässt sich noch nicht eröffnen.');
+    expect(session.earlyOpenAsk()).toBe(false);
+
+    session.meeting.set(M({ opensAt: at(-20), confirmUntil: at(30) }));
+    session.startMeeting();
+    http.verify();
+    expect(session.earlyOpenAsk()).toBe(true);
+    // The dialog confirms: the PATCH carries confirmEarly and the question closes.
+    session.startMeeting(true);
+    expect(session.earlyOpenAsk()).toBe(false);
+    const req = http.expectOne('/api/meetings/m-1');
+    expect(req.request.body).toEqual({ status: 'live', confirmEarly: true });
+    req.flush({ id: 'm-1', title: 'x', status: 'live', protocolId: null, votes: [], createdAt: 'x' });
+    expect(session.meeting()?.status).toBe('live');
+  });
+
+  it('asks when the server still finds the open early, else names the refusal', () => {
+    const { http, session, toasts } = setup();
+    session.meeting.set(M());
+    session.startMeeting();
+    http
+      .expectOne('/api/meetings/m-1')
+      .flush({ code: 'early_open_unconfirmed', detail: 'early' }, { status: 409, statusText: 'Conflict' });
+    expect(session.earlyOpenAsk()).toBe(true);
+
+    session.startMeeting(true);
+    http
+      .expectOne('/api/meetings/m-1')
+      .flush({ code: 'meeting_too_early', detail: 'zu früh' }, { status: 409, statusText: 'Conflict' });
+    http.expectOne('/api/meetings/m-1').flush({ id: 'm-1', title: 'x', status: 'planned', votes: [], createdAt: 'x' });
+    expect(session.earlyOpenAsk()).toBe(false);
+    expect(toasts().some((t) => t.includes('zu früh'))).toBe(true);
+  });
+
   it('finalizes only a closed meeting, and the close is no part of it (O13)', () => {
     const { http, session } = setup();
     session.meeting.set(M({ status: 'live' }));

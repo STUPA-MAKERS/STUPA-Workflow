@@ -45,10 +45,13 @@
 
   @if (m.canControl) {
     <div class="pc__start">
-      <app-button variant="fill" [disabled]="!m.protokollantId" [title]="(m.protokollantId ? 'meetings.control.open' : 'meetings.control.needProtokollant') | t" (click)="start.emit()">
+      <app-button variant="fill" [disabled]="!m.protokollantId || !!opensAtText()" [title]="m.protokollantId ? (opensAtText() || ('meetings.control.open' | t)) : ('meetings.control.needProtokollant' | t)" (click)="start.emit()">
         <app-icon name="play" [size]="16" />
         {{ 'meetings.control.open' | t }}
       </app-button>
+      @if (opensAtText()) {
+        <span class="pc__hint">{{ opensAtText() }}</span>
+      }
     </div>
   }
 </section>

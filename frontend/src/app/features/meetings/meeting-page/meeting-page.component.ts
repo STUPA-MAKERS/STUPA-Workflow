@@ -49,6 +49,7 @@ import { type SaveState, TopSheetComponent } from '../top-sheet/top-sheet.compon
 import { VoteCardComponent } from '../vote-card/vote-card.component';
 import { voteSnippet, voteSnippetHead } from '../meetings.util';
 import { clockTime, voteOptionLabel } from '../meetings-display.util';
+import { openWindowClock, openWindowState, openWindowWhen } from '../open-window.util';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { JoinQrComponent } from '../public-join/join-qr.component';
 
@@ -276,6 +277,17 @@ export class MeetingPageComponent {
    * meeting finalizes its protocol in the protocol bar of the sheet (O13). `null` when the
    * viewer has none.
    */
+  private readonly now = openWindowClock();
+  /** Where now is in the open window of a planned meeting (see `openWindowState`). */
+  protected readonly openWindow = computed(() => openWindowState(this.meeting(), this.now()));
+  /** "Eröffnen ab 17:00" while the window is not open yet, else `''`. */
+  protected readonly opensAtText = computed(() => {
+    const at = this.meeting().opensAt;
+    if (this.openWindow() !== 'tooEarly' || !at) return '';
+    const when = openWindowWhen(at, this.now(), this.i18n.locale());
+    return this.i18n.translate('meetings.control.opensAt', { when });
+  });
+
   protected readonly mainAction = computed<'open' | 'close' | null>(() => {
     const m = this.meeting();
     if (m.status === 'planned' && m.canControl) return 'open';

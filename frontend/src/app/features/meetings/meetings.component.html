@@ -173,6 +173,14 @@
     />
   }
 
+  <!-- Before confirmUntil the open is early and needs this extra question. -->
+  <app-early-open-dialog
+    [open]="earlyOpenAsk()"
+    [meeting]="m"
+    (closed)="earlyOpenAsk.set(false)"
+    (confirmed)="startMeeting(true)"
+  />
+
   <!-- The close never finalizes the protocol (O13). -->
   <app-close-meeting-dialog
     [open]="dialogs.closeOpen()"

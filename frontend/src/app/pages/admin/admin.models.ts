@@ -1131,6 +1131,22 @@ export const MAX_CONFIRM_TTL_HOURS = 720;
 /** Upper bound of {@link GuestSettings.linkTtlDays} (`MAX_LINK_TTL_DAYS`). */
 export const MAX_LINK_TTL_DAYS = 3650;
 
+/**
+ * The open window of meetings (P admin.deadlines): `GET/PUT /admin/meeting-settings`.
+ * Both values are minutes before the planned start of a meeting.
+ */
+export interface MeetingSettings {
+  /** The earliest open (0 to 10080). */
+  openLeadMinutes: number;
+  /** Before this point the open needs an extra confirmation (0 to `openLeadMinutes`). */
+  confirmLeadMinutes: number;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+}
+
+/** Upper bound of both {@link MeetingSettings} values (`MAX_LEAD_MINUTES`, one week). */
+export const MAX_LEAD_MINUTES = 10080;
+
 /** DSGVO erasure request (queue, P privacy.manage). */
 export type ErasureSubjectType = 'applicant' | 'principal';
 export type ErasureStatus = 'open' | 'executed' | 'rejected';
