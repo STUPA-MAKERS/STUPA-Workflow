@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
@@ -64,8 +65,12 @@ class _FakeService:
     async def create(self, application_id, payload, principal):  # noqa: ANN001
         return _vote_out("draft")
 
-    async def open(self, vote_id, *, now, actor=None):  # noqa: ANN001
+    async def meeting_id_of(self, vote_id):  # noqa: ANN001
+        return getattr(self, "meeting_id", None)
+
+    async def open(self, vote_id, *, now, actor=None, eligible_count=None):  # noqa: ANN001
         self.open_actor = actor
+        self.open_eligible = eligible_count
         return _vote_out("open")
 
     async def get(self, vote_id):  # noqa: ANN001
@@ -164,6 +169,54 @@ def test_open_ok(app: FastAPI, client: TestClient, fake_service: _FakeService) -
     assert r.json()["status"] == "open"
     # F12: the router passes the caller as the audit actor.
     assert fake_service.open_actor == "p"
+
+
+def test_open_meeting_vote_runs_the_meeting_checks(
+    app: FastAPI,
+    client: TestClient,
+    fake_service: _FakeService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A prepared meeting draft never opens around the checks of the meeting route."""
+    from app.modules.livevote import vote_open
+
+    mid = uuid4()
+    fake_service.meeting_id = mid  # type: ignore[attr-defined]
+    fake_service.session = object()  # type: ignore[attr-defined]
+    calls: list[Any] = []
+
+    async def _checks(session: Any, meeting_id: Any, vote_id: Any, principal: Any) -> int:
+        calls.append(meeting_id)
+        return 11
+
+    monkeypatch.setattr(vote_open, "check_draft_open", _checks)
+    _as_manager(app)
+    r = client.post(f"/api/votes/{uuid4()}/open")
+    assert r.status_code == 200
+    assert calls == [mid]
+    assert fake_service.open_eligible == 11
+
+
+def test_open_meeting_vote_refused_by_the_meeting_checks(
+    app: FastAPI,
+    client: TestClient,
+    fake_service: _FakeService,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.livevote import vote_open
+    from app.shared.errors import ConflictError
+
+    fake_service.meeting_id = uuid4()  # type: ignore[attr-defined]
+    fake_service.session = object()  # type: ignore[attr-defined]
+
+    async def _refuse(*_a: Any) -> int:
+        raise ConflictError("no guests", code="guests_vote_unavailable")
+
+    monkeypatch.setattr(vote_open, "check_draft_open", _refuse)
+    _as_manager(app)
+    r = client.post(f"/api/votes/{uuid4()}/open")
+    assert r.status_code == 409
+    assert r.json()["code"] == "guests_vote_unavailable"
 
 
 def test_close_ok(app: FastAPI, client: TestClient) -> None:

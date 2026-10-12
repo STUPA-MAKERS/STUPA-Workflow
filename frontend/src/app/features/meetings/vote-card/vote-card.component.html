@@ -110,6 +110,10 @@
     </dl>
   }
 
+  @if (v.status === 'draft' && canEdit() && meetingStatus() === 'planned') {
+    <p class="vc__hint">{{ 'meetings.vote.opensLater' | t }}</p>
+  }
+
   @if (v.status === 'draft' && canEdit() && meetingStatus() === 'live') {
     <div class="vc__actions">
       <app-button variant="fill" [block]="true" [disabled]="otherOpen()" [title]="(otherOpen() ? 'meetings.vote.openBlocked' : 'meetings.vote.open') | t" (click)="open.emit(v.id)">{{ 'meetings.vote.open' | t }}</app-button>

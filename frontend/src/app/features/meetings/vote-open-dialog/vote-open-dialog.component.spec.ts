@@ -1,6 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { AgendaItem, Meeting } from '@core/api/models';
 import { ToastService } from '@stupa-makers/ui-kit';
@@ -29,6 +29,44 @@ async function setup(item: AgendaItem | null = APP_TOP, topNumber = 3) {
 }
 
 describe('VoteOpenDialogComponent', () => {
+  describe('prepare', () => {
+    it('prepares the question as a draft beside the open', async () => {
+      const { http, opened, toasts, cmp } = await setup();
+      await userEvent.click(screen.getByRole('button', { name: 'Vorbereiten' }));
+      expect(cmp.preparing()).toBe(true);
+      const req = http.expectOne('/api/meetings/m-1/votes');
+      expect(req.request.body).toEqual(expect.objectContaining({ agendaItemId: 't-3', draft: true }));
+      req.flush({ ...MEETING, votes: [], createdAt: 'x' });
+      expect(opened).toHaveBeenCalled();
+      expect(toasts()).toContain('Abstimmung vorbereitet.');
+    });
+
+    it('only prepares in a planned meeting, also on enter', async () => {
+      const view = await setup();
+      view.fixture.componentRef.setInput('meeting', { ...MEETING, status: 'planned' });
+      view.fixture.detectChanges();
+      expect(screen.getByRole('dialog', { name: 'Abstimmung vorbereiten' })).toBeInTheDocument();
+      const footer = screen.getByRole('button', { name: 'Vorbereiten' }).closest('.dialog__footer') as HTMLElement;
+      expect(within(footer).queryByRole('button', { name: 'Abstimmung öffnen' })).toBeNull();
+      // A direct open is refused while the vote cannot open.
+      view.cmp.submit(false);
+      view.http.expectNone('/api/meetings/m-1/votes');
+      view.cmp.submit();
+      const req = view.http.expectOne('/api/meetings/m-1/votes');
+      expect(req.request.body.draft).toBe(true);
+    });
+
+    it('only prepares while another vote of the meeting is open', async () => {
+      const view = await setup();
+      view.fixture.componentRef.setInput('meeting', {
+        ...MEETING,
+        votes: [{ id: 'v-9', status: 'open' }],
+      });
+      view.fixture.detectChanges();
+      expect(view.cmp.canOpen()).toBe(false);
+    });
+  });
+
   it('names the item and prefills the question of an application item', async () => {
     await setup();
     const dialog = screen.getByRole('dialog', { name: 'Abstimmung öffnen' });

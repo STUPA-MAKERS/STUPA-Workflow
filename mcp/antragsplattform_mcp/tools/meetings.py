@@ -347,8 +347,10 @@ async def list_assignable_agenda_items(meeting_id: str) -> dict:
 
 @group.tool
 async def create_meeting_vote(meeting_id: str, vote: S.MeetingVoteOpenBody) -> dict:
-    """Open a live vote on an agenda item of a meeting.
+    """Open a live vote on an agenda item of a meeting, or prepare it as a draft.
 
+    With `draft: true` the vote is only prepared: it stays a draft, also in a planned
+    meeting, until `open_meeting_vote` opens it. Without it the meeting must be live.
     The agenda item can be a free-text item or an application item. The gremium of the
     meeting votes, and the server counts its eligible voters. Requires the lead of the
     meeting, the minute-taker, or the gremium permission `vote.manage`. An application
@@ -366,6 +368,18 @@ async def create_meeting_vote(meeting_id: str, vote: S.MeetingVoteOpenBody) -> d
     `guestsVote` is true.
     """
     return await api().post(f"/meetings/{meeting_id}/votes", json=dump_create(vote))
+
+
+@group.tool
+async def open_meeting_vote(meeting_id: str, vote_id: str) -> dict:
+    """Open a prepared draft vote of a live meeting.
+
+    The same callers as for `create_meeting_vote`. The server checks the application
+    and the guests again and counts the eligible voters from the current roster. 409
+    `meeting_not_started` before the start, 409 `guests_vote_unavailable` when guests
+    no longer vote on the question.
+    """
+    return await api().post(f"/meetings/{meeting_id}/votes/{vote_id}/open")
 
 
 @group.tool

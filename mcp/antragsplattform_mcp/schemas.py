@@ -593,6 +593,11 @@ class MeetingVoteOpenBody(WireModel):
         description="Decision proposal of an application item. A free-text item gives "
         "422 `decision_not_allowed`.",
     )
+    draft: bool = Field(
+        default=False,
+        description="Prepare the question only: it stays a draft, also in a planned "
+        "meeting, until `open_meeting_vote` opens it in the live meeting.",
+    )
 
 
 class VoteCreate(WireModel):

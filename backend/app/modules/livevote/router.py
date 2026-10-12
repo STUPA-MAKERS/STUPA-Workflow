@@ -53,6 +53,12 @@ from app.modules.livevote.schemas import (
     ProtokollantHandoverBody,
 )
 from app.modules.livevote.service import BrokerPublisher, MeetingService
+from app.modules.livevote.vote_open import (
+    assert_application_votable,
+    assert_vote_window,
+    draft_open_checks,
+    eligible_count,
+)
 from app.modules.notifications.auto import AutoMailer, get_auto_mailer
 from app.modules.voting.schemas import VoteCreateInternal
 from app.modules.voting.service import VotingService
@@ -570,23 +576,26 @@ async def open_meeting_vote(
     broker: BrokerRestDep,
     principal: ReaderDep,
 ) -> MeetingOut:
-    """Open a live vote on an agenda item of this meeting.
+    """Open a live vote on an agenda item of this meeting, or prepare it as a draft.
 
-    The route creates the vote and opens it in one step. The caller must be the
-    manager, the protokollant, or hold the gremium permission ``vote.manage``. An
-    application agenda item allows exactly one vote, because that vote fires the pass
-    or fail branch on close. A free-text agenda item allows several generic questions.
+    The route creates the vote and opens it in one step. With ``draft`` it only
+    creates the vote: the question waits as a ``draft`` until
+    ``POST /meetings/{id}/votes/{voteId}/open`` opens it. A draft can be prepared in a
+    planned or a live meeting, an open vote needs a live meeting (409
+    ``meeting_not_started`` / ``meeting_closed``). The caller must be the manager, the
+    protokollant, or hold the gremium permission ``vote.manage``. An application
+    agenda item allows exactly one vote, because that vote fires the pass or fail
+    branch on close. A free-text agenda item allows several generic questions.
     ``eligibleGroup`` is the Gremium of the meeting. The server derives the quorum
     denominator from the roster (members with ``vote.cast``) and never from client
-    input. The route broadcasts ``vote_opened``.
+    input. The route broadcasts ``vote_opened``, or ``meeting_state`` for a draft.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:
         raise ForbiddenError("not allowed to open a vote in this meeting")
-    # A vote needs a started meeting. Before ``live`` there is no protocol to
-    # record the result in.
-    if meeting.status != "live":
-        raise ConflictError("the meeting has not started — start it before opening a vote")
+    # An open vote needs a started meeting. Before ``live`` there is no protocol to
+    # record the result in. A prepared draft only waits for the start.
+    assert_vote_window(meeting, draft=payload.draft)
     item = await agenda.item(meeting_id, payload.agenda_item_id)
     # #17: the admitted guests vote too when the meeting lets them and the item is
     # public. Such a vote has no quorum: only the majority of the cast ballots counts.
@@ -620,25 +629,7 @@ async def open_meeting_vote(
     if item.application_id is not None:
         if await service.agenda_item_has_vote(item.id):
             raise ConflictError("this application TOP already has a decision vote")
-        # Fail fast: an application vote fires the pass or fail branch of the
-        # current state on close. If the application is not in a vote state, nobody
-        # can close the vote, and the cast ballots are lost.
-        kind = await service.application_state_kind(item.application_id)
-        if kind != "vote":
-            raise ConflictError(
-                "The application is not in a vote state — move it into its "
-                "decision state before opening the vote.",
-                code="conflict",
-            )
-        # Only the Gremium that decides the current vote state votes. A stale agenda
-        # item (the application left the state and came back for another Gremium)
-        # must not let this meeting decide.
-        if await service.application_vote_gremium(item.application_id) != meeting.gremium_id:
-            raise ConflictError(
-                "The Gremium of this meeting does not decide the current vote of the "
-                "application.",
-                code="vote_gremium_mismatch",
-            )
+        await assert_application_votable(service, meeting, item.application_id)
     config_data: dict[str, object] = (
         {
             "seats": payload.seats,
@@ -677,14 +668,7 @@ async def open_meeting_vote(
         if election
         else VoteConfig.model_validate(config_data)
     )
-    # The server always derives the quorum denominator from the real roster and
-    # never from the client. A holder of ``canManageVotes`` cannot manipulate it.
-    # A vote with guests counts the present members and the admitted guests; the
-    # close fixes the number again (a display value, there is no quorum).
-    if guests_vote:
-        eligible = await service.present_member_count(meeting_id) + meeting.admitted_guests
-    else:
-        eligible = await service.vote_eligible_count(meeting.gremium_id)
+    eligible = await eligible_count(service, meeting, guests_vote=guests_vote)
     create = VoteCreateInternal(
         config=config,
         eligibleGroup=meeting.gremium_id,
@@ -693,11 +677,57 @@ async def open_meeting_vote(
         proposal=payload.proposal,
     )
     vote = await voting.create_internal(
-        item.application_id, create, meeting_id=meeting_id, agenda_item_id=item.id
+        item.application_id,
+        create,
+        meeting_id=meeting_id,
+        agenda_item_id=item.id,
+        planned_ok=payload.draft,
     )
+    if payload.draft:
+        # The other managers of the meeting see the prepared question at once.
+        await service.broadcast_state(meeting_id, principal)
+        return await service.get(meeting_id, principal)
     opened = await voting.open(vote.id, now=datetime.now(UTC), actor=principal.sub)
     await BrokerPublisher(broker).vote_opened(opened)
     return await service.get(meeting_id, principal)
+
+
+@router.post(
+    "/meetings/{meeting_id}/votes/{vote_id}/open",
+    response_model=MeetingOut,
+    responses=_errors(401, 403, 404, 409),
+)
+async def open_prepared_meeting_vote(
+    meeting_id: UUID,
+    vote_id: UUID,
+    service: ServiceDep,
+    voting: VotingDep,
+    agenda: AgendaDep,
+    broker: BrokerRestDep,
+    principal: ReaderDep,
+) -> MeetingOut:
+    """Open a prepared draft vote of this meeting.
+
+    The caller must hold ``canManageVotes``, as for the create. The meeting must be
+    live. The draft can wait a long time, so the route runs the checks of the create
+    again: the application must still be in a vote state that the Gremium of the
+    meeting decides, and a vote with guests needs a meeting where guests vote and a
+    public agenda item (409 ``guests_vote_unavailable``). The quorum denominator comes
+    from the current roster, not from the roster at the create. The route broadcasts
+    ``vote_opened``. 404 when the meeting has no such vote, 409 when the vote is no
+    longer a draft.
+    """
+    meeting = await service.get(meeting_id, principal)
+    if not meeting.can_manage_votes:
+        raise ForbiddenError("not allowed to open a vote in this meeting")
+    eligible = await draft_open_checks(service, agenda, meeting, vote_id)
+    opened = await voting.open(
+        vote_id, now=datetime.now(UTC), actor=principal.sub, eligible_count=eligible
+    )
+    await BrokerPublisher(broker).vote_opened(opened)
+    return await service.get(meeting_id, principal)
+
+
 
 
 @router.delete(
@@ -844,9 +874,10 @@ async def set_agenda_body(
     """Set the markdown body or the title of an agenda item.
 
     The per-item editor calls this route. Only the meeting lead or an admin may
-    edit the agenda (``canWrite``). The body needs a live meeting, or a closed
-    meeting whose protocol is still a draft (O22). A rename needs a planned or live
-    meeting (O25). The service answers 409 otherwise.
+    edit the agenda (``canWrite``). The body needs a planned or live meeting, or a
+    closed meeting whose protocol is still a draft (O22): the minute-taker can write
+    the minutes before the start. A rename needs a planned or live meeting (O25). The
+    service answers 409 otherwise.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:

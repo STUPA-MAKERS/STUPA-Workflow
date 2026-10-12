@@ -15,14 +15,14 @@ State rules (F24, O22, O25):
   `vote_delete` audit entry. To delete these votes the caller needs the
   `canManageVotes` right, else 403.
 * Add and remove lock the meeting row, as the meeting close and the vote open do.
-* The Markdown body needs a `live` meeting, or a closed meeting whose protocol is
-  still a draft. The `nonPublic` flag is open from the planning until the protocol
-  leaves the draft.
+* The Markdown body and the `nonPublic` flag are open from the planning until the
+  protocol leaves the draft. The minute-taker can thus write the minutes of an item
+  before the meeting starts.
 
 Every change writes an audit entry (F12): `agenda_item_add`, `agenda_item_update`,
-`agenda_item_remove` and `agenda_reorder`. A body edit of a live meeting is the
-running minutes and its autosave is not audited. A body edit after the close is a
-correction of the minutes and is audited, without the text.
+`agenda_item_remove` and `agenda_reorder`. A body edit of a planned or live meeting
+is the preparation or the running minutes, and its autosave is not audited. A body
+edit after the close is a correction of the minutes and is audited, without the text.
 """
 
 from __future__ import annotations
@@ -104,22 +104,16 @@ class AgendaService:
                 code="meeting_closed",
             )
 
-    async def _assert_minutes_open(self, meeting: Meeting, *, planned_ok: bool) -> None:
+    async def _assert_minutes_open(self, meeting: Meeting) -> None:
         """Refuse a body or ``nonPublic`` edit outside the minutes window (O22).
 
-        The window is a ``live`` meeting, or a closed meeting whose protocol is still a
-        draft. A ``planned`` meeting has no minutes yet, so only ``planned_ok`` (the
-        ``nonPublic`` flag, which is planning work) passes there.
+        The window is a ``planned`` or ``live`` meeting, or a closed meeting whose
+        protocol is still a draft. A ``planned`` meeting has no protocol yet, but the
+        text of its items is already the start of the minutes.
 
         Raises:
-            ConflictError: The meeting has not started (``meeting_not_started``), or
-                the protocol is no longer a draft (``protocol_locked``).
+            ConflictError: The protocol is no longer a draft (``protocol_locked``).
         """
-        if meeting.status == "planned" and not planned_ok:
-            raise ConflictError(
-                "the meeting has not started — start it before taking minutes",
-                code="meeting_not_started",
-            )
         if meeting.status == "closed":
             status = await self.session.scalar(
                 select(Protocol.status).where(Protocol.meeting_id == meeting.id)
@@ -252,9 +246,9 @@ class AgendaService:
         title of its application. `non_public` hides the item content in the
         public protocol PDF.
 
-        A rename needs a `planned` or `live` meeting (O25). The body needs a `live`
-        meeting, or a closed meeting with a draft protocol (O22). `non_public` also
-        passes on a `planned` meeting. A change writes `agenda_item_update` with the
+        A rename needs a `planned` or `live` meeting (O25). The body and `non_public`
+        need a `planned` or `live` meeting, or a closed meeting with a draft protocol
+        (O22). A change writes `agenda_item_update` with the
         changed field names. The body counts only after the close.
 
         Raises:
@@ -266,10 +260,8 @@ class AgendaService:
         renames = title is not None and row.application_id is None
         if renames:
             self._assert_agenda_open(meeting)
-        if body is not None:
-            await self._assert_minutes_open(meeting, planned_ok=False)
-        elif non_public is not None:
-            await self._assert_minutes_open(meeting, planned_ok=True)
+        if body is not None or non_public is not None:
+            await self._assert_minutes_open(meeting)
         changed: list[str] = []
         if body is not None and body != row.body:
             row.body = body

@@ -129,7 +129,7 @@
       @if (canAddVote() && top(); as t) {
         <app-button class="mp__addVote" variant="tonal" [block]="true" (click)="voteDialog.emit(t)">
           <app-icon name="plus" [size]="18" />
-          {{ (t.applicationId ? 'meetings.vote.openFor' : 'meetings.vote.addQuestion') | t }}
+          {{ (t.applicationId ? addVoteKey() : 'meetings.vote.addQuestion') | t }}
         </app-button>
       }
     </aside>
@@ -149,6 +149,12 @@
         />
       </div>
     } @else {
+      @if (canBackToPrep()) {
+        <app-button class="mp__prepBack" variant="text" size="sm" (click)="prepItem.set(false)">
+          <app-icon name="back" [size]="16" />
+          {{ 'meetings.prep.back' | t }}
+        </app-button>
+      }
       <app-top-sheet
         class="mp__sheet"
         [meeting]="m"

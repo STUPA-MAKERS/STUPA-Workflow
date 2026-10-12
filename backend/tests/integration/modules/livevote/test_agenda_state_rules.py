@@ -112,16 +112,18 @@ async def test_agenda_changes_are_audited(
     assert "Verschiedenes" not in str([e.data for e in entries])
 
 
-async def test_body_on_planned_meeting_is_refused(
+async def test_body_on_planned_meeting_is_saved(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
+    """The minute-taker can write the text of an item before the meeting starts."""
     s = await seed(maker, status="planned")
     with TestClient(api) as client:
         resp = client.patch(
             f"/api/meetings/{s.meeting_id}/agenda/{s.item_ids[0]}", json={"body": "x"}
         )
-    assert resp.status_code == 409, resp.text
-    assert resp.json()["code"] == "meeting_not_started"
+    assert resp.status_code == 200, resp.text
+    assert resp.json()[0]["body"] == "x"
+    assert await audit_actions(maker, target_id=s.meeting_id) == []
 
 
 async def test_live_minutes_are_not_audited(

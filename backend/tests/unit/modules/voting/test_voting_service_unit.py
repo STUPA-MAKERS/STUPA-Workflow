@@ -199,6 +199,18 @@ async def test_open_meeting_vote_in_a_live_meeting() -> None:
     assert out.status == "open"
 
 
+async def test_open_prepared_meeting_vote_takes_the_new_roster_count() -> None:
+    """A prepared draft waited while the roster changed: the caller recounts it."""
+    mid = uuid4()
+    vote = _vote(status="draft", meeting_id=mid, eligible_count=20)
+    db = fake_session(result(vote))
+    db.scalar_results = [mid, "live"]
+    out = await VotingService(db).open(vote.id, now=NOW, eligible_count=23)
+    assert out.status == "open"
+    assert vote.eligible_count == 23
+    assert out.tally.eligible == 23
+
+
 async def test_cast_not_open_409() -> None:
     vote = _vote(status="draft")
     db = fake_session(result(vote))
@@ -866,6 +878,32 @@ async def test_create_in_a_meeting_that_is_not_live_conflicts(status: str, code:
         await VotingService(db).create_internal(None, payload, meeting_id=uuid4())
     assert ei.value.code == code
     assert db.added == []
+
+
+async def test_create_prepared_draft_in_a_planned_meeting() -> None:
+    """A prepared question waits as a draft before the meeting starts."""
+    db = fake_session()
+    db.scalar_results = ["planned"]
+    payload = VoteCreateInternal.model_validate(
+        {"config": _config(), "eligibleGroup": str(GID), "eligibleCount": 4}
+    )
+    out = await VotingService(db).create_internal(
+        None, payload, meeting_id=uuid4(), planned_ok=True
+    )
+    assert out.status == "draft"
+
+
+async def test_create_prepared_draft_in_a_closed_meeting_conflicts() -> None:
+    db = fake_session()
+    db.scalar_results = ["closed"]
+    payload = VoteCreateInternal.model_validate(
+        {"config": _config(), "eligibleGroup": str(GID), "eligibleCount": 4}
+    )
+    with pytest.raises(ConflictError) as ei:
+        await VotingService(db).create_internal(
+            None, payload, meeting_id=uuid4(), planned_ok=True
+        )
+    assert ei.value.code == "meeting_closed"
 
 
 async def test_create_with_a_missing_meeting_or_agenda_item_is_404() -> None:
