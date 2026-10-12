@@ -1213,7 +1213,7 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  it('links the vote of a branch event, or names it as deleted with its meeting', async () => {
+  it('links the vote of a branch event without its machine note, or names it as deleted', async () => {
     const { http, detectChanges, cmp } = await setup();
     http.expectOne(url('')).flush(appWire());
     http.expectOne(url('/versions')).flush([]);
@@ -1226,9 +1226,9 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
     const [linked, deleted] = cmp.historyEntries();
     expect(linked.link).toEqual({ label: 'Zur Abstimmung', route: ['/voting', 'v1'] });
-    expect(linked.body).toBe('vote:passed');
+    expect(linked.body).toBeNull();
     expect(deleted.link).toBeNull();
-    expect(deleted.body).toBe('vote:rejected\nAbstimmung gelöscht (mit Sitzung)');
+    expect(deleted.body).toBe('Abstimmung gelöscht (mit Sitzung)');
     flushAttachments(http);
     http.verify();
   });
