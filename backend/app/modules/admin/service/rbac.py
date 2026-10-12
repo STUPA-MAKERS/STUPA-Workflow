@@ -32,6 +32,7 @@ from app.modules.admin.service.service_base import ConfigServiceBase, _iso
 from app.modules.audit.actions import AuditAction
 from app.modules.auth.models import GroupMapping, Principal, Role, RolePermission
 from app.modules.auth.models import RoleAssignment as RoleAssignmentRow
+from app.modules.auth.sessions import end_principal_sessions
 from app.search import escape_like
 from app.shared.errors import ConflictError, NotFoundError
 from app.shared.permissions import PERMISSION_CATALOGUE
@@ -269,6 +270,8 @@ class RbacOps(ConfigServiceBase):
                 "a merged account cannot be activated", code="principal_merged"
             )
         principal.active = active
+        if not active:
+            await end_principal_sessions(self.session, principal.id)
         await self._audit(actor, AuditAction.ROLE_CHANGE, "principal", principal.id)
         await self.session.commit()
         assignments = (

@@ -1140,12 +1140,31 @@ export interface MeetingSettings {
   openLeadMinutes: number;
   /** Before this point the open needs an extra confirmation (0 to `openLeadMinutes`). */
   confirmLeadMinutes: number;
+}
+
+/**
+ * Lifetimes of an SSO login (P admin.users): `GET/PUT /admin/login-settings`.
+ *
+ * A login stays valid for that many days after its last use (sliding). A change applies
+ * to every session at its next renewal.
+ */
+export interface LoginSettings {
+  /** Days a login in a browser tab stays valid after its last use (1 to 400). */
+  webSessionDays: number;
+  /** Days a login in the installed app (PWA) stays valid after its last use (1 to 400). */
+  pwaSessionDays: number;
   updatedAt?: string | null;
   updatedBy?: string | null;
 }
 
 /** Upper bound of both {@link MeetingSettings} values (`MAX_LEAD_MINUTES`, one week). */
 export const MAX_LEAD_MINUTES = 10080;
+
+/**
+ * Upper bound of both {@link LoginSettings} lifetimes. Browsers cap the lifetime of a
+ * cookie at 400 days, so a longer session would end with its cookie anyway.
+ */
+export const MAX_SESSION_DAYS = 400;
 
 /** DSGVO erasure request (queue, P privacy.manage). */
 export type ErasureSubjectType = 'applicant' | 'principal';

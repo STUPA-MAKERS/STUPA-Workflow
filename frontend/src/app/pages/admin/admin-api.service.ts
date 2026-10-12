@@ -39,6 +39,7 @@ import {
   type NotificationSettings,
   type GuestSettings,
   type MeetingSettings,
+  type LoginSettings,
   type AuditPage,
   type Branding,
   type CdLogoSlot,
@@ -110,6 +111,7 @@ import {
   MOCK_GROUP_MAPPINGS,
   MOCK_GUEST_SETTINGS,
   MOCK_MEETING_SETTINGS,
+  MOCK_LOGIN_SETTINGS,
   MOCK_MAIL_TEMPLATES,
   MOCK_PERMISSIONS,
   MOCK_PRINCIPALS,
@@ -164,6 +166,7 @@ export class AdminApiService {
     deadlinePolicies: structuredCopy(MOCK_DEADLINE_POLICIES) as DeadlinePolicy[],
     guestSettings: structuredCopy(MOCK_GUEST_SETTINGS) as GuestSettings,
     meetingSettings: structuredCopy(MOCK_MEETING_SETTINGS) as MeetingSettings,
+    loginSettings: structuredCopy(MOCK_LOGIN_SETTINGS) as LoginSettings,
     cdVariants: structuredCopy(MOCK_CD_VARIANTS) as CdVariant[],
     mailTemplates: structuredCopy(MOCK_MAIL_TEMPLATES) as MailTemplate[],
     erasures: structuredCopy(MOCK_ERASURES) as ErasureRequest[],
@@ -1292,6 +1295,28 @@ export class AdminApiService {
       return of(structuredCopy(this.store.meetingSettings));
     }
     return this.http.put<MeetingSettings>(`${this.base}/admin/meeting-settings`, body);
+  }
+
+  // SSO login lifetimes. Both routes need P(admin.users).
+  /** GET /admin/login-settings — the session lifetimes of a browser tab and of the installed app. */
+  getLoginSettings(): Observable<LoginSettings> {
+    if (this.mock) return of(structuredCopy(this.store.loginSettings));
+    return this.http.get<LoginSettings>(`${this.base}/admin/login-settings`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** PUT /admin/login-settings — replaces both lifetimes (whole days, 1 to 400). */
+  putLoginSettings(body: Pick<LoginSettings, 'webSessionDays' | 'pwaSessionDays'>): Observable<LoginSettings> {
+    if (this.mock) {
+      this.store.loginSettings = {
+        ...body,
+        updatedAt: new Date().toISOString(),
+        updatedBy: 'mock-admin',
+      };
+      return of(structuredCopy(this.store.loginSettings));
+    }
+    return this.http.put<LoginSettings>(`${this.base}/admin/login-settings`, body);
   }
 
   // Every DSGVO/privacy endpoint below needs P(privacy.manage).

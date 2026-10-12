@@ -426,6 +426,15 @@ export const routes: Routes = [
               ),
           },
           {
+            path: 'login-settings',
+            data: { title: 'admin.loginSettings.title', permission: 'admin.users', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/login-settings/login-settings.component').then(
+                (m) => m.LoginSettingsComponent,
+              ),
+          },
+          {
             path: 'privacy',
             data: { title: 'admin.privacy.title', permission: 'privacy.manage', parent: ['admin'] },
             canActivate: [authGuard],

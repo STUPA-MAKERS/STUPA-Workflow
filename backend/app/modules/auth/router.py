@@ -10,7 +10,8 @@ HttpOnly+Secure+SameSite=Lax cookie.
 from __future__ import annotations
 
 import logging
-from typing import Annotated, Any
+from datetime import UTC, datetime
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response, status
@@ -21,6 +22,8 @@ from app.db import get_sessionmaker
 from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.admin.models import Gremium
 from app.modules.auth import oidc, service, sessions
+from app.modules.auth.login_settings import load_login_settings, session_days
+from app.modules.auth.models import SESSION_CLIENT_WEB
 from app.modules.auth.oidc import OidcError, OidcUnavailableError
 from app.modules.auth.schemas import (
     GremiumRef,
@@ -79,12 +82,20 @@ def _cookie_kwargs(settings: SettingsDep) -> dict[str, object]:
     status_code=status.HTTP_307_TEMPORARY_REDIRECT,
     responses=_errors(404, 503),
 )
-async def login(settings: SettingsDep) -> RedirectResponse:
+async def login(
+    settings: SettingsDep,
+    client: Annotated[Literal["web", "pwa"], Query()] = SESSION_CLIENT_WEB,
+) -> RedirectResponse:
     """Redirect to the IdP with the auth code flow and PKCE.
 
-    The tx cookie carries the state, the code verifier and the nonce. The authorize
-    endpoint comes from the discovery document of the IdP. If that document is
-    unusable, the route answers 503.
+    The tx cookie carries the state, the code verifier, the nonce and the client. The
+    authorize endpoint comes from the discovery document of the IdP. If that document
+    is unusable, the route answers 503.
+
+    `client=pwa` comes from the installed app (display mode standalone). The session
+    then gets the lifetime of the app (`login_settings.pwa_session_days`), else that
+    of a browser tab. The value only selects a lifetime; both stay bounded by the
+    admin settings and the check at the IdP.
     """
     if not settings.oidc_enabled:
         raise NotFoundError("OIDC is not configured.")
@@ -100,7 +111,7 @@ async def login(settings: SettingsDep) -> RedirectResponse:
     response = RedirectResponse(url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     response.set_cookie(
         settings.oidc_tx_cookie_name,
-        sessions.issue_oidc_tx(settings.session_secret, state, verifier, nonce),
+        sessions.issue_oidc_tx(settings.session_secret, state, verifier, nonce, client),
         max_age=_TX_MAX_AGE,
         **_cookie_kwargs(settings),  # type: ignore[arg-type]
     )
@@ -136,7 +147,12 @@ async def callback(
         raise BadRequestError("Invalid or expired OIDC transaction.")
     try:
         cookie, _ = await service.oidc_callback(
-            db, settings, code=code, verifier=tx["verifier"], nonce=tx["nonce"]
+            db,
+            settings,
+            code=code,
+            verifier=tx["verifier"],
+            nonce=tx["nonce"],
+            client=tx["client"],
         )
     except OidcUnavailableError as exc:
         raise ServiceUnavailableError("The identity provider is unavailable.") from exc
@@ -162,11 +178,12 @@ async def callback(
     dest = settings.public_base_url
     if request.cookies.get(settings.oauth_tx_cookie_name):
         dest = settings.public_base_url.rstrip("/") + "/api/oauth/finish"
+    days = session_days(await load_login_settings(db), tx["client"])
     response = RedirectResponse(dest, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     response.set_cookie(
         settings.session_cookie_name,
         cookie,
-        max_age=settings.session_ttl_hours * 3600,
+        max_age=days * 24 * 3600,
         **_cookie_kwargs(settings),  # type: ignore[arg-type]
     )
     response.delete_cookie(settings.oidc_tx_cookie_name, path="/")
@@ -196,7 +213,7 @@ async def logout(
             db,
             secret=settings.session_secret,
             cookie_value=cookie,
-            max_age=settings.session_ttl_hours * 3600,
+            max_age=sessions.SESSION_COOKIE_MAX_AGE,
         )
         if settings.oidc_enabled and ended is not None:
             try:
@@ -217,12 +234,51 @@ async def logout(
     return LogoutOut(logout_url=logout_url)
 
 
+async def _renew_session_cookie(
+    request: Request, response: Response, db: DbSession, settings: Settings
+) -> None:
+    """Sign the session cookie again and align its lifetime with the session row.
+
+    The app calls `/auth/me` on each start. The session row slides at each check at
+    the IdP (`session_renewal`), but the browser keeps the cookie only for its own
+    `max_age`. This step carries the new end over to the cookie and renews the
+    signature time, so an active user is never logged out by the cookie.
+    """
+    cookie = request.cookies.get(settings.session_cookie_name)
+    if not cookie:
+        return
+    now = datetime.now(UTC)
+    row = await sessions.load_principal_session(
+        db,
+        secret=settings.session_secret,
+        cookie_value=cookie,
+        now=now,
+        max_age=sessions.SESSION_COOKIE_MAX_AGE,
+    )
+    if row is None:
+        return
+    response.set_cookie(
+        settings.session_cookie_name,
+        sessions.sign_principal_sid(settings.session_secret, row.sid),
+        max_age=max(int((row.expires_at - now).total_seconds()), 0),
+        **_cookie_kwargs(settings),  # type: ignore[arg-type]
+    )
+
+
 @router.get("/me", responses=_errors(401, 403))
 async def me(
+    request: Request,
+    response: Response,
     principal: Annotated[Principal, Depends(require_principal())],
     db: DbSession,
+    settings: SettingsDep,
 ) -> MeOut:
-    """Return the principal plus the resolved roles, permissions, groups and Gremien."""
+    """Return the principal plus the resolved roles, permissions, groups and Gremien.
+
+    For a cookie session, the response also renews the session cookie (see
+    `_renew_session_cookie`).
+    """
+    await _renew_session_cookie(request, response, db, settings)
     return MeOut(
         sub=principal.sub,
         email=principal.email,

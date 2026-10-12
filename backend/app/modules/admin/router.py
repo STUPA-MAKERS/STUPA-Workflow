@@ -80,6 +80,8 @@ from app.modules.admin.schemas import (
     GroupMappingUpdate,
     GuestSettingsOut,
     GuestSettingsUpdate,
+    LoginSettingsOut,
+    LoginSettingsUpdate,
     MeetingSettingsOut,
     MeetingSettingsUpdate,
     MergePreviewOut,
@@ -104,11 +106,12 @@ from app.modules.admin.schemas import (
 from app.modules.admin.service import CdVariantService, ConfigService
 from app.modules.admin.site_config_service import SiteConfigService
 from app.modules.applications.guest_settings import GuestSettingsService
+from app.modules.auth.login_settings import LoginSettingsService
 from app.modules.livevote.open_window import MeetingSettingsService
 from app.modules.notifications.auto import AutoMailer, get_auto_mailer
 from app.shared.antiabuse import body_cap
 from app.shared.config_schemas import FlowGraph, export_json_schemas
-from app.shared.errors import ProblemDetail
+from app.shared.errors import ForbiddenError, ProblemDetail
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 public_router = APIRouter(tags=["admin"])
@@ -1185,6 +1188,15 @@ MeetingSettingsServiceDep = Annotated[
 ]
 
 
+def get_login_settings_service(session: DbSession) -> LoginSettingsService:
+    return LoginSettingsService(session)
+
+
+LoginSettingsServiceDep = Annotated[
+    LoginSettingsService, Depends(get_login_settings_service)
+]
+
+
 @router.get(
     "/meeting-settings",
     response_model=MeetingSettingsOut,
@@ -1222,6 +1234,49 @@ async def put_meeting_settings(
         actor=principal.sub,
     )
     return MeetingSettingsOut.model_validate(row, from_attributes=True)
+
+
+@router.get(
+    "/login-settings",
+    response_model=LoginSettingsOut,
+    dependencies=[_USERS],
+    responses=_errors(401, 403),
+)
+async def get_login_settings(service: LoginSettingsServiceDep) -> LoginSettingsOut:
+    """Return the lifetime of an OIDC login in a browser tab and in the installed app."""
+    row = await service.get()
+    await service.session.commit()
+    return LoginSettingsOut.model_validate(row, from_attributes=True)
+
+
+@router.put(
+    "/login-settings",
+    response_model=LoginSettingsOut,
+    responses=_errors(400, 401, 403, 422),
+)
+async def put_login_settings(
+    payload: LoginSettingsUpdate,
+    service: LoginSettingsServiceDep,
+    principal: UsersAdmin,
+) -> LoginSettingsOut:
+    """Replace both lifetimes (days after the last use, 1 to 400).
+
+    A new value applies to every session at its next check at the IdP, so the
+    existing sessions follow it too. The change writes a ``config_change`` audit
+    entry that the audit log cannot revert. Only a person in the browser may change
+    the session policy: an agent token (OAuth scope) gets 403, also with
+    ``admin:write``, like the account merge.
+    """
+    if principal.scope_permissions is not None:
+        raise ForbiddenError(
+            "Agent tokens cannot change the session lifetimes.", code="cookie_session_required"
+        )
+    row = await service.update(
+        web_session_days=payload.web_session_days,
+        pwa_session_days=payload.pwa_session_days,
+        actor=principal.sub,
+    )
+    return LoginSettingsOut.model_validate(row, from_attributes=True)
 
 
 # Site config and branding with draft and activate semantics.

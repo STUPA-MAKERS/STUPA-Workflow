@@ -521,3 +521,82 @@ def test_magic_link_verify_gone(
     monkeypatch.setattr(router_mod.service, "verify_magic_link", _verify)
     resp = enabled_client.post("/api/auth/magic-link/verify", json={"token": "tok"})
     assert resp.status_code == 410
+
+
+# Long sessions: the client of the login and the cookie renewal at /auth/me.
+def test_login_pwa_client_rides_the_tx_cookie(
+    enabled_client: TestClient, idp: respx.MockRouter
+) -> None:
+    from app.modules.auth import sessions
+
+    resp = enabled_client.get("/api/auth/login?client=pwa")
+    assert resp.status_code == 307
+    tx = sessions.load_oidc_tx(
+        ENABLED.session_secret, resp.cookies[ENABLED.oidc_tx_cookie_name], 600
+    )
+    assert tx is not None
+    assert tx["client"] == "pwa"
+
+
+def test_login_unknown_client_is_422(enabled_client: TestClient) -> None:
+    assert enabled_client.get("/api/auth/login?client=desktop").status_code == 422
+
+
+def test_callback_pwa_uses_the_app_lifetime(
+    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.modules.auth import sessions
+
+    seen: dict[str, object] = {}
+
+    async def _ok(*a: object, **k: object) -> tuple[str, PrincipalRow]:
+        seen.update(k)
+        return "signed-sid", PrincipalRow(sub="u1")
+
+    monkeypatch.setattr(router_mod.service, "oidc_callback", _ok)
+    tx = sessions.issue_oidc_tx(ENABLED.session_secret, "st", "v", "n", "pwa")
+    enabled_client.cookies.set(ENABLED.oidc_tx_cookie_name, tx)
+    resp = enabled_client.get("/api/auth/callback?code=c&state=st")
+    assert resp.status_code == 307
+    assert seen["client"] == "pwa"
+    assert f"Max-Age={180 * 24 * 3600}" in resp.headers.get("set-cookie", "")
+
+
+def _me_client(rows: list[object]) -> TestClient:
+    app = create_app(ENABLED)
+
+    async def _fake_db() -> AsyncIterator[object]:
+        yield fake_session(*(result(r) for r in rows))
+
+    app.dependency_overrides[get_settings] = lambda: ENABLED
+    app.dependency_overrides[get_session] = _fake_db
+    app.dependency_overrides[get_current_principal] = lambda: Principal(sub="u1")
+    return TestClient(app)
+
+
+def test_me_renews_the_session_cookie() -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from app.modules.auth import sessions
+
+    row = AuthSession(
+        sid="sid-1", principal_id="p", expires_at=datetime.now(UTC) + timedelta(days=10)
+    )
+    client = _me_client([row])
+    client.cookies.set(
+        ENABLED.session_cookie_name, sessions.sign_principal_sid(ENABLED.session_secret, "sid-1")
+    )
+    resp = client.get("/api/auth/me")
+    assert resp.status_code == 200
+    renewed = resp.cookies[ENABLED.session_cookie_name]
+    assert sessions.principal_sid(ENABLED.session_secret, renewed, 60) == "sid-1"
+    max_age = int(resp.headers["set-cookie"].split("Max-Age=")[1].split(";")[0])
+    assert 9 * 24 * 3600 < max_age <= 10 * 24 * 3600
+
+
+def test_me_without_a_valid_session_row_sets_no_cookie() -> None:
+    client = _me_client([])
+    client.cookies.set(ENABLED.session_cookie_name, "not-signed")
+    resp = client.get("/api/auth/me")
+    assert resp.status_code == 200
+    assert ENABLED.session_cookie_name not in resp.headers.get("set-cookie", "")

@@ -108,6 +108,7 @@ _DATA_TABLES = (
     # defaults, so a test that changes them does not leak into the next one.
     "guest_application_settings",
     "meeting_settings",
+    "login_settings",
     # Draft tokens of the wizard (Z4). No FK reaches this table, so the `application`
     # CASCADE does not clear it.
     "attachment_draft_token",

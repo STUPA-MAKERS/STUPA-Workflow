@@ -403,6 +403,20 @@ describe('AdminApiService — real mode (contract)', () => {
     req.flush({ openLeadMinutes: 30, confirmLeadMinutes: 5 });
   });
 
+  it('reads and replaces the login settings', () => {
+    let read: unknown;
+    s.getLoginSettings().subscribe((v) => (read = v));
+    const settings = { webSessionDays: 90, pwaSessionDays: 180, updatedAt: null, updatedBy: null };
+    http.expectOne({ method: 'GET', url: '/api/admin/login-settings' }).flush(settings);
+    expect(read).toEqual(settings);
+    let saved: unknown;
+    s.putLoginSettings({ webSessionDays: 30, pwaSessionDays: 400 }).subscribe((v) => (saved = v));
+    const req = http.expectOne({ method: 'PUT', url: '/api/admin/login-settings' });
+    expect(req.request.body).toEqual({ webSessionDays: 30, pwaSessionDays: 400 });
+    req.flush({ ...settings, webSessionDays: 30, pwaSessionDays: 400 });
+    expect(saved).toEqual({ ...settings, webSessionDays: 30, pwaSessionDays: 400 });
+  });
+
   it('POSTs a new application type and maps the wire response', () => {
     let created: { hasBudget: boolean; name: unknown } | undefined;
     s.createApplicationType({ key: 'k', name: { de: 'N' }, gremiumId: 'g1', hasBudget: true }).subscribe(
@@ -1050,6 +1064,20 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(await firstValueFrom(s.getMeetingSettings())).toEqual({ openLeadMinutes: 60, confirmLeadMinutes: 10 });
     await firstValueFrom(s.putMeetingSettings({ openLeadMinutes: 120, confirmLeadMinutes: 15 }));
     expect(await firstValueFrom(s.getMeetingSettings())).toEqual({ openLeadMinutes: 120, confirmLeadMinutes: 15 });
+  });
+
+  it('keeps the login settings in the mock store', async () => {
+    const s = svc();
+    expect(await firstValueFrom(s.getLoginSettings())).toEqual({
+      webSessionDays: 90,
+      pwaSessionDays: 180,
+      updatedAt: null,
+      updatedBy: null,
+    });
+    await firstValueFrom(s.putLoginSettings({ webSessionDays: 14, pwaSessionDays: 365 }));
+    const after = await firstValueFrom(s.getLoginSettings());
+    expect(after).toMatchObject({ webSessionDays: 14, pwaSessionDays: 365, updatedBy: 'mock-admin' });
+    expect(after.updatedAt).toEqual(expect.any(String));
   });
 
   it('serves the CD variants, the site versions and the notification save in mock mode', async () => {

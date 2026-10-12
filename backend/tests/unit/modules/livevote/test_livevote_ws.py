@@ -389,7 +389,7 @@ def _auth_db(*, naive: bool):
         vf, vu = vf.replace(tzinfo=None), vu.replace(tzinfo=None)
     auth_session = AuthSession(
         sid=_SID, principal_id=pid, expires_at=now + timedelta(hours=1),
-        refresh_token=None, id_token=None,
+        refresh_token=None, id_token=None, revalidated_at=now,
     )
     principal_row = PrincipalRow(
         sub="member", email=None, display_name="M", oidc_groups=[]

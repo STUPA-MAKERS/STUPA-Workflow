@@ -19,6 +19,7 @@ import type {
   FormDraft,
   GuestSettings,
   MeetingSettings,
+  LoginSettings,
   MailTemplate,
   FormOverviewItem,
   Gremium,
@@ -381,6 +382,14 @@ export const MOCK_DEADLINE_POLICIES: DeadlinePolicy[] = [
 /** The guest settings of the mock backend (the server defaults). */
 export const MOCK_GUEST_SETTINGS: GuestSettings = { confirmTtlHours: 12, linkTtlDays: null };
 export const MOCK_MEETING_SETTINGS: MeetingSettings = { openLeadMinutes: 60, confirmLeadMinutes: 10 };
+
+/** The SSO login lifetimes of the mock: the defaults of the server. */
+export const MOCK_LOGIN_SETTINGS: LoginSettings = {
+  webSessionDays: 90,
+  pwaSessionDays: 180,
+  updatedAt: null,
+  updatedBy: null,
+};
 
 /** CD variants of the mock gremien. */
 export const MOCK_CD_VARIANTS: CdVariant[] = [

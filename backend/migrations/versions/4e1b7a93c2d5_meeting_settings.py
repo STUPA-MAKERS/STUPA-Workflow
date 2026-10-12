@@ -11,7 +11,7 @@ The statements are idempotent. A fresh database gets the table from the
 The downgrade drops the table.
 
 Revision ID: 4e1b7a93c2d5
-Revises: c87c51e806bd
+Revises: 7c1e4a9b2d63
 Create Date: 2026-10-12 16:30:00.000000
 """
 
@@ -22,7 +22,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "4e1b7a93c2d5"
-down_revision: str | None = "c87c51e806bd"
+down_revision: str | None = "7c1e4a9b2d63"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

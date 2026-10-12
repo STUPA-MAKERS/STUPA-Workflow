@@ -101,7 +101,7 @@ from app.modules.applications.models import (
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.models import AuditEntry, AuditVerification
 from app.modules.audit.service import AuditService
-from app.modules.auth.models import AuthSession, RoleAssignment
+from app.modules.auth.models import AuthSession, LoginSettings, RoleAssignment
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oauth_models import OAuthAuthorizationCode, OAuthToken
 from app.modules.auth.rbac import resolve_principal
@@ -185,6 +185,7 @@ SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("config", SiteConfigVersion.created_by),
     ("config", GuestApplicationSettings.updated_by),
     ("config", MeetingSettings.updated_by),
+    ("config", LoginSettings.updated_by),
     ("roles", RoleAssignment.granted_by),
     ("roles", RoleAssignment.delegated_by),
     ("privacy", ErasureRequest.requested_by),

@@ -96,7 +96,11 @@ class Settings(BaseSettings):
     oidc_client_id: str | None = None
     oidc_client_secret: str | None = Field(default=None, min_length=_MIN_SECRET_LEN)
     oidc_redirect_url: str | None = None
-    oidc_scopes: str = "openid email profile"
+    # `offline_access` asks the IdP for a refresh token. A long principal session needs
+    # it, because the session checks the account at the IdP with that token every
+    # `session_revalidate_hours`. Without a refresh token the session ends at the first
+    # check (see `app.modules.auth.session_renewal`).
+    oidc_scopes: str = "openid email profile offline_access"
     oidc_groups_claim: str = "groups"
     oidc_post_logout_redirect_url: str | None = None
 
@@ -144,9 +148,21 @@ class Settings(BaseSettings):
     session_cookie_name: str = "ap_session"
     applicant_cookie_name: str = "ap_applicant"
     oidc_tx_cookie_name: str = "ap_oidc_tx"
-    session_ttl_hours: int = 12
+    # The lifetime of a principal session is no environment setting. It lives in
+    # `login_settings` (admin UI: browser 90 days, installed app 180 days by default)
+    # and slides with each check at the IdP. An old `.env` that still sets
+    # `SESSION_TTL_HOURS` keeps starting, because `extra="ignore"` drops the key.
+    # The session asks the IdP again after this interval (refresh token grant). The
+    # check refreshes the groups, the gremium memberships and the active flag, and it
+    # ends the session when the IdP refuses the token. It bounds how long a removed
+    # group or a disabled IdP account keeps its rights.
+    session_revalidate_hours: int = Field(default=12, ge=1, le=168)
+    # When the IdP is unreachable, the session stays open, but only for this time
+    # after the last successful check. An IdP outage then does not log everybody out,
+    # and a long outage cannot keep a removed account in forever.
+    session_revalidate_grace_hours: int = Field(default=72, ge=1, le=720)
     # Applicant session from a magic link: server-side (`applicant_session` table)
-    # with an opaque signed `sid`. It is decoupled from `session_ttl_hours` on
+    # with an opaque signed `sid`. It is decoupled from the principal session on
     # purpose, so the applicant window can be tuned on its own. A shorter window
     # narrows the replay window.
     applicant_session_ttl_hours: int = 12
