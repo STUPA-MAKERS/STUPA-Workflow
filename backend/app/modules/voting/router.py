@@ -120,9 +120,23 @@ async def open_vote(
     Gremium-scoped manage right. The call returns 409 when the vote is not
     ``draft``. If a meeting holds the vote, the publisher broadcasts ``vote_opened``
     on the live-vote channel. Without a meeting the broadcast is a no-op.
+
+    A meeting vote runs the checks of the open route of the meeting first
+    (``livevote.vote_open``): a prepared draft can wait while the state changes, and
+    this route must not open it around them. The quorum denominator then comes from
+    the current roster.
     """
     await service.assert_can_manage_vote(vote_id, principal)
-    vote = await service.open(vote_id, now=datetime.now(UTC), actor=principal.sub)
+    eligible: int | None = None
+    meeting_id = await service.meeting_id_of(vote_id)
+    if meeting_id is not None:
+        # Local import: the livevote modules import this module.
+        from app.modules.livevote.vote_open import check_draft_open
+
+        eligible = await check_draft_open(service.session, meeting_id, vote_id, principal)
+    vote = await service.open(
+        vote_id, now=datetime.now(UTC), actor=principal.sub, eligible_count=eligible
+    )
     await publisher.vote_opened(vote)
     return vote
 

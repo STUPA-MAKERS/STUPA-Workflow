@@ -3651,3 +3651,27 @@ async def test_set_self_conflict_when_closed_via_service() -> None:
     with pytest.raises(ConflictError):
         await svc.set_self(closed.id, "present", "me")
     assert sess.committed == 0
+
+
+async def test_check_draft_open_reads_the_meeting_and_runs_the_checks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The generic open route reaches the same checks as the meeting route."""
+    from app.modules.livevote import vote_open
+
+    out = _meeting_out()
+    seen: list[Any] = []
+
+    async def _get(self: Any, meeting_id: UUID, principal: Any = None) -> Any:
+        return out
+
+    async def _checks(service: Any, agenda: Any, meeting: Any, vote_id: UUID) -> int:
+        seen.append((meeting, vote_id))
+        return 4
+
+    monkeypatch.setattr(vote_open.MeetingService, "get", _get)
+    monkeypatch.setattr(vote_open, "draft_open_checks", _checks)
+    vid = uuid4()
+    principal = Principal(sub="p", permissions=set(), roles=[])
+    assert await vote_open.check_draft_open(_QueueSession(), out.id, vid, principal) == 4  # type: ignore[arg-type]
+    assert seen == [(out, vid)]

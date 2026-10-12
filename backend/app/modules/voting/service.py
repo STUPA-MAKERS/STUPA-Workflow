@@ -1442,6 +1442,10 @@ class VotingService:
         """Like ``assert_can_manage_group`` but for an already-loaded vote."""
         await self.assert_can_manage_group(vote.eligible_group, vote.meeting_id, principal)
 
+    async def meeting_id_of(self, vote_id: UUID) -> UUID | None:
+        """Return the meeting of the vote, or None for a vote without a meeting."""
+        return await self.session.scalar(select(Vote.meeting_id).where(Vote.id == vote_id))
+
     async def assert_can_manage_vote(self, vote_id: UUID, principal: Principal) -> None:
         """Load the vote and run ``assert_can_manage`` on it.
 
