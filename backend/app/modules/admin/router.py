@@ -80,6 +80,8 @@ from app.modules.admin.schemas import (
     GroupMappingUpdate,
     GuestSettingsOut,
     GuestSettingsUpdate,
+    LoginSettingsOut,
+    LoginSettingsUpdate,
     MergePreviewOut,
     MergeResultOut,
     PrincipalMergeIn,
@@ -102,6 +104,7 @@ from app.modules.admin.schemas import (
 from app.modules.admin.service import CdVariantService, ConfigService
 from app.modules.admin.site_config_service import SiteConfigService
 from app.modules.applications.guest_settings import GuestSettingsService
+from app.modules.auth.login_settings import LoginSettingsService
 from app.modules.notifications.auto import AutoMailer, get_auto_mailer
 from app.shared.antiabuse import body_cap
 from app.shared.config_schemas import FlowGraph, export_json_schemas
@@ -1169,6 +1172,52 @@ async def put_guest_settings(
         actor=principal.sub,
     )
     return GuestSettingsOut.model_validate(row, from_attributes=True)
+
+
+def get_login_settings_service(session: DbSession) -> LoginSettingsService:
+    return LoginSettingsService(session)
+
+
+LoginSettingsServiceDep = Annotated[
+    LoginSettingsService, Depends(get_login_settings_service)
+]
+
+
+@router.get(
+    "/login-settings",
+    response_model=LoginSettingsOut,
+    dependencies=[_USERS],
+    responses=_errors(401, 403),
+)
+async def get_login_settings(service: LoginSettingsServiceDep) -> LoginSettingsOut:
+    """Return the lifetime of an OIDC login in a browser tab and in the installed app."""
+    row = await service.get()
+    await service.session.commit()
+    return LoginSettingsOut.model_validate(row, from_attributes=True)
+
+
+@router.put(
+    "/login-settings",
+    response_model=LoginSettingsOut,
+    responses=_errors(400, 401, 403, 422),
+)
+async def put_login_settings(
+    payload: LoginSettingsUpdate,
+    service: LoginSettingsServiceDep,
+    principal: UsersAdmin,
+) -> LoginSettingsOut:
+    """Replace both lifetimes (days after the last use, 1 to 400).
+
+    A new value applies to every session at its next check at the IdP, so the
+    existing sessions follow it too. The change writes a ``config_change`` audit
+    entry that the audit log cannot revert.
+    """
+    row = await service.update(
+        web_session_days=payload.web_session_days,
+        pwa_session_days=payload.pwa_session_days,
+        actor=principal.sub,
+    )
+    return LoginSettingsOut.model_validate(row, from_attributes=True)
 
 
 # Site config and branding with draft and activate semantics.

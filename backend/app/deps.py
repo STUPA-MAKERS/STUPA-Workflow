@@ -24,6 +24,7 @@ from app.db import get_session
 from app.modules.auth import oauth, oauth_service, rbac, sessions
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Applicant, ApplicantScope, Principal
+from app.modules.auth.session_renewal import renew_principal_session
 from app.settings import Settings, get_settings
 from app.shared.errors import ForbiddenError, UnauthorizedError
 
@@ -121,7 +122,7 @@ async def get_current_principal(
         secret=settings.session_secret,
         cookie_value=cookie,
         now=now,
-        max_age=settings.session_ttl_hours * 3600,
+        max_age=sessions.SESSION_COOKIE_MAX_AGE,
     )
     if session is None:
         return None
@@ -131,6 +132,14 @@ async def get_current_principal(
         )
     ).scalar_one_or_none()
     if row is None or row.active is False:
+        return None
+    # A long session checks the account at the IdP from time to time. The check can
+    # end the session, and it can change the groups and memberships of the row.
+    if not await renew_principal_session(
+        db, settings, session=session, principal=row, now=now
+    ):
+        return None
+    if row.active is False:
         return None
     return await rbac.resolve_principal(db, row, now)
 

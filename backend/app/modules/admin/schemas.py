@@ -20,6 +20,7 @@ from app.modules.applications.models import (
     DEFAULT_CONFIRM_TTL_HOURS,
     MAX_CONFIRM_TTL_HOURS,
 )
+from app.modules.auth.models import MAX_SESSION_DAYS
 from app.shared.config_schemas import ComparisonOffers, EventName, FlowGraph
 from app.shared.i18n import I18nMap
 from app.shared.permissions import PERMISSION_CATALOGUE
@@ -847,6 +848,24 @@ class PublicSiteConfigOut(_CamelModel):
 # The API caps the link lifetime at ten years. A larger value adds nothing, and a
 # far-future expiry can overflow the datetime arithmetic.
 MAX_LINK_TTL_DAYS = 3650
+
+
+class LoginSettingsOut(_CamelModel):
+    """Lifetimes of an OIDC login in days after the last use (browser and app)."""
+
+    web_session_days: int = Field(serialization_alias="webSessionDays")
+    pwa_session_days: int = Field(serialization_alias="pwaSessionDays")
+    updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
+    updated_by: str | None = Field(default=None, serialization_alias="updatedBy")
+
+
+class LoginSettingsUpdate(_CamelModel):
+    """Full replacement of both lifetimes, each 1 to 400 days."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    web_session_days: int = Field(alias="webSessionDays", ge=1, le=MAX_SESSION_DAYS)
+    pwa_session_days: int = Field(alias="pwaSessionDays", ge=1, le=MAX_SESSION_DAYS)
 
 
 class GuestSettingsOut(_CamelModel):

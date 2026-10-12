@@ -214,3 +214,39 @@ async def test_get_current_principal_deactivated(monkeypatch: pytest.MonkeyPatch
         req, fake_session(result(SimpleNamespace(active=False))), _settings()
     )
     assert principal is None
+
+
+async def test_get_current_principal_renewal_ends_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _sess(*a: object, **k: object) -> AuthSession:
+        return AuthSession(sid="s", principal_id="pid")
+
+    async def _renew(*a: object, **k: object) -> bool:
+        return False
+
+    monkeypatch.setattr(deps.sessions, "load_principal_session", _sess)
+    monkeypatch.setattr(deps, "renew_principal_session", _renew)
+    req = _request(cookies={_settings().session_cookie_name: "x"})
+    principal = await get_current_principal(
+        req, fake_session(result(SimpleNamespace(active=True))), _settings()
+    )
+    assert principal is None
+
+
+async def test_get_current_principal_deactivated_by_renewal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    row = SimpleNamespace(active=True)
+
+    async def _sess(*a: object, **k: object) -> AuthSession:
+        return AuthSession(sid="s", principal_id="pid")
+
+    async def _renew(*a: object, **k: object) -> bool:
+        row.active = False
+        return True
+
+    monkeypatch.setattr(deps.sessions, "load_principal_session", _sess)
+    monkeypatch.setattr(deps, "renew_principal_session", _renew)
+    req = _request(cookies={_settings().session_cookie_name: "x"})
+    assert await get_current_principal(req, fake_session(result(row)), _settings()) is None

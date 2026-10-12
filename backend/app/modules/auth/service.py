@@ -29,8 +29,10 @@ from app.modules.auth.bootstrap import (
     ensure_admin_for_principal,
     ensure_member_for_principal,
 )
+from app.modules.auth.models import SESSION_CLIENT_WEB
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import ApplicantScope
+from app.modules.auth.session_renewal import session_expiry
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.service import FlowService
 from app.settings import Settings
@@ -266,9 +268,17 @@ async def upsert_principal(db: AsyncSession, claims: oidc.OidcClaims) -> Princip
 
 
 async def oidc_callback(
-    db: AsyncSession, settings: Settings, *, code: str, verifier: str, nonce: str
+    db: AsyncSession,
+    settings: Settings,
+    *,
+    code: str,
+    verifier: str,
+    nonce: str,
+    client: str = SESSION_CLIENT_WEB,
 ) -> tuple[str, PrincipalRow]:
     """Exchange the code, verify the token, upsert the principal and open a session.
+
+    `client` (`web` or `pwa`) selects the session lifetime from `login_settings`.
 
     Returns:
         The signed `sid` cookie value and the principal row.
@@ -293,13 +303,16 @@ async def oidc_callback(
     # just refreshed the group cache, so the memberships follow the IdP from this
     # login on.
     await sync_principal_memberships(db, row)
+    now = _now()
     cookie = await sessions.create_principal_session(
         db,
         secret=settings.session_secret,
         principal_id=row.id,
-        expires_at=_now() + timedelta(hours=settings.session_ttl_hours),
+        expires_at=await session_expiry(db, client, now),
         refresh_token=token_set.get("refresh_token"),
         id_token=token_set.get("id_token"),
+        client=client,
+        now=now,
     )
     # D3: one LOGIN entry per successful OIDC login, in the same transaction as the
     # session. The actor is the principal. ``data`` names only the method: no IP

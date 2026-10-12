@@ -180,7 +180,24 @@ def test_oidc_tx_roundtrip() -> None:
         "state": "st",
         "verifier": "vf",
         "nonce": "nc",
+        "client": "web",
     }
+
+
+def test_oidc_tx_pwa_client_roundtrip() -> None:
+    value = sessions.issue_oidc_tx(SECRET, "st", "vf", "nc", "pwa")
+    tx = sessions.load_oidc_tx(SECRET, value, MAX_AGE)
+    assert tx is not None
+    assert tx["client"] == "pwa"
+
+
+def test_oidc_tx_unknown_client_falls_back_to_web() -> None:
+    value = sessions._serializer(SECRET, sessions._OIDC_TX_SALT).dumps(
+        {"state": "st", "verifier": "vf", "nonce": "nc", "client": "evil"}
+    )
+    tx = sessions.load_oidc_tx(SECRET, value, MAX_AGE)
+    assert tx is not None
+    assert tx["client"] == "web"
 
 
 def test_oidc_tx_bad_signature_returns_none() -> None:

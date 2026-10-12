@@ -11,13 +11,27 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     PrimaryKeyConstraint,
     Text,
+    func,
 )
 from sqlalchemy.dialects.postgresql import CITEXT, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, CreatedAtMixin, UUIDPkMixin
+
+# The client kind of a principal session. `pwa` is the installed app (display mode
+# standalone), `web` every browser tab. Each kind has its own lifetime.
+SESSION_CLIENT_WEB = "web"
+SESSION_CLIENT_PWA = "pwa"
+SESSION_CLIENTS = (SESSION_CLIENT_WEB, SESSION_CLIENT_PWA)
+# Default lifetimes of a principal session in days, after the last use.
+DEFAULT_WEB_SESSION_DAYS = 90
+DEFAULT_PWA_SESSION_DAYS = 180
+# Upper bound of both lifetimes. Browsers cap a cookie at 400 days (RFC 6265bis), so a
+# longer value would end at the browser anyway.
+MAX_SESSION_DAYS = 400
 
 
 class Principal(UUIDPkMixin, Base):
@@ -140,8 +154,57 @@ class AuthSession(UUIDPkMixin, CreatedAtMixin, Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     refresh_token: Mapped[str | None] = mapped_column(Text, nullable=True)
     id_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # `web` or `pwa`. It selects the lifetime from `login_settings`.
+    client: Mapped[str] = mapped_column(
+        Text, server_default=SESSION_CLIENT_WEB, default=SESSION_CLIENT_WEB
+    )
+    # The time of the last successful check at the IdP (login or refresh grant).
+    # `session_renewal` checks again after `session_revalidate_hours`.
+    revalidated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
-    __table_args__ = (Index("ix_auth_session_principal_id", "principal_id"),)
+    __table_args__ = (
+        Index("ix_auth_session_principal_id", "principal_id"),
+        CheckConstraint("client IN ('web', 'pwa')", name="client"),
+    )
+
+
+class LoginSettings(Base):
+    """Lifetimes of a principal session (single row id=1).
+
+    `web_session_days` applies to a login in a browser tab, `pwa_session_days` to a
+    login in the installed app. A session ends after that many days without use. Each
+    check at the IdP moves the end, so an active user stays logged in.
+    """
+
+    __tablename__ = "login_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    web_session_days: Mapped[int] = mapped_column(
+        Integer,
+        server_default=str(DEFAULT_WEB_SESSION_DAYS),
+        default=DEFAULT_WEB_SESSION_DAYS,
+    )
+    pwa_session_days: Mapped[int] = mapped_column(
+        Integer,
+        server_default=str(DEFAULT_PWA_SESSION_DAYS),
+        default=DEFAULT_PWA_SESSION_DAYS,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("id = 1", name="singleton"),
+        CheckConstraint(
+            f"web_session_days BETWEEN 1 AND {MAX_SESSION_DAYS}", name="web_days"
+        ),
+        CheckConstraint(
+            f"pwa_session_days BETWEEN 1 AND {MAX_SESSION_DAYS}", name="pwa_days"
+        ),
+    )
 
 
 class ApplicantSession(UUIDPkMixin, CreatedAtMixin, Base):
