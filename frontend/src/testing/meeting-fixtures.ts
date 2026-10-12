@@ -64,6 +64,8 @@ export function meeting(over: Partial<Meeting> = {}): Meeting {
     admittedGuests: 0,
     pendingGuests: 0,
     publicJoinAllowed: true,
+    opensAt: null,
+    confirmUntil: null,
     ...over,
   };
 }

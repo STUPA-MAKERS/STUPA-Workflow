@@ -19,6 +19,7 @@ import type {
   Attendance,
   AttendanceStatus,
   Meeting,
+  MeetingPatchBody,
   MeetingVote,
   Protocol,
   SelfAttendanceStatus,
@@ -29,6 +30,7 @@ import type { ServerMessage } from '@core/ws/ws-messages';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { MeetingAgendaService } from './meeting-agenda.service';
 import { MeetingGuestsService } from './meeting-guests.service';
+import { openWindowState } from './open-window.util';
 import {
   assembleProtocolMarkdown,
   canReportOwn,
@@ -86,6 +88,8 @@ export class MeetingSessionService implements OnDestroy {
   readonly savingDate = signal(false);
 
   readonly finalizing = signal(false);
+  /** "Sitzung schon eröffnen?" is open: the open is early and waits for the confirmation. */
+  readonly earlyOpenAsk = signal(false);
   /** Poll fallback while the worker renders the protocol. */
   private renderPollTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -208,17 +212,36 @@ export class MeetingSessionService implements OnDestroy {
    * the start. Only a planned meeting starts, and it needs a minute-taker: the page
    * says so at once instead of showing the server 409 after the click.
    *
+   * The open window: before `opensAt` the page refuses at once (the button is off
+   * anyway) and reads the meeting again, because the window may have moved. The
+   * server 409 `meeting_too_early` (the clocks differ) does the same. Before `confirmUntil` the open is early: the first call opens "Sitzung
+   * schon eröffnen?" (`earlyOpenAsk`), and the dialog calls again with
+   * `confirmEarly`. When the server still finds the open early (the clocks differ),
+   * its 409 `early_open_unconfirmed` opens the dialog too.
+   *
    * The close is a dialog of its own (`CloseMeetingDialogComponent`), and a planned
    * meeting that does not take place is deleted, not closed (O13).
    */
-  startMeeting(): void {
+  startMeeting(confirmEarly = false): void {
     const m = this.meeting();
+    this.earlyOpenAsk.set(false);
     if (!m || m.status !== 'planned') return;
     if (!m.protokollantId) {
       this.toast.error(this.i18n.translate('meetings.toast.protokollantRequired'));
       return;
     }
-    this.api.patchMeeting(m.id, { status: 'live' }).subscribe({
+    const phase = openWindowState(m, Date.now());
+    if (phase === 'tooEarly') {
+      // The window may have moved (settings, a date change in another tab): read again.
+      this.tooEarly();
+      return;
+    }
+    if (phase === 'early' && !confirmEarly) {
+      this.earlyOpenAsk.set(true);
+      return;
+    }
+    const body: MeetingPatchBody = confirmEarly ? { status: 'live', confirmEarly } : { status: 'live' };
+    this.api.patchMeeting(m.id, body).subscribe({
       next: (updated) => {
         this.meeting.set(updated);
         // The backend creates the protocol on start. Fetch it right away.
@@ -226,7 +249,18 @@ export class MeetingSessionService implements OnDestroy {
           this.refreshProtocol();
         }
       },
-      error: (err: unknown) => this.statusChangeFailed(err),
+      error: (err: unknown) => {
+        const code = errorCode(err);
+        if (code === 'early_open_unconfirmed') {
+          this.earlyOpenAsk.set(true);
+          return;
+        }
+        if (code === 'meeting_too_early') {
+          this.tooEarly();
+          return;
+        }
+        this.statusChangeFailed(err);
+      },
     });
   }
 
@@ -245,6 +279,12 @@ export class MeetingSessionService implements OnDestroy {
         error: () => {},
       });
     }
+  }
+
+  /** The open is too early: say so and read the meeting again for a fresh window. */
+  private tooEarly(): void {
+    this.toast.error(this.i18n.translate('meetings.toast.tooEarly'));
+    this.reloadMeeting();
   }
 
   /** Read the meeting again (quiet): the lot of an election or its runoff (F2). */

@@ -18,6 +18,7 @@ import type {
   FlowGraph,
   FormDraft,
   GuestSettings,
+  MeetingSettings,
   LoginSettings,
   MailTemplate,
   FormOverviewItem,
@@ -380,6 +381,7 @@ export const MOCK_DEADLINE_POLICIES: DeadlinePolicy[] = [
 
 /** The guest settings of the mock backend (the server defaults). */
 export const MOCK_GUEST_SETTINGS: GuestSettings = { confirmTtlHours: 12, linkTtlDays: null };
+export const MOCK_MEETING_SETTINGS: MeetingSettings = { openLeadMinutes: 60, confirmLeadMinutes: 10 };
 
 /** The SSO login lifetimes of the mock: the defaults of the server. */
 export const MOCK_LOGIN_SETTINGS: LoginSettings = {

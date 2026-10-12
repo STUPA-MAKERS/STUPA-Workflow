@@ -1132,6 +1132,17 @@ export const MAX_CONFIRM_TTL_HOURS = 720;
 export const MAX_LINK_TTL_DAYS = 3650;
 
 /**
+ * The open window of meetings (P admin.deadlines): `GET/PUT /admin/meeting-settings`.
+ * Both values are minutes before the planned start of a meeting.
+ */
+export interface MeetingSettings {
+  /** The earliest open (0 to 10080). */
+  openLeadMinutes: number;
+  /** Before this point the open needs an extra confirmation (0 to `openLeadMinutes`). */
+  confirmLeadMinutes: number;
+}
+
+/**
  * Lifetimes of an SSO login (P admin.users): `GET/PUT /admin/login-settings`.
  *
  * A login stays valid for that many days after its last use (sliding). A change applies
@@ -1145,6 +1156,9 @@ export interface LoginSettings {
   updatedAt?: string | null;
   updatedBy?: string | null;
 }
+
+/** Upper bound of both {@link MeetingSettings} values (`MAX_LEAD_MINUTES`, one week). */
+export const MAX_LEAD_MINUTES = 10080;
 
 /**
  * Upper bound of both {@link LoginSettings} lifetimes. Browsers cap the lifetime of a

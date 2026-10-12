@@ -116,6 +116,7 @@ from app.modules.livevote.models import (
     Meeting,
     MeetingAttendance,
     MeetingGuest,
+    MeetingSettings,
     ProtocolKeeperPeriod,
 )
 from app.modules.notifications.models import NotificationPreference
@@ -183,6 +184,7 @@ SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("budget", Invoice.actor),
     ("config", SiteConfigVersion.created_by),
     ("config", GuestApplicationSettings.updated_by),
+    ("config", MeetingSettings.updated_by),
     ("config", LoginSettings.updated_by),
     ("roles", RoleAssignment.granted_by),
     ("roles", RoleAssignment.delegated_by),

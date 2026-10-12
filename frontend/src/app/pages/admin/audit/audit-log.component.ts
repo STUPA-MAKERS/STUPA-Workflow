@@ -167,6 +167,7 @@ const TARGET_ROUTES: Record<string, (id: string) => string[]> = {
   webhook: () => ['/admin/webhooks'],
   site_config: () => ['/admin/branding'],
   guest_application_settings: () => ['/admin/deadlines'],
+  meeting_settings: () => ['/admin/deadlines'],
   // Each budget target goes to the tab that owns it. Cost centers, allocations and transfers
   // go to the budget dashboard. Bookings go to the expenses list. Invoices go to the invoice
   // list.

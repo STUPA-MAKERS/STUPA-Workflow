@@ -25,6 +25,7 @@ from sqlalchemy import (
     Text,
     Time,
     UniqueConstraint,
+    func,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -294,5 +295,50 @@ class MeetingGuest(UUIDPkMixin, CreatedAtMixin, Base):
             "token_hash",
             unique=True,
             postgresql_where=text("token_hash IS NOT NULL"),
+        ),
+    )
+
+
+# The open window of a meeting: the earliest open is `open_lead_minutes` before the
+# planned start. Up to `confirm_lead_minutes` before the start the open needs an extra
+# confirmation. Both are defaults that the deadlines page changes.
+DEFAULT_OPEN_LEAD_MINUTES = 60
+DEFAULT_CONFIRM_LEAD_MINUTES = 10
+# One week. A larger lead time makes the window useless.
+MAX_LEAD_MINUTES = 10080
+
+
+class MeetingSettings(Base):
+    """Platform settings of meetings (single row id=1).
+
+    `open_lead_minutes` is the earliest open of a meeting, in minutes before its
+    planned start. `confirm_lead_minutes` is the end of the early window: before it
+    the open needs an extra confirmation. It is never larger than
+    `open_lead_minutes`.
+    """
+
+    __tablename__ = "meeting_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    open_lead_minutes: Mapped[int] = mapped_column(
+        Integer, server_default=str(DEFAULT_OPEN_LEAD_MINUTES), default=DEFAULT_OPEN_LEAD_MINUTES
+    )
+    confirm_lead_minutes: Mapped[int] = mapped_column(
+        Integer,
+        server_default=str(DEFAULT_CONFIRM_LEAD_MINUTES),
+        default=DEFAULT_CONFIRM_LEAD_MINUTES,
+    )
+    updated_at: Mapped[_datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_by: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("id = 1", name="singleton"),
+        CheckConstraint(
+            f"open_lead_minutes BETWEEN 0 AND {MAX_LEAD_MINUTES}", name="open_lead"
+        ),
+        CheckConstraint(
+            "confirm_lead_minutes BETWEEN 0 AND open_lead_minutes", name="confirm_lead"
         ),
     )

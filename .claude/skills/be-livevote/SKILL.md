@@ -9,6 +9,7 @@ description: Meetings — planned→live→closed lifecycle, agenda items, atten
 
 **Key files:**
 - `models.py` — `Meeting`, `MeetingAttendance`, `MeetingAgendaItem`, `ProtocolKeeperPeriod` ORM tables.
+- `open_window.py` — the open window of a planned meeting: `MeetingSettings` (single row `meeting_settings`: `open_lead_minutes` default 60, `confirm_lead_minutes` default 10), `open_window` (UTC `opens_at`/`confirm_until` from the local planned start; `None` without a date or when not planned), `check_open` (409 `meeting_too_early` before `opens_at`, 409 `early_open_unconfirmed` before `confirm_until` without `confirmEarly`), `MeetingSettingsService` (admin GET/PUT, `config_change` without revision). `lifecycle.patch` calls `check_open` on planned→live; `MeetingOut` carries `opensAt`/`confirmUntil`, the frontend asks in `EarlyOpenDialogComponent`.
 - `keepers.py` — read helpers of the protocol keeper: `keeper_principal_ids` (members with `protocol.write`, O20), `agenda_positions`, `keeper_periods`, `keeper_summaries` (the A13 fields of `MeetingOut`).
 - `service/handover.py` — `HandoverOps` (mixed into `MeetingService`): the keeper periods (Z3), `hand_over`, `cancel_handover`, and the hooks that `lifecycle.patch` calls (`open_first_period`, `activate_planned`, `switch_now`, `close_periods`, `check_keeper`).
 - `schemas.py` — Pydantic API I/O (`MeetingCreate/Patch/Out`, `MeetingVoteOut`, `MeetingPage`, agenda + attendance bodies) with camelCase aliases and `populate_by_name`.

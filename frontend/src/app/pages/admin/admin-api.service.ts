@@ -38,6 +38,7 @@ import {
   type ConfigRevisionDiffWire,
   type NotificationSettings,
   type GuestSettings,
+  type MeetingSettings,
   type LoginSettings,
   type AuditPage,
   type Branding,
@@ -109,6 +110,7 @@ import {
   MOCK_GREMIUM_STUPA_ID,
   MOCK_GROUP_MAPPINGS,
   MOCK_GUEST_SETTINGS,
+  MOCK_MEETING_SETTINGS,
   MOCK_LOGIN_SETTINGS,
   MOCK_MAIL_TEMPLATES,
   MOCK_PERMISSIONS,
@@ -163,6 +165,7 @@ export class AdminApiService {
     mailRecipients: structuredCopy(MOCK_GREMIUM_MAIL_RECIPIENTS),
     deadlinePolicies: structuredCopy(MOCK_DEADLINE_POLICIES) as DeadlinePolicy[],
     guestSettings: structuredCopy(MOCK_GUEST_SETTINGS) as GuestSettings,
+    meetingSettings: structuredCopy(MOCK_MEETING_SETTINGS) as MeetingSettings,
     loginSettings: structuredCopy(MOCK_LOGIN_SETTINGS) as LoginSettings,
     cdVariants: structuredCopy(MOCK_CD_VARIANTS) as CdVariant[],
     mailTemplates: structuredCopy(MOCK_MAIL_TEMPLATES) as MailTemplate[],
@@ -1272,6 +1275,26 @@ export class AdminApiService {
       return of(structuredCopy(this.store.guestSettings));
     }
     return this.http.put<GuestSettings>(`${this.base}/admin/guest-settings`, body);
+  }
+
+  // The open window of meetings. Both routes need P(admin.deadlines).
+  /** GET /admin/meeting-settings — the earliest open and the end of the early window. */
+  getMeetingSettings(): Observable<MeetingSettings> {
+    if (this.mock) return of(structuredCopy(this.store.meetingSettings));
+    return this.http.get<MeetingSettings>(`${this.base}/admin/meeting-settings`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** PUT /admin/meeting-settings — replaces both values (minutes before the start). */
+  putMeetingSettings(
+    body: Pick<MeetingSettings, 'openLeadMinutes' | 'confirmLeadMinutes'>,
+  ): Observable<MeetingSettings> {
+    if (this.mock) {
+      this.store.meetingSettings = { ...this.store.meetingSettings, ...body };
+      return of(structuredCopy(this.store.meetingSettings));
+    }
+    return this.http.put<MeetingSettings>(`${this.base}/admin/meeting-settings`, body);
   }
 
   // SSO login lifetimes. Both routes need P(admin.users).

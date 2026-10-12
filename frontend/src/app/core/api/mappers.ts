@@ -312,6 +312,8 @@ export function mapMeeting(wire: MeetingOutWire): Meeting {
     admittedGuests: wire.admittedGuests ?? 0,
     pendingGuests: wire.pendingGuests ?? 0,
     publicJoinAllowed: wire.publicJoinAllowed ?? true,
+    opensAt: wire.opensAt ?? null,
+    confirmUntil: wire.confirmUntil ?? null,
   };
 }
 

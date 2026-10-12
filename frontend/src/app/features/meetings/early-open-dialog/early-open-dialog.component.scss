@@ -1,0 +1,14 @@
+@use '../dialog-form' as df;
+
+@include df.host;
+
+.eod {
+  @include df.form;
+}
+
+.eod__body {
+  margin: 0;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--color-text);
+}

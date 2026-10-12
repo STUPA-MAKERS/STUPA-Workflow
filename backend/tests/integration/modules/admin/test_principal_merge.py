@@ -75,6 +75,7 @@ from app.modules.livevote.models import (
     Meeting,
     MeetingAttendance,
     MeetingGuest,
+    MeetingSettings,
     ProtocolKeeperPeriod,
 )
 from app.modules.notifications.models import NotificationPreference
@@ -282,6 +283,7 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             )
         )
         session.add(GuestApplicationSettings(id=1, updated_by=old.sub))
+        session.add(MeetingSettings(id=1, updated_by=old.sub))
         await session.merge(
             LoginSettings(id=1, web_session_days=90, pwa_session_days=180, updated_by=old.sub)
         )

@@ -1,0 +1,17 @@
+<app-dialog
+  [open]="open()"
+  [title]="'meetings.earlyOpen.title' | t"
+  [subtitle]="meeting().title"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="closed.emit()"
+>
+  <div class="eod">
+    <app-note icon="clock">{{ body() }}</app-note>
+    <p class="eod__body">{{ 'meetings.earlyOpen.question' | t }}</p>
+  </div>
+  <app-button dialog-footer variant="text" (click)="closed.emit()">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="fill" (click)="confirmed.emit()">
+    <app-icon name="play" [size]="16" />
+    {{ 'meetings.earlyOpen.confirm' | t }}
+  </app-button>
+</app-dialog>

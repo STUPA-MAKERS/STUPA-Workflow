@@ -18,8 +18,10 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.livevote.agenda_service import agenda_order, title_of
 from app.modules.livevote.keepers import KeeperSummary
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingGuest
+from app.modules.livevote.open_window import OpenWindow, load_meeting_settings, open_window
 from app.modules.livevote.schemas import CurrentAgendaItemOut, MeetingOut, MeetingVoteOut
 from app.modules.protocol.models import Protocol
+from app.settings import get_settings
 from app.shared.errors import NotFoundError
 
 if TYPE_CHECKING:
@@ -58,6 +60,7 @@ class MeetingServiceBase:
         keepers: KeeperSummary | None = None,
         guests: GuestCounts = (0, 0),
         public_join_allowed: bool = True,
+        window: OpenWindow | None = None,
     ) -> MeetingOut:
         periods, planned = keepers if keepers is not None else ([], None)
         return MeetingOut(
@@ -100,7 +103,20 @@ class MeetingServiceBase:
             admittedGuests=guests[0],
             pendingGuests=guests[1] if can_manage else 0,
             publicJoinAllowed=public_join_allowed,
+            opensAt=window.opens_at if window is not None else None,
+            confirmUntil=window.confirm_until if window is not None else None,
         )
+
+    async def _open_windows(self, meetings: Sequence[Meeting]) -> dict[UUID, OpenWindow | None]:
+        """Return the open window of each meeting.
+
+        One read of the settings row, and none when no planned meeting has a date.
+        """
+        if not any(m.status == "planned" and m.date is not None for m in meetings):
+            return {m.id: None for m in meetings}
+        settings = await load_meeting_settings(self.session)
+        tz_name = get_settings().local_timezone
+        return {m.id: open_window(m, settings, tz_name) for m in meetings}
 
     async def _guest_counts(self, meeting_ids: Sequence[UUID]) -> dict[UUID, GuestCounts]:
         """Count the admitted and the pending guests of each meeting (#17), batched."""

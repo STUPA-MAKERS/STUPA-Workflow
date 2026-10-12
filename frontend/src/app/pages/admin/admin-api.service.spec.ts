@@ -392,6 +392,17 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(saved).toEqual({ confirmTtlHours: 24, linkTtlDays: 30 });
   });
 
+  it('GETs and PUTs the meeting settings', () => {
+    let read: unknown;
+    s.getMeetingSettings().subscribe((v) => (read = v));
+    http.expectOne({ method: 'GET', url: '/api/admin/meeting-settings' }).flush({ openLeadMinutes: 60, confirmLeadMinutes: 10 });
+    expect(read).toEqual({ openLeadMinutes: 60, confirmLeadMinutes: 10 });
+    s.putMeetingSettings({ openLeadMinutes: 30, confirmLeadMinutes: 5 }).subscribe();
+    const req = http.expectOne({ method: 'PUT', url: '/api/admin/meeting-settings' });
+    expect(req.request.body).toEqual({ openLeadMinutes: 30, confirmLeadMinutes: 5 });
+    req.flush({ openLeadMinutes: 30, confirmLeadMinutes: 5 });
+  });
+
   it('reads and replaces the login settings', () => {
     let read: unknown;
     s.getLoginSettings().subscribe((v) => (read = v));
@@ -1050,6 +1061,9 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(await firstValueFrom(s.getGuestSettings())).toEqual({ confirmTtlHours: 12, linkTtlDays: null });
     await firstValueFrom(s.putGuestSettings({ confirmTtlHours: 48, linkTtlDays: 14 }));
     expect(await firstValueFrom(s.getGuestSettings())).toEqual({ confirmTtlHours: 48, linkTtlDays: 14 });
+    expect(await firstValueFrom(s.getMeetingSettings())).toEqual({ openLeadMinutes: 60, confirmLeadMinutes: 10 });
+    await firstValueFrom(s.putMeetingSettings({ openLeadMinutes: 120, confirmLeadMinutes: 15 }));
+    expect(await firstValueFrom(s.getMeetingSettings())).toEqual({ openLeadMinutes: 120, confirmLeadMinutes: 15 });
   });
 
   it('keeps the login settings in the mock store', async () => {
