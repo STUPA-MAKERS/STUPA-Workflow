@@ -162,6 +162,10 @@ app-button ::ng-deep .btn:not(.btn--icon) .btn__label > app-icon:first-child {
   flex: 1 1 auto;
   min-height: 24rem;
 }
+.mp__prepBack {
+  align-self: flex-start;
+  margin-bottom: var(--space-2);
+}
 .mp__prep {
   flex: 1 1 auto;
   border-radius: var(--radius-2xl);

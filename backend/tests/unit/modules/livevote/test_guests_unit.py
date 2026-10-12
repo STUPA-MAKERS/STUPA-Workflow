@@ -694,3 +694,24 @@ async def test_view_without_public_items() -> None:
     session = db(result(admitted), result(meeting()), result(*items), result(), scalars=[0, "FS"])
     me = await GuestService(session).me("7KQ4MP", "tok", now=NOW)
     assert me.view is not None and me.view.votes == []
+
+
+async def test_view_of_a_planned_meeting_shows_no_prepared_text() -> None:
+    """The minute-taker can prepare the text before the start; guests read it only live."""
+    items = [
+        SimpleNamespace(
+            id=uuid4(), application_id=None, title="Bericht", non_public=False, body="Notiz"
+        )
+    ]
+    admitted = guest(status="admitted")
+    session = db(
+        result(admitted),
+        result(meeting(status="planned")),
+        result(*items),
+        result(("admitted", 1)),
+        result(),
+        scalars=[0, "FS"],
+    )
+    me = await GuestService(session).me("7KQ4MP", "tok", now=NOW)
+    assert me.view is not None
+    assert [(a.title, a.body) for a in me.view.agenda] == [("Bericht", None)]

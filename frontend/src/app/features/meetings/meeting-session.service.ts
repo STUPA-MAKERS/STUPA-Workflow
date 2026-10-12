@@ -132,14 +132,15 @@ export class MeetingSessionService implements OnDestroy {
    * the manager and any `protocol.write` role alike, so this last step is the
    * frontend's alone.
    *
-   * After the close there is no live keeper to protect. Every writer edits the draft
-   * (O22): the session lead, the finalizer and an earlier keeper, not only the last
-   * one. A final protocol stays locked through `Protocol.isLocked`.
+   * Before the start and after the close there is no live keeper to protect. Every
+   * writer prepares the text of a planned meeting, and every writer edits the draft of
+   * a closed one (O22): the session lead, the finalizer and an earlier keeper, not only
+   * the last one. A final protocol stays locked through `Protocol.isLocked`.
    */
   readonly canEditProtocol = computed(() => {
     const m = this.meeting();
     if (!m?.canWrite) return false;
-    if (m.status === 'closed') return true;
+    if (m.status !== 'live') return true;
     return !m.protokollantId || this.isProtokollant();
   });
 
@@ -285,9 +286,17 @@ export class MeetingSessionService implements OnDestroy {
     });
   }
 
+  /**
+   * Open a prepared vote of the meeting. The meeting route checks the draft again and
+   * counts the voters from the current roster, so the answer carries the new meeting.
+   */
   openVote(voteId: Uuid): void {
-    this.api.openVote(voteId).subscribe({
-      next: () => this.patchVote(voteId, { status: 'open', openedAt: nowIso() }),
+    const m = this.meeting();
+    if (!m) return;
+    this.api.openPreparedMeetingVote(m.id, voteId).subscribe({
+      next: (updated) => {
+        if (this.meeting()?.id === updated.id) this.meeting.set(updated);
+      },
       error: (err: unknown) => this.voteActionFailed(err),
     });
   }

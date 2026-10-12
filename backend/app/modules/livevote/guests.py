@@ -939,8 +939,9 @@ class GuestService:
                 title=titles.get(item.application_id) if item.application_id else item.title,
                 kind="application" if item.application_id else "freetext",
                 nonPublic=item.non_public,
-                # Never the text of a non-public item.
-                body=None if item.non_public else item.body,
+                # Never the text of a non-public item, and no text before the start:
+                # the minute-taker can prepare the text of a planned meeting.
+                body=None if item.non_public or meeting.status == "planned" else item.body,
             )
             for position, item in enumerate(items, start=1)
         ]

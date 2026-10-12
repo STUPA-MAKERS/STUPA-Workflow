@@ -189,7 +189,7 @@ describe('VoteCardComponent', () => {
   describe('a planned or cancelled vote', () => {
     it('opens and deletes a planned vote while the meeting is live (O24)', async () => {
       const { on } = await setup({ vote: vote({ status: 'draft', majorityRule: 'absolute', secret: true }) });
-      expect(screen.getByText('Abstimmung geplant')).toBeInTheDocument();
+      expect(screen.getByText('Abstimmung vorbereitet')).toBeInTheDocument();
       expect(screen.getByText('Absolute Mehrheit · geheime Abstimmung')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Abstimmung öffnen' }));
       expect(on.open).toHaveBeenCalledWith('v-1');
@@ -212,6 +212,7 @@ describe('VoteCardComponent', () => {
     it('does not open a planned vote before the meeting runs', async () => {
       await setup({ vote: vote({ status: 'draft' }), meetingStatus: 'planned' });
       expect(screen.queryByRole('button', { name: 'Abstimmung öffnen' })).toBeNull();
+      expect(screen.getByText('Öffnen kannst du sie, sobald die Sitzung eröffnet ist.')).toHaveClass('vc__hint');
       expect(screen.getByRole('button', { name: 'Beschlussfrage löschen' })).toBeInTheDocument();
     });
 

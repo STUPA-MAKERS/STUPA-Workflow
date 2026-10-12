@@ -841,7 +841,9 @@ export class ApiClient {
 
   /**
    * POST /meetings/{id}/votes — create and open a live vote for an application,
-   * with a motion for the protocol. The response is the updated meeting.
+   * with a motion for the protocol. `draft` only prepares it: the vote stays a draft,
+   * also in a planned meeting, until `openPreparedMeetingVote`. The response is the
+   * updated meeting.
    */
   openMeetingVote(
     meetingId: Uuid,
@@ -860,10 +862,23 @@ export class ApiClient {
       kind?: VoteKind;
       seats?: number;
       candidates?: { name: string; principalId?: Uuid | null }[];
+      /** Prepare the question only; it opens later. */
+      draft?: boolean;
     },
   ): Observable<Meeting> {
     return this.http
       .post<MeetingOutWire>(`${this.base}/meetings/${meetingId}/votes`, body)
+      .pipe(map(mapMeeting));
+  }
+
+  /**
+   * POST /meetings/{id}/votes/{voteId}/open — open a prepared draft vote of a live
+   * meeting. The server checks it again and counts the voters from the current roster.
+   * The response is the updated meeting.
+   */
+  openPreparedMeetingVote(meetingId: Uuid, voteId: Uuid): Observable<Meeting> {
+    return this.http
+      .post<MeetingOutWire>(`${this.base}/meetings/${meetingId}/votes/${voteId}/open`, {})
       .pipe(map(mapMeeting));
   }
 

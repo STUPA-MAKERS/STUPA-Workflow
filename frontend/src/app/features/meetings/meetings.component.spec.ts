@@ -264,9 +264,9 @@ describe('MeetingsComponent', () => {
     flushLoad(http);
     const openBtn = await screen.findByRole('button', { name: /Abstimmung öffnen/i });
     await userEvent.click(openBtn);
-    const req = http.expectOne('/api/votes/v-2/open');
+    const req = http.expectOne('/api/meetings/m-1/votes/v-2/open');
     expect(req.request.method).toBe('POST');
-    req.flush(null, { status: 204, statusText: 'No Content' });
+    req.flush(OPENED_V2);
   });
 
   it('closes an open vote via the API', async () => {
@@ -759,6 +759,14 @@ function services(fixture: { debugElement: { injector: { get<T>(t: new (...a: ne
 const PR9 = { principalId: 'pr-9', displayName: 'Neu', email: null, status: 'present' as const, source: 'self' as const, note: null, isSelf: false, canKeepProtocol: true };
 const PR2 = { ...PR9, principalId: 'pr-2', displayName: 'B' };
 
+/** The answer of the open of the prepared vote v-2: the meeting with v-2 open. */
+const OPENED_V2: MeetingOutWire = {
+  ...MEETING,
+  votes: MEETING.votes.map((v) =>
+    v.id === 'v-2' ? { ...v, status: 'open', openedAt: '2026-06-12T17:30:00Z' } : v,
+  ),
+};
+
 async function loaded(opts: Parameters<typeof setup>[0] = {}) {
   const view = await setup(opts);
   view.http.expectOne('/api/meetings/m-1').flush(MEETING);
@@ -798,14 +806,17 @@ describe('MeetingsComponent — methods', () => {
       cmp.openVoteDialog(AGENDA_ITEM({ id: 't-2', title: 'Bericht' }) as never);
       fixture.detectChanges();
       expect(cmp.voteTopNumber()).toBe(2);
-      const dialog = screen.getByRole('dialog', { name: 'Abstimmung öffnen' });
+      // Another vote of the meeting is open, so the dialog only prepares the question.
+      const dialog = screen.getByRole('dialog', { name: 'Abstimmung vorbereiten' });
       expect(dialog).toHaveAccessibleDescription('TOP 2 · Bericht');
-      const submit = within(dialog).getAllByRole('button', { name: 'Abstimmung öffnen' }).pop() as HTMLElement;
-      await userEvent.click(submit);
-      http.expectOne('/api/meetings/m-1/votes').flush({ ...MEETING, votes: [] });
+      expect(within(dialog).queryByRole('button', { name: 'Abstimmung öffnen' })).toBeNull();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Vorbereiten' }));
+      const req = http.expectOne('/api/meetings/m-1/votes');
+      expect(req.request.body).toEqual(expect.objectContaining({ agendaItemId: 't-2', draft: true }));
+      req.flush({ ...MEETING, votes: [] });
       fixture.detectChanges();
       expect(cmp.meeting()?.votes).toEqual([]);
-      expect(screen.queryByRole('dialog', { name: 'Abstimmung öffnen' })).toBeNull();
+      expect(screen.queryByRole('dialog', { name: 'Abstimmung vorbereiten' })).toBeNull();
     });
 
     it('deletes the open meeting through the dialog and goes back to the list', async () => {
@@ -1358,7 +1369,7 @@ describe('MeetingsComponent — methods', () => {
     it('opens a vote and patches its status', async () => {
       const { cmp, http } = await loaded();
       cmp.openVote('v-2');
-      http.expectOne('/api/votes/v-2/open').flush(null, { status: 204, statusText: 'No Content' });
+      http.expectOne('/api/meetings/m-1/votes/v-2/open').flush(OPENED_V2);
       expect(cmp.meeting()?.votes.find((v) => v.id === 'v-2')?.status).toBe('open');
     });
 
@@ -1416,7 +1427,7 @@ describe('MeetingsComponent — methods', () => {
       const { cmp, http } = await loaded();
       cmp.openVote('v-2');
       http
-        .expectOne('/api/votes/v-2/open')
+        .expectOne('/api/meetings/m-1/votes/v-2/open')
         .flush({ detail: 'Antrag nicht im vote-State' }, { status: 409, statusText: 'Conflict' });
       // voteActionFailed reloads the meeting.
       http.expectOne('/api/meetings/m-1').flush({ ...MEETING, status: 'live' });
@@ -1985,7 +1996,7 @@ describe('MeetingsComponent — methods', () => {
       const { cmp, http } = await loaded();
       const find = (id: string) => cmp.meeting()?.votes.find((x) => x.id === id);
       cmp.openVote('v-2');
-      http.expectOne('/api/votes/v-2/open').flush(null, { status: 204, statusText: 'No Content' });
+      http.expectOne('/api/meetings/m-1/votes/v-2/open').flush(OPENED_V2);
       expect(find('v-2')?.status).toBe('open');
       expect(find('v-2')?.openedAt).toEqual(expect.any(String));
       cmp.cancelVote('v-2');
@@ -2238,13 +2249,13 @@ describe('MeetingsComponent — methods', () => {
       expect(v?.options).toEqual([]);
     });
 
-    it('does nothing in patchVote once the meeting has been cleared', async () => {
+    it('ignores an opened vote once the meeting has been cleared', async () => {
       const { cmp, http } = await loaded();
-      // openVote triggers patchVote on success. If the meeting is null by then,
-      // the early `if (!m) return` guard applies and no state changes.
+      // The answer of the open carries the meeting. If the page left the meeting by
+      // then, the answer changes no state.
       cmp.openVote('v-2');
       cmp.meeting.set(null);
-      http.expectOne('/api/votes/v-2/open').flush(null, { status: 204, statusText: 'No Content' });
+      http.expectOne('/api/meetings/m-1/votes/v-2/open').flush(OPENED_V2);
       expect(cmp.meeting()).toBeNull();
     });
   });

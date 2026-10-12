@@ -37,7 +37,7 @@ from app.shared.errors import ConflictError
 # Fallback app names for the case where the config leaves them empty. They match the
 # defaults in ``frontend/public/manifest.webmanifest``.
 DEFAULT_APP_NAME = "STUPA Antragsplattform"
-DEFAULT_APP_SHORT_NAME = "StuPa"
+DEFAULT_APP_SHORT_NAME = "STUPA"
 
 # The static manifest fields, that is everything except name and short_name.
 # They are the single source of truth for the PWA manifest that the API serves.
@@ -47,6 +47,9 @@ _MANIFEST_BASE: dict = {
         "Sitzungsprotokolle und Budget."
     ),
     "lang": "de",
+    # A fixed identity. Without it the browser derives the id from start_url, and a
+    # later change of start_url makes an installed app a different app.
+    "id": "/",
     "display": "standalone",
     "scope": "./",
     "start_url": "./",

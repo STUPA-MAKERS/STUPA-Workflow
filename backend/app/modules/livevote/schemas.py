@@ -446,9 +446,11 @@ class MeetingVoteOpenBody(_CamelModel):
     """``POST /meetings/{id}/votes`` — open a live vote on an agenda item.
 
     The route binds a new vote to the agenda item (``agendaItemId``) and opens it at
-    once. An application agenda item allows exactly one vote, because that vote
-    fires the pass or fail branch of the application on close. A free-text agenda
-    item allows several generic questions. ``question`` goes into the protocol
+    once. ``draft`` only prepares the vote: it stays a ``draft``, also in a planned
+    meeting, until the open route of the meeting opens it. An application agenda
+    item allows exactly one vote, because that vote fires the pass or fail branch
+    of the application on close. A free-text agenda item allows several generic
+    questions. ``question`` goes into the protocol
     snippet.
 
     The body has no ``tieBreak``: a meeting vote has no casting vote, and the route
@@ -486,6 +488,8 @@ class MeetingVoteOpenBody(_CamelModel):
     # F1: the decision proposal (approved amount, conditions). Only an application
     # agenda item takes it (422 `decision_not_allowed` otherwise).
     proposal: DecisionIn | None = None
+    # Prepare the question only: the vote stays a draft and does not open.
+    draft: bool = False
 
     @model_validator(mode="after")
     def _min_options(self) -> MeetingVoteOpenBody:

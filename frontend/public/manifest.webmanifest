@@ -1,8 +1,9 @@
 {
   "name": "STUPA Antragsplattform",
-  "short_name": "StuPa",
+  "short_name": "STUPA",
   "description": "Antragsplattform des Studierendenparlaments — Anträge, Abstimmungen, Sitzungsprotokolle und Budget.",
   "lang": "de",
+  "id": "/",
   "display": "standalone",
   "scope": "./",
   "start_url": "./",

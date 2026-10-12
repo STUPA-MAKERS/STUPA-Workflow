@@ -6,7 +6,8 @@ import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
 /**
  * "Sitzung vorbereiten": what a planned meeting needs before it opens.
  *
- * Three cards: the agenda ("6 TOPs vorbereitet", "Tagesordnung bearbeiten"), the
+ * Three cards: the agenda ("6 TOPs vorbereitet", the hint that a picked item opens to
+ * prepare its text and votes, "Tagesordnung bearbeiten"), the
  * minute-taker ("Zuweisen"; the opening needs one, so a missing one is marked) and the
  * attendance ("0 von 23 anwesend", "Erfassen"). Below them "Sitzung eröffnen", disabled
  * until a minute-taker is set.

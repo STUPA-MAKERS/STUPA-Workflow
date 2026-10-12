@@ -1170,6 +1170,20 @@ describe('mockApiInterceptor', () => {
       expect(last.question).toBeNull();
     });
 
+    it('POST …/meetings/{id}/votes prepares a draft that the open route opens', async () => {
+      type Row = { id: string; status: string; agendaItemId?: string | null };
+      const m = await firstValueFrom(
+        http.post<{ votes: Row[] }>('/api/meetings/m1/votes', { agendaItemId: 't-1', draft: true }),
+      );
+      const last = m.votes[m.votes.length - 1];
+      expect(last.status).toBe('draft');
+      expect(last.agendaItemId).toBe('t-1');
+      const opened = await firstValueFrom(
+        http.post<{ votes: Row[] }>(`/api/meetings/m1/votes/${last.id}/open`, {}),
+      );
+      expect(opened.votes.find((v) => v.id === last.id)?.status).toBe('open');
+    });
+
     it('POST …/agenda with freetext title adds a freetext TOP', async () => {
       const a = await firstValueFrom(
         http.post<{ applicationId: string | null; title: string | null }[]>(

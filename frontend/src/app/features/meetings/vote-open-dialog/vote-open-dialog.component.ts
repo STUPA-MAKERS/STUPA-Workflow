@@ -68,6 +68,10 @@ export interface CandidateDraft {
  * the roster or a free name, in a list the lead can reorder). An election is secret by
  * default, and guests vote only when the lead switches them on. The dialog cannot
  * submit while there are fewer candidates than seats.
+ *
+ * "Vorbereiten" saves the question as a draft without opening it, so the lead can
+ * prepare the votes before the meeting starts. The vote card opens the draft later. A
+ * planned meeting, or a meeting with another open vote, only prepares (`canOpen`).
  */
 @Component({
   selector: 'app-vote-open-dialog',
@@ -104,8 +108,17 @@ export class VoteOpenDialogComponent {
   /** The roster of the meeting: the persons the lead can pick as candidates. */
   readonly members = input<readonly Attendance[]>([]);
   readonly closed = output<void>();
-  /** The server opened the vote. Carries the updated meeting. */
+  /** The server opened or prepared the vote. Carries the updated meeting. */
   readonly opened = output<Meeting>();
+
+  /**
+   * The vote can open now: the meeting is live and no other vote is open. Otherwise
+   * the dialog only prepares the question.
+   */
+  readonly canOpen = computed(() => {
+    const m = this.meeting();
+    return m.status === 'live' && !m.votes.some((v) => v.status === 'open');
+  });
 
   readonly question = signal('');
   readonly majorityRule = signal<MajorityRule>('simple');
@@ -113,6 +126,8 @@ export class VoteOpenDialogComponent {
   /** Admitted guests vote too (#17): no quorum, the majority of the cast votes. */
   readonly guestsVote = signal(false);
   readonly submitting = signal(false);
+  /** The running submit only prepares the question: its button shows the spinner. */
+  readonly preparing = signal(false);
   /** F1: the decision proposal of an application item. */
   readonly draft = signal<DecisionDraft>(emptyDraft(null));
   /** The lead edited the question by hand: the proposal no longer rewrites it. */
@@ -336,9 +351,12 @@ export class VoteOpenDialogComponent {
     this.closed.emit();
   }
 
-  submit(): void {
+  /** Open the vote, or with `prepare` save it as a draft that opens later. */
+  submit(prepare = !this.canOpen()): void {
     const it = this.item();
     if (!it || this.submitting() || !this.canSubmit()) return;
+    if (!prepare && !this.canOpen()) return;
+    this.preparing.set(prepare);
     const proposal = it.applicationId ? toProposal(this.draft(), it.amount ?? null) : null;
     this.submitting.set(true);
     // Only a meeting that lets guests vote carries the switch; else the server decides.
@@ -370,11 +388,13 @@ export class VoteOpenDialogComponent {
           // No quorum: the server takes the Gremium default.
         };
     this.api
-      .openMeetingVote(this.meeting().id, body)
+      .openMeetingVote(this.meeting().id, prepare ? { ...body, draft: true } : body)
       .subscribe({
         next: (updated) => {
           this.submitting.set(false);
-          this.toast.success(this.i18n.translate('meetings.toast.voteOpened'));
+          this.toast.success(
+            this.i18n.translate(prepare ? 'meetings.toast.votePrepared' : 'meetings.toast.voteOpened'),
+          );
           this.opened.emit(updated);
         },
         error: (err: unknown) => {
