@@ -563,7 +563,9 @@ export class ApplicationsDetailComponent {
       if (e.transitionLabel) {
         lines.push(t('applications.history.transition', { label: e.transitionLabel }));
       }
-      if (e.note) lines.push(e.note);
+      // A vote branch writes the machine note "vote:<result>". The title (the new state)
+      // and the vote link already say the result, so the note stays hidden.
+      if (e.note && !e.note.startsWith('vote:')) lines.push(e.note);
       // F1: the status change carried a decision with deviations.
       if (e.decision) {
         const line = decisionHistoryLine(
