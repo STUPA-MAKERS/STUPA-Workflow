@@ -4,6 +4,7 @@ import { catchError, map } from 'rxjs/operators';
 import { ApiClient } from '../api/api-client.service';
 import type { Principal } from '../api/models';
 import { LOCATION } from '../browser/location.token';
+import { IS_INSTALLED_APP } from '../browser/installed-app.token';
 import { HttpCacheService } from '@core/cache/http-cache.service';
 
 /**
@@ -25,6 +26,7 @@ export class AuthService {
   // with NG0201.
   private readonly injector = inject(Injector);
   private readonly location = inject(LOCATION);
+  private readonly isInstalledApp = inject(IS_INSTALLED_APP);
   private readonly cache = inject(HttpCacheService);
   private get api(): ApiClient {
     return this.injector.get(ApiClient);
@@ -120,9 +122,21 @@ export class AuthService {
     return permissions.length === 0 || permissions.some((p) => this.can(p));
   }
 
-  /** Starts the OIDC login. It redirects the whole page to the IdP via the backend. */
+  /**
+   * Starts the OIDC login. It redirects the whole page to the IdP via the backend.
+   *
+   * The installed app (PWA) sends `?client=pwa`, because the server keeps the session
+   * of the installed app longer than the session of a browser tab. Every login of the
+   * app goes through this method, so the guard, the 401 re-login and each login button
+   * send the same parameter.
+   */
   login(): void {
-    this.location.assign('/api/auth/login');
+    this.location.assign(this.loginUrl());
+  }
+
+  /** The URL of the login start: `?client=pwa` for the installed app, else no parameter. */
+  private loginUrl(): string {
+    return this.isInstalledApp() ? '/api/auth/login?client=pwa' : '/api/auth/login';
   }
 
   /**

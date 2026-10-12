@@ -6,6 +6,7 @@ import {
 } from '@angular/common/http/testing';
 import { AuthService } from './auth.service';
 import { USE_MOCK_API } from '../api/api.config';
+import { IS_INSTALLED_APP } from '../browser/installed-app.token';
 import type { Principal } from '../api/models';
 import {
   createLocationMock,
@@ -79,6 +80,22 @@ describe('AuthService', () => {
   it('redirects to the OIDC login endpoint', () => {
     auth.login();
     expect(assign).toHaveBeenCalledWith('/api/auth/login');
+  });
+
+  it('starts the login of the installed app with client=pwa', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: USE_MOCK_API, useValue: false },
+        provideLocationMock(location),
+        { provide: IS_INSTALLED_APP, useValue: () => true },
+      ],
+    });
+    TestBed.inject(AuthService).login();
+    expect(assign).toHaveBeenCalledWith('/api/auth/login?client=pwa');
+    http = TestBed.inject(HttpTestingController);
   });
 
   it('logs out, clears the principal and follows the RP logout url', () => {

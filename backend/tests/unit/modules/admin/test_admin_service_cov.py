@@ -1068,7 +1068,8 @@ async def test_set_principal_active_activate() -> None:
 
 async def test_set_principal_active_deactivate_other() -> None:
     principal = principal_row(active=True, sub="someone")
-    s, _ = svc([*audit_results(), res(assignment_row(principal_id=principal.id))],
+    # Queue: the session delete, the audit results, the assignments.
+    s, _ = svc([res(), *audit_results(), res(assignment_row(principal_id=principal.id))],
                gets=[principal])
     out = await s.set_principal_active(principal.id, False, "admin")
     assert out.active is False
@@ -1094,9 +1095,10 @@ async def test_set_principal_active_merged_cannot_be_activated() -> None:
 async def test_set_principal_active_merged_names_the_target() -> None:
     target = uuid.uuid4()
     principal = principal_row(active=True, sub="old", merged_into=target)
-    # Queue: the audit results, the assignments, then the merge-aware name lookup.
+    # Queue: the session delete, the audit results, the assignments, then the
+    # merge-aware name lookup.
     s, _ = svc(
-        [*audit_results(), res(), res(sub_ref("new", "Neu", None, target))], gets=[principal]
+        [res(), *audit_results(), res(), res(sub_ref("new", "Neu", None, target))], gets=[principal]
     )
     out = await s.set_principal_active(principal.id, False, "admin")
     assert out.merged_into_id == target

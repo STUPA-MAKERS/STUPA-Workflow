@@ -356,6 +356,11 @@ class BackupService:
                 "--format=custom",
                 "--no-owner",
                 "--no-privileges",
+                # Sessions hold IdP refresh tokens that live for months. An archive
+                # must not carry them, and a restore must not bring back a session
+                # that was logged out after the backup. A restore therefore ends
+                # every session.
+                "--exclude-table-data=auth_session",
                 f"--file={target_path}",
                 "--dbname",
                 libpq_dsn(self.settings.database_url),

@@ -1,0 +1,46 @@
+:host {
+  display: block;
+}
+
+.ls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  container-type: inline-size;
+}
+
+/* Two fields side by side; one column in a narrow sheet. */
+.ls__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+@container (max-width: 40rem) {
+  .ls__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The unit sits at the end of the field box, on the line of the value. */
+.ls__unitBox {
+  position: relative;
+  min-width: 0;
+}
+.ls__unitBox app-input ::ng-deep input {
+  padding-inline-end: 5rem;
+}
+.ls__unit {
+  position: absolute;
+  inset-inline-end: var(--space-4);
+  top: 1.5rem;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.ls__meta {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+}
