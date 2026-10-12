@@ -282,10 +282,14 @@ async def refresh_tokens(settings: Settings, *, refresh_token: str) -> dict[str,
         raise OidcUnavailableError(f"token endpoint failed: {resp.status_code}")
     if resp.status_code != httpx.codes.OK:
         raise OidcError(f"refresh grant refused: {resp.status_code}")
-    payload = resp.json()
-    if "id_token" not in payload:
+    try:
+        payload = resp.json()
+    except ValueError as exc:
+        # A 200 that is not JSON is a proxy or maintenance page, not a refusal.
+        raise OidcUnavailableError("token endpoint answered without JSON") from exc
+    if not isinstance(payload, dict) or "id_token" not in payload:
         raise OidcError("refresh response without id_token")
-    return payload
+    return cast("dict[str, str]", payload)
 
 
 async def _decode_id_token(settings: Settings, id_token: str) -> dict[str, Any]:
@@ -338,21 +342,32 @@ async def verify_id_token(settings: Settings, *, id_token: str, nonce: str) -> O
 
 
 async def verify_refreshed_id_token(
-    settings: Settings, *, id_token: str, sub: str
+    settings: Settings, *, id_token: str, cached: OidcClaims
 ) -> OidcClaims:
-    """Verify the `id_token` of a refresh grant.
+    """Verify the `id_token` of a refresh grant and merge it with the cached claims.
 
     The checks are those of `verify_id_token`, but without the nonce: OIDC Core
-    12.2 lets the IdP leave it out of a refreshed token. Instead, `sub` must equal the
-    `sub` of the session, so a token of another account cannot take the session over.
+    12.2 lets the IdP leave it out of a refreshed token. Instead, `sub` must equal
+    `cached.sub`, the `sub` of the session, so a token of another account cannot take
+    the session over. The same section lets the IdP send a minimal token, so a claim
+    that the token leaves out (email, name, groups) keeps its cached value.
 
     Raises:
         OidcError: The token is malformed or invalid, or `sub` does not match.
     """
     claims = await _decode_id_token(settings, id_token)
-    if str(claims["sub"]) != sub:
+    if str(claims["sub"]) != cached.sub:
         raise OidcError("sub mismatch")
-    return _claims_of(settings, claims)
+    fresh = _claims_of(settings, claims)
+    return OidcClaims(
+        sub=fresh.sub,
+        email=fresh.email if "email" in claims else cached.email,
+        name=fresh.name
+        if ("name" in claims or "preferred_username" in claims)
+        else cached.name,
+        groups=fresh.groups if settings.oidc_groups_claim in claims else cached.groups,
+        email_verified=fresh.email_verified,
+    )
 
 
 async def end_session_url(settings: Settings, *, id_token: str | None) -> str | None:

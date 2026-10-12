@@ -18,7 +18,7 @@ import secrets
 from typing import Any
 
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import (
@@ -272,6 +272,16 @@ async def load_principal_session(
     if row is None or row.expires_at <= now:
         return None
     return row
+
+
+async def end_principal_sessions(db: AsyncSession, principal_id: Any) -> None:
+    """Delete every session of a principal. The caller commits.
+
+    A session lives for months and renews itself at the IdP. So a deactivation or a
+    revoke of rights must end the sessions, or an existing cookie keeps working (and,
+    after a reactivation, works again).
+    """
+    await db.execute(delete(AuthSession).where(AuthSession.principal_id == principal_id))
 
 
 def sign_principal_sid(secret: str, sid: str) -> str:

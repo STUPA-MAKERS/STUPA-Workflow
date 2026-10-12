@@ -108,7 +108,7 @@ from app.modules.auth.login_settings import LoginSettingsService
 from app.modules.notifications.auto import AutoMailer, get_auto_mailer
 from app.shared.antiabuse import body_cap
 from app.shared.config_schemas import FlowGraph, export_json_schemas
-from app.shared.errors import ProblemDetail
+from app.shared.errors import ForbiddenError, ProblemDetail
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 public_router = APIRouter(tags=["admin"])
@@ -1210,8 +1210,14 @@ async def put_login_settings(
 
     A new value applies to every session at its next check at the IdP, so the
     existing sessions follow it too. The change writes a ``config_change`` audit
-    entry that the audit log cannot revert.
+    entry that the audit log cannot revert. Only a person in the browser may change
+    the session policy: an agent token (OAuth scope) gets 403, also with
+    ``admin:write``, like the account merge.
     """
+    if principal.scope_permissions is not None:
+        raise ForbiddenError(
+            "Agent tokens cannot change the session lifetimes.", code="cookie_session_required"
+        )
     row = await service.update(
         web_session_days=payload.web_session_days,
         pwa_session_days=payload.pwa_session_days,

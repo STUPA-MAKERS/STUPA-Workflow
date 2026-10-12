@@ -567,6 +567,7 @@ async def test_revoke_clears_the_gremium_and_deactivates(writes: list[str]) -> N
         "role_assignment",
         "delegation_substitute",
         "meeting_delegation",
+        "auth_session",
     ]
     actions = [e["action"] for e in _Audit.entries]
     assert actions == [

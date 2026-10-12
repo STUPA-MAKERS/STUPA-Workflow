@@ -58,7 +58,9 @@ def _row(
 
 
 def _principal(*, active: bool = True) -> Any:
-    return SimpleNamespace(sub="user-1", active=active)
+    return SimpleNamespace(
+        sub="user-1", active=active, email="e@x.de", display_name="N", oidc_groups=["old"]
+    )
 
 
 @pytest.fixture
@@ -78,7 +80,8 @@ def idp(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             raise out
         return out
 
-    async def _verify(_s: Settings, *, id_token: str, sub: str) -> OidcClaims:
+    async def _verify(_s: Settings, *, id_token: str, cached: OidcClaims) -> OidcClaims:
+        state["cached"] = cached
         out = state["verify"]
         if isinstance(out, Exception):
             raise out
@@ -97,6 +100,7 @@ def idp(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(oidc, "verify_refreshed_id_token", _verify)
     monkeypatch.setattr(service, "upsert_principal", _upsert)
     monkeypatch.setattr(session_renewal, "sync_principal_memberships", _sync)
+    monkeypatch.setattr(session_renewal, "_idp_retry_after", 0.0)
     return state
 
 
@@ -122,7 +126,7 @@ async def test_renews_and_slides(idp: dict[str, Any]) -> None:
     assert row.revalidated_at == NOW
     assert row.expires_at == NOW + timedelta(days=DEFAULT_WEB_SESSION_DAYS)
     assert idp["synced"] == [idp["upsert"]]
-    assert db.committed == 1
+    assert db.committed == 2  # tokens first, then the check
     assert db.deleted == []
 
 
@@ -155,7 +159,7 @@ async def test_row_without_check_time_is_due(idp: dict[str, Any]) -> None:
 
 
 async def test_locked_by_other_request_goes_on(idp: dict[str, Any]) -> None:
-    db = fake_session(result())
+    db = fake_session(result(), result("session-id"))
     assert await renew_principal_session(
         db, _settings(), session=_row(), principal=_principal(), now=NOW
     )
@@ -248,3 +252,69 @@ async def test_session_expiry_reads_the_settings_row() -> None:
     db = fake_session(gets=[stored, stored])
     assert await session_expiry(db, "web", NOW) == NOW + timedelta(days=30)
     assert await session_expiry(db, "pwa", NOW) == NOW + timedelta(days=60)
+
+
+async def test_cached_claims_come_from_the_principal(idp: dict[str, Any]) -> None:
+    row = _row()
+    await renew_principal_session(
+        fake_session(result(row)), _settings(), session=row, principal=_principal(), now=NOW
+    )
+    assert idp["cached"] == OidcClaims(
+        sub="user-1", email="e@x.de", name="N", groups=["old"]
+    )
+
+
+async def test_new_tokens_are_committed_before_the_principal_update(
+    idp: dict[str, Any],
+) -> None:
+    idp["upsert"] = ForbiddenError("merged", code="account_merged")
+    row = _row()
+    db = fake_session(result(row))
+    assert not await renew_principal_session(
+        db, _settings(), session=row, principal=_principal(), now=NOW
+    )
+    # One commit for the tokens, one for the end of the session.
+    assert db.committed == 2
+    assert row.refresh_token == "rt2"
+
+
+async def test_session_past_the_absolute_lifetime_ends(idp: dict[str, Any]) -> None:
+    row = _row()
+    row.created_at = NOW - timedelta(days=401)
+    db = fake_session(result(row))
+    assert not await renew_principal_session(
+        db, _settings(), session=row, principal=_principal(), now=NOW
+    )
+    assert db.deleted == [row]
+    assert "used_token" not in idp
+
+
+async def test_deleted_row_does_not_go_on(idp: dict[str, Any]) -> None:
+    db = fake_session(result(), result())
+    assert not await renew_principal_session(
+        db, _settings(), session=_row(), principal=_principal(), now=NOW
+    )
+
+
+async def test_outage_backs_off_without_calling_the_idp(
+    idp: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    idp["refresh"] = OidcUnavailableError("down")
+    row = _row(checked_hours_ago=20)
+    assert await renew_principal_session(
+        fake_session(result(row)), _settings(), session=row, principal=_principal(), now=NOW
+    )
+    del idp["used_token"]
+    other = _row(checked_hours_ago=20)
+    db = fake_session()
+    assert await renew_principal_session(
+        db, _settings(), session=other, principal=_principal(), now=NOW
+    )
+    assert "used_token" not in idp
+    assert db.committed == 0
+    # Past the grace time the backoff does not protect the session.
+    old = _row(checked_hours_ago=80)
+    db = fake_session(result(old))
+    assert not await renew_principal_session(
+        db, _settings(), session=old, principal=_principal(), now=NOW
+    )

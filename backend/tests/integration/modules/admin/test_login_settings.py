@@ -135,6 +135,26 @@ async def test_routes_need_admin_users(
         assert client.get("/api/admin/login-settings").status_code == 401
 
 
+async def test_agent_token_cannot_change_lifetimes(
+    migrated: tuple[str, str],
+    engine: Engine,
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    token = Principal(
+        sub="users-admin",
+        roles=[],
+        permissions={"admin.users"},
+        scope_permissions=frozenset({"admin.users"}),
+    )
+    with _client(migrated, settings, monkeypatch, token) as client:
+        put = client.put(
+            "/api/admin/login-settings", json={"webSessionDays": 400, "pwaSessionDays": 400}
+        )
+    assert put.status_code == 403, put.text
+    assert put.json()["code"] == "cookie_session_required"
+
+
 def _oidc_settings(db_url: str) -> Settings:
     return load_settings(
         database_url=db_url,
@@ -177,8 +197,8 @@ async def test_renewal_slides_and_refreshes_groups(
     async def _refresh(_s: Settings, *, refresh_token: str) -> dict[str, str]:
         return {"id_token": "idt2", "refresh_token": "rt2"}
 
-    async def _verify(_s: Settings, *, id_token: str, sub: str) -> OidcClaims:
-        return OidcClaims(sub=sub, email=None, name="N", groups=["new"])
+    async def _verify(_s: Settings, *, id_token: str, cached: OidcClaims) -> OidcClaims:
+        return OidcClaims(sub=cached.sub, email=None, name="N", groups=["new"])
 
     monkeypatch.setattr(oidc, "refresh_tokens", _refresh)
     monkeypatch.setattr(oidc, "verify_refreshed_id_token", _verify)
@@ -224,5 +244,19 @@ async def test_renewal_refused_deletes_the_session(
             now=datetime.now(UTC),
         )
     assert not ok
+    async with maker() as session:
+        assert await session.get(AuthSession, session_id) is None
+
+
+async def test_deactivation_ends_the_sessions(
+    migrated: tuple[str, str],
+    settings: Settings,
+    maker: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    principal_id, session_id = await _seed_session(maker, client="pwa")
+    with _client(migrated, settings, monkeypatch, _ADMIN) as client:
+        resp = client.patch(f"/api/admin/principals/{principal_id}", json={"active": False})
+    assert resp.status_code == 200, resp.text
     async with maker() as session:
         assert await session.get(AuthSession, session_id) is None

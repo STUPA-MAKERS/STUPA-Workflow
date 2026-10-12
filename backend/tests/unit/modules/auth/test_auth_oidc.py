@@ -533,19 +533,47 @@ async def test_refresh_tokens_without_id_token() -> None:
             await oidc.refresh_tokens(_settings(), refresh_token="rt")
 
 
-async def test_verify_refreshed_id_token_needs_no_nonce() -> None:
-    token = _id_token(groups=["stupa"])
+_CACHED = oidc.OidcClaims(sub="user-1", email="old@x.de", name="Old", groups=["old"])
+
+
+async def _verify_refreshed(token: str, cached: oidc.OidcClaims = _CACHED) -> oidc.OidcClaims:
     with respx.mock:
         _serve_discovery()
         respx.get(CERTS).mock(return_value=httpx.Response(200, json={"keys": [_jwk()]}))
-        claims = await oidc.verify_refreshed_id_token(_settings(), id_token=token, sub="user-1")
+        return await oidc.verify_refreshed_id_token(_settings(), id_token=token, cached=cached)
+
+
+async def test_verify_refreshed_id_token_needs_no_nonce() -> None:
+    claims = await _verify_refreshed(
+        _id_token(groups=["stupa"], email="new@x.de", name="New")
+    )
     assert claims.groups == ["stupa"]
+    assert claims.email == "new@x.de"
+    assert claims.name == "New"
+
+
+async def test_verify_refreshed_id_token_keeps_cached_claims_it_lacks() -> None:
+    claims = await _verify_refreshed(_id_token())
+    assert claims.groups == ["old"]
+    assert claims.email == "old@x.de"
+    assert claims.name == "Old"
+
+
+async def test_verify_refreshed_id_token_empty_groups_claim_wins() -> None:
+    claims = await _verify_refreshed(_id_token(groups=[], preferred_username="u"))
+    assert claims.groups == []
+    assert claims.name == "u"
 
 
 async def test_verify_refreshed_id_token_sub_mismatch() -> None:
-    token = _id_token()
+    other = oidc.OidcClaims(sub="other", email=None, name=None)
+    with pytest.raises(OidcError, match="sub mismatch"):
+        await _verify_refreshed(_id_token(), other)
+
+
+async def test_refresh_tokens_non_json_is_unavailable() -> None:
     with respx.mock:
         _serve_discovery()
-        respx.get(CERTS).mock(return_value=httpx.Response(200, json={"keys": [_jwk()]}))
-        with pytest.raises(OidcError, match="sub mismatch"):
-            await oidc.verify_refreshed_id_token(_settings(), id_token=token, sub="other")
+        respx.post(TOKEN).mock(return_value=httpx.Response(200, text="<html>maintenance"))
+        with pytest.raises(oidc.OidcUnavailableError):
+            await oidc.refresh_tokens(_settings(), refresh_token="rt")
