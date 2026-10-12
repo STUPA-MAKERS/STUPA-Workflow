@@ -35,10 +35,10 @@ function config(): NgswConfig {
 function matches(pattern: string, path: string): boolean {
   const source = pattern
     .replace(/[.+^${}[\]\\]/g, '\\$&')
-    .replace(/\*\*\//g, '\u0000')
+    .replace(/\*\*\//g, 'GLOBSTAR')
     .replace(/\*\*/g, '.*')
     .replace(/\*/g, '[^/]*')
-    .replace(/\u0000/g, '(?:.*/)?');
+    .replace(/GLOBSTAR/g, '(?:.*/)?');
   return new RegExp(`^${source}$`).test(path);
 }
 
