@@ -52,7 +52,13 @@ from app.modules.applications.service import ApplicationsService
 from app.modules.audit.models import AuditEntry, AuditVerification
 from app.modules.audit.service import AuditService
 from app.modules.auth import oidc
-from app.modules.auth.models import AuthSession, Role, RoleAssignment, RolePermission
+from app.modules.auth.models import (
+    AuthSession,
+    LoginSettings,
+    Role,
+    RoleAssignment,
+    RolePermission,
+)
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.oauth_models import OAuthAuthorizationCode, OAuthToken
 from app.modules.auth.principal import Principal
@@ -276,6 +282,9 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             )
         )
         session.add(GuestApplicationSettings(id=1, updated_by=old.sub))
+        await session.merge(
+            LoginSettings(id=1, web_session_days=90, pwa_session_days=180, updated_by=old.sub)
+        )
         # F1: the old account decided on the application by a manual transition.
         session.add(ApplicationDecision(application_id=app_id, decided_by=old.sub))
 
