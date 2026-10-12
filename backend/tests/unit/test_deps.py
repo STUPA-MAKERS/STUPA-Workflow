@@ -188,7 +188,8 @@ async def test_get_current_principal_orphan_session(monkeypatch: pytest.MonkeyPa
 
 async def test_get_current_principal_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _sess(*a: object, **k: object) -> AuthSession:
-        return AuthSession(sid="s", principal_id="pid")
+        # Checked at the IdP a moment ago, so the renewal is not due.
+        return AuthSession(sid="s", principal_id="pid", revalidated_at=datetime.now(UTC))
 
     async def _resolve(*a: object, **k: object) -> Principal:
         return Principal(sub="u1", permissions={"application.read"})
