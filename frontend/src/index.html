@@ -20,7 +20,15 @@
     <link rel="icon" type="image/svg+xml" href="assets/logos/stupa-mark.svg" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="icons/icon-192x192.png" />
+    <!-- iOS and iPadOS do not read the icons of the manifest. "Add to Home Screen" takes
+         this 180 px icon. It is opaque, because iOS fills a transparent area with black.
+         The capable tags make iOS before 16.4 open the home screen icon as a standalone
+         app and not as a Safari tab; later versions read display from the manifest. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="STUPA" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   </head>
   <body>
     <app-root></app-root>

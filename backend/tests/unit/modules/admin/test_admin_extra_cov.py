@@ -492,6 +492,7 @@ async def test_manifest_uses_config_names() -> None:
     assert man["short_name"] == "MP"
     # The manifest also merges in the static fields.
     assert man["display"] == "standalone"
+    assert man["id"] == "/"
     assert "icons" in man
 
 
