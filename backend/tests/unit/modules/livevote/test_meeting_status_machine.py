@@ -8,7 +8,7 @@ start sets ``started_at`` once. F12: create and update write an audit entry.
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID, uuid4
@@ -485,3 +485,62 @@ async def test_close_purges_guests_and_public_patch_publishes(
     assert out.public_join is True and out.join_code == "7KQ4MP"
     assert [c[0] for c in guests.calls][-2:] == ["ensure_code", "publish"]
     assert audit[-1]["action"].value == "meeting_public_join_changed"
+
+
+def _soon(minutes: int) -> Meeting:
+    """A planned meeting that starts ``minutes`` from now (Berlin local time)."""
+    from zoneinfo import ZoneInfo
+
+    m = _meeting("planned")
+    local = datetime.now(ZoneInfo("Europe/Berlin")) + timedelta(minutes=minutes)
+    m.date = local.date()
+    m.start_time = local.time().replace(second=0, microsecond=0)
+    return m
+
+
+async def test_start_before_the_open_window_conflicts(
+    audit: list[dict[str, Any]], voting: SimpleNamespace
+) -> None:
+    m = _soon(180)
+    with pytest.raises(ConflictError) as ei:
+        await _service(m).patch(m.id, MeetingPatch(status="live", confirmEarly=True), _admin())
+    assert ei.value.code == "meeting_too_early"
+    assert m.status == "planned"
+    assert m.started_at is None
+    assert audit == []
+
+
+async def test_early_start_needs_the_confirmation(
+    audit: list[dict[str, Any]], voting: SimpleNamespace
+) -> None:
+    m = _soon(30)
+    with pytest.raises(ConflictError) as ei:
+        await _service(m).patch(m.id, MeetingPatch(status="live"), _admin())
+    assert ei.value.code == "early_open_unconfirmed"
+    assert m.status == "planned"
+    out = await _service(m).patch(m.id, MeetingPatch(status="live", confirmEarly=True), _admin())
+    assert out.status == "live"
+    assert out.opens_at is None
+
+
+async def test_start_shortly_before_the_meeting_needs_no_confirmation(
+    audit: list[dict[str, Any]], voting: SimpleNamespace
+) -> None:
+    m = _soon(5)
+    out = await _service(m).patch(m.id, MeetingPatch(status="live"), _admin())
+    assert out.status == "live"
+
+
+async def test_planned_meeting_out_carries_the_window(
+    audit: list[dict[str, Any]], voting: SimpleNamespace
+) -> None:
+    m = _soon(180)
+    out = await _service(m).patch(m.id, MeetingPatch(title="Neu"), _admin())
+    assert out.opens_at is not None
+    assert out.confirm_until is not None
+    assert out.confirm_until - out.opens_at == timedelta(minutes=50)
+
+
+def test_confirm_early_alone_is_no_patch() -> None:
+    with pytest.raises(ValidationError):
+        MeetingPatch(confirmEarly=True)

@@ -158,6 +158,11 @@ async def update_meeting(meeting_id: str, patch: S.MeetingPatch) -> dict:
     (close or cancel it first), and it cancels the draft votes. A closed meeting
     keeps its title, date, time and minute-taker.
 
+    The start has an open window (`opensAt`, `confirmUntil` on the meeting): before
+    `opensAt` it gives 409 `meeting_too_early`, and before `confirmUntil` it needs
+    `confirmEarly: true` (else 409 `early_open_unconfirmed`). Ask the user before you
+    confirm an early open.
+
     A new minute-taker needs protocol.write in the gremium (422
     `protokollant_needs_protocol_write`). While the meeting is live, a new
     minute-taker is a handover with mode `now` (see `protokollant_handover`). The

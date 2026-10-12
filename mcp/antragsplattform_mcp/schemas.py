@@ -519,6 +519,11 @@ class MeetingPatch(WireModel):
         default=None,
         description="`watch` gives 409 `guest_vote_open` while a vote with guests is open.",
     )
+    confirmEarly: bool | None = Field(
+        default=None,
+        description="Confirm an early open: `status: live` before `confirmUntil` of the "
+        "meeting gives 409 `early_open_unconfirmed` without it.",
+    )
 
 
 class DecisionProposal(WireModel):
@@ -649,6 +654,22 @@ class GuestSettingsUpdate(WireModel):
         description=(
             "Lifetime of a new magic link in days. Required: send null for no expiry, "
             "or the current value from get_guest_settings to keep it"
+        ),
+    )
+
+
+class MeetingSettingsUpdate(WireModel):
+    openLeadMinutes: int = Field(
+        ge=0,
+        le=10080,
+        description="Earliest open of a meeting, in minutes before its planned start",
+    )
+    confirmLeadMinutes: int = Field(
+        ge=0,
+        le=10080,
+        description=(
+            "Before this point (minutes before the planned start) the open needs "
+            "`confirmEarly`. Not larger than openLeadMinutes (422)"
         ),
     )
 

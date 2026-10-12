@@ -20,6 +20,7 @@ from app.modules.applications.models import (
     DEFAULT_CONFIRM_TTL_HOURS,
     MAX_CONFIRM_TTL_HOURS,
 )
+from app.modules.livevote.models import MAX_LEAD_MINUTES
 from app.shared.config_schemas import ComparisonOffers, EventName, FlowGraph
 from app.shared.i18n import I18nMap
 from app.shared.permissions import PERMISSION_CATALOGUE
@@ -859,6 +860,27 @@ class GuestSettingsOut(_CamelModel):
     link_ttl_days: int | None = Field(serialization_alias="linkTtlDays")
     updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
     updated_by: str | None = Field(default=None, serialization_alias="updatedBy")
+
+
+class MeetingSettingsOut(_CamelModel):
+    """The open window of meetings, in minutes before the planned start."""
+
+    open_lead_minutes: int = Field(serialization_alias="openLeadMinutes")
+    confirm_lead_minutes: int = Field(serialization_alias="confirmLeadMinutes")
+    updated_at: datetime | None = Field(default=None, serialization_alias="updatedAt")
+    updated_by: str | None = Field(default=None, serialization_alias="updatedBy")
+
+
+class MeetingSettingsUpdate(_CamelModel):
+    """Full replacement of the meeting settings.
+
+    ``confirmLeadMinutes`` must not be larger than ``openLeadMinutes`` (422).
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    open_lead_minutes: int = Field(alias="openLeadMinutes", ge=0, le=MAX_LEAD_MINUTES)
+    confirm_lead_minutes: int = Field(alias="confirmLeadMinutes", ge=0, le=MAX_LEAD_MINUTES)
 
 
 class GuestSettingsUpdate(_CamelModel):

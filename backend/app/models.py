@@ -56,6 +56,7 @@ from app.modules.livevote.models import (
     MeetingAgendaItem,
     MeetingAttendance,
     MeetingGuest,
+    MeetingSettings,
     ProtocolKeeperPeriod,
 )
 from app.modules.notifications.models import (
@@ -106,6 +107,7 @@ __all__ = [
     "MeetingAgendaItem",
     "MeetingAttendance",
     "MeetingGuest",
+    "MeetingSettings",
     "ProtocolKeeperPeriod",
     "OAuthAuthorizationCode",
     "OAuthToken",

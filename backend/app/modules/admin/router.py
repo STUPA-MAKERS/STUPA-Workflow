@@ -8,7 +8,7 @@ branding read.
 RBAC is server-side authoritative. ``require_principal`` answers 401 or 403.
 The frontend is only a UX gate. Per-area permissions: ``admin.gremien``,
 ``admin.types``, ``admin.site``, ``admin.roles``, ``admin.cd_variants``,
-``admin.deadlines`` (guest settings), ``webhook.manage``.
+``admin.deadlines`` (guest settings, meeting settings), ``webhook.manage``.
 
 ``notification-rules`` and ``mail-templates`` live in the notifications module.
 ``/admin/audit`` lives in audit and the form versions live in forms. This
@@ -80,6 +80,8 @@ from app.modules.admin.schemas import (
     GroupMappingUpdate,
     GuestSettingsOut,
     GuestSettingsUpdate,
+    MeetingSettingsOut,
+    MeetingSettingsUpdate,
     MergePreviewOut,
     MergeResultOut,
     PrincipalMergeIn,
@@ -102,6 +104,7 @@ from app.modules.admin.schemas import (
 from app.modules.admin.service import CdVariantService, ConfigService
 from app.modules.admin.site_config_service import SiteConfigService
 from app.modules.applications.guest_settings import GuestSettingsService
+from app.modules.livevote.open_window import MeetingSettingsService
 from app.modules.notifications.auto import AutoMailer, get_auto_mailer
 from app.shared.antiabuse import body_cap
 from app.shared.config_schemas import FlowGraph, export_json_schemas
@@ -1169,6 +1172,56 @@ async def put_guest_settings(
         actor=principal.sub,
     )
     return GuestSettingsOut.model_validate(row, from_attributes=True)
+
+
+# The open window of meetings: the earliest open and the end of the early window
+# that needs a confirmation. The deadlines page (admin.deadlines) maintains them.
+def get_meeting_settings_service(session: DbSession) -> MeetingSettingsService:
+    return MeetingSettingsService(session)
+
+
+MeetingSettingsServiceDep = Annotated[
+    MeetingSettingsService, Depends(get_meeting_settings_service)
+]
+
+
+@router.get(
+    "/meeting-settings",
+    response_model=MeetingSettingsOut,
+    dependencies=[Depends(require_principal("admin.deadlines"))],
+    responses=_errors(401, 403),
+)
+async def get_meeting_settings(service: MeetingSettingsServiceDep) -> MeetingSettingsOut:
+    """Return the open window of meetings, in minutes before the planned start."""
+    row = await service.get()
+    await service.session.commit()
+    return MeetingSettingsOut.model_validate(row, from_attributes=True)
+
+
+@router.put(
+    "/meeting-settings",
+    response_model=MeetingSettingsOut,
+    responses=_errors(400, 401, 403, 422),
+)
+async def put_meeting_settings(
+    payload: MeetingSettingsUpdate,
+    service: MeetingSettingsServiceDep,
+    principal: DeadlinesAdmin,
+) -> MeetingSettingsOut:
+    """Replace both values.
+
+    ``openLeadMinutes`` is the earliest open before the planned start. Before
+    ``confirmLeadMinutes`` the open needs an extra confirmation, so the value must not
+    be larger than ``openLeadMinutes`` (422). The change applies to every planned
+    meeting at once and writes a ``config_change`` audit entry that the audit log
+    cannot revert.
+    """
+    row = await service.update(
+        open_lead_minutes=payload.open_lead_minutes,
+        confirm_lead_minutes=payload.confirm_lead_minutes,
+        actor=principal.sub,
+    )
+    return MeetingSettingsOut.model_validate(row, from_attributes=True)
 
 
 # Site config and branding with draft and activate semantics.
