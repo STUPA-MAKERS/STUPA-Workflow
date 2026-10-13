@@ -37,7 +37,7 @@
     "@angular/platform-browser": "^20.3.30",
     "@angular/router": "^20.3.30",
     "@angular/service-worker": "^20.3.30",
-    "@ngx-formly/core": "^7.0.0",
+    "@ngx-formly/core": "^9.0.0",
     "@tiptap/core": "^3.30.5",
     "@tiptap/extension-mathematics": "^3.30.5",
     "@tiptap/pm": "^3.29.1",
