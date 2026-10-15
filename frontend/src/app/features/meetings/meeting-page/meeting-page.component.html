@@ -51,8 +51,6 @@
     </app-button>
   }
 
-  <app-row-menu [sections]="menu()" [label]="'meetings.page.menu' | t" (selected)="onMenu($event)" />
-
   <!-- One main action. Only a live meeting closes, and "closed" is terminal: a planned
        meeting that does not take place is deleted (O13). The finalize is a step of its
        own after the close, in the protocol bar of the sheet. A phone keeps the title
@@ -80,6 +78,9 @@
       }
     }
   }
+
+  <!-- The menu is the last control of the header, after the main action. -->
+  <app-row-menu [sections]="menu()" [label]="'meetings.page.menu' | t" (selected)="onMenu($event)" />
 </header>
 
 <div class="mp__body" appScrollFade="y" [class.mp__body--wide]="wide()" [class.mp__body--votes]="showVotes()">
