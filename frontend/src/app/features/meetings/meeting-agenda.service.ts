@@ -2,7 +2,7 @@ import { Injectable, type OnDestroy, computed, inject, signal } from '@angular/c
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
-import { AsyncSubject, type Observable, of } from 'rxjs';
+import { AsyncSubject, type Observable, map, of, switchMap } from 'rxjs';
 import type { AgendaItem, Uuid } from '@core/api/models';
 import { errorDetail } from './meetings-display.util';
 
@@ -33,7 +33,7 @@ export class MeetingAgendaService implements OnDestroy {
   readonly saveState = signal<'idle' | 'saving' | 'saved' | 'error'>('idle');
   private bodyTimer: ReturnType<typeof setTimeout> | null = null;
   /** Debounced TOP edit that the server does not hold yet: the item and the text. */
-  private pendingBody: { itemId: Uuid; body: string } | null = null;
+  private pendingBody: { meetingId: Uuid; itemId: Uuid; body: string } | null = null;
   /**
    * The newest text of an item that this tab has typed and the server has not confirmed
    * yet. A read of the agenda keeps it in place of the text of the server, because a read
@@ -65,8 +65,9 @@ export class MeetingAgendaService implements OnDestroy {
     this.toast.error(detail ? `${base}: ${detail}` : base);
   }
 
+  /** Save a pending edit when the page goes away, so that the debounce drops no text. */
   ngOnDestroy(): void {
-    if (this.bodyTimer !== null) clearTimeout(this.bodyTimer);
+    this.flushPendingBody(this.pendingBody?.meetingId ?? null);
   }
 
   /**
@@ -202,7 +203,7 @@ export class MeetingAgendaService implements OnDestroy {
   /** Debounce the save of the TOP body. The local text changes at once. */
   onTopBodyChange(meetingId: Uuid, itemId: Uuid, body: string): void {
     if (this.bodyTimer !== null) clearTimeout(this.bodyTimer);
-    this.pendingBody = { itemId, body };
+    this.pendingBody = { meetingId, itemId, body };
     this.localBody = { itemId, body };
     this.agenda.update((items) =>
       items.map((a) => (a.id === itemId ? { ...a, body } : a)),
@@ -237,6 +238,29 @@ export class MeetingAgendaService implements OnDestroy {
   settlePendingBody(meetingId: Uuid | null): Observable<void> {
     this.flushPendingBody(meetingId);
     return this.runningSave ?? of(undefined);
+  }
+
+  /**
+   * Make sure that the server holds the text that this tab shows, and tell if it does.
+   *
+   * The finalize renders the protocol from the item texts on the server, and a body
+   * save after the finalize gets 409 `protocol_locked`. So the finalize waits for this:
+   * it runs a pending autosave at once and waits for a running save. Without either,
+   * it sends the text of an earlier failed save again. The observable emits `false` when the server still
+   * does not hold the text.
+   */
+  persistBody(meetingId: Uuid): Observable<boolean> {
+    // A save that runs now is the try. Only an earlier failed save is sent again.
+    const busy = this.bodyTimer !== null || this.runningSave !== null;
+    return this.settlePendingBody(meetingId).pipe(
+      switchMap(() => {
+        const local = this.localBody;
+        if (busy || !local) return of(undefined);
+        this.saveBody(meetingId, local.itemId, local.body);
+        return this.runningSave ?? of(undefined);
+      }),
+      map(() => this.localBody === null),
+    );
   }
 
   private saveBody(meetingId: Uuid, itemId: Uuid, body: string): void {

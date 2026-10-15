@@ -87,4 +87,17 @@ describe('MeetingAgendaService — text of the minute-taker', () => {
     reads[0].next([item('Vom Server')]);
     expect(body()).toBe('Vom Server');
   });
+
+  it('saves a pending edit when the page goes away', () => {
+    svc.onTopBodyChange('m-1', 't-1', 'Beim Verlassen');
+    svc.ngOnDestroy();
+    expect(saves.length).toBe(1);
+  });
+
+  it('tells the finalize that the server holds the text, without a request when it does', () => {
+    let held: boolean | undefined;
+    svc.persistBody('m-1').subscribe((h) => (held = h));
+    expect(held).toBe(true);
+    expect(saves.length).toBe(0);
+  });
 });

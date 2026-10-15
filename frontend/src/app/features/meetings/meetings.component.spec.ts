@@ -1587,18 +1587,63 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.finalizing()).toBe(false);
     });
 
-    it('ignores finalize without a protocol / when locked / while saving a TOP', async () => {
-      const { cmp, http, fixture } = await loaded();
-      const { agenda } = services(fixture);
+    it('ignores finalize without a protocol / when locked / for a live meeting', async () => {
+      const { cmp, http } = await loaded();
       cmp.protocol.set(null);
       cmp.finalize(); // no protocol → return
       cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: true } as never);
       cmp.finalize(); // isLocked → return
       cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: false } as never);
-      agenda.savingTop.set(true);
-      cmp.finalize(); // savingTop → return
-      agenda.savingTop.set(false);
       cmp.finalize(); // F8: the meeting is still live → return
+      http.verify();
+    });
+
+    // The server renders the PDF from the item texts it holds, and refuses a body save
+    // after the finalize. Text typed within the autosave delay must reach it first.
+    it('saves the text of the last TOP before it finalizes', async () => {
+      const { cmp, http } = await loaded();
+      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
+      cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: false } as never);
+      cmp.onTopBodyChange('t-1', 'Letzter Satz');
+      cmp.finalize();
+      http.expectNone('/api/protocols/p-1');
+      const save = http.expectOne('/api/meetings/m-1/agenda/t-1');
+      expect(save.request.body).toEqual({ body: 'Letzter Satz' });
+      save.flush([AGENDA_ITEM({ body: 'Letzter Satz' })]);
+      http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
+      http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, isFinal: true, isLocked: true });
+      expect(cmp.finalizing()).toBe(false);
+    });
+
+    it('sends a text again that an earlier save lost, before it finalizes', async () => {
+      jest.useFakeTimers();
+      try {
+        const { cmp, http } = await loaded();
+        cmp.onTopBodyChange('t-1', 'Verloren');
+        jest.advanceTimersByTime(1000);
+        http.expectOne('/api/meetings/m-1/agenda/t-1').flush(null, { status: 500, statusText: 'e' });
+        cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
+        cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: false } as never);
+        cmp.finalize();
+        const again = http.expectOne('/api/meetings/m-1/agenda/t-1');
+        expect(again.request.body).toEqual({ body: 'Verloren' });
+        again.flush([AGENDA_ITEM({ body: 'Verloren' })]);
+        http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
+        http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, isFinal: true, isLocked: true });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('does not finalize when the text of a TOP cannot be saved', async () => {
+      const { cmp, http } = await loaded();
+      cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' });
+      cmp.protocol.set({ ...PROTOCOL, isFinal: false, isLocked: false } as never);
+      cmp.onTopBodyChange('t-1', 'Offline');
+      cmp.finalize();
+      http.expectOne('/api/meetings/m-1/agenda/t-1').flush(null, { status: 500, statusText: 'e' });
+      http.expectNone('/api/protocols/p-1');
+      expect(cmp.finalizing()).toBe(false);
       http.verify();
     });
   });
@@ -2128,18 +2173,21 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.looseVotes()).toEqual([]); // meeting()?.votes ?? []
     });
 
-    it('clears all pending timers (body autosave, render poll) on destroy', async () => {
+    it('saves the pending text and stops the render poll on destroy', async () => {
       jest.useFakeTimers();
       try {
         const { cmp, fixture, http } = await loaded();
-        // bodyTimer: an autosave that has not fired yet.
-        cmp.onTopBodyChange('t-1', 'X');
         // renderPollTimer: protocol rendering → watchRendering schedules a poll.
         cmp.meeting.set({ ...cmp.meeting()!, status: 'closed' }); // F8: finalize after the close
         cmp.finalize();
         http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
         http.expectOne('/api/protocols/p-1/finalize').flush({ ...PROTOCOL, status: 'rendering', isFinal: false, isLocked: true });
-        fixture.destroy(); // ngOnDestroy → both clearTimeout branches
+        // bodyTimer: an autosave that has not fired yet.
+        cmp.onTopBodyChange('t-1', 'X');
+        fixture.destroy(); // ngOnDestroy → the autosave runs at once, the poll stops
+        const save = http.expectOne('/api/meetings/m-1/agenda/t-1');
+        expect(save.request.body).toEqual({ body: 'X' });
+        save.flush([AGENDA_ITEM({ body: 'X' })]);
         jest.advanceTimersByTime(8000); // no timers fire anymore → no requests
         http.verify();
       } finally {
