@@ -1,0 +1,71 @@
+@use 'breakpoints' as bp;
+@use '../gremien-tab';
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+
+.gdc__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.gdc__search {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.gdc__chips {
+  @include gremien-tab.tools;
+}
+
+.gdc__group {
+  @include gremien-tab.group;
+}
+.gdc__head {
+  @include gremien-tab.head;
+}
+.gdc__meeting {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-regular);
+}
+
+.gdc__lead {
+  display: inline-flex;
+  color: var(--color-text-muted);
+}
+.gdc__sub {
+  @include gremien-tab.parts('.gdc__part');
+}
+.gdc__trail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 16rem;
+  text-align: end;
+}
+.gdc__chev {
+  @include gremien-tab.chevron;
+}
+
+.gdc__more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.gdc__status {
+  @include gremien-tab.status;
+}
+
+@include bp.phone {
+  .gdc__search {
+    flex-basis: 100%;
+  }
+}

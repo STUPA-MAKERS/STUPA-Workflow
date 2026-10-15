@@ -19,6 +19,12 @@ describe('permissionSections', () => {
     expect(out[0].title).toBe('admin.roles.section.applications');
   });
 
+  it('puts gremium.view_all with the meetings', () => {
+    const out = permissionSections(['gremium.view_all', 'meeting.view_all']);
+    expect(out.map((s) => s.key)).toEqual(['meetings']);
+    expect(out[0].keys).toEqual(['gremium.view_all', 'meeting.view_all']);
+  });
+
   it('puts an unknown prefix into "Weitere" and leaves out empty sections', () => {
     const out = permissionSections(['zzz.new', 'budget.book']);
     expect(out.map((s) => s.key)).toEqual(['budget', 'other']);

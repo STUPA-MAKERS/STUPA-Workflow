@@ -1,0 +1,411 @@
+@use 'breakpoints' as bp;
+@use '../gremien-tab';
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+/* Side by side: the matrix takes the free height of the pane and scrolls inside. */
+:host(.gat-host--fill) {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.gat__tools {
+  flex: none;
+  @include gremien-tab.tools;
+}
+.gat__grow {
+  flex: 1 1 auto;
+}
+.gat__status {
+  @include gremien-tab.status;
+}
+
+/* ------------------------------------------------------------------ matrix */
+/* The box scrolls in both directions; the head row and the first column stick. */
+.gat__frame {
+  min-width: 0;
+  max-width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+}
+:host(.gat-host--fill) .gat__frame {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+.gat__frame:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.gat__mx {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--fs-small);
+}
+.gat__colName {
+  width: 13rem;
+  min-width: 11rem;
+}
+.gat__colMonth {
+  width: 4.75rem;
+}
+.gat__colTotal {
+  width: 6rem;
+}
+
+.gat__th,
+.gat__td,
+.gat__who,
+.gat__foot {
+  padding: 6px var(--space-1);
+  border-top: var(--border-width) solid var(--color-border);
+  text-align: center;
+  vertical-align: middle;
+}
+.gat__th:first-child,
+.gat__who,
+.gat__foot--name {
+  padding-inline-start: 14px;
+  text-align: start;
+}
+.gat__th:last-child,
+.gat__td:last-child,
+.gat__foot:last-child {
+  padding-inline-end: 14px;
+}
+
+thead .gat__th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 56px;
+  border-top: 0;
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: var(--fw-regular);
+}
+.gat__th--name {
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.gat__month {
+  display: block;
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+.gat__meetings {
+  display: block;
+  white-space: nowrap;
+}
+.gat__th--total {
+  text-align: end;
+}
+.gat__sortBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.gat__sortBtn--on {
+  color: var(--color-accent-text);
+}
+.gat__sortBtn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* The first column sticks while the matrix scrolls sideways. */
+.gat__th--name,
+.gat__who,
+.gat__foot--name {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+}
+thead .gat__th--name {
+  z-index: 3;
+}
+.gat__who {
+  height: 52px;
+  background: var(--color-surface-2);
+  font-weight: var(--fw-regular);
+}
+.gat__whoIn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.gat__whoText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.gat__name {
+  color: var(--color-text);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
+}
+.gat__role {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+/* A cell: "present/held" on a ground from the surface (none) to the accent (all). */
+.gat__cell {
+  --gat-s: 0%;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-accent) var(--gat-s), var(--color-surface-3));
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: var(--fw-semibold);
+}
+button.gat__cell {
+  cursor: pointer;
+}
+button.gat__cell:hover {
+  box-shadow: 0 0 0 2px var(--color-border-strong);
+}
+button.gat__cell:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.gat__cell--full {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+.gat__cell--none {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--color-border);
+  color: var(--color-text-muted);
+  font-weight: var(--fw-medium);
+}
+.gat__cell--na {
+  background: repeating-linear-gradient(135deg, var(--color-surface-3) 0 4px, transparent 4px 8px);
+}
+
+/* The marks: a warning badge with the excused meetings, a grey one with "nV". */
+.gat__ex {
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--color-warning);
+  color: var(--color-on-danger);
+  font-size: 0.625rem;
+  font-weight: var(--fw-bold);
+  line-height: 16px;
+  text-align: center;
+}
+.gat__ex--dv {
+  top: auto;
+  bottom: -6px;
+  background: var(--color-surface-4);
+  color: var(--color-text);
+}
+.gat__ex--static {
+  position: static;
+}
+
+.gat__td--total {
+  text-align: end;
+  white-space: nowrap;
+}
+.gat__td--total .mono {
+  display: block;
+  color: var(--color-text);
+  font-weight: var(--fw-semibold);
+}
+.gat__pct {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+tfoot .gat__foot {
+  position: sticky;
+  bottom: 0;
+  height: 44px;
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+tfoot .gat__foot--name {
+  z-index: 2;
+  color: var(--color-text-muted);
+  font-weight: var(--fw-regular);
+}
+
+/* ------------------------------------------------------------------ legend */
+.gat__legend {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: var(--space-2) 18px;
+  margin: 0;
+  padding: 0 var(--space-1);
+  list-style: none;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.gat__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.gat__swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  background: var(--color-surface-3);
+}
+.gat__swatch--full {
+  background: var(--color-accent);
+}
+.gat__swatch--some {
+  background: color-mix(in srgb, var(--color-accent) 45%, var(--color-surface-3));
+}
+
+/* ------------------------------------------------------------------ no meetings */
+.gat__ghost {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 14px;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+}
+.gat__ghostRow {
+  display: flex;
+  gap: var(--space-2);
+}
+.gat__ghostName {
+  flex: 0 0 9rem;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--color-surface-3);
+}
+.gat__ghostCell {
+  flex: 1 1 0;
+  max-width: 4.5rem;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--color-surface-3);
+}
+
+/* ------------------------------------------------------------------ phone cards */
+.gat__phoneHead {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px;
+  color: var(--color-text-muted);
+  font-size: 0.71875rem;
+}
+.gat__phoneHead span {
+  flex: 1 1 0;
+  text-align: center;
+}
+.gat__cards {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gat__card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.gat__card:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.gat__cardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.gat__cardName {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.90625rem;
+  font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
+}
+.gat__cardSum {
+  font-size: var(--fs-small);
+}
+.gat__chev {
+  @include gremien-tab.chevron;
+}
+.gat__cardCells {
+  display: flex;
+  gap: 4px;
+}
+.gat__cell--sm {
+  flex: 1 1 0;
+  height: 28px;
+  font-size: 0.75rem;
+}
+.gat__dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 4px;
+}
+.gat__dot--ex {
+  background: var(--color-warning);
+}
+.gat__dot--dv {
+  top: auto;
+  bottom: 3px;
+  background: var(--color-text-muted);
+}
+
+@include bp.phone {
+  .gat__ghostName {
+    flex-basis: 5rem;
+  }
+}

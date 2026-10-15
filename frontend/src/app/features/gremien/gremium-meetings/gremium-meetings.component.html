@@ -1,0 +1,92 @@
+<div class="gmt__tools" role="group" [attr.aria-label]="'gremien.filters' | t">
+  <app-filter-select
+    [label]="'gremien.meetings.range' | t"
+    [options]="rangeOptions()"
+    [value]="range()"
+    (valueChange)="setRange($event)"
+    [text]="rangeText()"
+    [active]="range() !== ''"
+    [icon]="range() ? 'check' : null"
+    [chevron]="!range()"
+  />
+  <app-filter-select
+    [label]="'gremien.meetings.protocol' | t"
+    [options]="protocolOptions()"
+    [value]="protocol()"
+    (valueChange)="setProtocol($event)"
+    [text]="protocolText()"
+    [active]="protocol() !== ''"
+    [icon]="protocol() ? 'check' : null"
+    [chevron]="!protocol()"
+  />
+  @if (!phone()) {
+    <span class="gmt__grow"></span>
+    <a class="gmt__link" routerLink="/meetings">
+      {{ 'gremien.detail.allMeetings' | t }}
+      <app-icon name="arrow" [size]="15" />
+    </a>
+  }
+</div>
+
+@if (loading()) {
+  <app-skeleton variant="rows" [count]="4" [label]="'gremien.meetings.loading' | t" />
+} @else if (error()) {
+  <div class="gmt__status" role="alert">
+    <span>{{ 'gremien.meetings.error' | t }}</span>
+    <app-button variant="text" size="sm" (click)="load()">{{ 'gremien.list.retry' | t }}</app-button>
+  </div>
+} @else if (!groups().length) {
+  @if (filterActive()) {
+    <p class="gmt__status">{{ 'gremien.meetings.noMatch' | t }}</p>
+  } @else {
+    <app-empty-state icon="users" [heading]="'gremien.meetings.empty' | t" />
+  }
+} @else {
+  @for (g of groups(); track g.key) {
+    <section class="gmt__group" [attr.aria-labelledby]="'gmt-g-' + g.key">
+      <h3 class="sec gmt__head" [id]="'gmt-g-' + g.key">
+        {{ g.label }}
+        @if (g.upcoming) {
+          <span class="gmt__count">{{ g.rows.length }}</span>
+        }
+      </h3>
+      <div class="rowgroup" role="list">
+        @for (row of g.rows; track row.meeting.id) {
+          <app-list-item
+            role="listitem"
+            class="gmt__row"
+            [title]="row.meeting.title"
+            [link]="['/meetings', row.meeting.id]"
+            [wrap]="phone()"
+          >
+            <app-date-block
+              lead
+              [date]="row.meeting.date"
+              [live]="row.meeting.status === 'live'"
+              [muted]="!g.upcoming"
+            />
+            <span sub class="gmt__sub">
+              @if (row.sub) {
+                <span class="gmt__part">{{ row.sub }}</span>
+              }
+              <span class="gmt__part">
+                <app-status-text [kind]="row.status.kind">{{ row.status.key | t }}</app-status-text>
+              </span>
+            </span>
+            <span trail class="gmt__trail">
+              @if (row.attendance) {
+                <span class="gmt__att" [attr.aria-label]="row.attendanceLabel" role="img">
+                  <span class="mono gmt__attNum">{{ row.attendance }}</span>
+                  @if (!phone()) {
+                    <span class="gmt__attLabel">{{ 'gremien.meetings.present' | t }}</span>
+                  }
+                </span>
+              }
+              <app-icon class="gmt__chev" name="chevron-right" [size]="17" />
+            </span>
+          </app-list-item>
+        }
+      </div>
+    </section>
+  }
+}

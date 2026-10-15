@@ -12,7 +12,7 @@ export interface PermissionSection {
 const SECTIONS: readonly { key: PermissionSection['key']; title: TranslationKey; prefixes: readonly string[] }[] = [
   { key: 'applications', title: 'admin.roles.section.applications', prefixes: ['application.'] },
   { key: 'budget', title: 'admin.roles.section.budget', prefixes: ['budget.'] },
-  { key: 'meetings', title: 'admin.roles.section.meetings', prefixes: ['meeting.', 'vote.', 'protocol.', 'session.'] },
+  { key: 'meetings', title: 'admin.roles.section.meetings', prefixes: ['meeting.', 'gremium.', 'vote.', 'protocol.', 'session.'] },
   { key: 'admin', title: 'admin.roles.section.admin', prefixes: ['admin.', 'form.', 'flow.', 'webhook.'] },
   { key: 'security', title: 'admin.roles.section.security', prefixes: ['audit.', 'privacy.', 'backup.', 'mcp.'] },
 ];

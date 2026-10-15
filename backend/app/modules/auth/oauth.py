@@ -38,7 +38,8 @@ FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset(
 # The meeting lead (`session.manage`) includes the votes of the gremium, so a
 # `meetings:write` token of a lead can manage those votes also without `votes:write`.
 # `read` holds `meeting.view_all`, a global read-only key, so an admin token keeps the
-# view over the meetings of every gremium.
+# view over the meetings of every gremium. For the same reason `read` holds
+# `gremium.view_all`, the global read key of the tab "Gremien".
 SCOPES: dict[str, frozenset[str]] = {
     "read": frozenset(
         {
@@ -49,6 +50,7 @@ SCOPES: dict[str, frozenset[str]] = {
             "audit.read",
             "audit.verify",
             "meeting.view_all",
+            "gremium.view_all",
         }
     ),
     "applications:write": frozenset(

@@ -1,0 +1,145 @@
+@if (gremium(); as g) {
+  <article class="gd" [class.gd--split]="split()" aria-labelledby="gd-title">
+    <header class="gd__head">
+      <app-sheet-bar class="gd__bar" [bleed]="split()">
+        <span appSheetBarKicker class="gd__kicker ell">
+          {{ 'gremien.detail.kicker' | t }}
+          @if (roleLabel()) {
+            <span class="gd__dot" aria-hidden="true">·</span>{{ 'gremien.detail.yourRole' | t }}
+            <strong class="gd__role">{{ roleLabel() }}</strong>
+          }
+        </span>
+        @if (!phone()) {
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'gremien.detail.subscribe' | t"
+            [ariaPressed]="abo.isOpen()"
+            (click)="abo.toggle($event.currentTarget)"
+          ><app-icon name="cal" [size]="20" /></app-button>
+          @if (canAdmin()) {
+            <app-button
+              variant="text"
+              [iconOnly]="true"
+              [ariaLabel]="'gremien.detail.admin' | t"
+              (click)="openAdmin()"
+            ><app-icon name="shield" [size]="20" /></app-button>
+          }
+        }
+        <app-row-menu
+          [label]="('gremien.detail.menu' | t) + ': ' + g.name"
+          [sections]="menu()"
+          (selected)="onMenu($event, abo)"
+        />
+      </app-sheet-bar>
+      <app-calendar-subscribe #abo />
+
+      <div class="gd__titleRow">
+        <app-gremium-logo [name]="g.name" [logoUrl]="g.logoUrl" [size]="phone() ? 'md' : 'lg'" />
+        <h2 id="gd-title" class="gd__title">{{ g.name }}</h2>
+      </div>
+      <!-- Every part draws its dot before it; the line clips the dot of the first part on
+           each line, so a dot shows only between two parts, also after a wrap. -->
+      <p class="gd__line">
+        <span class="gd__parts">
+          @for (fact of facts(); track fact) {
+            <span class="gd__part">{{ fact }}</span>
+          }
+        </span>
+      </p>
+
+      @if (canPlan() || showNext()) {
+        <div class="gd__actions">
+          @if (canPlan()) {
+            <app-button variant="fill" [class.gd__grow]="phone()" (click)="createOpen.set(true)">
+              <app-icon name="plus" [size]="17" />
+              {{ 'gremien.detail.plan' | t }}
+            </app-button>
+          }
+          @if (showNext()) {
+            <app-button
+              [variant]="canPlan() ? 'tonal' : 'fill'"
+              [class.gd__grow]="phone()"
+              (click)="openNext()"
+            >
+              {{ (g.live ? 'gremien.detail.live' : 'gremien.detail.next') | t }}
+            </app-button>
+          }
+        </div>
+      }
+    </header>
+
+    <app-tabs
+      #tabBar
+      class="gd__tabs"
+      idPrefix="gd"
+      [ariaLabel]="'gremien.detail.tabs' | t"
+      [tabs]="tabs()"
+      [active]="tab()"
+      (activeChange)="selectTab($event)"
+    />
+
+    <div class="gd__body" [class.gd__body--fill]="split() && tab() === 'anwesenheit'">
+      <section
+        class="gd__panel"
+        role="tabpanel"
+        [id]="tabBar.panelId('sitzungen')"
+        [attr.aria-labelledby]="tabBar.tabId('sitzungen')"
+        [hidden]="tab() !== 'sitzungen'"
+      >
+        @if (visited().has('sitzungen')) {
+          <app-gremium-meetings [gremiumId]="g.id" (count)="meetingCount.set($event)" />
+        }
+      </section>
+      <section
+        class="gd__panel"
+        role="tabpanel"
+        [id]="tabBar.panelId('mitglieder')"
+        [attr.aria-labelledby]="tabBar.tabId('mitglieder')"
+        [hidden]="tab() !== 'mitglieder'"
+      >
+        @if (visited().has('mitglieder')) {
+          <app-gremium-members [gremiumId]="g.id" [gremiumName]="g.name" />
+        }
+      </section>
+      <section
+        class="gd__panel"
+        role="tabpanel"
+        [id]="tabBar.panelId('anwesenheit')"
+        [attr.aria-labelledby]="tabBar.tabId('anwesenheit')"
+        [hidden]="tab() !== 'anwesenheit'"
+      >
+        @if (visited().has('anwesenheit')) {
+          <app-gremium-attendance [gremiumId]="g.id" [gremiumName]="g.name" [fill]="split()" />
+        }
+      </section>
+      <section
+        class="gd__panel"
+        role="tabpanel"
+        [id]="tabBar.panelId('beschluesse')"
+        [attr.aria-labelledby]="tabBar.tabId('beschluesse')"
+        [hidden]="tab() !== 'beschluesse'"
+      >
+        @if (visited().has('beschluesse')) {
+          <app-gremium-decisions [gremiumId]="g.id" />
+        }
+      </section>
+    </div>
+  </article>
+
+  @if (canPlan()) {
+    <app-create-meeting-dialog [open]="createOpen()" [gremiumId]="g.id" (closed)="createOpen.set(false)" />
+  }
+} @else if (store.loading()) {
+  <div class="gd gd--busy" [class.gd--split]="split()" aria-busy="true">
+    <app-skeleton variant="panel" [label]="'gremien.detail.loading' | t" />
+  </div>
+} @else {
+  <div class="gd gd--none" [class.gd--split]="split()" role="alert">
+    <app-empty-state
+      icon="landmark"
+      [heading]="(store.error() ? 'gremien.list.error' : 'gremien.detail.notFound') | t"
+      [body]="store.error() ? null : ('gremien.detail.notFoundBody' | t)"
+    />
+  </div>
+}

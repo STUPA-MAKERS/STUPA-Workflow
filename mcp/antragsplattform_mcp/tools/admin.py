@@ -49,7 +49,9 @@ async def delete_gremium(gremium_id: str) -> dict:
 async def list_cd_variants() -> dict:
     """List the corporate-design variants. Requires admin.cd_variants or admin.gremien.
 
-    Use the returned id as `cdVariantId` when you create or patch a Gremium.
+    Use the returned id as `cdVariantId` when you create or patch a Gremium. Each
+    logo has a `slot`: `title` and `footer` go into the PDF, `square` is the 1:1
+    logo that the app shows for a Gremium (at most one per variant).
     """
     return await api().get("/admin/cd-variants")
 
@@ -79,7 +81,11 @@ async def delete_cd_variant(variant_id: str) -> dict:
 async def add_cd_variant_vendored_logo(
     variant_id: str, logo: S.CdVariantLogoVendoredCreate
 ) -> dict:
-    """Add a logo that the render service ships to a variant. Requires admin.cd_variants."""
+    """Add a logo that the render service ships to a variant. Requires admin.cd_variants.
+
+    Deprecated: the worker turns a vendored logo into a normal upload at its next
+    start, and a later release removes vendored logos. The slot `square` gives 422.
+    """
     return await api().post(
         f"/admin/cd-variants/{variant_id}/logos/vendored", json=dump_create(logo)
     )

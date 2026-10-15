@@ -1,0 +1,70 @@
+@use 'breakpoints' as bp;
+
+/* The shared parts of the four sub-tabs of a gremium: the chip row, a group of rows with
+   its heading, a sub line with a dot between its parts, the chevron and the status line. */
+
+/* The chips (and a search) in one row; on a phone the chips scroll sideways. */
+@mixin tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+
+  @include bp.phone {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+    & > * {
+      flex: none;
+    }
+  }
+}
+
+@mixin group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+@mixin head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-height: 1.5rem;
+  padding: 0 var(--space-1);
+  color: var(--color-accent-text);
+}
+
+/* A sub line: the parts with a dot between two of them. */
+@mixin parts($part) {
+  display: inline;
+  #{$part} + #{$part}::before {
+    content: '·';
+    content: '·' / '';
+    margin-inline: 6px;
+    color: var(--color-text-subtle);
+  }
+}
+
+@mixin chevron {
+  display: inline-flex;
+  margin-inline-end: calc(-1 * var(--space-2));
+  color: var(--color-text-muted);
+}
+
+@mixin status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}

@@ -29,6 +29,8 @@ from app.modules.flow.dispatch import build_worker_dispatcher
 from worker.audit_verify import process_audit_verification
 from worker.backup import create_backup, restore_backup, scheduled_backup
 from worker.backup import on_startup as backup_on_startup
+from worker.cd_builtin import migrate_builtin_cd_logos
+from worker.cd_builtin import on_startup as cd_builtin_on_startup
 from worker.deadlines import on_startup as deadlines_on_startup
 from worker.deadlines import process_deadlines
 from worker.files_drafts import purge_draft_attachments
@@ -71,6 +73,8 @@ _AUDIT_VERIFY_JOB_TIMEOUT_SECONDS = 7200.0
 async def _on_startup(ctx: dict[str, Any]) -> None:
     """Set up the mail, scan, protocol render, webhook and deadline dependencies.
 
+    It also enqueues the one-off conversion of the vendored CD logos.
+
     It also builds the flow action dispatcher once. The deadline cron, the automatic
     transitions and the vote auto-close read it from `ctx['flow_dispatcher']`, so a
     transition that the worker fires runs the same actions as one from the API.
@@ -81,6 +85,9 @@ async def _on_startup(ctx: dict[str, Any]) -> None:
     await webhook_on_startup(ctx)
     await deadlines_on_startup(ctx)
     await backup_on_startup(ctx)
+    # After the protocol start-up, because the conversion job reads the object
+    # storage that it builds.
+    await cd_builtin_on_startup(ctx)
     ctx["flow_dispatcher"] = build_worker_dispatcher(
         ctx.get("redis"), get_sessionmaker(), ctx.get("settings")
     )
@@ -140,6 +147,7 @@ class WorkerSettings:
         func(create_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
         func(restore_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
         func(scheduled_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
+        migrate_builtin_cd_logos,
     ]
     cron_jobs = [
         cron(refresh_budget_stats, hour=3, minute=0),

@@ -1,0 +1,66 @@
+<ng-template #body>
+  @if (loading()) {
+    <app-skeleton variant="lines" [count]="2" [label]="'gremien.attendance.detailLoading' | t" />
+  } @else if (error()) {
+    <div class="gad__status" role="alert">
+      <span>{{ 'gremien.attendance.detailError' | t }}</span>
+      <app-button variant="text" size="sm" (click)="retry()">{{ 'gremien.list.retry' | t }}</app-button>
+    </div>
+  } @else if (empty()) {
+    <p class="gad__status">{{ 'gremien.attendance.detailEmpty' | t }}</p>
+  } @else {
+    @for (g of groups(); track g.month) {
+      @if (g.meetings.length) {
+        @if (g.label) {
+          <h3 class="gad__month">{{ g.label }}</h3>
+        }
+        <ul class="gad__rows" [class.rowgroup]="phone()" [class.rowgroup--bg3]="phone()">
+          @for (m of g.meetings; track m.meetingId) {
+            <li class="gad__row">
+              <span class="mono gad__day">{{ day(m.date) }}</span>
+              <span class="gad__what">
+                <span class="gad__title">{{ m.title }}</span>
+                @if (m.status === 'delegated' && m.delegateName) {
+                  <span class="gad__note">{{ 'gremien.attendance.delegateTo' | t: { name: m.delegateName } }}</span>
+                }
+              </span>
+              <app-status-text [kind]="state(m.status).kind">{{ state(m.status).key | t }}</app-status-text>
+            </li>
+          }
+        </ul>
+      }
+    }
+  }
+</ng-template>
+
+@if (request(); as r) {
+  @if (phone()) {
+    <div #layer class="gad__layer" popover="manual">
+      <app-side-sheet side="bottom" [heading]="r.heading" [open]="true" (openChange)="onSheetOpen($event)">
+        <div class="gad gad--sheet">
+          <div class="gad__who">
+            <app-avatar size="sm" [name]="r.name" [principalId]="r.principalId" [decorative]="true" />
+            <span class="gad__summary">{{ r.summary }}</span>
+          </div>
+          <ng-container [ngTemplateOutlet]="body" />
+        </div>
+      </app-side-sheet>
+    </div>
+  } @else {
+    <div
+      #pop
+      class="gad gad--pop"
+      popover="manual"
+      role="dialog"
+      tabindex="-1"
+      [attr.aria-labelledby]="headingId"
+      (keydown)="onKey($event)"
+    >
+      <div class="gad__head">
+        <h2 class="gad__heading" [id]="headingId">{{ r.heading }}</h2>
+        <span class="gad__summary">{{ r.summary }}</span>
+      </div>
+      <ng-container [ngTemplateOutlet]="body" />
+    </div>
+  }
+}

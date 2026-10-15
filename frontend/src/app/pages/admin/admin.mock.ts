@@ -52,6 +52,7 @@ export const MOCK_PERMISSIONS: string[] = [
   'flow.configure',
   'meeting.view_all',
   'meeting.delete_finalized',
+  'gremium.view_all',
   'budget.view',
   'budget.structure',
   'budget.book',

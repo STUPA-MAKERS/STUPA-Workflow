@@ -287,33 +287,41 @@ export interface GremiumUpdateBody {
 export type CdBaseVariant = 'report' | 'protocol';
 export const CD_BASE_VARIANTS: readonly CdBaseVariant[] = ['report', 'protocol'] as const;
 
-/** Where a logo appears: on the title page or in the page footer. */
-export type CdLogoSlot = 'title' | 'footer';
-export const CD_LOGO_SLOTS: readonly CdLogoSlot[] = ['title', 'footer'] as const;
+/**
+ * Where a logo appears: on the title page or in the page footer of a PDF, or as the
+ * square 1:1 logo that the app shows for a Gremium (`square`, at most one per variant).
+ */
+export type CdLogoSlot = 'title' | 'footer' | 'square';
+/** The order of the slot choice in the "add a logo" dialog. */
+export const CD_LOGO_SLOTS: readonly CdLogoSlot[] = ['title', 'footer', 'square'] as const;
+/** The order of the logo rows of a variant: the square logo first. */
+export const CD_LOGO_LIST_ORDER: readonly CdLogoSlot[] = ['square', 'title', 'footer'] as const;
 
-/** Logo names that the render service ships (`VendoredLogoName`). They need no upload. */
-export const VENDORED_LOGO_NAMES: readonly string[] = [
-  'HSRT',
-  'INF',
-  'ASTA',
-  'STUPA',
-  'ECHO',
-  'MAKERS',
-  'MAKERS-RAlign',
-  'MAKERS-Icon',
-  'Skyline',
-] as const;
-
-/** Types the server accepts for an uploaded logo (`ALLOWED_CD_LOGO_MIME`). */
+/** Types the server accepts for a title or footer logo (`ALLOWED_CD_LOGO_MIME`). */
 export const CD_LOGO_ACCEPT = 'image/png,image/jpeg,image/webp,image/svg+xml,application/pdf';
+/**
+ * Types the server accepts for the square logo (`ALLOWED_SQUARE_LOGO_MIME`). The browser
+ * shows it inline, so no SVG.
+ */
+export const CD_SQUARE_LOGO_ACCEPT = 'image/png,image/jpeg,image/webp';
 /** Size cap of an uploaded logo (`MAX_CD_LOGO_BYTES`). */
 export const MAX_CD_LOGO_BYTES = 2 * 1024 * 1024;
+/** The shortest edge of a square logo in pixels (`SQUARE_LOGO_MIN_PX`). */
+export const SQUARE_LOGO_MIN_PX = 256;
+/** The longest edge of a square logo in pixels (`SQUARE_LOGO_MAX_PX`). */
+export const SQUARE_LOGO_MAX_PX = 4096;
+/** How far width and height may differ, as a part of the longer edge (`SQUARE_LOGO_TOLERANCE`). */
+export const SQUARE_LOGO_TOLERANCE = 0.01;
 
 /** Key pattern of a CD variant (`CD_VARIANT_KEY_PATTERN`). The key is a slug. */
 export const CD_VARIANT_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export const CD_VARIANT_KEY_MAX = 64;
 
-/** One logo of a variant. Exactly one of `vendoredName` / `fileName` is set. */
+/**
+ * One logo of a variant. Exactly one of `vendoredName` / `fileName` is set. A vendored
+ * logo is a row from before the upload-only release; the worker turns it into an upload
+ * at its next start, so the page only shows it.
+ */
 export interface CdVariantLogo {
   id: Uuid;
   slot: CdLogoSlot;

@@ -272,9 +272,17 @@ class CdVariantUpdate(WireModel):
 
 
 class CdVariantLogoVendoredCreate(WireModel):
-    """Add a logo that the render service ships. Upload a file through the web UI instead."""
+    """Add a logo that the render service ships. Deprecated: upload a file through the web UI.
 
-    slot: str
+    The worker turns a vendored logo into a normal upload at its next start.
+    """
+
+    slot: Literal["title", "footer"] = Field(
+        description=(
+            "title or footer. The slot square (the 1:1 logo of a Gremium in the app) "
+            "takes a PNG, JPEG or WebP upload only."
+        )
+    )
     vendoredName: str
 
 

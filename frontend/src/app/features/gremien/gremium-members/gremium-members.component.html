@@ -1,0 +1,96 @@
+<div class="gmb__tools">
+  <app-search-pill
+    class="gmb__search"
+    size="md"
+    [placeholder]="searchPlaceholder()"
+    [label]="'gremien.members.searchLabel' | t"
+    [clearable]="true"
+    [value]="query()"
+    (valueChange)="query.set($event)"
+  />
+  <div class="gmb__chips" role="group" [attr.aria-label]="'gremien.filters' | t">
+    <app-filter-select
+      [label]="'gremien.members.role' | t"
+      [options]="roleOptions()"
+      [value]="role()"
+      (valueChange)="role.set($event)"
+      [text]="roleText()"
+      [active]="role() !== ''"
+      [icon]="role() ? 'check' : null"
+      [chevron]="!role()"
+    />
+    <app-filter-select
+      [label]="'gremien.members.former' | t"
+      [options]="formerOptions()"
+      [value]="former() ? 'former' : ''"
+      (valueChange)="setFormer($event)"
+      [text]="'gremien.members.former' | t"
+      [active]="former()"
+      [icon]="former() ? 'check' : null"
+      [chevron]="!former()"
+    />
+    @if (!phone()) {
+      <app-button
+        variant="text"
+        [iconOnly]="true"
+        [ariaLabel]="'gremien.members.export' | t"
+        [disabled]="loading() || !groups().length"
+        (click)="exportCsv()"
+      ><app-icon name="download" [size]="20" /></app-button>
+    }
+  </div>
+</div>
+
+@if (loading()) {
+  <app-skeleton variant="rows" [count]="5" [label]="'gremien.members.loading' | t" />
+} @else if (error()) {
+  <div class="gmb__status" role="alert">
+    <span>{{ 'gremien.members.error' | t }}</span>
+    <app-button variant="text" size="sm" (click)="load()">{{ 'gremien.list.retry' | t }}</app-button>
+  </div>
+} @else if (!groups().length) {
+  @if (filterActive()) {
+    <p class="gmb__status">{{ 'gremien.members.noMatch' | t }}</p>
+  } @else {
+    <app-empty-state
+      icon="users"
+      [heading]="(former() ? 'gremien.members.emptyFormer' : 'gremien.members.empty') | t"
+    />
+  }
+} @else {
+  @if (!phone()) {
+    <div class="gmb__cols" aria-hidden="true">
+      <span class="gmb__colLead"></span>
+      <span class="gmb__colName">{{ 'gremien.members.colName' | t }}</span>
+      <span class="gmb__colMail">{{ 'gremien.members.colEmail' | t }}</span>
+    </div>
+  }
+  @for (g of groups(); track g.key) {
+    <section class="gmb__group" [attr.aria-labelledby]="'gmb-g-' + g.key">
+      <h3 class="sec gmb__head" [id]="'gmb-g-' + g.key">
+        {{ g.label }} <span class="gmb__count">{{ g.rows.length }}</span>
+      </h3>
+      <ul class="rowgroup gmb__rows">
+        @for (row of g.rows; track row.member.principalId + row.member.roleId) {
+          <li class="gmb__row">
+            <app-avatar size="sm" [name]="row.name" [principalId]="row.member.principalId" [decorative]="true" />
+            <span class="gmb__body">
+              <span class="gmb__name">
+                <span class="gmb__nameText">{{ row.name }}</span>
+                @if (row.member.isSelf) {
+                  <span class="gmb__you">{{ 'gremien.members.you' | t }}</span>
+                }
+              </span>
+              @if (row.period) {
+                <span class="gmb__period">{{ row.period }}</span>
+              }
+            </span>
+            @if (!phone() && row.member.email) {
+              <a class="gmb__mail" [href]="'mailto:' + row.member.email">{{ row.member.email }}</a>
+            }
+          </li>
+        }
+      </ul>
+    </section>
+  }
+}

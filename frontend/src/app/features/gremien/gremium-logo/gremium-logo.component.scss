@@ -1,0 +1,32 @@
+/* A square with round corners: the logo on white, or the initials on the accent tint. */
+:host {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--color-accent-container);
+  color: var(--color-on-accent-container);
+  font-size: 0.8125rem;
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+  user-select: none;
+}
+:host(.glo--lg) {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 14px;
+  font-size: 0.9375rem;
+}
+/* A logo keeps a white ground in both themes: the CD logos are made for paper. */
+:host(.glo--img) {
+  background: #fff;
+}
+.glo__img {
+  display: block;
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
+  object-fit: contain;
+}
