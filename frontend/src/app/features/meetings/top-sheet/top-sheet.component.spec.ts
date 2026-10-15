@@ -16,11 +16,16 @@ interface Inputs {
   saveState: SaveState;
   revision: number;
   follow: boolean;
+  canRename: boolean;
+  renamingTopId: string | null;
 }
 
 async function setup(over: Partial<Inputs> = {}) {
   const bodyChange = jest.fn();
   const finalize = jest.fn();
+  const startRename = jest.fn();
+  const cancelRename = jest.fn();
+  const renameTop = jest.fn();
   const view = await render(TopSheetComponent, {
     inputs: {
       meeting: meeting(),
@@ -33,10 +38,10 @@ async function setup(over: Partial<Inputs> = {}) {
       revision: 0,
       ...over,
     },
-    on: { bodyChange, finalize },
+    on: { bodyChange, finalize, startRename, cancelRename, renameTop },
     providers: [provideRouter([])],
   });
-  return { ...view, bodyChange, finalize };
+  return { ...view, bodyChange, finalize, startRename, cancelRename, renameTop };
 }
 
 function editorOf(view: Awaited<ReturnType<typeof setup>>): MarkdownEditorComponent {
@@ -267,6 +272,69 @@ describe('TopSheetComponent', () => {
     it('names no keeper when nobody keeps the minutes', async () => {
       await setup({ follow: true, protocol: null, meeting: member({ protokollantName: null }) });
       expect(screen.queryByText(/führt das Protokoll/)).toBeNull();
+    });
+  });
+
+  describe('rename by a click on the title', () => {
+    /** Open the field: the click starts the rename, the parent then names the item. */
+    async function openField(view: Awaited<ReturnType<typeof setup>>) {
+      await userEvent.click(screen.getByRole('button', { name: 'TOP umbenennen: Begrüßung' }));
+      expect(view.startRename).toHaveBeenCalledWith(AGENDA[0]);
+      view.fixture.componentRef.setInput('renamingTopId', AGENDA[0].id);
+      view.fixture.componentRef.setInput('renameDraft', 'Begrüßung');
+      view.fixture.detectChanges();
+      return screen.getByRole('textbox', { name: 'TOP umbenennen' });
+    }
+
+    it('opens the focused title field and saves on Enter once', async () => {
+      const view = await setup({ canRename: true });
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Begrüßung');
+      const field = await openField(view);
+      expect(field).toHaveFocus();
+      expect(field).toHaveValue('Begrüßung');
+      await userEvent.type(field, '!{Enter}');
+      expect(view.renameTop).toHaveBeenCalledTimes(1);
+      expect(view.renameTop).toHaveBeenCalledWith(AGENDA[0]);
+      expect(screen.queryByRole('textbox', { name: 'TOP umbenennen' })).toBeNull();
+    });
+
+    it('saves on blur and keeps the old title on Escape', async () => {
+      const view = await setup({ canRename: true });
+      let field = await openField(view);
+      field.blur();
+      view.fixture.detectChanges();
+      expect(view.renameTop).toHaveBeenCalledTimes(1);
+      view.fixture.componentRef.setInput('renamingTopId', null);
+      view.fixture.detectChanges();
+      field = await openField(view);
+      await userEvent.type(field, '{Escape}');
+      expect(view.cancelRename).toHaveBeenCalledTimes(1);
+      expect(view.renameTop).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Begrüßung');
+    });
+
+    it('closes the field when the rename ends elsewhere', async () => {
+      const view = await setup({ canRename: true });
+      await openField(view);
+      view.fixture.componentRef.setInput('renamingTopId', null);
+      view.fixture.detectChanges();
+      expect(screen.queryByRole('textbox', { name: 'TOP umbenennen' })).toBeNull();
+      expect(view.renameTop).not.toHaveBeenCalled();
+    });
+
+    it('shows no field for a rename from the agenda pane', async () => {
+      await setup({ canRename: true, renamingTopId: AGENDA[0].id });
+      expect(screen.queryByRole('textbox', { name: 'TOP umbenennen' })).toBeNull();
+    });
+
+    it.each<[string, Partial<Inputs>]>([
+      ['an application item', { canRename: true, top: AGENDA[2], topIndex: 2 }],
+      ['a reader', {}],
+      ['the participant view', { canRename: true, follow: true }],
+    ])('keeps a plain title for %s', async (_name, over) => {
+      await setup(over);
+      expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /TOP umbenennen/ })).toBeNull();
     });
   });
 });

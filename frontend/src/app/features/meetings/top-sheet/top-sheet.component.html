@@ -20,7 +20,32 @@
             · {{ 'meetings.agenda.nonPublicLabel' | t }}
           }
         </span>
-        <h1 class="ts__title" [title]="t.title || ('meetings.agenda.untitled' | t)">{{ t.title || ('meetings.agenda.untitled' | t) }}</h1>
+        @if (titleEditing()) {
+          <input
+            #titleInput
+            class="ts__titleInput"
+            name="renameTop"
+            [ngModel]="renameDraft()"
+            (ngModelChange)="renameDraft.set($event)"
+            (keydown.enter)="saveTitle(t)"
+            (keydown.escape)="cancelTitle()"
+            (blur)="saveTitle(t)"
+            [placeholder]="'meetings.agenda.renamePlaceholder' | t"
+            [attr.aria-label]="'meetings.agenda.rename' | t"
+          />
+        } @else if (titleRenamable()) {
+          <h1 class="ts__title">
+            <button
+              type="button"
+              class="ts__titleBtn"
+              [title]="t.title || ('meetings.agenda.untitled' | t)"
+              [attr.aria-label]="('meetings.agenda.rename' | t) + ': ' + (t.title || ('meetings.agenda.untitled' | t))"
+              (click)="editTitle(t)"
+            >{{ t.title || ('meetings.agenda.untitled' | t) }}</button>
+          </h1>
+        } @else {
+          <h1 class="ts__title" [title]="t.title || ('meetings.agenda.untitled' | t)">{{ t.title || ('meetings.agenda.untitled' | t) }}</h1>
+        }
       </div>
       @if (t.applicationId) {
         <a class="ts__open" [routerLink]="['/applications', t.applicationId]" target="_blank" rel="noopener">

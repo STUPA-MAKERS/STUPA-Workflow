@@ -225,7 +225,7 @@ export class MeetingPageComponent {
       this.canEdit(),
   );
 
-  /** "TOP hinzufügen" in the header of the agenda sheet. */
+  /** "TOP hinzufügen" in the header of the agenda sheet, and the rename by a click on the title. */
   protected readonly canAddTop = computed(() => canChangeAgenda(this.meeting(), this.locked()));
 
   /**
