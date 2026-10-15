@@ -93,17 +93,6 @@
       {{ 'meetings.agenda.title' | t }}
       <span class="mp__muted">· {{ agenda().length }}</span>
     </app-button>
-    <!-- A phone opens the agenda as a bottom sheet, a narrow screen from the start edge. -->
-    <app-side-sheet [side]="phone() ? 'bottom' : 'start'" [heading]="'meetings.agenda.title' | t" [(open)]="agendaOpen">
-      @if (canAddTop()) {
-        <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'meetings.agenda.dialogTitle' | t" (click)="addTop.emit()">
-          <app-icon name="plus" [size]="20" />
-        </app-button>
-      }
-      @if (agendaOpen()) {
-        <ng-container [ngTemplateOutlet]="agendaTpl" [ngTemplateOutletContext]="{ inSheet: true }" />
-      }
-    </app-side-sheet>
   }
 
   @if (showVotes()) {
@@ -198,6 +187,22 @@
   (pickHandover)="pickHandover.emit($event)"
   (cancelHandover)="cancelHandover.emit()"
 />
+
+<!-- The agenda below the wide layout: a bottom sheet on a phone, else from the start
+     edge. It stays outside the body, because the scroll fade of the body is a mask, and
+     a mask clips the fixed sheet and its scrim to the box of the body. -->
+@if (!wide()) {
+  <app-side-sheet [side]="phone() ? 'bottom' : 'start'" [heading]="'meetings.agenda.title' | t" [(open)]="agendaOpen">
+    @if (canAddTop()) {
+      <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'meetings.agenda.dialogTitle' | t" (click)="addTop.emit()">
+        <app-icon name="plus" [size]="20" />
+      </app-button>
+    }
+    @if (agendaOpen()) {
+      <ng-container [ngTemplateOutlet]="agendaTpl" [ngTemplateOutletContext]="{ inSheet: true }" />
+    }
+  </app-side-sheet>
+}
 
 <!-- The attendance: a side sheet from the end, a bottom sheet on a phone. -->
 <app-attendance-sheet
