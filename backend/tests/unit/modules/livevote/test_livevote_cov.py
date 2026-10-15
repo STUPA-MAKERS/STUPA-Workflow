@@ -2207,6 +2207,7 @@ def _meeting_out(
     can_write: bool = True,
     can_manage_votes: bool = True,
     gremium_id: UUID | None = None,
+    is_protokollant: bool = True,
 ) -> Any:
     from app.modules.livevote.schemas import MeetingOut
 
@@ -2218,6 +2219,7 @@ def _meeting_out(
         createdAt=datetime(2026, 6, 8, tzinfo=UTC),
         canWrite=can_write,
         canManageVotes=can_manage_votes,
+        isProtokollant=is_protokollant,
     )
 
 
@@ -2265,6 +2267,10 @@ class _FakeMeetingService:
 
     async def can_write_meeting(self, meeting_id: UUID, principal: Principal) -> bool:
         return self._meeting_out.can_write
+
+    async def assert_can_run_votes(self, meeting_id: UUID, principal: Principal) -> None:
+        if not self._meeting_out.is_protokollant:
+            raise ForbiddenError("only the protokollant may open or close a vote")
 
     async def delete(self, meeting_id: UUID, principal: Principal) -> None:
         self.deleted.append(meeting_id)
@@ -2817,6 +2823,48 @@ def test_open_vote_freetext_top_ok(app: FastAPI, client: TestClient, fakes) -> N
     )
     assert r.status_code == 200
     assert fakes["voting"].created
+
+
+@pytest.mark.parametrize(("draft", "code"), [(False, 403), (True, 200)])
+def test_only_the_protokollant_opens_a_vote(
+    app: FastAPI, client: TestClient, fakes, draft: bool, code: int
+) -> None:
+    """The lead prepares a draft; an open vote needs the protokollant."""
+    fakes["meeting"]._meeting_out = _meeting_out(status="live", is_protokollant=False)
+    _login(app)
+    r = client.post(
+        f"/api/meetings/{uuid4()}/votes",
+        json={"agendaItemId": str(uuid4()), "question": "Pass?", "draft": draft},
+    )
+    assert r.status_code == code, r.text
+
+
+def test_only_the_protokollant_opens_a_prepared_vote(
+    app: FastAPI, client: TestClient, fakes
+) -> None:
+    out, vote_id = _with_vote()
+    fakes["meeting"]._meeting_out = out.model_copy(update={"is_protokollant": False})
+    _login(app)
+    assert client.post(f"/api/meetings/{out.id}/votes/{vote_id}/open").status_code == 403
+    assert not hasattr(fakes["voting"], "opened_eligible")
+
+
+async def test_can_run_votes_is_the_protokollant_with_vote_manage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _is_keeper(_self: Any, _meeting: Any, principal: Principal) -> bool:
+        return principal.sub == "keeper"
+
+    monkeypatch.setattr(MeetingService, "_is_protokollant", _is_keeper)
+    svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
+    m = _meeting(status="live")
+    keeper = Principal(sub="keeper", permissions=set(), roles=[])
+    capped = Principal(
+        sub="keeper", permissions=set(), roles=[], scope_permissions=frozenset({"protocol.write"})
+    )
+    assert await svc.can_run_votes(m, keeper)
+    assert not await svc.can_run_votes(m, capped)
+    assert not await svc.can_run_votes(m, _admin())
 
 
 def test_open_vote_application_top_with_quorum_and_eligible(

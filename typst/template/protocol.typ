@@ -228,23 +228,28 @@
 
 // The vote tally: the question over three small boxes in three columns,
 // 10pt apart (\columnsep). The question ends 9.28pt above the small boxes,
-// which end 8.5pt above the bottom edge.
+// which end 8.5pt above the bottom edge. A callout without a tally line (an
+// election of several candidates) has no Ja/Nein/Enthaltung, so it draws its
+// lines without the boxes.
 #let tally(n) = {
   // The cell labels have no descender, so TeX sets the cells lower than a
   // box with running text.
   let cell(label, count, color, icon) = colored-box(color: color, icon: icon, inset: box-inset + (bottom: 11.5pt))[*#label:* #count]
   colored-box(color: vote-color(n.yes, n.no), inset: box-inset + (bottom: 8.5pt), {
+    let counts = n.at("counts", default: true)
     if n.lines.len() > 0 {
       block(n.lines.map(inline).join(linebreak()))
-      v(9.28pt)
+      if counts { v(9.28pt) }
     }
-    grid(
-      columns: (1fr, 1fr, 1fr),
-      column-gutter: 10pt,
-      cell("Ja", n.yes, palette.britishracinggreen, icons.thumbs-up),
-      cell("Nein", n.no, palette.red, icons.thumbs-down),
-      cell("Enthaltung", n.abstain, palette.eggplant, none),
-    )
+    if counts {
+      grid(
+        columns: (1fr, 1fr, 1fr),
+        column-gutter: 10pt,
+        cell("Ja", n.yes, palette.britishracinggreen, icons.thumbs-up),
+        cell("Nein", n.no, palette.red, icons.thumbs-down),
+        cell("Enthaltung", n.abstain, palette.eggplant, none),
+      )
+    }
   })
 }
 

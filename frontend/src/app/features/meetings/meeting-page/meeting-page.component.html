@@ -103,6 +103,7 @@
           [vote]="vote"
           [meetingStatus]="m.status"
           [canManage]="m.canManageVotes"
+          [canRun]="m.canManageVotes && m.isProtokollant"
           [canVote]="m.canVote"
           [myChoice]="myChoice(vote.id)"
           [casting]="casting()"

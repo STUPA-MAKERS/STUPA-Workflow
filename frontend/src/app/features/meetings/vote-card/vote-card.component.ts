@@ -74,8 +74,10 @@ export class VoteCardComponent {
 
   readonly vote = input.required<MeetingVote>();
   readonly meetingStatus = input.required<MeetingStatus>();
-  /** Open, close, cancel and delete votes (`Meeting.canManageVotes`). */
+  /** Prepare, cancel and delete votes (`Meeting.canManageVotes`). */
   readonly canManage = input(false);
+  /** Open and close votes: the protokollant only, the open and the close follow the minutes. */
+  readonly canRun = input(false);
   /** Eligible to vote in this meeting (`Meeting.canVote`). */
   readonly canVote = input(false);
   /** The own choice of this session, or `null`. The server value is `vote.myBallot`. */

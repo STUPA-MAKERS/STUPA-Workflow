@@ -86,7 +86,9 @@
 
   @if (v.status === 'open' && canManage()) {
     <div class="vc__actions">
-      <app-button variant="fill" [block]="true" (click)="close.emit(v.id)">{{ 'meetings.vote.close' | t }}</app-button>
+      @if (canRun()) {
+        <app-button variant="fill" [block]="true" (click)="close.emit(v.id)">{{ 'meetings.vote.close' | t }}</app-button>
+      }
       <app-button variant="danger" [block]="true" (click)="cancel.emit(v.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
     </div>
   }
@@ -114,7 +116,7 @@
     <p class="vc__hint">{{ 'meetings.vote.opensLater' | t }}</p>
   }
 
-  @if (v.status === 'draft' && canEdit() && meetingStatus() === 'live') {
+  @if (v.status === 'draft' && canEdit() && canRun() && meetingStatus() === 'live') {
     <div class="vc__actions">
       <app-button variant="fill" [block]="true" [disabled]="otherOpen()" [title]="(otherOpen() ? 'meetings.vote.openBlocked' : 'meetings.vote.open') | t" (click)="open.emit(v.id)">{{ 'meetings.vote.open' | t }}</app-button>
     </div>

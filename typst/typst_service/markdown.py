@@ -550,7 +550,12 @@ class _Converter:
         return [line for line in lines if line]
 
     def _vote(self, kids: list[object]) -> Node:
-        """Build a tally box. The tally line gives the counts, the rest is the body."""
+        """Build a tally box. The tally line gives the counts, the rest is the body.
+
+        A callout without a tally line, such as the election of several candidates,
+        has no Ja/Nein/Enthaltung counts. `counts` is then false, and the template
+        draws the body without the three boxes.
+        """
         lines = self._callout_lines(kids)
         texts = ["".join(_plain(n) for n in line) for line in lines]
         if texts:
@@ -571,6 +576,7 @@ class _Converter:
             "yes": _tally(tally, "yes"),
             "no": _tally(tally, "no"),
             "abstain": _tally(tally, "abstain"),
+            "counts": bool(tally),
             "lines": body,
         }
 

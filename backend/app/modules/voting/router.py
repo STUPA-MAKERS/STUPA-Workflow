@@ -1,8 +1,8 @@
 """Voting API router.
 
 * ``POST /api/applications/{id}/votes`` - create a vote. Manage right in the gremium.
-* ``POST /api/votes/{id}/open``         - open a vote. Manage right in the gremium.
-* ``POST /api/votes/{id}/close``        - close -> result -> flow. Manage right.
+* ``POST /api/votes/{id}/open``         - open a vote. Manage right, protokollant (meeting).
+* ``POST /api/votes/{id}/close``        - close -> result -> flow. As for the open.
 * ``POST /api/votes/{id}/cancel``       - cancel an open vote. Manage right.
 * ``DELETE /api/votes/{id}``            - delete a draft vote. Manage right.
 * ``POST /api/votes/{id}/ballot``       - cast a vote. Roster of the vote, human only.
@@ -126,7 +126,7 @@ async def open_vote(
     this route must not open it around them. The quorum denominator then comes from
     the current roster.
     """
-    await service.assert_can_manage_vote(vote_id, principal)
+    await service.assert_can_run_vote(vote_id, principal)
     eligible: int | None = None
     meeting_id = await service.meeting_id_of(vote_id)
     if meeting_id is not None:
@@ -162,7 +162,7 @@ async def close_vote(
     publisher broadcasts ``vote_closed`` on the meeting channel. Without a meeting the
     broadcast is a no-op.
     """
-    await service.assert_can_manage_vote(vote_id, principal)
+    await service.assert_can_run_vote(vote_id, principal)
     closed = await service.close(vote_id, principal)
     await publisher.vote_closed(closed)
     return closed
