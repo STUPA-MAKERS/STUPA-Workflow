@@ -48,7 +48,7 @@ clients.
 
 | Scope | Grants (capped by the user's own rights) |
 |-------|------------------------------------------|
-| `read` | read applications, budgets, votes, meetings (incl. `meeting.view_all`), audit, exports |
+| `read` | read applications, budgets, votes, meetings (incl. `meeting.view_all`), gremien (incl. `gremium.view_all`), audit, exports |
 | `applications:write` | comment / transition / manage applications, capture an application on behalf of an applicant (`application.create_on_behalf`) |
 | `votes:write` | create / open / close / cancel / manage votes through the gremium right `vote.manage` (NEVER cast a ballot — only a human may do that. `vote.cast` is in `FORBIDDEN_PERMISSIONS` and is never grantable) |
 | `budget:write` | book expenses, manage cost centers & invoices |
