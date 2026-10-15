@@ -242,13 +242,13 @@ describe('TopSheetComponent', () => {
     expect(screen.getByText('Für diese Sitzung gibt es noch kein Protokoll.')).toBeInTheDocument();
     fixture.componentRef.setInput('meeting', meeting({ status: 'planned' }));
     fixture.detectChanges();
-    expect(screen.getByText(/Den Text kannst du schon jetzt vorbereiten/)).toBeInTheDocument();
+    expect(screen.queryByText(/noch kein Protokoll/)).toBeNull();
   });
 
   it('prepares the text of an item of a planned meeting without a protocol', async () => {
     await setup({ protocol: null, meeting: meeting({ status: 'planned' }) });
     expect(screen.getByRole('toolbar', { name: 'Format' })).toBeInTheDocument();
-    expect(screen.getByText(/Den Text kannst du schon jetzt vorbereiten/)).toBeInTheDocument();
+    expect(screen.queryByText(/noch kein Protokoll/)).toBeNull();
     // No protocol yet, so no notice of the public protocol page and no protocol state.
     expect(screen.queryByText('Entwurf')).toBeNull();
   });

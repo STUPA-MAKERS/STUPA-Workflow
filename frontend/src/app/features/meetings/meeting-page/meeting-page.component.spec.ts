@@ -349,7 +349,6 @@ describe('MeetingPageComponent', () => {
       expect(on.selectTop).toHaveBeenCalledWith('t-2');
       expect(screen.queryByRole('heading', { name: 'Sitzung vorbereiten' })).toBeNull();
       // The text of the item can be written before the start, without a protocol.
-      expect(screen.getByText(/Den Text kannst du schon jetzt vorbereiten/)).toBeInTheDocument();
       expect(screen.getByRole('toolbar', { name: 'Format' })).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Zurück zur Vorbereitung' }));
       expect(screen.getByRole('heading', { name: 'Sitzung vorbereiten' })).toBeInTheDocument();
@@ -377,7 +376,7 @@ describe('MeetingPageComponent', () => {
     it('shows a reader without session rights the sheet instead of the checklist', async () => {
       await setup({ meeting: planned({ canControl: false, canManage: false }), protocol: null });
       expect(screen.queryByRole('heading', { name: 'Sitzung vorbereiten' })).toBeNull();
-      expect(screen.getByText(/Den Text kannst du schon jetzt vorbereiten/)).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Formatiert' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Zurück zur Vorbereitung' })).toBeNull();
     });
   });

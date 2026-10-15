@@ -1223,8 +1223,6 @@ export const de = {
     'Sitzung ist geschlossen — Titel und Einstellungen können nicht mehr geändert werden.',
   'meetings.settings.titleTooLong': 'Der Titel darf höchstens {max} Zeichen haben.',
   'meetings.protocol.none': 'Für diese Sitzung gibt es noch kein Protokoll.',
-  'meetings.protocol.beforeStart':
-    'Die Sitzung ist noch nicht eröffnet. Den Text kannst du schon jetzt vorbereiten, er kommt beim Start ins Protokoll.',
   'meetings.protocol.draft': 'Entwurf',
   'meetings.protocol.rendering': 'Wird gerendert …',
   'meetings.protocol.final': 'Final',
@@ -4975,8 +4973,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'The session is closed — its title and settings can no longer be changed.',
   'meetings.settings.titleTooLong': 'The title can have a maximum of {max} characters.',
   'meetings.protocol.none': 'There are no minutes for this meeting yet.',
-  'meetings.protocol.beforeStart':
-    'The meeting is not open yet. You can prepare the text now; it goes into the minutes when the meeting starts.',
   'meetings.protocol.draft': 'Draft',
   'meetings.protocol.rendering': 'Rendering …',
   'meetings.protocol.final': 'Final',
