@@ -5,14 +5,21 @@ carries no color and no font. A logo entry is EITHER a vendored logo name
 OR an object that an admin uploaded. This module holds the closed value sets and
 the upload security contract.
 
-Security contract for an uploaded CD logo. The bytes go to the LaTeX renderer
-only. They never render in the browser as an image. The allowlist therefore adds
+Security contract for an uploaded CD logo in the ``title`` or ``footer`` slot.
+The bytes go to the render service only. They never render in the browser as
+an image. The allowlist therefore adds
 ``image/svg+xml`` and ``application/pdf``, which the site branding
 (``admin.branding``) refuses on purpose. The server sniffs the magic bytes and
 compares them against the declared type. It caps the real byte size. Any route
 that serves such an object back MUST force ``Content-Disposition: attachment``
 and MUST NOT answer with ``image/svg+xml``, because an SVG is an XSS vector in
 the app origin. ``get_invoice_file`` in the budget module hardens the same way.
+
+The ``square`` slot is the exception. The browser shows that logo inline as an
+image, so it accepts PNG, JPEG and WebP only (an SVG is an XSS vector in the app
+origin). The server reads the pixel size from the header and requires a square
+of at least ``SQUARE_LOGO_MIN_PX`` pixels. ``check_square_logo`` holds this
+policy.
 
 The asset name that ``cd_resolver`` hands to the render service is a plain
 file name without a path separator. The service refuses anything else. The
@@ -27,6 +34,12 @@ import uuid
 from typing import Final, Literal
 
 from app.modules.admin.branding import sniff_raster_image
+from app.modules.admin.image_size import raster_dimensions
+from app.shared.errors import (
+    PayloadTooLargeError,
+    UnsupportedMediaTypeError,
+    ValidationProblem,
+)
 
 # --- closed value sets ----------------------------------------------------
 
@@ -56,9 +69,15 @@ VENDORED_LOGO_NAMES: Final[tuple[VendoredLogoName, ...]] = (
     "Skyline",
 )
 
-# Where a logo appears: on the title page or in the page footer.
-LogoSlot = Literal["title", "footer"]
-LOGO_SLOTS: Final[tuple[LogoSlot, ...]] = ("title", "footer")
+# Where a logo appears. ``title`` and ``footer`` go into the rendered document.
+# ``square`` is the 1:1 logo that the app shows for a Gremium in the browser. The
+# render path never reads it.
+LogoSlot = Literal["title", "footer", "square"]
+LOGO_SLOTS: Final[tuple[LogoSlot, ...]] = ("title", "footer", "square")
+
+# The slots that the render path reads.
+RenderSlot = Literal["title", "footer"]
+RENDER_SLOTS: Final[tuple[RenderSlot, ...]] = ("title", "footer")
 
 # The document shape that the variant builds on.
 CdBaseVariant = Literal["report", "protocol"]
@@ -76,6 +95,17 @@ ALLOWED_CD_LOGO_MIME: Final[frozenset[str]] = frozenset(
     }
 )
 MAX_CD_LOGO_BYTES: Final[int] = 2 * 1024 * 1024  # 2 MB, same cap as a branding logo
+
+# The square logo renders in the browser, so it is raster only.
+ALLOWED_SQUARE_LOGO_MIME: Final[frozenset[str]] = frozenset(
+    {"image/png", "image/jpeg", "image/webp"}
+)
+# The smallest edge of a square logo in pixels. A smaller one looks blurred on a
+# high-density screen.
+SQUARE_LOGO_MIN_PX: Final[int] = 256
+# The largest difference between width and height, as a fraction of the longer
+# edge, that still counts as square.
+SQUARE_LOGO_TOLERANCE: Final[float] = 0.01
 
 # Extension per accepted type. The asset name takes the extension from the
 # SNIFFED type, never from the uploaded file name. LaTeX picks its image driver
@@ -139,3 +169,49 @@ def asset_file_name(logo_id: uuid.UUID, file_name: str | None, mime: str) -> str
     stem = base.rsplit(".", 1)[0] if "." in base else base
     safe = _ASSET_UNSAFE_RE.sub("_", stem).strip("._-")[:_ASSET_STEM_MAX] or "logo"
     return f"{logo_id.hex}-{safe}{_MIME_EXTENSION.get(mime, '.bin')}"
+
+
+def check_square_logo(data: bytes) -> str:
+    """Apply the upload policy of the square logo and return the sniffed type.
+
+    Raises:
+        PayloadTooLargeError: The bytes exceed ``MAX_CD_LOGO_BYTES`` (413,
+            ``logo_too_large``).
+        UnsupportedMediaTypeError: The bytes are empty or not PNG, JPEG or WebP
+            (415, ``logo_type_not_allowed``).
+        ValidationProblem: The header gives no pixel size (``logo_unreadable``),
+            the image is not square (``logo_not_square``), or an edge is shorter
+            than ``SQUARE_LOGO_MIN_PX`` (``logo_too_small``). All 422.
+    """
+    if len(data) > MAX_CD_LOGO_BYTES:
+        raise PayloadTooLargeError(
+            f"Logo exceeds {MAX_CD_LOGO_BYTES} bytes.", code="logo_too_large"
+        )
+    mime = sniff_raster_image(data)
+    if mime is None or mime not in ALLOWED_SQUARE_LOGO_MIME:
+        raise UnsupportedMediaTypeError(
+            "A square logo must be PNG, JPEG or WebP (checked from the bytes).",
+            code="logo_type_not_allowed",
+        )
+    size = raster_dimensions(data)
+    if size is None:
+        raise ValidationProblem(
+            "The image header gives no pixel size.",
+            code="logo_unreadable",
+            errors=[{"field": "file", "msg": "unreadable image header"}],
+        )
+    width, height = size
+    if abs(width - height) > SQUARE_LOGO_TOLERANCE * max(width, height):
+        raise ValidationProblem(
+            f"The logo is {width} x {height} px. A square logo needs a 1:1 aspect ratio.",
+            code="logo_not_square",
+            errors=[{"field": "file", "msg": f"{width}x{height}"}],
+        )
+    if min(width, height) < SQUARE_LOGO_MIN_PX:
+        raise ValidationProblem(
+            f"The logo is {width} x {height} px. A square logo needs at least "
+            f"{SQUARE_LOGO_MIN_PX} x {SQUARE_LOGO_MIN_PX} px.",
+            code="logo_too_small",
+            errors=[{"field": "file", "msg": f"{width}x{height}"}],
+        )
+    return mime

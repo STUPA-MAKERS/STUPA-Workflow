@@ -15,7 +15,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.modules.admin.branding import Branding
-from app.modules.admin.cd_logos import CdBaseVariant, LogoSlot, VendoredLogoName
+from app.modules.admin.cd_logos import CdBaseVariant, LogoSlot, RenderSlot, VendoredLogoName
 from app.modules.applications.models import (
     DEFAULT_CONFIRM_TTL_HOURS,
     MAX_CONFIRM_TTL_HOURS,
@@ -104,9 +104,13 @@ class CdVariantUpdate(_CamelModel):
 
 
 class CdVariantLogoVendoredCreate(_CamelModel):
-    """Add a logo that the render service ships. No upload and no object storage involved."""
+    """Add a logo that the render service ships. No upload and no object storage involved.
 
-    slot: LogoSlot
+    Deprecated: the admin UI offers only the upload. A vendored logo goes to a
+    render slot only, because the square slot needs a raster upload.
+    """
+
+    slot: RenderSlot
     vendored_name: VendoredLogoName = Field(alias="vendoredName")
 
 
