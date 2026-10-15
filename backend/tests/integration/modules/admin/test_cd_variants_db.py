@@ -289,6 +289,25 @@ def test_upgrade_from_an_installed_database(engine: Engine) -> None:
     assert ("asta", "asta") in [tuple(r) for r in backfilled]
     assert old_column is False
 
+    # The rebuild left the tables at revision ec167d091656. Re-apply the square
+    # slot of a3f9c2d71e4b, so the tests that run later see the head schema.
+    with engine.begin() as conn:
+        conn.execute(
+            text("ALTER TABLE cd_variant_logo DROP CONSTRAINT IF EXISTS ck_cd_variant_logo_slot")
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE cd_variant_logo ADD CONSTRAINT ck_cd_variant_logo_slot "
+                "CHECK (slot IN ('title', 'footer', 'square'))"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_cd_variant_logo_square "
+                "ON cd_variant_logo (variant_id) WHERE slot = 'square'"
+            )
+        )
+
 
 def test_admin_role_holds_the_new_permission(engine: Engine) -> None:
     with engine.connect() as conn:

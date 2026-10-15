@@ -40,6 +40,14 @@ async def test_require_gremium_for_a_member() -> None:
     assert await access.require_gremium(db, Principal(sub="a"), GID) is row
 
 
+async def test_require_gremium_hides_a_member_gremium_from_a_capped_token() -> None:
+    # The membership path obeys the scope cap: no membership query runs.
+    token = Principal(sub="a", scope_permissions=frozenset({"budget.write"}))
+    db = fake_session(gets=[SimpleNamespace(id=GID)])
+    with pytest.raises(NotFoundError):
+        await access.require_gremium(db, token, GID)
+
+
 @pytest.mark.parametrize("exists", [True, False])
 async def test_require_gremium_404(exists: bool) -> None:
     # Unknown gremium and hidden gremium give the same 404.

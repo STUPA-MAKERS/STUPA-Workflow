@@ -40,6 +40,7 @@ import {
   type CdVariant,
   type CdVariantLogo,
   MAX_CD_LOGO_BYTES,
+  SQUARE_LOGO_MAX_PX,
   SQUARE_LOGO_MIN_PX,
   slugify,
 } from '../admin.models';
@@ -77,6 +78,7 @@ interface LogoDraft {
 const SQUARE_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
   logo_not_square: 'admin.cdVariants.serverNotSquare',
   logo_too_small: 'admin.cdVariants.serverTooSmall',
+  logo_too_many_px: 'admin.cdVariants.serverTooManyPx',
   logo_unreadable: 'admin.cdVariants.squareUnreadable',
   logo_type_not_allowed: 'admin.cdVariants.squareType',
 };
@@ -540,7 +542,7 @@ export class AdminCdVariantsComponent {
         if (key === 'admin.common.saveFailed' && status === 413) key = 'admin.cdVariants.logoTooLarge';
         else if (key === 'admin.common.saveFailed' && status === 415) key = 'admin.cdVariants.logoType';
         this.logoError.set(key);
-        this.toast.error(this.i18n.translate(key, { min: this.minPx }));
+        this.toast.error(this.i18n.translate(key, { min: this.minPx, max: SQUARE_LOGO_MAX_PX }));
       },
     });
   }

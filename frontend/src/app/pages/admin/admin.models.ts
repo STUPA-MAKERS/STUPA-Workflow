@@ -308,6 +308,8 @@ export const CD_SQUARE_LOGO_ACCEPT = 'image/png,image/jpeg,image/webp';
 export const MAX_CD_LOGO_BYTES = 2 * 1024 * 1024;
 /** The shortest edge of a square logo in pixels (`SQUARE_LOGO_MIN_PX`). */
 export const SQUARE_LOGO_MIN_PX = 256;
+/** The longest edge of a square logo in pixels (`SQUARE_LOGO_MAX_PX`). */
+export const SQUARE_LOGO_MAX_PX = 4096;
 /** How far width and height may differ, as a part of the longer edge (`SQUARE_LOGO_TOLERANCE`). */
 export const SQUARE_LOGO_TOLERANCE = 0.01;
 

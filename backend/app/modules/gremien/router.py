@@ -31,7 +31,7 @@ from app.shared.errors import ProblemDetail
 router = APIRouter(prefix="/gremien", tags=["gremien"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
-_MONTH = r"^\d{4}-(0[1-9]|1[0-2])$"
+_MONTH = r"^(19|20)\d{2}-(0[1-9]|1[0-2])$"
 
 ReaderDep = Annotated[Principal, Depends(require_principal())]
 
@@ -145,7 +145,7 @@ async def gremium_decisions(
     q: Annotated[str | None, Query(max_length=200)] = None,
     result: DecisionResultFilter | None = None,
     kind: DecisionKind | None = None,
-    since: date | None = None,
+    since: Annotated[date | None, Query(ge=date(1900, 1, 1), le=date(2099, 12, 31))] = None,
 ) -> DecisionPageOut:
     """List the closed votes of a gremium, the newest first, 30 per page.
 

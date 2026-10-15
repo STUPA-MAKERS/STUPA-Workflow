@@ -51,6 +51,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.modules.admin.cd_logos import ALLOWED_SQUARE_LOGO_MIME
+from app.modules.admin.gremium_roles import GREMIUM_VIEW_ALL
 from app.modules.admin.models import (
     CdVariantLogo,
     Gremium,
@@ -103,6 +104,8 @@ SQUARE_SLOT = "square"
 
 INVALID_MONTH_RANGE = "invalid_month_range"
 MEMBER_NOT_FOUND = "member_not_found"
+
+_MAX_CURSOR_OFFSET = 1_000_000
 
 # The forced roles first, the own roles of the gremium between them and "member".
 _ROLE_ORDER = {"vorstand": 0, "manager": 1, "member": 3}
@@ -178,7 +181,7 @@ def decode_cursor(cursor: str | None) -> int:
         offset = int(num)
     except ValueError as exc:
         raise BadRequestError("invalid pagination cursor", code="invalid_cursor") from exc
-    if tag != "o" or offset < 0:
+    if tag != "o" or offset < 0 or offset > _MAX_CURSOR_OFFSET:
         raise BadRequestError("invalid pagination cursor", code="invalid_cursor")
     return offset
 
@@ -243,7 +246,7 @@ class GremienService:
         own = await self._own_roles(principal, now)
         stmt = select(Gremium).order_by(Gremium.name, Gremium.id)
         if not views_all(principal):
-            if not own:
+            if not own or not principal.scope_allows(GREMIUM_VIEW_ALL):
                 return []
             stmt = stmt.where(Gremium.id.in_(list(own)))
         gremien = list((await self.session.scalars(stmt)).all())

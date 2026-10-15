@@ -528,6 +528,7 @@ describe('AdminCdVariantsComponent', () => {
     it.each([
       ['logo_not_square', 'admin.cdVariants.serverNotSquare', 'Das Logo ist nicht quadratisch.'],
       ['logo_too_small', 'admin.cdVariants.serverTooSmall', 'Das Logo ist kleiner als 256 × 256 px.'],
+      ['logo_too_many_px', 'admin.cdVariants.serverTooManyPx', 'Das Logo ist größer als 4096 × 4096 px.'],
       ['logo_unreadable', 'admin.cdVariants.squareUnreadable', 'Das Bild konnte nicht gelesen werden.'],
       ['logo_type_not_allowed', 'admin.cdVariants.squareType', 'Ein quadratisches Logo muss PNG, JPEG oder WebP sein.'],
     ])('maps the server code %s to its own message', async (code, key, text) => {

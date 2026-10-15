@@ -18,8 +18,9 @@ the app origin. ``get_invoice_file`` in the budget module hardens the same way.
 The ``square`` slot is the exception. The browser shows that logo inline as an
 image, so it accepts PNG, JPEG and WebP only (an SVG is an XSS vector in the app
 origin). The server reads the pixel size from the header and requires a square
-of at least ``SQUARE_LOGO_MIN_PX`` pixels. ``check_square_logo`` holds this
-policy.
+of at least ``SQUARE_LOGO_MIN_PX`` and at most ``SQUARE_LOGO_MAX_PX`` pixels,
+because every viewer's browser decodes the image, and a small file can declare
+a huge canvas. ``check_square_logo`` holds this policy.
 
 The asset name that ``cd_resolver`` hands to the render service is a plain
 file name without a path separator. The service refuses anything else. The
@@ -103,6 +104,7 @@ ALLOWED_SQUARE_LOGO_MIME: Final[frozenset[str]] = frozenset(
 # The smallest edge of a square logo in pixels. A smaller one looks blurred on a
 # high-density screen.
 SQUARE_LOGO_MIN_PX: Final[int] = 256
+SQUARE_LOGO_MAX_PX: Final[int] = 4096
 # The largest difference between width and height, as a fraction of the longer
 # edge, that still counts as square.
 SQUARE_LOGO_TOLERANCE: Final[float] = 0.01
@@ -181,7 +183,8 @@ def check_square_logo(data: bytes) -> str:
             (415, ``logo_type_not_allowed``).
         ValidationProblem: The header gives no pixel size (``logo_unreadable``),
             the image is not square (``logo_not_square``), or an edge is shorter
-            than ``SQUARE_LOGO_MIN_PX`` (``logo_too_small``). All 422.
+            than ``SQUARE_LOGO_MIN_PX`` (``logo_too_small``) or an edge is longer
+            than ``SQUARE_LOGO_MAX_PX`` (``logo_too_many_px``). All 422.
     """
     if len(data) > MAX_CD_LOGO_BYTES:
         raise PayloadTooLargeError(
@@ -212,6 +215,13 @@ def check_square_logo(data: bytes) -> str:
             f"The logo is {width} x {height} px. A square logo needs at least "
             f"{SQUARE_LOGO_MIN_PX} x {SQUARE_LOGO_MIN_PX} px.",
             code="logo_too_small",
+            errors=[{"field": "file", "msg": f"{width}x{height}"}],
+        )
+    if max(width, height) > SQUARE_LOGO_MAX_PX:
+        raise ValidationProblem(
+            f"The logo is {width} x {height} px. A square logo can have at most "
+            f"{SQUARE_LOGO_MAX_PX} x {SQUARE_LOGO_MAX_PX} px.",
+            code="logo_too_many_px",
             errors=[{"field": "file", "msg": f"{width}x{height}"}],
         )
     return mime

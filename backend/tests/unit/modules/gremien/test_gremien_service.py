@@ -85,7 +85,8 @@ def test_cursor_round_trip() -> None:
 
 @pytest.mark.parametrize(
     "cursor",
-    ["%%%", svc.encode_cursor(-1), "eHw1", "bm9waXBl"],  # bad base64, negative, "x|5", "nopipe"
+    # bad base64, negative, "x|5", "nopipe", beyond the offset cap
+    ["%%%", svc.encode_cursor(-1), "eHw1", "bm9waXBl", svc.encode_cursor(1_000_001)],
 )
 def test_cursor_refused(cursor: str) -> None:
     with pytest.raises(BadRequestError):
@@ -95,6 +96,12 @@ def test_cursor_refused(cursor: str) -> None:
 # ------------------------------------------------------------------ overview
 async def test_overview_without_membership_is_empty() -> None:
     assert await _svc(result()).overview(ME) == []
+
+
+async def test_overview_hides_own_gremien_from_a_capped_token() -> None:
+    token = Principal(sub="me", scope_permissions=frozenset({"budget.write"}))
+    service = _svc(result((G1, "member", None)))
+    assert await service.overview(token) == []
 
 
 async def test_overview_view_all_without_gremien_is_empty() -> None:

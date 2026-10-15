@@ -157,11 +157,15 @@ async def can_view_gremium(
 
     A principal sees a Gremium when it holds the global permission
     ``gremium.view_all`` (the admin role included, scope-capped through ``has``),
-    or when it is an active member of the Gremium now. A read route that refuses
-    answers 404, not 403, so the answer does not tell that the Gremium exists.
+    or when it is an active member of the Gremium now. The membership path also
+    obeys the OAuth scope cap, so a token without the ``read`` scope sees no
+    Gremium. A read route that refuses answers 404, not 403, so the answer does
+    not tell that the Gremium exists.
     """
     if principal.has(GREMIUM_VIEW_ALL):
         return True
+    if not principal.scope_allows(GREMIUM_VIEW_ALL):
+        return False
     return gremium_id in await gremium_member_ids(session, principal.sub, now)
 
 

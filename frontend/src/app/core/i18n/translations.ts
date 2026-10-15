@@ -2772,6 +2772,7 @@ export const de = {
   'admin.cdVariants.squareUnreadable': 'Das Bild konnte nicht gelesen werden.',
   'admin.cdVariants.serverNotSquare': 'Das Logo ist nicht quadratisch.',
   'admin.cdVariants.serverTooSmall': 'Das Logo ist kleiner als {min} × {min} px.',
+  'admin.cdVariants.serverTooManyPx': 'Das Logo ist größer als {max} × {max} px.',
   'admin.cdVariants.previewLabel': 'So erscheint es in der Gremien-Liste',
   'admin.cdVariants.squareReplaces':
     'Eine Variante hat höchstens ein quadratisches Logo. Ein neues ersetzt das alte.',
@@ -6675,6 +6676,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.cdVariants.squareUnreadable': 'The image could not be read.',
   'admin.cdVariants.serverNotSquare': 'The logo is not square.',
   'admin.cdVariants.serverTooSmall': 'The logo is smaller than {min} × {min} px.',
+  'admin.cdVariants.serverTooManyPx': 'The logo is larger than {max} × {max} px.',
   'admin.cdVariants.previewLabel': 'This is how it appears in the committee list',
   'admin.cdVariants.squareReplaces':
     'A variant has at most one square logo. A new one replaces the old one.',

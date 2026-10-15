@@ -2,7 +2,9 @@
 
 The gate is ``can_view_gremium`` of the admin module, the same rule as the route of
 the square logo: the global permission ``gremium.view_all`` (``Principal.has``, so
-the admin role and the OAuth scope cap apply), or an active membership now. A hidden
+the admin role and the OAuth scope cap apply), or an active membership now. The
+membership path obeys the scope cap too, so a token without the ``read`` scope sees
+no gremium. A hidden
 gremium and an unknown gremium give the same 404, so the API does not tell that a
 gremium exists.
 """

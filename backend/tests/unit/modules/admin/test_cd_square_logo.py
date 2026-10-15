@@ -33,6 +33,7 @@ from app.modules.admin import gremium_roles
 from app.modules.admin import router as admin_router
 from app.modules.admin.cd_logos import (
     MAX_CD_LOGO_BYTES,
+    SQUARE_LOGO_MAX_PX,
     SQUARE_LOGO_MIN_PX,
     check_square_logo,
 )
@@ -213,6 +214,13 @@ def test_check_square_logo_refuses_a_small_square() -> None:
     with pytest.raises(ValidationProblem) as exc:
         check_square_logo(png(edge, edge))
     assert _code(exc) == "logo_too_small"
+
+
+def test_check_square_logo_refuses_a_huge_square() -> None:
+    edge = SQUARE_LOGO_MAX_PX + 1
+    with pytest.raises(ValidationProblem) as exc:
+        check_square_logo(png(edge, edge))
+    assert _code(exc) == "logo_too_many_px"
 
 
 # --- 3. service: upload -----------------------------------------------------
@@ -417,9 +425,19 @@ async def test_can_view_gremium_by_membership(
         return {gid} if member else {uuid.uuid4()}
 
     monkeypatch.setattr(gremium_roles, "gremium_member_ids", ids)
-    # A scoped admin token without the key falls back to the membership.
-    principal = Principal(sub="u", roles=["admin"], scope_permissions=frozenset({"read"}))
+    # A token whose scope holds the key, without the permission, falls back to the membership.
+    principal = Principal(sub="u", scope_permissions=frozenset({GREMIUM_VIEW_ALL}))
     assert await can_view_gremium(None, principal, gid) is member  # type: ignore[arg-type]
+
+
+async def test_can_view_gremium_refuses_a_capped_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def boom(*_a: Any, **_k: Any) -> set[uuid.UUID]:
+        raise AssertionError("membership must not be read")
+
+    monkeypatch.setattr(gremium_roles, "gremium_member_ids", boom)
+    # A scoped admin token without the key sees no gremium, not even its own.
+    principal = Principal(sub="u", roles=["admin"], scope_permissions=frozenset({"budget.write"}))
+    assert not await can_view_gremium(None, principal, uuid.uuid4())  # type: ignore[arg-type]
 
 
 # --- 6. routes --------------------------------------------------------------
