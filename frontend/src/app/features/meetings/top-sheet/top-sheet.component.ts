@@ -18,7 +18,12 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { AgendaItem, Meeting, Protocol, Uuid } from '@core/api/models';
-import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
+import {
+  IconComponent,
+  SegmentedComponent,
+  type IconName,
+  type SegmentedOption,
+} from '@stupa-makers/ui-kit';
 import {
   MarkdownEditorComponent,
   type MarkdownFormat,
@@ -30,9 +35,15 @@ import { resolveI18n } from '../meetings-display.util';
 import { meetingKeeperLine } from '../keepers.util';
 import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
 import { voteResultResolver } from '../vote-result/vote-result';
+import { applyRawFormat } from './raw-format';
 
 /** The autosave state of the text of the open item. */
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
+
+/** The view of the text: rendered as it reads, or the Markdown source. */
+export type EditorMode = 'formatted' | 'raw';
+
+const NO_FORMATS: ReadonlySet<MarkdownFormat> = new Set();
 
 /** A button of the format bar. */
 interface FormatTool {
@@ -66,6 +77,9 @@ const TOOLS: readonly FormatTool[] = [
  *
  * The participant view (`follow`) reads the same sheet without a protocol of its own.
  *
+ * A switch in the format bar shows the text formatted or as its Markdown source. The
+ * format buttons work in both views. The choice stays when another item opens.
+ *
  * A vote result in the text shows as a card with "Beschluss · 18:52 · Einfache Mehrheit",
  * the counts and the result (a tie is "Abgelehnt", O18), from the votes of this meeting.
  */
@@ -81,6 +95,7 @@ const TOOLS: readonly FormatTool[] = [
     MarkdownEditorComponent,
     NoteComponent,
     ProtocolBarComponent,
+    SegmentedComponent,
     StatusTextComponent,
   ],
   templateUrl: './top-sheet.component.html',
@@ -198,6 +213,48 @@ export class TopSheetComponent {
   protected cancelTitle(): void {
     this.renamingHere.set(null);
     this.cancelRename.emit();
+  }
+
+  /** The view of the text. */
+  protected readonly mode = signal<EditorMode>('formatted');
+
+  protected readonly modeOptions = computed<SegmentedOption[]>(() => {
+    this.i18n.locale();
+    return [
+      { value: 'formatted', label: this.i18n.translate('meetings.editor.modeFormatted') },
+      { value: 'raw', label: this.i18n.translate('meetings.editor.modeRaw') },
+    ];
+  });
+
+  private readonly editor = viewChild<MarkdownEditorComponent>('ed');
+  private readonly rawArea = viewChild<ElementRef<HTMLTextAreaElement>>('raw');
+
+  /** The formats at the cursor. The Markdown source shows none as pressed. */
+  protected readonly activeFormats = computed(() =>
+    this.mode() === 'raw' ? NO_FORMATS : (this.editor()?.activeFormats() ?? NO_FORMATS),
+  );
+
+  protected setMode(value: string | null): void {
+    this.mode.set(value === 'raw' ? 'raw' : 'formatted');
+  }
+
+  /** A button of the format bar: in the editor, or in the Markdown source. */
+  protected toggleFormat(format: MarkdownFormat): void {
+    if (this.mode() !== 'raw') {
+      this.editor()?.toggleFormat(format);
+      return;
+    }
+    const area = this.rawArea()?.nativeElement;
+    const t = this.top();
+    if (!area || !t || area.readOnly) return;
+    const next = applyRawFormat(
+      { text: area.value, start: area.selectionStart, end: area.selectionEnd },
+      format,
+    );
+    area.value = next.text;
+    area.focus();
+    area.setSelectionRange(next.start, next.end);
+    this.bodyChange.emit({ itemId: t.id, body: next.text });
   }
 
   /** "TOP 3 · Antrag", or "TOP 3" for a free-text item ("Freitext" says nothing). */

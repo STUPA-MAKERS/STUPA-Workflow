@@ -104,6 +104,46 @@ describe('TopSheetComponent', () => {
     expect(view.bodyChange).toHaveBeenCalledWith({ itemId: 't-1', body: 'Neu.' });
   });
 
+  describe('view of the text', () => {
+    it('switches to the Markdown source and back', async () => {
+      const view = await setup({ top: { ...AGENDA[0], body: '**Hallo**' } });
+      const formatted = screen.getByRole('radio', { name: 'Formatiert' });
+      expect(formatted).toHaveAttribute('aria-checked', 'true');
+      await userEvent.click(screen.getByRole('radio', { name: 'Markdown' }));
+      const area = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Markdown' });
+      expect(area.value).toBe('**Hallo**');
+      await userEvent.type(area, '!');
+      expect(view.bodyChange).toHaveBeenLastCalledWith({ itemId: 't-1', body: '**Hallo**!' });
+      await userEvent.click(formatted);
+      expect(screen.queryByRole('textbox', { name: 'Markdown' })).toBeNull();
+      expect(editorOf(view)).toBeTruthy();
+    });
+
+    it('formats the Markdown source from the bar', async () => {
+      const view = await setup({ top: { ...AGENDA[0], body: 'Wort' } });
+      await userEvent.click(screen.getByRole('radio', { name: 'Markdown' }));
+      const area = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Markdown' });
+      area.setSelectionRange(0, 4);
+      await userEvent.click(screen.getByRole('button', { name: 'Fett' }));
+      expect(area.value).toBe('**Wort**');
+      expect(view.bodyChange).toHaveBeenLastCalledWith({ itemId: 't-1', body: '**Wort**' });
+      expect(screen.getByRole('button', { name: 'Fett' })).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('keeps the Markdown source of a reader read only', async () => {
+      const view = await setup({ editable: false, top: { ...AGENDA[0], body: 'Text' } });
+      await userEvent.click(screen.getByRole('radio', { name: 'Markdown' }));
+      const area = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Markdown' });
+      expect(area.readOnly).toBe(true);
+      const cmp = view.fixture.componentInstance as unknown as {
+        toggleFormat(f: string): void;
+      };
+      cmp.toggleFormat('bold');
+      expect(area.value).toBe('Text');
+      expect(view.bodyChange).not.toHaveBeenCalled();
+    });
+  });
+
   it('shows no format bar to a reader and names the minute-taker', async () => {
     await setup({ editable: false, canEdit: false });
     expect(screen.queryByRole('toolbar', { name: 'Format' })).toBeNull();
@@ -202,13 +242,13 @@ describe('TopSheetComponent', () => {
     expect(screen.getByText('Für diese Sitzung gibt es noch kein Protokoll.')).toBeInTheDocument();
     fixture.componentRef.setInput('meeting', meeting({ status: 'planned' }));
     fixture.detectChanges();
-    expect(screen.getByText(/Den Text kannst du schon jetzt vorbereiten/)).toBeInTheDocument();
+    expect(screen.queryByText(/noch kein Protokoll/)).toBeNull();
   });
 
   it('prepares the text of an item of a planned meeting without a protocol', async () => {
     await setup({ protocol: null, meeting: meeting({ status: 'planned' }) });
     expect(screen.getByRole('toolbar', { name: 'Format' })).toBeInTheDocument();
-    expect(screen.getByText(/Den Text kannst du schon jetzt vorbereiten/)).toBeInTheDocument();
+    expect(screen.queryByText(/noch kein Protokoll/)).toBeNull();
     // No protocol yet, so no notice of the public protocol page and no protocol state.
     expect(screen.queryByText('Entwurf')).toBeNull();
   });
