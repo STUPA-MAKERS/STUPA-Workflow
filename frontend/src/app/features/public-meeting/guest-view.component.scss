@@ -153,9 +153,12 @@
   background: var(--color-accent);
   color: var(--color-on-accent);
 }
+/* A border, not an inset shadow, so the ring is equally wide on every side (see the
+   agenda pane). */
 .gv__badge--done {
   background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--color-accent);
+  box-sizing: border-box;
+  border: 1.5px solid var(--color-accent);
   color: var(--color-accent-text);
 }
 .gv__itemText {

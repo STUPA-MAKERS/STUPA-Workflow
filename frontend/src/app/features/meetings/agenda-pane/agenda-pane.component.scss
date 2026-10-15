@@ -109,7 +109,10 @@
 .ap__num--done {
   background: transparent;
   color: var(--color-accent-text);
-  box-shadow: inset 0 0 0 1.5px var(--color-accent);
+  /* A border, not an inset shadow: the browser snaps a border to whole device pixels on
+     every side, while a fractional shadow is anti-aliased per side and looks uneven. */
+  box-sizing: border-box;
+  border: 1.5px solid var(--color-accent);
 }
 
 /* The grip shows on hover and while a control of the row has the focus. It sits in the
