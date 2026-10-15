@@ -72,6 +72,16 @@ _REASONS: dict[str, dict[str, str]] = {
         "en": "You are receiving this email because a vote delegation that "
         "concerns you was granted or revoked.",
     },
+    "ticket_created": {
+        "de": "Sie erhalten diese E-Mail, weil Sie gemeldete Tickets bearbeiten.",
+        "en": "You are receiving this email because you work on reported tickets.",
+    },
+    "ticket_received": {
+        "de": "Sie erhalten diese E-Mail, weil Sie ein Problem, eine Frage oder "
+        "eine Idee gemeldet haben.",
+        "en": "You are receiving this email because you reported a problem, a "
+        "question or an idea.",
+    },
     "generic": {
         "de": "Sie erhalten diese E-Mail von der Antragsplattform.",
         "en": "You are receiving this email from the application platform.",

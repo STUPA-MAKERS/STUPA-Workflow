@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 
 from app.deps import Principal, get_current_principal
 from app.main import create_app
-from app.modules.admin.branding import Branding
+from app.modules.admin.branding import Branding, PublicBranding
 from app.modules.admin.router import (
     get_config_service,
     get_gremium_role_service,
@@ -315,8 +315,20 @@ class _FakeSite:
         self._has = False
         return await self.get()
 
+    async def help_tickets(self):
+        from app.modules.admin.schemas import HelpTicketsSettings
+
+        return getattr(self, "_help", HelpTicketsSettings())
+
+    async def put_help_tickets(self, payload, actor):  # noqa: ANN001
+        self._help = payload
+        return payload
+
     async def public(self):
-        return PublicSiteConfigOut(version=self._version, branding=self._active)
+        return PublicSiteConfigOut(
+            version=self._version,
+            branding=PublicBranding.model_validate(self._active.model_dump(by_alias=True)),
+        )
 
 
 class _FakeGremiumRoles:
@@ -950,3 +962,26 @@ def test_gremium_public_preview(app: FastAPI, client: TestClient) -> None:
     assert r.json() == {"finalCount": 6, "missingCount": 5}
     r = client.get("/api/admin/gremien/00000000-0000-0000-0000-000000000000/public-preview")
     assert r.status_code == 404
+
+
+def test_help_tickets_read_and_save_need_admin_site(app: FastAPI, client: TestClient) -> None:
+    assert client.get("/api/admin/help-tickets").status_code == 401
+    _as(app, {"admin.gremien"})
+    assert client.get("/api/admin/help-tickets").status_code == 403
+    assert client.put("/api/admin/help-tickets", json={}).status_code == 403
+    _as(app, {"admin.site"})
+    assert client.get("/api/admin/help-tickets").json()["retentionMonths"] == 12
+    body = {
+        "wikiUrl": "https://w.example.org",
+        "publicEnabled": False,
+        "notifyNew": True,
+        "retentionMonths": None,
+    }
+    saved = client.put("/api/admin/help-tickets", json=body)
+    assert saved.status_code == 200
+    assert saved.json() == body
+    assert client.get("/api/admin/help-tickets").json() == body
+    for bad in ({"wikiUrl": "mailto:x"}, {"retentionMonths": 0}, {"other": 1}):
+        resp = client.put("/api/admin/help-tickets", json={**body, **bad})
+        assert resp.status_code == 422
+        assert resp.headers["content-type"] == "application/problem+json"

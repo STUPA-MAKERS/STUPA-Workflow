@@ -129,6 +129,7 @@ def body_cap(limit_attr: str) -> Callable[[Request, Settings], None]:
 
 enforce_auth_payload_limit = body_cap("max_auth_payload_bytes")
 enforce_application_payload_limit = body_cap("max_application_payload_bytes")
+enforce_ticket_payload_limit = body_cap("max_ticket_payload_bytes")
 
 # Room for the multipart frame around the file: boundaries, part headers and the small
 # form fields (field key, flag, ALTCHA solution).
@@ -259,6 +260,24 @@ async def rate_limit_applications(
         limit=settings.rl_applications_ip_per_hour,
         window=_HOUR,
         detail="Too many application submissions from this IP. Try again later.",
+    )
+
+
+async def rate_limit_tickets(
+    request: Request,
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+) -> None:
+    """``POST /tickets``: 10/h/IP. An OAuth token (the logged-in MCP) is exempt."""
+    if _is_oauth_principal(principal):
+        return
+    await _enforce(
+        limiter,
+        f"tickets:ip:{client_ip(request)}",
+        limit=settings.rl_tickets_ip_per_hour,
+        window=_HOUR,
+        detail="Too many ticket reports from this IP. Try again later.",
     )
 
 

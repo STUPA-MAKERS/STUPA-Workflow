@@ -44,6 +44,7 @@ from app.modules.files.queue import scan_queue_from_pool
 from app.modules.files.schemas import AttachmentOut, DraftAttachmentOut, SignedUrlOut
 from app.modules.files.service import FilesService, application_id_of
 from app.modules.files.storage import _safe_disposition
+from app.modules.tickets.access import TICKET_MANAGE
 from app.shared.altcha import AltchaError, AltchaVerifier, NullAltchaVerifier
 from app.shared.antiabuse import (
     enforce_attachment_body_cap,
@@ -180,6 +181,18 @@ async def _assert_not_pii_hidden(db: AsyncSession, access: Access, attachment: A
         raise NotFoundError(f"attachment {attachment.id} not found")
 
 
+def _require_ticket_reader(principal: Principal | None, attachment_id: UUID) -> None:
+    """Let only a holder of ``ticket.manage`` reach the attachment of a ticket.
+
+    Anyone else gets 404, as for an unknown id, so the route is no existence oracle.
+
+    Raises:
+        NotFoundError: The caller does not hold ``ticket.manage`` (HTTP 404).
+    """
+    if principal is None or not principal.has(TICKET_MANAGE):
+        raise NotFoundError(f"attachment {attachment_id} not found")
+
+
 async def _read_capped(file: UploadFile, max_bytes: int) -> bytes:
     """Read the upload in chunks with a size cap.
 
@@ -277,12 +290,16 @@ async def get_attachment_url(
 ) -> SignedUrlOut:
     """Return the download URL of an attachment.
 
-    A principal or the applicant of the application may call this route.
+    A principal or the applicant of the application may call this route. The
+    attachment of a ticket needs ``ticket.manage``; without it the route gives 404.
     """
     # Fail closed before the database access. Without an identity the route answers 401.
     # A difference between 404 and 401 would reveal that the attachment exists.
     if principal is None and applicant is None:
         raise UnauthorizedError("Authentication required.")
+    if await service.is_ticket_attachment(attachment_id):
+        _require_ticket_reader(principal, attachment_id)
+        return await service.ticket_url(attachment_id)
     attachment = await service.get_attachment(attachment_id)
     # Check read access against the application of the attachment. This uses the same
     # paths as in require_app_read, that is read_all, creator and Gremium read, not only
@@ -333,24 +350,32 @@ async def download_attachment(
     With ``?inline=1`` and a PDF or raster image, the response is an inline preview. Only
     that response may be framed, and only by the same origin (``PREVIEW_CSP``,
     ``X-Frame-Options: SAMEORIGIN``).
+
+    The attachment of a ticket needs ``ticket.manage``; without it the route gives
+    404. The same quarantine gates apply.
     """
     if principal is None and applicant is None:
         raise UnauthorizedError("Authentication required.")
-    attachment = await service.get_attachment(attachment_id)
-    try:
-        access = await _resolve_attachment_read(
-            db, application_id_of(attachment), principal, applicant
+    if await service.is_ticket_attachment(attachment_id):
+        _require_ticket_reader(principal, attachment_id)
+        stream, filename, mime, size = await service.ticket_download_stream(attachment_id)
+    else:
+        attachment = await service.get_attachment(attachment_id)
+        try:
+            access = await _resolve_attachment_read(
+                db, application_id_of(attachment), principal, applicant
+            )
+        except ForbiddenError as exc:
+            raise NotFoundError(f"attachment {attachment_id} not found") from exc
+        await _assert_not_pii_hidden(db, access, attachment)
+        # An unconfirmed guest submission stays invisible to a principal or a member
+        # of the Gremium and gives 404. Only the owning magic-link applicant downloads
+        # it. This mirrors the list and detail gates. The quarantine gates
+        # (409/410/503) run in the service BEFORE the stream starts. The
+        # StreamingResponse begins after those gates.
+        stream, filename, mime, size = await service.download_stream(
+            attachment_id, allow_unconfirmed=access.is_owning_applicant
         )
-    except ForbiddenError as exc:
-        raise NotFoundError(f"attachment {attachment_id} not found") from exc
-    await _assert_not_pii_hidden(db, access, attachment)
-    # An unconfirmed guest submission stays invisible to a principal or a member of the
-    # Gremium and gives 404. Only the owning magic-link applicant downloads it. This
-    # mirrors the list and detail gates. The quarantine gates (409/410/503) run in the
-    # service BEFORE the stream starts. The StreamingResponse begins after those gates.
-    stream, filename, mime, size = await service.download_stream(
-        attachment_id, allow_unconfirmed=access.is_owning_applicant
-    )
     # ``?inline=1`` renders the file in the browser preview dialog. This works only for
     # the non-scriptable allowlist. Anything else stays a forced download with the
     # default API headers, which forbid framing.

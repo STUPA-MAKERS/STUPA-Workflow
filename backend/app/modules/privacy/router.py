@@ -174,8 +174,13 @@ async def erase_principal(
     principal_id: UUID,
     principal: ConfigPrincipal,
     session: DbSession,
+    request: Request,
 ) -> Response:
-    await PrincipalService(session).erase(principal_id, actor=principal.sub)
+    await PrincipalService(session).erase(
+        principal_id,
+        actor=principal.sub,
+        files=_files_with_storage(session, request),
+    )
     return Response(status_code=204)
 
 
@@ -231,6 +236,7 @@ async def auskunft(
             "comments": len(data["comments"]),
             "attachments": len(data["attachments"]),
             "attendance": len(data["attendance"]),
+            "tickets": len(data["tickets"]),
             "hasPrincipal": data["principal"] is not None,
         },
     )

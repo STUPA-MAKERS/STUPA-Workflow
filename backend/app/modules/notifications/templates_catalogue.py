@@ -17,7 +17,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.modules.notifications import action_dispatcher, auto, captured, comments, privacy
+from app.modules.notifications import (
+    action_dispatcher,
+    auto,
+    captured,
+    comments,
+    privacy,
+    tickets,
+)
 from app.modules.notifications import service as _svc
 
 # task_reminder: the worker (``worker/task_reminders.py``) sends it. The worker imports
@@ -263,6 +270,20 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
             "reason": "Ablehnungsgrund",
             "requestId": "ID des Löschantrags",
         },
+    ),
+    MailTemplateSpec(
+        tickets.TICKET_CREATED_KEY,
+        tickets.TICKET_CREATED_KEY,
+        tickets.TICKET_CREATED_SUBJECT,
+        tickets.TICKET_CREATED_BODY,
+        tickets.TICKET_CREATED_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
+        tickets.TICKET_RECEIVED_KEY,
+        tickets.TICKET_RECEIVED_KEY,
+        tickets.TICKET_RECEIVED_SUBJECT,
+        tickets.TICKET_RECEIVED_BODY,
+        tickets.TICKET_RECEIVED_PLACEHOLDERS,
     ),
 )
 

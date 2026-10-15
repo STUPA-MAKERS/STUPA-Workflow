@@ -360,3 +360,21 @@ async def test_lifespan_closes_redis_client() -> None:
     async with lifespan(app):
         pass
     assert fake.closed
+
+
+async def test_rate_limit_tickets_keys_on_the_ip_and_spares_oauth() -> None:
+    """``POST /tickets``: ten an hour per IP; an OAuth token (MCP) is exempt."""
+    import pytest
+
+    from app.modules.auth.principal import Principal
+    from app.shared.antiabuse import rate_limit_tickets
+
+    settings = _settings(rl_tickets_ip_per_hour=1)
+    limiter = InMemoryRateLimiter(now=lambda: 0.0)
+    req = SimpleNamespace(client=SimpleNamespace(host="5.6.7.8"), headers={})
+    await rate_limit_tickets(req, settings, limiter, None)  # type: ignore[arg-type]
+    with pytest.raises(RateLimitedError):
+        await rate_limit_tickets(req, settings, limiter, Principal(sub="web"))  # type: ignore[arg-type]
+    mcp = Principal(sub="mcp", scope_permissions=frozenset({"ticket.manage"}))
+    await rate_limit_tickets(req, settings, limiter, mcp)  # type: ignore[arg-type]
+    assert _settings().max_ticket_payload_bytes == 65536

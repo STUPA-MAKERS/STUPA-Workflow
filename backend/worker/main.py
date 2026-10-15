@@ -42,6 +42,7 @@ from worker.retention import process_retention
 from worker.scan import on_startup as scan_on_startup
 from worker.scan import scan_attachment
 from worker.task_reminders import process_task_reminders
+from worker.tickets import anonymize_tickets
 from worker.webhook import deliver_webhook
 from worker.webhook import on_startup as webhook_on_startup
 
@@ -143,6 +144,7 @@ class WorkerSettings:
         process_task_reminders,
         process_retention,
         purge_draft_attachments,
+        anonymize_tickets,
         func(process_audit_verification, timeout=_AUDIT_VERIFY_JOB_TIMEOUT_SECONDS),
         func(create_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
         func(restore_backup, timeout=_BACKUP_JOB_TIMEOUT_SECONDS),
@@ -154,6 +156,9 @@ class WorkerSettings:
         # GDPR retention: anonymize terminal applications once a day and purge expired
         # sessions and magic links. The job does not touch budget data.
         cron(process_retention, hour=3, minute=30),
+        # Ticket retention: anonymize the tickets closed longer than
+        # `tickets.retentionMonths` ago (reporter, context and attachments).
+        cron(anonymize_tickets, hour=3, minute=45),
         # Scan deadlines and votes every minute. The scan is idempotent and uses
         # SKIP LOCKED.
         cron(process_deadlines, second=0),

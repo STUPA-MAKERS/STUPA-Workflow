@@ -14,8 +14,8 @@ The flow has four steps:
    and of ALL its drafts to now + ``attachment_draft_ttl_days``. One token holds at
    most ``attachment_draft_max_files`` files and ``attachment_draft_max_bytes`` bytes.
 3. ``DELETE /apply/attachments/{id}`` with the token: ``delete`` removes one draft.
-4. ``POST /applications`` with ``attachmentIds`` and ``draftToken``: ``bind_drafts``
-   binds the files in the transaction of the create.
+4. ``POST /applications`` (or ``POST /tickets``) with ``attachmentIds`` and
+   ``draftToken``: ``bind_drafts`` binds the files in the transaction of the create.
 
 The token lives on its own in ``attachment_draft_token``. It stays valid until its
 end, also when the owner deletes the last draft. The hourly cron
@@ -306,17 +306,23 @@ class DraftAttachments:
 async def bind_drafts(
     session: AsyncSession,
     *,
-    application_id: uuid.UUID,
     attachment_ids: Sequence[uuid.UUID],
     token: str,
     pepper: str,
+    application_id: uuid.UUID | None = None,
+    ticket_id: uuid.UUID | None = None,
 ) -> None:
-    """Bind the listed drafts of a token to a new application, without a commit.
+    """Bind the listed drafts of a token to a new application or ticket, without a commit.
 
     The caller runs this in the transaction of the create, after ``check_drafts``.
-    The method sets ``application_id`` and clears both draft columns. The storage key
-    stays.
+    The method sets ``application_id`` or ``ticket_id`` (exactly one) and clears both
+    draft columns. The storage key stays.
+
+    Raises:
+        ValueError: Not exactly one of ``application_id`` and ``ticket_id`` is given.
     """
+    if (application_id is None) == (ticket_id is None):
+        raise ValueError("bind_drafts needs exactly one of application_id and ticket_id")
     if not attachment_ids:
         return
     await session.execute(
@@ -324,9 +330,15 @@ async def bind_drafts(
         .where(
             Attachment.id.in_(list(attachment_ids)),
             Attachment.application_id.is_(None),
+            Attachment.ticket_id.is_(None),
             Attachment.draft_token_hash == hash_draft_token(token, pepper),
         )
-        .values(application_id=application_id, draft_token_hash=None, draft_expires_at=None)
+        .values(
+            application_id=application_id,
+            ticket_id=ticket_id,
+            draft_token_hash=None,
+            draft_expires_at=None,
+        )
         .execution_options(synchronize_session=False)
     )
 

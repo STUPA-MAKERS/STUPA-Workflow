@@ -34,6 +34,7 @@ def _svc(**sources: Any) -> SearchService:
         "_budgets",
         "_gremien",
         "_principals",
+        "_tickets",
     ):
 
         async def _empty(*_a: object, **_kw: object) -> list[SearchHit]:
@@ -289,3 +290,46 @@ async def test_a_nameless_person_reads_no_name_not_its_sub(
 
     assert [(h.title, h.subtitle) for h in hits] == [(expected, None)]
     assert hits[0].url == "/admin/users?q=kc%7Cghost"
+
+
+async def test_the_ticket_source_needs_ticket_manage(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tickets reuse `TicketService.list`, behind the gate of `GET /api/tickets`."""
+    from datetime import UTC, datetime
+
+    from app.modules.tickets import service as ticket_service
+    from app.modules.tickets.schemas import TicketListItem, TicketReporter
+    from app.shared.paging import Page
+
+    seen: dict[str, object] = {}
+    tid = uuid.uuid4()
+
+    async def _list(_self: object, **kw: object) -> Page[TicketListItem]:
+        seen.update(kw)
+        at = datetime(2026, 1, 1, tzinfo=UTC)
+        item = TicketListItem(
+            id=tid,
+            number="T-0040",
+            kind="bug",
+            title="Drucker",
+            status="in_progress",
+            reporter=TicketReporter(),
+            created_at=at,
+            updated_at=at,
+        )
+        return Page[TicketListItem](items=[item], total=1, limit=PER_KIND + 1, offset=0)
+
+    monkeypatch.setattr(ticket_service.TicketService, "list", _list)
+    svc = SearchService(session=None)  # type: ignore[arg-type]
+    assert await svc._tickets("drucker", Principal(sub="u"), "de") == []
+    assert seen == {}
+    manager = Principal(sub="u", permissions={"ticket.manage"})
+    (hit,) = await svc._tickets("drucker", manager, "en")
+    assert seen == {"q": "drucker", "limit": PER_KIND + 1}
+    assert (hit.kind, hit.title, hit.subtitle, hit.url) == (
+        "ticket",
+        "T-0040 · Drucker",
+        "In progress",
+        f"/tickets/{tid}",
+    )
+    (hit,) = await svc._tickets("drucker", manager, "fr")
+    assert hit.subtitle == "In Arbeit"

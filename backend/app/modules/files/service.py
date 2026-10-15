@@ -283,7 +283,10 @@ class FilesService:
             ConflictError: The scan is not finished yet (HTTP 409).
             ServiceUnavailableError: Object storage is off (HTTP 503).
         """
-        attachment = await self.get_attachment(attachment_id)
+        return self._ready(await self.get_attachment(attachment_id))
+
+    def _ready(self, attachment: Attachment) -> Attachment:
+        """Apply the download gates to a loaded attachment (see ``_ready_attachment``)."""
         if _is_infected(attachment) or attachment.storage_key is None:
             raise GoneError("Attachment removed (failed virus scan).")
         # FAIL CLOSED. Do NOT invert this condition. The method refuses the download
@@ -376,9 +379,53 @@ class FilesService:
         await self._assert_app_visible(
             application_id_of(loaded), allow_unconfirmed=allow_unconfirmed
         )
-        attachment = await self._ready_attachment(attachment_id)
-        # _ready_attachment guarantees both values, else it raises 410 or 503. The
-        # two asserts only help the type checker.
+        return await self._open_stream(await self._ready_attachment(attachment_id))
+
+    async def is_ticket_attachment(self, attachment_id: uuid.UUID) -> bool:
+        """Tell whether the id names the attachment of a ticket."""
+        ticket_id = await self.session.scalar(
+            select(Attachment.ticket_id).where(Attachment.id == attachment_id)
+        )
+        return ticket_id is not None
+
+    async def get_ticket_attachment(self, attachment_id: uuid.UUID) -> Attachment:
+        """Load the attachment of a ticket. Any other row gives 404.
+
+        The router checks ``ticket.manage`` first, so the route is no existence
+        oracle.
+
+        Raises:
+            NotFoundError: No ticket attachment has this id (HTTP 404).
+        """
+        attachment = await self.session.get(Attachment, attachment_id)
+        if attachment is None or attachment.ticket_id is None:
+            raise NotFoundError(f"attachment {attachment_id} not found")
+        return attachment
+
+    async def ticket_url(self, attachment_id: uuid.UUID) -> SignedUrlOut:
+        """Return the download route of a ticket attachment after a clean scan.
+
+        The gates are those of ``signed_url``: 409 while the scan runs, 410 after a
+        finding, 503 without storage.
+        """
+        self._ready(await self.get_ticket_attachment(attachment_id))
+        return SignedUrlOut(
+            url=f"/api/attachments/{attachment_id}/download",
+            expiresIn=self.settings.attachment_url_ttl_seconds,
+        )
+
+    async def ticket_download_stream(
+        self, attachment_id: uuid.UUID
+    ) -> tuple[AsyncIterator[bytes], str, str, int]:
+        """Stream a ticket attachment, with the gates of ``download_stream``."""
+        attachment = self._ready(await self.get_ticket_attachment(attachment_id))
+        return await self._open_stream(attachment)
+
+    async def _open_stream(
+        self, attachment: Attachment
+    ) -> tuple[AsyncIterator[bytes], str, str, int]:
+        # _ready guarantees both values, else it raises 410 or 503. The two asserts
+        # only help the type checker.
         assert attachment.storage_key is not None
         assert self.storage is not None
         try:
@@ -386,6 +433,52 @@ class FilesService:
         except StorageError as exc:
             raise ServiceUnavailableError("Attachment temporarily unavailable.") from exc
         return stream, attachment.filename, attachment.mime, attachment.size
+
+    async def list_for_ticket(self, ticket_id: uuid.UUID) -> list[AttachmentOut]:
+        """Return the attachments of a ticket, oldest first."""
+        rows = (
+            await self.session.scalars(
+                select(Attachment)
+                .where(Attachment.ticket_id == ticket_id)
+                .order_by(Attachment.created_at, Attachment.id)
+            )
+        ).all()
+        return [_attachment_out(a) for a in rows]
+
+    async def delete_for_ticket(self, ticket_id: uuid.UUID, *, actor: str) -> int:
+        """Remove all attachments of a ticket for its anonymization, without a commit.
+
+        For each attachment the method deletes the row, removes the object as best
+        effort and writes an ``attachment_delete`` audit entry. The caller commits.
+
+        Returns:
+            The number of removed attachments.
+        """
+        rows = (
+            await self.session.scalars(
+                select(Attachment).where(Attachment.ticket_id == ticket_id)
+            )
+        ).all()
+        for attachment in rows:
+            storage_key = attachment.storage_key
+            await self.session.delete(attachment)
+            if self.storage is not None and storage_key is not None:
+                try:
+                    await self.storage.remove(storage_key)
+                except StorageError:
+                    logger.warning(
+                        "could not remove object for anonymized attachment %s",
+                        attachment.id,
+                    )
+            await audit_record(
+                self.session,
+                actor=actor,
+                action=AuditAction.ATTACHMENT_DELETE,
+                target_type="attachment",
+                target_id=str(attachment.id),
+                data={"ticket_id": str(ticket_id)},
+            )
+        return len(rows)
 
     async def assert_editable(self, application_id: uuid.UUID) -> None:
         """Make sure that the current state of the application allows data edits.
@@ -482,8 +575,8 @@ class FilesService:
         """Persist the scan result.
 
         On a finding the method deletes the object and writes an audit entry
-        (quarantine). The entry names the application of a bound file. For a draft
-        (Z4) it carries ``draft: true`` instead.
+        (quarantine). The entry names the application or the ticket of a bound file.
+        For a draft (Z4) it carries ``draft: true`` instead.
 
         The method loads the row again by id. A row that a delete, a draft purge or
         an anonymization removed during the scan is no error: the method skips it and
@@ -508,11 +601,7 @@ class FilesService:
         attachment.scan_result = signature
         storage_key = attachment.storage_key
         attachment.storage_key = None
-        owner: dict[str, object] = (
-            {"application_id": str(attachment.application_id)}
-            if attachment.application_id is not None
-            else {"draft": True}
-        )
+        owner = _owner_data(attachment)
         if not await self._commit_scan(
             attachment_id, actor=actor, quarantine={**owner, "signature": signature}
         ):
@@ -583,18 +672,22 @@ def upload_audit_data(attachment: Attachment) -> dict[str, object]:
     ``field_key``. The caller sends ``field_key`` as free text, so the data records
     only whether the upload has one (``hasFieldKey``).
     """
-    owner: dict[str, object] = (
-        {"application_id": str(attachment.application_id)}
-        if attachment.application_id is not None
-        else {"draft": True}
-    )
     return {
-        **owner,
+        **_owner_data(attachment),
         "hasFieldKey": attachment.field_key is not None,
         "isComparisonOffer": attachment.is_comparison_offer,
         "mime": attachment.mime,
         "size": attachment.size,
     }
+
+
+def _owner_data(attachment: Attachment) -> dict[str, object]:
+    """Name the owner of an attachment in an audit entry: application, ticket or draft."""
+    if attachment.application_id is not None:
+        return {"application_id": str(attachment.application_id)}
+    if attachment.ticket_id is not None:
+        return {"ticket_id": str(attachment.ticket_id)}
+    return {"draft": True}
 
 
 def _attachment_out(attachment: Attachment) -> AttachmentOut:

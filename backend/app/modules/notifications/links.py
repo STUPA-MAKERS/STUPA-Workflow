@@ -1,7 +1,7 @@
 """Deep links from a mail to the element that it refers to.
 
 Every mail carries one absolute link to its element: the application, the task, the
-meeting, the protocol or the admin page. The service puts the URL into the template
+meeting, the protocol, the ticket or the admin page. The service puts the URL into the template
 context as ``link``. When the rendered text does not contain the URL, the service adds
 one labelled line to the text and one button to the HTML layout. A DB override that
 does not use ``{{ link }}`` therefore still gets the link.
@@ -26,7 +26,7 @@ from uuid import UUID
 from app.settings import Settings
 
 #: The element that a link opens. It selects the label of the line and the button.
-LinkTarget = Literal["application", "task", "meeting", "protocol", "privacy"]
+LinkTarget = Literal["application", "task", "meeting", "protocol", "privacy", "ticket"]
 
 _LABELS: dict[str, dict[str, str]] = {
     "application": {"de": "Antrag öffnen", "en": "Open the application"},
@@ -34,6 +34,7 @@ _LABELS: dict[str, dict[str, str]] = {
     "meeting": {"de": "Sitzung öffnen", "en": "Open the meeting"},
     "protocol": {"de": "Protokoll öffnen", "en": "Open the protocol"},
     "privacy": {"de": "Löschanträge öffnen", "en": "Open the erasure requests"},
+    "ticket": {"de": "Ticket öffnen", "en": "Open the ticket"},
 }
 
 
@@ -88,3 +89,8 @@ def public_protocol_url(settings: Settings, protocol_id: UUID | str) -> str:
 def privacy_admin_link(settings: Settings) -> MailLink:
     """Return the link to the erasure requests of the privacy admin page."""
     return MailLink(f"{_base(settings)}/admin/privacy", "privacy")
+
+
+def ticket_link(settings: Settings, ticket_id: UUID | str) -> MailLink:
+    """Return the link to a ticket (holders of ``ticket.manage`` only)."""
+    return MailLink(f"{_base(settings)}/tickets/{ticket_id}", "ticket")

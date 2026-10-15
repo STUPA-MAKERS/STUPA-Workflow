@@ -346,6 +346,11 @@ class Settings(BaseSettings):
     # only a mail address or a token, so the bound stays tight. A larger body gets 413.
     max_auth_payload_bytes: int = 8192
 
+    # Body cap of the ticket report (POST /tickets, anti-DoS). A report holds a title,
+    # a Markdown body of at most 10000 characters and a small context. A larger body
+    # gets 413.
+    max_ticket_payload_bytes: int = 65536
+
     # Altcha proof-of-work. Without a secret the verification is off (dev/test), and
     # the field only passes through. The Altcha sidecar shares this secret
     # (deploy/.env: ALTCHA_HMAC_SECRET).
@@ -359,6 +364,9 @@ class Settings(BaseSettings):
     rl_magic_link_mail_per_hour: int = 3
     rl_magic_link_verify_ip_per_hour: int = 20
     rl_applications_ip_per_hour: int = 10
+    # POST /tickets: reports per hour per IP. A session counts too, because a campus NAT
+    # rarely sends ten reports an hour; an OAuth token is exempt.
+    rl_tickets_ip_per_hour: int = 10
     rl_attachments_per_hour: int = 30  # POST /attachments: 30 per hour per applicant
     # Default limit on all writing endpoints. It keys on the IP and stays generous. It
     # catches an endpoint without its own stricter limit (defense in depth).

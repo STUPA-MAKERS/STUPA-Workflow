@@ -32,6 +32,8 @@ from app.modules.flow.models import State
 from app.modules.livevote.models import Meeting, MeetingAttendance
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.protocol.erasure import erase_candidate_names
+from app.modules.tickets.models import Ticket
+from app.modules.tickets.service import TicketService, format_number
 from app.modules.voting.erasure import erase_candidacies
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
@@ -53,12 +55,22 @@ class PrincipalService:
         self.session = session
 
     async def erase(
-        self, principal_id: UUID, *, actor: str, commit: bool = True
+        self,
+        principal_id: UUID,
+        *,
+        actor: str,
+        commit: bool = True,
+        files: FilesService | None = None,
     ) -> Principal:
         """Null the PII fields, deactivate the principal, and drop the sessions.
 
         The `sub` stays as a pseudonym for the audit chain. The IdP deletes the user
         out of band. The pseudonymity that remains depends on that deletion.
+
+        The tickets that the principal reported get the ticket anonymization: no
+        reporter, no context, no attachments. With an object storage in `files` the
+        attachment objects go too. Notes and events keep the principal id, so they
+        show a deleted person.
 
         Raises:
             NotFoundError: No principal has this id.
@@ -104,6 +116,17 @@ class PrincipalService:
         # text, unless the principal was elected (a documented resolution).
         erased = await erase_candidacies(self.session, principal_id)
         await erase_candidate_names(self.session, erased)
+        tickets = TicketService(self.session, files=files or FilesService(self.session))
+        reported = (
+            await self.session.scalars(
+                select(Ticket).where(
+                    Ticket.reporter_principal_id == principal_id,
+                    Ticket.anonymized_at.is_(None),
+                )
+            )
+        ).all()
+        for ticket in reported:
+            await tickets.anonymize(ticket, actor=actor)
         await self.session.execute(
             delete(AuthSession).where(AuthSession.principal_id == principal_id)
         )
@@ -244,7 +267,7 @@ class ErasureRequestService:
             )
         elif request.subject_type == "principal" and request.principal_id is not None:
             await PrincipalService(self.session).erase(
-                request.principal_id, actor=actor, commit=False
+                request.principal_id, actor=actor, commit=False, files=files
             )
         else:
             raise ConflictError(
@@ -476,6 +499,25 @@ class AuskunftService:
                 }
                 for rec, meeting in arows
             ]
+        # The tickets that the address reported: as the e-mail of a report without a
+        # session, or through the account.
+        reporter = [Ticket.reporter_email == email]
+        if principal_row is not None:
+            reporter.append(Ticket.reporter_principal_id == principal_row.id)
+        trows = (
+            await self.session.scalars(
+                select(Ticket).where(or_(*reporter)).order_by(Ticket.number)
+            )
+        ).all()
+        tickets = [
+            {
+                "number": format_number(t.number),
+                "title": t.title,
+                "status": t.status,
+                "createdAt": t.created_at,
+            }
+            for t in trows
+        ]
         principal = (
             {
                 "sub": principal_row.sub,
@@ -494,6 +536,7 @@ class AuskunftService:
             "comments": comments,
             "attachments": attachments,
             "attendance": attendance,
+            "tickets": tickets,
             "principal": principal,
         }
 
@@ -511,12 +554,13 @@ def build_auskunft_workbook(
     comments: Sequence[Mapping[str, Any]] = (),
     attachments: Sequence[Mapping[str, Any]] = (),
     attendance: Sequence[Mapping[str, Any]] = (),
+    tickets: Sequence[Mapping[str, Any]] = (),
 ) -> bytes:
     """Build the GDPR access request (Art. 15) as `.xlsx` bytes.
 
     This function extends the shared `app.shared.xlsx.build_auskunft_workbook`. It adds
-    three sheets: the comments that the subject can see, the attachment metadata, and
-    the meeting attendance with the reason of an excuse.
+    four sheets: the comments that the subject can see, the attachment metadata, the
+    meeting attendance with the reason of an excuse, and the reported tickets.
     """
     from io import BytesIO
 
@@ -598,6 +642,20 @@ def build_auskunft_workbook(
                 a.get("note") or "",
             ]
             for a in attendance
+        ],
+    )
+
+    _add_sheet(
+        "Tickets",
+        ["Nummer", "Titel", "Status", "Gemeldet"],
+        [
+            [
+                t.get("number") or "",
+                t.get("title") or "",
+                t.get("status") or "",
+                _fmt_dt(t.get("createdAt")),
+            ]
+            for t in tickets
         ],
     )
 

@@ -32,8 +32,13 @@ def test_worker_settings_registers_tasks() -> None:
     assert WorkerSettings.redis_settings is not None
     # Nightly budget rollup, deadline scan every minute (T-44), hourly task reminders,
     # daily DSGVO retention, the nightly backup, the hourly draft purge (Z4) and the
-    # nightly audit-chain check (Z6) and the hourly heal of the public protocols.
-    assert len(WorkerSettings.cron_jobs) == 8
+    # nightly audit-chain check (Z6), the hourly heal of the public protocols and the
+    # daily ticket anonymization.
+    assert len(WorkerSettings.cron_jobs) == 9
+    from worker.tickets import anonymize_tickets
+
+    assert anonymize_tickets in WorkerSettings.functions
+    assert any(job.coroutine is anonymize_tickets for job in WorkerSettings.cron_jobs)
     from worker.protocol import backfill_public_protocols, heal_public_protocols
 
     assert backfill_public_protocols in WorkerSettings.functions

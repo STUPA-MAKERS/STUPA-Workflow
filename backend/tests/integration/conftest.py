@@ -114,6 +114,8 @@ _DATA_TABLES = (
     "attachment_draft_token",
     # Stored audit-chain checks (Z6). No FK reaches this table either.
     "audit_verification",
+    # Tickets. CASCADE also clears the notes, the events and the ticket attachments.
+    "ticket",
 )
 
 

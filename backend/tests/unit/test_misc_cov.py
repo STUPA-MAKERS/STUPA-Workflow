@@ -49,7 +49,7 @@ from app.middleware import (
     CsrfMiddleware,
     DefaultWriteRateLimitMiddleware,
 )
-from app.modules.admin.branding import Branding
+from app.modules.admin.branding import Branding, PublicBranding
 from app.modules.admin.router import (
     get_config_service,
     get_gremium_role_service,
@@ -531,7 +531,7 @@ class _SiteFake:
         )
 
     async def public(self) -> PublicSiteConfigOut:
-        return PublicSiteConfigOut(version=1, branding=Branding())
+        return PublicSiteConfigOut(version=1, branding=PublicBranding())
 
 
 @pytest.fixture

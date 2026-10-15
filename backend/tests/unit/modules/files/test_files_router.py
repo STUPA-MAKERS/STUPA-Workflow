@@ -93,6 +93,21 @@ class _FakeService:
     async def delete(self, attachment_id: UUID, *, actor: str) -> None:
         self.deleted = attachment_id
 
+    # The attachment of a ticket: ids that start with "11111111".
+    async def is_ticket_attachment(self, attachment_id: UUID) -> bool:
+        return str(attachment_id).startswith("11111111")
+
+    async def ticket_url(self, attachment_id: UUID) -> SignedUrlOut:
+        return SignedUrlOut(url=f"/api/attachments/{attachment_id}/download", expiresIn=60)
+
+    async def ticket_download_stream(
+        self, attachment_id: UUID
+    ) -> tuple[AsyncIterator[bytes], str, str, int]:
+        async def _iter() -> AsyncIterator[bytes]:
+            yield b"PNG"
+
+        return _iter(), "shot.png", "image/png", 3
+
     async def list_for_application(
         self,
         application_id: UUID,
@@ -531,3 +546,35 @@ def test_get_url_no_access_paths_is_404(
     _patch_committee(monkeypatch, can_read=False)
     r = client.get(f"/api/attachments/{ATT_ID}")
     assert r.status_code == 404
+
+
+TICKET_ATT = UUID("11111111-0000-0000-0000-000000000001")
+
+
+def test_a_ticket_attachment_needs_ticket_manage(app: FastAPI, client: TestClient) -> None:
+    """Without ``ticket.manage`` the URL and the download of a ticket file give 404."""
+    assert client.get(f"/api/attachments/{TICKET_ATT}").status_code == 401
+    _as(app, "application.read_all", "application.read")
+    assert client.get(f"/api/attachments/{TICKET_ATT}").status_code == 404
+    assert client.get(f"/api/attachments/{TICKET_ATT}/download").status_code == 404
+    app.dependency_overrides[get_current_principal] = lambda: None
+    app.dependency_overrides[get_current_applicant] = lambda: Applicant(
+        application_id=str(APP_ID), scope="view"
+    )
+    assert client.get(f"/api/attachments/{TICKET_ATT}").status_code == 404
+    assert client.get(f"/api/attachments/{TICKET_ATT}/download").status_code == 404
+
+
+def test_a_ticket_attachment_streams_for_a_ticket_manager(
+    app: FastAPI, client: TestClient
+) -> None:
+    _as(app, "ticket.manage")
+    url = client.get(f"/api/attachments/{TICKET_ATT}")
+    assert url.status_code == 200
+    assert url.json() == {"url": f"/api/attachments/{TICKET_ATT}/download", "expiresIn": 60}
+    resp = client.get(f"/api/attachments/{TICKET_ATT}/download")
+    assert resp.status_code == 200
+    assert resp.content == b"PNG"
+    assert 'attachment; filename="shot.png"' in resp.headers["content-disposition"]
+    inline = client.get(f"/api/attachments/{TICKET_ATT}/download?inline=1")
+    assert inline.headers["content-disposition"].startswith("inline")

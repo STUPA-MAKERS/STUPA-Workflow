@@ -31,4 +31,7 @@ NOTIFICATION_KINDS: tuple[str, ...] = (
     "deadline",
     # GDPR erasure requests: received, executed or rejected.
     "privacy",
+    # A new ticket was reported (holders of ticket.manage). The confirmation to the
+    # reporter (`ticket_received`) is not here, so nobody can switch it off.
+    "ticket_created",
 )

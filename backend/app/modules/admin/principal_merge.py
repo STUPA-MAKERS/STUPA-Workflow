@@ -122,6 +122,7 @@ from app.modules.livevote.models import (
 from app.modules.notifications.models import NotificationPreference
 from app.modules.privacy.models import ErasureRequest
 from app.modules.protocol.models import Protocol
+from app.modules.tickets.models import Ticket, TicketEvent, TicketNote
 from app.modules.voting.models import Ballot, Vote, VotedMarker
 from app.shared.errors import ConflictError, FieldError, NotFoundError, ValidationProblem
 
@@ -151,6 +152,7 @@ AREAS: tuple[MergeArea, ...] = (
     "sessions",
     "memberships",
     "calendar",
+    "tickets",
 )
 
 # Every text column that stores the ``sub`` of a principal, by area. The merge rewrites
@@ -207,6 +209,10 @@ ID_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("meetings", MeetingGuest.decided_by),
     # Never written so far, but it holds a principal id.
     ("config", FormVersion.created_by),
+    ("tickets", Ticket.reporter_principal_id),
+    ("tickets", Ticket.assignee_id),
+    ("tickets", TicketNote.author_id),
+    ("tickets", TicketEvent.actor_id),
 )
 
 # The rows of the source that the merge deletes, by area.

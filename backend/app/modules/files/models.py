@@ -6,13 +6,15 @@ result. The file stays quarantined and nobody can download it until ``scanned`` 
 On a finding the worker deletes the object, sets ``storage_key`` to NULL and writes the
 signature into ``scan_result``.
 
-A row is either bound or a draft (Z4). A bound row has ``application_id``. A draft row
+A row is either bound or a draft (Z4). A bound row has ``application_id`` or
+``ticket_id`` (the attachment of a ticket report). A draft row
 comes from the wizard before the application exists: it has ``draft_token_hash`` and
 ``draft_expires_at`` instead, and its object lives under ``drafts/<id>/``. The create of
 the application binds the draft. It sets ``application_id`` and clears both draft
-columns, and the storage key stays. Two CHECKs make this an exclusive choice. Every
-application-scoped query must filter ``application_id IS NOT NULL`` (``BOUND``), so a
-draft never shows up in an application path.
+columns, and the storage key stays. The ticket create binds the same way with
+``ticket_id``. Two CHECKs make this an exclusive choice. Every application-scoped query
+must filter ``application_id IS NOT NULL`` (``BOUND``), so neither a draft nor a ticket
+attachment shows up in an application path.
 """
 
 from __future__ import annotations
@@ -47,7 +49,8 @@ class Attachment(UUIDPkMixin, Base):
     """An attachment of an application, or a draft upload of the wizard.
 
     ``application_id`` cascades. A deleted application removes its attachments. It is
-    NULL for a draft only.
+    NULL for a draft and for the attachment of a ticket. ``ticket_id`` cascades the
+    same way.
 
     Attributes:
         field_key: Optional link to a form field.
@@ -63,6 +66,9 @@ class Attachment(UUIDPkMixin, Base):
 
     application_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application.id", ondelete="CASCADE"), nullable=True
+    )
+    ticket_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ticket.id", ondelete="CASCADE"), nullable=True
     )
     field_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     filename: Mapped[str] = mapped_column(Text)
@@ -84,9 +90,9 @@ class Attachment(UUIDPkMixin, Base):
         CheckConstraint(
             f"size <= {MAX_ATTACHMENT_BYTES}", name="attachment_size_limit"
         ),
-        # Exactly one owner: an application or a draft token.
+        # Exactly one owner: an application, a ticket or a draft token.
         CheckConstraint(
-            "num_nonnulls(application_id, draft_token_hash) = 1",
+            "num_nonnulls(application_id, ticket_id, draft_token_hash) = 1",
             name="draft_xor_application",
         ),
         # A draft has both draft columns, a bound row has neither.
@@ -95,6 +101,7 @@ class Attachment(UUIDPkMixin, Base):
             name="draft_columns_paired",
         ),
         Index("ix_attachment_application_id", "application_id"),
+        Index("ix_attachment_ticket_id", "ticket_id"),
         # The hourly purge and the token lookup read the drafts only.
         Index(
             "ix_attachment_draft_expires_at",
