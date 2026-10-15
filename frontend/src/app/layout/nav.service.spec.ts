@@ -6,7 +6,7 @@ import type { Principal } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { createLocationMock, provideLocationMock } from '../../testing/location-mock';
 import { ADMIN_PAGES } from '../pages/admin/admin-frame/admin-pages';
-import { ADMIN_AREA_PERMISSIONS, NAV_ITEMS, NavService } from './nav.service';
+import { ADMIN_AREA_PERMISSIONS, BOTTOM_BAR_KEYS, NAV_ITEMS, NavService } from './nav.service';
 import { routes } from '../app.routes';
 
 const BASE: Principal = { sub: '1', roles: ['member'], permissions: [], groups: [] } as unknown as Principal;
@@ -66,6 +66,22 @@ describe('NavService', () => {
     const keys = keysFor({ ...BASE, gremium_permissions: { g1: ['protocol.write'] } });
     expect(keys).toContain('meetings');
     expect(keys).not.toContain('voting');
+  });
+
+  it('opens the gremien for a member of a gremium, after the meetings', () => {
+    const keys = keysFor({ ...BASE, gremien: [{ id: 'g1', name: 'StuPa' }] } as unknown as Principal);
+    expect(keys).toContain('gremien');
+    expect(keys.indexOf('gremien')).toBe(keys.indexOf('meetings') + 1);
+  });
+
+  it('opens the gremien with gremium.view_all, without a membership', () => {
+    const keys = keysFor({ ...BASE, permissions: ['gremium.view_all'] });
+    expect(keys).toContain('gremien');
+    expect(keys).not.toContain('meetings');
+  });
+
+  it('keeps the gremien out of the phone bar', () => {
+    expect(BOTTOM_BAR_KEYS).not.toContain('gremien');
   });
 
   it('points every entry at a route the app has, with the same gate', () => {

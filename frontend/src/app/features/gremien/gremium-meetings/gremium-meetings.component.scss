@@ -1,0 +1,78 @@
+@use '../gremien-tab';
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+
+.gmt__tools {
+  @include gremien-tab.tools;
+}
+.gmt__grow {
+  flex: 1 1 auto;
+}
+.gmt__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--control-height-sm);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  color: var(--color-accent-text);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.gmt__link:hover {
+  background: var(--color-selected);
+}
+.gmt__link:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.gmt__group {
+  @include gremien-tab.group;
+}
+.gmt__head {
+  @include gremien-tab.head;
+}
+.gmt__count {
+  color: var(--color-text-muted);
+  font-weight: var(--fw-medium);
+}
+
+.gmt__sub {
+  @include gremien-tab.parts('.gmt__part');
+}
+
+.gmt__trail {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.gmt__att {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.gmt__attNum {
+  color: var(--color-text);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+.gmt__attLabel {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+.gmt__chev {
+  @include gremien-tab.chevron;
+}
+
+.gmt__status {
+  @include gremien-tab.status;
+}

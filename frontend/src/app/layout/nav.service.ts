@@ -46,6 +46,7 @@ export type NavKey =
   | 'applications'
   | 'tasks'
   | 'meetings'
+  | 'gremien'
   | 'voting'
   | 'budget'
   | 'expenses'
@@ -90,6 +91,16 @@ export const NAV_ITEMS: readonly NavItem[] = [
     // only global key is the read right `meeting.view_all`.
     permissions: ['meeting.view_all'],
     gremiumPermissions: ['session.manage', 'protocol.write'],
+    inAnyCommittee: true,
+    place: 'main',
+  },
+  {
+    key: 'gremien',
+    path: '/gremien',
+    labelKey: 'nav.gremien',
+    icon: 'landmark',
+    // A member sees the own gremien; `gremium.view_all` (and the admin) sees every one.
+    permissions: ['gremium.view_all'],
     inAnyCommittee: true,
     place: 'main',
   },

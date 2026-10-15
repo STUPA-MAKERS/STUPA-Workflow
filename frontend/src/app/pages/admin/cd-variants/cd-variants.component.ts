@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -12,6 +19,8 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
+  SegmentedComponent,
+  type SegmentedOption,
   SelectComponent,
   type SelectOption,
   ToastService,
@@ -21,7 +30,9 @@ import { formatBytes } from '../admin-health/admin-health.util';
 import {
   CD_BASE_VARIANTS,
   CD_LOGO_ACCEPT,
+  CD_LOGO_LIST_ORDER,
   CD_LOGO_SLOTS,
+  CD_SQUARE_LOGO_ACCEPT,
   CD_VARIANT_KEY_MAX,
   CD_VARIANT_KEY_PATTERN,
   type CdBaseVariant,
@@ -29,9 +40,18 @@ import {
   type CdVariant,
   type CdVariantLogo,
   MAX_CD_LOGO_BYTES,
-  VENDORED_LOGO_NAMES,
+  SQUARE_LOGO_MAX_PX,
+  SQUARE_LOGO_MIN_PX,
   slugify,
 } from '../admin.models';
+import {
+  type ImageSize,
+  type SquareVerdict,
+  isSquareLogoType,
+  readImageSize,
+  squareVerdict,
+  variantInitials,
+} from './cd-variants.util';
 
 /** Dialog state of the create/edit form. */
 interface VariantForm {
@@ -40,14 +60,28 @@ interface VariantForm {
   baseVariant: CdBaseVariant;
 }
 
-/** Dialog state of "add a logo". A logo is either an upload or a vendored name. */
+/**
+ * Dialog state of "add a logo". A new logo is always an upload. For the square slot the
+ * dialog also holds an object URL of the file (the preview) and its pixel size.
+ */
 interface LogoDraft {
   variantId: Uuid;
+  variantName: string;
   slot: CdLogoSlot;
-  source: 'upload' | 'vendored';
-  vendoredName: string;
   file: File | null;
+  previewUrl: string | null;
+  size: ImageSize | null;
+  checking: boolean;
 }
+
+/** Message per server error code of a square upload (`check_square_logo`). */
+const SQUARE_ERROR_KEYS: Readonly<Record<string, TranslationKey>> = {
+  logo_not_square: 'admin.cdVariants.serverNotSquare',
+  logo_too_small: 'admin.cdVariants.serverTooSmall',
+  logo_too_many_px: 'admin.cdVariants.serverTooManyPx',
+  logo_unreadable: 'admin.cdVariants.squareUnreadable',
+  logo_type_not_allowed: 'admin.cdVariants.squareType',
+};
 
 function emptyForm(): VariantForm {
   return { key: '', name: '', baseVariant: 'report' };
@@ -62,16 +96,29 @@ function errorStatus(err: unknown): number {
   return 0;
 }
 
+/** The problem+json `code` of a failed request, or '' when the error carries none. */
+function errorCode(err: unknown): string {
+  if (typeof err === 'object' && err !== null && 'error' in err) {
+    const body = (err as { error: unknown }).error;
+    if (typeof body === 'object' && body !== null && 'code' in body) {
+      return String((body as { code: unknown }).code);
+    }
+  }
+  return '';
+}
+
 /**
  * Corporate-design variants (board Admin-Dokument-Varianten): the logo sets a Gremium
- * renders its documents with.
+ * renders its documents with, and the square logo the app shows for a Gremium.
  *
- * A variant carries no color and no font. It only holds an ordered list of logos per
- * slot (title page, page footer) on top of a base variant. A logo is either a name that
- * the render service ships or a file an admin uploaded. One card per variant names its
- * key, its base and the gremien that use it (from the gremium master data); "Logos
- * anzeigen" opens its logo rows (move, download, remove). Create, edit and "add a logo"
- * all run in a dialog. The key is a slug that the name generates, and it is immutable
+ * A variant carries no color and no font. It holds an ordered list of logos per PDF slot
+ * (title page, page footer) on top of a base variant, and at most one square 1:1 logo.
+ * A new logo is always an upload; a logo that the render service ships (an older row)
+ * still shows until the worker converts it. One row per variant shows the square logo
+ * (or an outlined placeholder with the initials), the name, the key, the base and the
+ * gremien that use it; "Logos anzeigen" opens its logo rows (move, download, remove; the
+ * square logo has no move). Create, edit and "add a logo" run in a dialog, which is a
+ * bottom sheet on a phone. The key is a slug that the name generates, and it is immutable
  * after the create, because the renderer refers to it.
  */
 @Component({
@@ -86,6 +133,7 @@ function errorStatus(err: unknown): number {
     IconComponent,
     InputComponent,
     NoteComponent,
+    SegmentedComponent,
     SelectComponent,
     SkeletonComponent,
     PageHeaderComponent,
@@ -97,6 +145,9 @@ export class AdminCdVariantsComponent {
   private readonly api = inject(AdminApiService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+
+  /** Reads the pixel size of the picked square file. Tests replace it: jsdom loads no image. */
+  readImageSize: (url: string) => Promise<ImageSize> = (url) => readImageSize(url);
 
   readonly variants = signal<CdVariant[]>([]);
   readonly loading = signal(true);
@@ -120,30 +171,37 @@ export class AdminCdVariantsComponent {
   readonly logoSaving = signal(false);
   readonly logoError = signal<TranslationKey | null>(null);
 
-  readonly slots = CD_LOGO_SLOTS;
-  readonly accept = CD_LOGO_ACCEPT;
+  readonly listOrder = CD_LOGO_LIST_ORDER;
   readonly maxMb = Math.round(MAX_CD_LOGO_BYTES / (1024 * 1024));
+  readonly minPx = SQUARE_LOGO_MIN_PX;
+
+  /** Ids of square logos whose image failed to load: they show the placeholder. */
+  readonly brokenThumbs = signal<ReadonlySet<Uuid>>(new Set());
 
   readonly baseOptions = computed<SelectOption[]>(() =>
     CD_BASE_VARIANTS.map((v) => ({ value: v, label: this.baseLabel(v) })),
   );
-  readonly vendoredOptions: SelectOption[] = VENDORED_LOGO_NAMES.map((n) => ({
-    value: n,
-    label: n,
-  }));
-  readonly sourceOptions = computed<SelectOption[]>(() => [
-    { value: 'upload', label: this.i18n.translate('admin.cdVariants.sourceUpload') },
-    { value: 'vendored', label: this.i18n.translate('admin.cdVariants.sourceVendored') },
-  ]);
 
-  readonly slotOptions = computed<SelectOption[]>(() =>
-    this.slots.map((s) => ({ value: s, label: this.slotLabel(s) })),
+  readonly slotOptions = computed<SegmentedOption[]>(() =>
+    CD_LOGO_SLOTS.map((s) => ({ value: s, label: this.slotLabel(s) })),
   );
+
+  /** The file types of the picker: raster only for the square slot. */
+  readonly accept = computed(() =>
+    this.logoDraft()?.slot === 'square' ? CD_SQUARE_LOGO_ACCEPT : CD_LOGO_ACCEPT,
+  );
+
+  /** The client verdict on the picked square file, once its size is known. */
+  readonly verdict = computed<SquareVerdict | null>(() => {
+    const size = this.logoDraft()?.size;
+    return size ? squareVerdict(size) : null;
+  });
 
   /** Gremium names per variant id, from the gremium master data. */
   private readonly usedBy = signal<ReadonlyMap<string, string[]>>(new Map());
 
   constructor() {
+    inject(DestroyRef).onDestroy(() => this.revokePreview());
     this.reload();
     // The master data names the variant of each gremium. A failed read leaves the
     // "genutzt von" part out.
@@ -216,6 +274,38 @@ export class AdminCdVariantsComponent {
   /** Download URL of an uploaded logo. The server always answers `attachment`. */
   fileUrl(logo: CdVariantLogo): string {
     return this.api.cdVariantLogoFileUrl(logo.id);
+  }
+
+  /** The uploaded square logo of a variant whose image loads, else null. */
+  squareLogo(variant: CdVariant): CdVariantLogo | null {
+    const logo = variant.logos.find((l) => l.slot === 'square' && !!l.fileName);
+    return logo && !this.brokenThumbs().has(logo.id) ? logo : null;
+  }
+
+  /** Inline image URL of a square logo. */
+  squareUrl(logo: CdVariantLogo): string {
+    return this.api.cdVariantSquareLogoUrl(logo.id);
+  }
+
+  /** A thumbnail failed to load: show the placeholder instead. */
+  thumbFailed(logo: CdVariantLogo): void {
+    this.brokenThumbs.update((set) => new Set([...set, logo.id]));
+  }
+
+  /** The letters of the placeholder of a variant without a square logo. */
+  initials(name: string): string {
+    return variantInitials(name);
+  }
+
+  /** "512 × 512 px · quadratisch, groß genug" or the reason why the file does not fit. */
+  verdictText(size: ImageSize): string {
+    const key = `admin.cdVariants.square.${squareVerdict(size)}` as TranslationKey;
+    return this.i18n.translate(key, { w: size.width, h: size.height, min: this.minPx });
+  }
+
+  /** The name in the preview row: the first Gremium that uses the variant, else the variant. */
+  previewName(draft: LogoDraft): string {
+    return this.usedBy().get(draft.variantId)?.[0] ?? draft.variantName;
   }
 
   toggle(id: Uuid): void {
@@ -339,59 +429,108 @@ export class AdminCdVariantsComponent {
 
   // --- logos ---------------------------------------------------------------
 
-  openLogoDialog(variantId: Uuid, slot: CdLogoSlot = 'title'): void {
+  openLogoDialog(variant: CdVariant, slot: CdLogoSlot = 'title'): void {
+    this.revokePreview();
     this.logoError.set(null);
     this.logoDraft.set({
-      variantId,
+      variantId: variant.id,
+      variantName: variant.name,
       slot,
-      source: 'upload',
-      vendoredName: VENDORED_LOGO_NAMES[0],
       file: null,
+      previewUrl: null,
+      size: null,
+      checking: false,
     });
   }
 
   closeLogoDialog(): void {
+    this.revokePreview();
     this.logoDraft.set(null);
   }
 
-  patchLogo<K extends keyof LogoDraft>(key: K, value: LogoDraft[K]): void {
-    this.logoDraft.update((d) => (d ? { ...d, [key]: value } : d));
+  /** A new slot drops the picked file, because the allowed types differ per slot. */
+  setSlot(slot: string | null): void {
+    const draft = this.logoDraft();
+    if (!draft || !slot || draft.slot === slot) return;
+    this.revokePreview();
+    this.logoError.set(null);
+    this.logoDraft.set({ ...draft, slot: slot as CdLogoSlot, ...this.noFile() });
   }
 
-  /** Read the picked file and reject anything above the server cap up front. */
+  /**
+   * Read the picked file and reject what the server would refuse: a file above the cap,
+   * and for the square slot a type other than PNG, JPEG or WebP. A square file then loads
+   * as an image, for the preview and the size check.
+   */
   onFileSelected(input: HTMLInputElement): void {
+    const draft = this.logoDraft();
+    if (!draft) return;
     const file = input.files?.[0] ?? null;
+    this.revokePreview();
+    this.logoError.set(null);
     if (file && file.size > MAX_CD_LOGO_BYTES) {
       this.logoError.set('admin.cdVariants.logoTooLarge');
-      this.patchLogo('file', null);
+      this.logoDraft.set({ ...draft, ...this.noFile() });
       return;
     }
-    this.logoError.set(null);
-    this.patchLogo('file', file);
+    if (!file || draft.slot !== 'square') {
+      this.logoDraft.set({ ...draft, ...this.noFile(), file });
+      return;
+    }
+    if (!isSquareLogoType(file)) {
+      this.logoError.set('admin.cdVariants.squareType');
+      this.logoDraft.set({ ...draft, ...this.noFile() });
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    this.logoDraft.set({ ...draft, file, previewUrl: url, size: null, checking: true });
+    this.readImageSize(url).then(
+      (size) => this.applyIfCurrent(file, { size, checking: false }),
+      () => {
+        if (this.applyIfCurrent(file, { checking: false })) {
+          this.logoError.set('admin.cdVariants.squareUnreadable');
+        }
+      },
+    );
+  }
+
+  private noFile(): Pick<LogoDraft, 'file' | 'previewUrl' | 'size' | 'checking'> {
+    return { file: null, previewUrl: null, size: null, checking: false };
+  }
+
+  /** Patch the draft only while it still holds `file`: a later pick wins. */
+  private applyIfCurrent(file: File, patch: Partial<LogoDraft>): boolean {
+    const draft = this.logoDraft();
+    if (draft?.file !== file) return false;
+    this.logoDraft.set({ ...draft, ...patch });
+    return true;
+  }
+
+  private revokePreview(): void {
+    const url = this.logoDraft()?.previewUrl;
+    if (url) URL.revokeObjectURL(url);
   }
 
   canSaveLogo(): boolean {
     const draft = this.logoDraft();
-    if (!draft || this.logoSaving()) return false;
-    return draft.source === 'upload' ? draft.file !== null : !!draft.vendoredName;
+    if (!draft?.file || this.logoSaving()) return false;
+    return draft.slot !== 'square' || this.verdict() === 'ok';
   }
 
   saveLogo(): void {
     const draft = this.logoDraft();
-    if (!draft || !this.canSaveLogo()) return;
+    if (!draft?.file || !this.canSaveLogo()) return;
     this.logoSaving.set(true);
     this.logoError.set(null);
-    const request =
-      draft.source === 'upload' && draft.file
-        ? this.api.uploadCdVariantLogo(draft.variantId, draft.slot, draft.file)
-        : this.api.addCdVariantVendoredLogo(draft.variantId, draft.slot, draft.vendoredName);
-    request.subscribe({
+    this.api.uploadCdVariantLogo(draft.variantId, draft.slot, draft.file).subscribe({
       next: (logo) => {
         this.logoSaving.set(false);
-        this.logoDraft.set(null);
+        this.closeLogoDialog();
+        // A square logo replaces the one that the variant held.
+        const keep = (l: CdVariantLogo) => logo.slot !== 'square' || l.slot !== 'square';
         this.variants.update((list) =>
           list.map((v) =>
-            v.id === draft.variantId ? { ...v, logos: [...v.logos, logo] } : v,
+            v.id === draft.variantId ? { ...v, logos: [...v.logos.filter(keep), logo] } : v,
           ),
         );
         this.toast.success(this.i18n.translate('admin.common.saved'));
@@ -399,11 +538,11 @@ export class AdminCdVariantsComponent {
       error: (err: unknown) => {
         this.logoSaving.set(false);
         const status = errorStatus(err);
-        let key: TranslationKey = 'admin.common.saveFailed';
-        if (status === 413) key = 'admin.cdVariants.logoTooLarge';
-        else if (status === 415) key = 'admin.cdVariants.logoType';
+        let key: TranslationKey = SQUARE_ERROR_KEYS[errorCode(err)] ?? 'admin.common.saveFailed';
+        if (key === 'admin.common.saveFailed' && status === 413) key = 'admin.cdVariants.logoTooLarge';
+        else if (key === 'admin.common.saveFailed' && status === 415) key = 'admin.cdVariants.logoType';
         this.logoError.set(key);
-        this.toast.error(this.i18n.translate(key));
+        this.toast.error(this.i18n.translate(key, { min: this.minPx, max: SQUARE_LOGO_MAX_PX }));
       },
     });
   }

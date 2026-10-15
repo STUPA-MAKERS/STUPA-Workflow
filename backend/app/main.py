@@ -48,6 +48,7 @@ from app.modules.flow.dispatch import ActionDispatcher, build_worker_dispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.flow.router import router as flow_router
 from app.modules.forms.router import router as forms_router
+from app.modules.gremien.router import router as gremien_tab_router
 from app.modules.livevote.broker import RedisBroker
 from app.modules.livevote.locks import RedisLocker
 from app.modules.livevote.public_router import router as public_meeting_router
@@ -114,6 +115,7 @@ api_router.include_router(privacy_router)
 api_router.include_router(backup_router)
 api_router.include_router(search_router)
 api_router.include_router(gremien_authed_router)
+api_router.include_router(gremien_tab_router)
 api_router.include_router(site_config_public_router)
 
 

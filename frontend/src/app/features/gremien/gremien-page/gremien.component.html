@@ -1,0 +1,132 @@
+<div class="grl" [class.grl--split]="split()">
+  <app-list-detail [detailOpen]="selectedId() !== null" (back)="closeDetail()">
+    <section list class="ld-pane grl__pane" aria-labelledby="grl-title">
+      <app-page-header [pane]="true" titleId="grl-title" [title]="'gremien.title' | t">
+        <ng-container ngProjectAs="[actions]">
+          @if (phone()) {
+            <app-row-menu
+              [label]="'gremien.list.menu' | t"
+              [sections]="phoneMenu()"
+              (selected)="onPhoneMenu($event, abo)"
+            />
+          } @else {
+            <app-button
+              variant="text"
+              [iconOnly]="true"
+              [ariaLabel]="'gremien.list.subscribe' | t"
+              [ariaPressed]="abo.isOpen()"
+              (click)="abo.toggle($event.currentTarget)"
+            ><app-icon name="cal" [size]="21" /></app-button>
+          }
+          <app-calendar-subscribe #abo />
+        </ng-container>
+      </app-page-header>
+
+      <!-- The search and the chip never scroll away. -->
+      <app-sticky-bar class="ld-pane__filters">
+        <app-search-pill
+          [size]="phone() ? 'md' : 'lg'"
+          [placeholder]="searchPlaceholder()"
+          [label]="'gremien.list.searchLabel' | t"
+          [clearable]="true"
+          [value]="query()"
+          (valueChange)="query.set($event)"
+        />
+        @if (viewAll()) {
+          <div class="grl__chips">
+            <app-filter-select
+              class="grl__chip"
+              icon="check"
+              [chevron]="false"
+              [label]="'gremien.list.show' | t"
+              [options]="scopeOptions()"
+              [value]="scope()"
+              (valueChange)="setScope($event)"
+              [text]="scopeText()"
+              [active]="true"
+            />
+          </div>
+        }
+      </app-sticky-bar>
+
+      <div class="grl__scroll" appScrollFade="y">
+        @if (store.loading()) {
+          <app-skeleton variant="rows" [count]="5" [label]="'gremien.list.loading' | t" />
+        } @else if (store.error()) {
+          <div class="grl__status" role="alert">
+            <span>{{ 'gremien.list.error' | t }}</span>
+            <app-button variant="text" size="sm" (click)="store.load()">
+              <app-icon name="repeat" [size]="15" />
+              {{ 'gremien.list.retry' | t }}
+            </app-button>
+          </div>
+        } @else if (!mine().length && !others().length) {
+          @if (query().trim()) {
+            <p class="grl__status">{{ 'gremien.list.noMatch' | t }}</p>
+          } @else {
+            <app-empty-state
+              class="grl__empty"
+              icon="landmark"
+              [heading]="'gremien.list.empty' | t"
+              [body]="'gremien.list.emptyBody' | t"
+            />
+          }
+        } @else {
+          @if (mine().length) {
+            <ng-container
+              *ngTemplateOutlet="group; context: { $implicit: mine(), key: 'mine', label: 'gremien.list.mine' | t }"
+            />
+          }
+          @if (others().length) {
+            <ng-container
+              *ngTemplateOutlet="group; context: { $implicit: others(), key: 'others', label: 'gremien.list.others' | t }"
+            />
+          }
+        }
+      </div>
+    </section>
+
+    <div detail class="grl__detail">
+      <router-outlet />
+    </div>
+  </app-list-detail>
+</div>
+
+<ng-template #group let-rows let-key="key" let-label="label">
+  <section class="grl__group" [attr.aria-labelledby]="'grl-g-' + key">
+    <h2 class="sec grl__head" [id]="'grl-g-' + key">
+      {{ label }} <span class="grl__count">{{ rows.length }}</span>
+    </h2>
+    <div class="grl__rows" [class.rowgroup]="!split()" role="list">
+      @for (row of rows; track row.item.id) {
+        <app-list-item
+          role="listitem"
+          class="grl__row"
+          [title]="row.item.name"
+          [sub]="row.sub"
+          [link]="['/gremien', row.item.id]"
+          linkQueryParamsHandling="preserve"
+          [selected]="row.item.id === selectedId()"
+        >
+          <app-gremium-logo lead [name]="row.item.name" [logoUrl]="row.item.logoUrl" />
+          <span trail class="grl__trail">
+            @switch (row.next.kind) {
+              @case ('live') {
+                <span class="grl__live">{{ 'gremien.list.live' | t }}</span>
+              }
+              @case ('date') {
+                <span class="grl__next num" [title]="row.next.title">{{ row.next.text }}</span>
+              }
+              @default {
+                <span class="grl__none">{{ 'gremien.list.nonePlanned' | t }}</span>
+              }
+            }
+            @if (!split()) {
+              <app-icon class="grl__chev" name="chevron-right" [size]="17" />
+            }
+          </span>
+        </app-list-item>
+      }
+    </div>
+  </section>
+</ng-template>

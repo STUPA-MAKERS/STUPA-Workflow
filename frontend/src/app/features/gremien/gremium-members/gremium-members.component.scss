@@ -1,0 +1,134 @@
+@use 'breakpoints' as bp;
+@use '../gremien-tab';
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+
+.gmb__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.gmb__search {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.gmb__chips {
+  @include gremien-tab.tools;
+}
+
+/* The column labels above the rows (desktop). */
+.gmb__cols {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 var(--space-4);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.gmb__colLead {
+  width: 2rem;
+  flex: none;
+}
+.gmb__colName {
+  flex: 1 1 auto;
+}
+.gmb__colMail {
+  flex: 0 1 15rem;
+}
+
+.gmb__group {
+  @include gremien-tab.group;
+}
+.gmb__head {
+  @include gremien-tab.head;
+}
+.gmb__count {
+  color: var(--color-text-muted);
+  font-weight: var(--fw-medium);
+}
+
+.gmb__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gmb__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 60px;
+  padding: var(--space-2) var(--space-4);
+}
+.gmb__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.gmb__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+}
+.gmb__nameText {
+  overflow-wrap: anywhere;
+}
+.gmb__you {
+  display: inline-flex;
+  align-items: center;
+  height: 1.25rem;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: 0.6875rem;
+  font-weight: var(--fw-semibold);
+}
+.gmb__period {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+/* An address is never cut: it wraps anywhere and stays fully readable. */
+.gmb__mail {
+  flex: 0 1 15rem;
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+.gmb__mail:hover {
+  color: var(--color-accent-text);
+  text-decoration: underline;
+}
+.gmb__mail:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.gmb__status {
+  @include gremien-tab.status;
+}
+
+@include bp.phone {
+  .gmb__search {
+    flex-basis: 100%;
+  }
+  .gmb__row {
+    padding-inline: var(--space-3);
+  }
+}

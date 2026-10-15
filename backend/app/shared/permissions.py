@@ -57,6 +57,11 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     # gremium permission session.manage. The audit log records each delete as
     # meeting_delete.
     "meeting.delete_finalized",
+    # A global READ permission that only adds. The holder sees every Gremium in the tab
+    # "Gremien": its members with their e-mail addresses, its meetings and the
+    # attendance per member and month. Without it a member sees the own Gremien only.
+    # The decisions of a Gremium keep the read scope of the votes (`meeting.view_all`).
+    "gremium.view_all",
     "budget.view",
     "budget.structure",
     "budget.book",

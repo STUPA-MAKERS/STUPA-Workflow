@@ -292,7 +292,7 @@ def test_logo_table_holds_the_exactly_one_of_constraint() -> None:
     assert checks["ck_cd_variant_logo_source"] == (
         "(vendored_name IS NULL) <> (object_key IS NULL)"
     )
-    assert checks["ck_cd_variant_logo_slot"] == "slot IN ('title','footer')"
+    assert checks["ck_cd_variant_logo_slot"] == "slot IN ('title','footer','square')"
 
 
 def test_variant_table_holds_the_base_variant_constraint() -> None:

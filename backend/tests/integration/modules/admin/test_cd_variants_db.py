@@ -6,6 +6,7 @@ manual SQL can write a broken row.
 
 * `ck_cd_variant_logo_source` — a logo is EITHER vendored OR uploaded.
 * `ck_cd_variant_logo_slot` and `ck_cd_variant_base_variant` — closed value sets.
+* `uq_cd_variant_logo_square` — at most one square logo per variant.
 * `fk_gremium_cd_variant_id_cd_variant` is RESTRICT — a variant that a Gremium
   still uses cannot be deleted, so the Gremium is never orphaned.
 * The seed reproduces the five variants of before with vendored logos only.
@@ -14,6 +15,8 @@ manual SQL can write a broken row.
 from __future__ import annotations
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import IntegrityError
 
@@ -171,6 +174,51 @@ def test_old_free_text_column_is_gone(engine: Engine) -> None:
     assert exists is False
 
 
+def _insert_square(conn, vid: str, key: str) -> None:  # noqa: ANN001
+    conn.execute(
+        text(
+            "INSERT INTO cd_variant_logo (variant_id, slot, object_key, file_name, mime, size) "
+            "VALUES (:v, 'square', :k, 'q.png', 'image/png', 10)"
+        ),
+        {"v": vid, "k": key},
+    )
+
+
+def test_one_square_logo_per_variant(engine: Engine) -> None:
+    """`uq_cd_variant_logo_square` allows one square row per variant, any number of others."""
+    with engine.begin() as conn:
+        _insert_square(conn, _variant_id(conn, "stupa"), "cd-logos/a/q.png")
+        _insert_square(conn, _variant_id(conn, "asta"), "cd-logos/b/q.png")
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        _insert_square(conn, _variant_id(conn, "stupa"), "cd-logos/c/q.png")
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM cd_variant_logo WHERE slot = 'square'"))
+
+
+def test_square_migration_round_trip(alembic_cfg: Config, engine: Engine) -> None:
+    """The downgrade drops the square rows and the index; the upgrade restores both rules."""
+    with engine.begin() as conn:
+        _insert_square(conn, _variant_id(conn, "stupa"), "cd-logos/a/q.png")
+    command.downgrade(alembic_cfg, "4e1b7a93c2d5")
+    with engine.connect() as conn:
+        squares = conn.execute(
+            text("SELECT count(*) FROM cd_variant_logo WHERE slot = 'square'")
+        ).scalar_one()
+        index = conn.execute(
+            text("SELECT to_regclass('uq_cd_variant_logo_square') IS NOT NULL")
+        ).scalar_one()
+    assert squares == 0 and index is False
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        _insert_square(conn, _variant_id(conn, "stupa"), "cd-logos/a/q.png")
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        _insert_square(conn, _variant_id(conn, "stupa"), "cd-logos/a/q.png")
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        _insert_square(conn, _variant_id(conn, "stupa"), "cd-logos/b/q.png")
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM cd_variant_logo WHERE slot = 'square'"))
+
+
 def test_upgrade_from_an_installed_database(engine: Engine) -> None:
     """Drive the branch that the normal chain never reaches.
 
@@ -240,6 +288,25 @@ def test_upgrade_from_an_installed_database(engine: Engine) -> None:
     assert ("stupa", "stupa") in [tuple(r) for r in backfilled]
     assert ("asta", "asta") in [tuple(r) for r in backfilled]
     assert old_column is False
+
+    # The rebuild left the tables at revision ec167d091656. Re-apply the square
+    # slot of a3f9c2d71e4b, so the tests that run later see the head schema.
+    with engine.begin() as conn:
+        conn.execute(
+            text("ALTER TABLE cd_variant_logo DROP CONSTRAINT IF EXISTS ck_cd_variant_logo_slot")
+        )
+        conn.execute(
+            text(
+                "ALTER TABLE cd_variant_logo ADD CONSTRAINT ck_cd_variant_logo_slot "
+                "CHECK (slot IN ('title', 'footer', 'square'))"
+            )
+        )
+        conn.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_cd_variant_logo_square "
+                "ON cd_variant_logo (variant_id) WHERE slot = 'square'"
+            )
+        )
 
 
 def test_admin_role_holds_the_new_permission(engine: Engine) -> None:

@@ -1,0 +1,113 @@
+<div class="gdc__tools">
+  <app-search-pill
+    class="gdc__search"
+    size="md"
+    [placeholder]="'gremien.decisions.search' | t"
+    [label]="'gremien.decisions.searchLabel' | t"
+    [clearable]="true"
+    [busy]="search.pending()"
+    [value]="search.text()"
+    (valueChange)="search.set($event)"
+    (commit)="search.flush()"
+  />
+  <div class="gdc__chips" role="group" [attr.aria-label]="'gremien.filters' | t">
+    <app-filter-select
+      [label]="'gremien.decisions.result' | t"
+      [options]="resultOptions()"
+      [value]="result()"
+      (valueChange)="setResult($event)"
+      [text]="resultText()"
+      [active]="result() !== ''"
+      [icon]="result() ? 'check' : null"
+      [chevron]="!result()"
+    />
+    <app-filter-select
+      [label]="'gremien.decisions.kind' | t"
+      [options]="kindOptions()"
+      [value]="kind()"
+      (valueChange)="setKind($event)"
+      [text]="kindText()"
+      [active]="kind() !== ''"
+      [icon]="kind() ? 'check' : null"
+      [chevron]="!kind()"
+    />
+    @if (!phone()) {
+      <app-filter-select
+        [label]="'gremien.decisions.since' | t"
+        [options]="sinceOptions()"
+        [value]="since()"
+        (valueChange)="setSince($event)"
+        [text]="sinceText()"
+        [active]="since() !== ''"
+        [icon]="since() ? 'check' : null"
+        [chevron]="!since()"
+      />
+    }
+  </div>
+</div>
+
+@if (loading() && !items().length) {
+  <app-skeleton variant="rows" [count]="5" [label]="'gremien.decisions.loading' | t" />
+} @else if (error()) {
+  <div class="gdc__status" role="alert">
+    <span>{{ 'gremien.decisions.error' | t }}</span>
+    <app-button variant="text" size="sm" (click)="load()">{{ 'gremien.list.retry' | t }}</app-button>
+  </div>
+} @else if (!groups().length) {
+  @if (filterActive()) {
+    <p class="gdc__status">{{ 'gremien.decisions.noMatch' | t }}</p>
+  } @else {
+    <app-empty-state icon="vote" [heading]="'gremien.decisions.empty' | t" />
+  }
+} @else {
+  @for (g of groups(); track g.key) {
+    <section class="gdc__group" [attr.aria-labelledby]="'gdc-g-' + $index">
+      <h3 class="sec gdc__head" [id]="'gdc-g-' + $index">
+        {{ g.label }} <span class="gdc__meeting">{{ g.meeting }}</span>
+      </h3>
+      <div class="rowgroup" role="list">
+        @for (row of g.rows; track row.decision.id) {
+          <app-list-item
+            role="listitem"
+            class="gdc__row"
+            [title]="row.title"
+            [link]="['/voting', row.decision.id]"
+            [wrap]="true"
+          >
+            @if (!phone()) {
+              <app-icon lead class="gdc__lead" name="vote" [size]="20" />
+            }
+            <span sub class="gdc__sub">
+              @if (phone()) {
+                <span class="gdc__part">
+                  <app-status-text [kind]="row.status.kind">{{ row.status.key | t }}</app-status-text>
+                </span>
+              }
+              @for (p of row.parts; track $index) {
+                <span class="gdc__part">{{ p }}</span>
+              }
+            </span>
+            <span trail class="gdc__trail">
+              @if (!phone()) {
+                <app-status-text [kind]="row.status.kind"
+                  >{{ row.status.key | t }}@if (row.elected) {: {{ row.elected }}}</app-status-text
+                >
+              }
+              <app-icon class="gdc__chev" name="chevron-right" [size]="17" />
+            </span>
+          </app-list-item>
+        }
+      </div>
+    </section>
+  }
+  @if (nextCursor()) {
+    <div class="gdc__more">
+      @if (moreError()) {
+        <span class="gdc__status" role="alert">{{ 'gremien.decisions.moreError' | t }}</span>
+      }
+      <app-button variant="tonal" [disabled]="loadingMore()" (click)="loadMore()">
+        {{ 'gremien.decisions.more' | t }}
+      </app-button>
+    </div>
+  }
+}
