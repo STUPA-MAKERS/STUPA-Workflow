@@ -85,6 +85,17 @@ class PermissionOps(MeetingServiceBase):
         """
         return await self.can_write(await self._get(meeting_id), principal)
 
+    async def can_set_current_item(self, meeting: Meeting, principal: Principal) -> bool:
+        """Check who sets the current agenda item: the protokollant of the meeting only.
+
+        The session lead, a gremium role and the admin role do not pass, because the
+        current item moves the beamer and every follower. The scope cap applies: a
+        token without `protocol.write` in its scope cannot set it.
+        """
+        return principal.scope_allows("protocol.write") and await self._is_protokollant(
+            meeting, principal
+        )
+
     async def can_manage_votes(self, meeting: Meeting, principal: Principal) -> bool:
         """Check who opens and closes votes: manager, protokollant, or `vote.manage`.
 

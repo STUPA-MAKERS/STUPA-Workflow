@@ -179,13 +179,15 @@ async def test_handover_now_ends_the_running_period(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
     s = await seed(maker, status="planned", items=2)
-    _, anna = await _member(maker, s.gremium_id, "Anna", ["protocol.write"])
+    anna_sub, anna = await _member(maker, s.gremium_id, "Anna", ["protocol.write"])
     _, bert = await _member(maker, s.gremium_id, "Bert", ["protocol.write"])
     await _set_keeper(maker, s.meeting_id, anna, current=s.item_ids[0])
     url = f"/api/meetings/{s.meeting_id}"
     with TestClient(api) as client:
         assert client.patch(url, json={"status": "live"}).status_code == 200
+        _as(api, anna_sub)
         moved = client.patch(url, json={"currentAgendaItemId": str(s.item_ids[1])})
+        _as(api, None)
         assert moved.status_code == 200, moved.text
         resp = client.post(
             f"{url}/protokollant-handover", json={"principalId": str(bert), "mode": "now"}
@@ -202,7 +204,7 @@ async def test_next_item_starts_on_a_forward_move(
     maker: async_sessionmaker[AsyncSession], api: FastAPI, states: list[MeetingOut]
 ) -> None:
     s = await seed(maker, status="planned", items=3)
-    _, anna = await _member(maker, s.gremium_id, "Anna", ["protocol.write"])
+    anna_sub, anna = await _member(maker, s.gremium_id, "Anna", ["protocol.write"])
     _, bert = await _member(maker, s.gremium_id, "Bert", ["protocol.write"])
     await _set_keeper(maker, s.meeting_id, anna, current=s.item_ids[1])
     url = f"/api/meetings/{s.meeting_id}"
@@ -216,6 +218,10 @@ async def test_next_item_starts_on_a_forward_move(
         assert planned.json()["protokollantId"] == str(anna)
         assert planned.json()["plannedHandover"]["principalId"] == str(bert)
         assert planned.json()["plannedHandover"]["fromAt"] is None
+        # Only the protokollant moves the current agenda item.
+        refused = client.patch(url, json={"currentAgendaItemId": str(s.item_ids[0])})
+        assert refused.status_code == 403
+        _as(api, anna_sub)
         # A move back keeps the plan.
         back = client.patch(url, json={"currentAgendaItemId": str(s.item_ids[0])})
         assert back.json()["plannedHandover"] is not None
@@ -244,7 +250,7 @@ async def test_planned_keeper_is_checked_again_on_the_move(
 ) -> None:
     """O20: the start of a planned period checks the new keeper again."""
     s = await seed(maker, status="live", items=2)
-    _, anna = await _member(maker, s.gremium_id, "Anna", ["protocol.write"])
+    anna_sub, anna = await _member(maker, s.gremium_id, "Anna", ["protocol.write"])
     _, bert = await _member(maker, s.gremium_id, "Bert", ["protocol.write"])
     await _set_keeper(maker, s.meeting_id, anna, current=s.item_ids[0])
     url = f"/api/meetings/{s.meeting_id}"
@@ -267,6 +273,7 @@ async def test_planned_keeper_is_checked_again_on_the_move(
                 assert role is not None
                 role.permissions = ["vote.cast"]
             await session.commit()
+        _as(api, anna_sub)
         moved = client.patch(url, json={"currentAgendaItemId": str(s.item_ids[1])})
     assert moved.status_code == 200, moved.text
     body = moved.json()

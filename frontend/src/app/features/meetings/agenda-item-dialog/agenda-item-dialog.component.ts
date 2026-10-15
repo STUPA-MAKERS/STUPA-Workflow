@@ -75,7 +75,7 @@ export class AgendaItemDialogComponent {
   /** The server added the item. Carries the new agenda. */
   readonly added = output<AgendaItem[]>();
 
-  readonly kind = signal<AgendaItemKind>('application');
+  readonly kind = signal<AgendaItemKind>('freetext');
   readonly assignable = signal<AssignableApplication[]>([]);
   readonly loading = signal(false);
   readonly query = signal('');
@@ -116,7 +116,8 @@ export class AgendaItemDialogComponent {
   }
 
   private reset(): void {
-    this.kind.set('application');
+    // Most new items are free text; an application item is one tap away.
+    this.kind.set('freetext');
     this.query.set('');
     this.pick.set(null);
     this.freetext.set('');
