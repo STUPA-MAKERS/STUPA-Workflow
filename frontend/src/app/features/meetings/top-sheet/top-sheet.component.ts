@@ -2,10 +2,17 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
+  type ElementRef,
   inject,
   input,
+  model,
   output,
+  signal,
+  untracked,
+  viewChild,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -67,6 +74,7 @@ const TOOLS: readonly FormatTool[] = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FormsModule,
     RouterLink,
     TranslatePipe,
     IconComponent,
@@ -108,12 +116,89 @@ export class TopSheetComponent {
    * below the title, and the text without a protocol of the viewer.
    */
   readonly follow = input(false);
+  /**
+   * The viewer may rename a free-text item (`canChangeAgenda`). A click on the title
+   * then opens the title field in place of the heading. An application item keeps the
+   * title of its application.
+   */
+  readonly canRename = input(false);
+  /** The item in the inline rename of the agenda, shared with the agenda pane. */
+  readonly renamingTopId = input<Uuid | null>(null);
+  readonly renameDraft = model<string>('');
 
   readonly bodyChange = output<{ itemId: Uuid; body: string }>();
   /** "Finalisieren & versenden" in the protocol bar of a closed meeting. */
   readonly finalize = output<void>();
+  readonly startRename = output<AgendaItem>();
+  readonly cancelRename = output<void>();
+  readonly renameTop = output<AgendaItem>();
 
   protected readonly tools = TOOLS;
+
+  /**
+   * The item whose rename started from this heading. The agenda pane shows its own field
+   * for a rename from its row menu, so the heading shows the field only for its own rename.
+   */
+  private readonly renamingHere = signal<Uuid | null>(null);
+  private readonly titleInput = viewChild<ElementRef<HTMLInputElement>>('titleInput');
+
+  /** The title of the open item can change here. */
+  protected readonly titleRenamable = computed(() => {
+    const t = this.top();
+    return this.canRename() && !this.follow() && !!t && !t.applicationId;
+  });
+  /** The heading shows the title field. */
+  protected readonly titleEditing = computed(
+    () => {
+      const id = this.top()?.id;
+      return this.titleRenamable() && this.renamingHere() === id && this.renamingTopId() === id;
+    },
+  );
+
+  constructor() {
+    // The field takes the focus when it opens, with the whole title selected.
+    effect(() => {
+      const el = this.titleInput()?.nativeElement;
+      if (!el) return;
+      el.focus();
+      el.select();
+    });
+    // A rename that ends elsewhere (a save or a cancel in the agenda pane) closes the
+    // field of the heading too. The agenda names the item only after the click, so only
+    // an end after that start counts.
+    let started = false;
+    effect(() => {
+      const id = this.renamingTopId();
+      const here = untracked(this.renamingHere);
+      if (here !== null && id === here) {
+        started = true;
+      } else if (started) {
+        started = false;
+        this.renamingHere.set(null);
+      }
+    });
+  }
+
+  /** Open the title field of the heading. */
+  protected editTitle(t: AgendaItem): void {
+    this.renamingHere.set(t.id);
+    this.startRename.emit(t);
+  }
+
+  /**
+   * Save the title (Enter or blur). An unchanged or empty title saves nothing, and the
+   * agenda ignores the blur that follows an Enter or an Escape.
+   */
+  protected saveTitle(t: AgendaItem): void {
+    this.renamingHere.set(null);
+    this.renameTop.emit(t);
+  }
+
+  /** Close the title field and keep the old title (Escape). */
+  protected cancelTitle(): void {
+    this.renamingHere.set(null);
+    this.cancelRename.emit();
+  }
 
   /** "TOP 3 · Antrag", or "TOP 3" for a free-text item ("Freitext" says nothing). */
   protected kindLine(t: AgendaItem): string {

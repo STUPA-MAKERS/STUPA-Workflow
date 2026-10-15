@@ -170,8 +170,14 @@
         [saveState]="saveState()"
         [revision]="revision()"
         [finalizing]="finalizing()"
+        [canRename]="canAddTop()"
+        [renamingTopId]="renamingTopId()"
+        [(renameDraft)]="renameDraft"
         (bodyChange)="bodyChange.emit($event)"
         (finalize)="finalize.emit()"
+        (startRename)="startRename.emit($event)"
+        (cancelRename)="cancelRename.emit()"
+        (renameTop)="renameTop.emit($event)"
       />
     }
   </div>
