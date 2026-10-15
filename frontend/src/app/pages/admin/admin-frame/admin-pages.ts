@@ -61,6 +61,7 @@ export const ADMIN_PAGES: readonly AdminPage[] = [
   { link: 'notifications', title: 'admin.nav.notifications', desc: 'admin.nav.notificationsDesc', icon: 'bell', group: 'communication', permissions: ['admin.notifications'] },
   { link: 'mail-templates', title: 'admin.nav.mailTemplates', desc: 'admin.nav.mailTemplatesDesc', icon: 'mail', group: 'communication', permissions: ['admin.notifications'] },
   { link: 'webhooks', title: 'admin.nav.webhooks', desc: 'admin.nav.webhooksDesc', icon: 'webhook', group: 'communication', permissions: ['webhook.manage'] },
+  { link: 'help-tickets', title: 'admin.nav.helpTickets', desc: 'admin.nav.helpTicketsDesc', icon: 'help', group: 'communication', permissions: ['admin.site'] },
   { link: 'audit', title: 'admin.nav.audit', desc: 'admin.nav.auditDesc', icon: 'shieldok', group: 'security', permissions: ['audit.read'] },
   // The lifetimes of an SSO login belong to the people the users permission manages.
   { link: 'login-settings', title: 'admin.nav.loginSettings', desc: 'admin.nav.loginSettingsDesc', icon: 'key', group: 'security', permissions: ['admin.users'] },

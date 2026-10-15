@@ -112,6 +112,11 @@
 .more__item:hover {
   background: var(--color-surface-3);
 }
+/* The label takes the room; a count sits at the end of the row. */
+.more__label {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .more__item.is-active {
   background: var(--color-selected);
 }

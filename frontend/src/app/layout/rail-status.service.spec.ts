@@ -224,4 +224,40 @@ describe('RailStatusService', () => {
     expect(env.svc.taskCount()).toBeNull();
     expect(env.svc.live()).toBe(false);
   });
+
+  it('counts the new tickets only with ticket.manage, and forgets them at sign-out', () => {
+    const env = setup();
+    signIn(env, { ...MEMBER, permissions: ['ticket.manage'] } as Principal);
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    const counts = env.http.expectOne((r) => r.url === '/api/tickets/counts');
+    expect(counts.request.context.get(SKIP_LOADING)).toBe(true);
+    counts.flush({ new: 2, inProgress: 1, done: 0, rejected: 0 });
+    answer(env, 1);
+    expect(env.svc.ticketCount()).toBe(2);
+
+    // A failed count shows no badge, the other marks stay.
+    env.svc.refresh();
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectOne((r) => r.url === '/api/tickets/counts').flush({}, { status: 500, statusText: 'x' });
+    answer(env, 4);
+    expect(env.svc.ticketCount()).toBeNull();
+    expect(env.svc.taskCount()).toBe(4);
+
+    env.svc.refresh();
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectOne((r) => r.url === '/api/tickets/counts').flush({ new: 5, inProgress: 0, done: 0, rejected: 0 });
+    answer(env, 4);
+    env.auth.handleUnauthorized();
+    TestBed.tick();
+    expect(env.svc.ticketCount()).toBeNull();
+  });
+
+  it('does not ask for the tickets without ticket.manage', () => {
+    const env = setup();
+    signIn(env);
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    answer(env, 0);
+    env.http.expectNone((r) => r.url === '/api/tickets/counts');
+    expect(env.svc.ticketCount()).toBeNull();
+  });
 });

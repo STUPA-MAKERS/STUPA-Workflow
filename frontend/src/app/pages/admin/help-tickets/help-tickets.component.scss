@@ -1,0 +1,56 @@
+:host {
+  display: block;
+}
+
+.ht {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.ht__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: 48rem;
+  margin: 0;
+}
+
+.ht__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.ht__secTitle {
+  margin: 0;
+  padding: 0 var(--space-1);
+}
+
+/* The switches share one rounded box, one row each (frame 25). */
+.ht__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  border-radius: var(--radius-field);
+}
+.ht__row {
+  min-height: 64px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-2);
+  justify-content: center;
+}
+.ht__row--split {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+}
+.ht__label {
+  flex: 1 1 12rem;
+  min-width: 0;
+  color: var(--color-text);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}

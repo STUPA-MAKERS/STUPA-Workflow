@@ -83,6 +83,10 @@ export interface PublicSiteConfig {
     /** Show the Gravatar images of the avatars (through the API proxy). Missing = on. */
     gravatarEnabled?: boolean;
   } | null;
+  /** The handbook link of the help menu. Missing on an older server. */
+  help?: { wikiUrl: string };
+  /** Visitors without a session may send a ticket ("Problem melden"). */
+  tickets?: { publicEnabled: boolean };
 }
 
 /** Upload limits of the wizard (`attachmentLimits` of the public site config). */
@@ -1655,7 +1659,9 @@ export type SearchKind =
   | 'expense'
   | 'budget'
   | 'gremium'
-  | 'principal';
+  | 'principal'
+  | 'ticket'
+  | 'todo';
 
 /**
  * One row of the global search (`GET /api/search`).

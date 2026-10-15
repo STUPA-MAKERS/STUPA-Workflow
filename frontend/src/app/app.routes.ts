@@ -335,6 +335,27 @@ export const routes: Routes = [
           import('./pages/invoices/invoices.component').then((m) => m.InvoicesComponent),
       },
       {
+        path: 'tickets',
+        // The tickets of the help menu: the list beside the detail of the open ticket. Only
+        // `ticket.manage`; the server answers 403/404 to anybody else.
+        data: { title: 'nav.tickets', permission: 'ticket.manage', wide: true },
+        canActivate: [authGuard],
+        loadComponent: () => import('./pages/tickets/tickets.component').then((m) => m.TicketsComponent),
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./pages/tickets/tickets-none.component').then((m) => m.TicketsNoneComponent),
+          },
+          {
+            path: ':id',
+            data: { title: 'tickets.detail.crumb', parent: ['tickets'] },
+            loadComponent: () =>
+              import('./pages/tickets/ticket-detail.component').then((m) => m.TicketDetailComponent),
+          },
+        ],
+      },
+      {
         // The admin frame (board Verwaltung): the admin navigation beside every admin
         // page. The frame itself needs only a session; each page below keeps its own
         // permission gate. `wide`: the navigation and the page fill the width. `frame`:
@@ -521,6 +542,15 @@ export const routes: Routes = [
             canActivate: [authGuard],
             loadComponent: () =>
               import('./pages/admin/config/webhooks.component').then((m) => m.WebhooksComponent),
+          },
+          {
+            path: 'help-tickets',
+            data: { title: 'admin.helpTickets.title', permission: 'admin.site', parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/help-tickets/help-tickets.component').then(
+                (m) => m.HelpTicketsComponent,
+              ),
           },
           {
             path: 'gremien/:id/roles',

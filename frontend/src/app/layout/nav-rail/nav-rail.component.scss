@@ -111,6 +111,11 @@
   flex: 1 0 var(--space-4);
 }
 
+.rail__help {
+  flex: none;
+  width: 100%;
+}
+
 .rail__account {
   flex: none;
   margin-top: 8px;

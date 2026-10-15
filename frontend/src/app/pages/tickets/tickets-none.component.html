@@ -1,0 +1,10 @@
+<div class="none">
+  @switch (state()) {
+    @case ('empty') {
+      <app-empty-state icon="ticket" [heading]="'tickets.list.empty' | t" />
+    }
+    @case ('pick') {
+      <app-empty-state icon="ticket" [heading]="'tickets.none' | t" />
+    }
+  }
+</div>

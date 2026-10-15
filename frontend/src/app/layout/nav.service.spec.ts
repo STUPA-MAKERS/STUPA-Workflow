@@ -50,6 +50,11 @@ describe('NavService', () => {
     ]);
   });
 
+  it('opens the tickets with ticket.manage, after the invoices', () => {
+    expect(keysFor({ ...BASE, permissions: ['ticket.manage'] })).toEqual(['start', 'applications', 'tasks', 'tickets']);
+    expect(NAV_ITEMS.findIndex((i) => i.key === 'tickets')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'invoices') + 1);
+  });
+
   it('opens the administration with any area-admin right', () => {
     expect(keysFor({ ...BASE, permissions: ['backup.manage'] })).toContain('admin');
   });

@@ -52,6 +52,10 @@
   flex: 1 1 auto;
 }
 
+.pub__help {
+  flex: none;
+}
+
 /* A chip: globe, code, chevron. The native select keeps the keyboard and the
    platform picker; the icons sit over it and let the clicks through. */
 .pub__icon {

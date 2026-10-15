@@ -40,7 +40,9 @@
             (click)="closeMore()"
           >
             <app-icon [name]="item.icon" [size]="20" />
-            <span class="ell">{{ item.labelKey | t }}</span>
+            <span class="ell more__label">{{ item.labelKey | t }}</span>
+            <app-nav-mark [key]="item.key" part="count" />
+            <app-nav-mark [key]="item.key" part="text" />
           </a>
         }
       </div>
@@ -51,6 +53,7 @@
         <span class="ell">{{ 'search.title' | t }}</span>
       </button>
     </div>
+    <app-help-menu variant="sheet" (navigated)="closeMore()" />
     <app-account-menu variant="sheet" (navigated)="closeMore()" />
   </div>
 </app-side-sheet>

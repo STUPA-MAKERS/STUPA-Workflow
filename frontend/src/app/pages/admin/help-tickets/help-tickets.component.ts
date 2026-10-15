@@ -1,0 +1,177 @@
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { AuthService } from '@core/auth/auth.service';
+import { I18nService } from '@core/i18n/i18n.service';
+import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { PageHeaderComponent } from '@shared/ui';
+import { FilterSelectComponent, type FilterSelectOption } from '@shared/ui/filter-select/filter-select.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import { ButtonComponent, InputComponent, SwitchComponent, ToastService } from '@stupa-makers/ui-kit';
+import { AdminApiService } from '../admin-api.service';
+import type { HelpTicketsSettings } from '../admin.models';
+
+/** The choices of the retention chip, in months. */
+export const RETENTION_CHOICES: readonly number[] = [1, 3, 6, 12, 24, 36, 60, 120];
+/** The retention that the switch turns on with when no earlier value is known. */
+const DEFAULT_RETENTION = 12;
+
+/** An absolute http(s) URL. */
+export function isHttpUrl(text: string): boolean {
+  try {
+    const url = new URL(text.trim());
+    return (url.protocol === 'http:' || url.protocol === 'https:') && !!url.hostname;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * "Hilfe & Tickets" (frame 25, permission `admin.site`): where the help menu leads and how
+ * reports are handled.
+ *
+ * `GET/PUT /admin/help-tickets` saves directly, without the draft of the branding:
+ *
+ * - `wikiUrl`: the handbook link of the help menu, http(s) only.
+ * - `publicEnabled`: visitors without an account may report (e-mail and ALTCHA).
+ * - `notifyNew`: a new ticket mails the holders of `ticket.manage`.
+ * - `retentionMonths`: months after the close until the reporter is anonymized; the
+ *   switch off sends `null` (never).
+ *
+ * "Verwerfen" puts the stored values back. The page shows the form only with
+ * `admin.site` and not after a 403.
+ */
+@Component({
+  selector: 'app-help-tickets',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    FormsModule,
+    TranslatePipe,
+    PageHeaderComponent,
+    FilterSelectComponent,
+    ButtonComponent,
+    InputComponent,
+    NoteComponent,
+    SkeletonComponent,
+    SwitchComponent,
+  ],
+  templateUrl: './help-tickets.component.html',
+  styleUrl: './help-tickets.component.scss',
+})
+export class HelpTicketsComponent {
+  private readonly api = inject(AdminApiService);
+  private readonly auth = inject(AuthService);
+  private readonly i18n = inject(I18nService);
+  private readonly toast = inject(ToastService);
+
+  /** The page needs the site right. The server checks it again. */
+  protected readonly allowed = computed(() => this.auth.can('admin.site'));
+
+  protected readonly loading = signal(true);
+  /** The read failed: `forbidden` hides the form, `error` names the failure. */
+  protected readonly loadState = signal<'ok' | 'forbidden' | 'error'>('ok');
+  protected readonly saving = signal(false);
+  /** The stored values; the draft compares against them. */
+  protected readonly saved = signal<HelpTicketsSettings | null>(null);
+  protected readonly draft = signal<HelpTicketsSettings>({
+    wikiUrl: '',
+    publicEnabled: false,
+    notifyNew: false,
+    retentionMonths: null,
+  });
+  /** The last months value, so the switch turns on with it again. */
+  private lastMonths = DEFAULT_RETENTION;
+
+  protected readonly wikiError = computed(() =>
+    isHttpUrl(this.draft().wikiUrl) ? '' : this.i18n.translate('admin.helpTickets.wikiInvalid'),
+  );
+
+  protected readonly monthOptions = computed<FilterSelectOption[]>(() => {
+    const current = this.draft().retentionMonths;
+    const values = new Set(RETENTION_CHOICES);
+    if (current !== null) values.add(current);
+    return [...values]
+      .sort((a, b) => a - b)
+      .map((n) => ({ value: String(n), label: this.monthsText(n) }));
+  });
+
+  protected readonly dirty = computed(() => {
+    const s = this.saved();
+    if (!s) return false;
+    const d = this.draft();
+    return (
+      d.wikiUrl.trim() !== s.wikiUrl ||
+      d.publicEnabled !== s.publicEnabled ||
+      d.notifyNew !== s.notifyNew ||
+      d.retentionMonths !== s.retentionMonths
+    );
+  });
+
+  protected readonly canSave = computed(() => this.dirty() && !this.wikiError() && !this.saving());
+
+  constructor() {
+    if (!this.allowed()) {
+      this.loading.set(false);
+      this.loadState.set('forbidden');
+      return;
+    }
+    this.api.getHelpTickets().subscribe({
+      next: (s) => this.apply(s),
+      error: (err: { status?: number }) => {
+        this.loading.set(false);
+        this.loadState.set(err?.status === 403 ? 'forbidden' : 'error');
+      },
+    });
+  }
+
+  protected monthsText(n: number): string {
+    return n === 1
+      ? this.i18n.translate('admin.helpTickets.afterOne')
+      : this.i18n.translate('admin.helpTickets.after', { n });
+  }
+
+  private apply(s: HelpTicketsSettings): void {
+    this.saved.set(s);
+    this.draft.set({ ...s });
+    if (s.retentionMonths !== null) this.lastMonths = s.retentionMonths;
+    this.loading.set(false);
+    this.loadState.set('ok');
+  }
+
+  protected patch(change: Partial<HelpTicketsSettings>): void {
+    this.draft.update((d) => ({ ...d, ...change }));
+  }
+
+  protected setAnonymize(on: boolean): void {
+    this.patch({ retentionMonths: on ? this.lastMonths : null });
+  }
+
+  protected setMonths(value: string): void {
+    const n = Number(value);
+    this.lastMonths = n;
+    this.patch({ retentionMonths: n });
+  }
+
+  protected discard(): void {
+    const s = this.saved();
+    if (s) this.apply(s);
+  }
+
+  protected save(): void {
+    if (!this.canSave()) return;
+    const d = this.draft();
+    this.saving.set(true);
+    this.api.putHelpTickets({ ...d, wikiUrl: d.wikiUrl.trim() }).subscribe({
+      next: (s) => {
+        this.saving.set(false);
+        this.apply(s);
+        this.toast.success(this.i18n.translate('admin.common.saved'));
+      },
+      error: () => {
+        this.saving.set(false);
+        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+      },
+    });
+  }
+}

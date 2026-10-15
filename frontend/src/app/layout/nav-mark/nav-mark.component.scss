@@ -20,6 +20,16 @@
   line-height: 1;
 }
 
+/* In the flow of a row (the "Mehr" sheet), not on an icon. */
+.mark__count--inline {
+  position: static;
+  flex: none;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+
 /* The ring in the colour behind the bar separates the dot from the icon stroke. */
 .mark__live {
   position: absolute;

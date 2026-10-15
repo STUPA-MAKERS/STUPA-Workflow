@@ -4,6 +4,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { SwUpdate } from '@angular/service-worker';
 import { render, screen, within } from '@testing-library/angular';
+import { DeferBlockState } from '@angular/core/testing';
+import { HelpService } from '../features/help/help.service';
 import { ShellComponent } from './shell.component';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -39,7 +41,7 @@ const ROUTES: Routes = [
 
 /** The marks of the rail, set by the test instead of HTTP. */
 function railStatusStub(tasks: number | null = 4, live = true) {
-  return { taskCount: signal(tasks), live: signal(live), refresh: () => undefined };
+  return { taskCount: signal(tasks), ticketCount: signal<number | null>(null), live: signal(live), refresh: () => undefined };
 }
 
 function brandingStub(
@@ -58,6 +60,8 @@ function brandingStub(
     // The avatars read these; the config is not loaded, so they show the initials.
     loaded: signal(false),
     gravatarEnabled: signal(true),
+    wikiUrl: signal('https://wiki.example.org/handbook'),
+    ticketsPublic: signal(false),
     init: () => undefined,
   };
 }
@@ -130,6 +134,16 @@ describe('ShellComponent', () => {
       expect(container.querySelector('app-site-footer')).not.toBeNull();
       // Nobody signed in: no search palette either.
       expect(container.querySelector('app-command-palette')).toBeNull();
+    });
+
+    it('loads the report dialog only on its first opening', async () => {
+      const { container, fixture } = await setup(MEMBER);
+      expect(container.querySelector('app-report-dialog')).toBeNull();
+      fixture.debugElement.injector.get(HelpService).openReport();
+      fixture.detectChanges();
+      const [block] = await fixture.getDeferBlocks();
+      await block.render(DeferBlockState.Complete);
+      expect(container.querySelector('app-report-dialog')).not.toBeNull();
     });
 
     it('frames a signed-in principal with the rail, without the public bar', async () => {
@@ -269,6 +283,7 @@ describe('ShellComponent', () => {
         'Budget',
         'Buchungen',
         'Rechnungen',
+        'Tickets',
         'Verwaltung',
       ]);
     });

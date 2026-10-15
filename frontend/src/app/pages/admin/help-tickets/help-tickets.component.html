@@ -1,0 +1,68 @@
+<section class="ht">
+  <app-page-header [flush]="true" [title]="'admin.helpTickets.title' | t">
+    @if (loadState() === 'ok' && !loading()) {
+      <ng-container ngProjectAs="[actions]">
+        <app-button variant="text" [disabled]="!dirty() || saving()" (click)="discard()">
+          {{ 'admin.helpTickets.discard' | t }}
+        </app-button>
+        <app-button variant="fill" [disabled]="!canSave()" [loading]="saving()" (click)="save()">
+          {{ 'action.save' | t }}
+        </app-button>
+      </ng-container>
+    }
+  </app-page-header>
+
+  @if (loading()) {
+    <app-skeleton variant="lines" [count]="4" [label]="'common.loading' | t" />
+  } @else if (loadState() === 'forbidden') {
+    <app-note kind="warn" icon="lock" role="alert">{{ 'admin.helpTickets.forbidden' | t }}</app-note>
+  } @else if (loadState() === 'error') {
+    <app-note kind="error" icon="alert" role="alert">{{ 'admin.helpTickets.loadError' | t }}</app-note>
+  } @else {
+    <form class="ht__form" (submit)="$event.preventDefault(); save()">
+      <section class="ht__sec" aria-labelledby="ht-wiki">
+        <h2 id="ht-wiki" class="cap ht__secTitle">{{ 'admin.helpTickets.wiki' | t }}</h2>
+        <app-input
+          type="url"
+          name="wikiUrl"
+          [label]="'admin.helpTickets.wikiUrl' | t"
+          [required]="true"
+          [error]="wikiError()"
+          [ngModel]="draft().wikiUrl"
+          (ngModelChange)="patch({ wikiUrl: $event })"
+        />
+      </section>
+
+      <section class="ht__sec" aria-labelledby="ht-reports">
+        <h2 id="ht-reports" class="cap ht__secTitle">{{ 'admin.helpTickets.reports' | t }}</h2>
+        <div class="ht__rows">
+          <app-switch
+            class="ht__row"
+            [checked]="draft().publicEnabled"
+            (checkedChange)="patch({ publicEnabled: $event })"
+            >{{ 'admin.helpTickets.public' | t }}</app-switch
+          >
+          <app-switch class="ht__row" [checked]="draft().notifyNew" (checkedChange)="patch({ notifyNew: $event })">{{
+            'admin.helpTickets.notify' | t
+          }}</app-switch>
+          <div class="ht__row ht__row--split">
+            <span id="ht-anon" class="ht__label">{{ 'admin.helpTickets.anonymize' | t }}</span>
+            @if (draft().retentionMonths; as months) {
+              <app-filter-select
+                [label]="'admin.helpTickets.retention' | t"
+                [options]="monthOptions()"
+                [value]="'' + months"
+                (valueChange)="setMonths($event)"
+              />
+            }
+            <app-switch
+              [ariaLabel]="'admin.helpTickets.anonymize' | t"
+              [checked]="draft().retentionMonths !== null"
+              (checkedChange)="setAnonymize($event)"
+            />
+          </div>
+        </div>
+      </section>
+    </form>
+  }
+</section>

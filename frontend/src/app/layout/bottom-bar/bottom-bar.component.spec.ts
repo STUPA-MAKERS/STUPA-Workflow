@@ -42,7 +42,7 @@ async function setup(principal: Principal = ADMIN) {
       provideLocationMock(createLocationMock()),
       {
         provide: RailStatusService,
-        useValue: { taskCount: signal(8), live: signal(true), refresh: () => undefined },
+        useValue: { taskCount: signal(8), ticketCount: signal<number | null>(2), live: signal(true), refresh: () => undefined },
       },
     ],
   });
@@ -87,6 +87,20 @@ describe('BottomBarComponent', () => {
     expect(within(sheet).getByRole('button', { name: 'Suche' })).toBeInTheDocument();
     expect(within(sheet).getByText('Ada Admin')).toBeInTheDocument();
     expect(within(sheet).getByRole('button', { name: 'Abmelden' })).toBeInTheDocument();
+    // Tickets with the count of new ones, and the help entries.
+    const tickets = within(sheet).getByRole('link', { name: 'Tickets 2 neu' });
+    expect(tickets.querySelector('.mark__count--inline')).toHaveTextContent('2');
+    expect(within(sheet).getByRole('group', { name: 'Hilfe' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: 'Problem melden' })).toBeInTheDocument();
+  });
+
+  it('closes the sheet when "Problem melden" opens the dialog', async () => {
+    const { fixture } = await setup();
+    await userEvent.click(more());
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Problem melden' }));
+    fixture.detectChanges();
+    expect(screen.queryByRole('dialog', { name: 'Mehr' })).not.toBeInTheDocument();
   });
 
   it('opens the search palette from the sheet and closes the sheet', async () => {

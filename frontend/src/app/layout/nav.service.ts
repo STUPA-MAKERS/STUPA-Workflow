@@ -51,6 +51,7 @@ export type NavKey =
   | 'budget'
   | 'expenses'
   | 'invoices'
+  | 'tickets'
   | 'admin';
 
 /** One entry of the navigation rail and of the phone bar. */
@@ -125,6 +126,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   },
   { key: 'expenses', path: '/expenses', labelKey: 'nav.expenses', icon: 'swap', permissions: BUDGET_PERMISSIONS, place: 'main' },
   { key: 'invoices', path: '/invoices', labelKey: 'nav.invoices', icon: 'receipt', permissions: BUDGET_PERMISSIONS, place: 'main' },
+  { key: 'tickets', path: '/tickets', labelKey: 'nav.tickets', icon: 'ticket', permissions: ['ticket.manage'], place: 'main' },
   { key: 'admin', path: '/admin', labelKey: 'nav.admin', icon: 'shield', permissions: ADMIN_AREA_PERMISSIONS, place: 'end' },
 ];
 
