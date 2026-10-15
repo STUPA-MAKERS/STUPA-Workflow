@@ -54,6 +54,48 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.ts__titleBtn {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-align: start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: inherit;
+  cursor: text;
+}
+.ts__titleBtn:hover {
+  color: var(--color-accent-text);
+}
+.ts__titleBtn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+/* The field keeps the size of the heading, so the head does not jump when it opens. */
+.ts__titleInput {
+  width: calc(100% + var(--space-2));
+  min-width: 0;
+  height: 1.75rem;
+  margin: 0 0 0 calc(-1 * var(--space-2));
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-h1);
+  font-weight: var(--fw-semibold);
+}
+.ts__titleInput:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
 .ts__title--muted {
   color: var(--color-text-muted);
   white-space: normal;
@@ -83,7 +125,8 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: 2px;
+  flex-wrap: wrap;
+  gap: var(--space-2) 2px;
   min-height: var(--control-height);
   padding: 0 var(--space-5) 10px;
 }
@@ -223,8 +266,21 @@
     line-height: 1.375rem;
     white-space: normal;
   }
+  /* An inline button keeps the clamp of the heading to two lines. */
+  .ts__titleBtn {
+    display: inline;
+  }
+  .ts__titleInput {
+    height: 1.375rem;
+    font-size: var(--fs-h2);
+  }
   .ts__bar {
     padding-inline: var(--space-2);
+  }
+  /* The format buttons and the save state take the first row, the view switch the second. */
+  .ts__mode {
+    order: 1;
+    margin-inline: var(--space-2) 0;
   }
   .ts__rule {
     margin-inline: var(--space-4);
@@ -239,4 +295,32 @@
   .ts__keepers {
     padding-inline: var(--space-4);
   }
+}
+
+/* The switch between the formatted text and its Markdown source. */
+.ts__mode {
+  flex: none;
+  margin-inline-end: var(--space-3);
+}
+
+/* The Markdown source: the same type size and inset as the formatted text, so the text
+   keeps its place when the view changes. */
+.ts__editor--raw {
+  display: flex;
+}
+.ts__raw {
+  flex: 1 1 auto;
+  min-height: 16rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 0.90625rem; /* 14.5px */
+  line-height: 1.7;
+  resize: none;
+  outline: none;
+}
+.ts__raw::placeholder {
+  color: var(--color-text-muted);
 }
