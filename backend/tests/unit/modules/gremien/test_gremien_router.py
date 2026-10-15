@@ -197,7 +197,15 @@ def test_decisions_passes_the_filters(calls: _Calls) -> None:
 
 
 @pytest.mark.parametrize(
-    "query", ["result=maybe", "kind=other", "since=yesterday", "q=" + "x" * 201]
+    "query",
+    [
+        "result=maybe",
+        "kind=other",
+        "since=yesterday",
+        "since=0001-01-01",
+        "since=2100-01-01",
+        "q=" + "x" * 201,
+    ],
 )
 def test_decisions_rejects_bad_filters(calls: _Calls, query: str) -> None:
     resp = _client(Principal(sub="u1")).get(f"/api/gremien/{GID}/decisions?{query}")

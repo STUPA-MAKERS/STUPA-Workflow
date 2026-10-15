@@ -26,11 +26,13 @@ from app.modules.gremien.schemas import (
     MemberAttendanceOut,
 )
 from app.modules.gremien.service import GremienService
-from app.shared.errors import ProblemDetail
+from app.shared.errors import ProblemDetail, ValidationProblem
 
 router = APIRouter(prefix="/gremien", tags=["gremien"])
 
 _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
+_FIRST_DAY = date(1900, 1, 1)
+_LAST_DAY = date(2099, 12, 31)
 _MONTH = r"^(19|20)\d{2}-(0[1-9]|1[0-2])$"
 
 ReaderDep = Annotated[Principal, Depends(require_principal())]
@@ -145,7 +147,7 @@ async def gremium_decisions(
     q: Annotated[str | None, Query(max_length=200)] = None,
     result: DecisionResultFilter | None = None,
     kind: DecisionKind | None = None,
-    since: Annotated[date | None, Query(ge=date(1900, 1, 1), le=date(2099, 12, 31))] = None,
+    since: date | None = None,
 ) -> DecisionPageOut:
     """List the closed votes of a gremium, the newest first, 30 per page.
 
@@ -153,6 +155,10 @@ async def gremium_decisions(
     (application, election, motion), ``since`` (a day) and ``q`` (question or meeting
     title) filter.
     """
+    if since is not None and not _FIRST_DAY <= since <= _LAST_DAY:
+        raise ValidationProblem(
+            f"since must lie between {_FIRST_DAY} and {_LAST_DAY}", code="invalid_since"
+        )
     await require_gremium(db, principal, gremium_id)
     return await service.decisions(
         gremium_id, principal, cursor=cursor, q=q, result=result, kind=kind, since=since
