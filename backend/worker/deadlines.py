@@ -59,6 +59,7 @@ from app.modules.flow.models import Transition
 from app.modules.flow.service import FlowService
 from app.modules.livevote.broker import RedisBroker
 from app.modules.livevote.service import BrokerPublisher
+from app.modules.notifications.links import application_link
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
 from app.modules.notifications.service import NotificationService
 from app.modules.voting.schemas import VoteClosed
@@ -276,6 +277,18 @@ async def _remind_one(
         if deadline is None:
             return False  # another worker holds it, or it is no longer due
         type_id = deadline.type_id
+        applicant_link = None
+        if deadline.application_id is not None:
+            # A guest applicant (no account) reads the application on the public
+            # applicant page.
+            created_by = await session.scalar(
+                select(Application.created_by).where(
+                    Application.id == deadline.application_id
+                )
+            )
+            applicant_link = application_link(
+                settings, deadline.application_id, guest=created_by is None
+            )
         if type_id is None and deadline.application_id is not None:
             type_id = await session.scalar(
                 select(Application.type_id).where(
@@ -294,6 +307,7 @@ async def _remind_one(
             },
             lang=None,
             idempotency_base=f"deadline:{deadline.id}",
+            applicant_link=applicant_link,
         )
         await svc.mark_reminded(deadline, now)
     logger.info("deadline reminder sent (deadline=%s kind=%s)", deadline_id, deadline.kind)

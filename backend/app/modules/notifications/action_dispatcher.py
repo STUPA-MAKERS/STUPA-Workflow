@@ -29,6 +29,7 @@ from app.modules.applications.models import Application, ApplicationDecision
 from app.modules.applications.share import format_money
 from app.modules.flow.dispatch import DispatchedAction
 from app.modules.flow.models import State
+from app.modules.notifications.links import application_link, task_link
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.service import (
     NotificationService,
@@ -146,16 +147,17 @@ class NotificationActionDispatcher:
 
     async def _dispatch_notify(self, action: DispatchedAction) -> None:
         async with self.sessionmaker() as session:
-            app_type_id, current_state_id, app_data, confirmed = (
+            app_type_id, current_state_id, app_data, confirmed, created_by = (
                 await session.execute(
                     select(
                         Application.type_id,
                         Application.current_state_id,
                         Application.data,
                         Application.email_confirmed_at.is_not(None),
+                        Application.created_by,
                     ).where(Application.id == action.application_id)
                 )
-            ).first() or (None, None, None, True)
+            ).first() or (None, None, None, True, None)
             if not confirmed:
                 _log_unconfirmed(action)
                 return
@@ -210,6 +212,12 @@ class NotificationActionDispatcher:
                 context=context,
                 lang=lang,
                 idempotency_base=action.idempotency_key,
+                # A guest applicant has no account (`created_by` is None) and reads
+                # the application on the public applicant page.
+                applicant_link=application_link(
+                    self.settings, action.application_id, guest=created_by is None
+                ),
+                team_link=application_link(self.settings, action.application_id),
             )
 
 
@@ -281,6 +289,7 @@ class NotificationActionDispatcher:
                     "status": status_label,
                 },
                 idempotency_parts=(action.idempotency_key, "task_new"),
+                link=task_link(self.settings, action.application_id),
             )
 
 

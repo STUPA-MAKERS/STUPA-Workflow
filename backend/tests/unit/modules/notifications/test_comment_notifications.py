@@ -32,7 +32,7 @@ class _FakeService:
     async def _get_template_by_key(self, key: str) -> None:
         return None
 
-    def _layout_html(self, rendered: Any, reason: str) -> str:
+    def _layout_html(self, rendered: Any, reason: str, link: Any = None) -> str:
         return f"<html>{reason}</html>"
 
     async def _enqueue(self, msg: Any) -> bool:
@@ -47,10 +47,14 @@ def _patch_service(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(mod, "NotificationService", _FakeService)
 
 
-def _app_row(title: str | None = "Beamer", gremium_id: uuid.UUID | None = None) -> list[Any]:
-    """Return the `(data, current_state_id, gremium_id)` row of the application."""
+def _app_row(
+    title: str | None = "Beamer",
+    gremium_id: uuid.UUID | None = None,
+    created_by: str | None = "sub-applicant",
+) -> list[Any]:
+    """Return the `(data, current_state_id, gremium_id, created_by)` application row."""
     data = {"title": title} if title else {}
-    return [(data, None, gremium_id)]
+    return [(data, None, gremium_id, created_by)]
 
 
 async def test_principal_public_comment_mails_applicant() -> None:
@@ -74,6 +78,32 @@ async def test_principal_public_comment_mails_applicant() -> None:
     assert "Beamer" in msg.subject
     assert "Bitte Angebot nachreichen." in msg.text
     assert msg.html == "<html>comment</html>"
+    # An applicant with an account opens the application.
+    assert "Antrag öffnen: " in msg.text
+    assert "/applications/" in msg.text
+
+
+async def test_principal_comment_links_a_guest_to_the_applicant_page() -> None:
+    """A guest applicant (no account) gets the public applicant page as the link."""
+    app_id = uuid.uuid4()
+    session = cast(
+        AsyncSession,
+        FakeSession(executes=[_app_row(created_by=None)], scalars=[[]]),
+    )
+    await send_comment_notifications(
+        session,
+        queue=FakeQueue(),
+        settings=SETTINGS,
+        application_id=app_id,
+        comment_id=uuid.uuid4(),
+        author_kind="principal",
+        visibility="public",
+        body="Bitte Angebot nachreichen.",
+    )
+    svc = _FakeService.last
+    assert svc is not None
+    base = SETTINGS.public_base_url.rstrip("/")
+    assert f"Antrag öffnen: {base}/antrag/{app_id}" in svc.enqueued[0].text
 
 
 async def test_principal_public_comment_uses_the_application_language() -> None:

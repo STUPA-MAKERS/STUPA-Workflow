@@ -112,11 +112,13 @@ class _VotingFake:
 
 class _NotifyFake:
     events: list[str] = []
+    links: list[Any] = []
 
     def __init__(self, *_a: Any, **_k: Any) -> None: ...
 
     async def handle_notify_action(self, action: dict[str, Any], **_kw: Any) -> int:
         _NotifyFake.events.append(action.get("templateKey", ""))
+        _NotifyFake.links.append(_kw.get("applicant_link"))
         return 1
 
 
@@ -125,6 +127,7 @@ def _reset() -> Iterator[None]:
     _FlowFake.calls = []
     _VotingFake.calls = []
     _NotifyFake.events = []
+    _NotifyFake.links = []
     yield
 
 
@@ -422,6 +425,9 @@ async def test_remind_with_application_type_lookup(patched: None) -> None:
     sent = await wd._remind_one(_ctx([lock]), SETTINGS, deadline.id, NOW, timedelta(hours=24))
     assert sent is True
     assert _NotifyFake.events == ["deadline_approaching"]
+    # The scalar fake answers the `created_by` lookup too: an applicant account.
+    base = SETTINGS.public_base_url.rstrip("/")
+    assert _NotifyFake.links[0].url == f"{base}/applications/{deadline.application_id}"
     assert deadline.reminded_at == NOW
     assert lock.committed == 1
 
@@ -435,6 +441,7 @@ async def test_remind_type_only_deadline_no_lookup(patched: None) -> None:
     lock = FakeSession([[deadline]])  # no scalar needed
     sent = await wd._remind_one(_ctx([lock]), SETTINGS, deadline.id, NOW, timedelta(hours=24))
     assert sent is True
+    assert _NotifyFake.links == [None]  # no application, no link
 
 
 @freeze_time(FROZEN)

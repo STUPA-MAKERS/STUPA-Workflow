@@ -879,10 +879,12 @@ async def test_meeting_delegation_mail_info_row_none() -> None:
 async def test_meeting_delegation_mail_info_with_date_and_delegator_name() -> None:
     did = uuid.uuid4()
     date = datetime(2026, 6, 16, tzinfo=UTC).date()
-    row = ("d@x.de", "Sitzung 1", date, "AStA", "Max", "max@x.de", True)
+    mid = uuid.uuid4()
+    row = ("d@x.de", "Sitzung 1", date, "AStA", "Max", "max@x.de", True, mid)
     session = FakeSession(executes=[[row]])
     out = await meeting_delegation_mail_info(session, did)
     assert out is not None
+    assert out.meeting_id == mid
     assert out.meeting_date == "16.06.2026"
     assert out.delegator_name == "Max"  # display_name wins
     assert out.voting is True
@@ -907,7 +909,7 @@ async def test_meeting_delegation_mail_info_picks_the_recipient(
 
 async def test_meeting_delegation_mail_info_no_date_falls_back_to_email() -> None:
     # date None gives meeting_date None. d_name None gives d_email as delegator_name.
-    row = ("d@x.de", "Sitzung 2", None, None, None, "max@x.de", None)
+    row = ("d@x.de", "Sitzung 2", None, None, None, "max@x.de", None, uuid.uuid4())
     session = FakeSession(executes=[[row]])
     out = await meeting_delegation_mail_info(session, uuid.uuid4())
     assert out is not None
@@ -1100,6 +1102,8 @@ async def test_notify_erasure_requested_with_recipients(
     )
     assert queue.messages
     assert queue.messages[0].to == ("dpo@x.de",)
+    base = SETTINGS.public_base_url.rstrip("/")
+    assert f"Löschanträge öffnen: {base}/admin/privacy" in queue.messages[0].text
 
 
 async def test_notify_erasure_requested_no_recipients_skips(
@@ -1166,6 +1170,25 @@ async def test_notify_erasure_rejected_sends_with_reason(
     )
     assert queue.messages
     assert "Aufbewahrungsfrist" in queue.messages[0].text
+
+
+async def test_notify_erasure_rejected_links_the_application(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The rejection links the application: the public page for a guest."""
+    app_id = uuid.uuid4()
+    session = FakeSession(executes=[[(app_id, None)]], scalars=[[], []])
+    monkeypatch.setattr(privacy, "get_sessionmaker", _sessionmaker_for(session))
+    queue = FakeQueue()
+    await privacy.notify_erasure_rejected(
+        queue=cast(Any, queue),
+        settings=SETTINGS,
+        request_id=uuid.uuid4(),
+        email="user@x.de",
+        reason=None,
+    )
+    base = SETTINGS.public_base_url.rstrip("/")
+    assert f"Antrag öffnen: {base}/antrag/{app_id}" in queue.messages[0].text
 
 
 async def test_notify_erasure_rejected_no_reason(

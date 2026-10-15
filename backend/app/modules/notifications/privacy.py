@@ -3,6 +3,11 @@
 Each function runs as a background task after the triggering transaction
 commits. Each opens its own sessionmaker. The send is best effort. The builtin
 subject and body dicts are also the editor defaults.
+
+The mail to the admins links the privacy admin page. The rejection links the
+application of the request. The mail about an executed request has no link,
+because the erasure removed the element: the application is anonymized and its
+page shows nothing to the data subject.
 """
 
 from __future__ import annotations
@@ -10,7 +15,10 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
+from sqlalchemy import select
+
 from app.db import get_sessionmaker
+from app.modules.notifications.links import application_link, privacy_admin_link
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.recipients import RecipientResolver
 from app.modules.notifications.service import NotificationService
@@ -24,9 +32,9 @@ ERASURE_REQUESTED_SUBJECT: dict[str, str] = {
 }
 ERASURE_REQUESTED_BODY: dict[str, str] = {
     "de": "Hallo,\n\nein Löschantrag ist eingegangen und wartet auf Bearbeitung in "
-    "der Datenschutz-Verwaltung (/admin/privacy).\n",
+    "der Datenschutz-Verwaltung.\n",
     "en": "Hello,\n\nan erasure request has been received and is awaiting review in "
-    "the privacy admin area (/admin/privacy).\n",
+    "the privacy admin area.\n",
 }
 ERASURE_EXECUTED_SUBJECT: dict[str, str] = {
     "de": "Ihre Daten wurden gelöscht (DSGVO Art. 17)",
@@ -43,10 +51,8 @@ ERASURE_REJECTED_SUBJECT: dict[str, str] = {
     "en": "Your erasure request was rejected",
 }
 ERASURE_REJECTED_BODY: dict[str, str] = {
-    "de": "Hallo,\n\nIhr Löschantrag wurde abgelehnt"
-    "{% if reason %}: {{ reason }}{% endif %}.\n",
-    "en": "Hello,\n\nyour erasure request was rejected"
-    "{% if reason %}: {{ reason }}{% endif %}.\n",
+    "de": "Hallo,\n\nIhr Löschantrag wurde abgelehnt{% if reason %}: {{ reason }}{% endif %}.\n",
+    "en": "Hello,\n\nyour erasure request was rejected{% if reason %}: {{ reason }}{% endif %}.\n",
 }
 
 
@@ -65,9 +71,7 @@ async def notify_erasure_requested(
         )
         if not recipients:
             return
-        await NotificationService(
-            session, queue=queue, settings=settings
-        ).send_kind_mail(
+        await NotificationService(session, queue=queue, settings=settings).send_kind_mail(
             recipients,
             kind="privacy",
             template_key="erasure_requested",
@@ -75,6 +79,7 @@ async def notify_erasure_requested(
             builtin_body=ERASURE_REQUESTED_BODY,
             context={"subjectType": subject_type, "requestId": str(request_id)},
             idempotency_parts=("erasure_requested", str(request_id)),
+            link=privacy_admin_link(settings),
         )
 
 
@@ -94,9 +99,7 @@ async def notify_erasure_executed(
         return
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as session:
-        await NotificationService(
-            session, queue=queue, settings=settings
-        ).send_kind_mail(
+        await NotificationService(session, queue=queue, settings=settings).send_kind_mail(
             [email],
             kind="privacy",
             template_key="erasure_executed",
@@ -121,11 +124,27 @@ async def notify_erasure_rejected(
     """
     if not email:
         return
+    from app.modules.applications.models import Application
+    from app.modules.privacy.models import ErasureRequest
+
     sessionmaker = get_sessionmaker()
     async with sessionmaker() as session:
-        await NotificationService(
-            session, queue=queue, settings=settings
-        ).send_kind_mail(
+        # The rejected request leaves the application as it is, so the data subject
+        # can still open it. A guest (no account) opens the public applicant page.
+        row = (
+            await session.execute(
+                select(ErasureRequest.application_id, Application.created_by)
+                .outerjoin(Application, Application.id == ErasureRequest.application_id)
+                .where(ErasureRequest.id == request_id)
+            )
+        ).first()
+        app_id, created_by = row if row is not None else (None, None)
+        link = (
+            application_link(settings, app_id, guest=created_by is None)
+            if app_id is not None
+            else None
+        )
+        await NotificationService(session, queue=queue, settings=settings).send_kind_mail(
             [email],
             kind="privacy",
             template_key="erasure_rejected",
@@ -133,4 +152,5 @@ async def notify_erasure_rejected(
             builtin_body=ERASURE_REJECTED_BODY,
             context={"reason": reason or "", "requestId": str(request_id)},
             idempotency_parts=("erasure_rejected", str(request_id)),
+            link=link,
         )
