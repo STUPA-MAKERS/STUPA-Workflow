@@ -64,8 +64,10 @@ Backend domain modules (`backend/app/modules/<module>`):
 - **be-avatars** — Gravatar proxy for person avatars (`/principals/{id}/avatar`), Redis cache,
   admin switch
 - **be-antiabuse** — ALTCHA captcha + rate-limiting + body-cap for public endpoints
-- **be-search** — global search (command palette): one query, seven sources, each behind the
+- **be-search** — global search (command palette): one query, eight sources, each behind the
   gate of its own module
+- **be-tickets** — help-menu tickets: one-way public report (ALTCHA when signed out),
+  `ticket.manage` work routes, notes, events, retention cron
 
 Components:
 - **frontend** — Angular 20 SPA (`frontend/`): core/shared/features/pages, design system, build

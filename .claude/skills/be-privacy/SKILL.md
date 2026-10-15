@@ -28,6 +28,7 @@ description: DSGVO/GDPR backend — erasure-request queue (Art. 17), application
 - `POST /api/admin/privacy/erasures/{id}/execute` — run erasure (anonymize/erase), atomic with status flip.
 - `POST /api/admin/privacy/erasures/{id}/reject` — reject with `reason`.
 - `POST /api/admin/privacy/principals/{id}/erase` — direct principal erasure (204).
+- Tickets (be-tickets): the erasure anonymizes the tickets that the principal reported (reporter, context, attachments with their objects); notes and events show a deleted person. The Auskunft export has a sheet "Tickets" (reported as the account or as the bare e-mail).
 - `GET /api/admin/privacy/auskunft?email=` — Art. 15 personal-data export as XLSX (the principal sheet takes the live account of the address: not merged, then active, then the newest login; a merged old account keeps its email) (applicants, applications+`data`, submission-version history, principal row, visible comments, attachment metadata, and the sheet `Anwesenheit`: the meeting attendance of the principal with status, source and the reason of an excuse). The `pii_export` audit entry counts the rows per kind (`attendance` included).
 - `GET|PUT /api/admin/privacy/settings` — global retention default.
 - The public entry point lives in **be-applications**: `POST /api/applications/{id}/erasure-request` (202). Applicant self-service (magic-link, creator, or authorized reader) creates an `open` queue row. `require_app_read` gates it, not `privacy.manage`.
@@ -41,4 +42,4 @@ description: DSGVO/GDPR backend — erasure-request queue (Art. 17), application
 - If a migration seed is missing, `PrivacySettingsService.get` seeds the id=1 row itself.
 - The Auskunft export resolves the i18n type and state labels via `_i18n` (locale → `de` → `en` fallback).
 
-**Related:** be-applications, be-audit, be-files, be-notifications, be-auth
+**Related:** be-applications, be-audit, be-files, be-notifications, be-auth, be-tickets
