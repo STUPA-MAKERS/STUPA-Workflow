@@ -2064,8 +2064,9 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.meeting()?.currentAgendaItemId).toBe('t-1');
     });
 
-    it('broadcasts the item the room lead opens, once', async () => {
+    it('broadcasts the item the protokollant opens, once', async () => {
       const { cmp, http } = await loaded();
+      cmp.meeting.set({ ...MEETING_MODEL, isProtokollant: true });
       cmp.agenda.set([AGENDA_ITEM(), AGENDA_ITEM({ id: 't-2', position: 1 })] as never);
       cmp.jumpTo('t-2');
       expect(cmp.selectedTopId()).toBe('t-2');
@@ -2078,13 +2079,15 @@ describe('MeetingsComponent — methods', () => {
       http.expectNone('/api/meetings/m-1');
     });
 
-    it('keeps "now" local without vote management, before the opening, after the close and without a meeting', async () => {
+    it('keeps "now" local for the session lead, before the opening, after the close and without a meeting', async () => {
       const { cmp, http } = await loaded();
-      cmp.meeting.set({ ...MEETING_MODEL, canManageVotes: false });
+      // The session lead manages votes, but only the protokollant moves the room.
+      cmp.meeting.set({ ...MEETING_MODEL, canManageVotes: true, isProtokollant: false });
       cmp.jumpTo('t-2');
-      cmp.meeting.set({ ...MEETING_MODEL, status: 'closed' });
+      expect(cmp.selectedTopId()).toBe('t-2');
+      cmp.meeting.set({ ...MEETING_MODEL, isProtokollant: true, status: 'closed' });
       cmp.jumpTo('t-2');
-      cmp.meeting.set({ ...MEETING_MODEL, status: 'planned' });
+      cmp.meeting.set({ ...MEETING_MODEL, isProtokollant: true, status: 'planned' });
       cmp.jumpTo('t-2');
       cmp.meeting.set(null);
       cmp.jumpTo('t-2');
@@ -2093,6 +2096,7 @@ describe('MeetingsComponent — methods', () => {
 
     it('leaves the meeting untouched when the "now" broadcast fails', async () => {
       const { cmp, http } = await loaded();
+      cmp.meeting.set({ ...MEETING_MODEL, isProtokollant: true });
       cmp.jumpTo('t-2');
       http.expectOne('/api/meetings/m-1').flush({ detail: 'nope' }, { status: 403, statusText: 'Forbidden' });
       expect(cmp.meeting()?.currentAgendaItemId).toBeNull();

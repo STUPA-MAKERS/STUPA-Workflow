@@ -193,14 +193,15 @@ export class MeetingSessionService implements OnDestroy {
   /**
    * Tell the room which agenda item runs now.
    *
-   * The protokollant leads, and the session lead may take over, so the gate is
-   * `canManageVotes`. Everybody else keeps a local selection. Only a live meeting
+   * Only the protokollant moves the room: the open item follows the minutes. The
+   * session lead and everybody else keep a local selection, so a look at another
+   * item does not move the beamer and the followers. Only a live meeting
    * has a "now": the server refuses it for a closed meeting, and a planned meeting
    * must not start with an item that a click during the preparation set.
    */
   setCurrentTop(itemId: Uuid): void {
     const m = this.meeting();
-    if (!m || !m.canManageVotes || m.status !== 'live' || m.currentAgendaItemId === itemId) return;
+    if (!m || !m.isProtokollant || m.status !== 'live' || m.currentAgendaItemId === itemId) return;
     this.api.patchMeeting(m.id, { currentAgendaItemId: itemId }).subscribe({
       next: (updated) => this.meeting.set(updated),
       error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
