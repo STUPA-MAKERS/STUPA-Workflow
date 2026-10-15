@@ -14,7 +14,7 @@ const APPS: AssignableApplication[] = [
   { applicationId: 'a-3', title: null },
 ];
 
-async function setup(open = true) {
+async function setup(open = true, kind: 'application' | 'freetext' = 'application') {
   const closed = jest.fn();
   const added = jest.fn();
   const view = await render(AgendaItemDialogComponent, {
@@ -23,6 +23,11 @@ async function setup(open = true) {
     providers: [provideHttpClient(), provideHttpClientTesting()],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
+  // The dialog opens on a free-text item. Most specs work on the application list.
+  if (kind === 'application') {
+    view.fixture.componentInstance.setKind('application');
+    view.fixture.detectChanges();
+  }
   const toasts = () =>
     view.fixture.debugElement.injector
       .get(ToastService)
@@ -108,6 +113,14 @@ describe('AgendaItemDialogComponent', () => {
     const { http, fixture } = await setup();
     flushApps(http, fixture, APPS.slice(0, 2));
     expect(await runAxe(document.body)).toHaveNoViolations();
+  });
+
+  it('opens on a free-text item', async () => {
+    const { http, fixture, cmp } = await setup(true, 'freetext');
+    flushApps(http, fixture);
+    expect(cmp.kind()).toBe('freetext');
+    expect(screen.getByRole('radio', { name: 'Freitext-TOP' })).toBeChecked();
+    expect(screen.getByLabelText(/Titel/)).toBeInTheDocument();
   });
 
   it('adds a free-text item', async () => {
