@@ -90,12 +90,12 @@
               <button
                 type="button"
                 class="ts__tool"
-                [class.ts__tool--on]="ed.activeFormats().has(tool.format)"
-                [attr.aria-pressed]="ed.activeFormats().has(tool.format)"
+                [class.ts__tool--on]="activeFormats().has(tool.format)"
+                [attr.aria-pressed]="activeFormats().has(tool.format)"
                 [attr.aria-label]="tool.label | t"
                 [title]="tool.label | t"
                 (mousedown)="$event.preventDefault()"
-                (click)="ed.toggleFormat(tool.format)"
+                (click)="toggleFormat(tool.format)"
               >
                 <app-icon [name]="tool.icon" [size]="20" />
               </button>
@@ -103,6 +103,15 @@
           </div>
         }
         <span class="ts__spacer"></span>
+        <app-segmented
+          class="ts__mode"
+          width="equal"
+          [check]="false"
+          [ariaLabel]="'meetings.editor.mode' | t"
+          [options]="modeOptions()"
+          [value]="mode()"
+          (valueChange)="setMode($event)"
+        />
         <span class="ts__save mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
           @switch (saveState()) {
             @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
@@ -119,17 +128,34 @@
       @if (proto && !proto.isLocked && proto.gremiumProtocolsPublic && editable() && !t.nonPublic) {
         <app-note class="ts__public" icon="globe">{{ 'meetings.protocol.publicNotice' | t }}</app-note>
       }
-      <app-markdown-editor
-        #ed
-        class="ts__editor"
-        [docKey]="docKey()"
-        [voteInfo]="voteInfo()"
-        [value]="t.body ?? ''"
-        [disabled]="!editable()"
-        [placeholder]="'meetings.protocol.placeholder' | t"
-        [hint]="'meetings.protocol.hint' | t"
-        (valueChange)="bodyChange.emit({ itemId: t.id, body: $event })"
-      />
+      <!-- The Markdown source: the same text, without the rendering. The editor loads the
+           text again when it comes back. -->
+      @if (mode() === 'raw') {
+        <div class="ts__editor ts__editor--raw">
+          <textarea
+            #raw
+            class="ts__raw"
+            [attr.aria-label]="'meetings.editor.modeRaw' | t"
+            [value]="t.body ?? ''"
+            [readOnly]="!editable()"
+            [placeholder]="'meetings.protocol.placeholder' | t"
+            spellcheck="true"
+            (input)="bodyChange.emit({ itemId: t.id, body: raw.value })"
+          ></textarea>
+        </div>
+      } @else {
+        <app-markdown-editor
+          #ed
+          class="ts__editor"
+          [docKey]="docKey()"
+          [voteInfo]="voteInfo()"
+          [value]="t.body ?? ''"
+          [disabled]="!editable()"
+          [placeholder]="'meetings.protocol.placeholder' | t"
+          [hint]="'meetings.protocol.hint' | t"
+          (valueChange)="bodyChange.emit({ itemId: t.id, body: $event })"
+        />
+      }
     }
   } @else {
     <div class="ts__empty">
