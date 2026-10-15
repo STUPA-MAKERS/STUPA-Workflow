@@ -2811,7 +2811,7 @@ export const de = {
   'admin.substitutes.title': 'Stellvertretungen',
   'admin.substitutes.hint':
     'An eine Stellvertretung darf ohne Vorlauf bis Sitzungsbeginn übertragen werden, auch wenn sie nicht Mitglied ist.',
-  'admin.substitutes.add': 'Eintrag hinzufügen',
+  'admin.substitutes.add': 'Stellvertretung hinzufügen',
   'admin.substitutes.addAction': 'Hinzufügen',
   'admin.substitutes.search': 'Person suchen',
   'admin.substitutes.forMember': 'Vertritt',
@@ -6715,7 +6715,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.substitutes.title': 'Substitutes',
   'admin.substitutes.hint':
     'A delegation to a substitute needs no lead time and is possible until the meeting starts, also when the substitute is not a member.',
-  'admin.substitutes.add': 'Add entry',
+  'admin.substitutes.add': 'Add substitute',
   'admin.substitutes.addAction': 'Add',
   'admin.substitutes.search': 'Search person',
   'admin.substitutes.forMember': 'Substitutes for',

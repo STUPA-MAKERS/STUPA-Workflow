@@ -194,8 +194,8 @@ describe('SubstitutePoolComponent', () => {
 
   it('adds an entry for one member through the person search', async () => {
     const { delegations, admin, toast } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: /Eintrag hinzufügen/ }));
-    const dialog = screen.getByRole('dialog', { name: 'Eintrag hinzufügen' });
+    await userEvent.click(screen.getByRole('button', { name: /Stellvertretung hinzufügen/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Stellvertretung hinzufügen' });
     const add = within(dialog).getByText('Hinzufügen').closest('button')!;
     expect(add).toBeDisabled();
     await userEvent.type(within(dialog).getByRole('searchbox', { name: /Person suchen/ }), 'ki');
@@ -238,7 +238,7 @@ describe('SubstitutePoolComponent', () => {
         .mockReturnValueOnce(throwError(() => ({ status: 500 }))),
     });
     await setup({ delegations });
-    await userEvent.click(screen.getByRole('button', { name: /Eintrag hinzufügen/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Stellvertretung hinzufügen/ }));
     const dialog = screen.getByRole('dialog');
     await userEvent.type(within(dialog).getByRole('searchbox'), 'kim');
     await userEvent.click(await within(dialog).findByRole('button', { name: /Kim/ }));
@@ -264,7 +264,7 @@ describe('SubstitutePoolComponent', () => {
         .mockReturnValue(of(clone(PEOPLE))),
     });
     await setup({ admin });
-    await userEvent.click(screen.getByRole('button', { name: /Eintrag hinzufügen/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Stellvertretung hinzufügen/ }));
     const search = screen.getByRole('searchbox');
     await userEvent.type(search, 'zz');
     expect(await screen.findByText('Keine Person gefunden.')).toBeInTheDocument();
