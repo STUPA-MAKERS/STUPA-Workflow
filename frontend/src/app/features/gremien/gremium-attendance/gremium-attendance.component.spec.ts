@@ -174,7 +174,7 @@ describe('GremiumAttendanceComponent', () => {
     const view = await setup({ api: gremienApiMock({ attendance: jest.fn(() => of(empty)) }) });
     restore = view.restore;
     expect(view.cmp.noMeetings()).toBe(true);
-    expect(screen.getByText('Im Zeitraum gab es keine abgeschlossene Sitzung.')).toBeTruthy();
+    expect(screen.getByText('Im Zeitraum gab es keine abgeschlossene Sitzung.').classList).toContain('sr-only');
     expect(screen.queryByRole('alert')).toBeNull();
     expect(view.container.querySelectorAll('.gat__ghostRow')).toHaveLength(4);
     expect(view.cmp.heads()[0].meetings).toBe('0 Sitzungen');
