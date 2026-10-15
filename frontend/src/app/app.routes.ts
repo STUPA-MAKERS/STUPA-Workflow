@@ -272,6 +272,44 @@ export const routes: Routes = [
           import('./features/meetings/meetings.component').then((m) => m.MeetingsComponent),
       },
       {
+        path: 'gremien',
+        // The gremien of a member, or every gremium with `gremium.view_all` (the admin
+        // passes `permission`). The server gates each gremium the same way and answers
+        // 404 for a gremium the principal cannot see.
+        data: {
+          title: 'nav.gremien',
+          permission: ['gremium.view_all'],
+          allowCommitteeMember: true,
+          wide: true,
+        },
+        canActivateChild: [authGuard],
+        loadComponent: () =>
+          import('./features/gremien/gremien-page/gremien.component').then((m) => m.GremienComponent),
+        children: [
+          {
+            path: '',
+            data: { permission: ['gremium.view_all'], allowCommitteeMember: true },
+            loadComponent: () =>
+              import('./features/gremien/gremien-none/gremien-none.component').then(
+                (m) => m.GremienNoneComponent,
+              ),
+          },
+          {
+            path: ':id',
+            data: {
+              title: 'gremien.title',
+              parent: ['gremien'],
+              permission: ['gremium.view_all'],
+              allowCommitteeMember: true,
+            },
+            loadComponent: () =>
+              import('./features/gremien/gremium-detail/gremium-detail.component').then(
+                (m) => m.GremiumDetailComponent,
+              ),
+          },
+        ],
+      },
+      {
         path: 'budget',
         // A Gremium with an assigned cost center sees a scoped tab.
         data: { title: 'nav.budget', permission: BUDGET_PERMISSIONS, allowScopedBudgetView: true, wide: true },

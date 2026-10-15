@@ -1,0 +1,217 @@
+<div class="gat__tools" role="group" [attr.aria-label]="'gremien.filters' | t">
+  <app-filter-select
+    [label]="'gremien.attendance.range' | t"
+    [options]="rangeOptions()"
+    [value]="preset()"
+    (valueChange)="setPreset($event)"
+    [text]="rangeText()"
+    [active]="true"
+    [icon]="'check'"
+  />
+  <app-filter-select
+    [label]="'gremien.members.role' | t"
+    [options]="roleOptions()"
+    [value]="role()"
+    (valueChange)="role.set($event)"
+    [text]="roleText()"
+    [active]="role() !== ''"
+    [icon]="role() ? 'check' : null"
+    [chevron]="!role()"
+  />
+  @if (!phone()) {
+    <app-filter-select
+      [label]="'gremien.attendance.sort' | t"
+      [options]="sortOptions()"
+      [value]="sort()"
+      (valueChange)="setSort($event)"
+      [text]="sortText()"
+    />
+    <span class="gat__grow"></span>
+    <app-button
+      variant="text"
+      [iconOnly]="true"
+      [ariaLabel]="'gremien.attendance.export' | t"
+      [disabled]="loading() || !rows().length"
+      (click)="exportCsv()"
+    ><app-icon name="download" [size]="20" /></app-button>
+  }
+</div>
+
+@if (loading()) {
+  <app-skeleton variant="rows" [count]="5" [label]="'gremien.attendance.loading' | t" />
+} @else if (error()) {
+  <div class="gat__status" role="alert">
+    <span>{{ 'gremien.attendance.error' | t }}</span>
+    <app-button variant="text" size="sm" (click)="load()">{{ 'gremien.list.retry' | t }}</app-button>
+  </div>
+} @else if (noMeetings()) {
+  <p class="gat__status">{{ 'gremien.attendance.noMeetings' | t }}</p>
+  <div class="gat__ghost" aria-hidden="true">
+    @for (r of [1, 2, 3, 4]; track r) {
+      <div class="gat__ghostRow">
+        <span class="gat__ghostName"></span>
+        @for (h of heads(); track h.month) {
+          <span class="gat__ghostCell"></span>
+        }
+      </div>
+    }
+  </div>
+} @else if (!rows().length) {
+  <p class="gat__status">{{ (role() ? 'gremien.attendance.noMatch' : 'gremien.attendance.empty') | t }}</p>
+} @else if (phone()) {
+  <div class="gat__phoneHead" aria-hidden="true">
+    @for (h of heads(); track h.month) {
+      <span>{{ h.short }}</span>
+    }
+  </div>
+  <ul class="rowgroup gat__cards">
+    @for (m of rows(); track m.row.principalId) {
+      <li>
+        <button
+          type="button"
+          class="gat__card"
+          [attr.aria-label]="m.name + ', ' + ('gremien.attendance.ofPresent' | t: { present: m.totals.present, held: m.totals.held })"
+          (click)="openPerson(m, $event.currentTarget)"
+        >
+          <span class="gat__cardHead">
+            <span class="gat__cardName">{{ m.name }}</span>
+            <span class="mono gat__cardSum">{{ m.totals.present }}/{{ m.totals.held }}</span>
+            <app-icon class="gat__chev" name="chevron-right" [size]="16" />
+          </span>
+          <span class="gat__cardCells">
+            @for (c of m.cells; track c.month) {
+              <span
+                class="gat__cell gat__cell--sm"
+                [class.gat__cell--na]="c.view.kind === 'na'"
+                [class.gat__cell--none]="c.view.kind === 'none'"
+                [class.gat__cell--full]="c.strength === 100"
+                [style.--gat-s]="c.strength + '%'"
+              >
+                @if (c.view.kind === 'count') {
+                  {{ c.view.present }}
+                  @if (c.view.excused) {
+                    <span class="gat__dot gat__dot--ex"></span>
+                  }
+                  @if (c.view.delegated) {
+                    <span class="gat__dot gat__dot--dv"></span>
+                  }
+                } @else if (c.view.kind === 'none') {
+                  –
+                }
+              </span>
+            }
+          </span>
+        </button>
+      </li>
+    }
+  </ul>
+} @else {
+  <div class="gat__frame" tabindex="0" role="region" [attr.aria-label]="'gremien.attendance.matrix' | t">
+    <table class="gat__mx">
+      <caption class="sr-only">{{ 'gremien.attendance.caption' | t: { range: rangeText() } }}</caption>
+      <colgroup>
+        <col class="gat__colName" />
+        @for (h of heads(); track h.month) {
+          <col class="gat__colMonth" />
+        }
+        <col class="gat__colTotal" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th scope="col" class="gat__th gat__th--name">{{ 'gremien.attendance.member' | t }}</th>
+          @for (h of heads(); track h.month) {
+            <th scope="col" class="gat__th">
+              <abbr class="gat__month" [title]="h.long">{{ h.short }}</abbr>
+              <span class="gat__meetings">{{ h.meetings }}</span>
+            </th>
+          }
+          <th
+            scope="col"
+            class="gat__th gat__th--total"
+            [attr.aria-sort]="sort() === 'quotaAsc' ? 'ascending' : sort() === 'quotaDesc' ? 'descending' : 'none'"
+          >
+            <button
+              type="button"
+              class="gat__sortBtn"
+              [class.gat__sortBtn--on]="sort() !== 'name'"
+              (click)="toggleQuotaSort()"
+            >
+              {{ 'gremien.attendance.total' | t }}
+              @if (sort() !== 'name') {
+                <app-icon [name]="sort() === 'quotaAsc' ? 'up' : 'down'" [size]="13" />
+              }
+            </button>
+            <span class="gat__meetings">{{ totalText() }}</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (m of rows(); track m.row.principalId) {
+          <tr>
+            <th scope="row" class="gat__who">
+              <span class="gat__whoIn">
+                <app-avatar size="sm" [name]="m.name" [principalId]="m.row.principalId" [decorative]="true" />
+                <span class="gat__whoText">
+                  <span class="gat__name">{{ m.name }}</span>
+                  @if (m.role) {
+                    <span class="gat__role">{{ m.role }}</span>
+                  }
+                </span>
+              </span>
+            </th>
+            @for (c of m.cells; track c.month) {
+              <td class="gat__td">
+                @if (c.view.kind === 'count') {
+                  <button
+                    type="button"
+                    class="gat__cell"
+                    [class.gat__cell--full]="c.strength === 100"
+                    [style.--gat-s]="c.strength + '%'"
+                    [attr.aria-label]="c.label"
+                    (click)="openCell(m, c, $event.currentTarget)"
+                  >
+                    <span class="mono">{{ c.view.present }}/{{ c.view.held }}</span>
+                    @if (c.view.excused) {
+                      <span class="gat__ex" aria-hidden="true">{{ c.view.excused }}</span>
+                    }
+                    @if (c.view.delegated) {
+                      <span class="gat__ex gat__ex--dv" aria-hidden="true">{{ c.view.delegated }}V</span>
+                    }
+                  </button>
+                } @else if (c.view.kind === 'none') {
+                  <span class="gat__cell gat__cell--none" role="img" [attr.aria-label]="c.label">–</span>
+                } @else {
+                  <span class="gat__cell gat__cell--na" role="img" [attr.aria-label]="c.label"></span>
+                }
+              </td>
+            }
+            <td class="gat__td gat__td--total">
+              <span class="mono">{{ m.totals.present }}/{{ m.totals.held }}</span>
+              <span class="gat__pct">{{ m.totals.pct === null ? '–' : m.totals.pct + ' %' }}</span>
+            </td>
+          </tr>
+        }
+      </tbody>
+      <tfoot>
+        <tr>
+          <th scope="row" class="gat__foot gat__foot--name">{{ 'gremien.attendance.average' | t }}</th>
+          @for (a of averages().months; track $index) {
+            <td class="gat__foot mono">{{ a }}</td>
+          }
+          <td class="gat__foot gat__td--total mono">{{ averages().total }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <ul class="gat__legend" [attr.aria-label]="'gremien.attendance.legend' | t">
+    <li><span class="gat__swatch gat__swatch--full"></span>{{ 'gremien.attendance.legendAll' | t }}</li>
+    <li><span class="gat__swatch gat__swatch--some"></span>{{ 'gremien.attendance.legendSome' | t }}</li>
+    <li><span class="gat__swatch"></span>{{ 'gremien.attendance.legendNone' | t }}</li>
+    <li><span class="gat__swatch gat__cell--na"></span>{{ 'gremien.attendance.legendNa' | t }}</li>
+    <li><span class="gat__ex gat__ex--static">1</span>{{ 'gremien.attendance.state.excused' | t }}</li>
+    <li><span class="gat__ex gat__ex--dv gat__ex--static">1V</span>{{ 'gremien.attendance.state.delegated' | t }}</li>
+  </ul>
+}
+
+<app-attendance-detail [gremiumId]="gremiumId()" />

@@ -1,0 +1,176 @@
+@use 'breakpoints' as bp;
+
+/* The open gremium. Side by side it is a sheet (surface 1, large radius) as high as the
+   pane: the header and the tab bar stay, and only the body below them scrolls, down to
+   the bottom edge of the sheet. One pane at a time it sits on the page, which scrolls. */
+:host {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+:host(.gd-host--split) {
+  min-height: 0;
+}
+
+.gd {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.gd--split {
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.gd--busy.gd--split,
+.gd--none.gd--split {
+  padding: var(--space-6);
+}
+.gd--none {
+  display: grid;
+  place-items: center;
+}
+
+/* ------------------------------------------------------------------ header */
+.gd__head {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--sheet-head-gap);
+  padding-bottom: 14px;
+}
+.gd--split .gd__head,
+.gd--split .gd__tabs {
+  padding-inline: var(--space-6);
+}
+.gd--split .gd__bar {
+  margin-inline-end: 0;
+  padding-inline-end: calc(var(--space-6) - var(--space-3));
+}
+.gd__kicker {
+  display: block;
+  min-width: 0;
+}
+.gd__dot {
+  margin-inline: 6px;
+  color: var(--color-text-subtle);
+}
+.gd__role {
+  color: var(--color-text);
+  font-weight: var(--fw-semibold);
+}
+
+.gd__titleRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.gd__title {
+  margin: 0;
+  min-width: 0;
+  font-size: 1.75rem;
+  line-height: 2.25rem;
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+/* Items with a dot between two of them, also after a wrap (never a dot at a line start). */
+.gd__line {
+  --gd-sep: 24px;
+  margin: 0;
+  overflow-x: clip;
+  color: var(--color-text-muted);
+  font-size: var(--fs-md);
+  line-height: 1.375rem;
+  min-width: 0;
+}
+.gd__line:empty,
+.gd__parts:empty {
+  display: none;
+}
+.gd__parts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin-inline-start: calc(-1 * var(--gd-sep));
+  min-width: 0;
+}
+.gd__part {
+  min-width: 0;
+  white-space: nowrap;
+}
+.gd__part::before {
+  display: inline-block;
+  width: var(--gd-sep);
+  color: var(--color-text-subtle);
+  text-align: center;
+  content: '·';
+  content: '·' / '';
+}
+
+.gd__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: 6px;
+}
+.gd__actions app-icon {
+  margin-inline-end: 6px;
+}
+.gd__grow {
+  flex: 1 1 auto;
+}
+
+.gd__tabs {
+  flex: none;
+}
+
+/* ------------------------------------------------------------------ body */
+.gd__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-top: 22px;
+}
+.gd--split .gd__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 22px var(--space-6) var(--space-6);
+}
+/* The attendance matrix scrolls inside itself (sticky head and first column), so the
+   body does not scroll around it. */
+.gd--split .gd__body--fill {
+  overflow: hidden;
+}
+.gd__panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.gd__panel[hidden] {
+  display: none;
+}
+.gd__body--fill .gd__panel:not([hidden]) {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+@include bp.phone {
+  .gd__title {
+    font-size: 1.375rem;
+    line-height: 1.75rem;
+  }
+  .gd__line {
+    font-size: var(--fs-sm);
+  }
+  .gd__body {
+    padding-top: var(--space-4);
+  }
+}
