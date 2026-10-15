@@ -17,6 +17,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
+from sqlalchemy import delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -24,7 +25,13 @@ import app.main as main_mod
 from app.db import get_session
 from app.deps import get_current_principal
 from app.main import create_app
-from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
+from app.modules.admin.models import (
+    CdVariant,
+    CdVariantLogo,
+    Gremium,
+    GremiumMembership,
+    GremiumRole,
+)
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import MeetingDelegation
@@ -294,6 +301,42 @@ async def test_overview_member_and_view_all(
     viewer = Principal(sub="viewer-x", permissions={"gremium.view_all"})
     ids = {r["id"] for r in _client(app_for, viewer).get("/api/gremien/overview").json()}
     assert {str(w.gremium_id), str(w.other_id)} <= ids
+
+
+async def test_overview_logo_url_follows_the_square_logo(
+    maker: async_sessionmaker[AsyncSession], app_for: FastAPI
+) -> None:
+    w = await _world(maker)
+    async with maker() as s:
+        variant = CdVariant(key=f"v-{uuid.uuid4().hex[:8]}", name="STUPA")
+        s.add(variant)
+        await s.flush()
+        s.add(
+            CdVariantLogo(
+                variant_id=variant.id,
+                slot="square",
+                object_key=f"cd-logos/{uuid.uuid4()}.png",
+                file_name="stupa.png",
+                mime="image/png",
+                size=100,
+            )
+        )
+        gremium = await s.get(Gremium, w.gremium_id)
+        assert gremium is not None
+        gremium.cd_variant_id = variant.id
+        await s.commit()
+    try:
+        row = _client(app_for, w.me).get("/api/gremien/overview").json()[0]
+        assert row["logoUrl"] == f"/api/gremien/{w.gremium_id}/logo"
+    finally:
+        # Other suites count the seeded variants: leave none behind.
+        async with maker() as s:
+            gremium = await s.get(Gremium, w.gremium_id)
+            assert gremium is not None
+            gremium.cd_variant_id = None
+            await s.flush()
+            await s.execute(sa_delete(CdVariant).where(CdVariant.id == variant.id))
+            await s.commit()
 
 
 async def test_gate_hides_foreign_gremium(

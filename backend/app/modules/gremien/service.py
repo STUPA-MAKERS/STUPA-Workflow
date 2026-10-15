@@ -50,6 +50,7 @@ from sqlalchemy import cast as sql_cast
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
+from app.modules.admin.cd_logos import ALLOWED_SQUARE_LOGO_MIME
 from app.modules.admin.models import (
     CdVariantLogo,
     Gremium,
@@ -356,7 +357,13 @@ class GremienService:
         rows = await self.session.scalars(
             select(Gremium.id)
             .join(CdVariantLogo, CdVariantLogo.variant_id == Gremium.cd_variant_id)
-            .where(Gremium.id.in_(ids), CdVariantLogo.slot == SQUARE_SLOT)
+            .where(
+                Gremium.id.in_(ids),
+                CdVariantLogo.slot == SQUARE_SLOT,
+                # The rule of the logo route (`_square_ref`): only a stored raster image.
+                CdVariantLogo.object_key.is_not(None),
+                CdVariantLogo.mime.in_(sorted(ALLOWED_SQUARE_LOGO_MIME)),
+            )
             .distinct()
         )
         return set(rows.all())
