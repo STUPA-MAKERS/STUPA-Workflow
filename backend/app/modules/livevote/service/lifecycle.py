@@ -187,9 +187,11 @@ class LifecycleOps(HandoverOps):
             raise ForbiddenError("only a session manager may plan this meeting")
         if wants_write and not await self.can_write(meeting, principal):
             raise ForbiddenError("not allowed to control this meeting")
-        # The protokollant leads the room. The session lead may take over or override.
-        if wants_now and not await self.can_manage_votes(meeting, principal):
-            raise ForbiddenError("not allowed to set the current agenda item")
+        # The current agenda item follows the protokollant and nobody else, so a look
+        # of the session lead at another item does not move the beamer and the
+        # followers. The lead takes the minutes over first (handover) to move it.
+        if wants_now and not await self.can_set_current_item(meeting, principal):
+            raise ForbiddenError("only the protokollant may set the current agenda item")
         if wants_now and meeting.status == "closed":
             raise ConflictError("the session is closed — it has no current agenda item")
         if wants_now and payload.current_agenda_item_id is not None:

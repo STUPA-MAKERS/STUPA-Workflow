@@ -1329,7 +1329,20 @@ async def test_patch_set_date() -> None:
 
 
 # service.py: patch of the current agenda item ("Jetzt")
-async def test_patch_current_item_forbidden_without_vote_management(
+def _keeper(monkeypatch: pytest.MonkeyPatch, *, scope: set[str] | None = None) -> Principal:
+    """Act as the protokollant of every meeting: the sub `keeper`."""
+
+    async def _is_keeper(_self: Any, _meeting: Any, principal: Principal) -> bool:
+        return principal.sub == "keeper"
+
+    monkeypatch.setattr(MeetingService, "_is_protokollant", _is_keeper)
+    capped = None if scope is None else frozenset(scope)
+    return Principal(sub="keeper", permissions=set(), roles=[], scope_permissions=capped)
+
+
+@pytest.mark.parametrize("who", ["role", "admin", "scoped keeper"])
+async def test_patch_current_item_forbidden_without_the_minutes(
+    who: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     m = _meeting(status="live")
@@ -1340,32 +1353,40 @@ async def test_patch_current_item_forbidden_without_vote_management(
     _patch_gids(monkeypatch, _none)
     from app.modules.livevote.schemas import MeetingPatch
 
-    # A protocol.write role may take minutes, but it does not lead the room.
+    # Only the protokollant moves the room: not a gremium role, not the session lead
+    # or the admin, and not a token of the protokollant without `protocol.write`.
+    principal = {
+        "role": _principal(),
+        "admin": _admin(),
+        "scoped keeper": _keeper(monkeypatch, scope={"vote.manage"}),
+    }[who]
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
     with pytest.raises(ForbiddenError):
-        await svc.patch(m.id, MeetingPatch(currentAgendaItemId=uuid4()), _principal())
+        await svc.patch(m.id, MeetingPatch(currentAgendaItemId=uuid4()), principal)
 
 
-async def test_patch_current_item_closed_conflict() -> None:
+async def test_patch_current_item_closed_conflict(monkeypatch: pytest.MonkeyPatch) -> None:
     m = _meeting(status="closed")
     from app.modules.livevote.schemas import MeetingPatch
 
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
     with pytest.raises(ConflictError):
-        await svc.patch(m.id, MeetingPatch(currentAgendaItemId=uuid4()), _admin())
+        await svc.patch(m.id, MeetingPatch(currentAgendaItemId=uuid4()), _keeper(monkeypatch))
 
 
-async def test_patch_current_item_of_other_meeting_not_found() -> None:
+async def test_patch_current_item_of_other_meeting_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     m = _meeting(status="live")
     from app.modules.livevote.schemas import MeetingPatch
 
     # The item lookup answers with a foreign meeting id.
     svc = MeetingService(_QueueSession(executes=[res(m)], scalar_q=[uuid4()]))  # type: ignore[arg-type]
     with pytest.raises(NotFoundError):
-        await svc.patch(m.id, MeetingPatch(currentAgendaItemId=uuid4()), _admin())
+        await svc.patch(m.id, MeetingPatch(currentAgendaItemId=uuid4()), _keeper(monkeypatch))
 
 
-async def test_patch_current_item_set_and_broadcast() -> None:
+async def test_patch_current_item_set_and_broadcast(monkeypatch: pytest.MonkeyPatch) -> None:
     m = _meeting(status="live")
     from app.modules.livevote.schemas import MeetingPatch
 
@@ -1379,20 +1400,20 @@ async def test_patch_current_item_set_and_broadcast() -> None:
     pub = _Pub()
     tid = uuid4()
     svc = MeetingService(_QueueSession(executes=[res(m)], scalar_q=[m.id]), pub)  # type: ignore[arg-type]
-    out = await svc.patch(m.id, MeetingPatch(currentAgendaItemId=tid), _admin())
+    out = await svc.patch(m.id, MeetingPatch(currentAgendaItemId=tid), _keeper(monkeypatch))
     assert m.current_agenda_item_id == tid
     assert out.current_agenda_item_id == tid
     assert pub.states[0].current_agenda_item_id == tid
 
 
-async def test_patch_current_item_clear() -> None:
+async def test_patch_current_item_clear(monkeypatch: pytest.MonkeyPatch) -> None:
     m = _meeting(status="live")
     m.current_agenda_item_id = uuid4()
     from app.modules.livevote.schemas import MeetingPatch
 
     # ``null`` clears the item and skips the ownership lookup.
     svc = MeetingService(_QueueSession(executes=[res(m)]))  # type: ignore[arg-type]
-    out = await svc.patch(m.id, MeetingPatch(currentAgendaItemId=None), _admin())
+    out = await svc.patch(m.id, MeetingPatch(currentAgendaItemId=None), _keeper(monkeypatch))
     assert m.current_agenda_item_id is None
     assert out.current_agenda_item_id is None
 
