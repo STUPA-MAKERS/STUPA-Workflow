@@ -1,4 +1,4 @@
-/* A square with round corners: the logo on white, or the initials on the accent tint. */
+/* A square with round corners: the logo edge to edge, or the initials on the accent tint. */
 :host {
   display: inline-grid;
   flex: none;
@@ -20,13 +20,14 @@
   border-radius: 14px;
   font-size: 0.9375rem;
 }
-/* A logo keeps a white ground in both themes: the CD logos are made for paper. */
+/* A logo fills the whole square, with no ground and no frame: the square logo is
+   made for this slot, and the round corners clip it. */
 :host(.glo--img) {
-  background: #fff;
+  background: none;
 }
 .glo__img {
   display: block;
-  width: calc(100% - 8px);
-  height: calc(100% - 8px);
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
