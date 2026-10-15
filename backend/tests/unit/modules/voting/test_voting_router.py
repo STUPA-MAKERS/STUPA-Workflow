@@ -62,6 +62,12 @@ class _FakeService:
     async def assert_can_manage_vote(self, vote_id, principal):  # noqa: ANN001
         await self.assert_can_manage_group(str(GID), None, principal)
 
+    async def assert_can_run_vote(self, vote_id, principal):  # noqa: ANN001
+        # The protokollant gate of a meeting vote; the service tests cover it.
+        await self.assert_can_manage_vote(vote_id, principal)
+        if getattr(self, "meeting_id", None) is not None and getattr(self, "not_keeper", False):
+            raise ForbiddenError("only the protokollant may open or close a vote")
+
     async def create(self, application_id, payload, principal):  # noqa: ANN001
         return _vote_out("draft")
 
