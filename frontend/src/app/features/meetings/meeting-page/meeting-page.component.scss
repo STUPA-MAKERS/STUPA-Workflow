@@ -84,7 +84,8 @@ app-button ::ng-deep .btn:not(.btn--icon) .btn__label > app-icon:first-child {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 36px;
+  /* The height of the buttons beside it (Beamer-Ansicht, QR-Code). */
+  height: var(--control-height);
   padding: 0 var(--space-3);
   border: var(--border-width) solid var(--color-border);
   border-radius: var(--radius-pill);

@@ -103,6 +103,14 @@
           </div>
         }
         <span class="ts__spacer"></span>
+        <span class="ts__save mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
+          @switch (saveState()) {
+            @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
+            @case ('saved') { <app-icon name="check" [size]="16" /> {{ 'meetings.protocol.saved' | t }} }
+            @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
+            @default {}
+          }
+        </span>
         <app-segmented
           class="ts__mode"
           width="equal"
@@ -112,14 +120,6 @@
           [value]="mode()"
           (valueChange)="setMode($event)"
         />
-        <span class="ts__save mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
-          @switch (saveState()) {
-            @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
-            @case ('saved') { <app-icon name="check" [size]="16" /> {{ 'meetings.protocol.saved' | t }} }
-            @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
-            @default {}
-          }
-        </span>
       </div>
       <div class="ts__rule"></div>
       }

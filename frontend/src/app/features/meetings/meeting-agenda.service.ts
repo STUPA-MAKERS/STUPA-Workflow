@@ -2,7 +2,7 @@ import { Injectable, type OnDestroy, computed, inject, signal } from '@angular/c
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
-import { AsyncSubject, type Observable, of } from 'rxjs';
+import { AsyncSubject, type Observable, map, of, switchMap } from 'rxjs';
 import type { AgendaItem, Uuid } from '@core/api/models';
 import { errorDetail } from './meetings-display.util';
 
@@ -33,7 +33,16 @@ export class MeetingAgendaService implements OnDestroy {
   readonly saveState = signal<'idle' | 'saving' | 'saved' | 'error'>('idle');
   private bodyTimer: ReturnType<typeof setTimeout> | null = null;
   /** Debounced TOP edit that the server does not hold yet: the item and the text. */
-  private pendingBody: { itemId: Uuid; body: string } | null = null;
+  private pendingBody: { meetingId: Uuid; itemId: Uuid; body: string } | null = null;
+  /**
+   * The newest text of an item that this tab has typed and the server has not confirmed
+   * yet. A read of the agenda keeps it in place of the text of the server, because a read
+   * that started before the save (for example the agenda reload after the
+   * `meeting_state` of an earlier save) would set the item back to an older text. The
+   * next insert, like a vote result, appends to the text of the item, so that older text
+   * would replace what the minute-taker typed last.
+   */
+  private localBody: { itemId: Uuid; body: string } | null = null;
   /** The running body save. It emits once and completes after the response. */
   private runningSave: Observable<void> | null = null;
   private dragTopIndex: number | null = null;
@@ -56,8 +65,9 @@ export class MeetingAgendaService implements OnDestroy {
     this.toast.error(detail ? `${base}: ${detail}` : base);
   }
 
+  /** Save a pending edit when the page goes away, so that the debounce drops no text. */
   ngOnDestroy(): void {
-    if (this.bodyTimer !== null) clearTimeout(this.bodyTimer);
+    this.flushPendingBody(this.pendingBody?.meetingId ?? null);
   }
 
   /**
@@ -69,7 +79,7 @@ export class MeetingAgendaService implements OnDestroy {
   load(meetingId: Uuid, preferred: Uuid | null = null): void {
     this.api.listAgenda(meetingId, { quiet: true }).subscribe({
       next: (rows) => {
-        this.agenda.set(rows);
+        this.setRows(rows);
         const sel = this.selectedTopId();
         if (!sel || !rows.some((r) => r.id === sel)) {
           const now = preferred && rows.some((r) => r.id === preferred) ? preferred : null;
@@ -86,7 +96,7 @@ export class MeetingAgendaService implements OnDestroy {
     this.api.removeAgendaItem(meetingId, itemId).subscribe({
       next: (rows) => {
         this.savingAgenda.set(false);
-        this.agenda.set(rows);
+        this.setRows(rows);
       },
       error: (err: unknown) => {
         this.savingAgenda.set(false);
@@ -120,7 +130,7 @@ export class MeetingAgendaService implements OnDestroy {
     this.api.renameAgendaItem(meetingId, item.id, title).subscribe({
       next: (rows) => {
         this.savingAgenda.set(false);
-        this.agenda.set(rows);
+        this.setRows(rows);
         this.renameDraft.set('');
       },
       error: (err: unknown) => {
@@ -136,7 +146,7 @@ export class MeetingAgendaService implements OnDestroy {
     this.api.setAgendaNonPublic(meetingId, item.id, nonPublic).subscribe({
       next: (rows) => {
         this.savingAgenda.set(false);
-        this.agenda.set(rows);
+        this.setRows(rows);
       },
       error: (err: unknown) => {
         this.savingAgenda.set(false);
@@ -171,7 +181,7 @@ export class MeetingAgendaService implements OnDestroy {
     items.splice(to, 0, moved);
     this.agenda.set(items); // optimistic update
     this.api.reorderAgenda(meetingId, items.map((i) => i.id)).subscribe({
-      next: (rows) => this.agenda.set(rows),
+      next: (rows) => this.setRows(rows),
       error: (err: unknown) => {
         this.failed(err);
         this.load(meetingId);
@@ -193,7 +203,8 @@ export class MeetingAgendaService implements OnDestroy {
   /** Debounce the save of the TOP body. The local text changes at once. */
   onTopBodyChange(meetingId: Uuid, itemId: Uuid, body: string): void {
     if (this.bodyTimer !== null) clearTimeout(this.bodyTimer);
-    this.pendingBody = { itemId, body };
+    this.pendingBody = { meetingId, itemId, body };
+    this.localBody = { itemId, body };
     this.agenda.update((items) =>
       items.map((a) => (a.id === itemId ? { ...a, body } : a)),
     );
@@ -211,6 +222,7 @@ export class MeetingAgendaService implements OnDestroy {
     if (!meetingId) {
       this.bodyTimer = null;
       this.pendingBody = null;
+      this.localBody = null;
       return;
     }
     this.saveBody(meetingId, itemId, body);
@@ -226,6 +238,29 @@ export class MeetingAgendaService implements OnDestroy {
   settlePendingBody(meetingId: Uuid | null): Observable<void> {
     this.flushPendingBody(meetingId);
     return this.runningSave ?? of(undefined);
+  }
+
+  /**
+   * Make sure that the server holds the text that this tab shows, and tell if it does.
+   *
+   * The finalize renders the protocol from the item texts on the server, and a body
+   * save after the finalize gets 409 `protocol_locked`. So the finalize waits for this:
+   * it runs a pending autosave at once and waits for a running save. Without either,
+   * it sends the text of an earlier failed save again. The observable emits `false` when the server still
+   * does not hold the text.
+   */
+  persistBody(meetingId: Uuid): Observable<boolean> {
+    // A save that runs now is the try. Only an earlier failed save is sent again.
+    const busy = this.bodyTimer !== null || this.runningSave !== null;
+    return this.settlePendingBody(meetingId).pipe(
+      switchMap(() => {
+        const local = this.localBody;
+        if (busy || !local) return of(undefined);
+        this.saveBody(meetingId, local.itemId, local.body);
+        return this.runningSave ?? of(undefined);
+      }),
+      map(() => this.localBody === null),
+    );
   }
 
   private saveBody(meetingId: Uuid, itemId: Uuid, body: string): void {
@@ -244,7 +279,10 @@ export class MeetingAgendaService implements OnDestroy {
     this.api.setAgendaBody(meetingId, itemId, body).subscribe({
       next: (rows) => {
         this.savingTop.set(false);
-        this.agenda.set(rows);
+        // The server holds the newest text now, unless the minute-taker typed again.
+        const local = this.localBody;
+        if (local?.itemId === itemId && local.body === body) this.localBody = null;
+        this.setRows(rows);
         this.saveState.set('saved');
         settle();
       },
@@ -254,5 +292,15 @@ export class MeetingAgendaService implements OnDestroy {
         settle();
       },
     });
+  }
+
+  /** Show the rows of the server, with the unconfirmed text of this tab kept. */
+  private setRows(rows: AgendaItem[]): void {
+    const local = this.localBody;
+    this.agenda.set(
+      local
+        ? rows.map((a) => (a.id === local.itemId ? { ...a, body: local.body } : a))
+        : rows,
+    );
   }
 }
