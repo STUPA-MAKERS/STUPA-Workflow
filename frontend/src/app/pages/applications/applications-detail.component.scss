@@ -417,13 +417,16 @@
 
 /* ------------------------------------------------------------------ comments */
 /* The column scrolls as a whole, so the log of the chat scrolls inside a bound. On a
-   phone the tab holds the chat alone: the log fills the view above the pinned composer. */
+   phone the tab holds the chat alone: the log takes the view between the tabs and the
+   composer and scrolls inside, so it opens at the newest message and follows new ones. */
 .ad__chat {
   --chat-log-max: min(60vh, 36rem);
 }
 .ad__chat.chat--phone {
-  --chat-log-max: none;
-  --chat-log-min: calc(100dvh - var(--app-bottom-inset, 0px) - 22rem);
+  --chat-log-min: max(14rem, calc(100dvh - var(--app-bottom-inset, 0px) - 32rem));
+  --chat-log-max: var(--chat-log-min);
+  /* The chat ends the page: the composer bar runs down to the bottom navigation. */
+  --chat-composer-foot: 4rem;
 }
 
 /* ------------------------------------------------------------------ dialogs */

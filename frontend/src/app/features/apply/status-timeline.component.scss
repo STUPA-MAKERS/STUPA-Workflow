@@ -198,6 +198,8 @@
   min-height: 0;
   --chat-log-min: 14rem;
   --chat-composer-bottom: 0px;
+  /* The sheet is surface 2: the messages of the Gremium take the next step. */
+  --chat-bubble: var(--color-surface-3);
 }
 .sp__dialogText {
   margin: 0;

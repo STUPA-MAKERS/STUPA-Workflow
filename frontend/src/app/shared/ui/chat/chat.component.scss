@@ -1,13 +1,20 @@
 /* The host is a flex column: the log takes the space, the composer stays below it.
    A consumer bounds the log with `--chat-log-max` (a column that scrolls as a whole) or
-   gives the host a height (a sheet), and moves the pinned phone composer with
-   `--chat-composer-bottom`. */
+   gives the host a height (a sheet), moves the pinned phone composer with
+   `--chat-composer-bottom` and carries its surface further down with
+   `--chat-composer-foot`. `--chat-bubble` is the fill of the messages of others. */
 :host {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   min-width: 0;
   min-height: 0;
+}
+/* The delete dialog and the phone menu open in the top layer. Out of the flow, their
+   hosts add no gap below the composer. */
+:host > app-dialog,
+:host > app-side-sheet {
+  position: absolute;
 }
 
 /* ------------------------------------------------------------------ log */
@@ -144,7 +151,8 @@
   min-width: 0;
   padding: 9px 14px;
   border-radius: 6px 16px 16px 6px;
-  background: var(--color-surface-2);
+  /* A chat on a surface-2 sheet sets `--chat-bubble` one step up. */
+  background: var(--chat-bubble, var(--color-surface-2));
   color: var(--color-text);
 }
 .chat__row--head .chat__bubble {
@@ -360,6 +368,8 @@
   padding: 12px 0;
   border-top: 1px solid var(--color-border);
   background: var(--color-surface);
+  /* A consumer whose chat ends the page carries the surface down to the navigation. */
+  box-shadow: 0 var(--chat-composer-foot, 0px) 0 0 var(--color-surface);
 }
 .chat__box {
   display: flex;
