@@ -191,43 +191,18 @@
         (openChange)="commentsOpen.set($event)"
         [heading]="'status.comments.title' | t"
         [side]="phone() ? 'bottom' : 'end'"
+        [contentScrolls]="true"
       >
-        <div class="sp__chat">
-          @if (comments().length) {
-            <ul class="rowgroup rowgroup--bg3 sp__msgs">
-              @for (c of comments(); track c.id) {
-                <li class="sp__msg" [class.sp__msg--own]="c.isOwn">
-                  <span class="sp__msgHead">
-                    <strong>{{ authorName(c) }}</strong>
-                    <time [attr.datetime]="c.at">{{ c.at | ldate: 'short' }}</time>
-                  </span>
-                  <span class="sp__msgBody">{{ c.body }}</span>
-                </li>
-              }
-            </ul>
-          } @else {
-            <p class="sp__empty">{{ 'status.comments.empty' | t }}</p>
-          }
-          <form class="sp__composer" (submit)="$event.preventDefault(); addComment()">
-            <textarea
-              class="sp__composerInput"
-              rows="2"
-              [formControl]="commentBody"
-              [placeholder]="'status.comments.placeholder' | t"
-              (keydown.enter)="$event.preventDefault(); addComment()"
-              [attr.aria-label]="'status.comments.label' | t"
-            ></textarea>
-            <app-button
-              type="submit"
-              [iconOnly]="true"
-              [ariaLabel]="'status.comments.send' | t"
-              [disabled]="commentBody.invalid || postingComment()"
-              [loading]="postingComment()"
-            >
-              <app-icon name="send" [size]="17" />
-            </app-button>
-          </form>
-        </div>
+        <app-chat
+          class="sp__chat"
+          [draftKey]="'status.' + app.id"
+          [messages]="chatMessages()"
+          placeholder="status.comments.placeholder"
+          (send)="sendComment($event)"
+          (retry)="retryComment($event)"
+          (edit)="editComment($event)"
+          (delete)="deleteComment($event)"
+        />
       </app-side-sheet>
 
       <app-dialog

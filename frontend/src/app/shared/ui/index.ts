@@ -14,6 +14,18 @@
  */
 export { AvatarComponent, AvatarStackComponent, initials } from './avatar/avatar.component';
 export type { AvatarSize } from './avatar/avatar.component';
+export { ChatComponent } from './chat/chat.component';
+export { ChatOutbox } from './chat/chat-outbox';
+export type {
+  ChatAttachment,
+  ChatEdit,
+  ChatEvent,
+  ChatMessage,
+  ChatMessageState,
+  ChatRef,
+  ChatSend,
+  ChatVisibility,
+} from './chat/chat.models';
 export { DateBlockComponent } from './date-block/date-block.component';
 export { EmptyStateComponent } from './empty-state/empty-state.component';
 export { FieldGroupComponent, FieldRowComponent } from './field-group/field-group.component';

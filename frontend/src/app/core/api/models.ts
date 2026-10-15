@@ -15,6 +15,14 @@
 
 export type Uuid = string;
 export type IsoDateTime = string;
+
+/** A person on a card, a ticket, a note or an event. null/null = deleted person. */
+export interface PersonRef {
+  principalId: Uuid | null;
+  /** The name, else the account e-mail, else null. */
+  displayName: string | null;
+}
+
 export type Lang = 'de' | 'en';
 
 /** Configurable multilingual text (`*_i18n` JSONB). */

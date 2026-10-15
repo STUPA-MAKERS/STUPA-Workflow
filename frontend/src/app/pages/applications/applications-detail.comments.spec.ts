@@ -1,5 +1,5 @@
 /**
- * Comment edit and delete on the application detail page.
+ * The comments of the application detail page in `app-chat`: post, retry, edit, delete.
  *
  * Its own spec file: the base spec of the same component is already large, and one
  * file with both blocks pushes the first TestBed compile over the default jest timeout
@@ -11,7 +11,8 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { render, screen } from '@testing-library/angular';
+import { fireEvent, render, screen, within } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
 import { BehaviorSubject } from 'rxjs';
 import { ApplicationsDetailComponent } from './applications-detail.component';
 import { ApplicationsPageService } from './applications-page.service';
@@ -114,18 +115,6 @@ function flushForm(http: HttpTestingController, id = 'app-1') {
   });
 }
 
-/** Answer every request of one page load. */
-function flushAll(http: HttpTestingController, id = 'app-1') {
-  flushTypes(http);
-  http.expectOne(url('', id)).flush({ ...appWire(), id });
-  http.expectOne(url('/versions', id)).flush(VERSIONS);
-  http.expectOne(url('/comments', id)).flush(COMMENTS);
-  for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
-    req.flush([]);
-  }
-  flushForm(http, id);
-}
-
 /** The attachments panel loads on render. An empty answer is fine. */
 function flushAttachments(http: HttpTestingController) {
   flushTypes(http);
@@ -137,7 +126,7 @@ function flushAttachments(http: HttpTestingController) {
   }
 }
 
-// --- comment edit / delete -------------------------------------------------
+// --- helpers -----------------------------------------------------------------
 
 /** The application types load once, for "<Typ> · Version n" above the title. */
 function flushTypes(http: HttpTestingController) {
@@ -151,69 +140,103 @@ function flushTypes(http: HttpTestingController) {
   }
 }
 
-describe('ApplicationsDetailComponent — comment edit and delete', () => {
+/** Load the page with the given comments and answer every request of the load. */
+async function loaded(permissions?: string[], comments: CommentOutWire[] = COMMENTS) {
+  const ctx = await setup(permissions);
+  flushTypes(ctx.http);
+  ctx.http.expectOne(url('')).flush(appWire());
+  ctx.http.expectOne(url('/versions')).flush(VERSIONS);
+  ctx.http.expectOne(url('/comments')).flush(comments);
+  for (const req of ctx.http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) req.flush([]);
+  flushForm(ctx.http);
+  ctx.detectChanges();
+  flushAttachments(ctx.http);
+  const input = () => screen.getByRole('textbox', { name: 'Kommentar schreiben …' });
+  const type = (text: string) => {
+    fireEvent.input(input(), { target: { value: text } });
+    fireEvent.keyDown(input(), { key: 'Enter' });
+    ctx.detectChanges();
+  };
+  return { ...ctx, input, type };
+}
+
+const OWN: CommentOutWire = {
+  id: 'c2',
+  author: 'Mara Keller',
+  authorKind: 'principal',
+  authorInfo: { kind: 'principal', displayName: 'Mara Keller', principalId: 'p-9' },
+  body: 'Mein Text',
+  visibility: 'internal',
+  at: '2026-06-05T12:30:00Z',
+  isOwn: true,
+};
+
+describe('ApplicationsDetailComponent — comments in app-chat', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+  afterEach(() => localStorage.clear());
 
-  it('offers edit and delete for an own comment', async () => {
-    const { http, detectChanges } = await setup(['application.read']);
-    http.expectOne(url('')).flush(appWire());
-    http.expectOne(url('/versions')).flush(VERSIONS);
-    http.expectOne(url('/comments')).flush([{ ...COMMENTS[0], isOwn: true }]);
-    flushForm(http);
-    detectChanges();
-
-    expect(screen.getByRole('button', { name: 'Kommentar bearbeiten' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Kommentar löschen' })).toBeInTheDocument();
-    flushAttachments(http);
-    http.verify();
-  });
-
-  it('hides both controls for a foreign comment without application.manage', async () => {
-    const { http, detectChanges } = await setup(['application.read']);
-    http.expectOne(url('')).flush(appWire());
-    http.expectOne(url('/versions')).flush(VERSIONS);
-    http.expectOne(url('/comments')).flush(COMMENTS);
-    flushForm(http);
-    detectChanges();
-
-    expect(screen.queryByRole('button', { name: 'Kommentar bearbeiten' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Kommentar löschen' })).not.toBeInTheDocument();
-    flushAttachments(http);
-    http.verify();
-  });
-
-  it('offers both controls on a foreign comment for a manager', async () => {
-    const { http, detectChanges } = await setup();
-    flushAll(http);
-    detectChanges();
-
-    expect(screen.getByRole('button', { name: 'Kommentar bearbeiten' })).toBeInTheDocument();
-    flushAttachments(http);
-    http.verify();
-  });
-
-  it('patches only the body and replaces the comment in the list', async () => {
-    const { http, detectChanges, cmp, toast } = await setup();
-    flushAll(http);
-    detectChanges();
-    flushAttachments(http);
+  it('posts a public comment without application.manage, at once and without a toast', async () => {
+    const { http, toast, type, detectChanges } = await loaded(['application.read']);
     const success = jest.spyOn(toast, 'success');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = cmp as any;
+    expect(screen.queryByRole('radiogroup', { name: 'Sichtbarkeit' })).not.toBeInTheDocument();
+    expect(screen.getByText('Bitte Kostenplan ergänzen.')).toBeInTheDocument();
+    // A foreign comment offers no edit.
+    expect(screen.queryByRole('button', { name: 'Nachricht bearbeiten' })).not.toBeInTheDocument();
 
-    c.openEditComment(cmp.comments()[0]);
-    c.commentDraft.set('  Neuer Text  ');
-    c.saveComment();
+    type('Frage');
+    expect(screen.getByText('wird gesendet …')).toBeInTheDocument();
+    const post = http.expectOne(url('/comments'));
+    expect(post.request.body).toEqual({ body: 'Frage', visibility: 'public' });
+    post.flush({ ...OWN, id: 'c3', body: 'Frage', visibility: 'public' });
+    detectChanges();
+    expect(screen.getByText('Frage')).toBeInTheDocument();
+    expect(screen.queryByText('wird gesendet …')).not.toBeInTheDocument();
+    expect(success).not.toHaveBeenCalled();
+    http.verify();
+  });
 
-    const patch = http.expectOne(url('/comments/c1'));
+  it('posts an internal comment when the toggle says so, then goes back to public', async () => {
+    const { http, type, detectChanges } = await loaded();
+    const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
+    expect(within(group).getByRole('radio', { name: 'Öffentlich' })).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(within(group).getByRole('radio', { name: 'Intern' }));
+    type('Nur für uns');
+    const post = http.expectOne(url('/comments'));
+    expect(post.request.body).toEqual({ body: 'Nur für uns', visibility: 'internal' });
+    post.flush({ ...OWN, body: 'Nur für uns' });
+    detectChanges();
+    expect(within(group).getByRole('radio', { name: 'Öffentlich' })).toHaveAttribute('aria-checked', 'true');
+    // Both kinds exist: the internal comment carries its mark.
+    expect(document.querySelector('.chat__mark--internal')).toHaveTextContent('Intern');
+    http.verify();
+  });
+
+  it('keeps a failed comment and sends it again', async () => {
+    const { http, type, detectChanges } = await loaded();
+    type('Hmm');
+    http.expectOne(url('/comments')).flush({ title: 'Boom' }, { status: 500, statusText: 'Server Error' });
+    detectChanges();
+    expect(screen.getByText('Nicht gesendet')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Erneut senden' }));
+    http.expectOne(url('/comments')).flush({ ...OWN, body: 'Hmm', visibility: 'public' });
+    detectChanges();
+    expect(screen.queryByText('Nicht gesendet')).not.toBeInTheDocument();
+    expect(screen.getByText('Hmm')).toBeInTheDocument();
+    http.verify();
+  });
+
+  it('patches only the body of an own comment', async () => {
+    const { http, detectChanges, cmp } = await loaded(undefined, [COMMENTS[0], OWN]);
+    fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
+    const box = screen.getByRole('textbox', { name: 'Nachricht bearbeiten' });
+    fireEvent.input(box, { target: { value: '  Neuer Text  ' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    const patch = http.expectOne(url('/comments/c2'));
     expect(patch.request.method).toBe('PATCH');
     expect(patch.request.body).toEqual({ body: 'Neuer Text' });
-    patch.flush({ ...COMMENTS[0], body: 'Neuer Text' });
+    patch.flush({ ...OWN, body: 'Neuer Text' });
     detectChanges();
-
-    expect(cmp.comments()[0].body).toBe('Neuer Text');
-    expect(c.editingComment()).toBeNull();
-    expect(success).toHaveBeenCalledWith('Kommentar aktualisiert.');
+    expect(cmp.comments()[1].body).toBe('Neuer Text');
     http.verify();
   });
 
@@ -222,85 +245,39 @@ describe('ApplicationsDetailComponent — comment edit and delete', () => {
     [404, 'Dieser Kommentar existiert nicht mehr.'],
     [500, 'Kommentar konnte nicht gespeichert werden.'],
   ])('explains a %s on the comment patch', async (status, message) => {
-    const { http, detectChanges, cmp, toast } = await setup();
-    flushAll(http);
-    detectChanges();
-    flushAttachments(http);
+    const { http, toast, cmp } = await loaded(undefined, [OWN]);
     const error = jest.spyOn(toast, 'error');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = cmp as any;
-
-    c.openEditComment(cmp.comments()[0]);
-    c.saveComment();
-    http.expectOne(url('/comments/c1')).flush({ title: 'e' }, { status, statusText: 'x' });
+    (cmp as any).editComment({ id: 'c2', body: 'x' });
+    http.expectOne(url('/comments/c2')).flush({ title: 'e' }, { status, statusText: 'x' });
     expect(error).toHaveBeenCalledWith(message);
-    expect(c.savingComment()).toBe(false);
+    expect(cmp.comments()[0].body).toBe('Mein Text');
     http.verify();
   });
 
-  it('deletes a comment and drops it from the list', async () => {
-    const { http, detectChanges, cmp, toast } = await setup();
-    flushAll(http);
-    detectChanges();
-    flushAttachments(http);
-    const success = jest.spyOn(toast, 'success');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = cmp as any;
-
-    c.askDeleteComment(cmp.comments()[0]);
-    c.doDeleteComment();
-    const del = http.expectOne(url('/comments/c1'));
+  it('deletes an own comment after the confirmation', async () => {
+    const { http, detectChanges, cmp } = await loaded(undefined, [OWN]);
+    fireEvent.click(screen.getByRole('button', { name: 'Nachricht löschen' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nachricht löschen' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Löschen' }));
+    const del = http.expectOne(url('/comments/c2'));
     expect(del.request.method).toBe('DELETE');
     del.flush(null, { status: 204, statusText: 'No Content' });
     detectChanges();
-
     expect(cmp.comments()).toEqual([]);
-    expect(success).toHaveBeenCalledWith('Kommentar gelöscht.');
     http.verify();
   });
 
-  it('reports a failed comment delete and keeps the comment', async () => {
-    const { http, detectChanges, cmp, toast } = await setup();
-    flushAll(http);
-    detectChanges();
-    flushAttachments(http);
+  it('reports a failed delete and keeps the comment', async () => {
+    const { http, toast, cmp } = await loaded(undefined, [OWN]);
     const error = jest.spyOn(toast, 'error');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = cmp as any;
-
-    c.askDeleteComment(cmp.comments()[0]);
-    c.doDeleteComment();
-    http.expectOne(url('/comments/c1')).flush({ title: 'e' }, { status: 403, statusText: 'x' });
+    (cmp as any).deleteComment({ id: 'c2' });
+    http.expectOne(url('/comments/c2')).flush({ title: 'e' }, { status: 403, statusText: 'x' });
     expect(error).toHaveBeenCalledWith(
       'Nur die verfassende Person oder eine Antragsverwaltung darf diesen Kommentar ändern.',
     );
-    expect(cmp.comments().length).toBe(1);
-    http.verify();
-  });
-
-  it('ignores save and delete without a target, an empty body, or while busy', async () => {
-    const { http, detectChanges, cmp } = await setup();
-    flushAll(http);
-    detectChanges();
-    flushAttachments(http);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = cmp as any;
-
-    c.saveComment();
-    c.doDeleteComment();
-
-    c.openEditComment(cmp.comments()[0]);
-    c.commentDraft.set('   ');
-    c.saveComment();
-    c.commentDraft.set('x');
-    c.savingComment.set(true);
-    c.saveComment();
-    c.closeEditComment();
-    expect(c.editingComment()).toBeNull();
-
-    c.askDeleteComment(cmp.comments()[0]);
-    c.removingComment.set(true);
-    c.doDeleteComment();
+    expect(cmp.comments()).toHaveLength(1);
     http.verify();
   });
 });

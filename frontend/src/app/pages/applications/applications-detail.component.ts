@@ -22,7 +22,6 @@ import type {
   ApplicationComment,
   ApplicationType,
   ApplicationVersion,
-  CommentVisibility,
   FormFieldDef,
   FormSection,
   ProblemDetail,
@@ -44,7 +43,8 @@ import { applyServerErrors, clearServerErrors } from '@shared/forms/server-error
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.component';
 import {
-  AvatarComponent,
+  ChatComponent,
+  ChatOutbox,
   EmptyStateComponent,
   FieldGroupComponent,
   FieldRowComponent,
@@ -53,6 +53,11 @@ import {
   RowMenuComponent,
   StatusTextComponent,
   flowColorKind,
+  type ChatEdit,
+  type ChatMessage,
+  type ChatRef,
+  type ChatSend,
+  type ChatVisibility,
   type HistoryChange,
   type HistoryEntry,
   type RowMenuItem,
@@ -63,11 +68,9 @@ import {
   DialogComponent,
   IconComponent,
   MEDIA,
-  SegmentedComponent,
   SelectComponent,
   TabsComponent,
   ToastService,
-  type SegmentedOption,
   type SelectOption,
   type TabItem,
 } from '@stupa-makers/ui-kit';
@@ -114,9 +117,9 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
  * "Antrag bearbeiten · Speichern legt Version n+1 an" with Abbrechen and Speichern over
  * the fields of the form by section. A 422 of the server shows on its field.
  *
- * A comment is internal or public. Each comment shows its visibility. The composer
- * offers the internal visibility only with `application.manage`. Without it, a new
- * comment is public.
+ * The comments run in `app-chat`. A comment is internal or public. The composer offers
+ * the internal visibility only with `application.manage`. Without it, a new comment is
+ * public. The author edits and deletes an own comment; the visibility stays as written.
  *
  * RBAC here only gates the UX. The server decides.
  */
@@ -133,7 +136,7 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
     FormlyForm,
     LocalizedDatePipe,
     TranslatePipe,
-    AvatarComponent,
+    ChatComponent,
     EmptyStateComponent,
     FieldGroupComponent,
     FieldRowComponent,
@@ -143,7 +146,6 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
     ButtonComponent,
     DialogComponent,
     IconComponent,
-    SegmentedComponent,
     SelectComponent,
     TabsComponent,
     CostCentreTreeComponent,
@@ -212,24 +214,20 @@ export class ApplicationsDetailComponent {
     () => new Map(this.formFields().map((f) => [f.key, f])),
   );
 
-  readonly newComment = signal('');
-  /** The visibility of the next comment. It goes back to public after each post. */
-  readonly visibility = signal<CommentVisibility>('public');
-  readonly visibilityOptions = computed<SegmentedOption[]>(() => [
-    { value: 'public', label: this.i18n.translate('applications.comments.public') },
-    { value: 'internal', label: this.i18n.translate('applications.comments.internal') },
+  /** The composer offers the internal visibility only with `application.manage`. */
+  readonly chatVisibilities = computed<ChatVisibility[]>(() =>
+    this.canManage() ? ['public', 'internal'] : [],
+  );
+  /** Optimistic send: a new comment shows at once, the server answer replaces it. */
+  private readonly outbox = new ChatOutbox<ApplicationComment>(
+    (req) => this.api.addComment(this.id, req.body, req.visibility ?? 'public'),
+    (created) => this.comments.update((list) => [...list, created]),
+  );
+  /** The comments as chat messages, the pending ones last. */
+  readonly chatMessages = computed<ChatMessage[]>(() => [
+    ...this.comments().map((c) => this.toChatMessage(c)),
+    ...this.outbox.messages(),
   ]);
-  readonly posting = signal(false);
-
-  // Edit and delete of one comment. Both run in a dialog. The server allows the
-  // author of the comment and a holder of `application.manage`. `isOwn` carries
-  // the same author check the server makes, so the UI offers nothing that gives
-  // a 403. Only the body changes. The visibility stays as written.
-  readonly editingComment = signal<ApplicationComment | null>(null);
-  readonly commentDraft = signal('');
-  readonly savingComment = signal(false);
-  readonly deletingComment = signal<ApplicationComment | null>(null);
-  readonly removingComment = signal(false);
 
   /** The active tab of the narrow layout. */
   readonly tab = signal<DetailTab>('app');
@@ -829,8 +827,7 @@ export class ApplicationsDetailComponent {
     // The dialogs and the edit belong to the shown application: they close at once.
     this.editing.set(false);
     this.confirmDelete.set(false);
-    this.editingComment.set(null);
-    this.deletingComment.set(null);
+    this.outbox.clear();
     this.agendaOpen.set(false);
     // An application is shown: it stays until the next one arrives (`switching`). With
     // nothing shown, the page resets now and draws its loading shape.
@@ -892,14 +889,10 @@ export class ApplicationsDetailComponent {
     this.sections.set([]);
     this.formLoading.set(true);
     this.hasBudget.set(false);
-    this.newComment.set('');
-    this.visibility.set('public');
     this.editing.set(false);
     this.confirmDelete.set(false);
     this.notFound.set(false);
     this.error.set(false);
-    this.editingComment.set(null);
-    this.deletingComment.set(null);
     this.transitions.set([]);
     this.agendaOpen.set(false);
     this.attachmentCount.set(null);
@@ -1139,53 +1132,29 @@ export class ApplicationsDetailComponent {
     );
   }
 
-  /** Enter sends the comment. Shift+Enter makes a line break.
-   *  The Angular `keydown.enter` binding matches the unmodified Enter only. */
-  protected onComposerEnter(event: Event): void {
-    this.submitComment(event);
+  /** A comment as a chat message. The author keeps its avatar where the server sends
+   *  the account id; the applicant and the Gremium show initials. */
+  private toChatMessage(comment: ApplicationComment): ChatMessage {
+    return {
+      id: comment.id,
+      author: {
+        principalId: comment.authorInfo?.principalId ?? null,
+        displayName: this.authorName(comment),
+      },
+      body: comment.body,
+      at: comment.at,
+      own: comment.isOwn,
+      visibility: comment.visibility,
+    };
   }
 
-  protected setVisibility(value: string | null): void {
-    this.visibility.set(value === 'internal' ? 'internal' : 'public');
-  }
-
-  submitComment(event: Event): void {
-    event.preventDefault();
-    const body = this.newComment().trim();
-    if (!body || this.posting()) return;
-    this.posting.set(true);
+  protected sendComment(req: ChatSend): void {
     // Without `application.manage` the composer has no toggle, so the comment is public.
-    const visibility = this.canManage() ? this.visibility() : 'public';
-    this.api.addComment(this.id, body, visibility).subscribe({
-      next: (created) => {
-        this.comments.update((list) => [...list, created]);
-        this.newComment.set('');
-        this.visibility.set('public');
-        this.posting.set(false);
-        this.toast.success(this.i18n.translate('applications.comments.added'));
-      },
-      error: () => {
-        this.posting.set(false);
-        this.toast.error(this.i18n.translate('applications.comments.error'));
-      },
-    });
+    this.outbox.send(this.canManage() ? req : { body: req.body });
   }
 
-  // --- edit / delete of a comment -----------------------------------------
-
-  /** The author of the comment, or a manager, may change it. The server checks
-   *  the same rule, so no visible control ends in a 403. */
-  protected canEditComment(comment: ApplicationComment): boolean {
-    return comment.isOwn || this.canManage();
-  }
-
-  protected openEditComment(comment: ApplicationComment): void {
-    this.commentDraft.set(comment.body);
-    this.editingComment.set(comment);
-  }
-
-  protected closeEditComment(): void {
-    this.editingComment.set(null);
+  protected retryComment(ref: ChatRef): void {
+    this.outbox.retry(ref.id);
   }
 
   /** Translation key for a failed comment change. 403 and 404 read as reasons. */
@@ -1196,42 +1165,23 @@ export class ApplicationsDetailComponent {
   }
 
   /** PATCH the body of the comment. The visibility is not patchable. */
-  protected saveComment(): void {
-    const comment = this.editingComment();
-    const body = this.commentDraft().trim();
-    if (!comment || !body || this.savingComment()) return;
-    this.savingComment.set(true);
-    this.api.updateComment(this.id, comment.id, body).subscribe({
+  protected editComment(change: ChatEdit): void {
+    this.api.updateComment(this.id, change.id, change.body).subscribe({
       next: (updated) => {
-        this.savingComment.set(false);
-        this.editingComment.set(null);
         this.comments.update((list) => list.map((c) => (c.id === updated.id ? updated : c)));
-        this.toast.success(this.i18n.translate('applications.comments.updated'));
       },
       error: (err: { status?: number }) => {
-        this.savingComment.set(false);
         this.toast.error(this.i18n.translate(this.commentErrorKey(err.status)));
       },
     });
   }
 
-  protected askDeleteComment(comment: ApplicationComment): void {
-    this.deletingComment.set(comment);
-  }
-
-  protected doDeleteComment(): void {
-    const comment = this.deletingComment();
-    if (!comment || this.removingComment()) return;
-    this.removingComment.set(true);
-    this.api.deleteComment(this.id, comment.id).subscribe({
+  protected deleteComment(ref: ChatRef): void {
+    this.api.deleteComment(this.id, ref.id).subscribe({
       next: () => {
-        this.removingComment.set(false);
-        this.deletingComment.set(null);
-        this.comments.update((list) => list.filter((c) => c.id !== comment.id));
-        this.toast.success(this.i18n.translate('applications.comments.deleted'));
+        this.comments.update((list) => list.filter((c) => c.id !== ref.id));
       },
       error: (err: { status?: number }) => {
-        this.removingComment.set(false);
         this.toast.error(this.i18n.translate(this.commentErrorKey(err.status)));
       },
     });

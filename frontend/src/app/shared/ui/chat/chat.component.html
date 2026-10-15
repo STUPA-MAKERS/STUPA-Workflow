@@ -1,0 +1,224 @@
+<div class="chat__logWrap">
+  <div
+    #log
+    class="chat__log"
+    role="log"
+    aria-live="polite"
+    tabindex="0"
+    [attr.aria-label]="'chat.log' | t"
+    (scroll)="onScroll()"
+  >
+    @for (item of items(); track item.key) {
+      @if (item.kind === 'day') {
+        <div class="chat__sep" role="separator">
+          <span class="chat__sepText">{{ item.label }}</span>
+        </div>
+      } @else if (item.kind === 'new') {
+        <div class="chat__sep chat__sep--new" role="separator">
+          <span class="chat__sepText">{{ 'chat.newCount' | t: { count: item.count } }}</span>
+        </div>
+      } @else if (item.kind === 'event') {
+        <p class="chat__event">
+          {{ item.text }}<span class="chat__dot" aria-hidden="true">·</span><time [attr.datetime]="item.at">{{ time(item.at) }}</time>
+        </p>
+      } @else {
+        @let m = item.msg;
+        <div
+          class="chat__row"
+          [class.chat__row--own]="m.own"
+          [class.chat__row--head]="item.head"
+          [class.chat__row--tail]="item.tail"
+        >
+          @if (!m.own) {
+            @if (item.tail && m.author) {
+              <app-avatar
+                class="chat__av"
+                size="sm"
+                [decorative]="true"
+                [name]="item.name ?? ''"
+                [principalId]="m.author.principalId"
+              />
+            } @else if (m.author) {
+              <span class="chat__avSpace" aria-hidden="true"></span>
+            }
+          }
+          <div class="chat__col">
+            @if (item.head && item.name) {
+              <span class="chat__name">{{ item.name }}</span>
+            }
+            <div class="chat__line">
+              @if (canAct(m) && !phone() && editingId() !== m.id) {
+                <span class="chat__acts">
+                  <app-button
+                    variant="text"
+                    size="sm"
+                    [iconOnly]="true"
+                    [ariaLabel]="'chat.edit' | t"
+                    (click)="startEdit(m)"
+                  ><app-icon name="edit" [size]="16" /></app-button>
+                  <app-button
+                    variant="text"
+                    size="sm"
+                    [iconOnly]="true"
+                    [ariaLabel]="'chat.delete' | t"
+                    (click)="askDelete(m)"
+                  ><app-icon name="trash" [size]="16" /></app-button>
+                </span>
+              }
+              @if (editingId() === m.id) {
+                <form class="chat__edit" (submit)="saveEdit($event)">
+                  <textarea
+                    class="chat__editInput"
+                    rows="1"
+                    name="chatEdit"
+                    [value]="editDraft()"
+                    (input)="editDraft.set($any($event.target).value)"
+                    (keydown)="onEditKey($event)"
+                    [attr.aria-label]="'chat.edit' | t"
+                  ></textarea>
+                  <span class="chat__editActions">
+                    <app-button variant="text" size="sm" (click)="cancelEdit()">{{ 'chat.cancel' | t }}</app-button>
+                    <app-button type="submit" variant="fill" size="sm" [disabled]="!editDraft().trim()">{{
+                      'chat.save' | t
+                    }}</app-button>
+                  </span>
+                </form>
+              } @else {
+                <div
+                  class="chat__bubble"
+                  [class.chat__bubble--internal]="item.mark === 'internal'"
+                  [class.chat__bubble--failed]="m.state === 'failed'"
+                  appPressSelect
+                  [appPressSelectEnabled]="canAct(m) && phone()"
+                  (appPressSelectToggle)="openMenu(m)"
+                >
+                  @if (item.head && item.mark === 'internal') {
+                    <span class="chat__mark chat__mark--internal">
+                      <app-icon name="lock" [size]="13" />{{ 'chat.internal' | t }}
+                    </span>
+                  } @else if (item.head && item.mark === 'public') {
+                    <span class="chat__mark chat__mark--public">
+                      <app-icon name="globe" [size]="13" />{{ 'chat.public' | t }}
+                    </span>
+                  }
+                  <div class="chat__text" [innerHTML]="m.body | chatBody"></div>
+                  @if (m.attachments?.length) {
+                    <ul class="chat__files">
+                      @for (f of m.attachments; track f.id) {
+                        <li>
+                          <a class="chat__file" [href]="f.url" target="_blank" rel="noopener">
+                            <app-icon name="clip" [size]="15" />
+                            <span class="chat__fileName">{{ f.filename }}</span>
+                          </a>
+                        </li>
+                      }
+                    </ul>
+                  }
+                </div>
+              }
+            </div>
+            @if (m.state === 'sending') {
+              <span class="chat__meta">{{ 'chat.sending' | t }}</span>
+            } @else if (m.state === 'failed') {
+              <span class="chat__meta chat__meta--failed">
+                <span class="chat__failed"><app-icon name="alert" [size]="13" />{{ 'chat.failed' | t }}</span>
+                <button type="button" class="chat__retry" (click)="retry.emit({ id: m.id })">
+                  {{ 'chat.retry' | t }}
+                </button>
+              </span>
+            } @else if (item.tail || m.editedAt) {
+              <span class="chat__meta">
+                @if (item.tail) {
+                  <time [attr.datetime]="m.at">{{ time(m.at) }}</time>
+                }
+                @if (item.tail && m.editedAt) {
+                  <span class="chat__dot" aria-hidden="true">·</span>
+                }
+                @if (m.editedAt) {
+                  <span>{{ 'chat.edited' | t }}</span>
+                }
+              </span>
+            }
+          </div>
+        </div>
+      }
+    } @empty {
+      <p class="chat__empty">{{ 'chat.empty' | t }}</p>
+    }
+  </div>
+  @if (unread() > 0) {
+    <button type="button" class="chat__pill" (click)="scrollToEnd()">
+      <app-icon name="down" [size]="16" />{{ (unread() === 1 ? 'chat.newMessages.one' : 'chat.newMessages.other') | t: { count: unread() } }}
+    </button>
+  }
+</div>
+
+@if (canPost()) {
+  <form class="chat__composer" (submit)="submit($event)">
+    @if (segmentOptions().length > 1) {
+      <app-segmented
+        class="chat__vis"
+        width="fill"
+        [check]="false"
+        [ariaLabel]="'chat.visibility' | t"
+        [options]="segmentOptions()"
+        [value]="visibility()"
+        (valueChange)="setVisibility($event)"
+      />
+    }
+    <div class="chat__box">
+      <textarea
+        class="chat__input"
+        rows="1"
+        name="chatDraft"
+        [value]="draft()"
+        [placeholder]="placeholder() | t"
+        [attr.aria-label]="placeholder() | t"
+        (input)="onDraft($any($event.target).value)"
+        (keydown)="onComposerKey($event)"
+      ></textarea>
+      <app-button
+        class="chat__send"
+        type="submit"
+        variant="fill"
+        [iconOnly]="true"
+        [ariaLabel]="'chat.send' | t"
+        [disabled]="!draft().trim()"
+      ><app-icon name="send" [size]="17" /></app-button>
+    </div>
+  </form>
+}
+
+<app-dialog
+  [open]="deleting() !== null"
+  [title]="'chat.deleteTitle' | t"
+  [closeLabel]="'chat.cancel' | t"
+  (closed)="deleting.set(null)"
+>
+  <p>{{ 'chat.deleteConfirm' | t }}</p>
+  <div dialog-footer>
+    <app-button variant="text" size="sm" (click)="deleting.set(null)">{{ 'chat.cancel' | t }}</app-button>
+    <app-button variant="danger" size="sm" (click)="confirmDelete()">{{ 'chat.deleteShort' | t }}</app-button>
+  </div>
+</app-dialog>
+
+<app-side-sheet
+  side="bottom"
+  [open]="menuFor() !== null"
+  (openChange)="onMenuOpen($event)"
+  [heading]="menuHeading()"
+>
+  @if (menuFor(); as m) {
+    <div class="chat__menu" role="group">
+      <button type="button" class="chat__menuItem" (click)="copy(m)">
+        <app-icon name="copy" [size]="20" />{{ 'chat.copy' | t }}
+      </button>
+      <button type="button" class="chat__menuItem" (click)="startEdit(m)">
+        <app-icon name="edit" [size]="20" />{{ 'chat.editShort' | t }}
+      </button>
+      <button type="button" class="chat__menuItem chat__menuItem--danger" (click)="askDelete(m)">
+        <app-icon name="trash" [size]="20" />{{ 'chat.deleteShort' | t }}
+      </button>
+    </div>
+  }
+</app-side-sheet>

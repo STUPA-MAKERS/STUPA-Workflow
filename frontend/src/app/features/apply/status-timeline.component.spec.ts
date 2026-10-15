@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { render, screen, waitFor, within } from '@testing-library/angular';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
 import { BrandingService } from '@core/branding/branding.service';
@@ -111,6 +111,8 @@ interface ApiOverrides {
   getApplication?: Partial<ApiClient>['getApplication'];
   update?: jest.Mock;
   addComment?: jest.Mock;
+  updateComment?: jest.Mock;
+  deleteComment?: jest.Mock;
   applicantTransitions?: Partial<ApiClient>['applicantTransitions'];
   fireApplicant?: jest.Mock;
   timeline?: Partial<ApiClient>['timeline'];
@@ -140,6 +142,8 @@ function fakeApi(o: ApiOverrides = {}): Partial<ApiClient> {
     effectiveForm: (o.effectiveForm ?? (() => of(EFF))) as ApiClient['effectiveForm'],
     updateApplication: (o.update ?? jest.fn(() => of({ ...app(true), version: 3 }))) as unknown as ApiClient['updateApplication'],
     addComment: (o.addComment ?? jest.fn(() => of(COMMENTS[0]))) as unknown as ApiClient['addComment'],
+    updateComment: (o.updateComment ?? jest.fn()) as unknown as ApiClient['updateComment'],
+    deleteComment: (o.deleteComment ?? jest.fn()) as unknown as ApiClient['deleteComment'],
     requestErasure: (o.requestErasure ?? jest.fn(() => of(undefined))) as unknown as ApiClient['requestErasure'],
     attachmentUrl: jest.fn(),
   };
@@ -390,25 +394,24 @@ describe('StatusTimelineComponent', () => {
     expect(screen.queryByText(/Datei/)).toBeNull();
   });
 
-  it('opens the comments, names own ones "Du" and posts a public comment', async () => {
-    const addComment = jest.fn(() => of(COMMENTS[0]));
-    const { comp, fixture } = await setup(fakeApi({ addComment }));
+  it('opens the comments in the chat and posts a public comment at once', async () => {
+    const created = { ...COMMENTS[1], id: 'c3', body: 'Frage' };
+    const addComment = jest.fn(() => of(created));
+    const { fixture } = await setup(fakeApi({ addComment }));
     await userEvent.click(await screen.findByRole('button', { name: /Kommentare/ }));
     fixture.detectChanges();
     const dialog = await screen.findByRole('dialog', { name: 'Kommentare' });
+    expect(within(dialog).getByRole('log')).toBeInTheDocument();
     expect(within(dialog).getByText('Bitte ergänzen.')).toBeInTheDocument();
-    expect(within(dialog).getByText('Du')).toBeInTheDocument();
-    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Öffentlicher Kommentar' }), 'Frage');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Kommentar senden' }));
+    // The Gremium is named; an own comment stands right without a name.
+    expect(within(dialog).getByText('Studierendenparlament')).toBeInTheDocument();
+    expect(within(dialog).queryByText('Du')).not.toBeInTheDocument();
+    const box = within(dialog).getByRole('textbox', { name: 'Nachricht an das Gremium …' });
+    fireEvent.input(box, { target: { value: 'Frage' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    fixture.detectChanges();
     expect(addComment).toHaveBeenCalledWith(ID, 'Frage');
-    expect(comp.commentBody.value).toBe('');
-    // Enter sends as well; Shift+Enter makes a line break.
-    const box = within(dialog).getByRole('textbox', { name: 'Öffentlicher Kommentar' });
-    await userEvent.type(box, 'Zeile 1{Shift>}{Enter}{/Shift}Zeile 2');
-    expect(addComment).toHaveBeenCalledTimes(1);
-    expect(comp.commentBody.value).toBe('Zeile 1\nZeile 2');
-    await userEvent.type(box, '{Enter}');
-    expect(addComment).toHaveBeenLastCalledWith(ID, 'Zeile 1\nZeile 2');
+    expect(within(dialog).getByText('Frage')).toBeInTheDocument();
   });
 
   it('names an author by kind without a name, and shows an empty comment list', async () => {
@@ -417,26 +420,68 @@ describe('StatusTimelineComponent', () => {
     expect(screen.getByText('0 Kommentare')).toBeInTheDocument();
     comp.commentsOpen.set(true);
     fixture.detectChanges();
-    expect(await screen.findByText('Noch keine öffentlichen Kommentare.')).toBeInTheDocument();
+    expect(await screen.findByText('Noch keine Nachrichten.')).toBeInTheDocument();
     expect(comp.authorName({ ...COMMENTS[0], author: null })).toBe('Gremium');
     expect(comp.authorName({ ...COMMENTS[0], author: null, authorKind: 'applicant' })).toBe('Antragsteller:in');
+    expect(comp.authorName(COMMENTS[1])).toBe('Du');
     comp.comments.set([COMMENTS[0]]);
     expect(comp.commentsSub()).toBe('1 Kommentar');
   });
 
-  it('toasts a failed comment and ignores an empty one', async () => {
-    const addComment = jest.fn(() => throwError(() => new Error('x')));
+  it('keeps a failed comment and sends it again', async () => {
+    let fail = true;
+    const addComment = jest.fn(() => (fail ? throwError(() => new Error('x')) : of({ ...COMMENTS[1], id: 'c4', body: 'Hallo' })));
     const { comp, toast } = await setup(fakeApi({ addComment }));
     await screen.findByRole('heading', { level: 1 });
-    comp.commentBody.setValue('   ');
-    comp.addComment();
-    expect(addComment).not.toHaveBeenCalled();
-    comp.commentBody.setValue('Hallo');
-    comp.addComment();
-    expect(toast.error).toHaveBeenCalledWith('Kommentar konnte nicht gespeichert werden.');
-    comp.postingComment.set(true);
-    comp.addComment();
-    expect(addComment).toHaveBeenCalledTimes(1);
+    comp.sendComment({ body: 'Hallo', visibility: 'internal' });
+    expect(comp.chatMessages().at(-1)).toMatchObject({ body: 'Hallo', state: 'failed', visibility: null });
+    expect(toast.error).not.toHaveBeenCalled();
+    fail = false;
+    comp.retryComment({ id: comp.chatMessages().at(-1)!.id });
+    expect(addComment).toHaveBeenCalledTimes(2);
+    expect(comp.comments().at(-1)?.id).toBe('c4');
+    expect(comp.chatMessages().some((m) => m.state === 'failed')).toBe(false);
+  });
+
+  it('edits and deletes an own comment', async () => {
+    const updateComment = jest.fn(() => of({ ...COMMENTS[1], body: 'Neu' }));
+    const deleteComment = jest.fn(() => of(undefined));
+    const { comp } = await setup(fakeApi({ updateComment, deleteComment }));
+    await screen.findByRole('heading', { level: 1 });
+    comp.editComment({ id: 'c2', body: 'Neu' });
+    expect(updateComment).toHaveBeenCalledWith(ID, 'c2', 'Neu');
+    expect(comp.comments()[1].body).toBe('Neu');
+    comp.deleteComment({ id: 'c2' });
+    expect(deleteComment).toHaveBeenCalledWith(ID, 'c2');
+    expect(comp.comments().map((c) => c.id)).toEqual(['c1']);
+  });
+
+  it.each([
+    [403, 'Nur die verfassende Person oder eine Antragsverwaltung darf diesen Kommentar ändern.'],
+    [404, 'Dieser Kommentar existiert nicht mehr.'],
+    [500, 'Kommentar konnte nicht gespeichert werden.'],
+  ])('explains a %s on a comment change', async (status, message) => {
+    const fail = jest.fn(() => throwError(() => ({ status })));
+    const { comp, toast } = await setup(fakeApi({ updateComment: fail, deleteComment: fail }));
+    await screen.findByRole('heading', { level: 1 });
+    comp.editComment({ id: 'c2', body: 'Neu' });
+    comp.deleteComment({ id: 'c2' });
+    expect(toast.error).toHaveBeenNthCalledWith(1, message);
+    expect(toast.error).toHaveBeenNthCalledWith(2, message);
+    expect(comp.comments()).toHaveLength(2);
+  });
+
+  it('changes no comment before the application loaded', async () => {
+    const updateComment = jest.fn();
+    const { comp } = await setup(fakeApi({ updateComment, deleteComment: updateComment }));
+    await screen.findByRole('heading', { level: 1 });
+    comp.application.set(null);
+    comp.editComment({ id: 'c2', body: 'Neu' });
+    comp.deleteComment({ id: 'c2' });
+    expect(updateComment).not.toHaveBeenCalled();
+    // The chat exists only with an application; a send without one names no id.
+    comp.sendComment({ body: 'x' });
+    expect(comp.chatMessages().length).toBeGreaterThan(0);
   });
 
   it('fires an applicant transition and reloads', async () => {

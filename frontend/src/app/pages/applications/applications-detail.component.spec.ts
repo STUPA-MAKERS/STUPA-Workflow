@@ -223,111 +223,6 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  it('hides the visibility toggle without application.manage and posts public', async () => {
-    const { http, detectChanges } = await setup(['application.read']);
-    http.expectOne(url('')).flush(appWire());
-    http.expectOne(url('/versions')).flush(VERSIONS);
-    http.expectOne(url('/comments')).flush(COMMENTS);
-    detectChanges();
-
-    // The flow handles a status change. There is no manual UI and no manager option.
-    expect(screen.queryByRole('heading', { name: 'Statuswechsel' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('radiogroup', { name: 'Sichtbarkeit' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: 'Intern' })).not.toBeInTheDocument();
-    // The comment still tells its visibility.
-    expect(document.querySelector('.ad__msgMeta')?.textContent).toContain('Öffentlich');
-
-    await userEvent.type(screen.getByLabelText('Kommentar hinzufügen'), 'Frage');
-    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
-    const post = http.expectOne(url('/comments'));
-    expect(post.request.body).toEqual({ body: 'Frage', visibility: 'public' });
-    post.flush(
-      { id: 'c3', author: null, authorKind: 'principal', body: 'Frage', visibility: 'public', at: '2026-06-05T13:00:00Z' },
-      { status: 201, statusText: 'Created' },
-    );
-    flushForm(http);
-    flushAttachments(http);
-    http.verify();
-  });
-
-  it('posts a public comment by default', async () => {
-    const { http, detectChanges } = await setup();
-    flushAll(http);
-    detectChanges();
-
-    const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
-    expect(within(group).getByRole('radio', { name: 'Öffentlich' })).toHaveAttribute('aria-checked', 'true');
-    await userEvent.type(screen.getByLabelText('Kommentar hinzufügen'), 'Danke!');
-    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
-
-    const post = http.expectOne(url('/comments'));
-    expect(post.request.method).toBe('POST');
-    expect(post.request.body).toEqual({ body: 'Danke!', visibility: 'public' });
-    post.flush(
-      {
-        id: 'c2',
-        author: null,
-        authorKind: 'principal',
-        body: 'Danke!',
-        visibility: 'public',
-        at: '2026-06-05T13:00:00Z',
-      },
-      { status: 201, statusText: 'Created' },
-    );
-    detectChanges();
-    expect(screen.getByText('Danke!')).toBeInTheDocument();
-    flushAttachments(http);
-    http.verify();
-  });
-
-  it('posts an internal comment when the toggle says so, then resets it to public', async () => {
-    const { http, detectChanges } = await setup();
-    flushAll(http);
-    detectChanges();
-
-    await userEvent.click(screen.getByRole('radio', { name: 'Intern' }));
-    detectChanges();
-    expect(screen.getByRole('radio', { name: 'Intern' })).toHaveAttribute('aria-checked', 'true');
-    await userEvent.type(screen.getByLabelText('Kommentar hinzufügen'), 'Nur für uns');
-    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
-
-    const post = http.expectOne(url('/comments'));
-    expect(post.request.body).toEqual({ body: 'Nur für uns', visibility: 'internal' });
-    post.flush(
-      { id: 'c4', author: null, authorKind: 'principal', body: 'Nur für uns', visibility: 'internal', at: '2026-06-05T13:00:00Z', isOwn: true },
-      { status: 201, statusText: 'Created' },
-    );
-    detectChanges();
-    // The new comment shows "Intern" in its meta line. The toggle is public again.
-    const metas = [...document.querySelectorAll('.ad__msgMeta')].map((el) => el.textContent ?? '');
-    expect(metas[0]).toContain('Öffentlich');
-    expect(metas[1]).toContain('Intern');
-    expect(screen.getByRole('radio', { name: 'Öffentlich' })).toHaveAttribute('aria-checked', 'true');
-    flushAttachments(http);
-    http.verify();
-  });
-
-  it('sends on Enter, keeps typing on Shift+Enter', async () => {
-    const { http, detectChanges } = await setup();
-    flushAll(http);
-    detectChanges();
-
-    const input = screen.getByLabelText('Kommentar hinzufügen');
-    // Shift+Enter keeps the newline local and fires no request.
-    await userEvent.type(input, 'Hallo{Shift>}{Enter}{/Shift}');
-    http.expectNone(url('/comments'));
-    await userEvent.type(input, '{Enter}');
-    const post = http.expectOne(url('/comments'));
-    expect(post.request.method).toBe('POST');
-    post.flush(
-      { id: 'c9', author: null, authorKind: 'principal', body: 'Hallo', visibility: 'public', at: '2026-06-05T13:00:00Z', isOwn: true },
-      { status: 201, statusText: 'Created' },
-    );
-    detectChanges();
-    flushAttachments(http);
-    http.verify();
-  });
-
   it('labels a present-but-empty diff as "no field changes"', async () => {
     const { http, detectChanges } = await setup();
     http.expectOne(url('')).flush(appWire());
@@ -410,23 +305,6 @@ describe('ApplicationsDetailComponent', () => {
     expect(screen.getByText('alt')).toBeInTheDocument();
     expect(screen.getByText('neu')).toBeInTheDocument();
     expect(screen.queryAllByText(/Invalid Date/)).toHaveLength(0);
-    flushAttachments(http);
-    http.verify();
-  });
-
-  it('toasts an error when posting a comment fails', async () => {
-    const { http, detectChanges, toast } = await setup();
-    flushAll(http);
-    detectChanges();
-    const error = jest.spyOn(toast, 'error');
-
-    await userEvent.type(screen.getByLabelText('Kommentar hinzufügen'), 'Hmm');
-    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
-    http
-      .expectOne(url('/comments'))
-      .flush({ title: 'Boom' }, { status: 500, statusText: 'Server Error' });
-
-    expect(error).toHaveBeenCalledWith('Kommentar konnte nicht gespeichert werden.');
     flushAttachments(http);
     http.verify();
   });
@@ -1479,25 +1357,6 @@ describe('ApplicationsDetailComponent', () => {
     expect(
       cmp['authorName']({ author: null, authorKind: 'principal' } as ApplicationComment),
     ).toBe('Gremium');
-  });
-
-  it('does not post an empty/whitespace comment and guards against double-submit', async () => {
-    const { http, detectChanges, cmp } = await setup();
-    flushAll(http);
-    detectChanges();
-    flushAttachments(http);
-    const evt = { preventDefault: jest.fn() } as unknown as Event;
-
-    cmp.newComment.set('   ');
-    cmp.submitComment(evt);
-    expect(evt.preventDefault).toHaveBeenCalled();
-    expect(cmp.posting()).toBe(false);
-
-    cmp.newComment.set('real');
-    cmp.posting.set(true);
-    cmp.submitComment(evt);
-    // The post stays in flight and no request goes out. The check below proves it.
-    http.verify();
   });
 
   it('starts inline edit, cancels, and saves (success)', async () => {

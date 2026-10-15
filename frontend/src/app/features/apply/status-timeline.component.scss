@@ -191,60 +191,13 @@
   scroll-margin-top: 5rem;
 }
 
-/* Comments in the side sheet: the messages, then the composer. */
+/* Comments in the side sheet: the chat fills the body, its log scrolls inside, and the
+   composer sits at the foot of the sheet. */
 .sp__chat {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-.sp__msgs {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.sp__msg {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px var(--space-4);
-}
-.sp__msg--own {
-  background: var(--color-selected);
-}
-.sp__msgHead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0 var(--space-2);
-  font-size: 0.8125rem;
-}
-.sp__msgHead time {
-  color: var(--color-text-muted);
-}
-.sp__msgBody {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.sp__composer {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-2);
-}
-.sp__composerInput {
   flex: 1 1 auto;
-  min-width: 0;
-  min-height: 3.5rem;
-  padding: var(--space-3) var(--space-4);
-  border: 0;
-  border-radius: var(--radius-field);
-  background: var(--color-surface-3);
-  color: var(--color-text);
-  font: inherit;
-  resize: vertical;
-}
-.sp__composerInput:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 0;
+  min-height: 0;
+  --chat-log-min: 14rem;
+  --chat-composer-bottom: 0px;
 }
 .sp__dialogText {
   margin: 0;
