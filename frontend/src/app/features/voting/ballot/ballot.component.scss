@@ -279,6 +279,18 @@
 .ballot__abstainAll {
   align-self: flex-start;
 }
+/* In the side column the candidate rows take the body text of the column, so a long
+   name stays on one line or wraps inside a row that grows with it. */
 :host(.ballot--compact) .ballot__cands .choice {
-  height: 48px;
+  gap: var(--space-3);
+  height: auto;
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-lg);
+  font-size: var(--fs-body);
+  line-height: 1.25rem;
+}
+:host(.ballot--compact) .ballot__cands .choice__mark {
+  width: 20px;
+  height: 20px;
 }
