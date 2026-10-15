@@ -22,7 +22,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from app.modules.admin.cd_logos import CdBaseVariant, asset_file_name
+from app.modules.admin.cd_logos import RENDER_SLOTS, CdBaseVariant, asset_file_name
 from app.modules.admin.models import CdVariant, CdVariantLogo, Gremium
 from app.modules.files.storage import StorageError
 from app.shared.errors import ServiceUnavailableError
@@ -126,19 +126,28 @@ async def resolve_cd_variant_by_key(
 async def _resolve(
     db: AsyncSession, storage: ObjectStorage | None, variant: CdVariant
 ) -> ResolvedCdVariant:
-    """Load the logo rows of a variant and turn them into names plus bytes."""
+    """Load the logo rows of a variant and turn them into names plus bytes.
+
+    Only the render slots count. The square logo belongs to the app, so its row is
+    filtered out in the query and skipped again in the loop.
+    """
     variant_id = variant.id
     rows = (
         await db.scalars(
             select(CdVariantLogo)
-            .where(CdVariantLogo.variant_id == variant_id)
+            .where(
+                CdVariantLogo.variant_id == variant_id,
+                CdVariantLogo.slot.in_(RENDER_SLOTS),
+            )
             .order_by(CdVariantLogo.slot, CdVariantLogo.position, CdVariantLogo.id)
         )
     ).all()
 
-    logos: dict[str, list[str]] = {"title": [], "footer": []}
+    logos: dict[str, list[str]] = {slot: [] for slot in RENDER_SLOTS}
     assets: dict[str, bytes] = {}
     for row in rows:
+        if row.slot not in logos:
+            continue
         if row.vendored_name is not None:
             logos[row.slot].append(row.vendored_name)
             continue

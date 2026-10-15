@@ -52,9 +52,6 @@ function makeApi(over: Partial<Record<string, unknown>> = {}) {
     uploadCdVariantLogo: jest.fn(() =>
       of({ id: 'l-9', slot: 'title', position: 2, fileName: 'neu.png' }),
     ),
-    addCdVariantVendoredLogo: jest.fn(() =>
-      of({ id: 'l-8', slot: 'footer', position: 1, vendoredName: 'ECHO' }),
-    ),
     reorderCdVariantLogos: jest.fn(() =>
       of([
         { ...TITLE_UPLOAD, position: 0 },
@@ -63,6 +60,7 @@ function makeApi(over: Partial<Record<string, unknown>> = {}) {
     ),
     deleteCdVariantLogo: jest.fn(() => of(void 0)),
     cdVariantLogoFileUrl: jest.fn((id: string) => `/api/admin/cd-variant-logos/${id}/file`),
+    cdVariantSquareLogoUrl: jest.fn((id: string) => `/api/admin/cd-variant-logos/${id}/square`),
     listGremienOptions: jest.fn(() =>
       of([
         { id: 'g-1', name: 'Studierendenparlament', cdVariantId: 'cd-1' },
@@ -129,7 +127,8 @@ describe('AdminCdVariantsComponent', () => {
   it('explains under a bundled logo why it has no file', async () => {
     await setup();
     await screen.findByText('StuPa');
-    const hint = 'Diese Logos liefert der PDF-Renderer mit. Ein Upload ist nicht nötig.';
+    const hint =
+      'Dieses Logo liefert der PDF-Renderer mit. Der Server wandelt es beim nächsten Start in einen normalen Upload um.';
     // Two bundled logos (HSRT, STUPA), none for the upload.
     const lines = screen.getAllByText(hint).filter((el) => el.classList.contains('cdv__logoHint'));
     expect(lines).toHaveLength(2);
@@ -179,11 +178,20 @@ describe('AdminCdVariantsComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Logo hinzufügen' }));
     await fixture.whenStable();
     fixture.detectChanges();
-    expect(c.logoDraft()).toMatchObject({ variantId: 'cd-1', slot: 'title', source: 'upload' });
-    await userEvent.selectOptions(screen.getByLabelText('Position'), 'footer');
-    await userEvent.selectOptions(screen.getByLabelText('Quelle'), 'vendored');
+    expect(c.logoDraft()).toMatchObject({ variantId: 'cd-1', variantName: 'StuPa', slot: 'title' });
+    // The dialog names the variant and offers only the upload: no source choice.
+    expect(screen.getByText('Variante StuPa')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Quelle')).not.toBeInTheDocument();
+    const slots = screen.getByRole('radiogroup', { name: 'Position' });
+    expect(slots).toHaveTextContent('Titelseite');
+    expect(slots).toHaveTextContent('Fußzeile');
+    expect(slots).toHaveTextContent('Quadratisch 1:1');
+    await userEvent.click(screen.getByRole('radio', { name: /Fußzeile/ }));
+    expect(c.logoDraft().slot).toBe('footer');
+    const file = new File(['x'], 'fuss.svg', { type: 'image/svg+xml' });
+    c.onFileSelected({ files: [file] } as unknown as HTMLInputElement);
     c.saveLogo();
-    expect(api.addCdVariantVendoredLogo).toHaveBeenCalledWith('cd-1', 'footer', 'HSRT');
+    expect(api.uploadCdVariantLogo).toHaveBeenCalledWith('cd-1', 'footer', file);
   });
 
   it('shows an empty text for a variant without logos', async () => {
@@ -345,7 +353,7 @@ describe('AdminCdVariantsComponent', () => {
 
   it('uploads a logo file into the chosen slot', async () => {
     const { api, c, toast } = await setup();
-    c.openLogoDialog('cd-1', 'title');
+    c.openLogoDialog(VARIANT, 'title');
     expect(c.canSaveLogo()).toBe(false); // no file yet
     const file = new File(['x'], 'neu.png', { type: 'image/png' });
     c.onFileSelected({ files: [file] } as unknown as HTMLInputElement);
@@ -359,7 +367,7 @@ describe('AdminCdVariantsComponent', () => {
 
   it('rejects a file above the 2 MB cap before it reaches the server', async () => {
     const { api, c } = await setup();
-    c.openLogoDialog('cd-1', 'title');
+    c.openLogoDialog(VARIANT, 'title');
     const big = new File([''], 'big.png', { type: 'image/png' });
     Object.defineProperty(big, 'size', { value: 3 * 1024 * 1024 });
     c.onFileSelected({ files: [big] } as unknown as HTMLInputElement);
@@ -371,28 +379,254 @@ describe('AdminCdVariantsComponent', () => {
 
   it('clears the file when the picker is cancelled', async () => {
     const { c } = await setup();
-    c.openLogoDialog('cd-1', 'title');
+    c.openLogoDialog(VARIANT, 'title');
     c.onFileSelected({ files: null } as unknown as HTMLInputElement);
     expect(c.logoDraft().file).toBeNull();
   });
 
-  it('adds a vendored logo from the dropdown', async () => {
-    const { api, c } = await setup();
-    c.openLogoDialog('cd-1', 'footer');
-    c.patchLogo('source', 'vendored');
-    c.patchLogo('vendoredName', 'ECHO');
-    expect(c.canSaveLogo()).toBe(true);
-    c.saveLogo();
-    expect(api.addCdVariantVendoredLogo).toHaveBeenCalledWith('cd-1', 'footer', 'ECHO');
-    expect(c.variants()[0].logos.map((l: CdVariantLogo) => l.id)).toContain('l-8');
+  // --- square logo ----------------------------------------------------------
+
+  describe('square logo', () => {
+    let urls = 0;
+
+    // jsdom has no object URLs. The fakes stay after each test, because the fixture
+    // revokes its preview when the test bed tears it down after the test.
+    beforeEach(() => {
+      urls = 0;
+      (URL.createObjectURL as unknown) = jest.fn(() => `blob:preview-${++urls}`);
+      (URL.revokeObjectURL as unknown) = jest.fn();
+    });
+
+    const png = (name = 'quadrat.png') => new File(['x'], name, { type: 'image/png' });
+
+    async function squareSetup(
+      size: Promise<{ width: number; height: number }>,
+      api: ReturnType<typeof makeApi> = makeApi(),
+    ) {
+      const view = await setup(api);
+      view.c.readImageSize = jest.fn(() => size);
+      view.c.openLogoDialog(VARIANT, 'square');
+      return view;
+    }
+
+    it('checks a square file, previews it as a gremium row and uploads it', async () => {
+      const square: CdVariantLogo = {
+        id: 'l-sq', slot: 'square', position: 0, fileName: 'quadrat.png', mime: 'image/png',
+      };
+      const { api, c, fixture, toast } = await squareSetup(
+        Promise.resolve({ width: 512, height: 512 }),
+        makeApi({ uploadCdVariantLogo: jest.fn(() => of(square)) }),
+      );
+      expect(c.accept()).toBe('image/png,image/jpeg,image/webp');
+      const file = png();
+      c.onFileSelected({ files: [file] } as unknown as HTMLInputElement);
+      expect(c.logoDraft().checking).toBe(true);
+      expect(c.canSaveLogo()).toBe(false); // the size is not known yet
+      fixture.detectChanges();
+      expect(screen.getByText('Bild wird geprüft …')).toBeInTheDocument();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(c.readImageSize).toHaveBeenCalledWith('blob:preview-1');
+      expect(c.verdict()).toBe('ok');
+      expect(screen.getByText(/512 × 512 px · quadratisch, groß genug/)).toBeInTheDocument();
+      // The preview row carries the first gremium that uses the variant.
+      expect(screen.getByText('So erscheint es in der Gremien-Liste')).toBeInTheDocument();
+      expect(screen.getByText('Studierendenparlament')).toBeInTheDocument();
+      expect(c.canSaveLogo()).toBe(true);
+      c.saveLogo();
+      expect(api.uploadCdVariantLogo).toHaveBeenCalledWith('cd-1', 'square', file);
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview-1');
+      expect(c.squareLogo(c.variants()[0])).toEqual(square);
+      expect(toast.success).toHaveBeenCalled();
+    });
+
+    it('replaces the square logo that the variant held', async () => {
+      const old: CdVariantLogo = { id: 'l-old', slot: 'square', position: 0, fileName: 'alt.png' };
+      const next: CdVariantLogo = { id: 'l-new', slot: 'square', position: 0, fileName: 'neu.png' };
+      const api = makeApi({
+        listCdVariants: jest.fn(() => of([{ ...VARIANT, logos: [...VARIANT.logos, old] }])),
+        uploadCdVariantLogo: jest.fn(() => of(next)),
+      });
+      const { c, fixture } = await squareSetup(Promise.resolve({ width: 300, height: 300 }), api);
+      c.onFileSelected({ files: [png('neu.png')] } as unknown as HTMLInputElement);
+      await fixture.whenStable();
+      c.saveLogo();
+      const ids = c.variants()[0].logos.map((l: CdVariantLogo) => l.id);
+      expect(ids).toContain('l-new');
+      expect(ids).not.toContain('l-old');
+      expect(ids).toContain('l-1'); // the other slots stay
+    });
+
+    it.each([
+      [{ width: 600, height: 300 }, 'notSquare', /600 × 300 px · nicht quadratisch/],
+      [{ width: 128, height: 128 }, 'tooSmall', /128 × 128 px · zu klein, mindestens 256 × 256 px/],
+    ])('refuses %p before the upload', async (size, verdict, text) => {
+      const { api, c, fixture } = await squareSetup(Promise.resolve(size));
+      c.onFileSelected({ files: [png()] } as unknown as HTMLInputElement);
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(c.verdict()).toBe(verdict);
+      expect(screen.getByRole('status')).toHaveTextContent(text);
+      expect(screen.queryByText('So erscheint es in der Gremien-Liste')).not.toBeInTheDocument();
+      expect(c.canSaveLogo()).toBe(false);
+      c.saveLogo();
+      expect(api.uploadCdVariantLogo).not.toHaveBeenCalled();
+    });
+
+    it('refuses an SVG for the square slot', async () => {
+      const { c } = await squareSetup(Promise.resolve({ width: 512, height: 512 }));
+      const svg = new File(['<svg/>'], 'logo.svg', { type: 'image/svg+xml' });
+      c.onFileSelected({ files: [svg] } as unknown as HTMLInputElement);
+      expect(c.logoError()).toBe('admin.cdVariants.squareType');
+      expect(c.logoDraft().file).toBeNull();
+      expect(c.readImageSize).not.toHaveBeenCalled();
+    });
+
+    it('reports an image that does not load', async () => {
+      const { c, fixture } = await squareSetup(Promise.reject(new Error('broken')));
+      c.onFileSelected({ files: [png()] } as unknown as HTMLInputElement);
+      await fixture.whenStable();
+      expect(c.logoError()).toBe('admin.cdVariants.squareUnreadable');
+      expect(c.logoDraft().checking).toBe(false);
+      expect(c.canSaveLogo()).toBe(false);
+    });
+
+    it('ignores the size of a file that a later pick replaced', async () => {
+      let resolveFirst: (s: { width: number; height: number }) => void = () => undefined;
+      let rejectSecond: (e: Error) => void = () => undefined;
+      const { c, fixture } = await squareSetup(Promise.resolve({ width: 1, height: 1 }));
+      c.readImageSize = jest
+        .fn()
+        .mockReturnValueOnce(new Promise((r) => (resolveFirst = r)))
+        .mockReturnValueOnce(new Promise((_, r) => (rejectSecond = r)));
+      c.onFileSelected({ files: [png('a.png')] } as unknown as HTMLInputElement);
+      c.onFileSelected({ files: [png('b.png')] } as unknown as HTMLInputElement);
+      // The first preview URL goes when the second file comes.
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview-1');
+      c.closeLogoDialog();
+      resolveFirst({ width: 512, height: 512 });
+      rejectSecond(new Error('late'));
+      await fixture.whenStable();
+      expect(c.logoDraft()).toBeNull();
+      expect(c.logoError()).toBeNull();
+    });
+
+    it('drops the picked file when the slot changes', async () => {
+      const { c, fixture } = await squareSetup(Promise.resolve({ width: 512, height: 512 }));
+      c.onFileSelected({ files: [png()] } as unknown as HTMLInputElement);
+      await fixture.whenStable();
+      c.setSlot('square'); // the same slot keeps everything
+      expect(c.logoDraft().file).not.toBeNull();
+      c.setSlot('title');
+      expect(c.logoDraft()).toMatchObject({ slot: 'title', file: null, previewUrl: null, size: null });
+      expect(c.accept()).toBe('image/png,image/jpeg,image/webp,image/svg+xml,application/pdf');
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview-1');
+      c.setSlot(null);
+      expect(c.logoDraft().slot).toBe('title');
+    });
+
+    it.each([
+      ['logo_not_square', 'admin.cdVariants.serverNotSquare', 'Das Logo ist nicht quadratisch.'],
+      ['logo_too_small', 'admin.cdVariants.serverTooSmall', 'Das Logo ist kleiner als 256 × 256 px.'],
+      ['logo_unreadable', 'admin.cdVariants.squareUnreadable', 'Das Bild konnte nicht gelesen werden.'],
+      ['logo_type_not_allowed', 'admin.cdVariants.squareType', 'Ein quadratisches Logo muss PNG, JPEG oder WebP sein.'],
+    ])('maps the server code %s to its own message', async (code, key, text) => {
+      const api = makeApi({
+        uploadCdVariantLogo: jest.fn(() => throwError(() => ({ status: 422, error: { code } }))),
+      });
+      const { c, fixture, toast } = await squareSetup(
+        Promise.resolve({ width: 512, height: 512 }),
+        api,
+      );
+      c.onFileSelected({ files: [png()] } as unknown as HTMLInputElement);
+      await fixture.whenStable();
+      c.saveLogo();
+      expect(c.logoError()).toBe(key);
+      expect(toast.error).toHaveBeenCalledWith(text);
+    });
+
+    it('falls back to the status for an unknown code', async () => {
+      const api = makeApi({
+        uploadCdVariantLogo: jest.fn(() => throwError(() => ({ status: 413, error: { code: 'x' } }))),
+      });
+      const { c, fixture } = await squareSetup(Promise.resolve({ width: 512, height: 512 }), api);
+      c.onFileSelected({ files: [png()] } as unknown as HTMLInputElement);
+      await fixture.whenStable();
+      c.saveLogo();
+      expect(c.logoError()).toBe('admin.cdVariants.logoTooLarge');
+    });
+
+    it('reads an error body without a code as "no code"', async () => {
+      const api = makeApi({
+        uploadCdVariantLogo: jest.fn(() => throwError(() => ({ status: 415, error: 'nope' }))),
+      });
+      const { c, fixture } = await squareSetup(Promise.resolve({ width: 512, height: 512 }), api);
+      c.onFileSelected({ files: [png()] } as unknown as HTMLInputElement);
+      await fixture.whenStable();
+      c.saveLogo();
+      expect(c.logoError()).toBe('admin.cdVariants.logoType');
+    });
+
+    it('reads the size through an image element by default', async () => {
+      const { c } = await setup();
+      // jsdom never loads the source, so the promise stays open; the call must not throw.
+      expect(c.readImageSize('blob:x')).toBeInstanceOf(Promise);
+    });
+
+    it('revokes the preview when the page goes', async () => {
+      const { c, fixture } = await squareSetup(Promise.resolve({ width: 512, height: 512 }));
+      c.onFileSelected({ files: [png()] } as unknown as HTMLInputElement);
+      fixture.destroy();
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview-1');
+    });
+
+    it('ignores a pick without an open dialog', async () => {
+      const { c } = await setup();
+      c.onFileSelected({ files: [png()] } as unknown as HTMLInputElement);
+      expect(c.logoDraft()).toBeNull();
+    });
   });
 
-  it('blocks the vendored save without a name', async () => {
-    const { c } = await setup();
-    c.openLogoDialog('cd-1', 'footer');
-    c.patchLogo('source', 'vendored');
-    c.patchLogo('vendoredName', '');
-    expect(c.canSaveLogo()).toBe(false);
+  // --- list thumbnails -------------------------------------------------------
+
+  it('shows the square logo before the name, else the initials', async () => {
+    const square: CdVariantLogo = { id: 'l-sq', slot: 'square', position: 0, fileName: 'q.png' };
+    const other: CdVariant = { id: 'cd-2', key: 'hsrt-inf', name: 'HSRT INF', baseVariant: 'report', logos: [] };
+    const { c, container } = await setup(
+      makeApi({
+        listCdVariants: jest.fn(() => of([{ ...VARIANT, logos: [...VARIANT.logos, square] }, other])),
+      }),
+    );
+    const heads = container.querySelectorAll('.cdv__head .cdv__square');
+    expect(heads[0].tagName).toBe('IMG');
+    expect(heads[0].getAttribute('src')).toBe('/api/admin/cd-variant-logos/l-sq/square');
+    expect(heads[1]).toHaveTextContent('HI');
+    expect(heads[1]).toHaveAttribute('title', 'Kein quadratisches Logo');
+    // The square row comes first and has no move buttons.
+    const rows = container.querySelectorAll('.cdv__logo');
+    expect(rows[0]).toHaveTextContent('Quadratisch 1:1');
+    expect(rows[0].querySelector('.cdv__moveGap')).not.toBeNull();
+    expect(rows[0].querySelector('img.cdv__thumb')).not.toBeNull();
+    expect(rows[1].querySelector('.cdv__moveGap')).toBeNull();
+    expect(c.initials('STUPA')).toBe('ST');
+  });
+
+  it('falls back to the placeholder when a thumbnail fails to load', async () => {
+    const square: CdVariantLogo = { id: 'l-sq', slot: 'square', position: 0, fileName: 'q.png' };
+    const { c, container, fixture } = await setup(
+      makeApi({ listCdVariants: jest.fn(() => of([{ ...VARIANT, logos: [...VARIANT.logos, square] }])) }),
+    );
+    container.querySelector('.cdv__head img')?.dispatchEvent(new Event('error'));
+    fixture.detectChanges();
+    expect(c.squareLogo(c.variants()[0])).toBeNull();
+    expect(container.querySelector('.cdv__head .cdv__square--none')).toHaveTextContent('ST');
+    expect(container.querySelector('.cdv__logo img')).toBeNull();
+  });
+
+  it('names the variant in the preview when no gremium uses it', async () => {
+    const { c } = await setup(makeApi({ listGremienOptions: jest.fn(() => of([])) }));
+    c.openLogoDialog(VARIANT, 'square');
+    expect(c.previewName(c.logoDraft())).toBe('StuPa');
   });
 
   it.each([
@@ -404,7 +638,7 @@ describe('AdminCdVariantsComponent', () => {
     const { c, toast } = await setup(
       makeApi({ uploadCdVariantLogo: jest.fn(() => httpError(status as number)) }),
     );
-    c.openLogoDialog('cd-1', 'title');
+    c.openLogoDialog(VARIANT, 'title');
     c.onFileSelected({ files: [file] } as unknown as HTMLInputElement);
     c.saveLogo();
     expect(c.logoError()).toBe(key);
@@ -412,13 +646,14 @@ describe('AdminCdVariantsComponent', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  it('saveLogo and patchLogo are no-ops without an open dialog', async () => {
+  it('saveLogo and setSlot are no-ops without an open dialog', async () => {
     const { api, c } = await setup();
-    c.patchLogo('source', 'vendored');
+    c.setSlot('footer');
     expect(c.logoDraft()).toBeNull();
+    expect(c.accept()).toBe('image/png,image/jpeg,image/webp,image/svg+xml,application/pdf');
     c.saveLogo();
     expect(api.uploadCdVariantLogo).not.toHaveBeenCalled();
-    c.openLogoDialog('cd-1', 'title');
+    c.openLogoDialog(VARIANT, 'title');
     c.logoSaving.set(true);
     expect(c.canSaveLogo()).toBe(false);
     c.closeLogoDialog();
@@ -463,8 +698,10 @@ describe('AdminCdVariantsComponent', () => {
     c.submit(new Event('submit'));
     expect(c.variants()[0]).toEqual(other);
 
-    c.openLogoDialog('cd-1', 'footer');
-    c.patchLogo('source', 'vendored');
+    c.openLogoDialog(VARIANT, 'footer');
+    c.onFileSelected({
+      files: [new File(['x'], 'f.png', { type: 'image/png' })],
+    } as unknown as HTMLInputElement);
     c.saveLogo();
     expect(c.variants()[0].logos).toEqual([]);
 

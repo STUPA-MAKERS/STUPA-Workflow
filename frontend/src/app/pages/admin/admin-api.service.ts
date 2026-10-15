@@ -324,18 +324,6 @@ export class AdminApiService {
     return this.http.post<CdVariantLogo>(`${this.base}/admin/cd-variants/${id}/logos`, form);
   }
 
-  /** POST /admin/cd-variants/{id}/logos/vendored — append a logo that the render service ships. */
-  addCdVariantVendoredLogo(
-    id: Uuid,
-    slot: CdLogoSlot,
-    vendoredName: string,
-  ): Observable<CdVariantLogo> {
-    return this.http.post<CdVariantLogo>(`${this.base}/admin/cd-variants/${id}/logos/vendored`, {
-      slot,
-      vendoredName,
-    });
-  }
-
   /** PUT /admin/cd-variants/{id}/logos/order — full new order of ONE slot. */
   reorderCdVariantLogos(
     id: Uuid,
@@ -356,6 +344,11 @@ export class AdminApiService {
   /** Download URL of an uploaded logo. The server always answers `attachment`. */
   cdVariantLogoFileUrl(logoId: Uuid): string {
     return `${this.base}/admin/cd-variant-logos/${logoId}/file`;
+  }
+
+  /** Inline image URL of a square logo, for the thumbnail. Other slots answer 404. */
+  cdVariantSquareLogoUrl(logoId: Uuid): string {
+    return `${this.base}/admin/cd-variant-logos/${logoId}/square`;
   }
 
   /**

@@ -14,7 +14,11 @@
       @for (v of variants(); track v.id) {
         <li class="cdv__variant">
           <div class="cdv__head">
-            <app-icon class="cdv__icon" name="document" [size]="20" />
+            @if (squareLogo(v); as sq) {
+              <img class="cdv__square" [src]="squareUrl(sq)" alt="" width="40" height="40" (error)="thumbFailed(sq)" />
+            } @else {
+              <span class="cdv__square cdv__square--none" [attr.title]="'admin.cdVariants.noSquare' | t" aria-hidden="true">{{ initials(v.name) }}</span>
+            }
             <span class="cdv__text">
               <span class="cdv__titleLine">
                 <strong class="cdv__name">{{ v.name }}</strong>
@@ -46,10 +50,14 @@
             <div class="cdv__body" [id]="'cdv-logos-' + v.id">
               @if (v.logos.length) {
                 <ul class="rowgroup rowgroup--bg3 cdv__logos">
-                  @for (slot of slots; track slot) {
+                  @for (slot of listOrder; track slot) {
                     @for (logo of logosOf(v, slot); track logo.id; let i = $index; let last = $last) {
                       <li class="cdv__logo">
-                        <span class="cdv__thumb" aria-hidden="true"><app-icon [name]="logo.vendoredName ? 'pin' : 'file'" [size]="18" /></span>
+                        @if (slot === 'square' && logo.fileName && !brokenThumbs().has(logo.id)) {
+                          <img class="cdv__thumb cdv__thumb--img" [src]="squareUrl(logo)" alt="" width="40" height="40" (error)="thumbFailed(logo)" />
+                        } @else {
+                          <span class="cdv__thumb" aria-hidden="true"><app-icon [name]="logo.vendoredName ? 'pin' : 'file'" [size]="18" /></span>
+                        }
                         <span class="cdv__logoText">
                           <span class="cdv__logoHead">
                             <strong>{{ slotLabel(slot) }}</strong>
@@ -63,12 +71,17 @@
                           }
                         </span>
                         <span class="cdv__logoActions">
-                          <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="i === 0" [ariaLabel]="('admin.common.moveUp' | t) + ': ' + logoLabel(logo)" (click)="moveLogo(v, slot, i, -1)">
-                            <app-icon name="chevron-up" />
-                          </app-button>
-                          <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="last" [ariaLabel]="('admin.common.moveDown' | t) + ': ' + logoLabel(logo)" (click)="moveLogo(v, slot, i, 1)">
-                            <app-icon name="chevron-down" />
-                          </app-button>
+                          @if (slot === 'square') {
+                            <!-- One square logo per variant: nothing to move. -->
+                            <span class="cdv__moveGap" aria-hidden="true"></span>
+                          } @else {
+                            <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="i === 0" [ariaLabel]="('admin.common.moveUp' | t) + ': ' + logoLabel(logo)" (click)="moveLogo(v, slot, i, -1)">
+                              <app-icon name="chevron-up" />
+                            </app-button>
+                            <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="last" [ariaLabel]="('admin.common.moveDown' | t) + ': ' + logoLabel(logo)" (click)="moveLogo(v, slot, i, 1)">
+                              <app-icon name="chevron-down" />
+                            </app-button>
+                          }
                           @if (logo.fileName) {
                             <a
                               class="cdv__iconLink"
@@ -92,7 +105,7 @@
               } @else {
                 <p class="cdv__empty">{{ 'admin.cdVariants.noLogos' | t }}</p>
               }
-              <app-button class="cdv__add" variant="text" size="sm" (click)="openLogoDialog(v.id)">
+              <app-button class="cdv__add" variant="text" size="sm" (click)="openLogoDialog(v)">
                 <app-icon name="plus" [size]="16" /> {{ 'admin.cdVariants.addLogo' | t }}
               </app-button>
             </div>
@@ -103,7 +116,7 @@
       }
     </ul>
 
-    <app-note>{{ 'admin.cdVariants.note' | t: { mb: maxMb } }}</app-note>
+    <app-note>{{ 'admin.cdVariants.note' | t: { mb: maxMb, min: minPx } }}</app-note>
   }
 </section>
 
@@ -153,46 +166,65 @@
 <app-dialog
   [open]="logoDraft() !== null"
   [title]="'admin.cdVariants.addLogo' | t"
+  [subtitle]="logoDraft() ? ('admin.cdVariants.variantOf' | t: { name: logoDraft()?.variantName ?? '' }) : ''"
   [closeLabel]="'action.cancel' | t"
   (closed)="closeLogoDialog()"
 >
   @if (logoDraft(); as draft) {
     <form class="cdv__form" (submit)="$event.preventDefault(); saveLogo()">
-      <app-select
-        [label]="'admin.cdVariants.slot' | t"
-        [options]="slotOptions()"
-        name="slot"
-        [ngModel]="draft.slot"
-        (ngModelChange)="patchLogo('slot', $event)"
-      />
-      <app-select
-        [label]="'admin.cdVariants.source' | t"
-        [options]="sourceOptions()"
-        name="source"
-        [ngModel]="draft.source"
-        (ngModelChange)="patchLogo('source', $event)"
-      />
-      @if (draft.source === 'vendored') {
-        <app-select
-          [label]="'admin.cdVariants.vendoredName' | t"
-          [options]="vendoredOptions"
-          [hint]="'admin.cdVariants.vendoredHint' | t"
-          name="vendoredName"
-          [ngModel]="draft.vendoredName"
-          (ngModelChange)="patchLogo('vendoredName', $event)"
+      <div class="cdv__field">
+        <span class="cdv__fieldLabel" aria-hidden="true">{{ 'admin.cdVariants.slot' | t }}</span>
+        <app-segmented
+          width="fill"
+          [ariaLabel]="'admin.cdVariants.slot' | t"
+          [options]="slotOptions()"
+          [value]="draft.slot"
+          (valueChange)="setSlot($event)"
         />
-      } @else {
-        <div class="cdv__fileRow">
-          <input id="cdv-file" #logoFile class="cdv__file" type="file" [accept]="accept" (change)="onFileSelected(logoFile)" />
-          <app-button variant="outlined" (click)="logoFile.click()">
-            <app-icon name="upload" [size]="16" /> {{ 'admin.cdVariants.pickFile' | t }}
-          </app-button>
+      </div>
+      <div class="cdv__fileRow" [class.cdv__fileRow--square]="draft.slot === 'square'">
+        <input id="cdv-file" #logoFile class="cdv__file" type="file" [accept]="accept()" (change)="onFileSelected(logoFile)" />
+        @if (draft.previewUrl) {
+          <img class="cdv__bigSquare" [src]="draft.previewUrl" alt="" width="96" height="96" />
+        }
+        <span class="cdv__fileText">
           <span class="cdv__fileName mono">{{ draft.file?.name ?? ('admin.cdVariants.noFile' | t) }}</span>
-        </div>
-        <p class="cdv__hint">{{ 'admin.cdVariants.fileHint' | t: { mb: maxMb } }}</p>
+          @if (draft.slot === 'square' && draft.file) {
+            @if (draft.checking) {
+              <span class="cdv__check">{{ 'admin.cdVariants.squareChecking' | t }}</span>
+            } @else if (draft.size; as size) {
+              <span class="cdv__check" [class.cdv__check--ok]="verdict() === 'ok'" [class.cdv__check--bad]="verdict() !== 'ok'" role="status">
+                <app-icon [name]="verdict() === 'ok' ? 'check' : 'alert'" [size]="14" />
+                {{ verdictText(size) }}
+              </span>
+            }
+          }
+        </span>
+        <app-button [variant]="draft.file ? 'tonal' : 'outlined'" size="sm" (click)="logoFile.click()">
+          <app-icon name="upload" [size]="16" />
+          {{ (draft.file ? 'admin.cdVariants.otherFile' : 'admin.cdVariants.pickFile') | t }}
+        </app-button>
+      </div>
+      <p class="cdv__hint">
+        {{ (draft.slot === 'square' ? 'admin.cdVariants.squareFileHint' : 'admin.cdVariants.fileHint') | t: { mb: maxMb, min: minPx } }}
+      </p>
+      @if (draft.slot === 'square') {
+        @if (draft.previewUrl && verdict() === 'ok') {
+          <div class="cdv__field">
+            <span class="cdv__fieldLabel">{{ 'admin.cdVariants.previewLabel' | t }}</span>
+            <div class="cdv__preview">
+              <img class="cdv__square" [src]="draft.previewUrl" alt="" width="40" height="40" />
+              <span class="cdv__previewText">
+                <span class="cdv__previewName">{{ previewName(draft) }}</span>
+                <span class="cdv__previewSub">{{ 'admin.cdVariants.variantOf' | t: { name: draft.variantName } }}</span>
+              </span>
+            </div>
+          </div>
+        }
+        <p class="cdv__hint">{{ 'admin.cdVariants.squareReplaces' | t }}</p>
       }
       @if (logoError(); as err) {
-        <app-note kind="error" icon="alert" role="alert">{{ err | t }}</app-note>
+        <app-note kind="error" icon="alert" role="alert">{{ err | t: { min: minPx } }}</app-note>
       }
     </form>
   }

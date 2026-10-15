@@ -9,20 +9,29 @@ the magic bytes and compares them against the declared type. The allowlist adds
 SVG and PDF, because these bytes only ever reach the LaTeX renderer. The
 download path therefore forces an attachment disposition and never answers with
 ``image/svg+xml`` — see `app.modules.admin.router.get_cd_variant_logo_file`.
+
+The square slot is the exception. Its upload accepts PNG, JPEG and WebP only and
+checks the pixel size (`cd_logos.check_square_logo`). A variant holds at most one
+square logo, so a new upload replaces the old row and its object. Two routes serve
+it inline: the admin thumbnail and `GET /gremien/{id}/logo`. Both go through
+`SquareLogoRef`, which only a square row with a raster type can produce.
 """
 
 from __future__ import annotations
 
 import contextlib
 import uuid
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
 
 from app.modules.admin.cd_logos import (
     ALLOWED_CD_LOGO_MIME,
+    ALLOWED_SQUARE_LOGO_MIME,
     MAX_CD_LOGO_BYTES,
     LogoSlot,
+    check_square_logo,
     sniff_cd_logo,
 )
 from app.modules.admin.models import CdVariant, CdVariantLogo, Gremium
@@ -60,16 +69,81 @@ if TYPE_CHECKING:
 CD_LOGO_PREFIX = "cd-logos/"
 
 
+def _slot(value: str) -> LogoSlot:
+    """Narrow the stored text to the closed set. The DB check holds the invariant."""
+    if value == "footer":
+        return "footer"
+    if value == "square":
+        return "square"
+    return "title"
+
+
+@dataclass(frozen=True, slots=True)
+class SquareLogoRef:
+    """A square logo that may render inline in the browser.
+
+    Only `CdVariantService._square_ref` builds one, and only from a square row with
+    an uploaded raster object.
+
+    Attributes:
+        logo_id: Id of the ``cd_variant_logo`` row. A new upload is a new row, so
+            the id is a strong validator for the bytes.
+        object_key: Key of the object in the bucket.
+        mime: The sniffed raster type, one of ``ALLOWED_SQUARE_LOGO_MIME``.
+    """
+
+    logo_id: uuid.UUID
+    object_key: str
+    mime: str
+
+    @property
+    def etag(self) -> str:
+        """Return the strong entity tag of the logo bytes."""
+        return f'"{self.logo_id.hex}"'
+
+
 def _logo_out(row: CdVariantLogo) -> CdVariantLogoOut:
     return CdVariantLogoOut(
         id=row.id,
-        slot="footer" if row.slot == "footer" else "title",
+        slot=_slot(row.slot),
         position=row.position,
         vendored_name=row.vendored_name,
         file_name=row.file_name,
         mime=row.mime,
         size=row.size,
     )
+
+
+def _check_render_logo(data: bytes) -> str:
+    """Apply the upload policy of a title or footer logo and return the sniffed type.
+
+    Raises:
+        PayloadTooLargeError: The bytes exceed the cap (413).
+        UnsupportedMediaTypeError: The bytes are empty or not an accepted type (415).
+    """
+    if len(data) > MAX_CD_LOGO_BYTES:
+        raise PayloadTooLargeError(f"Logo exceeds {MAX_CD_LOGO_BYTES} bytes.")
+    if not data:
+        raise UnsupportedMediaTypeError("Empty file.")
+    mime = sniff_cd_logo(data)
+    if mime is None or mime not in ALLOWED_CD_LOGO_MIME:
+        raise UnsupportedMediaTypeError(
+            "Logo must be PNG, JPEG, WebP, SVG or PDF (checked from the bytes)."
+        )
+    return mime
+
+
+def _square_ref(row: CdVariantLogo | None) -> SquareLogoRef | None:
+    """Build the inline reference, or ``None`` for a row that must not render inline."""
+    if (
+        row is None
+        or row.slot != "square"
+        or row.object_key is None
+        or row.mime is None
+        or row.mime not in ALLOWED_SQUARE_LOGO_MIME
+    ):
+        return None
+    return SquareLogoRef(logo_id=row.id, object_key=row.object_key, mime=row.mime)
 
 
 def _variant_out(row: CdVariant, logos: list[CdVariantLogo]) -> CdVariantOut:
@@ -207,24 +281,21 @@ class CdVariantService(ConfigServiceBase):
     ) -> CdVariantLogoOut:
         """Validate the uploaded bytes and store them under the ``cd-logos/`` prefix.
 
+        A square logo replaces the square logo that the variant holds already. The
+        old row goes in the same transaction, and its object goes after the commit.
+
         Raises:
             NotFoundError: No variant has this id (404).
             PayloadTooLargeError: The bytes exceed the cap (413).
             UnsupportedMediaTypeError: The magic bytes are not one of the
                 accepted types (415).
+            ValidationProblem: A square logo is not square, too small or has an
+                unreadable header (422).
             ServiceUnavailableError: The object storage is off or the write
                 failed (503).
         """
         await self._get_or_404(variant_id)
-        if len(data) > MAX_CD_LOGO_BYTES:
-            raise PayloadTooLargeError(f"Logo exceeds {MAX_CD_LOGO_BYTES} bytes.")
-        if not data:
-            raise UnsupportedMediaTypeError("Empty file.")
-        mime = sniff_cd_logo(data)
-        if mime is None or mime not in ALLOWED_CD_LOGO_MIME:
-            raise UnsupportedMediaTypeError(
-                "Logo must be PNG, JPEG, WebP, SVG or PDF (checked from the bytes)."
-            )
+        mime = check_square_logo(data) if slot == "square" else _check_render_logo(data)
         if self.storage is None:
             raise ServiceUnavailableError("Object storage unavailable.")
         safe_name = sanitize_filename(filename)
@@ -233,10 +304,16 @@ class CdVariantService(ConfigServiceBase):
             await self.storage.put(object_key, data, mime)
         except StorageError as exc:
             raise ServiceUnavailableError("Object storage write failed.") from exc
+        replaced: list[CdVariantLogo] = []
+        if slot == "square":
+            replaced = await self._drop_square_logos(variant_id)
+            position = 0
+        else:
+            position = await self._next_position(variant_id, slot)
         row = CdVariantLogo(
             variant_id=variant_id,
             slot=slot,
-            position=await self._next_position(variant_id, slot),
+            position=position,
             object_key=object_key,
             file_name=safe_name,
             mime=mime,
@@ -244,9 +321,36 @@ class CdVariantService(ConfigServiceBase):
         )
         self.session.add(row)
         await self.session.flush()
-        await self._audit(actor, AuditAction.CONFIG_CHANGE, "cd_variant", variant_id)
+        audit_data = (
+            {"slot": "square", "replacedLogoIds": [str(old.id) for old in replaced]}
+            if replaced
+            else None
+        )
+        await self._audit(
+            actor, AuditAction.CONFIG_CHANGE, "cd_variant", variant_id, audit_data
+        )
         await self.session.commit()
+        for old in replaced:
+            if old.object_key is not None:
+                await self._remove_object(old.object_key)
         return _logo_out(row)
+
+    async def _drop_square_logos(self, variant_id: UUID) -> list[CdVariantLogo]:
+        """Delete the square rows of a variant and flush, before the new row goes in.
+
+        The variant row is locked first, so two concurrent uploads queue instead of
+        hitting the unique index. The flush matters: the unit of work runs inserts
+        before deletes, so without it the partial unique index refuses the new row.
+        """
+        await self.session.execute(
+            select(CdVariant.id).where(CdVariant.id == variant_id).with_for_update()
+        )
+        rows = [logo for logo in await self._logos_of(variant_id) if logo.slot == "square"]
+        for old in rows:
+            await self.session.delete(old)
+        if rows:
+            await self.session.flush()
+        return rows
 
     async def logo_file_bytes(self, logo_id: UUID) -> tuple[bytes, str]:
         """Load an uploaded logo from the object storage.
@@ -269,6 +373,54 @@ class CdVariantService(ConfigServiceBase):
         except StorageError as exc:
             raise ServiceUnavailableError("Could not read CD logo.") from exc
         return data, row.file_name or "logo"
+
+    async def admin_square_logo(self, logo_id: UUID) -> SquareLogoRef:
+        """Return the square logo with this id for the inline admin thumbnail.
+
+        Raises:
+            NotFoundError: No logo has this id, or it is not a square upload (404).
+        """
+        ref = _square_ref(await self.session.get(CdVariantLogo, logo_id))
+        if ref is None:
+            raise NotFoundError(f"square logo {logo_id} not found")
+        return ref
+
+    async def gremium_square_logo(self, gremium_id: UUID) -> SquareLogoRef:
+        """Return the square logo of the CD variant of a Gremium.
+
+        The caller checks first that the principal may see the Gremium.
+
+        Raises:
+            NotFoundError: The Gremium does not exist, holds no variant, or the
+                variant holds no square logo (404).
+        """
+        variant_id = await self.session.scalar(
+            select(Gremium.cd_variant_id).where(Gremium.id == gremium_id)
+        )
+        row: CdVariantLogo | None = None
+        if variant_id is not None:
+            row = await self.session.scalar(
+                select(CdVariantLogo).where(
+                    CdVariantLogo.variant_id == variant_id, CdVariantLogo.slot == "square"
+                )
+            )
+        ref = _square_ref(row)
+        if ref is None:
+            raise NotFoundError(f"gremium {gremium_id} has no logo")
+        return ref
+
+    async def square_logo_bytes(self, ref: SquareLogoRef) -> bytes:
+        """Load the bytes of a square logo from the object storage.
+
+        Raises:
+            ServiceUnavailableError: The object storage is off or unreachable (503).
+        """
+        if self.storage is None:
+            raise ServiceUnavailableError("Object storage unavailable.")
+        try:
+            return await self.storage.get(ref.object_key)
+        except StorageError as exc:
+            raise ServiceUnavailableError("Could not read CD logo.") from exc
 
     async def delete_logo(self, logo_id: UUID, actor: str) -> None:
         """Delete a logo entry and its object.

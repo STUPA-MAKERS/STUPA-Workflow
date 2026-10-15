@@ -27,6 +27,7 @@ from fastapi import (
     Depends,
     File,
     Form,
+    Header,
     Query,
     Request,
     Response,
@@ -42,7 +43,7 @@ from app.deps import (
 )
 from app.modules.admin.branding import Branding
 from app.modules.admin.cd_logos import LogoSlot
-from app.modules.admin.gremium_roles import GremiumRoleService
+from app.modules.admin.gremium_roles import GremiumRoleService, can_view_gremium
 from app.modules.admin.oidc_mappings import OidcMappingService
 from app.modules.admin.principal_merge import PrincipalMergeService
 from app.modules.admin.principal_revoke import PrincipalRevokeService
@@ -104,6 +105,7 @@ from app.modules.admin.schemas import (
     WebhookUpdate,
 )
 from app.modules.admin.service import CdVariantService, ConfigService
+from app.modules.admin.service.cd_variants import SquareLogoRef
 from app.modules.admin.site_config_service import SiteConfigService
 from app.modules.applications.guest_settings import GuestSettingsService
 from app.modules.auth.login_settings import LoginSettingsService
@@ -111,7 +113,7 @@ from app.modules.livevote.open_window import MeetingSettingsService
 from app.modules.notifications.auto import AutoMailer, get_auto_mailer
 from app.shared.antiabuse import body_cap
 from app.shared.config_schemas import FlowGraph, export_json_schemas
-from app.shared.errors import ForbiddenError, ProblemDetail
+from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 public_router = APIRouter(tags=["admin"])
@@ -537,7 +539,9 @@ async def upload_cd_variant_logo(
 
     The server decides the type from the magic bytes. PNG, JPEG, WebP, SVG and
     PDF pass. SVG and PDF pass here, and only here, because these bytes reach
-    the LaTeX renderer and never the browser.
+    the render service and never the browser. The slot ``square`` is the
+    exception: PNG, JPEG or WebP only, square, at least 256 x 256 px. It replaces
+    the square logo that the variant holds already.
     """
     data = await file.read()
     return await service.upload_logo(
@@ -550,6 +554,7 @@ async def upload_cd_variant_logo(
     response_model=CdVariantLogoOut,
     status_code=201,
     responses=_errors(400, 401, 403, 404, 422),
+    deprecated=True,
 )
 async def add_cd_variant_vendored_logo(
     variant_id: UUID,
@@ -557,7 +562,12 @@ async def add_cd_variant_vendored_logo(
     service: CdVariantServiceDep,
     principal: CdVariantsAdmin,
 ) -> CdVariantLogoOut:
-    """Append a logo that the render service ships. No upload and no object storage involved."""
+    """Append a logo that the render service ships. No upload and no object storage involved.
+
+    Deprecated: the admin UI offers only the upload, and the worker job
+    `migrate_builtin_cd_logos` turns a vendored row into an upload at its next
+    start. The slot ``square`` answers 422.
+    """
     return await service.add_vendored_logo(variant_id, payload, principal.sub)
 
 
@@ -599,6 +609,54 @@ async def get_cd_variant_logo_file(logo_id: UUID, service: CdVariantServiceDep) 
     )
 
 
+def _etag_matches(if_none_match: str | None, etag: str) -> bool:
+    """Tell if an ``If-None-Match`` header names ``etag`` or the wildcard."""
+    if not if_none_match:
+        return False
+    tags = [tag.strip().removeprefix("W/") for tag in if_none_match.split(",")]
+    return "*" in tags or etag in tags
+
+
+async def _square_logo_response(
+    ref: SquareLogoRef, service: CdVariantService, if_none_match: str | None
+) -> Response:
+    """Answer a square logo inline, or 304 when the client holds the same bytes.
+
+    The type is the sniffed raster type of the row, never SVG (`SquareLogoRef`).
+    ``nosniff`` stops the browser from guessing another type, and ``private``
+    keeps a shared cache from storing a logo that needs a login.
+    """
+    headers = {
+        "ETag": ref.etag,
+        "Cache-Control": "private, max-age=3600",
+        "X-Content-Type-Options": "nosniff",
+    }
+    if _etag_matches(if_none_match, ref.etag):
+        return Response(status_code=304, headers=headers)
+    data = await service.square_logo_bytes(ref)
+    return Response(content=data, media_type=ref.mime, headers=headers)
+
+
+@router.get(
+    "/cd-variant-logos/{logo_id}/square",
+    dependencies=[_CD_VARIANTS],
+    responses=_errors(401, 403, 404, 503),
+    response_class=Response,
+)
+async def get_cd_variant_square_logo(
+    logo_id: UUID,
+    service: CdVariantServiceDep,
+    if_none_match: Annotated[str | None, Header()] = None,
+) -> Response:
+    """Stream a square logo inline, for the thumbnail on the admin page.
+
+    Only a square row answers. Any other logo answers 404, because a title or footer
+    logo can be an SVG, which must never render in the app origin.
+    """
+    ref = await service.admin_square_logo(logo_id)
+    return await _square_logo_response(ref, service, if_none_match)
+
+
 @router.delete(
     "/cd-variant-logos/{logo_id}",
     status_code=204,
@@ -620,6 +678,31 @@ async def delete_cd_variant_logo(
 async def list_cd_variant_options(service: CdVariantServiceDep) -> list[CdVariantOptionOut]:
     """Slim CD-variant list (id, key, name) as the source of the Gremium dropdown."""
     return await service.list_variant_options()
+
+
+@authed_router.get(
+    "/gremien/{gremium_id}/logo",
+    responses=_errors(401, 404, 503),
+    response_class=Response,
+)
+async def get_gremium_logo(
+    gremium_id: UUID,
+    session: DbSession,
+    service: CdVariantServiceDep,
+    principal: Annotated[Principal, Depends(require_principal())],
+    if_none_match: Annotated[str | None, Header()] = None,
+) -> Response:
+    """Stream the square logo of the CD variant of a Gremium, inline.
+
+    The API streams the bytes itself and never hands out a presigned URL. A
+    member of the Gremium, a holder of ``gremium.view_all`` and an admin may read
+    it. Everyone else gets 404, the same answer as for a Gremium without a logo,
+    so the route does not tell which Gremien exist.
+    """
+    if not await can_view_gremium(session, principal, gremium_id):
+        raise NotFoundError(f"gremium {gremium_id} has no logo")
+    ref = await service.gremium_square_logo(gremium_id)
+    return await _square_logo_response(ref, service, if_none_match)
 
 
 @router.get(

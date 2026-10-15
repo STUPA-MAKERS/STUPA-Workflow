@@ -142,6 +142,29 @@ async def gremium_member_ids(
     return {gid for gid, _ in await active_gremium_roles(session, sub, now)}
 
 
+# Global permission that lets a principal see every Gremium, not only the Gremien
+# it is a member of. The admin role holds it through the admin bypass of `has`.
+GREMIUM_VIEW_ALL = "gremium.view_all"
+
+
+async def can_view_gremium(
+    session: AsyncSession,
+    principal: AuthPrincipal,
+    gremium_id: UUID,
+    now: datetime | None = None,
+) -> bool:
+    """Tell if ``principal`` may see the Gremium ``gremium_id``.
+
+    A principal sees a Gremium when it holds the global permission
+    ``gremium.view_all`` (the admin role included, scope-capped through ``has``),
+    or when it is an active member of the Gremium now. A read route that refuses
+    answers 404, not 403, so the answer does not tell that the Gremium exists.
+    """
+    if principal.has(GREMIUM_VIEW_ALL):
+        return True
+    return gremium_id in await gremium_member_ids(session, principal.sub, now)
+
+
 def _sanitize_perms(perms: list[str] | None) -> list[str]:
     """Keep only known gremium permissions, deduplicated, in catalog order."""
     given = set(perms or [])

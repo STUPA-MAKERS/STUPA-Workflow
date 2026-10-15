@@ -70,6 +70,10 @@ class CdVariantLogo(UUIDPkMixin, CreatedAtMixin, Base):
     rule in the database, so no code path can write a row with both or neither.
 
     ``position`` orders the logos inside one slot, lowest first.
+
+    The slot ``square`` holds the 1:1 logo that the app shows for a Gremium. The
+    partial unique index ``uq_cd_variant_logo_square`` allows at most one such
+    row per variant. The render path ignores the slot.
     """
 
     __tablename__ = "cd_variant_logo"
@@ -86,7 +90,7 @@ class CdVariantLogo(UUIDPkMixin, CreatedAtMixin, Base):
     size: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
-        CheckConstraint("slot IN ('title','footer')", name="slot"),
+        CheckConstraint("slot IN ('title','footer','square')", name="slot"),
         CheckConstraint(
             "(vendored_name IS NULL) <> (object_key IS NULL)", name="source"
         ),
@@ -95,6 +99,12 @@ class CdVariantLogo(UUIDPkMixin, CreatedAtMixin, Base):
             "variant_id",
             "slot",
             "position",
+        ),
+        Index(
+            "uq_cd_variant_logo_square",
+            "variant_id",
+            unique=True,
+            postgresql_where=text("slot = 'square'"),
         ),
     )
 

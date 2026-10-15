@@ -257,10 +257,9 @@ describe('AdminApiService — real mode (contract)', () => {
     expect((upload.request.body as FormData).get('slot')).toBe('title');
     expect((upload.request.body as FormData).get('file')).toBe(file);
 
-    s.addCdVariantVendoredLogo('cd-1', 'footer', 'HSRT').subscribe();
-    const vendored = http.expectOne('/api/admin/cd-variants/cd-1/logos/vendored');
-    expect(vendored.request.method).toBe('POST');
-    expect(vendored.request.body).toEqual({ slot: 'footer', vendoredName: 'HSRT' });
+    s.uploadCdVariantLogo('cd-1', 'square', file).subscribe();
+    const square = http.expectOne('/api/admin/cd-variants/cd-1/logos');
+    expect((square.request.body as FormData).get('slot')).toBe('square');
 
     s.reorderCdVariantLogos('cd-1', 'title', ['l-2', 'l-1']).subscribe();
     const order = http.expectOne('/api/admin/cd-variants/cd-1/logos/order');
@@ -271,6 +270,7 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/cd-variant-logos/l-1').request.method).toBe('DELETE');
 
     expect(s.cdVariantLogoFileUrl('l-1')).toBe('/api/admin/cd-variant-logos/l-1/file');
+    expect(s.cdVariantSquareLogoUrl('l-1')).toBe('/api/admin/cd-variant-logos/l-1/square');
 
     s.listCdVariantOptions().subscribe();
     http.expectOne('/api/cd-variants').flush([]);
