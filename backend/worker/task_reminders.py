@@ -23,6 +23,7 @@ from sqlalchemy import func, select
 
 from app.modules.applications.models import Application, StatusEvent
 from app.modules.flow.models import State
+from app.modules.notifications.links import task_link
 from app.modules.notifications.models import TaskReminderLog
 from app.modules.notifications.recipients import (
     actionable_principal_emails,
@@ -242,6 +243,7 @@ async def _remind_one(
             str(status_event_id or ""),
             now.date().isoformat(),
         ),
+        link=task_link(settings, application_id),
     )
     # Write the log even without a send, for example when all recipients opted out.
     # Without the log every run re-checks the same opted-out set. `sent` counts only

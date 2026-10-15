@@ -54,7 +54,9 @@ def _meeting() -> SimpleNamespace:
 
 
 def _gremium(cd_variant: str = "stupa") -> SimpleNamespace:
-    return SimpleNamespace(id=GID, slug="stupa", cd_variant=cd_variant)
+    return SimpleNamespace(
+        id=GID, name="STUPA", slug="stupa", cd_variant=cd_variant, protocols_public=False
+    )
 
 
 def _real_meeting() -> Meeting:
@@ -92,6 +94,9 @@ def _vote(**over: Any) -> SimpleNamespace:
     }
     base.update(over)
     return SimpleNamespace(**base)
+
+
+SETTINGS_BASE = get_settings().public_base_url.rstrip("/")
 
 
 def _service(session: Any, **infra: Any) -> ProtocolService:
@@ -280,6 +285,48 @@ async def test_finalize_renders_stores_and_mails() -> None:
     # login plus a meeting right and was worthless for the recipients.
     assert [a.filename for a in mail.sent[0].attachments] == ["protokoll.pdf"]
     assert mail.sent[0].attachments[0].content.startswith(b"%PDF")
+    # The mail links the meeting page, which holds the protocol, and names no public
+    # version for a Gremium that does not publish its protocols.
+    assert f"Protokoll öffnen: {SETTINGS_BASE}/meetings/{MID}" in mail.sent[0].text
+    assert f'href="{SETTINGS_BASE}/meetings/{MID}"' in (mail.sent[0].html or "")
+    assert "/protokolle/" not in mail.sent[0].text
+
+
+async def test_protocol_mail_links_the_public_version_when_public() -> None:
+    """A protocol on the public page: the mail links the public version too.
+
+    An external list address cannot log in, so the public link is the only link that
+    it can open.
+    """
+    proto = _protocol(status="final", public_withheld=False, public_content={"tops": []})
+    gremium = _gremium("stupa")
+    gremium.protocols_public = True
+    mail = FakeMailQueue()
+    session = FakeSession(
+        store={MID: _meeting(), GID: gremium},
+        results=[result("a@x.de"), result()],
+    )
+    await _service(session, mail_queue=mail)._send(proto, None)  # noqa: SLF001
+
+    assert len(mail.sent) == 1
+    text = mail.sent[0].text
+    assert f"Öffentliche Fassung: {SETTINGS_BASE}/protokolle/{PID}" in text
+    assert f"Protokoll öffnen: {SETTINGS_BASE}/meetings/{MID}" in text
+
+
+async def test_protocol_mail_hides_a_withheld_public_version() -> None:
+    """A held-back protocol is not public, so the mail names no public version."""
+    proto = _protocol(status="final", public_withheld=True, public_content={"tops": []})
+    gremium = _gremium("stupa")
+    gremium.protocols_public = True
+    mail = FakeMailQueue()
+    session = FakeSession(
+        store={MID: _meeting(), GID: gremium},
+        results=[result("a@x.de"), result()],
+    )
+    await _service(session, mail_queue=mail)._send(proto, None)  # noqa: SLF001
+
+    assert "/protokolle/" not in mail.sent[0].text
 
 
 async def test_the_design_never_decides_the_document_shape() -> None:

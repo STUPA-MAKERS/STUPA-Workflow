@@ -91,6 +91,7 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         _svc._BUILTIN_NOTIFY_SUBJECT,  # noqa: SLF001 — shared builtin
         _svc._BUILTIN_NOTIFY_BODY,  # noqa: SLF001
         {
+            "link": "Link zum Antrag (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
             "status": "Neuer Status",
             "applicationId": "ID des Antrags",
@@ -106,6 +107,7 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         STATUS_UPDATE_TEAM_SUBJECT,
         STATUS_UPDATE_TEAM_BODY,
         {
+            "link": "Link zum Antrag (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
             "status": "Neuer Status",
             "applicationId": "ID des Antrags",
@@ -121,6 +123,7 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         action_dispatcher._BUILTIN_TASK_SUBJECT,  # noqa: SLF001
         action_dispatcher._BUILTIN_TASK_BODY,  # noqa: SLF001
         {
+            "link": "Link zur Aufgabe (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
             "status": "Aktueller Status",
             "applicationId": "ID des Antrags",
@@ -132,6 +135,7 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         TASK_REMINDER_SUBJECT,
         TASK_REMINDER_BODY,
         {
+            "link": "Link zur Aufgabe (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
             "status": "Aktueller Status",
             "daysOpen": "Tage ohne Aktion",
@@ -144,6 +148,7 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         DEADLINE_APPROACHING_SUBJECT,
         DEADLINE_APPROACHING_BODY,
         {
+            "link": "Link zum Antrag (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
             "dueAt": "Fälligkeitszeitpunkt",
             "kind": "Art der Frist",
@@ -156,6 +161,7 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         comments._BUILTIN_APPLICANT_SUBJECT,  # noqa: SLF001
         comments._BUILTIN_APPLICANT_BODY,  # noqa: SLF001
         {
+            "link": "Link zum Antrag (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
             "status": "Aktueller Status",
             "comment": "Kommentartext (Auszug)",
@@ -170,6 +176,7 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         comments._BUILTIN_TEAM_SUBJECT,  # noqa: SLF001
         comments._BUILTIN_TEAM_BODY,  # noqa: SLF001
         {
+            "link": "Link zum Antrag (ohne den Platzhalter hängt die Mail ihn an)",
             "applicationTitle": "Titel des Antrags",
             "status": "Aktueller Status",
             "comment": "Kommentartext (Auszug)",
@@ -184,6 +191,7 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         auto._BUILTIN_MEETING_SUBJECT,  # noqa: SLF001
         auto._BUILTIN_MEETING_BODY,  # noqa: SLF001
         {
+            "link": "Link zur Sitzung (ohne den Platzhalter hängt die Mail ihn an)",
             "meetingTitle": "Titel der Sitzung",
             "meetingDate": "Datum",
             "meetingTime": "Uhrzeit",
@@ -196,14 +204,22 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         "delegation",
         auto._BUILTIN_DELEGATION_GRANTED_SUBJECT,  # noqa: SLF001
         auto._BUILTIN_DELEGATION_GRANTED_BODY,  # noqa: SLF001
-        {"meetingTitle": "Titel der Sitzung", "delegatorName": "Vollmachtgeber:in"},
+        {
+            "link": "Link zur Sitzung (ohne den Platzhalter hängt die Mail ihn an)",
+            "meetingTitle": "Titel der Sitzung",
+            "delegatorName": "Vollmachtgeber:in",
+        },
     ),
     MailTemplateSpec(
         "delegation_revoked",
         "delegation",
         auto._BUILTIN_DELEGATION_REVOKED_SUBJECT,  # noqa: SLF001
         auto._BUILTIN_DELEGATION_REVOKED_BODY,  # noqa: SLF001
-        {"meetingTitle": "Titel der Sitzung", "delegatorName": "Vollmachtgeber:in"},
+        {
+            "link": "Link zur Sitzung (ohne den Platzhalter hängt die Mail ihn an)",
+            "meetingTitle": "Titel der Sitzung",
+            "delegatorName": "Vollmachtgeber:in",
+        },
     ),
     MailTemplateSpec(
         "magic_link",
@@ -224,7 +240,11 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         "privacy",
         privacy.ERASURE_REQUESTED_SUBJECT,
         privacy.ERASURE_REQUESTED_BODY,
-        {"subjectType": "Art (applicant/principal)", "requestId": "ID des Löschantrags"},
+        {
+            "link": "Link zur Datenschutz-Verwaltung (ohne den Platzhalter hängt die Mail ihn an)",
+            "subjectType": "Art (applicant/principal)",
+            "requestId": "ID des Löschantrags",
+        },
     ),
     MailTemplateSpec(
         "erasure_executed",
@@ -238,7 +258,11 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         "privacy",
         privacy.ERASURE_REJECTED_SUBJECT,
         privacy.ERASURE_REJECTED_BODY,
-        {"reason": "Ablehnungsgrund", "requestId": "ID des Löschantrags"},
+        {
+            "link": "Link zum Antrag (ohne den Platzhalter hängt die Mail ihn an)",
+            "reason": "Ablehnungsgrund",
+            "requestId": "ID des Löschantrags",
+        },
     ),
 )
 

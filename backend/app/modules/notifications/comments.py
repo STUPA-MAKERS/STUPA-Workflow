@@ -31,6 +31,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.applications.models import Application
 from app.modules.applications.service.service_base import gremium_actor_name
 from app.modules.flow.models import State
+from app.modules.notifications.layout import append_link_text
+from app.modules.notifications.links import application_link
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.recipients import actionable_principal_emails
@@ -172,12 +174,13 @@ async def send_comment_notifications(
                 Application.data,
                 Application.current_state_id,
                 Application.gremium_id,
+                Application.created_by,
             ).where(Application.id == application_id)
         )
     ).first()
     if app_row is None:
         return 0
-    data, state_id, gremium_id = app_row
+    data, state_id, gremium_id, created_by = app_row
     # Applicants never see an internal comment, so send no mail. The check comes
     # before every other read, because it makes them all pointless.
     if author_kind == "principal" and visibility != "public":
@@ -215,7 +218,15 @@ async def send_comment_notifications(
     if not author_label:
         author_label = fallback.get(lang, fallback["de"])
 
+    # The applicant opens their own view: a guest (no account) the public applicant
+    # page, an account the application. The team opens the application.
+    link = application_link(
+        settings,
+        application_id,
+        guest=author_kind == "principal" and created_by is None,
+    )
     context = {
+        "link": link.url,
         "applicationId": str(application_id),
         "applicationTitle": title.strip() if isinstance(title, str) else "",
         "status": status_label,
@@ -256,6 +267,7 @@ async def send_comment_notifications(
             lang=lang,
             idempotency_parts=idem,
             reason="comment",
+            link=link,
         )
         return int(ok)
     try:
@@ -273,8 +285,8 @@ async def send_comment_notifications(
     msg = MailMessage(
         to=tuple(recipients),
         subject=rendered.subject,
-        text=rendered.text,
-        html=service._layout_html(rendered, "comment"),  # noqa: SLF001
+        text=append_link_text(rendered.text, link.url, link.label(rendered.lang)),
+        html=service._layout_html(rendered, "comment", link),  # noqa: SLF001
         idempotency_key=compute_idempotency_key(*idem),
     )
     return int(await service._enqueue(msg))  # noqa: SLF001
