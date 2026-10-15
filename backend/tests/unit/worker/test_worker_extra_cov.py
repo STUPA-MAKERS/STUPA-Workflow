@@ -431,6 +431,7 @@ async def test_main_on_startup_calls_all_inits(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(wmain, "webhook_on_startup", await _mk("webhook"))
     monkeypatch.setattr(wmain, "deadlines_on_startup", await _mk("deadlines"))
     monkeypatch.setattr(wmain, "backup_on_startup", await _mk("backup"))
+    monkeypatch.setattr(wmain, "cd_builtin_on_startup", await _mk("cd_builtin"))
     sentinel = object()
     built: list[tuple[Any, ...]] = []
 
@@ -441,7 +442,7 @@ async def test_main_on_startup_calls_all_inits(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(wmain, "build_worker_dispatcher", _build)
     ctx: dict[str, Any] = {"redis": "pool", "settings": "cfg"}
     await wmain._on_startup(ctx)
-    assert called == ["mail", "scan", "protocol", "webhook", "deadlines", "backup"]
+    assert called == ["mail", "scan", "protocol", "webhook", "deadlines", "backup", "cd_builtin"]
     # F2: the worker builds the full flow dispatcher once, over the arq pool.
     assert ctx["flow_dispatcher"] is sentinel
     assert built and built[0][0] == "pool" and built[0][2] == "cfg"
