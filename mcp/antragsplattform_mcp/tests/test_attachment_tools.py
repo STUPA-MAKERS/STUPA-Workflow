@@ -15,6 +15,7 @@ import asyncio
 from email.parser import BytesParser
 from email.policy import default as email_default
 from pathlib import Path
+from urllib.parse import quote
 from typing import Any
 
 import httpx
@@ -364,6 +365,23 @@ def test_download_rejects_a_path_in_the_id(
         ('attachment; filename=".."', ""),
         ("attachment", ""),
         ("", ""),
+        # A `filename*=` inside the quoted fallback is part of the fallback.
+        (
+            "attachment; filename=\"a filename*=UTF-8''.bashrc x.pdf\"; "
+            "filename*=UTF-8''a%20filename%2A%3DUTF-8%27%27.bashrc%20x.pdf",
+            "a filename*=UTF-8''.bashrc x.pdf",
+        ),
+        (
+            "attachment; filename=\"x filename*=UTF-8''evil.sh y.pdf\"",
+            "x filename*=UTF-8''evil.sh y.pdf",
+        ),
+        ('attachment; filename="a\\"b.pdf"', 'a"b.pdf'),
+        ("attachment; FILENAME*=utf8''%C3%A4.pdf", "ä.pdf"),
+        ("attachment; filename=plain.pdf", "plain.pdf"),
+        # RFC 5987 names only UTF-8 and ISO-8859-1.
+        ("attachment; filename=\"d.pdf\"; filename*=utf-16''%FF%FEa%00", "d.pdf"),
+        ("attachment; filename=\"e.pdf\"; filename*=rot13''r.cqs", "e.pdf"),
+        ("attachment; filename=\"f.pdf\"; filename*=noquotes.pdf", "f.pdf"),
     ],
 )
 def test_disposition_filename(header: str, expected: str) -> None:
@@ -401,3 +419,24 @@ def test_download_with_a_nul_in_the_name_uses_the_id(
     _client(monkeypatch, _Wire(_download_ext(PDF, header)))
     out = asyncio.run(meetings.download_attachment(ATT_ID, str(tmp_path)))
     assert out["filename"] == f"attachment-{ATT_ID}"
+
+
+def test_disposition_filename_fits_name_max() -> None:
+    name = "会" * 200 + ".pdf"
+    header = "attachment; filename*=UTF-8''" + quote(name)
+    out = meetings._disposition_filename(header)
+    assert out.endswith("会.pdf")
+    assert len(out.encode()) <= 255
+    assert len(meetings._fit_name_max("会" * 200).encode()) <= 255
+    long_ext = "a." + "会" * 100
+    assert len(meetings._fit_name_max(long_ext).encode()) <= 255
+
+
+def test_download_into_a_directory_with_a_long_utf8_name(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    header = "attachment; filename*=UTF-8''" + quote("会" * 200 + ".pdf")
+    _client(monkeypatch, _Wire(_download_ext(PDF, header)))
+    out = asyncio.run(meetings.download_attachment(ATT_ID, str(tmp_path)))
+    assert out["filename"].endswith(".pdf")
+    assert (tmp_path / out["filename"]).read_bytes() == PDF
