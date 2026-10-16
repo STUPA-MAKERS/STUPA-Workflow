@@ -14,7 +14,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.modules.admin.branding import Branding
 from app.modules.admin.models import SiteConfigVersion
+from app.modules.admin.site_config_service import SiteConfigService
 from app.modules.files.models import Attachment
 from app.modules.files.service import FilesService
 from app.modules.privacy.service import PrincipalService
@@ -72,6 +74,34 @@ async def test_the_settings_save_as_a_new_active_version(
             await session.scalars(select(SiteConfigVersion).order_by(SiteConfigVersion.version))
         ).all()
     assert [(v.version, v.active) for v in versions] == [(2, False), (3, True)]
+
+
+async def test_a_stale_branding_draft_keeps_the_help_and_ticket_settings(
+    api: Api, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    api.login(ADMIN)
+    with TestClient(api.app) as client:
+        stale = client.get("/api/admin/site-config").json()["draft"]
+        assert stale["tickets"]["publicEnabled"] is True
+        saved = client.put("/api/admin/help-tickets", json=_SETTINGS)
+        assert saved.status_code == 200, saved.text
+        draft = client.put("/api/admin/site-config/draft", json={**stale, "appName": "Neu"})
+        assert draft.status_code == 200, draft.text
+        assert draft.json()["draft"]["tickets"]["publicEnabled"] is False
+        activated = client.post("/api/admin/site-config/activate")
+        assert activated.status_code == 200, activated.text
+        assert activated.json()["active"]["appName"] == "Neu"
+        assert client.get("/api/admin/help-tickets").json() == _SETTINGS
+        again = client.put("/api/admin/site-config/draft", json={**stale, "appName": "Zwei"})
+        assert again.json()["draft"]["help"]["wikiUrl"] == _SETTINGS["wikiUrl"]
+    async with maker() as session:
+        restored = await SiteConfigService(session).restore_branding(
+            Branding.model_validate({"appName": "Alt"}), "admin"
+        )
+    assert restored.active.app_name == "Alt"
+    assert restored.active.tickets.public_enabled is False
+    assert restored.active.tickets.retention_months == 3
+    assert restored.active.help.wiki_url == _SETTINGS["wikiUrl"]
 
 
 async def _closed_ticket(

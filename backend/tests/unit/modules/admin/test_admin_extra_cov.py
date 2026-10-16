@@ -396,6 +396,7 @@ async def test_put_draft_creates_new_version_above_active() -> None:
     active = _scv(5, active=True)
     db = fake_session(
         result(active),  # _latest -> active, so the service creates a new draft
+        result(active),  # _active -> the source of help and tickets
         result(),  # audit advisory lock
         result(),  # audit prev-hash
         result(active),  # get._active
@@ -417,6 +418,7 @@ async def test_put_draft_creates_new_version_above_active() -> None:
 async def test_put_draft_no_versions_creates_version_1() -> None:
     db = fake_session(
         result(),  # _latest -> None, so base is 0
+        result(),  # _active -> None, so help and tickets are the defaults
         result(),  # audit advisory lock
         result(),  # audit prev-hash
         result(),  # get._active -> None

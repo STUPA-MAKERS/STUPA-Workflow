@@ -131,9 +131,7 @@ async def active_branding(session: AsyncSession) -> Branding:
     ``tickets.publicEnabled``, the retention cron ``tickets.retentionMonths``.
     """
     row = (
-        await session.scalars(
-            select(SiteConfigVersion).where(SiteConfigVersion.active.is_(True))
-        )
+        await session.scalars(select(SiteConfigVersion).where(SiteConfigVersion.active.is_(True)))
     ).first()
     return _branding(row)
 
@@ -178,8 +176,18 @@ class SiteConfigService:
         )
 
     async def put_draft(self, branding: Branding, actor: str) -> SiteConfigOut:
+        """Save the branding as the open draft.
+
+        ``help`` and ``tickets`` in the payload are ignored: the draft keeps the
+        values of the open draft, or of the active version without one. The
+        "Hilfe & Tickets" page is the only writer of these two sections, because an
+        editor that loaded the branding earlier sends stale values back, and an
+        activation of them would switch anonymous reports on again unnoticed.
+        """
         latest = await self._latest()
-        payload = branding.model_dump(by_alias=True)
+        current = latest if latest is not None and not latest.active else None
+        source = _branding(current) if current is not None else _branding(await self._active())
+        payload = _with_help_tickets_of(branding, source)
         if latest is not None and not latest.active:
             # The latest version is an open draft. Update it in place.
             latest.branding = payload
@@ -208,9 +216,7 @@ class SiteConfigService:
         if latest is None or latest.active:
             raise ConflictError("no pending site-config draft to activate")
         await self.session.execute(
-            update(SiteConfigVersion)
-            .where(SiteConfigVersion.active.is_(True))
-            .values(active=False)
+            update(SiteConfigVersion).where(SiteConfigVersion.active.is_(True)).values(active=False)
         )
         latest.active = True
         await ConfigRevisionService(self.session).record(
@@ -236,18 +242,18 @@ class SiteConfigService:
 
         The method creates a new active ``SiteConfigVersion`` from the snapshot
         and deactivates the rest. It writes a ``config_revision`` entry plus the
-        linked audit entry. Earlier versions stay.
+        linked audit entry. Earlier versions stay. ``help`` and ``tickets`` keep
+        the values of the active version, because the "Hilfe & Tickets" page is
+        their only writer: a restore of an older snapshot would otherwise bring
+        back its ticket settings, or the defaults (``publicEnabled=true``) for a
+        snapshot without them. An open draft is not touched.
         """
         latest = await self._latest()
         base = latest.version if latest is not None else 0
-        payload = branding.model_dump(by_alias=True)
-        row = SiteConfigVersion(
-            version=base + 1, active=True, branding=payload, created_by=actor
-        )
+        payload = _with_help_tickets_of(branding, _branding(await self._active()))
+        row = SiteConfigVersion(version=base + 1, active=True, branding=payload, created_by=actor)
         await self.session.execute(
-            update(SiteConfigVersion)
-            .where(SiteConfigVersion.active.is_(True))
-            .values(active=False)
+            update(SiteConfigVersion).where(SiteConfigVersion.active.is_(True)).values(active=False)
         )
         self.session.add(row)
         await self.session.flush()
@@ -319,13 +325,9 @@ class SiteConfigService:
         snapshot = branding.model_dump(by_alias=True)
         base = latest.version if latest is not None else 0
         await self.session.execute(
-            update(SiteConfigVersion)
-            .where(SiteConfigVersion.active.is_(True))
-            .values(active=False)
+            update(SiteConfigVersion).where(SiteConfigVersion.active.is_(True)).values(active=False)
         )
-        row = SiteConfigVersion(
-            version=base + 1, active=True, branding=snapshot, created_by=actor
-        )
+        row = SiteConfigVersion(version=base + 1, active=True, branding=snapshot, created_by=actor)
         self.session.add(row)
         await self.session.flush()
         if draft is not None:
@@ -358,6 +360,13 @@ class SiteConfigService:
             "short_name": branding.app_short_name.strip() or DEFAULT_APP_SHORT_NAME,
             **_MANIFEST_BASE,
         }
+
+
+def _with_help_tickets_of(branding: Branding, source: Branding) -> dict:
+    """Dump ``branding`` with ``help`` and ``tickets`` taken from ``source``."""
+    return branding.model_copy(update={"help": source.help, "tickets": source.tickets}).model_dump(
+        by_alias=True
+    )
 
 
 def _help_tickets_of(branding: Branding) -> HelpTicketsSettings:
