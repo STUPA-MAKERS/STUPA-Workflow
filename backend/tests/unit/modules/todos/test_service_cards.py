@@ -93,6 +93,9 @@ async def test_card_404s() -> None:
         await service.card(orphan.id, USER)
     with pytest.raises(NotFoundError):
         await service.patch(uuid.uuid4(), CardPatch(version=1), USER)
+    session.scalar_q.append(None)
+    with pytest.raises(NotFoundError):
+        await service.patch(orphan.id, CardPatch(version=1), USER)
     no_account = _svc(ScriptedSession(), me=None)
     with pytest.raises(NotFoundError):
         await no_account.archive_card(orphan.id, USER)
@@ -248,6 +251,9 @@ async def test_patch_changes_title_description_and_due_date() -> None:
     assert await service.patch(c.id, payload, USER) is OUT
     assert (c.title, c.description_md, c.due_date) == ("Neu", "d", date(2026, 11, 1))
     assert c.version == 2 and b.updated_at != stamp
+    board_lock, card_lock = (str(st) for st in session.statements[:2])
+    assert "FROM todo_board" in board_lock and "FOR UPDATE" in board_lock
+    assert "FROM todo_card" in card_lock and "FOR UPDATE" in card_lock
     renamed, due = _events(session)
     assert renamed.payload == {"from": "Alt", "to": "Neu"}
     assert due.payload == {"from": None, "to": "2026-11-01"}

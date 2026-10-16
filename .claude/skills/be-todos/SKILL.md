@@ -75,6 +75,9 @@ included), `GET /link-targets`, `GET /linked?kind&targetId`, `POST /cards`, `GET
   and `complete` read the card again after the lock (`refresh`); a move writes one row unless two
   ranks collide (`RankError` → `spread` over the column). Every write bumps
   `todo_board.updated_at`, so the ETag changes.
+- Lock order is board, then card, everywhere: `patch` (`_card(lock=True)`) locks the board
+  before the card, and the archive cron locks the boards of the due cards (by id) before
+  the cards. The other order deadlocks with a move (`test_todos_locks.py`).
 - A write that changes a card sets `card.updated_at` itself. The column has
   `onupdate=now()`: without the explicit value SQLAlchemy expires the attribute and the
   response after the commit loads it outside the greenlet (`MissingGreenlet`).

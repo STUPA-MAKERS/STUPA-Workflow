@@ -191,7 +191,16 @@ class TodoService:
     async def _card(
         self, card_id: uuid.UUID, principal: Principal, *, lock: bool = False
     ) -> tuple[TodoCard, TodoBoard]:
+        """Load a card and its board; ``lock`` locks the board first, then the card.
+
+        Every write locks the board before a card, because a move locks the board
+        and then updates the card, and the other order deadlocks with it.
+        """
         if lock:
+            known = await self.session.get(TodoCard, card_id)
+            if known is None:
+                raise NotFoundError(f"card {card_id} not found")
+            await self._lock_board(known.board_id)
             card = await self.session.scalar(
                 select(TodoCard)
                 .where(TodoCard.id == card_id)

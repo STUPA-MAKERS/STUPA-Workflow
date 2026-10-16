@@ -4,7 +4,9 @@
 done column of its board, not archived, and its ``completed_at`` is older than the
 ``archive_after_days`` of the board. A board with ``archive_after_days`` null never
 archives. Each archived card gets the event ``archived`` without an actor (the
-system), and the board gets a new ``updated_at``, so its ETag changes.
+system), and the board gets a new ``updated_at``, so its ETag changes. The cron
+locks the boards of the due cards first (ordered by id), then the cards, because a
+move locks the board and then updates the card, and the other order deadlocks.
 
 ``process_todo_due`` runs inside the deadline cron (``worker/deadlines.py``), so every
 minute. From 07:00 Europe/Berlin on, it reminds the assignees of every open card
@@ -71,24 +73,46 @@ async def archive_done_todos(ctx: dict[str, Any], now: datetime | None = None) -
     """
     moment = now or datetime.now(UTC)
     cutoff = moment - func.make_interval(0, 0, 0, TodoBoard.archive_after_days)
+    due = (
+        TodoColumn.is_done.is_(True),
+        TodoCard.archived_at.is_(None),
+        TodoCard.completed_at.is_not(None),
+        TodoBoard.archive_after_days.is_not(None),
+        TodoCard.completed_at < cutoff,
+    )
     async with _sessionmaker(ctx)() as session:
-        rows = (
-            await session.execute(
-                select(TodoCard, TodoBoard)
-                .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
-                .join(TodoColumn, TodoColumn.id == TodoCard.column_id)
-                .where(
-                    TodoColumn.is_done.is_(True),
-                    TodoCard.archived_at.is_(None),
-                    TodoCard.completed_at.is_not(None),
-                    TodoBoard.archive_after_days.is_not(None),
-                    TodoCard.completed_at < cutoff,
-                )
-                .order_by(TodoCard.completed_at, TodoCard.id)
-                .limit(BATCH)
-                .with_for_update(of=TodoCard, skip_locked=True)
+        candidates = (
+            select(TodoCard.board_id)
+            .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
+            .join(TodoColumn, TodoColumn.id == TodoCard.column_id)
+            .where(*due)
+            .order_by(TodoCard.completed_at, TodoCard.id)
+            .limit(BATCH)
+            .subquery()
+        )
+        boards = (
+            await session.scalars(
+                select(TodoBoard.id)
+                .where(TodoBoard.id.in_(select(candidates.c.board_id)))
+                .order_by(TodoBoard.id)
+                .with_for_update()
             )
         ).all()
+        rows = (
+            (
+                await session.execute(
+                    select(TodoCard, TodoBoard)
+                    .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
+                    .join(TodoColumn, TodoColumn.id == TodoCard.column_id)
+                    .where(*due, TodoCard.board_id.in_(boards))
+                    .order_by(TodoCard.completed_at, TodoCard.id)
+                    .limit(BATCH)
+                    .with_for_update(of=TodoCard, skip_locked=True)
+                )
+            ).all()
+            if boards
+            else []
+        )
         for card, board in rows:
             card.archived_at = moment
             board.updated_at = moment

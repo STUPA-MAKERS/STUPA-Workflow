@@ -51,20 +51,23 @@ async def test_archive_archives_the_due_cards() -> None:
     b = board()
     done = column(b.id, "Erledigt", is_done=True)
     old = card(b, done, completed_at=datetime(2026, 8, 1, tzinfo=UTC))
-    session = ScriptedSession(execute=[[(old, b)]])
+    session = ScriptedSession(scalars=[[b.id]], execute=[[(old, b)]])
     assert await wt.archive_done_todos(_ctx(session), now=MORNING) == 1
     assert old.archived_at == MORNING and b.updated_at == MORNING
     (event,) = [o for o in session.added if isinstance(o, TodoEvent)]
     assert event.kind == "archived" and event.actor_id is None
     assert session.committed == 1
-    sql = str(session.statements[0])
-    assert "make_interval" in sql and "FOR UPDATE" in sql
+    boards, cards = (str(st) for st in session.statements)
+    assert boards.startswith("SELECT todo_board.id") and "FOR UPDATE" in boards
+    assert "ORDER BY todo_board.id" in boards and "make_interval" in boards
+    assert "make_interval" in cards and "todo_card.board_id IN" in cards
+    assert "FOR UPDATE" in cards
 
 
 async def test_archive_with_nothing_due() -> None:
-    session = ScriptedSession(execute=[[]])
+    session = ScriptedSession(scalars=[[]])
     assert await wt.archive_done_todos(_ctx(session)) == 0
-    assert session.committed == 0
+    assert session.committed == 0 and len(session.statements) == 1
 
 
 async def test_due_waits_for_the_morning() -> None:
