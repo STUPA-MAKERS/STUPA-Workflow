@@ -29,6 +29,7 @@ from app.modules.protocol.public import (
 )
 from app.shared.antiabuse import rate_limit_public_protocol_pdf, rate_limit_public_protocols
 from app.shared.errors import ProblemDetail
+from app.shared.filenames import content_disposition
 
 router = APIRouter(prefix="/public", tags=["public-protocols"])
 
@@ -159,5 +160,5 @@ async def get_public_protocol_pdf(protocol_id: UUID, service: ServiceDep) -> Res
     return Response(
         content=data,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{name}"'},
+        headers={"Content-Disposition": content_disposition("attachment", name)},
     )

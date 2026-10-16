@@ -12,7 +12,7 @@ of the backend (`app.modules.auth.oauth`). A token without `applications:write` 
 403 on the upload, so the scope is the gate.
 
 Only the storage and the database are fakes: the service records the upload after the
-real `validate_upload` and `sanitize_filename`, and the session stub knows no creator
+real `validate_upload` and `sanitize_display_name`, and the session stub knows no creator
 and no Gremium.
 
 The test needs the backend dependencies. The CI job `mcp` does not install them, so
@@ -55,6 +55,7 @@ from app.modules.files.models import MAX_ATTACHMENT_BYTES, Attachment  # noqa: E
 from app.modules.files.router import get_files_service  # noqa: E402
 from app.modules.files.schemas import AttachmentOut  # noqa: E402
 from app.shared.errors import UnsupportedMediaTypeError  # noqa: E402
+from app.shared.filenames import sanitize_display_name  # noqa: E402
 
 from antragsplattform_mcp.client import ApiClient, ApiError  # noqa: E402
 from antragsplattform_mcp.config import DEFAULT_SCOPE, Config  # noqa: E402
@@ -72,6 +73,7 @@ class _Service:
 
     def __init__(self) -> None:
         self.uploads: list[dict[str, Any]] = []
+        self.stored_name = "Angebot_1.pdf"
 
     async def upload(
         self,
@@ -87,7 +89,7 @@ class _Service:
             sniffed = backend_mime.validate_upload(filename, data)
         except backend_mime.MimeRejected as exc:
             raise UnsupportedMediaTypeError(str(exc)) from exc
-        safe = backend_mime.sanitize_filename(filename)
+        safe = sanitize_display_name(filename)
         self.uploads.append(
             {
                 "application_id": application_id,
@@ -128,7 +130,7 @@ class _Service:
             yield PDF[:10]
             yield PDF[10:]
 
-        return _iter(), "Angebot_1.pdf", "application/pdf", len(PDF)
+        return _iter(), self.stored_name, "application/pdf", len(PDF)
 
 
 class _Result:
@@ -207,7 +209,7 @@ def test_upload_through_the_real_router(backend: Any, service: _Service, pdf: Pa
     )
     assert out == {
         "id": str(ATT_ID),
-        "filename": backend_mime.sanitize_filename("Angebot 1.pdf"),
+        "filename": sanitize_display_name("Angebot 1.pdf"),
         "mime": "application/pdf",
         "size": len(PDF),
         "scanned": False,
@@ -260,6 +262,27 @@ def test_download_through_the_real_router(backend: Any, tmp_path: Path) -> None:
         "mime": "application/pdf",
         "size": len(PDF),
     }
+
+
+def test_download_keeps_the_unicode_name_through_the_real_router(
+    backend: Any, service: _Service, tmp_path: Path
+) -> None:
+    service.stored_name = "Einführung €.pdf"
+    out = asyncio.run(meetings.download_attachment(str(ATT_ID), str(tmp_path)))
+    target = tmp_path / "Einführung €.pdf"
+    assert target.read_bytes() == PDF
+    assert out["filename"] == "Einführung €.pdf"
+    assert out["path"] == str(target.resolve())
+
+
+def test_upload_keeps_the_unicode_name_through_the_real_router(
+    backend: Any, service: _Service, tmp_path: Path
+) -> None:
+    p = tmp_path / "Einführung €.pdf"
+    p.write_bytes(PDF)
+    out = asyncio.run(meetings.upload_attachment(str(APP_ID), str(p)))
+    assert out["filename"] == "Einführung €.pdf"
+    assert service.uploads[0]["filename"] == "Einführung €.pdf"
 
 
 def test_allowlist_matches_the_backend() -> None:

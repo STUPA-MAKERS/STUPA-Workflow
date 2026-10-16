@@ -275,8 +275,10 @@ def test_logo_download_is_always_an_attachment(app: FastAPI, client: TestClient)
     assert response.status_code == 200
     assert response.content == SVG
     assert response.headers["content-type"] == "application/octet-stream"
-    # The quote and the newline of the stored name are stripped from the header.
-    assert response.headers["content-disposition"] == 'attachment; filename="wappen.svg"'
+    # The newline is gone; the quote stays only in the percent-encoded exact name.
+    assert response.headers["content-disposition"] == (
+        "attachment; filename=\"wap_pen.svg\"; filename*=UTF-8''wap%22pen.svg"
+    )
 
 
 def test_options_list_open_to_the_gremien_page(app: FastAPI, client: TestClient) -> None:

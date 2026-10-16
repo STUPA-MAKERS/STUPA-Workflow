@@ -103,27 +103,6 @@ def file_extension(filename: str | None) -> str:
     return os.path.splitext(filename)[1].lower()
 
 
-_FILENAME_SAFE = frozenset(
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._- "
-)
-_FILENAME_MAX = 200
-
-
-def sanitize_filename(filename: str | None) -> str:
-    """Harden a filename: drop the path components and replace special characters.
-
-    This protects the ``storage_key`` against ``../`` traversal, NUL bytes and slashes.
-    It also protects the stored display name. Every character outside the safe set
-    becomes an underscore. The function caps the length. If nothing usable remains, it
-    returns ``upload``.
-    """
-    raw = (filename or "").replace("\\", "/")
-    base = os.path.basename(raw).strip()
-    cleaned = "".join(c if c in _FILENAME_SAFE else "_" for c in base).strip(" .")
-    cleaned = cleaned[:_FILENAME_MAX]
-    return cleaned or "upload"
-
-
 def _is_ooxml_container(data: bytes, ext: str) -> bool:
     """Tell whether ``data`` is a real OOXML package for ``ext``.
 

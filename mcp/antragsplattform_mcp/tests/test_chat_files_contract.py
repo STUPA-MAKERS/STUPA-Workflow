@@ -88,6 +88,7 @@ from app.shared.errors import (  # noqa: E402
     UnsupportedMediaTypeError,
     ValidationProblem,
 )
+from app.shared.filenames import sanitize_display_name  # noqa: E402
 from app.shared.people import PersonRef  # noqa: E402
 
 from antragsplattform_mcp.client import ApiClient, ApiError  # noqa: E402
@@ -146,7 +147,7 @@ class _Drafts:
             token = f"dt_{len(self.tokens)}"
             self.tokens.add(token)
         att_id = uuid4()
-        safe = backend_mime.sanitize_filename(filename)
+        safe = sanitize_display_name(filename)
         self.rows[att_id] = {
             "token": token,
             "filename": safe,
@@ -451,7 +452,7 @@ def test_ticket_note_with_files(
 ) -> None:
     out = asyncio.run(tickets.tickets_note(str(TICKET_ID), "", [str(p) for p in files]))
     assert [a["filename"] for a in out["attachments"]] == [
-        backend_mime.sanitize_filename("Angebot 1.pdf"),
+        sanitize_display_name("Angebot 1.pdf"),
         "Foto.png",
     ]
     assert [a["mime"] for a in out["attachments"]] == ["application/pdf", "image/png"]

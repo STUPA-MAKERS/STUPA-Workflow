@@ -432,6 +432,20 @@ async def test_upload_logo_accepts_svg_and_pdf(data: bytes, mime: str) -> None:
     assert sess.committed == 1
 
 
+async def test_upload_logo_keeps_the_unicode_name_and_an_ascii_key() -> None:
+    row = variant_row()
+    storage = FakeStorage()
+    s, _ = svc([*audit_results()], gets=[row], storage=storage)
+    out = await s.upload_logo(
+        row.id, SVG, slot="title", filename="../Fachschaft Ökologie.svg", actor="a"
+    )
+    assert out.file_name == "Fachschaft Ökologie.svg"
+    (key,) = storage.put_calls
+    assert key.startswith(CD_LOGO_PREFIX)
+    assert key.endswith("/Fachschaft Okologie.svg")
+    assert key.isascii()
+
+
 async def test_upload_logo_rejects_a_mismatched_magic_byte() -> None:
     """The bytes decide, never the file name. `evil.png` that is HTML is refused."""
     row = variant_row()

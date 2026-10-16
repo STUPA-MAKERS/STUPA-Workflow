@@ -11,10 +11,12 @@ cast a ballot. Voting is human-only.
 
 from __future__ import annotations
 
+import codecs
 import os
 import re
 import tempfile
 from pathlib import Path
+from urllib.parse import unquote
 from typing import Literal
 
 from mcp.server.fastmcp import FastMCP
@@ -635,7 +637,84 @@ ATTACHMENT_TYPES: dict[str, str] = {
 ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
 
 _DOWNLOAD_CHUNK = 64 * 1024
-_DISPOSITION_NAME = re.compile(r'filename="([^"]*)"')
+_DISPOSITION_PARAM = re.compile(
+    r';\s*([!#$%&\'*+.^_`|~0-9A-Za-z-]+)\s*=\s*("(?:[^"\\]|\\.)*"|[^;]*)'
+)
+_DISPOSITION_EXT_VALUE = re.compile(r"([A-Za-z0-9!#$%&+^_`{}~-]+)'[^']*'(.*)", re.DOTALL)
+_DISPOSITION_CHARSETS = frozenset({"utf-8", "iso8859-1"})
+_NAME_MAX_BYTES = 255
+"""The longest file name in bytes on Linux, macOS and Windows file systems (NAME_MAX)."""
+
+
+def _disposition_params(header: str) -> dict[str, str]:
+    """Split the parameters of a `Content-Disposition` header into a dict.
+
+    A quoted value is read as one token, so a `filename*=` or a `;` inside the quoted
+    `filename` fallback is part of that value and never a parameter of its own. The
+    file name of an upload reaches the fallback, so a search over the raw header would
+    let an uploader pick the name that the tool saves the file under. The first
+    occurrence of a parameter wins.
+    """
+    params: dict[str, str] = {}
+    for match in _DISPOSITION_PARAM.finditer(header):
+        value = match.group(2).strip()
+        if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
+            value = re.sub(r"\\(.)", r"\1", value[1:-1])
+        params.setdefault(match.group(1).lower(), value)
+    return params
+
+
+def _decode_ext_value(value: str) -> str:
+    """Decode an RFC 5987 `charset'lang'value`, or return `""`.
+
+    Only UTF-8 and ISO-8859-1 are accepted, the two charsets that RFC 5987 names.
+    """
+    match = _DISPOSITION_EXT_VALUE.fullmatch(value)
+    if match is None:
+        return ""
+    try:
+        charset = codecs.lookup(match.group(1)).name
+    except LookupError:
+        return ""
+    if charset not in _DISPOSITION_CHARSETS:
+        return ""
+    try:
+        return unquote(match.group(2), encoding=charset, errors="strict")
+    except UnicodeDecodeError:
+        return ""
+
+
+def _fit_name_max(name: str) -> str:
+    """Shorten a name to `_NAME_MAX_BYTES` in UTF-8 and keep a short extension.
+
+    The server allows 200 characters, which can be 800 bytes in UTF-8. A longer name
+    makes the final rename fail with `ENAMETOOLONG`.
+    """
+    if len(name.encode()) <= _NAME_MAX_BYTES:
+        return name
+    stem, ext = os.path.splitext(name)
+    if len(ext.encode()) > 32:
+        stem, ext = name, ""
+    while stem and len((stem + ext).encode()) > _NAME_MAX_BYTES:
+        stem = stem[:-1]
+    return stem + ext if stem else ""
+
+
+def _disposition_filename(header: str) -> str:
+    """Read the file name from a `Content-Disposition` header, without path parts.
+
+    The server sends an ASCII `filename` fallback and the exact name as
+    `filename*=UTF-8''<percent-encoded>` (RFC 6266, RFC 5987). The extended form wins,
+    so `Einführung €.pdf` keeps its umlaut and its euro sign. A value that does not
+    decode falls back to the plain `filename`. The result is the last path component
+    only, at most 255 bytes in UTF-8, or `""` when there is none.
+    """
+    params = _disposition_params(header)
+    name = _decode_ext_value(params.get("filename*", ""))
+    if not name:
+        name = params.get("filename", "")
+    name = Path(name.replace("\\", "/")).name
+    return "" if name in {".", ".."} else _fit_name_max(name)
 
 
 def _attachment_part(
@@ -755,9 +834,8 @@ async def download_attachment(
         if target.exists() and not overwrite:
             raise ApiError(400, f"file exists (pass overwrite=true): {target_path!r}")
     async with api().stream("GET", f"/attachments/{attachment_id}/download") as resp:
-        match = _DISPOSITION_NAME.search(resp.headers.get("content-disposition", ""))
-        stored = Path(match.group(1)).name if match else ""
-        if stored in {"", ".", ".."}:
+        stored = _disposition_filename(resp.headers.get("content-disposition", ""))
+        if not stored or "\x00" in stored:
             stored = f"attachment-{attachment_id}"
         final = target / stored if target.is_dir() else target
         if final.exists() and not overwrite:

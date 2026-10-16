@@ -46,7 +46,6 @@ from app.modules.admin.schemas import (
 )
 from app.modules.admin.service.service_base import ConfigServiceBase
 from app.modules.audit.actions import AuditAction
-from app.modules.files.mime import sanitize_filename
 from app.modules.files.storage import StorageError
 from app.shared.errors import (
     ConflictError,
@@ -56,6 +55,7 @@ from app.shared.errors import (
     UnsupportedMediaTypeError,
     ValidationProblem,
 )
+from app.shared.filenames import sanitize_display_name, sanitize_storage_name
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -290,8 +290,8 @@ class CdVariantService(ConfigServiceBase):
         mime = check_square_logo(data) if slot == "square" else _check_render_logo(data)
         if self.storage is None:
             raise ServiceUnavailableError("Object storage unavailable.")
-        safe_name = sanitize_filename(filename)
-        object_key = f"{CD_LOGO_PREFIX}{uuid.uuid4().hex}/{safe_name}"
+        display_name = sanitize_display_name(filename)
+        object_key = f"{CD_LOGO_PREFIX}{uuid.uuid4().hex}/{sanitize_storage_name(display_name)}"
         try:
             await self.storage.put(object_key, data, mime)
         except StorageError as exc:
@@ -307,7 +307,7 @@ class CdVariantService(ConfigServiceBase):
             slot=slot,
             position=position,
             object_key=object_key,
-            file_name=safe_name,
+            file_name=display_name,
             mime=mime,
             size=len(data),
         )

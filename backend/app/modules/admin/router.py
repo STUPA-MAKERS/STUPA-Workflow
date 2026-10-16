@@ -115,6 +115,7 @@ from app.modules.notifications.auto import AutoMailer, get_auto_mailer
 from app.shared.antiabuse import body_cap
 from app.shared.config_schemas import FlowGraph, export_json_schemas
 from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail
+from app.shared.filenames import content_disposition
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 public_router = APIRouter(tags=["admin"])
@@ -604,11 +605,10 @@ async def get_cd_variant_logo_file(logo_id: UUID, service: CdVariantServiceDep) 
     attachment``, the same rule as ``get_invoice_file`` in the budget module.
     """
     data, name = await service.logo_file_bytes(logo_id)
-    safe = "".join(c for c in name if c.isprintable() and c not in '"\\\r\n')
     return Response(
         content=data,
         media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{safe}"'},
+        headers={"Content-Disposition": content_disposition("attachment", name)},
     )
 
 
