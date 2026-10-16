@@ -2,8 +2,11 @@
 
 A board is readable for its members: a gremium board for the active members whose
 gremium role holds `todo.write` (or an admin), the personal board for its owner only, a
-team board for the holders of its permission. An unreadable board or card is 404. The
-token needs the scope `todos:write`.
+team board for the holders of its permission. The global `todo.all` reads and writes,
+`todo.read_all` only reads every gremium and team board (never a personal one). An
+unreadable board or card is 404; a card write on a board that is only readable is 403
+`todo_write_required`. The token reads with the scope `read` (`todo.read_all`) or
+`todos:write` and writes with `todos:write`.
 """
 
 from __future__ import annotations
@@ -52,9 +55,24 @@ async def todo_my_cards() -> list:
     board `labels` and only my `cards`. The personal board is left out; read it with
     `todo_board`. A board that the caller can no longer read is left out, also when
     a card of it still names the caller. Move a card with `todo_card_move` on its own
-    board only.
+    board, and with `todo_card_transfer` to another board.
     """
     return await api().get("/todos/mine/boards")
+
+
+@group.tool
+async def todo_all_boards() -> list:
+    """List every board that the caller can read, with all its live cards.
+
+    The meta-board "Alle": the personal board first (the call creates it), then the
+    gremium boards by name, then the team boards. Each entry has `id`, `name`, `kind`,
+    `gremiumId`, `canWrite` (false on a board that the caller only reads), all
+    `columns` in their order (`cardCount` counts the live cards there), the board
+    `labels` and every live `card`, done ones too; archived cards are left out. Move a
+    card with `todo_card_move` on its own board, and with `todo_card_transfer` to
+    another board.
+    """
+    return await api().get("/todos/all/boards")
 
 
 @group.tool
@@ -114,6 +132,45 @@ async def todo_card_move(
     return await api().post(
         f"/todos/cards/{card_id}/move",
         json=params(columnId=column_id, beforeId=before_id, afterId=after_id),
+    )
+
+
+@group.tool
+async def todo_card_transfer(
+    card_id: str,
+    board_id: str,
+    column_id: str | None = None,
+    before_id: str | None = None,
+    after_id: str | None = None,
+) -> dict:
+    """Move a card into a column of another board, by default to its end.
+
+    Labels are per board: a label stays when the target board has a label with the
+    same name (case-insensitive), else it is dropped. No label is created on the
+    target. Assignees who are not members of the target board are dropped, without a
+    mail. Links, comments, the checklist and the history stay with the card. The
+    done column of the target marks the card done; another column reopens it.
+    A card of the caller's own personal board without assignees gets the caller as
+    assignee when the caller is a member of the target board. A card of a shared
+    board (gremium or team) never moves into a personal board.
+    Errors: 404 for a card or target board that the caller cannot read, 403
+    `todo_write_required` (a board that the caller reads but cannot write) or
+    `transfer_to_personal` (a shared board into a personal board), 422
+    `transfer_same_board` (use `todo_card_move`), `column_not_on_board` or
+    `rank_neighbors_invalid` (a neighbor outside the target column), 409
+    `card_archived` or `card_moved` (read the card again).
+
+    Args:
+        board_id: The target board.
+        column_id: A column of the target board (default: its first column).
+        before_id: The card below the new place, in the target column.
+        after_id: The card above the new place, in the target column.
+    """
+    return await api().post(
+        f"/todos/cards/{card_id}/transfer",
+        json=params(
+            boardId=board_id, columnId=column_id, beforeId=before_id, afterId=after_id
+        ),
     )
 
 

@@ -203,12 +203,14 @@ class TodoMine(_Out):
 
 
 class TodoAssignedBoard(_Out):
-    """A board of ``GET /todos/mine/boards``: its columns and the caller's cards on it.
+    """A board of ``GET /todos/mine/boards`` or ``GET /todos/all/boards``.
 
     ``columns`` are all columns of the board in their order; ``cardCount`` counts the
-    caller's live cards in each. ``cards`` holds only the live cards assigned to the
-    caller, done ones included, in board order. ``labels`` are the labels of the board.
-    ``canWrite`` has the value of the board read: a reader of a board writes on it.
+    live cards of ``cards`` in each. ``cards`` holds the live cards in board order, done
+    ones included: under ``mine`` only the ones assigned to the caller, under ``all``
+    every one. ``labels`` are the labels of the board.
+    ``canWrite`` is the write right of the board (``BoardAccess.can_write``): false for
+    a board that the caller only reads (``todo.read_all``).
     """
 
     id: UUID
@@ -295,6 +297,15 @@ class CardPatch(_In):
 
 class CardMove(_In):
     column_id: UUID = Field(alias="columnId")
+    before_id: UUID | None = Field(default=None, alias="beforeId")
+    after_id: UUID | None = Field(default=None, alias="afterId")
+
+
+class CardTransfer(_In):
+    """The target of a transfer; ``beforeId``/``afterId`` as in ``CardMove`` (default: the end)."""
+
+    board_id: UUID = Field(alias="boardId")
+    column_id: UUID | None = Field(default=None, alias="columnId")
     before_id: UUID | None = Field(default=None, alias="beforeId")
     after_id: UUID | None = Field(default=None, alias="afterId")
 

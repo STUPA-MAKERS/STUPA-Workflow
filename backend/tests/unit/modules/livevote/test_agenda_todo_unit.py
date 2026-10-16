@@ -19,12 +19,14 @@ from app.modules.livevote.agenda_service import AgendaService
 from app.modules.livevote.models import MeetingAgendaItem
 from app.modules.livevote.router import get_agenda_service, get_meeting_service
 from app.modules.livevote.schemas import AgendaAddBody, MeetingOut
+from app.modules.todos.live import BoardPings
 from app.shared.errors import ConflictError
 from tests.unit.modules.todos.fakes import ScriptedSession
 
 MEETING = uuid.uuid4()
 GREMIUM = uuid.uuid4()
 CARD = uuid.uuid4()
+BOARD = uuid.uuid4()
 
 
 def test_the_body_takes_exactly_one_source() -> None:
@@ -113,6 +115,7 @@ def test_the_route_adds_a_todo_item(monkeypatch: pytest.MonkeyPatch) -> None:
     class _Todos:
         def __init__(self, s: Any) -> None:
             assert s is session
+            self.pings = BoardPings()
 
         async def card_for_agenda(self, card_id: uuid.UUID, gremium_id: uuid.UUID, _p: Any) -> Any:
             calls.append(("check", card_id, gremium_id))
@@ -120,9 +123,19 @@ def test_the_route_adds_a_todo_item(monkeypatch: pytest.MonkeyPatch) -> None:
 
         async def link_agenda_item(self, card: Any, item_id: uuid.UUID, _p: Any) -> None:
             calls.append(("link", card.id, item_id))
+            self.pings.touch(BOARD, card.id)
+
+    class _Broker:
+        def __init__(self) -> None:
+            self.sent: list[tuple[str, dict[str, object]]] = []
+
+        async def publish(self, channel: str, message: dict[str, object]) -> None:
+            self.sent.append((channel, message))
 
     monkeypatch.setattr(router_mod, "TodoService", _Todos)
     app = create_app()
+    broker = _Broker()
+    app.state.broker = broker
     app.dependency_overrides[get_meeting_service] = lambda: _Meetings()
     app.dependency_overrides[get_agenda_service] = lambda: _Agenda()
     app.dependency_overrides[get_current_principal] = lambda: Principal(sub="p")
@@ -134,3 +147,6 @@ def test_the_route_adds_a_todo_item(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls[1][2] == {"todo_id": CARD, "title": "Plakat", "non_public": True, "actor": "p"}
     assert calls[2][0] == "link"
     assert session.committed == 1
+    # The card got a link: its board pings it after the commit.
+    ping = {"type": "card", "boardId": str(BOARD), "cardId": str(CARD)}
+    assert broker.sent == [(f"todo-board:{BOARD}", ping)]

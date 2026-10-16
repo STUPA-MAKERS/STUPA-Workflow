@@ -1,6 +1,5 @@
 /* The frame has no top bar any more, except the public one, which scrolls away with the
-   page. Pages that offset sticky panels by the header height get 0 here. The loading
-   overlay reads it too; the rules near the end keep it off the rail and the phone bar. */
+   page. Pages that offset sticky panels by the header height get 0 here. */
 :host {
   --layout-header-height: 0px;
   --rail-width: 96px;
@@ -116,11 +115,6 @@
 .frame--bare .main {
   --main-pad-top: 0px;
   --main-pad-bottom: 0px;
-}
-
-/* The loading bar runs along the top edge of the page, not over the rail. */
-.frame--rail ~ app-load-bar {
-  --lb-start: var(--rail-width);
 }
 
 /* Toasts sit above the phone bar instead of on it. */

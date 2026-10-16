@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, Subject } from 'rxjs';
 import { LOCATION } from '../browser/location.token';
-import type { ClientMessage, MeetingStateMsg, ServerMessage } from './ws-messages';
+import type { ClientMessage, MeetingStateMsg, ServerMessage, TodoServerMessage, TodoSubscribeMsg } from './ws-messages';
 
 /** An open live-vote connection. */
 export interface MeetingChannel {
@@ -9,6 +9,14 @@ export interface MeetingChannel {
   messages$: Observable<ServerMessage>;
   /** Send a client to server frame, that is `cast` or `subscribe`. */
   send(msg: ClientMessage): void;
+  close(): void;
+}
+
+/** The open channel of the to-do boards. */
+export interface TodoChannel {
+  /** The frames of the server; the last one is `closed` with the close code, then it completes. */
+  messages$: Observable<TodoServerMessage>;
+  send(msg: TodoSubscribeMsg): void;
   close(): void;
 }
 
@@ -40,6 +48,40 @@ export class WsService {
    */
   connectGuest(code: string): MeetingChannel {
     return this.open(`/api/public/meetings/${encodeURIComponent(code)}/ws`);
+  }
+
+  /**
+   * Open the channel of the to-do boards, `/api/ws/todos`. The session cookie authenticates
+   * it. Unlike the meeting channel it reports the close code (`closed`), so the caller can
+   * tell a refused socket (4401, 4403) from a dropped one.
+   */
+  connectTodos(): TodoChannel {
+    const ws = new WebSocket(this.url('/api/ws/todos'));
+    const subject = new Subject<TodoServerMessage>();
+    const outbox: string[] = [];
+    ws.addEventListener('open', () => {
+      while (outbox.length > 0) ws.send(outbox.shift() as string);
+    });
+    ws.addEventListener('message', (ev: MessageEvent<string>) => {
+      try {
+        subject.next(JSON.parse(ev.data) as TodoServerMessage);
+      } catch {
+        subject.next({ type: 'error', code: 'malformed_message' });
+      }
+    });
+    ws.addEventListener('close', (ev: CloseEvent) => {
+      subject.next({ type: 'closed', code: ev.code ?? 1006 });
+      subject.complete();
+    });
+    return {
+      messages$: subject.asObservable(),
+      send: (msg) => {
+        const data = JSON.stringify(msg);
+        if (ws.readyState === WebSocket.OPEN) ws.send(data);
+        else if (ws.readyState === WebSocket.CONNECTING) outbox.push(data);
+      },
+      close: () => ws.close(),
+    };
   }
 
   private open(path: string): MeetingChannel {

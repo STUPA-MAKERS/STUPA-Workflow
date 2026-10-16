@@ -105,3 +105,45 @@ async def test_redis_broker_subscribe_decodes_and_skips_non_messages() -> None:
     assert msg == {"type": "vote_tally", "counts": {"yes": 1}}
     assert client._pubsub.subscribed == ["meeting:7"]
     assert client._pubsub.closed is True
+
+
+@pytest.mark.asyncio
+async def test_inmemory_pattern_gets_every_matching_channel() -> None:
+    hub = _Hub()
+    broker = InMemoryBroker(hub)
+    async with broker.subscribe_pattern("todo-board:*") as sub:
+        await broker.publish("meeting:1", {"type": "x"})
+        await broker.publish("todo-board:b1", {"type": "card", "boardId": "b1"})
+        assert await asyncio.wait_for(_first(sub), timeout=1) == {"type": "card", "boardId": "b1"}
+    assert hub._patterns == {}
+
+
+class _FakePatternPubSub(_FakePubSub):
+    def __init__(self, messages: list[dict[str, object]]) -> None:
+        super().__init__(messages)
+        self.patterns: list[str] = []
+        self.unsubscribed: list[str] = []
+
+    async def psubscribe(self, pattern: str) -> None:
+        self.patterns.append(pattern)
+
+    async def punsubscribe(self, pattern: str) -> None:
+        self.unsubscribed.append(pattern)
+
+    async def listen(self):  # noqa: ANN201
+        yield {"type": "psubscribe", "data": 1}
+        yield {"type": "message", "data": b"{}"}
+        for raw in self._messages:
+            yield {"type": "pmessage", "data": json.dumps(raw).encode("utf-8")}
+
+
+@pytest.mark.asyncio
+async def test_redis_broker_pattern_reads_pmessages_only() -> None:
+    client = _FakeRedis()
+    client._pubsub = _FakePatternPubSub([{"type": "board", "boardId": "b"}])
+    async with RedisBroker(client).subscribe_pattern("todo-board:*") as sub:
+        msg = await _first(sub)
+    assert msg == {"type": "board", "boardId": "b"}
+    pubsub = client._pubsub
+    assert pubsub.patterns == pubsub.unsubscribed == ["todo-board:*"]
+    assert pubsub.closed is True

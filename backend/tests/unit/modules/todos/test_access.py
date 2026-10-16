@@ -149,3 +149,113 @@ async def test_members_of_each_kind(monkeypatch: pytest.MonkeyPatch) -> None:
 async def _empty_holders(_session: Any, perm: str) -> list[tuple[uuid.UUID, str, str]]:
     assert perm == ""
     return []
+
+
+_PERSONAL_MINE = {"kind": "personal", "gremium_id": None, "owner_id": ME}
+_PERSONAL_OTHER = {"kind": "personal", "gremium_id": None, "owner_id": OTHER}
+_TEAM = {"kind": "team", "gremium_id": None, "permission": "platform.manage"}
+
+
+@pytest.mark.parametrize(
+    ("key", "writes"),
+    [("todo.read_all", False), ("todo.all", True)],
+)
+async def test_a_global_key_reads_every_shared_board_and_no_foreign_personal_one(
+    grants: dict[str, Any], key: str, writes: bool
+) -> None:
+    access = BoardAccess(ScriptedSession(scalar=[ME]))  # type: ignore[arg-type]
+    holder = _p(permissions={key})
+    for shared in (board(gremium_id=G2), board(**_TEAM)):
+        assert await access.can_read(shared, holder)
+        assert await access.can_write(shared, holder) is writes
+        # Neither key configures a board.
+        assert not await access.can_configure(shared, holder)
+    assert not await access.can_read(board(**_PERSONAL_OTHER), holder)
+    assert not await access.can_write(board(**_PERSONAL_OTHER), holder)
+    # The own personal board keeps the owner rule.
+    assert await access.can_write(board(**_PERSONAL_MINE), holder)
+
+
+async def test_the_native_writer_writes_and_a_plain_member_does_not(
+    grants: dict[str, Any],
+) -> None:
+    access = BoardAccess(ScriptedSession(scalar=[ME]))  # type: ignore[arg-type]
+    user = _p(permissions={"platform.manage"})
+    assert await access.can_write(board(gremium_id=G1), user)
+    assert not await access.can_write(board(gremium_id=G2), user)
+    assert await access.can_write(board(**_TEAM), user)
+    assert not await access.can_write(board(kind="team", gremium_id=None, permission=None), user)
+    assert not await access.can_read(board(gremium_id=G2), user)
+
+
+@pytest.mark.parametrize(
+    ("scope", "reads", "writes"),
+    [
+        # `read` holds `todo.read_all`: reads, never writes.
+        (frozenset({"todo.read_all"}), True, False),
+        # `todos:write` holds `todo.all`.
+        (frozenset({"todo.write", "todo.configure", "todo.all"}), True, True),
+        (frozenset({"vote.manage"}), False, False),
+    ],
+)
+async def test_the_scope_caps_the_global_keys(
+    grants: dict[str, Any], scope: frozenset[str], reads: bool, writes: bool
+) -> None:
+    access = BoardAccess(ScriptedSession(scalar=[ME]))  # type: ignore[arg-type]
+    token = _p(permissions={"todo.all", "todo.read_all"}, scope_permissions=scope)
+    assert await access.can_read(board(gremium_id=G2), token) is reads
+    assert await access.can_write(board(gremium_id=G2), token) is writes
+    # A team board through a global key also needs its own permission in the scope.
+    assert not await access.can_read(board(**_TEAM), token)
+    assert not await access.can_write(board(**_TEAM), token)
+    wide = _p(
+        permissions={"todo.all", "todo.read_all"}, scope_permissions=scope | {"platform.manage"}
+    )
+    assert await access.can_read(board(**_TEAM), wide) is reads
+    assert await access.can_write(board(**_TEAM), wide) is writes
+
+
+async def test_an_admin_read_token_reads_every_gremium_board_but_writes_none(
+    grants: dict[str, Any],
+) -> None:
+    access = BoardAccess(
+        ScriptedSession(scalar=[ME], scalars=[["ticket.manage", "platform.manage"]])  # type: ignore[arg-type]
+    )
+    token = _p(
+        roles=["admin"],
+        scope_permissions=frozenset({"todo.read_all", "meeting.view_all", "platform.manage"}),
+    )
+    assert await access.can_read(board(gremium_id=G2), token)
+    assert not await access.can_write(board(gremium_id=G2), token)
+    assert not await access.can_read(board(**_PERSONAL_MINE), token)
+    # The team board "Plattform" (``ticket.manage``) stays closed to a ``read`` token.
+    plattform = board(kind="team", gremium_id=None, permission="ticket.manage")
+    assert not await access.can_read(plattform, token)
+    assert await access.can_read(board(**_TEAM), token)
+    scope = await access.scope(token)
+    assert scope == ReadScope(all_gremien=True, team_permissions={"platform.manage"})
+    assert not scope.allows(plattform) and scope.allows(board(**_TEAM))
+
+
+@pytest.mark.parametrize("key", ["todo.read_all", "todo.all"])
+async def test_the_read_scope_of_a_global_key_holds_every_shared_board(
+    grants: dict[str, Any], key: str
+) -> None:
+    # No team-permission query: every team board is in the scope already.
+    session = ScriptedSession(scalar=[ME])
+    scope = await BoardAccess(session).scope(_p(permissions={key}))  # type: ignore[arg-type]
+    assert scope == ReadScope(all_gremien=True, owner_id=ME, all_teams=True)
+    assert len(session.statements) == 1
+    sql = str(scope.condition())
+    assert sql.count("todo_board.kind") == 2 and "gremium_id IN" not in sql
+    assert scope.allows(board(gremium_id=G2))
+    assert scope.allows(board(kind="team", gremium_id=None, permission="other.key"))
+    assert not scope.allows(board(**_PERSONAL_OTHER))
+    assert scope.allows(board(**_PERSONAL_MINE))
+
+
+def test_the_token_gate_lets_every_read_key_through() -> None:
+    assert access_mod.token_reads(_p())
+    for key in ("todo.write", "todo.all", "todo.read_all"):
+        assert access_mod.token_reads(_p(scope_permissions=frozenset({key})))
+    assert not access_mod.token_reads(_p(scope_permissions=frozenset({"todo.configure"})))

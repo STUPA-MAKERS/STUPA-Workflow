@@ -34,6 +34,24 @@
           }
         </button>
       }
+      @if (section.kind === 'personal' && allId() !== null) {
+        <button
+          type="button"
+          class="bp__row"
+          data-testid="bp-all"
+          [attr.aria-current]="onAll() ? 'true' : null"
+          (click)="pickAll()"
+        >
+          <app-icon class="bp__icon" [name]="allIcon" [size]="18" />
+          <span class="bp__text">
+            <span class="bp__name">{{ 'todos.board.all' | t }}</span>
+            <span class="bp__sub">{{ allSub() }}</span>
+          </span>
+          @if (onAll()) {
+            <app-icon class="bp__check" name="check" [size]="18" />
+          }
+        </button>
+      }
     }
   </ng-template>
 

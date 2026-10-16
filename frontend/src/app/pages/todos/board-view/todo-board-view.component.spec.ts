@@ -1,18 +1,18 @@
-import { CdkDrag, type CdkDragDrop } from '@angular/cdk/drag-drop';
+import { CdkDrag, CdkDropList, type CdkDragDrop } from '@angular/cdk/drag-drop';
 import { By } from '@angular/platform-browser';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import type { TodoBoard } from '@core/api/todos.service';
-import { cardsOf } from '../../../features/todos/todos.util';
+import { DROP_ENTER, cardsOf } from '../../../features/todos/todos.util';
 import { TODAY, board, tile } from '../../../../testing/todo-fixtures';
 import { DONE_PREVIEW, TodoBoardViewComponent } from './todo-board-view.component';
 
-const OUTPUTS = ['openCard', 'moveCard', 'quickAdd', 'addIn', 'settings', 'archive'] as const;
+const OUTPUTS = ['openCard', 'moveCard', 'dropIn', 'quickAdd', 'addIn', 'settings', 'archive'] as const;
 
 function mapOf(b: TodoBoard) {
   return new Map(b.columns.map((c) => [c.id, cardsOf(b, c.id)]));
 }
 
-async function setup(b: TodoBoard = board(), extra: { phone?: boolean } = {}) {
+async function setup(b: TodoBoard = board(), extra: { phone?: boolean; connectTo?: string[] } = {}) {
   const on = Object.fromEntries(OUTPUTS.map((n) => [n, jest.fn()])) as Record<(typeof OUTPUTS)[number], jest.Mock>;
   const view = await render(TodoBoardViewComponent, {
     inputs: { board: b, cards: mapOf(b), labels: new Map(b.labels.map((l) => [l.id, l])), today: TODAY, ...extra },
@@ -156,8 +156,45 @@ describe('TodoBoardViewComponent', () => {
     expect(on.moveCard).toHaveBeenLastCalledWith({ cardId: 'k-1', move: { columnId: 'c-2' } });
     const calls = on.moveCard.mock.calls.length;
     cmp.drop(dropEvent('k-1', 'c-1', 'nope', 0, 0));
-    cmp.drop(dropEvent('ghost', 'c-1', 'c-2', 0, 0));
+    cmp.drop(dropEvent('ghost', 'x-1', 'nope', 0, 0));
     expect(on.moveCard).toHaveBeenCalledTimes(calls);
+    expect(on.dropIn).not.toHaveBeenCalled();
+  });
+
+  it('hands a card of another board to the page with the neighbours of its place', async () => {
+    const { cmp, on, fixture } = await setup(board(), { connectTo: ['br-list-x-1'] });
+    cmp.drop(dropEvent('ghost', 'x-1', 'c-1', 0, 1));
+    expect(on.dropIn).toHaveBeenLastCalledWith({ cardId: 'ghost', move: { columnId: 'c-1', afterId: 'k-1' } });
+    cmp.drop(dropEvent('ghost', 'x-1', 'c-2', 0, 0));
+    expect(on.dropIn).toHaveBeenLastCalledWith({ cardId: 'ghost', move: { columnId: 'c-2' } });
+    expect(on.moveCard).not.toHaveBeenCalled();
+    // Every list of a writable board reaches the rows; a read-only board reaches none.
+    const lists = fixture.debugElement.queryAll(By.directive(CdkDropList)).map((d) => d.injector.get(CdkDropList));
+    expect(lists.every((l) => (l.connectedTo as string[]).includes('br-list-x-1'))).toBe(true);
+    fixture.componentRef.setInput('board', board({ canWrite: false }));
+    fixture.detectChanges();
+    const ro = fixture.debugElement.queryAll(By.directive(CdkDropList)).map((d) => d.injector.get(CdkDropList));
+    expect(ro.every((l) => (l.connectedTo as string[]).length === 0)).toBe(true);
+  });
+
+  it('lets no card of a shared board into a column of the personal board', async () => {
+    const lists = async (b: TodoBoard) => {
+      const { fixture } = await setup(b, { connectTo: ['br-list-x-1'] });
+      return fixture.debugElement.queryAll(By.directive(CdkDropList)).map((d) => d.injector.get(CdkDropList));
+    };
+    const from = (kind: string) => {
+      const el = document.createElement('div');
+      el.dataset['boardKind'] = kind;
+      return { dropContainer: { element: { nativeElement: el } } } as unknown as CdkDrag;
+    };
+    const personal = await lists(board({ kind: 'personal', gremiumId: null }));
+    expect(personal.every((l) => l.element.nativeElement.dataset['boardKind'] === 'personal')).toBe(true);
+    expect(personal[0].enterPredicate(from('gremium'), personal[0])).toBe(false);
+    expect(personal[0].enterPredicate(from('team'), personal[0])).toBe(false);
+    expect(personal[0].enterPredicate(from('personal'), personal[0])).toBe(true);
+    // A gremium board lets a card of the personal board in.
+    const gremium = DROP_ENTER.gremium;
+    expect(gremium(from('personal'))).toBe(true);
   });
 
   it('drags with the keyboard inside and between columns and announces each step', async () => {

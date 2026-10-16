@@ -1,7 +1,8 @@
 """Router tests of the to-do module with a fake service (no database).
 
 They cover every route's wiring and status, the ETag and 304 of the board read,
-the scope gate of the link picker and the mail background task.
+the scope gate of the link picker, the mail background task and the board pings
+after the route.
 """
 
 from __future__ import annotations
@@ -19,7 +20,9 @@ from app.db import get_session
 from app.deps import get_current_principal
 from app.main import create_app
 from app.modules.auth.principal import Principal
+from app.modules.todos import live as live_mod
 from app.modules.todos import router as router_mod
+from app.modules.todos.live import BoardPings
 from app.modules.todos.router import (
     _deliver_todo_mails,
     _matches,
@@ -85,6 +88,7 @@ _ANSWERS: dict[str, Callable[[], Any]] = {
     "delete_label": lambda: None,
     "mine": lambda: TodoMine(),
     "mine_boards": lambda: [TodoAssignedBoard(id=BID, name="B", kind="gremium", cards=[_tile()])],
+    "all_boards": lambda: [TodoAssignedBoard(id=BID, name="B", kind="personal", cards=[_tile()])],
     "linked": lambda: [
         TodoLinkedCard(
             id=CID, board_id=BID, board_name="B", title="t", column_name="c", is_done=False
@@ -92,8 +96,10 @@ _ANSWERS: dict[str, Callable[[], Any]] = {
     ],
     "create": _detail,
     "card": _detail,
+    "tile": _tile,
     "patch": _detail,
     "move": _tile,
+    "transfer": _detail,
     "archive_card": lambda: None,
     "restore_card": _detail,
     "add_assignee": _detail,
@@ -126,6 +132,8 @@ class _FakeService:
         self.outbox: list[TodoMail] = []
         self.links = _Links()
         self.mail_on: set[str] = set()
+        self.pings = BoardPings()
+        self.ping_on: set[str] = set()
 
     def __getattr__(self, name: str) -> Any:
         if name not in _ANSWERS:
@@ -135,6 +143,8 @@ class _FakeService:
             self.calls.append((name, args, kw))
             if name in self.mail_on:
                 self.outbox.append(TodoMail("assigned", CID, (XID,), XID))
+            if name in self.ping_on:
+                self.pings.touch(BID, CID)
             return _ANSWERS[name]()
 
         return _call
@@ -246,6 +256,17 @@ def test_the_assigned_boards_read_has_an_etag_and_answers_304(env: _Env) -> None
     assert env.last()[0] == "mine_boards"
 
 
+def test_the_all_boards_read_has_an_etag_and_answers_304(env: _Env) -> None:
+    first = env.client.get("/api/todos/all/boards")
+    assert first.status_code == 200
+    assert first.json()[0]["kind"] == "personal"
+    etag = first.headers["ETag"]
+    assert first.headers["Cache-Control"] == "no-cache"
+    again = env.client.get("/api/todos/all/boards", headers={"If-None-Match": etag})
+    assert again.status_code == 304 and again.headers["ETag"] == etag
+    assert env.last()[0] == "all_boards"
+
+
 def test_mine_boards_etag_changes_with_the_body() -> None:
     one = [TodoAssignedBoard(id=BID, name="B", kind="gremium")]
     assert mine_boards_etag(one) == mine_boards_etag(list(one))
@@ -281,9 +302,13 @@ def test_card_routes(env: _Env) -> None:
     assert c.post("/api/todos/cards", json=body).status_code == 201
     assert c.post("/api/todos/cards", json={**body, "extra": 1}).status_code == 422
     assert c.get(f"/api/todos/cards/{CID}").json()["boardName"] == "B"
+    assert c.get(f"/api/todos/cards/{CID}/tile").json()["id"] == str(CID)
     assert c.patch(f"/api/todos/cards/{CID}", json={"version": 1}).status_code == 200
     move = c.post(f"/api/todos/cards/{CID}/move", json={"columnId": str(XID)})
     assert move.json()["rank"] == "i"
+    moved = c.post(f"/api/todos/cards/{CID}/transfer", json={"boardId": str(BID)})
+    assert moved.json()["boardName"] == "B"
+    assert env.last()[1][1].column_id is None
     assert c.delete(f"/api/todos/cards/{CID}").status_code == 204
     assert c.post(f"/api/todos/cards/{CID}/restore").status_code == 200
     assert (
@@ -358,3 +383,55 @@ async def test_the_mail_sender(monkeypatch: pytest.MonkeyPatch) -> None:
     mails = [TodoMail("assigned", CID, (XID,), XID)]
     await _deliver_todo_mails(load_settings(), mails, None)
     assert seen["mails"] == mails and seen["queue"] is None
+
+
+class _Broker:
+    def __init__(self, *, fail: bool = False) -> None:
+        self.sent: list[tuple[str, dict[str, object]]] = []
+        self.fail = fail
+
+    async def publish(self, channel: str, message: dict[str, object]) -> None:
+        if self.fail:
+            raise RuntimeError("redis down")
+        self.sent.append((channel, message))
+
+
+def test_a_write_pings_its_board_after_the_route(env: _Env) -> None:
+    broker = _Broker()
+    env.app.state.broker = broker
+    env.service.ping_on.add("move")
+    assert env.client.post(f"/api/todos/cards/{CID}/move", json={"columnId": str(XID)}).is_success
+    ping = {"type": "card", "boardId": str(BID), "cardId": str(CID)}
+    assert broker.sent == [(f"todo-board:{BID}", ping)]
+    # The pings are drained: a read after it sends nothing.
+    assert env.client.get(f"/api/todos/cards/{CID}").is_success
+    assert len(broker.sent) == 1
+
+
+def test_a_failed_route_sends_no_ping(env: _Env) -> None:
+    broker = _Broker()
+    env.app.state.broker = broker
+    env.service.ping_on.add("move")
+    assert env.client.post(f"/api/todos/cards/{CID}/move", json={}).status_code == 422
+    env.service.pings.touch(BID, CID)
+
+    async def _boom(*_a: Any, **_k: Any) -> Any:
+        raise RuntimeError("after the touch")
+
+    env.service.move = _boom  # type: ignore[attr-defined]
+    with pytest.raises(RuntimeError):
+        env.client.post(f"/api/todos/cards/{CID}/move", json={"columnId": str(XID)})
+    assert broker.sent == []
+
+
+def test_a_broker_fault_never_fails_the_write(env: _Env) -> None:
+    env.app.state.broker = _Broker(fail=True)
+    env.service.ping_on.add("move")
+    assert env.client.post(f"/api/todos/cards/{CID}/move", json={"columnId": str(XID)}).is_success
+
+
+def test_without_a_broker_the_fallback_takes_the_pings() -> None:
+    class _State:
+        pass
+
+    assert live_mod.todo_broker(_State()) is live_mod._FALLBACK_BROKER

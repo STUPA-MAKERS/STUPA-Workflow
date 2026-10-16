@@ -5,7 +5,10 @@ import { fireEvent, render, screen, within } from '@testing-library/angular';
 import { Subject, of, throwError, type Observable } from 'rxjs';
 import { TodosApiService, type TodoBoard, type TodoCardDetail, type TodoComment } from '@core/api/todos.service';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
-import { MEMBERS, asPhone, board, detail, link, tile } from '../../../../testing/todo-fixtures';
+import { BOARDS, MEMBERS, asPhone, board, detail, link, tile } from '../../../../testing/todo-fixtures';
+import { type FakeTodoLive, provideFakeTodoLive } from '../../../../testing/todo-live';
+import { TodoLiveService } from '@core/ws/todo-live.service';
+import { TestBed } from '@angular/core/testing';
 import { DraftAttachmentsService } from '../../apply/draft-attachments.service';
 import { TodoCardDetailComponent } from './todo-card-detail.component';
 
@@ -41,6 +44,10 @@ function makeApi(card: TodoCardDetail) {
     addLink: answer(),
     removeLink: answer(),
     archiveCard: jest.fn(() => of(undefined)),
+    boards: jest.fn(() => of(BOARDS)),
+    transferCard: jest.fn(
+      (): Observable<TodoCardDetail> => of({ ...card, boardId: 'b-2', boardName: 'Fachschaft Informatik', columnId: 'c-1' }),
+    ),
     restoreCard: answer({ archivedAt: null }),
     addComment: jest.fn(() => of({ ...COMMENT, id: 'cm-2', body: 'Neu' })),
     editComment: jest.fn(() => of({ ...COMMENT, body: 'Geändert', editedAt: '2026-10-15T10:00:00Z' })),
@@ -69,11 +76,13 @@ async function setup(opts: Opts = {}) {
       { provide: TodosApiService, useValue: api },
       { provide: ApiClient, useValue: files },
       { provide: ToastService, useValue: toast },
+      provideFakeTodoLive(),
     ],
   });
   const cmp = view.fixture.componentInstance;
   const detect = () => view.fixture.detectChanges();
-  return { ...view, api, toast, files, cmp, detect, ...out };
+  const live = TestBed.inject(TodoLiveService) as unknown as FakeTodoLive;
+  return { ...view, api, toast, files, cmp, detect, live, ...out };
 }
 
 describe('TodoCardDetailComponent', () => {
@@ -127,6 +136,21 @@ describe('TodoCardDetailComponent', () => {
     expect(screen.queryByRole('button', { name: /Verknüpfen/ })).toBeNull();
     expect(screen.getByRole('checkbox', { name: 'Raum anfragen' })).toBeDisabled();
     expect(readOnly.cmp.menuSections()).toEqual([]);
+  });
+
+  it('offers no edit of an own comment on a board that the person only reads', async () => {
+    const readOnly = await setup({ card: detail({ canWrite: false, comments: [COMMENT] }) });
+    expect(readOnly.cmp.messages()[0]).toEqual(expect.objectContaining({ own: true, canEdit: false }));
+    // An archived card of a writable board keeps the edit of an own comment.
+    readOnly.cmp.card.set(detail({ archivedAt: '2026-10-12T10:00:00Z', comments: [COMMENT] }));
+    expect(readOnly.cmp.messages()[0].canEdit).toBe(true);
+  });
+
+  it('names a write on a board that the person only reads', async () => {
+    const { cmp, api, toast } = await setup();
+    api.patchCard.mockReturnValueOnce(http(403, 'todo_write_required'));
+    cmp.setDue('2026-10-30');
+    expect(toast.error).toHaveBeenLastCalledWith('Dieses Board kannst du nur lesen.');
   });
 
   it('offers the restore for an archived card and shows when it was archived', async () => {
@@ -533,6 +557,86 @@ describe('TodoCardDetailComponent', () => {
     expect(toast.error).toHaveBeenCalledWith('Die Änderung konnte nicht gespeichert werden.');
   });
 
+  it('moves the card to another board from the menu', async () => {
+    const { cmp, api, toast, changed, detect } = await setup();
+    expect(cmp.menuSections()[0].items.map((i) => [i.id, i.icon])).toEqual([
+      ['rename', 'edit'],
+      ['transfer', 'arrow'],
+    ]);
+    expect(cmp.menuSections()[1].items[0].id).toBe('archive');
+    cmp.onMenu({ id: 'transfer', label: '' });
+    detect();
+    expect(screen.getByRole('dialog', { name: 'In anderes Board verschieben' })).toBeInTheDocument();
+    // Neither the current board nor, for a card of a gremium board, the personal board is a target.
+    expect(api.boards).toHaveBeenCalled();
+    expect(api.board).toHaveBeenCalledWith('b-2');
+    expect(api.board).not.toHaveBeenCalledWith('b-0');
+    const order: string[] = [];
+    const transferred = jest.fn(() => order.push('transferred'));
+    cmp.transferred.subscribe(transferred);
+    changed.mockImplementation(() => order.push('changed'));
+    const from = cmp.card()?.boardId;
+    cmp.transfer({ boardId: 'b-2', columnId: 'c-1', boardName: 'Fachschaft Informatik' });
+    expect(api.transferCard).toHaveBeenCalledWith('k-1', { boardId: 'b-2', columnId: 'c-1' });
+    expect(changed).toHaveBeenLastCalledWith(expect.objectContaining({ boardId: 'b-2' }));
+    // The page learns of the transfer first, with the board the card left.
+    expect(transferred).toHaveBeenCalledWith({ card: expect.objectContaining({ boardId: 'b-2' }), fromBoardId: from });
+    expect(order).toEqual(['transferred', 'changed']);
+    expect(cmp.card()?.boardId).toBe('b-2');
+    expect(api.members).toHaveBeenLastCalledWith('b-2');
+    expect(toast.success).toHaveBeenCalledWith('Karte nach „Fachschaft Informatik“ verschoben');
+    expect(cmp.transferOpen()).toBe(false);
+    expect(cmp.transferring()).toBe(false);
+    expect(cmp.busy()).toBe(false);
+  });
+
+  it('names a refused transfer and reads the card again', async () => {
+    const { cmp, api, toast } = await setup();
+    const target = { boardId: 'b-2', columnId: 'c-1', boardName: 'X' };
+    for (const [err, text] of [
+      [http(409, 'card_moved'), 'Die Karte konnte nicht verschoben werden.'],
+      [http(409, 'card_archived'), 'Die Karte konnte nicht verschoben werden.'],
+      [http(422, 'transfer_same_board'), 'Die Karte konnte nicht verschoben werden.'],
+      [http(422, 'column_not_on_board'), 'Die Karte konnte nicht verschoben werden.'],
+      [http(403, 'transfer_to_personal'), 'Karten aus geteilten Boards können nicht ins persönliche Board verschoben werden.'],
+      [http(404), 'Die Karte konnte nicht verschoben werden.'],
+      [http(500), 'Die Änderung konnte nicht gespeichert werden.'],
+    ] as const) {
+      const reads = api.card.mock.calls.length;
+      cmp.transferOpen.set(true);
+      api.transferCard.mockReturnValueOnce(err as never);
+      cmp.transfer(target);
+      expect(toast.error).toHaveBeenLastCalledWith(text);
+      expect(api.card).toHaveBeenCalledTimes(reads + 1);
+      expect(cmp.transferOpen()).toBe(false);
+      expect(cmp.busy()).toBe(false);
+    }
+  });
+
+  it('drops a transfer answer for a card that is no longer shown', async () => {
+    const { cmp, api, toast, changed, fixture } = await setup();
+    const answer = new Subject<TodoCardDetail>();
+    api.transferCard.mockReturnValueOnce(answer);
+    cmp.transfer({ boardId: 'b-2', columnId: 'c-1', boardName: 'X' });
+    expect(cmp.transferring()).toBe(true);
+    fixture.componentRef.setInput('cardId', 'k-9');
+    fixture.detectChanges();
+    answer.next(detail({ boardId: 'b-2' }));
+    const failing = new Subject<TodoCardDetail>();
+    api.transferCard.mockReturnValueOnce(failing);
+    cmp.transfer({ boardId: 'b-2', columnId: 'c-1', boardName: 'X' });
+    fixture.componentRef.setInput('cardId', 'k-1');
+    fixture.detectChanges();
+    failing.error(new HttpErrorResponse({ status: 500 }));
+    expect(changed).not.toHaveBeenCalledWith(expect.objectContaining({ boardId: 'b-2' }));
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    cmp.card.set(null);
+    api.transferCard.mockClear();
+    cmp.transfer({ boardId: 'b-2', columnId: 'c-1', boardName: 'X' });
+    expect(api.transferCard).not.toHaveBeenCalled();
+  });
+
   it('names the refusal of the server and reads the card again', async () => {
     const { cmp, api, toast } = await setup();
     api.patchCard.mockReturnValueOnce(http(409, 'card_version_conflict'));
@@ -902,6 +1006,90 @@ describe('TodoCardDetailComponent', () => {
     expect(chat().injector.get(DraftAttachmentsService)).toBe(drafts);
     expect(drafts.files()).toEqual([file]);
     expect(files.deleteDraftAttachment).not.toHaveBeenCalled();
+  });
+
+  describe('live', () => {
+    const wait = (detect: () => void) => {
+      jest.advanceTimersByTime(300);
+      detect();
+    };
+    beforeEach(() => jest.useFakeTimers({ doNotFake: ['queueMicrotask', 'setImmediate', 'nextTick'] }));
+    afterEach(() => jest.useRealTimers());
+
+    it('a ping of this card or its board reads it in the background and emits nothing', async () => {
+      const { cmp, api, live, detect, changed } = await setup();
+      expect(live.boards()).toEqual(['b-1']);
+      api.card.mockClear();
+      live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-other' });
+      wait(detect);
+      expect(api.card).not.toHaveBeenCalled();
+      api.card.mockReturnValueOnce(of(detail({ title: 'Raum gebucht', comments: [] })));
+      live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
+      wait(detect);
+      expect(cmp.card()?.title).toBe('Raum gebucht');
+      expect(screen.getByText('Raum gebucht')).toBeInTheDocument();
+      live.emit({ type: 'board', boardId: 'b-1' });
+      wait(detect);
+      expect(api.card).toHaveBeenCalledTimes(2);
+      expect(changed).not.toHaveBeenCalled();
+    });
+
+    it('waits while a field is in edit and reads when the edit ends', async () => {
+      const { cmp, api, live, detect } = await setup();
+      api.card.mockClear();
+      cmp.startTitle();
+      live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
+      wait(detect);
+      expect(api.card).not.toHaveBeenCalled();
+      api.card.mockReturnValueOnce(of(detail({ title: 'Von drüben' })));
+      cmp.editingTitle.set(false);
+      detect();
+      expect(api.card).toHaveBeenCalledTimes(1);
+      expect(cmp.card()?.title).toBe('Von drüben');
+    });
+
+    it('drops a read that a local change overtook, and waits when an edit began meanwhile', async () => {
+      const { cmp, api, live, detect } = await setup();
+      const read = new Subject<TodoCardDetail>();
+      api.card.mockReturnValueOnce(read);
+      live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
+      wait(detect);
+      cmp.addAssignee('p-2');
+      read.next(detail({ title: 'Alt' }));
+      expect(cmp.card()?.title).not.toBe('Alt');
+      const again = new Subject<TodoCardDetail>();
+      api.card.mockReturnValueOnce(again);
+      live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
+      wait(detect);
+      cmp.startAddItem();
+      again.next(detail({ title: 'Später' }));
+      expect(cmp.card()?.title).not.toBe('Später');
+      api.card.mockReturnValueOnce(of(detail({ title: 'Später' })));
+      cmp.addingItem.set(false);
+      detect();
+      expect(cmp.card()?.title).toBe('Später');
+    });
+
+    it('a 404 says the card is gone; another failure or a stale one changes nothing', async () => {
+      const { cmp, api, live, detect } = await setup();
+      api.card.mockReturnValueOnce(http(500));
+      live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
+      wait(detect);
+      expect(cmp.notFound()).toBe(false);
+      const late = new Subject<TodoCardDetail>();
+      api.card.mockReturnValueOnce(late);
+      live.emit({ type: 'card_removed', boardId: 'b-1', cardId: 'k-1' });
+      wait(detect);
+      cmp.addAssignee('p-2');
+      late.error(new HttpErrorResponse({ status: 404 }));
+      expect(cmp.notFound()).toBe(false);
+      api.card.mockReturnValueOnce(http(404));
+      live.emit({ type: 'card_removed', boardId: 'b-1', cardId: 'k-1' });
+      wait(detect);
+      expect(cmp.notFound()).toBe(true);
+      expect(cmp.card()).toBeNull();
+      expect(live.boards()).toEqual([]);
+    });
   });
 
   describe('phone', () => {

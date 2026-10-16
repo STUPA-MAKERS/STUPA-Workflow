@@ -45,9 +45,67 @@ describe('TodoLinkPickerComponent', () => {
     const { open, fixture, container } = await setup();
     expect(container.querySelector('.lp')).toBeNull();
     await open();
-    expect(screen.getByRole('dialog', { name: 'Verknüpfen' })).toBeInTheDocument();
-    expect(fixture.nativeElement).toHaveClass('lp-host--open');
+    const panel = screen.getByRole('dialog', { name: 'Verknüpfen' });
+    // The panel floats at the end of <body>, outside the parent that holds the picker.
+    expect(container.contains(panel)).toBe(false);
+    expect(panel.closest('.lp-layer')?.parentElement).toBe(document.body);
     expect(document.activeElement).toBe(screen.getByRole('searchbox'));
+    fixture.componentInstance.open.set(false);
+    fixture.detectChanges();
+    expect(document.querySelector('.lp-layer')).toBeNull();
+  });
+
+  it('opens on the first render when open is true from the start', async () => {
+    const linkTargets = jest.fn(() => of(HITS));
+    await render(TodoLinkPickerComponent, {
+      inputs: { open: true, excludeCardId: 'k-1', linked: new Set<string>() },
+      providers: [{ provide: TodosApiService, useValue: { linkTargets } }],
+    });
+    expect(screen.getByRole('dialog', { name: 'Verknüpfen' }).closest('.lp-layer')?.parentElement).toBe(document.body);
+    expect(document.querySelectorAll('.lp-layer')).toHaveLength(1);
+  });
+
+  it('closes on the scrim and gives the focus back', async () => {
+    const { open, fixture } = await setup();
+    const before = document.createElement('button');
+    document.body.appendChild(before);
+    before.focus();
+    await open();
+    expect(document.activeElement).toBe(screen.getByRole('searchbox'));
+    fireEvent.click(document.querySelector('.lp__scrim')!);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.open()).toBe(false);
+    expect(document.activeElement).toBe(before);
+    before.remove();
+  });
+
+  it('keeps Tab in the panel and stops it there', async () => {
+    const { open } = await setup();
+    await open();
+    const panel = screen.getByRole('dialog');
+    const field = screen.getByRole('searchbox');
+    const buttons = [...panel.querySelectorAll<HTMLElement>('button')];
+    const last = buttons[buttons.length - 1];
+    const outer = jest.fn();
+    document.addEventListener('keydown', outer);
+    last.focus();
+    fireEvent.keyDown(last, { key: 'Tab' });
+    expect(document.activeElement).toBe(field);
+    fireEvent.keyDown(field, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(last);
+    // In the middle, the browser moves the focus.
+    buttons[0].focus();
+    fireEvent.keyDown(buttons[0], { key: 'Tab' });
+    expect(document.activeElement).toBe(buttons[0]);
+    expect(outer).not.toHaveBeenCalled();
+    document.removeEventListener('keydown', outer);
+  });
+
+  it('removes the floating panel when it is destroyed open', async () => {
+    const { open, fixture } = await setup();
+    await open();
+    fixture.destroy();
+    expect(document.querySelector('.lp-layer')).toBeNull();
   });
 
   it('searches, groups the hits and marks a linked target', async () => {

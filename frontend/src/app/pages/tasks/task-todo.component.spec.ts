@@ -8,6 +8,7 @@ import { of } from 'rxjs';
 import { TodosApiService } from '@core/api/todos.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { MEMBERS, detail } from '../../../testing/todo-fixtures';
+import { provideFakeTodoLive } from '../../../testing/todo-live';
 import { TaskTodoComponent } from './task-todo.component';
 import { TasksComponent } from './tasks.component';
 
@@ -25,6 +26,7 @@ async function start(withPage: boolean) {
         { path: 'tasks/todo/:cardId', component: TaskTodoComponent },
       ]),
       { provide: TodosApiService, useValue: { card: jest.fn(() => of(detail())), members: jest.fn(() => of(MEMBERS)) } },
+      provideFakeTodoLive(),
       { provide: ToastService, useValue: { success: jest.fn(), error: jest.fn() } },
       ...(withPage ? [{ provide: TasksComponent, useValue: page }] : []),
     ],

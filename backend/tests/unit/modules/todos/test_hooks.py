@@ -101,3 +101,31 @@ async def test_complete_locks_the_boards_in_board_id_order() -> None:
     await bridge.complete(TICKET, USER)
     assert order == [(low.id, second.id), (high.id, first.id), (high.id, third.id)]
     assert session.committed == 1
+
+
+async def test_complete_leaves_a_card_on_a_board_that_the_actor_only_reads() -> None:
+    b = board()
+    c = card(b, column(b.id))
+    session = ScriptedSession(execute=[[(c, b)]])
+    await _bridge(session, {b.id}, write=False).complete(TICKET, USER)
+    assert session.committed == 0 and session.refreshed == []
+
+
+async def test_complete_pings_the_board_after_the_commit() -> None:
+    b = board()
+    col, done = column(b.id), column(b.id, "Erledigt", 1, is_done=True)
+    c = card(b, col)
+    session = ScriptedSession(execute=[[(c, b)]], scalars=[[col, done], [], [TICKET]])
+    bridge = _bridge(session, {b.id})
+    sent: list[tuple[str, dict[str, object]]] = []
+
+    class _Broker:
+        async def publish(self, channel: str, message: dict[str, object]) -> None:
+            assert session.committed == 1
+            sent.append((channel, message))
+
+    bridge.broker = _Broker()  # type: ignore[assignment]
+    await bridge.complete(TICKET, USER)
+    assert sent == [
+        (f"todo-board:{b.id}", {"type": "card", "boardId": str(b.id), "cardId": str(c.id)})
+    ]

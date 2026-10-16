@@ -1,8 +1,10 @@
 """To-do service: boards, columns, labels, cards and their sub-resources.
 
 The service decides every right itself (``BoardAccess``): a board, a card or a
-sub-resource that the caller cannot read answers 404, and a configuration change
-without ``todo.configure`` answers 403 ``todo_configure_required``.
+sub-resource that the caller cannot read answers 404, a card write on a board that
+the caller reads but cannot write (``todo.read_all``) answers 403
+``todo_write_required``, and a configuration change without ``todo.configure``
+answers 403 ``todo_configure_required``.
 
 Writes that order cards (create, move, column delete) lock the board row first, so
 two parallel moves compute their ranks one after the other. Every card write bumps
@@ -37,10 +39,11 @@ from app.modules.files.drafts import bind_drafts, check_message_drafts
 from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.files.service import FilesService
 from app.modules.tickets.models import TicketEvent
-from app.modules.todos.access import TODO_WRITE, BoardAccess
+from app.modules.todos.access import BoardAccess, token_reads
 from app.modules.todos.boards import ensure_personal_board
 from app.modules.todos.lexorank import MAX_LENGTH, RankError, between, spread
 from app.modules.todos.links import HIDDEN, LinkResolver, Resolved
+from app.modules.todos.live import BoardPings
 from app.modules.todos.models import (
     LINK_COLUMNS,
     TodoAssignee,
@@ -59,6 +62,7 @@ from app.modules.todos.schemas import (
     CardCreate,
     CardMove,
     CardPatch,
+    CardTransfer,
     CheckItemPatch,
     ChecklistCount,
     ColumnPatch,
@@ -177,6 +181,8 @@ class TodoService:
         self.access = access or BoardAccess(session)
         self.links = links or LinkResolver(session, self.access)
         self.outbox: list[TodoMail] = []
+        #: The boards and cards of this request, published after the commit (``live``).
+        self.pings = BoardPings()
 
     # -- loading and rights -----------------------------------------------------
 
@@ -186,11 +192,24 @@ class TodoService:
             raise NotFoundError("account not found")
         return me
 
-    async def _board(self, board_id: uuid.UUID, principal: Principal) -> TodoBoard:
+    async def _board(
+        self, board_id: uuid.UUID, principal: Principal, *, write: bool = False
+    ) -> TodoBoard:
+        """Load a readable board; ``write`` also needs the write right (else 403)."""
         board = await self.session.get(TodoBoard, board_id)
         if board is None or not await self.access.can_read(board, principal):
             raise NotFoundError(f"board {board_id} not found")
+        if write:
+            await self._writable(board, principal)
         return board
+
+    async def _writable(self, board: TodoBoard, principal: Principal) -> None:
+        """Raise 403 ``todo_write_required`` for a readable board that is not writable."""
+        if not await self.access.can_write(board, principal):
+            raise ForbiddenError(
+                "Changing the cards of this board needs todo.write.",
+                code="todo_write_required",
+            )
 
     async def _configurable(self, board_id: uuid.UUID, principal: Principal) -> TodoBoard:
         board = await self._board(board_id, principal)
@@ -201,12 +220,25 @@ class TodoService:
         return board
 
     async def _card(
-        self, card_id: uuid.UUID, principal: Principal, *, lock: bool = False
+        self,
+        card_id: uuid.UUID,
+        principal: Principal,
+        *,
+        lock: bool = False,
+        write: bool = False,
     ) -> tuple[TodoCard, TodoBoard]:
         """Load a card and its board; ``lock`` locks the board first, then the card.
 
-        Every write locks the board before a card, because a move locks the board
-        and then updates the card, and the other order deadlocks with it.
+        An unreadable board is 404; ``write`` also needs the write right of the board
+        (403 ``todo_write_required``). A card that a parallel transfer moved to
+        another board while ``lock`` waited is 409 ``card_moved``, because the lock
+        held is the lock of the old board.
+
+        Every card write passes ``lock`` (the moves and the transfer lock the board
+        themselves), so a write that a transfer overtakes is ``card_moved`` and its
+        ping goes to the board that the card is on. Every write locks the board
+        before a card, because a move locks the board and then updates the card, and
+        the other order deadlocks with it.
 
         The card lock is ``FOR NO KEY UPDATE``, because no write changes the key of a
         card, and ``FOR UPDATE`` conflicts with the ``FOR KEY SHARE`` lock of a foreign
@@ -218,13 +250,17 @@ class TodoService:
             known = await self.session.get(TodoCard, card_id)
             if known is None:
                 raise NotFoundError(f"card {card_id} not found")
-            await self._lock_board(known.board_id)
+            # ``populate_existing`` refreshes the same object, so keep the board id now.
+            locked_board = known.board_id
+            await self._lock_board(locked_board)
             card = await self.session.scalar(
                 select(TodoCard)
                 .where(TodoCard.id == card_id)
                 .with_for_update(key_share=True)
                 .execution_options(populate_existing=True)
             )
+            if card is not None and card.board_id != locked_board:
+                raise _card_moved()
         else:
             card = await self.session.get(TodoCard, card_id)
         if card is None:
@@ -232,6 +268,8 @@ class TodoService:
         board = await self.session.get(TodoBoard, card.board_id)
         if board is None or not await self.access.can_read(board, principal):
             raise NotFoundError(f"card {card_id} not found")
+        if write:
+            await self._writable(board, principal)
         return card, board
 
     async def _lock_board(self, board_id: uuid.UUID) -> None:
@@ -239,9 +277,16 @@ class TodoService:
             select(TodoBoard.id).where(TodoBoard.id == board_id).with_for_update()
         )
 
-    @staticmethod
-    def _touch(board: TodoBoard) -> None:
+    def _touch(
+        self, board: TodoBoard, card: TodoCard | None = None, *, removed: bool = False
+    ) -> None:
+        """Bump the board (its ETag changes) and record the ping of the write.
+
+        Without ``card`` the write changed the board itself; ``removed`` says the card
+        left the board (archived or transferred away).
+        """
         board.updated_at = _now()
+        self.pings.touch(board.id, card.id if card is not None else None, removed=removed)
 
     def _event(
         self,
@@ -408,9 +453,10 @@ class TodoService:
         The first call of an account creates its personal board.
 
         Raises:
-            ForbiddenError: A token without ``todo.write`` in its scope (HTTP 403).
+            ForbiddenError: A token whose scope allows none of ``todo.write``,
+                ``todo.all`` and ``todo.read_all`` (HTTP 403).
         """
-        if not principal.scope_allows(TODO_WRITE):
+        if not token_reads(principal):
             raise ForbiddenError("The token scope does not allow to-dos.")
         me = await self.access.me(principal)
         if me is not None:
@@ -444,7 +490,7 @@ class TodoService:
                 name=b.name,
                 kind=b.kind,  # pyright: ignore[reportArgumentType]
                 gremium_id=b.gremium_id,
-                can_write=True,
+                can_write=await self.access.can_write(b, principal),
                 can_configure=await self.access.can_configure(b, principal),
                 open_count=counts.get(b.id, 0),
             )
@@ -488,7 +534,7 @@ class TodoService:
             kind=board.kind,  # pyright: ignore[reportArgumentType]
             gremium_id=board.gremium_id,
             archive_after_days=board.archive_after_days,
-            can_write=True,
+            can_write=await self.access.can_write(board, principal),
             can_configure=await self.access.can_configure(board, principal),
             columns=[
                 TodoColumnOut(
@@ -795,6 +841,19 @@ class TodoService:
         card, board = await self._card(card_id, principal)
         return await self._detail(card, board, principal)
 
+    async def tile(self, card_id: uuid.UUID, principal: Principal) -> TodoCardTile:
+        """Return the tile of a live card, the same one that the board read holds.
+
+        A live ping names a card, and the page reads its tile here.
+
+        Raises:
+            NotFoundError: The card is unknown, archived or not readable (HTTP 404).
+        """
+        card, _board = await self._card(card_id, principal)
+        if card.archived_at is not None:
+            raise NotFoundError(f"card {card_id} not found")
+        return (await self.tiles([card], principal))[0]
+
     async def _detail(
         self, card: TodoCard, board: TodoBoard, principal: Principal
     ) -> TodoCardDetail:
@@ -853,7 +912,7 @@ class TodoService:
             description_md=card.description_md,
             board_name=board.name,
             board_kind=board.kind,  # pyright: ignore[reportArgumentType]
-            can_write=True,
+            can_write=await self.access.can_write(board, principal),
             columns=[TodoColumnRef(id=c.id, name=c.name, is_done=c.is_done) for c in columns],
             labels=[_label_out(label) for label in board_labels if label.id in own_labels],
             board_labels=[_label_out(label) for label in board_labels],
@@ -886,7 +945,7 @@ class TodoService:
                 ``label_not_on_board`` or ``link_target_not_found`` (HTTP 422).
         """
         actor = await self._actor(principal)
-        board = await self._board(payload.board_id, principal)
+        board = await self._board(payload.board_id, principal, write=True)
         await self._lock_board(board.id)
         columns = await self._columns(board.id)
         if payload.column_id is None:
@@ -936,7 +995,7 @@ class TodoService:
         await self.session.flush()
         if column.is_done:
             await self._write_ticket_done(card, board, actor)
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         self._mail("assigned", card, assignees, actor)
         return await self._detail(card, board, principal)
@@ -964,7 +1023,7 @@ class TodoService:
                 ``card_version_conflict``).
         """
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal, lock=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         if payload.version != card.version:
             raise ConflictError(
                 "The card was changed in the meantime.", code="card_version_conflict"
@@ -992,7 +1051,7 @@ class TodoService:
         if changed:
             card.version += 1
             card.updated_at = _now()
-            self._touch(board)
+            self._touch(board, card)
         await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1007,30 +1066,27 @@ class TodoService:
 
         Raises:
             NotFoundError: The card is unknown or not readable (HTTP 404).
+            ConflictError: ``card_moved``: a parallel transfer moved the card to
+                another board while the move waited for the board lock (HTTP 409).
             ValidationProblem: ``column_not_on_board``, or ``rank_neighbors_invalid``
                 for a neighbor outside the column or two neighbors that are not
                 adjacent (HTTP 422).
         """
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, write=True)
         await self._lock_board(board.id)
         # A parallel move of the same card held the lock: read the card again, so the
         # column change below works from the committed column.
         await self.session.refresh(card)
+        if card.board_id != board.id:
+            # A parallel transfer won: the lock held is the lock of the old board.
+            raise _card_moved()
         columns = {c.id: c for c in await self._columns(board.id)}
         target = columns.get(payload.column_id)
         if target is None:
             raise _invalid("The column is not on this board.", "column_not_on_board", "columnId")
         siblings = await self._column_cards(target.id, exclude=card.id)
-        index = _slot(siblings, payload.after_id, payload.before_id)
-        low = siblings[index - 1].rank if index > 0 else None
-        high = siblings[index].rank if index < len(siblings) else None
-        try:
-            card.rank = _rank(low, high)
-        except RankError:
-            # Two cards share a rank, a rank is broken or the new one is too long:
-            # give the column a fresh order.
-            _respread([*siblings[:index], card, *siblings[index:]])
+        respread = _place(siblings, _slot(siblings, payload.after_id, payload.before_id), card)
         source = columns.get(card.column_id)
         if target.id != card.column_id:
             self._event(
@@ -1051,20 +1107,168 @@ class TodoService:
             else:
                 card.completed_at = None
         card.updated_at = _now()
-        self._touch(board)
+        self._touch(board, card)
+        if respread:
+            # Every card of the column has a new rank: the board reads again.
+            self._touch(board)
         await self.session.commit()
         return (await self.tiles([card], principal))[0]
+
+    async def transfer(
+        self, card_id: uuid.UUID, payload: CardTransfer, principal: Principal
+    ) -> TodoCardDetail:
+        """Move a card into a column of another board (default: the first column).
+
+        The card goes between ``afterId`` (above) and ``beforeId`` (below), the same
+        neighbors as ``move``; without them it goes to the end of the column.
+
+        Labels are per board: a label of the card stays when the target board has a
+        label with the same name (case-insensitive), else it is dropped. The service
+        never creates a label on the target, because that needs ``todo.configure``.
+        Assignees who are not members of the target board are dropped, without a mail.
+        Links, comments, the checklist and the events stay with the card. A card
+        without an assignee that leaves the actor's personal board gets the actor as
+        assignee when the actor is a member of the target (no mail), so it stays in
+        "Meine To-Dos".
+
+        A card of a shared board (gremium or team) never moves into a personal board
+        (403 ``transfer_to_personal``), because its comments, files and links would
+        then leave the reach of everyone else on the board.
+
+        Both boards are locked in id order, so two transfers between the same two
+        boards in opposite directions wait instead of deadlocking.
+
+        Raises:
+            NotFoundError: The card or the target board is unknown or not readable
+                (HTTP 404).
+            ForbiddenError: ``todo_write_required`` for a board that the caller reads
+                but cannot write, ``transfer_to_personal`` from a shared board into a
+                personal board (HTTP 403).
+            ConflictError: ``card_moved`` (a parallel transfer moved the card) or
+                ``card_archived`` (HTTP 409).
+            ValidationProblem: ``transfer_same_board``, ``column_not_on_board``, or
+                ``rank_neighbors_invalid`` for a neighbor outside the target column
+                (HTTP 422).
+        """
+        actor = await self._actor(principal)
+        card, source = await self._card(card_id, principal, write=True)
+        if payload.board_id == source.id:
+            raise _invalid(
+                "The card is on this board already. Use move.", "transfer_same_board", "boardId"
+            )
+        target = await self._board(payload.board_id, principal, write=True)
+        _check_transfer_kinds(source, target)
+        for board_id in sorted((source.id, target.id)):
+            await self._lock_board(board_id)
+        await self.session.refresh(card)
+        if card.board_id != source.id:
+            raise _card_moved()
+        if card.archived_at is not None:
+            raise ConflictError("An archived card cannot move.", code="card_archived")
+        columns = await self._columns(target.id)
+        if payload.column_id is None:
+            column = columns[0]
+        else:
+            matches = [c for c in columns if c.id == payload.column_id]
+            if not matches:
+                raise _invalid(
+                    "The column is not on this board.", "column_not_on_board", "columnId"
+                )
+            column = matches[0]
+        from_column = await self.session.get(TodoColumn, card.column_id)
+        # Every read comes before the first change of the card: a read after it
+        # autoflushes the card, and an UPDATE without ``updated_at`` expires it.
+        own_labels = list(
+            (
+                await self.session.scalars(
+                    select(TodoLabel)
+                    .join(TodoCardLabel, TodoCardLabel.label_id == TodoLabel.id)
+                    .where(TodoCardLabel.card_id == card.id)
+                    .order_by(func.lower(TodoLabel.name), TodoLabel.id)
+                )
+            ).all()
+        )
+        by_name = {label.name.lower(): label for label in await self._labels(target.id)}
+        matched = {label.id: by_name.get(label.name.lower()) for label in own_labels}
+        kept = list(dict.fromkeys(m.id for m in matched.values() if m is not None))
+        dropped_labels: list[JsonValue] = [
+            label.name for label in own_labels if matched[label.id] is None
+        ]
+        assignees = set(
+            (
+                await self.session.scalars(
+                    select(TodoAssignee.principal_id).where(TodoAssignee.card_id == card.id)
+                )
+            ).all()
+        )
+        members = await self.access.member_ids(target)
+        dropped_assignees = assignees - members
+        # A card of the own personal board stays the actor's: without an assignee it
+        # would leave "Meine To-Dos" at once, which looks like a lost card.
+        claim = source.kind == "personal" and not assignees and actor in members
+        live = await self._column_cards(column.id)
+        index = _slot(live, payload.after_id, payload.before_id)
+        await self.session.execute(delete(TodoCardLabel).where(TodoCardLabel.card_id == card.id))
+        if dropped_assignees:
+            await self.session.execute(
+                delete(TodoAssignee).where(
+                    TodoAssignee.card_id == card.id,
+                    TodoAssignee.principal_id.in_(dropped_assignees),
+                )
+            )
+        now = _now()
+        card.updated_at = now
+        for label_id in kept:
+            self.session.add(TodoCardLabel(card_id=card.id, label_id=label_id))
+        self._event(
+            card,
+            "moved",
+            actor,
+            {
+                "fromColumnId": str(card.column_id),
+                "fromColumnName": from_column.name if from_column is not None else "",
+                "toColumnId": str(column.id),
+                "toColumnName": column.name,
+                "fromBoardId": str(source.id),
+                "fromBoardName": source.name,
+                "toBoardId": str(target.id),
+                "toBoardName": target.name,
+                "droppedLabels": dropped_labels,
+                "droppedAssignees": len(dropped_assignees),
+            },
+        )
+        if claim:
+            self.session.add(TodoAssignee(card_id=card.id, principal_id=actor))
+            self._event(card, "assigned", actor, {"principalId": str(actor), "added": True})
+        respread = _place(live, index, card)
+        card.board_id = target.id
+        card.column_id = column.id
+        if not column.is_done:
+            card.completed_at = None
+        elif card.completed_at is None:
+            card.completed_at = now
+            await self._write_ticket_done(card, target, actor)
+        self._touch(source, card, removed=True)
+        self._touch(target, card)
+        if respread:
+            self._touch(target)
+        await self.session.commit()
+        return await self._detail(card, target, principal)
 
     async def complete(self, card: TodoCard, board: TodoBoard, actor: uuid.UUID) -> bool:
         """Move an open card to the end of the done column, without a commit.
 
         Returns:
-            True when the card moved (False: no done column, or done already).
+            True when the card moved (False: no done column, done already, archived,
+            or a parallel transfer moved it to another board).
         """
         # The board lock orders this rank against a parallel move or create, and the
         # card is read again after the lock.
         await self._lock_board(board.id)
         await self.session.refresh(card)
+        if card.board_id != board.id:
+            # A parallel transfer moved the card: the lock held is the old board's.
+            return False
         columns = await self._columns(board.id)
         done = next((c for c in columns if c.is_done), None)
         if done is None or card.column_id == done.id or card.archived_at is not None:
@@ -1087,7 +1291,7 @@ class TodoService:
         card.completed_at = _now()
         card.updated_at = _now()
         await self._write_ticket_done(card, board, actor)
-        self._touch(board)
+        self._touch(board, card)
         await self.session.flush()
         return True
 
@@ -1120,11 +1324,11 @@ class TodoService:
     async def archive_card(self, card_id: uuid.UUID, principal: Principal) -> None:
         """Archive a card (``DELETE``); a second call changes nothing."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         if card.archived_at is None:
             card.archived_at = card.updated_at = _now()
             self._event(card, "archived", actor)
-            self._touch(board)
+            self._touch(board, card, removed=True)
             await self.session.commit()
 
     async def restore_card(self, card_id: uuid.UUID, principal: Principal) -> TodoCardDetail:
@@ -1134,7 +1338,7 @@ class TodoService:
         archives it again at its next run.
         """
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         if card.archived_at is not None:
             # Read the column before the card changes. A read after them autoflushes
             # the card, so ``completed_at`` goes in a second UPDATE without an explicit
@@ -1145,7 +1349,7 @@ class TodoService:
             if column is not None and column.is_done:
                 card.completed_at = card.updated_at
             self._event(card, "restored", actor)
-            self._touch(board)
+            self._touch(board, card)
             await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1159,7 +1363,7 @@ class TodoService:
         The board lock makes a parallel identical request wait and then see the row.
         """
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal, lock=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         await self._check_assignees(board, [principal_id])
         present = await self.session.scalar(
             select(TodoAssignee.principal_id).where(
@@ -1169,7 +1373,7 @@ class TodoService:
         if present is None:
             self.session.add(TodoAssignee(card_id=card.id, principal_id=principal_id))
             self._event(card, "assigned", actor, {"principalId": str(principal_id), "added": True})
-            self._touch(board)
+            self._touch(board, card)
             await self.session.commit()
             self._mail("assigned", card, [principal_id], actor)
         return await self._detail(card, board, principal)
@@ -1179,7 +1383,7 @@ class TodoService:
     ) -> TodoCardDetail:
         """Remove an assignee; an unknown one changes nothing."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         result = await self.session.execute(
             delete(TodoAssignee).where(
                 TodoAssignee.card_id == card.id, TodoAssignee.principal_id == principal_id
@@ -1187,7 +1391,7 @@ class TodoService:
         )
         if getattr(result, "rowcount", 0):
             self._event(card, "assigned", actor, {"principalId": str(principal_id), "added": False})
-            self._touch(board)
+            self._touch(board, card)
         await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1195,7 +1399,7 @@ class TodoService:
         self, card_id: uuid.UUID, label_id: uuid.UUID, principal: Principal
     ) -> TodoCardDetail:
         """Put a label of the board on the card (422 ``label_not_on_board`` otherwise)."""
-        card, board = await self._card(card_id, principal, lock=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         label = await self.session.get(TodoLabel, label_id)
         if label is None or label.board_id != board.id:
             raise _invalid("The label is not on this board.", "label_not_on_board", "labelId")
@@ -1206,7 +1410,7 @@ class TodoService:
         )
         if present is None:
             self.session.add(TodoCardLabel(card_id=card.id, label_id=label_id))
-            self._touch(board)
+            self._touch(board, card)
             await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1214,13 +1418,13 @@ class TodoService:
         self, card_id: uuid.UUID, label_id: uuid.UUID, principal: Principal
     ) -> TodoCardDetail:
         """Take a label off the card."""
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         await self.session.execute(
             delete(TodoCardLabel).where(
                 TodoCardLabel.card_id == card.id, TodoCardLabel.label_id == label_id
             )
         )
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1231,7 +1435,7 @@ class TodoService:
     ) -> TodoCardDetail:
         """Append a checklist item."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         last = await self.session.scalar(
             select(func.max(TodoCheckItem.position)).where(TodoCheckItem.card_id == card.id)
         )
@@ -1246,7 +1450,7 @@ class TodoService:
             )
         )
         self._event(card, "checklist", actor, {"action": "added", "text": value})
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1265,7 +1469,7 @@ class TodoService:
     ) -> TodoCardDetail:
         """Rename, tick or untick, or move a checklist item."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         item = await self._check_item(card, item_id)
         if payload.text is not None:
             value = payload.text.strip() or payload.text
@@ -1290,7 +1494,7 @@ class TodoService:
             others.insert(min(payload.position, len(others)), item)
             for position, entry in enumerate(others):
                 entry.position = position
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1299,11 +1503,11 @@ class TodoService:
     ) -> TodoCardDetail:
         """Delete a checklist item."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         item = await self._check_item(card, item_id)
         await self.session.delete(item)
         self._event(card, "checklist", actor, {"action": "removed", "text": item.text})
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1319,7 +1523,7 @@ class TodoService:
             ConflictError: The link exists (HTTP 409, ``link_exists``).
         """
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal, lock=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         if kind == "todo" and target_id == card.id:
             raise _invalid("A card cannot link to itself.", "link_self", "targetId")
         if not await self.links.readable(kind, target_id, principal):
@@ -1332,7 +1536,7 @@ class TodoService:
             raise ConflictError("The card has this link.", code="link_exists")
         self.session.add(_new_link(card.id, kind, target_id, actor))
         self._event(card, "linked", actor, {"linkKind": kind, "targetId": str(target_id)})
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1341,14 +1545,14 @@ class TodoService:
     ) -> TodoCardDetail:
         """Remove a link of the card."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         link = await self.session.get(TodoLink, link_id)
         if link is None or link.card_id != card.id:
             raise NotFoundError(f"link {link_id} not found")
         payload: dict[str, JsonValue] = {"linkKind": link.kind, "targetId": str(link.target_id)}
         await self.session.delete(link)
         self._event(card, "unlinked", actor, payload)
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1385,7 +1589,7 @@ class TodoService:
                 (HTTP 422).
         """
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal, lock=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         wanted = list(dict.fromkeys(mentions))
         await self._check_mentions(board, wanted)
         token = await check_message_drafts(
@@ -1409,7 +1613,7 @@ class TodoService:
                 pepper=pepper,
                 todo_comment_id=comment.id,
             )
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         self._mail("mentioned", card, wanted, actor, _excerpt(body))
         return await self._comment(comment, actor)
@@ -1434,7 +1638,7 @@ class TodoService:
         principal: Principal,
     ) -> TodoCommentOut:
         """Change an own comment; mentions that are new get the mail."""
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         comment, me = await self._own_comment(card, comment_id, principal)
         wanted = list(dict.fromkeys(mentions))
         await self._check_mentions(board, wanted)
@@ -1442,7 +1646,7 @@ class TodoService:
         comment.body = body
         comment.mentions = [str(m) for m in wanted]
         comment.edited_at = _now()
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         self._mail("mentioned", card, [m for m in wanted if m not in before], me, _excerpt(body))
         return await self._comment(comment, me)
@@ -1451,11 +1655,11 @@ class TodoService:
         self, card_id: uuid.UUID, comment_id: uuid.UUID, principal: Principal
     ) -> None:
         """Soft-delete an own comment and remove its files."""
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         comment, _me = await self._own_comment(card, comment_id, principal)
         comment.deleted_at = _now()
         await self.files.delete_for_messages("todo_comment", [comment.id], actor=principal.sub)
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
 
     async def _comment(self, comment: TodoComment, me: uuid.UUID) -> TodoCommentOut:
@@ -1473,9 +1677,10 @@ class TodoService:
         ``dueSoonCount`` counts the ones due within 7 days (overdue included).
 
         Raises:
-            ForbiddenError: A token without ``todo.write`` in its scope (HTTP 403).
+            ForbiddenError: A token whose scope allows none of ``todo.write``,
+                ``todo.all`` and ``todo.read_all`` (HTTP 403).
         """
-        if not principal.scope_allows(TODO_WRITE):
+        if not token_reads(principal):
             raise ForbiddenError("The token scope does not allow to-dos.")
         me = await self.access.me(principal)
         if me is None:
@@ -1539,32 +1744,82 @@ class TodoService:
         it still names the caller. Order: the gremium boards by name, then team.
 
         Raises:
-            ForbiddenError: A token without ``todo.write`` in its scope (HTTP 403).
+            ForbiddenError: A token whose scope allows none of ``todo.write``,
+                ``todo.all`` and ``todo.read_all`` (HTTP 403).
         """
-        if not principal.scope_allows(TODO_WRITE):
+        return await self._board_rows(principal, mine=True)
+
+    async def all_boards(self, principal: Principal) -> list[TodoAssignedBoard]:
+        """Every readable board with all its live cards (the meta-board "Alle").
+
+        The personal board comes first (the call creates it when it is missing, like
+        ``list_boards``), then the gremium boards by name, then the team boards. A
+        board comes with all its columns in their order, its labels and every live
+        card; ``cardCount`` counts the live cards of each column.
+
+        Raises:
+            ForbiddenError: A token whose scope allows none of ``todo.write``,
+                ``todo.all`` and ``todo.read_all`` (HTTP 403).
+        """
+        return await self._board_rows(principal, mine=False)
+
+    async def _board_rows(self, principal: Principal, *, mine: bool) -> list[TodoAssignedBoard]:
+        """Build the board rows of ``mine_boards`` (``mine``) or ``all_boards``.
+
+        The number of queries does not depend on the number of boards: one for the
+        boards or the cards, one each for the columns and the labels, and the tile
+        facts of all cards together.
+        """
+        if not token_reads(principal):
             raise ForbiddenError("The token scope does not allow to-dos.")
         me = await self.access.me(principal)
-        if me is None:
+        if mine and me is None:
             return []
+        if not mine and me is not None:
+            await ensure_personal_board(self.session, me)
         scope = await self.access.scope(principal)
-        rows = (
-            await self.session.execute(
-                select(TodoCard, TodoBoard)
-                .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
-                .join(TodoAssignee, TodoAssignee.card_id == TodoCard.id)
-                .where(
-                    TodoAssignee.principal_id == me,
-                    TodoCard.archived_at.is_(None),
-                    TodoBoard.archived_at.is_(None),
-                    TodoBoard.kind != "personal",
-                    scope.condition(),
+        if mine:
+            rows = (
+                await self.session.execute(
+                    select(TodoCard, TodoBoard)
+                    .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
+                    .join(TodoAssignee, TodoAssignee.card_id == TodoCard.id)
+                    .where(
+                        TodoAssignee.principal_id == me,
+                        TodoCard.archived_at.is_(None),
+                        TodoBoard.archived_at.is_(None),
+                        TodoBoard.kind != "personal",
+                        scope.condition(),
+                    )
+                    .order_by(TodoCard.rank, TodoCard.id)
                 )
-                .order_by(TodoCard.rank, TodoCard.id)
+            ).all()
+            boards = {b.id: b for _card, b in rows}
+            cards = [c for c, _b in rows]
+        else:
+            boards = {
+                b.id: b
+                for b in (
+                    await self.session.scalars(
+                        select(TodoBoard).where(scope.condition(), TodoBoard.archived_at.is_(None))
+                    )
+                ).all()
+            }
+            cards = (
+                list(
+                    (
+                        await self.session.scalars(
+                            select(TodoCard)
+                            .where(TodoCard.board_id.in_(boards), TodoCard.archived_at.is_(None))
+                            .order_by(TodoCard.rank, TodoCard.id)
+                        )
+                    ).all()
+                )
+                if boards
+                else []
             )
-        ).all()
-        if not rows:
+        if not boards:
             return []
-        boards = {b.id: b for _card, b in rows}
         columns: dict[uuid.UUID, list[TodoColumn]] = {}
         for col in (
             await self.session.scalars(
@@ -1583,7 +1838,6 @@ class TodoService:
             )
         ).all():
             labels.setdefault(lab.board_id, []).append(lab)
-        cards = [c for c, _b in rows]
         facts = await self._facts(cards, principal)
         per_board: dict[uuid.UUID, list[TodoCard]] = {}
         for c in cards:
@@ -1596,7 +1850,7 @@ class TodoService:
         for b in ordered:
             cols = columns.get(b.id, [])
             position = {c.id: i for i, c in enumerate(cols)}
-            own = per_board[b.id]
+            own = per_board.get(b.id, [])
             own.sort(key=lambda c: (position.get(c.column_id, len(cols)), c.rank, str(c.id)))
             per_column: dict[uuid.UUID, int] = {}
             for c in own:
@@ -1607,7 +1861,7 @@ class TodoService:
                     name=b.name,
                     kind=b.kind,  # pyright: ignore[reportArgumentType]
                     gremium_id=b.gremium_id,
-                    can_write=True,
+                    can_write=await self.access.can_write(b, principal),
                     columns=[
                         TodoColumnOut(
                             id=c.id,
@@ -1628,7 +1882,7 @@ class TodoService:
         self, kind: str, target_id: uuid.UUID, principal: Principal
     ) -> list[TodoLinkedCard]:
         """The readable live cards that link to a target: open first, then by due date."""
-        if not principal.scope_allows(TODO_WRITE):
+        if not token_reads(principal):
             return []
         scope = await self.access.scope(principal)
         column = getattr(TodoLink, LINK_COLUMNS[kind])
@@ -1664,7 +1918,7 @@ class TodoService:
         self, q: str, principal: Principal, *, limit: int
     ) -> list[tuple[TodoCard, TodoBoard, TodoColumn]]:
         """Find live cards by title on the boards that the principal reads (palette)."""
-        if not principal.scope_allows(TODO_WRITE):
+        if not token_reads(principal):
             return []
         scope = await self.access.scope(principal)
         where, rank = trigram_rank(q, [TodoCard.title], dialect=dialect_of(self.session))
@@ -1702,7 +1956,7 @@ class TodoService:
             ValidationProblem: The card is archived (``todo_archived``) or not on the
                 board of the gremium (``todo_wrong_board``) (HTTP 422).
         """
-        card, board = await self._card(card_id, principal, lock=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         if card.archived_at is not None:
             raise _invalid("The card is archived.", "todo_archived", "todoId")
         if board.kind != "gremium" or board.gremium_id != gremium_id:
@@ -1729,7 +1983,24 @@ class TodoService:
         )
         board = await self.session.get(TodoBoard, card.board_id)
         if board is not None:
-            self._touch(board)
+            self._touch(board, card)
+
+
+def _check_transfer_kinds(source: TodoBoard, target: TodoBoard) -> None:
+    """Refuse a transfer from a shared board into a personal board (403).
+
+    Raises:
+        ForbiddenError: ``transfer_to_personal``.
+    """
+    if source.kind != "personal" and target.kind == "personal":
+        raise ForbiddenError(
+            "A card of a shared board cannot move into a personal board.",
+            code="transfer_to_personal",
+        )
+
+
+def _card_moved() -> ConflictError:
+    return ConflictError("The card was moved in the meantime.", code="card_moved")
 
 
 def _rank(low: str | None, high: str | None) -> str:
@@ -1762,6 +2033,27 @@ def _append(live: Sequence[TodoCard], cards: Sequence[TodoCard]) -> None:
             card.rank = last
     except RankError:
         _respread([*live, *cards])
+
+
+def _place(live: Sequence[TodoCard], index: int, card: TodoCard) -> bool:
+    """Rank ``card`` at ``index`` among the live cards ``live`` of a column.
+
+    Two cards that share a rank, a broken rank or a new rank above ``MAX_LENGTH``
+    give the column a fresh order. The
+    caller holds the board lock, so no parallel write ranks the column at the same time.
+
+    Returns:
+        True when the column got a fresh order. The caller then pings the whole
+        board, because the other cards of the column changed too.
+    """
+    low = live[index - 1].rank if index > 0 else None
+    high = live[index].rank if index < len(live) else None
+    try:
+        card.rank = _rank(low, high)
+    except RankError:
+        _respread([*live[:index], card, *live[index:]])
+        return True
+    return False
 
 
 def _slot(

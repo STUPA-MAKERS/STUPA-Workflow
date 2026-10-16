@@ -1,22 +1,29 @@
 """To-dos API router (``/todos``).
 
-Every route needs a principal session (401) and, for an OAuth token, the scope
-``todos:write``: without it ``GET /todos/boards``, ``GET /todos/mine`` and
-``GET /todos/mine/boards`` answer 403 and every board or card 404. A board or card
-that the caller cannot read answers 404, never 403; a configuration change without
-``todo.configure`` 403 ``todo_configure_required``.
+Every route needs a principal session (401). An OAuth token reads to-dos when its
+scope lets ``todo.write`` or ``todo.all`` (``todos:write``) or ``todo.read_all``
+(``read``) through: without one of them ``GET /todos/boards``, ``GET /todos/mine``,
+``GET /todos/mine/boards`` and ``GET /todos/all/boards`` answer 403, the link picker
+and ``linked`` ``[]``, and every board or card 404. A write needs ``todo.write`` or
+``todo.all`` in the scope. A board or card that the caller cannot read answers 404,
+never 403; a card write on a board that the caller reads but cannot write 403
+``todo_write_required``; a configuration change without ``todo.configure`` 403
+``todo_configure_required``.
 
-``GET /todos/boards/{id}`` and ``GET /todos/mine/boards`` carry a weak ``ETag`` over
-their body and answer 304 to a matching ``If-None-Match``; the frontend polls them
-every 30 s. Mails of a write (``todo_assigned``, ``todo_mentioned``) go out as a
-background task after the commit.
+``GET /todos/boards/{id}``, ``GET /todos/mine/boards`` and ``GET /todos/all/boards``
+carry a weak ``ETag`` over their body and answer 304 to a matching
+``If-None-Match``; the frontend polls them every 30 s (120 s while its live socket is
+open). Mails of a write (``todo_assigned``, ``todo_mentioned``) go out as a background
+task after the commit. The change pings of a write (``live``) go to the broker after
+the route, so after its commit; ``GET /todos/cards/{id}/tile`` answers the tile that
+a ping names, and ``socket`` is the channel ``WS /api/ws/todos``.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -24,8 +31,11 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request,
 
 from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.files.service import FilesService
+from app.modules.livevote.broker import PatternBroker
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.todos import notify_todo_mails
+from app.modules.todos.access import token_reads
+from app.modules.todos.live import publish_pings, todo_broker
 from app.modules.todos.schemas import (
     AssigneeIn,
     BoardPatch,
@@ -33,6 +43,7 @@ from app.modules.todos.schemas import (
     CardLabelIn,
     CardMove,
     CardPatch,
+    CardTransfer,
     CheckItemCreate,
     CheckItemPatch,
     ColumnCreate,
@@ -82,7 +93,25 @@ def get_todo_service(session: DbSession, request: Request) -> TodoService:
     return TodoService(session, files=FilesService(session, storage=storage))
 
 
-ServiceDep = Annotated[TodoService, Depends(get_todo_service)]
+def get_todo_broker(request: Request) -> PatternBroker:
+    """The broker of the board pings (Redis in production); a test overrides it."""
+    return todo_broker(request.app.state)
+
+
+async def get_live_todo_service(
+    service: Annotated[TodoService, Depends(get_todo_service)],
+    broker: Annotated[PatternBroker, Depends(get_todo_broker)],
+) -> AsyncIterator[TodoService]:
+    """The service of a route; after the route (and its commit) the pings go out.
+
+    A route that raises sends none. ``publish_pings`` logs a broker fault and never
+    raises, so a write never fails on Redis.
+    """
+    yield service
+    await publish_pings(broker, service.pings.drain())
+
+
+ServiceDep = Annotated[TodoService, Depends(get_live_todo_service)]
 
 #: Sends the mails of a write after the commit (background task).
 TodoMailSender = Callable[[Settings, Sequence[TodoMail], object], Awaitable[None]]
@@ -124,7 +153,7 @@ def board_etag(board: TodoBoardOut) -> str:
 
 
 def mine_boards_etag(boards: Sequence[TodoAssignedBoard]) -> str:
-    """The weak ETag of ``GET /todos/mine/boards``: a hash over the whole list."""
+    """The weak ETag of ``GET /todos/mine/boards`` and ``/all/boards``: a hash over the list."""
     return _weak_etag([b.model_dump(by_alias=True, mode="json") for b in boards])
 
 
@@ -334,7 +363,30 @@ async def mine_boards(
     Each board brings all its columns and labels but only the caller's cards, done
     ones included; the personal board and a board without such a card are left out.
     """
-    boards = await service.mine_boards(principal)
+    return _rows(await service.mine_boards(principal), response, if_none_match)
+
+
+@router.get(
+    "/all/boards",
+    response_model=list[TodoAssignedBoard],
+    responses={**_errors(401, 403), 304: {"description": "Not modified"}},
+)
+async def all_boards(
+    service: ServiceDep,
+    principal: Member,
+    response: Response,
+    if_none_match: Annotated[str | None, Header()] = None,
+) -> list[TodoAssignedBoard] | Response:
+    """Every readable board with all its live cards, the personal one first (ETag, 304).
+
+    The first call creates the personal board "Meine To-Dos".
+    """
+    return _rows(await service.all_boards(principal), response, if_none_match)
+
+
+def _rows(
+    boards: list[TodoAssignedBoard], response: Response, if_none_match: str | None
+) -> list[TodoAssignedBoard] | Response:
     etag = mine_boards_etag(boards)
     if _matches(if_none_match, etag):
         return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers={"ETag": etag})
@@ -352,7 +404,7 @@ async def link_targets(
     exclude_card_id: Annotated[UUID | None, Query(alias="excludeCardId")] = None,
 ) -> list[TodoLinkTarget]:
     """Search the link targets that the caller may read (at most 5 per kind)."""
-    if not principal.scope_allows("todo.write"):
+    if not token_reads(principal):
         return []
     return await service.links.search(q, kind, principal, exclude_card_id=exclude_card_id)
 
@@ -375,7 +427,7 @@ async def linked(
     "/cards",
     response_model=TodoCardDetail,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(401, 404, 422),
+    responses=_errors(401, 403, 404, 422),
 )
 async def create_card(
     payload: CardCreate,
@@ -398,8 +450,14 @@ async def get_card(card_id: UUID, service: ServiceDep, principal: Member) -> Tod
     return await service.card(card_id, principal)
 
 
+@router.get("/cards/{card_id}/tile", response_model=TodoCardTile, responses=_errors(401, 404))
+async def get_card_tile(card_id: UUID, service: ServiceDep, principal: Member) -> TodoCardTile:
+    """The tile of a live card as the board read has it (404 when archived): a ping read."""
+    return await service.tile(card_id, principal)
+
+
 @router.patch(
-    "/cards/{card_id}", response_model=TodoCardDetail, responses=_errors(401, 404, 409, 422)
+    "/cards/{card_id}", response_model=TodoCardDetail, responses=_errors(401, 403, 404, 409, 422)
 )
 async def patch_card(
     card_id: UUID, payload: CardPatch, service: ServiceDep, principal: Member
@@ -408,7 +466,11 @@ async def patch_card(
     return await service.patch(card_id, payload, principal)
 
 
-@router.post("/cards/{card_id}/move", response_model=TodoCardTile, responses=_errors(401, 404, 422))
+@router.post(
+    "/cards/{card_id}/move",
+    response_model=TodoCardTile,
+    responses=_errors(401, 403, 404, 409, 422),
+)
 async def move_card(
     card_id: UUID, payload: CardMove, service: ServiceDep, principal: Member
 ) -> TodoCardTile:
@@ -416,11 +478,23 @@ async def move_card(
     return await service.move(card_id, payload, principal)
 
 
+@router.post(
+    "/cards/{card_id}/transfer",
+    response_model=TodoCardDetail,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def transfer_card(
+    card_id: UUID, payload: CardTransfer, service: ServiceDep, principal: Member
+) -> TodoCardDetail:
+    """Move a card to another board; labels by name and assignees by membership stay."""
+    return await service.transfer(card_id, payload, principal)
+
+
 @router.delete(
     "/cards/{card_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     response_class=Response,
-    responses=_errors(401, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def archive_card(card_id: UUID, service: ServiceDep, principal: Member) -> Response:
     """Archive a card."""
@@ -428,7 +502,9 @@ async def archive_card(card_id: UUID, service: ServiceDep, principal: Member) ->
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/cards/{card_id}/restore", response_model=TodoCardDetail, responses=_errors(401, 404))
+@router.post(
+    "/cards/{card_id}/restore", response_model=TodoCardDetail, responses=_errors(401, 403, 404, 409)
+)
 async def restore_card(card_id: UUID, service: ServiceDep, principal: Member) -> TodoCardDetail:
     """Bring an archived card back."""
     return await service.restore_card(card_id, principal)
@@ -437,7 +513,7 @@ async def restore_card(card_id: UUID, service: ServiceDep, principal: Member) ->
 @router.post(
     "/cards/{card_id}/assignees",
     response_model=TodoCardDetail,
-    responses=_errors(401, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def add_assignee(
     card_id: UUID,
@@ -458,7 +534,7 @@ async def add_assignee(
 @router.delete(
     "/cards/{card_id}/assignees/{principal_id}",
     response_model=TodoCardDetail,
-    responses=_errors(401, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def remove_assignee(
     card_id: UUID, principal_id: UUID, service: ServiceDep, principal: Member
@@ -468,7 +544,9 @@ async def remove_assignee(
 
 
 @router.post(
-    "/cards/{card_id}/labels", response_model=TodoCardDetail, responses=_errors(401, 404, 422)
+    "/cards/{card_id}/labels",
+    response_model=TodoCardDetail,
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def add_card_label(
     card_id: UUID, payload: CardLabelIn, service: ServiceDep, principal: Member
@@ -480,7 +558,7 @@ async def add_card_label(
 @router.delete(
     "/cards/{card_id}/labels/{label_id}",
     response_model=TodoCardDetail,
-    responses=_errors(401, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def remove_card_label(
     card_id: UUID, label_id: UUID, service: ServiceDep, principal: Member
@@ -492,7 +570,7 @@ async def remove_card_label(
 @router.post(
     "/cards/{card_id}/checklist",
     response_model=TodoCardDetail,
-    responses=_errors(401, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def add_check_item(
     card_id: UUID, payload: CheckItemCreate, service: ServiceDep, principal: Member
@@ -504,7 +582,7 @@ async def add_check_item(
 @router.patch(
     "/cards/{card_id}/checklist/{item_id}",
     response_model=TodoCardDetail,
-    responses=_errors(401, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def patch_check_item(
     card_id: UUID,
@@ -520,7 +598,7 @@ async def patch_check_item(
 @router.delete(
     "/cards/{card_id}/checklist/{item_id}",
     response_model=TodoCardDetail,
-    responses=_errors(401, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def delete_check_item(
     card_id: UUID, item_id: UUID, service: ServiceDep, principal: Member
@@ -532,7 +610,7 @@ async def delete_check_item(
 @router.post(
     "/cards/{card_id}/links",
     response_model=TodoCardDetail,
-    responses=_errors(401, 404, 409, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def add_link(
     card_id: UUID, payload: LinkIn, service: ServiceDep, principal: Member
@@ -545,7 +623,7 @@ async def add_link(
 @router.delete(
     "/cards/{card_id}/links/{link_id}",
     response_model=TodoCardDetail,
-    responses=_errors(401, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def remove_link(
     card_id: UUID, link_id: UUID, service: ServiceDep, principal: Member
@@ -558,7 +636,7 @@ async def remove_link(
     "/cards/{card_id}/comments",
     response_model=TodoCommentOut,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(401, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def add_comment(
     card_id: UUID,
@@ -591,7 +669,7 @@ async def add_comment(
 @router.patch(
     "/cards/{card_id}/comments/{comment_id}",
     response_model=TodoCommentOut,
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def edit_comment(
     card_id: UUID,
@@ -614,7 +692,7 @@ async def edit_comment(
     "/cards/{card_id}/comments/{comment_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     response_class=Response,
-    responses=_errors(401, 403, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def delete_comment(
     card_id: UUID, comment_id: UUID, service: ServiceDep, principal: Member

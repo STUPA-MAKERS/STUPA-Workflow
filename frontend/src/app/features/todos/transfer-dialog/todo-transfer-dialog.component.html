@@ -1,0 +1,38 @@
+<app-dialog
+  [open]="open()"
+  [title]="'todos.transfer.title' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="cancel()"
+>
+  @if (none()) {
+    <p class="tt__empty">{{ 'todos.transfer.none' | t }}</p>
+  } @else if (unloadable()) {
+    <p class="tt__error" role="alert">{{ 'todos.error.transfer' | t }}</p>
+  } @else {
+    <form class="tt" (submit)="$event.preventDefault(); confirm()">
+      <app-select
+        name="board"
+        [label]="'todos.transfer.board' | t"
+        [options]="boardOptions()"
+        [ngModel]="selectedBoard()"
+        (ngModelChange)="setBoard($event)"
+      />
+      <app-select
+        name="column"
+        [label]="'todos.transfer.column' | t"
+        [options]="columnOptions()"
+        [ngModel]="column()"
+        (ngModelChange)="column.set($event)"
+      />
+      @if (failed()) {
+        <p class="tt__error" role="alert">{{ 'todos.error.transfer' | t }}</p>
+      }
+    </form>
+  }
+  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
+  @if (!none() && !unloadable()) {
+    <app-button dialog-footer variant="fill" [loading]="busy()" [disabled]="!canConfirm()" (click)="confirm()">
+      {{ 'todos.transfer.confirm' | t }}
+    </app-button>
+  }
+</app-dialog>

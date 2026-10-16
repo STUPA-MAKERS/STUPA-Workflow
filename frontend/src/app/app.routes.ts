@@ -364,7 +364,8 @@ export const routes: Routes = [
         ],
       },
       {
-        // The To-Do boards: `/todos` opens the default board, `/todos/:boardId` one board.
+        // The To-Do boards: `/todos` opens the default board, `/todos/:boardId` one board,
+        // `/todos/alle` the meta-board "Alle" (every readable board, `ALL_BOARDS`).
         // `?card=` opens a card in the drawer, `?view=list` the table. The server
         // authorizes every board; any signed-in person has the personal one.
         path: 'todos',

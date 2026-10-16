@@ -48,11 +48,11 @@ clients.
 
 | Scope | Grants (capped by the user's own rights) |
 |-------|------------------------------------------|
-| `read` | read applications, budgets, votes, meetings (incl. `meeting.view_all`), gremien (incl. `gremium.view_all`), audit, exports |
+| `read` | read applications, budgets, votes, meetings (incl. `meeting.view_all`), gremien (incl. `gremium.view_all`), every gremium and team to-do board (`todo.read_all`, read only), audit, exports |
 | `applications:write` | comment / transition / manage applications, capture an application on behalf of an applicant (`application.create_on_behalf`) |
 | `votes:write` | create / open / close / cancel / manage votes through the gremium right `vote.manage` (NEVER cast a ballot — only a human may do that. `vote.cast` is in `FORBIDDEN_PERMISSIONS` and is never grantable) |
 | `budget:write` | book expenses, manage cost centers & invoices |
-| `todos:write` | read and write the to-do boards through the gremium rights `todo.write` and `todo.configure` (or the personal board, or a team board's permission) |
+| `todos:write` | read and write the to-do boards through the gremium rights `todo.write` and `todo.configure` (or the personal board, or a team board's permission), and every gremium and team board through the global `todo.all` (cards only, never the configuration) |
 | `tickets:write` | read and work on the tickets (`ticket.manage`) |
 | `meetings:write` | the gremium rights `session.manage` (meetings & agendas, and every vote of the gremium: the votes of its meetings and the application votes that no meeting holds), `protocol.write` (minutes) and `protocol.finalize` (finalize & send the minutes) |
 
@@ -99,8 +99,9 @@ Public meeting (#17): `list_meeting_guests`, `admit_meeting_guest`, `admit_all_m
 On behalf (#11): `create_application_on_behalf`, `search_on_behalf_applicants` (needs
 `application.create_on_behalf`).
 To-dos: `todo_boards`, `todo_board`, `todo_my_cards` (my cards on the other boards, by
-board), `todo_card_get`, `todo_card_create`, `todo_card_update` (needs the card `version`),
-`todo_card_move`, `todo_comment`.
+board), `todo_all_boards` (every readable board with all its cards), `todo_card_get`, `todo_card_create`, `todo_card_update` (needs the card `version`),
+`todo_card_move`, `todo_card_transfer` (to another board, optionally between two
+neighbors), `todo_comment`.
 Tickets: `tickets_list`, `tickets_get`, `tickets_note`, `tickets_update`,
 `tickets_block_sender`, `tickets_unblock_sender`, `tickets_blocked_senders`,
 `tickets_delete_blocked_sender` (need `ticket.manage`).

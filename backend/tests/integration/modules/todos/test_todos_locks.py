@@ -7,6 +7,9 @@ a move does, starts the other write, then updates the card and commits.
 The agenda path locks the board before the meeting, because a card create locks the
 board and then inserts a meeting link. ``completeTodos`` locks the boards in id
 order, so two closes on the same two boards wait for each other.
+
+A write that waited for the lock of a board while a transfer moved its card away
+answers 409 ``card_moved``, because the lock it holds is the lock of the old board.
 """
 
 from __future__ import annotations
@@ -21,10 +24,10 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.auth.principal import Principal
-from app.modules.todos.schemas import CardCreate, CardPatch, LabelCreate
+from app.modules.todos.schemas import CardCreate, CardMove, CardPatch, CardTransfer, LabelCreate
 from app.modules.todos.service import TodoService
 from app.shared.errors import ConflictError
-from tests.integration.modules.todos.conftest import add_gremium, add_person
+from tests.integration.modules.todos.conftest import add_gremium, add_member, add_person
 from tests.integration.modules.todos.test_todos_lifecycle import _personal
 from worker.todos import archive_done_todos
 
@@ -331,3 +334,52 @@ async def test_two_cards_on_two_boards_link_each_other_at_once(
         linked = await asyncio.wait_for(asyncio.create_task(link_b_to_a()), 5)
         assert linked == 1
         assert len((await service.add_link(a1, "todo", b1, lead)).links) == 1
+
+
+@pytest.mark.parametrize("write", ["move", "patch", "archive", "checklist"])
+async def test_a_write_that_waits_for_a_transfer_answers_card_moved(
+    maker: async_sessionmaker[AsyncSession], write: str
+) -> None:
+    me, me_id = await add_person(maker, "Ada")
+    board, columns = await _personal(maker, me_id)
+    gid, target = await add_gremium(maker, "StuPa")
+    await add_member(maker, gid, me_id, "todo.write")
+    async with maker() as session:
+        payload = CardCreate.model_validate({"boardId": str(board.id), "title": "Plakat"})
+        card_id = (await TodoService(session).create(payload, me)).id
+
+    async def run() -> Any:
+        async with maker() as session:
+            service = TodoService(session)
+            if write == "move":
+                return await service.move(card_id, CardMove(columnId=columns[1].id), me)
+            if write == "archive":
+                return await service.archive_card(card_id, me)
+            if write == "checklist":
+                return await service.add_check_item(card_id, "Druck", me)
+            return await service.patch(card_id, CardPatch(version=1, title="Neu"), me)
+
+    async with maker() as holder:
+        # The transfer holds the source board while the other write waits for it.
+        await holder.execute(
+            text("SELECT id FROM todo_board WHERE id = :b FOR UPDATE"), {"b": board.id}
+        )
+        waiting = asyncio.create_task(run())
+        await asyncio.sleep(0.3)
+        assert not waiting.done()
+        await TodoService(holder).transfer(card_id, CardTransfer(boardId=target), me)
+    with pytest.raises(ConflictError) as exc:
+        await asyncio.wait_for(waiting, 10)
+    assert exc.value.code == "card_moved"
+    async with maker() as session:
+        row = (
+            await session.execute(
+                text("SELECT board_id, title, archived_at FROM todo_card WHERE id = :c"),
+                {"c": card_id},
+            )
+        ).one()
+        assert row == (target, "Plakat", None)
+        items = await session.scalar(
+            text("SELECT count(*) FROM todo_check_item WHERE card_id = :c"), {"c": card_id}
+        )
+        assert items == 0

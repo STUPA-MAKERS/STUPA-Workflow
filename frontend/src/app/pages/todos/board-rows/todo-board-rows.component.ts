@@ -1,10 +1,12 @@
 import { CdkScrollable } from '@angular/cdk/scrolling';
-import { CdkDrag, CdkDropList, CdkDropListGroup, type CdkDragDrop, type CdkDragEnter } from '@angular/cdk/drag-drop';
+import { HttpErrorResponse } from '@angular/common/http';
+import { CdkDrag, CdkDropList, type CdkDragDrop, type CdkDragEnter } from '@angular/cdk/drag-drop';
 import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
   Injector,
+  type OnInit,
   afterNextRender,
   computed,
   effect,
@@ -12,8 +14,10 @@ import {
   input,
   output,
   signal,
+  untracked,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { Subject, finalize, merge } from 'rxjs';
 import type { Uuid } from '@core/api/models';
 import {
   TodosApiService,
@@ -26,11 +30,18 @@ import {
 } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
+import type { TodoPing } from '@core/ws/ws-messages';
 import { IconComponent, ToastService } from '@stupa-makers/ui-kit';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
 import {
+  DROP_ENTER,
   applyMove,
+  dropMove,
+  filterActive,
+  insertTile,
   matchesFilter,
+  moveErrorText,
   moveRequest,
   placeTile,
   removeTile,
@@ -41,8 +52,36 @@ import {
 import { BOARD_ICON } from '../board-picker/todo-board-picker.component';
 import { DONE_PREVIEW } from '../board-view/todo-board-view.component';
 
-/** The ids of the collapsed rows, per browser. */
+/** The ids of the collapsed rows, per browser ("Meine To-Dos" and "Alle" share them). */
 export const COLLAPSED_KEY = 'ap.todos.rows.collapsed';
+
+/** The id of the drop list of a column in the rows, for `cdkDropListConnectedTo`. */
+export function rowDropId(columnId: Uuid): string {
+  return `br-list-${columnId}`;
+}
+
+/** A card of another board (the personal board above the rows) landed in a row. */
+export interface RowDrop {
+  boardId: Uuid;
+  cardId: Uuid;
+  move: TodoCardMove;
+}
+
+/** How `boardRows` reads the cards. */
+export interface RowOptions {
+  /**
+   * "Alle": a row holds every card of its board, so "Zuständig: Ich" keeps the cards
+   * assigned to `me`, and a board without a card stays a row while no filter is on
+   * (unless no board has a card at all).
+   */
+  all?: boolean;
+  me?: Uuid | null;
+  /**
+   * The labels of the label filter by id. Labels are per board, so a row keeps the cards
+   * with a label of the same name (case-insensitive). Without it the filter compares ids.
+   */
+  filterLabels?: ReadonlyMap<Uuid, TodoLabel>;
+}
 
 /** A row as shown: the board, its columns in order and the cards that pass the filters. */
 export interface BoardRow {
@@ -65,28 +104,42 @@ interface KeyDrag {
 
 /**
  * Build the rows: every board with its columns and the cards that pass the filters.
- * A row without such a card is left out. Every card of a row is assigned to the viewer,
- * so "Zuständig: Ich" keeps all of them.
+ * A row without such a card is left out (see `RowOptions.all` for "Alle"). Under
+ * "Meine To-Dos" every card of a row is assigned to the viewer, so "Zuständig: Ich"
+ * keeps all of them.
  */
 export function boardRows(
   boards: readonly TodoAssignedBoard[],
   filter: BoardFilter,
   today: string,
+  opts: RowOptions = {},
 ): BoardRow[] {
   const rows: BoardRow[] = [];
+  const keepEmpty = !!opts.all && !filterActive(filter) && boards.some((b) => b.cards.length > 0);
+  const byName = opts.filterLabels;
+  const wanted = new Set(filter.labels.map((id) => byName?.get(id)?.name.toLowerCase() ?? ''));
   for (const board of boards) {
     const labels = new Map(board.labels.map((l) => [l.id, l]));
-    const ctx = { today, mine: new Set(board.cards.map((c) => c.id)), labels };
+    const mine = opts.all
+      ? board.cards.filter((c) => opts.me && c.assignees.some((a) => a.principalId === opts.me))
+      : board.cards;
+    const ctx = { today, mine: new Set(mine.map((c) => c.id)), labels };
+    let rowFilter = filter;
+    if (byName && filter.labels.length) {
+      const ids = board.labels.filter((l) => wanted.has(l.name.toLowerCase())).map((l) => l.id);
+      // No label of that name on this board: '' matches no card.
+      rowFilter = { ...filter, labels: ids.length ? ids : [''] };
+    }
     const columns = sortedColumns(board.columns);
     const cards = new Map<Uuid, TodoCardTile[]>(columns.map((c) => [c.id, []]));
     let count = 0;
     for (const card of board.cards) {
       const list = cards.get(card.columnId);
-      if (!list || !matchesFilter(card, filter, ctx)) continue;
+      if (!list || !matchesFilter(card, rowFilter, ctx)) continue;
       list.push(card);
       count++;
     }
-    if (count) rows.push({ board, columns, cards, labels, count });
+    if (count || keepEmpty) rows.push({ board, columns, cards, labels, count });
   }
   return rows;
 }
@@ -110,25 +163,39 @@ function writeCollapsed(ids: ReadonlySet<Uuid>): void {
 }
 
 /**
- * The rows under "Meine To-Dos": one row per other board that holds cards assigned to me
- * (`GET /todos/mine/boards`), headed by the board name and the count, with the columns of
- * that board and only my cards in them.
+ * The board rows. `source="mine"`: the rows under "Meine To-Dos", one row per other board
+ * that holds cards assigned to me (`GET /todos/mine/boards`), with only my cards.
+ * `source="all"`: the meta-board "Alle", one row per readable board with all its cards
+ * (`GET /todos/all/boards`). Each row is headed by the board name and the count, with the
+ * columns of that board.
  *
  * A row is a region with a heading; the heading button collapses it (remembered per
- * browser). A drag moves a card inside its row only, on its own board, through the move
- * route of the board: each row is its own drop group, so a card never reaches another
- * row or the personal board. The keyboard drag works as on the board: Space lifts, the
- * arrows move, Space or Enter put down, Escape puts back. A row without `canWrite` is
- * read only. On a phone the columns of a row scroll sideways and there is no drag.
+ * browser). A pointer drag reaches every column of every writable row and the drop lists
+ * of `extraDrops` (the personal board above the rows): a drop on the same board moves the
+ * card (`moveCard`), a drop on another row transfers it (`transferCard`, with the
+ * neighbors of the drop place), both at once and back with a toast when the server
+ * refuses. A card from `extraDrops` comes out as `dropIn` for the page. The keyboard drag
+ * stays in its row: Space lifts, the arrows move, Space or Enter put down, Escape puts
+ * back. A row without `canWrite` is read only: no drag source and no drop target. A card
+ * of a shared board does not enter the row of the personal board (`DROP_ENTER`). On a
+ * phone the columns of a row scroll sideways and there is no drag.
  *
  * The page calls `poll()` with its own poll (ETag, 304 keeps the rows), and the
  * `card…` methods after a change in the card drawer.
+ *
+ * Live: the rows take the pings of their boards and of `liveIds` (`TodoLiveService`). A
+ * `card` ping reads that tile and puts it in its row; under "Meine To-Dos" only a tile
+ * assigned to `me` stays, so a tile without me leaves and a new one with me joins. A tile
+ * of a board without a row, or an unknown `me`, reads the rows again. `card_removed` takes
+ * the tile out, a 404 of the tile read too, and `board` is the ETag read of the rows.
+ * While a card is held (here or, through `hold`, on the board above) or a move is in
+ * flight, the pings wait.
  */
 @Component({
   selector: 'app-todo-board-rows',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CdkDrag, CdkDropList, CdkDropListGroup, CdkScrollable, RouterLink, TranslatePipe, IconComponent, TodoCardTileComponent],
+  imports: [CdkDrag, CdkDropList, CdkScrollable, RouterLink, TranslatePipe, IconComponent, TodoCardTileComponent],
   host: {
     class: 'br-host',
     '(document:focusin)': 'leaveDrag($event)',
@@ -137,18 +204,43 @@ function writeCollapsed(ids: ReadonlySet<Uuid>): void {
   templateUrl: './todo-board-rows.component.html',
   styleUrl: './todo-board-rows.component.scss',
 })
-export class TodoBoardRowsComponent {
+export class TodoBoardRowsComponent implements OnInit {
   private readonly api = inject(TodosApiService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly live = inject(TodoLiveService);
 
   readonly filter = input.required<BoardFilter>();
   readonly today = input.required<string>();
   readonly phone = input(false);
+  /** `mine`: the rows under "Meine To-Dos"; `all`: the meta-board "Alle". */
+  readonly source = input<'mine' | 'all'>('mine');
+  /**
+   * My principal id: "Alle" needs it for "Zuständig: Ich", "Meine To-Dos" for the live
+   * changes (a card without me leaves the rows).
+   */
+  readonly me = input<Uuid | null>(null);
+  /** The labels of the page's label filter by id (see `RowOptions.filterLabels`). */
+  readonly filterLabels = input<ReadonlyMap<Uuid, TodoLabel> | undefined>(undefined);
+  /** The drop lists of the personal board above the rows, which a pointer drag reaches too. */
+  readonly extraDrops = input<string[]>([]);
+  /** More boards whose pings the rows take: a card of mine (or of "Alle") can appear there. */
+  readonly liveIds = input<readonly Uuid[]>([]);
+  /** The page holds a card or waits for a write: the pings wait too. */
+  readonly hold = input(false);
 
   readonly openCard = output<Uuid>();
+  /** A card of `extraDrops` landed in a row: the page transfers it. */
+  readonly dropIn = output<RowDrop>();
+  /** A drag moved a card to another row: the server answer. */
+  readonly transferred = output<TodoCardDetail>();
+  /**
+   * The drop lists of the writable open rows (`dropIds`), each time they change: the page
+   * hands them to the personal board above, so a card of the board reaches the rows.
+   */
+  readonly drops = output<string[]>();
   /**
    * The number of cards the rows show after the filters. It reports first when the first
    * read answered (or failed), so the page knows whether rows follow under the board.
@@ -164,26 +256,86 @@ export class TodoBoardRowsComponent {
   protected readonly dragDelay = { touch: 400, mouse: 0 };
   /** The keydown of Space lifted or put down a card, so its keyup must not click the tile. */
   private spaceTaken = false;
-  /** The pointer drag: the row, the column the card left and the column it is over. */
-  readonly ptr = signal<{ boardId: Uuid; from: Uuid; over: Uuid } | null>(null);
+  /** The pointer drag: the column the card left and the column it is over (any row). */
+  readonly ptr = signal<{ from: Uuid; over: Uuid } | null>(null);
+  /** A card of the rows is held, by pointer or keyboard. */
+  readonly dragging = computed(() => this.ptr() !== null || this.kb() !== null);
   readonly announce = signal('');
   readonly icon = BOARD_ICON;
 
   private etag: string | null = null;
-  /** Counts the local changes: a poll that left before one is dropped. */
+  /** Counts every change of the rows, live tiles too: a poll that left before one is dropped. */
   private mutations = 0;
+  /**
+   * Counts my own writes and the cards taken off: a tile read that left before one is
+   * dropped. A live tile does not count, else a burst of k pings reads ~k² tiles.
+   */
+  private localWrites = 0;
   private seq = 0;
   /** The first read answered or failed. */
   private readonly ready = signal(false);
+  /** Moves and transfers of the rows in flight. */
+  private pending = 0;
+  /** Pings that came while a card was held go round once more. */
+  private readonly liveRetry = new Subject<TodoPing>();
+  /** The boards of the pings: every row and `liveIds`, sorted, so an equal set is no change. */
+  private readonly liveSet = computed(
+    () => [...new Set([...this.boards().map((b) => b.id), ...this.liveIds()])].sort(),
+    { equal: (a, b) => a.join() === b.join() },
+  );
 
-  readonly rows = computed(() => boardRows(this.boards(), this.filter(), this.today()));
+  readonly rows = computed(() =>
+    boardRows(this.boards(), this.filter(), this.today(), {
+      all: this.source() === 'all',
+      me: this.me(),
+      filterLabels: this.filterLabels(),
+    }),
+  );
+  /** The open cards of every board (the search placeholder of "Alle"). */
+  readonly openCount = computed(() =>
+    this.boards().reduce((n, b) => {
+      const done = new Set(b.columns.filter((c) => c.isDone).map((c) => c.id));
+      return n + b.cards.filter((c) => !done.has(c.columnId)).length;
+    }, 0),
+  );
+  /** The drop lists of the writable open rows. */
+  readonly dropIds = computed(() =>
+    this.phone()
+      ? []
+      : this.rows()
+          .filter((r) => r.board.canWrite && this.isOpen(r))
+          .flatMap((r) => r.columns.map((c) => rowDropId(c.id))),
+  );
+  /** Where a drag of a writable row may go: every writable row and `extraDrops`. */
+  readonly connected = computed(() => [...this.dropIds(), ...this.extraDrops()]);
+  /** A card of a shared board does not enter the row of the personal board (`canTransfer`). */
+  readonly enter = DROP_ENTER;
+  readonly dropId = rowDropId;
 
   constructor() {
-    this.load(null);
     effect(() => {
       const rows = this.rows();
       if (this.ready()) this.matches.emit(rows.reduce((n, r) => n + r.count, 0));
     });
+    effect(() => {
+      const ids = this.dropIds();
+      untracked(() => this.drops.emit(ids));
+    });
+    effect((onCleanup) => {
+      const ids = this.liveSet();
+      if (!ids.length) return;
+      const sub = untracked(() =>
+        merge(this.live.changes$(ids), this.liveRetry)
+          .pipe(batchPings())
+          .subscribe((pings) => this.onPings(pings)),
+      );
+      onCleanup(() => sub.unsubscribe());
+    });
+  }
+
+  ngOnInit(): void {
+    // The first read waits for the inputs: `source` picks the route.
+    this.load(null);
   }
 
   // ------------------------------------------------------------------ data
@@ -191,7 +343,8 @@ export class TodoBoardRowsComponent {
   private load(etag: string | null): void {
     const seq = ++this.seq;
     const muts = this.mutations;
-    this.api.pollMineBoards(etag).subscribe({
+    const read = this.source() === 'all' ? this.api.pollAllBoards(etag) : this.api.pollMineBoards(etag);
+    read.subscribe({
       next: (res) => {
         if (seq !== this.seq || muts !== this.mutations || !res.boards) return;
         this.boards.set(res.boards);
@@ -211,17 +364,30 @@ export class TodoBoardRowsComponent {
   /** Read the rows again without an ETag (after a change elsewhere or a refused move). */
   refresh(): void {
     this.mutations++;
+    this.localWrites++;
     this.load(null);
   }
 
-  /** The card drawer changed a card: put it in its row, then read the rows again. */
+  /**
+   * The card drawer changed a card: take it out of the rows of other boards (it moved to
+   * another board), put it in its row, then read the rows again.
+   */
   cardChanged(card: TodoCardDetail): void {
-    if (!this.update(card.boardId, (b) => (card.archivedAt ? removeTile(b, card.id) : placeTile(b, card)))) return;
+    this.localWrites++;
+    const list = this.boards();
+    const left = list.some((b) => b.id !== card.boardId && b.cards.some((c) => c.id === card.id));
+    if (left) {
+      this.mutations++;
+      this.boards.set(list.map((b) => (b.id !== card.boardId ? removeTile(b, card.id) : b)));
+    }
+    const placed = this.update(card.boardId, (b) => (card.archivedAt ? removeTile(b, card.id) : placeTile(b, card)));
+    if (!placed && !left) return;
     this.refresh();
   }
 
   /** The card drawer archived a card. */
   cardRemoved(id: Uuid): void {
+    this.localWrites++;
     const board = this.boards().find((b) => b.cards.some((c) => c.id === id));
     if (!board) return;
     this.update(board.id, (b) => removeTile(b, id));
@@ -230,12 +396,127 @@ export class TodoBoardRowsComponent {
 
   /** Merge only the comment count: the drawer's copy of the rest can be stale. */
   commentsChanged(event: { id: Uuid; commentCount: number }): void {
+    this.localWrites++;
     const board = this.boards().find((b) => b.cards.some((c) => c.id === event.id));
     if (!board) return;
     this.update(board.id, (b) => ({
       ...b,
       cards: b.cards.map((c) => (c.id === event.id ? { ...c, commentCount: event.commentCount } : c)),
     }));
+  }
+
+  /** A card of another board lands in a row at once, before the server answers (`dropIn`). */
+  receive(tile: TodoCardTile, boardId: Uuid, move: TodoCardMove): void {
+    this.localWrites++;
+    this.update(boardId, (b) => insertTile(b, tile, move));
+  }
+
+  /**
+   * The server answer of a transfer into a row replaces the tile. Under "Meine To-Dos" a
+   * card that is not assigned to me leaves the rows: they show only my cards. Such a card
+   * gets a success toast with its new board, so it does not vanish without a word.
+   *
+   * Returns:
+   *   True when the rows still show the card.
+   */
+  accept(card: TodoCardDetail): boolean {
+    this.localWrites++;
+    if (!this.keeps(card)) {
+      this.removeCard(card.id);
+      this.toast.success(this.i18n.translate('todos.card.transferred', { board: card.boardName }));
+      return false;
+    }
+    this.update(card.boardId, (b) => replaceTile(b, card));
+    return true;
+  }
+
+  /** Take a card out of its row (it went onto the personal board); null when no row holds it. */
+  take(cardId: Uuid): TodoCardTile | null {
+    this.localWrites++;
+    for (const b of this.boards()) {
+      const card = b.cards.find((c) => c.id === cardId);
+      if (card) {
+        this.update(b.id, (x) => removeTile(x, cardId));
+        return card;
+      }
+    }
+    return null;
+  }
+
+  // ------------------------------------------------------------------ live
+
+  /** A card is held or a write is in flight: a live change waits. */
+  private busy(): boolean {
+    return this.dragging() || this.hold() || this.pending > 0;
+  }
+
+  private onPings(pings: readonly TodoPing[]): void {
+    if (this.busy()) {
+      for (const p of pings) this.liveRetry.next(p);
+      return;
+    }
+    let poll = false;
+    for (const p of pings) {
+      if (p.type === 'board') poll = true;
+      else if (p.type === 'card_removed') this.dropCard(p.cardId, p.boardId);
+      else this.readTile(p);
+    }
+    if (poll) this.poll();
+  }
+
+  /**
+   * Read the tile of a `card` ping and put it in place; a 404 takes it out of every row. A
+   * write of mine or a card taken off while the read was out makes the answer stale: it is
+   * dropped and the card is read again. Another live tile does not, because it changes
+   * only its own card.
+   */
+  private readTile(ping: TodoPing & { type: 'card' }): void {
+    const writes = this.localWrites;
+    this.api.cardTile(ping.cardId).subscribe({
+      next: (tile) => {
+        if (this.busy() || writes !== this.localWrites) this.liveRetry.next(ping);
+        else this.placeLive(tile);
+      },
+      error: (err: unknown) => {
+        if (err instanceof HttpErrorResponse && err.status === 404) this.dropCard(ping.cardId);
+      },
+    });
+  }
+
+  /**
+   * A live removal: a tile read that left before it would put the card back, so it counts
+   * as a write.
+   */
+  private dropCard(cardId: Uuid, only: Uuid | null = null): void {
+    this.localWrites++;
+    this.removeCard(cardId, null, only);
+  }
+
+  private placeLive(tile: TodoCardTile): void {
+    if (this.source() === 'mine' && !this.me()) {
+      this.refresh();
+      return;
+    }
+    // A card the rows do not show leaves every row; any other leaves the rows of other boards.
+    this.removeCard(tile.id, this.keeps(tile) ? tile.boardId : null);
+    if (!this.keeps(tile)) return;
+    if (!this.update(tile.boardId, (b) => placeTile(b, tile))) this.refresh();
+  }
+
+  /** The rows show this card: "Alle" every card, "Meine To-Dos" the cards assigned to me. */
+  private keeps(card: TodoCardTile): boolean {
+    const me = this.me();
+    return this.source() === 'all' || !me || card.assignees.some((a) => a.principalId === me);
+  }
+
+  /** Take a card out of every row but `except` (or only out of `only`), when a row holds it. */
+  private removeCard(cardId: Uuid, except: Uuid | null = null, only: Uuid | null = null): void {
+    const list = this.boards();
+    const drop = (b: TodoAssignedBoard) =>
+      b.id !== except && (only === null || b.id === only) && b.cards.some((c) => c.id === cardId);
+    if (!list.some(drop)) return;
+    this.mutations++;
+    this.boards.set(list.map((b) => (drop(b) ? removeTile(b, cardId) : b)));
   }
 
   /** Replace one board through `fn`; false when the rows do not hold it. */
@@ -287,18 +568,21 @@ export class TodoBoardRowsComponent {
     return n;
   }
 
-  /** The column a dragged card of the row left and the one it is over, by pointer or keyboard. */
+  /**
+   * The column a dragged card left and the one it is over, by pointer or keyboard. The
+   * column ids are unique over all boards, so a pointer drag counts in every row.
+   */
   private moving(row: BoardRow): { from: Uuid; over: Uuid } | null {
     const ptr = this.ptr();
-    if (ptr) return ptr.boardId === row.board.id ? ptr : null;
+    if (ptr) return ptr;
     const kb = this.kb();
     if (!kb || kb.boardId !== row.board.id) return null;
     return { from: row.columns[kb.fromCol].id, over: row.columns[kb.col].id };
   }
 
-  onDragStart(row: BoardRow, col: TodoColumn): void {
+  onDragStart(col: TodoColumn): void {
     this.kb.set(null);
-    this.ptr.set({ boardId: row.board.id, from: col.id, over: col.id });
+    this.ptr.set({ from: col.id, over: col.id });
   }
 
   onEnter(event: CdkDragEnter<Uuid>): void {
@@ -342,13 +626,50 @@ export class TodoBoardRowsComponent {
     const before = this.boards().find((b) => b.id === boardId);
     if (!before?.canWrite) return;
     const optimistic = applyMove(before, cardId, move);
+    this.localWrites++;
     this.update(boardId, () => optimistic);
-    this.api.moveCard(cardId, move).subscribe({
-      next: (tile) => this.update(boardId, (b) => replaceTile(b, tile)),
-      error: () => {
-        this.toast.error(this.i18n.translate('todos.error.move'));
+    this.pending++;
+    this.api.moveCard(cardId, move).pipe(finalize(() => this.pending--)).subscribe({
+      next: (tile) => {
+        this.localWrites++;
+        this.update(boardId, (b) => replaceTile(b, tile));
+      },
+      error: (err: unknown) => {
+        this.toast.error(this.i18n.translate(moveErrorText(err, 'todos.error.move')));
         // Roll back when nothing else changed the row meanwhile, then read the rows again.
         if (this.boards().find((b) => b.id === boardId) === optimistic) this.update(boardId, () => before);
+        this.refresh();
+      },
+    });
+  }
+
+  /**
+   * Move a card of one row to another board at once, and send the transfer. The answer
+   * replaces the tile (labels without a match there are gone); a refusal puts the rows
+   * back and reads them again.
+   */
+  private transfer(fromId: Uuid, toId: Uuid, tile: TodoCardTile, move: TodoCardMove): void {
+    const before = this.boards();
+    if (!before.find((b) => b.id === toId)?.canWrite) return;
+    const optimistic = before.map((b) =>
+      b.id === fromId ? removeTile(b, tile.id) : b.id === toId ? insertTile(b, tile, move) : b,
+    );
+    this.mutations++;
+    this.localWrites++;
+    this.boards.set(optimistic);
+    this.pending++;
+    this.api.transferCard(tile.id, { boardId: toId, ...move }).pipe(finalize(() => this.pending--)).subscribe({
+      next: (card) => {
+        this.accept(card);
+        this.transferred.emit(card);
+      },
+      error: (err: unknown) => {
+        this.toast.error(this.i18n.translate(moveErrorText(err, 'todos.error.transfer')));
+        if (this.boards() === optimistic) {
+          this.mutations++;
+          this.localWrites++;
+          this.boards.set(before);
+        }
         this.refresh();
       },
     });
@@ -359,9 +680,19 @@ export class TodoBoardRowsComponent {
     const toCol = event.container.data;
     if (toCol === event.previousContainer.data && event.previousIndex === event.currentIndex) return;
     const col = row.columns.find((c) => c.id === toCol);
-    const held = row.board.cards.find((c) => c.id === cardId);
-    if (!col || !held) return;
+    if (!col) return;
     const target = this.list(row, col).filter((c) => c.id !== cardId);
+    const from = this.boards().find((b) => b.cards.some((c) => c.id === cardId));
+    const held = from?.cards.find((c) => c.id === cardId);
+    if (!from || !held) {
+      // A card of the personal board above the rows: the page moves it over.
+      this.dropIn.emit({ boardId: row.board.id, cardId, move: dropMove(target, event.currentIndex, toCol) });
+      return;
+    }
+    if (from.id !== row.board.id) {
+      this.transfer(from.id, row.board.id, held, dropMove(target, event.currentIndex, toCol));
+      return;
+    }
     target.splice(event.currentIndex, 0, held);
     this.move(row.board.id, cardId, moveRequest(target, event.currentIndex, toCol));
   }

@@ -28,6 +28,9 @@ export const BOARD_ICON: Record<TodoBoardKind, IconName> = {
   team: 'ticket',
 };
 
+/** The icon of the meta-board "Alle". */
+export const ALL_ICON: IconName = 'grid';
+
 let nextId = 0;
 
 interface PickerSection {
@@ -38,7 +41,8 @@ interface PickerSection {
 
 /**
  * The board chip of the to-dos page ("Board: Studierendenparlament", frame 34) and its
- * list: Persönlich, Gremien and Team, each board with its open count. Desktop: a list
+ * list: Persönlich (with the meta-board "Alle" under "Meine To-Dos" when `allId` is set),
+ * Gremien and Team, each board with its open count. Desktop: a list
  * under the chip; Escape and a click outside close it. Phone: the bottom sheet.
  */
 @Component({
@@ -58,6 +62,11 @@ export class TodoBoardPickerComponent {
   readonly current = input<Uuid | null>(null);
   /** Phone: the chip names the board only. */
   readonly compact = input(false);
+  /**
+   * The id of the meta-board "Alle" (every board at once). When set, the list has an entry
+   * for it directly under "Meine To-Dos", and `picked` emits this id for it.
+   */
+  readonly allId = input<string | null>(null);
   readonly picked = output<Uuid>();
 
   readonly phone = mediaQuerySignal(MEDIA.phone);
@@ -66,12 +75,20 @@ export class TodoBoardPickerComponent {
   private readonly chip = viewChild.required<ElementRef<HTMLButtonElement>>('chip');
 
   readonly currentBoard = computed(() => this.boards().find((b) => b.id === this.current()) ?? null);
+  /** The meta-board "Alle" is the current one. */
+  readonly onAll = computed(() => this.allId() !== null && this.current() === this.allId());
   readonly chipText = computed(() => {
-    const b = this.currentBoard();
-    if (!b) return this.i18n.translate('todos.board.pick');
-    return this.compact() ? b.name : this.i18n.translate('todos.board.chip', { name: b.name });
+    const name = this.onAll() ? this.i18n.translate('todos.board.all') : this.currentBoard()?.name;
+    if (!name) return this.i18n.translate('todos.board.pick');
+    return this.compact() ? name : this.i18n.translate('todos.board.chip', { name });
   });
-  readonly chipIcon = computed(() => BOARD_ICON[this.currentBoard()?.kind ?? 'gremium']);
+  readonly chipIcon = computed<IconName>(() => (this.onAll() ? ALL_ICON : BOARD_ICON[this.currentBoard()?.kind ?? 'gremium']));
+  readonly allIcon = ALL_ICON;
+  /** The sub line of "Alle": the open cards of every board. */
+  readonly allSub = computed(() => {
+    const n = this.boards().reduce((sum, b) => sum + b.openCount, 0);
+    return this.i18n.translate('todos.board.open', { n });
+  });
 
   readonly sections = computed<PickerSection[]>(() => {
     const of = (kind: TodoBoardKind) => this.boards().filter((b) => b.kind === kind);
@@ -80,7 +97,8 @@ export class TodoBoardPickerComponent {
       { kind: 'gremium', label: 'todos.board.gremien', boards: of('gremium') },
       { kind: 'team', label: 'todos.board.team', boards: of('team') },
     ];
-    return all.filter((s) => s.boards.length);
+    // "Alle" stands in the section "Persönlich", also when it has no board.
+    return all.filter((s) => s.boards.length || (s.kind === 'personal' && this.allId() !== null));
   });
 
   constructor() {
@@ -120,8 +138,17 @@ export class TodoBoardPickerComponent {
   }
 
   pick(board: TodoBoardSummary): void {
+    this.choose(board.id);
+  }
+
+  pickAll(): void {
+    const id = this.allId();
+    if (id !== null) this.choose(id);
+  }
+
+  private choose(id: string): void {
     this.open.set(false);
-    if (board.id !== this.current()) this.picked.emit(board.id);
+    if (id !== this.current()) this.picked.emit(id);
     if (!this.phone()) this.chip().nativeElement.focus();
   }
 

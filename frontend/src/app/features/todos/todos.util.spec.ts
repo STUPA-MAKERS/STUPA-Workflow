@@ -7,9 +7,11 @@ import {
   cardsOf,
   daysUntil,
   defaultBoard,
+  dropMove,
   dueInfo,
   eventText,
   filterActive,
+  insertTile,
   isoDay,
   linkLine,
   linkSub,
@@ -23,6 +25,10 @@ import {
   relativeDays,
   removeTile,
   placeTile,
+  DROP_ENTER,
+  canTransfer,
+  dropEnter,
+  moveErrorText,
   replaceTile,
   shortDay,
   sortedColumns,
@@ -183,6 +189,9 @@ describe('todos.util', () => {
         'Selin hat die Karte von „Offen“ nach „Erledigt“ verschoben',
       );
       expect(text(event('moved', { fromColumnName: 3 }))).toBe('Selin hat die Karte von „“ nach „“ verschoben');
+      expect(
+        text(event('moved', { fromColumnName: 'Offen', toColumnName: 'Neu', fromBoardName: 'StuPa', toBoardName: 'Meine To-Dos' })),
+      ).toBe('Selin hat die Karte aus „StuPa“ nach „Meine To-Dos“ verschoben');
       expect(text(event('due', { to: '2026-11-03' }))).toBe('Selin hat die Fälligkeit auf Di, 03.11.2026 gesetzt');
       expect(text(event('due', { to: null }))).toBe('Selin hat die Fälligkeit entfernt');
       expect(text(event('renamed', { to: 'Neu' }))).toBe('Selin hat die Karte in „Neu“ umbenannt');
@@ -301,6 +310,24 @@ describe('todos.util', () => {
       expect(moveRequest([tile({ id: 'a' })], 0, 'c')).toEqual({ columnId: 'c' });
     });
 
+    it('names the neighbours of a card from another board, the target list without it', () => {
+      const list = [tile({ id: 'a' }), tile({ id: 'b' })];
+      expect(dropMove(list, 2, 'c')).toEqual({ columnId: 'c', afterId: 'b' });
+      expect(dropMove(list, 0, 'c')).toEqual({ columnId: 'c', beforeId: 'a' });
+      expect(dropMove([], 0, 'c')).toEqual({ columnId: 'c' });
+    });
+
+    it('puts a card of another board into a board at its place', () => {
+      const b = board();
+      const ids = (x: ReturnType<typeof board>) => x.cards.map((c) => `${c.id}@${c.columnId}`);
+      const visitor = tile({ id: 'k-9', boardId: 'b-7', columnId: 'x-1' });
+      const after = insertTile(b, visitor, { columnId: 'c-1', afterId: 'k-1' });
+      expect(ids(after)).toEqual(['k-1@c-1', 'k-9@c-1', 'k-2@c-1', 'k-3@c-4']);
+      expect(after.cards[1].boardId).toBe('b-1');
+      expect(after.columns.find((c) => c.id === 'c-1')?.cardCount).toBe(3);
+      expect(ids(insertTile(b, visitor, { columnId: 'c-2' })).at(-1)).toBe('k-9@c-2');
+    });
+
     it('moves a card at once, after or before a neighbour or to the end', () => {
       const b = board();
       const ids = (x: ReturnType<typeof board>) => x.cards.map((c) => `${c.id}@${c.columnId}`);
@@ -346,6 +373,53 @@ describe('todos.util', () => {
       const added = placeTile(b, tile({ id: 'k-9', columnId: 'c-2' }));
       expect(order(added)).toEqual(['k-1@c-1', 'k-2@c-4', 'k-3@c-4', 'k-9@c-2']);
       expect(added.columns.find((c) => c.id === 'c-2')?.cardCount).toBe(1);
+    });
+
+    it('never moves a card of a shared board into a personal board', () => {
+      expect(canTransfer('personal', 'gremium')).toBe(true);
+      expect(canTransfer('personal', 'personal')).toBe(true);
+      expect(canTransfer('gremium', 'team')).toBe(true);
+      expect(canTransfer('team', 'gremium')).toBe(true);
+      expect(canTransfer('gremium', 'personal')).toBe(false);
+      expect(canTransfer('team', 'personal')).toBe(false);
+      const from = (kind?: string) => {
+        const el = document.createElement('div');
+        if (kind) el.dataset['boardKind'] = kind;
+        return { dropContainer: { element: { nativeElement: el } } };
+      };
+      expect(DROP_ENTER.personal(from('gremium'))).toBe(false);
+      expect(DROP_ENTER.personal(from('personal'))).toBe(true);
+      expect(DROP_ENTER.gremium(from('personal'))).toBe(true);
+      expect(DROP_ENTER.team(from('gremium'))).toBe(true);
+      // A list without a kind lets the card in: the server decides.
+      expect(dropEnter('personal')(from())).toBe(true);
+    });
+
+    it('names the codes of a refused move', () => {
+      const err = (code?: unknown) => ({ error: code === undefined ? null : { code } });
+      expect(moveErrorText(err('card_moved'), 'todos.error.move')).toBe('todos.error.transfer');
+      expect(moveErrorText(err('transfer_to_personal'), 'todos.error.move')).toBe('todos.error.transferToPersonal');
+      expect(moveErrorText(err('todo_write_required'), 'todos.error.move')).toBe('todos.error.readOnly');
+      expect(moveErrorText(err('rank_neighbors_invalid'), 'todos.error.move')).toBe('todos.error.move');
+      expect(moveErrorText(err(7), 'todos.error.transfer')).toBe('todos.error.transfer');
+      expect(moveErrorText(err(), 'todos.error.move')).toBe('todos.error.move');
+      expect(moveErrorText({ error: 'text' }, 'todos.error.move')).toBe('todos.error.move');
+      expect(moveErrorText(null, 'todos.error.move')).toBe('todos.error.move');
+    });
+
+    it('re-places a tile whose rank changed inside its column', () => {
+      const b = board({ cards: [
+        tile({ id: 'k-1', columnId: 'c-4', rank: 'b' }),
+        tile({ id: 'k-2', columnId: 'c-4', rank: 'd' }),
+        tile({ id: 'k-3', columnId: 'c-4', rank: 'f' }),
+      ] });
+      const order = (x: typeof b) => x.cards.map((c) => c.id);
+      // Another user moved k-1 between k-2 and k-3.
+      expect(order(placeTile(b, tile({ id: 'k-1', columnId: 'c-4', rank: 'e' })))).toEqual(['k-2', 'k-1', 'k-3']);
+      // ... to the end of the column.
+      expect(order(placeTile(b, tile({ id: 'k-1', columnId: 'c-4', rank: 'z' })))).toEqual(['k-2', 'k-3', 'k-1']);
+      // ... to the top.
+      expect(order(placeTile(b, tile({ id: 'k-3', columnId: 'c-4', rank: 'a' })))).toEqual(['k-3', 'k-1', 'k-2']);
     });
 
     it('opens the personal board, else the first own gremium board, else any', () => {

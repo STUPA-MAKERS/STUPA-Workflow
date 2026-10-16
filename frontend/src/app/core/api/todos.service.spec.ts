@@ -91,6 +91,20 @@ describe('TodosApiService', () => {
     expect(errors).toHaveLength(1);
   });
 
+  it('polls every board for "Alle" with If-None-Match', () => {
+    const got: unknown[] = [];
+    api.pollAllBoards(null).subscribe((r) => got.push(r));
+    const first = http.expectOne('/api/todos/all/boards');
+    expect(first.request.headers.has('If-None-Match')).toBe(false);
+    first.flush([{ id: 'b-0' }], { headers: { ETag: 'W/"3"' } });
+    expect(got[0]).toEqual({ boards: [{ id: 'b-0' }], etag: 'W/"3"' });
+    api.pollAllBoards('W/"3"').subscribe((r) => got.push(r));
+    const second = http.expectOne('/api/todos/all/boards');
+    expect(second.request.headers.get('If-None-Match')).toBe('W/"3"');
+    second.flush(null, { status: 304, statusText: 'Not Modified' });
+    expect(got[1]).toEqual({ boards: null, etag: 'W/"3"' });
+  });
+
   it('passes any other error of a poll on', () => {
     const errors: unknown[] = [];
     api.pollBoard('b-1', null).subscribe({ error: (e: unknown) => errors.push(e) });
@@ -148,8 +162,10 @@ describe('TodosApiService', () => {
   it('reads and changes a card and its parts', () => {
     const cases: [() => unknown, string, string, unknown][] = [
       [() => api.card('k').subscribe(), 'GET', '/api/todos/cards/k', null],
+      [() => api.cardTile('k').subscribe(), 'GET', '/api/todos/cards/k/tile', null],
       [() => api.patchCard('k', { version: 2, title: 'T' }).subscribe(), 'PATCH', '/api/todos/cards/k', { version: 2, title: 'T' }],
       [() => api.moveCard('k', { columnId: 'c', afterId: 'x' }).subscribe(), 'POST', '/api/todos/cards/k/move', { columnId: 'c', afterId: 'x' }],
+      [() => api.transferCard('k', { boardId: 'b' }).subscribe(), 'POST', '/api/todos/cards/k/transfer', { boardId: 'b' }],
       [() => api.archiveCard('k').subscribe(), 'DELETE', '/api/todos/cards/k', null],
       [() => api.restoreCard('k').subscribe(), 'POST', '/api/todos/cards/k/restore', null],
       [() => api.addAssignee('k', 'p').subscribe(), 'POST', '/api/todos/cards/k/assignees', { principalId: 'p' }],

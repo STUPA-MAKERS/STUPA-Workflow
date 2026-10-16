@@ -73,8 +73,20 @@
       <ng-container *ngTemplateOutlet="body" />
     </div>
   </app-side-sheet>
-} @else if (open()) {
-  <div class="lp lp--pop" role="dialog" [attr.aria-label]="'todos.picker.title' | t" (keydown)="onKey($event)">
+}
+
+<!-- Desktop: the panel floats over the whole page, like the search palette. It is
+     rendered into the end of <body>, because a dialog or a drawer around the picker
+     clips and transforms its content. -->
+<ng-template #pop>
+  <div class="lp__scrim" (click)="close()"></div>
+  <div
+    class="lp lp--pop"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="'todos.picker.title' | t"
+    (keydown)="onKey($event)"
+  >
     <ng-container *ngTemplateOutlet="body" />
   </div>
-}
+</ng-template>

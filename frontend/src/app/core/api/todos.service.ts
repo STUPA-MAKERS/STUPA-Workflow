@@ -184,6 +184,17 @@ export interface TodoCardMove {
   afterId?: Uuid | null;
 }
 
+/**
+ * A move to another board: into `columnId` (default: the first column), between
+ * `afterId` (above) and `beforeId` (below) as in a move, else at the end.
+ */
+export interface TodoCardTransfer {
+  boardId: Uuid;
+  columnId?: Uuid | null;
+  beforeId?: Uuid | null;
+  afterId?: Uuid | null;
+}
+
 export interface TodoMineItem extends TodoCardTile {
   boardName: string;
   boardKind: TodoBoardKind;
@@ -199,9 +210,10 @@ export interface TodoMine {
 }
 
 /**
- * A board of `GET /todos/mine/boards` (the rows under "Meine To-Dos"): all its columns
- * and labels, but only the live cards assigned to the caller (done ones too).
- * `cardCount` of a column counts those cards.
+ * A board of `GET /todos/mine/boards` (the rows under "Meine To-Dos") or of
+ * `GET /todos/all/boards` (the meta-board "Alle"): all its columns and labels, and its
+ * live cards (done ones too): under "mine" only the ones assigned to the caller, under
+ * "all" every one. `cardCount` of a column counts those cards.
  */
 export interface TodoAssignedBoard {
   id: Uuid;
@@ -378,6 +390,11 @@ export class TodosApiService {
     return this.http.get<TodoCardDetail>(`${this.base}/todos/cards/${cardId}`, { context: skipLoading() });
   }
 
+  /** The tile of a live card, as the board read has it: what a live ping reads (404 when archived). */
+  cardTile(cardId: Uuid): Observable<TodoCardTile> {
+    return this.http.get<TodoCardTile>(`${this.base}/todos/cards/${cardId}/tile`, { context: skipLoading() });
+  }
+
   patchCard(cardId: Uuid, body: TodoCardPatch): Observable<TodoCardDetail> {
     return this.http.patch<TodoCardDetail>(`${this.base}/todos/cards/${cardId}`, body, {
       context: skipLoading(),
@@ -386,6 +403,14 @@ export class TodosApiService {
 
   moveCard(cardId: Uuid, body: TodoCardMove): Observable<TodoCardTile> {
     return this.http.post<TodoCardTile>(`${this.base}/todos/cards/${cardId}/move`, body, {
+      context: skipLoading(),
+    });
+  }
+
+  /** Move a card to another board. Labels without a match there and assignees
+   *  without access to it are dropped. */
+  transferCard(cardId: Uuid, body: TodoCardTransfer): Observable<TodoCardDetail> {
+    return this.http.post<TodoCardDetail>(`${this.base}/todos/cards/${cardId}/transfer`, body, {
       context: skipLoading(),
     });
   }
@@ -501,10 +526,22 @@ export class TodosApiService {
    * gives `boards: null`, so the caller keeps its state.
    */
   pollMineBoards(etag: string | null): Observable<TodoAssignedPoll> {
+    return this.pollRows('mine', etag);
+  }
+
+  /**
+   * Every readable board with all its live cards, the personal one first (the meta-board
+   * "Alle"), with `If-None-Match`. A 304 gives `boards: null`.
+   */
+  pollAllBoards(etag: string | null): Observable<TodoAssignedPoll> {
+    return this.pollRows('all', etag);
+  }
+
+  private pollRows(source: 'mine' | 'all', etag: string | null): Observable<TodoAssignedPoll> {
     let headers = new HttpHeaders();
     if (etag) headers = headers.set('If-None-Match', etag);
     return this.http
-      .get<TodoAssignedBoard[]>(`${this.base}/todos/mine/boards`, {
+      .get<TodoAssignedBoard[]>(`${this.base}/todos/${source}/boards`, {
         headers,
         observe: 'response',
         context: skipLoading(),

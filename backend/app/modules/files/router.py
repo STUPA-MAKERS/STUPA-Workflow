@@ -200,9 +200,9 @@ async def _assert_owner_reader(
     * ``ticket`` (a report file) and ``ticket_note``: a principal with
       ``ticket.manage``, or the reporter account of the ticket (a note only when it is
       ``public``; never on an anonymized ticket); a note must not be deleted.
-    * ``todo_comment``: a principal whose token allows ``todo.write`` and who reads
-      the board of the card (``BoardAccess``, archived cards too); the comment must
-      not be deleted.
+    * ``todo_comment``: a principal who reads the board of the card (``BoardAccess``:
+      the board rule with the token scope cap, ``todo.read_all`` included; archived
+      cards too); the comment must not be deleted.
     * ``comment``: read access to the application (``resolve_app_read``: principal,
       Gremium read scope, logged-in creator, magic-link applicant); an internal
       comment also needs ``can_see_internal``. An unconfirmed guest submission

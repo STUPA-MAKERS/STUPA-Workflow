@@ -35,6 +35,8 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
+import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
+import type { TodoPing } from '@core/ws/ws-messages';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
@@ -63,6 +65,7 @@ import { mediaQuerySignal } from '../../../layout/media-query';
 import { TodoDueChipComponent } from '../due-chip/todo-due-chip.component';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
 import { TodoMoveSheetComponent, type MoveChoice, type MoveColumn } from '../move-sheet/todo-move-sheet.component';
+import { TodoTransferDialogComponent, type TodoTransferTarget } from '../transfer-dialog/todo-transfer-dialog.component';
 import {
   LINK_ICON,
   eventText,
@@ -88,6 +91,12 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   link_self: 'todos.error.linkSelf',
   label_not_on_board: 'todos.error.save',
   mention_not_member: 'todos.error.mention',
+  transfer_same_board: 'todos.error.transfer',
+  card_moved: 'todos.error.transfer',
+  card_archived: 'todos.error.transfer',
+  column_not_on_board: 'todos.error.transfer',
+  transfer_to_personal: 'todos.error.transferToPersonal',
+  todo_write_required: 'todos.error.readOnly',
 };
 
 /**
@@ -103,6 +112,13 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
  * Every change goes to the server at once and the answer replaces the card; `changed`
  * gives it to the board. The content edits (title, description, due date) carry the
  * version; a 409 says "Karte wurde geändert" and reads the card again.
+ *
+ * Live: a ping of this card (or a `board` ping of its board) from `TodoLiveService` reads
+ * the card in the background and takes the server copy, comments included. While a field
+ * is in edit (title, description, a checklist item), the transfer dialog is open or a
+ * write is in flight, the read waits and runs when that ends. A read that a local change
+ * overtook is dropped; a 404 says the card is gone. Nothing goes out: the page takes its
+ * own pings.
  */
 @Component({
   selector: 'app-todo-card-detail',
@@ -128,6 +144,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     TodoDueChipComponent,
     TodoLinkPickerComponent,
     TodoMoveSheetComponent,
+    TodoTransferDialogComponent,
   ],
   // The phone and the wide layout render the chat in two branches: the page owns its
   // composer files, so a breakpoint change keeps them.
@@ -144,6 +161,7 @@ export class TodoCardDetailComponent {
   private readonly toast = inject(ToastService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly live = inject(TodoLiveService);
   private readonly t: Translate = (key, params) => this.i18n.translate(key, params);
 
   readonly cardId = input.required<Uuid>();
@@ -163,6 +181,12 @@ export class TodoCardDetailComponent {
   readonly commentsChanged = output<{ id: Uuid; commentCount: number }>();
   /** The card went into the archive. */
   readonly archived = output<Uuid>();
+  /**
+   * The card moved to another board (the card menu "In anderes Board verschieben"): the
+   * card on its new board and the id of the board it left. It goes out before `changed`,
+   * so the page knows that a card new to its board came over and was not restored.
+   */
+  readonly transferred = output<{ card: TodoCardDetail; fromBoardId: Uuid }>();
 
   readonly phone = mediaQuerySignal(MEDIA.phone);
   readonly card = signal<TodoCardDetail | null>(null);
@@ -184,6 +208,8 @@ export class TodoCardDetailComponent {
   readonly itemEditDraft = signal('');
   readonly pickerOpen = signal(false);
   readonly moveOpen = signal(false);
+  readonly transferOpen = signal(false);
+  readonly transferring = signal(false);
 
   private seq = 0;
   /** Counts the fresh loads: a write answer from before the card changed is dropped. */
@@ -192,6 +218,22 @@ export class TodoCardDetailComponent {
   private patchQueue: ((version: number) => void)[] = [];
   private patching = false;
   private membersOf: Uuid | null = null;
+  /** Counts the local changes of the card: a background read from before one is dropped. */
+  private localSeq = 0;
+  /** A ping came while the card could not take a read: read it when that ends. */
+  private readonly stale = signal(false);
+  /** The board of the shown card, for its pings. */
+  private readonly liveBoard = computed(() => this.card()?.boardId ?? null);
+  /** A field is in edit or a write is in flight: a background read would overwrite it. */
+  readonly editing = computed(
+    () =>
+      this.editingTitle() ||
+      this.editingDesc() ||
+      this.addingItem() ||
+      this.editingItem() !== null ||
+      this.transferOpen() ||
+      this.busy(),
+  );
 
   readonly today = signal(isoDay(new Date()));
 
@@ -211,6 +253,22 @@ export class TodoCardDetailComponent {
     effect(() => {
       const id = this.cardId();
       untracked(() => this.load(id, true));
+    });
+    effect((onCleanup) => {
+      const boardId = this.liveBoard();
+      if (!boardId) return;
+      const sub = untracked(() =>
+        this.live
+          .changes$([boardId])
+          .pipe(batchPings())
+          .subscribe((pings) => this.onPings(pings)),
+      );
+      onCleanup(() => sub.unsubscribe());
+    });
+    // The edit ended after a ping: read the card now.
+    effect(() => {
+      if (this.editing() || !this.stale()) return;
+      untracked(() => this.liveRead());
     });
   }
 
@@ -305,7 +363,12 @@ export class TodoCardDetailComponent {
     () => new Set((this.card()?.links ?? []).map((l) => linkKey(l.kind, l.targetId))),
   );
 
+  /**
+   * An own comment changes only on a board that the person writes: a reader of the board
+   * (`todo.read_all`) gets 403 `todo_write_required`. An archived card keeps the edit.
+   */
   readonly messages = computed<ChatMessage[]>(() => {
+    const writes = !!this.card()?.canWrite;
     const comments = (this.card()?.comments ?? []).map<ChatMessage>((c) => ({
       id: c.id,
       author: c.author,
@@ -313,6 +376,7 @@ export class TodoCardDetailComponent {
       at: c.at,
       editedAt: c.editedAt,
       own: c.isOwn,
+      canEdit: c.isOwn && writes,
       attachments: toChatAttachments(this.apiBase, c.attachments),
     }));
     return [...comments, ...this.outbox.messages()];
@@ -342,7 +406,12 @@ export class TodoCardDetailComponent {
     if (!c || !c.canWrite) return [];
     if (c.archivedAt) return [{ items: [{ id: 'restore', label: this.t('todos.card.restore'), icon: 'undo' }] }];
     return [
-      { items: [{ id: 'rename', label: this.t('todos.card.rename'), icon: 'edit' }] },
+      {
+        items: [
+          { id: 'rename', label: this.t('todos.card.rename'), icon: 'edit' },
+          { id: 'transfer', label: this.t('todos.card.transfer'), icon: 'arrow' },
+        ],
+      },
       { items: [{ id: 'archive', label: this.t('todos.card.archive'), icon: 'archive', danger: true }] },
     ];
   });
@@ -407,9 +476,43 @@ export class TodoCardDetailComponent {
     });
   }
 
+  private onPings(pings: readonly TodoPing[]): void {
+    const id = this.cardId();
+    if (!pings.some((p) => p.type === 'board' || p.cardId === id)) return;
+    if (this.editing()) this.stale.set(true);
+    else this.liveRead();
+  }
+
+  /** Read the card in the background after a ping; see the class comment. */
+  private liveRead(): void {
+    this.stale.set(false);
+    const id = this.cardId();
+    const gen = this.gen;
+    const local = this.localSeq;
+    this.api.card(id).subscribe({
+      next: (card) => {
+        if (id !== this.cardId() || gen !== this.gen || local !== this.localSeq) return;
+        if (this.editing()) {
+          this.stale.set(true);
+          return;
+        }
+        this.card.set(card);
+        this.loadMembers(card.boardId);
+      },
+      error: (err: unknown) => {
+        if (id !== this.cardId() || gen !== this.gen || local !== this.localSeq) return;
+        if (err instanceof HttpErrorResponse && err.status === 404) {
+          this.notFound.set(true);
+          this.card.set(null);
+        }
+      },
+    });
+  }
+
   private load(id: Uuid, fresh: boolean): void {
     const seq = ++this.seq;
     if (fresh) {
+      this.stale.set(false);
       this.gen++;
       this.patchQueue = [];
       this.patching = false;
@@ -518,6 +621,7 @@ export class TodoCardDetailComponent {
   }
 
   private apply(card: TodoCardDetail): void {
+    this.localSeq++;
     this.card.set(card);
     this.changed.emit(card);
   }
@@ -533,6 +637,7 @@ export class TodoCardDetailComponent {
     const c = this.card();
     if (!c) return;
     const next = fn(c);
+    this.localSeq++;
     this.card.set(next);
     this.commentsChanged.emit({ id: next.id, commentCount: next.commentCount });
   }
@@ -773,8 +878,45 @@ export class TodoCardDetailComponent {
 
   onMenu(item: RowMenuItem): void {
     if (item.id === 'rename') this.startTitle();
+    else if (item.id === 'transfer') this.transferOpen.set(true);
     else if (item.id === 'archive') this.archive();
     else if (item.id === 'restore') this.restore();
+  }
+
+  /**
+   * Move the card to another board. The answer is the card on its new board: the page
+   * takes it through `changed`, and the people come from the new board.
+   */
+  transfer(target: TodoTransferTarget): void {
+    const c = this.card();
+    if (!c) return;
+    const current = this.current();
+    this.busy.set(true);
+    this.transferring.set(true);
+    this.api.transferCard(c.id, { boardId: target.boardId, columnId: target.columnId }).subscribe({
+      next: (card) => {
+        if (!current()) return;
+        this.busy.set(false);
+        this.transferring.set(false);
+        this.transferOpen.set(false);
+        this.transferred.emit({ card, fromBoardId: c.boardId });
+        this.apply(card);
+        this.loadMembers(card.boardId);
+        this.toast.success(this.t('todos.card.transferred', { board: target.boardName }));
+      },
+      error: (err: unknown) => {
+        if (!current()) return;
+        this.transferring.set(false);
+        this.transferOpen.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 404) {
+          this.busy.set(false);
+          this.toast.error(this.t('todos.error.transfer'));
+          this.reload();
+          return;
+        }
+        this.fail(err, false);
+      },
+    });
   }
 
   archive(): void {

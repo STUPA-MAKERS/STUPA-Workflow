@@ -1,6 +1,7 @@
 import type { PersonRef, Uuid } from '@core/api/models';
 import type {
   TodoBoard,
+  TodoBoardKind,
   TodoBoardSummary,
   TodoCardMove,
   TodoCardTile,
@@ -215,6 +216,9 @@ export function eventText(event: TodoEvent, locale: string, t: Translate): strin
     case 'created':
       return t('todos.event.created', { actor });
     case 'moved':
+      if (p['toBoardName'] !== undefined) {
+        return t('todos.event.movedBoard', { actor, from: str(p['fromBoardName']), to: str(p['toBoardName']) });
+      }
       return t('todos.event.moved', { actor, from: str(p['fromColumnName']), to: str(p['toColumnName']) });
     case 'assigned': {
       const person = (p['person'] ?? null) as PersonRef | null;
@@ -329,6 +333,15 @@ export function moveRequest(list: readonly TodoCardTile[], index: number, column
   return below ? { columnId, beforeId: below.id } : { columnId };
 }
 
+/**
+ * The move request for a card from another board that lands at `index` of `list`, the
+ * target column WITHOUT the card (the same neighbors as `moveRequest`).
+ */
+export function dropMove(list: readonly TodoCardTile[], index: number, columnId: Uuid): TodoCardMove {
+  if (index > 0) return { columnId, afterId: list[index - 1].id };
+  return list[0] ? { columnId, beforeId: list[0].id } : { columnId };
+}
+
 /** What the tile helpers below read of a board: a board read or a row of "Meine To-Dos". */
 export type TileBoard = Pick<TodoBoard, 'columns' | 'cards'>;
 
@@ -365,17 +378,72 @@ export function replaceTile<B extends TileBoard>(board: B, tile: TodoCardTile): 
 }
 
 /**
- * Put a server tile into the board at its place. A tile that changed its column, or that
- * the board does not hold yet (a restored card), goes before the first card of its column
- * with a higher rank, else to the end of it; any other tile keeps its place (`replaceTile`).
+ * Put a server tile into the board at its place. A tile that changed its column or its rank
+ * (a move of another user inside the column), or that the board does not hold yet (a restored
+ * card), goes before the first card of its column with a higher rank, else to the end of it;
+ * any other tile keeps its place (`replaceTile`).
  */
 export function placeTile<B extends TileBoard>(board: B, tile: TodoCardTile): B {
   const old = board.cards.find((c) => c.id === tile.id);
-  if (old && old.columnId === tile.columnId) return replaceTile(board, tile);
+  if (old && old.columnId === tile.columnId && old.rank === tile.rank) return replaceTile(board, tile);
   const base = old ? board : { ...board, cards: [...board.cards, tile] };
   const next = base.cards.find((c) => c.id !== tile.id && c.columnId === tile.columnId && c.rank > tile.rank);
   const moved = applyMove(base, tile.id, next ? { columnId: tile.columnId, beforeId: next.id } : { columnId: tile.columnId });
   return replaceTile(moved, tile);
+}
+
+/** The board after a card of another board landed on it, before the server answers. */
+export function insertTile<B extends TileBoard & { id: Uuid }>(board: B, tile: TodoCardTile, move: TodoCardMove): B {
+  const base = { ...board, cards: [...board.cards.filter((c) => c.id !== tile.id), { ...tile, boardId: board.id }] };
+  return applyMove(base, tile.id, move);
+}
+
+/**
+ * Tell if a card may move from a board of kind `from` to a board of kind `to`. A card of a
+ * shared board (gremium, team) never moves into a personal board: the server refuses it with
+ * 403 `transfer_to_personal`, because the comments, files and links would then leave the
+ * reach of everyone else on the board. The transfer dialog and every drop list ask this.
+ */
+export function canTransfer(from: TodoBoardKind, to: TodoBoardKind): boolean {
+  return from === 'personal' || to !== 'personal';
+}
+
+/** The parts of a CDK drag that `dropEnter` reads (the element of the list it comes from). */
+interface DragSource {
+  dropContainer: { element: { nativeElement: HTMLElement } };
+}
+
+/**
+ * The `cdkDropListEnterPredicate` of the drop lists of a board of kind `to`. The kind of the
+ * board a drag comes from is the `data-board-kind` attribute of its drop list; a list without
+ * it lets the card in (the server decides).
+ */
+export function dropEnter(to: TodoBoardKind): (drag: DragSource) => boolean {
+  return (drag) => {
+    const from = drag.dropContainer.element.nativeElement.dataset['boardKind'] as TodoBoardKind | undefined;
+    return !from || canTransfer(from, to);
+  };
+}
+
+/** The drop predicate of each board kind, one function per kind (a stable input). */
+export const DROP_ENTER: Record<TodoBoardKind, (drag: DragSource) => boolean> = {
+  personal: dropEnter('personal'),
+  gremium: dropEnter('gremium'),
+  team: dropEnter('team'),
+};
+
+/** The error codes of a refused move or transfer that have a text of their own. */
+const MOVE_ERROR_TEXT: Record<string, TranslationKey> = {
+  card_moved: 'todos.error.transfer',
+  transfer_to_personal: 'todos.error.transferToPersonal',
+  todo_write_required: 'todos.error.readOnly',
+};
+
+/** The toast text of a refused move or transfer: its code's text, else `fallback`. */
+export function moveErrorText(err: unknown, fallback: TranslationKey): TranslationKey {
+  const body = (err as { error?: unknown } | null)?.error;
+  const code = typeof body === 'object' && body !== null ? (body as { code?: unknown }).code : undefined;
+  return (typeof code === 'string' && MOVE_ERROR_TEXT[code]) || fallback;
 }
 
 /** Drop a card from the board (archived). */

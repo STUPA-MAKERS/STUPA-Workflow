@@ -22,10 +22,15 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
 import { ButtonComponent, IconComponent, TabsComponent, type TabItem } from '@stupa-makers/ui-kit';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
-import { moveRequest, sortedColumns } from '../../../features/todos/todos.util';
+import { DROP_ENTER, dropMove, moveRequest, sortedColumns } from '../../../features/todos/todos.util';
 
 /** The done column shows this many cards until "n weitere" opens the rest. */
 export const DONE_PREVIEW = 3;
+
+/** The id of the drop list of a board column, for `cdkDropListConnectedTo`. */
+export function boardDropId(columnId: Uuid): string {
+  return `bv-list-${columnId}`;
+}
 
 /** A move of the board: the card and the request for the server. */
 export interface BoardMove {
@@ -48,7 +53,10 @@ interface KeyDrag {
  * Desktop: the columns side by side, each a drop list of `@angular/cdk/drag-drop`. A
  * tile lifts with a shadow, the place it would land is a dashed box. The keyboard does
  * the same: Space lifts the focused card, the arrows move it inside and between the
- * columns, Space or Enter put it down, Escape puts it back. A live region names each
+ * columns, Space or Enter put it down, Escape puts it back. A pointer drag also reaches
+ * the drop lists of `connectTo` (the rows of "Meine To-Dos"); the keyboard stays on the
+ * board. A card of a shared board does not enter a column of the personal board
+ * (`DROP_ENTER`, the server refuses it). A live region names each
  * step for a screen reader.
  *
  * The done column shows its newest cards and "n weitere · Archiv". Each column ends
@@ -104,9 +112,17 @@ export class TodoBoardViewComponent {
    * the rows of "Meine To-Dos" below it.
    */
   readonly fill = input(true);
+  /**
+   * The ids of the drop lists of other boards (the rows of "Meine To-Dos") that a card of
+   * this board may go to, and that may drop a card here. A card from there comes out as
+   * `dropIn`; the page moves it to this board.
+   */
+  readonly connectTo = input<string[]>([]);
 
   readonly openCard = output<Uuid>();
   readonly moveCard = output<BoardMove>();
+  /** A card of another board landed in a column of this board (`connectTo`). */
+  readonly dropIn = output<BoardMove>();
   readonly quickAdd = output<{ columnId: Uuid; title: string }>();
   readonly addIn = output<Uuid>();
   readonly settings = output<void>();
@@ -114,6 +130,9 @@ export class TodoBoardViewComponent {
 
   readonly columns = computed(() => sortedColumns(this.board().columns));
   readonly canWrite = computed(() => this.board().canWrite);
+  /** A card of a shared board does not enter the personal board (`canTransfer`). */
+  readonly enter = computed(() => DROP_ENTER[this.board().kind]);
+  readonly dropId = boardDropId;
 
   /** Done columns opened past the preview. */
   readonly expanded = signal<ReadonlySet<Uuid>>(new Set());
@@ -126,6 +145,8 @@ export class TodoBoardViewComponent {
   private spaceTaken = false;
   /** The pointer drag: the column the card left and the column it is over. */
   readonly ptr = signal<{ from: Uuid; over: Uuid } | null>(null);
+  /** A card is held, by pointer or keyboard: the page holds a live read until it lands. */
+  readonly dragging = computed(() => this.ptr() !== null || this.kb() !== null);
   readonly announce = signal('');
   /** Phone: the column on screen. */
   readonly phoneColumn = signal(0);
@@ -267,7 +288,11 @@ export class TodoBoardViewComponent {
     if (!col) return;
     const target = this.list(col).filter((c) => c.id !== cardId);
     const held = this.board().cards.find((c) => c.id === cardId);
-    if (!held) return;
+    if (!held) {
+      // A card of another board: the page moves it over.
+      this.dropIn.emit({ cardId, move: dropMove(target, event.currentIndex, toCol) });
+      return;
+    }
     target.splice(event.currentIndex, 0, held);
     this.moveCard.emit({ cardId, move: moveRequest(target, event.currentIndex, toCol) });
   }
