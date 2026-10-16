@@ -25,6 +25,7 @@ import type {
   Transition,
   VersionOutWire,
 } from '@core/api/models';
+import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
 
 const SUBMITTED: StateOutWire = {
   id: 's1',
@@ -96,6 +97,7 @@ async function setup(
 ) {
   const view = await render(ApplicationsDetailComponent, {
     providers: [
+      NO_LINKED_TODOS,
       provideRouter([]),
       provideHttpClient(),
       provideHttpClientTesting(),
@@ -358,6 +360,7 @@ describe('ApplicationsDetailComponent', () => {
   it('draws the tabs while it loads in one column', async () => {
     const view = await render(ApplicationsDetailComponent, {
       providers: [
+        NO_LINKED_TODOS,
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -1809,6 +1812,7 @@ describe('ApplicationsDetailComponent', () => {
     // layout until it arrives at once is the worst place for it.
     const view = await render(ApplicationsDetailComponent, {
       providers: [
+        NO_LINKED_TODOS,
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),

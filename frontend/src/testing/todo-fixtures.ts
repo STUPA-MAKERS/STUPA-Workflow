@@ -2,16 +2,22 @@
  * Test data of the to-do specs: a gremium board with four columns (the last is done), two
  * labels and three cards, a card detail and the board list.
  */
-import type {
-  TodoBoard,
-  TodoBoardSummary,
-  TodoCardDetail,
-  TodoCardTile,
-  TodoLink,
-  TodoMember,
+import type { Provider } from '@angular/core';
+import { of } from 'rxjs';
+import {
+  TodosApiService,
+  type TodoBoard,
+  type TodoBoardSummary,
+  type TodoCardDetail,
+  type TodoCardTile,
+  type TodoLink,
+  type TodoMember,
 } from '../app/core/api/todos.service';
 
 export const TODAY = '2026-10-16';
+
+/** A to-do API without linked cards, for pages that show the back-references "To-Dos". */
+export const NO_LINKED_TODOS: Provider = { provide: TodosApiService, useValue: { linked: () => of([]) } };
 
 export function link(over: Partial<TodoLink> = {}): TodoLink {
   return {

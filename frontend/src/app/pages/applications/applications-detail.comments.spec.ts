@@ -21,6 +21,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { ApplicationOutWire, CommentOutWire, StateOutWire, VersionOutWire } from '@core/api/models';
+import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
 
 const SUBMITTED: StateOutWire = {
   id: 's1',
@@ -83,6 +84,7 @@ async function setup(
 ) {
   const view = await render(ApplicationsDetailComponent, {
     providers: [
+      NO_LINKED_TODOS,
       provideRouter([]),
       provideHttpClient(),
       provideHttpClientTesting(),
@@ -227,7 +229,8 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
 
   it('patches only the body of an own comment', async () => {
     const { http, detectChanges, cmp } = await loaded(undefined, [COMMENTS[0], OWN]);
-    fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
+    // A manager may change both comments; the second one is the own.
+    fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[1]);
     const box = screen.getByRole('textbox', { name: 'Nachricht bearbeiten' });
     fireEvent.input(box, { target: { value: '  Neuer Text  ' } });
     fireEvent.keyDown(box, { key: 'Enter' });
@@ -253,6 +256,40 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     expect(error).toHaveBeenCalledWith(message);
     expect(cmp.comments()[0].body).toBe('Mein Text');
     http.verify();
+  });
+
+  it('lets a holder of application.manage edit and delete a comment of another person', async () => {
+    const { http, detectChanges, cmp } = await loaded(undefined, [COMMENTS[0]]);
+    fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
+    const box = screen.getByRole('textbox', { name: 'Nachricht bearbeiten' });
+    fireEvent.input(box, { target: { value: 'Korrigiert' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    const patch = http.expectOne(url('/comments/c1'));
+    expect(patch.request.method).toBe('PATCH');
+    patch.flush({ ...COMMENTS[0], body: 'Korrigiert' });
+    detectChanges();
+    expect(cmp.comments()[0].body).toBe('Korrigiert');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Nachricht löschen' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nachricht löschen' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Löschen' }));
+    const del = http.expectOne(url('/comments/c1'));
+    expect(del.request.method).toBe('DELETE');
+    del.flush(null, { status: 204, statusText: 'No Content' });
+    detectChanges();
+    expect(cmp.comments()).toEqual([]);
+    http.verify();
+  });
+
+  it('lists the to-dos linked to the application in the details', async () => {
+    await loaded();
+    expect(document.querySelector('app-todo-linked-list[kind="application"]')).not.toBeNull();
+  });
+
+  it('offers no edit or delete on a comment of another person without application.manage', async () => {
+    await loaded(['application.read'], [COMMENTS[0], OWN]);
+    expect(screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Nachricht löschen' })).toHaveLength(1);
   });
 
   it('deletes an own comment after the confirmation', async () => {

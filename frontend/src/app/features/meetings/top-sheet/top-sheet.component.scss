@@ -238,6 +238,11 @@
   color: var(--color-text-muted);
 }
 /* The keeper line of a closed meeting, below the title. */
+/* The to-dos linked to the item, between the title and the text. */
+.ts__todos {
+  flex: none;
+  padding: 0 var(--space-5) 10px;
+}
 .ts__keepers {
   display: flex;
   flex: none;

@@ -90,6 +90,7 @@ import { decisionHistoryLine, formatMoney } from '@shared/decision/decision.util
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
+import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
 import { mediaQuerySignal } from '../../layout/media-query';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { SheetBarComponent, SheetBarKickerDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
@@ -158,6 +159,7 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
     AgendaDialogComponent,
     DecisionDialogComponent,
     DecisionSectionComponent,
+    TodoLinkedListComponent,
   ],
   // The field types of the form (`provideFormly`) come with the component, so Formly is not
   // part of the initial bundle.
@@ -1144,6 +1146,8 @@ export class ApplicationsDetailComponent {
       body: comment.body,
       at: comment.at,
       own: comment.isOwn,
+      // The server lets the author and a holder of `application.manage` change a comment.
+      canEdit: comment.isOwn || this.canManage(),
       visibility: comment.visibility,
     };
   }

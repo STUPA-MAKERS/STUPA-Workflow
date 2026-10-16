@@ -1,0 +1,67 @@
+/* Without linked cards the host holds only a comment node, so it takes no gap. */
+:host {
+  display: block;
+  min-width: 0;
+}
+:host(:empty) {
+  display: none;
+}
+.tl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.tl__title {
+  padding: 0 var(--space-1);
+}
+.tl__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tl__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+.tl__row:focus-within {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.tl__icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.tl__row--done .tl__icon {
+  color: var(--color-accent-text);
+}
+.tl__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.tl__link {
+  color: var(--color-text);
+  font-weight: var(--fw-medium);
+  text-decoration: none;
+}
+/* The whole row opens the card. */
+.tl__link::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+}
+.tl__link:hover {
+  text-decoration: underline;
+}
+.tl__link:focus-visible {
+  outline: none;
+}
+.tl__sub {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}

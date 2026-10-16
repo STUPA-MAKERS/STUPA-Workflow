@@ -69,6 +69,10 @@
       </p>
     }
 
+    @if (!follow()) {
+      <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [targetId]="t.id" />
+    }
+
     @if (follow()) {
       <div class="ts__rule"></div>
       <app-markdown-editor
