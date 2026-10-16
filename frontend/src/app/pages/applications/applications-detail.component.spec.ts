@@ -225,6 +225,32 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
+  it('marks an edited comment as "bearbeitet", from the list and from the edit answer', async () => {
+    const { http, detectChanges, cmp, container } = await setup();
+    flushTypes(http);
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush([
+      ...COMMENTS,
+      { ...COMMENTS[0], id: 'c2', body: 'Erledigt.', at: '2026-06-05T12:05:00Z', editedAt: '2026-06-05T12:30:00Z' },
+    ]);
+    for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) req.flush([]);
+    flushForm(http);
+    detectChanges();
+    const edited = () => [...container.querySelectorAll('.chat__meta')].filter((m) => /bearbeitet/.test(m.textContent ?? ''));
+    expect(edited()).toHaveLength(1);
+
+    (cmp as unknown as { editComment(e: { id: string; body: string }): void }).editComment({ id: 'c1', body: 'Neu' });
+    http
+      .expectOne((r) => r.method === 'PATCH' && r.url === '/api/applications/app-1/comments/c1')
+      .flush({ ...COMMENTS[0], body: 'Neu', editedAt: '2026-06-05T13:00:00Z' });
+    detectChanges();
+    expect(screen.getByText('Neu')).toBeInTheDocument();
+    expect(edited()).toHaveLength(2);
+    flushAttachments(http);
+    http.verify();
+  });
+
   it('labels a present-but-empty diff as "no field changes"', async () => {
     const { http, detectChanges } = await setup();
     http.expectOne(url('')).flush(appWire());
