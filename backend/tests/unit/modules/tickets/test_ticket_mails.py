@@ -202,6 +202,32 @@ async def test_received_confirms_in_the_language_of_the_report(
         assert "link" not in sent[-1]
 
 
+async def test_received_leaves_out_the_title_of_a_report_without_a_session(
+    sent: list[dict[str, Any]], branding: dict[str, Branding]
+) -> None:
+    from jinja2.sandbox import SandboxedEnvironment
+
+    guest = _ticket(title="Klick hier: https://evil.example")
+    session = ScriptedSession()
+    session.put(guest)
+    assert await _received(session, guest.id) is True
+    assert sent[-1]["context"]["title"] == ""
+    member = _ticket(reporter_principal_id=uuid.uuid4(), reporter_email=None)
+    session = ScriptedSession(scalar=["m@x.org"])
+    session.put(member)
+    assert await _received(session, member.id) is True
+    assert sent[-1]["to"] == ["m@x.org"]
+    assert sent[-1]["context"]["title"] == "Wie?"
+    env = SandboxedEnvironment()
+    for lang, quoted in (("de", "„Wie?“"), ("en", '"Wie?"')):
+        body = env.from_string(mails.TICKET_RECEIVED_BODY[lang])
+        assert quoted in body.render(title="Wie?", number="T-0005", wikiUrl="w")
+        bare = body.render(title="", number="T-0005", wikiUrl="w")
+        assert "„" not in bare
+        assert '"' not in bare
+        assert "T-0005" in bare
+
+
 async def test_received_skips_without_ticket_or_address(
     sent: list[dict[str, Any]], branding: dict[str, Branding]
 ) -> None:

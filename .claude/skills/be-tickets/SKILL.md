@@ -68,14 +68,19 @@ kind, internal notes, a timeline of events and the technical context of the repo
 **Mails:** `ticket_created` to the holders of `ticket.manage` (not the reporter), only while
 `tickets.notifyNew`, opt-out kind, link `/tickets/{id}`. `ticket_received` to the reporter
 (account e-mail or given e-mail) in `context.language`, else `de`, with `wikiUrl`; its kind
-is not in `NOTIFICATION_KINDS`, so nobody can switch it off, and it has no link. Both run as
+is not in `NOTIFICATION_KINDS`, so nobody can switch it off, and it has no link. For a report
+without a session the context `title` is empty, because that address is unchecked and the
+platform must not mail the caller's text to it; the builtin texts drop the quoted title. Both run as
 a background task after the commit and never fail the report.
 
 **Retention and privacy:** `anonymize_tickets` (arq cron 03:45) anonymizes tickets whose
 `closed_at` is older than `tickets.retentionMonths` (null = off): reporter, context and
-attachments (row + object) go, title, body, notes and events stay, one commit and one
-`anonymization` audit entry per ticket. `PrincipalService.erase` gives the reported tickets
-the same anonymization. The Art. 15 export has a sheet "Tickets". The account merge moves
+attachments (row + object) go, title, body, notes and events stay, but the `created` event
+loses its actor (that actor is the reporter), one commit and one `anonymization` audit entry
+per ticket. `PrincipalService.erase` gives the same anonymization to the tickets of the
+account and to the reports without a session under the account's e-mail; an applicant
+erasure does it for the tickets of the request's e-mail
+(`privacy.service.anonymize_reported_tickets`). The Art. 15 export has a sheet "Tickets". The account merge moves
 reporter, assignee, note author and event actor (area `tickets`).
 
 **Search:** source `ticket` behind `ticket.manage`, reuses `TicketService.list`; title

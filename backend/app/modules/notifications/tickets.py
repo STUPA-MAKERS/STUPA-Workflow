@@ -7,8 +7,11 @@ session, and both are best effort: a mail failure never fails the report.
 ``tickets.notifyNew`` is on, without the reporter; each holder can switch it off
 (kind ``ticket_created``). ``ticket_received`` confirms the report to the reporter
 with the number and the handbook link. Its kind is not in ``NOTIFICATION_KINDS``, so
-nobody can switch it off. The mail has no link to the ticket, because the reporter
-never reads it again (one-way); the language is ``context.language``, else German.
+nobody can switch it off. A report without a session can name any address, so for
+it the mail leaves out the title (``title`` is empty): the platform does not send
+text of the caller to an address that nobody checked. The mail has no link to the
+ticket, because the reporter never reads it again (one-way); the language is
+``context.language``, else German.
 """
 
 from __future__ import annotations
@@ -63,16 +66,18 @@ TICKET_RECEIVED_SUBJECT: dict[str, str] = {
     "en": "Your report {{ number }} was received",
 }
 TICKET_RECEIVED_BODY: dict[str, str] = {
-    "de": "Hallo,\n\nvielen Dank für Ihre Meldung „{{ title }}“. Sie hat die Nummer "
+    "de": "Hallo,\n\nvielen Dank für Ihre Meldung{% if title %} „{{ title }}“{% endif %}. "
+    "Sie hat die Nummer "
     "{{ number }}. Bei Rückfragen melden wir uns per E-Mail.\n\n"
     "Antworten auf viele Fragen stehen im Handbuch: {{ wikiUrl }}\n",
-    "en": 'Hello,\n\nthank you for your report "{{ title }}". Its number is '
+    "en": "Hello,\n\nthank you for your report"
+    '{% if title %} "{{ title }}"{% endif %}. Its number is '
     "{{ number }}. If we have questions, we will contact you by email.\n\n"
     "The handbook answers many questions: {{ wikiUrl }}\n",
 }
 TICKET_RECEIVED_PLACEHOLDERS: dict[str, str] = {
     "number": "Ticketnummer (T-0042)",
-    "title": "Titel des Tickets",
+    "title": "Titel des Tickets (leer bei einer Meldung ohne Anmeldung)",
     "wikiUrl": "Link zum Handbuch",
 }
 
@@ -176,7 +181,9 @@ async def notify_ticket_received(
                 builtin_body=TICKET_RECEIVED_BODY,
                 context={
                     "number": format_number(ticket.number),
-                    "title": ticket.title,
+                    # A report without a session names an unchecked address, so
+                    # its mail carries no text of the caller.
+                    "title": ticket.title if ticket.reporter_principal_id else "",
                     "wikiUrl": branding.help.wiki_url,
                 },
                 idempotency_parts=(TICKET_RECEIVED_KEY, str(ticket.id)),
