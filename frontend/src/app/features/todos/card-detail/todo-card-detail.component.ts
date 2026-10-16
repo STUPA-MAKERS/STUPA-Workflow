@@ -94,7 +94,8 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
  * One card with all its fields (frames 2–4, 10, 12–13): the board drawer and the right
  * pane of "Aufgaben" use it.
  *
- * Side by side: "Aktivität" (`app-chat`: the comments and the events) beside the fields
+ * Side by side: the thread (`app-chat`: the comments and the events, with no heading of its
+ * own; its column is labelled "Aktivität") beside the fields
  * Spalte, Zuständig, Fällig, Label, then "Verknüpft" with the link picker,
  * "Beschreibung" and "Checkliste". Phone: the tabs Details | Aktivität and a bar with
  * "Verschieben" (the move sheet) and "Erledigt".
@@ -215,6 +216,25 @@ export class TodoCardDetailComponent {
 
   // ------------------------------------------------------------------ derived
 
+  /**
+   * The board of the page when it holds this card, else null. The page also opens the
+   * cards of the rows of other boards, and its board must not name or count those.
+   */
+  readonly pageBoard = computed(() => {
+    const b = this.board();
+    if (!b) return null;
+    const c = this.card();
+    if (c && c.id === this.cardId()) return c.boardId === b.id ? b : null;
+    const id = this.cardId();
+    return b.cards.some((x) => x.id === id) ? b : null;
+  });
+
+  /** The kicker while the card loads: the board is known from the page when it holds the card. */
+  readonly loadingKicker = computed(() => {
+    const name = this.pageBoard()?.name;
+    return name ? this.t('todos.card.kicker', { board: name }) : '';
+  });
+
   readonly kicker = computed(() => {
     const c = this.card();
     return c ? this.t('todos.card.kicker', { board: c.boardName }) : '';
@@ -306,6 +326,12 @@ export class TodoCardDetailComponent {
     })),
   );
 
+  /** The tabs while the card loads: no count yet. */
+  readonly busyTabs = computed<TabItem[]>(() => [
+    { id: 'details', label: this.t('todos.card.details') },
+    { id: 'activity', label: this.t('todos.card.activity') },
+  ]);
+
   readonly tabs = computed<TabItem[]>(() => [
     { id: 'details', label: this.t('todos.card.details') },
     { id: 'activity', label: this.t('todos.card.activity'), count: this.card()?.comments.length ?? 0 },
@@ -325,7 +351,7 @@ export class TodoCardDetailComponent {
   readonly moveColumns = computed<MoveColumn[]>(() => {
     const c = this.card();
     if (!c) return [];
-    const counts = new Map((this.board()?.columns ?? []).map((col) => [col.id, col.cardCount]));
+    const counts = new Map((this.pageBoard()?.columns ?? []).map((col) => [col.id, col.cardCount]));
     return c.columns.map((col) => ({ id: col.id, name: col.name, count: counts.get(col.id) ?? null }));
   });
 

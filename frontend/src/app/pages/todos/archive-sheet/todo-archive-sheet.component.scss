@@ -55,3 +55,13 @@
 .as__note--error {
   color: var(--color-danger);
 }
+
+/* The loading rows: the day line and the size of the small tonal button. */
+.as__skelSub {
+  width: 6rem;
+}
+.as__skelButton {
+  width: 7.5rem;
+  height: var(--control-height-sm);
+  border-radius: 999px;
+}

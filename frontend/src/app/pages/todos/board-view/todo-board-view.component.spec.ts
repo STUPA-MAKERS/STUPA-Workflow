@@ -1,4 +1,5 @@
-import type { CdkDragDrop } from '@angular/cdk/drag-drop';
+import { CdkDrag, type CdkDragDrop } from '@angular/cdk/drag-drop';
+import { By } from '@angular/platform-browser';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import type { TodoBoard } from '@core/api/todos.service';
 import { cardsOf } from '../../../features/todos/todos.util';
@@ -35,6 +36,19 @@ function dropEvent(cardId: string, from: string, to: string, previousIndex: numb
     previousIndex,
     currentIndex,
   } as unknown as CdkDragDrop<string>;
+}
+
+/**
+ * Space on a tile as Firefox does it: the keydown on the focused button, then the keyup,
+ * and the keyup clicks the button unless a handler prevented it.
+ */
+function firefoxSpace(title: string): void {
+  const button = screen.getByRole('button', { name: title });
+  fireEvent.keyDown(button, { key: ' ' });
+  const target = screen.getByRole('button', { name: title });
+  const up = new KeyboardEvent('keyup', { key: ' ', bubbles: true, cancelable: true });
+  target.dispatchEvent(up);
+  if (!up.defaultPrevented) target.click();
 }
 
 describe('TodoBoardViewComponent', () => {
@@ -179,6 +193,31 @@ describe('TodoBoardViewComponent', () => {
     expect(cmp.kb()).toBeNull();
   });
 
+  it('lifts and puts down a card with Space without opening it, as Firefox clicks on keyup', async () => {
+    const { cmp, on, fixture } = await setup();
+    firefoxSpace('Raum buchen');
+    fixture.detectChanges();
+    expect(cmp.kb()).toMatchObject({ cardId: 'k-1' });
+    expect(on.openCard).not.toHaveBeenCalled();
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Raum buchen' }), { key: 'ArrowDown' });
+    fixture.detectChanges();
+    firefoxSpace('Raum buchen');
+    fixture.detectChanges();
+    expect(cmp.kb()).toBeNull();
+    expect(on.moveCard).toHaveBeenCalled();
+    expect(on.openCard).not.toHaveBeenCalled();
+    // A Space keyup without a drag still clicks the tile.
+    fireEvent.click(screen.getByRole('button', { name: 'Raum buchen' }));
+    expect(on.openCard).toHaveBeenCalledWith('k-1');
+  });
+
+  it('lifts a card by touch only after a long press, so a swipe over the board scrolls', async () => {
+    const { fixture } = await setup();
+    const drags = fixture.debugElement.queryAll(By.directive(CdkDrag));
+    expect(drags.length).toBeGreaterThan(0);
+    for (const d of drags) expect(d.injector.get(CdkDrag).dragStartDelay).toEqual({ touch: 400, mouse: 0 });
+  });
+
   it('lets Tab leave a held card: the drag ends and the focus is not pulled back', async () => {
     const { cmp, key } = await setup();
     await key('Raum buchen', ' ');
@@ -241,6 +280,15 @@ describe('TodoBoardViewComponent', () => {
   it('marks the board as a scroll container for the drag', async () => {
     const { container } = await setup();
     expect(container.querySelector('.bv')).toHaveAttribute('cdkScrollable');
+  });
+
+  it('fills the page by default and takes its natural height when fill is off', async () => {
+    const { fixture } = await setup();
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host).not.toHaveClass('bv-host--natural');
+    fixture.componentRef.setInput('fill', false);
+    fixture.detectChanges();
+    expect(host).toHaveClass('bv-host--natural');
   });
 
   it('puts the card back when it ends where it started, on Escape and on Tab', async () => {
@@ -312,9 +360,13 @@ describe('TodoBoardViewComponent', () => {
       expect(container.querySelectorAll('.bv__dot')).toHaveLength(4);
       fireEvent.click(screen.getByRole('button', { name: 'Haushalt Kapitel 3' }));
       expect(on.openCard).toHaveBeenCalledWith('k-2');
+      // Every column is a page of the pager; an empty one says so.
+      expect(container.querySelectorAll('.bv__page')).toHaveLength(4);
+      expect(container.querySelectorAll('.bv__page--empty')).toHaveLength(2);
+      expect(screen.getAllByText('Keine Karten')).toHaveLength(2);
       cmp.selectPhoneColumn('c-2');
       fixture.detectChanges();
-      expect(screen.getByText('Keine Karten')).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /In Arbeit/ })).toHaveAttribute('aria-selected', 'true');
       cmp.selectPhoneColumn('nope');
       cmp.selectPhoneColumn(null);
       expect(cmp.phoneCol()?.id).toBe('c-2');
@@ -334,6 +386,77 @@ describe('TodoBoardViewComponent', () => {
       fireEvent.click(screen.getByRole('button', { name: '2 weitere' }));
       fixture.detectChanges();
       expect(within(screen.getByRole('list', { name: 'Erledigt' })).getAllByRole('listitem')).toHaveLength(5);
+    });
+
+    it('scrolls the pager to a tapped tab and follows a swipe', async () => {
+      const { cmp, fixture, container } = await setup(board(), { phone: true });
+      const pager = container.querySelector('.bv__pager') as HTMLElement;
+      Object.defineProperty(pager, 'clientWidth', { configurable: true, value: 390 });
+      const scrollTo = jest.fn();
+      pager.scrollTo = scrollTo as unknown as typeof pager.scrollTo;
+      cmp.selectPhoneColumn('c-3');
+      expect(scrollTo).toHaveBeenCalledWith({ left: 780, behavior: 'smooth' });
+      // A swipe: the tab follows once the scroll comes to rest.
+      jest.useFakeTimers();
+      try {
+        pager.scrollLeft = 390;
+        fireEvent.scroll(pager);
+        expect(cmp.phoneCol()?.id).toBe('c-3');
+        jest.advanceTimersByTime(150);
+        expect(cmp.phoneCol()?.id).toBe('c-2');
+        // `scrollend` syncs at once and clamps to the last page.
+        pager.scrollLeft = 5000;
+        fireEvent.scroll(pager);
+        pager.dispatchEvent(new Event('scrollend'));
+        expect(cmp.phoneCol()?.id).toBe('c-4');
+        jest.advanceTimersByTime(150);
+        expect(cmp.phoneCol()?.id).toBe('c-4');
+      } finally {
+        jest.useRealTimers();
+      }
+      fixture.detectChanges();
+      expect(screen.getByRole('tab', { name: /Erledigt/ })).toHaveAttribute('aria-selected', 'true');
+      // Without a laid-out pager nothing moves.
+      Object.defineProperty(pager, 'clientWidth', { configurable: true, value: 0 });
+      cmp.syncPage();
+      cmp.selectPhoneColumn('c-1');
+      expect(cmp.phoneCol()?.id).toBe('c-1');
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+    });
+
+    it('jumps without animation under reduced motion and right to left', async () => {
+      const { cmp, container } = await setup(board(), { phone: true });
+      const pager = container.querySelector('.bv__pager') as HTMLElement;
+      Object.defineProperty(pager, 'clientWidth', { configurable: true, value: 300 });
+      pager.style.direction = 'rtl';
+      const scrollTo = jest.fn();
+      pager.scrollTo = scrollTo as unknown as typeof pager.scrollTo;
+      const mm = window.matchMedia;
+      window.matchMedia = ((q: string) => ({ matches: q.includes('reduce') })) as unknown as typeof window.matchMedia;
+      try {
+        cmp.selectPhoneColumn('c-2');
+      } finally {
+        window.matchMedia = mm;
+      }
+      expect(scrollTo).toHaveBeenCalledWith({ left: -300, behavior: 'auto' });
+      pager.scrollLeft = -600;
+      cmp.syncPage();
+      expect(cmp.phoneCol()?.id).toBe('c-3');
+    });
+
+    it('stops a pending sync when it goes away', async () => {
+      jest.useFakeTimers();
+      try {
+        const { cmp, fixture } = await setup(board(), { phone: true });
+        const sync = jest.spyOn(cmp, 'syncPage');
+        cmp.onPagerScroll();
+        cmp.onPagerScroll();
+        fixture.destroy();
+        jest.advanceTimersByTime(500);
+        expect(sync).not.toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('shows nothing for a board without columns', async () => {

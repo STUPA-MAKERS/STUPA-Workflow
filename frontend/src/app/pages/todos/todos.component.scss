@@ -34,9 +34,11 @@
   flex: 0 1 18.75rem;
   min-width: 12rem;
 }
+/* The board picker and the search start the bar; the filter chips end it. */
 .td__chips {
   display: flex;
   flex: 0 1 auto;
+  margin-inline-start: auto;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
@@ -72,6 +74,35 @@
   outline: 2px solid var(--color-focus-ring);
 }
 
+/* The places of the header buttons and of the filter chips while the board loads. */
+.td__skelIcon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+}
+.td__skelIcon .skel-box {
+  width: 22px;
+  height: 22px;
+}
+.td__skelNew {
+  width: 6.75rem;
+  height: 40px;
+  border-radius: var(--radius-pill);
+}
+.td__skelChip {
+  width: 5rem;
+  height: 32px;
+  border-radius: var(--radius-md);
+}
+.td__skelChip--wide {
+  width: 6.75rem;
+}
+.td__skelChip--filter {
+  width: 6rem;
+  height: 36px;
+}
+
 /* ------------------------------------------------------------------ body */
 .td__body {
   display: flex;
@@ -79,6 +110,18 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+}
+/* "Meine To-Dos" with rows: the board and the rows below it scroll together, so the
+   board keeps its natural height. */
+.td__body--rows {
+  gap: var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+.td__body--rows > app-todo-board-view,
+.td__body--rows > app-todo-board-skeleton,
+.td__body--rows > app-todo-board-rows {
+  flex: none;
 }
 .td__state {
   display: flex;
@@ -93,6 +136,11 @@
 }
 
 /* ------------------------------------------------------------------ phone */
+/* The board picker starts the bar, the filter chip ends it. */
+.td--phone .td__filter,
+.td__skelChip--filter {
+  margin-inline-start: auto;
+}
 .td--phone .td__search,
 .td--phone .td__chips {
   flex-basis: 100%;

@@ -13,6 +13,7 @@ import {
 } from '@core/api/todos.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { TicketTodoDialogComponent } from './ticket-todo-dialog.component';
+import { pickOption } from '../../../../testing/select';
 
 const TICKET = {
   id: 't40',
@@ -289,9 +290,9 @@ describe('TicketTodoDialogComponent', () => {
 
   it('sets the column, the person and the date from the fields', async () => {
     const { c, fixture } = await setup();
-    await userEvent.selectOptions(screen.getByLabelText('Spalte'), 'tb-c2');
-    await userEvent.selectOptions(screen.getByLabelText('Zuständig'), 'p1');
-    await userEvent.selectOptions(screen.getByLabelText('Board'), 'pb');
+    await pickOption(screen.getByLabelText('Spalte'), 'In Arbeit');
+    await pickOption(screen.getByLabelText('Zuständig'), 'Mara Keller');
+    await pickOption(screen.getByLabelText('Board'), 'Persönlich');
     fixture.detectChanges();
     expect(c.boardId()).toBe('pb');
     await userEvent.clear(screen.getByLabelText(/Titel/));

@@ -8,142 +8,148 @@
     [attr.aria-label]="'chat.log' | t"
     (scroll)="onScroll()"
   >
-    @for (item of items(); track item.key) {
-      @if (item.kind === 'day') {
-        <div class="chat__sep">
-          <span class="chat__sepText">{{ item.label }}</span>
-        </div>
-      } @else if (item.kind === 'new') {
-        <div class="chat__sep chat__sep--new">
-          <span class="chat__sepText">{{ 'chat.newCount' | t: { count: item.count } }}</span>
-        </div>
-      } @else if (item.kind === 'event') {
-        <p class="chat__event">
-          {{ item.text }}<span class="chat__dot" aria-hidden="true">·</span><time [attr.datetime]="item.at">{{ time(item.at) }}</time>
-        </p>
-      } @else {
-        @let m = item.msg;
-        <div
-          class="chat__row"
-          [attr.data-msg-id]="m.id"
-          [class.chat__row--own]="m.own"
-          [class.chat__row--head]="item.head"
-          [class.chat__row--tail]="item.tail"
-        >
-          @if (!m.own) {
-            @if (item.tail && m.author) {
-              <app-avatar
-                class="chat__av"
-                size="sm"
-                [decorative]="true"
-                [name]="item.name ?? ''"
-                [principalId]="m.author.principalId"
-              />
-            } @else if (m.author) {
-              <span class="chat__avSpace" aria-hidden="true"></span>
+    @if (loading()) {
+      <!-- The thread is on its way: bubbles in place of the messages, never "Noch keine
+           Nachrichten", which would say there is nothing. -->
+      <app-skeleton class="chat__skel skel-in" variant="bubbles" [count]="5" [label]="'chat.loading' | t" />
+    } @else {
+      @for (item of items(); track item.key) {
+        @if (item.kind === 'day') {
+          <div class="chat__sep">
+            <span class="chat__sepText">{{ item.label }}</span>
+          </div>
+        } @else if (item.kind === 'new') {
+          <div class="chat__sep chat__sep--new">
+            <span class="chat__sepText">{{ 'chat.newCount' | t: { count: item.count } }}</span>
+          </div>
+        } @else if (item.kind === 'event') {
+          <p class="chat__event">
+            {{ item.text }}<span class="chat__dot" aria-hidden="true">·</span><time [attr.datetime]="item.at">{{ time(item.at) }}</time>
+          </p>
+        } @else {
+          @let m = item.msg;
+          <div
+            class="chat__row"
+            [attr.data-msg-id]="m.id"
+            [class.chat__row--own]="m.own"
+            [class.chat__row--head]="item.head"
+            [class.chat__row--tail]="item.tail"
+          >
+            @if (!m.own) {
+              @if (item.tail && m.author) {
+                <app-avatar
+                  class="chat__av"
+                  size="sm"
+                  [decorative]="true"
+                  [name]="item.name ?? ''"
+                  [principalId]="m.author.principalId"
+                />
+              } @else if (m.author) {
+                <span class="chat__avSpace" aria-hidden="true"></span>
+              }
             }
-          }
-          <div class="chat__col">
-            @if (item.head && item.name) {
-              <span class="chat__name">{{ item.name }}</span>
-            }
-            <div class="chat__line">
-              @if (canAct(m) && !touchMenu() && editingId() !== m.id) {
-                <span class="chat__acts">
-                  <app-button
-                    variant="text"
-                    size="sm"
-                    [iconOnly]="true"
-                    [ariaLabel]="'chat.edit' | t"
-                    (click)="startEdit(m)"
-                  ><app-icon name="edit" [size]="16" /></app-button>
-                  <app-button
-                    variant="text"
-                    size="sm"
-                    [iconOnly]="true"
-                    [ariaLabel]="'chat.delete' | t"
-                    (click)="askDelete(m)"
-                  ><app-icon name="trash" [size]="16" /></app-button>
+            <div class="chat__col">
+              @if (item.head && item.name) {
+                <span class="chat__name">{{ item.name }}</span>
+              }
+              <div class="chat__line">
+                @if (canAct(m) && !touchMenu() && editingId() !== m.id) {
+                  <span class="chat__acts">
+                    <app-button
+                      variant="text"
+                      size="sm"
+                      [iconOnly]="true"
+                      [ariaLabel]="'chat.edit' | t"
+                      (click)="startEdit(m)"
+                    ><app-icon name="edit" [size]="16" /></app-button>
+                    <app-button
+                      variant="text"
+                      size="sm"
+                      [iconOnly]="true"
+                      [ariaLabel]="'chat.delete' | t"
+                      (click)="askDelete(m)"
+                    ><app-icon name="trash" [size]="16" /></app-button>
+                  </span>
+                }
+                @if (editingId() === m.id) {
+                  <form class="chat__edit" (submit)="saveEdit($event)">
+                    <textarea
+                      class="chat__editInput"
+                      rows="1"
+                      name="chatEdit"
+                      [attr.maxlength]="maxLength"
+                      [value]="editDraft()"
+                      (input)="editDraft.set($any($event.target).value)"
+                      (keydown)="onEditKey($event)"
+                      [attr.aria-label]="'chat.edit' | t"
+                    ></textarea>
+                    <ng-container *ngTemplateOutlet="msgFiles; context: { $implicit: m }" />
+                    <span class="chat__editActions">
+                      <app-button variant="text" size="sm" (click)="cancelEdit()">{{ 'chat.cancel' | t }}</app-button>
+                      <app-button type="submit" variant="fill" size="sm" [disabled]="!editDraft().trim()">{{
+                        'chat.save' | t
+                      }}</app-button>
+                    </span>
+                  </form>
+                } @else {
+                  <div
+                    class="chat__bubble"
+                    [class.chat__bubble--internal]="item.mark === 'internal'"
+                    [class.chat__bubble--failed]="m.state === 'failed'"
+                    appPressSelect
+                    [appPressSelectEnabled]="canAct(m) && touchMenu()"
+                    (appPressSelectToggle)="openMenu(m)"
+                  >
+                    @if (item.markLabel && item.mark === 'internal') {
+                      <span class="chat__mark chat__mark--internal">
+                        <app-icon name="lock" [size]="13" />{{ 'chat.internal' | t }}
+                      </span>
+                    } @else if (item.markLabel && item.mark === 'public') {
+                      <span class="chat__mark chat__mark--public">
+                        <app-icon name="globe" [size]="13" />{{ 'chat.public' | t }}
+                      </span>
+                    }
+                    <div class="chat__text" [innerHTML]="m.body | chatBody"></div>
+                    <ng-container *ngTemplateOutlet="msgFiles; context: { $implicit: m }" />
+                  </div>
+                }
+              </div>
+              @if (m.state === 'sending') {
+                <span class="chat__meta">{{ 'chat.sending' | t }}</span>
+              } @else if (m.state === 'failed') {
+                <span class="chat__meta chat__meta--failed">
+                  <span class="chat__failed"><app-icon name="alert" [size]="13" />{{ 'chat.failed' | t }}</span>
+                  <button type="button" class="chat__retry" (click)="retryFailed(m)">
+                    {{ 'chat.retry' | t }}
+                  </button>
+                  @if (canEditFailed(m)) {
+                    <button type="button" class="chat__retry" (click)="editFailed(m)">
+                      {{ 'chat.editShort' | t }}
+                    </button>
+                  }
+                  <button type="button" class="chat__retry" (click)="discardFailed(m)">
+                    {{ 'chat.discard' | t }}
+                  </button>
+                </span>
+              } @else if (item.tail || m.editedAt) {
+                <span class="chat__meta">
+                  @if (item.tail) {
+                    <time [attr.datetime]="m.at">{{ time(m.at) }}</time>
+                  }
+                  @if (item.tail && m.editedAt) {
+                    <span class="chat__dot" aria-hidden="true">·</span>
+                  }
+                  @if (m.editedAt) {
+                    <span>{{ 'chat.edited' | t }}</span>
+                  }
                 </span>
               }
-              @if (editingId() === m.id) {
-                <form class="chat__edit" (submit)="saveEdit($event)">
-                  <textarea
-                    class="chat__editInput"
-                    rows="1"
-                    name="chatEdit"
-                    [attr.maxlength]="maxLength"
-                    [value]="editDraft()"
-                    (input)="editDraft.set($any($event.target).value)"
-                    (keydown)="onEditKey($event)"
-                    [attr.aria-label]="'chat.edit' | t"
-                  ></textarea>
-                  <ng-container *ngTemplateOutlet="msgFiles; context: { $implicit: m }" />
-                  <span class="chat__editActions">
-                    <app-button variant="text" size="sm" (click)="cancelEdit()">{{ 'chat.cancel' | t }}</app-button>
-                    <app-button type="submit" variant="fill" size="sm" [disabled]="!editDraft().trim()">{{
-                      'chat.save' | t
-                    }}</app-button>
-                  </span>
-                </form>
-              } @else {
-                <div
-                  class="chat__bubble"
-                  [class.chat__bubble--internal]="item.mark === 'internal'"
-                  [class.chat__bubble--failed]="m.state === 'failed'"
-                  appPressSelect
-                  [appPressSelectEnabled]="canAct(m) && touchMenu()"
-                  (appPressSelectToggle)="openMenu(m)"
-                >
-                  @if (item.markLabel && item.mark === 'internal') {
-                    <span class="chat__mark chat__mark--internal">
-                      <app-icon name="lock" [size]="13" />{{ 'chat.internal' | t }}
-                    </span>
-                  } @else if (item.markLabel && item.mark === 'public') {
-                    <span class="chat__mark chat__mark--public">
-                      <app-icon name="globe" [size]="13" />{{ 'chat.public' | t }}
-                    </span>
-                  }
-                  <div class="chat__text" [innerHTML]="m.body | chatBody"></div>
-                  <ng-container *ngTemplateOutlet="msgFiles; context: { $implicit: m }" />
-                </div>
-              }
             </div>
-            @if (m.state === 'sending') {
-              <span class="chat__meta">{{ 'chat.sending' | t }}</span>
-            } @else if (m.state === 'failed') {
-              <span class="chat__meta chat__meta--failed">
-                <span class="chat__failed"><app-icon name="alert" [size]="13" />{{ 'chat.failed' | t }}</span>
-                <button type="button" class="chat__retry" (click)="retryFailed(m)">
-                  {{ 'chat.retry' | t }}
-                </button>
-                @if (canEditFailed(m)) {
-                  <button type="button" class="chat__retry" (click)="editFailed(m)">
-                    {{ 'chat.editShort' | t }}
-                  </button>
-                }
-                <button type="button" class="chat__retry" (click)="discardFailed(m)">
-                  {{ 'chat.discard' | t }}
-                </button>
-              </span>
-            } @else if (item.tail || m.editedAt) {
-              <span class="chat__meta">
-                @if (item.tail) {
-                  <time [attr.datetime]="m.at">{{ time(m.at) }}</time>
-                }
-                @if (item.tail && m.editedAt) {
-                  <span class="chat__dot" aria-hidden="true">·</span>
-                }
-                @if (m.editedAt) {
-                  <span>{{ 'chat.edited' | t }}</span>
-                }
-              </span>
-            }
           </div>
-        </div>
+        }
+      } @empty {
+        <p class="chat__empty">{{ 'chat.empty' | t }}</p>
       }
-    } @empty {
-      <p class="chat__empty">{{ 'chat.empty' | t }}</p>
     }
   </div>
   @if (unread() > 0) {
@@ -242,7 +248,7 @@
         [iconOnly]="true"
         [disabled]="uploading()"
         [ariaLabel]="'chat.send' | t"
-      ><app-icon name="send" [size]="17" /></app-button>
+      ><app-icon class="chat__sendIcon" name="send" [size]="17" /></app-button>
     </div>
   </form>
 }

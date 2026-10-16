@@ -28,12 +28,12 @@ import {
   IconComponent,
   InputComponent,
   SegmentedComponent,
-  SelectComponent,
   SwitchComponent,
   ToastService,
   type SegmentedOption,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { FIXED_VOTE_OPTIONS, errorDetail } from '../meetings-display.util';
 
 const MAJORITY_RULES: readonly MajorityRule[] = ['simple', 'absolute', 'two_thirds'];
@@ -85,7 +85,7 @@ export interface CandidateDraft {
     IconComponent,
     InputComponent,
     SegmentedComponent,
-    SelectComponent,
+    SelectFieldComponent,
     SwitchComponent,
     DecisionEditorComponent,
   ],

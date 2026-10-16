@@ -13,10 +13,10 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
-  SelectComponent,
   type SelectOption,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { AdminApiService } from '../admin-api.service';
 import type {
   Gremium,
@@ -96,7 +96,7 @@ const RESERVED_GROUP_PREFIX = 'vote:';
     SkeletonComponent,
     ButtonComponent,
     InputComponent,
-    SelectComponent,
+    SelectFieldComponent,
     DialogComponent,
     IconComponent,
   ],

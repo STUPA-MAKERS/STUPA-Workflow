@@ -26,8 +26,10 @@ from app.modules.todos.router import (
     board_etag,
     get_todo_mail_sender,
     get_todo_service,
+    mine_boards_etag,
 )
 from app.modules.todos.schemas import (
+    TodoAssignedBoard,
     TodoBoardOut,
     TodoBoardSummary,
     TodoCardDetail,
@@ -82,6 +84,7 @@ _ANSWERS: dict[str, Callable[[], Any]] = {
     "patch_label": lambda: TodoLabelOut(id=XID, name="L", color="red"),
     "delete_label": lambda: None,
     "mine": lambda: TodoMine(),
+    "mine_boards": lambda: [TodoAssignedBoard(id=BID, name="B", kind="gremium", cards=[_tile()])],
     "linked": lambda: [
         TodoLinkedCard(
             id=CID, board_id=BID, board_name="B", title="t", column_name="c", is_done=False
@@ -228,6 +231,28 @@ def test_etag_matching() -> None:
     assert not _matches("", tag)
     assert _matches("*", tag)
     assert _matches(f'"a", {tag.removeprefix("W/")}', tag)
+
+
+def test_the_assigned_boards_read_has_an_etag_and_answers_304(env: _Env) -> None:
+    first = env.client.get("/api/todos/mine/boards")
+    assert first.status_code == 200
+    body = first.json()
+    assert body[0]["name"] == "B" and body[0]["canWrite"] is True
+    assert body[0]["cards"][0]["id"] == str(CID)
+    etag = first.headers["ETag"]
+    assert first.headers["Cache-Control"] == "no-cache"
+    again = env.client.get("/api/todos/mine/boards", headers={"If-None-Match": etag})
+    assert again.status_code == 304 and again.headers["ETag"] == etag
+    assert env.last()[0] == "mine_boards"
+
+
+def test_mine_boards_etag_changes_with_the_body() -> None:
+    one = [TodoAssignedBoard(id=BID, name="B", kind="gremium")]
+    assert mine_boards_etag(one) == mine_boards_etag(list(one))
+    assert mine_boards_etag(one) != mine_boards_etag([])
+    assert mine_boards_etag(one) != mine_boards_etag(
+        [TodoAssignedBoard(id=BID, name="B", kind="gremium", can_write=False)]
+    )
 
 
 def test_cross_board_routes(env: _Env) -> None:

@@ -17,6 +17,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { AvatarComponent } from '../avatar/avatar.component';
 import { SideSheetComponent } from '../side-sheet/side-sheet.component';
+import { TruncatedDirective } from '../../truncated.directive';
 
 /** A person in front of the text of the chip. */
 export interface FilterSelectPerson {
@@ -59,7 +60,14 @@ const TYPEAHEAD_RESET = 600;
   selector: 'app-filter-select',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [AvatarComponent, IconComponent, NgTemplateOutlet, TranslatePipe, SideSheetComponent],
+  imports: [
+    AvatarComponent,
+    IconComponent,
+    NgTemplateOutlet,
+    TranslatePipe,
+    SideSheetComponent,
+    TruncatedDirective,
+  ],
   templateUrl: './filter-select.component.html',
   styleUrl: './filter-select.component.scss',
 })

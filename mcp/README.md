@@ -98,8 +98,9 @@ Public meeting (#17): `list_meeting_guests`, `admit_meeting_guest`, `admit_all_m
 `get_meeting_join_link`, `rotate_meeting_join_code`. No tool casts a ballot for a guest.
 On behalf (#11): `create_application_on_behalf`, `search_on_behalf_applicants` (needs
 `application.create_on_behalf`).
-To-dos: `todo_boards`, `todo_board`, `todo_card_get`, `todo_card_create`, `todo_card_update`
-(needs the card `version`), `todo_card_move`, `todo_comment`.
+To-dos: `todo_boards`, `todo_board`, `todo_my_cards` (my cards on the other boards, by
+board), `todo_card_get`, `todo_card_create`, `todo_card_update` (needs the card `version`),
+`todo_card_move`, `todo_comment`.
 Tickets: `tickets_list`, `tickets_get`, `tickets_note`, `tickets_update`,
 `tickets_block_sender`, `tickets_unblock_sender`, `tickets_blocked_senders`,
 `tickets_delete_blocked_sender` (need `ticket.manage`).

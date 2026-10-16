@@ -21,11 +21,11 @@ import {
   DatepickerComponent,
   DialogComponent,
   InputComponent,
-  SelectComponent,
   TimeInputComponent,
   ToastService,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { AdminOptionsService } from '../../../pages/admin/admin-options.service';
 import { longDate } from '../meetings-display.util';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
@@ -51,7 +51,7 @@ import { PublicJoinSettingsComponent } from '../public-join/public-join-settings
     TranslatePipe,
     DialogComponent,
     ButtonComponent,
-    SelectComponent,
+    SelectFieldComponent,
     DatepickerComponent,
     TimeInputComponent,
     InputComponent,

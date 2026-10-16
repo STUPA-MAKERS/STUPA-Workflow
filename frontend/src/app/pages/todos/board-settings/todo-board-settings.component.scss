@@ -9,10 +9,12 @@
 :host ::ng-deep .dialog {
   max-width: 40rem;
 }
+/* Four sections (Allgemein, Spalten, Labels, Archiv), each an accent heading over a row
+   group, as on the admin settings pages. The row group draws the separators. */
 .bs {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
   min-width: 0;
 }
 .bs__sec {
@@ -20,19 +22,19 @@
   flex-direction: column;
   gap: var(--space-2);
 }
+/* The heading row has the height of the small text button beside it, so a section with
+   a button and one without start their content at the same distance. */
 .bs__secHead {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-height: 2rem;
+  padding-inline-start: var(--space-1);
 }
 .bs__title {
   margin: 0;
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
 }
 .bs__cols {
-  display: flex;
-  flex-direction: column;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -43,17 +45,15 @@
   gap: var(--space-3);
   min-height: 52px;
   padding: 0 var(--space-1) 0 var(--space-3);
-  border-radius: var(--radius-md);
-}
-.bs__col + .bs__col {
-  margin-top: 2px;
 }
 .bs__col.cdk-drag-preview {
+  border-radius: var(--radius-md);
   background: var(--color-surface-2);
   box-shadow: var(--shadow-elevated);
 }
-.bs__col.cdk-drag-placeholder {
-  border: 1.5px dashed var(--color-accent);
+.rowgroup > .bs__col.cdk-drag-placeholder {
+  outline: 1.5px dashed var(--color-accent);
+  outline-offset: -1.5px;
   background: transparent;
 }
 .bs__grip {
@@ -121,18 +121,24 @@
   justify-content: flex-end;
   gap: var(--space-2);
 }
-.bs__labels {
+.bs__labelRow {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-2);
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3);
 }
-/* A label is a compact filled pill. */
+.bs__none {
+  color: var(--color-text-muted);
+}
+/* A label is a compact filled pill, one step above its row. */
 .bs__label {
   height: 30px;
   padding-inline: var(--space-3);
   border-color: transparent;
   border-radius: var(--radius-pill);
-  background: var(--color-surface-2);
+  background: var(--color-surface-3);
   color: var(--color-text);
   font-size: 0.8125rem;
   font-weight: var(--fw-regular);
@@ -161,11 +167,31 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
-.bs__archive {
+/* A switch row, as on the admin settings pages: the label at the start, the switch at
+   the end. */
+.bs__row {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  justify-content: center;
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3);
 }
 .bs__days {
-  max-width: 10rem;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.bs__daysField {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+}
+.bs__daysInput {
+  flex: none;
+  width: 4.5rem;
+  min-height: 36px;
+  background: var(--color-surface-3);
+  text-align: end;
 }

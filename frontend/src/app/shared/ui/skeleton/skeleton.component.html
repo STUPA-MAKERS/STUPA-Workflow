@@ -1,5 +1,20 @@
-<div class="sk" [class.sk--rows]="variant() === 'rows'" aria-busy="true">
-  @if (variant() === 'panel') {
+<div
+  class="sk"
+  [class.sk--rows]="variant() === 'rows'"
+  [class.sk--chat]="variant() === 'chat'"
+  aria-busy="true"
+>
+  @if (variant() === 'bubbles') {
+    <ng-container *ngTemplateOutlet="bubbles" />
+  } @else if (variant() === 'chat') {
+    <!-- The geometry of `app-chat`: the log (framed on a wide screen), the composer. -->
+    <span class="sk__log" [class.sk__log--framed]="framed()" aria-hidden="true">
+      <ng-container *ngTemplateOutlet="bubbles" />
+    </span>
+    @if (composer()) {
+      <span class="sk__composer" aria-hidden="true"></span>
+    }
+  } @else if (variant() === 'panel') {
     <span class="skel skel--panel" aria-hidden="true"></span>
   } @else if (variant() === 'items') {
     <!-- The geometry of `app-list-item`: a title line and a sub line, a value at the end. -->
@@ -7,6 +22,9 @@
       @for (_ of items(); track $index) {
         @let w = itemWidths($index);
         <span class="sk__item">
+          @if (lead()) {
+            <span class="skel-box sk__itemLead"></span>
+          }
           <span class="sk__itemBody">
             <span class="sk__itemTitle"
               ><span class="skel-text" [style.width]="w.title"></span
@@ -16,9 +34,13 @@
               <span class="skel-text skel-text--muted" [style.width]="w.b"></span>
             </span>
           </span>
-          <span class="sk__itemTrail"
-            ><span class="skel-text skel-text--muted" [style.width]="w.trail"></span
-          ></span>
+          @if (trail() === 'avatar') {
+            <span class="skel-box sk__itemAvatar"></span>
+          } @else {
+            <span class="sk__itemTrail"
+              ><span class="skel-text skel-text--muted" [style.width]="w.trail"></span
+            ></span>
+          }
         </span>
       }
     </span>
@@ -38,3 +60,23 @@
     <span class="sr-only" role="status">{{ label() }}</span>
   }
 </div>
+
+<!-- Messages in the geometry of `app-chat`: a 32px avatar beside a bubble from someone
+     else, an own bubble at the end. -->
+<ng-template #bubbles>
+  <span class="sk__bubbles" aria-hidden="true">
+    @for (_ of items(); track $index) {
+      @let b = bubble($index);
+      <span class="sk__msg" [class.sk__msg--own]="b.own">
+        @if (!b.own) {
+          <span class="skel-box sk__avatar"></span>
+        }
+        <span
+          class="skel-box sk__bubble"
+          [class.sk__bubble--two]="b.lines === 2"
+          [style.width]="b.width"
+        ></span>
+      </span>
+    }
+  </span>
+</ng-template>

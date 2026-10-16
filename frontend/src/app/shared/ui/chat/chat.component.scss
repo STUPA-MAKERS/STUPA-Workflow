@@ -1,6 +1,8 @@
 /* The host is a flex column: the log takes the space, the composer stays below it.
-   A consumer bounds the log with `--chat-log-max` (a column that scrolls as a whole) or
-   gives the host a height (a sheet), moves the pinned phone composer with
+   A consumer bounds the log with `--chat-log-max` (a column that scrolls as a whole),
+   gives the host a height (a sheet), or lets it fill a column that grows with the page:
+   `--chat-log-basis: 0` then makes the log add only `--chat-log-min` to the height of
+   the column, so a long thread scrolls inside the log and never stretches the column; moves the pinned phone composer with
    `--chat-composer-bottom`, carries its surface further down with
    `--chat-composer-foot` and out over the side padding of the page with
    `--chat-composer-bleed`; `--chat-composer-surface` is the fill of that bar. `--chat-bubble` is the fill of the messages of others. */
@@ -29,7 +31,7 @@
 /* Desktop: a rounded outline frames the log; no rule above the composer, no fade. */
 .chat__log {
   display: flex;
-  flex: 1 1 auto;
+  flex: 1 1 var(--chat-log-basis, auto);
   flex-direction: column;
   gap: 10px;
   min-height: var(--chat-log-min, 10rem);
@@ -429,11 +431,14 @@
   /* A consumer whose chat ends the page carries the surface down to the navigation. */
   box-shadow: 0 var(--chat-composer-foot, 0px) 0 0 var(--chat-composer-surface, var(--color-surface));
 }
+/* One row of the box is as tall as its buttons (`--chat-row`). The buttons sit at the
+   foot, so a long text grows upwards and its last line stays level with them. */
 .chat__box {
+  --chat-row: 40px;
   display: flex;
   align-items: flex-end;
   gap: 6px;
-  min-height: 52px;
+  min-height: calc(var(--chat-row) + 12px);
   padding: 6px 6px 6px 18px;
   border-radius: 26px;
   background: var(--color-surface-3);
@@ -441,13 +446,14 @@
 .chat__box:has(.chat__input:focus-visible) {
   box-shadow: inset 0 0 0 2px var(--color-focus-ring);
 }
-/* Grows with its text up to 6 lines, then scrolls. */
+/* Grows with its text up to 6 lines, then scrolls. The padding centers one line in a
+   row, so a single line (or the placeholder) sits on the middle of the buttons. */
 .chat__input {
   flex: 1 1 auto;
   min-width: 0;
-  min-height: 40px;
-  max-height: calc(6 * 1.4em + 18px);
-  padding: 9px 0;
+  min-height: var(--chat-row);
+  max-height: calc(5lh + var(--chat-row));
+  padding: calc((var(--chat-row) - 1lh) / 2) 0;
   border: 0;
   background: transparent;
   color: var(--color-text);
@@ -463,6 +469,12 @@
 .chat__send,
 .chat__attach {
   flex: none;
+}
+/* The plane of the "send" icon fills its 24-unit box evenly, but its area centroid is at
+   (13.83, 10.17): 1.83 units right of and above the middle. The icon moves back by that
+   much at its 17px size, so the plane looks centered in the round button. */
+.chat__sendIcon {
+  translate: calc(-1.83 * 17px / 24) calc(1.83 * 17px / 24);
 }
 .chat__attach {
   color: var(--color-text-muted);

@@ -125,10 +125,12 @@
   gap: var(--space-4);
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* The column reaches 10px past the content edge, so the end buttons below and the
-     scrollbar have room there without a sideways scroll. */
-  margin-inline-end: -10px;
-  padding-inline-end: 10px;
+  /* The column is a scroll container, so it clips what reaches past its edges. It
+     reaches 10px past the content edge on both sides: the end buttons below and the
+     scrollbar have room at the end, and the focus ring of a field (the inline editors
+     of the checklist) has room at both ends. */
+  margin-inline: -10px;
+  padding-inline: 10px;
 }
 /* An icon or text button at the end of a row lines its glyph up with the content edge. */
 .cd__secHead > app-button {
@@ -156,11 +158,6 @@
   margin: 0;
   font-size: var(--fs-md);
   font-weight: var(--fw-semibold);
-}
-.cd__secTitle--accent {
-  margin-bottom: var(--space-3);
-  font-size: 0.84375rem;
-  color: var(--color-accent-text);
 }
 .cd__sec {
   position: relative;
@@ -397,6 +394,11 @@ a.cd__linkTitle:hover {
   height: 100%;
   background: var(--color-accent);
 }
+/* An empty list takes no gap of the section, so "Punkt hinzufügen" sits under the
+   heading at the same distance as the content of the other sections. */
+.cd__items:empty {
+  display: none;
+}
 .cd__items {
   display: flex;
   flex-direction: column;
@@ -418,6 +420,13 @@ a.cd__linkTitle:hover {
 }
 .cd__item .cd__itemForm {
   flex: 1 1 auto;
+}
+/* A new item: the field takes the full row, and the two buttons end the row below it. */
+.cd__itemForm--add .cd__itemInput {
+  flex-basis: 100%;
+}
+.cd__itemForm--add > app-button:first-of-type {
+  margin-inline-start: auto;
 }
 .cd__check {
   display: flex;
@@ -547,4 +556,67 @@ a.cd__linkTitle:hover {
   margin-top: var(--space-4);
   padding: var(--space-3) 0;
   background: var(--color-surface);
+}
+
+/* ------------------------------------------------------------------ loading */
+/* The places of the icon buttons of the sheet bar (40px). */
+.cd__skelIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+}
+.cd__skelIcon .skel-box {
+  width: 20px;
+  height: 20px;
+}
+.cd__skelTitle {
+  width: 68%;
+}
+/* On a phone a title takes two lines. */
+.cd__skelTitle--second {
+  width: 40%;
+}
+.cd__skelCreated {
+  width: 14rem;
+}
+/* The chips of the fields: the filter chip of the column, people, the date, labels. */
+.cd__skelChip {
+  width: 7rem;
+  height: 32px;
+  border-radius: var(--radius-md);
+}
+.cd__skelChip--person {
+  width: 7.5rem;
+  border-radius: var(--radius-pill);
+}
+.cd__skelChip--date {
+  width: 8rem;
+}
+.cd__skelChip--label {
+  width: 5.5rem;
+  border-radius: var(--radius-pill);
+}
+.cd__skelLinkIcon {
+  width: 18px;
+  height: 18px;
+}
+.cd__skelSub {
+  width: 10rem;
+}
+.cd__skelLines {
+  margin: 0;
+}
+/* One bar per text line: the bar sits in the middle of a line box of the body text. */
+.cd__skelLines > .skel-text {
+  display: block;
+  margin-block: 5px 6px;
+}
+.cd__skelItemText {
+  flex: 1 1 auto;
+}
+.cd__skelBox {
+  width: 17px;
+  height: 17px;
 }

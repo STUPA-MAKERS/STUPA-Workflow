@@ -14,10 +14,10 @@ import {
   IconComponent,
   InputComponent,
   type SelectOption,
-  SelectComponent,
   TimeInputComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { AdminApiService } from '../admin-api.service';
 import type { DeadlineKind, DeadlinePolicy } from '../admin.models';
 import { GuestSettingsComponent } from './guest-settings/guest-settings.component';
@@ -116,7 +116,7 @@ function emptyDraft(): PolicyDraft {
     DialogComponent,
     IconComponent,
     InputComponent,
-    SelectComponent,
+    SelectFieldComponent,
     TimeInputComponent,
     PageHeaderComponent,
     GuestSettingsComponent,

@@ -6,6 +6,8 @@
     <header class="ad__head" aria-hidden="true">
       <app-sheet-bar [bleed]="split()">
         <span appSheetBarKicker class="skel-in"><span class="skel-text skel-text--muted ad__skelKicker"></span></span>
+        <!-- The action "Kommentare" and the menu. -->
+        <span class="ad__skelIcon ad__skelComments skel-in"><span class="skel-box"></span></span>
         <span class="ad__skelIcon skel-in"><span class="skel-box"></span></span>
       </app-sheet-bar>
       <h2 class="ad__title skel-in"><span class="skel-text ad__skelTitle"></span></h2>
@@ -102,6 +104,26 @@
       }
       <header class="ad__head">
         <app-sheet-bar [bleed]="split()" [kicker]="metaLine()">
+          <!-- The comments open in a sheet over the page; the count waits for the thread. -->
+          <app-button
+            class="ad__commentsBtn"
+            variant="text"
+            [ariaLabel]="
+              commentsLoading()
+                ? ('applications.comments.title' | t)
+                : ('applications.comments.open' | t: { n: comments().length })
+            "
+            data-testid="ad-comments-open"
+            (click)="commentsOpen.set(true)"
+          >
+            <app-icon name="chat" [size]="19" />
+            @if (!phone()) {
+              {{ 'applications.comments.title' | t }}
+            }
+            @if (!commentsLoading()) {
+              <span class="ad__commentsN num" aria-hidden="true">{{ comments().length }}</span>
+            }
+          </app-button>
           @if (!phone()) {
             <!-- Outside the edit right: `application.share` decides who may read the
                  record, not who may edit it. -->
@@ -221,7 +243,6 @@
             <ng-container *ngTemplateOutlet="decision; context: { $implicit: application }" />
             <ng-container *ngTemplateOutlet="details; context: { $implicit: application }" />
             <ng-container *ngTemplateOutlet="history" />
-            <ng-container *ngTemplateOutlet="chat" />
           </div>
         </div>
       } @else {
@@ -234,8 +255,8 @@
           [active]="tab()"
           (activeChange)="selectTab($event)"
         />
-        <!-- Every panel stays in the DOM, so the attachment count, a comment draft and the
-             scroll of a list survive a tab change. -->
+        <!-- Every panel stays in the DOM, so the attachment count and the scroll of a list
+             survive a tab change. -->
         <section
           class="ad__panel"
           role="tabpanel"
@@ -257,15 +278,6 @@
           <ng-container *ngTemplateOutlet="history" />
         </section>
         <section
-          class="ad__panel ad__panel--chat"
-          role="tabpanel"
-          [id]="tabBar.panelId('comments')"
-          [attr.aria-labelledby]="tabBar.tabId('comments')"
-          [hidden]="tab() !== 'comments'"
-        >
-          <ng-container *ngTemplateOutlet="chat" />
-        </section>
-        <section
           class="ad__panel"
           role="tabpanel"
           [id]="tabBar.panelId('files')"
@@ -276,6 +288,37 @@
         </section>
       }
     </article>
+
+    <!-- "Kommentare": the thread and the composer in a sheet over the page, from the end
+         on a wide screen and from the bottom on a phone. The chat fills the sheet: the
+         log scrolls inside and the composer stays at its foot. The chat exists only while
+         the sheet is open: projected content lives even where the sheet does not render
+         it, and a hidden chat would mark the thread as seen. -->
+    <app-side-sheet
+      [(open)]="commentsOpen"
+      [heading]="'applications.comments.title' | t"
+      [side]="phone() ? 'bottom' : 'end'"
+      [contentScrolls]="true"
+    >
+      @if (commentsOpen()) {
+        <app-chat
+          class="ad__chat"
+          [class.ad__chat--sheet]="phone()"
+          [loading]="commentsLoading()"
+          [draftKey]="'application.' + application.id"
+          [messages]="chatMessages()"
+          [visibilityOptions]="chatVisibilities()"
+          [canAttach]="canAttach()"
+          placeholder="applications.comments.placeholder"
+          (send)="sendComment($event)"
+          (retry)="retryComment($event)"
+          (discard)="discardComment($event)"
+          (edit)="editComment($event)"
+          (delete)="deleteComment($event)"
+          (refresh)="refreshComments()"
+        />
+      }
+    </app-side-sheet>
   }
 }
 
@@ -385,32 +428,6 @@
     } @else {
       <p class="ad__none">{{ 'applications.history.empty' | t }}</p>
     }
-  </section>
-</ng-template>
-
-<!-- "Kommentare": the thread and the composer. -->
-<ng-template #chat>
-  <section class="ad__sec" [attr.aria-labelledby]="split() ? 'ad-comments' : null">
-    @if (split()) {
-      <div class="ad__secHead">
-        <h3 id="ad-comments" class="sec ad__secTitle">{{ 'applications.comments.title' | t }}</h3>
-        <span class="ad__count">{{ comments().length }}</span>
-      </div>
-    }
-    <app-chat
-      class="ad__chat"
-      [draftKey]="'application.' + (app()?.id ?? '')"
-      [messages]="chatMessages()"
-      [visibilityOptions]="chatVisibilities()"
-      [canAttach]="canAttach()"
-      placeholder="applications.comments.placeholder"
-      (send)="sendComment($event)"
-      (retry)="retryComment($event)"
-      (discard)="discardComment($event)"
-      (edit)="editComment($event)"
-      (delete)="deleteComment($event)"
-      (refresh)="refreshComments()"
-    />
   </section>
 </ng-template>
 

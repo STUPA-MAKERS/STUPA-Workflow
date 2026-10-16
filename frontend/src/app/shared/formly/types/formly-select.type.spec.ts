@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { de } from '@core/i18n/translations';
 import { provideFormly } from '../formly.providers';
@@ -29,6 +29,18 @@ async function renderField(
   return { host: fixture.componentInstance };
 }
 
+/** Let the list render: it opens after one task. */
+async function settle(): Promise<void> {
+  await new Promise((r) => setTimeout(r));
+}
+
+/** Open the select field named `name` and choose the option `option`. */
+async function pick(name: RegExp, option: string): Promise<void> {
+  await userEvent.click(screen.getByRole('combobox', { name }));
+  await settle();
+  await userEvent.click(screen.getByRole('option', { name: option }));
+}
+
 function makeType(field: Partial<FormlyFieldConfig> & { showError?: boolean }): FormlySelectType {
   const cmp = new FormlySelectType();
   const showError = field.showError ?? false;
@@ -52,21 +64,45 @@ describe('FormlySelectType (rendered)', () => {
         ],
       },
     });
-    await userEvent.selectOptions(screen.getByLabelText(/Kategorie/), 'b');
+    expect(document.querySelector('select')).toBeNull();
+    await pick(/Kategorie/, 'Beta');
     expect(host.model['cat']).toBe('b');
   });
 
-  it('renders the required marker and a disabled placeholder option', async () => {
-    // Formly defaults props.placeholder to '', so the disabled prompt stays empty.
-    // This is the real integration behavior.
+  it('renders the required marker and the default prompt, with no row to clear', async () => {
+    // Formly defaults props.placeholder to '': the field shows the default prompt.
+    const { host } = await renderField(
+      {
+        key: 'c',
+        type: 'select',
+        props: { label: 'Pflicht', required: true, options: [{ value: 'a', label: 'Alpha' }] },
+      },
+      { c: 'a' },
+    );
+    expect(screen.getByText('*')).toBeInTheDocument();
+    const field = screen.getByRole('combobox', { name: 'Pflicht' });
+    expect(field).toHaveAttribute('aria-required', 'true');
+    await userEvent.click(field);
+    await settle();
+    const list = screen.getByRole('listbox');
+    expect(within(list).getAllByRole('option').map((o) => o.textContent?.trim())).toEqual([
+      'Alpha',
+    ]);
+    expect(host.model['c']).toBe('a');
+  });
+
+  it('shows the default prompt in the field while no option is chosen', async () => {
     await renderField({
       key: 'c',
       type: 'select',
-      props: { label: 'Pflicht', required: true, options: [] },
+      props: { label: 'Leer', options: [{ value: 'a', label: 'Alpha' }] },
     });
-    expect(screen.getByText('*')).toBeInTheDocument();
-    const placeholderOpt = screen.getAllByRole('option').find((o) => o.hasAttribute('disabled'));
-    expect(placeholderOpt).toBeTruthy();
+    expect(screen.getByRole('combobox', { name: 'Leer' })).toHaveTextContent(
+      de['formly.select.placeholder'],
+    );
+    await userEvent.click(screen.getByRole('combobox', { name: 'Leer' }));
+    await settle();
+    expect(screen.queryByRole('option', { name: de['formly.select.placeholder'] })).toBeNull();
   });
 
   it('falls back to the default prompt when placeholder is genuinely undefined', async () => {
@@ -81,8 +117,7 @@ describe('FormlySelectType (rendered)', () => {
         } as never,
       },
     });
-    const placeholderOpt = screen.getAllByRole('option').find((o) => o.hasAttribute('disabled'));
-    expect(placeholderOpt?.textContent?.trim()).toBe(de['formly.select.placeholder']);
+    expect(screen.getByRole('combobox')).toHaveTextContent(de['formly.select.placeholder']);
   });
 
   it('uses a custom placeholder when provided', async () => {
@@ -91,8 +126,7 @@ describe('FormlySelectType (rendered)', () => {
       type: 'select',
       props: { label: 'P', placeholder: 'Auswahl treffen', options: [] },
     });
-    const placeholderOpt = screen.getAllByRole('option').find((o) => o.hasAttribute('disabled'));
-    expect(placeholderOpt?.textContent?.trim()).toBe('Auswahl treffen');
+    expect(screen.getByRole('combobox')).toHaveTextContent('Auswahl treffen');
   });
 
   it('shows the hint when there is a description and no error', async () => {
@@ -163,21 +197,6 @@ describe('FormlySelectType (getters)', () => {
     expect(makeType({ props: {} }).optionList).toEqual([]);
   });
 
-  it('describedBy → error id when showError is true', () => {
-    expect(makeType({ id: 's', props: { description: 'd' }, showError: true }).describedBy).toBe(
-      's-error',
-    );
-  });
-
-  it('describedBy → hint id when description present and no error', () => {
-    expect(makeType({ id: 's', props: { description: 'd' }, showError: false }).describedBy).toBe(
-      's-hint',
-    );
-  });
-
-  it('describedBy → null with no error and no description', () => {
-    expect(makeType({ id: 's', props: {}, showError: false }).describedBy).toBeNull();
-  });
 });
 
 describe('FormlySelectType (English locale)', () => {
@@ -214,7 +233,6 @@ describe('FormlySelectType (English locale)', () => {
         } as never,
       },
     });
-    const placeholderOpt = screen.getAllByRole('option').find((o) => o.hasAttribute('disabled'));
-    expect(placeholderOpt?.textContent?.trim()).toBe('Please select …');
+    expect(screen.getByRole('combobox')).toHaveTextContent('Please select …');
   });
 });

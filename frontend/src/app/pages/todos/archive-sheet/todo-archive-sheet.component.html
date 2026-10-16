@@ -11,7 +11,20 @@
     @if (failed()) {
       <p class="as__note as__note--error" role="alert">{{ 'todos.archive.error' | t }}</p>
     } @else if (loading() && !items().length) {
-      <app-skeleton variant="rows" [count]="4" [label]="'todos.archive.loading' | t" />
+      <!-- The rows of the loaded list: a title, the day it was done, "Wiederherstellen".
+           They show after 300ms (`skel-in`). -->
+      <ul class="as__list skel-in" aria-hidden="true">
+        @for (w of ['72%', '58%', '66%', '50%', '62%']; track $index) {
+          <li class="as__row">
+            <span class="as__open">
+              <span class="as__title"><span class="skel-text" [style.width]="w"></span></span>
+              <span class="as__sub"><span class="skel-text skel-text--muted as__skelSub"></span></span>
+            </span>
+            <span class="skel-box as__skelButton"></span>
+          </li>
+        }
+      </ul>
+      <span class="sr-only" role="status">{{ 'todos.archive.loading' | t }}</span>
     } @else if (!items().length) {
       <p class="as__note">{{ 'todos.archive.empty' | t }}</p>
     }

@@ -6,6 +6,7 @@ import { of, throwError } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal } from '../admin.models';
 import { SubstitutePoolComponent } from './substitute-pool.component';
+import { optionLabels, pickOption } from '../../../../testing/select';
 
 const ENTRIES: DelegationSubstitute[] = [
   {
@@ -211,14 +212,14 @@ describe('SubstitutePoolComponent', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: /Kim/ }));
     expect(within(dialog).getByRole('status')).toHaveTextContent('Gewählt: Kim');
     // The members are the choices of "Vertritt", one per person.
-    const select = within(dialog).getByRole('combobox', { name: 'Vertritt' }) as HTMLSelectElement;
-    expect([...select.options].map((o) => o.textContent?.trim())).toEqual([
+    const select = within(dialog).getByRole('combobox', { name: 'Vertritt' });
+    expect(await optionLabels(select)).toEqual([
       'Für alle Mitglieder',
       '(ohne Namen)',
       'robin@x.de',
       'Toni',
     ]);
-    await userEvent.selectOptions(select, 'p-4');
+    await pickOption(select, 'Toni');
     await userEvent.click(add);
     expect(delegations.addSubstitute).toHaveBeenCalledWith({
       gremiumId: 'g-1',

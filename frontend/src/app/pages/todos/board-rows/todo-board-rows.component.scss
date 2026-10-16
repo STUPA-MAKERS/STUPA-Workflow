@@ -1,0 +1,228 @@
+@use 'breakpoints' as bp;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+:host:has(> .sr-only:only-child) {
+  display: none;
+}
+
+/* One row: the board head, then its columns side by side. */
+.br {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+.br__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 40px;
+}
+.br__title {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+.br__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 var(--space-2) 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.br__toggle:hover {
+  background: var(--color-surface-2);
+}
+.br__toggle:focus-visible,
+.br__open:focus-visible,
+.br__more:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.br__chev,
+.br__kind {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.br__name {
+  min-width: 0;
+}
+.br__count {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-regular);
+}
+.br__tag {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: var(--fw-medium);
+}
+.br__open {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-inline-start: auto;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+}
+.br__open:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+/* The columns of the board, as on the board itself; the row scrolls sideways. */
+.br__cols {
+  display: grid;
+  grid-auto-columns: minmax(17rem, 1fr);
+  grid-auto-flow: column;
+  gap: var(--space-4);
+  align-items: start;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.br__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+}
+:host-context([data-theme='dark']) .br__col {
+  background: var(--color-surface-1);
+}
+.br__colHead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-1) var(--space-2) 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+}
+.br__colName {
+  min-width: 0;
+  color: var(--color-text);
+}
+.br__colCount {
+  flex: none;
+  font-weight: var(--fw-regular);
+}
+.br__doneIcon {
+  flex: none;
+  /* The done mark ends the column head, as the done tag on the board. */
+  margin-inline-start: auto;
+  align-self: center;
+  color: var(--color-on-selected);
+}
+.br__cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+}
+.br__item {
+  display: block;
+}
+.br__item:focus-visible {
+  outline: none;
+}
+.br__preview {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  box-shadow: 0 18px 40px -8px rgb(0 0 0 / 0.45), 0 4px 12px rgb(0 0 0 / 0.25);
+  rotate: 2deg;
+  opacity: 1;
+  /* The edge smoothing of the board preview (todo-board-view.component.scss). */
+  outline: 1px solid transparent;
+  backface-visibility: hidden;
+}
+.br__preview app-todo-card-tile {
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+.br__item.cdk-drag-placeholder {
+  border-radius: var(--radius-lg);
+  outline: 2px dashed var(--color-accent);
+  outline-offset: -2px;
+  background: transparent;
+}
+.br__item.cdk-drag-placeholder > * {
+  visibility: hidden;
+}
+.br__cards.cdk-drop-list-dragging .br__item:not(.cdk-drag-placeholder) {
+  transition: transform var(--motion-base) cubic-bezier(0, 0, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .br__cards.cdk-drop-list-dragging .br__item {
+    transition: none;
+  }
+}
+/* A read-only row: the tiles open, but they do not lift. */
+.br--readonly app-todo-card-tile {
+  cursor: pointer;
+}
+.br__more {
+  align-self: flex-start;
+  padding: 4px var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.br__more:hover {
+  text-decoration: underline;
+}
+
+/* Phone: the rows stack, the columns of a row scroll sideways and snap. */
+@include bp.phone {
+  .br__cols {
+    grid-auto-columns: min(80vw, 17rem);
+    gap: var(--space-3);
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: 0;
+  }
+  .br__col {
+    scroll-snap-align: start;
+  }
+}

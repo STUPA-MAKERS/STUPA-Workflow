@@ -56,7 +56,19 @@
         @if (error()) {
           <p class="tk__status tk__status--error" role="alert">{{ 'tickets.list.error' | t }}</p>
         } @else if (loading()) {
-          <app-skeleton variant="rows" [count]="6" [label]="'tickets.list.loading' | t" />
+          <!-- The shape of the loaded list: group headings and rows in the geometry of
+               `app-list-item` with the kind tile and the person, after 300ms (`skel-in`). -->
+          <div class="tk__skel skel-in">
+            @for (n of [2, 4]; track $index) {
+              <section class="tk__group" aria-hidden="true">
+                <h2 class="sec tk__groupTitle">
+                  <span class="skel-text skel-text--accent" [style.width]="$first ? '2.5rem' : '7rem'"></span>
+                </h2>
+                <app-skeleton class="tk__skelRows" variant="items" [count]="n" [lead]="true" trail="avatar" [grouped]="!split()" />
+              </section>
+            }
+            <span class="sr-only" role="status">{{ 'tickets.list.loading' | t }}</span>
+          </div>
         } @else if (!hasRows()) {
           @if (activeFilterCount() > 0) {
             <p class="tk__status">{{ 'tickets.list.noMatch' | t }}</p>

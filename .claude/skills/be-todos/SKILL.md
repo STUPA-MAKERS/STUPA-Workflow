@@ -25,7 +25,8 @@ done (`completed_at`).
   assignable and mentionable people).
 - `service.py` — `TodoService`: boards, columns, labels, cards, sub-resources, `mine`,
   `linked`, `search`, `card_for_agenda`, `link_agenda_item`, `complete`. Mails go to
-  `outbox` (`TodoMail`); the router sends them after the commit.
+  `outbox` (`TodoMail`); the router sends them after the commit. `mine_boards`: the rows
+  under "Meine To-Dos".
 - `links.py` — `LinkResolver`: `resolve` (one query per kind), `readable`, `search` (the
   link picker, `PER_KIND` 5), `card_url`.
 - `lexorank.py` — `between(low, high)` (a loop, no recursion), `spread(n)`; `RankError`, `MAX_LENGTH`.
@@ -52,8 +53,8 @@ done (`completed_at`).
   configure.
 - An unreadable board, card or sub-resource is 404, never 403. Configure without the
   right is 403 `todo_configure_required`. A token without `todo.write` in its scope
-  (`todos:write`) gets 403 on `GET /boards` and `GET /mine`, `[]` on the link picker and
-  `linked`, 404 elsewhere.
+  (`todos:write`) gets 403 on `GET /boards`, `GET /mine` and `GET /mine/boards`, `[]` on
+  the link picker and `linked`, 404 elsewhere.
 - Defaults: the migration grants `todo.write` to every gremium role and `todo.configure`
   to `vorstand` and `manager`; the forced `member` role of a new gremium has
   `vote.cast` and `todo.write`.
@@ -68,7 +69,13 @@ the whole body, 304 on `If-None-Match`), `GET /boards/{id}/members`, `GET
 `PATCH|DELETE /boards/{id}/columns/{cid}` (`isDone: true` moves the done flag; delete: 409
 `done_column_required` / `column_not_empty` without `moveTo`), labels (409
 `label_exists`), `GET /mine` (`dueSoonCount`: due within 7 days, Berlin, overdue
-included), `GET /link-targets`, `GET /linked?kind&targetId`, `POST /cards`, `GET|PATCH
+included), `GET /mine/boards` (`TodoAssignedBoard[]`: every readable board except the
+personal one that holds live cards assigned to the caller, done ones too; each with all
+its columns in order, `cardCount` = the caller's cards there, its labels and only the
+caller's cards; gremium boards by name, then team; the read scope keeps out a board the
+caller cannot read even when a card still names them; one query for the cards, one each
+for columns, labels and the tile facts; weak ETag over the list, 304 on
+`If-None-Match`), `GET /link-targets`, `GET /linked?kind&targetId`, `POST /cards`, `GET|PATCH
 /cards/{id}` (PATCH needs `version`, 409 `card_version_conflict`), `POST
 /cards/{id}/move` (`afterId`/`beforeId`, 422 `rank_neighbors_invalid`), `DELETE
 /cards/{id}` (archive), `POST /cards/{id}/restore`, assignees, labels, checklist, links

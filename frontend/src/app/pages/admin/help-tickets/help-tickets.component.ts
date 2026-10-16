@@ -18,7 +18,6 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { PageHeaderComponent } from '@shared/ui';
 import { FilterSelectComponent, type FilterSelectOption } from '@shared/ui/filter-select/filter-select.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { ButtonComponent, InputComponent, SwitchComponent, ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { HelpTicketsSettings } from '../admin.models';
@@ -71,7 +70,6 @@ export function isHttpUrl(text: string): boolean {
     ButtonComponent,
     InputComponent,
     NoteComponent,
-    SkeletonComponent,
     SwitchComponent,
   ],
   templateUrl: './help-tickets.component.html',
@@ -90,6 +88,12 @@ export class HelpTicketsComponent {
   protected readonly allowed = computed(() => this.auth.can('admin.site'));
 
   protected readonly loading = signal(true);
+  /** The labels of the switch rows, which the loading form shows as they are. */
+  protected readonly skelSwitches = [
+    'admin.helpTickets.public',
+    'admin.helpTickets.notify',
+    'admin.helpTickets.anonymize',
+  ] as const;
   /** The read failed: `forbidden` hides the form, `error` names the failure. */
   protected readonly loadState = signal<'ok' | 'forbidden' | 'error'>('ok');
   protected readonly saving = signal(false);

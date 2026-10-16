@@ -64,6 +64,11 @@ def test_todo_boards_without_and_with_gremium(fake_api: _FakeApi) -> None:
     ]
 
 
+def test_todo_my_cards_reads_the_assigned_boards(fake_api: _FakeApi) -> None:
+    asyncio.run(todos.todo_my_cards())
+    assert fake_api.calls == [("GET", "/todos/mine/boards", None)]
+
+
 def test_todo_board_and_card_get(fake_api: _FakeApi) -> None:
     asyncio.run(todos.todo_board("b1"))
     asyncio.run(todos.todo_card_get("c1"))
