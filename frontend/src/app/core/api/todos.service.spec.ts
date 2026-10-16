@@ -70,6 +70,27 @@ describe('TodosApiService', () => {
     expect(got[1]).toEqual({ board: null, etag: 'W/"1"' });
   });
 
+  it('polls the assigned boards with If-None-Match and keeps the state on a 304', () => {
+    const got: unknown[] = [];
+    api.pollMineBoards(null).subscribe((r) => got.push(r));
+    const first = http.expectOne('/api/todos/mine/boards');
+    expect(first.request.headers.has('If-None-Match')).toBe(false);
+    expect(first.request.context.get(SKIP_LOADING)).toBe(true);
+    first.flush([{ id: 'b-1' }], { headers: { ETag: 'W/"2"' } });
+    expect(got[0]).toEqual({ boards: [{ id: 'b-1' }], etag: 'W/"2"' });
+
+    api.pollMineBoards('W/"2"').subscribe((r) => got.push(r));
+    const second = http.expectOne('/api/todos/mine/boards');
+    expect(second.request.headers.get('If-None-Match')).toBe('W/"2"');
+    second.flush(null, { status: 304, statusText: 'Not Modified' });
+    expect(got[1]).toEqual({ boards: null, etag: 'W/"2"' });
+
+    const errors: unknown[] = [];
+    api.pollMineBoards(null).subscribe({ error: (e: unknown) => errors.push(e) });
+    http.expectOne('/api/todos/mine/boards').flush(null, { status: 403, statusText: 'Forbidden' });
+    expect(errors).toHaveLength(1);
+  });
+
   it('passes any other error of a poll on', () => {
     const errors: unknown[] = [];
     api.pollBoard('b-1', null).subscribe({ error: (e: unknown) => errors.push(e) });
