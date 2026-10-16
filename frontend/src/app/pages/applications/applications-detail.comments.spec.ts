@@ -82,6 +82,7 @@ function splitPage(): ApplicationsPageService {
 async function setup(
   permissions: string[] = ['application.read', 'application.manage'],
   paramMap$ = new BehaviorSubject(convertToParamMap({ id: 'app-1' })),
+  fragment$ = new BehaviorSubject<string | null>(null),
 ) {
   const view = await render(ApplicationsDetailComponent, {
     providers: [
@@ -93,7 +94,18 @@ async function setup(
       { provide: AuthService, useValue: fakeAuth(permissions) },
       // The real service polls; the page only asks it to refresh.
       { provide: RailStatusService, useValue: { refresh: jest.fn() } },
-      { provide: ActivatedRoute, useValue: { paramMap: paramMap$ } },
+      {
+        provide: ActivatedRoute,
+        useValue: {
+          paramMap: paramMap$,
+          fragment: fragment$,
+          snapshot: {
+            get fragment() {
+              return fragment$.value;
+            },
+          },
+        },
+      },
       // Side by side with the list: every section shows at once, no tabs.
       { provide: ApplicationsPageService, useFactory: splitPage },
     ],
@@ -131,6 +143,12 @@ function flushAttachments(http: HttpTestingController) {
 
 // --- helpers -----------------------------------------------------------------
 
+/** The header action "Kommentare" opens the sheet with the thread. */
+function openComments(detectChanges: () => void) {
+  fireEvent.click(screen.getByTestId('ad-comments-open'));
+  detectChanges();
+}
+
 /** The application types load once, for "<Typ> · Version n" above the title. */
 function flushTypes(http: HttpTestingController) {
   for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/application-types')) {
@@ -154,6 +172,7 @@ async function loaded(permissions?: string[], comments: CommentOutWire[] = COMME
   flushForm(ctx.http);
   ctx.detectChanges();
   flushAttachments(ctx.http);
+  openComments(ctx.detectChanges);
   const input = () => screen.getByRole('textbox', { name: 'Kommentar schreiben …' });
   const type = (text: string) => {
     fireEvent.input(input(), { target: { value: text } });
@@ -185,14 +204,15 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     http.expectOne(url('/versions')).flush(VERSIONS);
     detectChanges();
     expect(cmp.commentsLoading()).toBe(true);
+    expect(document.querySelector('.ad__commentsN')).toBeNull();
+    openComments(detectChanges);
     expect(screen.queryByText('Noch keine Nachrichten.')).not.toBeInTheDocument();
     expect(document.querySelectorAll('app-chat .sk__msg').length).toBeGreaterThan(0);
-    expect(document.querySelector('.ad__count')).toBeNull();
     http.expectOne(url('/comments')).flush(COMMENTS);
     detectChanges();
     expect(cmp.commentsLoading()).toBe(false);
     expect(screen.getByText('Bitte Kostenplan ergänzen.')).toBeInTheDocument();
-    expect(document.querySelector('.ad__count')).toHaveTextContent('1');
+    expect(document.querySelector('.ad__commentsN')).toHaveTextContent('1');
   });
 
   it('ends the loading state of the comments when their read fails', async () => {
@@ -201,8 +221,60 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     http.expectOne(url('')).flush(appWire());
     http.expectOne(url('/comments')).flush(null, { status: 500, statusText: 'x' });
     detectChanges();
+    openComments(detectChanges);
     expect(cmp.commentsLoading()).toBe(false);
     expect(screen.getByText('Noch keine Nachrichten.')).toBeInTheDocument();
+  });
+
+  it('keeps the thread out of the page and opens it in a sheet from the header action', async () => {
+    const { http, detectChanges } = await setup();
+    flushTypes(http);
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush(COMMENTS);
+    detectChanges();
+    expect(document.querySelector('app-chat')).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Kommentare' })).toBeNull();
+    const action = screen.getByRole('button', { name: 'Kommentare, 1' });
+    fireEvent.click(action);
+    detectChanges();
+    const sheet = screen.getByRole('dialog', { name: 'Kommentare' });
+    expect(sheet).toHaveAttribute('aria-modal', 'true');
+    expect(within(sheet).getByText('Bitte Kostenplan ergänzen.')).toBeInTheDocument();
+    // The visibility segment stays with application.manage.
+    expect(within(sheet).getByRole('radio', { name: 'Intern' })).toBeInTheDocument();
+    fireEvent.keyDown(sheet, { key: 'Escape' });
+    detectChanges();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('opens the sheet for a link to the comments and scrolls to the named comment', async () => {
+    const fragment$ = new BehaviorSubject<string | null>('comment-c1');
+    const scroll = jest.fn();
+    const proto = HTMLElement.prototype as { scrollIntoView?: unknown };
+    const before = proto.scrollIntoView;
+    proto.scrollIntoView = scroll;
+    try {
+      const { http, cmp, detectChanges, fixture } = await setup(undefined, undefined, fragment$);
+      flushTypes(http);
+      http.expectOne(url('')).flush(appWire());
+      http.expectOne(url('/versions')).flush(VERSIONS);
+      http.expectOne(url('/comments')).flush(COMMENTS);
+      detectChanges();
+      await fixture.whenStable();
+      detectChanges();
+      expect(cmp.commentsOpen()).toBe(true);
+      expect(screen.getByRole('dialog', { name: 'Kommentare' })).toBeInTheDocument();
+      expect(scroll).toHaveBeenCalledWith({ block: 'center' });
+      // A later "#comments" opens the closed sheet again; another fragment does not.
+      cmp.commentsOpen.set(false);
+      fragment$.next('details');
+      expect(cmp.commentsOpen()).toBe(false);
+      fragment$.next('comments');
+      expect(cmp.commentsOpen()).toBe(true);
+    } finally {
+      proto.scrollIntoView = before;
+    }
   });
 
   it('posts a public comment without application.manage, at once and without a toast', async () => {

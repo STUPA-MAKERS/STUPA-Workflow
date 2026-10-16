@@ -2,7 +2,10 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import {
   ChangeDetectionStrategy,
   Component,
+  Injector,
+  afterNextRender,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -102,6 +105,7 @@ import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-l
 import { mediaQuerySignal } from '../../layout/media-query';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { SheetBarComponent, SheetBarKickerDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { provideFormly } from '@shared/formly/formly.providers';
 
 /** Field types whose old and new value do not fit on one line of the history. The
@@ -116,7 +120,10 @@ const BLOCK_DIFF: ReadonlySet<string> = new Set(['positions', 'table', 'textarea
 const NO_FILES = new Set<string>();
 
 /** The tabs of the detail when the list and the detail do not sit side by side. */
-type DetailTab = 'app' | 'history' | 'comments' | 'files';
+type DetailTab = 'app' | 'history' | 'files';
+
+/** A link to the comments: `#comments`, or `#comment-<id>` for one comment. */
+const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
 
 /**
  * Application detail: the sheet beside the list (board Anträge), or alone with tabs on a
@@ -133,7 +140,10 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
  * "Antrag bearbeiten · Speichern legt Version n+1 an" with Abbrechen and Speichern over
  * the fields of the form by section. A 422 of the server shows on its field.
  *
- * The comments run in `app-chat`. A comment is internal or public. The composer offers
+ * The comments run in `app-chat`, in a sheet over the page: from the end on a wide
+ * screen, from the bottom on a phone. The header action "Kommentare" with the count
+ * opens it. A link with `#comments` or `#comment-<id>` opens it too, and scrolls to that
+ * comment. A comment is internal or public. The composer offers
  * the internal visibility only with `application.manage`. Without it, a new comment is
  * public. The author edits and deletes an own comment; the visibility stays as written.
  *
@@ -175,10 +185,11 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
     DecisionDialogComponent,
     DecisionSectionComponent,
     TodoLinkedListComponent,
+    SideSheetComponent,
   ],
   // The field types of the form (`provideFormly`) come with the component, so Formly is not
   // part of the initial bundle.
-  // The two layouts re-create the chat; the composer files stay with the page.
+  // The chat is content of the comments sheet and stays with the page; so do its files.
   providers: [provideFormly(), ChatDrafts],
   templateUrl: './applications-detail.component.html',
   styleUrl: './applications-detail.component.scss',
@@ -266,6 +277,11 @@ export class ApplicationsDetailComponent {
 
   /** The active tab of the narrow layout. */
   readonly tab = signal<DetailTab>('app');
+  /** The sheet with the comments is open. */
+  readonly commentsOpen = signal(false);
+  /** The comment that a link names: the sheet scrolls to it once the thread is there. */
+  private readonly linkedComment = signal<string | null>(null);
+  private readonly injector = inject(Injector);
   /** The number of attachments, from the panel. `null` until it loaded them. */
   readonly attachmentCount = signal<number | null>(null);
 
@@ -763,11 +779,6 @@ export class ApplicationsDetailComponent {
       count: this.historyEntries().length,
     },
     {
-      id: 'comments',
-      label: this.i18n.translate('applications.detail.tab.comments'),
-      count: this.comments().length,
-    },
-    {
       id: 'files',
       label: this.i18n.translate('applications.detail.tab.files'),
       count: this.attachmentCount(),
@@ -780,6 +791,21 @@ export class ApplicationsDetailComponent {
     // would keep the old `id`. The subscription reloads on every `id` change.
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.loadApplication(pm.get('id') ?? '');
+    });
+    // A link to the comments opens the sheet, also when only the fragment changes.
+    this.route.fragment.pipe(takeUntilDestroyed()).subscribe((f) => this.openFromLink(f));
+    // The linked comment scrolls into view after the thread rendered in the open sheet.
+    effect(() => {
+      const id = this.linkedComment();
+      if (!id || !this.commentsOpen() || this.commentsLoading() || this.loading()) return;
+      afterNextRender(
+        () => {
+          const el = document.querySelector(`[data-msg-id="${CSS.escape(id)}"]`);
+          el?.scrollIntoView?.({ block: 'center' });
+          this.linkedComment.set(null);
+        },
+        { injector: this.injector },
+      );
     });
     this.api.applicationTypes({ quiet: true }).subscribe({
       next: (types) => this.types.set(types),
@@ -795,7 +821,15 @@ export class ApplicationsDetailComponent {
 
   /** A tab of the narrow layout was chosen. */
   selectTab(id: string | null): void {
-    if (id === 'app' || id === 'history' || id === 'comments' || id === 'files') this.tab.set(id);
+    if (id === 'app' || id === 'history' || id === 'files') this.tab.set(id);
+  }
+
+  /** The fragment of the URL: `#comments` or `#comment-<id>` opens the comments. */
+  private openFromLink(fragment: string | null | undefined): void {
+    const hit = COMMENTS_FRAGMENT.exec(fragment ?? '');
+    if (!hit) return;
+    this.commentsOpen.set(true);
+    this.linkedComment.set(hit[1] ?? null);
   }
 
   /** An item of the header menu was chosen. */
@@ -867,6 +901,9 @@ export class ApplicationsDetailComponent {
     this.outbox.clear();
     this.filesRefusedHere.set(NO_FILES.has(id));
     this.agendaOpen.set(false);
+    // The comments belong to the shown application too; a link to them opens them again.
+    this.commentsOpen.set(false);
+    this.openFromLink(this.route.snapshot.fragment);
     // An application is shown: it stays until the next one arrives (`switching`). With
     // nothing shown, the page resets now and draws its loading shape.
     if (id && this.app() !== null && !this.notFound() && !this.error()) {

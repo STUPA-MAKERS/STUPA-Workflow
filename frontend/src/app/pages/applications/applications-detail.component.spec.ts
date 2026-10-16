@@ -107,7 +107,10 @@ async function setup(
       { provide: AuthService, useValue: fakeAuth(permissions, roles) },
       // The real service polls; the page only asks it to refresh.
       { provide: RailStatusService, useValue: { refresh: jest.fn() } },
-      { provide: ActivatedRoute, useValue: { paramMap: paramMap$ } },
+      {
+        provide: ActivatedRoute,
+        useValue: { paramMap: paramMap$, fragment: new BehaviorSubject<string | null>(null), snapshot: { fragment: null } },
+      },
       // Side by side with the list: every section shows at once, no tabs.
       { provide: ApplicationsPageService, useFactory: splitPage },
     ],
@@ -209,8 +212,9 @@ describe('ApplicationsDetailComponent', () => {
   });
 
   it('renders the header, data fields, version diff and comments', async () => {
-    const { http, detectChanges } = await setup();
+    const { http, detectChanges, cmp } = await setup();
     flushAll(http);
+    cmp.commentsOpen.set(true);
     detectChanges();
 
     expect(screen.getByRole('heading', { name: 'Förderung Fest', level: 2 })).toBeInTheDocument();
@@ -237,6 +241,7 @@ describe('ApplicationsDetailComponent', () => {
     ]);
     for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) req.flush([]);
     flushForm(http);
+    cmp.commentsOpen.set(true);
     detectChanges();
     const edited = () => [...container.querySelectorAll('.chat__meta')].filter((m) => /bearbeitet/.test(m.textContent ?? ''));
     expect(edited()).toHaveLength(1);
@@ -396,7 +401,11 @@ describe('ApplicationsDetailComponent', () => {
         { provide: RailStatusService, useValue: { refresh: jest.fn() } },
         {
           provide: ActivatedRoute,
-          useValue: { paramMap: new BehaviorSubject(convertToParamMap({ id: 'app-1' })) },
+          useValue: {
+            paramMap: new BehaviorSubject(convertToParamMap({ id: 'app-1' })),
+            fragment: new BehaviorSubject<string | null>(null),
+            snapshot: { fragment: null },
+          },
         },
       ],
     });
@@ -1574,6 +1583,7 @@ describe('ApplicationsDetailComponent', () => {
   it('offers no paperclip on an anonymized application', async () => {
     const { http, detectChanges, cmp } = await setup();
     flushAll(http);
+    cmp.commentsOpen.set(true);
     detectChanges();
     flushAttachments(http);
     expect(screen.getByRole('button', { name: 'Datei anhängen' })).toBeInTheDocument();
@@ -1594,6 +1604,8 @@ describe('ApplicationsDetailComponent', () => {
       flushForm(http, appId);
       detectChanges();
       flushAttachments(http);
+      // Another application closes the sheet; open it again for its composer.
+      cmp.commentsOpen.set(true);
       detectChanges();
     };
     const post = () => http.expectOne((r) => r.method === 'POST' && r.url === `/api/applications/${id}/comments`);
@@ -1622,6 +1634,7 @@ describe('ApplicationsDetailComponent', () => {
   it('keeps the paperclip of a thread that takes files after another failed send', async () => {
     const { http, detectChanges, cmp } = await setup();
     flushAll(http);
+    cmp.commentsOpen.set(true);
     detectChanges();
     flushAttachments(http);
     cmp['sendComment']({ body: 'Text' });
@@ -1632,18 +1645,23 @@ describe('ApplicationsDetailComponent', () => {
     expect(screen.getByRole('button', { name: 'Datei anhängen' })).toBeInTheDocument();
   });
 
-  it('keeps the composer files with the page when the layout switch re-creates the chat', async () => {
-    const { http, detectChanges, fixture } = await setup();
+  it('keeps the chat and its composer files while the sheet closes and opens', async () => {
+    const { http, detectChanges, fixture, cmp } = await setup();
     flushAll(http);
+    cmp.commentsOpen.set(true);
     detectChanges();
     flushAttachments(http);
     const chat = () => fixture.debugElement.query((d) => d.name === 'app-chat');
     const before = chat();
     const drafts = before.injector.get(DraftAttachmentsService);
-    fixture.debugElement.injector.get(ApplicationsPageService).split.set(false);
+    cmp.commentsOpen.set(false);
+    detectChanges();
+    expect(chat()).toBeNull();
+    cmp.commentsOpen.set(true);
     detectChanges();
     for (const req of http.match(() => true)) req.flush([]);
-    expect(chat().componentInstance).not.toBe(before.componentInstance);
+    // The chat is content of the sheet: it stays with the page, out of the DOM while closed.
+    expect(chat().componentInstance).toBe(before.componentInstance);
     expect(chat().injector.get(DraftAttachmentsService)).toBe(drafts);
   });
 
@@ -1985,7 +2003,11 @@ describe('ApplicationsDetailComponent', () => {
         { provide: RailStatusService, useValue: { refresh: jest.fn() } },
         {
           provide: ActivatedRoute,
-          useValue: { paramMap: new BehaviorSubject(convertToParamMap({ id: 'app-1' })) },
+          useValue: {
+            paramMap: new BehaviorSubject(convertToParamMap({ id: 'app-1' })),
+            fragment: new BehaviorSubject<string | null>(null),
+            snapshot: { fragment: null },
+          },
         },
       ],
     });

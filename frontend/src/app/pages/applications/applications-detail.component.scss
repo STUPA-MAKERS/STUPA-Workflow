@@ -42,6 +42,18 @@
   height: 20px;
   border-radius: 6px;
 }
+.ad__skelComments {
+  width: auto;
+  padding-inline: 12px;
+}
+.ad__skelComments .skel-box {
+  width: 7.25rem;
+}
+@include bp.phone {
+  .ad__skelComments .skel-box {
+    width: 3rem;
+  }
+}
 .ad__skelTitle {
   width: 60%;
 }
@@ -292,15 +304,6 @@
 .ad__secTitle {
   padding: 0 var(--space-1);
 }
-.ad__secHead {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-}
-.ad__count {
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
 .ad__none {
   margin: 0;
   padding: 0 var(--space-1);
@@ -416,28 +419,31 @@
 }
 
 /* ------------------------------------------------------------------ comments */
-/* The column scrolls as a whole, so the log of the chat scrolls inside a bound. On a
-   phone the tab holds the chat alone: the log takes the view between the tabs and the
-   composer and scrolls inside, so it opens at the newest message and follows new ones. */
+/* The count of the comments on the header action: a small plate after the label. */
+.ad__commentsN {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+}
+/* The chat fills the sheet: the sheet passes its height down (`contentScrolls`), the log
+   takes the height between the head of the sheet and the composer and scrolls inside, and
+   the composer stays at the foot. The sheet is surface 2, so the messages of others take
+   the next step. */
 .ad__chat {
-  --chat-log-max: min(60vh, 36rem);
-}
-/* The tab fills the page down to the bottom navigation: the panel, its section and the
-   chat grow, and the chat reaches over the bottom padding of the page, so the composer bar
-   sits on the navigation and runs from edge to edge. */
-.ad__panel--chat:not([hidden]):has(.chat--phone) {
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-height: 0;
-}
-.ad__panel--chat .ad__sec:has(.chat--phone) {
-  flex: 1 1 0;
-  min-height: 0;
-}
-.ad__chat.chat--phone {
-  flex: 1 1 0;
-  margin-bottom: calc(-1 * var(--main-pad-bottom, 0px));
-  --chat-log-min: 12rem;
-  --chat-log-max: none;
+  --chat-log-basis: 0;
+  --chat-log-min: 14rem;
+  --chat-composer-bottom: 0px;
+  --chat-bubble: var(--color-surface-3);
+  --chat-composer-surface: transparent;
   --chat-composer-bleed: var(--space-4);
 }
 
