@@ -175,7 +175,9 @@ async def test_inline_preview_may_be_framed_by_the_same_origin_only(
     assert resp.status_code == 200, resp.text
     h = resp.headers
     assert h["content-type"] == mime
-    assert h["content-disposition"] == f'inline; filename="{filename}"'
+    assert h["content-disposition"] == (
+        f"inline; filename=\"{filename}\"; filename*=UTF-8''{filename}"
+    )
     assert h.get_list("x-frame-options") == ["SAMEORIGIN"]
     assert h.get_list("content-security-policy") == [PREVIEW_CSP]
     assert "frame-ancestors 'self'" in PREVIEW_CSP
@@ -199,7 +201,9 @@ async def test_plain_download_keeps_deny(
         resp = client.get(f"/api/attachments/{att_id}/download")
         other = client.get(f"/api/applications/{app_id}/attachments")
     assert resp.status_code == 200, resp.text
-    assert resp.headers["content-disposition"] == 'attachment; filename="beleg.pdf"'
+    assert resp.headers["content-disposition"] == (
+        "attachment; filename=\"beleg.pdf\"; filename*=UTF-8''beleg.pdf"
+    )
     _assert_deny(resp.headers)
     # Any other API route keeps the default set too.
     assert other.status_code == 200, other.text
@@ -219,7 +223,9 @@ async def test_inline_flag_on_an_office_file_stays_a_framing_denied_download(
         resp = client.get(f"/api/attachments/{att_id}/download?inline=1")
     assert resp.status_code == 200, resp.text
     assert resp.headers["content-type"] == _DOCX
-    assert resp.headers["content-disposition"] == 'attachment; filename="antrag.docx"'
+    assert resp.headers["content-disposition"] == (
+        "attachment; filename=\"antrag.docx\"; filename*=UTF-8''antrag.docx"
+    )
     _assert_deny(resp.headers)
 
 

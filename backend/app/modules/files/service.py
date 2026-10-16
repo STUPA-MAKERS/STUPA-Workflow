@@ -44,7 +44,7 @@ from sqlalchemy.orm.exc import StaleDataError
 from app.modules.applications.models import Application, Comment
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.modules.files.mime import MimeRejected, sanitize_filename, validate_upload
+from app.modules.files.mime import MimeRejected, validate_upload
 from app.modules.files.models import BOUND, MAX_ATTACHMENT_BYTES, Attachment
 from app.modules.files.queue import ScanQueue
 from app.modules.files.scanner import ScanVerdict
@@ -66,6 +66,7 @@ from app.shared.errors import (
     ServiceUnavailableError,
     UnsupportedMediaTypeError,
 )
+from app.shared.filenames import sanitize_display_name, sanitize_storage_name
 
 logger = logging.getLogger("app.files")
 
@@ -122,7 +123,9 @@ class FilesService:
         The application upload and the draft upload share this check.
 
         Returns:
-            The sniffed MIME type and the sanitized file name.
+            The sniffed MIME type and the display name (``sanitize_display_name``: the
+            Unicode stays). The caller builds the ASCII object-key segment from it with
+            ``sanitize_storage_name``.
 
         Raises:
             PayloadTooLargeError: The file is larger than ``max_bytes`` (HTTP 413).
@@ -136,13 +139,16 @@ class FilesService:
             )
         if not data:
             raise UnsupportedMediaTypeError("Empty file.")
+        # The extension check reads the cleaned name, so the stored name always ends in
+        # an extension that matches the sniffed type.
+        display_name = sanitize_display_name(filename)
         try:
-            mime = validate_upload(filename, data)
+            mime = validate_upload(display_name, data)
         except MimeRejected as exc:
             raise UnsupportedMediaTypeError(str(exc)) from exc
         if self.storage is None:
             raise ServiceUnavailableError("Object storage unavailable.")
-        return mime, sanitize_filename(filename)
+        return mime, display_name
 
     async def put_object(self, storage_key: str, data: bytes, mime: str) -> None:
         """Write the object to storage.
@@ -189,8 +195,10 @@ class FilesService:
         # invoice or a receipt after the decision. The PATCH lock still protects the form
         # data. The RBAC and applicant check in the router still guards access.
 
-        mime, safe_name = self.validate(filename, data)
-        storage_key = f"{application_id}/{uuid.uuid4().hex}/{safe_name}"
+        mime, display_name = self.validate(filename, data)
+        storage_key = (
+            f"{application_id}/{uuid.uuid4().hex}/{sanitize_storage_name(display_name)}"
+        )
         await self.put_object(storage_key, data, mime)
 
         attachment = Attachment(
@@ -198,7 +206,7 @@ class FilesService:
             id=uuid.uuid4(),
             application_id=application_id,
             field_key=field_key,
-            filename=safe_name,
+            filename=display_name,
             mime=mime,
             size=len(data),
             storage_key=storage_key,

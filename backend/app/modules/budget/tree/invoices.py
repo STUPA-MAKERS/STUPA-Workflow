@@ -25,7 +25,7 @@ from app.modules.budget.tree_schemas import (
     InvoiceSegmentCounts,
     InvoiceUpdate,
 )
-from app.modules.files.mime import MimeRejected, sanitize_filename, validate_upload
+from app.modules.files.mime import MimeRejected, validate_upload
 from app.modules.files.scanner import ScannerError, build_scanner
 from app.modules.files.storage import StorageError
 from app.search import dialect_of, trigram_rank
@@ -36,6 +36,7 @@ from app.shared.errors import (
     UnsupportedMediaTypeError,
     ValidationProblem,
 )
+from app.shared.filenames import sanitize_display_name, sanitize_storage_name
 
 logger = logging.getLogger("app.budget")
 
@@ -309,7 +310,8 @@ class InvoiceOps(BudgetTreeServiceBase):
             # Take over the file from the ZUGFeRD import. The token is the MinIO
             # key of the stored object. The prefix check keeps foreign objects out.
             inv.file_object_key = _validate_invoice_file_token(payload.file_token)
-            inv.file_name = payload.file_name
+            # The client sends the name back, so it gets the display-name rule again.
+            inv.file_name = sanitize_display_name(payload.file_name, default="beleg.pdf")
             inv.file_mime = payload.file_mime
         self.session.add(inv)
         await self.session.flush()  # generate the id for the audit entry
@@ -330,24 +332,26 @@ class InvoiceOps(BudgetTreeServiceBase):
         Both the ZUGFeRD parse and the manual invoice-file upload use this path.
 
         Returns:
-            The storage token, the sanitized file name and the MIME type.
+            The storage token, the display name and the MIME type.
         """
         max_bytes = self.settings.attachment_max_bytes
         if len(data) > max_bytes:
             raise PayloadTooLargeError(f"Invoice exceeds {max_bytes} bytes.")
         if not data:
             raise UnsupportedMediaTypeError("Empty file.")
+        display_name = sanitize_display_name(filename)
         try:
-            mime = validate_upload(filename, data)
+            mime = validate_upload(display_name, data)
         except MimeRejected as exc:
             raise UnsupportedMediaTypeError(str(exc)) from exc
         if mime != "application/pdf":
             raise UnsupportedMediaTypeError("Invoice import expects a PDF.")
 
         await self._scan_or_raise(data)
-        safe_name = sanitize_filename(filename)
-        storage_key = await self._store_invoice_file(data, mime, safe_name)
-        return storage_key, safe_name, mime
+        storage_key = await self._store_invoice_file(
+            data, mime, sanitize_storage_name(display_name)
+        )
+        return storage_key, display_name, mime
 
     async def store_invoice_file(self, data: bytes, *, filename: str | None) -> InvoiceFileResult:
         """Validate and store an invoice PDF without a ZUGFeRD parse.
@@ -358,8 +362,10 @@ class InvoiceOps(BudgetTreeServiceBase):
         Returns:
             The same `fileToken` that `POST /invoices` expects.
         """
-        storage_key, safe_name, mime = await self._validate_scan_store(data, filename=filename)
-        return InvoiceFileResult(fileToken=storage_key, fileName=safe_name, fileMime=mime)
+        storage_key, display_name, mime = await self._validate_scan_store(
+            data, filename=filename
+        )
+        return InvoiceFileResult(fileToken=storage_key, fileName=display_name, fileMime=mime)
 
     async def parse_invoice_file(self, data: bytes, *, filename: str | None) -> InvoiceParseResult:
         """Validate the PDF, parse the ZUGFeRD data and store the original.
@@ -373,8 +379,9 @@ class InvoiceOps(BudgetTreeServiceBase):
             raise PayloadTooLargeError(f"Invoice exceeds {max_bytes} bytes.")
         if not data:
             raise UnsupportedMediaTypeError("Empty file.")
+        display_name = sanitize_display_name(filename)
         try:
-            mime = validate_upload(filename, data)
+            mime = validate_upload(display_name, data)
         except MimeRejected as exc:
             raise UnsupportedMediaTypeError(str(exc)) from exc
         if mime != "application/pdf":
@@ -385,8 +392,9 @@ class InvoiceOps(BudgetTreeServiceBase):
         # so it does not block the event loop.
         parsed = await asyncio.to_thread(parse_zugferd_pdf, data)
 
-        safe_name = sanitize_filename(filename)
-        storage_key = await self._store_invoice_file(data, mime, safe_name)
+        storage_key = await self._store_invoice_file(
+            data, mime, sanitize_storage_name(display_name)
+        )
         return InvoiceParseResult(
             number=parsed.number,
             issueDate=parsed.issue_date,
@@ -397,7 +405,7 @@ class InvoiceOps(BudgetTreeServiceBase):
             grossAmount=parsed.gross_amount,
             currency=parsed.currency,
             fileToken=storage_key,
-            fileName=safe_name,
+            fileName=display_name,
             fileMime=mime,
             duplicate=await self._invoice_number_exists(parsed.number),
         )
@@ -457,10 +465,10 @@ class InvoiceOps(BudgetTreeServiceBase):
                 f"File rejected by virus scan: {verdict.signature or 'unknown'}"
             )
 
-    async def _store_invoice_file(self, data: bytes, mime: str, safe_name: str) -> str:
+    async def _store_invoice_file(self, data: bytes, mime: str, key_name: str) -> str:
         if self.storage is None:
             raise ServiceUnavailableError("Object storage unavailable.")
-        storage_key = f"invoices/{uuid.uuid4().hex}/{safe_name}"
+        storage_key = f"invoices/{uuid.uuid4().hex}/{key_name}"
         try:
             await self.storage.put(storage_key, data, mime)
         except StorageError as exc:

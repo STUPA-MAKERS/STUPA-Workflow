@@ -52,6 +52,7 @@ from app.shared.errors import (
     PayloadTooLargeError,
     ValidationProblem,
 )
+from app.shared.filenames import sanitize_storage_name
 
 logger = logging.getLogger("app.files")
 
@@ -160,7 +161,7 @@ class DraftAttachments:
             UnsupportedMediaTypeError: The content is not allowed (HTTP 415).
             ServiceUnavailableError: Object storage is off or failed (HTTP 503).
         """
-        mime, safe_name = self.files.validate(filename, data)
+        mime, display_name = self.files.validate(filename, data)
         now = datetime.now(UTC)
         issued = token is None
         plain = tokens.generate_token() if token is None else token
@@ -171,14 +172,16 @@ class DraftAttachments:
         await self._check_quota(token_hash, len(data))
 
         attachment_id = uuid.uuid4()
-        storage_key = f"{DRAFT_KEY_PREFIX}{attachment_id}/{safe_name}"
+        storage_key = (
+            f"{DRAFT_KEY_PREFIX}{attachment_id}/{sanitize_storage_name(display_name)}"
+        )
         await self.files.put_object(storage_key, data, mime)
         expires_at = now + timedelta(days=self.settings.attachment_draft_ttl_days)
         attachment = Attachment(
             id=attachment_id,
             application_id=None,
             field_key=field_key,
-            filename=safe_name,
+            filename=display_name,
             mime=mime,
             size=len(data),
             storage_key=storage_key,
@@ -221,7 +224,7 @@ class DraftAttachments:
         await self.files.enqueue_scan(attachment_id, actor=by)
         return DraftAttachmentOut(
             id=attachment_id,
-            filename=safe_name,
+            filename=display_name,
             mime=mime,
             size=len(data),
             scanned=False,

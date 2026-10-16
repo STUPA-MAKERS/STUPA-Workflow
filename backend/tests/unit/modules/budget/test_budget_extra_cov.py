@@ -834,9 +834,15 @@ def test_get_invoice_file_sanitises_filename(fake: _FakeService) -> None:
     # never render inline.
     assert resp.headers["content-type"] == "application/pdf"
     assert cd.startswith("attachment;")
-    # The router removes quotes, backslashes, CR and LF from the file name.
-    assert '"' not in cd.split('filename="', 1)[1].rstrip().rstrip('"')
+    # The header helper drops CR and LF and keeps quotes and backslashes out of the
+    # quoted fallback; the exact name goes percent-encoded into filename*.
+    plain, ext = cd.removeprefix("attachment; ").split("; ")
+    assert plain.startswith('filename="') and plain.endswith('"')
+    assert '"' not in plain[len('filename="') : -1]
+    assert "\\" not in plain
+    assert ext.startswith("filename*=UTF-8''")
     assert "\r" not in cd and "\n" not in cd
+    cd.encode("latin-1")
     assert fake.calls["invoice_file_bytes"] == _IID
 
 

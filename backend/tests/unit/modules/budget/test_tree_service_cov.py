@@ -910,6 +910,24 @@ async def test_create_invoice_with_file_token() -> None:
     assert out.file_name == "a.pdf"
 
 
+async def test_create_invoice_cleans_the_client_file_name() -> None:
+    svc = BudgetTreeService(fake_session())
+    out = await svc.create_invoice(
+        InvoiceCreate(
+            number="R-4", grossAmount=Decimal("10.00"),
+            fileToken="invoices/x/a.pdf", fileName="../Beleg\u202e März €\r\n.pdf",
+            fileMime="application/pdf",
+        ),
+        actor="u",
+    )
+    assert out.file_name == "Beleg März €.pdf"
+    no_name = await BudgetTreeService(fake_session()).create_invoice(
+        InvoiceCreate(number="R-5", grossAmount=Decimal("1"), fileToken="invoices/x/b.pdf"),
+        actor="u",
+    )
+    assert no_name.file_name == "beleg.pdf"
+
+
 async def test_create_invoice_with_invalid_file_token() -> None:
     sess = fake_session()
     svc = BudgetTreeService(sess)
@@ -1127,12 +1145,25 @@ def _ok_storage(store: list[Any] | None = None) -> Any:
 
 async def test_store_invoice_file_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(invoices_mod, "validate_upload", lambda fn, data: "application/pdf")
-    monkeypatch.setattr(invoices_mod, "sanitize_filename", lambda fn: "safe.pdf")
+    monkeypatch.setattr(invoices_mod, "sanitize_display_name", lambda fn: "safe.pdf")
     svc = BudgetTreeService(fake_session(), storage=_ok_storage(), settings=_settings())
     res = await svc.store_invoice_file(b"%PDF-1.4", filename="beleg.pdf")
     assert res.file_name == "safe.pdf"
     assert res.file_mime == "application/pdf"
     assert res.file_token.startswith("invoices/")
+
+
+async def test_store_invoice_file_keeps_the_unicode_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(invoices_mod, "validate_upload", lambda fn, data: "application/pdf")
+    svc = BudgetTreeService(fake_session(), storage=_ok_storage(), settings=_settings())
+    res = await svc.store_invoice_file(b"%PDF-1.4", filename="../Rechnung Müller €.pdf")
+    assert res.file_name == "Rechnung Müller €.pdf"
+    # The object key stays ASCII.
+    assert res.file_token.startswith("invoices/")
+    assert res.file_token.endswith("/Rechnung Muller _.pdf")
+    assert res.file_token.isascii()
 
 
 async def test_validate_scan_store_too_large() -> None:
@@ -1243,7 +1274,7 @@ async def test_store_invoice_file_put_error() -> None:
 
 async def test_parse_invoice_file_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(invoices_mod, "validate_upload", lambda fn, data: "application/pdf")
-    monkeypatch.setattr(invoices_mod, "sanitize_filename", lambda fn: "safe.pdf")
+    monkeypatch.setattr(invoices_mod, "sanitize_display_name", lambda fn: "safe.pdf")
     parsed = ParsedInvoice(
         number="R-100", issue_date=date(2026, 1, 1), due_date=date(2026, 2, 1),
         supplier="ACME", net_amount=Decimal("100"), tax_amount=Decimal("19"),
@@ -1262,7 +1293,7 @@ async def test_parse_invoice_file_ok(monkeypatch: pytest.MonkeyPatch) -> None:
 
 async def test_parse_invoice_file_duplicate(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(invoices_mod, "validate_upload", lambda fn, data: "application/pdf")
-    monkeypatch.setattr(invoices_mod, "sanitize_filename", lambda fn: "safe.pdf")
+    monkeypatch.setattr(invoices_mod, "sanitize_display_name", lambda fn: "safe.pdf")
     parsed = ParsedInvoice(
         number="DUP", issue_date=None, due_date=None, supplier=None,
         net_amount=None, tax_amount=None, gross_amount=Decimal("5"), currency="EUR",

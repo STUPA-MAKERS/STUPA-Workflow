@@ -341,3 +341,63 @@ def test_download_rejects_a_path_in_the_id(
     with pytest.raises(ApiError, match="traversal"):
         asyncio.run(meetings.download_attachment("../admin", str(tmp_path / "x.pdf")))
     assert wire.requests == []
+
+
+@pytest.mark.parametrize(
+    ("header", "expected"),
+    [
+        (
+            "attachment; filename=\"Einfuhrung _.pdf\"; "
+            "filename*=UTF-8''Einf%C3%BChrung%20%E2%82%AC.pdf",
+            "Einführung €.pdf",
+        ),
+        ("inline; filename*=utf-8'de'%E4%BC%9A%E8%AE%AE.pdf", "会议.pdf"),
+        ("attachment; filename*=ISO-8859-1''Gr%FC%DFe.pdf", "Grüße.pdf"),
+        ('attachment; filename="Angebot_1.pdf"', "Angebot_1.pdf"),
+        # A value that does not decode falls back to the plain name.
+        ("attachment; filename=\"a.pdf\"; filename*=UTF-8''%FF%FE.pdf", "a.pdf"),
+        ("attachment; filename=\"b.pdf\"; filename*=x-unknown''c.pdf", "b.pdf"),
+        # Path parts never survive, in either form.
+        ("attachment; filename*=UTF-8''..%2F..%2Fetc%2Fpasswd", "passwd"),
+        ("attachment; filename*=UTF-8''..%5C..%5Cwin.ini", "win.ini"),
+        ("attachment; filename*=UTF-8''..", ""),
+        ('attachment; filename=".."', ""),
+        ("attachment", ""),
+        ("", ""),
+    ],
+)
+def test_disposition_filename(header: str, expected: str) -> None:
+    assert meetings._disposition_filename(header) == expected
+
+
+def _download_ext(content: bytes, header: str) -> Any:
+    def handler(req: httpx.Request, n: int) -> httpx.Response:
+        return httpx.Response(
+            200,
+            content=content,
+            headers={"content-type": "application/pdf", "content-disposition": header},
+        )
+
+    return handler
+
+
+def test_download_into_a_directory_uses_the_utf8_name(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    header = (
+        "attachment; filename=\"Einfuhrung _.pdf\"; "
+        "filename*=UTF-8''Einf%C3%BChrung%20%E2%82%AC.pdf"
+    )
+    _client(monkeypatch, _Wire(_download_ext(PDF, header)))
+    out = asyncio.run(meetings.download_attachment(ATT_ID, str(tmp_path)))
+    assert out["filename"] == "Einführung €.pdf"
+    assert (tmp_path / "Einführung €.pdf").read_bytes() == PDF
+
+
+def test_download_with_a_nul_in_the_name_uses_the_id(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    header = "attachment; filename*=UTF-8''a%00b.pdf"
+    _client(monkeypatch, _Wire(_download_ext(PDF, header)))
+    out = asyncio.run(meetings.download_attachment(ATT_ID, str(tmp_path)))
+    assert out["filename"] == f"attachment-{ATT_ID}"

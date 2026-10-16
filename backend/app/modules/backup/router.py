@@ -53,6 +53,7 @@ from app.shared.errors import (
     ServiceUnavailableError,
     ValidationProblem,
 )
+from app.shared.filenames import content_disposition
 
 router = APIRouter(prefix="/admin/backups", tags=["backup"])
 
@@ -226,7 +227,9 @@ async def export_backup(
     await session.commit()
 
     headers = {
-        "Content-Disposition": f'attachment; filename="{download_name(row.created_at)}"',
+        "Content-Disposition": content_disposition(
+            "attachment", download_name(row.created_at)
+        ),
         "X-Content-Type-Options": "nosniff",
     }
     if row.size_bytes:

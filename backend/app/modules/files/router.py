@@ -43,7 +43,6 @@ from app.modules.files.models import Attachment
 from app.modules.files.queue import scan_queue_from_pool
 from app.modules.files.schemas import AttachmentOut, DraftAttachmentOut, SignedUrlOut
 from app.modules.files.service import AttachmentOwner, FilesService, application_id_of
-from app.modules.files.storage import _safe_disposition
 from app.modules.tickets.access import TICKET_MANAGE
 from app.modules.tickets.models import TicketNote
 from app.modules.todos.access import BoardAccess
@@ -62,6 +61,7 @@ from app.shared.errors import (
     ProblemDetail,
     UnauthorizedError,
 )
+from app.shared.filenames import content_disposition
 
 router = APIRouter(tags=["files"])
 
@@ -445,7 +445,7 @@ async def download_attachment(
     preview = inline and mime in _INLINE_MIMES
     kind = "inline" if preview else "attachment"
     headers = {
-        "Content-Disposition": f'{kind}; filename="{_safe_disposition(filename)}"',
+        "Content-Disposition": content_disposition(kind, filename),
         "Content-Length": str(size),
         "X-Content-Type-Options": "nosniff",
     }

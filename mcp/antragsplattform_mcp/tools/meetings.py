@@ -11,10 +11,12 @@ cast a ballot. Voting is human-only.
 
 from __future__ import annotations
 
+import codecs
 import os
 import re
 import tempfile
 from pathlib import Path
+from urllib.parse import unquote
 from typing import Literal
 
 from mcp.server.fastmcp import FastMCP
@@ -636,6 +638,33 @@ ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
 
 _DOWNLOAD_CHUNK = 64 * 1024
 _DISPOSITION_NAME = re.compile(r'filename="([^"]*)"')
+_DISPOSITION_EXT_NAME = re.compile(
+    r"filename\*\s*=\s*([A-Za-z0-9!#$%&+^_`{}~-]+)'[^']*'([^;\s]+)", re.IGNORECASE
+)
+
+
+def _disposition_filename(header: str) -> str:
+    """Read the file name from a `Content-Disposition` header, without path parts.
+
+    The server sends an ASCII `filename` fallback and the exact name as
+    `filename*=UTF-8''<percent-encoded>` (RFC 6266, RFC 5987). The extended form wins,
+    so `Einführung €.pdf` keeps its umlaut and its euro sign. A value that does not
+    decode falls back to the plain `filename`. The result is the last path component
+    only, or `""` when there is none.
+    """
+    name = ""
+    ext = _DISPOSITION_EXT_NAME.search(header)
+    if ext is not None:
+        try:
+            charset = codecs.lookup(ext.group(1)).name
+            name = unquote(ext.group(2), encoding=charset, errors="strict")
+        except (LookupError, UnicodeDecodeError):
+            name = ""
+    if not name:
+        plain = _DISPOSITION_NAME.search(header)
+        name = plain.group(1) if plain else ""
+    name = Path(name.replace("\\", "/")).name
+    return "" if name in {".", ".."} else name
 
 
 def _attachment_part(
@@ -755,9 +784,8 @@ async def download_attachment(
         if target.exists() and not overwrite:
             raise ApiError(400, f"file exists (pass overwrite=true): {target_path!r}")
     async with api().stream("GET", f"/attachments/{attachment_id}/download") as resp:
-        match = _DISPOSITION_NAME.search(resp.headers.get("content-disposition", ""))
-        stored = Path(match.group(1)).name if match else ""
-        if stored in {"", ".", ".."}:
+        stored = _disposition_filename(resp.headers.get("content-disposition", ""))
+        if not stored or "\x00" in stored:
             stored = f"attachment-{attachment_id}"
         final = target / stored if target.is_dir() else target
         if final.exists() and not overwrite:

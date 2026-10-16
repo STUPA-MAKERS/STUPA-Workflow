@@ -190,14 +190,6 @@ class MinioStorage:
             raise StorageError(f"get_file failed: {type(exc).__name__}") from exc
 
 
-def _safe_disposition(name: str) -> str:
-    """Strip quotes and control characters from the filename to block header injection.
-
-    Used by the download routes when they build ``Content-Disposition``.
-    """
-    return "".join(c for c in name if c.isprintable() and c not in '"\\\r\n')
-
-
 def build_object_storage(
     settings: Settings, *, bucket: str | None = None
 ) -> BulkObjectStorage | None:
