@@ -567,6 +567,7 @@ export const de = {
   'status.linkUnlimited': 'Dein Link ist unbegrenzt gültig.',
 
   'auth.signedInAs': 'Angemeldet als',
+  'auth.loginFailed': 'Die Anmeldung hat nicht geklappt. Bitte versuche es noch einmal.',
   'rbac.forbidden': 'Keine Berechtigung für diesen Bereich.',
 
   'dashboard.greeting': 'Willkommen, {name}',

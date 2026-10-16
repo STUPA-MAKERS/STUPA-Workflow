@@ -10,7 +10,7 @@ import { AuthService } from './auth.service';
  * 1. The guard loads the principal once through `ensureLoaded`. It then decides
  *    synchronously.
  * 2. If there is no session, the guard starts the OIDC login with a full redirect
- *    and cancels the navigation.
+ *    and cancels the navigation. The login returns to the URL of that navigation.
  * 3. If `route.data.permission` (global) or `route.data.gremiumPermission` (a
  *    gremium permission in any gremium, or the admin role) is set and the
  *    principal holds none of them, the guard sends the user to the 403 page
@@ -19,7 +19,7 @@ import { AuthService } from './auth.service';
  * RBAC here is only UX. The server stays authoritative. The guard decides after it
  * loads the real principal. It never rejects before it checks the permissions.
  */
-export const authGuard: CanActivateFn = (route) => {
+export const authGuard: CanActivateFn = (route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
   const toast = inject(ToastService);
@@ -28,7 +28,13 @@ export const authGuard: CanActivateFn = (route) => {
   return auth.ensureLoaded().pipe(
     map((principal) => {
       if (!principal) {
-        auth.login();
+        // A login that just came back without a session: go home, do not loop.
+        if (auth.loginJustFailed()) {
+          toast.error(i18n.translate('auth.loginFailed'));
+          return router.createUrlTree(['/']);
+        }
+        // Back to the blocked target after the login, not to the page before it.
+        auth.login(state?.url);
         return false;
       }
       const permission = route.data['permission'] as string | string[] | undefined;
