@@ -12,6 +12,10 @@ is set.
 
 Notes are internal and soft-deleted (``deleted_at``). Events are the timeline of
 the status, the assignee and the kind. Both cascade with the ticket.
+
+``ticket_sender_block`` holds the blocked senders: an account (``principal_id``) or a
+normalized e-mail address (``email``, stripped and lowercase). A report of a blocked
+sender is swallowed: it consumes a number and stores nothing (``hit_count``).
 """
 
 from __future__ import annotations
@@ -131,4 +135,51 @@ class TicketEvent(UUIDPkMixin, Base):
     __table_args__ = (
         CheckConstraint(f"kind IN ({_in(TICKET_EVENT_KINDS)})", name="kind"),
         Index("ix_ticket_event_ticket_id", "ticket_id"),
+    )
+
+
+class TicketSenderBlock(UUIDPkMixin, Base):
+    """A blocked sender of reports: an account or an e-mail address.
+
+    Exactly one of ``principal_id`` and ``email`` is set. ``email`` is stored
+    stripped and lowercase. ``source_ticket_id`` is the ticket the block came from;
+    it turns NULL when that ticket is deleted, an anonymization keeps it.
+
+    Attributes:
+        created_by: The holder of ``ticket.manage`` who blocked; NULL once deleted.
+        hit_count: The reports swallowed since the block.
+        last_hit_at: The moment of the last swallowed report.
+    """
+
+    __tablename__ = "ticket_sender_block"
+
+    principal_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("principal.id", ondelete="CASCADE"), nullable=True
+    )
+    email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_ticket_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ticket.id", ondelete="SET NULL"), nullable=True
+    )
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("principal.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    hit_count: Mapped[int] = mapped_column(Integer, server_default="0")
+    last_hit_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("num_nonnulls(principal_id, email) = 1", name="target"),
+        CheckConstraint("email IS NULL OR email = lower(email)", name="email_lower"),
+        Index(
+            "uq_ticket_sender_block_principal",
+            "principal_id",
+            unique=True,
+            postgresql_where=text("principal_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_ticket_sender_block_email",
+            "email",
+            unique=True,
+            postgresql_where=text("email IS NOT NULL"),
+        ),
     )

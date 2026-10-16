@@ -36,15 +36,18 @@ from app.modules.applications.access import (
     require_app_read,
     resolve_app_read,
 )
-from app.modules.applications.models import Application
+from app.modules.applications.models import Application, Comment
 from app.modules.auth.principal import Applicant, Principal
 from app.modules.files.drafts import DraftAttachments, invalid_token
 from app.modules.files.models import Attachment
 from app.modules.files.queue import scan_queue_from_pool
 from app.modules.files.schemas import AttachmentOut, DraftAttachmentOut, SignedUrlOut
-from app.modules.files.service import FilesService, application_id_of
+from app.modules.files.service import AttachmentOwner, FilesService, application_id_of
 from app.modules.files.storage import _safe_disposition
 from app.modules.tickets.access import TICKET_MANAGE
+from app.modules.tickets.models import TicketNote
+from app.modules.todos.access import BoardAccess
+from app.modules.todos.models import TodoBoard, TodoCard, TodoComment
 from app.shared.altcha import AltchaError, AltchaVerifier, NullAltchaVerifier
 from app.shared.antiabuse import (
     enforce_attachment_body_cap,
@@ -181,16 +184,73 @@ async def _assert_not_pii_hidden(db: AsyncSession, access: Access, attachment: A
         raise NotFoundError(f"attachment {attachment.id} not found")
 
 
-def _require_ticket_reader(principal: Principal | None, attachment_id: UUID) -> None:
-    """Let only a holder of ``ticket.manage`` reach the attachment of a ticket.
+async def _assert_owner_reader(
+    db: AsyncSession,
+    service: FilesService,
+    owner: AttachmentOwner,
+    principal: Principal | None,
+    applicant: Applicant | None,
+    attachment_id: UUID,
+) -> None:
+    """Apply the read rule of the ticket or message that owns a file.
 
-    Anyone else gets 404, as for an unknown id, so the route is no existence oracle.
+    The rule is the rule of reading the message itself:
+
+    * ``ticket`` (a report file) and ``ticket_note``: a principal with
+      ``ticket.manage``; a note must not be deleted.
+    * ``todo_comment``: a principal whose token allows ``todo.write`` and who reads
+      the board of the card (``BoardAccess``, archived cards too); the comment must
+      not be deleted.
+    * ``comment``: read access to the application (``resolve_app_read``: principal,
+      Gremium read scope, logged-in creator, magic-link applicant); an internal
+      comment also needs ``can_see_internal``. An unconfirmed guest submission
+      stays hidden unless the caller is its applicant.
+
+    Every "no" is 404, as for an unknown id, so the route is no existence oracle. The
+    check runs before any quarantine gate.
 
     Raises:
-        NotFoundError: The caller does not hold ``ticket.manage`` (HTTP 404).
+        NotFoundError: The caller may not read the message (HTTP 404).
     """
-    if principal is None or not principal.has(TICKET_MANAGE):
-        raise NotFoundError(f"attachment {attachment_id} not found")
+    missing = NotFoundError(f"attachment {attachment_id} not found")
+    if owner.kind in ("ticket", "ticket_note"):
+        if principal is None or not principal.has(TICKET_MANAGE):
+            raise missing
+        if owner.kind == "ticket_note":
+            deleted = await db.scalar(
+                select(TicketNote.deleted_at).where(TicketNote.id == owner.id)
+            )
+            if deleted is not None:
+                raise missing
+        return
+    if owner.kind == "todo_comment":
+        if principal is None:
+            raise missing
+        row = (
+            await db.execute(
+                select(TodoComment.deleted_at, TodoBoard)
+                .join(TodoCard, TodoCard.id == TodoComment.card_id)
+                .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
+                .where(TodoComment.id == owner.id)
+            )
+        ).first()
+        if row is None or row[0] is not None:
+            raise missing
+        if not await BoardAccess(db).can_read(row[1], principal):
+            raise missing
+        return
+    comment = await db.get(Comment, owner.id)
+    if comment is None:
+        raise missing
+    try:
+        access = await resolve_app_read(db, comment.application_id, principal, applicant)
+    except ForbiddenError as exc:
+        raise missing from exc
+    if comment.visibility != "public" and not access.can_see_internal:
+        raise missing
+    await service.assert_app_visible(
+        comment.application_id, allow_unconfirmed=access.is_owning_applicant
+    )
 
 
 async def _read_capped(file: UploadFile, max_bytes: int) -> bytes:
@@ -290,16 +350,18 @@ async def get_attachment_url(
 ) -> SignedUrlOut:
     """Return the download URL of an attachment.
 
-    A principal or the applicant of the application may call this route. The
-    attachment of a ticket needs ``ticket.manage``; without it the route gives 404.
+    A principal or the applicant of the application may call this route. The file
+    of a ticket or of a chat message needs the read rule of its owner
+    (``_assert_owner_reader``); without it the route gives 404.
     """
     # Fail closed before the database access. Without an identity the route answers 401.
     # A difference between 404 and 401 would reveal that the attachment exists.
     if principal is None and applicant is None:
         raise UnauthorizedError("Authentication required.")
-    if await service.is_ticket_attachment(attachment_id):
-        _require_ticket_reader(principal, attachment_id)
-        return await service.ticket_url(attachment_id)
+    owner = await service.owner_of(attachment_id)
+    if owner is not None and owner.kind != "application":
+        await _assert_owner_reader(db, service, owner, principal, applicant, attachment_id)
+        return await service.message_url(attachment_id)
     attachment = await service.get_attachment(attachment_id)
     # Check read access against the application of the attachment. This uses the same
     # paths as in require_app_read, that is read_all, creator and Gremium read, not only
@@ -351,14 +413,15 @@ async def download_attachment(
     that response may be framed, and only by the same origin (``PREVIEW_CSP``,
     ``X-Frame-Options: SAMEORIGIN``).
 
-    The attachment of a ticket needs ``ticket.manage``; without it the route gives
-    404. The same quarantine gates apply.
+    The file of a ticket or of a chat message needs the read rule of its owner
+    (``_assert_owner_reader``), else 404. The same quarantine gates apply.
     """
     if principal is None and applicant is None:
         raise UnauthorizedError("Authentication required.")
-    if await service.is_ticket_attachment(attachment_id):
-        _require_ticket_reader(principal, attachment_id)
-        stream, filename, mime, size = await service.ticket_download_stream(attachment_id)
+    owner = await service.owner_of(attachment_id)
+    if owner is not None and owner.kind != "application":
+        await _assert_owner_reader(db, service, owner, principal, applicant, attachment_id)
+        stream, filename, mime, size = await service.message_download_stream(attachment_id)
     else:
         attachment = await service.get_attachment(attachment_id)
         try:

@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy import ColumnElement, delete, or_, select, update
@@ -34,7 +34,12 @@ from app.modules.livevote.models import Meeting, MeetingAttendance
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.protocol.erasure import erase_candidate_names
 from app.modules.tickets.models import Ticket
-from app.modules.tickets.service import TicketService, format_number
+from app.modules.tickets.service import (
+    TicketService,
+    erase_sender_blocks,
+    format_number,
+    sender_blocks_of,
+)
 from app.modules.todos.privacy import erase_todos, todo_export
 from app.modules.voting.erasure import erase_candidacies
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
@@ -76,9 +81,11 @@ class PrincipalService:
         the principal id, so they show a deleted person; only the ``created`` event
         loses its actor.
 
-        The to-do assignments of the principal go, and so does the personal board.
-        Cards, comments and events on the shared boards keep the principal id and
-        show "Gelöschte Person".
+        The to-do assignments of the principal go, and so does the personal board
+        with the files of its comments. Cards, comments, their files and events on the
+        shared boards keep the principal id and show "Gelöschte Person".
+
+        The sender blocks of the account and of its e-mail go too.
 
         Raises:
             NotFoundError: No principal has this id.
@@ -128,7 +135,8 @@ class PrincipalService:
         await anonymize_reported_tickets(
             self.session, actor=actor, files=files, principal_id=principal_id, email=address
         )
-        await erase_todos(self.session, principal_id)
+        await erase_sender_blocks(self.session, principal_id=principal_id, email=address)
+        await erase_todos(self.session, principal_id, files=files, actor=actor)
         await self.session.execute(
             delete(AuthSession).where(AuthSession.principal_id == principal_id)
         )
@@ -196,7 +204,7 @@ async def erase_email(
     whose applicant has the address gets the applicant anonymization, and every
     ticket with the address as ``reporter_email`` gets the ticket anonymization. The
     compare is citext, as in the Auskunft. Rows that are already anonymized do not
-    change.
+    change. A sender block of the address goes.
 
     An account under the address stays: its erasure deactivates the account, so it
     stays a separate step. ``principalId`` names that account.
@@ -231,6 +239,7 @@ async def erase_email(
     tickets = await anonymize_reported_tickets(
         session, actor=actor, files=files, email=email
     )
+    await erase_sender_blocks(session, email=email)
     principal_id = await session.scalar(
         select(Principal.id).where(Principal.email == email)
     )
@@ -375,6 +384,7 @@ class ErasureRequestService:
             await anonymize_reported_tickets(
                 self.session, actor=actor, files=files, email=request.email
             )
+            await erase_sender_blocks(self.session, email=request.email)
         elif request.subject_type == "principal" and request.principal_id is not None:
             await PrincipalService(self.session).erase(
                 request.principal_id, actor=actor, commit=False, files=files
@@ -538,6 +548,16 @@ class AuskunftService:
                     )
                 ).all()
             )
+            names: dict[UUID, list[str]] = {}
+            if crows:
+                for comment_id, filename in (
+                    await self.session.execute(
+                        select(Attachment.comment_id, Attachment.filename)
+                        .where(Attachment.comment_id.in_([c.id for c in crows]))
+                        .order_by(Attachment.created_at, Attachment.id)
+                    )
+                ).all():
+                    names.setdefault(cast(UUID, comment_id), []).append(filename)
             comments = [
                 {
                     "applicationId": c.application_id,
@@ -545,6 +565,7 @@ class AuskunftService:
                     "visibility": c.visibility,
                     "body": c.body,
                     "at": c.at,
+                    "attachments": names.get(c.id, []),
                 }
                 for c in crows
             ]
@@ -653,6 +674,19 @@ class AuskunftService:
         todos = await todo_export(
             self.session, [principal_row.id] if principal_row is not None else []
         )
+        blocks = [
+            {
+                "kind": "principal" if b.principal_id is not None else "email",
+                "createdAt": b.created_at,
+                "hitCount": b.hit_count,
+                "lastHitAt": b.last_hit_at,
+            }
+            for b in await sender_blocks_of(
+                self.session,
+                principal_id=principal_row.id if principal_row is not None else None,
+                email=email,
+            )
+        ]
         principal = (
             {
                 "sub": principal_row.sub,
@@ -674,6 +708,7 @@ class AuskunftService:
             "tickets": tickets,
             "todos": todos["cards"],
             "todo_comments": todos["comments"],
+            "sender_blocks": blocks,
             "principal": principal,
         }
 
@@ -694,15 +729,17 @@ def build_auskunft_workbook(
     tickets: Sequence[Mapping[str, Any]] = (),
     todos: Sequence[Mapping[str, Any]] = (),
     todo_comments: Sequence[Mapping[str, Any]] = (),
+    sender_blocks: Sequence[Mapping[str, Any]] = (),
 ) -> bytes:
     """Build the GDPR access request (Art. 15) as `.xlsx` bytes.
 
     This function extends the shared `app.shared.xlsx.build_auskunft_workbook`. It adds
-    six sheets: the comments that the subject can see, the attachment metadata of the
-    applications and the reported tickets, the meeting attendance with the reason of an
-    excuse, the reported tickets with their text and technical context, the to-dos that
-    the subject created or is assigned to (with the description of the own cards), and
-    the own to-do comments.
+    seven sheets: the comments that the subject can see (with the names of their
+    files), the attachment metadata of the applications and the reported tickets, the
+    meeting attendance with the reason of an excuse, the reported tickets with their
+    text and technical context, the to-dos that the subject created or is assigned to
+    (with the description of the own cards), the own to-do comments (with the names of
+    their files), and the sender blocks of the account or the address.
     """
     from io import BytesIO
 
@@ -745,7 +782,7 @@ def build_auskunft_workbook(
 
     _add_sheet(
         "Kommentare",
-        ["Antrags-ID", "Autor-Art", "Sichtbarkeit", "Zeitpunkt", "Text"],
+        ["Antrags-ID", "Autor-Art", "Sichtbarkeit", "Zeitpunkt", "Text", "Anhänge"],
         [
             [
                 str(c.get("applicationId") or ""),
@@ -753,6 +790,7 @@ def build_auskunft_workbook(
                 c.get("visibility") or "",
                 _fmt_dt(c.get("at")),
                 c.get("body") or "",
+                "; ".join(c.get("attachments") or []),
             ]
             for c in comments
         ],
@@ -821,15 +859,29 @@ def build_auskunft_workbook(
     )
     _add_sheet(
         "To-Do-Kommentare",
-        ["To-Do", "Zeitpunkt", "Gelöscht", "Text"],
+        ["To-Do", "Zeitpunkt", "Gelöscht", "Text", "Anhänge"],
         [
             [
                 c.get("card") or "",
                 _fmt_dt(c.get("createdAt")),
                 _fmt_dt(c.get("deletedAt")),
                 c.get("body") or "",
+                "; ".join(c.get("attachments") or []),
             ]
             for c in todo_comments
+        ],
+    )
+    _add_sheet(
+        "Ticket-Sperren",
+        ["Art", "gesperrt am", "abgefangene Meldungen", "letzter Versuch"],
+        [
+            [
+                "Konto" if b.get("kind") == "principal" else "E-Mail-Adresse",
+                _fmt_dt(b.get("createdAt")),
+                b.get("hitCount") or 0,
+                _fmt_dt(b.get("lastHitAt")),
+            ]
+            for b in sender_blocks
         ],
     )
 

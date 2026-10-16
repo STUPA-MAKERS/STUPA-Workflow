@@ -16,6 +16,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from app.modules.applications.diff import DataDiff
+from app.modules.files.schemas import MessageAttachmentOut, MessageFilesIn
 from app.shared.altcha import AltchaSolutionStr
 from app.shared.i18n import DEFAULT_LANG, I18nMap, Lang
 
@@ -379,10 +380,15 @@ class ShareOut(_CamelModel):
     url: str | None = None
 
 
-class CommentCreate(_CamelModel):
+class CommentCreate(MessageFilesIn, _CamelModel):
+    """A new comment. ``attachmentIds`` and ``draftToken`` bind its files.
+
+    The body may be empty only with at least one file.
+    """
+
     # Anti-DoS cap. It stops one comment from growing without a bound in the
     # database and in the mail render. A longer body answers 422.
-    body: str = Field(min_length=1, max_length=10_000)
+    body: str = Field(max_length=10_000)
     visibility: Literal["internal", "public"] = "public"
 
 
@@ -408,6 +414,8 @@ class CommentOut(_CamelModel):
     # True when the requesting viewer wrote the comment. The frontend aligns the
     # chat bubble by this flag.
     is_own: bool = Field(default=False, alias="isOwn")
+    # The files of the comment, oldest first. They are fixed at the send.
+    attachments: list[MessageAttachmentOut] = Field(default_factory=list)
 
 
 # ``ApplicationOut`` names ``CaptureOut``, which this module defines later, after

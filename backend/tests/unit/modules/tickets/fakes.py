@@ -1,7 +1,9 @@
 """Fakes of the ticket unit tests: a scripted session and a files double.
 
 ``ScriptedSession`` answers ``scalar``, ``scalars`` and ``execute`` from FIFO queues
-that the test fills in the order of the queries of the code under test. ``get``
+that the test fills in the order of the queries of the code under test. An empty
+``scalar`` queue answers None (no row), so a trailing lookup such as the sender
+block of a detail needs no entry. ``get``
 reads an in-memory store that ``add`` fills. Every statement is kept, so a test can
 look at the SQL of a query.
 """
@@ -12,7 +14,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from app.modules.files.schemas import AttachmentOut
+from app.modules.files.schemas import AttachmentOut, MessageAttachmentOut
 
 
 class Result:
@@ -80,7 +82,7 @@ class ScriptedSession:
 
     async def scalar(self, stmt: Any) -> Any:
         self.statements.append(stmt)
-        return self.scalar_q.pop(0)
+        return self.scalar_q.pop(0) if self.scalar_q else None
 
     async def scalars(self, stmt: Any) -> Result:
         self.statements.append(stmt)
@@ -92,11 +94,28 @@ class ScriptedSession:
 
 
 class FakeFiles:
-    """The two files methods that the ticket service calls."""
+    """The files methods that the ticket service calls."""
 
-    def __init__(self, attachments: list[AttachmentOut] | None = None) -> None:
+    def __init__(
+        self,
+        attachments: list[AttachmentOut] | None = None,
+        messages: dict[uuid.UUID, list[MessageAttachmentOut]] | None = None,
+    ) -> None:
         self.attachments = attachments or []
+        self.messages = messages or {}
         self.deleted: list[tuple[uuid.UUID, str]] = []
+        self.asked: list[tuple[str, list[uuid.UUID]]] = []
+        self.removed: list[tuple[str, list[uuid.UUID], str]] = []
+
+    async def message_attachments(
+        self, owner: str, ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, list[MessageAttachmentOut]]:
+        self.asked.append((owner, list(ids)))
+        return {i: self.messages[i] for i in ids if i in self.messages}
+
+    async def delete_for_messages(self, owner: str, ids: list[uuid.UUID], *, actor: str) -> int:
+        self.removed.append((owner, list(ids), actor))
+        return len(ids)
 
     async def list_for_ticket(self, _ticket_id: uuid.UUID) -> list[AttachmentOut]:
         return self.attachments

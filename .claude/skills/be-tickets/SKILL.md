@@ -1,6 +1,6 @@
 ---
 name: be-tickets
-description: Tickets from the help menu — problem reports, questions and ideas (ticket/ticket_note/ticket_event, number T-0001 from ticket_number_seq). Covers the public one-way report POST /api/tickets (session, or ALTCHA + rate limit + body cap while tickets.publicEnabled), the ticket.manage work routes (list/counts/assignees/detail/patch/notes), draft attachments bound with ticket_id, the mails ticket_created/ticket_received, the "Hilfe & Tickets" settings (help.wikiUrl, tickets.publicEnabled/notifyNew/retentionMonths, GET/PUT /api/admin/help-tickets), the retention cron anonymize_tickets, privacy export/erasure and the search source. Use when working on tickets, the help menu backend, TicketService, ticket mails, ticket retention or ticket attachments in backend/app/modules/tickets.
+description: Tickets from the help menu — problem reports, questions and ideas (ticket/ticket_note/ticket_event, number T-0001 from ticket_number_seq). Covers the public one-way report POST /api/tickets (session, or ALTCHA + rate limit + body cap while tickets.publicEnabled), the ticket.manage work routes (list/counts/assignees/detail/patch/notes), draft attachments bound with ticket_id, note files, the sender block (ticket_sender_block, "Absender sperren"), the mails ticket_created/ticket_received, the "Hilfe & Tickets" settings (help.wikiUrl, tickets.publicEnabled/notifyNew/retentionMonths, GET/PUT /api/admin/help-tickets), the retention cron anonymize_tickets, privacy export/erasure and the search source. Use when working on tickets, the help menu backend, TicketService, ticket mails, ticket retention or ticket attachments in backend/app/modules/tickets.
 ---
 
 # Tickets — `backend/app/modules/tickets`
@@ -11,7 +11,7 @@ reads the ticket again. Holders of `ticket.manage` work on the tickets: status, 
 kind, internal notes, a timeline of events and the technical context of the report.
 
 **Key files:**
-- `models.py` — `Ticket` (number from `ticket_number_seq`, kind, status, reporter
+- `models.py` — `TicketSenderBlock` (see below), `Ticket` (number from `ticket_number_seq`, kind, status, reporter
   `reporter_principal_id` XOR `reporter_email` until `anonymized_at`, `assignee_id`,
   `duplicate_of_id`, `context` JSONB, `closed_at` = retention clock), `TicketNote` (soft
   delete), `TicketEvent` (`created|status|assignee|kind|todo_done`).
@@ -44,7 +44,9 @@ kind, internal notes, a timeline of events and the technical context of the repo
   matches title, body, number `T-0040`/`0040`/`40`, reporter name and e-mail; paged,
   newest first), `GET /api/tickets/counts`, `GET /api/tickets/assignees`,
   `GET|PATCH /api/tickets/{id}`, `POST /api/tickets/{id}/notes`,
-  `PATCH|DELETE /api/tickets/{id}/notes/{noteId}` (403 `not_note_author`) — all
+  `PATCH|DELETE /api/tickets/{id}/notes/{noteId}` (403 `not_note_author`),
+  `POST|DELETE /api/tickets/{id}/block-sender` (returns `TicketDetail`),
+  `GET /api/tickets/blocked-senders`, `DELETE /api/tickets/blocked-senders/{blockId}` (204) — all
   `ticket.manage`; an unknown ticket or note is 404. PATCH 422 codes:
   `assignee_not_allowed` (not a holder), `duplicate_invalid` (`duplicateOfId` only with
   `rejected`, never itself).
@@ -63,6 +65,21 @@ kind, internal notes, a timeline of events and the technical context of the repo
   route `GET /api/attachments/{id}/download` and the URL route need `ticket.manage` for a
   ticket attachment, else 404. Application paths filter `application_id IS NOT NULL`
   (`BOUND`), so a ticket file never shows there.
+- Note files: `POST /notes` takes `NoteCreate` (`body` may be empty with a file,
+  `attachmentIds` ≤ 5, `draftToken`) and binds with `ticket_note_id`; files on an
+  anonymized ticket give 422 `ticket_anonymized`. `TicketNoteOut.attachments` lists them;
+  `delete_note` and `delete_for_ticket` (anonymization, retention) remove them.
+- **Sender block** (`ticket_sender_block`): exactly one of `principal_id` (the reporter
+  account, cascade) or `email` (lowercase), plus `source_ticket_id`, `created_by`,
+  `hit_count`, `last_hit_at`; a partial unique index per target, so a second block is a
+  no-op. Blocking yourself (account or own account e-mail) is 422 `sender_is_self`; an
+  anonymized or sender-less ticket is 409 `ticket_sender_unknown`. `TicketDetail.senderBlocked`.
+  `create` checks `matching_block` after the draft check: an account matches by id or by
+  its e-mail, an address matches the address or an account with it, case-insensitive. A
+  match takes a number from the sequence, counts the hit, commits and answers the normal
+  201 `{ number }` (`SwallowedReport`) — no ticket row, no bound drafts, no mail. The log
+  names the block id, never the address. The merge combines blocks; the erasure deletes
+  them (be-privacy).
 - `PersonRef`: name, else e-mail, else the deleted person (`null/null`).
 
 **Mails:** `ticket_created` to the holders of `ticket.manage` (not the reporter), only while
@@ -80,13 +97,15 @@ loses its actor (that actor is the reporter), one commit and one `anonymization`
 per ticket. `PrincipalService.erase` gives the same anonymization to the tickets of the
 account and to the reports without a session under the account's e-mail; an applicant
 erasure does it for the tickets of the request's e-mail
-(`privacy.service.anonymize_reported_tickets`). The Art. 15 export has a sheet "Tickets" (with text and context) and lists the ticket attachments in "Anhänge". The account merge moves
+(`privacy.service.anonymize_reported_tickets`). The Art. 15 export has a sheet "Tickets" (with text and context) and lists the ticket attachments in "Anhänge", and "Ticket-Sperren" lists the sender blocks. The account merge moves
 reporter, assignee, note author and event actor (area `tickets`).
 
 **Search:** source `ticket` behind `ticket.manage`, reuses `TicketService.list`; title
 `T-0040 · <title>`, subtitle the status in the reader's language, url `/tickets/{id}`.
 
 **Conventions & gotchas:**
+- The migration `269d13cd80a8` adds the three message owners of `attachment` and
+  `ticket_sender_block` (idempotent, with a downgrade).
 - The migration `86718c748401_tickets` is idempotent (baseline `create_all` already builds
   the tables) and widens `ck_attachment_draft_xor_application` to three owners.
 - `TicketContext.url` keeps a platform page only: an http(s) URL on the origin of

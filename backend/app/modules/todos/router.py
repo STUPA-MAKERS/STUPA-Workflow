@@ -23,6 +23,7 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request, Response, status
 
 from app.deps import DbSession, Principal, SettingsDep, require_principal
+from app.modules.files.service import FilesService
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.todos import notify_todo_mails
 from app.modules.todos.schemas import (
@@ -37,6 +38,7 @@ from app.modules.todos.schemas import (
     ColumnCreate,
     ColumnOrder,
     ColumnPatch,
+    CommentCreate,
     CommentIn,
     LabelCreate,
     LabelPatch,
@@ -70,9 +72,13 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 Member = Annotated[Principal, Depends(require_principal())]
 
 
-def get_todo_service(session: DbSession) -> TodoService:
-    """Wire the service (a test overrides it)."""
-    return TodoService(session)
+def get_todo_service(session: DbSession, request: Request) -> TodoService:
+    """Wire the service with the object storage (a test overrides it).
+
+    The storage removes the objects of the files of a deleted comment.
+    """
+    storage = getattr(request.app.state, "object_storage", None)
+    return TodoService(session, files=FilesService(session, storage=storage))
 
 
 ServiceDep = Annotated[TodoService, Depends(get_todo_service)]
@@ -521,7 +527,7 @@ async def remove_link(
 )
 async def add_comment(
     card_id: UUID,
-    payload: CommentIn,
+    payload: CommentCreate,
     service: ServiceDep,
     principal: Member,
     background: BackgroundTasks,
@@ -529,8 +535,20 @@ async def add_comment(
     settings: SettingsDep,
     send: MailSenderDep,
 ) -> TodoCommentOut:
-    """Comment on a card; the new mentions get the mail ``todo_mentioned``."""
-    out = await service.add_comment(card_id, payload.body, payload.mentions, principal)
+    """Comment on a card; the new mentions get the mail ``todo_mentioned``.
+
+    ``attachmentIds`` and ``draftToken`` bind the files of the comment; a draft that
+    is missing, expired, foreign or infected gives 422 ``draft_attachments_missing``.
+    """
+    out = await service.add_comment(
+        card_id,
+        payload.body,
+        payload.mentions,
+        principal,
+        attachment_ids=payload.attachment_ids,
+        draft_token=payload.draft_token,
+        pepper=settings.magic_link_secret,
+    )
     _send(service, background, request, settings, send)
     return out
 
@@ -566,6 +584,6 @@ async def edit_comment(
 async def delete_comment(
     card_id: UUID, comment_id: UUID, service: ServiceDep, principal: Member
 ) -> Response:
-    """Delete an own comment (403 ``not_comment_author`` otherwise)."""
+    """Delete an own comment and its files (403 ``not_comment_author`` otherwise)."""
     await service.delete_comment(card_id, comment_id, principal)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

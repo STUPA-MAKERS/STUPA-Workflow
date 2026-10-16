@@ -19,11 +19,14 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Respons
 
 from app.deps import DbSession, Principal, SettingsDep, get_current_principal, require_principal
 from app.modules.admin.site_config_service import active_branding
+from app.modules.files.service import FilesService
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.tickets import notify_ticket_created, notify_ticket_received
 from app.modules.tickets.access import TICKET_MANAGE
 from app.modules.tickets.schemas import (
     NoteBody,
+    NoteCreate,
+    TicketBlockedSender,
     TicketCounts,
     TicketCreate,
     TicketCreated,
@@ -36,6 +39,7 @@ from app.modules.tickets.schemas import (
 )
 from app.modules.tickets.service import (
     AssigneeFilter,
+    SwallowedReport,
     TicketService,
     format_number,
     principal_id_of,
@@ -63,9 +67,17 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 Manager = Annotated[Principal, Depends(require_principal(TICKET_MANAGE))]
 
 
-def get_ticket_service(session: DbSession) -> TicketService:
-    """Wire the service with the to-do hooks (open count, completeTodos, titles)."""
-    return TicketService(session, todos=TicketTodoBridge(session))
+def get_ticket_service(session: DbSession, request: Request) -> TicketService:
+    """Wire the service with the object storage and the to-do hooks.
+
+    The storage removes the objects of the files of a deleted note.
+    """
+    storage = getattr(request.app.state, "object_storage", None)
+    return TicketService(
+        session,
+        files=FilesService(session, storage=storage),
+        todos=TicketTodoBridge(session),
+    )
 
 
 ServiceDep = Annotated[TicketService, Depends(get_ticket_service)]
@@ -134,6 +146,9 @@ async def create_ticket(
     one, ``email`` is required (422). ``attachmentIds`` and ``draftToken`` bind the
     draft uploads of ``POST /apply/attachments``. After the commit the reporter gets
     the confirmation ``ticket_received`` and the team the mail ``ticket_created``.
+
+    A report of a blocked sender gets the same answer with a fresh number, but
+    nothing is stored and no mail goes out.
     """
     reporter_id = await principal_id_of(db, principal.sub) if principal is not None else None
     email = str(payload.email) if payload.email is not None else None
@@ -145,8 +160,9 @@ async def create_ticket(
     ticket = await service.create(
         payload, reporter_id=reporter_id, email=email, pepper=settings.magic_link_secret
     )
-    pool = getattr(request.app.state, "arq_pool", None)
-    background.add_task(send_mails, settings, ticket.id, pool)
+    if not isinstance(ticket, SwallowedReport):
+        pool = getattr(request.app.state, "arq_pool", None)
+        background.add_task(send_mails, settings, ticket.id, pool)
     return TicketCreated(number=format_number(ticket.number))
 
 
@@ -207,6 +223,30 @@ async def ticket_assignees(service: ServiceDep, _principal: Manager) -> list[Per
     return await service.assignees()
 
 
+@router.get(
+    "/tickets/blocked-senders",
+    response_model=list[TicketBlockedSender],
+    responses=_errors(401, 403),
+)
+async def blocked_senders(service: ServiceDep, _principal: Manager) -> list[TicketBlockedSender]:
+    """List the blocked senders, newest first."""
+    return await service.blocked_senders()
+
+
+@router.delete(
+    "/tickets/blocked-senders/{block_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses=_errors(401, 403, 404),
+)
+async def delete_blocked_sender(
+    block_id: UUID, service: ServiceDep, _principal: Manager
+) -> Response:
+    """Lift one block. An unknown block gives 404."""
+    await service.delete_block(block_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/tickets/{ticket_id}", response_model=TicketDetail, responses=_errors(401, 403, 404))
 async def get_ticket(ticket_id: UUID, service: ServiceDep, principal: Manager) -> TicketDetail:
     """The whole ticket: body, context, attachments, notes and events."""
@@ -229,16 +269,49 @@ async def patch_ticket(
 
 
 @router.post(
+    "/tickets/{ticket_id}/block-sender",
+    response_model=TicketDetail,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def block_sender(ticket_id: UUID, service: ServiceDep, principal: Manager) -> TicketDetail:
+    """Block the reporter of the ticket: the account, or the e-mail of a report without one.
+
+    A second block changes nothing. An anonymized ticket gives 409
+    ``ticket_sender_unknown``, the own account or address 422 ``sender_is_self``.
+    """
+    return await service.block_sender(ticket_id, principal)
+
+
+@router.delete(
+    "/tickets/{ticket_id}/block-sender",
+    response_model=TicketDetail,
+    responses=_errors(401, 403, 404, 409),
+)
+async def unblock_sender(ticket_id: UUID, service: ServiceDep, principal: Manager) -> TicketDetail:
+    """Lift the block of the ticket's reporter; without a block nothing changes."""
+    return await service.unblock_sender(ticket_id, principal)
+
+
+@router.post(
     "/tickets/{ticket_id}/notes",
     response_model=TicketNoteOut,
     status_code=status.HTTP_201_CREATED,
     responses=_errors(401, 403, 404, 422),
 )
 async def add_ticket_note(
-    ticket_id: UUID, payload: NoteBody, service: ServiceDep, principal: Manager
+    ticket_id: UUID,
+    payload: NoteCreate,
+    service: ServiceDep,
+    principal: Manager,
+    settings: SettingsDep,
 ) -> TicketNoteOut:
-    """Add an internal note."""
-    return await service.add_note(ticket_id, payload.body, principal)
+    """Add an internal note. ``attachmentIds`` and ``draftToken`` bind its files.
+
+    A draft that is missing, expired, foreign or infected gives 422
+    ``draft_attachments_missing``; files on an anonymized ticket 422
+    ``ticket_anonymized``.
+    """
+    return await service.add_note(ticket_id, payload, principal, pepper=settings.magic_link_secret)
 
 
 @router.patch(
@@ -266,6 +339,6 @@ async def edit_ticket_note(
 async def delete_ticket_note(
     ticket_id: UUID, note_id: UUID, service: ServiceDep, principal: Manager
 ) -> Response:
-    """Delete an own note. Another author gives 403 ``not_note_author``."""
+    """Delete an own note and its files. Another author gives 403 ``not_note_author``."""
     await service.delete_note(ticket_id, note_id, principal)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

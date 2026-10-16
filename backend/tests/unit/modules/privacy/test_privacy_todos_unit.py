@@ -38,8 +38,9 @@ def _quiet(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_the_erasure_removes_the_todo_data(monkeypatch: pytest.MonkeyPatch) -> None:
     erased: list[uuid.UUID] = []
 
-    async def _erase(_s: Any, principal_id: uuid.UUID) -> None:
+    async def _erase(_s: Any, principal_id: uuid.UUID, **kw: Any) -> None:
         erased.append(principal_id)
+        assert kw == {"files": None, "actor": "admin"}
 
     monkeypatch.setattr(privacy_service, "erase_todos", _erase)
     principal = Principal(id=uuid.uuid4(), sub="kc", email="u@x.org", active=True)
@@ -87,7 +88,13 @@ def test_the_workbook_has_the_todo_sheets() -> None:
             {"board": None, "title": None, "column": None, "dueDate": None, "createdAt": None},
         ],
         todo_comments=[
-            {"card": "A", "body": "Hi", "createdAt": _AT, "deletedAt": _AT},
+            {
+                "card": "A",
+                "body": "Hi",
+                "createdAt": _AT,
+                "deletedAt": _AT,
+                "attachments": ["a.pdf", "b.png"],
+            },
             {"card": None, "body": None, "createdAt": None, "deletedAt": None},
         ],
     )
@@ -99,5 +106,5 @@ def test_the_workbook_has_the_todo_sheets() -> None:
     assert not str(cards[1][1]).startswith("=")
     assert cards[2] == [None] * 6
     comments = [[c.value for c in row] for row in book["To-Do-Kommentare"].iter_rows()]
-    assert comments[0] == ["To-Do", "Zeitpunkt", "Gelöscht", "Text"]
-    assert comments[1] == ["A", "2026-06-16 12:00", "2026-06-16 12:00", "Hi"]
+    assert comments[0] == ["To-Do", "Zeitpunkt", "Gelöscht", "Text", "Anhänge"]
+    assert comments[1] == ["A", "2026-06-16 12:00", "2026-06-16 12:00", "Hi", "a.pdf; b.png"]

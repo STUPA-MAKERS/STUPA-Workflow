@@ -10,6 +10,7 @@ from app.modules.todos.service import TodoService
 from tests.unit.modules.todos.fakes import (
     USER,
     FakeAccess,
+    FakeFiles,
     FakeLinks,
     ScriptedSession,
     board,
@@ -34,6 +35,7 @@ def _bridge(session: ScriptedSession, readable: set[uuid.UUID], **kw: Any) -> Ti
         session,  # type: ignore[arg-type]
         access=_Access(readable, **kw),  # type: ignore[arg-type]
         links=FakeLinks(),  # type: ignore[arg-type]
+        files=FakeFiles(),  # type: ignore[arg-type]
     )
     return TicketTodoBridge(session, service)  # type: ignore[arg-type]
 

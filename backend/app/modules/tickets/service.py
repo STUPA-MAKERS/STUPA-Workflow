@@ -12,6 +12,7 @@ card.
 
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from collections.abc import Iterable, Sequence
@@ -20,7 +21,8 @@ from datetime import UTC, datetime
 from typing import Literal, Protocol
 
 from pydantic import JsonValue
-from sqlalchemy import ColumnElement, String, cast, func, or_, select, update
+from sqlalchemy import ColumnElement, String, cast, delete, func, or_, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -29,20 +31,24 @@ from app.modules.applications.models import Application
 from app.modules.applications.service.service_base import _title_of
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
-from app.modules.files.drafts import bind_drafts, check_drafts
+from app.modules.files.drafts import bind_drafts, check_drafts, check_message_drafts
 from app.modules.files.service import FilesService
 from app.modules.livevote.models import Meeting
 from app.modules.tickets.access import TICKET_MANAGE
 from app.modules.tickets.models import (
     CLOSED_STATUSES,
+    TICKET_NUMBER_SEQ,
     TICKET_STATUSES,
     Ticket,
     TicketEvent,
     TicketNote,
+    TicketSenderBlock,
 )
 from app.modules.tickets.schemas import (
     ContextTarget,
+    NoteCreate,
     TicketAttachment,
+    TicketBlockedSender,
     TicketCounts,
     TicketCreate,
     TicketDetail,
@@ -54,7 +60,7 @@ from app.modules.tickets.schemas import (
     TicketReporter,
 )
 from app.search import escape_like
-from app.shared.errors import ForbiddenError, NotFoundError, ValidationProblem
+from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from app.shared.paging import Page
 from app.shared.people import (
     DELETED_PERSON,
@@ -73,6 +79,34 @@ _ROUTE_RE = re.compile(
 )
 
 AssigneeFilter = uuid.UUID | Literal["me", "none"]
+
+logger = logging.getLogger("app.tickets")
+
+#: The problem code of a block on a ticket without a reporter (anonymized).
+SENDER_UNKNOWN = "ticket_sender_unknown"
+#: The problem code of a block of the own account or address.
+SENDER_IS_SELF = "sender_is_self"
+#: The problem code of a note with files on an anonymized ticket.
+TICKET_ANONYMIZED = "ticket_anonymized"
+
+#: What a block targets: an account id or a normalized e-mail address.
+BlockTarget = tuple[Literal["principal"], uuid.UUID] | tuple[Literal["email"], str]
+
+
+def normalize_email(value: str) -> str:
+    """Normalize an address for ``ticket_sender_block.email``: strip and lowercase."""
+    return value.strip().lower()
+
+
+@dataclass(frozen=True, slots=True)
+class SwallowedReport:
+    """The answer to a report of a blocked sender: a number, and no ticket.
+
+    ``id`` is always None, so the router sends no mail.
+    """
+
+    number: int
+    id: None = None
 
 
 def format_number(number: int) -> str:
@@ -148,11 +182,17 @@ class TicketService:
         reporter_id: uuid.UUID | None,
         email: str | None,
         pepper: str,
-    ) -> Ticket:
+    ) -> Ticket | SwallowedReport:
         """Store a report, bind its draft attachments and write the ``created`` event.
 
         ``reporter_id`` is the account of a session, else ``email`` is the address of
         the reporter. The router makes sure that one of them is set.
+
+        A report of a blocked sender (``matching_block``) passes every check of a
+        normal report first, so its errors look the same. It then takes a number from
+        ``ticket_number_seq`` and stores nothing: no ticket, no event, no bind. The
+        result is a ``SwallowedReport`` and the router sends no mail. The drafts stay
+        unbound until the purge.
 
         Raises:
             ValidationProblem: Attachments without a draft token, or a draft that is
@@ -170,6 +210,9 @@ class TicketService:
                 token=payload.draft_token,
                 pepper=pepper,
             )
+        block_id = await self.matching_block(reporter_id=reporter_id, email=email)
+        if block_id is not None:
+            return await self._swallow(block_id)
         ticket = Ticket(
             id=uuid.uuid4(),
             kind=payload.kind,
@@ -209,6 +252,217 @@ class TicketService:
         return await self.session.scalar(
             select(PrincipalRow.email).where(PrincipalRow.id == ticket.reporter_principal_id)
         )
+
+    async def matching_block(
+        self, *, reporter_id: uuid.UUID | None, email: str | None
+    ) -> uuid.UUID | None:
+        """Return the block that a new report meets, else None.
+
+        With an account the block names the account, or the account e-mail. Without
+        one the block names the given e-mail, or an account with that e-mail. Both
+        compares are case-insensitive.
+        """
+        if reporter_id is not None:
+            account_email = (
+                select(func.lower(cast(PrincipalRow.email, String)))
+                .where(PrincipalRow.id == reporter_id)
+                .scalar_subquery()
+            )
+            cond = or_(
+                TicketSenderBlock.principal_id == reporter_id,
+                TicketSenderBlock.email == account_email,
+            )
+        elif email:
+            address = normalize_email(email)
+            cond = or_(
+                TicketSenderBlock.email == address,
+                TicketSenderBlock.principal_id.in_(
+                    select(PrincipalRow.id).where(PrincipalRow.email == address)
+                ),
+            )
+        else:
+            return None
+        return await self.session.scalar(
+            select(TicketSenderBlock.id).where(cond).order_by(TicketSenderBlock.created_at).limit(1)
+        )
+
+    async def _swallow(self, block_id: uuid.UUID) -> SwallowedReport:
+        """Take a number for a blocked report and count the hit; store no ticket.
+
+        The log line names the block, never the address.
+        """
+        number = await self.session.scalar(select(TICKET_NUMBER_SEQ.next_value()))
+        await self.session.execute(
+            update(TicketSenderBlock)
+            .where(TicketSenderBlock.id == block_id)
+            .values(hit_count=TicketSenderBlock.hit_count + 1, last_hit_at=_now())
+        )
+        await self.session.commit()
+        logger.info("report held back by sender block %s", block_id)
+        return SwallowedReport(number=int(number or 0))
+
+    # -- sender blocks ------------------------------------------------------------
+
+    @staticmethod
+    def block_target(ticket: Ticket) -> BlockTarget | None:
+        """Return what a block of this ticket's sender targets.
+
+        An anonymized ticket has no sender any more and gives None.
+        """
+        if ticket.anonymized_at is not None:
+            return None
+        if ticket.reporter_principal_id is not None:
+            return ("principal", ticket.reporter_principal_id)
+        if ticket.reporter_email:
+            return ("email", normalize_email(ticket.reporter_email))
+        return None
+
+    @staticmethod
+    def _target_condition(target: BlockTarget) -> ColumnElement[bool]:
+        if target[0] == "principal":
+            return TicketSenderBlock.principal_id == target[1]
+        return TicketSenderBlock.email == target[1]
+
+    async def _sender_blocked(self, ticket: Ticket) -> bool:
+        target = self.block_target(ticket)
+        if target is None:
+            return False
+        found = await self.session.scalar(
+            select(TicketSenderBlock.id).where(self._target_condition(target))
+        )
+        return found is not None
+
+    def _sender_target(self, ticket: Ticket) -> BlockTarget:
+        target = self.block_target(ticket)
+        if target is None:
+            raise ConflictError("The ticket has no sender any more.", code=SENDER_UNKNOWN)
+        return target
+
+    async def block_sender(self, ticket_id: uuid.UUID, principal: Principal) -> TicketDetail:
+        """Block the sender of a ticket; a second block changes nothing.
+
+        Raises:
+            NotFoundError: No ticket has this id (HTTP 404).
+            ConflictError: The ticket is anonymized (HTTP 409, ``ticket_sender_unknown``).
+            ValidationProblem: The sender is the caller (HTTP 422, ``sender_is_self``).
+        """
+        ticket = await self._get(ticket_id)
+        target = self._sender_target(ticket)
+        me = await principal_id_of(self.session, principal.sub)
+        if target[0] == "principal":
+            is_self = me is not None and target[1] == me
+        else:
+            own = (
+                await self.session.scalar(select(PrincipalRow.email).where(PrincipalRow.id == me))
+                if me is not None
+                else None
+            )
+            is_self = own is not None and normalize_email(own) == target[1]
+        if is_self:
+            raise ValidationProblem(
+                "You cannot block yourself.",
+                code=SENDER_IS_SELF,
+                errors=[{"field": "ticketId", "msg": "the sender is the caller"}],
+            )
+        values: dict[str, object] = {
+            "source_ticket_id": ticket.id,
+            "created_by": me,
+            "principal_id": target[1] if target[0] == "principal" else None,
+            "email": target[1] if target[0] == "email" else None,
+        }
+        await self.session.execute(
+            insert(TicketSenderBlock).values(**values).on_conflict_do_nothing()
+        )
+        await self.session.commit()
+        return await self.detail(ticket.id, principal)
+
+    async def unblock_sender(self, ticket_id: uuid.UUID, principal: Principal) -> TicketDetail:
+        """Lift the block of a ticket's sender; without a block nothing changes.
+
+        Raises:
+            NotFoundError: No ticket has this id (HTTP 404).
+            ConflictError: The ticket is anonymized (HTTP 409, ``ticket_sender_unknown``).
+        """
+        ticket = await self._get(ticket_id)
+        target = self._sender_target(ticket)
+        await self.session.execute(delete(TicketSenderBlock).where(self._target_condition(target)))
+        await self.session.commit()
+        return await self.detail(ticket.id, principal)
+
+    async def blocked_senders(self) -> list[TicketBlockedSender]:
+        """List the blocked senders, newest first."""
+        rows = list(
+            (
+                await self.session.scalars(
+                    select(TicketSenderBlock).order_by(
+                        TicketSenderBlock.created_at.desc(), TicketSenderBlock.id
+                    )
+                )
+            ).all()
+        )
+        people: set[uuid.UUID | None] = set()
+        for row in rows:
+            people.add(row.principal_id)
+            people.add(row.created_by)
+        accounts = await self._load_accounts(people)
+        sources = {r.source_ticket_id for r in rows if r.source_ticket_id is not None}
+        numbers: dict[uuid.UUID, int] = (
+            {
+                tid: int(number)
+                for tid, number in (
+                    await self.session.execute(
+                        select(Ticket.id, Ticket.number).where(Ticket.id.in_(sources))
+                    )
+                ).all()
+            }
+            if sources
+            else {}
+        )
+        out: list[TicketBlockedSender] = []
+        for row in rows:
+            account = accounts.get(row.principal_id) if row.principal_id is not None else None
+            source = numbers.get(row.source_ticket_id) if row.source_ticket_id else None
+            out.append(
+                TicketBlockedSender(
+                    id=row.id,
+                    kind="principal" if row.principal_id is not None else "email",
+                    person=(
+                        _person(accounts, row.principal_id)
+                        if row.principal_id is not None
+                        else None
+                    ),
+                    email=account.email if account is not None else row.email,
+                    blocked_by=(
+                        _person(accounts, row.created_by) if row.created_by is not None else None
+                    ),
+                    blocked_at=row.created_at,
+                    source_ticket=(
+                        TicketRef(id=row.source_ticket_id, number=format_number(source))
+                        if row.source_ticket_id is not None and source is not None
+                        else None
+                    ),
+                    hit_count=row.hit_count,
+                    last_hit_at=row.last_hit_at,
+                )
+            )
+        return out
+
+    async def delete_block(self, block_id: uuid.UUID) -> None:
+        """Lift one block by its id.
+
+        Raises:
+            NotFoundError: No block has this id (HTTP 404).
+        """
+        removed = (
+            await self.session.execute(
+                delete(TicketSenderBlock)
+                .where(TicketSenderBlock.id == block_id)
+                .returning(TicketSenderBlock.id)
+            )
+        ).first()
+        if removed is None:
+            raise NotFoundError(f"block {block_id} not found")
+        await self.session.commit()
 
     # -- reads ------------------------------------------------------------------
 
@@ -339,6 +593,7 @@ class TicketService:
             else None
         )
         item = self._list_item(ticket, accounts)
+        files = await self.files.message_attachments("ticket_note", [n.id for n in notes])
         return TicketDetail(
             **item.model_dump(),
             body=ticket.body,
@@ -354,6 +609,7 @@ class TicketService:
                     at=n.created_at,
                     edited_at=n.edited_at,
                     is_own=me is not None and n.author_id == me,
+                    attachments=files.get(n.id, []),
                 )
                 for n in notes
             ],
@@ -369,6 +625,7 @@ class TicketService:
             ),
             closed_at=ticket.closed_at,
             anonymized_at=ticket.anonymized_at,
+            sender_blocked=await self._sender_blocked(ticket),
         )
 
     async def _readable_cards(
@@ -506,18 +763,43 @@ class TicketService:
         )
 
     async def add_note(
-        self, ticket_id: uuid.UUID, body: str, principal: Principal
+        self, ticket_id: uuid.UUID, payload: NoteCreate, principal: Principal, *, pepper: str
     ) -> TicketNoteOut:
-        """Add an internal note.
+        """Add an internal note and bind its files.
 
         Raises:
             NotFoundError: No ticket has this id, or the caller has no account row
                 (HTTP 404).
+            ValidationProblem: Files on an anonymized ticket (``ticket_anonymized``),
+                files without a draft token, or a draft that is missing, expired,
+                foreign or infected (HTTP 422).
         """
         ticket = await self._get(ticket_id)
         author = await self._require_account(principal)
-        note = TicketNote(id=uuid.uuid4(), ticket_id=ticket.id, author_id=author, body=body)
+        if payload.attachment_ids and ticket.anonymized_at is not None:
+            # The retention ran once and would not see the file again.
+            raise ValidationProblem(
+                "The ticket is anonymized and takes no files.",
+                code=TICKET_ANONYMIZED,
+                errors=[{"field": "attachmentIds", "msg": "ticket is anonymized"}],
+            )
+        token = await check_message_drafts(
+            self.session,
+            attachment_ids=payload.attachment_ids,
+            token=payload.draft_token,
+            pepper=pepper,
+        )
+        note = TicketNote(id=uuid.uuid4(), ticket_id=ticket.id, author_id=author, body=payload.body)
         self.session.add(note)
+        if token is not None:
+            await self.session.flush()
+            await bind_drafts(
+                self.session,
+                attachment_ids=payload.attachment_ids,
+                token=token,
+                pepper=pepper,
+                ticket_note_id=note.id,
+            )
         ticket.updated_at = _now()
         await self.session.commit()
         await self.session.refresh(note)
@@ -526,7 +808,7 @@ class TicketService:
     async def edit_note(
         self, ticket_id: uuid.UUID, note_id: uuid.UUID, body: str, principal: Principal
     ) -> TicketNoteOut:
-        """Change the text of an own note and set ``edited_at``.
+        """Change the text of an own note and set ``edited_at``; the files stay.
 
         Raises:
             NotFoundError: No live note with this id on this ticket (HTTP 404).
@@ -541,7 +823,7 @@ class TicketService:
     async def delete_note(
         self, ticket_id: uuid.UUID, note_id: uuid.UUID, principal: Principal
     ) -> None:
-        """Soft-delete an own note (``deleted_at``); the detail omits it.
+        """Soft-delete an own note (``deleted_at``) and remove its files.
 
         Raises:
             NotFoundError: No live note with this id on this ticket (HTTP 404).
@@ -549,6 +831,7 @@ class TicketService:
         """
         note, _me = await self._own_note(ticket_id, note_id, principal)
         note.deleted_at = _now()
+        await self.files.delete_for_messages("ticket_note", [note.id], actor=principal.sub)
         await self.session.commit()
 
     async def _own_note(
@@ -564,6 +847,7 @@ class TicketService:
 
     async def _note_out(self, note: TicketNote, me: uuid.UUID) -> TicketNoteOut:
         accounts = await self._load_accounts({note.author_id})
+        files = await self.files.message_attachments("ticket_note", [note.id])
         return TicketNoteOut(
             id=note.id,
             author=_person(accounts, note.author_id),
@@ -571,6 +855,7 @@ class TicketService:
             at=note.created_at,
             edited_at=note.edited_at,
             is_own=note.author_id == me,
+            attachments=files.get(note.id, []),
         )
 
     # -- anonymization ----------------------------------------------------------
@@ -578,8 +863,9 @@ class TicketService:
     async def anonymize(self, ticket: Ticket, *, actor: str) -> None:
         """Remove the personal data of a ticket, without a commit.
 
-        The reporter (account and e-mail), the context and the attachments (rows and
-        objects) go; title, body, notes and events stay. The ``created`` event loses its
+        The reporter (account and e-mail), the context and the files of the report and
+        of every note (rows and objects) go; title, body, the note texts and events
+        stay. A sender block from this ticket stays. The ``created`` event loses its
         actor, because that actor is the reporter and the detail would show the name.
         ``anonymized_at`` marks it.
         """
@@ -762,12 +1048,47 @@ def _event_out(
     )
 
 
+async def erase_sender_blocks(
+    session: AsyncSession, *, principal_id: uuid.UUID | None = None, email: str | None = None
+) -> None:
+    """Delete the blocks of an account and of an address, without a commit (erasure)."""
+    conds: list[ColumnElement[bool]] = []
+    if principal_id is not None:
+        conds.append(TicketSenderBlock.principal_id == principal_id)
+    if email:
+        conds.append(TicketSenderBlock.email == normalize_email(email))
+    if conds:
+        await session.execute(delete(TicketSenderBlock).where(or_(*conds)))
+
+
+async def sender_blocks_of(
+    session: AsyncSession, *, principal_id: uuid.UUID | None, email: str
+) -> list[TicketSenderBlock]:
+    """Return the blocks of an account and of an address, oldest first (Auskunft)."""
+    conds: list[ColumnElement[bool]] = [TicketSenderBlock.email == normalize_email(email)]
+    if principal_id is not None:
+        conds.append(TicketSenderBlock.principal_id == principal_id)
+    return list(
+        (
+            await session.scalars(
+                select(TicketSenderBlock)
+                .where(or_(*conds))
+                .order_by(TicketSenderBlock.created_at, TicketSenderBlock.id)
+            )
+        ).all()
+    )
+
+
 __all__ = [
     "TICKET_STATUSES",
     "AssigneeFilter",
+    "SwallowedReport",
     "TicketService",
     "TicketTodoHooks",
+    "erase_sender_blocks",
     "format_number",
+    "normalize_email",
     "principal_id_of",
+    "sender_blocks_of",
     "ticket_managers",
 ]

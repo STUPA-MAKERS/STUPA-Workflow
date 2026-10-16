@@ -1762,3 +1762,64 @@ async def test_patch_moves_a_relative_changed_deadline(
     )
     await ApplicationsService(session).patch(app.id, {"title": "new"}, changed_by="u")  # type: ignore[arg-type]
     assert _FakeFlow.scheduled == [(app, state)]
+
+
+async def test_add_comment_checks_and_binds_its_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.modules.applications.service import comments as comments_mod
+
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    async def _check(_s: object, **kw: Any) -> str:
+        calls.append(("check", kw))
+        return "tok"
+
+    async def _bind(_s: object, **kw: Any) -> None:
+        calls.append(("bind", kw))
+
+    monkeypatch.setattr(comments_mod, "check_message_drafts", _check)
+    monkeypatch.setattr(comments_mod, "bind_drafts", _bind)
+    app = _app()
+    draft = uuid4()
+    session = _Session(get_results=[app], execute_results=[[]])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    out = await svc.add_comment(
+        app.id,
+        author=None,
+        author_kind="applicant",
+        body="",
+        visibility="public",
+        attachment_ids=[draft],
+        draft_token="tok",
+        pepper="p",
+    )
+    assert [k for k, _ in calls] == ["check", "bind"]
+    assert calls[1][1]["comment_id"] == out.id
+    assert calls[1][1]["attachment_ids"] == [draft]
+    assert session.flushed == 1
+    assert out.attachments == []
+
+
+async def test_delete_comment_removes_its_files_first() -> None:
+    app = _app()
+    c = _comment(application_id=app.id)
+    session = _Session(get_results=[app], execute_results=[[c], [], []])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    removed: list[tuple[str, list[UUID], str]] = []
+
+    class _Files:
+        async def delete_for_messages(self, owner: str, ids: list[UUID], *, actor: str) -> int:
+            removed.append((owner, list(ids), actor))
+            assert session.deleted == []
+            return 1
+
+    await svc.delete_comment(
+        app.id,
+        c.id,
+        actor="sub-1",
+        viewer_sub="sub-1",
+        viewer_is_applicant=False,
+        can_manage=False,
+        files=_Files(),  # type: ignore[arg-type]
+    )
+    assert removed == [("comment", [c.id], "sub-1")]
+    assert session.deleted == [c]

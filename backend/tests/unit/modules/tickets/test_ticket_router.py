@@ -27,12 +27,14 @@ from app.modules.tickets.router import (
     get_ticket_service,
 )
 from app.modules.tickets.schemas import (
+    TicketBlockedSender,
     TicketCounts,
     TicketDetail,
     TicketListItem,
     TicketNoteOut,
     TicketReporter,
 )
+from app.modules.tickets.service import SwallowedReport
 from app.settings import load_settings
 from app.shared.errors import ValidationProblem
 from app.shared.paging import Page
@@ -77,10 +79,25 @@ class _Created:
 class _FakeService:
     def __init__(self) -> None:
         self.calls: list[tuple[str, Any]] = []
+        self.swallow = False
 
-    async def create(self, payload: Any, **kw: Any) -> _Created:
+    async def create(self, payload: Any, **kw: Any) -> _Created | SwallowedReport:
         self.calls.append(("create", kw))
-        return _Created()
+        return SwallowedReport(number=43) if self.swallow else _Created()
+
+    async def block_sender(self, ticket_id: uuid.UUID, _p: Principal) -> TicketDetail:
+        self.calls.append(("block", ticket_id))
+        return _detail().model_copy(update={"sender_blocked": True})
+
+    async def unblock_sender(self, ticket_id: uuid.UUID, _p: Principal) -> TicketDetail:
+        self.calls.append(("unblock", ticket_id))
+        return _detail()
+
+    async def blocked_senders(self) -> list[TicketBlockedSender]:
+        return [TicketBlockedSender(id=TID, kind="email", email="a@x", blocked_at=NOW, hit_count=2)]
+
+    async def delete_block(self, block_id: uuid.UUID) -> None:
+        self.calls.append(("delete_block", block_id))
 
     async def list(self, **kw: Any) -> Page[TicketListItem]:
         self.calls.append(("list", kw))
@@ -100,7 +117,8 @@ class _FakeService:
         self.calls.append(("patch", payload))
         return _detail()
 
-    async def add_note(self, *_a: Any) -> TicketNoteOut:
+    async def add_note(self, *a: Any, **kw: Any) -> TicketNoteOut:
+        self.calls.append(("add_note", (a, kw)))
         return _note()
 
     async def edit_note(self, *_a: Any) -> TicketNoteOut:
@@ -168,6 +186,14 @@ def test_an_anonymous_report_answers_the_number_and_mails(env: _Env) -> None:
     assert env.mails.sent == [TID]
 
 
+def test_a_swallowed_report_answers_a_number_and_sends_no_mail(env: _Env) -> None:
+    env.service.swallow = True
+    resp = TestClient(env.app).post("/api/tickets", json={**_REPORT, "email": "a@example.org"})
+    assert resp.status_code == 201
+    assert resp.json() == {"number": "T-0043"}
+    assert env.mails.sent == []
+
+
 def test_an_anonymous_report_without_an_email_is_422(env: _Env) -> None:
     resp = TestClient(env.app).post("/api/tickets", json=_REPORT)
     assert resp.status_code == 422
@@ -215,6 +241,10 @@ def test_a_body_over_the_cap_is_413(env: _Env) -> None:
         ("post", f"/api/tickets/{TID}/notes"),
         ("patch", f"/api/tickets/{TID}/notes/{TID}"),
         ("delete", f"/api/tickets/{TID}/notes/{TID}"),
+        ("post", f"/api/tickets/{TID}/block-sender"),
+        ("delete", f"/api/tickets/{TID}/block-sender"),
+        ("get", "/api/tickets/blocked-senders"),
+        ("delete", f"/api/tickets/blocked-senders/{TID}"),
     ],
 )
 def test_the_work_routes_need_ticket_manage(env: _Env, method: str, path: str) -> None:
@@ -276,6 +306,25 @@ def test_the_work_routes_answer(env: _Env) -> None:
     assert note.status_code == 201
     assert note.json()["isOwn"] is False
     assert client.post(f"/api/tickets/{TID}/notes", json={"body": ""}).status_code == 422
+    files = {"body": "", "attachmentIds": [str(TID)], "draftToken": "tok"}
+    assert client.post(f"/api/tickets/{TID}/notes", json=files).status_code == 201
+    (args, kw) = env.service.calls[-1][1]
+    assert args[1].attachment_ids == [TID]
+    assert args[1].draft_token == "tok"
+    assert kw["pepper"]
+    too_many = {"body": "x", "attachmentIds": [str(uuid.uuid4()) for _ in range(6)]}
+    assert client.post(f"/api/tickets/{TID}/notes", json=too_many).status_code == 422
+    blocked = client.post(f"/api/tickets/{TID}/block-sender")
+    assert blocked.status_code == 200
+    assert blocked.json()["senderBlocked"] is True
+    unblocked = client.delete(f"/api/tickets/{TID}/block-sender")
+    assert unblocked.json()["senderBlocked"] is False
+    listed = client.get("/api/tickets/blocked-senders").json()
+    assert listed[0]["kind"] == "email"
+    assert listed[0]["hitCount"] == 2
+    assert listed[0]["blockedAt"].startswith("2026-10-01")
+    assert client.delete(f"/api/tickets/blocked-senders/{TID}").status_code == 204
+    assert env.service.calls[-1] == ("delete_block", TID)
     assert client.patch(f"/api/tickets/{TID}/notes/{TID}", json={"body": "m"}).status_code == 200
     assert client.delete(f"/api/tickets/{TID}/notes/{TID}").status_code == 204
 
@@ -284,8 +333,16 @@ def test_the_default_wiring() -> None:
     assert get_ticket_mail_sender() is _deliver_ticket_mails
     from app.modules.todos.hooks import TicketTodoBridge
 
-    service = get_ticket_service(object())  # type: ignore[arg-type]
+    storage = object()
+
+    class _Request:
+        class app:  # noqa: N801
+            class state:  # noqa: N801
+                object_storage = storage
+
+    service = get_ticket_service(object(), _Request())  # type: ignore[arg-type]
     assert isinstance(service.todos, TicketTodoBridge)
+    assert service.files.storage is storage
 
 
 async def test_the_mail_sender_sends_both_mails(monkeypatch: pytest.MonkeyPatch) -> None:

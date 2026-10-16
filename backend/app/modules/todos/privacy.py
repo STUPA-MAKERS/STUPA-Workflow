@@ -1,24 +1,28 @@
 """The to-do part of the erasure and of the Auskunft.
 
 ``erase_todos`` removes the assignments of the person and deletes the personal
-board with its cards, because that board holds only the person's own notes. Cards,
-comments and events on the shared boards stay: their author, actor and creator ids
-point to the erased principal, which shows as "Gelöschte Person".
+board with its cards, because that board holds only the person's own notes. The files
+of the comments on that board go first with their objects, because the board cascade
+would leave the objects behind. Cards, comments, their files and events on the shared
+boards stay: their author, actor and creator ids point to the erased principal, which
+shows as "Gelöschte Person".
 
 ``todo_export`` collects the cards that the person created or is assigned to, and
-the person's own comments, for the Auskunft workbook. The description of a card is
-part of it only when the person created the card, because the description is the
-creator's text.
+the person's own comments with the names of their files, for the Auskunft workbook.
+The description of a card is part of it only when the person created the card,
+because the description is the creator's text.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.files.models import Attachment
+from app.modules.files.service import FilesService
 from app.modules.todos.models import (
     TodoAssignee,
     TodoBoard,
@@ -28,8 +32,31 @@ from app.modules.todos.models import (
 )
 
 
-async def erase_todos(session: AsyncSession, principal_id: UUID) -> None:
-    """Remove the assignments and the personal board of the principal."""
+async def erase_todos(
+    session: AsyncSession,
+    principal_id: UUID,
+    *,
+    files: FilesService | None = None,
+    actor: str = "system",
+) -> None:
+    """Remove the assignments and the personal board of the principal.
+
+    The files of the comments on the personal board go first: rows, audit entries and
+    objects (``delete_for_messages``).
+    """
+    comment_ids = list(
+        (
+            await session.scalars(
+                select(TodoComment.id)
+                .join(TodoCard, TodoCard.id == TodoComment.card_id)
+                .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
+                .where(TodoBoard.kind == "personal", TodoBoard.owner_id == principal_id)
+            )
+        ).all()
+    )
+    await (files or FilesService(session)).delete_for_messages(
+        "todo_comment", comment_ids, actor=actor
+    )
     await session.execute(delete(TodoAssignee).where(TodoAssignee.principal_id == principal_id))
     await session.execute(
         delete(TodoBoard).where(TodoBoard.kind == "personal", TodoBoard.owner_id == principal_id)
@@ -76,13 +103,32 @@ async def todo_export(session: AsyncSession, principal_ids: list[UUID]) -> dict[
             .order_by(TodoComment.created_at, TodoComment.id)
         )
     ).all()
+    names = await _file_names([comment.id for comment, _title in comment_rows], session)
     comments = [
         {
             "card": card_title,
             "body": comment.body,
             "createdAt": comment.created_at,
             "deletedAt": comment.deleted_at,
+            "attachments": names.get(comment.id, []),
         }
         for comment, card_title in comment_rows
     ]
     return {"cards": cards, "comments": comments}
+
+
+async def _file_names(ids: list[UUID], session: AsyncSession) -> dict[UUID, list[str]]:
+    """Return the file names of the comments, oldest first."""
+    if not ids:
+        return {}
+    rows = (
+        await session.execute(
+            select(Attachment.todo_comment_id, Attachment.filename)
+            .where(Attachment.todo_comment_id.in_(ids))
+            .order_by(Attachment.created_at, Attachment.id)
+        )
+    ).all()
+    out: dict[UUID, list[str]] = {}
+    for comment_id, filename in rows:
+        out.setdefault(cast(UUID, comment_id), []).append(filename)
+    return out

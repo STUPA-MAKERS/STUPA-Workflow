@@ -16,6 +16,7 @@ from tests.unit.modules.todos.fakes import (
     ME,
     USER,
     FakeAccess,
+    FakeFiles,
     FakeLinks,
     ScriptedSession,
     board,
@@ -40,6 +41,7 @@ def _svc(session: ScriptedSession, **kw: Any) -> TodoService:
         session,  # type: ignore[arg-type]
         access=FakeAccess(**kw),  # type: ignore[arg-type]
         links=FakeLinks(),  # type: ignore[arg-type]
+        files=FakeFiles(),  # type: ignore[arg-type]
     )
 
 

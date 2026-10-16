@@ -631,4 +631,7 @@ def test_the_merge_moves_the_tickets_of_the_source() -> None:
         "Ticket.assignee_id",
         "TicketNote.author_id",
         "TicketEvent.actor_id",
+        "TicketSenderBlock.created_by",
     }
+    # A block of the source moves to the target, unless the target has one.
+    assert merge_mod.TicketSenderBlock.principal_id in merge_mod.COMBINED_COLUMNS

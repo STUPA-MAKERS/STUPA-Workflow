@@ -15,7 +15,7 @@ from app.modules.auth.principal import Applicant
 from app.modules.files.models import Attachment
 from app.modules.files.router import PREVIEW_CSP, get_files_service
 from app.modules.files.schemas import AttachmentOut, SignedUrlOut
-from app.modules.files.service import FilesService
+from app.modules.files.service import AttachmentOwner, FilesService
 from app.settings import load_settings
 from app.shared.errors import ConflictError, NotFoundError
 
@@ -94,13 +94,17 @@ class _FakeService:
         self.deleted = attachment_id
 
     # The attachment of a ticket: ids that start with "11111111".
-    async def is_ticket_attachment(self, attachment_id: UUID) -> bool:
-        return str(attachment_id).startswith("11111111")
+    async def owner_of(self, attachment_id: UUID) -> AttachmentOwner | None:
+        if str(attachment_id).startswith("11111111"):
+            return AttachmentOwner(kind="ticket", id=uuid4())
+        if str(attachment_id).startswith("00000000"):
+            return None
+        return AttachmentOwner(kind="application", id=APP_ID)
 
-    async def ticket_url(self, attachment_id: UUID) -> SignedUrlOut:
+    async def message_url(self, attachment_id: UUID) -> SignedUrlOut:
         return SignedUrlOut(url=f"/api/attachments/{attachment_id}/download", expiresIn=60)
 
-    async def ticket_download_stream(
+    async def message_download_stream(
         self, attachment_id: UUID
     ) -> tuple[AsyncIterator[bytes], str, str, int]:
         async def _iter() -> AsyncIterator[bytes]:

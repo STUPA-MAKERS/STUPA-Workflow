@@ -2,6 +2,9 @@
 
 The author of the comment decides the direction.
 
+A comment with files and no text uses the file names, joined by ", ", as its text
+(``comment_mail_text``). A mail never carries a file or a download link.
+
 A public comment from a principal sends a mail to the applicant address. An
 internal comment deliberately sends nothing. Applicants never see an internal
 comment.
@@ -136,6 +139,13 @@ _APPLICANT_AUTHOR_FALLBACK = {"de": "Antragsteller:in", "en": "Applicant"}
 # Author label of a member comment for an application without a Gremium. It is
 # the same label as the web UI shows.
 _COMMITTEE_AUTHOR_FALLBACK = {"de": "Gremium", "en": "Committee"}
+
+
+def comment_mail_text(body: str, filenames: list[str]) -> str:
+    """Return the text of a comment mail: the body, or the file names without one."""
+    if body.strip() or not filenames:
+        return body
+    return ", ".join(filenames)
 
 
 def _initials(name: str) -> str:

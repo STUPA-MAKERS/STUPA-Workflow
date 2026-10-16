@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import date
 
 from app.modules.todos.merge import fold_personal_board, rewrite_mentions
@@ -10,6 +11,7 @@ from tests.unit.modules.todos.fakes import (
     ME,
     NOW,
     OTHER,
+    FakeFiles,
     Rows,
     ScriptedSession,
     board,
@@ -21,11 +23,21 @@ from tests.unit.modules.todos.fakes import (
 
 
 async def test_erase_todos_drops_the_assignments_and_the_personal_board() -> None:
-    session = ScriptedSession()
-    await erase_todos(session, ME)  # type: ignore[arg-type]
-    first, second = (str(s) for s in session.statements)
+    comment_id = uuid.uuid4()
+    session = ScriptedSession(scalars=[[comment_id]])
+    files = FakeFiles()
+    await erase_todos(session, ME, files=files, actor="admin")  # type: ignore[arg-type]
+    lookup, first, second = (str(s) for s in session.statements)
+    assert "todo_board.kind" in lookup and "todo_comment.id" in lookup
+    assert files.removed == [([comment_id], "admin")]
     assert first.startswith("DELETE FROM todo_assignee")
     assert second.startswith("DELETE FROM todo_board") and "kind" in second
+
+
+async def test_erase_todos_builds_its_own_files_service() -> None:
+    session = ScriptedSession(scalars=[[]])
+    await erase_todos(session, ME)  # type: ignore[arg-type]
+    assert len(session.statements) == 3
 
 
 async def test_todo_export() -> None:
@@ -36,7 +48,11 @@ async def test_todo_export() -> None:
     plain = card(b, col, title="B", description_md="fremd", created_by=OTHER)
     note = comment(due.id, ME, body="Hi", deleted_at=NOW)
     session = ScriptedSession(
-        execute=[[(due, "StuPa", "Offen"), (plain, "StuPa", "Offen")], [(note, "A")]]
+        execute=[
+            [(due, "StuPa", "Offen"), (plain, "StuPa", "Offen")],
+            [(note, "A")],
+            [(note.id, "a.pdf"), (note.id, "b.png")],
+        ]
     )
     out = await todo_export(session, [ME])  # type: ignore[arg-type]
     assert out["cards"][0] == {
@@ -49,7 +65,21 @@ async def test_todo_export() -> None:
     }
     assert out["cards"][1]["dueDate"] is None
     assert out["cards"][1]["description"] is None
-    assert out["comments"] == [{"card": "A", "body": "Hi", "createdAt": NOW, "deletedAt": NOW}]
+    assert out["comments"] == [
+        {
+            "card": "A",
+            "body": "Hi",
+            "createdAt": NOW,
+            "deletedAt": NOW,
+            "attachments": ["a.pdf", "b.png"],
+        }
+    ]
+    assert "attachment.todo_comment_id IN" in str(session.statements[2])
+    # Without comments no file query runs.
+    session = ScriptedSession(execute=[[], []])
+    out = await todo_export(session, [ME])  # type: ignore[arg-type]
+    assert out["comments"] == []
+    assert len(session.statements) == 2
 
 
 async def test_rewrite_mentions_counts_or_applies() -> None:

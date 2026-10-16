@@ -15,6 +15,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 from app.modules.auth.principal import Principal
+from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.todos.access import ReadScope
 from app.modules.todos.links import HIDDEN, LinkRef, Resolved
 from app.modules.todos.models import (
@@ -268,3 +269,22 @@ def comment(card_id: uuid.UUID, author: uuid.UUID = ME, **kw: Any) -> TodoCommen
 
 
 TODAY = date(2026, 10, 1)
+
+
+class FakeFiles:
+    """The files methods of the to-do service: the files of the comments."""
+
+    def __init__(self, messages: dict[uuid.UUID, list[MessageAttachmentOut]] | None = None) -> None:
+        self.messages = messages or {}
+        self.asked: list[list[uuid.UUID]] = []
+        self.removed: list[tuple[list[uuid.UUID], str]] = []
+
+    async def message_attachments(
+        self, _owner: str, ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, list[MessageAttachmentOut]]:
+        self.asked.append(list(ids))
+        return {i: self.messages[i] for i in ids if i in self.messages}
+
+    async def delete_for_messages(self, _owner: str, ids: list[uuid.UUID], *, actor: str) -> int:
+        self.removed.append((list(ids), actor))
+        return len(ids)

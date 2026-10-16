@@ -281,6 +281,13 @@ def test_card_routes(env: _Env) -> None:
     assert comment.status_code == 201
     assert c.patch(f"/api/todos/cards/{CID}/comments/{XID}", json={"body": "c"}).status_code == 200
     assert c.delete(f"/api/todos/cards/{CID}/comments/{XID}").status_code == 204
+    files = {"body": "", "attachmentIds": [str(XID)], "draftToken": "tok"}
+    assert c.post(f"/api/todos/cards/{CID}/comments", json=files).status_code == 201
+    name, _args, kw = next(call for call in reversed(env.service.calls) if call[0] == "add_comment")
+    assert (kw["attachment_ids"], kw["draft_token"]) == ([XID], "tok")
+    assert kw["pepper"]
+    assert c.post(f"/api/todos/cards/{CID}/comments", json={"body": " "}).status_code == 422
+    assert c.patch(f"/api/todos/cards/{CID}/comments/{XID}", json={"body": ""}).status_code == 422
     assert env.sent == []
 
 
@@ -303,7 +310,16 @@ def test_the_writes_with_mails_send_them_after_the_commit(
 
 def test_the_default_wiring() -> None:
     assert get_todo_mail_sender() is _deliver_todo_mails
-    assert isinstance(get_todo_service(object()), TodoService)  # type: ignore[arg-type]
+    storage = object()
+
+    class _Request:
+        class app:  # noqa: N801
+            class state:  # noqa: N801
+                object_storage = storage
+
+    service = get_todo_service(object(), _Request())  # type: ignore[arg-type]
+    assert isinstance(service, TodoService)
+    assert service.files.storage is storage
 
 
 async def test_the_mail_sender(monkeypatch: pytest.MonkeyPatch) -> None:

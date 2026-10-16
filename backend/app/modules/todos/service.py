@@ -33,6 +33,9 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.principal import Principal
+from app.modules.files.drafts import bind_drafts, check_message_drafts
+from app.modules.files.schemas import MessageAttachmentOut
+from app.modules.files.service import FilesService
 from app.modules.tickets.models import TicketEvent
 from app.modules.todos.access import TODO_WRITE, BoardAccess
 from app.modules.todos.boards import ensure_personal_board
@@ -166,8 +169,10 @@ class TodoService:
         *,
         access: BoardAccess | None = None,
         links: LinkResolver | None = None,
+        files: FilesService | None = None,
     ) -> None:
         self.session = session
+        self.files = files or FilesService(session)
         self.access = access or BoardAccess(session)
         self.links = links or LinkResolver(session, self.access)
         self.outbox: list[TodoMail] = []
@@ -841,6 +846,7 @@ class TodoService:
         persons = await person_refs(self.session, people)
         me = await self.access.me(principal)
         own_labels = set(tile.label_ids)
+        files = await self.files.message_attachments("todo_comment", [c.id for c in comments])
         return TodoCardDetail(
             **tile.model_dump(by_alias=False),
             description_md=card.description_md,
@@ -857,7 +863,7 @@ class TodoService:
                 for i in items
             ],
             events=[_event_out(e, persons, resolved) for e in events],
-            comments=[_comment_out(c, persons, me) for c in comments],
+            comments=[_comment_out(c, persons, me, files.get(c.id, [])) for c in comments],
             archived_at=card.archived_at,
         )
 
@@ -1359,12 +1365,26 @@ class TodoService:
         body: str,
         mentions: Sequence[uuid.UUID],
         principal: Principal,
+        *,
+        attachment_ids: Sequence[uuid.UUID] = (),
+        draft_token: str | None = None,
+        pepper: str = "",
     ) -> TodoCommentOut:
-        """Add a comment; new mentions get the mail ``todo_mentioned``."""
+        """Add a comment and bind its files; new mentions get the mail ``todo_mentioned``.
+
+        Raises:
+            NotFoundError: The card is not readable (HTTP 404).
+            ValidationProblem: A mention outside the board, files without a draft
+                token, or a draft that is missing, expired, foreign or infected
+                (HTTP 422).
+        """
         actor = await self._actor(principal)
         card, board = await self._card(card_id, principal)
         wanted = list(dict.fromkeys(mentions))
         await self._check_mentions(board, wanted)
+        token = await check_message_drafts(
+            self.session, attachment_ids=attachment_ids, token=draft_token, pepper=pepper
+        )
         comment = TodoComment(
             id=uuid.uuid4(),
             card_id=card.id,
@@ -1374,6 +1394,15 @@ class TodoService:
             created_at=_now(),
         )
         self.session.add(comment)
+        if token is not None:
+            await self.session.flush()
+            await bind_drafts(
+                self.session,
+                attachment_ids=attachment_ids,
+                token=token,
+                pepper=pepper,
+                todo_comment_id=comment.id,
+            )
         self._touch(board)
         await self.session.commit()
         self._mail("mentioned", card, wanted, actor, _excerpt(body))
@@ -1415,10 +1444,11 @@ class TodoService:
     async def delete_comment(
         self, card_id: uuid.UUID, comment_id: uuid.UUID, principal: Principal
     ) -> None:
-        """Soft-delete an own comment."""
+        """Soft-delete an own comment and remove its files."""
         card, board = await self._card(card_id, principal)
         comment, _me = await self._own_comment(card, comment_id, principal)
         comment.deleted_at = _now()
+        await self.files.delete_for_messages("todo_comment", [comment.id], actor=principal.sub)
         self._touch(board)
         await self.session.commit()
 
@@ -1426,7 +1456,8 @@ class TodoService:
         people: set[uuid.UUID | None] = {comment.author_id}
         people.update(_uuid_of(m) for m in comment.mentions or [])
         persons = await person_refs(self.session, people)
-        return _comment_out(comment, persons, me)
+        files = await self.files.message_attachments("todo_comment", [comment.id])
+        return _comment_out(comment, persons, me, files.get(comment.id, []))
 
     # -- across boards ------------------------------------------------------------
 
@@ -1722,7 +1753,10 @@ def _event_out(
 
 
 def _comment_out(
-    comment: TodoComment, persons: dict[uuid.UUID, PersonRef], me: uuid.UUID | None
+    comment: TodoComment,
+    persons: dict[uuid.UUID, PersonRef],
+    me: uuid.UUID | None,
+    attachments: list[MessageAttachmentOut] | None = None,
 ) -> TodoCommentOut:
     return TodoCommentOut(
         id=comment.id,
@@ -1732,6 +1766,7 @@ def _comment_out(
         at=comment.created_at,
         edited_at=comment.edited_at,
         is_own=me is not None and comment.author_id == me,
+        attachments=attachments or [],
     )
 
 

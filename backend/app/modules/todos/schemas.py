@@ -12,6 +12,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
+from app.modules.files.schemas import MessageAttachmentOut, MessageFilesIn
 from app.shared.people import PersonRef
 
 TodoBoardKind = Literal["gremium", "personal", "team"]
@@ -160,6 +161,7 @@ class TodoCommentOut(_Out):
     at: datetime
     edited_at: datetime | None = Field(default=None, serialization_alias="editedAt")
     is_own: bool = Field(default=False, serialization_alias="isOwn")
+    attachments: list[MessageAttachmentOut] = Field(default_factory=list)
 
 
 class TodoColumnRef(_Out):
@@ -297,5 +299,14 @@ class CheckItemPatch(_In):
 
 
 class CommentIn(_In):
+    """The edit of a comment: text and mentions; the files stay."""
+
     body: str = Field(min_length=1, max_length=10000)
+    mentions: list[UUID] = Field(default_factory=list, max_length=50)
+
+
+class CommentCreate(MessageFilesIn, _In):
+    """A new comment. The body may be empty only with at least one file."""
+
+    body: str = Field(max_length=10000)
     mentions: list[UUID] = Field(default_factory=list, max_length=50)

@@ -67,7 +67,7 @@ from app.modules.notifications.models import (
 )
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.protocol.models import Protocol, ProtocolVoteRef
-from app.modules.tickets.models import Ticket, TicketEvent, TicketNote
+from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.todos.models import (
     TodoAssignee,
     TodoBoard,
@@ -141,6 +141,7 @@ __all__ = [
     "Ticket",
     "TicketEvent",
     "TicketNote",
+    "TicketSenderBlock",
     "TodoAssignee",
     "TodoBoard",
     "TodoCard",

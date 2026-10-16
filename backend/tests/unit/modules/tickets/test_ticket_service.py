@@ -15,11 +15,11 @@ import pytest
 
 from app.modules.applications.models import Application
 from app.modules.auth.principal import Principal
-from app.modules.files.schemas import AttachmentOut
+from app.modules.files.schemas import AttachmentOut, MessageAttachmentOut
 from app.modules.livevote.models import Meeting
 from app.modules.tickets import service as svc_mod
 from app.modules.tickets.models import Ticket, TicketEvent, TicketNote
-from app.modules.tickets.schemas import TicketCreate, TicketPatch
+from app.modules.tickets.schemas import NoteCreate, TicketCreate, TicketPatch
 from app.modules.tickets.service import (
     TicketService,
     format_number,
@@ -117,6 +117,7 @@ async def test_create_with_an_email_reporter() -> None:
     ticket = await _svc(session).create(
         _create(context={"language": "en"}), reporter_id=None, email="a@x.org", pepper="p"
     )
+    assert isinstance(ticket, Ticket)
     assert ticket.title == "T"
     assert ticket.reporter_email == "a@x.org"
     assert ticket.context == {"language": "en"}
@@ -130,6 +131,7 @@ async def test_create_with_an_account_ignores_the_email_and_notes_a_missing_addr
     ticket = await _svc(session).create(
         _create(title="  "), reporter_id=ME, email="ignored@x.org", pepper="p"
     )
+    assert isinstance(ticket, Ticket)
     assert ticket.title == "  "
     assert ticket.reporter_principal_id == ME
     assert ticket.reporter_email is None
@@ -575,15 +577,23 @@ async def test_patch_assigns_unassigns_and_changes_the_kind(no_detail: list[uuid
 # -- notes --------------------------------------------------------------------------
 
 
+def _note_in(**kw: Any) -> NoteCreate:
+    return NoteCreate.model_validate({"body": "hallo", **kw})
+
+
 async def test_add_note() -> None:
     ticket = _ticket()
     session = ScriptedSession(scalar=[ME], execute=[[(ME, "Ada", None)]])
     session.put(ticket)
-    out = await _svc(session).add_note(ticket.id, "hallo", VIEWER)
+    files = FakeFiles()
+    out = await _svc(session, files=files).add_note(ticket.id, _note_in(), VIEWER, pepper="p")
     assert out.body == "hallo"
     assert out.is_own is True
     assert out.author.display_name == "Ada"
+    assert out.attachments == []
     assert session.committed == 1
+    assert session.flushed == 0
+    assert files.asked == [("ticket_note", [out.id])]
 
 
 async def test_add_note_needs_an_account_row() -> None:
@@ -591,7 +601,72 @@ async def test_add_note_needs_an_account_row() -> None:
     session = ScriptedSession(scalar=[None])
     session.put(ticket)
     with pytest.raises(NotFoundError):
-        await _svc(session).add_note(ticket.id, "x", VIEWER)
+        await _svc(session).add_note(ticket.id, _note_in(), VIEWER, pepper="p")
+
+
+async def test_add_note_checks_and_binds_its_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    async def _check(_s: object, **kw: Any) -> str:
+        calls.append(("check", kw))
+        return "tok"
+
+    async def _bind(_s: object, **kw: Any) -> None:
+        calls.append(("bind", kw))
+
+    monkeypatch.setattr(svc_mod, "check_message_drafts", _check)
+    monkeypatch.setattr(svc_mod, "bind_drafts", _bind)
+    ticket = _ticket()
+    draft = uuid.uuid4()
+    session = ScriptedSession(scalar=[ME], execute=[[(ME, "Ada", None)]])
+    session.put(ticket)
+    files = FakeFiles(
+        messages={},
+    )
+    out = await _svc(session, files=files).add_note(
+        ticket.id,
+        _note_in(body="", attachmentIds=[str(draft)], draftToken="tok"),
+        VIEWER,
+        pepper="p",
+    )
+    assert [c[0] for c in calls] == ["check", "bind"]
+    assert calls[1][1]["ticket_note_id"] == out.id
+    assert calls[1][1]["attachment_ids"] == [draft]
+    assert session.flushed == 1
+
+
+async def test_add_note_with_files_on_an_anonymized_ticket_is_422() -> None:
+    ticket = _ticket(anonymized_at=NOW, reporter_email=None)
+    session = ScriptedSession(scalar=[ME])
+    session.put(ticket)
+    with pytest.raises(ValidationProblem) as exc:
+        await _svc(session).add_note(
+            ticket.id,
+            _note_in(attachmentIds=[str(uuid.uuid4())], draftToken="t"),
+            VIEWER,
+            pepper="p",
+        )
+    assert exc.value.code == "ticket_anonymized"
+
+
+async def test_add_note_without_files_on_an_anonymized_ticket_passes() -> None:
+    ticket = _ticket(anonymized_at=NOW, reporter_email=None)
+    session = ScriptedSession(scalar=[ME], execute=[[(ME, "Ada", None)]])
+    session.put(ticket)
+    out = await _svc(session).add_note(ticket.id, _note_in(), VIEWER, pepper="p")
+    assert out.body == "hallo"
+
+
+def test_a_note_needs_a_text_or_a_file() -> None:
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        NoteCreate.model_validate({"body": "  "})
+    assert NoteCreate.model_validate({"body": "", "attachmentIds": [str(uuid.uuid4())]}).body == ""
+    with pytest.raises(ValidationError):
+        NoteCreate.model_validate(
+            {"body": "x", "attachmentIds": [str(uuid.uuid4()) for _ in range(6)]}
+        )
 
 
 def _note(ticket: Ticket, author: uuid.UUID, **kw: Any) -> TicketNote:
@@ -605,12 +680,18 @@ async def test_edit_and_delete_an_own_note() -> None:
     note = _note(ticket, ME)
     session = ScriptedSession(scalar=[ME, ME], execute=[[(ME, "Ada", None)]])
     session.put(ticket, note)
-    service = _svc(session)
+    shot = MessageAttachmentOut(
+        id=uuid.uuid4(), filename="a.png", mime="image/png", size=3, scan_state="clean"
+    )
+    files = FakeFiles(messages={note.id: [shot]})
+    service = _svc(session, files=files)
     out = await service.edit_note(ticket.id, note.id, "neu", VIEWER)
     assert out.body == "neu"
     assert out.edited_at is not None
+    assert out.attachments == [shot]
     await service.delete_note(ticket.id, note.id, VIEWER)
     assert note.deleted_at is not None
+    assert files.removed == [("ticket_note", [note.id], VIEWER.sub)]
 
 
 async def test_a_foreign_note_is_403() -> None:

@@ -14,8 +14,9 @@ The flow has four steps:
    and of ALL its drafts to now + ``attachment_draft_ttl_days``. One token holds at
    most ``attachment_draft_max_files`` files and ``attachment_draft_max_bytes`` bytes.
 3. ``DELETE /apply/attachments/{id}`` with the token: ``delete`` removes one draft.
-4. ``POST /applications`` (or ``POST /tickets``) with ``attachmentIds`` and
-   ``draftToken``: ``bind_drafts`` binds the files in the transaction of the create.
+4. ``POST /applications``, ``POST /tickets`` or the send of a chat message with
+   ``attachmentIds`` and ``draftToken``: ``bind_drafts`` binds the files in the
+   transaction of the create (``check_message_drafts`` checks a message first).
 
 The token lives on its own in ``attachment_draft_token``. It stays valid until its
 end, also when the owner deletes the last draft. The hourly cron
@@ -311,18 +312,30 @@ async def bind_drafts(
     pepper: str,
     application_id: uuid.UUID | None = None,
     ticket_id: uuid.UUID | None = None,
+    ticket_note_id: uuid.UUID | None = None,
+    todo_comment_id: uuid.UUID | None = None,
+    comment_id: uuid.UUID | None = None,
 ) -> None:
-    """Bind the listed drafts of a token to a new application or ticket, without a commit.
+    """Bind the listed drafts of a token to their new owner, without a commit.
 
-    The caller runs this in the transaction of the create, after ``check_drafts``.
-    The method sets ``application_id`` or ``ticket_id`` (exactly one) and clears both
-    draft columns. The storage key stays.
+    The owner is an application, a ticket or a chat message (ticket note, to-do
+    comment, application comment); exactly one is given. The caller runs this in the
+    transaction of the create, after ``check_drafts``. The method sets the owner
+    column and clears both draft columns. The storage key stays.
 
     Raises:
-        ValueError: Not exactly one of ``application_id`` and ``ticket_id`` is given.
+        ValueError: Not exactly one owner is given.
     """
-    if (application_id is None) == (ticket_id is None):
-        raise ValueError("bind_drafts needs exactly one of application_id and ticket_id")
+    owners = {
+        "application_id": application_id,
+        "ticket_id": ticket_id,
+        "ticket_note_id": ticket_note_id,
+        "todo_comment_id": todo_comment_id,
+        "comment_id": comment_id,
+    }
+    given = {key: value for key, value in owners.items() if value is not None}
+    if len(given) != 1:
+        raise ValueError("bind_drafts needs exactly one owner")
     if not attachment_ids:
         return
     await session.execute(
@@ -331,16 +344,45 @@ async def bind_drafts(
             Attachment.id.in_(list(attachment_ids)),
             Attachment.application_id.is_(None),
             Attachment.ticket_id.is_(None),
+            Attachment.ticket_note_id.is_(None),
+            Attachment.todo_comment_id.is_(None),
+            Attachment.comment_id.is_(None),
             Attachment.draft_token_hash == hash_draft_token(token, pepper),
         )
-        .values(
-            application_id=application_id,
-            ticket_id=ticket_id,
-            draft_token_hash=None,
-            draft_expires_at=None,
-        )
+        .values(**given, draft_token_hash=None, draft_expires_at=None)
         .execution_options(synchronize_session=False)
     )
+
+
+async def check_message_drafts(
+    session: AsyncSession,
+    *,
+    attachment_ids: Sequence[uuid.UUID],
+    token: str | None,
+    pepper: str,
+) -> str | None:
+    """Check the files of a chat message before its insert.
+
+    Without ``attachment_ids`` nothing is checked and the result is None. With them,
+    a missing token gives 422 (``draftToken``), and ``check_drafts`` locks and checks
+    every listed draft.
+
+    Returns:
+        The token to pass to ``bind_drafts``, or None when the message has no files.
+
+    Raises:
+        ValidationProblem: ``attachmentIds`` without ``draftToken``, or a draft that is
+            missing, expired, foreign or infected (HTTP 422).
+    """
+    if not attachment_ids:
+        return None
+    if not token:
+        raise ValidationProblem(
+            "Attachments need the draft token of their upload.",
+            errors=[{"field": "draftToken", "msg": "required with attachmentIds"}],
+        )
+    await check_drafts(session, attachment_ids=attachment_ids, token=token, pepper=pepper)
+    return token
 
 
 async def check_drafts(

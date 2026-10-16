@@ -13,7 +13,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, JsonValue, field_validator
 
-from app.modules.files.schemas import AttachmentOut
+from app.modules.files.schemas import AttachmentOut, MessageAttachmentOut, MessageFilesIn
 from app.settings import get_settings
 from app.shared.altcha import AltchaSolutionStr
 from app.shared.people import PersonRef
@@ -159,6 +159,7 @@ class TicketNoteOut(_CamelModel):
     at: datetime
     edited_at: datetime | None = Field(default=None, serialization_alias="editedAt")
     is_own: bool = Field(default=False, serialization_alias="isOwn")
+    attachments: list[MessageAttachmentOut] = Field(default_factory=list)
 
 
 class TicketRef(_CamelModel):
@@ -185,6 +186,7 @@ class TicketDetail(TicketListItem):
     open_todo_count: int = Field(default=0, serialization_alias="openTodoCount")
     closed_at: datetime | None = Field(default=None, serialization_alias="closedAt")
     anonymized_at: datetime | None = Field(default=None, serialization_alias="anonymizedAt")
+    sender_blocked: bool = Field(default=False, serialization_alias="senderBlocked")
 
 
 class TicketPatch(_CamelIn):
@@ -198,7 +200,29 @@ class TicketPatch(_CamelIn):
 
 
 class NoteBody(_CamelIn):
+    """The edit of a note: the text only."""
+
     body: str = Field(min_length=1, max_length=10000)
+
+
+class NoteCreate(MessageFilesIn, _CamelIn):
+    """A new note. The body may be empty only with at least one file."""
+
+    body: str = Field(max_length=10000)
+
+
+class TicketBlockedSender(_CamelModel):
+    """One blocked sender. ``email`` is the stored address, or the account e-mail."""
+
+    id: UUID
+    kind: Literal["principal", "email"]
+    person: PersonRef | None = None
+    email: str | None = None
+    blocked_by: PersonRef | None = Field(default=None, serialization_alias="blockedBy")
+    blocked_at: datetime = Field(serialization_alias="blockedAt")
+    source_ticket: TicketRef | None = Field(default=None, serialization_alias="sourceTicket")
+    hit_count: int = Field(default=0, serialization_alias="hitCount")
+    last_hit_at: datetime | None = Field(default=None, serialization_alias="lastHitAt")
 
 
 class TicketCounts(_CamelModel):

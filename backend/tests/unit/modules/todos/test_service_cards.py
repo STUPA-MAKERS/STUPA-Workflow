@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.tickets.models import TicketEvent
 from app.modules.todos import service as svc_mod
 from app.modules.todos.lexorank import MAX_LENGTH
@@ -30,6 +31,7 @@ from tests.unit.modules.todos.fakes import (
     OTHER,
     USER,
     FakeAccess,
+    FakeFiles,
     FakeLinks,
     ScriptedSession,
     board,
@@ -51,6 +53,7 @@ def _svc(session: ScriptedSession, links: FakeLinks | None = None, **kw: Any) ->
         session,  # type: ignore[arg-type]
         access=FakeAccess(**kw),  # type: ignore[arg-type]
         links=links or FakeLinks(),  # type: ignore[arg-type]
+        files=FakeFiles(),  # type: ignore[arg-type]
     )
 
 
@@ -123,6 +126,9 @@ async def test_card_detail_resolves_people_links_events_and_comments(
     ]
     mine = comment(c.id, ME, mentions=[str(OTHER), "kaputt"])
     theirs = comment(c.id, OTHER)
+    shot = MessageAttachmentOut(
+        id=uuid.uuid4(), filename="a.png", mime="image/png", size=3, scan_state="scanning"
+    )
     session = ScriptedSession(
         execute=[[(c.id, lab.id)], [(c.id, OTHER)], [(c.id, 1, 1)], [(c.id, 2)]],
         scalars=[
@@ -136,7 +142,10 @@ async def test_card_detail_resolves_people_links_events_and_comments(
     )
     session.put(b, c)
     resolved = {("application", APP): Resolved(True, "Antrag", f"/applications/{APP}")}
-    out = await _svc(session, FakeLinks(resolved=resolved)).card(c.id, USER)
+    service = _svc(session, FakeLinks(resolved=resolved))
+    service.files = FakeFiles({theirs.id: [shot]})  # type: ignore[assignment]
+    out = await service.card(c.id, USER)
+    assert [cm.attachments for cm in out.comments] == [[], [shot]]
     assert out.board_name == "StuPa" and out.description_md == "**x**"
     assert [x.name for x in out.labels] == ["Wichtig"]
     assert [x.name for x in out.board_labels] == ["Wichtig", "Später"]
@@ -580,6 +589,46 @@ async def test_comments(people: dict[uuid.UUID, PersonRef]) -> None:
     service.access._me = None  # type: ignore[attr-defined]
     with pytest.raises(ForbiddenError):
         await service.edit_comment(c.id, foreign.id, "x", [], USER)
+
+
+async def test_comment_files_bind_list_and_go_with_the_comment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    async def _check(_s: object, **kw: Any) -> str | None:
+        calls.append(("check", kw))
+        return "tok" if kw["attachment_ids"] else None
+
+    async def _bind(_s: object, **kw: Any) -> None:
+        calls.append(("bind", kw))
+
+    monkeypatch.setattr(svc_mod, "check_message_drafts", _check)
+    monkeypatch.setattr(svc_mod, "bind_drafts", _bind)
+    session, _b, _col, c, service = _setup()
+    files = FakeFiles()
+    service.files = files  # type: ignore[assignment]
+    draft = uuid.uuid4()
+    out = await service.add_comment(
+        c.id, "", [], USER, attachment_ids=[draft], draft_token="tok", pepper="p"
+    )
+    assert [k for k, _ in calls] == ["check", "bind"]
+    assert calls[1][1]["todo_comment_id"] == out.id
+    assert calls[1][1]["attachment_ids"] == [draft]
+    assert session.flushed == 1
+    shot = MessageAttachmentOut(
+        id=draft, filename="a.png", mime="image/png", size=3, scan_state="clean"
+    )
+    files.messages[out.id] = [shot]
+    (row,) = [o for o in session.added if isinstance(o, TodoComment)]
+    edited = await service.edit_comment(c.id, row.id, "jetzt mit Text", [], USER)
+    assert edited.attachments == [shot]
+    await service.delete_comment(c.id, row.id, USER)
+    assert files.removed == [([row.id], USER.sub)]
+    # Without files nothing is bound.
+    calls.clear()
+    await service.add_comment(c.id, "x", [], USER)
+    assert [k for k, _ in calls] == ["check"]
 
 
 def test_mail_skips_the_actor_only() -> None:

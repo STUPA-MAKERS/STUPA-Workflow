@@ -68,7 +68,10 @@ included), `GET /link-targets`, `GET /linked?kind&targetId`, `POST /cards`, `GET
 /cards/{id}/move` (`afterId`/`beforeId`, 422 `rank_neighbors_invalid`), `DELETE
 /cards/{id}` (archive), `POST /cards/{id}/restore`, assignees, labels, checklist, links
 (422 `link_self`, `link_target_not_found`; 409 `link_exists`), comments (403
-`not_comment_author`).
+`not_comment_author`). `POST /cards/{id}/comments` takes `CommentCreate` (`body`,
+`mentions`, `attachmentIds` ≤ 5, `draftToken`); the files bind with `todo_comment_id`,
+`TodoCommentOut.attachments` lists them, and a reader of the board downloads them through
+`/api/attachments/{id}/download` (be-files); the delete of a comment removes its files.
 
 **Data rules:**
 - Create, move, `complete`, the done-flag move and column delete lock the board row; move
@@ -126,9 +129,10 @@ assignment or an identical mention would otherwise be dropped.
 **Crons:** `archive_done_todos` 03:50: done cards whose `completed_at` is older than the
 board's `archive_after_days`, event `archived` without actor.
 
-**Privacy and merge:** the erasure deletes the assignments and the personal board; cards,
+**Privacy and merge:** the erasure deletes the comment files of the personal board (rows,
+objects, audit), the assignments and the personal board; cards,
 comments and events on shared boards keep the id and show "Gelöschte Person". The Art. 15
-export has the sheets "To-Dos" and "To-Do-Kommentare". The merge (area `todos`) rewrites
+export has the sheets "To-Dos" and "To-Do-Kommentare" (with the file names in "Anhänge"). The merge (area `todos`) rewrites
 creator, author, actor, link creator and the mentions, combines assignments, and moves the
 personal board or folds it into the target's board.
 

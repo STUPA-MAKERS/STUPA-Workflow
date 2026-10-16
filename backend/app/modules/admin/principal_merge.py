@@ -125,7 +125,7 @@ from app.modules.livevote.models import (
 from app.modules.notifications.models import NotificationPreference
 from app.modules.privacy.models import ErasureRequest
 from app.modules.protocol.models import Protocol
-from app.modules.tickets.models import Ticket, TicketEvent, TicketNote
+from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
 from app.modules.todos.merge import fold_personal_board, rewrite_mentions
 from app.modules.todos.models import (
     TodoAssignee,
@@ -226,6 +226,7 @@ ID_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("tickets", Ticket.assignee_id),
     ("tickets", TicketNote.author_id),
     ("tickets", TicketEvent.actor_id),
+    ("tickets", TicketSenderBlock.created_by),
     ("todos", TodoCard.created_by),
     ("todos", TodoComment.author_id),
     ("todos", TodoEvent.actor_id),
@@ -251,6 +252,7 @@ COMBINED_COLUMNS: tuple[InstrumentedAttribute[Any], ...] = (
     DelegationSubstitute.member_principal_id,
     DelegationSubstitute.substitute_principal_id,
     TodoAssignee.principal_id,
+    TicketSenderBlock.principal_id,
 )
 
 # The principal columns that the merge leaves alone on purpose, with the reason. A guard
@@ -769,6 +771,17 @@ class PrincipalMergeService:
             old,
             new,
             exists().where(ta.principal_id == new, ta.card_id == TodoAssignee.card_id),
+            tally,
+            apply=apply,
+        )
+        # Sender blocks: a block of the target already holds the account.
+        tsb = aliased(TicketSenderBlock)
+        await self._combine(
+            "tickets",
+            TicketSenderBlock.principal_id,
+            old,
+            new,
+            exists().where(tsb.principal_id == new),
             tally,
             apply=apply,
         )
