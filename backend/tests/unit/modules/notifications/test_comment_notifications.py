@@ -60,12 +60,14 @@ def _app_row(
 async def test_principal_public_comment_mails_applicant() -> None:
     # scalars: one preference filter query with no opt-outs.
     session = cast(AsyncSession, FakeSession(executes=[_app_row()], scalars=[[]]))
+    app_id = uuid.uuid4()
+    comment_id = uuid.uuid4()
     sent = await send_comment_notifications(
         session,
         queue=FakeQueue(),
         settings=SETTINGS,
-        application_id=uuid.uuid4(),
-        comment_id=uuid.uuid4(),
+        application_id=app_id,
+        comment_id=comment_id,
         author_kind="principal",
         visibility="public",
         body="Bitte Angebot nachreichen.",
@@ -78,9 +80,11 @@ async def test_principal_public_comment_mails_applicant() -> None:
     assert "Beamer" in msg.subject
     assert "Bitte Angebot nachreichen." in msg.text
     assert msg.html == "<html>comment</html>"
-    # An applicant with an account opens the application.
-    assert "Antrag öffnen: " in msg.text
-    assert "/applications/" in msg.text
+    # An applicant with an account opens the application at the comment.
+    base = SETTINGS.public_base_url.rstrip("/")
+    assert (
+        f"Antrag öffnen: {base}/applications/{app_id}#comment-{comment_id}" in msg.text
+    )
 
 
 async def test_principal_comment_links_a_guest_to_the_applicant_page() -> None:
@@ -103,7 +107,10 @@ async def test_principal_comment_links_a_guest_to_the_applicant_page() -> None:
     svc = _FakeService.last
     assert svc is not None
     base = SETTINGS.public_base_url.rstrip("/")
-    assert f"Antrag öffnen: {base}/antrag/{app_id}" in svc.enqueued[0].text
+    text = svc.enqueued[0].text
+    assert f"Antrag öffnen: {base}/antrag/{app_id}" in text
+    # The guest page takes no comment fragment.
+    assert "#comment" not in text
 
 
 async def test_principal_public_comment_uses_the_application_language() -> None:
@@ -158,13 +165,19 @@ async def test_applicant_comment_mails_actionable_team(
         return ["team@x.de", "vorstand@x.de"]
 
     monkeypatch.setattr(mod, "actionable_principal_emails", fake_actionable)
-    session = cast(AsyncSession, FakeSession(executes=[_app_row()], scalars=[[]]))
+    # A guest application: the team still opens the application, at the comment.
+    session = cast(
+        AsyncSession,
+        FakeSession(executes=[_app_row(created_by=None)], scalars=[[]]),
+    )
+    app_id = uuid.uuid4()
+    comment_id = uuid.uuid4()
     sent = await send_comment_notifications(
         session,
         queue=FakeQueue(),
         settings=SETTINGS,
-        application_id=uuid.uuid4(),
-        comment_id=uuid.uuid4(),
+        application_id=app_id,
+        comment_id=comment_id,
         author_kind="applicant",
         visibility="public",
         body="Wann wird entschieden?",
@@ -176,6 +189,10 @@ async def test_applicant_comment_mails_actionable_team(
     assert msg.to == ("team@x.de", "vorstand@x.de")
     assert "Beamer" in msg.subject
     assert "Wann wird entschieden?" in msg.text
+    base = SETTINGS.public_base_url.rstrip("/")
+    assert (
+        f"Antrag öffnen: {base}/applications/{app_id}#comment-{comment_id}" in msg.text
+    )
 
 
 async def test_preference_optout_blocks_comment_mail() -> None:

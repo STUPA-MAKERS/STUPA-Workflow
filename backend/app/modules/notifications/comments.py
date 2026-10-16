@@ -229,11 +229,13 @@ async def send_comment_notifications(
         author_label = fallback.get(lang, fallback["de"])
 
     # The applicant opens their own view: a guest (no account) the public applicant
-    # page, an account the application. The team opens the application.
+    # page, an account the application. The team opens the application. The link to
+    # the application opens the comments at this comment.
     link = application_link(
         settings,
         application_id,
         guest=author_kind == "principal" and created_by is None,
+        comment_id=comment_id,
     )
     context = {
         "link": link.url,

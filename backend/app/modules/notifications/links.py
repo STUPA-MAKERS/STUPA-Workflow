@@ -15,6 +15,10 @@ The link of an application depends on the reader:
   the cookie it asks the reader to open the link of the confirmation mail again. The
   mail never mints a new magic-link token, because a token in every status mail would
   multiply the access tokens of the application.
+
+A comment mail to a reader of ``/applications/{id}`` ends its link with
+``#comment-{comment id}``. The page then opens the comments and scrolls to that
+comment. The link of a guest has no fragment.
 """
 
 from __future__ import annotations
@@ -57,14 +61,25 @@ def _base(settings: Settings) -> str:
 
 
 def application_link(
-    settings: Settings, application_id: UUID | str, *, guest: bool = False
+    settings: Settings,
+    application_id: UUID | str,
+    *,
+    guest: bool = False,
+    comment_id: UUID | str | None = None,
 ) -> MailLink:
     """Return the link to an application.
 
     ``guest`` selects the public applicant page for an applicant without an account.
+    ``comment_id`` adds the fragment ``#comment-{id}`` to the link of
+    ``/applications/{id}``, which opens the comments at that comment. The link of a
+    guest stays without a fragment.
     """
-    path = "antrag" if guest else "applications"
-    return MailLink(f"{_base(settings)}/{path}/{application_id}", "application")
+    if guest:
+        return MailLink(f"{_base(settings)}/antrag/{application_id}", "application")
+    url = f"{_base(settings)}/applications/{application_id}"
+    if comment_id is not None:
+        url += f"#comment-{comment_id}"
+    return MailLink(url, "application")
 
 
 def task_link(settings: Settings, application_id: UUID | str) -> MailLink:
