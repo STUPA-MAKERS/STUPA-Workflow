@@ -384,22 +384,3 @@ td:first-child > .skel--bar {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-
-// A view switch in a page header (`app-segmented` of the ui-kit with `size="control"`,
-// for example "Board | Liste") keeps the room of the check mark on both sides of the
-// content of every segment. The switch then has the same width whichever segment is
-// chosen, and the label does not move when the check appears. Without the room, `equal`
-// sizes all segments to the widest content, and that content includes the check of the
-// chosen segment, so the switch changed its width on every switch, and the buttons
-// beside it moved. Only the header switches take the room, because the room makes each
-// segment wider, and a control with three segments in a phone dialog has no width to
-// spare. Remove this rule when the segments of the ui-kit reserve the room themselves.
-app-segmented.seg-host--control:not(.seg-host--fill) .seg:has(.seg__check) .seg__opt {
-  padding-inline: var(--space-3);
-}
-app-segmented.seg-host--control:not(.seg-host--fill) .seg:has(.seg__check) .seg__opt:not(.seg__opt--on)::before,
-app-segmented.seg-host--control:not(.seg-host--fill) .seg:has(.seg__check) .seg__opt::after {
-  content: '';
-  flex: none;
-  width: 14px; // the width of `.seg__check`
-}

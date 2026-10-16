@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use '../../shared/ui/view-switch' as vs;
 
 :host {
   display: flex;
@@ -72,6 +73,11 @@
 }
 .td__reset:focus-visible {
   outline: 2px solid var(--color-focus-ring);
+}
+
+/* The view switch "Board | Liste" keeps one width in both views (`_view-switch.scss`). */
+app-segmented {
+  @include vs.keep-width;
 }
 
 /* The places of the header buttons and of the filter chips while the board loads. */
