@@ -1,3 +1,4 @@
+import { CdkScrollable } from '@angular/cdk/scrolling';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -69,6 +70,7 @@ import { mediaQuerySignal } from '../../layout/media-query';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { TodoArchiveSheetComponent } from './archive-sheet/todo-archive-sheet.component';
 import { TodoBoardPickerComponent } from './board-picker/todo-board-picker.component';
+import { TodoBoardRowsComponent } from './board-rows/todo-board-rows.component';
 import { TodoBoardSettingsComponent } from './board-settings/todo-board-settings.component';
 import { TodoBoardSkeletonComponent } from './board-skeleton/todo-board-skeleton.component';
 import { TodoBoardViewComponent, type BoardMove } from './board-view/todo-board-view.component';
@@ -106,6 +108,7 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    CdkScrollable,
     TranslatePipe,
     ButtonComponent,
     EmptyStateComponent,
@@ -119,6 +122,7 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
     ScrollFadeDirective,
     TodoArchiveSheetComponent,
     TodoBoardPickerComponent,
+    TodoBoardRowsComponent,
     TodoBoardSkeletonComponent,
     TodoBoardSettingsComponent,
     TodoBoardViewComponent,
@@ -187,6 +191,11 @@ export class TodosComponent implements OnDestroy {
   readonly today = signal(isoDay(new Date()));
 
   private readonly drawer = viewChild<ElementRef<HTMLElement>>('drawer');
+  /** The rows of the other boards under "Meine To-Dos" (board view only). */
+  private readonly rowsView = viewChild(TodoBoardRowsComponent);
+  /** The cards the rows show after the filters. */
+  readonly rowMatches = signal(0);
+  readonly withRows = computed(() => this.board()?.kind === 'personal' && this.view() === 'board');
   private focusedFor: Uuid | null = null;
 
   readonly viewOptions = computed<SegmentedOption[]>(() => [
@@ -231,6 +240,7 @@ export class TodosComponent implements OnDestroy {
   readonly filtered = computed(() => filterActive(this.filter()));
   readonly noMatch = computed(() => {
     if (!this.filtered()) return false;
+    if (this.withRows() && this.rowMatches() > 0) return false;
     for (const list of this.visible().values()) if (list.length) return false;
     return true;
   });
@@ -388,6 +398,7 @@ export class TodosComponent implements OnDestroy {
   poll(): void {
     const board = this.board();
     if (!board) return;
+    this.rowsView()?.poll();
     const seq = this.loadSeq;
     const muts = this.mutations;
     this.today.set(isoDay(new Date()));
@@ -593,6 +604,7 @@ export class TodosComponent implements OnDestroy {
   }
 
   onCardChanged(card: TodoCardDetail): void {
+    this.rowsView()?.cardChanged(card);
     const board = this.board();
     if (!board || card.boardId !== board.id) return;
     this.mutations++;
@@ -609,6 +621,7 @@ export class TodosComponent implements OnDestroy {
 
   /** Merge only the comment count: the drawer's copy of the rest of the card can be stale. */
   onCommentsChanged(event: { id: Uuid; commentCount: number }): void {
+    this.rowsView()?.commentsChanged(event);
     const board = this.board();
     if (!board?.cards.some((c) => c.id === event.id)) return;
     this.mutations++;
@@ -619,9 +632,13 @@ export class TodosComponent implements OnDestroy {
   }
 
   onArchived(id: Uuid): void {
+    this.rowsView()?.cardRemoved(id);
     const board = this.board();
     this.mutations++;
-    if (board) this.board.set({ ...removeTile(board, id), archivedCount: board.archivedCount + 1 });
+    // A card of a row lives on another board: the archive count of this one stays.
+    if (board?.cards.some((c) => c.id === id)) {
+      this.board.set({ ...removeTile(board, id), archivedCount: board.archivedCount + 1 });
+    }
     this.closeCard();
   }
 

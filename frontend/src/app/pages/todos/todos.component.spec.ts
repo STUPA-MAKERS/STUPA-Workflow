@@ -7,6 +7,8 @@ import { fireEvent, screen } from '@testing-library/angular';
 import { Subject, of, throwError, type Observable } from 'rxjs';
 import {
   TodosApiService,
+  type TodoAssignedBoard,
+  type TodoAssignedPoll,
   type TodoBoard,
   type TodoBoardPoll,
   type TodoBoardSummary,
@@ -25,6 +27,7 @@ interface Opts {
   gremien?: string[];
   /** The board read never answers: the page stays in its loading state. */
   pending?: boolean;
+  rows?: TodoAssignedBoard[];
 }
 
 async function start(url: string, opts: Opts = {}) {
@@ -38,6 +41,7 @@ async function start(url: string, opts: Opts = {}) {
     pollBoard: jest.fn((): Observable<TodoBoardPoll> =>
       opts.pending ? new Subject<TodoBoardPoll>() : of({ board: b, etag: 'W/"1"' }),
     ),
+    pollMineBoards: jest.fn((): Observable<TodoAssignedPoll> => of({ boards: opts.rows ?? [], etag: 'W/"r"' })),
     members: jest.fn(() => of(MEMBERS)),
     mine: jest.fn((): Observable<TodoMine> => of({ items: [{ ...tile({ id: 'k-1' }), boardName: '', boardKind: 'gremium', columnName: '', labels: [] }], dueSoonCount: 0 })),
     moveCard: jest.fn(() => of(tile({ id: 'k-1', columnId: 'c-2', title: 'Raum buchen' }))),
@@ -615,6 +619,69 @@ describe('TodosComponent', () => {
     cmp.onCardChanged(detail());
     cmp.onArchived('k-1');
     cmp.onRestored(detail());
+  });
+
+  describe('rows of the other boards', () => {
+    const personal = () =>
+      board({
+        id: 'b-0',
+        name: 'Meine To-Dos',
+        kind: 'personal',
+        gremiumId: null,
+        cards: [tile({ id: 'p-1', boardId: 'b-0', columnId: 'c-1', title: 'Privat' })],
+      });
+    const other = (): TodoAssignedBoard => {
+      const { id, name, kind, gremiumId, canWrite, columns, labels } = board();
+      const cards = [tile({ id: 'k-5', columnId: 'c-1', title: 'Plakat drucken', dueDate: '2026-10-01' })];
+      return { id, name, kind, gremiumId, canWrite, columns, labels, cards };
+    };
+
+    it('shows the rows under the personal board and counts their matches', async () => {
+      const { cmp, api, harness, settle } = await start('/todos/b-0', { board: personal(), rows: [other()] });
+      expect(cmp.withRows()).toBe(true);
+      expect(api.pollMineBoards).toHaveBeenCalledWith(null);
+      expect(screen.getByRole('region', { name: /Studierendenparlament/ })).toBeInTheDocument();
+      expect(cmp.rowMatches()).toBe(1);
+      expect(harness.routeNativeElement?.querySelector('.td__body--rows')).not.toBeNull();
+      cmp.setDue('overdue');
+      await settle();
+      expect(cmp.noMatch()).toBe(false);
+      cmp.setDue('none');
+      await settle();
+      expect(cmp.rowMatches()).toBe(0);
+      expect(cmp.noMatch()).toBe(false);
+      cmp.search.set('nichts');
+      cmp.search.flush();
+      await settle();
+      expect(cmp.noMatch()).toBe(true);
+      cmp.poll();
+      expect(api.pollMineBoards).toHaveBeenLastCalledWith('W/"r"');
+    });
+
+    it('opens a row card in the drawer and passes the changes of the drawer to the rows', async () => {
+      const { cmp, api, settle, router } = await start('/todos/b-0', { board: personal(), rows: [other()] });
+      fireEvent.click(screen.getByRole('button', { name: 'Plakat drucken' }));
+      await settle();
+      expect(router.url).toBe('/todos/b-0?card=k-5');
+      api.pollMineBoards.mockClear();
+      cmp.onCardChanged(detail({ id: 'k-5', boardId: 'b-1', title: 'Plakat bestellen' }));
+      expect(api.pollMineBoards).toHaveBeenCalledWith(null);
+      cmp.onCommentsChanged({ id: 'k-5', commentCount: 3 });
+      const before = cmp.board()?.archivedCount;
+      cmp.onArchived('k-5');
+      expect(cmp.board()?.archivedCount).toBe(before);
+      expect(cmp.board()?.cards.map((c) => c.id)).toEqual(['p-1']);
+    });
+
+    it('has no rows on a gremium board or in the list view', async () => {
+      const gremium = await start('/todos/b-1', { rows: [other()] });
+      expect(gremium.cmp.withRows()).toBe(false);
+      expect(gremium.api.pollMineBoards).not.toHaveBeenCalled();
+      TestBed.resetTestingModule();
+      const list = await start('/todos/b-0?view=list', { board: personal(), rows: [other()] });
+      expect(list.cmp.withRows()).toBe(false);
+      expect(screen.queryByRole('region', { name: /Studierendenparlament/ })).toBeNull();
+    });
   });
 
   it('opens the settings and the archive and does nothing without a board id', async () => {

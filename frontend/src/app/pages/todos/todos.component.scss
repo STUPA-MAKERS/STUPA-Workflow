@@ -111,6 +111,17 @@
   min-width: 0;
   min-height: 0;
 }
+/* "Meine To-Dos" with rows: the board and the rows below it scroll together, so the
+   board keeps its natural height. */
+.td__body--rows {
+  gap: var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+.td__body--rows > app-todo-board-view,
+.td__body--rows > app-todo-board-rows {
+  flex: none;
+}
 .td__state {
   display: flex;
   flex-direction: column;

@@ -134,7 +134,7 @@
     </div>
   </app-sticky-bar>
 
-  <div class="td__body">
+  <div class="td__body" cdkScrollable [class.td__body--rows]="withRows() && rowMatches() > 0">
     @if (loading()) {
       <app-todo-board-skeleton [view]="view()" [phone]="phone()" [canWrite]="summary()?.canWrite ?? false" />
       <span class="sr-only" role="status">{{ 'todos.loading' | t }}</span>
@@ -173,6 +173,15 @@
           (addIn)="newCard($event)"
           (settings)="settingsOpen.set(true)"
           (archive)="archiveOpen.set(true)"
+        />
+      }
+      @if (withRows()) {
+        <app-todo-board-rows
+          [filter]="filter()"
+          [today]="today()"
+          [phone]="phone()"
+          (openCard)="openCard($event)"
+          (matches)="rowMatches.set($event)"
         />
       }
     }

@@ -43,6 +43,21 @@ async def todo_board(board_id: str) -> dict:
 
 
 @group.tool
+async def todo_my_cards() -> list:
+    """List my cards on the other boards, grouped by board.
+
+    Each entry is a board that the caller can read and on which live cards (done
+    ones too) name the caller as an assignee: `id`, `name`, `kind`, `gremiumId`,
+    `canWrite`, all `columns` in their order (`cardCount` counts my cards there), the
+    board `labels` and only my `cards`. The personal board is left out; read it with
+    `todo_board`. A board that the caller can no longer read is left out, also when
+    a card of it still names the caller. Move a card with `todo_card_move` on its own
+    board only.
+    """
+    return await api().get("/todos/mine/boards")
+
+
+@group.tool
 async def todo_card_get(card_id: str) -> dict:
     """Get one card with description, checklist, links, comments and events.
 
