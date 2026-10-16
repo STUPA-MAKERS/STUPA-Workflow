@@ -85,6 +85,7 @@ _ANSWERS: dict[str, Callable[[], Any]] = {
     "delete_label": lambda: None,
     "mine": lambda: TodoMine(),
     "mine_boards": lambda: [TodoAssignedBoard(id=BID, name="B", kind="gremium", cards=[_tile()])],
+    "all_boards": lambda: [TodoAssignedBoard(id=BID, name="B", kind="personal", cards=[_tile()])],
     "linked": lambda: [
         TodoLinkedCard(
             id=CID, board_id=BID, board_name="B", title="t", column_name="c", is_done=False
@@ -245,6 +246,17 @@ def test_the_assigned_boards_read_has_an_etag_and_answers_304(env: _Env) -> None
     again = env.client.get("/api/todos/mine/boards", headers={"If-None-Match": etag})
     assert again.status_code == 304 and again.headers["ETag"] == etag
     assert env.last()[0] == "mine_boards"
+
+
+def test_the_all_boards_read_has_an_etag_and_answers_304(env: _Env) -> None:
+    first = env.client.get("/api/todos/all/boards")
+    assert first.status_code == 200
+    assert first.json()[0]["kind"] == "personal"
+    etag = first.headers["ETag"]
+    assert first.headers["Cache-Control"] == "no-cache"
+    again = env.client.get("/api/todos/all/boards", headers={"If-None-Match": etag})
+    assert again.status_code == 304 and again.headers["ETag"] == etag
+    assert env.last()[0] == "all_boards"
 
 
 def test_mine_boards_etag_changes_with_the_body() -> None:

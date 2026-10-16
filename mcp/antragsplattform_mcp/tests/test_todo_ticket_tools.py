@@ -69,6 +69,11 @@ def test_todo_my_cards_reads_the_assigned_boards(fake_api: _FakeApi) -> None:
     assert fake_api.calls == [("GET", "/todos/mine/boards", None)]
 
 
+def test_todo_all_boards_reads_every_board(fake_api: _FakeApi) -> None:
+    asyncio.run(todos.todo_all_boards())
+    assert fake_api.calls == [("GET", "/todos/all/boards", None)]
+
+
 def test_todo_board_and_card_get(fake_api: _FakeApi) -> None:
     asyncio.run(todos.todo_board("b1"))
     asyncio.run(todos.todo_card_get("c1"))
@@ -125,9 +130,19 @@ def test_todo_card_move_between_neighbors(fake_api: _FakeApi) -> None:
 def test_todo_card_transfer_with_and_without_a_column(fake_api: _FakeApi) -> None:
     asyncio.run(todos.todo_card_transfer("c1", "b2"))
     asyncio.run(todos.todo_card_transfer("c1", "b2", column_id="col9"))
+    asyncio.run(
+        todos.todo_card_transfer(
+            "c1", "b2", column_id="col9", before_id="c3", after_id="c2"
+        )
+    )
     assert fake_api.calls == [
         ("POST", "/todos/cards/c1/transfer", {"boardId": "b2"}),
         ("POST", "/todos/cards/c1/transfer", {"boardId": "b2", "columnId": "col9"}),
+        (
+            "POST",
+            "/todos/cards/c1/transfer",
+            {"boardId": "b2", "columnId": "col9", "beforeId": "c3", "afterId": "c2"},
+        ),
     ]
 
 

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/angular';
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { BOARDS, asPhone } from '../../../../testing/todo-fixtures';
-import { BOARD_ICON, TodoBoardPickerComponent } from './todo-board-picker.component';
+import { ALL_ICON, BOARD_ICON, TodoBoardPickerComponent } from './todo-board-picker.component';
 
 async function setup(inputs: Record<string, unknown> = {}) {
   const picked = jest.fn();
@@ -38,6 +38,41 @@ describe('TodoBoardPickerComponent', () => {
     expect(current).toHaveAttribute('aria-current', 'true');
     expect(document.activeElement).toBe(current);
     expect(BOARD_ICON.team).toBe('ticket');
+  });
+
+  it('lists the meta-board "Alle" directly under "Meine To-Dos" and picks it', async () => {
+    const { picked, flush } = await setup({ allId: 'alle' });
+    fireEvent.click(screen.getByRole('button', { name: /Board:/ }));
+    await flush();
+    const rows = Array.from(document.querySelectorAll<HTMLElement>('.bp__row'));
+    expect(rows[0].textContent).toContain('Meine To-Dos');
+    expect(rows[1]).toBe(screen.getByTestId('bp-all'));
+    // The open cards of every board: 1 + 2 + 4 + 6.
+    expect(rows[1].textContent).toContain('Alle');
+    expect(rows[1].textContent).toContain('13 offen · alle Boards');
+    expect(rows[1]).not.toHaveAttribute('aria-current');
+    fireEvent.click(rows[1]);
+    expect(picked).toHaveBeenCalledWith('alle');
+    expect(ALL_ICON).toBe('grid');
+  });
+
+  it('names "Alle" in the chip when it is the current one, also without a personal board', async () => {
+    const { picked, flush, fixture } = await setup({ allId: 'alle', current: 'alle', boards: BOARDS.slice(1) });
+    const chip = screen.getByRole('button', { name: 'Board: Alle' });
+    fireEvent.click(chip);
+    await flush();
+    expect(screen.getByText('Persönlich')).toBeInTheDocument();
+    const all = screen.getByTestId('bp-all');
+    expect(all).toHaveAttribute('aria-current', 'true');
+    fireEvent.click(all);
+    expect(picked).not.toHaveBeenCalled();
+    fixture.componentRef.setInput('compact', true);
+    await flush();
+    expect(screen.getByRole('button', { name: 'Alle' })).toBeInTheDocument();
+    // Without an id the meta-board is not offered.
+    fixture.componentRef.setInput('allId', null);
+    fixture.componentInstance.pickAll();
+    expect(picked).not.toHaveBeenCalled();
   });
 
   it('picks another board, and the current one only closes', async () => {

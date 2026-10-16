@@ -27,7 +27,8 @@ done (`completed_at`).
 - `service.py` — `TodoService`: boards, columns, labels, cards, sub-resources, `mine`,
   `linked`, `search`, `card_for_agenda`, `link_agenda_item`, `complete`. Mails go to
   `outbox` (`TodoMail`); the router sends them after the commit. `mine_boards`: the rows
-  under "Meine To-Dos".
+  under "Meine To-Dos"; `all_boards`: the meta-board "Alle"; both through
+  `_board_rows(mine=...)`.
 - `links.py` — `LinkResolver`: `resolve` (one query per kind), `readable`, `search` (the
   link picker, `PER_KIND` 5), `card_url`.
 - `lexorank.py` — `between(low, high)` (a loop, no recursion), `spread(n)`; `RankError`, `MAX_LENGTH`.
@@ -92,10 +93,19 @@ its columns in order, `cardCount` = the caller's cards there, its labels and onl
 caller's cards; gremium boards by name, then team; the read scope keeps out a board the
 caller cannot read even when a card still names them; one query for the cards, one each
 for columns, labels and the tile facts; weak ETag over the list, 304 on
-`If-None-Match`), `GET /link-targets`, `GET /linked?kind&targetId`, `POST /cards`, `GET|PATCH
+`If-None-Match`), `GET /all/boards` (`TodoAssignedBoard[]`, the meta-board "Alle":
+every readable board through the read scope, so a `todo.read_all` holder gets the shared
+boards with `canWrite: false`; the personal board first (the call creates it, like `GET
+/boards`), then gremium boards by name, then team; each with all its columns, its labels
+and every live card, done ones too; `cardCount` = the live cards of the column; the same
+token gate (403), the same weak ETag and 304, and a constant number of queries: one for
+the boards, one for the cards, one each for columns and labels, and the tile facts),
+`GET /link-targets`, `GET /linked?kind&targetId`, `POST /cards`, `GET|PATCH
 /cards/{id}` (PATCH needs `version`, 409 `card_version_conflict`), `POST
 /cards/{id}/move` (`afterId`/`beforeId`, 422 `rank_neighbors_invalid`), `POST
-/cards/{id}/transfer` (`CardTransfer`: `boardId`, `columnId?` = default the first column;
+/cards/{id}/transfer` (`CardTransfer`: `boardId`, `columnId?` = default the first column,
+`beforeId?`/`afterId?` as in the move = default the end, 422 `rank_neighbors_invalid` for
+a neighbor outside the target column;
 answers `TodoCardDetail`; 404 for a target board that the caller cannot read, 422
 `transfer_same_board` / `column_not_on_board`, 409 `card_moved` / `card_archived`), `DELETE
 /cards/{id}` (archive), `POST /cards/{id}/restore`, assignees, labels, checklist, links
@@ -113,7 +123,8 @@ answers `TodoCardDetail`; 404 for a target board that the caller cannot read, 42
   is longer than `MAX_LENGTH` (50): every append adds about one digit per six cards, and
   the done column never empties (`_append`, `_rank` in `service.py`). Every write bumps
   `todo_board.updated_at`, so the ETag changes.
-- `transfer` moves a card to the end of a column of another board. It locks both boards in
+- `transfer` moves a card into a column of another board: between `afterId` and
+  `beforeId` (`_slot` and `_place`, the same code as the move), else to the end. It locks both boards in
   id order, because two transfers between the same two boards in opposite directions
   deadlock in the other order, and then reads the card again (`refresh`): a card that a
   parallel transfer moved gives 409 `card_moved`. Labels are per board, so a label stays

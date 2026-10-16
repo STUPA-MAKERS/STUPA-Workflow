@@ -2,18 +2,18 @@
 
 Every route needs a principal session (401). An OAuth token reads to-dos when its
 scope lets ``todo.write`` or ``todo.all`` (``todos:write``) or ``todo.read_all``
-(``read``) through: without one of them ``GET /todos/boards``, ``GET /todos/mine``
-and ``GET /todos/mine/boards`` answer 403, the link picker and ``linked`` ``[]``,
-and every board or card 404. A write needs ``todo.write`` or ``todo.all`` in the
-scope. A board or card that the caller cannot read answers 404, never 403; a card
-write on a board that the caller reads but cannot write 403
+(``read``) through: without one of them ``GET /todos/boards``, ``GET /todos/mine``,
+``GET /todos/mine/boards`` and ``GET /todos/all/boards`` answer 403, the link picker
+and ``linked`` ``[]``, and every board or card 404. A write needs ``todo.write`` or
+``todo.all`` in the scope. A board or card that the caller cannot read answers 404,
+never 403; a card write on a board that the caller reads but cannot write 403
 ``todo_write_required``; a configuration change without ``todo.configure`` 403
 ``todo_configure_required``.
 
-``GET /todos/boards/{id}`` and ``GET /todos/mine/boards`` carry a weak ``ETag`` over
-their body and answer 304 to a matching ``If-None-Match``; the frontend polls them
-every 30 s. Mails of a write (``todo_assigned``, ``todo_mentioned``) go out as a
-background task after the commit.
+``GET /todos/boards/{id}``, ``GET /todos/mine/boards`` and ``GET /todos/all/boards``
+carry a weak ``ETag`` over their body and answer 304 to a matching
+``If-None-Match``; the frontend polls them every 30 s. Mails of a write
+(``todo_assigned``, ``todo_mentioned``) go out as a background task after the commit.
 """
 
 from __future__ import annotations
@@ -130,7 +130,7 @@ def board_etag(board: TodoBoardOut) -> str:
 
 
 def mine_boards_etag(boards: Sequence[TodoAssignedBoard]) -> str:
-    """The weak ETag of ``GET /todos/mine/boards``: a hash over the whole list."""
+    """The weak ETag of ``GET /todos/mine/boards`` and ``/all/boards``: a hash over the list."""
     return _weak_etag([b.model_dump(by_alias=True, mode="json") for b in boards])
 
 
@@ -340,7 +340,30 @@ async def mine_boards(
     Each board brings all its columns and labels but only the caller's cards, done
     ones included; the personal board and a board without such a card are left out.
     """
-    boards = await service.mine_boards(principal)
+    return _rows(await service.mine_boards(principal), response, if_none_match)
+
+
+@router.get(
+    "/all/boards",
+    response_model=list[TodoAssignedBoard],
+    responses={**_errors(401, 403), 304: {"description": "Not modified"}},
+)
+async def all_boards(
+    service: ServiceDep,
+    principal: Member,
+    response: Response,
+    if_none_match: Annotated[str | None, Header()] = None,
+) -> list[TodoAssignedBoard] | Response:
+    """Every readable board with all its live cards, the personal one first (ETag, 304).
+
+    The first call creates the personal board "Meine To-Dos".
+    """
+    return _rows(await service.all_boards(principal), response, if_none_match)
+
+
+def _rows(
+    boards: list[TodoAssignedBoard], response: Response, if_none_match: str | None
+) -> list[TodoAssignedBoard] | Response:
     etag = mine_boards_etag(boards)
     if _matches(if_none_match, etag):
         return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers={"ETag": etag})

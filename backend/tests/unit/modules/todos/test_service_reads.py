@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from app.modules.auth.principal import Principal
+from app.modules.todos import service as svc_mod
 from app.modules.todos.models import TodoLink
 from app.modules.todos.service import TodoService, berlin_today
 from app.shared.errors import ForbiddenError, NotFoundError, ValidationProblem
@@ -128,6 +129,61 @@ async def test_mine_boards_groups_the_cards_by_board_with_all_columns() -> None:
     assert out[2].kind == "team" and out[2].gremium_id is None
     assert "todo_column.board_id IN" in _sql(session.statements[1])
     assert "todo_label.board_id IN" in _sql(session.statements[2])
+
+
+async def test_all_boards_needs_the_scope_and_skips_the_personal_board_without_account(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _never(_s: Any, _owner: uuid.UUID) -> bool:
+        raise AssertionError("no account, no personal board")
+
+    monkeypatch.setattr(svc_mod, "ensure_personal_board", _never)
+    with pytest.raises(ForbiddenError):
+        await _svc(ScriptedSession()).all_boards(TOKEN)
+    session = ScriptedSession(scalars=[[]])
+    assert await _svc(session, me=None).all_boards(USER) == []
+    assert len(session.statements) == 1
+
+
+async def test_all_boards_lists_every_board_with_all_live_cards(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ensured: list[uuid.UUID] = []
+
+    async def _ensure(_s: Any, owner: uuid.UUID) -> bool:
+        ensured.append(owner)
+        return True
+
+    monkeypatch.setattr(svc_mod, "ensure_personal_board", _ensure)
+    personal = board(kind="personal", gremium_id=None, owner_id=ME, name="Meine To-Dos")
+    stupa = board(name="StuPa")
+    empty = board(name="AStA")
+    p_open = column(personal.id, "Offen", 0)
+    s_open, s_done = column(stupa.id, "Offen", 0), column(stupa.id, "Erledigt", 1, is_done=True)
+    e_open = column(empty.id, "Offen", 0)
+    mine = card(personal, p_open, rank="a")
+    done = card(stupa, s_done, rank="b")
+    other = card(stupa, s_open, rank="c")
+    session = ScriptedSession(
+        scalars=[
+            [stupa, empty, personal],
+            [mine, done, other],
+            [p_open, s_open, s_done, e_open],
+            [],
+            [],
+        ],
+        execute=[[], [], [], []],
+    )
+    out = await _svc(session).all_boards(USER)
+    assert ensured == [ME]
+    assert [b.name for b in out] == ["Meine To-Dos", "AStA", "StuPa"]
+    assert [c.id for c in out[0].cards] == [mine.id]
+    assert out[1].cards == [] and [c.card_count for c in out[1].columns] == [0]
+    assert [c.id for c in out[2].cards] == [other.id, done.id]
+    assert [c.card_count for c in out[2].columns] == [1, 1]
+    cards_sql = _sql(session.statements[1])
+    assert "todo_card.board_id IN" in cards_sql and "todo_card.archived_at IS NULL" in cards_sql
+    assert "todo_assignee" not in cards_sql
 
 
 async def test_linked_sorts_open_first_then_by_due_date() -> None:

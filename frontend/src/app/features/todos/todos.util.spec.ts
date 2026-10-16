@@ -7,9 +7,11 @@ import {
   cardsOf,
   daysUntil,
   defaultBoard,
+  dropMove,
   dueInfo,
   eventText,
   filterActive,
+  insertTile,
   isoDay,
   linkLine,
   linkSub,
@@ -302,6 +304,24 @@ describe('todos.util', () => {
       expect(moveRequest(list, 1, 'c')).toEqual({ columnId: 'c', afterId: 'a' });
       expect(moveRequest(list, 0, 'c')).toEqual({ columnId: 'c', beforeId: 'b' });
       expect(moveRequest([tile({ id: 'a' })], 0, 'c')).toEqual({ columnId: 'c' });
+    });
+
+    it('names the neighbours of a card from another board, the target list without it', () => {
+      const list = [tile({ id: 'a' }), tile({ id: 'b' })];
+      expect(dropMove(list, 2, 'c')).toEqual({ columnId: 'c', afterId: 'b' });
+      expect(dropMove(list, 0, 'c')).toEqual({ columnId: 'c', beforeId: 'a' });
+      expect(dropMove([], 0, 'c')).toEqual({ columnId: 'c' });
+    });
+
+    it('puts a card of another board into a board at its place', () => {
+      const b = board();
+      const ids = (x: ReturnType<typeof board>) => x.cards.map((c) => `${c.id}@${c.columnId}`);
+      const visitor = tile({ id: 'k-9', boardId: 'b-7', columnId: 'x-1' });
+      const after = insertTile(b, visitor, { columnId: 'c-1', afterId: 'k-1' });
+      expect(ids(after)).toEqual(['k-1@c-1', 'k-9@c-1', 'k-2@c-1', 'k-3@c-4']);
+      expect(after.cards[1].boardId).toBe('b-1');
+      expect(after.columns.find((c) => c.id === 'c-1')?.cardCount).toBe(3);
+      expect(ids(insertTile(b, visitor, { columnId: 'c-2' })).at(-1)).toBe('k-9@c-2');
     });
 
     it('moves a card at once, after or before a neighbour or to the end', () => {

@@ -61,6 +61,21 @@ async def todo_my_cards() -> list:
 
 
 @group.tool
+async def todo_all_boards() -> list:
+    """List every board that the caller can read, with all its live cards.
+
+    The meta-board "Alle": the personal board first (the call creates it), then the
+    gremium boards by name, then the team boards. Each entry has `id`, `name`, `kind`,
+    `gremiumId`, `canWrite` (false on a board that the caller only reads), all
+    `columns` in their order (`cardCount` counts the live cards there), the board
+    `labels` and every live `card`, done ones too; archived cards are left out. Move a
+    card with `todo_card_move` on its own board, and with `todo_card_transfer` to
+    another board.
+    """
+    return await api().get("/todos/all/boards")
+
+
+@group.tool
 async def todo_card_get(card_id: str) -> dict:
     """Get one card with description, checklist, links, comments and events.
 
@@ -122,9 +137,13 @@ async def todo_card_move(
 
 @group.tool
 async def todo_card_transfer(
-    card_id: str, board_id: str, column_id: str | None = None
+    card_id: str,
+    board_id: str,
+    column_id: str | None = None,
+    before_id: str | None = None,
+    after_id: str | None = None,
 ) -> dict:
-    """Move a card to the end of a column of another board.
+    """Move a card into a column of another board, by default to its end.
 
     Labels are per board: a label stays when the target board has a label with the
     same name (case-insensitive), else it is dropped. No label is created on the
@@ -132,16 +151,21 @@ async def todo_card_transfer(
     mail. Links, comments, the checklist and the history stay with the card. The
     done column of the target marks the card done; another column reopens it.
     Errors: 404 for a card or target board that the caller cannot read, 422
-    `transfer_same_board` (use `todo_card_move`) or `column_not_on_board`, 409
+    `transfer_same_board` (use `todo_card_move`), `column_not_on_board` or
+    `rank_neighbors_invalid` (a neighbor outside the target column), 409
     `card_archived` or `card_moved` (read the card again).
 
     Args:
         board_id: The target board.
         column_id: A column of the target board (default: its first column).
+        before_id: The card below the new place, in the target column.
+        after_id: The card above the new place, in the target column.
     """
     return await api().post(
         f"/todos/cards/{card_id}/transfer",
-        json=params(boardId=board_id, columnId=column_id),
+        json=params(
+            boardId=board_id, columnId=column_id, beforeId=before_id, afterId=after_id
+        ),
     )
 
 

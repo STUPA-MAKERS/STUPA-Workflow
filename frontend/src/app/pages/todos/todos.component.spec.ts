@@ -12,13 +12,14 @@ import {
   type TodoBoard,
   type TodoBoardPoll,
   type TodoBoardSummary,
+  type TodoCardDetail,
   type TodoMine,
 } from '@core/api/todos.service';
 import { AuthService } from '@core/auth/auth.service';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { BOARDS, MEMBERS, asPhone, board, detail, tile } from '../../../testing/todo-fixtures';
-import { BOARD_POLL_MS, TodosComponent } from './todos.component';
+import { ALL_BOARDS, BOARD_POLL_MS, TodosComponent } from './todos.component';
 
 interface Opts {
   boards?: TodoBoardSummary[];
@@ -30,6 +31,9 @@ interface Opts {
   rows?: TodoAssignedBoard[];
   /** The rows read: a subject keeps it in flight. */
   rowsRead?: Subject<TodoAssignedPoll>;
+  /** The boards of "Alle", or a subject that keeps the read in flight. */
+  all?: TodoAssignedBoard[] | Subject<TodoAssignedPoll>;
+  transfer?: () => Observable<TodoCardDetail>;
 }
 
 async function start(url: string, opts: Opts = {}) {
@@ -44,6 +48,10 @@ async function start(url: string, opts: Opts = {}) {
       opts.pending ? new Subject<TodoBoardPoll>() : of({ board: b, etag: 'W/"1"' }),
     ),
     pollMineBoards: jest.fn((): Observable<TodoAssignedPoll> => opts.rowsRead ?? of({ boards: opts.rows ?? [], etag: 'W/"r"' })),
+    pollAllBoards: jest.fn((): Observable<TodoAssignedPoll> =>
+      opts.all instanceof Subject ? opts.all : of({ boards: opts.all ?? [], etag: 'W/"a"' }),
+    ),
+    transferCard: jest.fn(opts.transfer ?? (() => of(detail({ id: 'p-1', boardId: 'b-1', columnId: 'c-2', title: 'Privat' })))),
     members: jest.fn(() => of(MEMBERS)),
     mine: jest.fn((): Observable<TodoMine> => of({ items: [{ ...tile({ id: 'k-1' }), boardName: '', boardKind: 'gremium', columnName: '', labels: [] }], dueSoonCount: 0 })),
     moveCard: jest.fn(() => of(tile({ id: 'k-1', columnId: 'c-2', title: 'Raum buchen' }))),
@@ -82,6 +90,12 @@ async function start(url: string, opts: Opts = {}) {
   };
   await settle();
   return { harness, cmp, router, api, toast, settle, b };
+}
+
+/** Every tile the rows of the page hold. */
+function harnessRows(cmp: TodosComponent) {
+  const rows = (cmp as unknown as { rowsView(): { boards(): TodoAssignedBoard[] } | undefined }).rowsView();
+  return (rows?.boards() ?? []).flatMap((b) => b.cards);
 }
 
 describe('TodosComponent', () => {
@@ -132,9 +146,12 @@ describe('TodosComponent', () => {
     expect(cmp.openCount()).toBe(2);
     expect(screen.getByPlaceholderText('2 offene To-Dos durchsuchen')).toBeInTheDocument();
     expect(document.querySelectorAll('.td__skelIcon')).toHaveLength(1);
+    // The place of the settings is at the end, after the view switch.
     const views = document.querySelector('app-segmented')!;
-    expect(document.querySelector('.td__skelIcon')!.compareDocumentPosition(views) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(document.querySelector('.td__skelNew')).not.toBeNull();
+    expect(views.compareDocumentPosition(document.querySelector('.td__skelIcon')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // "+ To-Do" floats; the header has no button and no place for one.
+    expect(document.querySelector('.td__skelNew')).toBeNull();
+    expect(screen.queryByTestId('td-new')).toBeNull();
     expect(document.querySelectorAll('.td__chips .td__skelChip')).toHaveLength(3);
   });
 
@@ -143,7 +160,6 @@ describe('TodosComponent', () => {
     expect(cmp.summary()?.canConfigure).toBe(false);
     expect(cmp.openCount()).toBe(4);
     expect(document.querySelector('.td__skelIcon')).toBeNull();
-    expect(document.querySelector('.td__skelNew')).not.toBeNull();
   });
 
   it('draws the list in its loaded shape while it loads', async () => {
@@ -468,22 +484,32 @@ describe('TodosComponent', () => {
     const { cmp, api } = await start('/todos/b-1');
     const reads = api.boards.mock.calls.length;
     api.boards.mockReturnValueOnce(of([{ ...BOARDS[1], openCount: 9 }]));
-    cmp.onCardChanged(detail({ id: 'k-1', boardId: 'b-2' }));
+    // The drawer says that the card left this board, then sends the card.
+    const left = detail({ id: 'k-1', boardId: 'b-2' });
+    cmp.onTransferred({ card: left, fromBoardId: 'b-1' });
+    cmp.onCardChanged(left);
     expect(cmp.board()?.cards.map((c) => c.id)).toEqual(['k-2', 'k-3']);
     expect(cmp.board()?.archivedCount).toBe(2);
     expect(api.boards).toHaveBeenCalledTimes(reads + 1);
     expect(cmp.boards()[0].openCount).toBe(9);
     // A card of another board that the shown board does not hold changes nothing.
+    cmp.onTransferred({ card: detail({ id: 'k-1', boardId: 'b-3' }), fromBoardId: 'b-2' });
     cmp.onCardChanged(detail({ id: 'k-1', boardId: 'b-2', title: 'Neu' }));
     expect(api.boards).toHaveBeenCalledTimes(reads + 1);
     // A card that came over from another board is no restore: the archive count stays.
     api.boards.mockReturnValueOnce(throwError(() => new Error('x')));
-    const moved = { id: 'e-1', kind: 'moved' as const, actor: null, at: '2026-10-16T10:00:00Z', payload: { toBoardId: 'b-1' } };
-    cmp.onCardChanged(detail({ id: 'k-7', columnId: 'c-1', rank: 'z', events: [moved] }));
+    const came = detail({ id: 'k-7', columnId: 'c-1', rank: 'z' });
+    cmp.onTransferred({ card: came, fromBoardId: 'b-2' });
+    cmp.onCardChanged(came);
     expect(cmp.board()?.cards.map((c) => c.id)).toEqual(['k-2', 'k-7', 'k-3']);
     expect(cmp.board()?.archivedCount).toBe(2);
     expect(api.boards).toHaveBeenCalledTimes(reads + 2);
     expect(cmp.boards()[0].openCount).toBe(9);
+    // Twice changes nothing; without a board nothing happens.
+    cmp.onTransferred({ card: came, fromBoardId: 'b-2' });
+    expect(api.boards).toHaveBeenCalledTimes(reads + 2);
+    cmp.board.set(null);
+    cmp.onTransferred({ card: came, fromBoardId: 'b-2' });
   });
 
   it('toggles a card done from the list and back', async () => {
@@ -512,7 +538,7 @@ describe('TodosComponent', () => {
     const before = cmp.board()!.cards.length;
     cmp.onCreated(detail({ id: 'k-x', boardId: 'b-2' }));
     expect(cmp.board()!.cards).toHaveLength(before);
-    fireEvent.click(screen.getByTestId('td-new'));
+    fireEvent.click(screen.getByTestId('td-fab'));
     expect(cmp.newOpen()).toBe(true);
     expect(cmp.newColumn()).toBeNull();
     cmp.newCard('c-2');
@@ -524,11 +550,11 @@ describe('TodosComponent', () => {
 
   it('has no "+ To-Do" on a board that the person only reads, also not while it loads', async () => {
     await start('/todos/b-1', { board: board({ canWrite: false }) });
-    expect(screen.queryByTestId('td-new')).toBeNull();
+    expect(screen.queryByTestId('td-fab')).toBeNull();
     TestBed.resetTestingModule();
     const boards = BOARDS.map((b) => (b.id === 'b-1' ? { ...b, canWrite: false } : b));
     await start('/todos/b-1', { pending: true, boards });
-    expect(document.querySelector('.td__skelNew')).toBeNull();
+    expect(screen.queryByTestId('td-fab')).toBeNull();
   });
 
   it('opens a card in the drawer, traps the focus and closes with Escape', async () => {
@@ -761,6 +787,93 @@ describe('TodosComponent', () => {
       expect(cmp.board()?.cards.map((c) => c.id)).toEqual(['p-1']);
     });
 
+    it('connects the personal board and the rows for a drag', async () => {
+      const { cmp, harness } = await start('/todos/b-0', { board: personal(), rows: [other()] });
+      expect(cmp.boardDrops()).toEqual(['bv-list-c-1', 'bv-list-c-2', 'bv-list-c-3', 'bv-list-c-4']);
+      expect(cmp.rowDrops()).toEqual(['br-list-c-1', 'br-list-c-2', 'br-list-c-3', 'br-list-c-4']);
+      const view = harness.routeDebugElement!.query((d) => d.name === 'app-todo-board-view');
+      expect((view.componentInstance as { connectTo(): string[] }).connectTo()).toEqual(cmp.rowDrops());
+      TestBed.resetTestingModule();
+      const ro = await start('/todos/b-0', { board: { ...personal(), canWrite: false }, rows: [other()] });
+      expect(ro.cmp.boardDrops()).toEqual([]);
+      // A read-only board takes no card from a row.
+      ro.cmp.onDropFromRow({ cardId: 'k-5', move: { columnId: 'c-1' } });
+      expect(ro.api.transferCard).not.toHaveBeenCalled();
+    });
+
+    it('moves a card of the personal board into a row at once and takes the answer', async () => {
+      const answer = new Subject<TodoCardDetail>();
+      const { cmp, api } = await start('/todos/b-0', { board: personal(), rows: [other()], transfer: () => answer });
+      const reads = api.boards.mock.calls.length;
+      cmp.onDropIntoRow({ boardId: 'b-1', cardId: 'p-1', move: { columnId: 'c-2' } });
+      expect(api.transferCard).toHaveBeenCalledWith('p-1', { boardId: 'b-1', columnId: 'c-2' });
+      expect(cmp.board()?.cards).toEqual([]);
+      const rows = () => harnessRows(cmp);
+      expect(rows().find((c) => c.id === 'p-1')).toMatchObject({ boardId: 'b-1', columnId: 'c-2' });
+      answer.next(detail({ id: 'p-1', boardId: 'b-1', columnId: 'c-2', title: 'Privat (neu)' }));
+      expect(rows().find((c) => c.id === 'p-1')?.title).toBe('Privat (neu)');
+      expect(api.boards).toHaveBeenCalledTimes(reads + 1);
+      // A card the board does not hold, and no board: nothing.
+      cmp.onDropIntoRow({ boardId: 'b-1', cardId: 'nope', move: { columnId: 'c-2' } });
+      expect(api.transferCard).toHaveBeenCalledTimes(1);
+    });
+
+    it('puts a refused drop into a row back and reads both again', async () => {
+      const { cmp, api, toast } = await start('/todos/b-0', {
+        board: personal(),
+        rows: [other()],
+        transfer: () => throwError(() => new Error('x')),
+      });
+      const before = cmp.board();
+      api.pollBoard.mockClear();
+      api.pollMineBoards.mockClear();
+      cmp.onDropIntoRow({ boardId: 'b-1', cardId: 'p-1', move: { columnId: 'c-2' } });
+      expect(toast.error).toHaveBeenCalledWith('Die Karte konnte nicht verschoben werden.');
+      expect(cmp.board()?.cards.map((c) => c.id)).toEqual(before?.cards.map((c) => c.id));
+      expect(api.pollBoard).toHaveBeenCalledWith('b-0', null);
+      expect(api.pollMineBoards).toHaveBeenCalledWith(null);
+    });
+
+    it('moves a card of a row onto the personal board at once and takes the answer', async () => {
+      const answer = new Subject<TodoCardDetail>();
+      const { cmp, api } = await start('/todos/b-0', { board: personal(), rows: [other()], transfer: () => answer });
+      cmp.onDropFromRow({ cardId: 'k-5', move: { columnId: 'c-1', afterId: 'p-1' } });
+      expect(api.transferCard).toHaveBeenCalledWith('k-5', { boardId: 'b-0', columnId: 'c-1', afterId: 'p-1' });
+      expect(cmp.board()?.cards.map((c) => c.id)).toEqual(['p-1', 'k-5']);
+      expect(harnessRows(cmp).some((c) => c.id === 'k-5')).toBe(false);
+      answer.next(detail({ id: 'k-5', boardId: 'b-0', columnId: 'c-1', title: 'Plakat (privat)' }));
+      expect(cmp.board()?.cards[1].title).toBe('Plakat (privat)');
+      // An unknown card does nothing.
+      cmp.onDropFromRow({ cardId: 'nope', move: { columnId: 'c-1' } });
+      expect(api.transferCard).toHaveBeenCalledTimes(1);
+    });
+
+    it('puts a refused drop onto the board back, and drops a late answer for another board', async () => {
+      const failing = await start('/todos/b-0', {
+        board: personal(),
+        rows: [other()],
+        transfer: () => throwError(() => new Error('x')),
+      });
+      failing.cmp.onDropFromRow({ cardId: 'k-5', move: { columnId: 'c-1' } });
+      expect(failing.toast.error).toHaveBeenCalledWith('Die Karte konnte nicht verschoben werden.');
+      expect(failing.cmp.board()?.cards.map((c) => c.id)).toEqual(['p-1']);
+      TestBed.resetTestingModule();
+      const answer = new Subject<TodoCardDetail>();
+      const late = await start('/todos/b-0', { board: personal(), rows: [other()], transfer: () => answer });
+      late.cmp.onDropFromRow({ cardId: 'k-5', move: { columnId: 'c-1' } });
+      late.cmp.board.set(board({ id: 'b-1' }));
+      const shown = late.cmp.board();
+      answer.next(detail({ id: 'k-5', boardId: 'b-0' }));
+      expect(late.cmp.board()).toBe(shown);
+      // A refusal after the board changed keeps the newer board.
+      late.cmp.onDropIntoRow({ boardId: 'b-1', cardId: 'k-1', move: { columnId: 'c-2' } });
+      late.cmp.board.set(board({ id: 'b-1', name: 'Neu geladen' }));
+      const newer = late.cmp.board();
+      late.api.pollBoard.mockReturnValue(new Subject<TodoBoardPoll>());
+      answer.error(new Error('x'));
+      expect(late.cmp.board()).toBe(newer);
+    });
+
     it('has no rows on a gremium board or in the list view', async () => {
       const gremium = await start('/todos/b-1', { rows: [other()] });
       expect(gremium.cmp.withRows()).toBe(false);
@@ -774,14 +887,155 @@ describe('TodosComponent', () => {
 
   it('opens the settings and the archive and does nothing without a board id', async () => {
     const { cmp, harness } = await start('/todos/b-1');
-    // The settings stand left of the view switch.
+    // The settings stand at the far right, after the view switch.
     const settings = screen.getByTestId('td-settings');
     const views = document.querySelector('app-segmented')!;
-    expect(settings.compareDocumentPosition(views) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(views.compareDocumentPosition(settings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(settings.nextElementSibling).toBeNull();
     fireEvent.click(settings);
     harness.detectChanges();
     expect(cmp.settingsOpen()).toBe(true);
     expect(screen.getByRole('dialog', { name: 'Board-Einstellungen' })).toBeInTheDocument();
+  });
+
+  describe('"Alle"', () => {
+    const row = (over: Partial<TodoAssignedBoard>): TodoAssignedBoard => {
+      const { id, name, kind, gremiumId, canWrite, columns, labels } = board();
+      return { id, name, kind, gremiumId, canWrite, columns, labels, cards: [], ...over };
+    };
+    const urgent = { id: 'l-1', name: 'Eilig', color: 'red' as const };
+    const boards = () => [
+      row({
+        id: 'b-0',
+        name: 'Meine To-Dos',
+        kind: 'personal',
+        gremiumId: null,
+        labels: [{ id: 'l-p', name: 'eilig', color: 'blue' }],
+        cards: [tile({ id: 'p-1', boardId: 'b-0', columnId: 'c-1', title: 'Privat', labelIds: ['l-p'] })],
+      }),
+      row({
+        labels: [urgent, { id: 'l-2', name: 'Antrag', color: 'green' }],
+        cards: [
+          tile({ id: 'k-1', columnId: 'c-1', title: 'Raum buchen', assignees: [{ principalId: 'p-1', displayName: 'Selin Yıldız' }] }),
+          tile({ id: 'k-3', columnId: 'c-4', title: 'Bus anfragen' }),
+        ],
+      }),
+    ];
+
+    it('shows the rows of every board without a board read, a view switch or settings', async () => {
+      const { cmp, api, router } = await start(`/todos/${ALL_BOARDS}`, { all: boards() });
+      expect(cmp.all()).toBe(true);
+      expect(api.pollBoard).not.toHaveBeenCalled();
+      expect(api.pollAllBoards).toHaveBeenCalledWith(null);
+      expect(api.pollMineBoards).not.toHaveBeenCalled();
+      expect(screen.getByRole('region', { name: /Meine To-Dos/ })).toBeInTheDocument();
+      expect(screen.getByRole('region', { name: /Studierendenparlament/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Board: Alle' })).toBeInTheDocument();
+      expect(document.querySelector('app-segmented')).toBeNull();
+      expect(screen.queryByTestId('td-settings')).toBeNull();
+      expect(cmp.rowMatches()).toBe(3);
+      // The open cards of every board; labels once per name, by name.
+      expect(screen.getByPlaceholderText('2 offene To-Dos durchsuchen')).toBeInTheDocument();
+      expect(cmp.labelOptions().map((o) => o.label)).toEqual(['Antrag', 'eilig']);
+      // "Ich" filters by my id (the member of my personal board), without /todos/mine.
+      expect(api.members).toHaveBeenCalledWith('b-0');
+      expect(cmp.meId()).toBe('p-1');
+      cmp.setAssignee('me');
+      expect(api.mine).not.toHaveBeenCalled();
+      expect(cmp.view()).toBe('board');
+      cmp.poll();
+      expect(api.pollAllBoards).toHaveBeenLastCalledWith('W/"a"');
+      await router.navigateByUrl(`/todos/${ALL_BOARDS}?view=list`);
+      expect(cmp.view()).toBe('board');
+    });
+
+    it('filters the rows by a label name and says when nothing matches', async () => {
+      const { cmp, settle } = await start(`/todos/${ALL_BOARDS}`, { all: boards() });
+      cmp.setLabels([cmp.labelOptions()[1].value]);
+      await settle();
+      expect(cmp.rowMatches()).toBe(1);
+      cmp.setDue('overdue');
+      await settle();
+      expect(cmp.rowMatches()).toBe(0);
+      expect(cmp.noMatch()).toBe(true);
+      expect(screen.getByText('Keine To-Dos passen zu den Filtern.')).toBeInTheDocument();
+      expect(cmp.allEmpty()).toBe(false);
+    });
+
+    it('shows the skeleton until the rows answer and the empty state without a card', async () => {
+      const read = new Subject<TodoAssignedPoll>();
+      const { cmp, settle } = await start(`/todos/${ALL_BOARDS}`, { all: read });
+      expect(document.querySelector('app-todo-board-skeleton')).not.toBeNull();
+      expect(screen.getByRole('status')).toHaveTextContent('Board wird geladen');
+      read.next({ boards: [row({ id: 'b-0', kind: 'personal' })], etag: 'W/"a"' });
+      await settle();
+      expect(cmp.allEmpty()).toBe(true);
+      expect(document.querySelector('app-todo-board-skeleton')).toBeNull();
+      expect(screen.getByText('Auf deinen Boards gibt es noch keine To-Dos.')).toBeInTheDocument();
+      expect(screen.queryByRole('region')).toBeNull();
+    });
+
+    it('opens "+ To-Do" on the personal board and puts the new card in its row', async () => {
+      const { cmp, api, settle, harness } = await start(`/todos/${ALL_BOARDS}`, { all: boards() });
+      fireEvent.click(screen.getByTestId('td-fab'));
+      await settle();
+      expect(cmp.newOpen()).toBe(true);
+      const dialog = harness.routeDebugElement!.query((d) => d.name === 'app-todo-new-dialog');
+      expect((dialog.componentInstance as { boardId(): string | null }).boardId()).toBe('b-0');
+      api.pollAllBoards.mockClear();
+      api.pollAllBoards.mockReturnValue(new Subject<TodoAssignedPoll>());
+      cmp.onCreated(detail({ id: 'k-9', boardId: 'b-0', columnId: 'c-1', title: 'Neu' }));
+      expect(harnessRows(cmp).some((c) => c.id === 'k-9')).toBe(true);
+      expect(api.pollAllBoards).toHaveBeenCalledWith(null);
+    });
+
+    it('goes to "Alle" from the list without the list view, and back to a board', async () => {
+      const { cmp, router, settle, api } = await start('/todos/b-1?view=list', { all: boards() });
+      await router.navigateByUrl(`/todos/${ALL_BOARDS}`);
+      // Before the page draws "Alle" again, it has no rows to count.
+      expect(cmp.all()).toBe(true);
+      expect(cmp.openCount()).toBe(0);
+      expect(cmp.labelsById().size).toBe(0);
+      await router.navigateByUrl('/todos/b-1?view=list');
+      await settle();
+      cmp.pickBoard(ALL_BOARDS);
+      await settle();
+      expect(router.url).toBe(`/todos/${ALL_BOARDS}`);
+      expect(cmp.board()).toBeNull();
+      expect(cmp.loading()).toBe(false);
+      cmp.onRowTransferred();
+      expect(api.boards).toHaveBeenCalled();
+      cmp.pickBoard('b-2');
+      await settle();
+      expect(router.url).toBe('/todos/b-2');
+      expect(api.pollBoard).toHaveBeenLastCalledWith('b-2', null);
+    });
+
+    it('asks for my id once, and not without a personal board', async () => {
+      const { api, router, settle } = await start(`/todos/${ALL_BOARDS}`, { all: boards() });
+      await router.navigateByUrl('/todos/b-1');
+      await settle();
+      await router.navigateByUrl(`/todos/${ALL_BOARDS}`);
+      await settle();
+      expect((api.members.mock.calls as unknown[][]).filter((call) => call[0] === 'b-0')).toHaveLength(1);
+      TestBed.resetTestingModule();
+      const none = await start(`/todos/${ALL_BOARDS}`, { all: boards(), boards: BOARDS.slice(1) });
+      expect(none.cmp.personalId()).toBeNull();
+      expect(none.api.members).not.toHaveBeenCalled();
+      TestBed.resetTestingModule();
+      const failing = await start('/todos/b-1', { all: boards() });
+      failing.api.members.mockReturnValue(throwError(() => new Error('x')));
+      await failing.router.navigateByUrl(`/todos/${ALL_BOARDS}`);
+      await failing.settle();
+      expect(failing.cmp.meId()).toBeNull();
+      // A personal board without a member gives no id.
+      failing.api.members.mockReturnValue(of([]));
+      await failing.router.navigateByUrl('/todos/b-1');
+      await failing.settle();
+      await failing.router.navigateByUrl(`/todos/${ALL_BOARDS}`);
+      await failing.settle();
+      expect(failing.cmp.meId()).toBeNull();
+    });
   });
 
   describe('phone', () => {

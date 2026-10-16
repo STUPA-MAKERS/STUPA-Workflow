@@ -58,6 +58,7 @@ import {
   applyMove,
   defaultBoard,
   filterActive,
+  insertTile,
   isoDay,
   matchesFilter,
   placeTile,
@@ -70,14 +71,17 @@ import { mediaQuerySignal } from '../../layout/media-query';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { TodoArchiveSheetComponent } from './archive-sheet/todo-archive-sheet.component';
 import { TodoBoardPickerComponent } from './board-picker/todo-board-picker.component';
-import { TodoBoardRowsComponent } from './board-rows/todo-board-rows.component';
+import { TodoBoardRowsComponent, type RowDrop } from './board-rows/todo-board-rows.component';
 import { TodoBoardSettingsComponent } from './board-settings/todo-board-settings.component';
 import { TodoBoardSkeletonComponent } from './board-skeleton/todo-board-skeleton.component';
-import { TodoBoardViewComponent, type BoardMove } from './board-view/todo-board-view.component';
+import { TodoBoardViewComponent, boardDropId, type BoardMove } from './board-view/todo-board-view.component';
 import { TodoListViewComponent } from './list-view/todo-list-view.component';
 
 /** The board reads itself again this often while the tab is visible. */
 export const BOARD_POLL_MS = 30_000;
+
+/** The route segment of the meta-board "Alle" (`/todos/alle`): every readable board at once. */
+export const ALL_BOARDS = 'alle';
 
 type View = 'board' | 'list';
 
@@ -93,10 +97,17 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
  * "Boards" (`/todos`, `/todos/:boardId`): one board of the person (frames 0–9, 11–14, 34).
  *
  * `/todos` opens the personal board "Meine To-Dos", else the board of the first own Gremium;
- * a board in the URL wins. The header
- * holds "Board | Liste", the board settings (`todo.configure`) and "+ To-Do"; the bar
- * below the board picker, the search and the chips Zuständig, Label, Fällig. Filters run
- * in the browser over the cards of the board.
+ * a board in the URL wins. The header holds "Board | Liste" and, at its end, the board
+ * settings (`todo.configure`); "+ To-Do" is the floating button at the bottom right on
+ * every width. The bar below holds the board picker, the search and the chips Zuständig,
+ * Label, Fällig. Filters run in the browser over the cards of the board.
+ *
+ * `/todos/alle` is the meta-board "Alle": no board of its own, but the rows of every
+ * readable board with all their cards (`app-todo-board-rows`, `source="all"`), the same
+ * filters and search, no view switch, no settings and no archive; "+ To-Do" starts on the
+ * personal board. Under "Meine To-Dos" and in "Alle" a pointer drag moves a card between
+ * boards (`transferCard`); the page carries the drags between the personal board and the
+ * rows below it.
  *
  * `?card=<id>` opens the card in a drawer over the board (a deep link works the same).
  * `?view=list` shows the table. The board reads itself again every 30 seconds while the
@@ -154,9 +165,13 @@ export class TodosComponent implements OnDestroy {
   });
   private readonly query = toSignal(this.route.queryParamMap, { initialValue: this.route.snapshot.queryParamMap });
 
+  readonly allId = ALL_BOARDS;
   readonly boardId = computed(() => this.params());
+  /** The meta-board "Alle" is shown. */
+  readonly all = computed(() => this.boardId() === ALL_BOARDS);
   readonly cardId = computed(() => this.query().get('card'));
-  readonly view = computed<View>(() => (this.query().get('view') === 'list' ? 'list' : 'board'));
+  /** "Alle" has rows only, so it is always the board view. */
+  readonly view = computed<View>(() => (!this.all() && this.query().get('view') === 'list' ? 'list' : 'board'));
 
   readonly boards = signal<TodoBoardSummary[]>([]);
   readonly board = signal<TodoBoard | null>(null);
@@ -166,6 +181,8 @@ export class TodosComponent implements OnDestroy {
   readonly members = signal<TodoMember[]>([]);
   /** The ids of the open cards assigned to me (`GET /todos/mine`), for "Zuständig: Ich". */
   readonly mine = signal<ReadonlySet<Uuid>>(new Set());
+  /** "Alle": my principal id (the one member of my personal board), for "Zuständig: Ich". */
+  readonly meId = signal<Uuid | null>(null);
   private etag: string | null = null;
   private loadSeq = 0;
   /** Counts the local changes of the board: a poll that left before one is dropped. */
@@ -228,9 +245,32 @@ export class TodosComponent implements OnDestroy {
     { value: 'list', label: this.i18n.translate('todos.view.list') },
   ]);
 
-  readonly labelsById = computed<ReadonlyMap<Uuid, TodoLabel>>(
-    () => new Map((this.board()?.labels ?? []).map((l) => [l.id, l])),
-  );
+  /**
+   * The labels of the label filter by id. "Alle": the labels of every row, one per name
+   * (labels are per board; the rows match them by name), by name.
+   */
+  readonly labelsById = computed<ReadonlyMap<Uuid, TodoLabel>>(() => {
+    if (!this.all()) return new Map((this.board()?.labels ?? []).map((l) => [l.id, l]));
+    const byName = new Map<string, TodoLabel>();
+    for (const b of this.rowsView()?.boards() ?? []) {
+      for (const l of b.labels) if (!byName.has(l.name.toLowerCase())) byName.set(l.name.toLowerCase(), l);
+    }
+    const sorted = [...byName.values()].sort((a, b) => a.name.localeCompare(b.name, 'de', { sensitivity: 'base' }));
+    return new Map(sorted.map((l) => [l.id, l]));
+  });
+
+  /** The personal board in the board list ("+ To-Do" of "Alle" starts there). */
+  readonly personalId = computed(() => this.boards().find((b) => b.kind === 'personal')?.id ?? null);
+  /** "+ To-Do" shows: a writable board, or "Alle". */
+  readonly canAdd = computed(() => this.all() || !!this.board()?.canWrite);
+  /** The drop lists of the personal board that the rows below it connect to. */
+  readonly boardDrops = computed(() => {
+    const b = this.board();
+    if (!b?.canWrite || !this.withRows() || this.phone()) return [];
+    return sortedColumns(b.columns).map((c) => boardDropId(c.id));
+  });
+  /** The drop lists of the rows below the personal board (their `drops` output). */
+  readonly rowDrops = signal<string[]>([]);
 
   private readonly doneColumns = computed(
     () => new Set((this.board()?.columns ?? []).filter((c) => c.isDone).map((c) => c.id)),
@@ -240,6 +280,7 @@ export class TodosComponent implements OnDestroy {
   readonly summary = computed(() => this.boards().find((b) => b.id === this.boardId()) ?? null);
 
   readonly openCount = computed(() => {
+    if (this.all()) return this.rowsView()?.openCount() ?? 0;
     const board = this.board();
     // While the board loads, the list already knows its count, so the search does not
     // say "0 offene To-Dos".
@@ -265,6 +306,7 @@ export class TodosComponent implements OnDestroy {
   readonly filtered = computed(() => filterActive(this.filter()));
   readonly noMatch = computed(() => {
     if (!this.filtered()) return false;
+    if (this.all()) return this.rowMatches() === 0;
     if (this.withRows() && (this.rowMatches() ?? 0) > 0) return false;
     for (const list of this.visible().values()) if (list.length) return false;
     return true;
@@ -279,8 +321,10 @@ export class TodosComponent implements OnDestroy {
       label: m.displayName ?? this.i18n.translate('chat.deletedPerson'),
     })),
   ]);
+  /** "Alle" without a single card: the empty state instead of the rows. */
+  readonly allEmpty = computed(() => this.all() && !this.filtered() && this.rowMatches() === 0);
   readonly labelOptions = computed<FilterSelectOption[]>(() =>
-    (this.board()?.labels ?? []).map((l) => ({ value: l.id, label: l.name })),
+    [...this.labelsById().values()].map((l) => ({ value: l.id, label: l.name })),
   );
   readonly dueOptions = computed<FilterSelectOption[]>(() => [
     { value: '', label: this.i18n.translate('todos.filter.all') },
@@ -331,11 +375,19 @@ export class TodosComponent implements OnDestroy {
       },
     });
 
-    // A board in the route: read it (and its people) when it changes.
+    // A board in the route: read it (and its people) when it changes. "Alle" has no
+    // board: its rows read themselves.
     effect(() => {
       const id = this.boardId();
       if (!id) return;
-      untracked(() => this.loadBoard(id));
+      untracked(() => (id === ALL_BOARDS ? this.enterAll() : this.loadBoard(id)));
+    });
+
+    // "Alle": my principal id is the one member of my personal board.
+    effect(() => {
+      const id = this.all() ? this.personalId() : null;
+      if (!id) return;
+      untracked(() => this.loadMe(id));
     });
 
     // Remember the shape of each shown board for its skeleton on a return.
@@ -438,8 +490,35 @@ export class TodosComponent implements OnDestroy {
     });
   }
 
+  /** "Alle": no board, the rows (and their first read) start from a clean state. */
+  private enterAll(): void {
+    this.loadSeq++;
+    this.loading.set(false);
+    this.notFound.set(false);
+    this.error.set(false);
+    this.board.set(null);
+    this.etag = null;
+    this.rowMatches.set(null);
+    this.filter.set(NO_FILTER);
+    this.search.sync('');
+    this.members.set([]);
+  }
+
+  private loadMe(personalId: Uuid): void {
+    if (this.meId()) return;
+    this.api.members(personalId).subscribe({
+      next: (list) => this.meId.set(list[0]?.principalId ?? null),
+      error: () => undefined,
+    });
+  }
+
   /** Read the board again; a 304 keeps it. */
   poll(): void {
+    if (this.all()) {
+      this.today.set(isoDay(new Date()));
+      this.rowsView()?.poll();
+      return;
+    }
     const board = this.board();
     if (!board) return;
     this.rowsView()?.poll();
@@ -513,7 +592,8 @@ export class TodosComponent implements OnDestroy {
   // ------------------------------------------------------------------ header
 
   pickBoard(id: Uuid): void {
-    void this.router.navigate(['/todos', id], { queryParams: { view: this.view() === 'list' ? 'list' : null } });
+    const list = id !== ALL_BOARDS && this.view() === 'list';
+    void this.router.navigate(['/todos', id], { queryParams: { view: list ? 'list' : null } });
   }
 
   setView(value: string | null): void {
@@ -539,7 +619,8 @@ export class TodosComponent implements OnDestroy {
   // ------------------------------------------------------------------ filters
 
   setAssignee(value: string): void {
-    if (value === 'me') this.loadMine();
+    // "Alle" knows the assignees of every card: "Ich" needs no `/todos/mine`.
+    if (value === 'me' && !this.all()) this.loadMine();
     this.filter.update((f) => ({ ...f, assignee: value }));
   }
 
@@ -648,6 +729,10 @@ export class TodosComponent implements OnDestroy {
   }
 
   onCreated(card: TodoCardDetail): void {
+    if (this.all()) {
+      this.rowsView()?.cardChanged(card);
+      return;
+    }
     const board = this.board();
     if (!board || card.boardId !== board.id) return;
     this.mutations++;
@@ -655,29 +740,39 @@ export class TodosComponent implements OnDestroy {
     this.refreshMine();
   }
 
-  onCardChanged(card: TodoCardDetail): void {
-    this.rowsView()?.cardChanged(card);
+  /**
+   * The drawer moved the card to another board (it says so before `changed`): the tile
+   * leaves the shown board when the card came from it, and joins it when the card came
+   * over to it. The drawer stays on the card.
+   */
+  onTransferred(event: { card: TodoCardDetail; fromBoardId: Uuid }): void {
     const board = this.board();
     if (!board) return;
+    const { card } = event;
     const held = board.cards.some((c) => c.id === card.id);
-    if (card.boardId !== board.id) {
-      // The card went to another board: the tile goes, the drawer stays on the card.
-      if (!held) return;
+    if (event.fromBoardId === board.id && held) {
       this.mutations++;
       this.board.set(removeTile(board, card.id));
       this.refreshMine();
       this.refreshBoards();
-      return;
+    } else if (card.boardId === board.id && !held) {
+      this.mutations++;
+      this.board.set(placeTile(board, card));
+      this.refreshBoards();
     }
+  }
+
+  onCardChanged(card: TodoCardDetail): void {
+    this.rowsView()?.cardChanged(card);
+    const board = this.board();
+    // A card of another board (a row, or one that left with a transfer) is not on this board.
+    if (!board || card.boardId !== board.id) return;
+    const held = board.cards.some((c) => c.id === card.id);
     this.mutations++;
     if (card.archivedAt) {
       this.board.set(removeTile(board, card.id));
     } else if (held) {
       this.board.set(placeTile(board, card));
-    } else if (cameFrom(card, board.id)) {
-      // The card came over from another board.
-      this.board.set(placeTile(board, card));
-      this.refreshBoards();
     } else {
       // A card the board does not hold came back from the archive (the drawer's restore).
       this.board.set({ ...placeTile(board, card), archivedCount: Math.max(0, board.archivedCount - 1) });
@@ -715,6 +810,65 @@ export class TodosComponent implements OnDestroy {
     this.board.set({ ...placeTile(board, card), archivedCount: Math.max(0, board.archivedCount - 1) });
   }
 
+  /** A drag in the rows moved a card between two of their boards: the open counts change. */
+  onRowTransferred(): void {
+    this.refreshBoards();
+  }
+
+  /**
+   * A card of the personal board landed in a row below it: it moves at once, and back with
+   * a toast when the server refuses. It stays in that row (it is still mine) until the
+   * rows read themselves again.
+   */
+  onDropIntoRow(event: RowDrop): void {
+    const board = this.board();
+    const rows = this.rowsView();
+    const tile = board?.cards.find((c) => c.id === event.cardId);
+    if (!board || !rows || !tile) return;
+    const optimistic = removeTile(board, tile.id);
+    this.mutations++;
+    this.board.set(optimistic);
+    rows.receive(tile, event.boardId, event.move);
+    this.api.transferCard(tile.id, { boardId: event.boardId, ...event.move }).subscribe({
+      next: (card) => {
+        this.rowsView()?.accept(card);
+        this.refreshBoards();
+        this.refreshMine();
+      },
+      error: () => this.transferFailed(board, optimistic),
+    });
+  }
+
+  /** A card of a row landed on the personal board above: it moves at once, as above. */
+  onDropFromRow(event: BoardMove): void {
+    const board = this.board();
+    const tile = board?.canWrite ? this.rowsView()?.take(event.cardId) : null;
+    if (!board || !tile) return;
+    const optimistic = insertTile(board, tile, event.move);
+    this.mutations++;
+    this.board.set(optimistic);
+    this.api.transferCard(tile.id, { boardId: board.id, ...event.move }).subscribe({
+      next: (card) => {
+        const now = this.board();
+        if (now?.id === board.id) {
+          this.mutations++;
+          this.board.set(replaceTile(now, card));
+        }
+        this.refreshBoards();
+        this.refreshMine();
+      },
+      error: () => this.transferFailed(board, optimistic),
+    });
+  }
+
+  /** Roll a refused drag between the board and the rows back, then read both again. */
+  private transferFailed(board: TodoBoard, optimistic: TodoBoard): void {
+    this.toast.error(this.i18n.translate('todos.error.transfer'));
+    if (this.board() === optimistic) this.board.set(board);
+    this.resync(board.id);
+    this.rowsView()?.refresh();
+  }
+
   onSettingsChanged(board: TodoBoard): void {
     this.mutations++;
     this.board.set(board);
@@ -725,10 +879,4 @@ export class TodosComponent implements OnDestroy {
     const id = this.boardId();
     if (id) this.loadBoard(id);
   }
-}
-
-/** True when the last event of the card is its move from another board onto `boardId`. */
-function cameFrom(card: TodoCardDetail, boardId: Uuid): boolean {
-  const last = card.events.at(-1);
-  return last?.kind === 'moved' && last.payload['toBoardId'] === boardId;
 }

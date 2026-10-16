@@ -91,6 +91,20 @@ describe('TodosApiService', () => {
     expect(errors).toHaveLength(1);
   });
 
+  it('polls every board for "Alle" with If-None-Match', () => {
+    const got: unknown[] = [];
+    api.pollAllBoards(null).subscribe((r) => got.push(r));
+    const first = http.expectOne('/api/todos/all/boards');
+    expect(first.request.headers.has('If-None-Match')).toBe(false);
+    first.flush([{ id: 'b-0' }], { headers: { ETag: 'W/"3"' } });
+    expect(got[0]).toEqual({ boards: [{ id: 'b-0' }], etag: 'W/"3"' });
+    api.pollAllBoards('W/"3"').subscribe((r) => got.push(r));
+    const second = http.expectOne('/api/todos/all/boards');
+    expect(second.request.headers.get('If-None-Match')).toBe('W/"3"');
+    second.flush(null, { status: 304, statusText: 'Not Modified' });
+    expect(got[1]).toEqual({ boards: null, etag: 'W/"3"' });
+  });
+
   it('passes any other error of a poll on', () => {
     const errors: unknown[] = [];
     api.pollBoard('b-1', null).subscribe({ error: (e: unknown) => errors.push(e) });

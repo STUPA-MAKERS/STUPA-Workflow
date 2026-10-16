@@ -565,9 +565,17 @@ describe('TodoCardDetailComponent', () => {
     // The current board is no target.
     expect(api.boards).toHaveBeenCalled();
     expect(api.board).toHaveBeenCalledWith('b-0');
+    const order: string[] = [];
+    const transferred = jest.fn(() => order.push('transferred'));
+    cmp.transferred.subscribe(transferred);
+    changed.mockImplementation(() => order.push('changed'));
+    const from = cmp.card()?.boardId;
     cmp.transfer({ boardId: 'b-2', columnId: 'c-1', boardName: 'Fachschaft Informatik' });
     expect(api.transferCard).toHaveBeenCalledWith('k-1', { boardId: 'b-2', columnId: 'c-1' });
     expect(changed).toHaveBeenLastCalledWith(expect.objectContaining({ boardId: 'b-2' }));
+    // The page learns of the transfer first, with the board the card left.
+    expect(transferred).toHaveBeenCalledWith({ card: expect.objectContaining({ boardId: 'b-2' }), fromBoardId: from });
+    expect(order).toEqual(['transferred', 'changed']);
     expect(cmp.card()?.boardId).toBe('b-2');
     expect(api.members).toHaveBeenLastCalledWith('b-2');
     expect(toast.success).toHaveBeenCalledWith('Karte nach „Fachschaft Informatik“ verschoben');

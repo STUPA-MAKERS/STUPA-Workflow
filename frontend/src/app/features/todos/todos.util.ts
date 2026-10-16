@@ -332,6 +332,15 @@ export function moveRequest(list: readonly TodoCardTile[], index: number, column
   return below ? { columnId, beforeId: below.id } : { columnId };
 }
 
+/**
+ * The move request for a card from another board that lands at `index` of `list`, the
+ * target column WITHOUT the card (the same neighbors as `moveRequest`).
+ */
+export function dropMove(list: readonly TodoCardTile[], index: number, columnId: Uuid): TodoCardMove {
+  if (index > 0) return { columnId, afterId: list[index - 1].id };
+  return list[0] ? { columnId, beforeId: list[0].id } : { columnId };
+}
+
 /** What the tile helpers below read of a board: a board read or a row of "Meine To-Dos". */
 export type TileBoard = Pick<TodoBoard, 'columns' | 'cards'>;
 
@@ -379,6 +388,12 @@ export function placeTile<B extends TileBoard>(board: B, tile: TodoCardTile): B 
   const next = base.cards.find((c) => c.id !== tile.id && c.columnId === tile.columnId && c.rank > tile.rank);
   const moved = applyMove(base, tile.id, next ? { columnId: tile.columnId, beforeId: next.id } : { columnId: tile.columnId });
   return replaceTile(moved, tile);
+}
+
+/** The board after a card of another board landed on it, before the server answers. */
+export function insertTile<B extends TileBoard & { id: Uuid }>(board: B, tile: TodoCardTile, move: TodoCardMove): B {
+  const base = { ...board, cards: [...board.cards.filter((c) => c.id !== tile.id), { ...tile, boardId: board.id }] };
+  return applyMove(base, tile.id, move);
 }
 
 /** Drop a card from the board (archived). */

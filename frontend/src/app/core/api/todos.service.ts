@@ -184,10 +184,15 @@ export interface TodoCardMove {
   afterId?: Uuid | null;
 }
 
-/** A move to another board: the end of `columnId` (default: the first column). */
+/**
+ * A move to another board: into `columnId` (default: the first column), between
+ * `afterId` (above) and `beforeId` (below) as in a move, else at the end.
+ */
 export interface TodoCardTransfer {
   boardId: Uuid;
   columnId?: Uuid | null;
+  beforeId?: Uuid | null;
+  afterId?: Uuid | null;
 }
 
 export interface TodoMineItem extends TodoCardTile {
@@ -205,9 +210,10 @@ export interface TodoMine {
 }
 
 /**
- * A board of `GET /todos/mine/boards` (the rows under "Meine To-Dos"): all its columns
- * and labels, but only the live cards assigned to the caller (done ones too).
- * `cardCount` of a column counts those cards.
+ * A board of `GET /todos/mine/boards` (the rows under "Meine To-Dos") or of
+ * `GET /todos/all/boards` (the meta-board "Alle"): all its columns and labels, and its
+ * live cards (done ones too): under "mine" only the ones assigned to the caller, under
+ * "all" every one. `cardCount` of a column counts those cards.
  */
 export interface TodoAssignedBoard {
   id: Uuid;
@@ -515,10 +521,22 @@ export class TodosApiService {
    * gives `boards: null`, so the caller keeps its state.
    */
   pollMineBoards(etag: string | null): Observable<TodoAssignedPoll> {
+    return this.pollRows('mine', etag);
+  }
+
+  /**
+   * Every readable board with all its live cards, the personal one first (the meta-board
+   * "Alle"), with `If-None-Match`. A 304 gives `boards: null`.
+   */
+  pollAllBoards(etag: string | null): Observable<TodoAssignedPoll> {
+    return this.pollRows('all', etag);
+  }
+
+  private pollRows(source: 'mine' | 'all', etag: string | null): Observable<TodoAssignedPoll> {
     let headers = new HttpHeaders();
     if (etag) headers = headers.set('If-None-Match', etag);
     return this.http
-      .get<TodoAssignedBoard[]>(`${this.base}/todos/mine/boards`, {
+      .get<TodoAssignedBoard[]>(`${this.base}/todos/${source}/boards`, {
         headers,
         observe: 'response',
         context: skipLoading(),

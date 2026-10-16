@@ -78,9 +78,10 @@
           cdkDropList
           role="list"
           [attr.aria-label]="col.name"
-          [id]="'bv-list-' + col.id"
+          [id]="dropId(col.id)"
           [cdkDropListData]="col.id"
           [cdkDropListDisabled]="!canWrite()"
+          [cdkDropListConnectedTo]="canWrite() ? connectTo() : []"
           (cdkDropListEntered)="onEnter($event)"
           (cdkDropListDropped)="drop($event)"
         >

@@ -170,6 +170,12 @@ export class TodoCardDetailComponent {
   readonly commentsChanged = output<{ id: Uuid; commentCount: number }>();
   /** The card went into the archive. */
   readonly archived = output<Uuid>();
+  /**
+   * The card moved to another board (the card menu "In anderes Board verschieben"): the
+   * card on its new board and the id of the board it left. It goes out before `changed`,
+   * so the page knows that a card new to its board came over and was not restored.
+   */
+  readonly transferred = output<{ card: TodoCardDetail; fromBoardId: Uuid }>();
 
   readonly phone = mediaQuerySignal(MEDIA.phone);
   readonly card = signal<TodoCardDetail | null>(null);
@@ -814,6 +820,7 @@ export class TodoCardDetailComponent {
         this.busy.set(false);
         this.transferring.set(false);
         this.transferOpen.set(false);
+        this.transferred.emit({ card, fromBoardId: c.boardId });
         this.apply(card);
         this.loadMembers(card.boardId);
         this.toast.success(this.t('todos.card.transferred', { board: target.boardName }));

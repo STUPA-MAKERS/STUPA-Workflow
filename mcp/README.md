@@ -99,8 +99,9 @@ Public meeting (#17): `list_meeting_guests`, `admit_meeting_guest`, `admit_all_m
 On behalf (#11): `create_application_on_behalf`, `search_on_behalf_applicants` (needs
 `application.create_on_behalf`).
 To-dos: `todo_boards`, `todo_board`, `todo_my_cards` (my cards on the other boards, by
-board), `todo_card_get`, `todo_card_create`, `todo_card_update` (needs the card `version`),
-`todo_card_move`, `todo_card_transfer` (to another board), `todo_comment`.
+board), `todo_all_boards` (every readable board with all its cards), `todo_card_get`, `todo_card_create`, `todo_card_update` (needs the card `version`),
+`todo_card_move`, `todo_card_transfer` (to another board, optionally between two
+neighbors), `todo_comment`.
 Tickets: `tickets_list`, `tickets_get`, `tickets_note`, `tickets_update`,
 `tickets_block_sender`, `tickets_unblock_sender`, `tickets_blocked_senders`,
 `tickets_delete_blocked_sender` (need `ticket.manage`).

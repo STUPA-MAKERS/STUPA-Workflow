@@ -1,16 +1,22 @@
 import { ScrollDispatcher } from '@angular/cdk/scrolling';
-import { CdkDrag, type CdkDragDrop } from '@angular/cdk/drag-drop';
+import { CdkDrag, CdkDropList, type CdkDragDrop } from '@angular/cdk/drag-drop';
 import { By } from '@angular/platform-browser';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import { Subject, of, throwError, type Observable } from 'rxjs';
-import { TodosApiService, type TodoAssignedBoard, type TodoAssignedPoll, type TodoCardTile } from '@core/api/todos.service';
+import {
+  TodosApiService,
+  type TodoAssignedBoard,
+  type TodoAssignedPoll,
+  type TodoCardDetail,
+  type TodoCardTile,
+} from '@core/api/todos.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { NO_FILTER } from '../../../features/todos/todos.util';
 import { TODAY, board, detail, tile } from '../../../../testing/todo-fixtures';
 import { DONE_PREVIEW } from '../board-view/todo-board-view.component';
-import { COLLAPSED_KEY, TodoBoardRowsComponent, boardRows } from './todo-board-rows.component';
+import { COLLAPSED_KEY, TodoBoardRowsComponent, boardRows, rowDropId } from './todo-board-rows.component';
 
 const ME = { principalId: 'me', displayName: 'Mara Keller' };
 
@@ -47,7 +53,9 @@ interface Opts {
   boards?: TodoAssignedBoard[];
   poll?: () => Observable<TodoAssignedPoll>;
   move?: () => Observable<TodoCardTile>;
+  transfer?: () => Observable<TodoCardDetail>;
   phone?: boolean;
+  inputs?: Record<string, unknown>;
 }
 
 async function setup(opts: Opts = {}) {
@@ -55,12 +63,17 @@ async function setup(opts: Opts = {}) {
   const boards = opts.boards ?? [row(), team()];
   const api = {
     pollMineBoards: jest.fn(opts.poll ?? ((): Observable<TodoAssignedPoll> => of({ boards, etag: 'W/"r"' }))),
+    pollAllBoards: jest.fn((): Observable<TodoAssignedPoll> => of({ boards, etag: 'W/"a"' })),
     moveCard: jest.fn(opts.move ?? (() => of(tile({ id: 'k-1', columnId: 'c-2', title: 'Raum buchen', assignees: [ME] })))),
+    transferCard: jest.fn(
+      opts.transfer ??
+        (() => of(detail({ id: 'k-1', boardId: 'b-9', columnId: 't-1', rank: '0', title: 'Raum buchen', assignees: [ME] }))),
+    ),
   };
   const toast = { success: jest.fn(), error: jest.fn() };
-  const on = { openCard: jest.fn(), matches: jest.fn() };
+  const on = { openCard: jest.fn(), matches: jest.fn(), dropIn: jest.fn(), transferred: jest.fn() };
   const view = await render(TodoBoardRowsComponent, {
-    inputs: { filter: NO_FILTER, today: TODAY, phone: opts.phone ?? false },
+    inputs: { filter: NO_FILTER, today: TODAY, phone: opts.phone ?? false, ...opts.inputs },
     on,
     providers: [
       provideRouter([]),
@@ -117,6 +130,44 @@ describe('boardRows', () => {
     expect(boardRows([row(), team()], { ...NO_FILTER, q: 'haushalt' }, TODAY).map((r) => r.board.id)).toEqual(['b-1']);
     const stray = row({ cards: [tile({ id: 'x', columnId: 'gone', assignees: [ME] })] });
     expect(boardRows([stray], NO_FILTER, TODAY)).toEqual([]);
+  });
+});
+
+describe('boardRows of "Alle"', () => {
+  const other = { principalId: 'p-7', displayName: 'Olaf' };
+  const all = (cards: TodoCardTile[]) => row({ cards });
+
+  it('keeps every board as a row while no filter is on and some board has a card', () => {
+    const empty = team({ cards: [] });
+    expect(boardRows([all([tile({ id: 'k-1' })]), empty], NO_FILTER, TODAY, { all: true }).map((r) => r.count)).toEqual([1, 0]);
+    expect(boardRows([all([]), empty], NO_FILTER, TODAY, { all: true })).toEqual([]);
+    const filtered = boardRows([all([tile({ id: 'k-1', title: 'A' })]), empty], { ...NO_FILTER, q: 'a' }, TODAY, { all: true });
+    expect(filtered.map((r) => r.board.id)).toEqual(['b-1']);
+  });
+
+  it('filters "Ich" by the assignee', () => {
+    const cards = [tile({ id: 'k-1', assignees: [ME] }), tile({ id: 'k-2', assignees: [other] }), tile({ id: 'k-3' })];
+    const mine = { ...NO_FILTER, assignee: 'me' };
+    expect(boardRows([all(cards)], mine, TODAY, { all: true, me: 'me' })[0].count).toBe(1);
+    expect(boardRows([all(cards)], mine, TODAY, { all: true, me: null })).toEqual([]);
+    expect(boardRows([all(cards)], mine, TODAY)[0].count).toBe(3);
+  });
+
+  it('matches a label filter by the label name on every board', () => {
+    const urgent = { id: 'l-1', name: 'Eilig', color: 'red' as const };
+    const theirs = { id: 't-l', name: 'eilig', color: 'blue' as const };
+    const a = row({ labels: [urgent], cards: [tile({ id: 'k-1', labelIds: ['l-1'] }), tile({ id: 'k-2' })] });
+    const b = team({ labels: [theirs], cards: [tile({ id: 'k-9', boardId: 'b-9', columnId: 't-1', labelIds: ['t-l'] })] });
+    const c = team({ id: 'b-8', labels: [], cards: [tile({ id: 'k-8', boardId: 'b-8', columnId: 't-1' })] });
+    const f = { ...NO_FILTER, labels: ['l-1'] };
+    const rows = boardRows([a, b, c], f, TODAY, { all: true, filterLabels: new Map([['l-1', urgent]]) });
+    expect(rows.map((r) => [r.board.id, r.count])).toEqual([
+      ['b-1', 1],
+      ['b-9', 1],
+    ]);
+    // An id the filter does not know matches nothing; without the map the ids compare.
+    expect(boardRows([a], { ...NO_FILTER, labels: ['x'] }, TODAY, { filterLabels: new Map() })).toEqual([]);
+    expect(boardRows([a, b], f, TODAY).map((r) => r.board.id)).toEqual(['b-1']);
   });
 });
 
@@ -225,19 +276,22 @@ describe('TodoBoardRowsComponent', () => {
     expect(api.moveCard).toHaveBeenCalledTimes(1);
   });
 
-  it('moves the column counts with a pointer drag inside its row only', async () => {
+  it('moves the column counts with a pointer drag, also over another row', async () => {
     const { cmp } = await setup();
     const [r, other] = cmp.rows();
     const [open, doing] = r.columns;
     cmp.kb.set({ boardId: 'b-1', cardId: 'k-1', col: 0, index: 0, fromCol: 0, fromIndex: 0 });
     cmp.onEnter({ container: { data: doing.id } } as never);
     expect(cmp.ptr()).toBeNull();
-    cmp.onDragStart(r, open);
+    cmp.onDragStart(open);
     expect(cmp.kb()).toBeNull();
     expect(cmp.count(r, open)).toBe(2);
     cmp.onEnter({ container: { data: doing.id } } as never);
     expect([cmp.count(r, open), cmp.count(r, doing), cmp.count(r, r.columns[2])]).toEqual([1, 1, 0]);
     expect(cmp.count(other, other.columns[0])).toBe(1);
+    // Over a column of another row, that row counts the card.
+    cmp.onEnter({ container: { data: other.columns[0].id } } as never);
+    expect([cmp.count(r, open), cmp.count(other, other.columns[0])]).toEqual([1, 2]);
     cmp.ptr.set(null);
     expect(cmp.count(r, open)).toBe(2);
   });
@@ -431,5 +485,105 @@ describe('TodoBoardRowsComponent', () => {
     cmp.cardChanged(detail({ id: 'k-1', boardId: 'b-9', columnId: 't-1', assignees: [ME] }));
     expect(cmp.boards()[0].cards.some((c) => c.id === 'k-1')).toBe(false);
     expect(cmp.boards()[1].cards.map((c) => c.id)).toContain('k-1');
+  });
+  it('reads every board for "Alle" and filters "Ich" by my id', async () => {
+    const mixed = row({ cards: [tile({ id: 'k-1', title: 'Meins', assignees: [ME] }), tile({ id: 'k-2', title: 'Fremd' })] });
+    const { api, cmp, fixture, settle } = await setup({ boards: [mixed], inputs: { source: 'all', me: 'me' } });
+    expect(api.pollAllBoards).toHaveBeenCalledWith(null);
+    expect(api.pollMineBoards).not.toHaveBeenCalled();
+    expect(cmp.rows()[0].count).toBe(2);
+    expect(cmp.openCount()).toBe(2);
+    fixture.componentRef.setInput('filter', { ...NO_FILTER, assignee: 'me' });
+    await settle();
+    expect(cmp.rows()[0].count).toBe(1);
+    cmp.poll();
+    expect(api.pollAllBoards).toHaveBeenLastCalledWith('W/"a"');
+  });
+
+  it('connects the columns of every writable open row and the personal board', async () => {
+    const { cmp, fixture, settle } = await setup({ inputs: { extraDrops: ['bv-list-p-1'] } });
+    const own = row().columns.map((c) => rowDropId(c.id));
+    expect(cmp.dropIds()).toEqual(own);
+    expect(cmp.connected()).toEqual([...own, 'bv-list-p-1']);
+    const lists = fixture.debugElement.queryAll(By.directive(CdkDropList)).map((d) => d.injector.get(CdkDropList));
+    const byId = new Map(lists.map((l) => [l.id, l]));
+    expect(byId.get(rowDropId('c-1'))?.connectedTo).toEqual([...own, 'bv-list-p-1']);
+    // The read-only row is neither source nor target.
+    expect(byId.get(rowDropId('t-1'))?.connectedTo).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: /Studierendenparlament/ }));
+    await settle();
+    expect(cmp.dropIds()).toEqual([]);
+    fixture.componentRef.setInput('phone', true);
+    expect(cmp.dropIds()).toEqual([]);
+  });
+
+  it('transfers a card dropped on another row at once and takes the answer', async () => {
+    const answer = new Subject<TodoCardDetail>();
+    const third = team({ id: 'b-8', name: 'Dritte', columns: [{ id: 'z-1', name: 'Neu', position: 0, isDone: false, cardCount: 1 }], cards: [tile({ id: 'k-8', boardId: 'b-8', columnId: 'z-1', assignees: [ME] })] });
+    const { cmp, api, on } = await setup({ boards: [row(), team({ canWrite: true }), third], transfer: () => answer });
+    const [, other] = cmp.rows();
+    cmp.drop(other, dropEvent('k-1', 'c-1', 't-1', 0, 0));
+    expect(api.transferCard).toHaveBeenCalledWith('k-1', { boardId: 'b-9', columnId: 't-1', beforeId: 'k-9' });
+    expect(cmp.boards()[0].cards.some((c) => c.id === 'k-1')).toBe(false);
+    expect(cmp.boards()[1].cards.map((c) => c.id)).toEqual(['k-1', 'k-9']);
+    expect(cmp.boards()[1].cards[0].boardId).toBe('b-9');
+    answer.next(detail({ id: 'k-1', boardId: 'b-9', columnId: 't-1', title: 'Raum buchen', labelIds: [] }));
+    expect(cmp.boards()[1].cards[0].title).toBe('Raum buchen');
+    expect(on.transferred).toHaveBeenCalledWith(expect.objectContaining({ id: 'k-1', boardId: 'b-9' }));
+    expect(api.moveCard).not.toHaveBeenCalled();
+    expect(cmp.boards()[2]).toBe(third);
+  });
+
+  it('reports no count before the first read answers', async () => {
+    const { on } = await setup({ poll: () => new Subject<TodoAssignedPoll>() });
+    expect(on.matches).not.toHaveBeenCalled();
+  });
+
+  it('puts a refused transfer back with a toast and reads the rows again', async () => {
+    const { cmp, api, toast } = await setup({
+      boards: [row(), team({ canWrite: true })],
+      transfer: () => throwError(() => new Error('x')),
+    });
+    const before = cmp.boards();
+    const [, other] = cmp.rows();
+    api.pollMineBoards.mockImplementation(() => new Subject<TodoAssignedPoll>());
+    cmp.drop(other, dropEvent('k-2', 'c-1', 't-1', 1, 1));
+    expect(api.transferCard).toHaveBeenCalledWith('k-2', { boardId: 'b-9', columnId: 't-1', afterId: 'k-9' });
+    expect(toast.error).toHaveBeenCalledWith('Die Karte konnte nicht verschoben werden.');
+    expect(cmp.boards()).toBe(before);
+    expect(api.pollMineBoards).toHaveBeenLastCalledWith(null);
+  });
+
+  it('keeps a newer change when a transfer is refused late', async () => {
+    const answer = new Subject<TodoCardDetail>();
+    const { cmp, api } = await setup({ boards: [row(), team({ canWrite: true })], transfer: () => answer });
+    api.pollMineBoards.mockImplementation(() => new Subject<TodoAssignedPoll>());
+    cmp.drop(cmp.rows()[1], dropEvent('k-1', 'c-1', 't-1', 0, 0));
+    cmp.commentsChanged({ id: 'k-9', commentCount: 3 });
+    const changed = cmp.boards();
+    answer.error(new Error('x'));
+    expect(cmp.boards()).toBe(changed);
+  });
+
+  it('drops nothing on a read-only row and hands a card of the personal board to the page', async () => {
+    const { cmp, api, on } = await setup();
+    const [r, readOnly] = cmp.rows();
+    cmp.drop(readOnly, dropEvent('k-1', 'c-1', 't-1', 0, 0));
+    expect(api.transferCard).not.toHaveBeenCalled();
+    cmp.drop(r, dropEvent('p-card', 'p-col', 'c-1', 0, 1));
+    expect(on.dropIn).toHaveBeenCalledWith({ boardId: 'b-1', cardId: 'p-card', move: { columnId: 'c-1', afterId: 'k-1' } });
+  });
+
+  it('takes, receives and accepts a card that the page moves', async () => {
+    const { cmp } = await setup();
+    expect(cmp.take('nope')).toBeNull();
+    const taken = cmp.take('k-9');
+    expect(taken?.id).toBe('k-9');
+    expect(cmp.boards()[1].cards).toEqual([]);
+    const visitor = tile({ id: 'p-1', boardId: 'b-0', columnId: 'p-c', title: 'Privat' });
+    cmp.receive(visitor, 'b-1', { columnId: 'c-2' });
+    expect(cmp.boards()[0].cards.find((c) => c.id === 'p-1')).toMatchObject({ boardId: 'b-1', columnId: 'c-2' });
+    cmp.accept(tile({ id: 'p-1', boardId: 'b-1', columnId: 'c-2', title: 'Privat (neu)' }));
+    expect(cmp.boards()[0].cards.find((c) => c.id === 'p-1')?.title).toBe('Privat (neu)');
   });
 });

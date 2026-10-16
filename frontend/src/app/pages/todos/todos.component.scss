@@ -13,11 +13,6 @@
   min-width: 0;
   min-height: 0;
 }
-.td__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-}
 
 /* ------------------------------------------------------------------ bar */
 .td__bar {
@@ -73,7 +68,7 @@
   outline: 2px solid var(--color-focus-ring);
 }
 
-/* The places of the header buttons and of the filter chips while the board loads. */
+/* The places of the header button and of the filter chips while the board loads. */
 .td__skelIcon {
   display: grid;
   place-items: center;
@@ -83,11 +78,6 @@
 .td__skelIcon .skel-box {
   width: 22px;
   height: 22px;
-}
-.td__skelNew {
-  width: 6.75rem;
-  height: 40px;
-  border-radius: var(--radius-pill);
 }
 .td__skelChip {
   width: 5rem;
@@ -122,6 +112,10 @@
 .td__body--rows > app-todo-board-rows {
   flex: none;
 }
+/* "Alle" ends with the floating "+ To-Do": room for it below the last row. */
+.td__body--rows > app-todo-board-rows:last-child {
+  padding-bottom: calc(56px + var(--space-6));
+}
 .td__state {
   display: flex;
   flex-direction: column;
@@ -145,10 +139,12 @@
   flex-basis: 100%;
   max-width: none;
 }
+/* "+ To-Do" floats at the bottom right on every width, under the card drawer and its
+   scrim (--z-sticky is below --z-dialog). A phone keeps it above the bottom bar. */
 .td__fab {
   position: fixed;
-  right: var(--space-4);
-  bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
+  right: var(--space-6);
+  bottom: var(--space-6);
   z-index: var(--z-sticky);
   display: inline-flex;
   align-items: center;
@@ -171,6 +167,12 @@
 .td__fab:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
+}
+@include bp.phone {
+  .td__fab {
+    right: var(--space-4);
+    bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
+  }
 }
 
 /* ------------------------------------------------------------------ drawer */

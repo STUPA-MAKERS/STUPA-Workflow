@@ -1049,15 +1049,7 @@ class TodoService:
         if target is None:
             raise _invalid("The column is not on this board.", "column_not_on_board", "columnId")
         siblings = await self._column_cards(target.id, exclude=card.id)
-        index = _slot(siblings, payload.after_id, payload.before_id)
-        low = siblings[index - 1].rank if index > 0 else None
-        high = siblings[index].rank if index < len(siblings) else None
-        try:
-            card.rank = _rank(low, high)
-        except RankError:
-            # Two cards share a rank, a rank is broken or the new one is too long:
-            # give the column a fresh order.
-            _respread([*siblings[:index], card, *siblings[index:]])
+        _place(siblings, _slot(siblings, payload.after_id, payload.before_id), card)
         source = columns.get(card.column_id)
         if target.id != card.column_id:
             self._event(
@@ -1085,7 +1077,10 @@ class TodoService:
     async def transfer(
         self, card_id: uuid.UUID, payload: CardTransfer, principal: Principal
     ) -> TodoCardDetail:
-        """Move a card to the end of a column of another board (default: the first column).
+        """Move a card into a column of another board (default: the first column).
+
+        The card goes between ``afterId`` (above) and ``beforeId`` (below), the same
+        neighbors as ``move``; without them it goes to the end of the column.
 
         Labels are per board: a label of the card stays when the target board has a
         label with the same name (case-insensitive), else it is dropped. The service
@@ -1101,7 +1096,8 @@ class TodoService:
                 (HTTP 404).
             ConflictError: ``card_moved`` (a parallel transfer moved the card) or
                 ``card_archived`` (HTTP 409).
-            ValidationProblem: ``transfer_same_board`` or ``column_not_on_board``
+            ValidationProblem: ``transfer_same_board``, ``column_not_on_board``, or
+                ``rank_neighbors_invalid`` for a neighbor outside the target column
                 (HTTP 422).
         """
         actor = await self._actor(principal)
@@ -1156,6 +1152,7 @@ class TodoService:
         )
         dropped_assignees = assignees - await self.access.member_ids(target)
         live = await self._column_cards(column.id)
+        index = _slot(live, payload.after_id, payload.before_id)
         await self.session.execute(delete(TodoCardLabel).where(TodoCardLabel.card_id == card.id))
         if dropped_assignees:
             await self.session.execute(
@@ -1185,7 +1182,7 @@ class TodoService:
                 "droppedAssignees": len(dropped_assignees),
             },
         )
-        _append(live, [card])
+        _place(live, index, card)
         card.board_id = target.id
         card.column_id = column.id
         if not column.is_done:
@@ -1686,30 +1683,79 @@ class TodoService:
             ForbiddenError: A token whose scope allows none of ``todo.write``,
                 ``todo.all`` and ``todo.read_all`` (HTTP 403).
         """
+        return await self._board_rows(principal, mine=True)
+
+    async def all_boards(self, principal: Principal) -> list[TodoAssignedBoard]:
+        """Every readable board with all its live cards (the meta-board "Alle").
+
+        The personal board comes first (the call creates it when it is missing, like
+        ``list_boards``), then the gremium boards by name, then the team boards. A
+        board comes with all its columns in their order, its labels and every live
+        card; ``cardCount`` counts the live cards of each column.
+
+        Raises:
+            ForbiddenError: A token whose scope allows none of ``todo.write``,
+                ``todo.all`` and ``todo.read_all`` (HTTP 403).
+        """
+        return await self._board_rows(principal, mine=False)
+
+    async def _board_rows(self, principal: Principal, *, mine: bool) -> list[TodoAssignedBoard]:
+        """Build the board rows of ``mine_boards`` (``mine``) or ``all_boards``.
+
+        The number of queries does not depend on the number of boards: one for the
+        boards or the cards, one each for the columns and the labels, and the tile
+        facts of all cards together.
+        """
         if not token_reads(principal):
             raise ForbiddenError("The token scope does not allow to-dos.")
         me = await self.access.me(principal)
-        if me is None:
+        if mine and me is None:
             return []
+        if not mine and me is not None:
+            await ensure_personal_board(self.session, me)
         scope = await self.access.scope(principal)
-        rows = (
-            await self.session.execute(
-                select(TodoCard, TodoBoard)
-                .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
-                .join(TodoAssignee, TodoAssignee.card_id == TodoCard.id)
-                .where(
-                    TodoAssignee.principal_id == me,
-                    TodoCard.archived_at.is_(None),
-                    TodoBoard.archived_at.is_(None),
-                    TodoBoard.kind != "personal",
-                    scope.condition(),
+        if mine:
+            rows = (
+                await self.session.execute(
+                    select(TodoCard, TodoBoard)
+                    .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
+                    .join(TodoAssignee, TodoAssignee.card_id == TodoCard.id)
+                    .where(
+                        TodoAssignee.principal_id == me,
+                        TodoCard.archived_at.is_(None),
+                        TodoBoard.archived_at.is_(None),
+                        TodoBoard.kind != "personal",
+                        scope.condition(),
+                    )
+                    .order_by(TodoCard.rank, TodoCard.id)
                 )
-                .order_by(TodoCard.rank, TodoCard.id)
+            ).all()
+            boards = {b.id: b for _card, b in rows}
+            cards = [c for c, _b in rows]
+        else:
+            boards = {
+                b.id: b
+                for b in (
+                    await self.session.scalars(
+                        select(TodoBoard).where(scope.condition(), TodoBoard.archived_at.is_(None))
+                    )
+                ).all()
+            }
+            cards = (
+                list(
+                    (
+                        await self.session.scalars(
+                            select(TodoCard)
+                            .where(TodoCard.board_id.in_(boards), TodoCard.archived_at.is_(None))
+                            .order_by(TodoCard.rank, TodoCard.id)
+                        )
+                    ).all()
+                )
+                if boards
+                else []
             )
-        ).all()
-        if not rows:
+        if not boards:
             return []
-        boards = {b.id: b for _card, b in rows}
         columns: dict[uuid.UUID, list[TodoColumn]] = {}
         for col in (
             await self.session.scalars(
@@ -1728,7 +1774,6 @@ class TodoService:
             )
         ).all():
             labels.setdefault(lab.board_id, []).append(lab)
-        cards = [c for c, _b in rows]
         facts = await self._facts(cards, principal)
         per_board: dict[uuid.UUID, list[TodoCard]] = {}
         for c in cards:
@@ -1741,7 +1786,7 @@ class TodoService:
         for b in ordered:
             cols = columns.get(b.id, [])
             position = {c.id: i for i, c in enumerate(cols)}
-            own = per_board[b.id]
+            own = per_board.get(b.id, [])
             own.sort(key=lambda c: (position.get(c.column_id, len(cols)), c.rank, str(c.id)))
             per_column: dict[uuid.UUID, int] = {}
             for c in own:
@@ -1907,6 +1952,21 @@ def _append(live: Sequence[TodoCard], cards: Sequence[TodoCard]) -> None:
             card.rank = last
     except RankError:
         _respread([*live, *cards])
+
+
+def _place(live: Sequence[TodoCard], index: int, card: TodoCard) -> None:
+    """Rank ``card`` at ``index`` among the live cards ``live`` of a column.
+
+    Two cards that share a rank, a broken rank or a new rank above ``MAX_LENGTH``
+    give the column a fresh order. The
+    caller holds the board lock, so no parallel write ranks the column at the same time.
+    """
+    low = live[index - 1].rank if index > 0 else None
+    high = live[index].rank if index < len(live) else None
+    try:
+        card.rank = _rank(low, high)
+    except RankError:
+        _respread([*live[:index], card, *live[index:]])
 
 
 def _slot(
