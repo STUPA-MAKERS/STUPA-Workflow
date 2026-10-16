@@ -7,9 +7,11 @@ import {
   input,
   model,
   output,
+  signal,
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -21,9 +23,13 @@ import {
   type RowMenuItem,
   type RowMenuSection,
 } from '@shared/ui/row-menu/row-menu.component';
+import {
+  TodoNewDialogComponent,
+  type NewTodoLink,
+} from '../../todos/new-dialog/todo-new-dialog.component';
 
 /** The ids of the row menu items of an agenda item. */
-type AgendaAction = 'rename' | 'up' | 'down' | 'nonPublic' | 'remove';
+type AgendaAction = 'rename' | 'up' | 'down' | 'nonPublic' | 'remove' | 'todo';
 
 /**
  * Add, rename, reorder and remove agenda items: the meeting lead with write access, while
@@ -52,6 +58,10 @@ export interface AgendaMove {
  * planned or live meeting changes its agenda (O25); a closed meeting keeps the
  * non-public switch while the protocol is a draft (O22). An item with an open or
  * closed vote stays on the agenda, so its remove is disabled with the reason.
+ *
+ * "To-Do anlegen" (frame 5) is in the menu of every item for a person with `todo.write`
+ * in the gremium of the meeting, also on a closed meeting: it opens "Neues To-Do" on the
+ * gremium board, linked to the TOP and to its application.
  */
 @Component({
   selector: 'app-agenda-pane',
@@ -64,12 +74,14 @@ export interface AgendaMove {
     IconComponent,
     ListItemComponent,
     RowMenuComponent,
+    TodoNewDialogComponent,
   ],
   templateUrl: './agenda-pane.component.html',
   styleUrl: './agenda-pane.component.scss',
 })
 export class AgendaPaneComponent {
   private readonly i18n = inject(I18nService);
+  private readonly auth = inject(AuthService);
   private readonly heading = viewChild.required<ElementRef<HTMLElement>>('heading');
 
   readonly meeting = input.required<Meeting>();
@@ -104,6 +116,15 @@ export class AgendaPaneComponent {
   readonly dragStart = output<number>();
   readonly dragOver = output<DragEvent>();
   readonly dropAt = output<number>();
+
+  /** "Neues To-Do" from the menu of an item: open, and the links it starts with. */
+  protected readonly todoOpen = signal(false);
+  protected readonly todoLinks = signal<readonly NewTodoLink[]>([]);
+  /** The person may write To-Dos on the board of the gremium of the meeting. */
+  protected readonly canCreateTodo = computed(() => {
+    const gremiumId = this.meeting().gremiumId;
+    return !!gremiumId && this.auth.canInGremium(gremiumId, 'todo.write');
+  });
 
   /** Set the non-public flag: the meeting lead with write access, protocol not locked. */
   protected readonly canEditAgenda = computed(() => this.meeting().canWrite && !this.locked());
@@ -194,6 +215,13 @@ export class AgendaPaneComponent {
 
   /** The row menu of an item. Empty when nothing on the agenda may change. */
   private menu(item: AgendaItem, index: number): RowMenuSection[] {
+    const sections = this.agendaMenu(item, index);
+    if (!this.canCreateTodo()) return sections;
+    const todo: RowMenuItem = { id: 'todo', label: this.i18n.translate('meetings.agenda.todo'), icon: 'circleok' };
+    return [{ items: [todo] }, ...sections];
+  }
+
+  private agendaMenu(item: AgendaItem, index: number): RowMenuSection[] {
     if (!this.canEditAgenda()) return [];
     const t = (key: TranslationKey): string => this.i18n.translate(key);
     const nonPublic: RowMenuItem = {
@@ -236,6 +264,10 @@ export class AgendaPaneComponent {
   }
 
   protected onAction(item: AgendaItem, index: number, action: RowMenuItem): void {
+    if (action.id === 'todo') {
+      this.openTodo(item, index);
+      return;
+    }
     if (this.savingAgenda()) return;
     switch (action.id as AgendaAction) {
       case 'rename':
@@ -254,5 +286,20 @@ export class AgendaPaneComponent {
         this.remove.emit(item.id);
         break;
     }
+  }
+
+  /** "Neues To-Do" linked to the TOP and, for an application item, to the application. */
+  private openTodo(item: AgendaItem, index: number): void {
+    const title = this.title(item);
+    const links: NewTodoLink[] = [
+      {
+        kind: 'agenda_item',
+        targetId: item.id,
+        label: `${this.i18n.translate('todos.link.top', { n: index + 1 })} · ${title}`,
+      },
+    ];
+    if (item.applicationId) links.push({ kind: 'application', targetId: item.applicationId, label: title });
+    this.todoLinks.set(links);
+    this.todoOpen.set(true);
   }
 }

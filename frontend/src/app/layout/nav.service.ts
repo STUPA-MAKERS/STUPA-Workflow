@@ -45,6 +45,7 @@ export type NavKey =
   | 'start'
   | 'applications'
   | 'tasks'
+  | 'todos'
   | 'meetings'
   | 'gremien'
   | 'voting'
@@ -83,6 +84,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // Without application.read these pages show only the applications and tasks of the user.
   { key: 'applications', path: '/applications', labelKey: 'nav.applications', icon: 'file', permissions: [], place: 'main' },
   { key: 'tasks', path: '/tasks', labelKey: 'nav.tasks', icon: 'tasks', permissions: [], place: 'main' },
+  // Every session has at least the personal board.
+  { key: 'todos', path: '/todos', labelKey: 'nav.todos', icon: 'circleok', permissions: [], place: 'main' },
   {
     key: 'meetings',
     path: '/meetings',

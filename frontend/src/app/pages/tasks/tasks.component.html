@@ -1,5 +1,5 @@
 <div class="tasks" [class.tasks--split]="split()">
-  <app-list-detail [detailOpen]="selectedId() !== null" (back)="closeDetail()">
+  <app-list-detail [detailOpen]="detailOpen()" (back)="closeDetail()">
     <section list class="ld-pane" aria-labelledby="tasks-title">
       <app-page-header
         [pane]="true"
@@ -7,12 +7,35 @@
         [title]="'tasks.title' | t"
       />
 
+      @if (hasTodos()) {
+        <div class="tasks__chips" role="group" [attr.aria-label]="'tasks.show.group' | t">
+          <app-filter-select
+            [label]="'tasks.show.label' | t"
+            [options]="showOptions()"
+            [value]="show()"
+            (valueChange)="setShow($event)"
+            [text]="showText()"
+            [active]="true"
+          />
+          <app-filter-select
+            [label]="'todos.filter.due' | t"
+            [options]="dueOptions()"
+            [value]="due()"
+            (valueChange)="setDue($event)"
+            [text]="dueText()"
+            [active]="due() !== ''"
+            [icon]="due() ? 'check' : null"
+            [chevron]="!due()"
+          />
+        </div>
+      }
+
       <div class="tasks__scroll" appScrollFade="y">
         @if (error()) {
           <p class="tasks__status tasks__status--error" role="alert">{{ 'tasks.error' | t }}</p>
         } @else if (loading()) {
           <app-skeleton variant="rows" [count]="6" [label]="'tasks.loading' | t" />
-        } @else if (!rows().length) {
+        } @else if (!rows().length && !hasTodos()) {
           @if (split()) {
             <!-- Side by side the detail pane shows the empty state; one is enough. -->
             <p class="tasks__status">{{ 'tasks.empty' | t }}</p>
@@ -25,7 +48,15 @@
             />
           }
         } @else {
-          @for (group of groups(); track group.key + $index) {
+          @if (hasTodos() && showApplications()) {
+            <h2 class="tasks__kind" data-testid="tasks-apps-head">
+              {{ 'tasks.group.applications' | t }} <span class="tasks__kindN">{{ rows().length }}</span>
+            </h2>
+            @if (!rows().length) {
+              <p class="tasks__status">{{ 'tasks.empty' | t }}</p>
+            }
+          }
+          @for (group of showApplications() ? groups() : []; track group.key + $index) {
             <section class="tasks__group" [attr.aria-label]="group.label || null">
               @if (group.label) {
                 <h2 class="sec tasks__month">{{ group.label }}</h2>
@@ -59,6 +90,38 @@
                           waitingSince(row.since)
                         }}</span>
                       </span>
+                      @if (!split()) {
+                        <app-icon class="tasks__chev" name="chevron-right" [size]="17" />
+                      }
+                    </span>
+                  </app-list-item>
+                }
+              </div>
+            </section>
+          }
+          @if (showTodos()) {
+            <section class="tasks__group" aria-labelledby="tasks-todos-head">
+              <h2 class="tasks__kind" id="tasks-todos-head">
+                {{ 'tasks.group.todos' | t }} <span class="tasks__kindN">{{ todoRows().length }}</span>
+              </h2>
+              @if (!todoRows().length) {
+                <p class="tasks__status">{{ 'todos.noMatch' | t }}</p>
+              }
+              <div class="tasks__rows" [class.rowgroup]="!split()" role="list">
+                @for (row of todoRows(); track row.item.id) {
+                  <app-list-item
+                    role="listitem"
+                    class="tasks__row"
+                    [title]="row.item.title"
+                    [link]="['/tasks', 'todo', row.item.id]"
+                    [selected]="row.item.id === selectedTodo()"
+                  >
+                    <app-icon lead class="tasks__circle" name="circle" [size]="20" />
+                    <span sub class="tasks__board">
+                      <app-icon name="kanban" [size]="14" />{{ row.item.boardName }}
+                    </span>
+                    <span trail class="tasks__trail">
+                      <span class="tasks__due" [attr.data-tone]="row.tone">{{ row.due ?? ('todos.due.none' | t) }}</span>
                       @if (!split()) {
                         <app-icon class="tasks__chev" name="chevron-right" [size]="17" />
                       }

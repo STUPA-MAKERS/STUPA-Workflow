@@ -36,7 +36,7 @@ describe('NavService', () => {
   });
 
   it('shows a plain member only the personal areas', () => {
-    expect(keysFor(BASE)).toEqual(['start', 'applications', 'tasks']);
+    expect(keysFor(BASE)).toEqual(['start', 'applications', 'tasks', 'todos']);
   });
 
   it('opens the budget areas with a global budget right', () => {
@@ -44,6 +44,7 @@ describe('NavService', () => {
       'start',
       'applications',
       'tasks',
+      'todos',
       'budget',
       'expenses',
       'invoices',
@@ -51,8 +52,14 @@ describe('NavService', () => {
   });
 
   it('opens the tickets with ticket.manage, after the invoices', () => {
-    expect(keysFor({ ...BASE, permissions: ['ticket.manage'] })).toEqual(['start', 'applications', 'tasks', 'tickets']);
+    expect(keysFor({ ...BASE, permissions: ['ticket.manage'] })).toEqual(['start', 'applications', 'tasks', 'todos', 'tickets']);
     expect(NAV_ITEMS.findIndex((i) => i.key === 'tickets')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'invoices') + 1);
+  });
+
+  it('shows the To-Dos to every session, after the tasks', () => {
+    const todos = NAV_ITEMS.find((i) => i.key === 'todos');
+    expect(todos).toMatchObject({ path: '/todos', labelKey: 'nav.todos', icon: 'circleok', permissions: [] });
+    expect(NAV_ITEMS.findIndex((i) => i.key === 'todos')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'tasks') + 1);
   });
 
   it('opens the administration with any area-admin right', () => {

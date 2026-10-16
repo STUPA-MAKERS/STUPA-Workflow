@@ -1,6 +1,10 @@
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
+import { of } from 'rxjs';
 import type { AgendaItem, Meeting } from '@core/api/models';
+import { TodosApiService } from '@core/api/todos.service';
+import { AuthService } from '@core/auth/auth.service';
+import { BOARDS, MEMBERS, board } from '../../../../testing/todo-fixtures';
 import { AGENDA, item, meeting, vote } from '../../../../testing/meeting-fixtures';
 import { AgendaPaneComponent } from './agenda-pane.component';
 
@@ -19,7 +23,7 @@ interface Inputs {
   renameDraft: string;
 }
 
-async function setup(over: Partial<Inputs> = {}) {
+async function setup(over: Partial<Inputs> = {}, canTodo?: boolean) {
   const on = Object.fromEntries(OUTPUTS.map((name) => [name, jest.fn()])) as Record<
     (typeof OUTPUTS)[number],
     jest.Mock
@@ -36,6 +40,21 @@ async function setup(over: Partial<Inputs> = {}) {
       ...over,
     },
     on,
+    providers:
+      canTodo === undefined
+        ? []
+        : [
+            { provide: AuthService, useValue: { canInGremium: jest.fn(() => canTodo) } },
+            {
+              provide: TodosApiService,
+              useValue: {
+                boards: jest.fn(() => of(BOARDS)),
+                board: jest.fn(() => of(board())),
+                members: jest.fn(() => of(MEMBERS)),
+                linkTargets: jest.fn(() => of([])),
+              },
+            },
+          ],
   });
   return { ...view, on };
 }
@@ -247,4 +266,38 @@ describe('AgendaPaneComponent', () => {
     expect(on.dragOver).toHaveBeenCalled();
     expect(on.dropAt).toHaveBeenCalledWith(1);
   });
+
+  describe('To-Do anlegen', () => {
+    it('opens "Neues To-Do" linked to the TOP and its application', async () => {
+      const view = await setup({ locked: true }, true);
+      const menu = await openMenu(2);
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'To-Do anlegen' }));
+      view.fixture.detectChanges();
+      expect(screen.getByRole('dialog', { name: 'Neues To-Do' })).toBeInTheDocument();
+      expect(screen.getByText('TOP 3 · Antrag Kulturfestival')).toBeInTheDocument();
+      expect(screen.getByText('Antrag Kulturfestival', { selector: '.tn__chipText' })).toBeInTheDocument();
+      expect(view.on.remove).not.toHaveBeenCalled();
+    });
+
+    it('links a free-text TOP only, also while the agenda saves', async () => {
+      const view = await setup({ savingAgenda: true }, true);
+      const menu = await openMenu(0);
+      const items = within(menu).getAllByRole('menuitem').map((i) => i.textContent?.trim());
+      expect(items[0]).toBe('To-Do anlegen');
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'To-Do anlegen' }));
+      view.fixture.detectChanges();
+      expect(document.querySelectorAll('.tn__chip')).toHaveLength(1);
+    });
+
+    it('is not offered without todo.write or without a gremium', async () => {
+      await setup({ locked: true }, false);
+      expect(screen.queryAllByRole('button', { name: /Aktionen für/ })).toHaveLength(0);
+    });
+
+    it('is not offered for a meeting without a gremium', async () => {
+      await setup({ locked: true, meeting: meeting({ gremiumId: null }) }, true);
+      expect(screen.queryAllByRole('button', { name: /Aktionen für/ })).toHaveLength(0);
+    });
+  });
 });
+

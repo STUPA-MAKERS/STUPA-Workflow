@@ -1,0 +1,9 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--space-5) var(--space-6) var(--space-6);
+}
+.tt-pane {
+  flex: 1 1 auto;
+}

@@ -1,0 +1,10 @@
+@if (cardId(); as id) {
+  <app-todo-card-detail
+    class="tt-pane"
+    mode="pane"
+    [cardId]="id"
+    (closed)="close()"
+    (changed)="refresh()"
+    (archived)="onArchived()"
+  />
+}

@@ -277,6 +277,7 @@ describe('ShellComponent', () => {
         'Start',
         'Anträge',
         'Aufgaben',
+        'To-Dos',
         'Sitzungen',
         'Gremien',
         'Abstimmungen',

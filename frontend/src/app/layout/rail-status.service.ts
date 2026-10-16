@@ -19,6 +19,7 @@ import {
 } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { TicketsApiService } from '@core/api/tickets.service';
+import { TodosApiService } from '@core/api/todos.service';
 import { AuthService } from '@core/auth/auth.service';
 import { WsService } from '@core/ws/ws.service';
 import { NavService } from './nav.service';
@@ -49,7 +50,9 @@ export const LIVE_MAX_PAGES = 4;
  * The marks of the navigation: the number of open tasks and whether a meeting runs now.
  *
  * Sources:
- * - tasks: `GET /applications/tasks` (the length of the list);
+ * - tasks: `GET /applications/tasks` (the length of the list) plus `dueSoonCount` of
+ *   `GET /todos/mine` (my open To-Dos due within 7 days). A failed To-Do read counts 0;
+ *   a failed task read gives no count;
  * - tickets: `GET /tickets/counts` (the new tickets), only with `ticket.manage`;
  * - live: `GET /meetings/timeline?direction=upcoming`, where every live meeting is
  *   upcoming (backend `listing.py`), only if the principal sees the meetings entry. The
@@ -69,6 +72,7 @@ export class RailStatusService {
   private readonly auth = inject(AuthService);
   private readonly nav = inject(NavService);
   private readonly tickets = inject(TicketsApiService);
+  private readonly todos = inject(TodosApiService);
 
   private readonly _taskCount = signal<number | null>(null);
   private readonly _ticketCount = signal<number | null>(null);
@@ -129,8 +133,12 @@ export class RailStatusService {
   }
 
   private load(): Observable<{ tasks: number | null; tickets: number | null; live: boolean }> {
-    const tasks = this.api.listTasks().pipe(
-      map((items) => items.length),
+    const todos = this.todos.mine().pipe(
+      map((m) => m.dueSoonCount),
+      catchError(() => of(0)),
+    );
+    const tasks = forkJoin({ items: this.api.listTasks(), todos }).pipe(
+      map(({ items, todos: due }) => items.length + due),
       catchError(() => of(null)),
     );
     const tickets = this.auth.can('ticket.manage')
