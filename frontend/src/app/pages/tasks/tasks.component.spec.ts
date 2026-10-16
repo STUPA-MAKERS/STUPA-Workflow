@@ -356,10 +356,10 @@ describe('TasksComponent', () => {
       todo('k-4', { title: 'Steuer abholen', boardName: 'Meine To-Dos' }),
     ];
 
-    it('lists my To-Dos below the applications with headings, counts and due dates', async () => {
+    it('lists my To-Dos below the applications, with plain group headings and due dates', async () => {
       await start('/tasks', [THREE], { todos: TODOS });
-      expect(screen.getByTestId('tasks-apps-head')).toHaveTextContent('Anträge 3');
-      expect(screen.getByRole('heading', { name: /^To-Dos/ })).toHaveTextContent('To-Dos 4');
+      expect(screen.getByTestId('tasks-apps-head')).toHaveTextContent(/^\s*Anträge\s*$/);
+      expect(screen.getByRole('heading', { name: /^To-Dos/ })).toHaveTextContent(/^\s*To-Dos\s*$/);
       const link = screen.getByRole('link', { name: 'Raum buchen' });
       expect(link).toHaveAttribute('href', '/tasks/todo/k-2');
       expect(screen.getByText('Fachschaft Informatik')).toBeInTheDocument();
@@ -428,7 +428,7 @@ describe('TasksComponent', () => {
 
     it('shows the To-Dos without applications and the none pane asks to pick', async () => {
       await start('/tasks', [[]], { todos: TODOS });
-      expect(screen.getByTestId('tasks-apps-head')).toHaveTextContent('Anträge 0');
+      expect(screen.getByTestId('tasks-apps-head')).toHaveTextContent(/^\s*Anträge\s*$/);
       expect(screen.getAllByText('Keine offenen Aufgaben.').length).toBeGreaterThan(0);
       expect(screen.getByText('Keine Aufgabe geöffnet')).toBeInTheDocument();
     });

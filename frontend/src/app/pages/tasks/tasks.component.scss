@@ -164,10 +164,6 @@
 .tasks__scroll > .tasks__kind:first-child {
   padding-top: var(--space-1);
 }
-.tasks__kindN {
-  color: var(--color-text-muted);
-  font-weight: var(--fw-medium);
-}
 /* A to-do row has a narrow circle in front, so its slots sit closer and the title keeps its width. */
 .tasks__row:has(.tasks__circle) {
   --li-gap: var(--space-3);

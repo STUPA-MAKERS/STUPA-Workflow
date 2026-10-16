@@ -50,7 +50,7 @@
         } @else {
           @if (hasTodos() && showApplications()) {
             <h2 class="tasks__kind" data-testid="tasks-apps-head">
-              {{ 'tasks.group.applications' | t }} <span class="tasks__kindN">{{ rows().length }}</span>
+              {{ 'tasks.group.applications' | t }}
             </h2>
             @if (!rows().length) {
               <p class="tasks__status">{{ 'tasks.empty' | t }}</p>
@@ -102,7 +102,7 @@
           @if (showTodos()) {
             <section class="tasks__group" aria-labelledby="tasks-todos-head">
               <h2 class="tasks__kind" id="tasks-todos-head">
-                {{ 'tasks.group.todos' | t }} <span class="tasks__kindN">{{ todoRows().length }}</span>
+                {{ 'tasks.group.todos' | t }}
               </h2>
               @if (!todoRows().length) {
                 <p class="tasks__status">{{ 'todos.noMatch' | t }}</p>
