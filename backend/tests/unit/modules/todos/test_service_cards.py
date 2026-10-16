@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 
 import pytest
@@ -366,6 +366,17 @@ async def test_complete_moves_an_open_card_into_done() -> None:
     locks = [s for s in session.statements if "FOR UPDATE" in str(s)]
     assert len(locks) == 4
     assert session.refreshed == [c] * 4
+
+
+async def test_complete_skips_a_card_archived_before_the_lock() -> None:
+    session, b, col, c, service = _setup()
+    done = column(b.id, "Erledigt", 1, is_done=True)
+    c.archived_at = datetime.now(UTC)
+    session.scalars_q[:] = [[col, done]]
+    assert await service.complete(c, b, ME) is False
+    assert c.column_id == col.id and c.completed_at is None
+    assert _events(session) == []
+    assert not any(isinstance(o, TicketEvent) for o in session.added)
 
 
 LONG = "z" * MAX_LENGTH

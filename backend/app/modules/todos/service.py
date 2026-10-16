@@ -1060,7 +1060,7 @@ class TodoService:
         await self.session.refresh(card)
         columns = await self._columns(board.id)
         done = next((c for c in columns if c.is_done), None)
-        if done is None or card.column_id == done.id:
+        if done is None or card.column_id == done.id or card.archived_at is not None:
             return False
         source = next((c for c in columns if c.id == card.column_id), None)
         live = await self._column_cards(done.id, exclude=card.id)
