@@ -76,7 +76,7 @@ TYPICAL FLOWS:
 - To-dos: `todo_boards` → `todo_board(board_id)` (columns, cards; the `isDone` column is
   done) → `todo_card_get` → `todo_card_update(card_id, {version, ...})` with the card's
   current `version` (409 `card_version_conflict`: read again), `todo_card_move` into a
-  column, `todo_comment`. The scope `todos:write` must let the gremium right `todo.write`
+  column, `todo_comment`. `todo_my_cards` lists my cards on the other boards, by board. The scope `todos:write` must let the gremium right `todo.write`
   through.
 - Tickets (help menu reports, `ticket.manage` and scope `tickets:write`): `tickets_list` →
   `tickets_get` → `tickets_note` (internal) or `tickets_update` (status, assignee, kind).
