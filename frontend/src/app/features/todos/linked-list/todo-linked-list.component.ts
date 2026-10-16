@@ -7,6 +7,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { AvatarStackComponent } from '@shared/ui/avatar/avatar.component';
 import { IconComponent } from '@stupa-makers/ui-kit';
 import { personName, type Translate } from '../todos.util';
+import { TodoLinkedRefresh, linkedKey } from './todo-linked-refresh';
 
 /**
  * The back-reference "To-Dos" of an object (an application, an agenda item): the cards
@@ -25,6 +26,7 @@ import { personName, type Translate } from '../todos.util';
 })
 export class TodoLinkedListComponent {
   private readonly api = inject(TodosApiService);
+  private readonly refresh = inject(TodoLinkedRefresh);
   private readonly i18n = inject(I18nService);
   private readonly t: Translate = (key, params) => this.i18n.translate(key, params);
 
@@ -40,13 +42,22 @@ export class TodoLinkedListComponent {
     effect(() => {
       const kind = this.kind();
       const id = this.targetId();
-      untracked(() => this.load(kind, id));
+      untracked(() => this.load(kind, id, false));
+    });
+    // A card linked to this target elsewhere on the page: read again, keeping the list shown.
+    const seen = this.refresh.last();
+    effect(() => {
+      const change = this.refresh.last();
+      if (!change || change === seen) return;
+      untracked(() => {
+        if (change.keys.has(linkedKey(this.kind(), this.targetId()))) this.load(this.kind(), this.targetId(), true);
+      });
     });
   }
 
-  private load(kind: Exclude<TodoLinkKind, 'todo'>, id: Uuid): void {
+  private load(kind: Exclude<TodoLinkKind, 'todo'>, id: Uuid, keep: boolean): void {
     const seq = ++this.seq;
-    this.cards.set([]);
+    if (!keep) this.cards.set([]);
     this.api.linked(kind, id).subscribe({
       next: (cards) => {
         if (seq === this.seq) this.cards.set(cards);

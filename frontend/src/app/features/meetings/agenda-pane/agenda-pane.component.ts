@@ -17,6 +17,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { AgendaItem, Meeting, MeetingVote, Uuid } from '@core/api/models';
+import type { TodoCardDetail } from '@core/api/todos.service';
 import { BadgeComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
 import {
@@ -28,6 +29,7 @@ import {
   TodoNewDialogComponent,
   type NewTodoLink,
 } from '../../todos/new-dialog/todo-new-dialog.component';
+import { TodoLinkedRefresh } from '../../todos/linked-list/todo-linked-refresh';
 
 /** The ids of the row menu items of an agenda item. */
 type AgendaAction = 'rename' | 'up' | 'down' | 'nonPublic' | 'remove' | 'todo';
@@ -89,6 +91,7 @@ export interface AgendaMove {
 export class AgendaPaneComponent {
   private readonly i18n = inject(I18nService);
   private readonly auth = inject(AuthService);
+  private readonly linkedRefresh = inject(TodoLinkedRefresh);
   private readonly heading = viewChild.required<ElementRef<HTMLElement>>('heading');
 
   readonly meeting = input.required<Meeting>();
@@ -325,5 +328,10 @@ export class AgendaPaneComponent {
     links.push({ kind: 'agenda_item', targetId: item.id, label: `${this.meeting().title} · ${top}` });
     this.todoLinks.set(links);
     this.todoOpen.set(true);
+  }
+
+  /** The new card shows at once in the "To-Dos" of the TOP and of its application. */
+  protected onTodoCreated(card: TodoCardDetail): void {
+    this.linkedRefresh.touch(card.links);
   }
 }

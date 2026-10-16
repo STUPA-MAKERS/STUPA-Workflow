@@ -1,5 +1,5 @@
 import { CdkDrag, CdkDropList } from '@angular/cdk/drag-drop';
-import type { ComponentFixture } from '@angular/core/testing';
+import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -7,8 +7,10 @@ import { of } from 'rxjs';
 import type { AgendaItem, Meeting } from '@core/api/models';
 import { TodosApiService } from '@core/api/todos.service';
 import { AuthService } from '@core/auth/auth.service';
-import { BOARDS, MEMBERS, board } from '../../../../testing/todo-fixtures';
+import { BOARDS, MEMBERS, board, detail, link } from '../../../../testing/todo-fixtures';
 import { AGENDA, item, meeting, vote } from '../../../../testing/meeting-fixtures';
+import { TodoLinkedRefresh } from '../../todos/linked-list/todo-linked-refresh';
+import { TodoNewDialogComponent } from '../../todos/new-dialog/todo-new-dialog.component';
 import { AgendaPaneComponent } from './agenda-pane.component';
 
 const OUTPUTS = [
@@ -308,6 +310,17 @@ describe('AgendaPaneComponent', () => {
       const chips = [...document.querySelectorAll('.tn__chipText')].map((c) => c.textContent?.trim());
       expect(chips).toEqual(['Antrag · Antrag Kulturfestival', `${meeting().title} · TOP 3`]);
       expect(view.on.remove).not.toHaveBeenCalled();
+    });
+
+    it('tells the back-references on screen about the new card', async () => {
+      const view = await setup({ locked: true }, true);
+      const menu = await openMenu(2);
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'To-Do anlegen' }));
+      view.fixture.detectChanges();
+      const dialog = view.fixture.debugElement.query(By.directive(TodoNewDialogComponent));
+      const card = detail({ links: [link({ kind: 'agenda_item', targetId: 't-3' })] });
+      (dialog.componentInstance as TodoNewDialogComponent).created.emit(card);
+      expect(TestBed.inject(TodoLinkedRefresh).last()?.keys).toEqual(new Set(['agenda_item:t-3']));
     });
 
     it('links a free-text TOP only, also while the agenda saves', async () => {

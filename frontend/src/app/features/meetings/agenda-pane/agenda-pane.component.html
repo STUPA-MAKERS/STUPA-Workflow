@@ -99,5 +99,5 @@
 </ol>
 
 @if (todoOpen()) {
-  <app-todo-new-dialog [(open)]="todoOpen" [gremiumId]="meeting().gremiumId" [initialLinks]="todoLinks()" />
+  <app-todo-new-dialog [(open)]="todoOpen" [gremiumId]="meeting().gremiumId" [initialLinks]="todoLinks()" (created)="onTodoCreated($event)" />
 }

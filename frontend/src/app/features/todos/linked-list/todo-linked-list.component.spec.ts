@@ -2,7 +2,9 @@ import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import { Subject, of, throwError, type Observable } from 'rxjs';
 import { TodosApiService, type TodoLinkedCard } from '@core/api/todos.service';
+import { TestBed } from '@angular/core/testing';
 import { TodoLinkedListComponent } from './todo-linked-list.component';
+import { TodoLinkedRefresh } from './todo-linked-refresh';
 
 function card(over: Partial<TodoLinkedCard> = {}): TodoLinkedCard {
   return {
@@ -69,5 +71,42 @@ describe('TodoLinkedListComponent', () => {
     expect(api.linked).toHaveBeenLastCalledWith('agenda_item', 'ai-1');
     late.next([card()]);
     expect(cmp.cards().map((c) => c.id)).toEqual(['k-9']);
+  });
+
+  it('reads again, keeping the list, when a card is linked to its target elsewhere', async () => {
+    let answer = [card()];
+    const { api, fixture, cmp } = await setup(() => of(answer));
+    const refresh = TestBed.inject(TodoLinkedRefresh);
+    expect(api.linked).toHaveBeenCalledTimes(1);
+    refresh.touch([{ kind: 'agenda_item', targetId: 'a-1' }]);
+    fixture.detectChanges();
+    expect(api.linked).toHaveBeenCalledTimes(1);
+    refresh.touch([]);
+    fixture.detectChanges();
+    expect(api.linked).toHaveBeenCalledTimes(1);
+    const late = new Subject<TodoLinkedCard[]>();
+    api.linked.mockReturnValueOnce(late);
+    refresh.touch([{ kind: 'application', targetId: 'a-1' }]);
+    fixture.detectChanges();
+    expect(api.linked).toHaveBeenCalledTimes(2);
+    expect(cmp.cards().map((c) => c.id)).toEqual(['k-1']);
+    answer = [card(), card({ id: 'k-2', title: 'Neu' })];
+    late.next(answer);
+    fixture.detectChanges();
+    expect(screen.getByRole('link', { name: 'Neu' })).toBeInTheDocument();
+  });
+
+  it('does not read twice for a change made before it was shown', async () => {
+    const { api, fixture } = await setup(() => of([card()]));
+    TestBed.inject(TodoLinkedRefresh).touch([{ kind: 'application', targetId: 'a-1' }]);
+    fixture.detectChanges();
+    const before = api.linked.mock.calls.length;
+    const second = TestBed.createComponent(TodoLinkedListComponent);
+    second.componentRef.setInput('kind', 'application');
+    second.componentRef.setInput('targetId', 'a-1');
+    second.detectChanges();
+    second.detectChanges();
+    expect(api.linked).toHaveBeenCalledTimes(before + 1);
+    expect(second.componentInstance.cards().map((c) => c.id)).toEqual(['k-1']);
   });
 });
