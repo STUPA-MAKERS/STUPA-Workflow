@@ -27,6 +27,7 @@ _ALLOWED: frozenset[str] = frozenset(
         "gremium_permissions",
         "has_scoped_budget_view",
         "in_substitute_pool",
+        "has_reported_tickets",
         # `LogoutOut.logout_url`, mirrored the same way.
         "logout_url",
         # RFC 6749 fixes the wire names of the token endpoint and of an OAuth
