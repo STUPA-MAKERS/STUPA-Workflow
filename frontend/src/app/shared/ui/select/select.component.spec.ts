@@ -342,6 +342,47 @@ describe('SelectFieldComponent', () => {
       expect(screen.queryByRole('listbox')).toBeNull();
     });
 
+    it('cancels the keyup of Space, so the button click does not toggle the list back', async () => {
+      const { host, field, tick } = await setup();
+      field().focus();
+      fireEvent.keyDown(field(), { key: ' ' });
+      await tick();
+      const up = new KeyboardEvent('keyup', { key: ' ', bubbles: true, cancelable: true });
+      field().dispatchEvent(up);
+      expect(up.defaultPrevented).toBe(true);
+      // user-event clicks a button on the keyup of Space unless it is prevented.
+      await userEvent.keyboard(' ');
+      await tick();
+      expect(host.changes).toEqual([]);
+      expect(screen.queryByRole('listbox')).toBeNull();
+      await userEvent.keyboard(' ');
+      await tick();
+      expect(screen.getByRole('listbox')).toBeInTheDocument();
+      await userEvent.keyboard('{ArrowDown} ');
+      await tick();
+      expect(host.changes).toEqual(['c']);
+      expect(screen.queryByRole('listbox')).toBeNull();
+    });
+
+    it('Space chooses again once the type-ahead window has passed', async () => {
+      const { host, field, tick } = await setup((h) => h.value.set('a'));
+      field().focus();
+      const now = jest.spyOn(Date, 'now');
+      now.mockReturnValue(1000);
+      await userEvent.keyboard('d');
+      await tick();
+      now.mockReturnValue(1200);
+      await userEvent.keyboard(' ');
+      expect(screen.getByRole('listbox')).toBeInTheDocument();
+      expect(host.changes).toEqual([]);
+      now.mockReturnValue(5000);
+      await userEvent.keyboard(' ');
+      await tick();
+      expect(host.changes).toEqual(['d']);
+      expect(screen.queryByRole('listbox')).toBeNull();
+      now.mockRestore();
+    });
+
     it('Escape closes without a change and does not reach a dialog around it', async () => {
       const { host, field, tick } = await setup();
       const outer = jest.fn();

@@ -33,6 +33,7 @@
       [attr.aria-describedby]="error() ? id() + '-error' : hint() ? id() + '-hint' : null"
       (click)="toggle()"
       (keydown)="onTriggerKey($event)"
+      (keyup)="onTriggerKeyUp($event)"
       (blur)="onBlur()"
     >
       <span class="sel__value" [class.sel__value--empty]="!chosen()">{{ display() }}</span>

@@ -263,6 +263,14 @@ export class SelectFieldComponent implements ControlValueAccessor {
     this.onOpenKey(event);
   }
 
+  /**
+   * A button activates on the keyup of Space (Firefox does so even after a prevented
+   * keydown), so the click would toggle the list right back. The keydown handles Space.
+   */
+  protected onTriggerKeyUp(event: KeyboardEvent): void {
+    if (event.key === ' ') event.preventDefault();
+  }
+
   /** Keys on the listbox in the phone sheet. Escape and Tab belong to the sheet. */
   protected onSheetKey(event: KeyboardEvent): void {
     if (event.key === 'Escape' || event.key === 'Tab') return;
@@ -360,7 +368,7 @@ export class SelectFieldComponent implements ControlValueAccessor {
         this.close(false);
         return;
     }
-    if (event.key === ' ' && this.typed === '') {
+    if (event.key === ' ' && !this.typing(Date.now())) {
       event.preventDefault();
       this.pickActive();
       return;
@@ -394,6 +402,11 @@ export class SelectFieldComponent implements ControlValueAccessor {
     const rows = this.rows();
     const hit = rows.findIndex((r) => !r.disabled && this.isChosen(r));
     return hit >= 0 ? hit : this.step(-1, 1);
+  }
+
+  /** A type-ahead text is still in progress: a Space then belongs to it. */
+  private typing(now: number): boolean {
+    return this.typed !== '' && now - this.typedAt <= TYPEAHEAD_RESET;
   }
 
   private typeAhead(key: string, index: number, now: number): number {
