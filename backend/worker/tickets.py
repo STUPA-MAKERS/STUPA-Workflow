@@ -6,7 +6,8 @@ active site config and it is not anonymized yet. A null `retentionMonths` turns 
 job off. A reopen clears `closed_at`, so a reopened ticket is never due.
 
 The anonymization clears the reporter (account and e-mail) and the context and
-removes the attachments with their objects. Title, body, notes and events stay. Each
+removes the attachments with their objects. Title, body, notes and events stay; the
+`created` event loses its actor, because that actor is the reporter. Each
 ticket commits on its own with an `anonymization` audit entry, so one bad row does
 not stop the run, and a second run finds nothing.
 """

@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import ColumnElement, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.membership_sync import sync_principal_memberships
@@ -69,9 +69,11 @@ class PrincipalService:
         out of band. The pseudonymity that remains depends on that deletion.
 
         The tickets that the principal reported get the ticket anonymization: no
-        reporter, no context, no attachments. With an object storage in `files` the
-        attachment objects go too. Notes and events keep the principal id, so they
-        show a deleted person.
+        reporter, no context, no attachments. This covers the reports of the account
+        and the reports without a session under the e-mail of the account. With an
+        object storage in `files` the attachment objects go too. Notes and events keep
+        the principal id, so they show a deleted person; only the ``created`` event
+        loses its actor.
 
         The to-do assignments of the principal go, and so does the personal board.
         Cards, comments and events on the shared boards keep the principal id and
@@ -99,6 +101,7 @@ class PrincipalService:
                 "The account is merged into another account. Erase that account instead.",
                 code="erase_merged",
             )
+        address = principal.email
         principal.email = None
         principal.display_name = None
         principal.calendar_token = None
@@ -121,17 +124,9 @@ class PrincipalService:
         # text, unless the principal was elected (a documented resolution).
         erased = await erase_candidacies(self.session, principal_id)
         await erase_candidate_names(self.session, erased)
-        tickets = TicketService(self.session, files=files or FilesService(self.session))
-        reported = (
-            await self.session.scalars(
-                select(Ticket).where(
-                    Ticket.reporter_principal_id == principal_id,
-                    Ticket.anonymized_at.is_(None),
-                )
-            )
-        ).all()
-        for ticket in reported:
-            await tickets.anonymize(ticket, actor=actor)
+        await anonymize_reported_tickets(
+            self.session, actor=actor, files=files, principal_id=principal_id, email=address
+        )
         await erase_todos(self.session, principal_id)
         await self.session.execute(
             delete(AuthSession).where(AuthSession.principal_id == principal_id)
@@ -148,6 +143,41 @@ class PrincipalService:
         else:
             await self.session.flush()
         return principal
+
+
+async def anonymize_reported_tickets(
+    session: AsyncSession,
+    *,
+    actor: str,
+    files: FilesService | None = None,
+    principal_id: UUID | None = None,
+    email: str | None = None,
+) -> int:
+    """Anonymize the tickets of one reporter, without a commit.
+
+    A ticket matches when the account reported it (``principal_id``) or when a report
+    without a session gave the address (``email``, a citext compare). Already
+    anonymized tickets do not change.
+
+    Returns:
+        The number of anonymized tickets.
+    """
+    reporter: list[ColumnElement[bool]] = []
+    if principal_id is not None:
+        reporter.append(Ticket.reporter_principal_id == principal_id)
+    if email:
+        reporter.append(Ticket.reporter_email == email)
+    if not reporter:
+        return 0
+    reported = (
+        await session.scalars(
+            select(Ticket).where(or_(*reporter), Ticket.anonymized_at.is_(None))
+        )
+    ).all()
+    tickets = TicketService(session, files=files or FilesService(session))
+    for ticket in reported:
+        await tickets.anonymize(ticket, actor=actor)
+    return len(reported)
 
 
 class PrivacySettingsService:
@@ -270,6 +300,11 @@ class ErasureRequestService:
                 action=AuditAction.ANONYMIZATION,
                 target_type="application",
                 target_id=str(request.application_id),
+            )
+            # The applicant can also have reported a ticket without a session under
+            # the same address; the Auskunft lists those tickets, so they go too.
+            await anonymize_reported_tickets(
+                self.session, actor=actor, files=files, email=request.email
             )
         elif request.subject_type == "principal" and request.principal_id is not None:
             await PrincipalService(self.session).erase(

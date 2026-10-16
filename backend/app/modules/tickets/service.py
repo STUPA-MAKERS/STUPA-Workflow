@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from typing import Literal, Protocol
 
 from pydantic import JsonValue
-from sqlalchemy import ColumnElement, String, cast, func, or_, select
+from sqlalchemy import ColumnElement, String, cast, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -575,9 +575,16 @@ class TicketService:
         """Remove the personal data of a ticket, without a commit.
 
         The reporter (account and e-mail), the context and the attachments (rows and
-        objects) go; title, body, notes and events stay. ``anonymized_at`` marks it.
+        objects) go; title, body, notes and events stay. The ``created`` event loses its
+        actor, because that actor is the reporter and the detail would show the name.
+        ``anonymized_at`` marks it.
         """
         await self.files.delete_for_ticket(ticket.id, actor=actor)
+        await self.session.execute(
+            update(TicketEvent)
+            .where(TicketEvent.ticket_id == ticket.id, TicketEvent.kind == "created")
+            .values(actor_id=None)
+        )
         ticket.reporter_principal_id = None
         ticket.reporter_email = None
         ticket.context = {}

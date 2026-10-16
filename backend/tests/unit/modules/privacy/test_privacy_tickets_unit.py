@@ -24,7 +24,7 @@ from app.modules.privacy.service import (
 )
 from app.modules.tickets.models import Ticket
 from tests._support.privacy_fakes import fake_session, result
-from tests.unit.modules.tickets.fakes import FakeFiles
+from tests.unit.modules.tickets.fakes import FakeFiles, ScriptedSession
 
 _AT = datetime(2026, 6, 16, 12, 0, tzinfo=UTC)
 
@@ -156,3 +156,103 @@ def test_the_erase_route_passes_the_object_storage(monkeypatch: pytest.MonkeyPat
     assert seen["principal_id"] == target
     assert seen["actor"] == "admin"
     assert seen["files"].storage is storage
+
+
+def _sql(stmt: object) -> str:
+    from sqlalchemy.dialects import postgresql
+
+    return str(stmt.compile(dialect=postgresql.dialect()))  # type: ignore[attr-defined]
+
+
+async def test_the_reported_tickets_without_a_reporter_are_none() -> None:
+    session = ScriptedSession()
+    count = await privacy_service.anonymize_reported_tickets(
+        session,  # type: ignore[arg-type]
+        actor="admin",
+        email=None,
+    )
+    assert count == 0
+    assert session.statements == []
+
+
+async def test_the_reported_tickets_match_the_bare_e_mail() -> None:
+    ticket = _ticket(reporter_email="x@example.org")
+    session = ScriptedSession(scalars=[[ticket]])
+    files = FakeFiles()
+    count = await privacy_service.anonymize_reported_tickets(
+        session,  # type: ignore[arg-type]
+        actor="admin",
+        files=files,  # type: ignore[arg-type]
+        email="x@example.org",
+    )
+    assert count == 1
+    query = _sql(session.statements[0])
+    assert "reporter_email" in query
+    assert "reporter_principal_id =" not in query
+    assert "anonymized_at IS NULL" in query
+    assert ticket.reporter_email is None
+    assert ticket.anonymized_at is not None
+    assert files.deleted == [(ticket.id, "admin")]
+
+
+async def test_the_reported_tickets_match_the_account_and_its_e_mail() -> None:
+    session = ScriptedSession(scalars=[[]])
+    count = await privacy_service.anonymize_reported_tickets(
+        session,  # type: ignore[arg-type]
+        actor="admin",
+        principal_id=uuid.uuid4(),
+        email="u@x.org",
+    )
+    assert count == 0
+    query = _sql(session.statements[0])
+    assert "reporter_principal_id =" in query
+    assert "reporter_email =" in query
+
+
+async def test_the_erasure_passes_the_e_mail_from_before_the_erasure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: dict[str, Any] = {}
+
+    async def _tickets(_session: object, **kw: Any) -> int:
+        seen.update(kw)
+        return 0
+
+    monkeypatch.setattr(privacy_service, "anonymize_reported_tickets", _tickets)
+    principal = Principal(id=uuid.uuid4(), sub="kc", email="u@x.org", active=True)
+    db = fake_session(gets=[principal])
+    await PrincipalService(db).erase(principal.id, actor="admin", commit=False)
+    assert seen["principal_id"] == principal.id
+    assert seen["email"] == "u@x.org"
+    assert principal.email is None
+
+
+async def test_the_applicant_erasure_anonymizes_the_tickets_of_its_e_mail(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.applications import service as applications_service
+    from app.modules.privacy.models import ErasureRequest
+    from app.modules.privacy.service import ErasureRequestService
+
+    seen: dict[str, Any] = {}
+
+    async def _anonymize(*_a: object, **_k: object) -> None:
+        return None
+
+    async def _tickets(_session: object, **kw: Any) -> int:
+        seen.update(kw)
+        return 1
+
+    monkeypatch.setattr(applications_service.ApplicationsService, "anonymize", _anonymize)
+    monkeypatch.setattr(privacy_service, "anonymize_reported_tickets", _tickets)
+    request = ErasureRequest(
+        id=uuid.uuid4(),
+        subject_type="applicant",
+        application_id=uuid.uuid4(),
+        email="a@example.org",
+        status="open",
+    )
+    db = fake_session(gets=[request])
+    out = await ErasureRequestService(db).execute(request.id, actor="dpo")
+    assert out.status == "executed"
+    assert seen == {"actor": "dpo", "files": None, "email": "a@example.org"}

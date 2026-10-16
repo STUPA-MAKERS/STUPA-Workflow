@@ -632,8 +632,14 @@ async def test_a_missing_note_is_404() -> None:
 async def test_anonymize_clears_the_reporter_the_context_and_the_files() -> None:
     files = FakeFiles()
     ticket = _ticket(reporter_principal_id=ME, reporter_email=None, context={"url": "u"})
-    await _svc(ScriptedSession(), files=files).anonymize(ticket, actor="sys")
+    session = ScriptedSession()
+    await _svc(session, files=files).anonymize(ticket, actor="sys")
     assert files.deleted == [(ticket.id, "sys")]
+    # The created event names the reporter, so its actor goes too.
+    (clear,) = session.statements
+    sql = str(clear.compile(compile_kwargs={"literal_binds": True}))
+    assert sql.startswith("UPDATE ticket_event SET actor_id")
+    assert "kind = 'created'" in sql
     assert ticket.reporter_principal_id is None
     assert ticket.reporter_email is None
     assert ticket.context == {}

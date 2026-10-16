@@ -220,6 +220,46 @@ async def test_execute_applicant_erasure_anonymizes(
     assert again.status_code == 409
 
 
+async def test_execute_applicant_erasure_anonymizes_the_tickets_of_the_address(
+    app: FastAPI, client: TestClient, session: AsyncSession
+) -> None:
+    """A report without a session under the applicant's address goes with the erasure."""
+    from app.modules.tickets.models import Ticket
+
+    app_type, _, _ = await _seed_type(session)
+    application, _ = await ApplicationsService(session).create(_create_payload(app_type.id))
+    req = ErasureRequest(
+        subject_type="applicant",
+        application_id=application.id,
+        email="antrag@example.org",
+        status="open",
+    )
+    ticket = Ticket(
+        kind="bug",
+        title="t",
+        body="b",
+        status="new",
+        reporter_email="Antrag@Example.ORG",
+        context={"url": "https://x"},
+    )
+    other = Ticket(
+        kind="bug", title="t", body="b", status="new", reporter_email="else@example.org"
+    )
+    session.add_all([req, ticket, other])
+    await session.commit()
+
+    _as_dpo(app)
+    r = client.post(f"/api/admin/privacy/erasures/{req.id}/execute")
+    assert r.status_code == 200, r.text
+
+    await session.refresh(ticket)
+    await session.refresh(other)
+    assert (ticket.reporter_email, ticket.context) == (None, {})
+    assert ticket.anonymized_at is not None
+    assert other.reporter_email == "else@example.org"
+    assert other.anonymized_at is None
+
+
 async def test_execute_unknown_request_404(app: FastAPI, client: TestClient) -> None:
     _as_dpo(app)
     r = client.post(

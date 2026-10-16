@@ -18,7 +18,7 @@ from app.modules.admin.models import SiteConfigVersion
 from app.modules.files.models import Attachment
 from app.modules.files.service import FilesService
 from app.modules.privacy.service import PrincipalService
-from app.modules.tickets.models import Ticket, TicketNote
+from app.modules.tickets.models import Ticket, TicketEvent, TicketNote
 from tests._support.files_fakes import FakeStorage
 from tests.integration.modules.tickets.conftest import ADMIN, Api, add_principal
 from worker.tickets import anonymize_tickets
@@ -157,3 +157,55 @@ async def test_the_erasure_anonymizes_the_tickets_of_the_account(
     assert detail["context"] == {}
     assert detail["attachments"] == []
     assert detail["anonymizedAt"] is not None
+
+
+async def test_the_retention_cron_drops_the_reporter_from_the_timeline(
+    api: Api, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    reporter = await add_principal(maker, name="Rita")
+    worker = await add_principal(maker, name="Otto")
+    ticket = await _closed_ticket(maker, months_ago=13, reporter_principal_id=reporter)
+    async with maker() as session:
+        session.add_all(
+            [
+                TicketEvent(ticket_id=ticket.id, actor_id=reporter, kind="created"),
+                TicketEvent(
+                    ticket_id=ticket.id,
+                    actor_id=worker,
+                    kind="status",
+                    payload={"from": "new", "to": "done"},
+                    created_at=datetime.now(UTC) + timedelta(seconds=1),
+                ),
+            ]
+        )
+        await session.commit()
+    ctx = {"tickets_sessionmaker": maker, "object_storage": FakeStorage()}
+    assert await anonymize_tickets(ctx) == 1
+    api.login(ADMIN)
+    with TestClient(api.app) as client:
+        detail = client.get(f"/api/tickets/{ticket.id}").json()
+    assert detail["reporter"]["anonymized"] is True
+    events = {e["kind"]: e["actor"] for e in detail["events"]}
+    assert events["created"] is None
+    assert events["status"] == {"principalId": str(worker), "displayName": "Otto"}
+    assert "Rita" not in str(detail)
+
+
+async def test_the_erasure_anonymizes_the_reports_under_the_account_e_mail(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    reporter = await add_principal(maker, name="Rita", email="rita@example.org")
+    bare = await _closed_ticket(maker, months_ago=0, reporter_email="Rita@Example.org")
+    foreign = await _closed_ticket(maker, months_ago=0, reporter_email="else@example.org")
+    async with maker() as session:
+        await PrincipalService(session).erase(
+            reporter, actor="admin", files=FilesService(session, storage=FakeStorage())
+        )
+    async with maker() as session:
+        row = await session.get(Ticket, bare.id)
+        assert row is not None
+        assert (row.reporter_email, row.context) == (None, {})
+        assert row.anonymized_at is not None
+        kept = await session.get(Ticket, foreign.id)
+        assert kept is not None
+        assert kept.anonymized_at is None
