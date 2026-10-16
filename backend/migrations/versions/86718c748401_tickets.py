@@ -12,6 +12,7 @@ The upgrade:
 5. grants ``ticket.manage`` to the role ``admin``. The admin bypass grants it anyway;
    the row makes the role page show it.
 
+Every key is named ``pk_<table>`` like the baseline names it, so both paths match.
 All steps are idempotent. A fresh database already gets the tables, the column and
 the sequence from the ``create_all`` baseline (0001), because the models sit in
 ``app.models``.
@@ -42,7 +43,7 @@ _UPGRADE: tuple[str, ...] = (
     "CREATE SEQUENCE IF NOT EXISTS ticket_number_seq",
     """
     CREATE TABLE IF NOT EXISTS ticket (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        id uuid CONSTRAINT pk_ticket PRIMARY KEY DEFAULT gen_random_uuid(),
         number integer NOT NULL DEFAULT nextval('ticket_number_seq'),
         kind text NOT NULL,
         title text NOT NULL,
@@ -75,7 +76,7 @@ _UPGRADE: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS ix_ticket_assignee ON ticket (assignee_id)",
     """
     CREATE TABLE IF NOT EXISTS ticket_note (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        id uuid CONSTRAINT pk_ticket_note PRIMARY KEY DEFAULT gen_random_uuid(),
         ticket_id uuid NOT NULL
             CONSTRAINT fk_ticket_note_ticket_id_ticket REFERENCES ticket (id) ON DELETE CASCADE,
         author_id uuid NOT NULL
@@ -89,7 +90,7 @@ _UPGRADE: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS ix_ticket_note_ticket_id ON ticket_note (ticket_id)",
     """
     CREATE TABLE IF NOT EXISTS ticket_event (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        id uuid CONSTRAINT pk_ticket_event PRIMARY KEY DEFAULT gen_random_uuid(),
         ticket_id uuid NOT NULL
             CONSTRAINT fk_ticket_event_ticket_id_ticket REFERENCES ticket (id) ON DELETE CASCADE,
         actor_id uuid CONSTRAINT fk_ticket_event_actor_id_principal REFERENCES principal (id),

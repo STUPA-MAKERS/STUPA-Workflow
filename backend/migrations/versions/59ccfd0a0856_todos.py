@@ -17,6 +17,7 @@ The upgrade:
 5. creates the team board "Plattform" for ``ticket.manage`` with the same columns,
    unless a team board with that permission exists.
 
+Every key is named ``pk_<table>`` like the baseline names it, so both paths match.
 All steps are idempotent. A fresh database already gets the tables and the column
 from the ``create_all`` baseline (0001), because the models sit in ``app.models``.
 
@@ -41,7 +42,7 @@ depends_on: str | Sequence[str] | None = None
 _TABLES: tuple[str, ...] = (
     """
     CREATE TABLE IF NOT EXISTS todo_board (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        id uuid CONSTRAINT pk_todo_board PRIMARY KEY DEFAULT gen_random_uuid(),
         name text NOT NULL,
         kind text NOT NULL,
         gremium_id uuid CONSTRAINT fk_todo_board_gremium_id_gremium
@@ -75,7 +76,7 @@ _TABLES: tuple[str, ...] = (
     ),
     """
     CREATE TABLE IF NOT EXISTS todo_column (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        id uuid CONSTRAINT pk_todo_column PRIMARY KEY DEFAULT gen_random_uuid(),
         board_id uuid NOT NULL CONSTRAINT fk_todo_column_board_id_todo_board
             REFERENCES todo_board (id) ON DELETE CASCADE,
         name text NOT NULL,
@@ -90,7 +91,7 @@ _TABLES: tuple[str, ...] = (
     ),
     """
     CREATE TABLE IF NOT EXISTS todo_card (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        id uuid CONSTRAINT pk_todo_card PRIMARY KEY DEFAULT gen_random_uuid(),
         board_id uuid NOT NULL CONSTRAINT fk_todo_card_board_id_todo_board
             REFERENCES todo_board (id) ON DELETE CASCADE,
         column_id uuid NOT NULL CONSTRAINT fk_todo_card_column_id_todo_column
@@ -129,7 +130,7 @@ _TABLES: tuple[str, ...] = (
     ("CREATE INDEX IF NOT EXISTS ix_todo_assignee_principal_id ON todo_assignee (principal_id)"),
     """
     CREATE TABLE IF NOT EXISTS todo_label (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        id uuid CONSTRAINT pk_todo_label PRIMARY KEY DEFAULT gen_random_uuid(),
         board_id uuid NOT NULL CONSTRAINT fk_todo_label_board_id_todo_board
             REFERENCES todo_board (id) ON DELETE CASCADE,
         name text NOT NULL,
@@ -153,7 +154,7 @@ _TABLES: tuple[str, ...] = (
     """,
     """
     CREATE TABLE IF NOT EXISTS todo_check_item (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        id uuid CONSTRAINT pk_todo_check_item PRIMARY KEY DEFAULT gen_random_uuid(),
         card_id uuid NOT NULL CONSTRAINT fk_todo_check_item_card_id_todo_card
             REFERENCES todo_card (id) ON DELETE CASCADE,
         text text NOT NULL,
@@ -164,7 +165,7 @@ _TABLES: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS ix_todo_check_item_card_id ON todo_check_item (card_id)",
     """
     CREATE TABLE IF NOT EXISTS todo_comment (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        id uuid CONSTRAINT pk_todo_comment PRIMARY KEY DEFAULT gen_random_uuid(),
         card_id uuid NOT NULL CONSTRAINT fk_todo_comment_card_id_todo_card
             REFERENCES todo_card (id) ON DELETE CASCADE,
         author_id uuid NOT NULL CONSTRAINT fk_todo_comment_author_id_principal
@@ -179,7 +180,7 @@ _TABLES: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS ix_todo_comment_card_id ON todo_comment (card_id)",
     """
     CREATE TABLE IF NOT EXISTS todo_event (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        id uuid CONSTRAINT pk_todo_event PRIMARY KEY DEFAULT gen_random_uuid(),
         card_id uuid NOT NULL CONSTRAINT fk_todo_event_card_id_todo_card
             REFERENCES todo_card (id) ON DELETE CASCADE,
         actor_id uuid CONSTRAINT fk_todo_event_actor_id_principal REFERENCES principal (id),
@@ -195,7 +196,7 @@ _TABLES: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS ix_todo_event_card_id ON todo_event (card_id)",
     """
     CREATE TABLE IF NOT EXISTS todo_link (
-        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        id uuid CONSTRAINT pk_todo_link PRIMARY KEY DEFAULT gen_random_uuid(),
         card_id uuid NOT NULL CONSTRAINT fk_todo_link_card_id_todo_card
             REFERENCES todo_card (id) ON DELETE CASCADE,
         application_id uuid CONSTRAINT fk_todo_link_application_id_application
