@@ -81,8 +81,13 @@
   font-size: 0.75rem;
   font-weight: var(--fw-medium);
 }
+/* The name and the count start the head; the done tag and the menu end it. */
+.bv__doneTag,
 .bv__menu {
   margin-inline-start: auto;
+}
+.bv__doneTag + .bv__menu {
+  margin-inline-start: 0;
 }
 
 /* The drop list fills the scroll area, so an empty column is a drop target down to its
