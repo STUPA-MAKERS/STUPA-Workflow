@@ -150,7 +150,7 @@ async def send_todo_mail(
             key,
             str(card.id),
             ",".join(sorted(str(r) for r in mail.recipients)),
-            mail.excerpt or "",
+            str(mail.event_id),
         ),
         link=todo_link(settings, board.id, card.id),
     )

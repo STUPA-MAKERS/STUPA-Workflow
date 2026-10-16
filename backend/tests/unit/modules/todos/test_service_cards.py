@@ -402,10 +402,13 @@ async def test_restore_in_the_done_column_restarts_the_archive_clock() -> None:
 
 async def test_assignees() -> None:
     session, _b, _col, c, service = _setup()
-    session.scalar_q[:] = [None, OTHER]
+    session.scalar_q[:] = [c, None, c, OTHER, c]
     await service.add_assignee(c.id, OTHER, USER)
     await service.add_assignee(c.id, OTHER, USER)
     assert len([o for o in session.added if isinstance(o, TodoAssignee)]) == 1
+    board_lock, card_lock = (str(st) for st in session.statements[:2])
+    assert "FROM todo_board" in board_lock and "FOR UPDATE" in board_lock
+    assert "FROM todo_card" in card_lock and "FOR UPDATE" in card_lock
     assert service.outbox == [TodoMail("assigned", c.id, (OTHER,), ME, None)]
     with pytest.raises(ValidationProblem):
         await service.add_assignee(c.id, uuid.uuid4(), USER)
@@ -421,11 +424,12 @@ async def test_card_labels() -> None:
     session, b, _col, c, service = _setup()
     lab, foreign = label(b.id), label(uuid.uuid4())
     session.put(lab, foreign)
+    session.scalar_q[:] = [c, c, c, None, c, lab.id]
     with pytest.raises(ValidationProblem):
         await service.add_card_label(c.id, foreign.id, USER)
     with pytest.raises(ValidationProblem):
         await service.add_card_label(c.id, uuid.uuid4(), USER)
-    session.scalar_q[:] = [None, lab.id]
+    assert "FOR UPDATE" in str(session.statements[0])
     await service.add_card_label(c.id, lab.id, USER)
     await service.add_card_label(c.id, lab.id, USER)
     assert len([o for o in session.added if isinstance(o, TodoCardLabel)]) == 1
@@ -466,13 +470,15 @@ async def test_checklist() -> None:
 async def test_links() -> None:
     session, _b, _col, c, service = _setup()
     service.links = FakeLinks(readable=[("ticket", TICKET)])  # type: ignore[assignment]
+    session.scalar_q[:] = [c, c]
     with pytest.raises(ValidationProblem) as exc:
         await service.add_link(c.id, "todo", c.id, USER)
     assert exc.value.code == "link_self"
     with pytest.raises(ValidationProblem) as exc:
         await service.add_link(c.id, "application", APP, USER)
     assert exc.value.code == "link_target_not_found"
-    session.scalar_q[:] = [uuid.uuid4(), None]
+    assert "FOR UPDATE" in str(session.statements[0])
+    session.scalar_q[:] = [c, uuid.uuid4(), c, None]
     with pytest.raises(ConflictError) as exc:
         await service.add_link(c.id, "ticket", TICKET, USER)
     assert exc.value.code == "link_exists"

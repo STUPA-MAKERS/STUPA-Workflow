@@ -84,8 +84,19 @@ async def test_the_assigned_mail(sent: list[dict[str, Any]]) -> None:
     assert out["to"] == ["a@x.org", "b@x.org"]
     assert out["kind"] == "todo_assigned"
     assert out["context"] == {"cardTitle": "Plakat", "boardName": "StuPa", "actor": "Ada"}
-    assert out["idempotency_parts"] == ("todo_assigned", str(c.id), str(OTHER), "")
+    assert out["idempotency_parts"] == ("todo_assigned", str(c.id), str(OTHER), str(mail.event_id))
     assert out["link"].url.endswith(f"/todos/{b.id}?card={c.id}")
+
+
+async def test_two_identical_events_get_two_idempotency_keys(sent: list[dict[str, Any]]) -> None:
+    for kind, excerpt in (("assigned", None), ("mentioned", "@B bitte ansehen")):
+        for _ in range(2):
+            session, _b, c = _session()
+            mail = TodoMail(kind, c.id, (OTHER,), ME, excerpt)  # type: ignore[arg-type]
+            await mails.send_todo_mail(session, queue=None, settings=SETTINGS, mail=mail)  # type: ignore[arg-type]
+    keys = [tuple(out["idempotency_parts"][2:]) for out in sent]
+    assert len(sent) == 4
+    assert keys[0] != keys[1] and keys[2] != keys[3]
 
 
 async def test_the_mentioned_mail_and_an_actor_without_a_row(sent: list[dict[str, Any]]) -> None:

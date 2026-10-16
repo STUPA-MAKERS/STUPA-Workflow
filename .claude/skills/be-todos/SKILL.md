@@ -109,7 +109,9 @@ except the author, with an excerpt), both after the commit and best effort; `tod
 the deadline cron to the assignees of an open card due tomorrow (Berlin) who are still
 members of the board (`BoardAccess.member_ids`), from 07:00 Berlin,
 once per card and due date (`due_reminded_on`, idempotency key `todo_due:<card>:<date>`).
-All three are opt-out kinds.
+All three are opt-out kinds. The idempotency key of `todo_assigned` and `todo_mentioned`
+carries `TodoMail.event_id` (new per mail), because the key is the arq job id and a repeated
+assignment or an identical mention would otherwise be dropped.
 
 **Crons:** `archive_done_todos` 03:50: done cards whose `completed_at` is older than the
 board's `archive_after_days`, event `archived` without actor.
@@ -121,6 +123,9 @@ creator, author, actor, link creator and the mentions, combines assignments, and
 personal board or folds it into the target's board.
 
 **Gotchas:**
+- Select-then-insert writes (`add_assignee`, `add_card_label`, `add_link`, `add_label`) take
+  the board lock first, so a parallel identical request waits and then sees the row
+  (no-op or 409) instead of a unique violation (500).
 - The migration `59ccfd0a0856_todos` is idempotent and backfills a board per gremium and
   the team board "Plattform" (`ticket.manage`). Integration tests truncate `principal`
   CASCADE, which empties every todo table: a test creates its own boards.

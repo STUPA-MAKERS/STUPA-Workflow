@@ -66,7 +66,11 @@ from app.shared.people import (
 #: ``T-0040``, ``t0040``, ``0040`` and ``40`` all name ticket 40.
 _NUMBER_RE = re.compile(r"^(?:t-?)?0*(\d{1,9})$", re.IGNORECASE)
 #: The route of an application or a meeting in ``context.route``.
-_ROUTE_RE = re.compile(r"^/(applications|meetings)/([0-9a-fA-F-]{36})(?:[/?#].*)?$")
+_ROUTE_RE = re.compile(
+    r"^/(applications|meetings)/"
+    r"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+    r"(?:[/?#].*)?$"
+)
 
 AssigneeFilter = uuid.UUID | Literal["me", "none"]
 
@@ -652,7 +656,10 @@ class TicketService:
         if match is None:
             return None
         kind, raw_id = match.groups()
-        target_id = uuid.UUID(raw_id)
+        try:
+            target_id = uuid.UUID(raw_id)
+        except ValueError:
+            return None
         if kind == "applications":
             return await self._application_target(target_id, principal)
         return await self._meeting_target(target_id, principal)

@@ -112,13 +112,19 @@ def _invalid(msg: str, code: str, field_name: str) -> ValidationProblem:
 
 @dataclass(frozen=True, slots=True)
 class TodoMail:
-    """A mail that the router sends after the commit."""
+    """A mail that the router sends after the commit.
+
+    ``event_id`` is new for every mail and goes into the idempotency key, because
+    the key is the arq job id: a second assignment or an identical mention on the
+    same card would otherwise reuse the key and arq would drop it.
+    """
 
     kind: MailKind
     card_id: uuid.UUID
     recipients: tuple[uuid.UUID, ...]
     actor_id: uuid.UUID
     excerpt: str | None = None
+    event_id: uuid.UUID = field(default_factory=uuid.uuid4, compare=False)
 
 
 @dataclass(slots=True)
@@ -709,6 +715,7 @@ class TodoService:
     ) -> TodoLabelOut:
         """Add a label. A name the board has (case-insensitive) gives 409 ``label_exists``."""
         board = await self._configurable(board_id, principal)
+        await self._lock_board(board.id)
         name = payload.name.strip() or payload.name
         if await self._label_name_taken(board.id, name):
             raise ConflictError("The board has a label with this name.", code="label_exists")
@@ -1125,9 +1132,12 @@ class TodoService:
     async def add_assignee(
         self, card_id: uuid.UUID, principal_id: uuid.UUID, principal: Principal
     ) -> TodoCardDetail:
-        """Assign a member of the board (422 ``assignee_not_allowed`` otherwise)."""
+        """Assign a member of the board (422 ``assignee_not_allowed`` otherwise).
+
+        The board lock makes a parallel identical request wait and then see the row.
+        """
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, lock=True)
         await self._check_assignees(board, [principal_id])
         present = await self.session.scalar(
             select(TodoAssignee.principal_id).where(
@@ -1163,7 +1173,7 @@ class TodoService:
         self, card_id: uuid.UUID, label_id: uuid.UUID, principal: Principal
     ) -> TodoCardDetail:
         """Put a label of the board on the card (422 ``label_not_on_board`` otherwise)."""
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, lock=True)
         label = await self.session.get(TodoLabel, label_id)
         if label is None or label.board_id != board.id:
             raise _invalid("The label is not on this board.", "label_not_on_board", "labelId")
@@ -1287,7 +1297,7 @@ class TodoService:
             ConflictError: The link exists (HTTP 409, ``link_exists``).
         """
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, lock=True)
         if kind == "todo" and target_id == card.id:
             raise _invalid("A card cannot link to itself.", "link_self", "targetId")
         if not await self.links.readable(kind, target_id, principal):

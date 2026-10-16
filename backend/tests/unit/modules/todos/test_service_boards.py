@@ -339,6 +339,8 @@ async def test_add_label() -> None:
     out = await service.add_label(b.id, LabelCreate(name=" Neu ", color="blue"), USER)
     assert (out.name, out.color) == ("Neu", "blue")
     assert any(isinstance(o, TodoLabel) for o in session.added)
+    lock = str(session.statements[0])
+    assert "FROM todo_board" in lock and "FOR UPDATE" in lock
 
 
 async def test_patch_and_delete_label() -> None:

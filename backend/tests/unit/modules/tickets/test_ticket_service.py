@@ -362,7 +362,17 @@ async def _detail_with_route(route: object, session: ScriptedSession) -> Any:
     return (await _svc(session).detail(ticket.id, VIEWER)).context_target
 
 
-@pytest.mark.parametrize("route", [None, 5, "/admin", "/applications/not-a-uuid"])
+@pytest.mark.parametrize(
+    "route",
+    [
+        None,
+        5,
+        "/admin",
+        "/applications/not-a-uuid",
+        "/applications/" + "-" * 36,
+        "/meetings/" + "a" * 36,
+    ],
+)
 async def test_a_route_without_a_target_gives_none(route: object) -> None:
     assert await _detail_with_route(route, ScriptedSession()) is None
 

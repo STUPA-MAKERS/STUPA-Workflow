@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Callable, Coroutine
 from typing import Any
 
 import pytest
@@ -20,8 +21,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.auth.principal import Principal
-from app.modules.todos.schemas import CardCreate, CardPatch
+from app.modules.todos.schemas import CardCreate, CardPatch, LabelCreate
 from app.modules.todos.service import TodoService
+from app.shared.errors import ConflictError
 from tests.integration.modules.todos.conftest import add_gremium, add_person
 from tests.integration.modules.todos.test_todos_lifecycle import _personal
 from worker.todos import archive_done_todos
@@ -186,3 +188,76 @@ async def test_two_ticket_closes_lock_the_boards_in_one_order(
             )
         ).scalar_one()
         assert done == 4
+
+
+async def _two_at_once(
+    maker: async_sessionmaker[AsyncSession],
+    board_id: uuid.UUID,
+    write: Callable[[], Coroutine[Any, Any, Any]],
+) -> list[Any]:
+    """Start the same write twice while the board is locked, then let both run."""
+    async with maker() as holder:
+        await holder.execute(
+            text("SELECT id FROM todo_board WHERE id = :b FOR UPDATE"), {"b": board_id}
+        )
+        tasks = [asyncio.create_task(write()) for _ in range(2)]
+        await asyncio.sleep(0.3)
+        assert not any(task.done() for task in tasks)
+        await holder.commit()
+    return await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), 10)
+
+
+async def test_two_identical_assigns_and_card_labels_give_one_row(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    me, me_id = await add_person(maker, "Ada")
+    board, _columns = await _personal(maker, me_id)
+    async with maker() as session:
+        payload = CardCreate.model_validate({"boardId": str(board.id), "title": "Plakat"})
+        card_id = (await TodoService(session).create(payload, me)).id
+        label = await TodoService(session).add_label(
+            board.id, LabelCreate(name="Druck", color="blue"), me
+        )
+
+    async def assign() -> int:
+        async with maker() as session:
+            return len((await TodoService(session).add_assignee(card_id, me_id, me)).assignees)
+
+    async def put_label() -> int:
+        async with maker() as session:
+            return len((await TodoService(session).add_card_label(card_id, label.id, me)).labels)
+
+    assert await _two_at_once(maker, board.id, assign) == [1, 1]
+    assert await _two_at_once(maker, board.id, put_label) == [1, 1]
+
+
+async def test_two_identical_links_and_labels_give_one_409(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    me, me_id = await add_person(maker, "Ada")
+    board, _columns = await _personal(maker, me_id)
+    async with maker() as session:
+        ids = [
+            (
+                await TodoService(session).create(
+                    CardCreate.model_validate({"boardId": str(board.id), "title": t}), me
+                )
+            ).id
+            for t in ("A", "B")
+        ]
+
+    async def link() -> Any:
+        async with maker() as session:
+            return await TodoService(session).add_link(ids[0], "todo", ids[1], me)
+
+    async def label() -> Any:
+        async with maker() as session:
+            return await TodoService(session).add_label(
+                board.id, LabelCreate(name="Druck", color="red"), me
+            )
+
+    for write, code in ((link, "link_exists"), (label, "label_exists")):
+        results = await _two_at_once(maker, board.id, write)
+        errors = [r for r in results if isinstance(r, BaseException)]
+        assert len(errors) == 1
+        assert isinstance(errors[0], ConflictError) and errors[0].code == code
