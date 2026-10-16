@@ -1,0 +1,34 @@
+<app-side-sheet side="bottom" [heading]="'todos.move.title' | t" [(open)]="open">
+  <div class="ms">
+    <div class="ms__list" role="radiogroup" [attr.aria-label]="'todos.move.column' | t">
+      @for (col of columns(); track col.id) {
+        <button
+          type="button"
+          class="ms__row"
+          role="radio"
+          [class.ms__row--on]="col.id === columnId()"
+          [attr.aria-checked]="col.id === columnId()"
+          (click)="columnId.set(col.id)"
+        >
+          <app-icon class="ms__radio" [name]="col.id === columnId() ? 'circleok' : 'circle'" [size]="20" />
+          <span class="ms__name">{{ col.name }}</span>
+          @if (col.count !== null && col.count !== undefined) {
+            <span class="ms__count num">{{ col.count }}</span>
+          }
+        </button>
+      }
+    </div>
+    <p class="cap ms__cap" id="ms-pos">{{ 'todos.move.position' | t }}</p>
+    <app-segmented
+      width="fill"
+      ariaLabel="{{ 'todos.move.position' | t }}"
+      [options]="positions()"
+      [value]="position()"
+      (valueChange)="setPosition($event)"
+    />
+    <div class="ms__foot">
+      <app-button variant="text" (click)="open.set(false)">{{ 'action.cancel' | t }}</app-button>
+      <app-button variant="fill" [disabled]="!columnId()" (click)="confirm()">{{ 'todos.move.confirm' | t }}</app-button>
+    </div>
+  </div>
+</app-side-sheet>

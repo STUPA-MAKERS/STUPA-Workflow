@@ -134,3 +134,20 @@ export function detail(over: Partial<TodoCardDetail> = {}): TodoCardDetail {
     ...over,
   };
 }
+
+/** Let `mediaQuerySignal(MEDIA.phone)` match (restore with `jest.restoreAllMocks()`). */
+export function asPhone(phoneQuery: string): void {
+  jest.spyOn(window, 'matchMedia').mockImplementation(
+    (query: string) =>
+      ({
+        matches: query === phoneQuery,
+        media: query,
+        onchange: null,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        dispatchEvent: () => false,
+      }) as MediaQueryList,
+  );
+}

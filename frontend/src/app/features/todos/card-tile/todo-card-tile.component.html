@@ -1,0 +1,56 @@
+@if (tileLabels().length) {
+  <p class="tt__labels">
+    @for (label of tileLabels(); track label.id) {
+      <span class="tt__label" [attr.data-color]="label.color"><span class="tt__dot" aria-hidden="true"></span>{{ label.name }}</span>
+    }
+  </p>
+}
+<h3 class="tt__title">
+  @if (done()) {
+    <app-icon class="tt__doneIcon" name="circleok" [size]="17" />
+  }
+  <button type="button" class="tt__open" [attr.data-card-id]="card().id" (click)="open.emit()">
+    {{ card().title }}
+  </button>
+</h3>
+@if (link(); as link) {
+  <p class="tt__link">
+    <app-icon [name]="link.icon" [size]="14" />
+    <span class="ell" [title]="link.text">{{ link.text }}</span>
+  </p>
+}
+<div class="tt__facts">
+  @if (doneOn(); as day) {
+    <span class="tt__fact tt__fact--muted">
+      <app-icon name="check" [size]="14" />
+      <span class="num">{{ day }}</span>
+    </span>
+  }
+  @if (due(); as due) {
+    <span class="tt__fact" [class.tt__fact--overdue]="due.tone === 'overdue'" [class.tt__fact--soon]="due.tone === 'soon'">
+      <app-icon name="cal" [size]="14" />
+      <span class="num">{{ due.date }}@if (due.note) { · {{ due.note }}}</span>
+    </span>
+  }
+  @if (card().checklist.total) {
+    <span class="tt__fact" [attr.aria-label]="'todos.tile.checklist' | t: { done: card().checklist.done, total: card().checklist.total }">
+      <app-icon name="boxok" [size]="14" />
+      <span class="num">{{ card().checklist.done }}/{{ card().checklist.total }}</span>
+    </span>
+  }
+  @if (card().commentCount) {
+    <span class="tt__fact" [attr.aria-label]="'todos.tile.comments' | t: { n: card().commentCount }">
+      <app-icon name="chat" [size]="14" />
+      <span class="num">{{ card().commentCount }}</span>
+    </span>
+  }
+  <span class="tt__people">
+    @if (card().assignees.length) {
+      <app-avatar-stack [names]="names()" [principalIds]="ids()" [max]="3" />
+    } @else {
+      <span class="tt__nobody" [attr.aria-label]="'todos.tile.nobody' | t" role="img">
+        <app-icon name="user" [size]="13" />
+      </span>
+    }
+  </span>
+</div>
