@@ -40,7 +40,7 @@ from app.modules.tickets.service import (
     format_number,
     sender_blocks_of,
 )
-from app.modules.todos.privacy import erase_todos, todo_export
+from app.modules.todos.privacy import erase_todos, lock_personal_todos, todo_export
 from app.modules.voting.erasure import erase_candidacies
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
@@ -114,6 +114,10 @@ class PrincipalService:
                 "The account is merged into another account. Erase that account instead.",
                 code="erase_merged",
             )
+        # The to-do rows and the comment files are locked before the first audit
+        # entry, because ``finalize_scan`` of an infected file locks its row first
+        # and then waits for the lock of the audit chain.
+        todo_comment_ids = await lock_personal_todos(self.session, principal_id, files=files)
         address = principal.email
         principal.email = None
         principal.display_name = None
@@ -141,7 +145,9 @@ class PrincipalService:
             self.session, actor=actor, files=files, principal_id=principal_id, email=address
         )
         await erase_sender_blocks(self.session, principal_id=principal_id, email=address)
-        storage_keys = await erase_todos(self.session, principal_id, files=files, actor=actor)
+        storage_keys = await erase_todos(
+            self.session, principal_id, files=files, actor=actor, comment_ids=todo_comment_ids
+        )
         await self.session.execute(
             delete(AuthSession).where(AuthSession.principal_id == principal_id)
         )

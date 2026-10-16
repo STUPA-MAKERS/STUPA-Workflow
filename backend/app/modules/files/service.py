@@ -36,7 +36,7 @@ from collections.abc import AsyncIterator, Callable, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
-from sqlalchemy import or_, select
+from sqlalchemy import ColumnElement, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import InstrumentedAttribute
 from sqlalchemy.orm.exc import StaleDataError
@@ -526,8 +526,7 @@ class FilesService:
         wanted = list(dict.fromkeys(ids))
         if not wanted:
             return 0
-        column = _OWNER_COLUMNS[owner]
-        rows = (await self.session.scalars(select(Attachment).where(column.in_(wanted)))).all()
+        rows = await self._locked_rows(_OWNER_COLUMNS[owner].in_(wanted))
         await self._remove_rows(rows, actor=actor)
         return len(rows)
 
@@ -547,9 +546,27 @@ class FilesService:
         wanted = list(dict.fromkeys(ids))
         if not wanted:
             return []
-        column = _OWNER_COLUMNS[owner]
-        rows = (await self.session.scalars(select(Attachment).where(column.in_(wanted)))).all()
+        rows = await self._locked_rows(_OWNER_COLUMNS[owner].in_(wanted))
         return await self._drop_rows(rows, actor=actor)
+
+    async def lock_for_messages(self, owner: MessageOwner, ids: Sequence[uuid.UUID]) -> None:
+        """Lock the file rows of a set of messages until the commit, in id order.
+
+        A caller that writes an audit entry before it removes the files of a message
+        calls this method before that entry. The first audit write takes the advisory
+        lock of the audit chain until the commit, and ``finalize_scan`` of an infected
+        file locks its row first and audits after it. A row lock after the first audit
+        entry could therefore close a deadlock cycle.
+        """
+        wanted = list(dict.fromkeys(ids))
+        if not wanted:
+            return
+        await self.session.execute(
+            select(Attachment.id)
+            .where(_OWNER_COLUMNS[owner].in_(wanted))
+            .order_by(Attachment.id)
+            .with_for_update()
+        )
 
     async def remove_objects(self, storage_keys: Sequence[str]) -> None:
         """Remove storage objects as best effort; a failure only logs a warning."""
@@ -564,19 +581,47 @@ class FilesService:
     async def _remove_rows(self, rows: Sequence[Attachment], *, actor: str) -> None:
         await self.remove_objects(await self._drop_rows(rows, actor=actor))
 
+    async def _locked_rows(self, where: ColumnElement[bool]) -> Sequence[Attachment]:
+        """Load and lock the matching rows until the commit, in id order.
+
+        The lock comes before the first audit entry of ``_drop_rows``. The reason is
+        the one of ``lock_for_messages``. ``populate_existing`` reloads a row that the
+        session already holds, so a scan that committed while the lock waited shows
+        its NULL ``storage_key``.
+        """
+        return (
+            await self.session.scalars(
+                select(Attachment)
+                .where(where)
+                .order_by(Attachment.id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        ).all()
+
     async def _drop_rows(self, rows: Sequence[Attachment], *, actor: str) -> list[str]:
+        """Delete the rows, flush, and only then write an audit entry for each.
+
+        The flush takes every row lock before the first audit entry takes the lock of
+        the audit chain, so no row lock follows the chain lock (see
+        ``lock_for_messages``).
+        """
         keys: list[str] = []
+        owners: list[tuple[uuid.UUID, dict[str, object]]] = []
         for attachment in rows:
             if attachment.storage_key is not None:
                 keys.append(attachment.storage_key)
-            owner = _owner_data(attachment)
+            owners.append((attachment.id, _owner_data(attachment)))
             await self.session.delete(attachment)
+        if owners:
+            await self.session.flush()
+        for attachment_id, owner in owners:
             await audit_record(
                 self.session,
                 actor=actor,
                 action=AuditAction.ATTACHMENT_DELETE,
                 target_type="attachment",
-                target_id=str(attachment.id),
+                target_id=str(attachment_id),
                 data=owner,
             )
         return keys
@@ -617,13 +662,9 @@ class FilesService:
             The number of removed attachments.
         """
         notes = select(TicketNote.id).where(TicketNote.ticket_id == ticket_id)
-        rows = (
-            await self.session.scalars(
-                select(Attachment).where(
-                    or_(Attachment.ticket_id == ticket_id, Attachment.ticket_note_id.in_(notes))
-                )
-            )
-        ).all()
+        rows = await self._locked_rows(
+            or_(Attachment.ticket_id == ticket_id, Attachment.ticket_note_id.in_(notes))
+        )
         await self._remove_rows(rows, actor=actor)
         return len(rows)
 
@@ -686,16 +727,12 @@ class FilesService:
             The number of removed attachments.
         """
         comments = select(Comment.id).where(Comment.application_id == application_id)
-        rows = (
-            await self.session.scalars(
-                select(Attachment).where(
-                    or_(
-                        BOUND & (Attachment.application_id == application_id),
-                        Attachment.comment_id.in_(comments),
-                    )
-                )
+        rows = await self._locked_rows(
+            or_(
+                BOUND & (Attachment.application_id == application_id),
+                Attachment.comment_id.in_(comments),
             )
-        ).all()
+        )
         await self._remove_rows(rows, actor=actor)
         return len(rows)
 

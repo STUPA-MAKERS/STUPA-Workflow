@@ -36,6 +36,8 @@ async def test_erase_todos_drops_the_assignments_and_the_personal_board() -> Non
     assert "todo_comment.id" in lookup and "todo_board.owner_id" in lookup
     # Only the rows go here; the objects wait for the commit of the caller.
     assert files.dropped == [([comment_id], "admin")] and files.removed == []
+    # The file rows are locked before the first audit entry of the drop.
+    assert files.locked == [[comment_id]]
     assert keys == [f"key-{comment_id}"]
     assert first.startswith("DELETE FROM todo_assignee")
     assert second.startswith("DELETE FROM todo_board") and "kind" in second

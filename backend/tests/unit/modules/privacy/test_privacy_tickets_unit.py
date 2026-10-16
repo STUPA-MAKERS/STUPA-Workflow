@@ -63,7 +63,9 @@ def _quiet(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_the_erasure_anonymizes_the_reported_tickets() -> None:
     principal = Principal(id=uuid.uuid4(), sub="kc", email="u@x.org", active=True)
     ticket = _ticket(reporter_principal_id=principal.id)
-    db = fake_session(gets=[principal], scalars=[result(ticket)])
+    # The first result is the comment lookup of ``lock_personal_todos``, which runs
+    # before the first audit entry of the erasure.
+    db = fake_session(gets=[principal], scalars=[result(), result(ticket)])
     files = FakeFiles()
     await PrincipalService(db).erase(
         principal.id,
@@ -75,6 +77,7 @@ async def test_the_erasure_anonymizes_the_reported_tickets() -> None:
     assert ticket.context == {}
     assert ticket.anonymized_at is not None
     assert files.deleted == [(ticket.id, "admin")]
+    assert files.locked == [("todo_comment", [])]
 
 
 async def test_the_erasure_without_tickets_builds_its_own_files_service() -> None:

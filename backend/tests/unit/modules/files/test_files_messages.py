@@ -239,6 +239,36 @@ async def test_drop_for_messages_keeps_the_objects_until_remove_objects(
     assert empty.statements == []
 
 
+async def test_the_removal_locks_and_deletes_every_row_before_its_first_audit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first, second = _att(storage_key="k1"), _att(storage_key="k2")
+    session = ScriptedSession(scalars=[[first, second]])
+    seen: list[tuple[int, int]] = []
+
+    async def _record(_session: object, **_kw: Any) -> None:
+        seen.append((len(session.deleted), session.flushed))
+
+    monkeypatch.setattr(files_service, "audit_record", _record)
+    await _svc(session).drop_for_messages("ticket_note", [NOTE], actor="a")
+    sql = str(session.statements[0])
+    assert "ORDER BY attachment.id" in sql and sql.endswith("FOR UPDATE")
+    # Both rows are deleted and flushed before the first audit entry takes the lock
+    # of the audit chain, so no row lock follows that lock.
+    assert seen == [(2, 1), (2, 1)]
+
+
+async def test_lock_for_messages_locks_the_rows_in_id_order() -> None:
+    session = ScriptedSession()
+    await _svc(session).lock_for_messages("todo_comment", [NOTE, NOTE])
+    sql = str(session.statements[0])
+    assert sql.startswith("SELECT attachment.id") and "attachment.todo_comment_id IN" in sql
+    assert "ORDER BY attachment.id" in sql and sql.endswith("FOR UPDATE")
+    empty = ScriptedSession()
+    await _svc(empty).lock_for_messages("todo_comment", [])
+    assert empty.statements == []
+
+
 async def test_remove_objects_is_best_effort() -> None:
     await _svc(ScriptedSession(), FailingStorage()).remove_objects(["k1", "k2"])
     await _svc(ScriptedSession()).remove_objects(["k1"])

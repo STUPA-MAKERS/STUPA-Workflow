@@ -1864,7 +1864,12 @@ async def test_delete_comment_removes_its_files_first() -> None:
     svc = ApplicationsService(session)  # type: ignore[arg-type]
     removed: list[tuple[str, list[UUID], str]] = []
 
+    locked: list[tuple[str, list[UUID]]] = []
+
     class _Files:
+        async def lock_for_messages(self, owner: str, ids: list[UUID]) -> None:
+            locked.append((owner, list(ids)))
+
         async def delete_for_messages(self, owner: str, ids: list[UUID], *, actor: str) -> int:
             removed.append((owner, list(ids), actor))
             assert session.deleted == []
@@ -1880,4 +1885,6 @@ async def test_delete_comment_removes_its_files_first() -> None:
         files=_Files(),  # type: ignore[arg-type]
     )
     assert removed == [("comment", [c.id], "sub-1")]
+    # The file rows are locked before the COMMENT_DELETE audit entry.
+    assert locked == [("comment", [c.id])]
     assert session.deleted == [c]

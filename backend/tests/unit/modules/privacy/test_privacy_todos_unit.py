@@ -35,6 +35,7 @@ def _quiet(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(privacy_service, "erase_candidacies", _none)
     monkeypatch.setattr(privacy_service, "erase_candidate_names", _none)
     monkeypatch.setattr(privacy_service, "sync_principal_memberships", _synced)
+    monkeypatch.setattr(privacy_service, "lock_personal_todos", _none)
 
 
 async def test_the_erasure_removes_the_todo_data(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -42,7 +43,7 @@ async def test_the_erasure_removes_the_todo_data(monkeypatch: pytest.MonkeyPatch
 
     async def _erase(_s: Any, principal_id: uuid.UUID, **kw: Any) -> list[str]:
         erased.append(principal_id)
-        assert kw == {"files": None, "actor": "admin"}
+        assert kw == {"files": None, "actor": "admin", "comment_ids": []}
         return ["k1"]
 
     monkeypatch.setattr(privacy_service, "erase_todos", _erase)

@@ -357,9 +357,12 @@ class CommentOps(ApplicationsServiceBase):
             viewer_is_applicant=viewer_is_applicant,
             can_manage=can_manage,
         )
+        files = files or FilesService(self.session)
+        # The file rows are locked before the first audit entry, because
+        # ``finalize_scan`` of an infected file locks its row first and then waits for
+        # the lock of the audit chain (``FilesService.lock_for_messages``).
+        await files.lock_for_messages("comment", [comment.id])
         await self._audit_comment(comment, AuditAction.COMMENT_DELETE, actor=actor)
-        await (files or FilesService(self.session)).delete_for_messages(
-            "comment", [comment.id], actor=actor
-        )
+        await files.delete_for_messages("comment", [comment.id], actor=actor)
         await self.session.delete(comment)
         await self.session.commit()

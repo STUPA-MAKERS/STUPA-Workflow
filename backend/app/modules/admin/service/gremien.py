@@ -283,12 +283,16 @@ class GremiumOps(ConfigServiceBase):
                 code="gremium_decides_vote",
             )
         comment_ids = await self._lock_gremium_todos(gremium_id)
+        # The file rows are locked before the first audit entry of the vote delete,
+        # because ``finalize_scan`` of an infected file locks its row first and then
+        # waits for the lock of the audit chain (``FilesService.lock_for_messages``).
+        files = FilesService(self.session, storage=self.storage)
+        await files.lock_for_messages("todo_comment", comment_ids)
         await self._delete_gremium_votes(gremium_id, principal)
         # The board cascade deletes the attachment rows of the to-do comments, but not
         # their objects, which can hold personal data. The rows go first, with an
         # audit entry each. The objects go only after the commit, because a failed
         # commit brings the rows back, and a row without its object is a broken file.
-        files = FilesService(self.session, storage=self.storage)
         storage_keys = await files.drop_for_messages(
             "todo_comment", comment_ids, actor=principal.sub
         )

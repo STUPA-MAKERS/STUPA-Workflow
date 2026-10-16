@@ -7,6 +7,8 @@ their objects behind. The objects go only after the caller commits, because a
 rollback brings the rows back and a row without its object is a broken download. The
 board and its cards are locked before the comment ids are read, so a comment that
 binds files at the same moment is part of the ids or fails on the deleted card.
+``lock_personal_todos`` takes these locks and the locks of the file rows, so the
+erasure can take them before its first audit entry.
 Cards, comments, their files and events on the shared boards stay: their author,
 actor and creator ids point to the erased principal, which shows as "Gelöschte
 Person".
@@ -36,18 +38,10 @@ from app.modules.todos.models import (
 )
 
 
-async def erase_todos(
-    session: AsyncSession,
-    principal_id: UUID,
-    *,
-    files: FilesService | None = None,
-    actor: str = "system",
-) -> list[str]:
-    """Remove the assignments and the personal board of the principal, without a commit.
-
-    The files of the comments on the personal board go first: rows and audit entries
-    (``drop_for_messages``). The caller commits and then passes the returned keys to
-    ``FilesService.remove_objects``.
+async def lock_personal_todos(
+    session: AsyncSession, principal_id: UUID, *, files: FilesService | None = None
+) -> list[UUID]:
+    """Lock the personal board of the principal, its cards and the comment files.
 
     The board goes first and then its cards, the order of every to-do write. The card
     lock is ``FOR UPDATE``, which waits for the key-share lock of a comment insert. A
@@ -55,8 +49,13 @@ async def erase_todos(
     waits and then fails on the deleted card. Otherwise its files would lose their row
     through the board cascade and keep their object.
 
+    The file rows of the comments are locked last. The erasure calls this function
+    before its first audit entry, because ``finalize_scan`` of an infected file locks
+    its row first and then waits for the lock of the audit chain
+    (``FilesService.lock_for_messages``).
+
     Returns:
-        The storage keys of the removed comment files.
+        The ids of the comments on the personal board, for ``erase_todos``.
     """
     boards = select(TodoBoard.id).where(
         TodoBoard.kind == "personal", TodoBoard.owner_id == principal_id
@@ -78,9 +77,35 @@ async def erase_todos(
             )
         ).all()
     )
-    storage_keys = await (files or FilesService(session)).drop_for_messages(
-        "todo_comment", comment_ids, actor=actor
-    )
+    await (files or FilesService(session)).lock_for_messages("todo_comment", comment_ids)
+    return comment_ids
+
+
+async def erase_todos(
+    session: AsyncSession,
+    principal_id: UUID,
+    *,
+    files: FilesService | None = None,
+    actor: str = "system",
+    comment_ids: list[UUID] | None = None,
+) -> list[str]:
+    """Remove the assignments and the personal board of the principal, without a commit.
+
+    The files of the comments on the personal board go first: rows and audit entries
+    (``drop_for_messages``). The caller commits and then passes the returned keys to
+    ``FilesService.remove_objects``.
+
+    ``comment_ids`` comes from ``lock_personal_todos``, which a caller with earlier
+    audit entries runs before the first of them. Without it, the function takes the
+    locks itself.
+
+    Returns:
+        The storage keys of the removed comment files.
+    """
+    files = files or FilesService(session)
+    if comment_ids is None:
+        comment_ids = await lock_personal_todos(session, principal_id, files=files)
+    storage_keys = await files.drop_for_messages("todo_comment", comment_ids, actor=actor)
     await session.execute(delete(TodoAssignee).where(TodoAssignee.principal_id == principal_id))
     await session.execute(
         delete(TodoBoard).where(TodoBoard.kind == "personal", TodoBoard.owner_id == principal_id)

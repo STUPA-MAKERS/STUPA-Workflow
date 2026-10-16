@@ -279,6 +279,7 @@ class FakeFiles:
         self.asked: list[list[uuid.UUID]] = []
         self.removed: list[tuple[list[uuid.UUID], str]] = []
         self.dropped: list[tuple[list[uuid.UUID], str]] = []
+        self.locked: list[list[uuid.UUID]] = []
 
     async def message_attachments(
         self, _owner: str, ids: list[uuid.UUID]
@@ -290,8 +291,12 @@ class FakeFiles:
         self.removed.append((list(ids), actor))
         return len(ids)
 
+    async def lock_for_messages(self, _owner: str, ids: list[uuid.UUID]) -> None:
+        self.locked.append(list(ids))
+
     async def drop_for_messages(
         self, _owner: str, ids: list[uuid.UUID], *, actor: str
     ) -> list[str]:
+        assert self.locked, "the file rows are locked before they are dropped"
         self.dropped.append((list(ids), actor))
         return [f"key-{i}" for i in ids]
