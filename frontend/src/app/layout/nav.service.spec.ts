@@ -52,7 +52,7 @@ describe('NavService', () => {
   });
 
   it('opens the tickets with ticket.manage, after the invoices', () => {
-    expect(keysFor({ ...BASE, permissions: ['ticket.manage'] })).toEqual(['start', 'applications', 'tasks', 'todos', 'tickets']);
+    expect(keysFor({ ...BASE, permissions: ['ticket.manage'] })).toEqual(['start', 'applications', 'tasks', 'todos', 'tickets', 'admin']);
     expect(NAV_ITEMS.findIndex((i) => i.key === 'tickets')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'invoices') + 1);
   });
 
@@ -72,6 +72,13 @@ describe('NavService', () => {
       for (const p of page.permissions) expect(ADMIN_AREA_PERMISSIONS).toContain(p);
     }
     expect(keysFor({ ...BASE, permissions: ['budget.structure'] })).toContain('admin');
+  });
+
+  it('opens "Hilfe & Tickets" with ticket.manage alone, for the blocked senders', () => {
+    const admin = routes[0].children?.find((r) => r.path === 'admin');
+    const page = admin?.children?.find((r) => r.path === 'help-tickets');
+    expect(page?.data?.['permission']).toEqual(['admin.site', 'ticket.manage']);
+    expect(ADMIN_PAGES.find((p) => p.link === 'help-tickets')?.permissions).toEqual(['admin.site', 'ticket.manage']);
   });
 
   it('opens meetings for protocol.write in a gremium, without the voting area', () => {

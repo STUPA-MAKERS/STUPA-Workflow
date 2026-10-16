@@ -567,7 +567,8 @@ export const routes: Routes = [
           },
           {
             path: 'help-tickets',
-            data: { title: 'admin.helpTickets.title', permission: 'admin.site', parent: ['admin'] },
+            // `ticket.manage` alone sees the blocked senders, without the settings form.
+            data: { title: 'admin.helpTickets.title', permission: ['admin.site', 'ticket.manage'], parent: ['admin'] },
             canActivate: [authGuard],
             loadComponent: () =>
               import('./pages/admin/help-tickets/help-tickets.component').then(
