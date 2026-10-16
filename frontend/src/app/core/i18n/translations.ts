@@ -1190,7 +1190,7 @@ export const de = {
   'election.rule.single':
     'Jede Person hat eine Stimme. Gewählt ist, wer die meisten Stimmen erhält. Bei Gleichstand entscheidet das Los.',
   'election.rule.multi':
-    'Jede Person hat {n} Stimmen, höchstens eine je Person. Gewählt sind die {n} mit den meisten Stimmen. Gleichstand an der Grenze: Stichwahl.',
+    'Jede Person hat {n} Stimmen, höchstens eine je Person. Gewählt sind die {n} mit den meisten Stimmen. Bei Gleichstand an der Grenze entscheidet das Los.',
   'election.rule.yesNo':
     'Eine Kandidatur: Abstimmung mit Ja, Nein und Enthaltung. Gewählt bei mehr Ja- als Nein-Stimmen.',
   'election.ballot.counter': '{n} von {m} Stimmen vergeben',
@@ -5118,7 +5118,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'election.rule.single':
     'Each person has one vote. The candidate with the most votes is elected. A tie goes to the lot.',
   'election.rule.multi':
-    'Each person has {n} votes, at most one per candidate. The {n} candidates with the most votes are elected. A tie at the boundary goes to a runoff.',
+    'Each person has {n} votes, at most one per candidate. The {n} candidates with the most votes are elected. A tie at the boundary is decided by lot.',
   'election.rule.yesNo':
     'One candidate: a ballot with yes, no and abstain. Elected with more yes than no votes.',
   'election.ballot.counter': '{n} of {m} votes given',
