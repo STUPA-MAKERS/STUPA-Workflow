@@ -19,10 +19,10 @@ import {
   ButtonComponent,
   DialogComponent,
   InputComponent,
-  SelectComponent,
   ToastService,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 
 /**
  * The public share links of one application (`application.share`): mint a link, read it
@@ -46,7 +46,7 @@ import {
     ButtonComponent,
     DialogComponent,
     InputComponent,
-    SelectComponent,
+    SelectFieldComponent,
   ],
   templateUrl: './share-links-dialog.component.html',
   styleUrl: './share-links-dialog.component.scss',

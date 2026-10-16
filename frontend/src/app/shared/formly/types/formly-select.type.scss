@@ -1,4 +1,5 @@
-// The filled field of the ui-kit (`app-select`): a grey box with the label inside it.
+// The filled field of the ui-kit: a grey box with the label inside it. The `multiselect`
+// type uses it for its trigger; the `select` type renders the app's `app-select`.
 @use 'field' as f;
 
 .field {
@@ -35,11 +36,6 @@
     cursor: pointer;
     text-overflow: ellipsis;
   }
-}
-// The field is transparent, so the native option list gets a surface of its own.
-.field__control option {
-  background: var(--color-bg-elevated);
-  color: var(--color-text);
 }
 .field__chevron {
   position: absolute;

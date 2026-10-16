@@ -29,11 +29,11 @@ import {
   RowDetailDirective,
   SegmentedComponent,
   type SegmentedOption,
-  SelectComponent,
   type SelectOption,
   SwitchComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { mediaQuerySignal } from '../../layout/media-query';
 import { AdminApiService } from '../admin/admin-api.service';
 import { FilterSelectComponent, type FilterSelectOption } from '@shared/ui/filter-select/filter-select.component';
@@ -115,7 +115,7 @@ const MAX_CUTOFF_DAY = 28;
     RowDetailDirective,
     RowMenuComponent,
     SegmentedComponent,
-    SelectComponent,
+    SelectFieldComponent,
     SwitchComponent,
   ],
   templateUrl: './budget-tree.component.html',

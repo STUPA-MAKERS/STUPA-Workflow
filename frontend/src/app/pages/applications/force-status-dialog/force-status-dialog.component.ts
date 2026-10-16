@@ -18,10 +18,10 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
   DialogComponent,
-  SelectComponent,
   ToastService,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 
 /**
  * "Status setzen": put an application straight into a state of its flow
@@ -35,7 +35,7 @@ import {
   selector: 'app-force-status-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, DialogComponent, SelectComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, DialogComponent, SelectFieldComponent],
   templateUrl: './force-status-dialog.component.html',
   styleUrl: './force-status-dialog.component.scss',
 })

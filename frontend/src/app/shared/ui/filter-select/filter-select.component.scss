@@ -1,3 +1,5 @@
+@use '../option-menu' as om;
+
 :host {
   display: inline-flex;
   flex: none;
@@ -47,44 +49,17 @@
   flex: none;
 }
 
-/* The popover: the look of the row menu. Fixed to the viewport, under the chip and
-   aligned to its start. In the top layer the UA styles would centre it, so the reset
-   comes first. */
+/* The popover: the look of the row menu (`_option-menu.scss`), under the chip and aligned
+   to its start. */
 .fs__menu {
-  position: fixed;
-  inset: auto;
-  z-index: var(--z-dropdown);
-  margin: 0;
+  @include om.menu;
   min-width: 13rem;
   max-width: min(22rem, calc(100vw - 16px));
   max-height: min(24rem, calc(100vh - 16px));
-  overflow-y: auto;
-  padding: 6px 0;
-  border: 0;
-  border-radius: var(--radius-field);
-  background: var(--color-surface-3);
-  color: var(--color-text);
-  box-shadow: var(--shadow-elevated);
-}
-.fs__menu:focus {
-  outline: none;
 }
 
-/* The top-layer box of the phone sheet: no box of its own. The scrim and the sheet inside
-   are fixed to the viewport. */
 .fs__layer {
-  position: fixed;
-  inset: 0;
-  width: auto;
-  height: auto;
-  max-width: none;
-  max-height: none;
-  margin: 0;
-  padding: 0;
-  overflow: visible;
-  border: 0;
-  background: transparent;
-  color: inherit;
+  @include om.layer;
 }
 
 .fs__options:focus {
@@ -92,44 +67,22 @@
 }
 
 .fs__option {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  height: 2.75rem;
-  padding: 0 var(--space-4);
-  border: 0;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  font-size: var(--fs-body);
-  font-weight: var(--fw-medium);
-  text-align: start;
-  cursor: pointer;
+  @include om.option;
 }
-.fs__option:hover,
-.fs__option:focus-visible {
-  background: var(--color-surface-4);
+.fs__option:hover {
+  @include om.option-hover;
 }
-/* Surface 4 on surface 3 is only about 1.2:1, too weak to show the focus (WCAG 2.4.7).
-   The focused option also gets an inset ring in the focus colour. */
 .fs__option:focus-visible {
-  outline: none;
-  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+  @include om.option-focus;
 }
 .fs__option[aria-selected='true'] .fs__label {
   font-weight: var(--fw-semibold);
 }
-/* In the sheet: the rows of a row group (`.rowgroup--bg3`, global) on surface 3, as tall
-   as a list row. The row group sets the surface and the corners. */
 .fs__option--sheet {
-  height: auto;
-  min-height: 52px;
-  background: var(--color-surface-3);
+  @include om.option-sheet;
 }
-.fs__option--sheet:hover,
-.fs__option--sheet:focus-visible {
-  background: var(--color-surface-4);
+.fs__option--sheet:hover {
+  @include om.option-hover;
 }
 
 .fs__label {
@@ -140,8 +93,7 @@
   white-space: nowrap;
 }
 .fs__check {
-  flex: none;
-  color: var(--color-accent-text);
+  @include om.check;
 }
 
 /* Several choices: a check box in front of each choice, the look of `app-checkbox`. */
@@ -200,8 +152,5 @@
 }
 
 .fs__empty {
-  margin: 0;
-  padding: var(--space-3) var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
+  @include om.empty;
 }

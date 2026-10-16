@@ -19,8 +19,8 @@ import {
   InputComponent,
   SegmentedComponent,
   type SegmentedOption,
-  SelectComponent,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { CostCentreTreeComponent } from '../../budget/cost-centre-tree.component';
@@ -91,7 +91,7 @@ const PAYMENT_METHODS: readonly ('' | PaymentMethod)[] = [
     RowMenuComponent,
     ScrollFadeDirective,
     SegmentedComponent,
-    SelectComponent,
+    SelectFieldComponent,
     TranslatePipe,
   ],
   templateUrl: './booking-form.component.html',

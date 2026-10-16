@@ -56,6 +56,8 @@ export { SearchPillComponent } from './search-pill/search-pill.component';
 export type { SearchPillMode } from './search-pill/search-pill.component';
 export { SegBarComponent } from './seg-bar/seg-bar.component';
 export type { Seg, SegBarSize, SegTone } from './seg-bar/seg-bar.component';
+export { SelectFieldComponent } from './select/select.component';
+export type { SelectFieldOption } from './select/select.component';
 export { SelectionBarComponent } from './selection-bar/selection-bar.component';
 export { SheetBarComponent, SheetBarKickerDirective } from './sheet-bar/sheet-bar.component';
 export { SideSheetComponent } from './side-sheet/side-sheet.component';

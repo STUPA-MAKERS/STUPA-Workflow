@@ -573,6 +573,10 @@
   font: inherit;
 }
 
+.fe__pv-select {
+  max-width: 28rem;
+}
+
 .fe__pv-group {
   display: flex;
   flex-direction: column;
@@ -625,7 +629,8 @@
   .fe__preview {
     padding: var(--space-4);
   }
-  .fe__pv-control {
+  .fe__pv-control,
+  .fe__pv-select {
     max-width: 100%;
   }
 }

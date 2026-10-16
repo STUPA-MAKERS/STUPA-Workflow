@@ -79,12 +79,12 @@ import {
   DialogComponent,
   IconComponent,
   MEDIA,
-  SelectComponent,
   TabsComponent,
   ToastService,
   type SelectOption,
   type TabItem,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import {
   BudgetTreeApi,
   type BudgetTreeNode,
@@ -172,7 +172,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     ButtonComponent,
     DialogComponent,
     IconComponent,
-    SelectComponent,
+    SelectFieldComponent,
     TabsComponent,
     CostCentreTreeComponent,
     ScrollFadeDirective,
