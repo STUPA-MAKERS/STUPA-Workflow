@@ -104,8 +104,13 @@
 .inv__month {
   padding: 18px var(--space-4) 6px;
 }
-.inv__group:first-child .inv__month {
+.inv__group:first-child .inv__month,
+.inv__skel .inv__month {
   padding-top: var(--space-2);
+}
+/* The loading shape: a bar about as wide as "September 2026". */
+.inv__skelMonth {
+  width: 7rem;
 }
 .inv__rows {
   display: flex;

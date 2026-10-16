@@ -169,20 +169,36 @@
             }}</span>
           </div>
         }
+        @if (tab() === 'transfers' ? transferReloading() : reloading()) {
+          <span class="skel-progress skel-progress--foot" aria-hidden="true"></span>
+        }
       </app-sticky-bar>
 
       <div
         #scroller
         class="exp__scroll"
         appScrollFade="y"
-        [attr.aria-busy]="refreshing() ? 'true' : null"
+        [attr.aria-busy]="refreshing() || reloading() || transferReloading() ? 'true' : null"
       >
         @if (tab() === 'transfers') {
           @if (transferLoading()) {
-            <app-skeleton variant="rows" [count]="5" [label]="'expenses.loading' | t" />
+<!-- The shape of the loaded list (a month heading, rows in the geometry of
+               `app-list-item`), shown after 300ms. -->
+            <div class="exp__skel skel-in">
+              <h2 class="sec exp__month" aria-hidden="true">
+                <span class="skel-text skel-text--accent exp__skelMonth"></span>
+              </h2>
+              <app-skeleton
+                variant="items"
+                [count]="12"
+                [grouped]="!split()"
+                [label]="'expenses.loading' | t"
+              />
+            </div>
           } @else if (!transferItems().length) {
             <ng-container *ngTemplateOutlet="emptyList; context: { $implicit: 'expenses.transfers.empty' }" />
           } @else {
+            <div class="exp__groups" [class.skel-stale]="transferReloading()" [attr.inert]="transferReloading() ? '' : null">
             @for (group of transferGroups(); track group.key + $index) {
               <section class="exp__group" [attr.aria-label]="group.label || null">
                 @if (group.label) {
@@ -230,6 +246,7 @@
                 </div>
               </section>
             }
+            </div>
             @if (transferHasMore()) {
               <div #sentinel class="exp__sentinel" aria-hidden="true"></div>
               <div class="exp__more">
@@ -241,10 +258,23 @@
           }
         } @else {
           @if (loading()) {
-            <app-skeleton variant="rows" [count]="6" [label]="'expenses.loading' | t" />
+<!-- The shape of the loaded list (a month heading, rows in the geometry of
+               `app-list-item`), shown after 300ms. -->
+            <div class="exp__skel skel-in">
+              <h2 class="sec exp__month" aria-hidden="true">
+                <span class="skel-text skel-text--accent exp__skelMonth"></span>
+              </h2>
+              <app-skeleton
+                variant="items"
+                [count]="12"
+                [grouped]="!split()"
+                [label]="'expenses.loading' | t"
+              />
+            </div>
           } @else if (!items().length) {
             <ng-container *ngTemplateOutlet="emptyList; context: { $implicit: 'expenses.empty' }" />
           } @else {
+            <div class="exp__groups" [class.skel-stale]="reloading()" [attr.inert]="reloading() ? '' : null">
             @for (group of groups(); track group.key + $index) {
               <section class="exp__group" [attr.aria-label]="group.label || null">
                 @if (group.label) {
@@ -319,6 +349,7 @@
                 </div>
               </section>
             }
+            </div>
             @if (hasMore()) {
               <div #sentinel class="exp__sentinel" aria-hidden="true"></div>
               <div class="exp__more">
