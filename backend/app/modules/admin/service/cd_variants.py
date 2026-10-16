@@ -60,10 +60,6 @@ from app.shared.errors import (
 if TYPE_CHECKING:
     from uuid import UUID
 
-    from sqlalchemy.ext.asyncio import AsyncSession
-
-    from app.modules.files.storage import ObjectStorage
-
 # Prefix of every CD-logo object in the bucket. It keeps the logos apart from the
 # attachments and the invoices.
 CD_LOGO_PREFIX = "cd-logos/"
@@ -158,10 +154,6 @@ def _variant_out(row: CdVariant, logos: list[CdVariantLogo]) -> CdVariantOut:
 
 class CdVariantService(ConfigServiceBase):
     """Corporate-design variants: CRUD, logo upload, vendored logos, ordering."""
-
-    def __init__(self, session: AsyncSession, *, storage: ObjectStorage | None = None) -> None:
-        super().__init__(session)
-        self.storage = storage
 
     # --- variants ---------------------------------------------------------
 

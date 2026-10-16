@@ -130,8 +130,10 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     return {code: _PROBLEM for code in codes}
 
 
-def get_config_service(session: DbSession) -> ConfigService:
-    return ConfigService(session)
+def get_config_service(session: DbSession, request: Request) -> ConfigService:
+    # The storage removes the file objects of the to-do comments of a deleted
+    # gremium. Without MinIO only the rows go.
+    return ConfigService(session, storage=getattr(request.app.state, "object_storage", None))
 
 
 def get_site_config_service(session: DbSession) -> SiteConfigService:

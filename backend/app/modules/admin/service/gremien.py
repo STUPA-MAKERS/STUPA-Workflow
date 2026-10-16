@@ -28,7 +28,9 @@ from app.modules.admin.service.service_base import ConfigServiceBase
 from app.modules.audit.actions import AuditAction
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.files.service import FilesService
 from app.modules.todos.boards import ensure_gremium_board
+from app.modules.todos.models import TodoBoard, TodoCard, TodoComment
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
@@ -276,10 +278,45 @@ class GremiumOps(ConfigServiceBase):
                 "application out of its vote state first.",
                 code="gremium_decides_vote",
             )
+        comment_ids = await self._lock_gremium_todos(gremium_id)
         await self._delete_gremium_votes(gremium_id, principal)
+        # The board cascade deletes the attachment rows of the to-do comments, but not
+        # their objects, which can hold personal data. They go first, with an audit
+        # entry each, as in ``erase_todos``.
+        await FilesService(self.session, storage=self.storage).delete_for_messages(
+            "todo_comment", comment_ids, actor=principal.sub
+        )
         await self.session.delete(row)
         await self._audit(principal.sub, AuditAction.CONFIG_CHANGE, "gremium", gremium_id)
         await self.session.commit()
+
+    async def _lock_gremium_todos(self, gremium_id: UUID) -> list[UUID]:
+        """Lock the to-do board of a gremium and its cards, and return its comment ids.
+
+        The board goes first and then the cards, the order of every to-do write. The
+        card lock is ``FOR UPDATE``, which waits for the key-share lock of a comment
+        insert. A comment that binds files therefore commits before the ids are read,
+        or its insert waits and then fails on the deleted card. Otherwise its files
+        would lose their row through the cascade and keep their object.
+        """
+        boards = select(TodoBoard.id).where(TodoBoard.gremium_id == gremium_id)
+        await self.session.execute(boards.order_by(TodoBoard.id).with_for_update())
+        await self.session.execute(
+            select(TodoCard.id)
+            .where(TodoCard.board_id.in_(boards))
+            .order_by(TodoCard.id)
+            .with_for_update()
+        )
+        return list(
+            (
+                await self.session.scalars(
+                    select(TodoComment.id)
+                    .join(TodoCard, TodoCard.id == TodoComment.card_id)
+                    .where(TodoCard.board_id.in_(boards))
+                    .order_by(TodoComment.id)
+                )
+            ).all()
+        )
 
     async def _delete_gremium_votes(self, gremium_id: UUID, principal: Principal) -> None:
         """Delete the meetings of a gremium and their votes by their own rules, without a commit.

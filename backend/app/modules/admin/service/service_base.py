@@ -1,7 +1,9 @@
 """Shared base of the ``service.ConfigService`` ops classes.
 
 The base holds the session-bound constructor, the audit hook that every
-mutation uses, and the datetime helpers of the RBAC and webhook concerns.
+mutation uses, and the datetime helpers of the RBAC and webhook concerns. The
+optional object storage serves the logo files of a variant and the file objects that
+a gremium delete removes.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.modules.audit.actions import AuditAction
+    from app.modules.files.storage import ObjectStorage
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -50,8 +53,9 @@ def _iso(value: datetime | None) -> str | None:
 class ConfigServiceBase:
     """Admin config operations bound to one ``AsyncSession`` — shared base."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, *, storage: ObjectStorage | None = None) -> None:
         self.session = session
+        self.storage = storage
 
     async def _audit(
         self,
