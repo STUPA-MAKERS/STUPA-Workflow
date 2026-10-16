@@ -4156,7 +4156,7 @@ export const de = {
   'admin.helpTickets.error.unblock': 'Die Sperre konnte nicht aufgehoben werden.',
 
   // To-Dos (boards, card, list, settings) and the group "To-Dos" of Aufgaben.
-  'nav.todos': 'To-Dos',
+  'nav.todos': 'Boards',
   'tasks.group.applications': 'Anträge',
   'tasks.group.todos': 'To-Dos',
   'tasks.show.label': 'Anzeigen',
@@ -8485,7 +8485,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.helpTickets.error.unblock': 'The block could not be lifted.',
 
   // To-dos (boards, card, list, settings) and the group "To-dos" of tasks.
-  'nav.todos': 'To-dos',
+  'nav.todos': 'Boards',
   'tasks.group.applications': 'Applications',
   'tasks.group.todos': 'To-dos',
   'tasks.show.label': 'Show',

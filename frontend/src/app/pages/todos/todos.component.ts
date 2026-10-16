@@ -88,7 +88,7 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
 };
 
 /**
- * "To-Dos" (`/todos`, `/todos/:boardId`): one board of the person (frames 0–9, 11–14, 34).
+ * "Boards" (`/todos`, `/todos/:boardId`): one board of the person (frames 0–9, 11–14, 34).
  *
  * `/todos` opens the board of the first own Gremium, else the personal board. The header
  * holds "Board | Liste", the board settings (`todo.configure`) and "+ To-Do"; the bar

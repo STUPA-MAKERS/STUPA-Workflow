@@ -126,7 +126,7 @@ describe('TodosComponent', () => {
 
   it('shows the board with header, picker, search and filters in one bar', async () => {
     const { cmp } = await start('/todos/b-1');
-    expect(screen.getByRole('heading', { level: 1, name: 'To-Dos' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Boards' })).toBeInTheDocument();
     expect(screen.queryByText('2 offen')).toBeNull();
     expect(screen.queryByTestId('td-filter-toggle')).toBeNull();
     expect(screen.getByRole('group', { name: 'Filter' })).toBeInTheDocument();
