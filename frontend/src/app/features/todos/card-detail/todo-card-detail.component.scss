@@ -125,10 +125,12 @@
   gap: var(--space-4);
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* The column reaches 10px past the content edge, so the end buttons below and the
-     scrollbar have room there without a sideways scroll. */
-  margin-inline-end: -10px;
-  padding-inline-end: 10px;
+  /* The column is a scroll container, so it clips what reaches past its edges. It
+     reaches 10px past the content edge on both sides: the end buttons below and the
+     scrollbar have room at the end, and the focus ring of a field (the inline editors
+     of the checklist) has room at both ends. */
+  margin-inline: -10px;
+  padding-inline: 10px;
 }
 /* An icon or text button at the end of a row lines its glyph up with the content edge. */
 .cd__secHead > app-button {
@@ -392,6 +394,11 @@ a.cd__linkTitle:hover {
   height: 100%;
   background: var(--color-accent);
 }
+/* An empty list takes no gap of the section, so "Punkt hinzufügen" sits under the
+   heading at the same distance as the content of the other sections. */
+.cd__items:empty {
+  display: none;
+}
 .cd__items {
   display: flex;
   flex-direction: column;
@@ -413,6 +420,13 @@ a.cd__linkTitle:hover {
 }
 .cd__item .cd__itemForm {
   flex: 1 1 auto;
+}
+/* A new item: the field takes the full row, and the two buttons end the row below it. */
+.cd__itemForm--add .cd__itemInput {
+  flex-basis: 100%;
+}
+.cd__itemForm--add > app-button:first-of-type {
+  margin-inline-start: auto;
 }
 .cd__check {
   display: flex;

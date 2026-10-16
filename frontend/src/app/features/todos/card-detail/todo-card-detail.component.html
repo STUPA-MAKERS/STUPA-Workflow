@@ -405,7 +405,7 @@
     }
     @if (canWrite()) {
       @if (addingItem()) {
-        <form class="cd__itemForm" (submit)="$event.preventDefault(); addItem()">
+        <form class="cd__itemForm cd__itemForm--add" (submit)="$event.preventDefault(); addItem()">
           <input
             class="cd__itemInput"
             data-focus="item-new"
