@@ -14,26 +14,6 @@
 .dc__chev {
   color: var(--color-text-muted);
 }
-.dc__x {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-}
-.dc__x:hover {
-  background: var(--color-surface-3);
-  color: var(--color-text);
-}
-.dc__x:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 1px;
-}
 /* The native field gives only its calendar; it sits under the chip, invisible. */
 .dc__native {
   position: absolute;

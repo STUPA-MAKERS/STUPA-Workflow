@@ -65,8 +65,8 @@
 }
 .cd__title {
   margin: 0;
-  font-size: var(--fs-h2);
-  font-weight: var(--fw-semibold);
+  font-size: 1.625rem;
+  font-weight: var(--fw-bold);
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
@@ -110,8 +110,8 @@
 .cd__cols {
   display: grid;
   flex: 1 1 auto;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--space-6);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 1.75rem;
   min-height: 0;
   padding-top: var(--space-5);
 }
@@ -122,7 +122,7 @@
   min-height: 0;
 }
 .cd__col--details {
-  gap: var(--space-6);
+  gap: var(--space-4);
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-inline-end: var(--space-1);
@@ -132,14 +132,21 @@
 }
 /* The pane of "Aufgaben" scrolls as a whole; the thread keeps a bounded height. */
 :host(.cd--pane) .cd__chat {
-  --chat-log-max: min(60vh, 36rem);
+  --chat-log-max: max(20rem, calc(100dvh - 21.5rem));
+}
+/* The thread column is as tall as its thread, so the composer follows the log. */
+:host(.cd--pane) .cd__col--chat {
+  align-self: start;
 }
 
 .cd__secTitle {
   margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
 }
 .cd__secTitle--accent {
   margin-bottom: var(--space-3);
+  font-size: 0.84375rem;
   color: var(--color-accent-text);
 }
 .cd__sec {
@@ -230,6 +237,11 @@
 .cd__pickerAnchor {
   position: relative;
 }
+/* The picker floats over the head of its section, as wide as the column. */
+.cd__pickerAnchor {
+  height: 0;
+  margin-bottom: calc(-1 * var(--space-2));
+}
 .cd__picker {
   position: absolute;
   top: 0;
@@ -287,14 +299,29 @@ a.cd__linkTitle:hover {
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
-/* The remove button shows on hover and on focus where a pointer can hover. */
+/* A row with a target ends with a chevron. Where a pointer can hover, the remove button
+   takes the place of the chevron on hover and while the row holds the focus; on a touch
+   screen the remove button stays, because there is no hover to reveal it. */
+.cd__linkChev {
+  flex: none;
+  color: var(--color-text-muted);
+}
 @media (hover: hover) {
   .cd__linkX {
-    opacity: 0;
+    display: none;
   }
   .cd__linkRow:hover .cd__linkX,
-  .cd__linkX:focus-visible {
-    opacity: 1;
+  .cd__linkRow:focus-within .cd__linkX {
+    display: grid;
+  }
+  .cd__linkRow:hover .cd__linkChev,
+  .cd__linkRow:focus-within .cd__linkChev {
+    display: none;
+  }
+}
+@media (hover: none) {
+  .cd__linkChev {
+    display: none;
   }
 }
 
@@ -448,6 +475,17 @@ a.cd__linkTitle:hover {
 .cd__tabs {
   flex: none;
   margin-top: var(--space-2);
+}
+/* Two tabs of equal width that fill the row. */
+.cd__tabs ::ng-deep .tabs {
+  gap: 0;
+}
+.cd__tabs ::ng-deep .tabs__tab {
+  flex: 1 1 0;
+  justify-content: center;
+}
+:host(.cd--phone) .cd__title {
+  font-size: var(--fs-h1);
 }
 .cd__panel {
   display: flex;

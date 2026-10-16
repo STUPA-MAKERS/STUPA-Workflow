@@ -234,14 +234,14 @@ describe('ChatComponent', () => {
       expect(send).toHaveBeenCalledWith({ body: 'Text' });
     });
 
-    it('sends the chosen visibility and goes back to the first', async () => {
+    it('sends the chosen visibility and keeps it for the next message', async () => {
       const { input, send, user, cmp } = await setup({ visibilityOptions: ['public', 'internal'] });
       const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
       await user.click(within(group).getByRole('radio', { name: 'Intern' }));
       fireEvent.input(input(), { target: { value: 'Geheim' } });
       fireEvent.keyDown(input(), { key: 'Enter' });
       expect(send).toHaveBeenCalledWith({ body: 'Geheim', visibility: 'internal' });
-      expect(within(group).getByRole('radio', { name: 'Öffentlich' })).toHaveAttribute('aria-checked', 'true');
+      expect(within(group).getByRole('radio', { name: 'Intern' })).toHaveAttribute('aria-checked', 'true');
       cmp.setVisibility('other');
       expect(cmp.visibility()).toBeNull();
     });

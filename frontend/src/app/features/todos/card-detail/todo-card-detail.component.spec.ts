@@ -80,8 +80,8 @@ describe('TodoCardDetailComponent', () => {
     expect(api.card).toHaveBeenCalledWith('k-1');
     expect(api.members).toHaveBeenCalledWith('b-1');
     expect(screen.getByRole('heading', { level: 2, name: 'Raum buchen' })).toBeInTheDocument();
-    expect(screen.getByText('To-Do · Studierendenparlament')).toBeInTheDocument();
-    expect(screen.getByText(/^Angelegt von Selin Yıldız am /)).toBeInTheDocument();
+    expect(screen.getByText('Studierendenparlament · To-Do')).toBeInTheDocument();
+    expect(screen.getByText(/^Angelegt von Selin Yıldız · /)).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Aktivität' })).toBeInTheDocument();
     expect(screen.getByText('Raum ist frei')).toBeInTheDocument();
     expect(screen.getByText('in 7 Tagen')).toBeInTheDocument();
@@ -640,10 +640,9 @@ describe('TodoCardDetailComponent', () => {
         createdAt: 'bad',
       }),
     });
-    expect(cmp.events()[0].text).toMatch(/^Selin hat die Karte angelegt · \d\d:\d\d$/);
-    expect(cmp.events()[1].text).toMatch(/^STUPA hat die Karte wiederhergestellt · /);
-    expect((cmp as unknown as { time(at: string): string }).time('bad')).toBe('');
-    expect(cmp.createdLine()).toBe('Angelegt von Selin Yıldız am ');
+    expect(cmp.events()[0].text).toBe('Selin hat die Karte angelegt');
+    expect(cmp.events()[1].text).toBe('STUPA hat die Karte wiederhergestellt');
+    expect(cmp.createdLine()).toBe('Angelegt von Selin Yıldız · ');
     expect(cmp.name(null)).toBe('Gelöschte Person');
   });
 

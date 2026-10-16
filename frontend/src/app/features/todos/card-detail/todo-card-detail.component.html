@@ -101,11 +101,11 @@
       </section>
       @if (canWrite() && tab() === 'details') {
         <div class="cd__bar">
-          <app-button variant="tonal" [disabled]="busy()" (click)="moveOpen.set(true)">
+          <app-button class="btn-block" variant="tonal" [disabled]="busy()" (click)="moveOpen.set(true)">
             <app-icon name="swap" [size]="17" />
             {{ 'todos.card.move' | t }}
           </app-button>
-          <app-button variant="fill" [disabled]="busy()" (click)="toggleDone()">
+          <app-button class="btn-block" variant="fill" [disabled]="busy()" (click)="toggleDone()">
             <app-icon [name]="isDone() ? 'undo' : 'check'" [size]="17" />
             {{ (isDone() ? 'todos.card.reopen' : 'todos.card.done') | t }}
           </app-button>
@@ -128,6 +128,7 @@
     [(open)]="moveOpen"
     [columns]="moveColumns()"
     [current]="card.columnId"
+    [cardTitle]="card.title"
     (moved)="moveTo($event)"
   />
 }
@@ -187,8 +188,8 @@
           <app-filter-select
             icon="plus"
             [chevron]="false"
+            [iconOnly]="true"
             [label]="'todos.card.addAssignee' | t"
-            [text]="'todos.card.person' | t"
             [options]="memberOptions()"
             [emptyText]="'todos.card.noMembers' | t"
             (valueChange)="addAssignee($event)"
@@ -242,15 +243,6 @@
   </dl>
 
   <section class="cd__sec" aria-labelledby="cd-links">
-    <div class="cd__secHead">
-      <h3 id="cd-links" class="sec cd__secTitle">{{ 'todos.card.links' | t }}</h3>
-      @if (canWrite()) {
-        <app-button variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
-          <app-icon name="plus" [size]="16" />
-          {{ 'todos.card.link' | t }}
-        </app-button>
-      }
-    </div>
     <div class="cd__pickerAnchor">
       <app-todo-link-picker
         class="cd__picker"
@@ -259,6 +251,15 @@
         [linked]="linkedKeys()"
         (picked)="pickLink($event)"
       />
+    </div>
+    <div class="cd__secHead">
+      <h3 id="cd-links" class="cd__secTitle">{{ 'todos.card.links' | t }}</h3>
+      @if (canWrite()) {
+        <app-button variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
+          <app-icon name="plus" [size]="16" />
+          {{ 'todos.card.link' | t }}
+        </app-button>
+      }
     </div>
     @if (card.links.length) {
       <ul class="cd__links">
@@ -273,6 +274,9 @@
               }
               <span class="cd__linkSub">{{ linkSub(link) }}</span>
             </span>
+            @if (link.url) {
+              <app-icon class="cd__linkChev" name="chevron-right" [size]="16" />
+            }
             @if (canWrite()) {
               <button
                 type="button"
@@ -291,7 +295,7 @@
 
   <section class="cd__sec" aria-labelledby="cd-desc">
     <div class="cd__secHead">
-      <h3 id="cd-desc" class="sec cd__secTitle">{{ 'todos.card.description' | t }}</h3>
+      <h3 id="cd-desc" class="cd__secTitle">{{ 'todos.card.description' | t }}</h3>
       @if (canWrite() && !editingDesc()) {
         <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.card.editDescription' | t" (click)="startDesc()">
           <app-icon name="edit" [size]="18" />
@@ -321,7 +325,7 @@
 
   <section class="cd__sec" aria-labelledby="cd-check">
     <div class="cd__secHead">
-      <h3 id="cd-check" class="sec cd__secTitle">{{ 'todos.card.checklist' | t }}</h3>
+      <h3 id="cd-check" class="cd__secTitle">{{ 'todos.card.checklist' | t }}</h3>
       @if (items().length) {
         <span class="cd__progress">
           <span class="num">{{ doneItems().length }}/{{ items().length }}</span>

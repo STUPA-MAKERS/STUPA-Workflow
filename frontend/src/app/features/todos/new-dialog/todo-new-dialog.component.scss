@@ -3,6 +3,10 @@
 :host {
   display: contents;
 }
+/* The dialog is wider than the shared `md` size, so two fields fit side by side. */
+:host ::ng-deep .dialog {
+  max-width: 39rem;
+}
 
 .tn {
   display: flex;
@@ -32,6 +36,12 @@
 .tn__cap {
   flex: 1 0 100%;
   color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+}
+/* "+ Verknüpfen" sits on its own row under the chips. */
+.tn__add {
+  flex: 1 0 100%;
 }
 .tn__chip {
   display: inline-flex;
@@ -107,7 +117,8 @@
   font: inherit;
   font-size: var(--fs-md);
   line-height: 1.375rem;
-  resize: vertical;
+  resize: none;
+  field-sizing: content;
 }
 
 .tn__error {

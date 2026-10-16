@@ -101,10 +101,12 @@ describe('TodosComponent', () => {
     expect(cmp.board()?.id).toBe('b-1');
   });
 
-  it('shows the board with header, picker, search, filters and the open count', async () => {
+  it('shows the board with header, picker, search and filters in one bar', async () => {
     const { cmp } = await start('/todos/b-1');
     expect(screen.getByRole('heading', { level: 1, name: 'To-Dos' })).toBeInTheDocument();
-    expect(screen.getByText('2 offen')).toBeInTheDocument();
+    expect(screen.queryByText('2 offen')).toBeNull();
+    expect(screen.queryByTestId('td-filter-toggle')).toBeNull();
+    expect(screen.getByRole('group', { name: 'Filter' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Board: Studierendenparlament' })).toBeInTheDocument();
     expect(screen.getByPlaceholderText('2 offene To-Dos durchsuchen')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Board-Einstellungen' })).toBeInTheDocument();
@@ -494,6 +496,14 @@ describe('TodosComponent', () => {
       fireEvent.click(screen.getByTestId('td-search-toggle'));
       harness.detectChanges();
       expect(screen.getByPlaceholderText('2 offene To-Dos durchsuchen')).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: 'Filter' })).toBeNull();
+      const filter = screen.getByTestId('td-filter-toggle');
+      expect(filter).toHaveAttribute('aria-expanded', 'false');
+      fireEvent.click(filter);
+      harness.detectChanges();
+      expect(filter).toHaveAttribute('aria-expanded', 'true');
+      expect(filter).toHaveClass('on');
+      expect(screen.getByRole('group', { name: 'Filter' })).toBeInTheDocument();
       expect(cmp.phoneMenu()[0].items.map((i) => i.id)).toEqual(['list', 'settings', 'archive']);
       cmp.onPhoneMenu({ id: 'settings', label: '' });
       expect(cmp.settingsOpen()).toBe(true);

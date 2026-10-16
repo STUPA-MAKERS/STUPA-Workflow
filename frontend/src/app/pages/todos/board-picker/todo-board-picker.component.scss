@@ -31,6 +31,9 @@
 .bp__chip app-icon {
   flex: none;
 }
+.bp__chip[aria-expanded='true'] {
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
 .bp__chip:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;

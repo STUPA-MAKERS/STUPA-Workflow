@@ -255,7 +255,7 @@ export class TicketDetailComponent {
     return t.events.map((e) => ({
       id: e.id,
       at: e.at,
-      text: `${eventText(e, this.reporter(), this.t)} · ${this.time(e.at)}`,
+      text: eventText(e, this.reporter(), this.t),
     }));
   });
 
@@ -485,14 +485,6 @@ export class TicketDetailComponent {
     return new Intl.DateTimeFormat(this.i18n.formatLocale(), {
       day: '2-digit',
       month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    }).format(new Date(at));
-  }
-
-  private time(at: string): string {
-    return new Intl.DateTimeFormat(this.i18n.formatLocale(), {
       hour: '2-digit',
       minute: '2-digit',
       hourCycle: 'h23',

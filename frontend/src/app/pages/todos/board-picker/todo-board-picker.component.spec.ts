@@ -32,7 +32,7 @@ describe('TodoBoardPickerComponent', () => {
     expect(screen.getByText('Gremien')).toBeInTheDocument();
     expect(screen.getByText('Team')).toBeInTheDocument();
     expect(screen.getByText('1 offen · nur du')).toBeInTheDocument();
-    expect(screen.getByText('6 offen · mit Berechtigung')).toBeInTheDocument();
+    expect(screen.getByText('6 offen · für ticket.manage')).toBeInTheDocument();
     expect(screen.getByText('4 offen')).toBeInTheDocument();
     const current = screen.getByRole('button', { name: /^Studierendenparlament/ });
     expect(current).toHaveAttribute('aria-current', 'true');

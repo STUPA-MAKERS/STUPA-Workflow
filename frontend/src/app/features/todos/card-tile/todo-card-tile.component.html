@@ -46,7 +46,7 @@
   }
   <span class="tt__people">
     @if (card().assignees.length) {
-      <app-avatar-stack [names]="names()" [principalIds]="ids()" [max]="3" />
+      <app-avatar-stack [names]="names()" [principalIds]="ids()" [max]="3" size="xs" />
     } @else {
       <span class="tt__nobody" [attr.aria-label]="'todos.tile.nobody' | t" role="img">
         <app-icon name="user" [size]="13" />

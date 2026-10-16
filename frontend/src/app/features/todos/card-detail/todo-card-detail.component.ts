@@ -271,7 +271,7 @@ export class TodoCardDetailComponent {
     (this.card()?.events ?? []).map((e) => ({
       id: e.id,
       at: e.at,
-      text: `${eventText(e, this.i18n.formatLocale(), this.t)} · ${this.time(e.at)}`,
+      text: eventText(e, this.i18n.formatLocale(), this.t),
     })),
   );
 
@@ -323,12 +323,6 @@ export class TodoCardDetailComponent {
 
   linkSub(link: TodoLink): string {
     return linkSub(link, this.i18n.formatLocale(), this.i18n.locale(), this.t);
-  }
-
-  private time(at: string): string {
-    const d = new Date(at);
-    if (Number.isNaN(d.getTime())) return '';
-    return new Intl.DateTimeFormat(this.i18n.formatLocale(), { hour: '2-digit', minute: '2-digit' }).format(d);
   }
 
   // ------------------------------------------------------------------ load

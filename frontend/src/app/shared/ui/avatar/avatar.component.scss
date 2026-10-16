@@ -1,4 +1,4 @@
-/* A person: initials in a 40px circle (32px small), or the Gravatar image over them. */
+/* A person: initials in a 40px circle (32px small, 22px extra small), or the Gravatar image over them. */
 :host {
   position: relative;
   overflow: hidden;
@@ -8,7 +8,8 @@
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 50%;
-  background: var(--color-surface-3);
+  /* `--avatar-bg` lets a surface of the same colour (a dark tile on surface 3) lift it. */
+  background: var(--avatar-bg, var(--color-surface-3));
   color: var(--color-text-muted);
   font-size: 0.8125rem;
   font-weight: var(--fw-semibold);
@@ -19,6 +20,11 @@
   width: 2rem;
   height: 2rem;
   font-size: 0.75rem;
+}
+:host(.av--xs) {
+  width: 1.375rem;
+  height: 1.375rem;
+  font-size: 0.5625rem;
 }
 :host(.av--accent) {
   background: var(--color-accent);

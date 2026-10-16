@@ -301,6 +301,11 @@
 .chat__acts:focus-within {
   opacity: 1;
 }
+/* The message the actions belong to carries an accent edge while they show. */
+.chat__line:has(.chat__acts):hover .chat__bubble,
+.chat__line:has(.chat__acts:focus-within) .chat__bubble {
+  box-shadow: inset 0 0 0 1.5px var(--color-accent);
+}
 .chat__edit {
   display: flex;
   flex-direction: column;

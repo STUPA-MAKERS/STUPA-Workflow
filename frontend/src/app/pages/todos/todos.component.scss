@@ -31,17 +31,24 @@
   gap: var(--space-3);
 }
 .td__search {
-  flex: 1 1 18rem;
-  min-width: 0;
-  max-width: 32rem;
+  flex: 0 1 18.75rem;
+  min-width: 12rem;
 }
 .td__chips {
   display: flex;
+  flex: 0 1 auto;
   align-items: center;
   gap: var(--space-2);
-  margin-top: var(--space-2);
+  min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
+}
+.td__filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 36px;
+  padding-inline: var(--space-3);
 }
 .td__chips > * {
   flex: none;
@@ -86,7 +93,8 @@
 }
 
 /* ------------------------------------------------------------------ phone */
-.td--phone .td__search {
+.td--phone .td__search,
+.td--phone .td__chips {
   flex-basis: 100%;
   max-width: none;
 }
@@ -133,8 +141,8 @@
   z-index: var(--z-dialog);
   display: flex;
   flex-direction: column;
-  width: min(60rem, calc(100vw - var(--space-8)));
-  padding: var(--space-5) var(--space-6);
+  width: min(65rem, calc(100vw - var(--space-8)));
+  padding: var(--space-3) var(--space-6) var(--space-6);
   overflow-y: auto;
   overscroll-behavior: contain;
   border-top-left-radius: var(--radius-xl);
@@ -146,7 +154,12 @@
 .td__drawer > app-todo-card-detail {
   flex: 1 1 auto;
 }
+/* Phone: the drawer is the page and ends on the bottom bar, which stays visible. */
 @include bp.phone {
+  .td__scrim,
+  .td__drawer {
+    bottom: var(--app-bottom-inset, 0px);
+  }
   .td__drawer {
     width: 100vw;
     padding: var(--space-3) var(--space-4) 0;

@@ -9,7 +9,7 @@ function mapOf(b: TodoBoard) {
 }
 
 const CARDS = [
-  tile({ id: 'k-1', title: 'Ohne Datum', labelIds: ['l-x', 'l-2'], primaryLink: link({ title: 'Lerncafé' }) }),
+  tile({ id: 'k-1', title: 'Ohne Datum', labelIds: ['l-x', 'l-2', 'l-1'], primaryLink: link({ title: 'Lerncafé' }) }),
   tile({ id: 'k-2', title: 'Spät', dueDate: '2026-11-20', assignees: [{ principalId: 'p-1', displayName: 'Selin' }] }),
   tile({ id: 'k-3', title: 'Überfällig', dueDate: '2026-10-10' }),
   tile({ id: 'k-4', title: 'Auch ohne' }),
@@ -39,6 +39,7 @@ describe('TodoListViewComponent', () => {
     expect(screen.getByRole('table', { name: 'Studierendenparlament' })).toBeInTheDocument();
     expect(screen.getByText('Antrag · Lerncafé')).toBeInTheDocument();
     expect(screen.getByText('Sitzung')).toBeInTheDocument();
+    expect(screen.getByText('Haushalt')).toBeInTheDocument();
     expect(screen.getByText(/10\.10\. · überfällig/).closest('.lv__due')).toHaveClass('lv__due--overdue');
     expect(screen.getAllByRole('img', { name: 'Niemand zuständig' })).toHaveLength(3);
     expect(within(screen.getByRole('rowgroup', { name: 'In Arbeit' })).getByText('Keine Karten')).toBeInTheDocument();

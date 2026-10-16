@@ -64,6 +64,7 @@
           }
         </header>
 
+        <div class="bv__scroll" cdkScrollable>
         <div
           class="bv__cards"
           cdkDropList
@@ -72,6 +73,7 @@
           [id]="'bv-list-' + col.id"
           [cdkDropListData]="col.id"
           [cdkDropListDisabled]="!canWrite()"
+          (cdkDropListEntered)="onEnter($event)"
           (cdkDropListDropped)="drop($event)"
         >
           @for (card of list(col); track card.id; let i = $index) {
@@ -82,6 +84,8 @@
               cdkDragPreviewClass="bv__preview"
               [cdkDragData]="card.id"
               [cdkDragDisabled]="!canWrite()"
+              (cdkDragStarted)="onDragStart(col)"
+              (cdkDragEnded)="ptr.set(null)"
               (keydown)="onTileKey($event, card, ci, i)"
             >
               <app-todo-card-tile
@@ -92,7 +96,6 @@
                 [lifted]="kb()?.cardId === card.id"
                 (open)="openCard.emit(card.id)"
               />
-              <div *cdkDragPlaceholder class="bv__placeholder"></div>
             </div>
           }
         </div>
@@ -116,7 +119,7 @@
           </p>
         }
 
-        @if (canWrite()) {
+        @if (canWrite() && !col.isDone) {
           @if (adding() === col.id) {
             <div class="bv__quick">
               <textarea
@@ -130,19 +133,19 @@
                 (keydown)="onAddKey($event, col)"
               ></textarea>
               <div class="bv__quickFoot">
-                <app-button variant="text" size="sm" (click)="adding.set(null)">{{ 'action.cancel' | t }}</app-button>
                 <app-button variant="fill" size="sm" [disabled]="!draft().trim()" (click)="submitAdd(col)">
                   {{ 'todos.board.create' | t }}
                 </app-button>
               </div>
             </div>
           } @else {
-            <button type="button" class="bv__add" (click)="startAdd(col)">
+            <button type="button" class="bv__add" [attr.aria-label]="'todos.board.addCard' | t" (click)="startAdd(col)">
               <app-icon name="plus" [size]="16" />
-              {{ 'todos.board.addCard' | t }}
+              {{ 'todos.new.short' | t }}
             </button>
           }
         }
+        </div>
       </section>
     }
   </div>

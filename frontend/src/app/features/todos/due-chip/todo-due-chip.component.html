@@ -10,17 +10,6 @@
     <span>{{ text() ?? ('todos.due.none' | t) }}</span>
     <app-icon class="dc__chev" name="down" [size]="15" />
   </button>
-  @if (value() && !disabled()) {
-    <button
-      type="button"
-      class="dc__x"
-      [attr.aria-label]="'todos.due.remove' | t"
-      [title]="'todos.due.remove' | t"
-      (click)="changed.emit(null)"
-    >
-      <app-icon name="x" [size]="14" />
-    </button>
-  }
   <input
     #native
     class="dc__native"

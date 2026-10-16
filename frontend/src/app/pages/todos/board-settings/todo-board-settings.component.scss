@@ -5,6 +5,10 @@
 :host {
   display: contents;
 }
+/* Wider than the shared `md` dialog, so the labels fit in one row. */
+:host ::ng-deep .dialog {
+  max-width: 40rem;
+}
 .bs {
   display: flex;
   flex-direction: column;
@@ -23,6 +27,8 @@
 }
 .bs__title {
   margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
 }
 .bs__cols {
   display: flex;
@@ -38,12 +44,12 @@
   min-height: 52px;
   padding: 0 var(--space-1) 0 var(--space-2);
   border-radius: var(--radius-md);
-  background: var(--color-surface-2);
 }
 .bs__col + .bs__col {
   margin-top: 2px;
 }
 .bs__col.cdk-drag-preview {
+  background: var(--color-surface-2);
   box-shadow: var(--shadow-elevated);
 }
 .bs__col.cdk-drag-placeholder {
@@ -119,6 +125,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+/* A label is a filled pill. */
+.bs__label {
+  border-color: transparent;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  color: var(--color-text);
 }
 .bs__dot {
   @include lbl.dot;

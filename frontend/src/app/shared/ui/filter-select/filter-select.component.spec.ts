@@ -25,6 +25,7 @@ const OPTIONS: FilterSelectOption[] = [
       [(values)]="values"
       [active]="value() !== '' || values().length > 0"
       [text]="text()"
+      [iconOnly]="iconOnly()"
       resetLabel="Zurücksetzen"
     />
     <button type="button">danach</button>
@@ -36,6 +37,7 @@ class HostComponent {
   readonly value = signal('');
   readonly values = signal<readonly string[]>([]);
   readonly text = signal<string | null>(null);
+  readonly iconOnly = signal(false);
 }
 
 /** Let `matchMedia` report a phone (or not). jsdom has none of its own. */
@@ -87,6 +89,16 @@ describe('FilterSelectComponent', () => {
     view.fixture.detectChanges();
     expect(chip()).toHaveAccessibleName('Typ: Förderantrag');
     expect(view.container.querySelector('select')).toBeNull();
+  });
+
+  it('shows only the icon in a square chip, named by its label', async () => {
+    const { chip, host, view } = await setup();
+    host.iconOnly.set(true);
+    view.fixture.detectChanges();
+    expect(chip()).toHaveClass('fs__chip--icon');
+    expect(chip()).toHaveAccessibleName('Typ');
+    expect(chip()).toHaveAttribute('title', 'Typ');
+    expect(view.container.querySelector('.fs__text')).toBeNull();
   });
 
   it('opens the list under the chip on a click, with a check on the current value', async () => {

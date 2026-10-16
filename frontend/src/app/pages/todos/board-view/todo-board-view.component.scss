@@ -27,7 +27,22 @@
   min-height: 0;
   padding: var(--space-2);
   border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+}
+/* The dark column is surface 1, so its tiles (surface 3) stand out as the white tiles do
+   on the grey column of the light theme. */
+:host-context([data-theme='dark']) .bv__col {
   background: var(--color-surface-1);
+}
+/* The cards, the done footer and the quick field scroll together under the column head. */
+.bv__scroll {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .bv__head {
   display: flex;
@@ -70,12 +85,10 @@
 
 .bv__cards {
   display: flex;
-  flex: 0 1 auto;
+  flex: none;
   flex-direction: column;
   gap: var(--space-2);
   min-height: 3rem;
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 .bv__item {
   display: block;
@@ -83,22 +96,29 @@
 .bv__item:focus-visible {
   outline: none;
 }
-/* The tile in the hand: lifted, tilted a little, with the accent edge. */
+/* The tile in the hand: opaque, lifted with a shadow and tilted a little. The CDK opens
+   it as a popover, so the UA popover box (border, padding, canvas colour) is reset. */
 .bv__preview {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0;
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-elevated);
-  outline: 1.5px solid var(--color-accent);
+  background: transparent;
+  box-shadow: 0 18px 40px -8px rgb(0 0 0 / 0.45), 0 4px 12px rgb(0 0 0 / 0.25);
   /* `rotate`, not `transform`: the CDK sets the inline transform of the preview. */
   rotate: 2deg;
-  opacity: 0.97;
+  opacity: 1;
 }
-/* Where it lands: a dashed box of the height of the tile. */
-.bv__placeholder {
-  min-height: 5.5rem;
-  border: 1.5px dashed var(--color-accent);
+/* Where it lands: the item itself, kept at the height of the tile, as a dashed box. */
+.bv__item.cdk-drag-placeholder {
   border-radius: var(--radius-lg);
+  outline: 1.5px dashed var(--color-accent);
+  outline-offset: -1.5px;
   background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+.bv__item.cdk-drag-placeholder > * {
+  visibility: hidden;
 }
 .bv__cards.cdk-drop-list-dragging .bv__item:not(.cdk-drag-placeholder) {
   transition: transform var(--motion-base) cubic-bezier(0, 0, 0.2, 1);
@@ -110,9 +130,6 @@
   .bv__cards.cdk-drop-list-dragging .bv__item,
   .cdk-drag-animating {
     transition: none;
-  }
-  .bv__preview {
-    rotate: none;
   }
 }
 
@@ -193,7 +210,6 @@
 .bv__quickFoot {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-2);
 }
 
 /* ------------------------------------------------------------------ phone */

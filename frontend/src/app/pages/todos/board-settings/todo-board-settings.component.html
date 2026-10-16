@@ -11,10 +11,10 @@
 
     <section class="bs__sec" aria-labelledby="bs-cols">
       <div class="bs__secHead">
-        <h3 id="bs-cols" class="sec bs__title">{{ 'todos.settings.columns' | t }}</h3>
-        <app-button variant="text" size="sm" (click)="newColumn.set('')">
+        <h3 id="bs-cols" class="bs__title">{{ 'todos.settings.columns' | t }}</h3>
+        <app-button variant="text" size="sm" [ariaLabel]="'todos.settings.addColumn' | t" (click)="newColumn.set('')">
           <app-icon name="plus" [size]="15" />
-          {{ 'todos.settings.addColumn' | t }}
+          {{ 'todos.settings.addColumnShort' | t }}
         </app-button>
       </div>
       <ul class="bs__cols" cdkDropList [cdkDropListDisabled]="busy()" (cdkDropListDropped)="drop($event)">
@@ -88,10 +88,10 @@
 
     <section class="bs__sec" aria-labelledby="bs-labels">
       <div class="bs__secHead">
-        <h3 id="bs-labels" class="sec bs__title">{{ 'todos.settings.labels' | t }}</h3>
-        <app-button variant="text" size="sm" (click)="editLabel(null)">
+        <h3 id="bs-labels" class="bs__title">{{ 'todos.settings.labels' | t }}</h3>
+        <app-button variant="text" size="sm" [ariaLabel]="'todos.settings.addLabel' | t" (click)="editLabel(null)">
           <app-icon name="plus" [size]="15" />
-          {{ 'todos.settings.addLabel' | t }}
+          {{ 'todos.settings.addLabelShort' | t }}
         </app-button>
       </div>
       <div class="bs__labels">

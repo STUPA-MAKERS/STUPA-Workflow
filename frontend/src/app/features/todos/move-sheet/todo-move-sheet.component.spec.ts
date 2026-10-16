@@ -27,6 +27,10 @@ describe('TodoMoveSheetComponent', () => {
     const { moved, openSheet, fixture } = await setup();
     openSheet();
     expect(screen.getByRole('heading', { name: 'Verschieben' })).toBeInTheDocument();
+    expect(document.querySelector('.ms__sub')).toBeNull();
+    fixture.componentRef.setInput('cardTitle', 'Haushalt');
+    fixture.detectChanges();
+    expect(screen.getByText('Haushalt', { selector: '.ms__sub' })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: /In Arbeit/ })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: /Offen/ })).toHaveTextContent('5');
     expect(screen.getByRole('radio', { name: 'Erledigt' }).querySelector('.ms__count')).toBeNull();

@@ -1,8 +1,13 @@
+/* The detail sheet of a to-do: a round panel on the surface, like the sheet of an
+   application in the same pane. */
 :host {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   min-width: 0;
   padding: var(--space-5) var(--space-6) var(--space-6);
+  border-radius: var(--ld-detail-radius, var(--radius-2xl));
+  background: var(--color-surface);
 }
 .tt-pane {
   flex: 1 1 auto;

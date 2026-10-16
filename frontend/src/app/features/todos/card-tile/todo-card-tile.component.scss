@@ -2,21 +2,31 @@
 
 @include lbl.colors;
 
-/* A tile on surface 2, a step above its column. */
+/* A tile a step above its column: white on the grey column in the light theme, surface 3
+   on the surface 1 column in the dark theme. `--stack-ring` gives the avatar rings the
+   colour of the tile. */
 :host {
+  --tile-bg: var(--color-surface-1);
+  --tile-hover: var(--color-surface-3);
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-  padding: var(--space-3) var(--space-3) 10px var(--space-4);
+  padding: var(--space-3) var(--space-3) 10px 14px;
   border-radius: var(--radius-lg);
-  background: var(--color-surface-2);
+  background: var(--tile-bg);
   color: var(--color-text);
   cursor: grab;
+  --stack-ring: var(--tile-bg);
+}
+:host-context([data-theme='dark']) {
+  --tile-bg: var(--color-surface-3);
+  --tile-hover: var(--color-surface-4);
+  --avatar-bg: var(--color-surface-4);
 }
 :host(:hover) {
-  background: var(--color-surface-3);
+  --tile-bg: var(--tile-hover);
 }
 :host(.tt--lifted) {
   outline: 2px solid var(--color-accent);
@@ -49,6 +59,7 @@
   font-size: var(--fs-md);
   font-weight: var(--fw-medium);
   line-height: 1.375rem;
+  text-wrap: wrap;
 }
 .tt__doneIcon {
   flex: none;
@@ -102,7 +113,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 4px var(--space-3);
-  min-height: 26px;
+  min-height: 22px;
   font-size: 0.8125rem;
   color: var(--color-text-muted);
 }
@@ -129,8 +140,8 @@
 .tt__nobody {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border: 1px dashed var(--color-border-strong);
   border-radius: 50%;
   color: var(--color-text-subtle);

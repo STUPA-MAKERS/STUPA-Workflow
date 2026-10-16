@@ -305,8 +305,8 @@ describe('AgendaPaneComponent', () => {
       await userEvent.click(within(menu).getByRole('menuitem', { name: 'To-Do anlegen' }));
       view.fixture.detectChanges();
       expect(screen.getByRole('dialog', { name: 'Neues To-Do' })).toBeInTheDocument();
-      expect(screen.getByText('TOP 3 · Antrag Kulturfestival')).toBeInTheDocument();
-      expect(screen.getByText('Antrag Kulturfestival', { selector: '.tn__chipText' })).toBeInTheDocument();
+      const chips = [...document.querySelectorAll('.tn__chipText')].map((c) => c.textContent?.trim());
+      expect(chips).toEqual(['Antrag · Antrag Kulturfestival', `${meeting().title} · TOP 3`]);
       expect(view.on.remove).not.toHaveBeenCalled();
     });
 

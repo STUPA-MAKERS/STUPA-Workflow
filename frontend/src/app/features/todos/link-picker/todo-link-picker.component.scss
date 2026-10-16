@@ -27,8 +27,6 @@
   gap: var(--space-2);
   min-height: 44px;
   padding: 0 var(--space-2) 0 var(--space-3);
-  border-radius: var(--radius-field);
-  background: var(--color-surface-sunken);
   color: var(--color-text-muted);
 }
 .lp__field {
@@ -39,9 +37,6 @@
   background: transparent;
   color: var(--color-text);
   font: inherit;
-}
-.lp__search:focus-within {
-  outline: 2px solid var(--color-focus-ring);
 }
 .lp__x {
   display: grid;
@@ -68,6 +63,8 @@
 .lp__group {
   margin: var(--space-2) var(--space-2) var(--space-1);
   color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
 }
 .lp__list {
   margin: 0;

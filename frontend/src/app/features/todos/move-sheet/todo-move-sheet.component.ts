@@ -38,6 +38,8 @@ export class TodoMoveSheetComponent {
   readonly columns = input<readonly MoveColumn[]>([]);
   /** The column the card is in now. */
   readonly current = input<Uuid | null>(null);
+  /** The title of the card, as the line under the heading. */
+  readonly cardTitle = input('');
   readonly moved = output<MoveChoice>();
 
   readonly columnId = signal<Uuid | null>(null);

@@ -18,7 +18,7 @@ describe('TodoDueChipComponent', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Fälligkeit ändern: Di, 03.11.2026' }));
     expect(showPicker).toHaveBeenCalled();
     expect(native.value).toBe('2026-11-03');
-    fireEvent.click(screen.getByRole('button', { name: 'Fälligkeit entfernen' }));
+    fireEvent.change(native, { target: { value: '' } });
     expect(changed).toHaveBeenCalledWith(null);
   });
 
@@ -38,13 +38,12 @@ describe('TodoDueChipComponent', () => {
     expect(click).toHaveBeenCalledTimes(2);
     expect(native.value).toBe('');
     expect(screen.getByText('ohne Datum')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Fälligkeit entfernen' })).toBeNull();
+    fireEvent.change(native, { target: { value: '' } });
   });
 
   it('emits a new date only', async () => {
     const { changed, native } = await setup('2026-11-03');
     fireEvent.change(native, { target: { value: '2026-11-03' } });
-    fireEvent.change(native, { target: { value: '' } });
     expect(changed).not.toHaveBeenCalled();
     fireEvent.change(native, { target: { value: '2026-11-05' } });
     expect(changed).toHaveBeenCalledWith('2026-11-05');
@@ -53,6 +52,5 @@ describe('TodoDueChipComponent', () => {
   it('is locked while disabled', async () => {
     await setup('2026-11-03', true);
     expect(screen.getByRole('button', { name: /Fälligkeit ändern/ })).toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Fälligkeit entfernen' })).toBeNull();
   });
 });

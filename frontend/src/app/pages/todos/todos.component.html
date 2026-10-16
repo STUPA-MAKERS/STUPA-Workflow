@@ -1,5 +1,5 @@
 <div class="td" [class.td--phone]="phone()">
-  <app-page-header [flush]="true" [title]="'nav.todos' | t" [meta]="board() ? ('todos.openCount' | t: { n: openCount() }) : null">
+  <app-page-header [flush]="true" [pane]="phone()" [title]="'nav.todos' | t">
     <ng-container ngProjectAs="[actions]">
       @if (phone()) {
         <app-button
@@ -43,6 +43,20 @@
   <app-sticky-bar class="td__bar">
     <div class="td__barRow">
       <app-todo-board-picker [boards]="boards()" [current]="boardId()" [compact]="phone()" (picked)="pickBoard($event)" />
+      @if (phone() && board()) {
+        <button
+          type="button"
+          class="chip td__filter"
+          data-testid="td-filter-toggle"
+          [class.on]="filtersOpen() || filtered()"
+          [attr.aria-expanded]="filtersOpen()"
+          (click)="filtersOpen.set(!filtersOpen())"
+        >
+          <app-icon name="tune" [size]="15" />
+          {{ 'todos.filter.group' | t }}
+          <app-icon name="down" [size]="15" />
+        </button>
+      }
       @if (!phone() || searchOpen()) {
         <app-search-pill
           class="td__search"
@@ -55,8 +69,7 @@
           (commit)="search.flush()"
         />
       }
-    </div>
-    @if (board()) {
+    @if (board() && (!phone() || filtersOpen())) {
       <div class="td__chips" role="group" appScrollFade="x" [attr.aria-label]="'todos.filter.group' | t">
         <app-filter-select
           [label]="'todos.filter.assignee' | t"
@@ -99,6 +112,7 @@
         }
       </div>
     }
+    </div>
   </app-sticky-bar>
 
   <div class="td__body">

@@ -1,16 +1,16 @@
-// The six label colours of the server palette. The app has no own token for blue and
-// violet, so they come from the semantic info and danger colours; every colour follows
-// the theme. A component includes `colors` and sets `data-color` on the element that
+// The six label colours of the server palette. The app has no token for blue and
+// violet, so those two carry their own light value and a dark one under the dark
+// theme; every colour follows the theme. A component includes `colors` and sets `data-color` on the element that
 // paints `--lbl`.
 @mixin colors {
   [data-color='green'] {
     --lbl: var(--color-success);
   }
   [data-color='blue'] {
-    --lbl: var(--color-info);
+    --lbl: #3f74b8;
   }
   [data-color='violet'] {
-    --lbl: color-mix(in srgb, var(--color-info) 55%, var(--color-danger));
+    --lbl: #7a5cc0;
   }
   [data-color='amber'] {
     --lbl: var(--color-warning);
@@ -20,6 +20,12 @@
   }
   [data-color='gray'] {
     --lbl: var(--color-text-muted);
+  }
+  :host-context([data-theme='dark']) [data-color='blue'] {
+    --lbl: #6f9fd8;
+  }
+  :host-context([data-theme='dark']) [data-color='violet'] {
+    --lbl: #a68bd6;
   }
 }
 

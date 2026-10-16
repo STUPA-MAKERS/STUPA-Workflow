@@ -3,19 +3,22 @@
   type="button"
   class="chip fs__chip"
   [class.fs__chip--md]="size() === 'md'"
+  [class.fs__chip--icon]="iconOnly()"
   [class.on]="active()"
   aria-haspopup="listbox"
   [attr.aria-expanded]="open()"
   [attr.aria-controls]="open() ? listId : null"
   [attr.aria-label]="chipName()"
-  [title]="chipText()"
+  [title]="iconOnly() ? label() : chipText()"
   (click)="toggle()"
   (keydown)="onTriggerKey($event)"
 >
   @if (icon(); as lead) {
     <app-icon [name]="lead" [size]="15" />
   }
-  <span class="ell fs__text">{{ chipText() }}</span>
+  @if (!iconOnly()) {
+    <span class="ell fs__text">{{ chipText() }}</span>
+  }
   @if (chevron()) {
     <app-icon class="fs__chev" name="down" [size]="15" />
   }

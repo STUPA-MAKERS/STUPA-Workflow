@@ -171,6 +171,8 @@ export class TodosComponent implements OnDestroy {
   });
   /** Phone: the search field shows after the search button. */
   readonly searchOpen = signal(false);
+  /** Phone: the filter chips show after the filter chip. */
+  readonly filtersOpen = signal(false);
 
   readonly newOpen = signal(false);
   readonly newColumn = signal<Uuid | null>(null);

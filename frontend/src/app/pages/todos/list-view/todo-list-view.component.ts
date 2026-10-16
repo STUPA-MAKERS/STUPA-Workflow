@@ -19,7 +19,7 @@ export type DueSort = 'none' | 'asc' | 'desc';
 interface ListRow {
   card: TodoCardTile;
   link: string | null;
-  label: TodoLabel | null;
+  labels: TodoLabel[];
   due: DueInfo | null;
   names: string[];
   ids: (Uuid | null)[];
@@ -67,7 +67,7 @@ export class TodoListViewComponent {
       const rows = (this.cards().get(column.id) ?? []).map<ListRow>((card) => ({
         card,
         link: card.primaryLink ? linkLine(card.primaryLink, today, locale, this.t) : null,
-        label: card.labelIds.map((id) => this.labels().get(id)).find((l): l is TodoLabel => !!l) ?? null,
+        labels: card.labelIds.map((id) => this.labels().get(id)).filter((l): l is TodoLabel => !!l),
         due: card.dueDate ? dueInfo(card.dueDate, today, locale, this.t, column.isDone) : null,
         names: card.assignees.map((a) => personName(a, this.t)),
         ids: card.assignees.map((a) => a.principalId),

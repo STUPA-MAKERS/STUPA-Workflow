@@ -76,6 +76,8 @@ export class FilterSelectComponent {
   readonly icon = input<IconName | null>(null);
   /** The chevron after the text. */
   readonly chevron = input(true);
+  /** Only the icon shows, in a square chip; `label` names the button. */
+  readonly iconOnly = input(false);
   /** `sm`: the filter chip (32px). `md`: a pill as high as the search pill `md` (44px). */
   readonly size = input<'sm' | 'md'>('sm');
   /** Several choices: the text of the button that clears all values. No text, no button. */
@@ -108,6 +110,7 @@ export class FilterSelectComponent {
    * does not start with it ("Typ: Förderantrag", but "Archiv: Alle" as it is).
    */
   protected readonly chipName = computed(() => {
+    if (this.iconOnly()) return this.label();
     const text = this.chipText();
     return text.startsWith(this.label()) ? text : `${this.label()}: ${text}`;
   });

@@ -51,7 +51,7 @@
     }
 
     <div class="tn__links" role="group" aria-labelledby="tn-links">
-      <span id="tn-links" class="cap tn__cap">{{ 'todos.new.linked' | t }}</span>
+      <span id="tn-links" class="tn__cap">{{ 'todos.new.linked' | t }}</span>
       @for (link of links(); track link.kind + link.targetId) {
         <span class="tn__chip">
           <app-icon [name]="icon(link.kind)" [size]="15" />
@@ -66,10 +66,12 @@
           </button>
         </span>
       }
-      <app-button variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
-        <app-icon name="plus" [size]="15" />
-        {{ 'todos.new.link' | t }}
-      </app-button>
+      <div class="tn__add">
+        <app-button variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
+          <app-icon name="plus" [size]="15" />
+          {{ 'todos.new.link' | t }}
+        </app-button>
+      </div>
       <div class="tn__picker">
         <app-todo-link-picker [(open)]="pickerOpen" [linked]="linkedKeys()" (picked)="pickLink($event)" />
       </div>

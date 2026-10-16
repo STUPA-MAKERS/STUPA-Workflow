@@ -317,8 +317,8 @@ export class ChatComponent {
     if (!body) return;
     const vis = this.visibility();
     this.send.emit(vis ? { body, visibility: vis } : { body });
+    // The chosen visibility stays for the next message of the thread.
     this.onDraft('');
-    this.visibility.set(this.visibilityOptions()[0] ?? null);
     this.scrollToEnd();
   }
 

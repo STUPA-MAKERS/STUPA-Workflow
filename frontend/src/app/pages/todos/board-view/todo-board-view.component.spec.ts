@@ -81,7 +81,7 @@ describe('TodoBoardViewComponent', () => {
   it('reads only without the write right', async () => {
     const { cmp } = await setup(board({ canWrite: false, canConfigure: false }));
     expect(cmp.columnMenu(cmp.columns()[0])).toEqual([]);
-    expect(screen.queryByRole('button', { name: /Karte hinzufügen/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /To-Do hinzufügen/ })).toBeNull();
     const { item } = { item: screen.getByRole('button', { name: 'Raum buchen' }).closest('.bv__item') as HTMLElement };
     fireEvent.keyDown(item, { key: ' ' });
     expect(cmp.kb()).toBeNull();
@@ -89,7 +89,7 @@ describe('TodoBoardViewComponent', () => {
 
   it('adds a card with a quick title: Enter, Escape and the buttons', async () => {
     const { cmp, on, fixture } = await setup();
-    fireEvent.click(screen.getAllByRole('button', { name: /Karte hinzufügen/ })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: /To-Do hinzufügen/ })[0]);
     fixture.detectChanges();
     await fixture.whenStable();
     const field = screen.getByRole('textbox', { name: 'Titel der neuen Karte in Offen' });
@@ -106,10 +106,28 @@ describe('TodoBoardViewComponent', () => {
     expect(cmp.draft()).toBe('');
     fireEvent.keyDown(field, { key: 'Escape' });
     expect(cmp.adding()).toBeNull();
-    cmp.startAdd(col);
-    fixture.detectChanges();
-    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
-    expect(cmp.adding()).toBeNull();
+  });
+
+  it('has no quick field in the done column', async () => {
+    await setup();
+    expect(screen.getAllByRole('button', { name: /To-Do hinzufügen/ })).toHaveLength(3);
+  });
+
+  it('moves the column counts with a pointer drag', async () => {
+    const { cmp } = await setup();
+    const [open, doing, , done] = cmp.columns();
+    const before = [open, doing, done].map((c) => cmp.count(c));
+    cmp.onEnter({ container: { data: doing.id } } as never);
+    expect(cmp.ptr()).toBeNull();
+    cmp.onDragStart(open);
+    expect(cmp.count(open)).toBe(before[0]);
+    cmp.onEnter({ container: { data: doing.id } } as never);
+    expect(cmp.count(open)).toBe(before[0] - 1);
+    expect(cmp.count(doing)).toBe(before[1] + 1);
+    expect(cmp.count(done)).toBe(before[2]);
+    expect(cmp.more(done)).toBe(Math.max(0, before[2] - DONE_PREVIEW));
+    cmp.ptr.set(null);
+    expect(cmp.count(open)).toBe(before[0]);
   });
 
   it('turns a pointer drop into a move with one neighbour', async () => {
@@ -152,6 +170,8 @@ describe('TodoBoardViewComponent', () => {
     await key('Raum buchen', 'ArrowRight');
     expect(cmp.kb()).toMatchObject({ col: 1, index: 0 });
     expect(container.querySelector('[aria-live]')).toHaveTextContent('Spalte In Arbeit, Position 1 von 1.');
+    expect(cmp.count(cmp.columns()[0])).toBe(1);
+    expect(cmp.count(cmp.columns()[1])).toBe(1);
     await key('Raum buchen', 'x');
     await key('Raum buchen', 'Enter');
     expect(on.moveCard).toHaveBeenCalledWith({ cardId: 'k-1', move: { columnId: 'c-2' } });

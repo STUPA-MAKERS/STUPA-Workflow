@@ -58,7 +58,7 @@
           }
           @for (group of showApplications() ? groups() : []; track group.key + $index) {
             <section class="tasks__group" [attr.aria-label]="group.label || null">
-              @if (group.label) {
+              @if (group.label && !hasTodos()) {
                 <h2 class="sec tasks__month">{{ group.label }}</h2>
               }
               <div class="tasks__rows" [class.rowgroup]="!split()" role="list">
@@ -121,7 +121,12 @@
                       <app-icon name="kanban" [size]="14" />{{ row.item.boardName }}
                     </span>
                     <span trail class="tasks__trail">
-                      <span class="tasks__due" [attr.data-tone]="row.tone">{{ row.due ?? ('todos.due.none' | t) }}</span>
+                      <span class="tasks__due" [attr.data-tone]="row.tone">
+                        @if (row.due) {
+                          <app-icon name="cal" [size]="14" />
+                        }
+                        {{ row.due ?? ('todos.due.none' | t) }}
+                      </span>
                       @if (!split()) {
                         <app-icon class="tasks__chev" name="chevron-right" [size]="17" />
                       }

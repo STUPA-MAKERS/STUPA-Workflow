@@ -1,4 +1,4 @@
-import { CdkDrag, CdkDragPlaceholder, CdkDropList, CdkDropListGroup, type CdkDragDrop } from '@angular/cdk/drag-drop';
+import { CdkDrag, CdkDropList, CdkDropListGroup, type CdkDragDrop, type CdkDragEnter } from '@angular/cdk/drag-drop';
 import { CdkScrollable } from '@angular/cdk/scrolling';
 import {
   ChangeDetectionStrategy,
@@ -61,7 +61,6 @@ interface KeyDrag {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     CdkDrag,
-    CdkDragPlaceholder,
     CdkDropList,
     CdkDropListGroup,
     CdkScrollable,
@@ -103,6 +102,8 @@ export class TodoBoardViewComponent {
   readonly adding = signal<Uuid | null>(null);
   readonly draft = signal('');
   readonly kb = signal<KeyDrag | null>(null);
+  /** The pointer drag: the column the card left and the column it is over. */
+  readonly ptr = signal<{ from: Uuid; over: Uuid } | null>(null);
   readonly announce = signal('');
   /** Phone: the column on screen. */
   readonly phoneColumn = signal(0);
@@ -138,12 +139,41 @@ export class TodoBoardViewComponent {
     return cols[Math.min(this.phoneColumn(), cols.length - 1)] ?? null;
   });
 
+  /** The number in the column head; it follows a card that is being dragged. */
   count(col: TodoColumn): number {
-    return this.cards().get(col.id)?.length ?? 0;
+    const n = this.total(col);
+    const move = this.moving();
+    if (!move || move.from === move.over) return n;
+    if (col.id === move.from) return n - 1;
+    if (col.id === move.over) return n + 1;
+    return n;
   }
 
   more(col: TodoColumn): number {
-    return this.count(col) - (this.shown().get(col.id)?.length ?? 0);
+    return this.total(col) - (this.shown().get(col.id)?.length ?? 0);
+  }
+
+  private total(col: TodoColumn): number {
+    return this.cards().get(col.id)?.length ?? 0;
+  }
+
+  /** The column a dragged card left and the one it is over, by pointer or keyboard. */
+  private moving(): { from: Uuid; over: Uuid } | null {
+    const ptr = this.ptr();
+    if (ptr) return ptr;
+    const kb = this.kb();
+    if (!kb) return null;
+    const cols = this.columns();
+    return { from: cols[kb.fromCol].id, over: cols[kb.col].id };
+  }
+
+  onDragStart(col: TodoColumn): void {
+    this.ptr.set({ from: col.id, over: col.id });
+  }
+
+  onEnter(event: CdkDragEnter<Uuid>): void {
+    const over = event.container.data;
+    this.ptr.update((p) => (p ? { ...p, over } : p));
   }
 
   list(col: TodoColumn): TodoCardTile[] {

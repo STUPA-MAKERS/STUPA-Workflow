@@ -307,17 +307,22 @@ export class AgendaPaneComponent {
     }
   }
 
-  /** "Neues To-Do" linked to the TOP and, for an application item, to the application. */
+  /**
+   * "Neues To-Do" linked to the TOP and, for an application item, to the application.
+   * The chips read "Antrag · <title>" and "<meeting> · TOP n".
+   */
   private openTodo(item: AgendaItem, index: number): void {
     const title = this.title(item);
-    const links: NewTodoLink[] = [
-      {
-        kind: 'agenda_item',
-        targetId: item.id,
-        label: `${this.i18n.translate('todos.link.top', { n: index + 1 })} · ${title}`,
-      },
-    ];
-    if (item.applicationId) links.push({ kind: 'application', targetId: item.applicationId, label: title });
+    const top = this.i18n.translate('todos.link.top', { n: index + 1 });
+    const links: NewTodoLink[] = [];
+    if (item.applicationId) {
+      links.push({
+        kind: 'application',
+        targetId: item.applicationId,
+        label: `${this.i18n.translate('todos.linkKind.application')} · ${title}`,
+      });
+    }
+    links.push({ kind: 'agenda_item', targetId: item.id, label: `${this.meeting().title} · ${top}` });
     this.todoLinks.set(links);
     this.todoOpen.set(true);
   }

@@ -56,8 +56,9 @@ export class TodoDueChipComponent {
     el.click();
   }
 
+  /** A picked date, or null when the calendar of the browser cleared the date. */
   onNative(value: string): void {
-    if (!value || value === this.value()) return;
-    this.changed.emit(value);
+    if (value === (this.value() ?? '')) return;
+    this.changed.emit(value || null);
   }
 }

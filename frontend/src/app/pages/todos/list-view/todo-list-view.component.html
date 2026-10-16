@@ -8,11 +8,7 @@
       <span class="lv__c lv__c--due cap" role="columnheader" [attr.aria-sort]="ariaSort()">
         <button type="button" class="lv__sort" (click)="nextSort()">
           {{ 'todos.list.due' | t }}
-          @if (sort() !== 'none') {
-            <app-icon [name]="sort() === 'asc' ? 'up' : 'down'" [size]="13" />
-          } @else {
-            <app-icon name="sort" [size]="13" />
-          }
+          <app-icon [name]="sort() === 'asc' ? 'up' : 'down'" [size]="13" [class.lv__sortIdle]="sort() === 'none'" />
         </button>
       </span>
       <span class="lv__c lv__c--who cap" role="columnheader">{{ 'todos.list.who' | t }}</span>
@@ -62,7 +58,7 @@
               }
             </span>
             <span class="lv__c lv__c--label" role="cell">
-              @if (row.label; as label) {
+              @for (label of row.labels; track label.id) {
                 <span class="lv__label" [attr.data-color]="label.color"><span class="lv__dot" aria-hidden="true"></span>{{ label.name }}</span>
               }
             </span>
@@ -76,7 +72,7 @@
             </span>
             <span class="lv__c lv__c--who" role="cell">
               @if (row.names.length) {
-                <app-avatar-stack [names]="row.names" [principalIds]="row.ids" [max]="3" />
+                <app-avatar-stack [names]="row.names" [principalIds]="row.ids" [max]="3" size="xs" />
               } @else {
                 <span class="lv__nobody" role="img" [attr.aria-label]="'todos.tile.nobody' | t"><app-icon name="user" [size]="13" /></span>
               }

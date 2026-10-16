@@ -1,5 +1,8 @@
 <app-side-sheet side="bottom" [heading]="'todos.move.title' | t" [(open)]="open">
   <div class="ms">
+    @if (cardTitle()) {
+      <p class="ms__sub">{{ cardTitle() }}</p>
+    }
     <div class="ms__list" role="radiogroup" [attr.aria-label]="'todos.move.column' | t">
       @for (col of columns(); track col.id) {
         <button
@@ -18,7 +21,7 @@
         </button>
       }
     </div>
-    <p class="cap ms__cap" id="ms-pos">{{ 'todos.move.position' | t }}</p>
+    <p class="ms__cap" id="ms-pos">{{ 'todos.move.position' | t }}</p>
     <app-segmented
       width="fill"
       ariaLabel="{{ 'todos.move.position' | t }}"

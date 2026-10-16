@@ -4,7 +4,9 @@
     <input
       #field
       class="lp__field"
-      type="search"
+      type="text"
+      role="searchbox"
+      enterkeyhint="search"
       autocomplete="off"
       [attr.aria-label]="'todos.picker.search' | t"
       [placeholder]="'todos.picker.search' | t"
@@ -38,7 +40,7 @@
       <p class="lp__note">{{ 'todos.picker.none' | t }}</p>
     }
     @for (group of groups(); track group.key) {
-      <p class="cap lp__group">{{ group.label | t }}</p>
+      <p class="lp__group">{{ group.label | t }}</p>
       <ul class="lp__list">
         @for (hit of group.hits; track hit.kind + hit.targetId) {
           <li>

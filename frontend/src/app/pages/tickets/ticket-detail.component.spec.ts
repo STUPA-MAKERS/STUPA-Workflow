@@ -166,8 +166,8 @@ describe('TicketDetailComponent', () => {
     expect(msgs[0].author).toEqual({ principalId: 'r1', displayName: 'Tobias Brandt' });
     expect(msgs[0].attachments![0].url).toBe('/api/attachments/a1/download');
     const events = cmp.events().map((e) => e.text);
-    expect(events[0]).toMatch(/^Eingangsbestätigung an Tobias Brandt gesendet · \d\d:\d\d$/);
-    expect(events[1]).toMatch(/^Mara Keller hat das Ticket übernommen · /);
+    expect(events[0]).toBe('Eingangsbestätigung an Tobias Brandt gesendet');
+    expect(events[1]).toBe('Mara Keller hat das Ticket übernommen');
 
     cmp.selectTab('details');
     cmp.selectTab('bogus');
