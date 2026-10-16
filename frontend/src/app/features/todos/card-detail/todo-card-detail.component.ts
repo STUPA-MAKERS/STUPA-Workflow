@@ -146,6 +146,11 @@ export class TodoCardDetailComponent {
   readonly closed = output<void>();
   /** The card changed on the server. */
   readonly changed = output<TodoCardDetail>();
+  /**
+   * The comments of the card changed. Only the count goes out, because the drawer's copy of
+   * the rest of the card can be older than the board's: a full card would move it back.
+   */
+  readonly commentsChanged = output<{ id: Uuid; commentCount: number }>();
   /** The card went into the archive. */
   readonly archived = output<Uuid>();
 
@@ -182,7 +187,8 @@ export class TodoCardDetailComponent {
 
   readonly outbox = new ChatOutbox<TodoComment>(
     (req) => this.postComment(req),
-    (comment) => this.patchLocal((c) => ({ ...c, comments: [...c.comments, comment], commentCount: c.commentCount + 1 })),
+    (comment) =>
+      this.patchComments((c) => ({ ...c, comments: [...c.comments, comment], commentCount: c.commentCount + 1 })),
     (err) => this.toast.error(this.t(sendErrorKey(err, 'todos.error.comment'))),
   );
 
@@ -461,6 +467,15 @@ export class TodoCardDetailComponent {
     const c = this.card();
     if (!c) return;
     this.apply(fn(c));
+  }
+
+  /** Change only the comments: the drawer takes the card, the page only the count. */
+  private patchComments(fn: (c: TodoCardDetail) => TodoCardDetail): void {
+    const c = this.card();
+    if (!c) return;
+    const next = fn(c);
+    this.card.set(next);
+    this.commentsChanged.emit({ id: next.id, commentCount: next.commentCount });
   }
 
   private fail(err: unknown, cardRoute: boolean): void {
@@ -767,7 +782,7 @@ export class TodoCardDetailComponent {
     this.api.editComment(c.id, edit.id, edit.body, mentionIds(edit.body, this.members())).subscribe({
       next: (comment) => {
         if (!current()) return;
-        this.patchLocal((cur) => ({
+        this.patchComments((cur) => ({
           ...cur,
           comments: cur.comments.map((x) => (x.id === comment.id ? comment : x)),
         }));
@@ -787,7 +802,7 @@ export class TodoCardDetailComponent {
     this.api.deleteComment(c.id, ref.id).subscribe({
       next: () => {
         if (!current()) return;
-        this.patchLocal((cur) => ({
+        this.patchComments((cur) => ({
           ...cur,
           comments: cur.comments.filter((x) => x.id !== ref.id),
           commentCount: Math.max(0, cur.commentCount - 1),

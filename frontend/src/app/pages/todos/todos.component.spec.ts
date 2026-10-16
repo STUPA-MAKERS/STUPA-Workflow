@@ -523,6 +523,21 @@ describe('TodosComponent', () => {
     expect(document.querySelector('app-segmented')?.getAttribute('width')).toBe('equal');
   });
 
+  it('takes only the comment count from a comment write in the drawer', async () => {
+    const b = board({ cards: [tile({ id: 'k-1', columnId: 'c-4', rank: 'a', title: 'Frisch', commentCount: 2 })] });
+    const { cmp } = await start('/todos/b-1?card=k-1', { board: b });
+    cmp.onCommentsChanged({ id: 'k-1', commentCount: 3 });
+    const k1 = cmp.board()?.cards.find((c) => c.id === 'k-1');
+    // The poll moved and renamed the card; the drawer's older copy does not put it back.
+    expect(k1).toEqual(expect.objectContaining({ columnId: 'c-4', title: 'Frisch', commentCount: 3 }));
+    const before = cmp.board();
+    cmp.onCommentsChanged({ id: 'k-9', commentCount: 1 });
+    expect(cmp.board()).toBe(before);
+    cmp.board.set(null);
+    cmp.onCommentsChanged({ id: 'k-1', commentCount: 1 });
+    expect(cmp.board()).toBeNull();
+  });
+
   it('applies the changes of the drawer to the board', async () => {
     const { cmp, settle, router } = await start('/todos/b-1?card=k-1');
     cmp.onCardChanged(detail({ id: 'k-1', title: 'Neu benannt' }));

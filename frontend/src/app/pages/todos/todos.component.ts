@@ -590,6 +590,17 @@ export class TodosComponent implements OnDestroy {
     this.refreshMine();
   }
 
+  /** Merge only the comment count: the drawer's copy of the rest of the card can be stale. */
+  onCommentsChanged(event: { id: Uuid; commentCount: number }): void {
+    const board = this.board();
+    if (!board?.cards.some((c) => c.id === event.id)) return;
+    this.mutations++;
+    this.board.set({
+      ...board,
+      cards: board.cards.map((c) => (c.id === event.id ? { ...c, commentCount: event.commentCount } : c)),
+    });
+  }
+
   onArchived(id: Uuid): void {
     const board = this.board();
     this.mutations++;

@@ -56,7 +56,7 @@ async function setup(opts: Opts = {}) {
   const card = opts.card ?? detail({ comments: [COMMENT] });
   const api = makeApi(card);
   const toast = { success: jest.fn(), error: jest.fn() };
-  const out = { closed: jest.fn(), changed: jest.fn(), archived: jest.fn() };
+  const out = { closed: jest.fn(), changed: jest.fn(), commentsChanged: jest.fn(), archived: jest.fn() };
   const view = await render(TodoCardDetailComponent, {
     inputs: { cardId: card.id, mode: opts.mode ?? 'drawer', board: opts.board ?? null },
     on: out,
@@ -696,12 +696,13 @@ describe('TodoCardDetailComponent', () => {
   });
 
   it('posts, retries, edits and deletes comments, with mentions of members', async () => {
-    const { cmp, api, toast, changed } = await setup();
+    const { cmp, api, toast, changed, commentsChanged } = await setup();
     cmp.sendComment({ body: 'Hallo @Jonas Weber' });
     expect(api.addComment).toHaveBeenCalledWith('k-1', 'Hallo @Jonas Weber', ['p-2']);
     expect(cmp.card()?.comments.map((c) => c.id)).toEqual(['cm-1', 'cm-2']);
     expect(cmp.card()?.commentCount).toBe(1);
-    expect(changed).toHaveBeenCalled();
+    // A comment write gives the page only the count, never the drawer's copy of the card.
+    expect(commentsChanged).toHaveBeenLastCalledWith({ id: 'k-1', commentCount: 1 });
 
     api.addComment.mockReturnValueOnce(throwError(() => new Error('x')));
     cmp.sendComment({ body: 'Fehlt' });
@@ -715,7 +716,9 @@ describe('TodoCardDetailComponent', () => {
     cmp.discardComment({ id: cmp.messages().find((m) => m.state === 'failed')!.id });
     expect(cmp.messages().some((m) => m.state === 'failed')).toBe(false);
 
+    const sent = commentsChanged.mock.calls.length;
     cmp.editComment({ id: 'cm-1', body: 'Geändert' });
+    expect(commentsChanged).toHaveBeenCalledTimes(sent + 1);
     expect(api.editComment).toHaveBeenCalledWith('k-1', 'cm-1', 'Geändert', []);
     expect(cmp.card()?.comments[0].body).toBe('Geändert');
     api.editComment.mockReturnValueOnce(throwError(() => new Error('x')));
@@ -732,6 +735,8 @@ describe('TodoCardDetailComponent', () => {
     api.deleteComment.mockReturnValueOnce(throwError(() => new Error('x')));
     cmp.deleteComment({ id: 'cm-2' });
     expect(toast.error).toHaveBeenCalledTimes(4);
+    expect(commentsChanged).toHaveBeenLastCalledWith({ id: 'k-1', commentCount: 0 });
+    expect(changed).not.toHaveBeenCalled();
   });
 
   it('writes the events with their time', async () => {
