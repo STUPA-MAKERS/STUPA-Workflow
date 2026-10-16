@@ -1,7 +1,52 @@
 @if (loading()) {
-  <div class="cd cd--state" aria-busy="true">
-    <app-skeleton variant="lines" [count]="6" [label]="'todos.card.loading' | t" />
-  </div>
+  <!-- The loaded sheet with bars in place of the text: the same head, columns, fields and
+       sections, so nothing moves when the card arrives. The fixed labels and headings are
+       real text; the bars show after 300ms (`skel-in`). The close button works. -->
+  <article class="cd cd--busy" aria-busy="true">
+    <header class="cd__head">
+      @if (phone() && mode() === 'drawer') {
+        <button type="button" class="cd__back" (click)="closed.emit()">
+          <app-icon name="chevron-left" [size]="18" />
+          {{ 'todos.card.back' | t }}
+        </button>
+      }
+      <app-sheet-bar [kicker]="loadingKicker()" [bleed]="mode() === 'pane'">
+        @if (!phone() && mode() === 'drawer') {
+          <span class="cd__skelIcon skel-in" aria-hidden="true"><span class="skel-box"></span></span>
+        }
+        <span class="cd__skelIcon skel-in" aria-hidden="true"><span class="skel-box"></span></span>
+        @if (mode() === 'drawer' && !phone()) {
+          <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="closed.emit()">
+            <app-icon name="x" [size]="20" />
+          </app-button>
+        }
+      </app-sheet-bar>
+      <p class="cd__title skel-in" aria-hidden="true">
+        <span class="skel-text cd__skelTitle"></span>
+        @if (phone()) {
+          <span class="skel-text cd__skelTitle cd__skelTitle--second"></span>
+        }
+      </p>
+      <p class="cd__created skel-in" aria-hidden="true"><span class="skel-text skel-text--muted cd__skelCreated"></span></p>
+    </header>
+    @if (phone()) {
+      <app-tabs class="cd__tabs" idPrefix="cd-busy" [tabs]="busyTabs()" [active]="'details'" aria-hidden="true" />
+      <section class="cd__panel" aria-hidden="true">
+        <ng-container *ngTemplateOutlet="detailsSkel" />
+      </section>
+    } @else {
+      <div class="cd__cols" aria-hidden="true">
+        <section class="cd__col cd__col--chat">
+          <h3 class="sec cd__secTitle cd__secTitle--accent">{{ 'todos.card.activity' | t }}</h3>
+          <app-skeleton class="cd__chat skel-in" variant="chat" [count]="5" [composer]="board()?.canWrite ?? false" />
+        </section>
+        <div class="cd__col cd__col--details">
+          <ng-container *ngTemplateOutlet="detailsSkel" />
+        </div>
+      </div>
+    }
+    <span class="sr-only" role="status">{{ 'todos.card.loading' | t }}</span>
+  </article>
 } @else if (notFound()) {
   <div class="cd cd--state">
     <app-empty-state icon="circleok" [heading]="'todos.card.notFound' | t" />
@@ -433,4 +478,68 @@
       }
     }
   </li>
+</ng-template>
+
+<!-- The details while the card loads: the field labels and the section headings are
+     real text, the values are bars. -->
+<ng-template #detailsSkel>
+  <dl class="cd__fields">
+    <div class="cd__field">
+      <dt>{{ 'todos.card.column' | t }}</dt>
+      <dd class="cd__chips skel-in"><span class="skel-box cd__skelChip"></span></dd>
+    </div>
+    <div class="cd__field">
+      <dt>{{ 'todos.card.assignees' | t }}</dt>
+      <dd class="cd__chips skel-in">
+        <span class="skel-box cd__skelChip cd__skelChip--person"></span>
+        <span class="skel-box cd__skelChip cd__skelChip--person"></span>
+      </dd>
+    </div>
+    <div class="cd__field">
+      <dt>{{ 'todos.card.due' | t }}</dt>
+      <dd class="cd__chips skel-in"><span class="skel-box cd__skelChip cd__skelChip--date"></span></dd>
+    </div>
+    <div class="cd__field">
+      <dt>{{ 'todos.card.labels' | t }}</dt>
+      <dd class="cd__chips skel-in">
+        <span class="skel-box cd__skelChip cd__skelChip--label"></span>
+        <span class="skel-box cd__skelChip cd__skelChip--label"></span>
+      </dd>
+    </div>
+  </dl>
+  <section class="cd__sec">
+    <div class="cd__secHead"><h3 class="cd__secTitle">{{ 'todos.card.links' | t }}</h3></div>
+    <ul class="cd__links skel-in">
+      @for (w of ['62%', '48%']; track $index) {
+        <li class="cd__linkRow">
+          <span class="skel-box cd__skelLinkIcon"></span>
+          <span class="cd__linkText">
+            <span class="cd__linkTitle"><span class="skel-text" [style.width]="w"></span></span>
+            <span class="cd__linkSub"><span class="skel-text skel-text--muted cd__skelSub"></span></span>
+          </span>
+        </li>
+      }
+    </ul>
+  </section>
+  <section class="cd__sec">
+    <div class="cd__secHead"><h3 class="cd__secTitle">{{ 'todos.card.description' | t }}</h3></div>
+    <p class="cd__skelLines skel-in">
+      <span class="skel-text" style="width: 92%"></span>
+      <span class="skel-text" style="width: 84%"></span>
+      <span class="skel-text" style="width: 56%"></span>
+    </p>
+  </section>
+  <section class="cd__sec">
+    <div class="cd__secHead"><h3 class="cd__secTitle">{{ 'todos.card.checklist' | t }}</h3></div>
+    <ul class="cd__items skel-in">
+      @for (w of ['58%', '46%', '52%']; track $index) {
+        <li class="cd__item">
+          <span class="cd__check">
+            <span class="skel-box cd__skelBox"></span>
+            <span class="cd__itemText cd__skelItemText"><span class="skel-text" [style.width]="w"></span></span>
+          </span>
+        </li>
+      }
+    </ul>
+  </section>
 </ng-template>

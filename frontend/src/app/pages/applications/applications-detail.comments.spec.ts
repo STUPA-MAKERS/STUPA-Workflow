@@ -178,6 +178,33 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => localStorage.clear());
 
+  it('draws bubbles and no count while the comments load, then the thread', async () => {
+    const { http, cmp, detectChanges } = await setup();
+    flushTypes(http);
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    detectChanges();
+    expect(cmp.commentsLoading()).toBe(true);
+    expect(screen.queryByText('Noch keine Nachrichten.')).not.toBeInTheDocument();
+    expect(document.querySelectorAll('app-chat .sk__msg').length).toBeGreaterThan(0);
+    expect(document.querySelector('.ad__count')).toBeNull();
+    http.expectOne(url('/comments')).flush(COMMENTS);
+    detectChanges();
+    expect(cmp.commentsLoading()).toBe(false);
+    expect(screen.getByText('Bitte Kostenplan ergänzen.')).toBeInTheDocument();
+    expect(document.querySelector('.ad__count')).toHaveTextContent('1');
+  });
+
+  it('ends the loading state of the comments when their read fails', async () => {
+    const { http, cmp, detectChanges } = await setup();
+    flushTypes(http);
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/comments')).flush(null, { status: 500, statusText: 'x' });
+    detectChanges();
+    expect(cmp.commentsLoading()).toBe(false);
+    expect(screen.getByText('Noch keine Nachrichten.')).toBeInTheDocument();
+  });
+
   it('posts a public comment without application.manage, at once and without a toast', async () => {
     const { http, toast, type, detectChanges } = await loaded(['application.read']);
     const success = jest.spyOn(toast, 'success');

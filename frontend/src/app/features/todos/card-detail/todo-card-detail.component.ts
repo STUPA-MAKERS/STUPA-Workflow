@@ -215,6 +215,12 @@ export class TodoCardDetailComponent {
 
   // ------------------------------------------------------------------ derived
 
+  /** The kicker while the card loads: the board is known from the page. */
+  readonly loadingKicker = computed(() => {
+    const name = this.board()?.name;
+    return name ? this.t('todos.card.kicker', { board: name }) : '';
+  });
+
   readonly kicker = computed(() => {
     const c = this.card();
     return c ? this.t('todos.card.kicker', { board: c.boardName }) : '';
@@ -305,6 +311,12 @@ export class TodoCardDetailComponent {
       text: eventText(e, this.i18n.formatLocale(), this.t),
     })),
   );
+
+  /** The tabs while the card loads: no count yet. */
+  readonly busyTabs = computed<TabItem[]>(() => [
+    { id: 'details', label: this.t('todos.card.details') },
+    { id: 'activity', label: this.t('todos.card.activity') },
+  ]);
 
   readonly tabs = computed<TabItem[]>(() => [
     { id: 'details', label: this.t('todos.card.details') },

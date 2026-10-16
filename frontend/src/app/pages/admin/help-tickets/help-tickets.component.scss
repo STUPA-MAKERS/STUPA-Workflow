@@ -55,7 +55,8 @@
 }
 
 /* "Gesperrte Absender": the rows of the switch box, a name and a quiet line each. */
-.ht__blocks {
+.ht__blocks,
+.ht__skelBlocks {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -107,4 +108,52 @@
   margin: 0;
   padding: 0 var(--space-1);
   color: var(--color-text-muted);
+}
+
+/* ------------------------------------------------------------------ loading */
+/* A filled field with its label inside (56px), as `app-input` draws it. */
+.ht__skelField {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: var(--field-height);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-field);
+  background: var(--color-surface-sunken);
+}
+.ht__skelFieldLabel {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+.ht__skelFieldValue {
+  line-height: var(--lh-body);
+}
+.ht__skelFieldValue .skel-text {
+  width: 22rem;
+}
+/* The track of `app-switch`. */
+.ht__skelSwitch {
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+}
+.ht__skelName {
+  width: 14rem;
+}
+.ht__skelMeta {
+  width: 18rem;
+}
+.ht__skelButton {
+  width: 6.5rem;
+  height: var(--control-height);
+  border-radius: 999px;
+}
+.ht__skelButton--text {
+  width: 6rem;
+}
+.ht__skelButton--sm {
+  width: 6.5rem;
+  height: var(--control-height-sm);
 }

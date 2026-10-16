@@ -23,6 +23,8 @@ interface Opts {
   boardsFail?: boolean;
   board?: TodoBoard;
   gremien?: string[];
+  /** The board read never answers: the page stays in its loading state. */
+  pending?: boolean;
 }
 
 async function start(url: string, opts: Opts = {}) {
@@ -33,7 +35,9 @@ async function start(url: string, opts: Opts = {}) {
   ] });
   const api = {
     boards: jest.fn(() => (opts.boardsFail ? throwError(() => new Error('x')) : of(opts.boards ?? BOARDS))),
-    pollBoard: jest.fn((): Observable<TodoBoardPoll> => of({ board: b, etag: 'W/"1"' })),
+    pollBoard: jest.fn((): Observable<TodoBoardPoll> =>
+      opts.pending ? new Subject<TodoBoardPoll>() : of({ board: b, etag: 'W/"1"' }),
+    ),
     members: jest.fn(() => of(MEMBERS)),
     mine: jest.fn((): Observable<TodoMine> => of({ items: [{ ...tile({ id: 'k-1' }), boardName: '', boardKind: 'gremium', columnName: '', labels: [] }], dueSoonCount: 0 })),
     moveCard: jest.fn(() => of(tile({ id: 'k-1', columnId: 'c-2', title: 'Raum buchen' }))),
@@ -110,6 +114,35 @@ describe('TodosComponent', () => {
     expect(none.cmp.noMatch()).toBe(true);
     none.cmp.reload();
     expect(none.api.pollBoard).not.toHaveBeenCalled();
+  });
+
+  it('draws the board in its loaded shape while it loads, with the count of the board list', async () => {
+    const { cmp } = await start('/todos/b-1', { pending: true });
+    expect(cmp.loading()).toBe(true);
+    expect(document.querySelector('app-todo-board-skeleton')).not.toBeNull();
+    expect(document.querySelectorAll('.bv__col')).toHaveLength(4);
+    expect(screen.getByRole('status')).toHaveTextContent('Board wird geladen');
+    // The board list already knows the count and the rights of the board.
+    expect(cmp.openCount()).toBe(2);
+    expect(screen.getByPlaceholderText('2 offene To-Dos durchsuchen')).toBeInTheDocument();
+    expect(document.querySelectorAll('.td__skelIcon')).toHaveLength(1);
+    expect(document.querySelector('.td__skelNew')).not.toBeNull();
+    expect(document.querySelectorAll('.td__chips .td__skelChip')).toHaveLength(3);
+  });
+
+  it('leaves out the place of the settings for a board the person may not configure', async () => {
+    const { cmp } = await start('/todos/b-2', { pending: true });
+    expect(cmp.summary()?.canConfigure).toBe(false);
+    expect(cmp.openCount()).toBe(4);
+    expect(document.querySelector('.td__skelIcon')).toBeNull();
+    expect(document.querySelector('.td__skelNew')).not.toBeNull();
+  });
+
+  it('draws the list in its loaded shape while it loads', async () => {
+    await start('/todos/b-1?view=list', { pending: true });
+    expect(document.querySelector('.lv__row--head')).not.toBeNull();
+    expect(document.querySelectorAll('.lv__group')).toHaveLength(2);
+    expect(document.querySelector('.bv__col')).toBeNull();
   });
 
   it('shows an error when the boards fail without a board in the route', async () => {
@@ -594,6 +627,15 @@ describe('TodosComponent', () => {
 
   describe('phone', () => {
     beforeEach(() => asPhone(MEDIA.phone));
+
+    it('draws the tabs, one column of tiles and the places of the menu and the filter while it loads', async () => {
+      await start('/todos/b-1', { pending: true });
+      expect(document.querySelector('.bsk__tabs')).not.toBeNull();
+      expect(document.querySelectorAll('.bv__phoneCards .bsk__tile')).toHaveLength(5);
+      expect(document.querySelector('.td__skelIcon')).not.toBeNull();
+      expect(document.querySelector('.td__skelChip--filter')).not.toBeNull();
+      expect(screen.queryByTestId('td-fab')).toBeNull();
+    });
 
     it('has the search button, the menu, the chips row and the FAB', async () => {
       const { cmp, harness } = await start('/todos/b-1');

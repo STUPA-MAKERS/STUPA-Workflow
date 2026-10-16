@@ -548,3 +548,66 @@ a.cd__linkTitle:hover {
   padding: var(--space-3) 0;
   background: var(--color-surface);
 }
+
+/* ------------------------------------------------------------------ loading */
+/* The places of the icon buttons of the sheet bar (40px). */
+.cd__skelIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+}
+.cd__skelIcon .skel-box {
+  width: 20px;
+  height: 20px;
+}
+.cd__skelTitle {
+  width: 68%;
+}
+/* On a phone a title takes two lines. */
+.cd__skelTitle--second {
+  width: 40%;
+}
+.cd__skelCreated {
+  width: 14rem;
+}
+/* The chips of the fields: the filter chip of the column, people, the date, labels. */
+.cd__skelChip {
+  width: 7rem;
+  height: 32px;
+  border-radius: var(--radius-md);
+}
+.cd__skelChip--person {
+  width: 7.5rem;
+  border-radius: var(--radius-pill);
+}
+.cd__skelChip--date {
+  width: 8rem;
+}
+.cd__skelChip--label {
+  width: 5.5rem;
+  border-radius: var(--radius-pill);
+}
+.cd__skelLinkIcon {
+  width: 18px;
+  height: 18px;
+}
+.cd__skelSub {
+  width: 10rem;
+}
+.cd__skelLines {
+  margin: 0;
+}
+/* One bar per text line: the bar sits in the middle of a line box of the body text. */
+.cd__skelLines > .skel-text {
+  display: block;
+  margin-block: 5px 6px;
+}
+.cd__skelItemText {
+  flex: 1 1 auto;
+}
+.cd__skelBox {
+  width: 17px;
+  height: 17px;
+}

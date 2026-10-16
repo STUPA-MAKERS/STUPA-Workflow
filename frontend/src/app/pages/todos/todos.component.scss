@@ -74,6 +74,35 @@
   outline: 2px solid var(--color-focus-ring);
 }
 
+/* The places of the header buttons and of the filter chips while the board loads. */
+.td__skelIcon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+}
+.td__skelIcon .skel-box {
+  width: 22px;
+  height: 22px;
+}
+.td__skelNew {
+  width: 6.75rem;
+  height: 40px;
+  border-radius: var(--radius-pill);
+}
+.td__skelChip {
+  width: 5rem;
+  height: 32px;
+  border-radius: var(--radius-md);
+}
+.td__skelChip--wide {
+  width: 6.75rem;
+}
+.td__skelChip--filter {
+  width: 6rem;
+  height: 36px;
+}
+
 /* ------------------------------------------------------------------ body */
 .td__body {
   display: flex;

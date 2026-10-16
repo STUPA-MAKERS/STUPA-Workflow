@@ -165,6 +165,16 @@ describe('TicketsComponent', () => {
     expect(screen.queryByRole('button', { name: /abgeschlossene Tickets zeigen/ })).not.toBeInTheDocument();
   });
 
+  it('draws the groups and rows of the list while it loads, and names no count yet', async () => {
+    await start('/tickets', { answer: () => new Subject<TicketPage>() });
+    expect(screen.getByRole('searchbox')).toHaveAttribute('placeholder', 'Tickets durchsuchen');
+    expect(document.querySelectorAll('.tk__skel .tk__group')).toHaveLength(2);
+    expect(document.querySelectorAll('.tk__skel .sk__item')).toHaveLength(6);
+    expect(document.querySelectorAll('.tk__skel .sk__itemLead')).toHaveLength(6);
+    expect(document.querySelectorAll('.tk__skel .sk__itemAvatar')).toHaveLength(6);
+    expect(screen.getByRole('status')).toHaveTextContent('Tickets werden geladen');
+  });
+
   it('asks for the closed tickets only once at a time, and stays on a failure', async () => {
     const pending = new Subject<TicketPage>();
     const { harness, cmp, api, setAnswer } = await start();

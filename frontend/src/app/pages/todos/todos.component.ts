@@ -40,7 +40,6 @@ import {
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import {
@@ -71,6 +70,7 @@ import { PageFrameService } from '../../layout/page-frame.service';
 import { TodoArchiveSheetComponent } from './archive-sheet/todo-archive-sheet.component';
 import { TodoBoardPickerComponent } from './board-picker/todo-board-picker.component';
 import { TodoBoardSettingsComponent } from './board-settings/todo-board-settings.component';
+import { TodoBoardSkeletonComponent } from './board-skeleton/todo-board-skeleton.component';
 import { TodoBoardViewComponent, type BoardMove } from './board-view/todo-board-view.component';
 import { TodoListViewComponent } from './list-view/todo-list-view.component';
 
@@ -114,11 +114,11 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
     RowMenuComponent,
     SearchPillComponent,
     SegmentedComponent,
-    SkeletonComponent,
     StickyBarComponent,
     ScrollFadeDirective,
     TodoArchiveSheetComponent,
     TodoBoardPickerComponent,
+    TodoBoardSkeletonComponent,
     TodoBoardSettingsComponent,
     TodoBoardViewComponent,
     TodoCardDetailComponent,
@@ -199,9 +199,16 @@ export class TodosComponent implements OnDestroy {
     () => new Set((this.board()?.columns ?? []).filter((c) => c.isDone).map((c) => c.id)),
   );
 
+  /** The entry of the shown board in the board list: known before the board loads. */
+  readonly summary = computed(() => this.boards().find((b) => b.id === this.boardId()) ?? null);
+
   readonly openCount = computed(() => {
+    const board = this.board();
+    // While the board loads, the list already knows its count, so the search does not
+    // say "0 offene To-Dos".
+    if (!board) return this.summary()?.openCount ?? 0;
     const done = this.doneColumns();
-    return (this.board()?.cards ?? []).filter((c) => !done.has(c.columnId)).length;
+    return board.cards.filter((c) => !done.has(c.columnId)).length;
   });
 
   /** The cards that pass the filters, by column. */

@@ -561,6 +561,11 @@ describe('TicketDetailComponent', () => {
   it('shows the skeleton while the ticket loads', async () => {
     await start('/tickets/t40', { get: () => new Subject<TicketDetail>() });
     expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
+    // The loaded shape: the head, then the chat with its bubbles and its composer.
+    expect(document.querySelector('.td__head .td__skelTitle')).not.toBeNull();
+    expect(document.querySelectorAll('.td__chat .sk__msg').length).toBeGreaterThan(0);
+    expect(document.querySelector('.td__chat .sk__composer')).not.toBeNull();
+    expect(screen.getByRole('status')).toHaveTextContent('Ticket wird geladen');
   });
 
   it('reloads the same ticket in place', async () => {

@@ -25,9 +25,6 @@
   border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
 }
-.td--split[aria-busy='true'] {
-  padding-top: var(--space-6);
-}
 .td--center {
   align-items: center;
   justify-content: center;
@@ -397,4 +394,52 @@
   .td__actions app-button {
     flex: 1 1 0;
   }
+}
+
+/* ------------------------------------------------------------------ loading */
+.td__skelKicker {
+  width: 13rem;
+}
+.td__skelIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+}
+.td__skelIcon .skel-box {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+}
+.td__skelTitle {
+  width: 64%;
+}
+/* One view at a time a title takes two lines. */
+.td__skelTitle--second {
+  width: 40%;
+}
+.td__skelLine {
+  width: 15rem;
+}
+/* The size of an `app-button` of size md. */
+.td__skelButton {
+  width: 7.5rem;
+  height: var(--control-height);
+  border-radius: 999px;
+}
+.td__skelButton--short {
+  width: 6.5rem;
+}
+.td:not(.td--split) .td__skelButton {
+  width: 100%;
+}
+/* The place of "+ To-Do anlegen", a small text button. */
+.td__skelAdd {
+  display: flex;
+  align-items: center;
+  min-height: var(--control-height-sm);
+}
+.td__skelAdd .skel-text {
+  width: 7rem;
 }

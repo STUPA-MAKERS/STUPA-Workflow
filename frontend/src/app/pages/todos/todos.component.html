@@ -11,6 +11,8 @@
         ><app-icon name="search" [size]="21" /></app-button>
         @if (board()) {
           <app-row-menu [label]="'todos.menu' | t" [sections]="phoneMenu()" (selected)="onPhoneMenu($event)" />
+        } @else if (loading()) {
+          <span class="td__skelIcon skel-in" aria-hidden="true"><span class="skel-box"></span></span>
         }
       } @else {
         <app-segmented
@@ -35,6 +37,13 @@
           <app-button data-testid="td-new" (click)="newCard()">
             <span class="td__btn"><app-icon name="add" [size]="16" />{{ 'todos.new.short' | t }}</span>
           </app-button>
+        } @else if (loading()) {
+          <!-- The places of the settings and of "+ To-Do": the board list already says
+               whether the person may configure the board. -->
+          @if (summary()?.canConfigure) {
+            <span class="td__skelIcon skel-in" aria-hidden="true"><span class="skel-box"></span></span>
+          }
+          <span class="skel-box td__skelNew skel-in" aria-hidden="true"></span>
         }
       }
     </ng-container>
@@ -43,6 +52,9 @@
   <app-sticky-bar class="td__bar">
     <div class="td__barRow">
       <app-todo-board-picker [boards]="boards()" [current]="boardId()" [compact]="phone()" (picked)="pickBoard($event)" />
+      @if (phone() && !board() && loading()) {
+        <span class="skel-box td__skelChip td__skelChip--filter skel-in" aria-hidden="true"></span>
+      }
       @if (phone() && board()) {
         <button
           type="button"
@@ -69,6 +81,13 @@
           (commit)="search.flush()"
         />
       }
+    @if (!board() && loading() && !phone()) {
+      <div class="td__chips skel-in" aria-hidden="true">
+        <span class="skel-box td__skelChip td__skelChip--wide"></span>
+        <span class="skel-box td__skelChip"></span>
+        <span class="skel-box td__skelChip"></span>
+      </div>
+    }
     @if (board() && (!phone() || filtersOpen())) {
       <div class="td__chips" role="group" appScrollFade="x" [attr.aria-label]="'todos.filter.group' | t">
         <app-filter-select
@@ -117,7 +136,8 @@
 
   <div class="td__body">
     @if (loading()) {
-      <app-skeleton variant="panel" [count]="3" [label]="'todos.loading' | t" />
+      <app-todo-board-skeleton [view]="view()" [phone]="phone()" [canWrite]="summary()?.canWrite ?? false" />
+      <span class="sr-only" role="status">{{ 'todos.loading' | t }}</span>
     } @else if (notFound()) {
       <app-empty-state icon="circleok" [heading]="'todos.notFound' | t" />
     } @else if (error()) {

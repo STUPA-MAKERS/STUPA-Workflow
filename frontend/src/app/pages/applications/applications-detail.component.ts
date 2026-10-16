@@ -215,6 +215,8 @@ export class ApplicationsDetailComponent {
   readonly app = signal<Application | null>(null);
   readonly versions = signal<ApplicationVersion[]>([]);
   readonly comments = signal<ApplicationComment[]>([]);
+  /** The first read of the comments is out: the chat shows placeholder bubbles. */
+  readonly commentsLoading = signal(false);
   /** The status changes of the application, oldest first. */
   readonly timeline = signal<TimelineEntry[]>([]);
   /** The sections of the pinned form. Empty until it loaded, and on an error. */
@@ -962,11 +964,16 @@ export class ApplicationsDetailComponent {
       },
       error: () => {},
     });
+    this.commentsLoading.set(true);
     this.api.comments(this.id, { quiet: true }).subscribe({
       next: (c) => {
-        if (seq === this.loadSeq) this.comments.set(c);
+        if (seq !== this.loadSeq) return;
+        this.comments.set(c);
+        this.commentsLoading.set(false);
       },
-      error: () => {},
+      error: () => {
+        if (seq === this.loadSeq) this.commentsLoading.set(false);
+      },
     });
     this.api.timeline(this.id, { quiet: true }).subscribe({
       next: (events) => {

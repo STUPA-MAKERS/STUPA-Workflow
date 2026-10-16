@@ -59,6 +59,7 @@ interface SetupOpts {
   /** A phone width with a mouse or a keyboard (a narrow or zoomed desktop window). */
   fine?: boolean;
   canAttach?: boolean;
+  loading?: boolean;
   /** The answer of an upload; default: a draft with the file's name. */
   upload?: (file: File, opts: { token?: string | null }) => Observable<DraftUpload>;
 }
@@ -103,6 +104,7 @@ async function setup(opts: SetupOpts = {}) {
       visibilityOptions: opts.visibilityOptions ?? [],
       draftKey: opts.draftKey ?? 't1',
       canAttach: opts.canAttach ?? false,
+      loading: opts.loading ?? false,
     },
     on: { send, edit, delete: del, retry, discard, refresh },
     providers: [
@@ -147,6 +149,16 @@ describe('ChatComponent', () => {
     expect(log()).toHaveAttribute('aria-live', 'polite');
     expect(log()).toHaveAccessibleName('Verlauf');
     expect(within(log()).getByText('Noch keine Nachrichten.')).toBeInTheDocument();
+  });
+
+  it('draws bubbles, not "no messages", while the thread is on its way', async () => {
+    const { log } = await setup({ loading: true });
+    expect(within(log()).queryByText('Noch keine Nachrichten.')).toBeNull();
+    expect(log().querySelector('app-skeleton')).not.toBeNull();
+    expect(log().querySelectorAll('.sk__msg')).toHaveLength(5);
+    expect(within(log()).getByRole('status')).toHaveTextContent('Nachrichten werden geladen');
+    // The composer is there at once.
+    expect(document.querySelector('textarea.chat__input')).not.toBeNull();
   });
 
   it('has no a11y violations', async () => {

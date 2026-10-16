@@ -37,6 +37,7 @@ import { PressSelectDirective } from '@shared/press-select.directive';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { AvatarComponent } from '../avatar/avatar.component';
 import { SideSheetComponent } from '../side-sheet/side-sheet.component';
+import { SkeletonComponent } from '../skeleton/skeleton.component';
 import { scanStatus, type StatusView } from '../../status-kind.util';
 import { StatusTextComponent } from '../status-text/status-text.component';
 import { UPLOAD_ACCEPT, formatSize } from '../../../features/apply/apply.util';
@@ -172,6 +173,7 @@ function writeStore(key: string, value: string | null): void {
     PressSelectDirective,
     SegmentedComponent,
     SideSheetComponent,
+    SkeletonComponent,
     StatusTextComponent,
     TranslatePipe,
   ],
@@ -205,6 +207,8 @@ export class ChatComponent {
   readonly messages = input<readonly ChatMessage[]>([]);
   readonly events = input<readonly ChatEvent[]>([]);
   readonly canPost = input(true);
+  /** The messages are on their way: the log shows placeholder bubbles. */
+  readonly loading = input(false);
   /** The visibilities the composer offers. Empty: no toggle. */
   readonly visibilityOptions = input<readonly ChatVisibility[]>([]);
   /** Names the thread in the browser storage (draft, last seen). */

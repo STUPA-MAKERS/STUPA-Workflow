@@ -394,11 +394,14 @@
     @if (split()) {
       <div class="ad__secHead">
         <h3 id="ad-comments" class="sec ad__secTitle">{{ 'applications.comments.title' | t }}</h3>
-        <span class="ad__count">{{ comments().length }}</span>
+        @if (!commentsLoading()) {
+          <span class="ad__count">{{ comments().length }}</span>
+        }
       </div>
     }
     <app-chat
       class="ad__chat"
+      [loading]="commentsLoading()"
       [draftKey]="'application.' + (app()?.id ?? '')"
       [messages]="chatMessages()"
       [visibilityOptions]="chatVisibilities()"

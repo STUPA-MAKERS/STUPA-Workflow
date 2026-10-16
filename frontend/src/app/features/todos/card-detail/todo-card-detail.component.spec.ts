@@ -164,6 +164,33 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.card()?.title).toBe('Raum buchen');
   });
 
+  it('draws the sheet in its loaded shape while the card loads, with a working close button', async () => {
+    const { cmp, api, detect, closed, fixture } = await setup({ board: board() });
+    api.card.mockReturnValueOnce(new Subject<TodoCardDetail>());
+    fixture.componentRef.setInput('cardId', 'k-2');
+    detect();
+    expect(cmp.loading()).toBe(true);
+    expect(screen.getByRole('status')).toHaveTextContent('Karte wird geladen');
+    // The kicker names the board, which the page already has.
+    expect(cmp.loadingKicker()).toBe('Studierendenparlament · To-Do');
+    expect(document.querySelectorAll('.cd__skelIcon')).toHaveLength(2);
+    expect(document.querySelector('.cd__chat .sk__composer')).not.toBeNull();
+    expect(document.querySelectorAll('.cd__fields dt').length).toBe(4);
+    fireEvent.click(screen.getByRole('button', { name: 'Schließen' }));
+    expect(closed).toHaveBeenCalled();
+  });
+
+  it('draws no composer while it loads for a board the person may not write to, and no kicker without a board', async () => {
+    const { cmp, api, detect, fixture } = await setup({ board: board({ canWrite: false }) });
+    api.card.mockReturnValueOnce(new Subject<TodoCardDetail>());
+    fixture.componentRef.setInput('cardId', 'k-2');
+    detect();
+    expect(document.querySelector('.cd__chat .sk__composer')).toBeNull();
+    fixture.componentRef.setInput('board', null);
+    detect();
+    expect(cmp.loadingKicker()).toBe('');
+  });
+
   it('reads only the comments again when the chat asks, for the scan state of their files', async () => {
     const { cmp, api, fixture, detect, commentsChanged } = await setup();
     const clean = { ...COMMENT, attachments: [{ ...COMMENT.attachments[0], scanState: 'clean' as const }] };
@@ -861,6 +888,18 @@ describe('TodoCardDetailComponent', () => {
 
   describe('phone', () => {
     beforeEach(() => asPhone(MEDIA.phone));
+
+    it('draws the tabs without a count and the details while the card loads, with a working back link', async () => {
+      const { cmp, api, detect, closed, fixture } = await setup();
+      api.card.mockReturnValueOnce(new Subject<TodoCardDetail>());
+      fixture.componentRef.setInput('cardId', 'k-2');
+      detect();
+      expect(cmp.busyTabs().map((t) => t.count)).toEqual([undefined, undefined]);
+      expect(document.querySelector('.cd__skelTitle--second')).not.toBeNull();
+      expect(document.querySelectorAll('.cd__panel .cd__item').length).toBe(3);
+      fireEvent.click(screen.getByRole('button', { name: /Zum Board/ }));
+      expect(closed).toHaveBeenCalled();
+    });
 
     it('has the tabs Details and Aktivität, the back link and the bar', async () => {
       const { cmp, detect, closed, fixture } = await setup();
