@@ -34,6 +34,10 @@ NOTIFICATION_KINDS: tuple[str, ...] = (
     # A new ticket was reported (holders of ticket.manage). The confirmation to the
     # reporter (`ticket_received`) is not here, so nobody can switch it off.
     "ticket_created",
+    # The reporter wrote on a ticket (the assignee, else every holder of ticket.manage).
+    "ticket_message",
+    # The team answered publicly on a ticket that the user reported.
+    "ticket_answer",
     # A to-do was assigned to the user.
     "todo_assigned",
     # The user was mentioned in a comment of a to-do.

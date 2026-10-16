@@ -1,7 +1,9 @@
-"""Ticket mails: ``ticket_created`` to the team, ``ticket_received`` to the reporter.
+"""Ticket mails: ``ticket_created`` and ``ticket_message`` to the team,
+``ticket_received`` and ``ticket_answer`` to the reporter.
 
-Both run as background tasks after the commit of the report, each with its own
-session, and both are best effort: a mail failure never fails the report.
+All run as background tasks after the commit of the report or the message, each
+with its own session, and all are best effort: a mail failure never fails the
+request.
 
 ``ticket_created`` goes to the holders of ``ticket.manage`` while
 ``tickets.notifyNew`` is on, without the reporter; each holder can switch it off
@@ -9,9 +11,17 @@ session, and both are best effort: a mail failure never fails the report.
 with the number and the handbook link. Its kind is not in ``NOTIFICATION_KINDS``, so
 nobody can switch it off. A report without a session can name any address, so for
 it the mail leaves out the title (``title`` is empty): the platform does not send
-text of the caller to an address that nobody checked. The mail has no link to the
-ticket, because the reporter never reads it again (one-way); the language is
-``context.language``, else German.
+text of the caller to an address that nobody checked. Only a report of an account
+links the ticket, because only an account reads it again in the tab "Tickets"; a
+report without a session stays one-way. The language is ``context.language``, else
+German.
+
+``ticket_answer`` goes to the reporter account when the team writes a ``public``
+note. ``ticket_message`` goes to the team when the reporter writes: to the assignee
+while one holds ``ticket.manage``, else to every holder. An internal note, an edit
+a note on an anonymized ticket and an answer to a deactivated or merged reporter account
+send nothing. Each recipient can switch the kind
+off. A team author shows by name only, never by e-mail, as in the tab.
 """
 
 from __future__ import annotations
@@ -24,10 +34,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.db import get_sessionmaker
 from app.modules.admin.site_config_service import active_branding
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.files.service import FilesService
 from app.modules.notifications.links import ticket_link
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.service import NotificationService
-from app.modules.tickets.models import Ticket
+from app.modules.tickets.models import Ticket, TicketNote
 from app.modules.tickets.service import TicketService, format_number, ticket_managers
 from app.settings import Settings
 
@@ -35,6 +46,8 @@ logger = logging.getLogger("app.tickets")
 
 TICKET_CREATED_KEY = "ticket_created"
 TICKET_RECEIVED_KEY = "ticket_received"
+TICKET_ANSWER_KEY = "ticket_answer"
+TICKET_MESSAGE_KEY = "ticket_message"
 
 _KIND_DE = (
     "{% if kind == 'bug' %}Problem{% elif kind == 'question' %}Frage{% else %}Idee{% endif %}"
@@ -68,17 +81,58 @@ TICKET_RECEIVED_SUBJECT: dict[str, str] = {
 TICKET_RECEIVED_BODY: dict[str, str] = {
     "de": "Hallo,\n\nvielen Dank für Ihre Meldung{% if title %} „{{ title }}“{% endif %}. "
     "Sie hat die Nummer "
-    "{{ number }}. Bei Rückfragen melden wir uns per E-Mail.\n\n"
+    "{{ number }}. {% if link %}Antworten und den Stand finden Sie unter „Tickets“."
+    "{% else %}Bei Rückfragen melden wir uns per E-Mail.{% endif %}\n\n"
     "Antworten auf viele Fragen stehen im Handbuch: {{ wikiUrl }}\n",
     "en": "Hello,\n\nthank you for your report"
     '{% if title %} "{{ title }}"{% endif %}. Its number is '
-    "{{ number }}. If we have questions, we will contact you by email.\n\n"
+    "{{ number }}. {% if link %}You find the answers and the status under "
+    '"Tickets".{% else %}If we have questions, we will contact you by email.{% endif %}'
+    "\n\n"
     "The handbook answers many questions: {{ wikiUrl }}\n",
 }
 TICKET_RECEIVED_PLACEHOLDERS: dict[str, str] = {
+    "link": "Link zum Ticket (leer bei einer Meldung ohne Anmeldung)",
     "number": "Ticketnummer (T-0042)",
     "title": "Titel des Tickets (leer bei einer Meldung ohne Anmeldung)",
     "wikiUrl": "Link zum Handbuch",
+}
+
+
+TICKET_ANSWER_SUBJECT: dict[str, str] = {
+    "de": "Antwort auf Ihr Ticket {{ number }}",
+    "en": "Reply to your ticket {{ number }}",
+}
+TICKET_ANSWER_BODY: dict[str, str] = {
+    "de": "Hallo,\n\nzu Ihrem Ticket {{ number }} „{{ title }}“ gibt es eine neue "
+    "Nachricht{% if author %} von {{ author }}{% endif %}:\n\n{{ message }}\n",
+    "en": 'Hello,\n\nthere is a new message on your ticket {{ number }} "{{ title }}"'
+    "{% if author %} from {{ author }}{% endif %}:\n\n{{ message }}\n",
+}
+TICKET_ANSWER_PLACEHOLDERS: dict[str, str] = {
+    "link": "Link zum Ticket (ohne den Platzhalter hängt die Mail ihn an)",
+    "number": "Ticketnummer (T-0042)",
+    "title": "Titel des Tickets",
+    "author": "Name des Teammitglieds (leer ohne Namen)",
+    "message": "Text der Nachricht (ohne Text die Namen der Dateien)",
+}
+
+TICKET_MESSAGE_SUBJECT: dict[str, str] = {
+    "de": "Neue Nachricht zu Ticket {{ number }}: {{ title }}",
+    "en": "New message on ticket {{ number }}: {{ title }}",
+}
+TICKET_MESSAGE_BODY: dict[str, str] = {
+    "de": "Hallo,\n\n{{ reporter }} hat zum Ticket {{ number }} „{{ title }}“ "
+    "geschrieben:\n\n{{ message }}\n",
+    "en": 'Hello,\n\n{{ reporter }} wrote on the ticket {{ number }} "{{ title }}":'
+    "\n\n{{ message }}\n",
+}
+TICKET_MESSAGE_PLACEHOLDERS: dict[str, str] = {
+    "link": "Link zum Ticket (ohne den Platzhalter hängt die Mail ihn an)",
+    "number": "Ticketnummer (T-0042)",
+    "title": "Titel des Tickets",
+    "reporter": "Name oder E-Mail der meldenden Person",
+    "message": "Text der Nachricht (ohne Text die Namen der Dateien)",
 }
 
 
@@ -171,6 +225,12 @@ async def notify_ticket_received(
                 return False
             branding = await active_branding(session)
             language = (ticket.context or {}).get("language")
+            # Only an account reads the ticket again, in the tab "Tickets".
+            link = (
+                ticket_link(settings, ticket.id)
+                if ticket.reporter_principal_id is not None
+                else None
+            )
             return await NotificationService(
                 session, queue=queue, settings=settings
             ).send_kind_mail(
@@ -188,7 +248,131 @@ async def notify_ticket_received(
                 },
                 idempotency_parts=(TICKET_RECEIVED_KEY, str(ticket.id)),
                 lang=language if language in ("de", "en") else "de",
+                link=link,
             )
     except Exception:  # noqa: BLE001 - a mail must never break the report
         logger.exception("ticket_received mail failed")
         return False
+
+
+async def notify_ticket_note(
+    *,
+    queue: MailQueue | None,
+    settings: Settings,
+    note_id: UUID,
+    sessionmaker: async_sessionmaker[AsyncSession] | None = None,
+) -> bool:
+    """Mail a new public message to the other side of the ticket (best effort).
+
+    A message of the reporter goes to the team (``ticket_message``), a public note
+    of the team to the reporter account (``ticket_answer``).
+
+    Returns:
+        True when a mail was enqueued.
+    """
+    try:
+        async with _maker(sessionmaker)() as session:
+            note = await session.get(TicketNote, note_id)
+            if note is None or note.deleted_at is not None or note.visibility != "public":
+                return False
+            ticket = await session.get(Ticket, note.ticket_id)
+            if (
+                ticket is None
+                or ticket.anonymized_at is not None
+                or ticket.reporter_principal_id is None
+            ):
+                return False
+            message = note.body
+            if not message.strip():
+                # A message of files only names its files, as the comment mails do.
+                files = await FilesService(session).message_attachments("ticket_note", [note.id])
+                message = ", ".join(a.filename for a in files.get(note.id, []))
+            if not message.strip():
+                # Neither text nor files: nothing to tell.
+                return False
+            if note.author_id == ticket.reporter_principal_id:
+                return await _mail_team(session, queue, settings, ticket, note, message)
+            return await _mail_reporter(session, queue, settings, ticket, note, message)
+    except Exception:  # noqa: BLE001 - a mail must never break the message
+        logger.exception("ticket note mail failed")
+        return False
+
+
+async def _mail_team(
+    session: AsyncSession,
+    queue: MailQueue | None,
+    settings: Settings,
+    ticket: Ticket,
+    note: TicketNote,
+    message: str,
+) -> bool:
+    """Mail the assignee, else every holder; an assignee without an address falls back.
+
+    The assignee's own opt-out of ``ticket_message`` stays an opt-out: the mail then
+    reaches nobody, as the assignee chose.
+    """
+    managers = await ticket_managers(session)
+    reporter_row = await session.get(PrincipalRow, ticket.reporter_principal_id)
+    own = (reporter_row.email or "").casefold() if reporter_row is not None else ""
+
+    def _addresses(rows: list[tuple[UUID, str | None, str | None]]) -> list[str]:
+        return sorted({e for _pid, _name, e in rows if e and e.casefold() != own})
+
+    assignee = [m for m in managers if m[0] == ticket.assignee_id]
+    recipients = _addresses(assignee) or _addresses(managers)
+    if not recipients:
+        return False
+    reporter = (
+        (reporter_row.display_name or reporter_row.email or "") if reporter_row is not None else ""
+    )
+    return await NotificationService(session, queue=queue, settings=settings).send_kind_mail(
+        recipients,
+        kind=TICKET_MESSAGE_KEY,
+        template_key=TICKET_MESSAGE_KEY,
+        builtin_subject=TICKET_MESSAGE_SUBJECT,
+        builtin_body=TICKET_MESSAGE_BODY,
+        context={
+            "number": format_number(ticket.number),
+            "title": ticket.title,
+            "reporter": reporter,
+            "message": message,
+        },
+        idempotency_parts=(TICKET_MESSAGE_KEY, str(note.id)),
+        link=ticket_link(settings, ticket.id),
+    )
+
+
+async def _mail_reporter(
+    session: AsyncSession,
+    queue: MailQueue | None,
+    settings: Settings,
+    ticket: Ticket,
+    note: TicketNote,
+    message: str,
+) -> bool:
+    # Only a live account: a deactivated or merged one cannot open the link.
+    reporter = await session.get(PrincipalRow, ticket.reporter_principal_id)
+    if reporter is None or not reporter.active or reporter.merged_into is not None:
+        return False
+    address = reporter.email
+    if not address:
+        return False
+    author = await session.get(PrincipalRow, note.author_id) if note.author_id is not None else None
+    language = (ticket.context or {}).get("language")
+    return await NotificationService(session, queue=queue, settings=settings).send_kind_mail(
+        [address],
+        kind=TICKET_ANSWER_KEY,
+        template_key=TICKET_ANSWER_KEY,
+        builtin_subject=TICKET_ANSWER_SUBJECT,
+        builtin_body=TICKET_ANSWER_BODY,
+        context={
+            "number": format_number(ticket.number),
+            "title": ticket.title,
+            # The name only: the e-mail of a team member never reaches the reporter.
+            "author": (author.display_name or "") if author is not None else "",
+            "message": message,
+        },
+        idempotency_parts=(TICKET_ANSWER_KEY, str(note.id)),
+        lang=language if language in ("de", "en") else "de",
+        link=ticket_link(settings, ticket.id),
+    )

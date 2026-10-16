@@ -28,7 +28,11 @@ from app.deps import DbSession, Principal, SettingsDep, get_current_principal, r
 from app.modules.admin.site_config_service import active_branding
 from app.modules.files.service import FilesService
 from app.modules.notifications.provider import mail_queue_from_pool
-from app.modules.notifications.tickets import notify_ticket_created, notify_ticket_received
+from app.modules.notifications.tickets import (
+    notify_ticket_created,
+    notify_ticket_note,
+    notify_ticket_received,
+)
 from app.modules.tickets.access import TICKET_MANAGE
 from app.modules.tickets.schemas import (
     NoteBody,
@@ -58,6 +62,7 @@ from app.modules.todos.hooks import TicketTodoBridge
 from app.settings import Settings
 from app.shared.antiabuse import (
     enforce_ticket_payload_limit,
+    rate_limit_ticket_messages,
     rate_limit_tickets,
     verify_altcha_unless_authenticated,
 )
@@ -120,6 +125,23 @@ async def _deliver_ticket_mails(settings: Settings, ticket_id: UUID, pool: objec
 def get_ticket_mail_sender() -> TicketMailSender:
     """Return the injectable mail sender that a test can override."""
     return _deliver_ticket_mails
+
+
+#: Sends the mail of a new public message after the commit (background task).
+NoteMailSender = Callable[[Settings, UUID, object], Awaitable[None]]
+
+
+async def _deliver_note_mail(settings: Settings, note_id: UUID, pool: object) -> None:
+    queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
+    await notify_ticket_note(queue=queue, settings=settings, note_id=note_id)
+
+
+def get_note_mail_sender() -> NoteMailSender:
+    """Return the injectable mail sender of a message that a test can override."""
+    return _deliver_note_mail
+
+
+NoteMails = Annotated[NoteMailSender, Depends(get_note_mail_sender)]
 
 
 async def require_public_or_session(
@@ -239,7 +261,8 @@ async def get_my_ticket(
     "/tickets/mine/{ticket_id}/notes",
     response_model=TicketNoteOut,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(401, 403, 404, 422),
+    dependencies=[Depends(rate_limit_ticket_messages)],
+    responses=_errors(401, 403, 404, 422, 429),
 )
 async def add_my_ticket_note(
     ticket_id: UUID,
@@ -247,11 +270,19 @@ async def add_my_ticket_note(
     service: ServiceDep,
     principal: ReporterWriter,
     settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    send_mail: NoteMails,
 ) -> TicketNoteOut:
-    """Write a message on an own ticket. It is public. A block gives 403 ``sender_blocked``."""
-    return await service.reporter_add_note(
+    """Write a message on an own ticket. It is public. A block gives 403 ``sender_blocked``.
+
+    After the commit the team gets the mail ``ticket_message``.
+    """
+    note = await service.reporter_add_note(
         ticket_id, payload, principal, pepper=settings.magic_link_secret
     )
+    background.add_task(send_mail, settings, note.id, getattr(request.app.state, "arq_pool", None))
+    return note
 
 
 @router.patch(
@@ -422,17 +453,24 @@ async def add_ticket_note(
     service: ServiceDep,
     principal: Manager,
     settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    send_mail: NoteMails,
 ) -> TicketNoteOut:
     """Add a note. ``attachmentIds`` and ``draftToken`` bind its files.
 
     ``visibility`` is ``internal`` (the default) or ``public``: the reporter account
-    reads a public note in ``/tickets/mine``.
+    reads a public note in ``/tickets/mine`` and gets the mail ``ticket_answer``.
 
     A draft that is missing, expired, foreign or infected gives 422
     ``draft_attachments_missing``; files on an anonymized ticket 422
     ``ticket_anonymized``.
     """
-    return await service.add_note(ticket_id, payload, principal, pepper=settings.magic_link_secret)
+    note = await service.add_note(ticket_id, payload, principal, pepper=settings.magic_link_secret)
+    if note.visibility == "public":
+        pool = getattr(request.app.state, "arq_pool", None)
+        background.add_task(send_mail, settings, note.id, pool)
+    return note
 
 
 @router.patch(

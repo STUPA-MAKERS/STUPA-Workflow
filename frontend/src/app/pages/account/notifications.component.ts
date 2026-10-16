@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ApiClient } from '@core/api/api-client.service';
 import type { NotificationPreference } from '@core/api/models';
+import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -15,6 +16,15 @@ import { SwitchComponent } from '@stupa-makers/ui-kit';
  * filter keeps an older server from showing a switch that does nothing.
  */
 const HIDDEN_KINDS: ReadonlySet<string> = new Set(['vote', 'role_change']);
+
+/**
+ * Kinds that only reach the team that works on tickets. The page shows them only to a
+ * holder of `ticket.manage`, because nobody else gets these mails.
+ */
+const TEAM_KINDS: ReadonlyMap<string, string> = new Map([
+  ['ticket_created', 'ticket.manage'],
+  ['ticket_message', 'ticket.manage'],
+]);
 
 /**
  * Account page "Benachrichtigungen" (board Konto-Benachrichtigungen).
@@ -41,6 +51,7 @@ const HIDDEN_KINDS: ReadonlySet<string> = new Set(['vote', 'role_change']);
 export class AccountNotificationsComponent {
   private readonly api = inject(ApiClient);
   private readonly i18n = inject(I18nService);
+  private readonly auth = inject(AuthService);
 
   /** Every kind the server sent, the hidden ones included. */
   private readonly prefs = signal<NotificationPreference[]>([]);
@@ -55,7 +66,15 @@ export class AccountNotificationsComponent {
   private dirty = false;
 
   /** The kinds that get a row. */
-  readonly rows = computed(() => this.prefs().filter((p) => !HIDDEN_KINDS.has(p.kind)));
+  readonly rows = computed(() =>
+    this.prefs().filter((p) => !HIDDEN_KINDS.has(p.kind) && this.mayGet(p.kind)),
+  );
+
+  /** A team kind shows only to the holders of its permission. */
+  private mayGet(kind: string): boolean {
+    const permission = TEAM_KINDS.get(kind);
+    return permission === undefined || this.auth.can(permission);
+  }
 
   constructor() {
     this.api.listNotificationPreferences().subscribe({
