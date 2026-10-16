@@ -312,9 +312,13 @@ describe('TodoBoardViewComponent', () => {
       expect(container.querySelectorAll('.bv__dot')).toHaveLength(4);
       fireEvent.click(screen.getByRole('button', { name: 'Haushalt Kapitel 3' }));
       expect(on.openCard).toHaveBeenCalledWith('k-2');
+      // Every column is a page of the pager; an empty one says so.
+      expect(container.querySelectorAll('.bv__page')).toHaveLength(4);
+      expect(container.querySelectorAll('.bv__page--empty')).toHaveLength(2);
+      expect(screen.getAllByText('Keine Karten')).toHaveLength(2);
       cmp.selectPhoneColumn('c-2');
       fixture.detectChanges();
-      expect(screen.getByText('Keine Karten')).toBeInTheDocument();
+      expect(screen.getByRole('tab', { name: /In Arbeit/ })).toHaveAttribute('aria-selected', 'true');
       cmp.selectPhoneColumn('nope');
       cmp.selectPhoneColumn(null);
       expect(cmp.phoneCol()?.id).toBe('c-2');
@@ -334,6 +338,77 @@ describe('TodoBoardViewComponent', () => {
       fireEvent.click(screen.getByRole('button', { name: '2 weitere' }));
       fixture.detectChanges();
       expect(within(screen.getByRole('list', { name: 'Erledigt' })).getAllByRole('listitem')).toHaveLength(5);
+    });
+
+    it('scrolls the pager to a tapped tab and follows a swipe', async () => {
+      const { cmp, fixture, container } = await setup(board(), { phone: true });
+      const pager = container.querySelector('.bv__pager') as HTMLElement;
+      Object.defineProperty(pager, 'clientWidth', { configurable: true, value: 390 });
+      const scrollTo = jest.fn();
+      pager.scrollTo = scrollTo as unknown as typeof pager.scrollTo;
+      cmp.selectPhoneColumn('c-3');
+      expect(scrollTo).toHaveBeenCalledWith({ left: 780, behavior: 'smooth' });
+      // A swipe: the tab follows once the scroll comes to rest.
+      jest.useFakeTimers();
+      try {
+        pager.scrollLeft = 390;
+        fireEvent.scroll(pager);
+        expect(cmp.phoneCol()?.id).toBe('c-3');
+        jest.advanceTimersByTime(150);
+        expect(cmp.phoneCol()?.id).toBe('c-2');
+        // `scrollend` syncs at once and clamps to the last page.
+        pager.scrollLeft = 5000;
+        fireEvent.scroll(pager);
+        pager.dispatchEvent(new Event('scrollend'));
+        expect(cmp.phoneCol()?.id).toBe('c-4');
+        jest.advanceTimersByTime(150);
+        expect(cmp.phoneCol()?.id).toBe('c-4');
+      } finally {
+        jest.useRealTimers();
+      }
+      fixture.detectChanges();
+      expect(screen.getByRole('tab', { name: /Erledigt/ })).toHaveAttribute('aria-selected', 'true');
+      // Without a laid-out pager nothing moves.
+      Object.defineProperty(pager, 'clientWidth', { configurable: true, value: 0 });
+      cmp.syncPage();
+      cmp.selectPhoneColumn('c-1');
+      expect(cmp.phoneCol()?.id).toBe('c-1');
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+    });
+
+    it('jumps without animation under reduced motion and right to left', async () => {
+      const { cmp, container } = await setup(board(), { phone: true });
+      const pager = container.querySelector('.bv__pager') as HTMLElement;
+      Object.defineProperty(pager, 'clientWidth', { configurable: true, value: 300 });
+      pager.style.direction = 'rtl';
+      const scrollTo = jest.fn();
+      pager.scrollTo = scrollTo as unknown as typeof pager.scrollTo;
+      const mm = window.matchMedia;
+      window.matchMedia = ((q: string) => ({ matches: q.includes('reduce') })) as unknown as typeof window.matchMedia;
+      try {
+        cmp.selectPhoneColumn('c-2');
+      } finally {
+        window.matchMedia = mm;
+      }
+      expect(scrollTo).toHaveBeenCalledWith({ left: -300, behavior: 'auto' });
+      pager.scrollLeft = -600;
+      cmp.syncPage();
+      expect(cmp.phoneCol()?.id).toBe('c-3');
+    });
+
+    it('stops a pending sync when it goes away', async () => {
+      jest.useFakeTimers();
+      try {
+        const { cmp, fixture } = await setup(board(), { phone: true });
+        const sync = jest.spyOn(cmp, 'syncPage');
+        cmp.onPagerScroll();
+        cmp.onPagerScroll();
+        fixture.destroy();
+        jest.advanceTimersByTime(500);
+        expect(sync).not.toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('shows nothing for a board without columns', async () => {

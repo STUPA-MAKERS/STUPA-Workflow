@@ -126,7 +126,9 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
     TodoListViewComponent,
     TodoNewDialogComponent,
   ],
-  host: { '[class.pane-page]': '!phone()', class: 'todos-host' },
+  // On a phone the board fills the free height too, so its column pages scroll inside;
+  // the list scrolls as a page.
+  host: { '[class.pane-page]': "!phone() || view() === 'board'", class: 'todos-host' },
   templateUrl: './todos.component.html',
   styleUrl: './todos.component.scss',
 })

@@ -124,6 +124,11 @@
 }
 
 /* ------------------------------------------------------------------ phone */
+/* The board picker starts the bar, the filter chip ends it. */
+.td--phone .td__filter,
+.td__skelChip--filter {
+  margin-inline-start: auto;
+}
 .td--phone .td__search,
 .td--phone .td__chips {
   flex-basis: 100%;

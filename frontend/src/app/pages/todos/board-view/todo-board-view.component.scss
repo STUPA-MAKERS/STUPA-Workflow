@@ -228,16 +228,52 @@
 }
 
 /* ------------------------------------------------------------------ phone */
+/* The board fills the free height down to the bottom bar (the page is a pane page on a
+   phone too). The pager scrolls sideways, one page per column; each page scrolls down by
+   itself, so a vertical swipe moves the cards and a horizontal one the column. */
 .bv--phone {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--space-3);
+  min-height: 0;
   overflow: visible;
+}
+.bv__pager {
+  display: grid;
+  flex: 1 1 0;
+  grid-auto-columns: 100%;
+  grid-auto-flow: column;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.bv__pager::-webkit-scrollbar {
+  display: none;
+}
+.bv__page {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
 .bv__phoneCards {
   display: flex;
+  flex: 1 0 auto;
   flex-direction: column;
   gap: var(--space-2);
+}
+/* An empty column: "Keine Karten" in the middle of the page. */
+.bv__page--empty .bv__phoneCards {
+  align-items: center;
+  justify-content: center;
 }
 .bv__empty {
   margin: 0;
@@ -245,11 +281,15 @@
   color: var(--color-text-muted);
   text-align: center;
 }
+/* The dots end the board: a row as high as the floating "+ To-Do" button (56px), so they
+   sit on its line, in the middle and clear of it. */
 .bv__dots {
   display: flex;
+  flex: none;
+  align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: var(--space-2) 0;
+  height: 56px;
 }
 .bv__dot {
   width: 6px;

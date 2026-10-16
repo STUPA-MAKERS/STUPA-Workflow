@@ -62,10 +62,14 @@
         <span class="bsk__tab skel-in"><span class="skel-text" [style.width]="col.name"></span></span>
       }
     </div>
-    <div class="bv__phoneCards skel-in">
-      @for (t of phoneTiles; track $index) {
-        <ng-container *ngTemplateOutlet="tile; context: { $implicit: t }" />
-      }
+    <div class="bv__pager">
+      <div class="bv__page">
+        <div class="bv__phoneCards skel-in">
+          @for (t of phoneTiles; track $index) {
+            <ng-container *ngTemplateOutlet="tile; context: { $implicit: t }" />
+          }
+        </div>
+      </div>
     </div>
     <div class="bv__dots">
       @for (col of columns; track $index) {

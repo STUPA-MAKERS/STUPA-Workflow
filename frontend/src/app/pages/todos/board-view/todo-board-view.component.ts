@@ -3,6 +3,7 @@ import { CdkScrollable } from '@angular/cdk/scrolling';
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   ElementRef,
   Injector,
   afterNextRender,
@@ -11,6 +12,7 @@ import {
   input,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { Uuid } from '@core/api/models';
@@ -52,8 +54,13 @@ interface KeyDrag {
  * The done column shows its newest cards and "n weitere · Archiv". Each column ends
  * with "+ To-Do", which opens a quick field for a title.
  *
- * Phone: one column at a time behind tabs with the counts; no drag (the card moves with
- * "Verschieben" in its detail).
+ * Phone: one page per column behind tabs with the counts. The pages sit side by side in
+ * a horizontal scroller with CSS scroll snap, so a swipe moves one column; the tab and
+ * the dots follow the page where the scroll ends, and a tab scrolls to its page. The
+ * pager fills the free height and each page scrolls down by itself; an empty column
+ * shows "Keine Karten" in the middle. The dots sit at the bottom, on the line of the
+ * "+ To-Do" button of the page. No drag (the card moves with "Verschieben" in its
+ * detail).
  */
 @Component({
   selector: 'app-todo-board-view',
@@ -111,6 +118,12 @@ export class TodoBoardViewComponent {
   readonly announce = signal('');
   /** Phone: the column on screen. */
   readonly phoneColumn = signal(0);
+  /** Phone: the horizontal scroller with one page per column. */
+  private readonly pager = viewChild<ElementRef<HTMLElement>>('pager');
+  private scrollTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly stopTimer = inject(DestroyRef).onDestroy(() => {
+    if (this.scrollTimer) clearTimeout(this.scrollTimer);
+  });
 
   /** The cards of each column as shown: the filters, the keyboard drag, the done preview. */
   readonly shown = computed(() => {
@@ -365,8 +378,36 @@ export class TodoBoardViewComponent {
     );
   }
 
+  /** A tab: show its column and scroll the pager to its page. */
   selectPhoneColumn(id: string | null): void {
     const i = this.columns().findIndex((c) => c.id === id);
-    if (i >= 0) this.phoneColumn.set(i);
+    if (i < 0) return;
+    this.phoneColumn.set(i);
+    const el = this.pager()?.nativeElement;
+    if (!el?.clientWidth) return;
+    const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // `scrollLeft` is negative in a right-to-left page; the sign follows the direction.
+    const sign = getComputedStyle(el).direction === 'rtl' ? -1 : 1;
+    el.scrollTo({ left: sign * i * el.clientWidth, behavior: reduce ? 'auto' : 'smooth' });
+  }
+
+  /**
+   * A swipe moved the pager. `scrollend` names the page where the snap ends; a browser
+   * without that event gets the same after 150ms without a scroll.
+   */
+  onPagerScroll(): void {
+    if (this.scrollTimer) clearTimeout(this.scrollTimer);
+    this.scrollTimer = setTimeout(() => this.syncPage(), 150);
+  }
+
+  /** The tab and the dots follow the page that fills the pager. */
+  syncPage(): void {
+    if (this.scrollTimer) clearTimeout(this.scrollTimer);
+    this.scrollTimer = null;
+    const el = this.pager()?.nativeElement;
+    if (!el?.clientWidth) return;
+    const i = Math.round(Math.abs(el.scrollLeft) / el.clientWidth);
+    const last = this.columns().length - 1;
+    this.phoneColumn.set(Math.max(0, Math.min(i, last)));
   }
 }
