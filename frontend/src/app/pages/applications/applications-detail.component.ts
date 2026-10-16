@@ -892,9 +892,13 @@ export class ApplicationsDetailComponent {
    *  checks that it still belongs to the latest load. */
   private loadSeq = 0;
 
+  /** The comments of the shown application have been read once. */
+  private commentsLoaded = false;
+
   private loadApplication(id: Uuid): void {
     this.id = id;
     const seq = ++this.loadSeq;
+    this.commentsLoaded = false;
     // The dialogs and the edit belong to the shown application: they close at once.
     this.editing.set(false);
     this.confirmDelete.set(false);
@@ -1001,11 +1005,14 @@ export class ApplicationsDetailComponent {
       },
       error: () => {},
     });
-    this.commentsLoading.set(true);
+    // Only the first read of an application shows the loading state. A reload after a
+    // transition keeps the thread and the count, so the header does not shift.
+    if (!this.commentsLoaded) this.commentsLoading.set(true);
     this.api.comments(this.id, { quiet: true }).subscribe({
       next: (c) => {
         if (seq !== this.loadSeq) return;
         this.comments.set(c);
+        this.commentsLoaded = true;
         this.commentsLoading.set(false);
       },
       error: () => {

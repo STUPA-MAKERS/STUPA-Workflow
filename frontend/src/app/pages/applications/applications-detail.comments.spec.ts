@@ -248,6 +248,40 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
+  it('marks no comment as seen while the sheet is closed', async () => {
+    const { http, detectChanges, fixture } = await setup();
+    flushTypes(http);
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush(COMMENTS);
+    detectChanges();
+    await fixture.whenStable();
+    detectChanges();
+    expect(document.querySelector('app-chat')).toBeNull();
+    expect(localStorage.getItem('ap.chat.seen.application.app-1')).toBeNull();
+    openComments(detectChanges);
+    await fixture.whenStable();
+    detectChanges();
+    expect(localStorage.getItem('ap.chat.seen.application.app-1')).not.toBeNull();
+  });
+
+  it('keeps the count and the thread while a refresh reads the comments again', async () => {
+    const { http, cmp, detectChanges } = await setup();
+    flushTypes(http);
+    http.expectOne(url('')).flush(appWire());
+    http.expectOne(url('/versions')).flush(VERSIONS);
+    http.expectOne(url('/comments')).flush(COMMENTS);
+    detectChanges();
+    expect(document.querySelector('.ad__commentsN')).toHaveTextContent('1');
+    (cmp as unknown as { refresh(): void }).refresh();
+    http.expectOne(url('')).flush(appWire());
+    detectChanges();
+    // The comments read of the refresh is in flight: the plate and the thread stay.
+    expect(http.match(url('/comments'))).toHaveLength(1);
+    expect(cmp.commentsLoading()).toBe(false);
+    expect(document.querySelector('.ad__commentsN')).toHaveTextContent('1');
+  });
+
   it('opens the sheet for a link to the comments and scrolls to the named comment', async () => {
     const fragment$ = new BehaviorSubject<string | null>('comment-c1');
     const scroll = jest.fn();

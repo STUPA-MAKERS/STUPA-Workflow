@@ -291,28 +291,32 @@
 
     <!-- "Kommentare": the thread and the composer in a sheet over the page, from the end
          on a wide screen and from the bottom on a phone. The chat fills the sheet: the
-         log scrolls inside and the composer stays at its foot. -->
+         log scrolls inside and the composer stays at its foot. The chat exists only while
+         the sheet is open: projected content lives even where the sheet does not render
+         it, and a hidden chat would mark the thread as seen. -->
     <app-side-sheet
       [(open)]="commentsOpen"
       [heading]="'applications.comments.title' | t"
       [side]="phone() ? 'bottom' : 'end'"
       [contentScrolls]="true"
     >
-      <app-chat
-        class="ad__chat"
-        [loading]="commentsLoading()"
-        [draftKey]="'application.' + application.id"
-        [messages]="chatMessages()"
-        [visibilityOptions]="chatVisibilities()"
-        [canAttach]="canAttach()"
-        placeholder="applications.comments.placeholder"
-        (send)="sendComment($event)"
-        (retry)="retryComment($event)"
-        (discard)="discardComment($event)"
-        (edit)="editComment($event)"
-        (delete)="deleteComment($event)"
-        (refresh)="refreshComments()"
-      />
+      @if (commentsOpen()) {
+        <app-chat
+          class="ad__chat"
+          [loading]="commentsLoading()"
+          [draftKey]="'application.' + application.id"
+          [messages]="chatMessages()"
+          [visibilityOptions]="chatVisibilities()"
+          [canAttach]="canAttach()"
+          placeholder="applications.comments.placeholder"
+          (send)="sendComment($event)"
+          (retry)="retryComment($event)"
+          (discard)="discardComment($event)"
+          (edit)="editComment($event)"
+          (delete)="deleteComment($event)"
+          (refresh)="refreshComments()"
+        />
+      }
     </app-side-sheet>
   }
 }

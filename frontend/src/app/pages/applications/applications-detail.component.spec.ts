@@ -1645,7 +1645,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(screen.getByRole('button', { name: 'Datei anhängen' })).toBeInTheDocument();
   });
 
-  it('keeps the chat and its composer files while the sheet closes and opens', async () => {
+  it('keeps the composer files of the chat while the sheet closes and opens', async () => {
     const { http, detectChanges, fixture, cmp } = await setup();
     flushAll(http);
     cmp.commentsOpen.set(true);
@@ -1660,8 +1660,9 @@ describe('ApplicationsDetailComponent', () => {
     cmp.commentsOpen.set(true);
     detectChanges();
     for (const req of http.match(() => true)) req.flush([]);
-    // The chat is content of the sheet: it stays with the page, out of the DOM while closed.
-    expect(chat().componentInstance).toBe(before.componentInstance);
+    // The chat exists only while the sheet is open (a hidden one would mark the thread
+    // as seen); the page holds its drafts, so the new chat takes the same files.
+    expect(chat().componentInstance).not.toBe(before.componentInstance);
     expect(chat().injector.get(DraftAttachmentsService)).toBe(drafts);
   });
 
