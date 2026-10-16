@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 
 from typst_service.frontmatter import Meta
@@ -91,7 +93,59 @@ def test_election_without_a_tally_line_has_no_counts() -> None:
     )
     assert vote["t"] == "tally"
     assert vote["counts"] is False
-    assert len(vote["lines"]) == 4  # pyright: ignore[reportArgumentType]
+    # Only the question stays a body line; the template draws the ranking.
+    assert len(vote["lines"]) == 1  # pyright: ignore[reportArgumentType]
+    assert vote["election"] == {
+        "meta": "Wahl · 1 Posten",
+        "rows": [
+            {"name": "Jakob Frey", "votes": 1, "elected": True},
+            {"name": "Frederik Beimgraben", "votes": 0, "elected": False},
+        ],
+        "abstentions": 0,
+        "elected": [],
+        "others": 0,
+        "lot": None,
+        "notes": [],
+    }
+
+
+def test_election_keeps_a_name_with_a_comma_and_reads_the_lot() -> None:
+    (vote,) = conv(
+        "> [!abstimmung] **Q**\n> Wahl · 2 Posten\n"
+        "> Krüger, Ben: 6 · Amira: 6 · Finn: 3 · Enthaltungen: 0\n"
+        "> Gewählt: Amira, Krüger, Ben\n> Durch Los entschieden.\n> Ein Hinweis"
+    )
+    election = cast("dict[str, object]", vote["election"])
+    assert election["rows"] == [
+        {"name": "Krüger, Ben", "votes": 6, "elected": True},
+        {"name": "Amira", "votes": 6, "elected": True},
+        {"name": "Finn", "votes": 3, "elected": False},
+    ]
+    assert election["lot"] == "drawn"
+    assert election["notes"] == ["Ein Hinweis"]
+
+
+def test_public_election_and_a_pending_lot() -> None:
+    public, pending = conv(
+        "> [!abstimmung] **A**\n> Wahl · 1 Posten\n> Gewählt: Hannah, Ida\n"
+        "> 3 weitere Kandidierende\n\n"
+        "> [!abstimmung] **B**\n> Wahl · 1 Posten\n> Ben: 6 · Amira: 6\n"
+        "> Gewählt: niemand\n> Gleichstand: das Los steht aus."
+    )
+    election = cast("dict[str, object]", public["election"])
+    assert election["elected"] == ["Hannah", "Ida"]
+    assert election["others"] == 3
+    assert cast("dict[str, object]", pending["election"])["lot"] == "pending"
+
+
+def test_single_candidate_and_motion_have_no_ranking() -> None:
+    single, motion = conv(
+        "> [!abstimmung] **A**\n> Wahl · 1 Posten\n> Kandidatur: Anna\n"
+        "> ja: 3, nein: 1, enthaltung: 0\n\n"
+        "> [!abstimmung] **B**\n> Wahl · 1 Posten\n> Kandidatur: Anna\n> Gewählt: Anna"
+    )
+    assert "election" not in single
+    assert "election" not in motion
 
 
 def test_signature_callout() -> None:

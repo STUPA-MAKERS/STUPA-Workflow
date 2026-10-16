@@ -1061,6 +1061,13 @@ class VotingService:
                 target_id=str(vote.id),
                 data={"eligibleGroup": vote.eligible_group},
             )
+        if vote.meeting_id is not None and not as_delegation:
+            # A member who casts the own ballot takes part in the meeting.
+            from app.modules.livevote.attendance_service import AttendanceService
+
+            await AttendanceService(self.session).mark_present_on_cast(
+                vote.meeting_id, principal.sub
+            )
         if config.secret:
             return await self._cast_secret(vote.id, voter_sub, stored)
         return await self._cast_open(vote.id, voter_sub, stored)

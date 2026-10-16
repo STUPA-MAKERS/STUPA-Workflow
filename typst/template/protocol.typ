@@ -231,7 +231,63 @@
 // which end 8.5pt above the bottom edge. A callout without a tally line (an
 // election of several candidates) has no Ja/Nein/Enthaltung, so it draws its
 // lines without the boxes.
+// A personnel election as a ranking: one row per candidate, best first, a bar
+// scaled to the best count, "gewählt" on the elected rows and a dashed line
+// after them; the abstentions come last and muted. The public form lists the
+// elected people only. The bar scales to the best count, because the snippet
+// does not carry the number of ballots.
+#let election-box(n) = {
+  let e = n.election
+  let pending = e.lot == "pending"
+  let won = e.rows.any(r => r.elected) or e.elected.len() > 0
+  let color = if won and not pending { palette.britishracinggreen } else { palette.eggplant }
+  let muted = palette.gray
+  let check = text(font: icon-font, size: 0.8em, fill: palette.britishracinggreen, "\u{f00c}")
+  colored-box(color: color, inset: box-inset + (bottom: 8.5pt), {
+    if n.lines.len() > 0 { block(n.lines.map(inline).join(linebreak())) }
+    text(size: size.small, fill: muted, e.meta)
+    v(6pt)
+    if e.rows.len() > 0 {
+      let top = calc.max(1, ..e.rows.map(r => r.votes))
+      let cells = ()
+      let line-done = false
+      for (i, r) in e.rows.enumerate() {
+        if not r.elected and not line-done and i > 0 and e.rows.at(i - 1).elected {
+          cells.push(grid.cell(colspan: 4, line(length: 100%, stroke: (paint: tint(color, 60%), thickness: 0.6pt, dash: "dashed"))))
+          line-done = true
+        }
+        let bar-fill = if r.elected { palette.britishracinggreen } else { tint(palette.gray, 55%) }
+        cells.push(if r.elected { strong(r.name) } else { r.name })
+        cells.push(box(width: 100%, height: 5pt, radius: 2.5pt, fill: white, clip: true,
+          box(width: r.votes / top * 100%, height: 100%, radius: 2.5pt, fill: bar-fill)))
+        cells.push(align(right, str(r.votes)))
+        cells.push(if r.elected { text(size: size.small, fill: palette.britishracinggreen)[#check gewählt] } else [])
+      }
+      if e.abstentions != none {
+        cells.push(text(fill: muted, "Enthaltungen"))
+        cells.push([])
+        cells.push(align(right, text(fill: muted, str(e.abstentions))))
+        cells.push([])
+      }
+      grid(
+        columns: (auto, 1fr, 1.6em, 5.5em),
+        column-gutter: 10pt,
+        row-gutter: 6pt,
+        align: horizon,
+        ..cells,
+      )
+    } else {
+      for name in e.elected { block(spacing: 5pt)[#check #strong(name)] }
+    }
+    if e.others > 0 { block(spacing: 5pt, text(fill: muted)[#e.others weitere Kandidierende]) }
+    if e.lot == "drawn" { block(spacing: 6pt, emph[Durch Los entschieden.]) }
+    if pending { block(spacing: 6pt, emph[Gleichstand: das Los steht aus.]) }
+    for note in e.notes { block(spacing: 6pt, note) }
+  })
+}
+
 #let tally(n) = {
+  if n.at("election", default: none) != none { return election-box(n) }
   // The cell labels have no descender, so TeX sets the cells lower than a
   // box with running text.
   let cell(label, count, color, icon) = colored-box(color: color, icon: icon, inset: box-inset + (bottom: 11.5pt))[*#label:* #count]

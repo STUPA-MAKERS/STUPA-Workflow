@@ -273,14 +273,15 @@ async def test_close_election_with_a_tie_keeps_the_lot_pending() -> None:
     assert out.election_result.lot.drawn is None
 
 
-async def test_close_election_with_a_boundary_tie_needs_a_runoff() -> None:
+async def test_close_election_with_a_boundary_tie_needs_the_lot() -> None:
     vote = _evote(config=_econfig(seats=2, n=4))
     db = fake_session(result(vote), result('["c1","c2"]', '["c1","c3"]'))
     out = await VotingService(db).close(vote.id, _voter(), now=NOW)
-    assert out.result == "runoff"
-    assert out.election_result is not None and out.election_result.runoff is not None
-    assert out.election_result.runoff.candidate_ids == ["c2", "c3"]
-    assert out.election_result.runoff.seats == 1
+    assert out.result == "tie"
+    assert out.election_result is not None and out.election_result.runoff is None
+    assert out.election_result.lot is not None
+    assert out.election_result.lot.among == ["c2", "c3"]
+    assert out.election_result.lot.seats == 1
 
 
 async def test_close_election_without_quorum_409() -> None:
@@ -413,9 +414,15 @@ async def test_draw_lot_twice_409() -> None:
 # ---------------------------------------------------------------- runoff
 
 
+def _legacy_runoff(stored: dict[str, Any]) -> dict[str, Any]:
+    """Turn a pending lot into the runoff that an older close stored for the same tie."""
+    lot = stored["lot"]
+    return {**stored, "lot": None, "runoff": {"candidateIds": lot["among"], "seats": lot["seats"]}}
+
+
 def _runoff_parent(**over: Any) -> SimpleNamespace:
     config = _econfig(seats=2, n=4, **over.pop("config_over", {}))
-    stored = _stored(['["c1","c2"]', '["c1","c3"]'], config)
+    stored = _legacy_runoff(_stored(['["c1","c2"]', '["c1","c3"]'], config))
     base: dict[str, Any] = {
         "config": config,
         "status": "closed",

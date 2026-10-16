@@ -175,9 +175,10 @@ def result(config: VoteConfig, counts: Mapping[str, int], eligible: int) -> Outc
 # ballot with 1 of 3 votes gives 2 abstentions. The single-candidate ballot is
 # ``yes``/``no``/``abstain``, as for a motion.
 #
-# Result values: ``elected`` (the seats are decided), ``runoff`` (a tie at the seat
-# boundary of a first round with several seats), ``tie`` (a tie that the lot decides:
-# one seat, or a runoff round), ``rejected`` (quorum missed, or nobody elected).
+# Result values: ``elected`` (the seats are decided), ``tie`` (a tie at the seat
+# boundary that the lot decides), ``rejected`` (quorum missed, or nobody elected).
+# ``runoff`` stays readable for the elections that were closed while a tie at the
+# boundary of several seats went to a runoff.
 
 ElectionResult = Literal["elected", "runoff", "tie", "rejected"]
 
@@ -259,8 +260,8 @@ def tally_election(
     refuses them anyway). Ranking by votes; a candidate needs at least one vote to be
     elected. When more candidates have votes than there are seats, the first
     ``seats`` win, unless a tie crosses the seat boundary: then the candidates above
-    the boundary are elected and the tied ones go to a runoff (first round, several
-    seats) or to the lot (one seat, or a runoff round). A missed quorum elects nobody.
+    the boundary are elected and the lot decides among the tied ones, also with
+    several seats (no runoff). A missed quorum elects nobody.
     """
     raw = list(choices)
     if config.yes_no:
@@ -295,9 +296,8 @@ def tally_election(
         )
     above = tuple(c for c in ranked if counts[c] > boundary)
     tied = tuple(c for c in ranked if counts[c] == boundary)
-    runoff = config.seats > 1 and round_ == 1
     return ElectionOutcome(
-        result="runoff" if runoff else "tie",
+        result="tie",
         quorum_met=True,
         elected=above,
         tied=tied,
