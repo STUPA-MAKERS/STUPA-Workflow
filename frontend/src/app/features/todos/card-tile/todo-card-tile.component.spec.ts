@@ -35,8 +35,8 @@ describe('TodoCardTileComponent', () => {
     expect(screen.queryByText('Dritte')).toBeNull();
     expect(screen.getByText('Sitzung · Sondersitzung · Di, 03.11.')).toBeInTheDocument();
     expect(screen.getByText(/14\.10\. · überfällig/).closest('.tt__fact')).toHaveClass('tt__fact--overdue');
-    expect(screen.getByLabelText('Checkliste 1 von 3')).toHaveTextContent('1/3');
-    expect(screen.getByLabelText('2 Kommentare')).toHaveTextContent('2');
+    expect(screen.getByRole('img', { name: 'Checkliste 1 von 3' })).toHaveTextContent('1/3');
+    expect(screen.getByRole('img', { name: '2 Kommentare' })).toHaveTextContent('2');
     expect(screen.getByRole('img', { name: 'Niemand zuständig' })).toBeInTheDocument();
     const title = screen.getByRole('button', { name: 'Protokoll gegenlesen' });
     expect(title).toHaveAttribute('data-card-id', 'k-1');

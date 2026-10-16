@@ -33,13 +33,13 @@
     </span>
   }
   @if (card().checklist.total) {
-    <span class="tt__fact" [attr.aria-label]="'todos.tile.checklist' | t: { done: card().checklist.done, total: card().checklist.total }">
+    <span class="tt__fact" role="img" [attr.aria-label]="'todos.tile.checklist' | t: { done: card().checklist.done, total: card().checklist.total }">
       <app-icon name="boxok" [size]="14" />
       <span class="num">{{ card().checklist.done }}/{{ card().checklist.total }}</span>
     </span>
   }
   @if (card().commentCount) {
-    <span class="tt__fact" [attr.aria-label]="'todos.tile.comments' | t: { n: card().commentCount }">
+    <span class="tt__fact" role="img" [attr.aria-label]="'todos.tile.comments' | t: { n: card().commentCount }">
       <app-icon name="chat" [size]="14" />
       <span class="num">{{ card().commentCount }}</span>
     </span>
