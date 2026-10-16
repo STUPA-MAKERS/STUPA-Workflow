@@ -3,6 +3,9 @@ import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   effect,
   inject,
@@ -129,6 +132,8 @@ export class TodoCardDetailComponent {
   private readonly api = inject(TodosApiService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
   private readonly t: Translate = (key, params) => this.i18n.translate(key, params);
 
   readonly cardId = input.required<Uuid>();
@@ -343,6 +348,7 @@ export class TodoCardDetailComponent {
       this.gen++;
       this.patchQueue = [];
       this.patching = false;
+      this.busy.set(false);
       this.loading.set(true);
       this.card.set(null);
       this.outbox.clear();
@@ -577,16 +583,42 @@ export class TodoCardDetailComponent {
     this.patch(c, { title }, () => this.editingTitle.set(false));
   }
 
+  /**
+   * Move the focus to the element `selector` finds after the next render. An inline editor
+   * replaces the button that had the focus, and the focus must stay inside the drawer.
+   */
+  private focusSoon(...selectors: string[]): void {
+    afterNextRender(
+      () => {
+        const root = this.host.nativeElement;
+        for (const sel of selectors) {
+          const el = root.querySelector<HTMLElement>(sel);
+          if (el) {
+            el.focus();
+            return;
+          }
+        }
+      },
+      { injector: this.injector },
+    );
+  }
+
   startDesc(): void {
     this.descDraft.set(this.card()?.descriptionMd ?? '');
     this.editingDesc.set(true);
+    this.focusSoon('[data-focus="desc-input"]');
+  }
+
+  cancelDesc(): void {
+    this.editingDesc.set(false);
+    this.focusSoon('[data-focus="desc-edit"] button');
   }
 
   saveDesc(): void {
     const c = this.card();
     if (!c) return;
     const text = this.descDraft().trim();
-    this.patch(c, { descriptionMd: text || null }, () => this.editingDesc.set(false));
+    this.patch(c, { descriptionMd: text || null }, () => this.cancelDesc());
   }
 
   toggleItem(item: TodoCheckItem): void {
@@ -602,30 +634,52 @@ export class TodoCardDetailComponent {
     this.write(this.api.addCheckItem(c.id, text), () => this.itemDraft.set(''));
   }
 
+  startAddItem(): void {
+    this.addingItem.set(true);
+    this.focusSoon('[data-focus="item-new"]');
+  }
+
   cancelItem(): void {
     this.addingItem.set(false);
     this.itemDraft.set('');
+    this.focusSoon('[data-focus="item-add"]');
   }
 
   startItem(item: TodoCheckItem): void {
     this.itemEditDraft.set(item.text);
     this.editingItem.set(item.id);
+    this.focusSoon('[data-focus="item-edit"]');
+  }
+
+  cancelRename(item: TodoCheckItem): void {
+    this.editingItem.set(null);
+    this.focusSoon(`[data-rename="${item.id}"]`);
   }
 
   renameItem(item: TodoCheckItem): void {
     const c = this.card();
     const text = this.itemEditDraft().trim();
     if (!c || !text || text === item.text) {
-      this.editingItem.set(null);
+      this.cancelRename(item);
       return;
     }
-    this.write(this.api.patchCheckItem(c.id, item.id, { text }), () => this.editingItem.set(null));
+    this.write(this.api.patchCheckItem(c.id, item.id, { text }), () => this.cancelRename(item));
   }
 
+  /** The focus goes to the next item, else the previous one, else the add toggle. */
   deleteItem(item: TodoCheckItem): void {
     const c = this.card();
     if (!c) return;
-    this.write(this.api.deleteCheckItem(c.id, item.id));
+    const shown = [...(this.showDone() ? this.doneItems() : []), ...this.openItems()];
+    const at = shown.findIndex((x) => x.id === item.id);
+    const near = shown[at + 1] ?? shown[at - 1];
+    this.write(this.api.deleteCheckItem(c.id, item.id), () =>
+      this.focusSoon(
+        ...(near ? [`[data-item="${near.id}"]`] : []),
+        '[data-focus="item-add"]',
+        '[data-focus="item-new"]',
+      ),
+    );
   }
 
   /** A pick in the link picker: link the target, or take a linked one off. */

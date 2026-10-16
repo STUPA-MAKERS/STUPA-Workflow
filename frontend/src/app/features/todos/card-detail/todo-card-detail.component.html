@@ -298,7 +298,14 @@
     <div class="cd__secHead">
       <h3 id="cd-desc" class="cd__secTitle">{{ 'todos.card.description' | t }}</h3>
       @if (canWrite() && !editingDesc()) {
-        <app-button class="cd__secEnd--icon" variant="text" [iconOnly]="true" [ariaLabel]="'todos.card.editDescription' | t" (click)="startDesc()">
+        <app-button
+          class="cd__secEnd--icon"
+          data-focus="desc-edit"
+          variant="text"
+          [iconOnly]="true"
+          [ariaLabel]="'todos.card.editDescription' | t"
+          (click)="startDesc()"
+        >
           <app-icon name="edit" [size]="18" />
         </app-button>
       }
@@ -308,15 +315,16 @@
         <span class="sr-only">{{ 'todos.card.description' | t }}</span>
         <textarea
           class="cd__areaInput"
+          data-focus="desc-input"
           rows="6"
           maxlength="20000"
           [ngModel]="descDraft()"
           (ngModelChange)="descDraft.set($event)"
-          (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); editingDesc.set(false)"
+          (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); cancelDesc()"
         ></textarea>
       </label>
       <div class="cd__formFoot">
-        <app-button variant="text" (click)="editingDesc.set(false)">{{ 'action.cancel' | t }}</app-button>
+        <app-button variant="text" (click)="cancelDesc()">{{ 'action.cancel' | t }}</app-button>
         <app-button variant="fill" [loading]="busy()" (click)="saveDesc()">{{ 'action.save' | t }}</app-button>
       </div>
     } @else if (card.descriptionMd) {
@@ -355,6 +363,7 @@
         <form class="cd__itemForm" (submit)="$event.preventDefault(); addItem()">
           <input
             class="cd__itemInput"
+            data-focus="item-new"
             name="item"
             maxlength="500"
             [attr.aria-label]="'todos.card.newItem' | t"
@@ -366,7 +375,7 @@
           <app-button variant="fill" [disabled]="!itemDraft().trim()" (click)="addItem()">{{ 'todos.card.addItem' | t }}</app-button>
         </form>
       } @else {
-        <button type="button" class="cd__toggle" (click)="addingItem.set(true)">
+        <button type="button" class="cd__toggle" data-focus="item-add" (click)="startAddItem()">
           <app-icon name="plus" [size]="15" />
           {{ 'todos.card.addItem' | t }}
         </button>
@@ -381,12 +390,13 @@
       <form class="cd__itemForm" (submit)="$event.preventDefault(); renameItem(item)">
         <input
           class="cd__itemInput"
+          data-focus="item-edit"
           name="itemEdit"
           maxlength="500"
           [attr.aria-label]="'todos.card.itemText' | t"
           [ngModel]="itemEditDraft()"
           (ngModelChange)="itemEditDraft.set($event)"
-          (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); editingItem.set(null)"
+          (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); cancelRename(item)"
         />
         <app-button variant="fill" size="sm" (click)="renameItem(item)">{{ 'action.save' | t }}</app-button>
       </form>
@@ -395,6 +405,7 @@
         type="button"
         class="cd__check"
         role="checkbox"
+        [attr.data-item]="item.id"
         [attr.aria-checked]="item.done"
         [disabled]="!canWrite()"
         (click)="toggleItem(item)"
@@ -404,7 +415,13 @@
       </button>
       @if (canWrite()) {
         <span class="cd__itemActions">
-          <button type="button" class="cd__x" [attr.aria-label]="'todos.card.renameItem' | t: { text: item.text }" (click)="startItem(item)">
+          <button
+            type="button"
+            class="cd__x"
+            [attr.data-rename]="item.id"
+            [attr.aria-label]="'todos.card.renameItem' | t: { text: item.text }"
+            (click)="startItem(item)"
+          >
             <app-icon name="edit" [size]="15" />
           </button>
           <button type="button" class="cd__x" [attr.aria-label]="'todos.card.deleteItem' | t: { text: item.text }" (click)="deleteItem(item)">

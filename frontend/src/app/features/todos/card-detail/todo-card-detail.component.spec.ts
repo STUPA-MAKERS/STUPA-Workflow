@@ -358,6 +358,61 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.showDone()).toBe(false);
   });
 
+  it('keeps the focus in the drawer when an inline editor opens, closes or a row goes', async () => {
+    const items = [
+      { id: 'i-1', text: 'Eins', done: false, position: 0 },
+      { id: 'i-2', text: 'Zwei', done: false, position: 1 },
+      { id: 'i-3', text: 'Drei', done: false, position: 2 },
+    ];
+    const { cmp, api, fixture } = await setup({ card: detail({ descriptionMd: 'Alt', checklistItems: items }) });
+    const settle = async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+    };
+    const active = () => document.activeElement as HTMLElement;
+
+    const descEdit = screen.getByRole('button', { name: 'Beschreibung bearbeiten' });
+    descEdit.focus();
+    fireEvent.click(descEdit);
+    await settle();
+    expect(active().tagName).toBe('TEXTAREA');
+    fireEvent.keyDown(active(), { key: 'Escape' });
+    await settle();
+    expect(active()).toBe(screen.getByRole('button', { name: 'Beschreibung bearbeiten' }));
+    cmp.startDesc();
+    await settle();
+    cmp.saveDesc();
+    await settle();
+    expect(active()).toBe(screen.getByRole('button', { name: 'Beschreibung bearbeiten' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Punkt hinzufügen' }));
+    await settle();
+    expect(active()).toBe(screen.getByRole('textbox', { name: 'Neuer Punkt' }));
+    fireEvent.keyDown(active(), { key: 'Escape' });
+    await settle();
+    expect(active()).toBe(screen.getByRole('button', { name: 'Punkt hinzufügen' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '„Zwei“ umbenennen' }));
+    await settle();
+    expect(active()).toBe(screen.getByRole('textbox', { name: 'Text des Punkts' }));
+    fireEvent.keyDown(active(), { key: 'Escape' });
+    await settle();
+    expect(active()).toBe(screen.getByRole('button', { name: '„Zwei“ umbenennen' }));
+
+    api.deleteCheckItem.mockReturnValueOnce(of(detail({ descriptionMd: 'Alt', checklistItems: [items[0], items[2]] })));
+    fireEvent.click(screen.getByRole('button', { name: '„Zwei“ löschen' }));
+    await settle();
+    expect(active()).toBe(screen.getByRole('checkbox', { name: 'Drei' }));
+    api.deleteCheckItem.mockReturnValueOnce(of(detail({ descriptionMd: 'Alt', checklistItems: [items[0]] })));
+    fireEvent.click(screen.getByRole('button', { name: '„Drei“ löschen' }));
+    await settle();
+    expect(active()).toBe(screen.getByRole('checkbox', { name: 'Eins' }));
+    api.deleteCheckItem.mockReturnValueOnce(of(detail({ descriptionMd: 'Alt', checklistItems: [] })));
+    fireEvent.click(screen.getByRole('button', { name: '„Eins“ löschen' }));
+    await settle();
+    expect(active()).toBe(screen.getByRole('button', { name: 'Punkt hinzufügen' }));
+  });
+
   it('shows no progress for an empty checklist and a read-only toggle does nothing', async () => {
     const { cmp, api, container } = await setup({ card: detail({ checklistItems: [], canWrite: false }) });
     expect(cmp.progress()).toBe(0);
@@ -495,6 +550,8 @@ describe('TodoCardDetailComponent', () => {
     fixture.componentRef.setInput('cardId', 'k-2');
     fixture.detectChanges();
     expect(cmp.card()).toBe(other);
+    // The writes of k-1 are still out; k-2 starts with its buttons free.
+    expect(cmp.busy()).toBe(false);
     const moves = api.moveCard.mock.calls.length;
 
     write.next(detail({ id: 'k-1' }));
