@@ -81,6 +81,16 @@ from app.modules.livevote.models import (
 from app.modules.notifications.models import NotificationPreference
 from app.modules.privacy.models import ErasureRequest
 from app.modules.protocol.models import Protocol
+from app.modules.tickets.models import Ticket, TicketEvent, TicketNote
+from app.modules.todos.models import (
+    TodoAssignee,
+    TodoBoard,
+    TodoCard,
+    TodoColumn,
+    TodoComment,
+    TodoEvent,
+    TodoLink,
+)
 from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from tests._support.guest_apps import build_api, guest_settings
@@ -377,6 +387,51 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             ]
         )
 
+        # Tickets: the old account reported the ticket, works on it, wrote a note and
+        # an event.
+        ticket = Ticket(
+            kind="bug",
+            title="Fehler",
+            body="Es geht nicht",
+            reporter_principal_id=old.id,
+            assignee_id=old.id,
+        )
+        session.add(ticket)
+        await session.flush()
+        session.add_all(
+            [
+                TicketNote(ticket_id=ticket.id, author_id=old.id, body="Notiz"),
+                TicketEvent(ticket_id=ticket.id, actor_id=old.id, kind="created"),
+            ]
+        )
+
+        # To-dos: the personal board of the old account with one card that the old
+        # account created, holds, commented on (with a mention of itself), changed and
+        # linked to the ticket.
+        board = TodoBoard(name="Meine To-Dos", kind="personal", owner_id=old.id)
+        session.add(board)
+        await session.flush()
+        column = TodoColumn(board_id=board.id, name="Offen", position=0)
+        session.add_all(
+            [column, TodoColumn(board_id=board.id, name="Erledigt", position=1, is_done=True)]
+        )
+        await session.flush()
+        card = TodoCard(
+            board_id=board.id, column_id=column.id, rank="m", title="Aufgabe", created_by=old.id
+        )
+        session.add(card)
+        await session.flush()
+        session.add_all(
+            [
+                TodoAssignee(card_id=card.id, principal_id=old.id),
+                TodoComment(
+                    card_id=card.id, author_id=old.id, body="Merken", mentions=[str(old.id)]
+                ),
+                TodoEvent(card_id=card.id, actor_id=old.id, kind="created"),
+                TodoLink(card_id=card.id, ticket_id=ticket.id, created_by=old.id),
+            ]
+        )
+
         # Config, roles, privacy, backups, stored audit checks.
         role = await _role(session, "member")
         admin_id = await _admin_actor(session)
@@ -521,6 +576,10 @@ async def test_merge_rewrites_every_area(maker: async_sessionmaker[AsyncSession]
     assert after["sessions"] == {"rewritten": 0, "combined": 0, "removed": 3}
     assert after["memberships"]["removed"] == 1
     assert after["calendar"]["removed"] == 1
+    # Reporter, assignee, note and event.
+    assert after["tickets"] == {"rewritten": 4, "combined": 0, "removed": 0}
+    # Card, comment, event, link, assignee, the mention and the personal board.
+    assert after["todos"] == {"rewritten": 7, "combined": 0, "removed": 0}
 
     async with maker() as session:
         for column in SUB_REFS:
