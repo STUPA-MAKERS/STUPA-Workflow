@@ -162,6 +162,7 @@ export class TodosComponent implements OnDestroy {
   /** Counts the local changes of the board: a poll that left before one is dropped. */
   private mutations = 0;
   private mineLoaded = false;
+  private mineSeq = 0;
 
   readonly filter = signal<BoardFilter>(NO_FILTER);
   readonly search = liveSearch<void>({
@@ -380,6 +381,7 @@ export class TodosComponent implements OnDestroy {
         if (seq !== this.loadSeq || muts !== this.mutations || !res.board) return;
         this.board.set(res.board);
         this.etag = res.etag;
+        this.refreshMine();
       },
       error: () => undefined,
     });
@@ -397,6 +399,7 @@ export class TodosComponent implements OnDestroy {
         if (seq !== this.loadSeq || !board) return;
         this.board.set(board);
         this.etag = etag;
+        this.refreshMine();
       },
       error: () => undefined,
     });
@@ -405,12 +408,28 @@ export class TodosComponent implements OnDestroy {
   private loadMine(): void {
     if (this.mineLoaded) return;
     this.mineLoaded = true;
+    const seq = ++this.mineSeq;
     this.api.mine().subscribe({
-      next: (m) => this.mine.set(new Set(m.items.map((i) => i.id))),
+      next: (m) => {
+        if (seq !== this.mineSeq) return;
+        // `/todos/mine` lists open cards only: a card of mine in a done column stays mine.
+        const done = this.doneColumns();
+        const prev = this.mine();
+        const kept = (this.board()?.cards ?? [])
+          .filter((c) => prev.has(c.id) && done.has(c.columnId) && c.assignees.length)
+          .map((c) => c.id);
+        this.mine.set(new Set([...m.items.map((i) => i.id), ...kept]));
+      },
       error: () => {
-        this.mineLoaded = false;
+        if (seq === this.mineSeq) this.mineLoaded = false;
       },
     });
+  }
+
+  /** The assignees of a card changed or may have: read "mine" again, now or at the next pick of "Ich". */
+  private refreshMine(): void {
+    this.mineLoaded = false;
+    if (this.filter().assignee === 'me') this.loadMine();
   }
 
   // ------------------------------------------------------------------ header
@@ -548,6 +567,7 @@ export class TodosComponent implements OnDestroy {
     if (!board || card.boardId !== board.id) return;
     this.mutations++;
     this.board.set(replaceTile(board, card));
+    this.refreshMine();
   }
 
   onCardChanged(card: TodoCardDetail): void {
@@ -555,6 +575,7 @@ export class TodosComponent implements OnDestroy {
     if (!board || card.boardId !== board.id) return;
     this.mutations++;
     this.board.set(card.archivedAt ? removeTile(board, card.id) : placeTile(board, card));
+    this.refreshMine();
   }
 
   onArchived(id: Uuid): void {

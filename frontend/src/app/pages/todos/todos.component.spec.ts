@@ -165,6 +165,37 @@ describe('TodosComponent', () => {
     expect(api.mine).toHaveBeenCalledTimes(2);
   });
 
+  it('reads "me" again after a change of a card and keeps a done card of mine', async () => {
+    const { cmp, api } = await start('/todos/b-1');
+    const mineOf = (...ids: string[]): Observable<TodoMine> =>
+      of({ items: ids.map((id) => ({ ...tile({ id }), boardName: '', boardKind: 'gremium' as const, columnName: '', labels: [] })), dueSoonCount: 0 });
+    cmp.onCardChanged(detail({ id: 'k-2', title: 'Haushalt Kapitel 3' }));
+    expect(api.mine).not.toHaveBeenCalled();
+    cmp.setAssignee('me');
+    expect(cmp.visible().get('c-1')?.map((c) => c.id)).toEqual(['k-1']);
+
+    api.mine.mockReturnValueOnce(mineOf('k-1', 'k-2'));
+    cmp.onCardChanged(detail({ id: 'k-2', title: 'Haushalt Kapitel 3', assignees: [{ principalId: 'p-1', displayName: 'Ich' }] }));
+    expect(cmp.visible().get('c-1')?.map((c) => c.id)).toEqual(['k-1', 'k-2']);
+
+    api.mine.mockReturnValueOnce(mineOf('k-2', 'k-9'));
+    cmp.onCreated(detail({ id: 'k-9', columnId: 'c-2', title: 'Neu' }));
+    expect(cmp.visible().get('c-2')?.map((c) => c.id)).toEqual(['k-9']);
+    expect(cmp.visible().get('c-1')?.map((c) => c.id)).toEqual(['k-2']);
+
+    api.mine.mockReturnValueOnce(mineOf('k-2'));
+    cmp.onCardChanged(detail({ id: 'k-9', columnId: 'c-4', title: 'Neu', assignees: [{ principalId: 'p-1', displayName: 'Ich' }] }));
+    expect(cmp.visible().get('c-4')?.map((c) => c.id)).toEqual(['k-9']);
+
+    const late = new Subject<TodoMine>();
+    api.mine.mockReturnValueOnce(late);
+    api.mine.mockReturnValueOnce(mineOf('k-1'));
+    cmp.poll();
+    cmp.poll();
+    late.next({ items: [], dueSoonCount: 0 });
+    expect(cmp.mine().has('k-1')).toBe(true);
+  });
+
   it('switches to the list and back, and picks another board', async () => {
     const { cmp, router, settle, api } = await start('/todos/b-1');
     cmp.setView('list');
