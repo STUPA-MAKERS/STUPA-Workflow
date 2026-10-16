@@ -135,6 +135,13 @@
   flex-direction: column;
   min-width: 0;
 }
+/* Side by side a to-do sheet is as tall as the pane, like the card drawer of the board:
+   the thread fills its column with the composer at the foot of the pane, and the details
+   column scrolls inside itself. An application sheet keeps its height and the pane
+   scrolls. */
+.tasks--split .tasks__detail--todo {
+  min-height: 0;
+}
 
 @include bp.phone {
   .tasks__month {
@@ -163,10 +170,6 @@
 }
 .tasks__scroll > .tasks__kind:first-child {
   padding-top: var(--space-1);
-}
-.tasks__kindN {
-  color: var(--color-text-muted);
-  font-weight: var(--fw-medium);
 }
 /* A to-do row has a narrow circle in front, so its slots sit closer and the title keeps its width. */
 .tasks__row:has(.tasks__circle) {

@@ -171,6 +171,8 @@ describe('TasksComponent', () => {
     const { cmp } = await start('/tasks/a2', [THREE]);
     expect(cmp.selectedId()).toBe('a2');
     expect(screen.getByText('detail')).toBeInTheDocument();
+    // An application sheet keeps its own height; only a to-do sheet is bounded.
+    expect(document.querySelector('.tasks__detail--todo')).toBeNull();
     // One pane at a time in the test: the list is hidden while the detail is open.
     const link = (name: string) => screen.getByRole('link', { name, hidden: true });
     expect(link('Zweiter')).toHaveAttribute('aria-current', 'true');
@@ -356,10 +358,10 @@ describe('TasksComponent', () => {
       todo('k-4', { title: 'Steuer abholen', boardName: 'Meine To-Dos' }),
     ];
 
-    it('lists my To-Dos below the applications with headings, counts and due dates', async () => {
+    it('lists my To-Dos below the applications, with plain group headings and due dates', async () => {
       await start('/tasks', [THREE], { todos: TODOS });
-      expect(screen.getByTestId('tasks-apps-head')).toHaveTextContent('Anträge 3');
-      expect(screen.getByRole('heading', { name: /^To-Dos/ })).toHaveTextContent('To-Dos 4');
+      expect(screen.getByTestId('tasks-apps-head')).toHaveTextContent(/^\s*Anträge\s*$/);
+      expect(screen.getByRole('heading', { name: /^To-Dos/ })).toHaveTextContent(/^\s*To-Dos\s*$/);
       const link = screen.getByRole('link', { name: 'Raum buchen' });
       expect(link).toHaveAttribute('href', '/tasks/todo/k-2');
       expect(screen.getByText('Fachschaft Informatik')).toBeInTheDocument();
@@ -428,7 +430,7 @@ describe('TasksComponent', () => {
 
     it('shows the To-Dos without applications and the none pane asks to pick', async () => {
       await start('/tasks', [[]], { todos: TODOS });
-      expect(screen.getByTestId('tasks-apps-head')).toHaveTextContent('Anträge 0');
+      expect(screen.getByTestId('tasks-apps-head')).toHaveTextContent(/^\s*Anträge\s*$/);
       expect(screen.getAllByText('Keine offenen Aufgaben.').length).toBeGreaterThan(0);
       expect(screen.getByText('Keine Aufgabe geöffnet')).toBeInTheDocument();
     });
@@ -439,6 +441,8 @@ describe('TasksComponent', () => {
       expect(cmp.selectedId()).toBeNull();
       expect(cmp.detailOpen()).toBe(true);
       expect(screen.getByText('detail')).toBeInTheDocument();
+      // The pane bounds a to-do sheet, so its thread fills the pane height.
+      expect(document.querySelector('.tasks__detail--todo')).not.toBeNull();
     });
 
     it('leaves the group out when the To-Dos fail and drops a late answer', async () => {

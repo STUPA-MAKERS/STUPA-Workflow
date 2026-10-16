@@ -132,6 +132,8 @@ describe('TodosComponent', () => {
     expect(cmp.openCount()).toBe(2);
     expect(screen.getByPlaceholderText('2 offene To-Dos durchsuchen')).toBeInTheDocument();
     expect(document.querySelectorAll('.td__skelIcon')).toHaveLength(1);
+    const views = document.querySelector('app-segmented')!;
+    expect(document.querySelector('.td__skelIcon')!.compareDocumentPosition(views) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(document.querySelector('.td__skelNew')).not.toBeNull();
     expect(document.querySelectorAll('.td__chips .td__skelChip')).toHaveLength(3);
   });
@@ -741,7 +743,11 @@ describe('TodosComponent', () => {
 
   it('opens the settings and the archive and does nothing without a board id', async () => {
     const { cmp, harness } = await start('/todos/b-1');
-    fireEvent.click(screen.getByTestId('td-settings'));
+    // The settings stand left of the view switch.
+    const settings = screen.getByTestId('td-settings');
+    const views = document.querySelector('app-segmented')!;
+    expect(settings.compareDocumentPosition(views) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(settings);
     harness.detectChanges();
     expect(cmp.settingsOpen()).toBe(true);
     expect(screen.getByRole('dialog', { name: 'Board-Einstellungen' })).toBeInTheDocument();

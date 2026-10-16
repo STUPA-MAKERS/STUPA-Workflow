@@ -39,6 +39,18 @@ def test_url_builders_point_at_the_frontend_routes() -> None:
     assert ticket.label("en") == "Open the ticket"
 
 
+def test_application_link_points_at_a_comment_except_for_a_guest() -> None:
+    comment = "c-1"
+    assert (
+        application_link(SETTINGS, ID, comment_id=comment).url
+        == f"{BASE}/applications/{ID}#comment-{comment}"
+    )
+    assert (
+        application_link(SETTINGS, ID, guest=True, comment_id=comment).url
+        == f"{BASE}/antrag/{ID}"
+    )
+
+
 def test_label_follows_the_language_with_a_german_fallback() -> None:
     link = MailLink("https://x.de/a", "meeting")
     assert link.label("de") == "Sitzung öffnen"
