@@ -282,9 +282,22 @@
 }
 
 /* ------------------------------------------------------------------ thread */
-/* The thread fills the pane down to the composer at the bottom of the card. */
-.td__chat {
-  --chat-log-max: max(20rem, calc(100dvh - 25.5rem));
+/* Split: the columns fill the card down to its foot, and the thread fills its column.
+   The log takes the height between the heading and the composer and scrolls inside. It
+   adds only its minimum to the height of the card (`--chat-log-basis: 0`), so a long
+   thread does not make the pane scroll, and the composer stays at the foot of the card.
+   A details column taller than the pane makes the card taller, and the log grows with
+   it. */
+.td--split .td__cols {
+  flex: 1 0 auto;
+  align-items: stretch;
+}
+.td--split .td__col--log > .td__sec,
+.td--split .td__chat {
+  flex: 1 1 auto;
+}
+.td--split .td__chat {
+  --chat-log-basis: 0;
 }
 .td__chat.chat--phone {
   flex: 1 1 0;

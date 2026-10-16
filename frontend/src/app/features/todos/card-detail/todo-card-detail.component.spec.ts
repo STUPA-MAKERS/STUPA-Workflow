@@ -87,7 +87,9 @@ describe('TodoCardDetailComponent', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Raum buchen' })).toBeInTheDocument();
     expect(screen.getByText('Studierendenparlament · To-Do')).toBeInTheDocument();
     expect(screen.getByText(/^Angelegt von Selin Yıldız · /)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Aktivität' })).toBeInTheDocument();
+    // The thread has no heading of its own; its column carries the name.
+    expect(screen.queryByRole('heading', { name: 'Aktivität' })).toBeNull();
+    expect(screen.getByRole('region', { name: 'Aktivität' })).toBeInTheDocument();
     expect(screen.getByText('Raum ist frei')).toBeInTheDocument();
     expect(screen.getByText('in 7 Tagen')).toBeInTheDocument();
     expect(screen.getByText('Haushalt')).toBeInTheDocument();

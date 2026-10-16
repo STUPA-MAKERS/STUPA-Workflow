@@ -144,7 +144,8 @@
 }
 .sk__log {
   display: flex;
-  flex: 1 1 auto;
+  /* The same basis as the log of `app-chat`, so the placeholder fills the same height. */
+  flex: 1 1 var(--chat-log-basis, auto);
   flex-direction: column;
   justify-content: flex-end;
   min-height: var(--chat-log-min, 10rem);

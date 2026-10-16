@@ -37,7 +37,6 @@
     } @else {
       <div class="cd__cols" aria-hidden="true">
         <section class="cd__col cd__col--chat">
-          <h3 class="sec cd__secTitle cd__secTitle--accent">{{ 'todos.card.activity' | t }}</h3>
           <app-skeleton class="cd__chat skel-in" variant="chat" [count]="5" [composer]="board()?.canWrite ?? false" />
         </section>
         <div class="cd__col cd__col--details">
@@ -158,8 +157,7 @@
       }
     } @else {
       <div class="cd__cols">
-        <section class="cd__col cd__col--chat" aria-labelledby="cd-activity">
-          <h3 id="cd-activity" class="sec cd__secTitle cd__secTitle--accent">{{ 'todos.card.activity' | t }}</h3>
+        <section class="cd__col cd__col--chat" [attr.aria-label]="'todos.card.activity' | t">
           <ng-container *ngTemplateOutlet="activity" />
         </section>
         <div class="cd__col cd__col--details">

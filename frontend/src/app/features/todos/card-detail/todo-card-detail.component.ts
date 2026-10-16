@@ -94,7 +94,8 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
  * One card with all its fields (frames 2–4, 10, 12–13): the board drawer and the right
  * pane of "Aufgaben" use it.
  *
- * Side by side: "Aktivität" (`app-chat`: the comments and the events) beside the fields
+ * Side by side: the thread (`app-chat`: the comments and the events, with no heading of its
+ * own; its column is labelled "Aktivität") beside the fields
  * Spalte, Zuständig, Fällig, Label, then "Verknüpft" with the link picker,
  * "Beschreibung" and "Checkliste". Phone: the tabs Details | Aktivität and a bar with
  * "Verschieben" (the move sheet) and "Erledigt".

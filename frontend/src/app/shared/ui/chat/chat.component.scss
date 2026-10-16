@@ -1,6 +1,8 @@
 /* The host is a flex column: the log takes the space, the composer stays below it.
-   A consumer bounds the log with `--chat-log-max` (a column that scrolls as a whole) or
-   gives the host a height (a sheet), moves the pinned phone composer with
+   A consumer bounds the log with `--chat-log-max` (a column that scrolls as a whole),
+   gives the host a height (a sheet), or lets it fill a column that grows with the page:
+   `--chat-log-basis: 0` then makes the log add only `--chat-log-min` to the height of
+   the column, so a long thread scrolls inside the log and never stretches the column; moves the pinned phone composer with
    `--chat-composer-bottom`, carries its surface further down with
    `--chat-composer-foot` and out over the side padding of the page with
    `--chat-composer-bleed`; `--chat-composer-surface` is the fill of that bar. `--chat-bubble` is the fill of the messages of others. */
@@ -29,7 +31,7 @@
 /* Desktop: a rounded outline frames the log; no rule above the composer, no fade. */
 .chat__log {
   display: flex;
-  flex: 1 1 auto;
+  flex: 1 1 var(--chat-log-basis, auto);
   flex-direction: column;
   gap: 10px;
   min-height: var(--chat-log-min, 10rem);
