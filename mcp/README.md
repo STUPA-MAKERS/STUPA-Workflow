@@ -84,6 +84,9 @@ Budget: `list_budgets`, `get_budget_applications`, `book_expense`, `list_expense
 Invoices: `list_invoices`, `get_invoice`, `create_invoice`, `update_invoice`,
 `delete_invoice`, `parse_invoice` (ZUGFeRD/Factur-X PDF → fields + fileToken),
 `upload_invoice_file`.
+Attachments: `list_attachments`, `upload_attachment` (a local file, at most 10 MB, needs
+`application.manage`), `download_attachment` (to a local file, after a clean virus scan),
+`delete_attachment`.
 Meetings: `list_meetings`, `get_meeting`, `create_meeting`, `update_meeting`, `delete_meeting`,
 the agenda tools, attendance (`get_attendance`, `set_attendance`, `reset_attendance`) and the
 minute-taker handover (`protokollant_handover`, `cancel_protokollant_handover`).

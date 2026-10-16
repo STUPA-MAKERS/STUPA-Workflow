@@ -67,6 +67,12 @@ TYPICAL FLOWS:
   `delete_invoice`. To attach an original PDF: `parse_invoice(file_path)` (ZUGFeRD/Factur-X →
   extracted fields + `fileToken`) or `upload_invoice_file(file_path)`, then pass `fileToken`
   to `create_invoice`.
+- Application attachments: `list_attachments(application_id)` →
+  `upload_attachment(application_id, file_path, field_key?, is_comparison_offer?)` (a
+  local file: PDF, image or Office/OpenDocument, at most 10 MB; needs
+  `application.manage` and scope `applications:write`) → `scanned` is false until the
+  virus scan is clean. `download_attachment(attachment_id, target_path)` writes the file
+  to disk (409 while the scan runs); `delete_attachment` removes it.
 - To-dos: `todo_boards` → `todo_board(board_id)` (columns, cards; the `isDone` column is
   done) → `todo_card_get` → `todo_card_update(card_id, {version, ...})` with the card's
   current `version` (409 `card_version_conflict`: read again), `todo_card_move` into a
