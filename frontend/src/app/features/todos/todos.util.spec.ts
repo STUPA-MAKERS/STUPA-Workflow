@@ -22,6 +22,7 @@ import {
   personName,
   relativeDays,
   removeTile,
+  placeTile,
   replaceTile,
   shortDay,
   sortedColumns,
@@ -318,6 +319,21 @@ describe('todos.util', () => {
       const removed = removeTile(b, 'k-1');
       expect(removed.cards.map((c) => c.id)).toEqual(['k-2', 'k-3']);
       expect(removed.columns[0].cardCount).toBe(1);
+    });
+
+    it('places a tile that changed its column by its rank, else in place', () => {
+      const b = board({ cards: [
+        tile({ id: 'k-1', columnId: 'c-1', rank: 'a' }),
+        tile({ id: 'k-2', columnId: 'c-4', rank: 'b' }),
+        tile({ id: 'k-3', columnId: 'c-4', rank: 'd' }),
+      ] });
+      const order = (x: typeof b) => x.cards.map((c) => `${c.id}@${c.columnId}`);
+      expect(order(placeTile(b, tile({ id: 'k-1', columnId: 'c-4', rank: 'c' })))).toEqual(['k-2@c-4', 'k-1@c-4', 'k-3@c-4']);
+      expect(order(placeTile(b, tile({ id: 'k-1', columnId: 'c-4', rank: 'z' })))).toEqual(['k-2@c-4', 'k-3@c-4', 'k-1@c-4']);
+      const renamed = placeTile(b, tile({ id: 'k-3', columnId: 'c-4', rank: 'd', title: 'Neu' }));
+      expect(order(renamed)).toEqual(order(b));
+      expect(renamed.cards[2].title).toBe('Neu');
+      expect(order(placeTile(b, tile({ id: 'k-9', columnId: 'c-1' })))).toEqual(['k-1@c-1', 'k-2@c-4', 'k-3@c-4', 'k-9@c-1']);
     });
 
     it('opens the first gremium board, else the personal one, else any', () => {

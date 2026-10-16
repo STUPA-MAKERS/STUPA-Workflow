@@ -265,6 +265,91 @@ describe('TodosComponent', () => {
     cmp.moveCard({ cardId: 'k-2', move: { columnId: 'c-3' } });
   });
 
+  it('drops a poll that left before a local change and keeps its ETag', async () => {
+    const { cmp, api } = await start('/todos/b-1');
+    const late = new Subject<TodoBoardPoll>();
+    api.pollBoard.mockReturnValueOnce(late);
+    cmp.poll();
+    cmp.moveCard({ cardId: 'k-1', move: { columnId: 'c-2' } });
+    late.next({ board: board({ name: 'Vorher' }), etag: 'W/"0"' });
+    expect(cmp.board()?.name).toBe('Studierendenparlament');
+    expect(cmp.board()?.cards.find((c) => c.id === 'k-1')?.columnId).toBe('c-2');
+    cmp.poll();
+    expect(api.pollBoard).toHaveBeenLastCalledWith('b-1', 'W/"1"');
+    // The other local changes count the same.
+    for (const change of [
+      () => cmp.quickAdd({ columnId: 'c-1', title: 'Neu' }),
+      () => cmp.onCardChanged(detail({ id: 'k-2', title: 'Neu benannt' })),
+      () => cmp.onArchived('k-3'),
+      () => cmp.onRestored(detail({ id: 'k-7' })),
+      () => cmp.onSettingsChanged(board({ name: 'StuPa', cards: cmp.board()!.cards })),
+    ]) {
+      const pending = new Subject<TodoBoardPoll>();
+      api.pollBoard.mockReturnValueOnce(pending);
+      cmp.poll();
+      change();
+      pending.next({ board: board({ name: 'Alt' }), etag: 'W/"0"' });
+      expect(cmp.board()?.name).not.toBe('Alt');
+    }
+  });
+
+  it('rolls a failed move back without clearing the filters, then reads the board again', async () => {
+    const { cmp, api, toast } = await start('/todos/b-1');
+    cmp.setLabels(['l-1']);
+    cmp.search.set('Haushalt');
+    cmp.search.flush();
+    const fresh = board({ name: 'Frisch', cards: cmp.board()!.cards });
+    api.moveCard.mockReturnValueOnce(throwError(() => new Error('x')));
+    api.pollBoard.mockReturnValueOnce(of({ board: fresh, etag: 'W/"5"' }));
+    cmp.moveCard({ cardId: 'k-2', move: { columnId: 'c-3' } });
+    expect(toast.error).toHaveBeenCalledWith('Die Karte konnte nicht verschoben werden.');
+    expect(api.pollBoard).toHaveBeenLastCalledWith('b-1', null);
+    expect(cmp.board()).toBe(fresh);
+    expect(cmp.loading()).toBe(false);
+    expect(cmp.filter().labels).toEqual(['l-1']);
+    expect(cmp.filter().q).toBe('Haushalt');
+    expect(cmp.board()?.cards.find((c) => c.id === 'k-2')?.columnId).toBe('c-1');
+    cmp.poll();
+    expect(api.pollBoard).toHaveBeenLastCalledWith('b-1', 'W/"5"');
+
+    // A change after the move keeps the board until the read answers; a failed read keeps it.
+    const failed = new Subject<ReturnType<typeof tile>>();
+    api.moveCard.mockReturnValueOnce(failed);
+    cmp.moveCard({ cardId: 'k-2', move: { columnId: 'c-3' } });
+    cmp.onCardChanged(detail({ id: 'k-1', title: 'Neu benannt' }));
+    const changed = cmp.board();
+    api.pollBoard.mockReturnValueOnce(throwError(() => new Error('x')));
+    failed.error(new Error('x'));
+    expect(cmp.board()).toBe(changed);
+
+    // A read without a board, or one of a board that is no longer shown, is dropped.
+    api.moveCard.mockReturnValueOnce(throwError(() => new Error('x')));
+    api.pollBoard.mockReturnValueOnce(of({ board: null, etag: null }));
+    cmp.moveCard({ cardId: 'k-2', move: { columnId: 'c-3' } });
+    expect(cmp.board()?.id).toBe('b-1');
+    const late = new Subject<TodoBoardPoll>();
+    api.moveCard.mockReturnValueOnce(throwError(() => new Error('x')));
+    api.pollBoard.mockReturnValueOnce(late);
+    cmp.moveCard({ cardId: 'k-2', move: { columnId: 'c-3' } });
+    cmp.reload();
+    late.next({ board: board({ name: 'Spät' }), etag: null });
+    expect(cmp.board()?.name).not.toBe('Spät');
+  });
+
+  it('puts a card that the drawer moved to another column at its rank there', async () => {
+    const b = board({ cards: [
+      tile({ id: 'k-1', columnId: 'c-1', rank: 'a' }),
+      tile({ id: 'k-5', columnId: 'c-4', rank: 'b' }),
+      tile({ id: 'k-6', columnId: 'c-4', rank: 'd' }),
+    ] });
+    const { cmp } = await start('/todos/b-1', { board: b });
+    cmp.onCardChanged(detail({ id: 'k-1', columnId: 'c-4', rank: 'z' }));
+    expect(cmp.visible().get('c-4')?.map((c) => c.id)).toEqual(['k-5', 'k-6', 'k-1']);
+    cmp.onCardChanged(detail({ id: 'k-1', columnId: 'c-1', rank: 'a' }));
+    cmp.onCardChanged(detail({ id: 'k-1', columnId: 'c-4', rank: 'c' }));
+    expect(cmp.visible().get('c-4')?.map((c) => c.id)).toEqual(['k-5', 'k-1', 'k-6']);
+  });
+
   it('toggles a card done from the list and back', async () => {
     const { cmp, api } = await start('/todos/b-1');
     cmp.toggleDone(cmp.board()!.cards[0]);
@@ -345,6 +430,25 @@ describe('TodosComponent', () => {
     await settle();
     expect(router.url).toBe('/todos/b-1');
     cmp.closeCard();
+  });
+
+  it('leaves Escape in a dialog inside the drawer to that dialog', async () => {
+    const { settle, router } = await start('/todos/b-1?card=k-1');
+    const drawer = screen.getByRole('dialog', { name: 'Raum buchen' });
+    const inner = document.createElement('div');
+    inner.setAttribute('role', 'dialog');
+    const button = document.createElement('button');
+    inner.appendChild(button);
+    drawer.appendChild(inner);
+    fireEvent.keyDown(button, { key: 'Escape' });
+    fireEvent.keyDown(button, { key: 'Tab' });
+    await settle();
+    expect(router.url).toBe('/todos/b-1?card=k-1');
+  });
+
+  it('gives the view switch equal segments', async () => {
+    await start('/todos/b-1');
+    expect(document.querySelector('app-segmented')?.getAttribute('width')).toBe('equal');
   });
 
   it('applies the changes of the drawer to the board', async () => {

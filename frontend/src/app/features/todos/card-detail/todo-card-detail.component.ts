@@ -165,6 +165,8 @@ export class TodoCardDetailComponent {
   readonly moveOpen = signal(false);
 
   private seq = 0;
+  /** Counts the fresh loads: a write answer from before the card changed is dropped. */
+  private gen = 0;
   private membersOf: Uuid | null = null;
 
   readonly today = signal(isoDay(new Date()));
@@ -339,6 +341,7 @@ export class TodoCardDetailComponent {
   private load(id: Uuid, fresh: boolean): void {
     const seq = ++this.seq;
     if (fresh) {
+      this.gen++;
       this.loading.set(true);
       this.card.set(null);
       this.outbox.clear();
@@ -382,17 +385,31 @@ export class TodoCardDetailComponent {
 
   // ------------------------------------------------------------------ writes
 
-  /** Run a write that answers with the card; the answer replaces it. */
-  private write(req: Observable<TodoCardDetail>, after?: () => void): void {
+  /**
+   * Run a write that answers with the card; the answer replaces it. `cardRoute` says the
+   * route is the card itself, so its 404 means the card is gone; a 404 of a
+   * sub-resource (a checklist item, a link …) reads the card again instead.
+   */
+  private write(req: Observable<TodoCardDetail>, after?: () => void, cardRoute = false): void {
+    const current = this.current();
     this.busy.set(true);
     req.subscribe({
       next: (card) => {
+        if (!current()) return;
         this.busy.set(false);
         this.apply(card);
         after?.();
       },
-      error: (err: unknown) => this.fail(err),
+      error: (err: unknown) => {
+        if (current()) this.fail(err, cardRoute);
+      },
     });
+  }
+
+  /** True while the card that was shown when the request started is still shown. */
+  private current(): () => boolean {
+    const gen = this.gen;
+    return () => gen === this.gen;
   }
 
   private apply(card: TodoCardDetail): void {
@@ -406,11 +423,11 @@ export class TodoCardDetailComponent {
     this.apply(fn(c));
   }
 
-  private fail(err: unknown): void {
+  private fail(err: unknown, cardRoute: boolean): void {
     this.busy.set(false);
     const e = err instanceof HttpErrorResponse ? err : null;
     const code = (e?.error as { code?: string } | null)?.code;
-    if (e?.status === 404) {
+    if (cardRoute && e?.status === 404) {
       this.notFound.set(true);
       this.card.set(null);
       return;
@@ -422,13 +439,17 @@ export class TodoCardDetailComponent {
   private move(body: TodoCardMove): void {
     const c = this.card();
     if (!c) return;
+    const current = this.current();
     this.busy.set(true);
     this.api.moveCard(c.id, body).subscribe({
       next: (tile) => {
+        if (!current()) return;
         this.busy.set(false);
         this.patchLocal((cur) => ({ ...cur, ...tile }));
       },
-      error: (err: unknown) => this.fail(err),
+      error: (err: unknown) => {
+        if (current()) this.fail(err, true);
+      },
     });
   }
 
@@ -457,7 +478,15 @@ export class TodoCardDetailComponent {
       go(board);
       return;
     }
-    this.api.board(c.boardId).subscribe({ next: go, error: (err: unknown) => this.fail(err) });
+    const current = this.current();
+    this.api.board(c.boardId).subscribe({
+      next: (b) => {
+        if (current()) go(b);
+      },
+      error: (err: unknown) => {
+        if (current()) this.fail(err, false);
+      },
+    });
   }
 
   /** "Erledigt": the end of the done column; on a done card "Wieder öffnen": the first column. */
@@ -483,7 +512,7 @@ export class TodoCardDetailComponent {
   setDue(day: string | null): void {
     const c = this.card();
     if (!c) return;
-    this.write(this.api.patchCard(c.id, { version: c.version, dueDate: day }));
+    this.write(this.api.patchCard(c.id, { version: c.version, dueDate: day }), undefined, true);
   }
 
   addLabel(labelId: string): void {
@@ -511,7 +540,7 @@ export class TodoCardDetailComponent {
       this.editingTitle.set(false);
       return;
     }
-    this.write(this.api.patchCard(c.id, { version: c.version, title }), () => this.editingTitle.set(false));
+    this.write(this.api.patchCard(c.id, { version: c.version, title }), () => this.editingTitle.set(false), true);
   }
 
   startDesc(): void {
@@ -526,6 +555,7 @@ export class TodoCardDetailComponent {
     this.write(
       this.api.patchCard(c.id, { version: c.version, descriptionMd: text || null }),
       () => this.editingDesc.set(false),
+      true,
     );
   }
 
@@ -592,21 +622,25 @@ export class TodoCardDetailComponent {
   archive(): void {
     const c = this.card();
     if (!c) return;
+    const current = this.current();
     this.busy.set(true);
     this.api.archiveCard(c.id).subscribe({
       next: () => {
+        if (!current()) return;
         this.busy.set(false);
         this.toast.success(this.t('todos.card.archived'));
         this.archived.emit(c.id);
       },
-      error: (err: unknown) => this.fail(err),
+      error: (err: unknown) => {
+        if (current()) this.fail(err, true);
+      },
     });
   }
 
   restore(): void {
     const c = this.card();
     if (!c) return;
-    this.write(this.api.restoreCard(c.id));
+    this.write(this.api.restoreCard(c.id), undefined, true);
   }
 
   copyLink(): void {
@@ -641,27 +675,37 @@ export class TodoCardDetailComponent {
   editComment(edit: ChatEdit): void {
     const c = this.card();
     if (!c) return;
+    const current = this.current();
     this.api.editComment(c.id, edit.id, edit.body, mentionIds(edit.body, this.members())).subscribe({
-      next: (comment) =>
+      next: (comment) => {
+        if (!current()) return;
         this.patchLocal((cur) => ({
           ...cur,
           comments: cur.comments.map((x) => (x.id === comment.id ? comment : x)),
-        })),
-      error: () => this.toast.error(this.t('todos.error.comment')),
+        }));
+      },
+      error: () => {
+        if (current()) this.toast.error(this.t('todos.error.comment'));
+      },
     });
   }
 
   deleteComment(ref: ChatRef): void {
     const c = this.card();
     if (!c) return;
+    const current = this.current();
     this.api.deleteComment(c.id, ref.id).subscribe({
-      next: () =>
+      next: () => {
+        if (!current()) return;
         this.patchLocal((cur) => ({
           ...cur,
           comments: cur.comments.filter((x) => x.id !== ref.id),
           commentCount: Math.max(0, cur.commentCount - 1),
-        })),
-      error: () => this.toast.error(this.t('todos.error.comment')),
+        }));
+      },
+      error: () => {
+        if (current()) this.toast.error(this.t('todos.error.comment'));
+      },
     });
   }
 

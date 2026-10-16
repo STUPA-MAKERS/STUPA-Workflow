@@ -354,6 +354,19 @@ export function replaceTile(board: TodoBoard, tile: TodoCardTile): TodoBoard {
   return { ...board, cards, columns: recount(board, cards) };
 }
 
+/**
+ * Put a server tile into the board at its place. A tile that changed its column goes
+ * before the first card of the new column with a higher rank, else to the end of it;
+ * any other tile keeps its place (`replaceTile`).
+ */
+export function placeTile(board: TodoBoard, tile: TodoCardTile): TodoBoard {
+  const old = board.cards.find((c) => c.id === tile.id);
+  if (!old || old.columnId === tile.columnId) return replaceTile(board, tile);
+  const next = board.cards.find((c) => c.id !== tile.id && c.columnId === tile.columnId && c.rank > tile.rank);
+  const moved = applyMove(board, tile.id, next ? { columnId: tile.columnId, beforeId: next.id } : { columnId: tile.columnId });
+  return replaceTile(moved, tile);
+}
+
 /** Drop a card from the board (archived). */
 export function removeTile(board: TodoBoard, cardId: Uuid): TodoBoard {
   const cards = board.cards.filter((c) => c.id !== cardId);

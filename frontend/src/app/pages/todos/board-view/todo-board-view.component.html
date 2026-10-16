@@ -40,7 +40,7 @@
     }
   </div>
 } @else {
-  <div class="bv" cdkDropListGroup>
+  <div class="bv" cdkDropListGroup cdkScrollable>
     @for (col of columns(); track col.id; let ci = $index) {
       <section class="bv__col" [attr.aria-labelledby]="'bv-col-' + col.id">
         <header class="bv__head">

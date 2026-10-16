@@ -1,4 +1,5 @@
 import { CdkDrag, CdkDragPlaceholder, CdkDropList, CdkDropListGroup, type CdkDragDrop } from '@angular/cdk/drag-drop';
+import { CdkScrollable } from '@angular/cdk/scrolling';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -63,6 +64,7 @@ interface KeyDrag {
     CdkDragPlaceholder,
     CdkDropList,
     CdkDropListGroup,
+    CdkScrollable,
     FormsModule,
     TranslatePipe,
     ButtonComponent,
@@ -249,10 +251,13 @@ export class TodoBoardViewComponent {
         return;
       case 'Escape':
       case 'Tab':
-        if (event.key === 'Escape') event.preventDefault();
         this.kb.set(null);
         this.say('todos.drag.cancelled', card);
-        this.refocus(card.id);
+        // Tab leaves the card the native way; only Escape keeps the focus on it.
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          this.refocus(card.id);
+        }
         return;
       default:
         return;

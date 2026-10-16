@@ -159,6 +159,28 @@ describe('TodoBoardViewComponent', () => {
     expect(cmp.kb()).toBeNull();
   });
 
+  it('lets Tab leave a held card: the drag ends and the focus is not pulled back', async () => {
+    const { cmp, key } = await setup();
+    await key('Raum buchen', ' ');
+    const elsewhere = document.createElement('button');
+    document.body.appendChild(elsewhere);
+    // The browser moves the focus on before the drag ends.
+    const card = screen.getByRole('button', { name: 'Raum buchen' });
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    card.dispatchEvent(tab);
+    elsewhere.focus();
+    await key('Haushalt Kapitel 3', 'a');
+    expect(cmp.kb()).toBeNull();
+    expect(tab.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(elsewhere);
+    elsewhere.remove();
+  });
+
+  it('marks the board as a scroll container for the drag', async () => {
+    const { container } = await setup();
+    expect(container.querySelector('.bv')).toHaveAttribute('cdkScrollable');
+  });
+
   it('puts the card back when it ends where it started, on Escape and on Tab', async () => {
     const { cmp, on, key, container } = await setup();
     await key('Raum buchen', ' ');

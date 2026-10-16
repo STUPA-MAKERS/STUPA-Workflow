@@ -46,6 +46,7 @@
       </app-sheet-bar>
 
       @if (editingTitle()) {
+        <h2 id="cd-title" class="sr-only">{{ card.title }}</h2>
         <form class="cd__titleForm" (submit)="$event.preventDefault(); saveTitle()">
           <input
             class="cd__titleInput"
@@ -54,7 +55,7 @@
             [attr.aria-label]="'todos.card.titleLabel' | t"
             [ngModel]="titleDraft()"
             (ngModelChange)="titleDraft.set($event)"
-            (keydown.escape)="editingTitle.set(false)"
+            (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); editingTitle.set(false)"
           />
           <app-button variant="text" (click)="editingTitle.set(false)">{{ 'action.cancel' | t }}</app-button>
           <app-button variant="fill" [loading]="busy()" [disabled]="!titleDraft().trim()" (click)="saveTitle()">
@@ -306,7 +307,7 @@
           maxlength="20000"
           [ngModel]="descDraft()"
           (ngModelChange)="descDraft.set($event)"
-          (keydown.escape)="editingDesc.set(false)"
+          (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); editingDesc.set(false)"
         ></textarea>
       </label>
       <div class="cd__formFoot">
@@ -354,7 +355,7 @@
             [attr.aria-label]="'todos.card.newItem' | t"
             [ngModel]="itemDraft()"
             (ngModelChange)="itemDraft.set($event)"
-            (keydown.escape)="cancelItem()"
+            (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); cancelItem()"
           />
           <app-button variant="text" (click)="cancelItem()">{{ 'action.cancel' | t }}</app-button>
           <app-button variant="fill" [disabled]="!itemDraft().trim()" (click)="addItem()">{{ 'todos.card.addItem' | t }}</app-button>
@@ -380,7 +381,7 @@
           [attr.aria-label]="'todos.card.itemText' | t"
           [ngModel]="itemEditDraft()"
           (ngModelChange)="itemEditDraft.set($event)"
-          (keydown.escape)="editingItem.set(null)"
+          (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); editingItem.set(null)"
         />
         <app-button variant="fill" size="sm" (click)="renameItem(item)">{{ 'action.save' | t }}</app-button>
       </form>

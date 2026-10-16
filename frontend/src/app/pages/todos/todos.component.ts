@@ -59,6 +59,7 @@ import {
   filterActive,
   isoDay,
   matchesFilter,
+  placeTile,
   removeTile,
   replaceTile,
   sortedColumns,
@@ -158,6 +159,8 @@ export class TodosComponent implements OnDestroy {
   readonly mine = signal<ReadonlySet<Uuid>>(new Set());
   private etag: string | null = null;
   private loadSeq = 0;
+  /** Counts the local changes of the board: a poll that left before one is dropped. */
+  private mutations = 0;
   private mineLoaded = false;
 
   readonly filter = signal<BoardFilter>(NO_FILTER);
@@ -368,12 +371,30 @@ export class TodosComponent implements OnDestroy {
     const board = this.board();
     if (!board) return;
     const seq = this.loadSeq;
+    const muts = this.mutations;
     this.today.set(isoDay(new Date()));
     this.api.pollBoard(board.id, this.etag).subscribe({
       next: (res) => {
-        if (seq !== this.loadSeq || !res.board) return;
+        if (seq !== this.loadSeq || muts !== this.mutations || !res.board) return;
         this.board.set(res.board);
         this.etag = res.etag;
+      },
+      error: () => undefined,
+    });
+  }
+
+  /**
+   * Read the board again without an ETag after a refused change. Unlike `loadBoard` it
+   * keeps the board on screen, the filters and the search.
+   */
+  private resync(id: Uuid): void {
+    const seq = this.loadSeq;
+    this.mutations++;
+    this.api.pollBoard(id, null).subscribe({
+      next: ({ board, etag }) => {
+        if (seq !== this.loadSeq || !board) return;
+        this.board.set(board);
+        this.etag = etag;
       },
       error: () => undefined,
     });
@@ -455,6 +476,8 @@ export class TodosComponent implements OnDestroy {
   }
 
   onDrawerKey(event: KeyboardEvent): void {
+    // A dialog or sheet inside the drawer (the delete question of the chat) handles its own keys.
+    if ((event.target as Element).closest('[role="dialog"]') !== event.currentTarget) return;
     if (event.key === 'Escape' && !event.defaultPrevented) {
       event.preventDefault();
       this.closeCard();
@@ -480,15 +503,20 @@ export class TodosComponent implements OnDestroy {
   moveCard(event: BoardMove): void {
     const board = this.board();
     if (!board) return;
-    this.board.set(applyMove(board, event.cardId, event.move));
+    const optimistic = applyMove(board, event.cardId, event.move);
+    this.mutations++;
+    this.board.set(optimistic);
     this.api.moveCard(event.cardId, event.move).subscribe({
       next: (tile) => {
+        this.mutations++;
         const now = this.board();
         if (now) this.board.set(replaceTile(now, tile));
       },
       error: () => {
         this.toast.error(this.i18n.translate('todos.error.move'));
-        this.reload();
+        // Roll back when nothing else changed the board meanwhile, then read it again.
+        if (this.board() === optimistic) this.board.set(board);
+        this.resync(board.id);
       },
     });
   }
@@ -506,6 +534,7 @@ export class TodosComponent implements OnDestroy {
   quickAdd(event: { columnId: Uuid; title: string }): void {
     const board = this.board();
     if (!board) return;
+    this.mutations++;
     this.api.createCard({ boardId: board.id, columnId: event.columnId, title: event.title }).subscribe({
       next: (card) => this.onCreated(card),
       error: () => this.toast.error(this.i18n.translate('todos.error.create')),
@@ -514,17 +543,21 @@ export class TodosComponent implements OnDestroy {
 
   onCreated(card: TodoCardDetail): void {
     const board = this.board();
-    if (board && card.boardId === board.id) this.board.set(replaceTile(board, card));
+    if (!board || card.boardId !== board.id) return;
+    this.mutations++;
+    this.board.set(replaceTile(board, card));
   }
 
   onCardChanged(card: TodoCardDetail): void {
     const board = this.board();
     if (!board || card.boardId !== board.id) return;
-    this.board.set(card.archivedAt ? removeTile(board, card.id) : replaceTile(board, card));
+    this.mutations++;
+    this.board.set(card.archivedAt ? removeTile(board, card.id) : placeTile(board, card));
   }
 
   onArchived(id: Uuid): void {
     const board = this.board();
+    this.mutations++;
     if (board) this.board.set({ ...removeTile(board, id), archivedCount: board.archivedCount + 1 });
     this.closeCard();
   }
@@ -532,10 +565,12 @@ export class TodosComponent implements OnDestroy {
   onRestored(card: TodoCardDetail): void {
     const board = this.board();
     if (!board || card.boardId !== board.id) return;
+    this.mutations++;
     this.board.set({ ...replaceTile(board, card), archivedCount: Math.max(0, board.archivedCount - 1) });
   }
 
   onSettingsChanged(board: TodoBoard): void {
+    this.mutations++;
     this.board.set(board);
     this.boards.update((list) => list.map((b) => (b.id === board.id ? { ...b, name: board.name } : b)));
   }

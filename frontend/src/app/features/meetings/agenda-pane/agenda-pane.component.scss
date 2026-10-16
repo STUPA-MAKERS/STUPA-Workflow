@@ -196,7 +196,8 @@
   background: var(--color-surface-2);
   box-shadow: var(--shadow-elevated);
   outline: 1.5px solid var(--color-accent);
-  transform: rotate(2deg);
+  /* `rotate`, not `transform`: the CDK sets the inline transform of the preview. */
+  rotate: 2deg;
   opacity: 0.97;
 }
 .ap__preview .ap__grip {
@@ -219,6 +220,6 @@
     transition: none;
   }
   .ap__preview {
-    transform: none;
+    rotate: none;
   }
 }

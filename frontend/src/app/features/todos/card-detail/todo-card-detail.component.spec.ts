@@ -374,6 +374,146 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.card()).toBeNull();
   });
 
+  it('reads the card again on a 404 of a checklist item or a link, and drops it only on a 404 of the card', async () => {
+    const { cmp, api, toast } = await setup();
+    const item = cmp.items()[0];
+    for (const run of [
+      () => {
+        api.patchCheckItem.mockReturnValueOnce(http(404));
+        cmp.toggleItem(item);
+      },
+      () => {
+        api.deleteCheckItem.mockReturnValueOnce(http(404));
+        cmp.deleteItem(item);
+      },
+      () => {
+        api.removeLink.mockReturnValueOnce(http(404));
+        cmp.removeLink(link());
+      },
+    ]) {
+      const reads = api.card.mock.calls.length;
+      run();
+      expect(toast.error).toHaveBeenLastCalledWith('Die Änderung konnte nicht gespeichert werden.');
+      expect(api.card).toHaveBeenCalledTimes(reads + 1);
+      expect(cmp.notFound()).toBe(false);
+      expect(cmp.card()?.id).toBe('k-1');
+    }
+    // The card route itself: the card is gone.
+    for (const run of [
+      () => {
+        api.patchCard.mockReturnValueOnce(http(404));
+        cmp.setDue('2026-10-30');
+      },
+      () => {
+        api.restoreCard.mockReturnValueOnce(http(404));
+        cmp.restore();
+      },
+      () => {
+        api.archiveCard.mockReturnValueOnce(http(404) as never);
+        cmp.archive();
+      },
+    ]) {
+      run();
+      expect(cmp.notFound()).toBe(true);
+      expect(cmp.card()).toBeNull();
+      cmp.reload();
+    }
+  });
+
+  it('drops the answers of writes on a card that is no longer shown', async () => {
+    const { cmp, api, toast, changed, archived, fixture } = await setup();
+    const write = new Subject<TodoCardDetail>();
+    const writeErr = new Subject<TodoCardDetail>();
+    const move = new Subject<ReturnType<typeof tile>>();
+    const moveErr = new Subject<ReturnType<typeof tile>>();
+    const boardRead = new Subject<TodoBoard>();
+    const boardErr = new Subject<TodoBoard>();
+    const edit = new Subject<TodoComment>();
+    const editErr = new Subject<TodoComment>();
+    const del = new Subject<undefined>();
+    const delErr = new Subject<undefined>();
+    const arch = new Subject<undefined>();
+    const archErr = new Subject<undefined>();
+    api.addAssignee.mockReturnValueOnce(write).mockReturnValueOnce(writeErr);
+    api.moveCard.mockReturnValueOnce(move as never).mockReturnValueOnce(moveErr as never);
+    api.board.mockReturnValueOnce(boardRead).mockReturnValueOnce(boardErr);
+    api.editComment.mockReturnValueOnce(edit as never).mockReturnValueOnce(editErr as never);
+    api.deleteComment.mockReturnValueOnce(del as never).mockReturnValueOnce(delErr as never);
+    api.archiveCard.mockReturnValueOnce(arch as never).mockReturnValueOnce(archErr as never);
+    cmp.addAssignee('p-2');
+    cmp.addAssignee('p-3');
+    cmp.setColumn('c-2');
+    cmp.setColumn('c-3');
+    cmp.moveTo({ columnId: 'c-2', position: 'top' });
+    cmp.moveTo({ columnId: 'c-3', position: 'top' });
+    cmp.editComment({ id: 'cm-1', body: 'x' });
+    cmp.editComment({ id: 'cm-1', body: 'y' });
+    cmp.deleteComment({ id: 'cm-1' });
+    cmp.deleteComment({ id: 'cm-1' });
+    cmp.archive();
+    cmp.archive();
+
+    const other = detail({ id: 'k-2', title: 'Andere Karte', comments: [] });
+    api.card.mockReturnValueOnce(of(other));
+    fixture.componentRef.setInput('cardId', 'k-2');
+    fixture.detectChanges();
+    expect(cmp.card()).toBe(other);
+    const moves = api.moveCard.mock.calls.length;
+
+    write.next(detail({ id: 'k-1' }));
+    writeErr.error(new HttpErrorResponse({ status: 404 }));
+    move.next(tile({ id: 'k-1', columnId: 'c-2' }));
+    moveErr.error(new HttpErrorResponse({ status: 500 }));
+    boardRead.next(board());
+    boardErr.error(new HttpErrorResponse({ status: 500 }));
+    edit.next(COMMENT);
+    editErr.error(new Error('x'));
+    del.next(undefined);
+    delErr.error(new Error('x'));
+    arch.next(undefined);
+    archErr.error(new HttpErrorResponse({ status: 404 }));
+
+    expect(cmp.card()).toBe(other);
+    expect(cmp.notFound()).toBe(false);
+    expect(changed).not.toHaveBeenCalled();
+    expect(archived).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(api.moveCard).toHaveBeenCalledTimes(moves);
+  });
+
+  it('reports a failed read of the board for "top of the column"', async () => {
+    const { cmp, api, toast } = await setup();
+    api.board.mockReturnValueOnce(http(500) as never);
+    cmp.moveTo({ columnId: 'c-2', position: 'top' });
+    expect(toast.error).toHaveBeenLastCalledWith('Die Änderung konnte nicht gespeichert werden.');
+  });
+
+  it('keeps Escape of an edit inside the card and keeps the title heading for the drawer', async () => {
+    const { cmp, detect, container } = await setup();
+    cmp.startTitle();
+    detect();
+    expect(container.querySelector('#cd-title')).toHaveTextContent('Raum buchen');
+    const box = screen.getByRole('textbox', { name: 'Titel' });
+    const outer = jest.fn();
+    container.addEventListener('keydown', outer);
+    const esc = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    box.dispatchEvent(esc);
+    detect();
+    expect(esc.defaultPrevented).toBe(true);
+    expect(outer).not.toHaveBeenCalled();
+    expect(cmp.editingTitle()).toBe(false);
+    cmp.startDesc();
+    detect();
+    const desc = container.querySelector<HTMLTextAreaElement>('.cd__areaInput')!;
+    const esc2 = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    desc.dispatchEvent(esc2);
+    detect();
+    expect(esc2.defaultPrevented).toBe(true);
+    expect(cmp.editingDesc()).toBe(false);
+    expect(outer).not.toHaveBeenCalled();
+  });
+
   it('does nothing without a card', async () => {
     const { cmp, api } = await setup();
     cmp.card.set(null);
