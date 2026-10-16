@@ -1,9 +1,6 @@
 :host {
   display: contents;
 }
-:host(.lp-host--open) {
-  display: block;
-}
 
 .lp {
   display: flex;
@@ -11,13 +8,27 @@
   gap: var(--space-3);
   min-width: 0;
 }
-/* Desktop: a raised panel; the parent sets its place. */
+/* Desktop: the panel floats over everything, like the search palette, also over a
+   dialog that holds the picker. It sits near the top, because the hits grow downward. */
+.lp__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-dialog) + 1);
+  background: var(--color-scrim);
+}
 .lp--pop {
-  max-height: min(34rem, 70vh);
-  padding: var(--space-3);
-  overflow-y: auto;
-  border-radius: var(--radius-xl);
-  background: var(--color-surface-3);
+  position: fixed;
+  z-index: calc(var(--z-dialog) + 2);
+  top: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(680px, calc(100vw - 2 * var(--space-4)));
+  max-height: calc(100dvh - 96px - var(--space-6));
+  padding: var(--space-3) var(--space-3) 0;
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-2);
+  color: var(--color-text);
   box-shadow: var(--shadow-elevated);
 }
 
@@ -66,9 +77,13 @@
   padding-inline: var(--space-3);
   font-size: 0.8125rem;
 }
-/* The hits run from edge to edge of the panel. */
+/* The search and the chips stay; the hits scroll and run from edge to edge. */
 .lp--pop .lp__results {
+  flex: 1 1 auto;
+  min-height: 0;
   margin-inline: calc(-1 * var(--space-3));
+  padding-bottom: var(--space-3);
+  overflow-y: auto;
 }
 .lp--pop .lp__group {
   margin-inline: var(--space-4);

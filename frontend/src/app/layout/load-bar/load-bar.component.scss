@@ -1,9 +1,9 @@
-/* The bar of `.skel-progress`, fixed at the top edge of the page. The frame moves its start
-   past the rail (shell.component.scss). */
+/* The bar of `.skel-progress`, fixed at the top edge of the window, over its full width
+   (also over the rail). */
 .lb {
   position: fixed;
   top: env(safe-area-inset-top, 0);
-  inset-inline: var(--lb-start, 0) 0;
+  inset-inline: 0;
   z-index: 1100;
   height: 3px;
   overflow: hidden;
