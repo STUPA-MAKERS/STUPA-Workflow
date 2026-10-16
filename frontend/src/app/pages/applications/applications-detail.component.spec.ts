@@ -1645,6 +1645,31 @@ describe('ApplicationsDetailComponent', () => {
     expect(screen.getByRole('button', { name: 'Datei anhängen' })).toBeInTheDocument();
   });
 
+  it.each([
+    [true, true],
+    [false, false],
+  ])('lets the log grow with the thread in the bottom sheet of a phone (phone %s)', async (phone, sheet) => {
+    const realMatchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: phone && query.includes('max-width'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    })) as unknown as typeof window.matchMedia;
+    try {
+      const { http, detectChanges, fixture, cmp } = await setup();
+      flushAll(http);
+      cmp.commentsOpen.set(true);
+      detectChanges();
+      flushAttachments(http);
+      const chat = fixture.debugElement.query((d) => d.name === 'app-chat').nativeElement as HTMLElement;
+      expect(chat.classList.contains('ad__chat')).toBe(true);
+      expect(chat.classList.contains('ad__chat--sheet')).toBe(sheet);
+    } finally {
+      window.matchMedia = realMatchMedia;
+    }
+  });
+
   it('keeps the composer files of the chat while the sheet closes and opens', async () => {
     const { http, detectChanges, fixture, cmp } = await setup();
     flushAll(http);

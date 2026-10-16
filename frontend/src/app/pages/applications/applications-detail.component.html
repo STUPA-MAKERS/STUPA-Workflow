@@ -303,6 +303,7 @@
       @if (commentsOpen()) {
         <app-chat
           class="ad__chat"
+          [class.ad__chat--sheet]="phone()"
           [loading]="commentsLoading()"
           [draftKey]="'application.' + application.id"
           [messages]="chatMessages()"

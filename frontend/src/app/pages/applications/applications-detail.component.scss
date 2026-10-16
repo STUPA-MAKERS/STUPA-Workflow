@@ -446,6 +446,13 @@
   --chat-composer-surface: transparent;
   --chat-composer-bleed: var(--space-4);
 }
+/* The bottom sheet of a phone has no height of its own: it takes the height of its
+   content up to 85dvh. A log with basis 0 adds only its min-height, so the sheet stays
+   at half the screen. Here the log takes the height of the thread, the sheet grows with
+   it to its cap, and the log then scrolls inside. */
+.ad__chat--sheet {
+  --chat-log-basis: auto;
+}
 
 /* ------------------------------------------------------------------ dialogs */
 .ad__dlgLead {
