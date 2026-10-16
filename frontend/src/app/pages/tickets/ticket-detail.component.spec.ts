@@ -5,6 +5,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { Observable, Subject, of, throwError } from 'rxjs';
+import { ApiClient } from '@core/api/api-client.service';
 import type { PersonRef } from '@core/api/models';
 import {
   TicketsApiService,
@@ -43,7 +44,15 @@ function detail(over: Partial<TicketDetail> = {}): TicketDetail {
     },
     attachments: [{ id: 'a1', filename: 'protokoll-kopf.png', mime: 'image/png', size: 98304, scanned: true }],
     notes: [
-      { id: 'n1', author: MARA, body: 'Prüfe ich.', at: '2026-10-15T06:20:00Z', editedAt: null, isOwn: true },
+      {
+        id: 'n1',
+        author: MARA,
+        body: 'Prüfe ich.',
+        at: '2026-10-15T06:20:00Z',
+        editedAt: null,
+        isOwn: true,
+        attachments: [{ id: 'f1', filename: 'log.txt', mime: 'text/plain', size: 10, scanState: 'clean' }],
+      },
     ],
     events: [
       { id: 'e1', kind: 'created', actor: null, at: '2026-10-14T19:14:00Z', payload: { confirmationSent: true } },
@@ -54,6 +63,7 @@ function detail(over: Partial<TicketDetail> = {}): TicketDetail {
     openTodoCount: 0,
     closedAt: null,
     anonymizedAt: null,
+    senderBlocked: false,
     ...over,
   };
 }
@@ -87,12 +97,22 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
     get: jest.fn((id: string) => get(id)),
     assignees: jest.fn(() => opts.assignees ?? of([MARA, JONAS, { principalId: null, displayName: 'Weg' }])),
     patch: jest.fn((id: string, body: TicketPatch) => of(detail({ ...body, id } as Partial<TicketDetail>))),
-    addNote: jest.fn((_id: string, body: string) =>
-      of<TicketNote>({ id: 'n9', author: MARA, body, at: '2026-10-15T09:00:00Z', editedAt: null, isOwn: true }),
+    addNote: jest.fn((_id: string, body: string, _files?: unknown) =>
+      of<TicketNote>({ id: 'n9', author: MARA, body, at: '2026-10-15T09:00:00Z', editedAt: null, isOwn: true, attachments: [] }),
     ),
     editNote: jest.fn((_id: string, noteId: string, body: string) =>
-      of<TicketNote>({ id: noteId, author: MARA, body, at: '2026-10-15T06:20:00Z', editedAt: '2026-10-15T09:00:00Z', isOwn: true }),
+      of<TicketNote>({
+        id: noteId,
+        author: MARA,
+        body,
+        at: '2026-10-15T06:20:00Z',
+        editedAt: '2026-10-15T09:00:00Z',
+        isOwn: true,
+        attachments: [],
+      }),
     ),
+    blockSender: jest.fn((id: string) => of(detail({ id, senderBlocked: true }))),
+    unblockSender: jest.fn((id: string) => of(detail({ id, senderBlocked: false }))),
     deleteNote: jest.fn(() => of(undefined)),
     list: jest.fn(() => of<TicketPage>({ items: [], total: 0, limit: 8, offset: 0 })),
     attachmentUrl: (id: string) => `/api/attachments/${id}/download`,
@@ -105,6 +125,7 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
     createCard: jest.fn(),
   };
   const toast = { success: jest.fn(), error: jest.fn() };
+  const files = { deleteDraftAttachment: jest.fn(() => of(undefined)), uploadDraftAttachment: jest.fn() };
   const page = opts.split === null ? null : new TicketsPageService();
   page?.split.set(opts.split ?? false);
   const notify = page ? jest.spyOn(page, 'notify') : null;
@@ -112,6 +133,7 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
     providers: [
       provideRouter([{ path: 'tickets/:id', component: TicketDetailComponent }]),
       { provide: TicketsApiService, useValue: api },
+      { provide: ApiClient, useValue: files },
       { provide: TodosApiService, useValue: todosApi },
       { provide: ToastService, useValue: toast },
       ...(page ? [{ provide: TicketsPageService, useValue: page }] : []),
@@ -129,6 +151,7 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
     harness,
     cmp,
     api,
+    files,
     todosApi,
     toast,
     router,
@@ -251,7 +274,7 @@ describe('TicketDetailComponent', () => {
       get: () => of(detail({ status: 'rejected', duplicateOf: { id: 't12', number: 'T-0012' } })),
     });
     expect(screen.getByRole('link', { name: 'T-0012' })).toHaveAttribute('href', '/tickets/t12');
-    expect(cmp.menuSections()[0].items.map((i) => i.id)).toEqual(['reset']);
+    expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['reset'], ['block']]);
     await userEvent.click(screen.getByRole('button', { name: /Wieder öffnen/ }));
     harness.detectChanges();
     expect(api.patch).toHaveBeenCalledWith('t40', { status: 'in_progress' });
@@ -259,12 +282,79 @@ describe('TicketDetailComponent', () => {
 
   it('puts the duplicate in its own section of the menu', async () => {
     const { cmp } = await start('/tickets/t40', { get: () => of(detail({ status: 'in_progress' })) });
-    expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['reset'], ['duplicate']]);
+    expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['reset'], ['duplicate', 'block']]);
   });
 
   it('offers only the duplicate for a new ticket', async () => {
     const { cmp } = await start('/tickets/t40', { get: () => of(detail({ status: 'new' })) });
-    expect(cmp.menuSections()[0].items.map((i) => i.id)).toEqual(['duplicate']);
+    expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['duplicate', 'block']]);
+  });
+
+  it('offers the unblock for a blocked sender, and no block on an anonymized ticket', async () => {
+    const { cmp, setGet, harness } = await start('/tickets/t40', {
+      get: () => of(detail({ status: 'new', senderBlocked: true })),
+    });
+    const items = cmp.menuSections()[0].items;
+    expect(items.map((i) => i.id)).toEqual(['duplicate', 'unblock']);
+    expect(items[1]).toMatchObject({ label: 'Absender entsperren', icon: 'lock' });
+    setGet(() => of(detail({ status: 'done', anonymizedAt: '2026-10-15T00:00:00Z' })));
+    await harness.navigateByUrl('/tickets/t41');
+    harness.detectChanges();
+    expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['reset']]);
+    // An anonymized ticket takes no note files.
+    expect(harness.fixture.debugElement.query((d) => d.name === 'app-chat').componentInstance.canAttach()).toBe(false);
+  });
+
+  it('blocks the sender after the question, and unblocks at once', async () => {
+    const { cmp, api, toast, harness } = await start();
+    expect(harness.fixture.debugElement.query((d) => d.name === 'app-chat').componentInstance.canAttach()).toBe(true);
+    cmp.onMenu({ id: 'block', label: '' });
+    harness.detectChanges();
+    expect(cmp.blockOpen()).toBe(true);
+    expect(screen.getByRole('dialog')).toHaveTextContent(
+      'Weitere Meldungen von Tobias Brandt werden ab jetzt ohne Ticket und ohne Mail verworfen.',
+    );
+    expect(api.blockSender).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Sperren' }));
+    harness.detectChanges();
+    expect(api.blockSender).toHaveBeenCalledWith('t40');
+    expect(cmp.ticket()!.senderBlocked).toBe(true);
+    expect(cmp.blockOpen()).toBe(false);
+    expect(toast.success).toHaveBeenCalledWith('Absender gesperrt.');
+
+    cmp.onMenu({ id: 'unblock', label: '' });
+    expect(api.unblockSender).toHaveBeenCalledWith('t40');
+    expect(cmp.ticket()!.senderBlocked).toBe(false);
+    expect(toast.success).toHaveBeenCalledWith('Absender entsperrt.');
+  });
+
+  it('closes the block question without a change', async () => {
+    const { cmp, api, harness } = await start();
+    cmp.onMenu({ id: 'block', label: '' });
+    harness.detectChanges();
+    const footer = screen.getAllByRole('button', { name: 'Abbrechen' }).filter((b) => !b.classList.contains('dialog__close'));
+    await userEvent.click(footer[0]);
+    expect(cmp.blockOpen()).toBe(false);
+    expect(api.blockSender).not.toHaveBeenCalled();
+  });
+
+  it('names a failed block, runs one at a time and drops the answer for a ticket the user left', async () => {
+    const { cmp, api, toast, harness } = await start();
+    api.blockSender.mockReturnValueOnce(throwError(() => new Error('x')));
+    cmp.confirmBlock();
+    expect(toast.error).toHaveBeenCalledWith('Die Sperre konnte nicht geändert werden.');
+    expect(cmp.blocking()).toBe(false);
+
+    const late = new Subject<TicketDetail>();
+    api.unblockSender.mockReturnValueOnce(late);
+    cmp.onMenu({ id: 'unblock', label: '' });
+    expect(cmp.blocking()).toBe(true);
+    cmp.confirmBlock();
+    expect(api.blockSender).toHaveBeenCalledTimes(1);
+    await harness.navigateByUrl('/tickets/t41');
+    late.next(detail({ id: 't40', senderBlocked: false, title: 'Alt' }));
+    expect(cmp.blocking()).toBe(false);
+    expect(cmp.ticket()!.title).not.toBe('Alt');
   });
 
   it('closes a ticket without to-dos at once and tells the list', async () => {
@@ -613,7 +703,7 @@ describe('TicketDetailComponent', () => {
   it('sends, edits and deletes notes, and never the report', async () => {
     const { cmp, api, toast } = await start();
     cmp.sendNote({ body: 'Fix ist offen.' });
-    expect(api.addNote).toHaveBeenCalledWith('t40', 'Fix ist offen.');
+    expect(api.addNote).toHaveBeenCalledWith('t40', 'Fix ist offen.', { body: 'Fix ist offen.' });
     expect(cmp.notes().map((n) => n.id)).toEqual(['n1', 'n9']);
 
     cmp.editNote({ id: 'n1', body: 'Prüfe ich morgen.' });
@@ -657,6 +747,32 @@ describe('TicketDetailComponent', () => {
     const failed = cmp.messages().at(-1)!;
     cmp.discardNote({ id: failed.id });
     expect(cmp.messages().some((m) => m.id === failed.id)).toBe(false);
+  });
+
+  it('shows the files of the notes and of the report with their scan state', async () => {
+    const { cmp } = await start('/tickets/t40', {
+      get: () =>
+        of(detail({ attachments: [{ id: 'a2', filename: 'neu.png', mime: 'image/png', size: 5, scanned: false }] })),
+    });
+    const [body, note] = cmp.messages();
+    expect(body.attachments).toEqual([
+      { id: 'a2', filename: 'neu.png', mime: 'image/png', size: 5, url: '/api/attachments/a2/download', scanState: 'scanning' },
+    ]);
+    expect(note.attachments).toEqual([
+      { id: 'f1', filename: 'log.txt', mime: 'text/plain', size: 10, scanState: 'clean', url: '/api/attachments/f1/download' },
+    ]);
+  });
+
+  it('sends a note with files, and deletes the drafts of a discarded one', async () => {
+    const { cmp, api, files } = await start();
+    const file = { id: 'd1', filename: 'a.png', mime: 'image/png', size: 3, scanState: 'scanning' as const, url: '/x' };
+    api.addNote.mockReturnValueOnce(throwError(() => new Error('offline')));
+    cmp.sendNote({ body: '', attachmentIds: ['d1'], draftToken: 'tok', files: [file] });
+    expect(api.addNote).toHaveBeenCalledWith('t40', '', expect.objectContaining({ attachmentIds: ['d1'], draftToken: 'tok' }));
+    const failed = cmp.messages().at(-1)!;
+    expect(failed.attachments).toEqual([file]);
+    cmp.discardNote({ id: failed.id });
+    expect(files.deleteDraftAttachment).toHaveBeenCalledWith('d1', 'tok');
   });
 
   it('runs without the list page as one pane', async () => {

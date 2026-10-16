@@ -197,6 +197,7 @@
           class="sp__chat"
           [draftKey]="'status.' + app.id"
           [messages]="chatMessages()"
+          [canAttach]="true"
           placeholder="status.comments.placeholder"
           (send)="sendComment($event)"
           (retry)="retryComment($event)"

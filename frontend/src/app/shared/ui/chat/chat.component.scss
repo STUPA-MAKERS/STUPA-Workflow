@@ -267,6 +267,10 @@
   background: color-mix(in srgb, var(--color-text) 8%, transparent);
   color: var(--color-text-muted);
 }
+/* A file in the scan or in quarantine: the same tile, no link. */
+.chat__file--off {
+  cursor: default;
+}
 .chat__fileText {
   display: flex;
   flex-direction: column;
@@ -456,8 +460,85 @@
 .chat__input:focus-visible {
   outline: none;
 }
-.chat__send {
+.chat__send,
+.chat__attach {
   flex: none;
+}
+.chat__attach {
+  color: var(--color-text-muted);
+}
+.chat__fileInput {
+  display: none;
+}
+
+/* The files of the composer: a chip per file above the text box. */
+.chat__drafts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chat__draft {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 100%;
+  min-height: 48px;
+  padding: 6px var(--space-1) 6px 6px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-3);
+}
+.chat__draft--pending {
+  padding-inline-end: var(--space-4);
+}
+.chat__draftX {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.chat__draftX:hover {
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  color: var(--color-text);
+}
+.chat__draftX:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.chat__spinner {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+}
+.chat__spinner::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border-strong);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: chat-spin 0.8s linear infinite;
+}
+@keyframes chat-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat__spinner::before {
+    animation: none;
+  }
 }
 
 /* ------------------------------------------------------------------ phone menu */

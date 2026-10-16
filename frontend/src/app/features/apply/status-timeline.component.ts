@@ -14,6 +14,7 @@ import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { catchError, forkJoin, of } from 'rxjs';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
+import { API_BASE_URL } from '@core/api/api.config';
 import { LOCATION } from '@core/browser/location.token';
 import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -43,8 +44,9 @@ import { HistoryComponent, type HistoryEntry } from '@shared/ui/history/history.
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
-import { ChatOutbox, sendErrorKey } from '@shared/ui/chat/chat-outbox';
+import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import type { ChatEdit, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/chat.models';
+import { toChatAttachments } from '@shared/ui/chat/chat.util';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { mediaQuerySignal } from '../../layout/media-query';
 import { ButtonComponent, DialogComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
@@ -114,6 +116,7 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
 })
 export class StatusTimelineComponent {
   private readonly api = inject(ApiClient);
+  private readonly apiBase = inject(API_BASE_URL);
   private readonly location = inject(LOCATION);
   private readonly branding = inject(BrandingService);
   private readonly i18n = inject(I18nService);
@@ -152,9 +155,10 @@ export class StatusTimelineComponent {
 
   /** Optimistic send: a new comment shows at once, the server answer replaces it. */
   private readonly outbox = new ChatOutbox<ApplicationComment>(
-    (req) => this.api.addComment(this.application()?.id ?? '', req.body),
+    (req) => this.api.addComment(this.application()?.id ?? '', req.body, 'public', req),
     (created) => this.comments.update((list) => [...list, created]),
     (err) => this.toast.error(this.i18n.translate(sendErrorKey(err, 'status.toast.commentFailed'))),
+    draftDropper(this.api),
   );
   /** The comments as chat messages, the pending ones last. */
   readonly chatMessages = computed<ChatMessage[]>(() => [
@@ -427,6 +431,7 @@ export class StatusTimelineComponent {
       at: comment.at,
       editedAt: comment.editedAt,
       own: comment.isOwn,
+      attachments: toChatAttachments(this.apiBase, comment.attachments),
     };
   }
 
@@ -564,9 +569,11 @@ export class StatusTimelineComponent {
     });
   }
 
-  /** The applicant writes public comments only. */
+  /** The applicant writes public comments only; the files go along. */
   sendComment(req: ChatSend): void {
-    this.outbox.send({ body: req.body });
+    const comment: ChatSend = { ...req };
+    delete comment.visibility;
+    this.outbox.send(comment);
   }
 
   retryComment(ref: ChatRef): void {

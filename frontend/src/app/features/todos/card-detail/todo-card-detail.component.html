@@ -140,6 +140,7 @@
     [messages]="messages()"
     [events]="events()"
     [canPost]="canWrite()"
+    [canAttach]="canWrite()"
     placeholder="todos.card.commentPlaceholder"
     (send)="sendComment($event)"
     (retry)="retryComment($event)"

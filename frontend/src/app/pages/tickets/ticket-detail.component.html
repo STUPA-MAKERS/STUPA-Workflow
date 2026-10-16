@@ -130,6 +130,7 @@
       [messages]="messages()"
       [events]="events()"
       placeholder="tickets.detail.notePlaceholder"
+      [canAttach]="!ticket()?.anonymizedAt"
       (send)="sendNote($event)"
       (retry)="retryNote($event)"
       (discard)="discardNote($event)"
@@ -314,6 +315,18 @@
     }
   </div>
   <app-button dialog-footer variant="text" (click)="duplicateOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+</app-dialog>
+
+<!-- "Absender sperren": the block asks first. -->
+<app-dialog
+  [open]="blockOpen()"
+  [title]="'tickets.detail.blockSender' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="blockOpen.set(false)"
+>
+  <p>{{ 'tickets.detail.blockConfirm' | t: { sender: reporter() } }}</p>
+  <app-button dialog-footer variant="text" (click)="blockOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="danger" (click)="confirmBlock()">{{ 'tickets.detail.blockShort' | t }}</app-button>
 </app-dialog>
 
 @if (ticket(); as ticket) {

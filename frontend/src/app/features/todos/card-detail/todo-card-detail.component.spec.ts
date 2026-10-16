@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
+import { ApiClient } from '@core/api/api-client.service';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import { Subject, of, throwError, type Observable } from 'rxjs';
 import { TodosApiService, type TodoBoard, type TodoCardDetail, type TodoComment } from '@core/api/todos.service';
@@ -15,6 +16,7 @@ const COMMENT: TodoComment = {
   at: '2026-10-15T09:00:00Z',
   editedAt: null,
   isOwn: true,
+  attachments: [{ id: 'f1', filename: 'plan.pdf', mime: 'application/pdf', size: 20, scanState: 'quarantined' }],
 };
 
 const http = (status: number, code?: string) =>
@@ -56,6 +58,7 @@ async function setup(opts: Opts = {}) {
   const card = opts.card ?? detail({ comments: [COMMENT] });
   const api = makeApi(card);
   const toast = { success: jest.fn(), error: jest.fn() };
+  const files = { deleteDraftAttachment: jest.fn(() => of(undefined)), uploadDraftAttachment: jest.fn() };
   const out = { closed: jest.fn(), changed: jest.fn(), commentsChanged: jest.fn(), archived: jest.fn() };
   const view = await render(TodoCardDetailComponent, {
     inputs: { cardId: card.id, mode: opts.mode ?? 'drawer', board: opts.board ?? null },
@@ -63,12 +66,13 @@ async function setup(opts: Opts = {}) {
     providers: [
       provideRouter([]),
       { provide: TodosApiService, useValue: api },
+      { provide: ApiClient, useValue: files },
       { provide: ToastService, useValue: toast },
     ],
   });
   const cmp = view.fixture.componentInstance;
   const detect = () => view.fixture.detectChanges();
-  return { ...view, api, toast, cmp, detect, ...out };
+  return { ...view, api, toast, files, cmp, detect, ...out };
 }
 
 describe('TodoCardDetailComponent', () => {
@@ -695,10 +699,34 @@ describe('TodoCardDetailComponent', () => {
     expect(toast.error).toHaveBeenCalledTimes(2);
   });
 
+  it('shows the files of a comment and sends new ones; a discard deletes the drafts', async () => {
+    const { cmp, api, files } = await setup();
+    expect(cmp.messages()[0].attachments).toEqual([
+      {
+        id: 'f1',
+        filename: 'plan.pdf',
+        mime: 'application/pdf',
+        size: 20,
+        scanState: 'quarantined',
+        url: '/api/attachments/f1/download',
+      },
+    ]);
+    api.addComment.mockReturnValueOnce(throwError(() => new Error('x')));
+    cmp.sendComment({ body: '', attachmentIds: ['d1'], draftToken: 'tok' });
+    expect(api.addComment).toHaveBeenLastCalledWith(
+      'k-1',
+      '',
+      [],
+      expect.objectContaining({ attachmentIds: ['d1'], draftToken: 'tok' }),
+    );
+    cmp.discardComment({ id: cmp.messages().find((m) => m.state === 'failed')!.id });
+    expect(files.deleteDraftAttachment).toHaveBeenCalledWith('d1', 'tok');
+  });
+
   it('posts, retries, edits and deletes comments, with mentions of members', async () => {
     const { cmp, api, toast, changed, commentsChanged } = await setup();
     cmp.sendComment({ body: 'Hallo @Jonas Weber' });
-    expect(api.addComment).toHaveBeenCalledWith('k-1', 'Hallo @Jonas Weber', ['p-2']);
+    expect(api.addComment).toHaveBeenCalledWith('k-1', 'Hallo @Jonas Weber', ['p-2'], { body: 'Hallo @Jonas Weber' });
     expect(cmp.card()?.comments.map((c) => c.id)).toEqual(['cm-1', 'cm-2']);
     expect(cmp.card()?.commentCount).toBe(1);
     // A comment write gives the page only the count, never the drawer's copy of the card.

@@ -9,6 +9,7 @@ import { BrandingService } from '@core/branding/branding.service';
 import { AltchaService } from './altcha.service';
 import {
   DRAFT_FILES_KEY,
+  DRAFT_FILES_PERSIST,
   DraftAttachmentsService,
   uploadErrorKey,
 } from './draft-attachments.service';
@@ -46,6 +47,7 @@ interface Setup {
 function setup(
   opts: {
     loggedIn?: boolean;
+    persist?: boolean;
     upload?: jest.Mock;
     remove?: jest.Mock;
     solve?: jest.Mock;
@@ -75,6 +77,7 @@ function setup(
       { provide: AuthService, useValue: { isAuthenticated: signal(!!opts.loggedIn) } },
       { provide: AltchaService, useValue: { solve } },
       { provide: BrandingService, useValue: { attachmentLimits: signal(LIMITS) } },
+      ...(opts.persist === false ? [{ provide: DRAFT_FILES_PERSIST, useValue: false }] : []),
     ],
   });
   return { svc: TestBed.inject(DraftAttachmentsService), upload, remove, solve };
@@ -125,6 +128,21 @@ describe('DraftAttachmentsService', () => {
     const again = setup().svc;
     expect(again.token()).toBe('tok');
     expect(again.files().map((f) => f.id)).toEqual(['d1']);
+  });
+
+  it('keeps nothing in sessionStorage without persistence (the chat composer)', async () => {
+    sessionStorage.setItem(DRAFT_FILES_KEY, JSON.stringify({ token: 'old', files: [] }));
+    const { svc } = setup({ persist: false });
+    // A stored draft of the wizard is not read.
+    expect(svc.token()).toBeNull();
+    await svc.upload([file('a.pdf')]);
+    expect(svc.token()).toBe('tok');
+    expect(JSON.parse(sessionStorage.getItem(DRAFT_FILES_KEY) as string)).toMatchObject({ token: 'old' });
+    svc.clear();
+    expect(svc.token()).toBeNull();
+    expect(svc.files()).toEqual([]);
+    // The wizard draft of the tab stays.
+    expect(sessionStorage.getItem(DRAFT_FILES_KEY)).not.toBeNull();
   });
 
   it('drops an expired, broken or empty stored draft', () => {

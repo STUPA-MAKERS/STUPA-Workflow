@@ -1,3 +1,5 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
@@ -16,6 +18,8 @@ async function start(withPage: boolean) {
   const page = { loadTodos: jest.fn() };
   TestBed.configureTestingModule({
     providers: [
+      provideHttpClient(),
+      provideHttpClientTesting(),
       provideRouter([
         { path: 'tasks', component: ListStub },
         { path: 'tasks/todo/:cardId', component: TaskTodoComponent },

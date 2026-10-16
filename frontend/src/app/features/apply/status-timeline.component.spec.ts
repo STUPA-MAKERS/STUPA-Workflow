@@ -410,7 +410,7 @@ describe('StatusTimelineComponent', () => {
     fireEvent.input(box, { target: { value: 'Frage' } });
     fireEvent.keyDown(box, { key: 'Enter' });
     fixture.detectChanges();
-    expect(addComment).toHaveBeenCalledWith(ID, 'Frage');
+    expect(addComment).toHaveBeenCalledWith(ID, 'Frage', 'public', { body: 'Frage' });
     expect(within(dialog).getByText('Frage')).toBeInTheDocument();
   });
 
@@ -441,6 +441,28 @@ describe('StatusTimelineComponent', () => {
     expect(addComment).toHaveBeenCalledTimes(2);
     expect(comp.comments().at(-1)?.id).toBe('c4');
     expect(comp.chatMessages().some((m) => m.state === 'failed')).toBe(false);
+  });
+
+  it('sends the files of a public comment and shows the files of the comments', async () => {
+    const addComment = jest.fn(() => throwError(() => new Error('x')));
+    const deleteDraftAttachment = jest.fn(() => of(undefined));
+    const api = {
+      ...fakeApi({
+        addComment,
+        comments: () =>
+          of([{ ...COMMENTS[0], attachments: [{ id: 'f9', filename: 'a.pdf', mime: 'application/pdf', size: 1, scanState: 'clean' as const }] }]),
+      }),
+      deleteDraftAttachment: deleteDraftAttachment as unknown as ApiClient['deleteDraftAttachment'],
+    };
+    const { comp } = await setup(api);
+    await screen.findByRole('heading', { level: 1 });
+    expect(comp.chatMessages()[0].attachments).toEqual([
+      { id: 'f9', filename: 'a.pdf', mime: 'application/pdf', size: 1, scanState: 'clean', url: '/api/attachments/f9/download' },
+    ]);
+    comp.sendComment({ body: '', visibility: 'internal', attachmentIds: ['d1'], draftToken: 'tok' });
+    expect(addComment).toHaveBeenCalledWith(ID, '', 'public', { body: '', attachmentIds: ['d1'], draftToken: 'tok' });
+    comp.discardComment({ id: comp.chatMessages().at(-1)!.id });
+    expect(deleteDraftAttachment).toHaveBeenCalledWith('d1', 'tok');
   });
 
   it('names a refused send and discards the failed comment', async () => {

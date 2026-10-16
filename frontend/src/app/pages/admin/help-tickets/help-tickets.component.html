@@ -65,4 +65,49 @@
       </section>
     </form>
   }
+
+  @if (canBlock()) {
+    <section class="ht__sec" aria-labelledby="ht-blocked">
+      <h2 id="ht-blocked" class="sec ht__secTitle">{{ 'admin.helpTickets.blocked' | t }}</h2>
+      @if (blocked(); as list) {
+        @if (blockedError()) {
+          <app-note kind="error" icon="alert" role="alert">{{ 'admin.helpTickets.error.blocked' | t }}</app-note>
+        } @else if (list.length) {
+          <ul class="ht__rows ht__blocks">
+            @for (b of list; track b.id) {
+              <li class="ht__row ht__row--split">
+                <span class="ht__block">
+                  <span class="ht__label">{{ senderName(b) }}</span>
+                  <span class="ht__meta">
+                    <span>{{ 'admin.helpTickets.blockedOn' | t: { date: (b.blockedAt | ldate: 'mediumDate') } }}</span>
+                    @if (b.sourceTicket; as src) {
+                      <span aria-hidden="true">·</span>
+                      <a class="mono ht__link" [routerLink]="['/tickets', src.id]">{{ src.number }}</a>
+                    }
+                    @if (b.hitCount > 0) {
+                      <span aria-hidden="true">·</span>
+                      <span>{{ hits(b) }}</span>
+                    }
+                  </span>
+                </span>
+                <app-button
+                  variant="tonal"
+                  size="sm"
+                  [loading]="unblocking() === b.id"
+                  [disabled]="unblocking() !== null"
+                  (click)="unblock(b)"
+                >
+                  {{ 'admin.helpTickets.unblock' | t }}
+                </app-button>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="ht__empty">{{ 'admin.helpTickets.blockedEmpty' | t }}</p>
+        }
+      } @else {
+        <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
+      }
+    </section>
+  }
 </section>

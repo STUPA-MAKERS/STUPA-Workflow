@@ -17,6 +17,8 @@ import {
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import type { Observable } from 'rxjs';
+import { ApiClient } from '@core/api/api-client.service';
+import { API_BASE_URL } from '@core/api/api.config';
 import type { Uuid } from '@core/api/models';
 import {
   TodosApiService,
@@ -35,9 +37,10 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
-import { ChatOutbox, sendErrorKey } from '@shared/ui/chat/chat-outbox';
+import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
 import type { ChatEdit, ChatEvent, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/chat.models';
+import { toChatAttachments } from '@shared/ui/chat/chat.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import {
   FilterSelectComponent,
@@ -130,6 +133,8 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
 })
 export class TodoCardDetailComponent {
   private readonly api = inject(TodosApiService);
+  private readonly files = inject(ApiClient);
+  private readonly apiBase = inject(API_BASE_URL);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -190,6 +195,7 @@ export class TodoCardDetailComponent {
     (comment) =>
       this.patchComments((c) => ({ ...c, comments: [...c.comments, comment], commentCount: c.commentCount + 1 })),
     (err) => this.toast.error(this.t(sendErrorKey(err, 'todos.error.comment'))),
+    draftDropper(this.files),
   );
 
   constructor() {
@@ -279,6 +285,7 @@ export class TodoCardDetailComponent {
       at: c.at,
       editedAt: c.editedAt,
       own: c.isOwn,
+      attachments: toChatAttachments(this.apiBase, c.attachments),
     }));
     return [...comments, ...this.outbox.messages()];
   });
@@ -760,7 +767,7 @@ export class TodoCardDetailComponent {
   // ------------------------------------------------------------------ comments
 
   private postComment(req: ChatSend): Observable<TodoComment> {
-    return this.api.addComment(this.cardId(), req.body, mentionIds(req.body, this.members()));
+    return this.api.addComment(this.cardId(), req.body, mentionIds(req.body, this.members()), req);
   }
 
   sendComment(req: ChatSend): void {

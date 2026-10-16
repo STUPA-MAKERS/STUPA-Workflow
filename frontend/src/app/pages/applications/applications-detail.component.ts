@@ -12,6 +12,7 @@ import { FormGroup, FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
+import { API_BASE_URL } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -45,7 +46,9 @@ import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.compo
 import {
   ChatComponent,
   ChatOutbox,
+  draftDropper,
   sendErrorKey,
+  toChatAttachments,
   EmptyStateComponent,
   FieldGroupComponent,
   FieldRowComponent,
@@ -170,6 +173,7 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
 })
 export class ApplicationsDetailComponent {
   private readonly api = inject(ApiClient);
+  private readonly apiBase = inject(API_BASE_URL);
   private readonly budgetApi = inject(BudgetTreeApi);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
@@ -223,9 +227,10 @@ export class ApplicationsDetailComponent {
   );
   /** Optimistic send: a new comment shows at once, the server answer replaces it. */
   private readonly outbox = new ChatOutbox<ApplicationComment>(
-    (req) => this.api.addComment(this.id, req.body, req.visibility ?? 'public'),
+    (req) => this.api.addComment(this.id, req.body, req.visibility ?? 'public', req),
     (created) => this.comments.update((list) => [...list, created]),
     (err) => this.toast.error(this.i18n.translate(sendErrorKey(err, 'applications.comments.error'))),
+    draftDropper(this.api),
   );
   /** The comments as chat messages, the pending ones last. */
   readonly chatMessages = computed<ChatMessage[]>(() => [
@@ -1152,12 +1157,15 @@ export class ApplicationsDetailComponent {
       // The server lets the author and a holder of `application.manage` change a comment.
       canEdit: comment.isOwn || this.canManage(),
       visibility: comment.visibility,
+      attachments: toChatAttachments(this.apiBase, comment.attachments),
     };
   }
 
   protected sendComment(req: ChatSend): void {
     // Without `application.manage` the composer has no toggle, so the comment is public.
-    this.outbox.send(this.canManage() ? req : { body: req.body });
+    const comment: ChatSend = { ...req };
+    if (!this.canManage()) delete comment.visibility;
+    this.outbox.send(comment);
   }
 
   protected retryComment(ref: ChatRef): void {

@@ -1,7 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
+import { TicketsApiService, type TicketBlockedSender } from '@core/api/tickets.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { PageHeaderComponent } from '@shared/ui';
 import { FilterSelectComponent, type FilterSelectOption } from '@shared/ui/filter-select/filter-select.component';
@@ -40,6 +43,10 @@ export function isHttpUrl(text: string): boolean {
  *
  * "Verwerfen" puts the stored values back. The page shows the form only with
  * `admin.site` and not after a 403.
+ *
+ * "Gesperrte Absender" (with `ticket.manage`): one row per block of "Absender sperren"
+ * on a ticket, with the date, the source ticket, the reports held back, and
+ * "Entsperren".
  */
 @Component({
   selector: 'app-help-tickets',
@@ -47,7 +54,9 @@ export function isHttpUrl(text: string): boolean {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    RouterLink,
     TranslatePipe,
+    LocalizedDatePipe,
     PageHeaderComponent,
     FilterSelectComponent,
     ButtonComponent,
@@ -61,6 +70,7 @@ export function isHttpUrl(text: string): boolean {
 })
 export class HelpTicketsComponent {
   private readonly api = inject(AdminApiService);
+  private readonly tickets = inject(TicketsApiService);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
@@ -110,7 +120,16 @@ export class HelpTicketsComponent {
 
   protected readonly canSave = computed(() => this.dirty() && !this.wikiError() && !this.saving());
 
+  /** The blocked senders need `ticket.manage`. The server checks it again. */
+  protected readonly canBlock = computed(() => this.auth.can('ticket.manage'));
+  /** null while loading; the read failed: `blockedError`. */
+  protected readonly blocked = signal<TicketBlockedSender[] | null>(null);
+  protected readonly blockedError = signal(false);
+  /** The block whose unblock is in flight. */
+  protected readonly unblocking = signal<string | null>(null);
+
   constructor() {
+    if (this.canBlock()) this.loadBlocked();
     if (!this.allowed()) {
       this.loading.set(false);
       this.loadState.set('forbidden');
@@ -121,6 +140,49 @@ export class HelpTicketsComponent {
       error: (err: { status?: number }) => {
         this.loading.set(false);
         this.loadState.set(err?.status === 403 ? 'forbidden' : 'error');
+      },
+    });
+  }
+
+  private loadBlocked(): void {
+    this.tickets.blockedSenders().subscribe({
+      next: (list) => {
+        this.blockedError.set(false);
+        this.blocked.set(list);
+      },
+      error: () => {
+        this.blocked.set([]);
+        this.blockedError.set(true);
+      },
+    });
+  }
+
+  /** The person, else the address. */
+  protected senderName(b: TicketBlockedSender): string {
+    if (b.kind === 'principal' && b.person) {
+      return b.person.displayName ?? b.email ?? this.i18n.translate('chat.deletedPerson');
+    }
+    return b.email ?? '';
+  }
+
+  protected hits(b: TicketBlockedSender): string {
+    return b.hitCount === 1
+      ? this.i18n.translate('admin.helpTickets.blockedHits.one')
+      : this.i18n.translate('admin.helpTickets.blockedHits.other', { count: b.hitCount });
+  }
+
+  protected unblock(b: TicketBlockedSender): void {
+    if (this.unblocking()) return;
+    this.unblocking.set(b.id);
+    this.tickets.deleteBlockedSender(b.id).subscribe({
+      next: () => {
+        this.unblocking.set(null);
+        this.blocked.update((list) => (list ?? []).filter((x) => x.id !== b.id));
+        this.toast.success(this.i18n.translate('admin.helpTickets.unblocked'));
+      },
+      error: () => {
+        this.unblocking.set(null);
+        this.toast.error(this.i18n.translate('admin.helpTickets.error.unblock'));
       },
     });
   }

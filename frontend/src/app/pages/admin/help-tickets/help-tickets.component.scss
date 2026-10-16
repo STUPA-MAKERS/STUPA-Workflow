@@ -53,3 +53,36 @@
   font-size: var(--fs-body);
   line-height: var(--lh-body);
 }
+
+/* "Gesperrte Absender": the rows of the switch box, a name and a quiet line each. */
+.ht__blocks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ht__block {
+  display: flex;
+  flex: 1 1 14rem;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ht__block .ht__label {
+  flex: none;
+  overflow-wrap: anywhere;
+}
+.ht__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.ht__link {
+  color: var(--color-accent-text);
+}
+.ht__empty {
+  margin: 0;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+}

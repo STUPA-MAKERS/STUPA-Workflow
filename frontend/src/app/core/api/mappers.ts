@@ -38,6 +38,7 @@ import type {
   MeetingPageWire,
   MeetingVote,
   MeetingVoteOutWire,
+  MessageFiles,
   NewApplication,
   Protocol,
   ProtocolOutWire,
@@ -143,6 +144,16 @@ export function mapTimelineEvent(wire: TimelineEventOutWire, lang: string): Time
   };
 }
 
+/**
+ * The file part of a message create: nothing without files, else the ids and the
+ * token. A send without files keeps its old body, so an older server takes it.
+ */
+export function messageFiles(files: MessageFiles | undefined): MessageFiles {
+  const ids = files?.attachmentIds ?? [];
+  if (!ids.length) return {};
+  return { attachmentIds: [...ids], draftToken: files?.draftToken ?? null };
+}
+
 export function mapComment(wire: CommentOutWire): ApplicationComment {
   return {
     id: wire.id,
@@ -155,6 +166,7 @@ export function mapComment(wire: CommentOutWire): ApplicationComment {
     isOwn: wire.isOwn ?? false,
     at: wire.at,
     editedAt: wire.editedAt ?? null,
+    attachments: wire.attachments ?? [],
   };
 }
 

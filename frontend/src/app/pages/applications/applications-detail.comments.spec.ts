@@ -68,6 +68,7 @@ function fakeAuth(permissions: string[]): Partial<AuthService> {
   return {
     can: (p: string) => permissions.includes(p),
     roles: (() => []) as unknown as AuthService['roles'],
+    isAuthenticated: (() => true) as unknown as AuthService['isAuthenticated'],
   };
 }
 
@@ -210,6 +211,53 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     expect(within(group).getByRole('radio', { name: 'Intern' })).toHaveAttribute('aria-checked', 'true');
     // Both kinds exist: the internal comment carries its mark.
     expect(document.querySelector('.chat__mark--internal')).toHaveTextContent('Intern');
+    http.verify();
+  });
+
+  it('sends a comment with a file only, and shows the files of the comments', async () => {
+    const withFile: CommentOutWire = {
+      ...COMMENTS[0],
+      attachments: [{ id: 'f1', filename: 'kosten.pdf', mime: 'application/pdf', size: 2048, scanState: 'clean' }],
+    };
+    const { http, input, detectChanges, fixture } = await loaded(undefined, [withFile]);
+    expect(screen.getByRole('link', { name: /kosten\.pdf/ })).toHaveAttribute('href', '/api/attachments/f1/download');
+
+    const box = fixture.nativeElement.querySelector('.chat__fileInput') as HTMLInputElement;
+    const file = new File(['%PDF'], 'angebot.pdf', { type: 'application/pdf' });
+    Object.defineProperty(box, 'files', { value: [file], configurable: true });
+    fireEvent.change(box);
+    const upload = http.expectOne('/api/apply/attachments');
+    expect(upload.request.headers.has('X-Draft-Token')).toBe(false);
+    upload.flush({
+      id: 'd1',
+      filename: 'angebot.pdf',
+      mime: 'application/pdf',
+      size: 4,
+      scanned: false,
+      is_comparison_offer: false,
+      draftToken: 'tok',
+      draftExpiresAt: '2999-01-01T00:00:00Z',
+    });
+    await new Promise((r) => setTimeout(r));
+    detectChanges();
+    expect(screen.getByRole('button', { name: 'angebot.pdf entfernen' })).toBeInTheDocument();
+
+    fireEvent.keyDown(input(), { key: 'Enter' });
+    detectChanges();
+    const post = http.expectOne(url('/comments'));
+    expect(post.request.body).toEqual({ body: '', visibility: 'public', attachmentIds: ['d1'], draftToken: 'tok' });
+    // The pending message shows the file, still in the scan, as no link.
+    expect(screen.getByText('In Prüfung')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'angebot.pdf entfernen' })).not.toBeInTheDocument();
+    post.flush({
+      ...OWN,
+      id: 'c3',
+      body: '',
+      visibility: 'public',
+      attachments: [{ id: 'd1', filename: 'angebot.pdf', mime: 'application/pdf', size: 4, scanState: 'scanning' }],
+    });
+    detectChanges();
+    expect(screen.queryByRole('link', { name: /angebot\.pdf/ })).not.toBeInTheDocument();
     http.verify();
   });
 

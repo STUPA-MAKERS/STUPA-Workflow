@@ -15,7 +15,8 @@
 export { AvatarComponent, AvatarStackComponent, initials } from './avatar/avatar.component';
 export type { AvatarSize } from './avatar/avatar.component';
 export { ChatComponent } from './chat/chat.component';
-export { ChatOutbox, sendErrorKey } from './chat/chat-outbox';
+export { ChatOutbox, draftDropper, missingFiles, sendErrorKey } from './chat/chat-outbox';
+export { CHAT_MAX_FILES, chatFileUrl, toChatAttachments } from './chat/chat.util';
 export type {
   ChatAttachment,
   ChatEdit,

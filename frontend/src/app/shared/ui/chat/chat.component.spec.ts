@@ -1,7 +1,15 @@
+import { HttpErrorResponse } from '@angular/common/http';
+import { signal } from '@angular/core';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
+import { Subject, of, throwError, type Observable } from 'rxjs';
+import { ApiClient } from '@core/api/api-client.service';
+import type { DraftUpload } from '@core/api/models';
+import { AuthService } from '@core/auth/auth.service';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
-import { ChatComponent } from './chat.component';
+import { AltchaService } from '../../../features/apply/altcha.service';
+import { ChatComponent, chatUploadError } from './chat.component';
 import type { ChatEvent, ChatMessage, ChatVisibility } from './chat.models';
 
 /** A time today, so the day separator reads "Heute". */
@@ -48,6 +56,25 @@ interface SetupOpts {
   phone?: boolean;
   /** A phone width with a mouse or a keyboard (a narrow or zoomed desktop window). */
   fine?: boolean;
+  canAttach?: boolean;
+  /** The answer of an upload; default: a draft with the file's name. */
+  upload?: (file: File, opts: { token?: string | null }) => Observable<DraftUpload>;
+}
+
+function draftOf(file: File, n: number): DraftUpload {
+  return {
+    attachment: {
+      id: `d${n}`,
+      filename: file.name,
+      mime: file.type,
+      size: file.size,
+      scanned: false,
+      isComparisonOffer: false,
+      scanState: 'scanning',
+    },
+    draftToken: 'tok',
+    draftExpiresAt: '2999-01-01T00:00:00Z',
+  };
 }
 
 async function setup(opts: SetupOpts = {}) {
@@ -57,6 +84,14 @@ async function setup(opts: SetupOpts = {}) {
   const del = jest.fn();
   const retry = jest.fn();
   const discard = jest.fn();
+  let n = 0;
+  const api = {
+    uploadDraftAttachment: jest.fn((file: File, o: { token?: string | null }) =>
+      opts.upload ? opts.upload(file, o) : of(draftOf(file, ++n)),
+    ),
+    deleteDraftAttachment: jest.fn((): Observable<void> => of(undefined)),
+  };
+  const toast = { success: jest.fn(), error: jest.fn() };
   const view = await render(ChatComponent, {
     inputs: {
       messages: opts.messages ?? [],
@@ -64,8 +99,15 @@ async function setup(opts: SetupOpts = {}) {
       canPost: opts.canPost ?? true,
       visibilityOptions: opts.visibilityOptions ?? [],
       draftKey: opts.draftKey ?? 't1',
+      canAttach: opts.canAttach ?? false,
     },
     on: { send, edit, delete: del, retry, discard },
+    providers: [
+      { provide: ApiClient, useValue: api },
+      { provide: AuthService, useValue: { isAuthenticated: signal(true) } },
+      { provide: AltchaService, useValue: { solve: jest.fn(async () => 'sol') } },
+      { provide: ToastService, useValue: toast },
+    ],
   });
   const set = (name: string, value: unknown) => {
     view.fixture.componentRef.setInput(name, value);
@@ -75,7 +117,18 @@ async function setup(opts: SetupOpts = {}) {
   const input = () => screen.getByRole('textbox', { name: 'Nachricht schreiben …' }) as HTMLTextAreaElement;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cmp = view.fixture.componentInstance as any;
-  return { view, send, edit, del, retry, discard, set, log, input, cmp, user: userEvent.setup() };
+  /** Pick files with the hidden input and let the uploads finish. */
+  const pick = async (...files: File[]) => {
+    const box = view.container.querySelector('.chat__fileInput') as HTMLInputElement;
+    Object.defineProperty(box, 'files', { value: files, configurable: true });
+    fireEvent.change(box);
+    await settle();
+  };
+  const settle = async () => {
+    await new Promise((r) => setTimeout(r));
+    view.fixture.detectChanges();
+  };
+  return { view, send, edit, del, retry, discard, set, log, input, cmp, api, toast, pick, settle, user: userEvent.setup() };
 }
 
 describe('ChatComponent', () => {
@@ -713,4 +766,256 @@ describe('ChatComponent', () => {
       expect(log().scrollTop).toBe(1000);
     });
   });
+
+  describe('files', () => {
+    const pdf = (name = 'angebot.pdf', size = 4) => {
+      const f = new File(['%PDF'], name, { type: 'application/pdf' });
+      if (size !== 4) Object.defineProperty(f, 'size', { value: size });
+      return f;
+    };
+
+    it('shows the paperclip only where the thread takes files', async () => {
+      await setup();
+      expect(screen.queryByRole('button', { name: 'Datei anhängen' })).not.toBeInTheDocument();
+      expect(document.querySelector('.chat__fileInput')).toBeNull();
+    });
+
+    it('uploads picked files as chips and sends them with the message', async () => {
+      const { pick, api, send, input, view, cmp } = await setup({ canAttach: true });
+      const clip = screen.getByRole('button', { name: 'Datei anhängen' });
+      const click = jest.spyOn(view.container.querySelector('.chat__fileInput') as HTMLInputElement, 'click');
+      fireEvent.click(clip);
+      expect(click).toHaveBeenCalled();
+      await pick(pdf(), pdf('kopf.png'));
+      expect(api.uploadDraftAttachment.mock.calls[0][1]).toMatchObject({ token: null, altcha: null });
+      expect(api.uploadDraftAttachment.mock.calls[1][1]).toMatchObject({ token: 'tok' });
+      const chips = [...view.container.querySelectorAll('.chat__draft')].map((c) => c.textContent?.replace(/\s+/g, ' ').trim());
+      expect(chips).toEqual(['angebot.pdf PDF · 1 KB · In Prüfung', 'kopf.png PNG · 1 KB · In Prüfung']);
+      // The input is emptied, so the same file can be picked again.
+      expect((view.container.querySelector('.chat__fileInput') as HTMLInputElement).value).toBe('');
+
+      // A message of files only goes out with an empty text.
+      fireEvent.keyDown(input(), { key: 'Enter' });
+      expect(send).toHaveBeenCalledWith({
+        body: '',
+        attachmentIds: ['d1', 'd2'],
+        draftToken: 'tok',
+        files: [
+          { id: 'd1', filename: 'angebot.pdf', mime: 'application/pdf', size: 4, scanState: 'scanning', url: '/api/attachments/d1/download' },
+          { id: 'd2', filename: 'kopf.png', mime: 'application/pdf', size: 4, scanState: 'scanning', url: '/api/attachments/d2/download' },
+        ],
+      });
+      view.fixture.detectChanges();
+      expect(view.container.querySelectorAll('.chat__draft')).toHaveLength(0);
+      // The next message starts a new draft.
+      await pick(pdf());
+      expect(api.uploadDraftAttachment.mock.calls[2][1]).toMatchObject({ token: null });
+      expect(cmp.files()).toHaveLength(1);
+    });
+
+    it('sends text and files with the visibility', async () => {
+      const { pick, send, input } = await setup({ canAttach: true, visibilityOptions: ['public', 'internal'] });
+      await pick(pdf());
+      fireEvent.input(input(), { target: { value: 'Siehe Anhang' } });
+      fireEvent.keyDown(input(), { key: 'Enter' });
+      expect(send.mock.calls[0][0]).toMatchObject({ body: 'Siehe Anhang', visibility: 'public', attachmentIds: ['d1'] });
+    });
+
+    it('shows the upload, and sends nothing while it runs', async () => {
+      const answer = new Subject<DraftUpload>();
+      const { pick, send, input, view, settle } = await setup({ canAttach: true, upload: () => answer });
+      await pick(pdf());
+      const chip = view.container.querySelector('.chat__draft--pending') as HTMLElement;
+      expect(chip).toHaveTextContent('angebot.pdf');
+      expect(chip).toHaveTextContent('wird hochgeladen …');
+      expect(screen.getByRole('button', { name: 'Senden' })).toBeDisabled();
+      fireEvent.input(input(), { target: { value: 'Text' } });
+      fireEvent.submit(input().closest('form') as HTMLFormElement);
+      expect(send).not.toHaveBeenCalled();
+      answer.next(draftOf(pdf(), 1));
+      answer.complete();
+      await settle();
+      expect(view.container.querySelector('.chat__draft--pending')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Senden' })).not.toBeDisabled();
+    });
+
+    it('removes a chip before the send, and says when the server refuses', async () => {
+      const { pick, api, toast, view, settle, cmp } = await setup({ canAttach: true });
+      await pick(pdf(), pdf('b.pdf'));
+      fireEvent.click(screen.getByRole('button', { name: 'angebot.pdf entfernen' }));
+      await settle();
+      expect(api.deleteDraftAttachment).toHaveBeenCalledWith('d1', 'tok');
+      expect(view.container.querySelectorAll('.chat__draft')).toHaveLength(1);
+      api.deleteDraftAttachment.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 500 })));
+      await cmp.removeFile(cmp.files()[0]);
+      await settle();
+      expect(toast.error).toHaveBeenCalledWith('Die Datei konnte nicht entfernt werden.');
+      expect(view.container.querySelectorAll('.chat__draft')).toHaveLength(1);
+    });
+
+    it('takes at most 5 files per message and disables the paperclip when full', async () => {
+      const { pick, api, toast, cmp } = await setup({ canAttach: true });
+      await pick(...Array.from({ length: 6 }, (_, i) => pdf(`f${i}.pdf`)));
+      expect(toast.error).toHaveBeenCalledWith('Höchstens 5 Dateien pro Nachricht.');
+      expect(api.uploadDraftAttachment).toHaveBeenCalledTimes(5);
+      expect(cmp.files()).toHaveLength(5);
+      expect(screen.getByRole('button', { name: 'Datei anhängen' })).toBeDisabled();
+      await pick(pdf());
+      expect(api.uploadDraftAttachment).toHaveBeenCalledTimes(5);
+    });
+
+    it('checks the size before the upload', async () => {
+      const { pick, api, toast } = await setup({ canAttach: true });
+      await pick(pdf('gross.pdf', 11 * 1024 * 1024));
+      expect(toast.error).toHaveBeenCalledWith('gross.pdf: Datei zu groß (max. 10 MB).');
+      expect(api.uploadDraftAttachment).not.toHaveBeenCalled();
+    });
+
+    it('names a refused upload', async () => {
+      let status = 415;
+      const { toast, cmp } = await setup({
+        canAttach: true,
+        upload: () => throwError(() => new HttpErrorResponse({ status })),
+      });
+      await cmp.addFiles([pdf('a.exe')]);
+      expect(toast.error).toHaveBeenLastCalledWith('a.exe: Dieser Dateityp ist nicht erlaubt.');
+      status = 413;
+      await cmp.addFiles([pdf('b.pdf')]);
+      expect(toast.error).toHaveBeenLastCalledWith('b.pdf: Datei zu groß (max. 10 MB).');
+      status = 500;
+      await cmp.addFiles([pdf('c.pdf')]);
+      expect(toast.error).toHaveBeenLastCalledWith('c.pdf: Die Datei konnte nicht hochgeladen werden.');
+    });
+
+    it('maps the reasons of the draft service to the chat texts', () => {
+      expect(chatUploadError('apply.files.error.type')).toBe('chat.error.fileType');
+      expect(chatUploadError('apply.files.error.tooLarge')).toBe('chat.error.fileTooLarge');
+      expect(chatUploadError('apply.files.error.rateLimit')).toBe('chat.error.upload');
+    });
+
+    it('ignores an empty pick', async () => {
+      const { view, api, settle } = await setup({ canAttach: true });
+      const box = view.container.querySelector('.chat__fileInput') as HTMLInputElement;
+      Object.defineProperty(box, 'files', { value: null, configurable: true });
+      fireEvent.change(box);
+      await settle();
+      expect(api.uploadDraftAttachment).not.toHaveBeenCalled();
+    });
+
+    it('takes a pasted image and names one without an extension', async () => {
+      const { input, api, cmp, settle } = await setup({ canAttach: true });
+      jest.spyOn(cmp, 'now').mockReturnValue(new Date(2026, 9, 15, 10, 45, 0));
+      const paste = (files: File[]) => {
+        const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
+        Object.defineProperty(event, 'clipboardData', { value: { files } });
+        input().dispatchEvent(event);
+        return event;
+      };
+      const unnamed = paste([
+        new File(['x'], 'image', { type: 'image/png' }),
+        new File(['x'], '', { type: 'image/jpeg' }),
+        new File(['x'], 'blob', { type: 'image/heic' }),
+        new File(['x'], 'shot.png', { type: 'image/png' }),
+      ]);
+      expect(unnamed.defaultPrevented).toBe(true);
+      await settle();
+      const names = api.uploadDraftAttachment.mock.calls.map((c) => (c[0] as File).name);
+      expect(names).toEqual(['Bild-20261015-104500.png', 'Bild-20261015-104500.jpg', 'Bild-20261015-104500.bin', 'shot.png']);
+      expect((api.uploadDraftAttachment.mock.calls[0][0] as File).type).toBe('image/png');
+
+      // Pasted text stays text.
+      expect(paste([]).defaultPrevented).toBe(false);
+      const plain = new Event('paste', { bubbles: true, cancelable: true });
+      input().dispatchEvent(plain);
+      expect(plain.defaultPrevented).toBe(false);
+    });
+
+    it('takes no pasted file where the thread takes none', async () => {
+      const { input, api } = await setup();
+      const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
+      Object.defineProperty(event, 'clipboardData', { value: { files: [new File(['x'], 'a.png', { type: 'image/png' })] } });
+      input().dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(api.uploadDraftAttachment).not.toHaveBeenCalled();
+    });
+
+    it('drops the files of a thread the viewer leaves, and on destroy', async () => {
+      const { pick, set, api, cmp, view, settle } = await setup({ canAttach: true });
+      await pick(pdf());
+      set('draftKey', 't2');
+      await settle();
+      expect(api.deleteDraftAttachment).toHaveBeenCalledWith('d1', 'tok');
+      expect(cmp.files()).toEqual([]);
+      await pick(pdf('b.pdf'));
+      view.fixture.destroy();
+      expect(api.deleteDraftAttachment).toHaveBeenCalledWith('d2', 'tok');
+    });
+
+    it('links only clean files of a message; others show their scan state', async () => {
+      const file = (id: string, extra: object) => ({
+        id,
+        filename: `${id}.pdf`,
+        mime: 'application/pdf',
+        size: 10,
+        url: `/api/attachments/${id}/download`,
+        ...extra,
+      });
+      const { view } = await setup({
+        messages: [
+          msg('a', today(9), {
+            attachments: [
+              file('clean', { scanState: 'clean' }),
+              file('plain', {}),
+              file('scan', { scanState: 'scanning' }),
+              file('bad', { scanState: 'quarantined' }),
+              file('gone', { scanState: 'scanning', lost: true }),
+              file('lost', { lost: true }),
+            ],
+          }),
+        ],
+      });
+      expect(screen.getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual([
+        '/api/attachments/clean/download',
+        '/api/attachments/plain/download',
+      ]);
+      const off = [...view.container.querySelectorAll('.chat__file--off')].map((c) => c.textContent?.replace(/\s+/g, ' ').trim());
+      expect(off).toEqual([
+        'scan.pdf PDF · 1 KB · In Prüfung',
+        'bad.pdf PDF · 1 KB · Quarantäne',
+        'gone.pdf PDF · 1 KB · Nicht mehr vorhanden',
+        'lost.pdf PDF · 1 KB · Nicht mehr vorhanden',
+      ]);
+    });
+
+    it('offers no edit for a failed message with files', async () => {
+      await setup({
+        messages: [
+          msg('f', today(10), {
+            own: true,
+            state: 'failed',
+            attachments: [{ id: 'x', filename: 'x.pdf', mime: 'application/pdf', size: 1, url: '/x', scanState: 'scanning' }],
+          }),
+        ],
+      });
+      expect(screen.getByRole('button', { name: 'Erneut senden' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+    });
+
+    it('marks a lost file in the composer', async () => {
+      const { pick, cmp, view } = await setup({ canAttach: true });
+      await pick(pdf());
+      cmp.drafts.markFailed({ code: 'draft_attachments_missing', errors: [{ field: 'attachmentIds.d1' }] });
+      view.fixture.detectChanges();
+      const chip = view.container.querySelector('.chat__draft') as HTMLElement;
+      expect(chip).toHaveClass('chat__draft--failed');
+      expect(chip).toHaveTextContent('Nicht mehr vorhanden');
+    });
+
+    it('has no a11y violations with chips', async () => {
+      const { pick, view } = await setup({ canAttach: true });
+      await pick(pdf());
+      expect(await runAxe(view.container)).toHaveNoViolations();
+    });
+  });
 });
+

@@ -1,5 +1,15 @@
 import type { ChatMessage } from './chat.models';
-import { buildItems, dayKey, isPending, linkify, newCount, type BuildOptions, type ChatItem } from './chat.util';
+import {
+  buildItems,
+  chatFileUrl,
+  dayKey,
+  isPending,
+  linkify,
+  newCount,
+  toChatAttachments,
+  type BuildOptions,
+  type ChatItem,
+} from './chat.util';
 
 const at = (iso: string) => new Date(iso).toISOString();
 
@@ -159,5 +169,18 @@ describe('chat util', () => {
         '<p><a href="https://a.de" target="_blank">https://a.de</a> <code>https://b.de</code></p><pre><code>https://c.de</code></pre>';
       expect(linkify(html)).toBe(html);
     });
+  });
+});
+
+describe('message files', () => {
+  it('maps the wire files to chat files with a streamed download', () => {
+    expect(chatFileUrl('/api', 'f1')).toBe('/api/attachments/f1/download');
+    expect(
+      toChatAttachments('/api', [{ id: 'f1', filename: 'a.pdf', mime: 'application/pdf', size: 3, scanState: 'quarantined' }]),
+    ).toEqual([
+      { id: 'f1', filename: 'a.pdf', mime: 'application/pdf', size: 3, scanState: 'quarantined', url: '/api/attachments/f1/download' },
+    ]);
+    expect(toChatAttachments('/api', undefined)).toEqual([]);
+    expect(toChatAttachments('/api', null)).toEqual([]);
   });
 });

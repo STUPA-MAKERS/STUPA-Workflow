@@ -142,6 +142,12 @@ describe('TodosApiService', () => {
       [() => api.removeLink('k', 'li').subscribe(), 'DELETE', '/api/todos/cards/k/links/li', null],
       [() => api.addComment('k', 'Hallo', ['p']).subscribe(), 'POST', '/api/todos/cards/k/comments', { body: 'Hallo', mentions: ['p'] }],
       [() => api.addComment('k', 'Hallo').subscribe(), 'POST', '/api/todos/cards/k/comments', { body: 'Hallo', mentions: [] }],
+      [
+        () => api.addComment('k', '', [], { attachmentIds: ['d'], draftToken: 't' }).subscribe(),
+        'POST',
+        '/api/todos/cards/k/comments',
+        { body: '', mentions: [], attachmentIds: ['d'], draftToken: 't' },
+      ],
       [() => api.editComment('k', 'm', 'Neu').subscribe(), 'PATCH', '/api/todos/cards/k/comments/m', { body: 'Neu', mentions: [] }],
       [() => api.editComment('k', 'm', 'Neu', ['p']).subscribe(), 'PATCH', '/api/todos/cards/k/comments/m', { body: 'Neu', mentions: ['p'] }],
       [() => api.deleteComment('k', 'm').subscribe(), 'DELETE', '/api/todos/cards/k/comments/m', null],

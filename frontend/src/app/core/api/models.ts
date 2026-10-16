@@ -468,6 +468,8 @@ export interface CommentOutWire {
   isOwn?: boolean;
   /** When the text was last changed; null or absent for a comment never edited. */
   editedAt?: IsoDateTime | null;
+  /** The files of the comment, oldest first; absent on an older server. */
+  attachments?: MessageAttachment[];
 }
 
 /** `ApplicationTypeListItem`. */
@@ -590,7 +592,7 @@ export interface ApplicationCreateBody {
 }
 
 /** Body for `POST /applications/{id}/comments` (`CommentCreate`). */
-export interface CommentCreateBody {
+export interface CommentCreateBody extends MessageFiles {
   body: string;
   visibility: CommentVisibility;
 }
@@ -770,6 +772,8 @@ export interface ApplicationComment {
   at: IsoDateTime;
   /** When the text was last changed: the chat says "bearbeitet". */
   editedAt?: IsoDateTime | null;
+  /** The files of the comment, oldest first. */
+  attachments: MessageAttachment[];
 }
 
 /** Application type, frontend view, for the wizard selection. */
@@ -846,6 +850,26 @@ export interface ApplicationVersion {
  *   on a finding or a quarantine. The metadata alone does not show this state.
  */
 export type ScanState = 'scanning' | 'clean' | 'quarantined';
+
+/**
+ * The file of a chat message (ticket note, card comment, application comment). The
+ * server sets `scanState`: only a `clean` file downloads, streamed through the API.
+ */
+export interface MessageAttachment {
+  id: Uuid;
+  filename: string;
+  mime: string;
+  size: number;
+  scanState: ScanState;
+}
+
+/** The files of a message create: draft ids of `POST /apply/attachments` and their token. */
+export interface MessageFiles {
+  /** At most 5. */
+  attachmentIds?: Uuid[];
+  /** Required with `attachmentIds`. */
+  draftToken?: string | null;
+}
 
 /** Attachment, frontend view. `isComparisonOffer` is camelCase. `scanState` is derived. */
 export interface Attachment {

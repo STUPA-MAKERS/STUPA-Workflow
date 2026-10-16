@@ -1,4 +1,4 @@
-import type { IsoDateTime, PersonRef } from '@core/api/models';
+import type { IsoDateTime, PersonRef, ScanState } from '@core/api/models';
 
 /** The visibility of a message where a thread knows two (application comments). */
 export type ChatVisibility = 'internal' | 'public';
@@ -13,6 +13,10 @@ export interface ChatAttachment {
   mime: string;
   size: number;
   url: string;
+  /** Only a clean file is a link. Absent: clean. */
+  scanState?: ScanState;
+  /** The send named the draft as missing (422): the server no longer has it. */
+  lost?: boolean;
 }
 
 /** One message of a thread. */
@@ -47,9 +51,16 @@ export interface ChatEvent {
 
 /** The `send` output. `visibility` is set only when the thread offers a choice. */
 export interface ChatSend {
+  /** May be '' when the message has files. */
   body: string;
   visibility?: ChatVisibility;
   mentions?: string[];
+  /** The draft ids of the composer files; set only when the composer holds files. */
+  attachmentIds?: string[];
+  /** The draft token of those files. */
+  draftToken?: string | null;
+  /** The composer files, for the pending bubble of `ChatOutbox`. */
+  files?: ChatAttachment[];
 }
 
 /**

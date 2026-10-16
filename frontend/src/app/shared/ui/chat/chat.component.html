@@ -108,15 +108,30 @@
                     <ul class="chat__files">
                       @for (f of m.attachments; track f.id) {
                         <li>
-                          <a class="chat__file" [href]="f.url" target="_blank" rel="noopener">
-                            <span class="chat__fileIcon" aria-hidden="true">
-                              <app-icon [name]="f.mime.startsWith('image/') ? 'image' : 'file'" [size]="17" />
+                          @if (isLink(f)) {
+                            <a class="chat__file" [href]="f.url" target="_blank" rel="noopener">
+                              <span class="chat__fileIcon" aria-hidden="true">
+                                <app-icon [name]="f.mime.startsWith('image/') ? 'image' : 'file'" [size]="17" />
+                              </span>
+                              <span class="chat__fileText">
+                                <span class="mono chat__fileName">{{ f.filename }}</span>
+                                <span class="chat__fileMeta">{{ fileMeta(f) }}</span>
+                              </span>
+                            </a>
+                          } @else {
+                            @let st = fileState(f);
+                            <span class="chat__file chat__file--off">
+                              <span class="chat__fileIcon" aria-hidden="true">
+                                <app-icon [name]="f.mime.startsWith('image/') ? 'image' : 'file'" [size]="17" />
+                              </span>
+                              <span class="chat__fileText">
+                                <span class="mono chat__fileName">{{ f.filename }}</span>
+                                <span class="chat__fileMeta">
+                                  {{ fileMeta(f) }} · <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+                                </span>
+                              </span>
                             </span>
-                            <span class="chat__fileText">
-                              <span class="mono chat__fileName">{{ f.filename }}</span>
-                              <span class="chat__fileMeta">{{ fileMeta(f) }}</span>
-                            </span>
-                          </a>
+                          }
                         </li>
                       }
                     </ul>
@@ -132,9 +147,11 @@
                 <button type="button" class="chat__retry" (click)="retryFailed(m)">
                   {{ 'chat.retry' | t }}
                 </button>
-                <button type="button" class="chat__retry" (click)="editFailed(m)">
-                  {{ 'chat.editShort' | t }}
-                </button>
+                @if (!m.attachments?.length) {
+                  <button type="button" class="chat__retry" (click)="editFailed(m)">
+                    {{ 'chat.editShort' | t }}
+                  </button>
+                }
                 <button type="button" class="chat__retry" (click)="discardFailed(m)">
                   {{ 'chat.discard' | t }}
                 </button>
@@ -179,6 +196,41 @@
         (valueChange)="setVisibility($event)"
       />
     }
+    @if (files().length || uploads().length) {
+      <ul class="chat__drafts">
+        @for (f of files(); track f.id) {
+          @let st = fileState(f);
+          <li class="chat__draft" [class.chat__draft--failed]="f.failed">
+            <span class="chat__fileIcon" aria-hidden="true">
+              <app-icon [name]="f.mime.startsWith('image/') ? 'image' : 'file'" [size]="17" />
+            </span>
+            <span class="chat__fileText">
+              <span class="mono chat__fileName">{{ f.filename }}</span>
+              <span class="chat__fileMeta">
+                {{ fileMeta(f) }} · <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+              </span>
+            </span>
+            <button
+              type="button"
+              class="chat__draftX"
+              [attr.aria-label]="'chat.removeFile' | t: { name: f.filename }"
+              (click)="removeFile(f)"
+            >
+              <app-icon name="x" [size]="16" />
+            </button>
+          </li>
+        }
+        @for (p of uploads(); track p.key) {
+          <li class="chat__draft chat__draft--pending" role="status">
+            <span class="chat__spinner" aria-hidden="true"></span>
+            <span class="chat__fileText">
+              <span class="mono chat__fileName">{{ p.filename }}</span>
+              <span class="chat__fileMeta">{{ 'chat.uploading' | t }}</span>
+            </span>
+          </li>
+        }
+      </ul>
+    }
     <div class="chat__box">
       <textarea
         #composerInput
@@ -191,12 +243,34 @@
         [attr.aria-label]="placeholder() | t"
         (input)="onDraft($any($event.target).value)"
         (keydown)="onComposerKey($event)"
+        (paste)="onPaste($event)"
       ></textarea>
+      @if (canAttach()) {
+        <app-button
+          class="chat__attach"
+          variant="text"
+          [iconOnly]="true"
+          [disabled]="full()"
+          [ariaLabel]="'chat.attach' | t"
+          (click)="pickFiles()"
+        ><app-icon name="paperclip" [size]="19" /></app-button>
+        <input
+          #fileInput
+          class="chat__fileInput"
+          type="file"
+          multiple
+          tabindex="-1"
+          aria-hidden="true"
+          [accept]="accept"
+          (change)="onPicked($event)"
+        />
+      }
       <app-button
         class="chat__send"
         type="submit"
         variant="fill"
         [iconOnly]="true"
+        [disabled]="uploading()"
         [ariaLabel]="'chat.send' | t"
       ><app-icon name="send" [size]="17" /></app-button>
     </div>

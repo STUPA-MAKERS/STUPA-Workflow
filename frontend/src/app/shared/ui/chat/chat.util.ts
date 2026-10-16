@@ -1,4 +1,28 @@
-import type { ChatEvent, ChatMessage, ChatVisibility } from './chat.models';
+import type { MessageAttachment } from '@core/api/models';
+import type { ChatAttachment, ChatEvent, ChatMessage, ChatVisibility } from './chat.models';
+
+/** The most files one message carries; the server checks it again. */
+export const CHAT_MAX_FILES = 5;
+
+/** The download of a message file: streamed through the API (`base` = `API_BASE_URL`). */
+export function chatFileUrl(base: string, id: string): string {
+  return `${base}/attachments/${id}/download`;
+}
+
+/** The files of a message on the wire, as the chat shows them. */
+export function toChatAttachments(
+  base: string,
+  files: readonly MessageAttachment[] | null | undefined,
+): ChatAttachment[] {
+  return (files ?? []).map((f) => ({
+    id: f.id,
+    filename: f.filename,
+    mime: f.mime,
+    size: f.size,
+    scanState: f.scanState,
+    url: chatFileUrl(base, f.id),
+  }));
+}
 
 /** Messages of one person within this time form one group: one name, one avatar. */
 export const GROUP_WINDOW_MS = 5 * 60_000;

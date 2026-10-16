@@ -1,4 +1,5 @@
-import { HttpErrorResponse } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -45,6 +46,8 @@ async function start(url: string, opts: Opts = {}) {
   const toast = { success: jest.fn(), error: jest.fn() };
   TestBed.configureTestingModule({
     providers: [
+      provideHttpClient(),
+      provideHttpClientTesting(),
       provideRouter([
         { path: 'todos', component: TodosComponent },
         { path: 'todos/:boardId', component: TodosComponent },

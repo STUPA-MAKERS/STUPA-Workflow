@@ -14,6 +14,8 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ApiClient } from '@core/api/api-client.service';
+import { API_BASE_URL } from '@core/api/api.config';
 import type { PersonRef, Uuid } from '@core/api/models';
 import {
   TICKET_KINDS,
@@ -32,9 +34,10 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { liveSearch } from '@shared/live-search';
 import { AvatarStackComponent } from '@shared/ui/avatar/avatar.component';
-import { ChatOutbox, sendErrorKey } from '@shared/ui/chat/chat-outbox';
+import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
 import type { ChatEdit, ChatEvent, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/chat.models';
+import { toChatAttachments } from '@shared/ui/chat/chat.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { FieldGroupComponent, FieldRowComponent } from '@shared/ui/field-group/field-group.component';
 import {
@@ -84,8 +87,10 @@ const BODY_ID = 'ticket-body';
  * the report, the internal notes and the events) and "Details" (reporter, assignee, kind,
  * the linked to-dos, the technical context). One pane at a time the two are tabs.
  *
- * Every note is internal, so the composer has no visibility switch and no attachments.
- * Closing a ticket with open to-dos asks "Offene To-Dos mit erledigen?" (default yes).
+ * Every note is internal, so the composer has no visibility switch. A note takes up to
+ * 5 files (not on an anonymized ticket). Closing a ticket with open to-dos asks "Offene
+ * To-Dos mit erledigen?" (default yes). The ⋮ menu blocks or unblocks the sender (frame
+ * 19); the block asks first, the unblock does not.
  */
 @Component({
   selector: 'app-ticket-detail',
@@ -122,6 +127,8 @@ const BODY_ID = 'ticket-body';
 })
 export class TicketDetailComponent {
   private readonly api = inject(TicketsApiService);
+  private readonly files = inject(ApiClient);
+  private readonly apiBase = inject(API_BASE_URL);
   private readonly todosApi = inject(TodosApiService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
@@ -162,6 +169,10 @@ export class TicketDetailComponent {
     error: () => this.duplicateHits.set([]),
   });
   readonly todoOpen = signal(false);
+  /** "Absender sperren" asks first. */
+  readonly blockOpen = signal(false);
+  /** A block or an unblock in flight. */
+  readonly blocking = signal(false);
 
   readonly open = computed(() => {
     const t = this.ticket();
@@ -215,10 +226,18 @@ export class TicketDetailComponent {
     if (t.status !== 'new') {
       sections.push({ items: [{ id: 'reset', label: this.t('tickets.detail.resetNew'), icon: 'history' }] });
     }
-    // The closing action stands apart from the status change, behind a rule.
-    if (isOpen(t.status)) {
-      sections.push({ items: [{ id: 'duplicate', label: this.t('tickets.detail.duplicate'), icon: 'copy' }] });
+    // The closing action and the block stand apart from the status change, behind a rule.
+    const apart: RowMenuItem[] = [];
+    if (isOpen(t.status)) apart.push({ id: 'duplicate', label: this.t('tickets.detail.duplicate'), icon: 'copy' });
+    // An anonymized ticket has no sender any more.
+    if (!t.anonymizedAt) {
+      apart.push(
+        t.senderBlocked
+          ? { id: 'unblock', label: this.t('tickets.detail.unblockSender'), icon: 'lock' }
+          : { id: 'block', label: this.t('tickets.detail.blockSender'), icon: 'lock' },
+      );
     }
+    if (apart.length) sections.push({ items: apart });
     // A new ticket can be a duplicate, any other can go back to "Neu": never empty.
     return sections;
   });
@@ -246,9 +265,10 @@ export class TicketDetailComponent {
 
   /** The report as the first message, then the notes, then the pending ones. */
   private readonly outbox = new ChatOutbox<TicketNote>(
-    (req) => this.api.addNote(this.id, req.body),
+    (req) => this.api.addNote(this.id, req.body, req),
     (created) => this.notes.update((list) => [...list, created]),
     (err) => this.toast.error(this.t(sendErrorKey(err, 'tickets.detail.error.note'))),
+    draftDropper(this.files),
   );
 
   readonly messages = computed<ChatMessage[]>(() => {
@@ -267,6 +287,7 @@ export class TicketDetailComponent {
         mime: a.mime,
         size: a.size,
         url: this.api.attachmentUrl(a.id),
+        scanState: a.scanned ? 'clean' : 'scanning',
       })),
     };
     const notes = this.notes().map<ChatMessage>((n) => ({
@@ -276,6 +297,7 @@ export class TicketDetailComponent {
       at: n.at,
       editedAt: n.editedAt,
       own: n.isOwn,
+      attachments: toChatAttachments(this.apiBase, n.attachments),
     }));
     return [body, ...notes, ...this.outbox.messages()];
   });
@@ -381,6 +403,32 @@ export class TicketDetailComponent {
       this.duplicateHits.set([]);
       this.duplicateOpen.set(true);
     }
+    if (item.id === 'block') this.blockOpen.set(true);
+    if (item.id === 'unblock') this.setBlocked(false);
+  }
+
+  /** "Sperren" in the question. */
+  confirmBlock(): void {
+    this.blockOpen.set(false);
+    this.setBlocked(true);
+  }
+
+  private setBlocked(block: boolean): void {
+    if (this.blocking()) return;
+    const id = this.id;
+    this.blocking.set(true);
+    (block ? this.api.blockSender(id) : this.api.unblockSender(id)).subscribe({
+      next: (t) => {
+        this.blocking.set(false);
+        if (id !== this.id) return;
+        this.ticket.set(t);
+        this.toast.success(this.t(block ? 'tickets.detail.senderBlocked' : 'tickets.detail.senderUnblocked'));
+      },
+      error: () => {
+        this.blocking.set(false);
+        this.toast.error(this.t('tickets.detail.error.block'));
+      },
+    });
   }
 
   /** Copy the link of the ticket. */
@@ -496,7 +544,7 @@ export class TicketDetailComponent {
   // --- notes --------------------------------------------------------------
 
   sendNote(req: ChatSend): void {
-    this.outbox.send({ body: req.body });
+    this.outbox.send(req);
   }
 
   retryNote(ref: ChatRef): void {

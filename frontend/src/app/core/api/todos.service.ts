@@ -9,7 +9,8 @@ import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular
 import { Injectable, inject } from '@angular/core';
 import { catchError, map, of, throwError, type Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
-import type { I18nMap, IsoDateTime, Page, PersonRef, Uuid } from '@core/api/models';
+import type { I18nMap, IsoDateTime, MessageAttachment, MessageFiles, Page, PersonRef, Uuid } from '@core/api/models';
+import { messageFiles } from '@core/api/mappers';
 import { skipLoading } from '@core/loading/loading.interceptor';
 import type { TicketStatus } from './tickets.service';
 
@@ -135,6 +136,8 @@ export interface TodoComment {
   at: IsoDateTime;
   editedAt: IsoDateTime | null;
   isOwn: boolean;
+  /** The files of the comment, oldest first. */
+  attachments: MessageAttachment[];
 }
 
 export interface TodoCardDetail extends TodoCardTile {
@@ -438,10 +441,16 @@ export class TodosApiService {
     });
   }
 
-  addComment(cardId: Uuid, body: string, mentions: Uuid[] = []): Observable<TodoComment> {
+  /** A comment; `files` binds draft uploads of `POST /apply/attachments` (at most 5). */
+  addComment(
+    cardId: Uuid,
+    body: string,
+    mentions: Uuid[] = [],
+    files: MessageFiles = {},
+  ): Observable<TodoComment> {
     return this.http.post<TodoComment>(
       `${this.base}/todos/cards/${cardId}/comments`,
-      { body, mentions },
+      { body, mentions, ...messageFiles(files) },
       { context: skipLoading() },
     );
   }

@@ -96,6 +96,33 @@ describe('TicketsApiService', () => {
     const del = http.expectOne('/api/tickets/t-1/notes/n-1');
     expect(del.request.method).toBe('DELETE');
     del.flush(null);
+
+    api.addNote('t-1', '', { attachmentIds: ['d1'], draftToken: 'tok' }).subscribe();
+    const files = http.expectOne('/api/tickets/t-1/notes');
+    expect(files.request.body).toEqual({ body: '', attachmentIds: ['d1'], draftToken: 'tok' });
+    files.flush({});
+  });
+
+  it('blocks and unblocks the sender and works the block list', () => {
+    api.blockSender('t-1').subscribe();
+    const block = http.expectOne('/api/tickets/t-1/block-sender');
+    expect(block.request.method).toBe('POST');
+    block.flush({});
+
+    api.unblockSender('t-1').subscribe();
+    const unblock = http.expectOne('/api/tickets/t-1/block-sender');
+    expect(unblock.request.method).toBe('DELETE');
+    unblock.flush({});
+
+    api.blockedSenders().subscribe();
+    const list = http.expectOne('/api/tickets/blocked-senders');
+    expect(list.request.method).toBe('GET');
+    list.flush([]);
+
+    api.deleteBlockedSender('b-1').subscribe();
+    const lift = http.expectOne('/api/tickets/blocked-senders/b-1');
+    expect(lift.request.method).toBe('DELETE');
+    lift.flush(null);
   });
 
   it('builds the download url of an attachment', () => {

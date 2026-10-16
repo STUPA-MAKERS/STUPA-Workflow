@@ -395,6 +395,13 @@ describe('ApiClient', () => {
     req.flush(wire, { status: 201, statusText: 'Created' });
   });
 
+  it('POSTs the files of a comment', () => {
+    api.addComment('app-3', '', 'internal', { attachmentIds: ['d1'], draftToken: 'tok' }).subscribe();
+    const req = http.expectOne('/api/applications/app-3/comments');
+    expect(req.request.body).toEqual({ body: '', visibility: 'internal', attachmentIds: ['d1'], draftToken: 'tok' });
+    req.flush({ id: 'c', authorKind: 'principal', body: '', visibility: 'internal', at: '2026-06-05T13:00:00Z' });
+  });
+
   it('GETs a vote state + tally from /votes/{id}', (done) => {
     api.getVote('v1').subscribe((vote) => {
       expect(vote.status).toBe('open');

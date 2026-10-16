@@ -24,8 +24,10 @@ import {
   IconComponent,
   MEDIA,
   SegmentedComponent,
+  ToastService,
   type SegmentedOption,
 } from '@stupa-makers/ui-kit';
+import { API_BASE_URL } from '@core/api/api.config';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -34,7 +36,14 @@ import { PressSelectDirective } from '@shared/press-select.directive';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { AvatarComponent } from '../avatar/avatar.component';
 import { SideSheetComponent } from '../side-sheet/side-sheet.component';
-import { formatSize } from '../../../features/apply/apply.util';
+import { scanStatus, type StatusView } from '../../status-kind.util';
+import { StatusTextComponent } from '../status-text/status-text.component';
+import { UPLOAD_ACCEPT, formatSize } from '../../../features/apply/apply.util';
+import {
+  DRAFT_FILES_PERSIST,
+  DraftAttachmentsService,
+  type DraftFile,
+} from '../../../features/apply/draft-attachments.service';
 import type {
   ChatAttachment,
   ChatEdit,
@@ -44,7 +53,7 @@ import type {
   ChatSend,
   ChatVisibility,
 } from './chat.models';
-import { buildItems, dayKey, isPending, linkify, newCount } from './chat.util';
+import { CHAT_MAX_FILES, buildItems, chatFileUrl, dayKey, isPending, linkify, newCount } from './chat.util';
 
 /** The log counts as "at the newest message" this close to its end, in px. */
 const BOTTOM_SLACK = 24;
@@ -52,6 +61,25 @@ const DRAFT_PREFIX = 'ap.chat.draft.';
 /** The longest body the server takes for a comment, a note or a card comment. */
 export const CHAT_MAX_LENGTH = 10_000;
 const SEEN_PREFIX = 'ap.chat.seen.';
+
+/** The extension of a pasted image without a name of its own. */
+const PASTE_EXT: Readonly<Record<string, string>> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+};
+
+/** The chat text of a refused upload, from the reason of `DraftAttachmentsService`. */
+export function chatUploadError(reason: TranslationKey): TranslationKey {
+  if (reason === 'apply.files.error.type') return 'chat.error.fileType';
+  if (reason === 'apply.files.error.tooLarge') return 'chat.error.fileTooLarge';
+  return 'chat.error.upload';
+}
+
+function pad(n: number): string {
+  return String(n).padStart(2, '0');
+}
 
 /** The body of a message as safe HTML: escaped Markdown, bare URLs as links. */
 @Pipe({ name: 'chatBody', standalone: true })
@@ -100,6 +128,12 @@ function writeStore(key: string, value: string | null): void {
  *   composer) and "Verwerfen".
  * - Own messages: edit and delete on hover or focus (desktop), a long press opens a
  *   bottom sheet (phone).
+ * - Files (`canAttach`): the paperclip and a pasted image upload drafts through
+ *   `POST /apply/attachments` (its own `DraftAttachmentsService`, never kept in
+ *   `sessionStorage`). Up to 5 per message, each under the limit of the site config.
+ *   The chips show the upload and the scan state and can leave before the send; the
+ *   send carries the ids and the token and forgets them. On a message only a clean file
+ *   is a link (streamed through the API); a file in the scan or in quarantine is not.
  */
 @Component({
   selector: 'app-chat',
@@ -114,8 +148,10 @@ function writeStore(key: string, value: string | null): void {
     PressSelectDirective,
     SegmentedComponent,
     SideSheetComponent,
+    StatusTextComponent,
     TranslatePipe,
   ],
+  providers: [DraftAttachmentsService, { provide: DRAFT_FILES_PERSIST, useValue: false }],
   host: { '[class.chat--phone]': 'phone()' },
   templateUrl: './chat.component.html',
   styleUrl: './chat.component.scss',
@@ -124,6 +160,9 @@ export class ChatComponent {
   private readonly i18n = inject(I18nService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
+  private readonly drafts = inject(DraftAttachmentsService);
+  private readonly toast = inject(ToastService);
+  private readonly apiBase = inject(API_BASE_URL);
 
   readonly messages = input<readonly ChatMessage[]>([]);
   readonly events = input<readonly ChatEvent[]>([]);
@@ -133,6 +172,8 @@ export class ChatComponent {
   /** Names the thread in the browser storage (draft, last seen). */
   readonly draftKey = input.required<string>();
   readonly placeholder = input<TranslationKey>('chat.placeholder');
+  /** Show the paperclip: the composer takes files. */
+  readonly canAttach = input(false);
 
   readonly send = output<ChatSend>();
   readonly edit = output<ChatEdit>();
@@ -150,6 +191,16 @@ export class ChatComponent {
   protected readonly touchMenu = computed(() => this.phone() && this.coarse());
   private readonly log = viewChild.required<ElementRef<HTMLElement>>('log');
   private readonly composerInput = viewChild<ElementRef<HTMLTextAreaElement>>('composerInput');
+  private readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
+
+  protected readonly accept = UPLOAD_ACCEPT;
+  /** The uploaded files of the composer, oldest first. */
+  protected readonly files = this.drafts.files;
+  /** The files on their way up. */
+  protected readonly uploads = this.drafts.pending;
+  protected readonly uploading = this.drafts.busy;
+  /** No room for another file. */
+  protected readonly full = computed(() => this.files().length + this.uploads().length >= CHAT_MAX_FILES);
 
   protected readonly maxLength = CHAT_MAX_LENGTH;
   protected readonly draft = signal('');
@@ -210,6 +261,8 @@ export class ChatComponent {
         this.stick = true;
         this.atBottom.set(true);
         this.editingId.set(null);
+        // The files of another thread never go into this one.
+        if (this.drafts.files().length) void this.drafts.discard();
         // A new thread starts on the default visibility (public first), never on the last one.
         this.visibility.set(this.visibilityOptions()[0] ?? null);
       });
@@ -232,6 +285,7 @@ export class ChatComponent {
       const messages = this.messages();
       untracked(() => this.refocusAfterDelete(messages));
     });
+    this.destroyRef.onDestroy(() => void this.drafts.discard());
     afterNextRender(() => {
       const observer = new ResizeObserver(() => this.follow());
       observer.observe(this.log().nativeElement);
@@ -272,11 +326,24 @@ export class ChatComponent {
   }
 
   /** "PNG · 96 KB": the file type from the name, then the size. */
-  protected fileMeta(file: ChatAttachment): string {
+  protected fileMeta(file: { filename: string; size: number }): string {
     const dot = file.filename.lastIndexOf('.');
     const ext = dot > 0 ? file.filename.slice(dot + 1).toUpperCase() : '';
     const size = formatSize(file.size, this.i18n.formatLocale());
     return ext ? `${ext} · ${size}` : size;
+  }
+
+  /** The scan state of a file that is not a link; a lost file says so. */
+  protected fileState(file: ChatAttachment | DraftFile): StatusView {
+    if (('lost' in file && file.lost) || ('failed' in file && file.failed)) {
+      return { kind: 'error', key: 'apply.files.lost' };
+    }
+    return scanStatus(file.scanState ?? 'clean');
+  }
+
+  /** A file of a message opens only when the scan found it clean. */
+  protected isLink(file: ChatAttachment): boolean {
+    return !file.lost && (file.scanState ?? 'clean') === 'clean';
   }
 
   protected time(at: string): string {
@@ -347,13 +414,94 @@ export class ChatComponent {
 
   protected submit(event?: Event): void {
     event?.preventDefault();
+    if (this.uploading()) return;
     const body = this.draft().trim();
-    if (!body) return;
+    const files = this.drafts.usable();
+    if (!body && !files.length) return;
     const vis = this.visibility();
-    this.send.emit(vis ? { body, visibility: vis } : { body });
+    const req: ChatSend = vis ? { body, visibility: vis } : { body };
+    if (files.length) {
+      req.attachmentIds = files.map((f) => f.id);
+      req.draftToken = this.drafts.token();
+      req.files = files.map((f) => ({
+        id: f.id,
+        filename: f.filename,
+        mime: f.mime,
+        size: f.size,
+        scanState: f.scanState,
+        url: chatFileUrl(this.apiBase, f.id),
+      }));
+    }
+    this.send.emit(req);
+    // The message owns the files now: the next one starts a new draft.
+    this.drafts.clear();
     // The chosen visibility stays for the next message of the thread.
     this.onDraft('');
     this.scrollToEnd();
+  }
+
+  // --- files -----------------------------------------------------------------------
+
+  protected pickFiles(): void {
+    this.fileInput()?.nativeElement.click();
+  }
+
+  protected onPicked(event: Event): void {
+    const box = event.target as HTMLInputElement;
+    const files = Array.from(box.files ?? []);
+    box.value = '';
+    void this.addFiles(files);
+  }
+
+  /** A pasted image becomes a file of the message; pasted text stays text. */
+  protected onPaste(event: ClipboardEvent): void {
+    if (!this.canAttach()) return;
+    const files = Array.from(event.clipboardData?.files ?? []);
+    if (!files.length) return;
+    event.preventDefault();
+    void this.addFiles(files.map((f) => this.named(f)));
+  }
+
+  /**
+   * A pasted image often has no extension, and the server matches the extension with
+   * the content: "Bild-20261015-104500.png".
+   */
+  private named(file: File): File {
+    if (/.\.[^.]+$/.test(file.name)) return file;
+    const d = this.now();
+    const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    const ext = PASTE_EXT[file.type] ?? 'bin';
+    const name = `${this.i18n.translate('chat.pastedImage')}-${stamp}.${ext}`;
+    return new File([file], name, { type: file.type, lastModified: file.lastModified });
+  }
+
+  /** Upload files: the count and the size are checked here first, the server checks again. */
+  protected async addFiles(list: readonly File[]): Promise<void> {
+    const room = CHAT_MAX_FILES - this.files().length - this.uploads().length;
+    if (list.length > room) {
+      this.toast.error(this.i18n.translate('chat.error.tooManyFiles', { max: CHAT_MAX_FILES }));
+    }
+    const maxBytes = this.drafts.limits().maxFileBytes;
+    const mb = Math.round(maxBytes / (1024 * 1024));
+    const take: File[] = [];
+    for (const file of list.slice(0, Math.max(0, room))) {
+      if (file.size > maxBytes) {
+        this.toast.error(`${file.name}: ${this.i18n.translate('chat.error.fileTooLarge', { mb })}`);
+      } else {
+        take.push(file);
+      }
+    }
+    if (!take.length) return;
+    const { failed } = await this.drafts.upload(take);
+    for (const f of failed) {
+      this.toast.error(`${f.filename}: ${this.i18n.translate(chatUploadError(f.reason), { mb })}`);
+    }
+  }
+
+  protected async removeFile(file: DraftFile): Promise<void> {
+    if (!(await this.drafts.remove(file.id))) {
+      this.toast.error(this.i18n.translate('apply.files.error.delete'));
+    }
   }
 
   // --- failed messages -------------------------------------------------------------

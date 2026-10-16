@@ -48,6 +48,16 @@ export const DRAFT_FILES_STORAGE_KEY = new InjectionToken<string>('DRAFT_FILES_S
   factory: () => DRAFT_FILES_KEY,
 });
 
+/**
+ * Keep the draft in `sessionStorage`, so a reload keeps it. The wizard and the capture
+ * dialog keep the default; the chat composer provides `false`: its files live as long
+ * as the composer, only its text draft stays.
+ */
+export const DRAFT_FILES_PERSIST = new InjectionToken<boolean>('DRAFT_FILES_PERSIST', {
+  providedIn: 'root',
+  factory: () => true,
+});
+
 const TOKEN_INVALID = 'draft_token_invalid';
 const QUOTA_EXCEEDED = 'draft_quota_exceeded';
 const MISSING = 'draft_attachments_missing';
@@ -86,6 +96,7 @@ export class DraftAttachmentsService {
   private readonly altcha = inject(AltchaService);
   private readonly branding = inject(BrandingService);
   private readonly storageKey = inject(DRAFT_FILES_STORAGE_KEY);
+  private readonly persist = inject(DRAFT_FILES_PERSIST);
 
   private readonly _token = signal<string | null>(null);
   private expiresAt: string | null = null;
@@ -268,6 +279,7 @@ export class DraftAttachmentsService {
     this._token.set(null);
     this.expiresAt = null;
     this.files.set([]);
+    if (!this.persist) return;
     try {
       sessionStorage.removeItem(this.storageKey);
     } catch {
@@ -314,6 +326,7 @@ export class DraftAttachmentsService {
   }
 
   private store(): void {
+    if (!this.persist) return;
     const token = this._token();
     try {
       if (!token) {
@@ -328,6 +341,7 @@ export class DraftAttachmentsService {
   }
 
   private restore(): void {
+    if (!this.persist) return;
     let raw: string | null = null;
     try {
       raw = sessionStorage.getItem(this.storageKey);

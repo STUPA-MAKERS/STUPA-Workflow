@@ -10,7 +10,8 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
-import type { IsoDateTime, PersonRef, Uuid } from '@core/api/models';
+import type { IsoDateTime, MessageAttachment, MessageFiles, PersonRef, Uuid } from '@core/api/models';
+import { messageFiles } from '@core/api/mappers';
 import { skipLoading } from '@core/loading/loading.interceptor';
 
 export type TicketKind = 'bug' | 'question' | 'idea';
@@ -111,6 +112,8 @@ export interface TicketNote {
   at: IsoDateTime;
   editedAt: IsoDateTime | null;
   isOwn: boolean;
+  /** The files of the note, oldest first. */
+  attachments: MessageAttachment[];
 }
 
 export interface TicketDetail extends TicketListItem {
@@ -126,6 +129,29 @@ export interface TicketDetail extends TicketListItem {
   openTodoCount: number;
   closedAt: IsoDateTime | null;
   anonymizedAt: IsoDateTime | null;
+  /** The reporter is blocked; false for an anonymized ticket. */
+  senderBlocked: boolean;
+}
+
+/**
+ * A blocked sender of "Absender sperren". A report of a blocked sender gets a number,
+ * but nothing is stored and no mail goes out.
+ */
+export interface TicketBlockedSender {
+  id: Uuid;
+  kind: 'principal' | 'email';
+  /** kind `principal`. */
+  person: PersonRef | null;
+  /** kind `email`: the stored address; kind `principal`: the account e-mail. */
+  email: string | null;
+  /** null: a deleted person. */
+  blockedBy: PersonRef | null;
+  blockedAt: IsoDateTime;
+  /** null after the ticket is gone. */
+  sourceTicket: { id: Uuid; number: string } | null;
+  /** Reports held back since the block. */
+  hitCount: number;
+  lastHitAt: IsoDateTime | null;
 }
 
 export interface TicketPatch {
@@ -204,8 +230,12 @@ export class TicketsApiService {
     return this.http.patch<TicketDetail>(`${this.base}/tickets/${id}`, body);
   }
 
-  addNote(id: Uuid, body: string): Observable<TicketNote> {
-    return this.http.post<TicketNote>(`${this.base}/tickets/${id}/notes`, { body });
+  /** A note; `files` binds draft uploads of `POST /apply/attachments` (at most 5). */
+  addNote(id: Uuid, body: string, files: MessageFiles = {}): Observable<TicketNote> {
+    return this.http.post<TicketNote>(`${this.base}/tickets/${id}/notes`, {
+      body,
+      ...messageFiles(files),
+    });
   }
 
   editNote(id: Uuid, noteId: Uuid, body: string): Observable<TicketNote> {
@@ -214,6 +244,27 @@ export class TicketsApiService {
 
   deleteNote(id: Uuid, noteId: Uuid): Observable<void> {
     return this.http.delete<void>(`${this.base}/tickets/${id}/notes/${noteId}`);
+  }
+
+  /** Block the reporter: the account, or the e-mail of a report without one. Idempotent. */
+  blockSender(id: Uuid): Observable<TicketDetail> {
+    return this.http.post<TicketDetail>(`${this.base}/tickets/${id}/block-sender`, null);
+  }
+
+  /** Lift the block of the reporter. Idempotent. */
+  unblockSender(id: Uuid): Observable<TicketDetail> {
+    return this.http.delete<TicketDetail>(`${this.base}/tickets/${id}/block-sender`);
+  }
+
+  /** The blocked senders, newest first. */
+  blockedSenders(): Observable<TicketBlockedSender[]> {
+    return this.http.get<TicketBlockedSender[]>(`${this.base}/tickets/blocked-senders`, {
+      context: skipLoading(),
+    });
+  }
+
+  deleteBlockedSender(blockId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/tickets/blocked-senders/${blockId}`);
   }
 
   /** The download of a ticket attachment: streamed through the API, never presigned. */

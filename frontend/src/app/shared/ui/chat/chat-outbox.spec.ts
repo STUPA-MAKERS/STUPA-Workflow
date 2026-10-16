@@ -1,6 +1,16 @@
-import { Subject } from 'rxjs';
-import { ChatOutbox, sendErrorKey } from './chat-outbox';
-import type { ChatSend } from './chat.models';
+import { Subject, of, throwError } from 'rxjs';
+import { ChatOutbox, draftDropper, missingFiles, sendErrorKey } from './chat-outbox';
+import type { ChatAttachment, ChatSend } from './chat.models';
+
+const FILE_A: ChatAttachment = { id: 'a', filename: 'a.png', mime: 'image/png', size: 1, url: '/a', scanState: 'scanning' };
+const FILE_B: ChatAttachment = { id: 'b', filename: 'b.pdf', mime: 'application/pdf', size: 2, url: '/b', scanState: 'clean' };
+
+function missing(...ids: string[]) {
+  return {
+    status: 422,
+    error: { code: 'draft_attachments_missing', errors: ids.map((id) => ({ field: `attachmentIds.${id}` })) },
+  };
+}
 
 describe('ChatOutbox', () => {
   let calls: { req: ChatSend; answer: Subject<string> }[];
@@ -110,5 +120,75 @@ describe('ChatOutbox', () => {
     expect(sendErrorKey({ status: 403 }, 'chat.failed')).toBe('chat.error.forbidden');
     expect(sendErrorKey({ status: 500 }, 'chat.failed')).toBe('chat.failed');
     expect(sendErrorKey(null, 'chat.failed')).toBe('chat.failed');
+  });
+
+  it('names a lost file before a long body', () => {
+    expect(sendErrorKey(missing('a'), 'chat.failed')).toBe('chat.error.filesMissing');
+  });
+
+  it('reads the ids of a 422 draft_attachments_missing', () => {
+    expect(missingFiles(missing('a', 'b'))).toEqual(new Set(['a', 'b']));
+    expect(
+      missingFiles({
+        status: 422,
+        error: { code: 'draft_attachments_missing', errors: [null, { field: 'draftToken' }, { field: 3 }] },
+      }),
+    ).toEqual(new Set());
+    expect(missingFiles({ status: 422, error: { code: 'draft_attachments_missing' } })).toEqual(new Set());
+    expect(missingFiles({ status: 422, error: { code: 'other' } })).toBeNull();
+    expect(missingFiles({ status: 500 })).toBeNull();
+    expect(missingFiles(null)).toBeNull();
+  });
+
+  it('shows the files of a pending message, marks lost ones and resends the others', () => {
+    outbox.send({ body: '', attachmentIds: ['a', 'b'], draftToken: 'tok', files: [FILE_A, FILE_B] });
+    expect(outbox.messages()[0].attachments).toEqual([FILE_A, FILE_B]);
+    calls[0].answer.error(missing('a'));
+    const msg = outbox.messages()[0];
+    expect(msg.state).toBe('failed');
+    expect(msg.attachments).toEqual([{ ...FILE_A, lost: true }, FILE_B]);
+    outbox.retry(msg.id);
+    expect(calls[1].req.attachmentIds).toEqual(['b']);
+    expect(calls[1].req.draftToken).toBe('tok');
+  });
+
+  it('marks lost files of a message without files without a change', () => {
+    outbox.send({ body: 'x' });
+    outbox.send({ body: 'y', attachmentIds: ['b'], draftToken: 't', files: [FILE_B] });
+    calls[0].answer.error(missing('a'));
+    expect(outbox.messages()[0].attachments).toBeUndefined();
+    // The other pending message keeps its files.
+    expect(outbox.messages()[1].attachments).toEqual([FILE_B]);
+    outbox.retry(outbox.messages()[0].id);
+    expect(calls[2].req.attachmentIds).toEqual([]);
+  });
+
+  it('deletes the drafts of a discarded message, and none without files or token', () => {
+    const drop = jest.fn();
+    const answer = new Subject<string>();
+    const box = new ChatOutbox<string>(() => answer, () => undefined, () => undefined, drop);
+    box.send({ body: '', attachmentIds: ['a'], draftToken: 'tok', files: [FILE_A] });
+    box.send({ body: 'ohne' });
+    box.send({ body: '', attachmentIds: ['a'], draftToken: null });
+    answer.error(new Error('x'));
+    for (const m of box.messages()) box.discard(m.id);
+    expect(drop).toHaveBeenCalledTimes(1);
+    expect(drop).toHaveBeenCalledWith(['a'], 'tok');
+  });
+
+  it('works without a drop callback', () => {
+    const answer = new Subject<string>();
+    const box = new ChatOutbox<string>(() => answer, () => undefined);
+    box.send({ body: '', attachmentIds: ['a'], draftToken: 'tok' });
+    answer.error(new Error('x'));
+    box.discard(box.messages()[0].id);
+    expect(box.messages()).toEqual([]);
+  });
+
+  it('drops drafts through the API and ignores a failed delete', () => {
+    const del = jest.fn((id: string) => (id === 'bad' ? throwError(() => new Error('x')) : of(undefined)));
+    draftDropper({ deleteDraftAttachment: del })(['a', 'bad'], 'tok');
+    expect(del).toHaveBeenCalledWith('a', 'tok');
+    expect(del).toHaveBeenCalledWith('bad', 'tok');
   });
 });

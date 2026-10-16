@@ -20,6 +20,7 @@ import {
   mapTimelineEvent,
   mapTransition,
   mapVersion,
+  messageFiles,
   toApplicationCreateBody,
 } from './mappers';
 import type {
@@ -48,6 +49,7 @@ import type {
   CommentCreateBody,
   CommentOutWire,
   CommentVisibility,
+  MessageFiles,
   DraftAttachmentOutWire,
   DraftUpload,
   EffectiveForm,
@@ -384,13 +386,17 @@ export class ApiClient {
       .pipe(map((comments) => comments.map(mapComment)));
   }
 
-  /** Applicants may write only `public` (the backend rejects `internal` with 403). */
+  /**
+   * Applicants may write only `public` (the backend rejects `internal` with 403).
+   * `files` binds draft uploads of `POST /apply/attachments` (at most 5).
+   */
   addComment(
     id: Uuid,
     body: string,
     visibility: CommentVisibility = 'public',
+    files: MessageFiles = {},
   ): Observable<ApplicationComment> {
-    const payload: CommentCreateBody = { body, visibility };
+    const payload: CommentCreateBody = { body, visibility, ...messageFiles(files) };
     return this.http
       .post<CommentOutWire>(`${this.base}/applications/${id}/comments`, payload)
       .pipe(map(mapComment));
