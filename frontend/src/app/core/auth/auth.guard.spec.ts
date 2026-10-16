@@ -89,6 +89,20 @@ describe('authGuard', () => {
     expect(assign).toHaveBeenCalledWith('/api/auth/login');
   });
 
+  it('returns to the blocked target after the login', () => {
+    let result!: boolean | UrlTree;
+    TestBed.runInInjectionContext(() => {
+      const out = authGuard(
+        { data: {} } as unknown as ActivatedRouteSnapshot,
+        { url: '/applications/a1#comment-c1' } as RouterStateSnapshot,
+      );
+      (out as Observable<boolean | UrlTree>).subscribe((r) => (result = r));
+    });
+    http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
+    expect(result).toBe(false);
+    expect(assign).toHaveBeenCalledWith('/api/auth/login?returnTo=%2Fapplications%2Fa1%23comment-c1');
+  });
+
   it('allows an authenticated user when no permission is required', () => {
     expect(run({}, MEMBER)).toBe(true);
   });

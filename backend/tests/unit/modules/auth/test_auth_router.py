@@ -600,3 +600,103 @@ def test_me_without_a_valid_session_row_sets_no_cookie() -> None:
     resp = client.get("/api/auth/me")
     assert resp.status_code == 200
     assert ENABLED.session_cookie_name not in resp.headers.get("set-cookie", "")
+
+
+# Return to the page where the login started.
+def test_login_return_to_rides_the_tx_cookie(
+    enabled_client: TestClient, idp: respx.MockRouter
+) -> None:
+    from app.modules.auth import sessions
+
+    resp = enabled_client.get(
+        "/api/auth/login", params={"returnTo": "/applications/a1?tab=x#comment-c1"}
+    )
+    assert resp.status_code == 307
+    tx = sessions.load_oidc_tx(
+        ENABLED.session_secret, resp.cookies[ENABLED.oidc_tx_cookie_name], 600
+    )
+    assert tx is not None
+    assert tx["return_to"] == "/applications/a1?tab=x#comment-c1"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://evil.example/x",
+        "//evil.example/x",
+        "/\\evil.example",
+        "evil",
+        "/api/auth/logout",
+        "/api",
+        "/a b",
+        "/a\nb",
+        "/" + "a" * 1100,
+    ],
+)
+def test_login_drops_an_unsafe_return_to(
+    enabled_client: TestClient, idp: respx.MockRouter, value: str
+) -> None:
+    from app.modules.auth import sessions
+
+    resp = enabled_client.get("/api/auth/login", params={"returnTo": value})
+    assert resp.status_code == 307
+    tx = sessions.load_oidc_tx(
+        ENABLED.session_secret, resp.cookies[ENABLED.oidc_tx_cookie_name], 600
+    )
+    assert tx is not None
+    assert "return_to" not in tx
+
+
+def test_callback_goes_back_to_the_return_to_path(
+    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.modules.auth import sessions
+
+    async def _ok(*a: object, **k: object) -> tuple[str, PrincipalRow]:
+        return "signed-sid", PrincipalRow(sub="u1")
+
+    monkeypatch.setattr(router_mod.service, "oidc_callback", _ok)
+    tx = sessions.issue_oidc_tx(
+        ENABLED.session_secret, "st", "v", "n", return_to="/todos/b1?view=list#card-c1"
+    )
+    enabled_client.cookies.set(ENABLED.oidc_tx_cookie_name, tx)
+    resp = enabled_client.get("/api/auth/callback?code=c&state=st", follow_redirects=False)
+    assert resp.status_code == 307
+    base = ENABLED.public_base_url.rstrip("/")
+    assert resp.headers["location"] == f"{base}/todos/b1?view=list#card-c1"
+
+
+def test_callback_ignores_an_unsafe_return_to_in_the_cookie(
+    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A signed cookie with a bad target (an older or forged value) goes home."""
+    from app.modules.auth import sessions
+
+    async def _ok(*a: object, **k: object) -> tuple[str, PrincipalRow]:
+        return "signed-sid", PrincipalRow(sub="u1")
+
+    monkeypatch.setattr(router_mod.service, "oidc_callback", _ok)
+    tx = sessions.issue_oidc_tx(
+        ENABLED.session_secret, "st", "v", "n", return_to="//evil.example/x"
+    )
+    enabled_client.cookies.set(ENABLED.oidc_tx_cookie_name, tx)
+    resp = enabled_client.get("/api/auth/callback?code=c&state=st", follow_redirects=False)
+    assert resp.status_code == 307
+    assert resp.headers["location"] == ENABLED.public_base_url
+
+
+def test_callback_oauth_finish_wins_over_return_to(
+    enabled_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.modules.auth import sessions
+
+    async def _ok(*a: object, **k: object) -> tuple[str, PrincipalRow]:
+        return "signed-sid", PrincipalRow(sub="u1")
+
+    monkeypatch.setattr(router_mod.service, "oidc_callback", _ok)
+    tx = sessions.issue_oidc_tx(ENABLED.session_secret, "st", "v", "n", return_to="/todos")
+    enabled_client.cookies.set(ENABLED.oidc_tx_cookie_name, tx)
+    enabled_client.cookies.set(ENABLED.oauth_tx_cookie_name, "pending")
+    resp = enabled_client.get("/api/auth/callback?code=c&state=st", follow_redirects=False)
+    assert resp.status_code == 307
+    assert resp.headers["location"].endswith("/api/oauth/finish")

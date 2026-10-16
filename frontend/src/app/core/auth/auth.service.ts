@@ -128,15 +128,24 @@ export class AuthService {
    * The installed app (PWA) sends `?client=pwa`, because the server keeps the session
    * of the installed app longer than the session of a browser tab. Every login of the
    * app goes through this method, so the guard, the 401 re-login and each login button
-   * send the same parameter.
+   * send the same parameters.
+   *
+   * `returnTo` is the app URL to open after the login (the guard passes the URL of the
+   * blocked navigation). Without it, the login returns to the current page. A link from
+   * a mail, such as `/applications/<id>#comment-<id>`, then still opens its target.
    */
-  login(): void {
-    this.location.assign(this.loginUrl());
+  login(returnTo?: string): void {
+    const current = `${this.location.pathname}${this.location.search}${this.location.hash}`;
+    this.location.assign(this.loginUrl(loginReturnTo(returnTo ?? current)));
   }
 
-  /** The URL of the login start: `?client=pwa` for the installed app, else no parameter. */
-  private loginUrl(): string {
-    return this.isInstalledApp() ? '/api/auth/login?client=pwa' : '/api/auth/login';
+  /** The URL of the login start, with `client=pwa` for the installed app and `returnTo`. */
+  private loginUrl(returnTo: string | null): string {
+    const params = new URLSearchParams();
+    if (this.isInstalledApp()) params.set('client', 'pwa');
+    if (returnTo) params.set('returnTo', returnTo);
+    const query = params.toString();
+    return query ? `/api/auth/login?${query}` : '/api/auth/login';
   }
 
   /**
@@ -171,4 +180,29 @@ export class AuthService {
     this.principal$ = undefined;
     this.login();
   }
+}
+
+/**
+ * The part of an app URL that the login may carry to the server and back.
+ *
+ * The path and the query stay, without a magic-link token (`t`). The fragment stays only
+ * when it is a plain anchor (`#comments`, `#comment-<id>`), because the guest page keeps
+ * its token in the fragment (`#t=<token>`) and a token must not reach a server log. The
+ * start page and paths under `/api` give `null`: the login then goes home, as before.
+ */
+export function loginReturnTo(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url, 'http://app.invalid');
+  } catch {
+    return null;
+  }
+  if (parsed.origin !== 'http://app.invalid') return null;
+  const path = parsed.pathname;
+  if (path === '/api' || path.startsWith('/api/')) return null;
+  parsed.searchParams.delete('t');
+  const search = parsed.searchParams.toString();
+  const hash = /^#[A-Za-z][\w-]*$/.test(parsed.hash) ? parsed.hash : '';
+  const out = `${path}${search ? `?${search}` : ''}${hash}`;
+  return out === '/' ? null : out;
 }

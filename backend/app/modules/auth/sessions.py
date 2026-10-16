@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import secrets
 from typing import Any
+from urllib.parse import urlsplit
 
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import delete, select, update
@@ -141,18 +142,47 @@ async def revoke_applicant_sessions(
 
 # OIDC transaction cookie: state, PKCE verifier, nonce and the session client.
 def issue_oidc_tx(
-    secret: str, state: str, verifier: str, nonce: str, client: str = SESSION_CLIENT_WEB
+    secret: str,
+    state: str,
+    verifier: str,
+    nonce: str,
+    client: str = SESSION_CLIENT_WEB,
+    return_to: str | None = None,
 ) -> str:
-    return _serializer(secret, _OIDC_TX_SALT).dumps(
-        {"state": state, "verifier": verifier, "nonce": nonce, "client": client}
-    )
+    data = {"state": state, "verifier": verifier, "nonce": nonce, "client": client}
+    if return_to:
+        data["return_to"] = return_to
+    return _serializer(secret, _OIDC_TX_SALT).dumps(data)
+
+
+_RETURN_TO_MAX = 1024
+
+
+def safe_return_to(value: str | None) -> str | None:
+    """Return `value` if it is a path of this app to land on after the login, else `None`.
+
+    Only a same-origin path is accepted: it starts with exactly one `/` (so it has no
+    scheme and no host), has no backslash (which a browser reads as `/`), no whitespace
+    or control character, and is not under `/api/`. This keeps the redirect after the
+    callback from becoming an open redirect.
+    """
+    if not value or len(value) > _RETURN_TO_MAX:
+        return None
+    if not value.startswith("/") or value.startswith("//") or "\\" in value:
+        return None
+    if any(c.isspace() or not c.isprintable() for c in value):
+        return None
+    path = urlsplit(value).path
+    if path == "/api" or path.startswith("/api/"):
+        return None
+    return value
 
 
 def load_oidc_tx(secret: str, value: str, max_age: int) -> dict[str, str] | None:
     """Return the transaction, or `None` for a bad or expired cookie.
 
     `client` is `web` or `pwa`. Any other value, or none, gives `web`, the shorter
-    lifetime.
+    lifetime. `return_to` is present only when it passes `safe_return_to`.
     """
     try:
         data = _serializer(secret, _OIDC_TX_SALT).loads(value, max_age=max_age)
@@ -163,6 +193,10 @@ def load_oidc_tx(secret: str, value: str, max_age: int) -> dict[str, str] | None
     tx = {k: str(data[k]) for k in ("state", "verifier", "nonce")}
     client = data.get("client")
     tx["client"] = client if client in SESSION_CLIENTS else SESSION_CLIENT_WEB
+    return_to = data.get("return_to")
+    checked = safe_return_to(return_to) if isinstance(return_to, str) else None
+    if checked:
+        tx["return_to"] = checked
     return tx
 
 
