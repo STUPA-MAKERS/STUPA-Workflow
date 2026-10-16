@@ -78,6 +78,11 @@ included), `GET /link-targets`, `GET /linked?kind&targetId`, `POST /cards`, `GET
 - Lock order is board, then card, everywhere: `patch` (`_card(lock=True)`) locks the board
   before the card, and the archive cron locks the boards of the due cards (by id) before
   the cards. The other order deadlocks with a move (`test_todos_locks.py`).
+- The board also comes before a meeting: `card_for_agenda` locks the board and the card
+  before `add_todo_in_tx` locks the meeting, because a card create locks the board and
+  then inserts a meeting link (a key share on the meeting row). `TicketTodoBridge.complete`
+  takes the boards in id order, so two `completeTodos` closes on the same boards wait
+  instead of deadlocking.
 - A write that changes a card sets `card.updated_at` itself. The column has
   `onupdate=now()`: without the explicit value SQLAlchemy expires the attribute and the
   response after the commit loads it outside the greenlet (`MissingGreenlet`).

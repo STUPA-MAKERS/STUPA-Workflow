@@ -81,3 +81,21 @@ async def test_readable_cards() -> None:
     bridge = _bridge(ScriptedSession(execute=[[(a, seen), (z, hidden)]]), {seen.id})
     assert await bridge.readable_cards([a, z], USER) == {a}
     assert await bridge.readable_cards([], USER) == set()
+
+
+async def test_complete_locks_the_boards_in_board_id_order() -> None:
+    low, high = board(id=uuid.UUID(int=1)), board(id=uuid.UUID(int=2))
+    first, second = card(high, column(high.id)), card(low, column(low.id))
+    third = card(high, column(high.id))
+    session = ScriptedSession(execute=[[(first, high), (second, low), (third, high)]])
+    bridge = _bridge(session, {low.id, high.id})
+    order: list[tuple[uuid.UUID, uuid.UUID]] = []
+
+    async def _complete(c: Any, b: Any, _actor: uuid.UUID) -> bool:
+        order.append((b.id, c.id))
+        return True
+
+    bridge.todos.complete = _complete  # type: ignore[method-assign]
+    await bridge.complete(TICKET, USER)
+    assert order == [(low.id, second.id), (high.id, first.id), (high.id, third.id)]
+    assert session.committed == 1

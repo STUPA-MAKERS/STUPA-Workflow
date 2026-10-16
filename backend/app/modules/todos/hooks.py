@@ -3,7 +3,9 @@
 ``open_count`` counts the linked cards that are open (not in a done column, not
 archived) on a board that the viewer reads. ``complete`` moves those cards into the
 done column of their board, each with its ``moved`` event and the ``todo_done``
-event on the ticket; a card on a board that the actor cannot write stays.
+event on the ticket; a card on a board that the actor cannot write stays. It takes
+the board locks in board-id order, because two closes that lock the same boards in
+different orders deadlock.
 ``readable_cards`` tells which cards of ``todo_done`` events the viewer may see by
 title.
 """
@@ -62,7 +64,10 @@ class TicketTodoBridge:
         if not cards or actor is None:
             return
         moved = False
-        for card, board in cards:
+        # One transaction locks every board of the loop; the order by board id (the
+        # order of the archive cron) keeps two closes on the same boards apart.
+        # The sort is stable, so the cards of one board keep their creation order.
+        for card, board in sorted(cards, key=lambda pair: pair[1].id):
             moved = await self.todos.complete(card, board, actor) or moved
         if moved:
             await self.session.commit()

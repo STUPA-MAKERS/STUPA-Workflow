@@ -24,6 +24,13 @@ from tests.unit.modules.todos.fakes import (
     label,
 )
 
+
+def _sql(stmt: object) -> str:
+    from sqlalchemy.dialects import postgresql
+
+    return str(stmt.compile(dialect=postgresql.dialect()))  # type: ignore[attr-defined]
+
+
 TOKEN = Principal(sub="t", scope_permissions=frozenset({"vote.cast"}))
 ITEM = uuid.UUID(int=51)
 
@@ -107,10 +114,14 @@ async def test_card_for_agenda_rules() -> None:
     live, archived = card(b, col), card(b, col, archived_at=b.created_at)
     personal = board(kind="personal", gremium_id=None, owner_id=ME)
     mine = card(personal, column(personal.id))
-    session = ScriptedSession()
+    session = ScriptedSession(scalar=[live, archived, live, mine, live])
     session.put(b, live, archived, personal, mine)
     service = _svc(session)
     assert await service.card_for_agenda(live.id, gid, USER) is live
+    # The board lock comes first, then the card lock: the order of every card write.
+    board_lock, card_lock = (_sql(stmt) for stmt in session.statements[:2])
+    assert board_lock.startswith("SELECT todo_board.id") and "FOR UPDATE" in board_lock
+    assert "FROM todo_card" in card_lock and "FOR UPDATE" in card_lock
     with pytest.raises(ValidationProblem) as exc:
         await service.card_for_agenda(archived.id, gid, USER)
     assert exc.value.code == "todo_archived"

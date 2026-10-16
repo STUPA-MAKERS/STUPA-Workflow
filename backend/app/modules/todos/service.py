@@ -1535,12 +1535,17 @@ class TodoService:
     ) -> TodoCard:
         """Check a card for a new agenda item of a meeting of ``gremium_id``.
 
+        The call locks the board of the card, then the card, before the agenda locks
+        the meeting. A card create locks the board and then inserts a meeting link,
+        which takes a key share on the meeting row, so every path takes the board
+        first and the two cannot deadlock.
+
         Raises:
             NotFoundError: The card is unknown or not readable (HTTP 404).
             ValidationProblem: The card is archived (``todo_archived``) or not on the
                 board of the gremium (``todo_wrong_board``) (HTTP 422).
         """
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, lock=True)
         if card.archived_at is not None:
             raise _invalid("The card is archived.", "todo_archived", "todoId")
         if board.kind != "gremium" or board.gremium_id != gremium_id:
