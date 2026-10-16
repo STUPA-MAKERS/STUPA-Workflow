@@ -22,7 +22,9 @@ class _FakeApi:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, Any]] = []
 
-    async def _record(self, method: str, path: str, kw: dict[str, Any]) -> dict[str, Any]:
+    async def _record(
+        self, method: str, path: str, kw: dict[str, Any]
+    ) -> dict[str, Any]:
         self.calls.append((method, path, kw.get("json", kw.get("params"))))
         return {}
 
@@ -96,7 +98,9 @@ def test_todo_card_create_drops_unset_fields(fake_api: _FakeApi) -> None:
 def test_todo_card_update_keeps_an_explicit_null(fake_api: _FakeApi) -> None:
     patch = S.TodoCardPatch(version=3, dueDate=None)
     asyncio.run(todos.todo_card_update("c1", patch))
-    assert fake_api.calls == [("PATCH", "/todos/cards/c1", {"version": 3, "dueDate": None})]
+    assert fake_api.calls == [
+        ("PATCH", "/todos/cards/c1", {"version": 3, "dueDate": None})
+    ]
 
 
 def test_todo_card_move_to_the_end(fake_api: _FakeApi) -> None:
@@ -106,7 +110,11 @@ def test_todo_card_move_to_the_end(fake_api: _FakeApi) -> None:
 
 def test_todo_card_move_between_neighbors(fake_api: _FakeApi) -> None:
     asyncio.run(todos.todo_card_move("c1", "col2", before_id="c3", after_id="c2"))
-    assert fake_api.calls[0][2] == {"columnId": "col2", "beforeId": "c3", "afterId": "c2"}
+    assert fake_api.calls[0][2] == {
+        "columnId": "col2",
+        "beforeId": "c3",
+        "afterId": "c2",
+    }
 
 
 def test_todo_comment_without_and_with_mentions(fake_api: _FakeApi) -> None:
@@ -114,7 +122,11 @@ def test_todo_comment_without_and_with_mentions(fake_api: _FakeApi) -> None:
     asyncio.run(todos.todo_comment("c1", "@Anna bitte", mentions=["p1"]))
     assert fake_api.calls == [
         ("POST", "/todos/cards/c1/comments", {"body": "Erledigt?", "mentions": []}),
-        ("POST", "/todos/cards/c1/comments", {"body": "@Anna bitte", "mentions": ["p1"]}),
+        (
+            "POST",
+            "/todos/cards/c1/comments",
+            {"body": "@Anna bitte", "mentions": ["p1"]},
+        ),
     ]
 
 
@@ -125,7 +137,9 @@ def test_tickets_list_defaults(fake_api: _FakeApi) -> None:
 
 def test_tickets_list_filters(fake_api: _FakeApi) -> None:
     asyncio.run(
-        tickets.tickets_list(status=["new", "in_progress"], kind=["bug"], assignee="me", q="40")
+        tickets.tickets_list(
+            status=["new", "in_progress"], kind=["bug"], assignee="me", q="40"
+        )
     )
     assert fake_api.calls[0][2] == {
         "status": ["new", "in_progress"],
@@ -148,7 +162,9 @@ def test_tickets_get_and_note(fake_api: _FakeApi) -> None:
 
 def test_tickets_update_unassigns_with_null(fake_api: _FakeApi) -> None:
     asyncio.run(tickets.tickets_update("t1", S.TicketPatch(assigneeId=None)))
-    asyncio.run(tickets.tickets_update("t1", S.TicketPatch(status="done", completeTodos=True)))
+    asyncio.run(
+        tickets.tickets_update("t1", S.TicketPatch(status="done", completeTodos=True))
+    )
     assert fake_api.calls == [
         ("PATCH", "/tickets/t1", {"assigneeId": None}),
         ("PATCH", "/tickets/t1", {"status": "done", "completeTodos": True}),

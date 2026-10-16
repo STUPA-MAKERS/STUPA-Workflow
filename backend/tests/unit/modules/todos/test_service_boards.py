@@ -293,9 +293,7 @@ async def test_delete_column_moves_the_cards_and_renumbers() -> None:
     assert moving[0].completed_at is not None and moving[1].completed_at == stamp
     # Each card gets a moved event; only the card that becomes done tells its ticket.
     moved = [o for o in session.added if isinstance(o, TodoEvent)]
-    assert [(e.card_id, e.kind, e.actor_id) for e in moved] == [
-        (m.id, "moved", ME) for m in moving
-    ]
+    assert [(e.card_id, e.kind, e.actor_id) for e in moved] == [(m.id, "moved", ME) for m in moving]
     assert moved[0].payload == {
         "fromColumnId": str(col.id),
         "fromColumnName": "Wartet",

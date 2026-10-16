@@ -199,9 +199,7 @@ async def test_a_column_change_into_done_tells_the_linked_ticket(
                 .order_by(TicketEvent.created_at)
             )
         ).all()
-        events = (
-            await session.scalars(select(TodoEvent).where(TodoEvent.kind == "moved"))
-        ).all()
+        events = (await session.scalars(select(TodoEvent).where(TodoEvent.kind == "moved"))).all()
         cards = {c.id: c for c in (await session.scalars(select(TodoCard))).all()}
     assert [e.payload["cardId"] for e in told] == [str(flagged), str(moved)]
     assert all(e.actor_id == me_id for e in told)

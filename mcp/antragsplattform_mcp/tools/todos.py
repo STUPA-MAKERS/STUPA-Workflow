@@ -99,7 +99,9 @@ async def todo_card_move(
 
 
 @group.tool
-async def todo_comment(card_id: str, body: str, mentions: list[str] | None = None) -> dict:
+async def todo_comment(
+    card_id: str, body: str, mentions: list[str] | None = None
+) -> dict:
     """Add a comment to a card.
 
     Args:
@@ -108,7 +110,8 @@ async def todo_comment(card_id: str, body: str, mentions: list[str] | None = Non
             person who is not a member gives 422 `mention_not_member`.
     """
     return await api().post(
-        f"/todos/cards/{card_id}/comments", json={"body": body, "mentions": mentions or []}
+        f"/todos/cards/{card_id}/comments",
+        json={"body": body, "mentions": mentions or []},
     )
 
 
