@@ -450,7 +450,8 @@ def test_admin_service_factories_construct() -> None:
     from app.modules.admin.site_config_service import SiteConfigService
 
     sess = SimpleNamespace()
-    assert isinstance(get_config_service(sess), ConfigService)  # type: ignore[arg-type]
+    req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace()))
+    assert isinstance(get_config_service(sess, req), ConfigService)  # type: ignore[arg-type]
     assert isinstance(get_site_config_service(sess), SiteConfigService)  # type: ignore[arg-type]
     assert isinstance(get_gremium_role_service(sess), GremiumRoleService)  # type: ignore[arg-type]
 
