@@ -160,7 +160,8 @@ export class TasksComponent implements OnDestroy {
   readonly show = signal<TasksShow>('all');
   readonly due = signal<TasksDue>('');
   readonly hasTodos = computed(() => this.todos().length > 0);
-  readonly showApplications = computed(() => this.show() !== 'todos');
+  /** Without open to-dos the filter is hidden, so it must not hide the applications. */
+  readonly showApplications = computed(() => !this.hasTodos() || this.show() !== 'todos');
   readonly showTodos = computed(() => this.hasTodos() && this.show() !== 'applications');
 
   readonly todoRows = computed<TodoRow[]>(() => {

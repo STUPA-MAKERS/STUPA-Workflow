@@ -122,8 +122,12 @@ export class HelpMenuComponent {
     this.navigated.emit();
   }
 
+  /**
+   * Open the report dialog. The focus goes to the trigger first, because the dialog stores the
+   * active element to restore on close, and the popover button is gone by then.
+   */
   report(): void {
-    this.close();
+    this.close(true);
     this.navigated.emit();
     this.help.openReport();
   }

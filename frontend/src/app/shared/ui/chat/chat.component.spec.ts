@@ -351,6 +351,15 @@ describe('ChatComponent', () => {
       expect(send).not.toHaveBeenCalled();
     });
 
+    it('starts each thread on the default visibility', async () => {
+      const { user, set } = await setup({ visibilityOptions: ['public', 'internal'] });
+      const group = () => screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
+      await user.click(within(group()).getByRole('radio', { name: 'Intern' }));
+      expect(within(group()).getByRole('radio', { name: 'Intern' })).toHaveAttribute('aria-checked', 'true');
+      set('draftKey', 't2');
+      expect(within(group()).getByRole('radio', { name: 'Öffentlich' })).toHaveAttribute('aria-checked', 'true');
+    });
+
     it('keeps the draft per thread', async () => {
       localStorage.setItem('ap.chat.draft.t1', 'Entwurf 1');
       localStorage.setItem('ap.chat.draft.t2', 'Entwurf 2');
@@ -492,6 +501,21 @@ describe('ChatComponent', () => {
       cmp.editDraft.set('x');
       cmp.saveEdit();
       expect(edit).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the focus in the thread when the deleted message leaves the list', async () => {
+      const { set, input, view } = await setup({ messages: own() });
+      const trash = screen.getAllByRole('button', { name: 'Nachricht löschen' })[0];
+      trash.focus();
+      fireEvent.click(trash);
+      view.fixture.detectChanges();
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Nachricht löschen' })).getByRole('button', { name: 'Löschen' }));
+      view.fixture.detectChanges();
+      // The answer is still out: the message and its button stay.
+      set('messages', own());
+      set('messages', own().filter((m) => m.id !== 'm'));
+      await view.fixture.whenStable();
+      expect(document.activeElement).toBe(input());
     });
 
     it('deletes after a confirmation', async () => {

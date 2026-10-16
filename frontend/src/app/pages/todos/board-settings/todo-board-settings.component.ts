@@ -282,16 +282,18 @@ export class TodoBoardSettingsComponent {
     const id = this.labelEdit();
     const name = this.labelName().trim();
     if (id === null || !name) return;
-    const board = this.board();
+    const boardId = this.board().id;
     const req = id
-      ? this.api.patchLabel(board.id, id, { name, color: this.labelColor() })
-      : this.api.addLabel(board.id, { name, color: this.labelColor() });
+      ? this.api.patchLabel(boardId, id, { name, color: this.labelColor() })
+      : this.api.addLabel(boardId, { name, color: this.labelColor() });
     this.busy.set(true);
     req.subscribe({
       next: (label) => {
         this.busy.set(false);
-        const labels = id ? board.labels.map((l) => (l.id === id ? label : l)) : [...board.labels, label];
-        this.changed.emit({ ...board, labels: labels.sort((a, b) => a.name.localeCompare(b.name)) });
+        // The board as it is now: a poll during the request may have brought newer cards.
+        const now = this.board();
+        const labels = id ? now.labels.map((l) => (l.id === id ? label : l)) : [...now.labels, label];
+        this.changed.emit({ ...now, labels: labels.sort((a, b) => a.name.localeCompare(b.name)) });
         this.labelEdit.set(null);
       },
       error: (err: unknown) => this.fail(err),
@@ -301,15 +303,15 @@ export class TodoBoardSettingsComponent {
   deleteLabel(): void {
     const id = this.labelEdit();
     if (!id) return;
-    const board = this.board();
     this.busy.set(true);
-    this.api.deleteLabel(board.id, id).subscribe({
+    this.api.deleteLabel(this.board().id, id).subscribe({
       next: () => {
         this.busy.set(false);
+        const now = this.board();
         this.changed.emit({
-          ...board,
-          labels: board.labels.filter((l) => l.id !== id),
-          cards: board.cards.map((c) => ({ ...c, labelIds: c.labelIds.filter((x) => x !== id) })),
+          ...now,
+          labels: now.labels.filter((l) => l.id !== id),
+          cards: now.cards.map((c) => ({ ...c, labelIds: c.labelIds.filter((x) => x !== id) })),
         });
         this.labelEdit.set(null);
       },

@@ -157,6 +157,8 @@ export class ChatComponent {
   protected readonly editingId = signal<string | null>(null);
   protected readonly editDraft = signal('');
   protected readonly deleting = signal<ChatMessage | null>(null);
+  /** The message whose delete was confirmed, until it leaves `messages`. */
+  private deletedId: string | null = null;
   /** The own message whose phone menu is open. */
   protected readonly menuFor = signal<ChatMessage | null>(null);
 
@@ -208,6 +210,8 @@ export class ChatComponent {
         this.stick = true;
         this.atBottom.set(true);
         this.editingId.set(null);
+        // A new thread starts on the default visibility (public first), never on the last one.
+        this.visibility.set(this.visibilityOptions()[0] ?? null);
       });
     });
     effect(() => {
@@ -223,6 +227,10 @@ export class ChatComponent {
     afterRenderEffect(() => {
       this.items();
       untracked(() => this.follow());
+    });
+    afterRenderEffect(() => {
+      const messages = this.messages();
+      untracked(() => this.refocusAfterDelete(messages));
     });
     afterNextRender(() => {
       const observer = new ResizeObserver(() => this.follow());
@@ -480,7 +488,23 @@ export class ChatComponent {
   protected confirmDelete(): void {
     const msg = this.deleting();
     this.deleting.set(null);
-    if (msg) this.delete.emit({ id: msg.id });
+    if (!msg) return;
+    this.deletedId = msg.id;
+    this.delete.emit({ id: msg.id });
+  }
+
+  /**
+   * The dialog gives the focus back to the trash button, and that button goes with the
+   * message once the consumer removes it. Then the focus goes to the composer, or to the
+   * log where the thread has none, unless it has already moved somewhere that stays.
+   */
+  private refocusAfterDelete(messages: readonly ChatMessage[]): void {
+    const id = this.deletedId;
+    if (id === null || messages.some((m) => m.id === id)) return;
+    this.deletedId = null;
+    const active = this.log().nativeElement.ownerDocument.activeElement;
+    if (active && active !== active.ownerDocument.body && active.isConnected) return;
+    (this.composerInput()?.nativeElement ?? this.log().nativeElement).focus();
   }
 
   protected readonly menuHeading = computed(() => {

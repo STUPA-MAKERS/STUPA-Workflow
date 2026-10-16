@@ -399,6 +399,19 @@ describe('TasksComponent', () => {
       expect(screen.getByText('Keine To-Dos passen zu den Filtern.')).toBeInTheDocument();
     });
 
+    it('shows the applications again when the last To-Do goes away under "Anzeigen: To-Dos"', async () => {
+      const { cmp, harness, mine } = await start('/tasks', [THREE], { todos: [TODOS[0]!] });
+      cmp.setShow('todos');
+      harness.detectChanges();
+      expect(screen.queryByRole('link', { name: 'Erster' })).toBeNull();
+      mine.mockReturnValueOnce(of({ items: [], dueSoonCount: 0 }) as never);
+      cmp.loadTodos();
+      harness.detectChanges();
+      expect(cmp.hasTodos()).toBe(false);
+      expect(cmp.showApplications()).toBe(true);
+      expect(screen.getByRole('link', { name: 'Erster' })).toBeInTheDocument();
+    });
+
     it('shows the To-Dos without applications and the none pane asks to pick', async () => {
       await start('/tasks', [[]], { todos: TODOS });
       expect(screen.getByTestId('tasks-apps-head')).toHaveTextContent('Anträge 0');

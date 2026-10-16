@@ -241,6 +241,33 @@ describe('TodoBoardSettingsComponent', () => {
     expect(cmp.colorName('violet')).toBe('Violett');
   });
 
+  it('builds the label answer on the board as it is then, not as it was at the click', async () => {
+    const { cmp, api, changed, fixture } = await setup();
+    const { Subject } = await import('rxjs');
+    const added = new Subject<{ id: string; name: string; color: 'red' }>();
+    api.addLabel.mockReturnValueOnce(added as never);
+    cmp.editLabel(null);
+    cmp.labelName.set('Aaa');
+    cmp.saveLabel();
+    const polled = board();
+    const moved = { ...polled, cards: polled.cards.map((c) => (c.id === 'k-2' ? { ...c, title: 'Neu vom Poll' } : c)) };
+    fixture.componentRef.setInput('board', moved);
+    added.next({ id: 'l-9', name: 'Aaa', color: 'red' });
+    const out = changed.mock.lastCall[0] as TodoBoard;
+    expect(out.cards.find((c) => c.id === 'k-2')?.title).toBe('Neu vom Poll');
+    expect(out.labels.map((l) => l.name)).toContain('Aaa');
+
+    const deleted = new Subject<undefined>();
+    api.deleteLabel.mockReturnValueOnce(deleted as never);
+    cmp.editLabel(board().labels[0]);
+    cmp.deleteLabel();
+    fixture.componentRef.setInput('board', { ...moved, name: 'Umbenannt' });
+    deleted.next(undefined);
+    const after = changed.mock.lastCall[0] as TodoBoard;
+    expect(after.name).toBe('Umbenannt');
+    expect(after.cards.find((c) => c.id === 'k-2')?.title).toBe('Neu vom Poll');
+  });
+
   it('does nothing for a label form that is closed or new', async () => {
     const { cmp, api } = await setup();
     cmp.labelEdit.set(null);

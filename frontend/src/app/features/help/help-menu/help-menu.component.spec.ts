@@ -90,6 +90,23 @@ describe('HelpMenuComponent', () => {
     expect(panel()).toBeNull();
   });
 
+  it('puts the focus on the trigger before the report dialog opens, so it returns there', async () => {
+    const { fixture, help } = await setup();
+    let focused: Element | null = null;
+    const open = help.openReport.bind(help);
+    jest.spyOn(help, 'openReport').mockImplementation(() => {
+      // The dialog stores this element and focuses it again on close.
+      focused = document.activeElement;
+      open();
+    });
+    trigger().click();
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Problem melden' }));
+    fixture.detectChanges();
+    expect(focused).toBe(trigger());
+    expect(help.reportOpen()).toBe(true);
+  });
+
   it('closes when the handbook link is followed', async () => {
     const { fixture, navigated } = await setup();
     trigger().click();
