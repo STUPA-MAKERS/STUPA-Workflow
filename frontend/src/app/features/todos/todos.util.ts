@@ -34,7 +34,7 @@ export const LINK_ICON: Record<TodoLinkKind, IconName> = {
   application: 'file',
   meeting: 'users',
   agenda_item: 'list',
-  ticket: 'ticket',
+  ticket: 'chat',
   todo: 'circleok',
 };
 
@@ -149,9 +149,12 @@ export function linkTitle(link: Pick<TodoLink, 'kind' | 'accessible' | 'title'>,
   return link.title;
 }
 
-/** The facts of a link below its title: "Sitzung · Di, 03.11.2026 · TOP 2". */
+/**
+ * The facts of a link below its title: "TOP · 33. Sitzung · TOP 2". A number or a TOP
+ * position that the title already starts with is not repeated.
+ */
 export function linkSub(
-  link: Pick<TodoLink, 'kind' | 'detail' | 'accessible'> | TodoLinkTarget,
+  link: (Pick<TodoLink, 'kind' | 'detail' | 'accessible'> & { title?: string | null }) | TodoLinkTarget,
   locale: string,
   lang: string,
   t: Translate,
@@ -159,6 +162,7 @@ export function linkSub(
   const parts = [t(LINK_KIND_LABEL[link.kind])];
   const d = link.detail;
   if (!d || ('accessible' in link && !link.accessible)) return parts[0];
+  const title = link.title ?? '';
   switch (link.kind) {
     case 'application':
       if (d.stateLabel) parts.push(resolveI18n(d.stateLabel, lang));
@@ -168,10 +172,13 @@ export function linkSub(
       break;
     case 'agenda_item':
       if (d.meetingTitle) parts.push(d.meetingTitle);
-      if (d.position) parts.push(t('todos.link.top', { n: d.position }));
+      if (d.position) {
+        const top = t('todos.link.top', { n: d.position });
+        if (!title.startsWith(`${top}:`) && title !== top) parts.push(top);
+      }
       break;
     case 'ticket':
-      if (d.number) parts.push(d.number);
+      if (d.number && !title.startsWith(d.number)) parts.push(d.number);
       if (d.status) parts.push(t(TICKET_STATUS_LABEL[d.status] ?? 'tickets.status.new'));
       break;
     case 'todo':

@@ -297,7 +297,7 @@
     <div class="cd__secHead">
       <h3 id="cd-desc" class="cd__secTitle">{{ 'todos.card.description' | t }}</h3>
       @if (canWrite() && !editingDesc()) {
-        <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.card.editDescription' | t" (click)="startDesc()">
+        <app-button class="cd__secEnd--icon" variant="text" [iconOnly]="true" [ariaLabel]="'todos.card.editDescription' | t" (click)="startDesc()">
           <app-icon name="edit" [size]="18" />
         </app-button>
       }

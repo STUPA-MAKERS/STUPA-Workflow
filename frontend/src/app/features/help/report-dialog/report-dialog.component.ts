@@ -155,8 +155,8 @@ export class ReportDialogComponent {
   /** The rows of "Wird automatisch mitgeschickt". */
   readonly contextRows = computed(() => {
     const c = this.context();
-    const rows: { label: TranslationKey; value: string; link?: boolean }[] = [];
-    if (c.url) rows.push({ label: 'tickets.context.page', value: c.url, link: true });
+    const rows: { label: TranslationKey; value: string }[] = [];
+    if (c.url) rows.push({ label: 'tickets.context.page', value: c.url });
     if (c.userAgent) rows.push({ label: 'tickets.context.browser', value: browserLabel(c.userAgent) });
     if (c.viewport) {
       const lang = c.language === 'en' ? 'English' : 'Deutsch';
@@ -164,8 +164,10 @@ export class ReportDialogComponent {
     }
     const at = this.openedAt();
     if (at) {
-      const value = new Intl.DateTimeFormat(this.i18n.formatLocale(), {
-        weekday: 'short',
+      const locale = this.i18n.formatLocale();
+      // "Do, 15.10.2026, 18:31:07": the weekday without its abbreviation dot.
+      const weekday = new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(at).replace(/\.$/, '');
+      const rest = new Intl.DateTimeFormat(locale, {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
@@ -174,7 +176,7 @@ export class ReportDialogComponent {
         second: '2-digit',
         hourCycle: 'h23',
       }).format(at);
-      rows.push({ label: 'tickets.context.time', value });
+      rows.push({ label: 'tickets.context.time', value: `${weekday}, ${rest}` });
     }
     return rows;
   });

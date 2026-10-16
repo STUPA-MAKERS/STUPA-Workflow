@@ -205,12 +205,12 @@
   flex-direction: column;
   gap: var(--space-1);
   margin: var(--space-2) 0 0;
-  padding-inline-start: var(--space-6);
+  padding-inline-start: var(--space-5);
   font-size: var(--fs-small);
 }
 .rd__ctxRow {
   display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr);
+  grid-template-columns: 4rem minmax(0, 1fr);
   gap: var(--space-3);
 }
 .rd__ctxRow dt {
@@ -220,13 +220,6 @@
 .rd__ctxRow dd {
   margin: 0;
   overflow-wrap: anywhere;
-}
-.rd__ctxRow a {
-  color: var(--color-accent-text);
-  text-decoration: none;
-}
-.rd__ctxRow a:hover {
-  text-decoration: underline;
 }
 
 .rd__error {

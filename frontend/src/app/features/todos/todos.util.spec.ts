@@ -129,6 +129,13 @@ describe('todos.util', () => {
         'TOP · 33. Sitzung · TOP 2',
       );
       expect(sub(link({ kind: 'agenda_item', detail: {} }))).toBe('TOP');
+      // A title that already names the TOP or the number does not repeat it.
+      expect(
+        sub(link({ kind: 'agenda_item', title: 'TOP 2: Haushalt', detail: { meetingTitle: 'Sondersitzung', position: 2 } })),
+      ).toBe('TOP · Sondersitzung');
+      expect(
+        sub(link({ kind: 'ticket', title: 'T-0037 Export', detail: { number: 'T-0037', status: 'in_progress' } })),
+      ).toBe('Ticket · In Bearbeitung');
       expect(sub(link({ kind: 'ticket', detail: { number: 'T-0007', status: 'in_progress' } }))).toBe(
         'Ticket · T-0007 · In Bearbeitung',
       );

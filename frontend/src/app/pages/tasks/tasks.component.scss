@@ -168,6 +168,10 @@
   color: var(--color-text-muted);
   font-weight: var(--fw-medium);
 }
+/* A to-do row has a narrow circle in front, so its slots sit closer and the title keeps its width. */
+.tasks__row:has(.tasks__circle) {
+  --li-gap: var(--space-3);
+}
 .tasks__circle {
   display: inline-flex;
   color: var(--color-text-muted);

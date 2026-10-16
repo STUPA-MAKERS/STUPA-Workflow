@@ -8,7 +8,8 @@
     <div class="rd__sent" role="status">
       <span class="rd__sentIcon" aria-hidden="true"><app-icon name="check" [size]="26" /></span>
       <p class="rd__sentText">
-        {{ 'help.report.sentNumber' | t }} <span class="mono rd__number">{{ number }}</span>
+        {{ 'help.report.sentNumber' | t }} <span class="mono rd__number">{{ number }}</span>.
+        {{ 'help.report.sentMail' | t }}
       </p>
     </div>
   } @else {
@@ -126,13 +127,7 @@
           @for (row of contextRows(); track row.label) {
             <div class="rd__ctxRow">
               <dt>{{ row.label | t }}</dt>
-              <dd>
-                @if (row.link) {
-                  <a [href]="row.value" target="_blank" rel="noopener">{{ row.value }}</a>
-                } @else {
-                  {{ row.value }}
-                }
-              </dd>
+              <dd>{{ row.value }}</dd>
             </div>
           }
         </dl>

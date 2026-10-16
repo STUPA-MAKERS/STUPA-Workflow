@@ -196,19 +196,20 @@ export class TicketDetailComponent {
   readonly menuSections = computed<RowMenuSection[]>(() => {
     const t = this.ticket();
     if (!t) return [];
-    const items: RowMenuItem[] = [];
+    const sections: RowMenuSection[] = [];
     if (t.status !== 'new') {
-      items.push({ id: 'reset', label: this.t('tickets.detail.resetNew'), icon: 'history' });
+      sections.push({ items: [{ id: 'reset', label: this.t('tickets.detail.resetNew'), icon: 'history' }] });
     }
+    // The closing action stands apart from the status change, behind a rule.
     if (isOpen(t.status)) {
-      items.push({ id: 'duplicate', label: this.t('tickets.detail.duplicate'), icon: 'copy' });
+      sections.push({ items: [{ id: 'duplicate', label: this.t('tickets.detail.duplicate'), icon: 'copy' }] });
     }
     // A new ticket can be a duplicate, any other can go back to "Neu": never empty.
-    return [{ items }];
+    return sections;
   });
 
   readonly tabs = computed<TabItem[]>(() => [
-    { id: 'log', label: this.t('tickets.detail.log'), count: this.notes().length },
+    { id: 'log', label: this.t('tickets.detail.log') },
     { id: 'details', label: this.t('tickets.detail.details') },
   ]);
 

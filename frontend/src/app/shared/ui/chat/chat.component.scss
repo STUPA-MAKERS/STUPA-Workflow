@@ -74,6 +74,10 @@
   color: var(--color-primary);
   font-weight: var(--fw-semibold);
 }
+.chat__sep--new::before,
+.chat__sep--new::after {
+  background: var(--color-accent);
+}
 .chat__event {
   margin: 0;
   padding: 2px 0;

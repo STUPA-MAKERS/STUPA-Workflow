@@ -110,16 +110,11 @@
   rotate: 2deg;
   opacity: 1;
 }
-/* An accent edge marks the tile in the hand. The tile is positioned, so the edge lies
-   on a layer above it. */
-.bv__preview::after {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  border: 1.5px solid var(--color-accent);
-  border-radius: inherit;
-  content: '';
-  pointer-events: none;
+/* An accent edge marks the tile in the hand, drawn on the tile itself so it follows
+   its corners. */
+.bv__preview app-todo-card-tile {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
 }
 /* Where it lands: the item itself, kept at the height of the tile, as a dashed box. */
 .bv__item.cdk-drag-placeholder {

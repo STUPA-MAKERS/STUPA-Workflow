@@ -242,9 +242,15 @@ export class ChatComponent {
     const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
     if (dayKey(date) === dayKey(today)) return this.i18n.translate('chat.today');
     if (dayKey(date) === dayKey(yesterday)) return this.i18n.translate('chat.yesterday');
-    const opts: Intl.DateTimeFormatOptions = { weekday: 'short', day: '2-digit', month: '2-digit' };
-    if (date.getFullYear() !== today.getFullYear()) opts.year = 'numeric';
-    return new Intl.DateTimeFormat(this.i18n.formatLocale(), opts).format(date);
+    // "Do, 08.10.": the weekday without its abbreviation dot, as everywhere in the app.
+    const locale = this.i18n.formatLocale();
+    const weekday = new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(date).replace(/\.$/, '');
+    const opts: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit' };
+    const sameYear = date.getFullYear() === today.getFullYear();
+    if (!sameYear) opts.year = 'numeric';
+    let day = new Intl.DateTimeFormat(locale, opts).format(date);
+    if (sameYear && locale.startsWith('de') && !day.endsWith('.')) day = `${day}.`;
+    return `${weekday}, ${day}`;
   }
 
   /** "PNG · 96 KB": the file type from the name, then the size. */

@@ -257,6 +257,11 @@ describe('TicketDetailComponent', () => {
     expect(api.patch).toHaveBeenCalledWith('t40', { status: 'in_progress' });
   });
 
+  it('puts the duplicate in its own section of the menu', async () => {
+    const { cmp } = await start('/tickets/t40', { get: () => of(detail({ status: 'in_progress' })) });
+    expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['reset'], ['duplicate']]);
+  });
+
   it('offers only the duplicate for a new ticket', async () => {
     const { cmp } = await start('/tickets/t40', { get: () => of(detail({ status: 'new' })) });
     expect(cmp.menuSections()[0].items.map((i) => i.id)).toEqual(['duplicate']);
@@ -612,8 +617,8 @@ describe('TicketDetailComponent', () => {
     expect(cmp.ticket()!.kind).toBe('idea');
   });
 
-  it('counts the notes on the tab', async () => {
+  it('names the tabs without a count', async () => {
     const { cmp } = await start();
-    expect(cmp.tabs()[0]).toEqual(expect.objectContaining({ id: 'log', count: 1 }));
+    expect(cmp.tabs()[0]).toEqual({ id: 'log', label: 'Verlauf' });
   });
 });

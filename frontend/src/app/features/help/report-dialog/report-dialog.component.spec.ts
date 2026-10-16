@@ -136,7 +136,7 @@ describe('ReportDialogComponent', () => {
     expect(screen.queryByLabelText(/Deine E-Mail/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Ich bin kein Roboter/ })).not.toBeInTheDocument();
     // The context rows: the page without the query, the browser and the window.
-    expect(screen.getByRole('link', { name: 'https://stupa.example.org/applications/A-1' })).toBeInTheDocument();
+    expect(screen.getByText('https://stupa.example.org/applications/A-1')).toBeInTheDocument();
     expect(screen.getByText('Firefox 131 · Linux')).toBeInTheDocument();
     expect(screen.getByText('1440 × 900 · Deutsch')).toBeInTheDocument();
 

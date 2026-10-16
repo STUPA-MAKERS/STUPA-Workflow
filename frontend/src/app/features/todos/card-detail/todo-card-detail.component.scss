@@ -125,7 +125,20 @@
   gap: var(--space-4);
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-inline-end: var(--space-1);
+  /* The column reaches 10px past the content edge, so the end buttons below and the
+     scrollbar have room there without a sideways scroll. */
+  margin-inline-end: -10px;
+  padding-inline-end: 10px;
+}
+/* An icon or text button at the end of a row lines its glyph up with the content edge. */
+.cd__secHead > app-button {
+  margin-inline-end: calc(-1 * var(--space-2));
+}
+.cd__secHead > app-button.cd__secEnd--icon {
+  margin-inline-end: -10px;
+}
+:host(:not(.cd--phone):not(.cd--pane)) .cd__head app-sheet-bar {
+  margin-inline-end: -10px;
 }
 .cd__col--chat .cd__chat {
   flex: 1 1 auto;
@@ -168,7 +181,7 @@
   display: grid;
   /* The values start on one line, a label column of at least 5.25rem. */
   grid-template-columns: minmax(5.25rem, max-content) minmax(0, 1fr);
-  gap: var(--space-3) var(--space-6);
+  gap: var(--space-3) var(--space-5);
   margin: 0;
 }
 .cd__field {
@@ -195,15 +208,20 @@
   align-items: center;
   gap: 6px;
   max-width: 100%;
-  min-height: 32px;
-  padding: 2px 4px 2px 4px;
+  min-height: 30px;
+  padding: 1px 3px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  font-size: 0.84375rem;
-  font-weight: var(--fw-medium);
+  font-size: 0.8125rem;
+  font-weight: var(--fw-regular);
 }
 .cd__label {
-  padding-inline-start: var(--space-3);
+  gap: 5px;
+  padding-inline-start: 10px;
+}
+.cd__chips .cd__x {
+  width: 22px;
+  height: 22px;
 }
 .cd__dot {
   @include lbl.dot;
@@ -253,7 +271,7 @@
 .cd__links {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -262,8 +280,9 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 10px var(--space-3);
-  border-radius: var(--radius-md);
+  min-height: 52px;
+  padding: 6px var(--space-3);
+  border-radius: 0;
   background: var(--color-surface-2);
 }
 .cd__linkRow:first-child {
@@ -465,10 +484,6 @@ a.cd__linkTitle:hover {
   font-size: var(--fs-small);
   font-weight: var(--fw-semibold);
   cursor: pointer;
-}
-/* A text link: the hover underlines, no box. */
-.cd__toggle:hover {
-  text-decoration: underline;
 }
 .cd__toggle:focus-visible {
   outline: 2px solid var(--color-focus-ring);
