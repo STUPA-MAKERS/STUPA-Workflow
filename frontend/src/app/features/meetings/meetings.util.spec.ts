@@ -7,6 +7,7 @@ import {
   topSnippet,
   voteSnippet,
   voteSnippetHead,
+  votesInText,
 } from './meetings.util';
 
 function vote(overrides: Partial<MeetingVote> = {}): MeetingVote {
@@ -258,5 +259,25 @@ describe('renderMarkdown', () => {
     const out = renderMarkdown('- a\n1. b');
     expect((out.match(/<ul>/g) ?? []).length).toBe(1);
     expect((out.match(/<ol>/g) ?? []).length).toBe(1);
+  });
+});
+
+describe('votesInText', () => {
+  const a = vote({ id: 'a', question: 'Bla', counts: { yes: 1, no: 0, abstain: 0 } });
+  const b = vote({ id: 'b', question: 'Bla', counts: { yes: 2, no: 1, abstain: 0 } });
+
+  it('gives a shared head line to the vote whose whole callout is in the text', () => {
+    expect([...votesInText(`Text\n\n${voteSnippet(b)}`, [a, b])]).toEqual(['b']);
+  });
+
+  it('counts each head line for one vote only', () => {
+    const edited = `${voteSnippetHead(a)}\n> geändert`;
+    expect([...votesInText(edited, [a, b])]).toEqual(['a']);
+    expect([...votesInText(`${edited}\n\n${edited}`, [a, b])].sort()).toEqual(['a', 'b']);
+  });
+
+  it('ignores a vote that is not closed', () => {
+    const open = vote({ id: 'o', question: 'Bla', status: 'open' });
+    expect(votesInText(voteSnippetHead(open), [open]).size).toBe(0);
   });
 });

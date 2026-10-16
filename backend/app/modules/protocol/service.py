@@ -82,8 +82,8 @@ from app.modules.protocol.markdown import (
     demote_headings,
     guest_vote_note,
     protocol_variant_for,
-    replace_vote_block,
-    vote_in_body,
+    replace_vote_blocks,
+    votes_in_body,
 )
 from app.modules.protocol.models import Protocol, ProtocolVoteRef
 from app.modules.protocol.public import (
@@ -1080,21 +1080,27 @@ class ProtocolService:
                 # F2: an election callout that the protokollant put into the text
                 # names every candidate with the votes. The public text carries the
                 # public form: the elected names only.
-                for view in views:
-                    if getattr(view, "kind", "motion") == "election":
-                        body = replace_vote_block(
-                            body, _snippet(view, "Beschlussfrage", public=True)
+                body = replace_vote_blocks(
+                    body,
+                    [
+                        (
+                            _snippet(view, "Beschlussfrage"),
+                            _snippet(view, "Beschlussfrage", public=True),
                         )
+                        for view in views
+                        if getattr(view, "kind", "motion") == "election"
+                    ],
+                )
             if body:
                 # Demote the body headings by one level. Only the item heading stays
                 # top-level. Otherwise every `#` counts as its own agenda item.
                 block.append(demote_headings(body))
             top = PublicTop(number=number, title=heading, markdown=body or None)
-            for view in views:
-                snippet = _snippet(view, "Beschlussfrage", public=public)
-                # The protokollant may have put the result into the text already,
-                # with the same snippet. One box per vote.
-                in_text = vote_in_body(body, snippet)
+            snippets = [_snippet(view, "Beschlussfrage", public=public) for view in views]
+            # The protokollant may have put the result into the text already, with
+            # the same snippet. One box per vote, also for two votes with one question.
+            found = votes_in_body(body, snippets)
+            for view, snippet, in_text in zip(views, snippets, found, strict=True):
                 if getattr(view, "status", None) == "closed":
                     # The public list shows the result also when the protokollant
                     # put the snippet into the text already. `inText` tells the

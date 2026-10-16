@@ -245,7 +245,17 @@ async def test_cast_blocked_when_voting_right_delegated_403() -> None:
     assert db.committed == 0
 
 
-async def test_cast_nonvoting_delegation_does_not_block_member() -> None:
+@pytest.fixture
+def marks(monkeypatch: pytest.MonkeyPatch) -> mock.AsyncMock:
+    """Stub the attendance mark of a meeting ballot and record its calls."""
+    from app.modules.livevote.attendance_service import AttendanceService
+
+    stub = mock.AsyncMock()
+    monkeypatch.setattr(AttendanceService, "mark_present_on_cast", stub)
+    return stub
+
+
+async def test_cast_nonvoting_delegation_does_not_block_member(marks: mock.AsyncMock) -> None:
     # A non-voting delegation, for example a pure meeting delegation, does not block
     # the own voting right of a member.
     gid = uuid4()
@@ -262,6 +272,8 @@ async def test_cast_nonvoting_delegation_does_not_block_member() -> None:
     )
     assert out.status == "cast"
     assert db.committed == 1
+    # The own ballot of a meeting vote marks the member present.
+    marks.assert_awaited_once_with(vote.meeting_id, _voter().sub)
 
 
 async def test_cast_exercising_delegated_vote_is_audited() -> None:
@@ -285,7 +297,9 @@ async def test_cast_exercising_delegated_vote_is_audited() -> None:
     assert any(type(a).__name__ == "AuditEntry" for a in db.added)
 
 
-async def test_cast_own_vote_unaffected_by_incoming_delegation() -> None:
+async def test_cast_own_vote_unaffected_by_incoming_delegation(
+    marks: mock.AsyncMock,
+) -> None:
     # Member WITH an incoming delegation: the own ballot still runs as a separate cast.
     # Without as_delegation the service writes no audit entry and the ballot uses the
     # own sub.

@@ -368,6 +368,52 @@ class AttendanceService:
         await self.session.commit()
         return await self.roster(meeting_id, requester_sub, can_write=can_write)
 
+    async def mark_present_on_cast(self, meeting_id: UUID, voter_sub: str) -> None:
+        """Mark a member present who casts the own ballot in a meeting vote.
+
+        A ballot shows that the member takes part, so the record becomes `present`,
+        also over an `absent` or `excused` record of the lead. The source stays as it
+        was, so a lead record stays locked against the self report. A caller who is
+        not a current member (an external substitute) has no attendance and gets
+        none, and so does a member with a delegation for the meeting (O23: present
+        and delegated exclude each other). The method does not commit: the ballot
+        commits it, and a refused ballot rolls it back. It does not lock the meeting
+        row, because the caller holds the vote row and the lock order is meeting row
+        first.
+        """
+        meeting = await self._meeting(meeting_id)
+        if meeting.status == "closed":
+            return
+        member = next(
+            (m for m in await self._current_members(meeting.gremium_id) if m.sub == voter_sub),
+            None,
+        )
+        if member is None:
+            return
+        existing = await self._record(meeting_id, member.id)
+        if existing is not None and existing.status == "present":
+            return
+        if await self._has_delegation(meeting_id, member.id):
+            return
+        before = existing.status if existing is not None else None
+        self._write(
+            existing,
+            meeting_id=meeting_id,
+            principal_id=member.id,
+            status="present",
+            source=existing.source if existing is not None else "self",
+            note=None,
+        )
+        await self._audit(
+            AuditAction.ATTENDANCE_SET,
+            actor=voter_sub,
+            meeting_id=meeting_id,
+            principal_id=member.id,
+            status={"from": before, "to": "present"},
+            reason="vote_cast",
+        )
+        await self._flush_write()
+
     async def _has_delegation(self, meeting_id: UUID, principal_id: UUID) -> bool:
         """Return True when the member delegated for this meeting (O23)."""
         found = (

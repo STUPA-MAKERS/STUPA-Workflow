@@ -446,23 +446,66 @@ def replace_vote_block(body: str, snippet: str) -> str:
     """Replace the callout of a vote in `body` with `snippet`.
 
     The head line of `snippet` (marker and bold question) finds the block; the block
-    runs over the following `>` lines. The public protocol uses this to swap an
-    internal election callout that the protokollant put into the text for its public
-    form (F2). A body without the head stays as it is.
+    runs over the following `>` lines. A body without the head stays as it is.
     """
-    head = snippet.split("\n", 1)[0].strip()
+    return replace_vote_blocks(body, [(snippet, snippet)])
+
+
+def replace_vote_blocks(body: str, pairs: list[tuple[str, str]]) -> str:
+    """Replace the callout of each vote in `body` with its other form.
+
+    Each pair is (the snippet of the text, the replacement). The public protocol uses
+    this to swap an internal election callout that the protokollant put into the text
+    for its public form (F2). Two votes can share a question and so a head line, so
+    each block goes to one vote only, as in `votes_in_body`: a block whose whole text
+    equals a snippet belongs to that vote first, and the other blocks with the head
+    go to the remaining votes in the given order. A block runs over `>` lines and
+    ends before the next `> [!` marker line. A vote without a block changes nothing.
+    """
     lines = body.split("\n")
-    out: list[str] = []
+    blocks: list[tuple[int, int]] = []
     i = 0
     while i < len(lines):
-        if lines[i].strip() == head:
-            out.extend(snippet.split("\n"))
-            i += 1
-            while i < len(lines) and lines[i].lstrip().startswith(">"):
-                i += 1
+        if lines[i].lstrip().startswith(">"):
+            j = i + 1
+            while (
+                j < len(lines)
+                and lines[j].lstrip().startswith(">")
+                and not lines[j].lstrip().startswith("> [!")
+            ):
+                j += 1
+            blocks.append((i, j))
+            i = j
             continue
-        out.append(lines[i])
         i += 1
+
+    def text_of(block: tuple[int, int]) -> list[str]:
+        return [line.strip() for line in lines[block[0] : block[1]]]
+
+    assigned: dict[int, str] = {}
+    done = [False] * len(pairs)
+    for n, (match, _) in enumerate(pairs):
+        want = [line.strip() for line in match.split("\n")]
+        for k, block in enumerate(blocks):
+            if k not in assigned and text_of(block) == want:
+                assigned[k] = pairs[n][1]
+                done[n] = True
+                break
+    for n, (match, _) in enumerate(pairs):
+        if done[n]:
+            continue
+        head = match.split("\n", 1)[0].strip()
+        for k, block in enumerate(blocks):
+            if k not in assigned and text_of(block)[0] == head:
+                assigned[k] = pairs[n][1]
+                break
+    out: list[str] = []
+    i = 0
+    for k, (start, stop) in enumerate(blocks):
+        out.extend(lines[i:start])
+        out.extend(assigned[k].split("\n") if k in assigned else lines[start:stop])
+        i = stop
+    out.extend(lines[i:])
     return "\n".join(out)
 
 
@@ -471,10 +514,44 @@ def vote_in_body(body: str, snippet: str) -> bool:
 
     The protokollant inserts the same callout from the editor. The marker line with
     the bold question identifies it, so the tally can differ (a re-count) and the
-    box still counts as present.
+    box still counts as present. For several votes of one item use `votes_in_body`,
+    because two votes with the same question share the head line.
     """
-    head = snippet.split("\n", 1)[0].strip()
-    return any(line.strip() == head for line in body.split("\n"))
+    return votes_in_body(body, [snippet])[0]
+
+
+def votes_in_body(body: str, snippets: list[str]) -> list[bool]:
+    """Report for each snippet whether its vote is in the body.
+
+    Two votes can share a question and then share the head line, so a head line
+    counts for one vote only. A callout whose whole text equals a snippet belongs to
+    that vote first. The other head lines go to the remaining votes in the given
+    order (oldest first). The editor matches the same way (`votesInText`).
+    """
+    heads: dict[str, int] = {}
+    for line in body.split("\n"):
+        key = line.strip()
+        heads[key] = heads.get(key, 0) + 1
+    exact: dict[str, int] = {}
+    found = [False] * len(snippets)
+
+    def head_of(snippet: str) -> str:
+        return snippet.split("\n", 1)[0].strip()
+
+    for i, snippet in enumerate(snippets):
+        if snippet not in exact:
+            exact[snippet] = body.count(snippet)
+        head = head_of(snippet)
+        if exact[snippet] > 0 and heads.get(head, 0) > 0:
+            exact[snippet] -= 1
+            heads[head] -= 1
+            found[i] = True
+    for i, snippet in enumerate(snippets):
+        head = head_of(snippet)
+        if not found[i] and heads.get(head, 0) > 0:
+            heads[head] -= 1
+            found[i] = True
+    return found
 
 
 def demote_headings(markdown: str) -> str:
