@@ -20,6 +20,7 @@ import {
   type TodoBoard,
   type TodoCardDetail,
   type TodoCardMove,
+  type TodoCardPatch,
   type TodoCheckItem,
   type TodoComment,
   type TodoLink,
@@ -167,6 +168,9 @@ export class TodoCardDetailComponent {
   private seq = 0;
   /** Counts the fresh loads: a write answer from before the card changed is dropped. */
   private gen = 0;
+  /** The patches that wait for the answer of the one in flight, which carries the next version. */
+  private patchQueue: ((version: number) => void)[] = [];
+  private patching = false;
   private membersOf: Uuid | null = null;
 
   readonly today = signal(isoDay(new Date()));
@@ -336,6 +340,8 @@ export class TodoCardDetailComponent {
     const seq = ++this.seq;
     if (fresh) {
       this.gen++;
+      this.patchQueue = [];
+      this.patching = false;
       this.loading.set(true);
       this.card.set(null);
       this.outbox.clear();
@@ -384,7 +390,12 @@ export class TodoCardDetailComponent {
    * route is the card itself, so its 404 means the card is gone; a 404 of a
    * sub-resource (a checklist item, a link …) reads the card again instead.
    */
-  private write(req: Observable<TodoCardDetail>, after?: () => void, cardRoute = false): void {
+  private write(
+    req: Observable<TodoCardDetail>,
+    after?: (card: TodoCardDetail) => void,
+    cardRoute = false,
+    failed?: () => void,
+  ): void {
     const current = this.current();
     this.busy.set(true);
     req.subscribe({
@@ -392,12 +403,40 @@ export class TodoCardDetailComponent {
         if (!current()) return;
         this.busy.set(false);
         this.apply(card);
-        after?.();
+        after?.(card);
       },
       error: (err: unknown) => {
-        if (current()) this.fail(err, cardRoute);
+        if (!current()) return;
+        failed?.();
+        this.fail(err, cardRoute);
       },
     });
+  }
+
+  /**
+   * Patch the card with the version it has when the patch goes out. The server raises
+   * the version on every patch, so a second patch waits for the answer of the first;
+   * sent at once, it would carry the old version and the server would refuse it with 409.
+   */
+  private patch(c: TodoCardDetail, body: Omit<TodoCardPatch, 'version'>, after?: () => void): void {
+    const run = (version: number) => {
+      this.patching = true;
+      this.write(
+        this.api.patchCard(c.id, { ...body, version }),
+        (card) => {
+          after?.();
+          this.patching = false;
+          this.patchQueue.shift()?.(card.version);
+        },
+        true,
+        () => {
+          this.patching = false;
+          this.patchQueue = [];
+        },
+      );
+    };
+    if (this.patching) this.patchQueue.push(run);
+    else run(c.version);
   }
 
   /** True while the card that was shown when the request started is still shown. */
@@ -506,7 +545,7 @@ export class TodoCardDetailComponent {
   setDue(day: string | null): void {
     const c = this.card();
     if (!c) return;
-    this.write(this.api.patchCard(c.id, { version: c.version, dueDate: day }), undefined, true);
+    this.patch(c, { dueDate: day });
   }
 
   addLabel(labelId: string): void {
@@ -534,7 +573,7 @@ export class TodoCardDetailComponent {
       this.editingTitle.set(false);
       return;
     }
-    this.write(this.api.patchCard(c.id, { version: c.version, title }), () => this.editingTitle.set(false), true);
+    this.patch(c, { title }, () => this.editingTitle.set(false));
   }
 
   startDesc(): void {
@@ -546,11 +585,7 @@ export class TodoCardDetailComponent {
     const c = this.card();
     if (!c) return;
     const text = this.descDraft().trim();
-    this.write(
-      this.api.patchCard(c.id, { version: c.version, descriptionMd: text || null }),
-      () => this.editingDesc.set(false),
-      true,
-    );
+    this.patch(c, { descriptionMd: text || null }, () => this.editingDesc.set(false));
   }
 
   toggleItem(item: TodoCheckItem): void {

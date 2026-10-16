@@ -280,6 +280,42 @@ describe('TodoCardDetailComponent', () => {
     expect(api.patchCard).toHaveBeenLastCalledWith('k-1', { version: 2, descriptionMd: null });
   });
 
+  it('sends a second patch only after the first answered, with its version', async () => {
+    const { cmp, api, toast, fixture } = await setup();
+    const first = new Subject<TodoCardDetail>();
+    api.patchCard.mockReturnValueOnce(first);
+    cmp.startDesc();
+    cmp.descDraft.set('Neu');
+    cmp.saveDesc();
+    cmp.setDue('2026-10-30');
+    expect(api.patchCard).toHaveBeenCalledTimes(1);
+    first.next(detail({ version: 3, descriptionMd: 'Neu' }));
+    expect(api.patchCard).toHaveBeenCalledTimes(2);
+    expect(api.patchCard).toHaveBeenLastCalledWith('k-1', { version: 3, dueDate: '2026-10-30' });
+    expect(cmp.editingDesc()).toBe(false);
+    expect(toast.error).not.toHaveBeenCalled();
+
+    const refused = new Subject<TodoCardDetail>();
+    api.patchCard.mockReturnValueOnce(refused);
+    cmp.setDue(null);
+    cmp.startTitle();
+    cmp.titleDraft.set('Anders');
+    cmp.saveTitle();
+    refused.error(new HttpErrorResponse({ status: 409, error: { code: 'card_version_conflict' } }));
+    expect(api.patchCard).toHaveBeenCalledTimes(3);
+    cmp.setDue('2026-11-02');
+    expect(api.patchCard).toHaveBeenCalledTimes(4);
+
+    const stale = new Subject<TodoCardDetail>();
+    api.patchCard.mockReturnValueOnce(stale);
+    cmp.setDue(null);
+    fixture.componentRef.setInput('cardId', 'k-2');
+    fixture.detectChanges();
+    stale.next(detail({ version: 9 }));
+    cmp.setDue('2026-11-03');
+    expect(api.patchCard).toHaveBeenCalledTimes(6);
+  });
+
   it('works the checklist', async () => {
     const { cmp, api, detect } = await setup();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Raum anfragen' }));
