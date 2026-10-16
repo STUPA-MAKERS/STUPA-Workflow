@@ -58,13 +58,17 @@ context of the report.
   (`ReporterTicketDetail`: report, files, `public` notes, `status` events without actor and
   without `duplicateOf`, `canReply`), `POST /api/tickets/mine/{id}/notes`
   (`ReporterNoteCreate`, always `public`; 403 `sender_blocked` while a block matches),
-  `PATCH|DELETE /api/tickets/mine/{id}/notes/{noteId}` (own messages; 403
-  `not_note_author`). Any session reads, no permission; a write needs a cookie session or a
+  `PATCH|DELETE /api/tickets/mine/{id}/notes/{noteId}` (own `public` messages; an
+  `internal` note gives 404 like a missing one, a team note 403 `not_note_author`, an edit
+  403 `sender_blocked` while a block matches, a delete stays allowed). The message and the
+  edit lock the ticket row, because an anonymization between the check and the commit would
+  miss the new note. Any session reads, no permission; a write needs a cookie session or a
   token whose scope allows `ticket.manage` (`tickets:write`), else 403. A ticket of another
   account, an anonymized ticket or a session without an account row gives 404 (list:
   empty page). The routes stand before `/tickets/{ticket_id}` so `mine` never parses as an
   id. The reporter sees no assignee, no context, no reporter block, no to-dos; a team author
-  shows by name only (never the e-mail fallback of `PersonRef`).
+  shows by name only: no e-mail fallback of `PersonRef` and no `principalId`, because the id
+  opens the Gravatar of the e-mail. `updatedAt` also moves on internal activity.
 - `POST /api/tickets/{id}/notes` takes `visibility` (`internal` default, `public`);
   `TicketNoteOut` carries `visibility` and `fromReporter`.
 - `GET /api/auth/me` carries `has_reported_tickets` (a ticket of the account that is not

@@ -1061,11 +1061,9 @@ class TicketService:
             ValidationProblem: Files without a draft token, or a draft that is missing,
                 expired, foreign or infected (HTTP 422).
         """
-        # The lock of ``add_note``: the anonymization must not run between the check and
-        # the commit of the files.
-        ticket, me = await self._reporter_ticket(
-            ticket_id, principal, lock=bool(payload.attachment_ids)
-        )
+        # Always under the row lock: an anonymization that runs between the check and the
+        # commit would miss the new note and leave the reporter on an anonymized ticket.
+        ticket, me = await self._reporter_ticket(ticket_id, principal, lock=True)
         if await self._sender_blocked(ticket):
             raise ForbiddenError("The sender is blocked.", code=SENDER_BLOCKED)
         return await self._insert_note(
@@ -1085,11 +1083,14 @@ class TicketService:
         """Change the text of an own message on an own ticket.
 
         Raises:
-            NotFoundError: Not a ticket of the caller, or no live note (HTTP 404).
-            ForbiddenError: The note has another author (HTTP 403, ``not_note_author``).
+            NotFoundError: Not a ticket of the caller, or no live public note (HTTP 404).
+            ForbiddenError: The note has another author (HTTP 403, ``not_note_author``), or
+                a sender block holds back the reporter (HTTP 403, ``sender_blocked``).
         """
-        ticket, me = await self._reporter_ticket(ticket_id, principal)
-        note, _me = await self._own_note(ticket.id, note_id, principal)
+        ticket, me = await self._reporter_ticket(ticket_id, principal, lock=True)
+        note = await self._reporter_note(ticket, note_id, principal)
+        if await self._sender_blocked(ticket):
+            raise ForbiddenError("The sender is blocked.", code=SENDER_BLOCKED)
         note.body = body
         note.edited_at = _now()
         await self.session.commit()
@@ -1101,11 +1102,27 @@ class TicketService:
         """Delete an own message on an own ticket, with its files.
 
         Raises:
-            NotFoundError: Not a ticket of the caller, or no live note (HTTP 404).
+            NotFoundError: Not a ticket of the caller, or no live public note (HTTP 404).
             ForbiddenError: The note has another author (HTTP 403, ``not_note_author``).
         """
         ticket, _me = await self._reporter_ticket(ticket_id, principal)
+        await self._reporter_note(ticket, note_id, principal)
         await self.delete_note(ticket.id, note_id, principal)
+
+    async def _reporter_note(
+        self, ticket: Ticket, note_id: uuid.UUID, principal: Principal
+    ) -> TicketNote:
+        """Return an own note of the reporter; an internal note answers like a missing one.
+
+        Raises:
+            NotFoundError: No live public note with this id on the ticket (HTTP 404).
+            ForbiddenError: The note has another author (HTTP 403, ``not_note_author``).
+        """
+        visible = await self.session.get(TicketNote, note_id)
+        if visible is None or visible.visibility != "public":
+            raise NotFoundError(f"note {note_id} not found")
+        note, _me = await self._own_note(ticket.id, note_id, principal)
+        return note
 
     # -- anonymization ----------------------------------------------------------
 
@@ -1272,14 +1289,16 @@ def _note_row(
 ) -> TicketNoteOut:
     """Build the wire note.
 
-    For the reporter the author shows by name only: the e-mail of a holder of
-    ``ticket.manage`` without a name never reaches the reporter.
+    For the reporter a team author shows by name only: neither the e-mail nor the
+    account id of a holder of ``ticket.manage`` reaches the reporter, because the id
+    opens the avatar of that e-mail.
     """
     author = _person(accounts, note.author_id)
     if for_reporter and note.author_id is not None:
         account = accounts.get(note.author_id)
+        own = account is not None and note.author_id == me
         author = PersonRef(
-            principal_id=note.author_id if account is not None else None,
+            principal_id=note.author_id if own else None,
             display_name=account.display_name if account is not None else None,
         )
     return TicketNoteOut(

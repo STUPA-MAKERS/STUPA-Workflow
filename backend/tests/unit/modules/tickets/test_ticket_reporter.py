@@ -172,13 +172,15 @@ async def test_the_detail_shows_public_notes_and_status_changes_only() -> None:
     assert out.can_reply is True
     assert out.attachments[0].filename == "a.png"
     first, second, third = out.notes
-    # The name only: the e-mail of a holder of ticket.manage never reaches the reporter.
-    assert first.author.principal_id == STAFF
+    # The name only: neither the e-mail nor the id of a holder of ticket.manage reaches
+    # the reporter.
+    assert first.author.principal_id is None
     assert first.author.display_name is None
     assert first.attachments == [shot]
     assert first.is_own is False
     assert second.is_own is True
     assert second.from_reporter is True
+    assert second.author.principal_id == ME
     assert third.author.principal_id is None
     (event,) = out.events
     assert event.payload == {"from": "new", "to": "in_progress"}
@@ -213,7 +215,8 @@ async def test_a_message_of_the_reporter_is_public() -> None:
     assert out.from_reporter is True
     assert out.is_own is True
     assert ticket.updated_at != NOW
-    assert session.get_kw[0] == {}
+    # Always locked: the anonymization must not run between the check and the commit.
+    assert session.get_kw[0] == {"with_for_update": True, "populate_existing": True}
 
 
 async def test_a_message_with_files_locks_the_ticket(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -263,15 +266,44 @@ async def test_the_reporter_edits_and_deletes_an_own_message() -> None:
     ticket = _ticket()
     note = _note(ticket, ME)
     files = FakeFiles()
-    session = ScriptedSession(scalar=[ME, ME, ME, ME], execute=[[(ME, "Me", None)]])
+    session = ScriptedSession(scalar=[ME, ME, None, ME, ME, ME], execute=[[(ME, "Me", None)]])
     session.put(ticket, note)
     service = _svc(session, files)
     out = await service.reporter_edit_note(ticket.id, note.id, "neu", REPORTER)
     assert out.body == "neu"
     assert note.edited_at is not None
+    assert session.get_kw[0] == {"with_for_update": True, "populate_existing": True}
     await service.reporter_delete_note(ticket.id, note.id, REPORTER)
     assert note.deleted_at is not None
     assert files.removed == [("ticket_note", [note.id], "reporter-sub")]
+
+
+async def test_a_blocked_reporter_cannot_edit_but_can_delete() -> None:
+    ticket = _ticket()
+    note = _note(ticket, ME)
+    session = ScriptedSession(scalar=[ME, ME, uuid.uuid4(), ME, ME, ME])
+    session.put(ticket, note)
+    service = _svc(session)
+    with pytest.raises(ForbiddenError) as exc:
+        await service.reporter_edit_note(ticket.id, note.id, "x", REPORTER)
+    assert exc.value.code == "sender_blocked"
+    assert note.body == "b"
+    await service.reporter_delete_note(ticket.id, note.id, REPORTER)
+    assert note.deleted_at is not None
+
+
+async def test_an_internal_note_answers_like_a_missing_one() -> None:
+    ticket = _ticket()
+    internal = _note(ticket, ME, visibility="internal")
+    session = ScriptedSession(scalar=[ME, ME])
+    session.put(ticket, internal)
+    service = _svc(session)
+    with pytest.raises(NotFoundError):
+        await service.reporter_edit_note(ticket.id, internal.id, "x", REPORTER)
+    with pytest.raises(NotFoundError):
+        await service.reporter_delete_note(ticket.id, internal.id, REPORTER)
+    with pytest.raises(NotFoundError):
+        await service.reporter_edit_note(ticket.id, uuid.uuid4(), "x", REPORTER)
 
 
 async def test_the_reporter_cannot_change_a_message_of_the_team() -> None:
