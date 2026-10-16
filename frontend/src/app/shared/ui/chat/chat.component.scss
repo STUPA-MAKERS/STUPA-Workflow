@@ -35,6 +35,8 @@
   min-height: var(--chat-log-min, 10rem);
   max-height: var(--chat-log-max, none);
   padding: 12px var(--space-4) 14px;
+  /* Nothing in a message may scroll the log sideways. */
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   border: 1px solid var(--color-border);
@@ -313,19 +315,19 @@
 }
 
 /* Edit and delete of an own message: visible on hover or focus. */
-/* The actions float beside the bubble, so the hidden pill takes no width from it. */
+/* The actions float over the top edge of the bubble, at its end: inside the bubble's
+   width, so they never leave the log, and absolute, so the hidden pill takes no width. */
 .chat__line {
   position: relative;
 }
 .chat__acts {
   position: absolute;
-  top: 50%;
-  right: calc(100% + var(--space-2));
+  inset-block-start: -16px;
+  inset-inline-end: 0;
   z-index: 1;
   display: inline-flex;
   flex: none;
   gap: 2px;
-  transform: translateY(-50%);
   padding: 2px;
   border-radius: var(--radius-pill);
   background: var(--color-surface-3);
@@ -333,10 +335,11 @@
   opacity: 0;
   transition: opacity 120ms ease;
 }
-/* Beside a message of another person (a moderator) the actions follow the bubble. */
+/* Over a message of another person (a moderator) the actions sit at the bubble's start,
+   so a short bubble does not push them over the avatar. */
 .chat__row:not(.chat__row--own) .chat__acts {
-  right: auto;
-  left: calc(100% + var(--space-2));
+  inset-inline-end: auto;
+  inset-inline-start: 0;
 }
 .chat__row:hover .chat__acts,
 .chat__acts:focus-within {
