@@ -15,7 +15,9 @@
   @if (loading()) {
     <app-skeleton variant="lines" [count]="4" [label]="'common.loading' | t" />
   } @else if (loadState() === 'forbidden') {
-    <app-note kind="warn" icon="lock" role="alert">{{ 'admin.helpTickets.forbidden' | t }}</app-note>
+    @if (!canBlock()) {
+      <app-note kind="warn" icon="lock" role="alert">{{ 'admin.helpTickets.forbidden' | t }}</app-note>
+    }
   } @else if (loadState() === 'error') {
     <app-note kind="error" icon="alert" role="alert">{{ 'admin.helpTickets.loadError' | t }}</app-note>
   } @else {

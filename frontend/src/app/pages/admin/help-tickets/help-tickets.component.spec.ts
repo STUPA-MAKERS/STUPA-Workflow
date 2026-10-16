@@ -272,9 +272,22 @@ describe('HelpTicketsComponent', () => {
       expect(screen.getByRole('link', { name: 'T-0042' })).toHaveAttribute('href', '/tickets/t42');
     });
 
-    it('lists the blocks without the site right too', async () => {
-      await setup({ perms: ['ticket.manage'] });
-      expect(screen.getByText('Für diese Einstellungen fehlt das Recht, die Seite zu verwalten.')).toBeInTheDocument();
+    it('lists only the blocks without the site right, with no alert', async () => {
+      const { api } = await setup({ perms: ['ticket.manage'] });
+      expect(api.getHelpTickets).not.toHaveBeenCalled();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByText(/fehlt das Recht/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Gesperrte Absender' })).toBeInTheDocument();
+      expect(rows()).toHaveLength(3);
+    });
+
+    it('shows no alert after a 403 when the blocks are there', async () => {
+      await setup({
+        perms: ['admin.site', 'ticket.manage'],
+        api: { getHelpTickets: jest.fn(() => throwError(() => ({ status: 403 }))), putHelpTickets: jest.fn() },
+      });
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       expect(rows()).toHaveLength(3);
     });
 
