@@ -41,7 +41,7 @@
         <span>{{ assigneeName() }}</span>
       </p>
 
-      <div class="td__actions" role="group" [attr.aria-label]="'tickets.detail.actions' | t">
+      <div #actions class="td__actions" role="group" [attr.aria-label]="'tickets.detail.actions' | t">
         @if (open()) {
           <app-button
             class="td__act"

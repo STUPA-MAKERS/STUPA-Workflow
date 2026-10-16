@@ -1,6 +1,16 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -117,6 +127,9 @@ export class TicketDetailComponent {
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   private readonly page = inject(TicketsPageService, { optional: true });
+  private readonly injector = inject(Injector);
+  /** The status buttons: a close or a reopen swaps them, so the focus moves to the new one. */
+  private readonly actions = viewChild<ElementRef<HTMLElement>>('actions');
 
   readonly split = computed(() => this.page?.split() ?? false);
   readonly phone = mediaQuerySignal(MEDIA.phone);
@@ -450,7 +463,9 @@ export class TicketDetailComponent {
       next: (t) => {
         this.saving.set(null);
         if (id !== this.id) return;
+        const wasOpen = this.open();
         this.show(t);
+        if (what === 'status' && wasOpen !== this.open()) this.focusActions();
         this.page?.notify(id);
         if (todos) this.loadTodos();
       },
@@ -458,6 +473,16 @@ export class TicketDetailComponent {
         this.saving.set(null);
         this.toast.error(this.t(this.patchError(err)));
       },
+    });
+  }
+
+  /**
+   * "Erledigt", "Ablehnen" and "Wieder öffnen" remove the button that has the focus. Give
+   * the focus to the button that takes its place, so it does not fall back to the page.
+   */
+  private focusActions(): void {
+    afterNextRender(() => this.actions()?.nativeElement.querySelector<HTMLElement>('button')?.focus(), {
+      injector: this.injector,
     });
   }
 

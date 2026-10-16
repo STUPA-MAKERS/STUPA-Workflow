@@ -276,6 +276,20 @@ describe('TicketDetailComponent', () => {
     expect(screen.getByRole('button', { name: /Wieder öffnen/ })).toBeInTheDocument();
   });
 
+  it('moves the focus to the button that replaces the status action', async () => {
+    const { harness } = await start();
+    const done = screen.getByRole('button', { name: /Erledigt/ });
+    done.focus();
+    await userEvent.click(done);
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /Wieder öffnen/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Wieder öffnen/ }));
+    harness.detectChanges();
+    await harness.fixture.whenStable();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /Erledigt/ }));
+  });
+
   it('asks first when open to-dos are linked, and completes them by default', async () => {
     const { cmp, api, todosApi, harness } = await start('/tickets/t40', {
       todos: of([card(), card({ id: 'c2', title: 'Zweite', isDone: true, dueDate: null, assignees: [] })]),
