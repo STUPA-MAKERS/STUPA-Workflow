@@ -10,7 +10,9 @@ is set.
 ``rejected`` sets it, a reopen clears it. The retention cron anonymizes a ticket
 ``tickets.retentionMonths`` after that moment.
 
-Notes are internal and soft-deleted (``deleted_at``). Events are the timeline of
+A note is ``internal`` (the holders of ``ticket.manage`` only) or ``public`` (the
+reporter account reads it too). Notes are soft-deleted (``deleted_at``). A note of the
+reporter is ``public``; the anonymization clears its ``author_id``. Events are the timeline of
 the status, the assignee and the kind. Both cascade with the ticket.
 
 ``ticket_sender_block`` holds the blocked senders: an account (``principal_id``) or a
@@ -46,6 +48,8 @@ TICKET_KINDS: tuple[str, ...] = ("bug", "question", "idea")
 TICKET_STATUSES: tuple[str, ...] = ("new", "in_progress", "done", "rejected")
 #: The statuses that close a ticket and start the retention clock.
 CLOSED_STATUSES: frozenset[str] = frozenset({"done", "rejected"})
+#: The visibilities of a note.
+TICKET_NOTE_VISIBILITIES: tuple[str, ...] = ("internal", "public")
 #: The kinds of a timeline event.
 TICKET_EVENT_KINDS: tuple[str, ...] = ("created", "status", "assignee", "kind", "todo_done")
 
@@ -107,18 +111,25 @@ class Ticket(UUIDPkMixin, TimestampMixin, Base):
 
 
 class TicketNote(UUIDPkMixin, Base):
-    """An internal note on a ticket. Only its author edits or deletes it."""
+    """A note on a ticket. Only its author edits or deletes it.
+
+    ``author_id`` is NULL only for a note of the reporter on an anonymized ticket.
+    """
 
     __tablename__ = "ticket_note"
 
     ticket_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ticket.id", ondelete="CASCADE"))
-    author_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("principal.id"))
+    author_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("principal.id"), nullable=True)
     body: Mapped[str] = mapped_column(Text)
+    visibility: Mapped[str] = mapped_column(Text, server_default="internal")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    __table_args__ = (Index("ix_ticket_note_ticket_id", "ticket_id"),)
+    __table_args__ = (
+        CheckConstraint(f"visibility IN ({_in(TICKET_NOTE_VISIBILITIES)})", name="visibility"),
+        Index("ix_ticket_note_ticket_id", "ticket_id"),
+    )
 
 
 class TicketEvent(UUIDPkMixin, Base):

@@ -21,6 +21,7 @@ from app.shared.people import PersonRef
 TicketKind = Literal["bug", "question", "idea"]
 TicketStatus = Literal["new", "in_progress", "done", "rejected"]
 TicketEventKind = Literal["created", "status", "assignee", "kind", "todo_done"]
+NoteVisibility = Literal["internal", "public"]
 
 #: The most draft attachments one report binds.
 MAX_TICKET_ATTACHMENTS = 5
@@ -160,6 +161,8 @@ class TicketNoteOut(_CamelModel):
     edited_at: datetime | None = Field(default=None, serialization_alias="editedAt")
     is_own: bool = Field(default=False, serialization_alias="isOwn")
     attachments: list[MessageAttachmentOut] = Field(default_factory=list)
+    visibility: NoteVisibility = "internal"
+    from_reporter: bool = Field(default=False, serialization_alias="fromReporter")
 
 
 class TicketRef(_CamelModel):
@@ -206,9 +209,54 @@ class NoteBody(_CamelIn):
 
 
 class NoteCreate(MessageFilesIn, _CamelIn):
-    """A new note. The body may be empty only with at least one file."""
+    """A new note. The body may be empty only with at least one file.
+
+    ``visibility`` defaults to ``internal``; ``public`` lets the reporter account read it.
+    """
 
     body: str = Field(max_length=10000)
+    visibility: NoteVisibility = "internal"
+
+
+class ReporterNoteCreate(MessageFilesIn, _CamelIn):
+    """A message of the reporter. It is always ``public``."""
+
+    body: str = Field(max_length=10000)
+
+
+class ReporterTicketItem(_CamelModel):
+    """A ticket in the list of its reporter: no reporter, no assignee."""
+
+    id: UUID
+    number: str
+    kind: TicketKind
+    title: str
+    status: TicketStatus
+    created_at: datetime = Field(serialization_alias="createdAt")
+    updated_at: datetime = Field(serialization_alias="updatedAt")
+
+
+class ReporterTicketEvent(_CamelModel):
+    """A status change as the reporter sees it: no actor."""
+
+    id: UUID
+    kind: Literal["status"]
+    at: datetime
+    payload: dict[str, JsonValue] = Field(default_factory=dict)
+
+
+class ReporterTicketDetail(ReporterTicketItem):
+    """The own ticket of a reporter: the report, the public notes and the status changes.
+
+    ``canReply`` is false while a sender block holds back the reporter.
+    """
+
+    body: str
+    attachments: list[TicketAttachment] = Field(default_factory=list)
+    notes: list[TicketNoteOut] = Field(default_factory=list)
+    events: list[ReporterTicketEvent] = Field(default_factory=list)
+    closed_at: datetime | None = Field(default=None, serialization_alias="closedAt")
+    can_reply: bool = Field(default=True, serialization_alias="canReply")
 
 
 class TicketBlockedSender(_CamelModel):
