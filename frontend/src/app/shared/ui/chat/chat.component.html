@@ -129,13 +129,13 @@
             } @else if (m.state === 'failed') {
               <span class="chat__meta chat__meta--failed">
                 <span class="chat__failed"><app-icon name="alert" [size]="13" />{{ 'chat.failed' | t }}</span>
-                <button type="button" class="chat__retry" (click)="retry.emit({ id: m.id })">
+                <button type="button" class="chat__retry" (click)="retryFailed(m)">
                   {{ 'chat.retry' | t }}
                 </button>
                 <button type="button" class="chat__retry" (click)="editFailed(m)">
                   {{ 'chat.editShort' | t }}
                 </button>
-                <button type="button" class="chat__retry" (click)="discard.emit({ id: m.id })">
+                <button type="button" class="chat__retry" (click)="discardFailed(m)">
                   {{ 'chat.discard' | t }}
                 </button>
               </span>

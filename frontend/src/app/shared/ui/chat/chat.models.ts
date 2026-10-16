@@ -52,10 +52,14 @@ export interface ChatSend {
   mentions?: string[];
 }
 
-/** The `edit` output. */
+/**
+ * The `edit` output. The edit closes when it goes out; a consumer whose request fails
+ * calls `restore`, which opens the edit again with the new text.
+ */
 export interface ChatEdit {
   id: string;
   body: string;
+  restore?: () => void;
 }
 
 /** The `delete` and `retry` outputs. */

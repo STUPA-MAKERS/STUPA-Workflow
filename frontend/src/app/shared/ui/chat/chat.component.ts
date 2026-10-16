@@ -357,6 +357,10 @@ export class ChatComponent {
   protected editFailed(msg: ChatMessage): void {
     const draft = this.draft().trim();
     this.onDraft(draft ? `${msg.body}\n\n${draft}` : msg.body);
+    // The resend keeps the visibility the message had, not the one the composer shows now.
+    if (msg.visibility && this.segmentOptions().some((o) => o.value === msg.visibility)) {
+      this.visibility.set(msg.visibility);
+    }
     this.discard.emit({ id: msg.id });
     afterNextRender(
       () => {
@@ -377,8 +381,12 @@ export class ChatComponent {
    */
   protected startEdit(msg: ChatMessage): void {
     this.menuFor.set(null);
-    this.editDraft.set(msg.body);
-    this.editingId.set(msg.id);
+    this.openEdit(msg.id, msg.body);
+  }
+
+  private openEdit(id: string, body: string): void {
+    this.editDraft.set(body);
+    this.editingId.set(id);
     afterNextRender(
       () => {
         const box = this.log().nativeElement.querySelector<HTMLTextAreaElement>('.chat__editInput');
@@ -431,7 +439,37 @@ export class ChatComponent {
     if (id === null || !body) return;
     const msg = this.messages().find((m) => m.id === id);
     this.endEdit();
-    if (msg && msg.body !== body) this.edit.emit({ id, body });
+    if (msg && msg.body !== body) this.edit.emit({ id, body, restore: () => this.restoreEdit(id, body) });
+  }
+
+  /**
+   * The server refused an edit: it opens again with the new text, so nothing typed is
+   * lost. Not while another edit is open, and not for a message that is gone.
+   */
+  private restoreEdit(id: string, body: string): void {
+    if (this.editingId() !== null || !this.messages().some((m) => m.id === id)) return;
+    this.openEdit(id, body);
+  }
+
+  /**
+   * "Erneut senden" and "Verwerfen" take away the button that had the focus, so it goes
+   * to the composer, or to the log where the thread has none.
+   */
+  protected retryFailed(msg: ChatMessage): void {
+    this.retry.emit({ id: msg.id });
+    this.focusComposer();
+  }
+
+  protected discardFailed(msg: ChatMessage): void {
+    this.discard.emit({ id: msg.id });
+    this.focusComposer();
+  }
+
+  private focusComposer(): void {
+    afterNextRender(
+      () => (this.composerInput()?.nativeElement ?? this.log().nativeElement).focus(),
+      { injector: this.injector },
+    );
   }
 
   protected askDelete(msg: ChatMessage): void {

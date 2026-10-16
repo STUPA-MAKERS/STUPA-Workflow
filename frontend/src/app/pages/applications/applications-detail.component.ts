@@ -1182,6 +1182,7 @@ export class ApplicationsDetailComponent {
         this.comments.update((list) => list.map((c) => (c.id === updated.id ? updated : c)));
       },
       error: (err: { status?: number }) => {
+        change.restore?.();
         this.toast.error(this.i18n.translate(this.commentErrorKey(err.status)));
       },
     });

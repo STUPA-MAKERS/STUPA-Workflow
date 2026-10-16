@@ -474,8 +474,10 @@ describe('StatusTimelineComponent', () => {
     const fail = jest.fn(() => throwError(() => ({ status })));
     const { comp, toast } = await setup(fakeApi({ updateComment: fail, deleteComment: fail }));
     await screen.findByRole('heading', { level: 1 });
-    comp.editComment({ id: 'c2', body: 'Neu' });
+    const restore = jest.fn();
+    comp.editComment({ id: 'c2', body: 'Neu', restore });
     comp.deleteComment({ id: 'c2' });
+    expect(restore).toHaveBeenCalledTimes(1);
     expect(toast.error).toHaveBeenNthCalledWith(1, message);
     expect(toast.error).toHaveBeenNthCalledWith(2, message);
     expect(comp.comments()).toHaveLength(2);

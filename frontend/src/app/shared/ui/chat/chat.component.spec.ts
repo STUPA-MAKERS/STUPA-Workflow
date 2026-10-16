@@ -232,6 +232,54 @@ describe('ChatComponent', () => {
     expect(document.activeElement).toBe(input());
   });
 
+  it('resends a failed message with its own visibility, not the one the composer shows', async () => {
+    const { input, send, view, cmp } = await setup({
+      visibilityOptions: ['public', 'internal'],
+      messages: [msg('f', today(10), { own: true, state: 'failed', body: 'Kosten noch unklar', visibility: 'internal' })],
+    });
+    expect(cmp.visibility()).toBe('public');
+    fireEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    view.fixture.detectChanges();
+    expect(cmp.visibility()).toBe('internal');
+    fireEvent.keyDown(input(), { key: 'Enter' });
+    expect(send).toHaveBeenCalledWith({ body: 'Kosten noch unklar', visibility: 'internal' });
+  });
+
+  it('keeps the composer visibility for a failed message of a kind it does not offer', async () => {
+    const { view, cmp } = await setup({
+      visibilityOptions: ['internal'],
+      messages: [msg('f', today(10), { own: true, state: 'failed', body: 'x', visibility: 'public' })],
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    view.fixture.detectChanges();
+    expect(cmp.visibility()).toBe('internal');
+  });
+
+  it('keeps the focus in the thread after "Erneut senden" or "Verwerfen"', async () => {
+    const { retry, discard, input, log, view, set } = await setup({
+      messages: [msg('f', today(10), { own: true, state: 'failed' })],
+    });
+    const settle = async () => {
+      view.fixture.detectChanges();
+      await view.fixture.whenStable();
+    };
+    screen.getByRole('button', { name: 'Erneut senden' }).focus();
+    fireEvent.click(screen.getByRole('button', { name: 'Erneut senden' }));
+    set('messages', [msg('f', today(10), { own: true, state: 'sending' })]);
+    await settle();
+    expect(retry).toHaveBeenCalledWith({ id: 'f' });
+    expect(document.activeElement).toBe(input());
+
+    set('messages', [msg('f', today(10), { own: true, state: 'failed' })]);
+    set('canPost', false);
+    screen.getByRole('button', { name: 'Verwerfen' }).focus();
+    fireEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    set('messages', []);
+    await settle();
+    expect(discard).toHaveBeenCalledWith({ id: 'f' });
+    expect(document.activeElement).toBe(log());
+  });
+
   it('puts the text of a failed message into an empty composer as it is', async () => {
     const { input, view } = await setup({
       messages: [msg('f', today(10), { own: true, state: 'failed', body: 'Hallo' })],
@@ -352,7 +400,7 @@ describe('ChatComponent', () => {
       fireEvent.keyDown(box(), { key: 'a' });
       expect(edit).not.toHaveBeenCalled();
       fireEvent.keyDown(box(), { key: 'Enter' });
-      expect(edit).toHaveBeenCalledWith({ id: 'm', body: 'Neu' });
+      expect(edit).toHaveBeenCalledWith({ id: 'm', body: 'Neu', restore: expect.any(Function) });
     });
 
     it('moves the focus into the edit field and back to the Edit button', async () => {
@@ -390,6 +438,40 @@ describe('ChatComponent', () => {
       expect(outside).toHaveFocus();
     });
 
+    it('opens a refused edit again with the new text, not over another edit or a gone message', async () => {
+      const { edit, view, set } = await setup({ messages: own() });
+      const settle = async () => {
+        view.fixture.detectChanges();
+        await view.fixture.whenStable();
+      };
+      const box = () => screen.queryByRole('textbox', { name: 'Nachricht bearbeiten' }) as HTMLTextAreaElement | null;
+      fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[0]);
+      fireEvent.input(box() as HTMLTextAreaElement, { target: { value: 'Lange neue Fassung' } });
+      fireEvent.keyDown(box() as HTMLTextAreaElement, { key: 'Enter' });
+      await settle();
+      expect(box()).toBeNull();
+      const first = edit.mock.calls[0][0] as { restore: () => void };
+      first.restore();
+      await settle();
+      expect(box()?.value).toBe('Lange neue Fassung');
+      expect(box()).toHaveFocus();
+
+      // Another edit is open: the refused one waits.
+      fireEvent.keyDown(box() as HTMLTextAreaElement, { key: 'Escape' });
+      fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[1]);
+      await settle();
+      first.restore();
+      await settle();
+      expect(box()?.value).not.toBe('Lange neue Fassung');
+
+      // The message is gone: nothing opens.
+      fireEvent.keyDown(box() as HTMLTextAreaElement, { key: 'Escape' });
+      set('messages', [own()[1]]);
+      first.restore();
+      await settle();
+      expect(box()).toBeNull();
+    });
+
     it('saves with the button, cancels with Abbrechen and needs a text', async () => {
       const { edit, cmp } = await setup({ messages: own() });
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[1]);
@@ -399,7 +481,7 @@ describe('ChatComponent', () => {
       expect(edit).not.toHaveBeenCalled();
       fireEvent.input(box, { target: { value: 'Geändert' } });
       fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-      expect(edit).toHaveBeenCalledWith({ id: 'n', body: 'Geändert' });
+      expect(edit).toHaveBeenCalledWith({ id: 'n', body: 'Geändert', restore: expect.any(Function) });
 
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[1]);
       fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
@@ -435,7 +517,7 @@ describe('ChatComponent', () => {
       const box = screen.getByRole('textbox', { name: 'Nachricht bearbeiten' });
       fireEvent.input(box, { target: { value: 'Neu' } });
       fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-      expect(edit).toHaveBeenCalledWith({ id: 'm', body: 'Neu' });
+      expect(edit).toHaveBeenCalledWith({ id: 'm', body: 'Neu', restore: expect.any(Function) });
       expect(screen.getByRole('button', { name: 'Nachricht löschen' })).toBeInTheDocument();
     });
   });

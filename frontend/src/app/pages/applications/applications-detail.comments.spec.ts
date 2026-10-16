@@ -250,11 +250,28 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
   ])('explains a %s on the comment patch', async (status, message) => {
     const { http, toast, cmp } = await loaded(undefined, [OWN]);
     const error = jest.spyOn(toast, 'error');
+    const restore = jest.fn();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (cmp as any).editComment({ id: 'c2', body: 'x' });
+    (cmp as any).editComment({ id: 'c2', body: 'x', restore });
+    expect(restore).not.toHaveBeenCalled();
     http.expectOne(url('/comments/c2')).flush({ title: 'e' }, { status, statusText: 'x' });
     expect(error).toHaveBeenCalledWith(message);
+    // The chat opens the edit again with the text, so nothing typed is lost.
+    expect(restore).toHaveBeenCalledTimes(1);
     expect(cmp.comments()[0].body).toBe('Mein Text');
+    http.verify();
+  });
+
+  it('keeps the new text in the edit when the server refuses it', async () => {
+    const { http, detectChanges, fixture } = await loaded(undefined, [COMMENTS[0]]);
+    fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
+    const box = screen.getByRole('textbox', { name: 'Nachricht bearbeiten' });
+    fireEvent.input(box, { target: { value: 'Lange neue Fassung' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    http.expectOne(url('/comments/c1')).flush({ title: 'e' }, { status: 500, statusText: 'x' });
+    detectChanges();
+    await fixture.whenStable();
+    expect(screen.getByRole('textbox', { name: 'Nachricht bearbeiten' })).toHaveValue('Lange neue Fassung');
     http.verify();
   });
 

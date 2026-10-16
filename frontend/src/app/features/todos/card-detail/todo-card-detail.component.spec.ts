@@ -538,8 +538,9 @@ describe('TodoCardDetailComponent', () => {
     cmp.setColumn('c-3');
     cmp.moveTo({ columnId: 'c-2', position: 'top' });
     cmp.moveTo({ columnId: 'c-3', position: 'top' });
+    const staleRestore = jest.fn();
     cmp.editComment({ id: 'cm-1', body: 'x' });
-    cmp.editComment({ id: 'cm-1', body: 'y' });
+    cmp.editComment({ id: 'cm-1', body: 'y', restore: staleRestore });
     cmp.deleteComment({ id: 'cm-1' });
     cmp.deleteComment({ id: 'cm-1' });
     cmp.archive();
@@ -574,6 +575,8 @@ describe('TodoCardDetailComponent', () => {
     expect(toast.error).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
     expect(api.moveCard).toHaveBeenCalledTimes(moves);
+    // A refused edit of a card no longer shown opens nothing.
+    expect(staleRestore).not.toHaveBeenCalled();
   });
 
   it('reports a failed read of the board for "top of the column"', async () => {
@@ -716,7 +719,9 @@ describe('TodoCardDetailComponent', () => {
     expect(api.editComment).toHaveBeenCalledWith('k-1', 'cm-1', 'Geändert', []);
     expect(cmp.card()?.comments[0].body).toBe('Geändert');
     api.editComment.mockReturnValueOnce(throwError(() => new Error('x')));
-    cmp.editComment({ id: 'cm-1', body: 'x' });
+    const restore = jest.fn();
+    cmp.editComment({ id: 'cm-1', body: 'x', restore });
+    expect(restore).toHaveBeenCalledTimes(1);
     expect(toast.error).toHaveBeenLastCalledWith('Der Kommentar konnte nicht gespeichert werden.');
 
     cmp.deleteComment({ id: 'cm-1' });

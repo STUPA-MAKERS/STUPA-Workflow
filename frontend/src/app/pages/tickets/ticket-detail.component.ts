@@ -486,7 +486,10 @@ export class TicketDetailComponent {
     if (change.id === BODY_ID) return;
     this.api.editNote(this.id, change.id, change.body).subscribe({
       next: (n) => this.notes.update((list) => list.map((x) => (x.id === n.id ? n : x))),
-      error: () => this.toast.error(this.t('tickets.detail.error.note')),
+      error: () => {
+        change.restore?.();
+        this.toast.error(this.t('tickets.detail.error.note'));
+      },
     });
   }
 

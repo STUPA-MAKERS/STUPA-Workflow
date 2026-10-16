@@ -773,7 +773,9 @@ export class TodoCardDetailComponent {
         }));
       },
       error: () => {
-        if (current()) this.toast.error(this.t('todos.error.comment'));
+        if (!current()) return;
+        edit.restore?.();
+        this.toast.error(this.t('todos.error.comment'));
       },
     });
   }

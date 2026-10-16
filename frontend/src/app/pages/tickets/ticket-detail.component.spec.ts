@@ -616,7 +616,9 @@ describe('TicketDetailComponent', () => {
     expect(api.deleteNote).not.toHaveBeenCalled();
 
     api.editNote.mockReturnValueOnce(throwError(() => new Error('x')));
-    cmp.editNote({ id: 'n1', body: 'y' });
+    const restore = jest.fn();
+    cmp.editNote({ id: 'n1', body: 'y', restore });
+    expect(restore).toHaveBeenCalledTimes(1);
     api.deleteNote.mockReturnValueOnce(throwError(() => new Error('x')));
     cmp.deleteNote({ id: 'n1' });
     expect(toast.error).toHaveBeenCalledTimes(2);
