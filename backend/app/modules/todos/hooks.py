@@ -3,9 +3,9 @@
 ``open_count`` counts the linked cards that are open (not in a done column, not
 archived) on a board that the viewer reads. ``complete`` moves those cards into the
 done column of their board, each with its ``moved`` event and the ``todo_done``
-event on the ticket; a card on a board that the actor cannot write stays. It takes
-the board locks in board-id order, because two closes that lock the same boards in
-different orders deadlock.
+event on the ticket; a card on a board that the actor reads but cannot write
+(``todo.read_all``) stays. It takes the board locks in board-id order, because two
+closes that lock the same boards in different orders deadlock.
 ``readable_cards`` tells which cards of ``todo_done`` events the viewer may see by
 title.
 """
@@ -59,7 +59,11 @@ class TicketTodoBridge:
 
     async def complete(self, ticket_id: uuid.UUID, principal: Principal) -> None:
         """Move the open linked cards that the principal can write into done."""
-        cards = await self._open_cards(ticket_id, principal)
+        cards = [
+            (card, board)
+            for card, board in await self._open_cards(ticket_id, principal)
+            if await self.todos.access.can_write(board, principal)
+        ]
         actor = await self.todos.access.me(principal)
         if not cards or actor is None:
             return

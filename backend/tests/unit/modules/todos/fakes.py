@@ -124,12 +124,14 @@ class FakeAccess:
         *,
         me: uuid.UUID | None = ME,
         read: bool = True,
+        write: bool | None = None,
         configure: bool = True,
         members: Iterable[uuid.UUID] = (ME, OTHER),
         scope: ReadScope | None = None,
     ) -> None:
         self._me = me
         self.read = read
+        self.write = write
         self.configure = configure
         self.member_set = set(members)
         self._scope = scope or ReadScope(owner_id=me)
@@ -139,6 +141,12 @@ class FakeAccess:
 
     async def can_read(self, _board: TodoBoard, _principal: Principal) -> bool:
         return self.read
+
+    async def can_write(self, board: TodoBoard, principal: Principal) -> bool:
+        """The write right: ``write``, or the read answer when ``write`` is None."""
+        if self.write is None:
+            return await self.can_read(board, principal)
+        return self.write
 
     async def can_configure(self, _board: TodoBoard, _principal: Principal) -> bool:
         return self.configure

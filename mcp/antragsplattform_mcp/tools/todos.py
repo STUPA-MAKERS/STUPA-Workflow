@@ -2,8 +2,11 @@
 
 A board is readable for its members: a gremium board for the active members whose
 gremium role holds `todo.write` (or an admin), the personal board for its owner only, a
-team board for the holders of its permission. An unreadable board or card is 404. The
-token needs the scope `todos:write`.
+team board for the holders of its permission. The global `todo.all` reads and writes,
+`todo.read_all` only reads every gremium and team board (never a personal one). An
+unreadable board or card is 404; a card write on a board that is only readable is 403
+`todo_write_required`. The token reads with the scope `read` (`todo.read_all`) or
+`todos:write` and writes with `todos:write`.
 """
 
 from __future__ import annotations

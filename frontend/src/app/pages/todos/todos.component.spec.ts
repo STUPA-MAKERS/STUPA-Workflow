@@ -522,6 +522,15 @@ describe('TodosComponent', () => {
     cmp.onCreated(detail());
   });
 
+  it('has no "+ To-Do" on a board that the person only reads, also not while it loads', async () => {
+    await start('/todos/b-1', { board: board({ canWrite: false }) });
+    expect(screen.queryByTestId('td-new')).toBeNull();
+    TestBed.resetTestingModule();
+    const boards = BOARDS.map((b) => (b.id === 'b-1' ? { ...b, canWrite: false } : b));
+    await start('/todos/b-1', { pending: true, boards });
+    expect(document.querySelector('.td__skelNew')).toBeNull();
+  });
+
   it('opens a card in the drawer, traps the focus and closes with Escape', async () => {
     const { cmp, router, settle, harness } = await start('/todos/b-1');
     cmp.openCard('k-1');
@@ -810,6 +819,11 @@ describe('TodosComponent', () => {
       fireEvent.click(screen.getByTestId('td-fab'));
       expect(cmp.newOpen()).toBe(true);
       expect(TestBed.inject(PageFrameService).fill()).toBe(false);
+    });
+
+    it('has no FAB on a board that the person only reads', async () => {
+      await start('/todos/b-1', { board: board({ canWrite: false }) });
+      expect(screen.queryByTestId('td-fab')).toBeNull();
     });
 
     it('offers the board view from the list and leaves out settings and archive without them', async () => {

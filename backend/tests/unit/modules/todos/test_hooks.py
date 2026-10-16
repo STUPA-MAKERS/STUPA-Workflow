@@ -101,3 +101,11 @@ async def test_complete_locks_the_boards_in_board_id_order() -> None:
     await bridge.complete(TICKET, USER)
     assert order == [(low.id, second.id), (high.id, first.id), (high.id, third.id)]
     assert session.committed == 1
+
+
+async def test_complete_leaves_a_card_on_a_board_that_the_actor_only_reads() -> None:
+    b = board()
+    c = card(b, column(b.id))
+    session = ScriptedSession(execute=[[(c, b)]])
+    await _bridge(session, {b.id}, write=False).complete(TICKET, USER)
+    assert session.committed == 0 and session.refreshed == []

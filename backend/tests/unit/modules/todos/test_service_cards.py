@@ -112,6 +112,45 @@ async def test_card_404s() -> None:
         await no_account.archive_card(orphan.id, USER)
 
 
+class _WriteOn(FakeAccess):
+    """Reads every board, writes only the boards in ``writable``."""
+
+    def __init__(self, writable: set[uuid.UUID]) -> None:
+        super().__init__()
+        self.writable = writable
+
+    async def can_write(self, board: Any, principal: Any) -> bool:
+        del principal
+        return board.id in self.writable
+
+
+async def test_a_readable_board_without_the_write_right_answers_403() -> None:
+    session, b, col, c, _service = _setup()
+    service = TodoService(
+        session,  # type: ignore[arg-type]
+        access=_WriteOn(set()),  # type: ignore[arg-type]
+        links=FakeLinks(),  # type: ignore[arg-type]
+        files=FakeFiles(),  # type: ignore[arg-type]
+    )
+    _stub(service)
+    with pytest.raises(ForbiddenError) as card_write:
+        await service.archive_card(c.id, USER)
+    assert card_write.value.code == "todo_write_required"
+    with pytest.raises(ForbiddenError) as create:
+        await service.create(CardCreate(boardId=b.id, title="Neu"), USER)
+    assert create.value.code == "todo_write_required"
+    # The read still works.
+    assert await service.card(c.id, USER) is OUT
+    # A transfer needs the write right on the target board too.
+    target = board()
+    session.put(target)
+    service.access = _WriteOn({b.id})  # type: ignore[assignment]
+    with pytest.raises(ForbiddenError) as transfer:
+        await service.transfer(c.id, CardTransfer(boardId=target.id), USER)
+    assert transfer.value.code == "todo_write_required"
+    assert session.committed == 0 and c.board_id == b.id and c.column_id == col.id
+
+
 async def test_card_detail_resolves_people_links_events_and_comments(
     people: dict[uuid.UUID, PersonRef],
 ) -> None:

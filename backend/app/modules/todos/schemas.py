@@ -208,7 +208,8 @@ class TodoAssignedBoard(_Out):
     ``columns`` are all columns of the board in their order; ``cardCount`` counts the
     caller's live cards in each. ``cards`` holds only the live cards assigned to the
     caller, done ones included, in board order. ``labels`` are the labels of the board.
-    ``canWrite`` has the value of the board read: a reader of a board writes on it.
+    ``canWrite`` is the write right of the board (``BoardAccess.can_write``): false for
+    a board that the caller only reads (``todo.read_all``).
     """
 
     id: UUID

@@ -93,6 +93,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   card_moved: 'todos.error.transfer',
   card_archived: 'todos.error.transfer',
   column_not_on_board: 'todos.error.transfer',
+  todo_write_required: 'todos.error.readOnly',
 };
 
 /**
@@ -313,7 +314,12 @@ export class TodoCardDetailComponent {
     () => new Set((this.card()?.links ?? []).map((l) => linkKey(l.kind, l.targetId))),
   );
 
+  /**
+   * An own comment changes only on a board that the person writes: a reader of the board
+   * (`todo.read_all`) gets 403 `todo_write_required`. An archived card keeps the edit.
+   */
   readonly messages = computed<ChatMessage[]>(() => {
+    const writes = !!this.card()?.canWrite;
     const comments = (this.card()?.comments ?? []).map<ChatMessage>((c) => ({
       id: c.id,
       author: c.author,
@@ -321,6 +327,7 @@ export class TodoCardDetailComponent {
       at: c.at,
       editedAt: c.editedAt,
       own: c.isOwn,
+      canEdit: c.isOwn && writes,
       attachments: toChatAttachments(this.apiBase, c.attachments),
     }));
     return [...comments, ...this.outbox.messages()];

@@ -4306,6 +4306,7 @@ export const de = {
   'todos.error.move': 'Die Karte konnte nicht verschoben werden.',
   'todos.error.transfer': 'Die Karte konnte nicht verschoben werden.',
   'todos.error.create': 'Das To-Do konnte nicht angelegt werden.',
+  'todos.error.readOnly': 'Dieses Board kannst du nur lesen.',
   'todos.picker.title': 'Verknüpfen',
   'todos.picker.search': 'Suchen',
   'todos.picker.kind': 'Art',

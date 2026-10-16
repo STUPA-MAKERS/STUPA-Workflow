@@ -133,6 +133,21 @@ describe('TodoCardDetailComponent', () => {
     expect(readOnly.cmp.menuSections()).toEqual([]);
   });
 
+  it('offers no edit of an own comment on a board that the person only reads', async () => {
+    const readOnly = await setup({ card: detail({ canWrite: false, comments: [COMMENT] }) });
+    expect(readOnly.cmp.messages()[0]).toEqual(expect.objectContaining({ own: true, canEdit: false }));
+    // An archived card of a writable board keeps the edit of an own comment.
+    readOnly.cmp.card.set(detail({ archivedAt: '2026-10-12T10:00:00Z', comments: [COMMENT] }));
+    expect(readOnly.cmp.messages()[0].canEdit).toBe(true);
+  });
+
+  it('names a write on a board that the person only reads', async () => {
+    const { cmp, api, toast } = await setup();
+    api.patchCard.mockReturnValueOnce(http(403, 'todo_write_required'));
+    cmp.setDue('2026-10-30');
+    expect(toast.error).toHaveBeenLastCalledWith('Dieses Board kannst du nur lesen.');
+  });
+
   it('offers the restore for an archived card and shows when it was archived', async () => {
     const { cmp, api, changed } = await setup({ card: detail({ archivedAt: '2026-10-12T10:00:00Z' }) });
     expect(screen.getByText(/^Archiviert am /)).toBeInTheDocument();

@@ -38,11 +38,14 @@
           [value]="view()"
           (valueChange)="setView($event)"
         />
-        @if (board()) {
-          <app-button data-testid="td-new" (click)="newCard()">
-            <span class="td__btn"><app-icon name="add" [size]="16" />{{ 'todos.new.short' | t }}</span>
-          </app-button>
-        } @else if (loading()) {
+        <!-- A board that the person only reads (canWrite false) has no "+ To-Do". -->
+        @if (board(); as b) {
+          @if (b.canWrite) {
+            <app-button data-testid="td-new" (click)="newCard()">
+              <span class="td__btn"><app-icon name="add" [size]="16" />{{ 'todos.new.short' | t }}</span>
+            </app-button>
+          }
+        } @else if (loading() && summary()?.canWrite !== false) {
           <span class="skel-box td__skelNew skel-in" aria-hidden="true"></span>
         }
       }
@@ -196,7 +199,7 @@
     }
   </div>
 
-  @if (phone() && board()) {
+  @if (phone() && board()?.canWrite) {
     <button type="button" class="td__fab" data-testid="td-fab" (click)="newCard()">
       <app-icon name="add" [size]="22" />
       {{ 'todos.new.short' | t }}

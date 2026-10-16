@@ -1,8 +1,10 @@
 """To-do service: boards, columns, labels, cards and their sub-resources.
 
 The service decides every right itself (``BoardAccess``): a board, a card or a
-sub-resource that the caller cannot read answers 404, and a configuration change
-without ``todo.configure`` answers 403 ``todo_configure_required``.
+sub-resource that the caller cannot read answers 404, a card write on a board that
+the caller reads but cannot write (``todo.read_all``) answers 403
+``todo_write_required``, and a configuration change without ``todo.configure``
+answers 403 ``todo_configure_required``.
 
 Writes that order cards (create, move, column delete) lock the board row first, so
 two parallel moves compute their ranks one after the other. Every card write bumps
@@ -37,7 +39,7 @@ from app.modules.files.drafts import bind_drafts, check_message_drafts
 from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.files.service import FilesService
 from app.modules.tickets.models import TicketEvent
-from app.modules.todos.access import TODO_WRITE, BoardAccess
+from app.modules.todos.access import BoardAccess, token_reads
 from app.modules.todos.boards import ensure_personal_board
 from app.modules.todos.lexorank import MAX_LENGTH, RankError, between, spread
 from app.modules.todos.links import HIDDEN, LinkResolver, Resolved
@@ -187,11 +189,24 @@ class TodoService:
             raise NotFoundError("account not found")
         return me
 
-    async def _board(self, board_id: uuid.UUID, principal: Principal) -> TodoBoard:
+    async def _board(
+        self, board_id: uuid.UUID, principal: Principal, *, write: bool = False
+    ) -> TodoBoard:
+        """Load a readable board; ``write`` also needs the write right (else 403)."""
         board = await self.session.get(TodoBoard, board_id)
         if board is None or not await self.access.can_read(board, principal):
             raise NotFoundError(f"board {board_id} not found")
+        if write:
+            await self._writable(board, principal)
         return board
+
+    async def _writable(self, board: TodoBoard, principal: Principal) -> None:
+        """Raise 403 ``todo_write_required`` for a readable board that is not writable."""
+        if not await self.access.can_write(board, principal):
+            raise ForbiddenError(
+                "Changing the cards of this board needs todo.write.",
+                code="todo_write_required",
+            )
 
     async def _configurable(self, board_id: uuid.UUID, principal: Principal) -> TodoBoard:
         board = await self._board(board_id, principal)
@@ -202,9 +217,17 @@ class TodoService:
         return board
 
     async def _card(
-        self, card_id: uuid.UUID, principal: Principal, *, lock: bool = False
+        self,
+        card_id: uuid.UUID,
+        principal: Principal,
+        *,
+        lock: bool = False,
+        write: bool = False,
     ) -> tuple[TodoCard, TodoBoard]:
         """Load a card and its board; ``lock`` locks the board first, then the card.
+
+        An unreadable board is 404; ``write`` also needs the write right of the board
+        (403 ``todo_write_required``).
 
         Every write locks the board before a card, because a move locks the board
         and then updates the card, and the other order deadlocks with it.
@@ -233,6 +256,8 @@ class TodoService:
         board = await self.session.get(TodoBoard, card.board_id)
         if board is None or not await self.access.can_read(board, principal):
             raise NotFoundError(f"card {card_id} not found")
+        if write:
+            await self._writable(board, principal)
         return card, board
 
     async def _lock_board(self, board_id: uuid.UUID) -> None:
@@ -409,9 +434,10 @@ class TodoService:
         The first call of an account creates its personal board.
 
         Raises:
-            ForbiddenError: A token without ``todo.write`` in its scope (HTTP 403).
+            ForbiddenError: A token whose scope allows none of ``todo.write``,
+                ``todo.all`` and ``todo.read_all`` (HTTP 403).
         """
-        if not principal.scope_allows(TODO_WRITE):
+        if not token_reads(principal):
             raise ForbiddenError("The token scope does not allow to-dos.")
         me = await self.access.me(principal)
         if me is not None:
@@ -445,7 +471,7 @@ class TodoService:
                 name=b.name,
                 kind=b.kind,  # pyright: ignore[reportArgumentType]
                 gremium_id=b.gremium_id,
-                can_write=True,
+                can_write=await self.access.can_write(b, principal),
                 can_configure=await self.access.can_configure(b, principal),
                 open_count=counts.get(b.id, 0),
             )
@@ -489,7 +515,7 @@ class TodoService:
             kind=board.kind,  # pyright: ignore[reportArgumentType]
             gremium_id=board.gremium_id,
             archive_after_days=board.archive_after_days,
-            can_write=True,
+            can_write=await self.access.can_write(board, principal),
             can_configure=await self.access.can_configure(board, principal),
             columns=[
                 TodoColumnOut(
@@ -854,7 +880,7 @@ class TodoService:
             description_md=card.description_md,
             board_name=board.name,
             board_kind=board.kind,  # pyright: ignore[reportArgumentType]
-            can_write=True,
+            can_write=await self.access.can_write(board, principal),
             columns=[TodoColumnRef(id=c.id, name=c.name, is_done=c.is_done) for c in columns],
             labels=[_label_out(label) for label in board_labels if label.id in own_labels],
             board_labels=[_label_out(label) for label in board_labels],
@@ -887,7 +913,7 @@ class TodoService:
                 ``label_not_on_board`` or ``link_target_not_found`` (HTTP 422).
         """
         actor = await self._actor(principal)
-        board = await self._board(payload.board_id, principal)
+        board = await self._board(payload.board_id, principal, write=True)
         await self._lock_board(board.id)
         columns = await self._columns(board.id)
         if payload.column_id is None:
@@ -965,7 +991,7 @@ class TodoService:
                 ``card_version_conflict``).
         """
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal, lock=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         if payload.version != card.version:
             raise ConflictError(
                 "The card was changed in the meantime.", code="card_version_conflict"
@@ -1013,7 +1039,7 @@ class TodoService:
                 adjacent (HTTP 422).
         """
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, write=True)
         await self._lock_board(board.id)
         # A parallel move of the same card held the lock: read the card again, so the
         # column change below works from the committed column.
@@ -1079,12 +1105,12 @@ class TodoService:
                 (HTTP 422).
         """
         actor = await self._actor(principal)
-        card, source = await self._card(card_id, principal)
+        card, source = await self._card(card_id, principal, write=True)
         if payload.board_id == source.id:
             raise _invalid(
                 "The card is on this board already. Use move.", "transfer_same_board", "boardId"
             )
-        target = await self._board(payload.board_id, principal)
+        target = await self._board(payload.board_id, principal, write=True)
         for board_id in sorted((source.id, target.id)):
             await self._lock_board(board_id)
         await self.session.refresh(card)
@@ -1237,7 +1263,7 @@ class TodoService:
     async def archive_card(self, card_id: uuid.UUID, principal: Principal) -> None:
         """Archive a card (``DELETE``); a second call changes nothing."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, write=True)
         if card.archived_at is None:
             card.archived_at = card.updated_at = _now()
             self._event(card, "archived", actor)
@@ -1251,7 +1277,7 @@ class TodoService:
         archives it again at its next run.
         """
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, write=True)
         if card.archived_at is not None:
             # Read the column before the card changes. A read after them autoflushes
             # the card, so ``completed_at`` goes in a second UPDATE without an explicit
@@ -1276,7 +1302,7 @@ class TodoService:
         The board lock makes a parallel identical request wait and then see the row.
         """
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal, lock=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         await self._check_assignees(board, [principal_id])
         present = await self.session.scalar(
             select(TodoAssignee.principal_id).where(
@@ -1296,7 +1322,7 @@ class TodoService:
     ) -> TodoCardDetail:
         """Remove an assignee; an unknown one changes nothing."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, write=True)
         result = await self.session.execute(
             delete(TodoAssignee).where(
                 TodoAssignee.card_id == card.id, TodoAssignee.principal_id == principal_id
@@ -1312,7 +1338,7 @@ class TodoService:
         self, card_id: uuid.UUID, label_id: uuid.UUID, principal: Principal
     ) -> TodoCardDetail:
         """Put a label of the board on the card (422 ``label_not_on_board`` otherwise)."""
-        card, board = await self._card(card_id, principal, lock=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         label = await self.session.get(TodoLabel, label_id)
         if label is None or label.board_id != board.id:
             raise _invalid("The label is not on this board.", "label_not_on_board", "labelId")
@@ -1331,7 +1357,7 @@ class TodoService:
         self, card_id: uuid.UUID, label_id: uuid.UUID, principal: Principal
     ) -> TodoCardDetail:
         """Take a label off the card."""
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, write=True)
         await self.session.execute(
             delete(TodoCardLabel).where(
                 TodoCardLabel.card_id == card.id, TodoCardLabel.label_id == label_id
@@ -1348,7 +1374,7 @@ class TodoService:
     ) -> TodoCardDetail:
         """Append a checklist item."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, write=True)
         last = await self.session.scalar(
             select(func.max(TodoCheckItem.position)).where(TodoCheckItem.card_id == card.id)
         )
@@ -1382,7 +1408,7 @@ class TodoService:
     ) -> TodoCardDetail:
         """Rename, tick or untick, or move a checklist item."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, write=True)
         item = await self._check_item(card, item_id)
         if payload.text is not None:
             value = payload.text.strip() or payload.text
@@ -1416,7 +1442,7 @@ class TodoService:
     ) -> TodoCardDetail:
         """Delete a checklist item."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, write=True)
         item = await self._check_item(card, item_id)
         await self.session.delete(item)
         self._event(card, "checklist", actor, {"action": "removed", "text": item.text})
@@ -1436,7 +1462,7 @@ class TodoService:
             ConflictError: The link exists (HTTP 409, ``link_exists``).
         """
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal, lock=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         if kind == "todo" and target_id == card.id:
             raise _invalid("A card cannot link to itself.", "link_self", "targetId")
         if not await self.links.readable(kind, target_id, principal):
@@ -1458,7 +1484,7 @@ class TodoService:
     ) -> TodoCardDetail:
         """Remove a link of the card."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, write=True)
         link = await self.session.get(TodoLink, link_id)
         if link is None or link.card_id != card.id:
             raise NotFoundError(f"link {link_id} not found")
@@ -1502,7 +1528,7 @@ class TodoService:
                 (HTTP 422).
         """
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal, lock=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         wanted = list(dict.fromkeys(mentions))
         await self._check_mentions(board, wanted)
         token = await check_message_drafts(
@@ -1551,7 +1577,7 @@ class TodoService:
         principal: Principal,
     ) -> TodoCommentOut:
         """Change an own comment; mentions that are new get the mail."""
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, write=True)
         comment, me = await self._own_comment(card, comment_id, principal)
         wanted = list(dict.fromkeys(mentions))
         await self._check_mentions(board, wanted)
@@ -1568,7 +1594,7 @@ class TodoService:
         self, card_id: uuid.UUID, comment_id: uuid.UUID, principal: Principal
     ) -> None:
         """Soft-delete an own comment and remove its files."""
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, write=True)
         comment, _me = await self._own_comment(card, comment_id, principal)
         comment.deleted_at = _now()
         await self.files.delete_for_messages("todo_comment", [comment.id], actor=principal.sub)
@@ -1590,9 +1616,10 @@ class TodoService:
         ``dueSoonCount`` counts the ones due within 7 days (overdue included).
 
         Raises:
-            ForbiddenError: A token without ``todo.write`` in its scope (HTTP 403).
+            ForbiddenError: A token whose scope allows none of ``todo.write``,
+                ``todo.all`` and ``todo.read_all`` (HTTP 403).
         """
-        if not principal.scope_allows(TODO_WRITE):
+        if not token_reads(principal):
             raise ForbiddenError("The token scope does not allow to-dos.")
         me = await self.access.me(principal)
         if me is None:
@@ -1656,9 +1683,10 @@ class TodoService:
         it still names the caller. Order: the gremium boards by name, then team.
 
         Raises:
-            ForbiddenError: A token without ``todo.write`` in its scope (HTTP 403).
+            ForbiddenError: A token whose scope allows none of ``todo.write``,
+                ``todo.all`` and ``todo.read_all`` (HTTP 403).
         """
-        if not principal.scope_allows(TODO_WRITE):
+        if not token_reads(principal):
             raise ForbiddenError("The token scope does not allow to-dos.")
         me = await self.access.me(principal)
         if me is None:
@@ -1724,7 +1752,7 @@ class TodoService:
                     name=b.name,
                     kind=b.kind,  # pyright: ignore[reportArgumentType]
                     gremium_id=b.gremium_id,
-                    can_write=True,
+                    can_write=await self.access.can_write(b, principal),
                     columns=[
                         TodoColumnOut(
                             id=c.id,
@@ -1745,7 +1773,7 @@ class TodoService:
         self, kind: str, target_id: uuid.UUID, principal: Principal
     ) -> list[TodoLinkedCard]:
         """The readable live cards that link to a target: open first, then by due date."""
-        if not principal.scope_allows(TODO_WRITE):
+        if not token_reads(principal):
             return []
         scope = await self.access.scope(principal)
         column = getattr(TodoLink, LINK_COLUMNS[kind])
@@ -1781,7 +1809,7 @@ class TodoService:
         self, q: str, principal: Principal, *, limit: int
     ) -> list[tuple[TodoCard, TodoBoard, TodoColumn]]:
         """Find live cards by title on the boards that the principal reads (palette)."""
-        if not principal.scope_allows(TODO_WRITE):
+        if not token_reads(principal):
             return []
         scope = await self.access.scope(principal)
         where, rank = trigram_rank(q, [TodoCard.title], dialect=dialect_of(self.session))
@@ -1819,7 +1847,7 @@ class TodoService:
             ValidationProblem: The card is archived (``todo_archived``) or not on the
                 board of the gremium (``todo_wrong_board``) (HTTP 422).
         """
-        card, board = await self._card(card_id, principal, lock=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         if card.archived_at is not None:
             raise _invalid("The card is archived.", "todo_archived", "todoId")
         if board.kind != "gremium" or board.gremium_id != gremium_id:

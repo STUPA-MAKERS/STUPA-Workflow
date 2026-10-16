@@ -20,9 +20,10 @@ done (`completed_at`).
   `TodoCardLabel`, `TodoCheckItem`, `TodoComment` (`mentions` JSONB of id strings, soft
   delete), `TodoEvent`, `TodoLink` (exactly one target column, `LINK_COLUMNS`). Constants
   `DEFAULT_COLUMNS`, `PERSONAL_BOARD_NAME`, `TEAM_BOARD_NAME`/`TEAM_BOARD_PERMISSION`.
-- `access.py` — `BoardAccess` (per-request cache): `can_read` (= write), `can_configure`,
-  `scope()` → `ReadScope.condition()` for the cross-board queries, `members()` (the
-  assignable and mentionable people).
+- `access.py` — `BoardAccess` (per-request cache): `can_read` (write or `todo.read_all`),
+  `can_write`, `can_configure`, `scope()` → `ReadScope.condition()` for the cross-board
+  queries (`all_gremien`, `all_teams` for the global keys), `members()` (the assignable
+  and mentionable people); `token_reads` (the token gate), `TODO_ALL`, `TODO_READ_ALL`.
 - `service.py` — `TodoService`: boards, columns, labels, cards, sub-resources, `mine`,
   `linked`, `search`, `card_for_agenda`, `link_agenda_item`, `complete`. Mails go to
   `outbox` (`TodoMail`); the router sends them after the commit. `mine_boards`: the rows
@@ -46,15 +47,31 @@ done (`completed_at`).
   gremium), `admin/principal_merge._todos`, `shared/people.permission_holders`.
 
 **Rights:**
-- gremium board: read and write with `todo.write` in the gremium, configure with
+- gremium board: write with `todo.write` in the gremium, configure with
   `todo.configure` (name, archive days, columns, labels); the admin bypass covers both.
-- personal board: the owner only, also no admin bypass.
+- personal board: the owner only, also no admin bypass and no global key.
 - team board: the holders of `board.permission` (global permission), read, write and
   configure.
-- An unreadable board, card or sub-resource is 404, never 403. Configure without the
-  right is 403 `todo_configure_required`. A token without `todo.write` in its scope
-  (`todos:write`) gets 403 on `GET /boards`, `GET /mine` and `GET /mine/boards`, `[]` on
-  the link picker and `linked`, 404 elsewhere.
+- Global keys (`PERMISSION_CATALOGUE`, migration `199cc9a409f2` grants both to the role
+  `admin`): `todo.all` writes the cards of every gremium and team board, `todo.read_all`
+  only reads them. Neither reaches a personal board, neither configures
+  (`can_configure` asks the native right only), and neither makes a member:
+  `members()`/`member_ids` stay as they are, so a holder is not assignable, not
+  mentionable and gets no `todo_due`. Read = write or `todo.read_all`.
+- An unreadable board, card or sub-resource is 404, never 403. A card write on a board
+  that the caller reads but cannot write is 403 `todo_write_required` (`_card(...,
+  write=True)` / `_board(..., write=True)`, after the read check): create, patch, move,
+  transfer (both boards), archive/restore, assignees, card labels, checklist, links,
+  comments (create, edit, delete, files), `card_for_agenda`; `completeTodos` moves only
+  the cards that the actor writes. Configure without the right is 403
+  `todo_configure_required`. `canWrite` of `TodoBoardSummary`, `TodoBoardOut`,
+  `TodoCardDetail` and `TodoAssignedBoard` is `can_write`.
+- Token scope: the native rights need `todo.write` in the scope (`todos:write`);
+  `todo.all` (`todos:write`) and `todo.read_all` (`read`) go through `Principal.has`. A
+  token whose scope holds none of `todo.write`, `todo.all`, `todo.read_all`
+  (`token_reads`) gets 403 on `GET /boards`, `GET /mine` and `GET /mine/boards`, `[]` on
+  the link picker, `linked` and the search, 404 elsewhere. A `read` token of an admin
+  reads every gremium and team board and writes none.
 - Defaults: the migration grants `todo.write` to every gremium role and `todo.configure`
   to `vorstand` and `manager`; the forced `member` role of a new gremium has
   `vote.cast` and `todo.write`.

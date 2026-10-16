@@ -4234,6 +4234,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'todos.error.move': 'The card could not be moved.',
   'todos.error.transfer': 'The card could not be moved.',
   'todos.error.create': 'The to-do could not be created.',
+  'todos.error.readOnly': 'You can only read this board.',
   'todos.picker.title': 'Link',
   'todos.picker.search': 'Search',
   'todos.picker.kind': 'Kind',
