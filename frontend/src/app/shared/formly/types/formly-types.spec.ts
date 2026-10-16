@@ -4,6 +4,7 @@ import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { fireEvent, render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { provideFormly } from '../formly.providers';
+import { pickOption } from '../../../../testing/select';
 
 @Component({
   standalone: true,
@@ -51,7 +52,7 @@ describe('Formly field types', () => {
         },
       },
     ]);
-    await userEvent.selectOptions(screen.getByLabelText(/Kategorie/), 'b');
+    await pickOption(screen.getByRole('combobox', { name: /Kategorie/ }), 'Beta');
     expect(host.model['cat']).toBe('b');
   });
 

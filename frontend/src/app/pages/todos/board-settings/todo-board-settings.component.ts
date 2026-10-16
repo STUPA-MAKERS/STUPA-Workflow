@@ -31,11 +31,11 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
-  SelectComponent,
   SwitchComponent,
   ToastService,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { LABEL_COLORS, LABEL_COLOR_NAME, sortedColumns } from '../../../features/todos/todos.util';
 
 /** The default archive age when the switch turns on. */
@@ -69,7 +69,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     IconComponent,
     InputComponent,
     RowMenuComponent,
-    SelectComponent,
+    SelectFieldComponent,
     SwitchComponent,
   ],
   templateUrl: './todo-board-settings.component.html',

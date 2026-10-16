@@ -4,6 +4,7 @@ import { of, throwError } from 'rxjs';
 import { AdminApiService } from '../../admin-api.service';
 import type { CdVariantOption, Gremium } from '../../admin.models';
 import { GremiumDialogComponent, parseRecipients } from './gremium-dialog.component';
+import { pickOption } from '../../../../../testing/select';
 
 const CD: CdVariantOption[] = [
   { id: 'cd-1', key: 'stupa', name: 'StuPa-Protokoll' },
@@ -64,8 +65,8 @@ describe('GremiumDialogComponent', () => {
     expect(screen.getByRole('textbox', { name: /Name/ })).toHaveValue('Studierendenparlament');
     // The slug of a stored gremium never changes, so the dialog shows the stored one.
     expect(screen.getByText('studierendenparlament')).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'CD-Variante' })).toHaveValue('cd-1');
-    expect(screen.getByRole('combobox', { name: 'Standardsprache' })).toHaveValue('de');
+    expect(screen.getByRole('combobox', { name: 'CD-Variante' })).toHaveTextContent('StuPa-Protokoll');
+    expect(screen.getByRole('combobox', { name: 'Standardsprache' })).toHaveTextContent('Deutsch');
     expect(screen.getByRole('spinbutton', { name: 'Quorum (%)' })).toHaveValue(50);
     expect(screen.getByRole('switch', { name: 'Stimm-Delegation erlauben' })).toHaveAttribute(
       'aria-checked',
@@ -93,8 +94,8 @@ describe('GremiumDialogComponent', () => {
 
   it('saves every setting and then the recipients', async () => {
     const { api, saved } = await setup(STUPA);
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'CD-Variante' }), 'cd-2');
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Standardsprache' }), 'en');
+    await pickOption(screen.getByRole('combobox', { name: 'CD-Variante' }), 'AStA');
+    await pickOption(screen.getByRole('combobox', { name: 'Standardsprache' }), 'Englisch');
     const quorum = screen.getByRole('spinbutton', { name: 'Quorum (%)' });
     await userEvent.clear(quorum);
     await userEvent.type(quorum, '150');

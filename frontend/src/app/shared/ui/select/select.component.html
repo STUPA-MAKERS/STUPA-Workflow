@@ -1,0 +1,137 @@
+<div class="fld">
+  <div
+    #box
+    class="fld__box"
+    [class.fld__box--labelled]="!!label()"
+    [class.fld__box--invalid]="!!error()"
+    [class.fld__box--disabled]="isDisabled()"
+    [class.fld__box--open]="open()"
+  >
+    @if (label()) {
+      <label class="fld__label" [id]="labelId()" [for]="id()">
+        {{ label() }}
+        @if (required()) {
+          <span class="fld__req" aria-hidden="true">*</span>
+        }
+      </label>
+    }
+    <button
+      #trigger
+      type="button"
+      class="sel__control"
+      role="combobox"
+      aria-haspopup="listbox"
+      [id]="id()"
+      [disabled]="isDisabled()"
+      [attr.aria-expanded]="open()"
+      [attr.aria-controls]="open() ? listId() : null"
+      [attr.aria-activedescendant]="popoverOpen() ? activeId() : null"
+      [attr.aria-labelledby]="label() ? labelId() : null"
+      [attr.aria-label]="!label() && ariaLabel() ? ariaLabel() : null"
+      [attr.aria-invalid]="error() ? 'true' : null"
+      [attr.aria-required]="required() ? 'true' : null"
+      [attr.aria-describedby]="error() ? id() + '-error' : hint() ? id() + '-hint' : null"
+      (click)="toggle()"
+      (keydown)="onTriggerKey($event)"
+      (blur)="onBlur()"
+    >
+      <span class="sel__value" [class.sel__value--empty]="!chosen()">{{ display() }}</span>
+    </button>
+    <app-icon class="fld__chevron" name="down" [size]="18" />
+  </div>
+  @if (hint() && !error()) {
+    <p class="fld__msg fld__msg--hint" [id]="id() + '-hint'">{{ hint() }}</p>
+  }
+  @if (error()) {
+    <p class="fld__msg fld__msg--error" [id]="id() + '-error'" role="alert">{{ error() }}</p>
+  }
+</div>
+
+<ng-template #optionRow let-row let-inSheet="inSheet">
+  <div
+    class="sel__option"
+    role="option"
+    [id]="optionId(row.index)"
+    [class.sel__option--sheet]="inSheet"
+    [class.sel__option--active]="viaKeys() && row.index === active()"
+    [attr.aria-selected]="isChosen(row)"
+    [attr.aria-disabled]="row.disabled ? 'true' : null"
+    (click)="pick(row)"
+    (pointermove)="hover(row)"
+  >
+    <span class="sel__label" [class.sel__label--empty]="row.placeholder">{{ row.label }}</span>
+    @if (isChosen(row)) {
+      <app-icon class="sel__check" name="check" [size]="18" />
+    }
+  </div>
+</ng-template>
+
+<ng-template #optionList let-inSheet>
+  @if (rows().length) {
+    <div
+      class="sel__options"
+      role="listbox"
+      [id]="listId()"
+      [attr.aria-labelledby]="label() ? labelId() : null"
+      [attr.aria-label]="label() ? null : heading()"
+      [attr.tabindex]="inSheet ? 0 : -1"
+      [attr.aria-activedescendant]="inSheet ? activeId() : null"
+      (keydown)="inSheet && onSheetKey($event)"
+    >
+      @for (section of sections(); track $index; let s = $index) {
+        @if (section.group !== null) {
+          <div class="sel__group" role="group" [attr.aria-labelledby]="groupId(s)">
+            <div class="sel__groupHead" [id]="groupId(s)">{{ section.group }}</div>
+            <div class="sel__rows" [class.rowgroup]="inSheet" [class.rowgroup--bg3]="inSheet">
+              @for (row of section.rows; track row.index) {
+                <ng-container
+                  [ngTemplateOutlet]="optionRow"
+                  [ngTemplateOutletContext]="{ $implicit: row, inSheet: inSheet }"
+                />
+              }
+            </div>
+          </div>
+        } @else {
+          <div class="sel__rows" [class.rowgroup]="inSheet" [class.rowgroup--bg3]="inSheet">
+            @for (row of section.rows; track row.index) {
+              <ng-container
+                [ngTemplateOutlet]="optionRow"
+                [ngTemplateOutletContext]="{ $implicit: row, inSheet: inSheet }"
+              />
+            }
+          </div>
+        }
+      }
+    </div>
+  } @else {
+    <p class="sel__empty">{{ 'ui.filterSelect.empty' | t }}</p>
+  }
+</ng-template>
+
+<!-- Desktop: the popover in the top layer, so no dialog and no scrolling container clips
+     it. A press in it keeps the focus on the field. -->
+@if (popoverOpen()) {
+  <div
+    #menu
+    class="sel__menu"
+    popover="manual"
+    [class.sel__menu--placed]="placed()"
+    [style.top.px]="position().top"
+    [style.left.px]="position().left"
+    [style.min-width.px]="position().width"
+    [style.max-height.px]="position().maxHeight"
+    (mousedown)="$event.preventDefault()"
+  >
+    <ng-container [ngTemplateOutlet]="optionList" [ngTemplateOutletContext]="{ $implicit: false }" />
+  </div>
+}
+
+<!-- Phone: the shared bottom sheet, in the top layer too. It returns the focus to the
+     field when it goes. -->
+@if (sheetOpen()) {
+  <div #layer class="sel__layer" popover="manual">
+    <app-side-sheet side="bottom" [heading]="heading()" [open]="true" (openChange)="onSheetOpen($event)">
+      <ng-container [ngTemplateOutlet]="optionList" [ngTemplateOutletContext]="{ $implicit: true }" />
+    </app-side-sheet>
+  </div>
+}

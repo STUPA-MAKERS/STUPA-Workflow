@@ -30,11 +30,11 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
-  SelectComponent,
   ToastService,
   type IconName,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { TodoLinkPickerComponent, linkKey } from '../../../features/todos/link-picker/todo-link-picker.component';
 import { LINK_ICON, LINK_KIND_LABEL } from '../../../features/todos/todos.util';
 
@@ -70,7 +70,7 @@ const MAX_TITLE = 300;
     DialogComponent,
     IconComponent,
     InputComponent,
-    SelectComponent,
+    SelectFieldComponent,
     TodoLinkPickerComponent,
   ],
   templateUrl: './ticket-todo-dialog.component.html',

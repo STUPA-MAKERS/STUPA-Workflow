@@ -666,6 +666,9 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     // The state inspector shows the source select and the hint, not the gremium select.
     c.selection.set({ kind: 'state', key: v });
     fixture.detectChanges();
+    // ngModel writes the value of the select field after a microtask.
+    await fixture.whenStable();
+    fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Gremium aus der Kostenstelle');
     expect(fixture.nativeElement.textContent).toContain('Gremium: aus Kostenstelle');
     // Back to a fixed gremium: the source goes, no gremium is set yet.

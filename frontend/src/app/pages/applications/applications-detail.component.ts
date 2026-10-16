@@ -76,12 +76,12 @@ import {
   DialogComponent,
   IconComponent,
   MEDIA,
-  SelectComponent,
   TabsComponent,
   ToastService,
   type SelectOption,
   type TabItem,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import {
   BudgetTreeApi,
   type BudgetTreeNode,
@@ -162,7 +162,7 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
     ButtonComponent,
     DialogComponent,
     IconComponent,
-    SelectComponent,
+    SelectFieldComponent,
     TabsComponent,
     CostCentreTreeComponent,
     ScrollFadeDirective,

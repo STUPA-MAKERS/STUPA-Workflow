@@ -20,11 +20,11 @@ import {
   DatepickerComponent,
   DialogComponent,
   InputComponent,
-  SelectComponent,
   TimeInputComponent,
   ToastService,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { errorCode, errorDetail } from '../meetings-display.util';
 import { MeetingGuestsService } from '../meeting-guests.service';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
@@ -54,7 +54,7 @@ export const MEETING_TITLE_MAX = 200;
     DialogComponent,
     ButtonComponent,
     InputComponent,
-    SelectComponent,
+    SelectFieldComponent,
     DatepickerComponent,
     TimeInputComponent,
     NoteComponent,
@@ -158,8 +158,7 @@ export class MeetingSettingsDialogComponent {
     this.api.listAttendance(m.id, { quiet: true }).subscribe({
       next: (rows) => {
         this.roster.set(rows);
-        // Set the choice again once its option exists. Without this the native
-        // <select> falls back to "nobody".
+        // Set the choice again once its option exists, so the field shows the name.
         this.keeper.set(m.protokollantId ?? '');
       },
       error: () => this.roster.set([]),
