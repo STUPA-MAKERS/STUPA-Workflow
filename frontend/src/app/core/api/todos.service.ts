@@ -5,11 +5,11 @@
  * or a team board (holders of its permission). A board or a card the caller may not read
  * answers 404. The client only binds the data; the server stays authoritative.
  */
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import type { Observable } from 'rxjs';
+import { catchError, map, of, throwError, type Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
-import type { I18nMap, IsoDateTime, PersonRef, Uuid } from '@core/api/models';
+import type { I18nMap, IsoDateTime, Page, PersonRef, Uuid } from '@core/api/models';
 import { skipLoading } from '@core/loading/loading.interceptor';
 import type { TicketStatus } from './tickets.service';
 
@@ -165,6 +165,56 @@ export interface TodoCardCreate {
   links?: { kind: TodoLinkKind; targetId: Uuid }[];
 }
 
+/** Content edits; `version` guards them (409 `card_version_conflict`). */
+export interface TodoCardPatch {
+  version: number;
+  title?: string;
+  descriptionMd?: string | null;
+  dueDate?: string | null;
+}
+
+/** A move: `beforeId` places the card directly above that card, `afterId` directly
+ *  below it; neither puts it at the end of the column. */
+export interface TodoCardMove {
+  columnId: Uuid;
+  beforeId?: Uuid | null;
+  afterId?: Uuid | null;
+}
+
+export interface TodoMineItem extends TodoCardTile {
+  boardName: string;
+  boardKind: TodoBoardKind;
+  columnName: string;
+  labels: TodoLabel[];
+}
+
+/** The open cards assigned to the caller over all boards. */
+export interface TodoMine {
+  items: TodoMineItem[];
+  /** Cards due within 7 days, overdue included. */
+  dueSoonCount: number;
+}
+
+/** A hit of the link picker. */
+export interface TodoLinkTarget {
+  kind: TodoLinkKind;
+  targetId: Uuid;
+  title: string;
+  detail: TodoLinkDetail;
+}
+
+/** The board settings a configurer may change. */
+export interface TodoBoardPatch {
+  name?: string;
+  archiveAfterDays?: number | null;
+}
+
+/** The answer of a poll: a new board and its ETag, or `board: null` for 304. */
+export interface TodoBoardPoll {
+  board: TodoBoard | null;
+  etag: string | null;
+}
+
 /** A card that links an application, a meeting, an agenda item or a ticket. */
 export interface TodoLinkedCard {
   id: Uuid;
@@ -202,6 +252,93 @@ export class TodosApiService {
     return this.http.get<TodoBoard>(`${this.base}/todos/boards/${boardId}`, { context: skipLoading() });
   }
 
+  /**
+   * Read the board again with `If-None-Match`. A 304 gives `board: null`, so the caller
+   * keeps its state.
+   */
+  pollBoard(boardId: Uuid, etag: string | null): Observable<TodoBoardPoll> {
+    let headers = new HttpHeaders();
+    if (etag) headers = headers.set('If-None-Match', etag);
+    return this.http
+      .get<TodoBoard>(`${this.base}/todos/boards/${boardId}`, {
+        headers,
+        observe: 'response',
+        context: skipLoading(),
+      })
+      .pipe(
+        map((res) => ({ board: res.body, etag: res.headers.get('ETag') })),
+        catchError((err: unknown) =>
+          err instanceof HttpErrorResponse && err.status === 304
+            ? of({ board: null, etag })
+            : throwError(() => err),
+        ),
+      );
+  }
+
+  patchBoard(boardId: Uuid, body: TodoBoardPatch): Observable<TodoBoard> {
+    return this.http.patch<TodoBoard>(`${this.base}/todos/boards/${boardId}`, body, {
+      context: skipLoading(),
+    });
+  }
+
+  addColumn(boardId: Uuid, name: string): Observable<TodoBoard> {
+    return this.http.post<TodoBoard>(`${this.base}/todos/boards/${boardId}/columns`, { name }, {
+      context: skipLoading(),
+    });
+  }
+
+  patchColumn(boardId: Uuid, columnId: Uuid, body: { name?: string; isDone?: true }): Observable<TodoBoard> {
+    return this.http.patch<TodoBoard>(`${this.base}/todos/boards/${boardId}/columns/${columnId}`, body, {
+      context: skipLoading(),
+    });
+  }
+
+  orderColumns(boardId: Uuid, columnIds: Uuid[]): Observable<TodoBoard> {
+    return this.http.put<TodoBoard>(
+      `${this.base}/todos/boards/${boardId}/columns/order`,
+      { columnIds },
+      { context: skipLoading() },
+    );
+  }
+
+  /** Delete a column; `moveTo` takes its cards. */
+  deleteColumn(boardId: Uuid, columnId: Uuid, moveTo?: Uuid | null): Observable<TodoBoard> {
+    let params = new HttpParams();
+    if (moveTo) params = params.set('moveTo', moveTo);
+    return this.http.delete<TodoBoard>(`${this.base}/todos/boards/${boardId}/columns/${columnId}`, {
+      params,
+      context: skipLoading(),
+    });
+  }
+
+  addLabel(boardId: Uuid, body: { name: string; color: TodoLabelColor }): Observable<TodoLabel> {
+    return this.http.post<TodoLabel>(`${this.base}/todos/boards/${boardId}/labels`, body, {
+      context: skipLoading(),
+    });
+  }
+
+  patchLabel(boardId: Uuid, labelId: Uuid, body: { name?: string; color?: TodoLabelColor }): Observable<TodoLabel> {
+    return this.http.patch<TodoLabel>(`${this.base}/todos/boards/${boardId}/labels/${labelId}`, body, {
+      context: skipLoading(),
+    });
+  }
+
+  deleteLabel(boardId: Uuid, labelId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/todos/boards/${boardId}/labels/${labelId}`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** The archived cards of a board, newest first. */
+  archive(boardId: Uuid, q = '', offset = 0, limit = 50): Observable<Page<TodoCardTile>> {
+    let params = new HttpParams().set('limit', limit).set('offset', offset);
+    if (q) params = params.set('q', q);
+    return this.http.get<Page<TodoCardTile>>(`${this.base}/todos/boards/${boardId}/archive`, {
+      params,
+      context: skipLoading(),
+    });
+  }
+
   members(boardId: Uuid): Observable<TodoMember[]> {
     return this.http.get<TodoMember[]>(`${this.base}/todos/boards/${boardId}/members`, {
       context: skipLoading(),
@@ -210,6 +347,132 @@ export class TodosApiService {
 
   createCard(body: TodoCardCreate): Observable<TodoCardDetail> {
     return this.http.post<TodoCardDetail>(`${this.base}/todos/cards`, body);
+  }
+
+  card(cardId: Uuid): Observable<TodoCardDetail> {
+    return this.http.get<TodoCardDetail>(`${this.base}/todos/cards/${cardId}`, { context: skipLoading() });
+  }
+
+  patchCard(cardId: Uuid, body: TodoCardPatch): Observable<TodoCardDetail> {
+    return this.http.patch<TodoCardDetail>(`${this.base}/todos/cards/${cardId}`, body, {
+      context: skipLoading(),
+    });
+  }
+
+  moveCard(cardId: Uuid, body: TodoCardMove): Observable<TodoCardTile> {
+    return this.http.post<TodoCardTile>(`${this.base}/todos/cards/${cardId}/move`, body, {
+      context: skipLoading(),
+    });
+  }
+
+  /** Archive a card (the server keeps it). */
+  archiveCard(cardId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/todos/cards/${cardId}`, { context: skipLoading() });
+  }
+
+  restoreCard(cardId: Uuid): Observable<TodoCardDetail> {
+    return this.http.post<TodoCardDetail>(`${this.base}/todos/cards/${cardId}/restore`, null, {
+      context: skipLoading(),
+    });
+  }
+
+  addAssignee(cardId: Uuid, principalId: Uuid): Observable<TodoCardDetail> {
+    return this.http.post<TodoCardDetail>(
+      `${this.base}/todos/cards/${cardId}/assignees`,
+      { principalId },
+      { context: skipLoading() },
+    );
+  }
+
+  removeAssignee(cardId: Uuid, principalId: Uuid): Observable<TodoCardDetail> {
+    return this.http.delete<TodoCardDetail>(`${this.base}/todos/cards/${cardId}/assignees/${principalId}`, {
+      context: skipLoading(),
+    });
+  }
+
+  addCardLabel(cardId: Uuid, labelId: Uuid): Observable<TodoCardDetail> {
+    return this.http.post<TodoCardDetail>(`${this.base}/todos/cards/${cardId}/labels`, { labelId }, {
+      context: skipLoading(),
+    });
+  }
+
+  removeCardLabel(cardId: Uuid, labelId: Uuid): Observable<TodoCardDetail> {
+    return this.http.delete<TodoCardDetail>(`${this.base}/todos/cards/${cardId}/labels/${labelId}`, {
+      context: skipLoading(),
+    });
+  }
+
+  addCheckItem(cardId: Uuid, text: string): Observable<TodoCardDetail> {
+    return this.http.post<TodoCardDetail>(`${this.base}/todos/cards/${cardId}/checklist`, { text }, {
+      context: skipLoading(),
+    });
+  }
+
+  patchCheckItem(
+    cardId: Uuid,
+    itemId: Uuid,
+    body: { text?: string; done?: boolean; position?: number },
+  ): Observable<TodoCardDetail> {
+    return this.http.patch<TodoCardDetail>(`${this.base}/todos/cards/${cardId}/checklist/${itemId}`, body, {
+      context: skipLoading(),
+    });
+  }
+
+  deleteCheckItem(cardId: Uuid, itemId: Uuid): Observable<TodoCardDetail> {
+    return this.http.delete<TodoCardDetail>(`${this.base}/todos/cards/${cardId}/checklist/${itemId}`, {
+      context: skipLoading(),
+    });
+  }
+
+  addLink(cardId: Uuid, kind: TodoLinkKind, targetId: Uuid): Observable<TodoCardDetail> {
+    return this.http.post<TodoCardDetail>(
+      `${this.base}/todos/cards/${cardId}/links`,
+      { kind, targetId },
+      { context: skipLoading() },
+    );
+  }
+
+  removeLink(cardId: Uuid, linkId: Uuid): Observable<TodoCardDetail> {
+    return this.http.delete<TodoCardDetail>(`${this.base}/todos/cards/${cardId}/links/${linkId}`, {
+      context: skipLoading(),
+    });
+  }
+
+  addComment(cardId: Uuid, body: string, mentions: Uuid[] = []): Observable<TodoComment> {
+    return this.http.post<TodoComment>(
+      `${this.base}/todos/cards/${cardId}/comments`,
+      { body, mentions },
+      { context: skipLoading() },
+    );
+  }
+
+  editComment(cardId: Uuid, commentId: Uuid, body: string, mentions: Uuid[] = []): Observable<TodoComment> {
+    return this.http.patch<TodoComment>(
+      `${this.base}/todos/cards/${cardId}/comments/${commentId}`,
+      { body, mentions },
+      { context: skipLoading() },
+    );
+  }
+
+  deleteComment(cardId: Uuid, commentId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/todos/cards/${cardId}/comments/${commentId}`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** The open cards assigned to the caller, for "Aufgaben" and the rail counter. */
+  mine(): Observable<TodoMine> {
+    return this.http.get<TodoMine>(`${this.base}/todos/mine`, { context: skipLoading() });
+  }
+
+  /** The link picker: what the caller may read, at most five per kind. */
+  linkTargets(q: string, kind: TodoLinkKind | 'all', excludeCardId?: Uuid | null): Observable<TodoLinkTarget[]> {
+    let params = new HttpParams().set('q', q).set('kind', kind);
+    if (excludeCardId) params = params.set('excludeCardId', excludeCardId);
+    return this.http.get<TodoLinkTarget[]>(`${this.base}/todos/link-targets`, {
+      params,
+      context: skipLoading(),
+    });
   }
 
   /** The readable, not archived cards that link the target: open first, then by due date. */

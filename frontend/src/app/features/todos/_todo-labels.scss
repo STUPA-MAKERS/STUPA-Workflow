@@ -1,0 +1,34 @@
+// The six label colours of the server palette. The app has no own token for blue and
+// violet, so they come from the semantic info and danger colours; every colour follows
+// the theme. A component includes `colors` and sets `data-color` on the element that
+// paints `--lbl`.
+@mixin colors {
+  [data-color='green'] {
+    --lbl: var(--color-success);
+  }
+  [data-color='blue'] {
+    --lbl: var(--color-info);
+  }
+  [data-color='violet'] {
+    --lbl: color-mix(in srgb, var(--color-info) 55%, var(--color-danger));
+  }
+  [data-color='amber'] {
+    --lbl: var(--color-warning);
+  }
+  [data-color='red'] {
+    --lbl: var(--color-danger);
+  }
+  [data-color='gray'] {
+    --lbl: var(--color-text-muted);
+  }
+}
+
+// A label as a small dot before its name.
+@mixin dot {
+  display: inline-block;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lbl, var(--color-text-muted));
+}
