@@ -7,6 +7,16 @@
   min-width: 0;
   min-height: 0;
 }
+/* Without `fill` the board is as tall as its cards: the scroll areas and the phone pager
+   take the height of their content instead of a share of the free height, which a board
+   of natural height does not have. */
+:host(.bv-host--natural) .bv__scroll,
+:host(.bv-host--natural) .bv__pager {
+  flex: 0 0 auto;
+}
+:host(.bv-host--natural) .bv__page {
+  overflow-y: visible;
+}
 
 /* The columns side by side; the board scrolls sideways, each column down. */
 .bv {

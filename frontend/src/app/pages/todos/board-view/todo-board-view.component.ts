@@ -80,6 +80,7 @@ interface KeyDrag {
     TodoCardTileComponent,
   ],
   host: {
+    '[class.bv-host--natural]': '!fill()',
     '(document:focusin)': 'leaveDrag($event)',
     '(document:pointerdown)': 'leaveDrag($event)',
   },
@@ -97,6 +98,12 @@ export class TodoBoardViewComponent {
   readonly labels = input<ReadonlyMap<Uuid, TodoLabel>>(new Map());
   readonly today = input.required<string>();
   readonly phone = input(false);
+  /**
+   * The board fills the free height of the page, and each column (or phone page) scrolls
+   * inside. Off, the board is as tall as its cards: the page scrolls it together with
+   * the rows of "Meine To-Dos" below it.
+   */
+  readonly fill = input(true);
 
   readonly openCard = output<Uuid>();
   readonly moveCard = output<BoardMove>();

@@ -167,6 +167,7 @@
           [labels]="labelsById()"
           [today]="today()"
           [phone]="phone()"
+          [fill]="!(withRows() && rowMatches() > 0)"
           (openCard)="openCard($event)"
           (moveCard)="moveCard($event)"
           (quickAdd)="quickAdd($event)"

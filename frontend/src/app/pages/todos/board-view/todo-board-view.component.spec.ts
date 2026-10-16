@@ -243,6 +243,15 @@ describe('TodoBoardViewComponent', () => {
     expect(container.querySelector('.bv')).toHaveAttribute('cdkScrollable');
   });
 
+  it('fills the page by default and takes its natural height when fill is off', async () => {
+    const { fixture } = await setup();
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host).not.toHaveClass('bv-host--natural');
+    fixture.componentRef.setInput('fill', false);
+    fixture.detectChanges();
+    expect(host).toHaveClass('bv-host--natural');
+  });
+
   it('puts the card back when it ends where it started, on Escape and on Tab', async () => {
     const { cmp, on, key, container } = await setup();
     await key('Raum buchen', ' ');
