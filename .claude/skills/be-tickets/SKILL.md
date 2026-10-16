@@ -118,9 +118,9 @@ context of the report.
 is not in `NOTIFICATION_KINDS`, so nobody can switch it off; only a report of an account
 links `/tickets/{id}` (the tab), a report without a session stays one-way. A new `public`
 message (`notify_ticket_note`, background task of both note routes, idempotency key per note)
-goes to the other side: from the reporter as `ticket_message` to the assignee while they hold
+goes to the other side (reporter messages capped by `rl_ticket_messages_per_hour`, 60/h per account): from the reporter as `ticket_message` to the assignee while they hold an address and
 `ticket.manage`, else to every holder (never the reporter's own address); from the team as
-`ticket_answer` to the reporter account, with the author's name only. Internal notes, edits,
+`ticket_answer` to the live reporter account (active, not merged), with the author's name only; a message with neither text nor files sends nothing. Internal notes, edits,
 anonymized tickets and reports without an account send nothing; a message of files only
 names its files. Both kinds are opt-out. For a report
 without a session the context `title` is empty, because that address is unchecked and the
