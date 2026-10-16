@@ -137,6 +137,8 @@ export class TicketDetailComponent {
   /** The done question (frame 35): the state to set, and whether the to-dos go along. */
   readonly closing = signal<'done' | 'rejected' | null>(null);
   readonly completeTodos = signal(true);
+  /** The ticket a rejection marks as the original, when the question came from the duplicate pick. */
+  private closingDuplicateOf: string | null = null;
   /** "Als Duplikat schließen …": the search and the picked ticket. */
   readonly duplicateOpen = signal(false);
   readonly duplicateHits = signal<TicketListItem[]>([]);
@@ -381,7 +383,8 @@ export class TicketDetailComponent {
   close(status: 'done' | 'rejected'): void {
     const t = this.ticket();
     if (!t || this.saving()) return;
-    if (this.openTodos().length > 0 || t.openTodoCount > 0) {
+    this.closingDuplicateOf = null;
+    if (this.hasOpenTodos(t)) {
       this.completeTodos.set(true);
       this.closing.set(status);
       return;
@@ -392,8 +395,18 @@ export class TicketDetailComponent {
   confirmClose(): void {
     const status = this.closing();
     if (!status) return;
+    const duplicateOfId = this.closingDuplicateOf;
     this.closing.set(null);
-    this.patch({ status, completeTodos: this.completeTodos() }, 'status', true);
+    this.closingDuplicateOf = null;
+    const body: TicketPatch = { status, completeTodos: this.completeTodos() };
+    if (duplicateOfId) body.duplicateOfId = duplicateOfId;
+    this.patch(body, 'status', true);
+  }
+
+  /** Close the question without a change. */
+  cancelClose(): void {
+    this.closing.set(null);
+    this.closingDuplicateOf = null;
   }
 
   reopen(): void {
@@ -402,7 +415,19 @@ export class TicketDetailComponent {
 
   pickDuplicate(hit: TicketListItem): void {
     this.duplicateOpen.set(false);
+    const t = this.ticket();
+    if (!t || this.saving()) return;
+    if (this.hasOpenTodos(t)) {
+      this.closingDuplicateOf = hit.id;
+      this.completeTodos.set(true);
+      this.closing.set('rejected');
+      return;
+    }
     this.patch({ status: 'rejected', duplicateOfId: hit.id }, 'status');
+  }
+
+  private hasOpenTodos(t: TicketDetail): boolean {
+    return this.openTodos().length > 0 || t.openTodoCount > 0;
   }
 
   setAssignee(value: string): void {

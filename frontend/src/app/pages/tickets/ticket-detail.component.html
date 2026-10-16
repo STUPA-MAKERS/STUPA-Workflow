@@ -261,7 +261,7 @@
   [open]="closing() !== null"
   [title]="(closing() === 'rejected' ? 'tickets.close.rejectTitle' : 'tickets.close.doneTitle') | t"
   [closeLabel]="'action.cancel' | t"
-  (closed)="closing.set(null)"
+  (closed)="cancelClose()"
 >
   <div class="td__closeBox">
     <app-checkbox [ngModel]="completeTodos()" (ngModelChange)="completeTodos.set($event)">
@@ -277,7 +277,7 @@
       </ul>
     }
   </div>
-  <app-button dialog-footer variant="text" (click)="closing.set(null)">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="text" (click)="cancelClose()">{{ 'action.cancel' | t }}</app-button>
   <app-button dialog-footer variant="fill" (click)="confirmClose()">
     {{ (closing() === 'rejected' ? 'tickets.detail.reject' : 'tickets.detail.done') | t }}
   </app-button>

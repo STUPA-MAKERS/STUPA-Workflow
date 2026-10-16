@@ -525,6 +525,29 @@ describe('TicketDetailComponent', () => {
     expect(cmp.duplicateOpen()).toBe(false);
   });
 
+  it('asks about the open to-dos before it closes as a duplicate', async () => {
+    const { cmp, api, harness } = await start('/tickets/t40', { get: () => of(detail({ status: 'new', openTodoCount: 1 })) });
+    cmp.onMenu({ id: 'duplicate', label: '' });
+    cmp.pickDuplicate(detail({ id: 't12', number: 'T-0012' }));
+    harness.detectChanges();
+    expect(api.patch).not.toHaveBeenCalled();
+    expect(cmp.duplicateOpen()).toBe(false);
+    expect(screen.getByRole('dialog', { name: 'Ticket ablehnen?' })).toBeInTheDocument();
+    cmp.confirmClose();
+    expect(api.patch).toHaveBeenCalledWith('t40', { status: 'rejected', duplicateOfId: 't12', completeTodos: true });
+  });
+
+  it('forgets the duplicate when the question is cancelled', async () => {
+    const { cmp, api } = await start('/tickets/t40', { get: () => of(detail({ status: 'new', openTodoCount: 1 })) });
+    cmp.pickDuplicate(detail({ id: 't12', number: 'T-0012' }));
+    cmp.cancelClose();
+    expect(cmp.closing()).toBeNull();
+    cmp.close('rejected');
+    cmp.completeTodos.set(false);
+    cmp.confirmClose();
+    expect(api.patch).toHaveBeenCalledWith('t40', { status: 'rejected', completeTodos: false });
+  });
+
   it('says that the duplicate search found nothing, and empties on a failure', async () => {
     const { cmp, api, harness, settle } = await start();
     cmp.onMenu({ id: 'duplicate', label: '' });
