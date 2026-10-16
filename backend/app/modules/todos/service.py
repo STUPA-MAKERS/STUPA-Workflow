@@ -64,6 +64,7 @@ from app.modules.todos.schemas import (
     ColumnPatch,
     LabelCreate,
     LabelPatch,
+    TodoAssignedBoard,
     TodoBoardOut,
     TodoBoardSummary,
     TodoCardDetail,
@@ -1527,6 +1528,101 @@ class TodoService:
             )
         due_soon = sum(1 for c in cards if c.due_date is not None and c.due_date <= limit)
         return TodoMine(items=items, due_soon_count=due_soon)
+
+    async def mine_boards(self, principal: Principal) -> list[TodoAssignedBoard]:
+        """The shared boards that hold live cards assigned to the caller, with only those cards.
+
+        The rows under "Meine To-Dos": every readable board except the personal one, on
+        which at least one live card (done ones too) names the caller as an assignee.
+        A board comes with all its columns in their order and its labels; the read
+        scope keeps out every board that the caller cannot read, also when a card of
+        it still names the caller. Order: the gremium boards by name, then team.
+
+        Raises:
+            ForbiddenError: A token without ``todo.write`` in its scope (HTTP 403).
+        """
+        if not principal.scope_allows(TODO_WRITE):
+            raise ForbiddenError("The token scope does not allow to-dos.")
+        me = await self.access.me(principal)
+        if me is None:
+            return []
+        scope = await self.access.scope(principal)
+        rows = (
+            await self.session.execute(
+                select(TodoCard, TodoBoard)
+                .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
+                .join(TodoAssignee, TodoAssignee.card_id == TodoCard.id)
+                .where(
+                    TodoAssignee.principal_id == me,
+                    TodoCard.archived_at.is_(None),
+                    TodoBoard.archived_at.is_(None),
+                    TodoBoard.kind != "personal",
+                    scope.condition(),
+                )
+                .order_by(TodoCard.rank, TodoCard.id)
+            )
+        ).all()
+        if not rows:
+            return []
+        boards = {b.id: b for _card, b in rows}
+        columns: dict[uuid.UUID, list[TodoColumn]] = {}
+        for col in (
+            await self.session.scalars(
+                select(TodoColumn)
+                .where(TodoColumn.board_id.in_(boards))
+                .order_by(TodoColumn.position, TodoColumn.id)
+            )
+        ).all():
+            columns.setdefault(col.board_id, []).append(col)
+        labels: dict[uuid.UUID, list[TodoLabel]] = {}
+        for lab in (
+            await self.session.scalars(
+                select(TodoLabel)
+                .where(TodoLabel.board_id.in_(boards))
+                .order_by(func.lower(TodoLabel.name), TodoLabel.id)
+            )
+        ).all():
+            labels.setdefault(lab.board_id, []).append(lab)
+        cards = [c for c, _b in rows]
+        facts = await self._facts(cards, principal)
+        per_board: dict[uuid.UUID, list[TodoCard]] = {}
+        for c in cards:
+            per_board.setdefault(c.board_id, []).append(c)
+        out: list[TodoAssignedBoard] = []
+        ordered = sorted(
+            boards.values(),
+            key=lambda b: (_KIND_ORDER.get(b.kind, 3), b.name.casefold(), str(b.id)),
+        )
+        for b in ordered:
+            cols = columns.get(b.id, [])
+            position = {c.id: i for i, c in enumerate(cols)}
+            own = per_board[b.id]
+            own.sort(key=lambda c: (position.get(c.column_id, len(cols)), c.rank, str(c.id)))
+            per_column: dict[uuid.UUID, int] = {}
+            for c in own:
+                per_column[c.column_id] = per_column.get(c.column_id, 0) + 1
+            out.append(
+                TodoAssignedBoard(
+                    id=b.id,
+                    name=b.name,
+                    kind=b.kind,  # pyright: ignore[reportArgumentType]
+                    gremium_id=b.gremium_id,
+                    can_write=True,
+                    columns=[
+                        TodoColumnOut(
+                            id=c.id,
+                            name=c.name,
+                            position=c.position,
+                            is_done=c.is_done,
+                            card_count=per_column.get(c.id, 0),
+                        )
+                        for c in cols
+                    ],
+                    labels=[_label_out(lab) for lab in labels.get(b.id, [])],
+                    cards=[self._tile(c, facts) for c in own],
+                )
+            )
+        return out
 
     async def linked(
         self, kind: str, target_id: uuid.UUID, principal: Principal
