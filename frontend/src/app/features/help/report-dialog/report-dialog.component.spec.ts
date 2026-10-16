@@ -165,6 +165,9 @@ describe('ReportDialogComponent', () => {
     expect(drafts.clear).toHaveBeenCalled();
     expect(screen.getByRole('status')).toHaveTextContent('Deine Meldung hat die Nummer T-0043');
     expect(screen.queryByRole('button', { name: 'Senden' })).not.toBeInTheDocument();
+    // The focused send button is gone: the focus moves to the confirmation.
+    await fixture.whenStable();
+    expect(document.activeElement).toBe(screen.getByRole('status'));
   });
 
   it('starts a fresh report after a send, and keeps a closed draft', async () => {

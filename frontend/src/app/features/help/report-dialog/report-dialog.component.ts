@@ -3,6 +3,8 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   effect,
   inject,
@@ -191,6 +193,8 @@ export class ReportDialogComponent {
 
   private readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
   private readonly altchaWidget = viewChild(AltchaComponent);
+  private readonly sentBox = viewChild<ElementRef<HTMLElement>>('sentBox');
+  private readonly injector = inject(Injector);
 
   constructor() {
     // Each opening reads the page it was opened on. A closed draft stays; a sent report
@@ -316,6 +320,9 @@ export class ReportDialogComponent {
           this.sending.set(false);
           this.drafts.clear();
           this.sentNumber.set(res.number);
+          // The send button that had the focus is gone: the focus moves to the
+          // confirmation, so a screen reader reads the ticket number.
+          afterNextRender(() => this.sentBox()?.nativeElement.focus(), { injector: this.injector });
         },
         error: (err: unknown) => {
           this.sending.set(false);

@@ -237,6 +237,10 @@
   padding: var(--space-4) 0;
   text-align: center;
 }
+/* The confirmation takes the focus only to be read out; it is no control. */
+.rd__sent:focus {
+  outline: none;
+}
 .rd__sentIcon {
   display: grid;
   place-items: center;

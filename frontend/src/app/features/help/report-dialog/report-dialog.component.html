@@ -5,7 +5,7 @@
   (closed)="cancel()"
 >
   @if (sentNumber(); as number) {
-    <div class="rd__sent" role="status">
+    <div #sentBox class="rd__sent" role="status" tabindex="-1">
       <span class="rd__sentIcon" aria-hidden="true"><app-icon name="check" [size]="26" /></span>
       <p class="rd__sentText">
         {{ 'help.report.sentNumber' | t }} <span class="mono rd__number">{{ number }}</span>.
