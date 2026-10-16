@@ -102,8 +102,13 @@
 .vl__month {
   padding: 18px var(--space-4) 6px;
 }
-.vl__group:first-child .vl__month {
+.vl__group:first-child .vl__month,
+.vl__skel .vl__month {
   padding-top: var(--space-2);
+}
+/* The loading shape: a bar about as wide as "September 2026". */
+.vl__skelMonth {
+  width: 7rem;
 }
 .vl__rows {
   display: flex;

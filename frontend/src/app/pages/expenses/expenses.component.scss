@@ -108,6 +108,10 @@
   font-size: var(--fs-small);
   white-space: nowrap;
 }
+/* "0 von 0" is not true before the first answer: the place stays, the text waits. */
+.exp__count--wait {
+  visibility: hidden;
+}
 .exp__selbar {
   gap: var(--space-2);
   padding: 0 var(--space-2) 0 var(--space-4);
@@ -188,8 +192,13 @@
 .exp__month {
   padding: 18px var(--space-4) 6px;
 }
-.exp__group:first-child .exp__month {
+.exp__group:first-child .exp__month,
+.exp__skel .exp__month {
   padding-top: var(--space-2);
+}
+/* The loading shape: a bar about as wide as "September 2026". */
+.exp__skelMonth {
+  width: 7rem;
 }
 .exp__rows {
   display: flex;

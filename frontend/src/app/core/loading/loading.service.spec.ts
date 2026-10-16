@@ -46,14 +46,14 @@ describe('LoadingService', () => {
   it('shows after the delay while a request is in flight', () => {
     svc.inc();
     expect(svc.visible()).toBe(false);
-    svc.advance(150);
+    svc.advance(300);
     expect(svc.visible()).toBe(true);
   });
 
   it('keeps visible until all requests finish, then hides after min duration', () => {
     svc.inc();
     svc.inc();
-    svc.advance(150);
+    svc.advance(300);
     expect(svc.visible()).toBe(true);
 
     svc.dec(); // one still running
@@ -66,7 +66,7 @@ describe('LoadingService', () => {
 
   it('enforces a minimum visible duration to avoid flicker', () => {
     svc.inc();
-    svc.advance(150); // visible now (shownAt = 150)
+    svc.advance(300); // visible now (shownAt = 150)
     svc.dec(); // finishes immediately after showing
     expect(svc.visible()).toBe(true); // must stay for the min window
     svc.advance(399);
@@ -77,7 +77,7 @@ describe('LoadingService', () => {
 
   it('cancels the pending hide when a new request starts', () => {
     svc.inc();
-    svc.advance(150);
+    svc.advance(300);
     svc.dec(); // schedule hide
     svc.advance(200);
     svc.inc(); // new request, cancels the hide

@@ -289,6 +289,26 @@ describe('VotingComponent', () => {
       expect(cmp.error()).toBe(false);
     });
 
+    it('keeps the old rows dimmed and inert while a filter loads, with a bar under the chips', async () => {
+      const { cmp, listVotes, router, settle, harness } = await start('/voting', { pages: [page([item('v1')])] });
+      const pending = new (await import('rxjs')).Subject<Page<VoteListItem>>();
+      listVotes.mockReturnValueOnce(pending);
+      await router.navigateByUrl('/voting?status=ended');
+      await settle();
+      const el = harness.routeNativeElement as HTMLElement;
+      expect(cmp.reloading()).toBe(true);
+      expect(cmp.loading()).toBe(false);
+      expect(el.querySelector('.vl__groups')).toHaveClass('skel-stale');
+      expect(el.querySelector('.vl__groups')).toHaveAttribute('inert');
+      expect(el.querySelector('.skel-progress')).not.toBeNull();
+      expect(el.querySelector('app-skeleton')).toBeNull();
+      pending.next(page([item('v2')]));
+      harness.detectChanges();
+      expect(cmp.reloading()).toBe(false);
+      expect(el.querySelector('.vl__groups')).not.toHaveClass('skel-stale');
+      expect(el.querySelector('.skel-progress')).toBeNull();
+    });
+
     it('drops the late answer of an older request', async () => {
       const { cmp, listVotes, router, settle } = await start('/voting', { pages: [page([item('v1')])] });
       const late = new (await import('rxjs')).Subject<Page<VoteListItem>>();

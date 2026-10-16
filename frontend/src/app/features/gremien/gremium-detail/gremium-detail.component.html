@@ -131,9 +131,24 @@
     <app-create-meeting-dialog [open]="createOpen()" [gremiumId]="g.id" (closed)="createOpen.set(false)" />
   }
 } @else if (store.loading()) {
-  <div class="gd gd--busy" [class.gd--split]="split()" aria-busy="true">
-    <app-skeleton variant="panel" [label]="'gremien.detail.loading' | t" />
-  </div>
+  <!-- The containers of the loaded sheet (bar, logo and title, facts line, rows), so the
+       surface is there at once and nothing moves when the Gremium arrives. The bars show
+       after 300ms. -->
+  <article class="gd gd--busy" [class.gd--split]="split()" aria-busy="true">
+    <header class="gd__head skel-in" aria-hidden="true">
+      <app-sheet-bar class="gd__bar" [bleed]="split()">
+        <span appSheetBarKicker class="gd__kicker"><span class="skel-text gd__skelKicker"></span></span>
+      </app-sheet-bar>
+      <div class="gd__titleRow">
+        <span class="skel-box gd__skelLogo" [class.gd__skelLogo--lg]="!phone()"></span>
+        <span class="gd__title"><span class="skel-text gd__skelTitle"></span></span>
+      </div>
+      <p class="gd__line"><span class="skel-text skel-text--muted gd__skelLine"></span></p>
+    </header>
+    <div class="gd__body">
+      <app-skeleton variant="items" [count]="5" [grouped]="true" [label]="'gremien.detail.loading' | t" />
+    </div>
+  </article>
 } @else {
   <div class="gd gd--none" [class.gd--split]="split()" role="alert">
     <app-empty-state

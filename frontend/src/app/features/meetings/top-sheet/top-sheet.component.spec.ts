@@ -1,4 +1,5 @@
 import { provideRouter } from '@angular/router';
+import { renderDeferred } from '../../../../testing/defer';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import type { AgendaItem, Meeting, Protocol } from '@core/api/models';
@@ -42,6 +43,7 @@ async function setup(over: Partial<Inputs> = {}) {
     on: { bodyChange, finalize, startRename, cancelRename, renameTop },
     providers: [provideRouter([]), NO_LINKED_TODOS],
   });
+  await renderDeferred(view.fixture);
   return { ...view, bodyChange, finalize, startRename, cancelRename, renameTop };
 }
 
@@ -125,6 +127,7 @@ describe('TopSheetComponent', () => {
       expect(view.bodyChange).toHaveBeenLastCalledWith({ itemId: 't-1', body: '**Hallo**!' });
       await userEvent.click(formatted);
       expect(screen.queryByRole('textbox', { name: 'Markdown' })).toBeNull();
+      await renderDeferred(view.fixture);
       expect(editorOf(view)).toBeTruthy();
     });
 

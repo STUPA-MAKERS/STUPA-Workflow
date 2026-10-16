@@ -75,14 +75,22 @@
 
     @if (follow()) {
       <div class="ts__rule"></div>
-      <app-markdown-editor
-        class="ts__editor"
-        [docKey]="docKey()"
-        [voteInfo]="voteInfo()"
-        [value]="t.body ?? ''"
-        [disabled]="true"
-        [placeholder]="'participant.top.empty' | t"
-      />
+      @defer (on immediate) {
+        <app-markdown-editor
+          class="ts__editor"
+          [docKey]="docKey()"
+          [voteInfo]="voteInfo()"
+          [value]="t.body ?? ''"
+          [disabled]="true"
+          [placeholder]="'participant.top.empty' | t"
+        />
+      } @placeholder {
+        <div class="ts__editor ts__editor--wait" aria-hidden="true">
+          <p class="skel-in"><span class="skel-text"></span></p>
+          <p class="skel-in"><span class="skel-text"></span></p>
+          <p class="skel-in"><span class="skel-text"></span></p>
+        </div>
+      }
     } @else if (proto || m.status === 'planned') {
       <!-- A locked protocol has no format bar and no save state, so no rule either. A
            planned meeting has no protocol yet: its text is prepared here. -->
@@ -148,17 +156,25 @@
           ></textarea>
         </div>
       } @else {
-        <app-markdown-editor
-          #ed
-          class="ts__editor"
-          [docKey]="docKey()"
-          [voteInfo]="voteInfo()"
-          [value]="t.body ?? ''"
-          [disabled]="!editable()"
-          [placeholder]="'meetings.protocol.placeholder' | t"
-          [hint]="'meetings.protocol.hint' | t"
-          (valueChange)="bodyChange.emit({ itemId: t.id, body: $event })"
-        />
+        @defer (on immediate) {
+          <app-markdown-editor
+            #ed
+            class="ts__editor"
+            [docKey]="docKey()"
+            [voteInfo]="voteInfo()"
+            [value]="t.body ?? ''"
+            [disabled]="!editable()"
+            [placeholder]="'meetings.protocol.placeholder' | t"
+            [hint]="'meetings.protocol.hint' | t"
+            (valueChange)="bodyChange.emit({ itemId: t.id, body: $event })"
+          />
+        } @placeholder {
+          <div class="ts__editor ts__editor--wait" aria-hidden="true">
+            <p class="skel-in"><span class="skel-text"></span></p>
+            <p class="skel-in"><span class="skel-text"></span></p>
+            <p class="skel-in"><span class="skel-text"></span></p>
+          </div>
+        }
       }
     }
   } @else {

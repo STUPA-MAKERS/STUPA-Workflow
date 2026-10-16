@@ -63,7 +63,7 @@
             [to]="grossMax()"
             (applied)="onGrossRange($event)"
           />
-          <span class="inv__count" role="status">{{ 'invoices.count' | t: { count: items().length, total: total() } }}</span>
+          <span class="inv__count" [class.inv__count--wait]="loading()" role="status">{{ 'invoices.count' | t: { count: items().length, total: total() } }}</span>
         </div>
         <app-segmented
           class="inv__seg"
@@ -74,6 +74,9 @@
           [value]="segment()"
           (valueChange)="setSegment($event ?? 'all')"
         />
+        @if (reloading()) {
+          <span class="skel-progress skel-progress--foot" aria-hidden="true"></span>
+        }
       </app-sticky-bar>
 
       <!-- A phone has no drag and drop: the import sits in the menu of the title row. -->
@@ -90,9 +93,21 @@
         />
       }
 
-      <div #scroller class="inv__scroll" appScrollFade="y">
+      <div #scroller class="inv__scroll" appScrollFade="y" [attr.aria-busy]="reloading() || null">
         @if (loading()) {
-          <app-skeleton variant="rows" [count]="6" [label]="'invoices.loading' | t" />
+          <!-- The shape of the loaded list (a month heading, rows in the geometry of
+               `app-list-item`), shown after 300ms. -->
+          <div class="inv__skel skel-in">
+            <h2 class="sec inv__month" aria-hidden="true">
+              <span class="skel-text skel-text--accent inv__skelMonth"></span>
+            </h2>
+            <app-skeleton
+              variant="items"
+              [count]="12"
+              [grouped]="!split()"
+              [label]="'invoices.loading' | t"
+            />
+          </div>
         } @else if (!items().length) {
           <app-empty-state icon="search" [heading]="'invoices.empty' | t">
             @if (activeFilterCount() > 0) {
@@ -100,6 +115,7 @@
             }
           </app-empty-state>
         } @else {
+          <div class="inv__groups" [class.skel-stale]="reloading()" [attr.inert]="reloading() ? '' : null">
           @for (group of groups(); track group.key + $index) {
             <section class="inv__group" [attr.aria-label]="group.label || null">
               @if (group.label) {
@@ -158,6 +174,7 @@
               </div>
             </section>
           }
+          </div>
           @if (hasMore()) {
             <div #sentinel class="inv__sentinel" aria-hidden="true"></div>
             <div class="inv__more">

@@ -51,7 +51,20 @@
 
       <div class="grl__scroll" appScrollFade="y">
         @if (store.loading()) {
-          <app-skeleton variant="rows" [count]="5" [label]="'gremien.list.loading' | t" />
+          <!-- The shape of the loaded list (a group heading, rows with the logo in the
+               geometry of `app-list-item`), shown after 300ms. -->
+          <div class="grl__skel skel-in">
+            <h2 class="sec grl__head" aria-hidden="true">
+              <span class="skel-text skel-text--accent grl__skelHead"></span>
+            </h2>
+            <app-skeleton
+              variant="items"
+              [count]="8"
+              [lead]="true"
+              [grouped]="!split()"
+              [label]="'gremien.list.loading' | t"
+            />
+          </div>
         } @else if (store.error()) {
           <div class="grl__status" role="alert">
             <span>{{ 'gremien.list.error' | t }}</span>

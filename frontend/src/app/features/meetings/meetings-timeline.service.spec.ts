@@ -10,7 +10,9 @@ type Params = { direction: string; cursor?: string | null; limit: number; gremiu
 
 const m = (id: string): Meeting => ({ id, title: id }) as Meeting;
 
-function setup(opts: { reader?: boolean; gremien?: () => ReturnType<ApiClient['listMeetingFilterGremien']> } = {}) {
+function setup(
+  opts: { reader?: boolean; many?: boolean; gremien?: () => ReturnType<ApiClient['listMeetingFilterGremien']> } = {},
+) {
   const calls: Params[] = [];
   const answers: Subject<Page>[] = [];
   const api = {
@@ -26,7 +28,7 @@ function setup(opts: { reader?: boolean; gremien?: () => ReturnType<ApiClient['l
   const auth = {
     isAdmin: () => false,
     can: () => false,
-    gremien: () => (reader ? [{ id: 'g1' }] : []),
+    gremien: () => (reader ? (opts.many ? [{ id: 'g1' }, { id: 'g2' }] : [{ id: 'g1' }]) : []),
     inSubstitutePool: () => false,
   };
   TestBed.configureTestingModule({
@@ -53,6 +55,21 @@ describe('MeetingsTimelineService', () => {
     TestBed.resetTestingModule();
     const { svc } = setup({ gremien: () => throwError(() => new Error('x')) });
     expect(svc.filterGremien()).toEqual([]);
+  });
+
+  it('holds the place of the filter chip while the filter Gremien load, for a member of several', () => {
+    const pending = new Subject<{ id: string; name: string }[]>();
+    const { svc } = setup({ many: true, gremien: () => pending });
+    expect(svc.filterPending()).toBe(true);
+    pending.next([{ id: 'g1', name: 'StuPa' }]);
+    expect(svc.filterPending()).toBe(false);
+    TestBed.resetTestingModule();
+    const failed = new Subject<{ id: string; name: string }[]>();
+    const second = setup({ many: true, gremien: () => failed }).svc;
+    failed.error(new Error('x'));
+    expect(second.filterPending()).toBe(false);
+    TestBed.resetTestingModule();
+    expect(setup({ gremien: () => new Subject() }).svc.filterPending()).toBe(false);
   });
 
   it('does not load the timeline for a user who may not read it', () => {
@@ -92,6 +109,30 @@ describe('MeetingsTimelineService', () => {
     fail(4);
     expect(svc.loadingUpcoming()).toBe(false);
     expect(svc.upcomingHasMore()).toBe(true);
+  });
+
+  it('keeps the shown meetings while a filter reloads, and drops a late older answer', () => {
+    const { svc, answer } = setup();
+    svc.loadList();
+    expect(svc.loadingList()).toBe(true);
+    expect(svc.reloadingList()).toBe(false);
+    answer(0, { items: [m('u1')], nextCursor: null });
+    answer(1, { items: [], nextCursor: null });
+
+    svc.selectGremiumFilter('g1');
+    expect(svc.loadingList()).toBe(false);
+    expect(svc.reloadingList()).toBe(true);
+    expect(svc.upcomingItems().map((x) => x.id)).toEqual(['u1']);
+    svc.selectGremiumFilter('g2');
+    // The answer of the g1 load comes late: it changes nothing.
+    answer(2, { items: [m('late')], nextCursor: null });
+    answer(3, { items: [], nextCursor: null });
+    expect(svc.upcomingItems().map((x) => x.id)).toEqual(['u1']);
+    expect(svc.reloadingList()).toBe(true);
+    answer(4, { items: [m('u2')], nextCursor: null });
+    answer(5, { items: [], nextCursor: null });
+    expect(svc.upcomingItems().map((x) => x.id)).toEqual(['u2']);
+    expect(svc.reloadingList()).toBe(false);
   });
 
   it('stops loading on errors of the first load and of an older page', () => {
