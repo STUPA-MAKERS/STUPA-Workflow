@@ -27,6 +27,7 @@ import {
   type TodoLabel,
   type TodoMember,
 } from '@core/api/todos.service';
+import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -130,6 +131,7 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
 })
 export class TodosComponent implements OnDestroy {
   private readonly api = inject(TodosApiService);
+  private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
@@ -325,7 +327,10 @@ export class TodosComponent implements OnDestroy {
   }
 
   private openDefault(boards: readonly TodoBoardSummary[]): void {
-    const pick = defaultBoard(boards);
+    const pick = defaultBoard(
+      boards,
+      this.auth.gremien().map((g) => g.id),
+    );
     if (!pick) {
       this.loading.set(false);
       this.notFound.set(true);

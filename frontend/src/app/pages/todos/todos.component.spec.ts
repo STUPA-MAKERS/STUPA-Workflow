@@ -11,6 +11,7 @@ import {
   type TodoBoardSummary,
   type TodoMine,
 } from '@core/api/todos.service';
+import { AuthService } from '@core/auth/auth.service';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { BOARDS, MEMBERS, asPhone, board, detail, tile } from '../../../testing/todo-fixtures';
@@ -20,6 +21,7 @@ interface Opts {
   boards?: TodoBoardSummary[];
   boardsFail?: boolean;
   board?: TodoBoard;
+  gremien?: string[];
 }
 
 async function start(url: string, opts: Opts = {}) {
@@ -51,6 +53,12 @@ async function start(url: string, opts: Opts = {}) {
       { provide: ToastService, useValue: toast },
     ],
   });
+  const auth = TestBed.inject(AuthService);
+  (auth as unknown as { _principal: { set(v: unknown): void } })._principal.set({
+    id: 'me',
+    permissions: [],
+    gremien: (opts.gremien ?? ['g-1', 'g-2']).map((id) => ({ id, name: id, slug: id })),
+  });
   const harness = await RouterTestingHarness.create();
   const cmp = await harness.navigateByUrl(url, TodosComponent);
   harness.detectChanges();
@@ -73,6 +81,18 @@ describe('TodosComponent', () => {
     expect(router.url).toBe('/todos/b-1?view=list');
     expect(api.pollBoard).toHaveBeenCalledWith('b-1', null);
     expect(api.members).toHaveBeenCalledWith('b-1');
+  });
+
+  it('opens the personal board when the caller belongs to none of the listed gremien', async () => {
+    const { router, settle } = await start('/todos', { gremien: ['g-9'] });
+    await settle();
+    expect(router.url).toBe('/todos/b-0');
+  });
+
+  it('opens the board of an own gremium before a foreign one', async () => {
+    const { router, settle } = await start('/todos', { gremien: ['g-2'] });
+    await settle();
+    expect(router.url).toBe('/todos/b-2');
   });
 
   it('says so when there is no board or the boards fail', async () => {

@@ -384,9 +384,22 @@ function recount(board: TodoBoard, cards: readonly TodoCardTile[]): TodoBoard['c
   return board.columns.map((col) => ({ ...col, cardCount: cards.filter((c) => c.columnId === col.id).length }));
 }
 
-/** The board `/todos` opens: the first gremium board by name, else the personal board. */
-export function defaultBoard(boards: readonly TodoBoardSummary[]): TodoBoardSummary | null {
-  return boards.find((b) => b.kind === 'gremium') ?? boards.find((b) => b.kind === 'personal') ?? boards[0] ?? null;
+/**
+ * The board `/todos` opens: the board of the caller's first own gremium by name, else the personal
+ * board. An admin also lists the boards of gremien they do not belong to, so a gremium board outside
+ * `ownGremiumIds` comes only after the personal board.
+ */
+export function defaultBoard(
+  boards: readonly TodoBoardSummary[],
+  ownGremiumIds: readonly Uuid[] = [],
+): TodoBoardSummary | null {
+  return (
+    boards.find((b) => b.kind === 'gremium' && b.gremiumId !== null && ownGremiumIds.includes(b.gremiumId)) ??
+    boards.find((b) => b.kind === 'personal') ??
+    boards.find((b) => b.kind === 'gremium') ??
+    boards[0] ??
+    null
+  );
 }
 
 /** The ids of the people a comment names as "@Display Name". */
