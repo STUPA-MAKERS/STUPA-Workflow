@@ -180,6 +180,74 @@ async def anonymize_reported_tickets(
     return len(reported)
 
 
+async def erase_email(
+    session: AsyncSession,
+    email: str,
+    *,
+    actor: str,
+    files: FilesService | None = None,
+) -> dict[str, Any]:
+    """Erase the data of one e-mail address that has no account behind it, and commit.
+
+    A person can reach the platform without an account: as an applicant, or as the
+    reporter of a ticket without a session. Neither path files an erasure request
+    for a ticket, so this is the erasure for such an address. Every application
+    whose applicant has the address gets the applicant anonymization, and every
+    ticket with the address as ``reporter_email`` gets the ticket anonymization. The
+    compare is citext, as in the Auskunft. Rows that are already anonymized do not
+    change.
+
+    An account under the address stays: its erasure deactivates the account, so it
+    stays a separate step. ``principalId`` names that account.
+
+    The audit entry holds the counts and no address, because the address is the data
+    that goes.
+
+    Returns:
+        ``applications`` and ``tickets`` (the anonymized counts) and ``principalId``.
+    """
+    app_ids = list(
+        (
+            await session.scalars(
+                select(Applicant.application_id).where(
+                    Applicant.email == email, Applicant.anonymized_at.is_(None)
+                )
+            )
+        ).all()
+    )
+    applications = ApplicationsService(session)
+    for application_id in app_ids:
+        await applications.anonymize(
+            application_id, files=files, actor=actor, commit=False
+        )
+        await audit_record(
+            session,
+            actor=actor,
+            action=AuditAction.ANONYMIZATION,
+            target_type="application",
+            target_id=str(application_id),
+        )
+    tickets = await anonymize_reported_tickets(
+        session, actor=actor, files=files, email=email
+    )
+    principal_id = await session.scalar(
+        select(Principal.id).where(Principal.email == email)
+    )
+    await audit_record(
+        session,
+        actor=actor,
+        action=AuditAction.ERASURE_EXECUTED,
+        target_type="email",
+        data={"applications": len(app_ids), "tickets": tickets},
+    )
+    await session.commit()
+    return {
+        "applications": len(app_ids),
+        "tickets": tickets,
+        "principalId": principal_id,
+    }
+
+
 class PrivacySettingsService:
     """Single-row config: global retention default in months."""
 
