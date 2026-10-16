@@ -160,6 +160,10 @@ export class TodoBoardRowsComponent {
   /** Done columns opened past the preview, by column id. */
   readonly expanded = signal<ReadonlySet<Uuid>>(new Set());
   readonly kb = signal<KeyDrag | null>(null);
+  /** A touch lifts a card after this long press, so a swipe over the cards scrolls; a mouse lifts it at once. */
+  protected readonly dragDelay = { touch: 400, mouse: 0 };
+  /** The keydown of Space lifted or put down a card, so its keyup must not click the tile. */
+  private spaceTaken = false;
   /** The pointer drag: the row, the column the card left and the column it is over. */
   readonly ptr = signal<{ boardId: Uuid; from: Uuid; over: Uuid } | null>(null);
   readonly announce = signal('');
@@ -364,12 +368,24 @@ export class TodoBoardRowsComponent {
 
   // ------------------------------------------------------------------ keyboard drag
 
+  /**
+   * A button activates on the keyup of Space (Firefox does so even after a prevented
+   * keydown), so the keyup after a lift or a put-down would open the card and the drawer
+   * would end the drag. The keydown handles Space.
+   */
+  onTileKeyUp(event: KeyboardEvent): void {
+    if (event.key !== ' ' || (!this.spaceTaken && !this.kb())) return;
+    this.spaceTaken = false;
+    event.preventDefault();
+  }
+
   onTileKey(event: KeyboardEvent, row: BoardRow, card: TodoCardTile, colIndex: number, index: number): void {
     if (!this.canDrag(row)) return;
     const kb = this.kb();
     if (!kb) {
       if (event.key !== ' ') return;
       event.preventDefault();
+      this.spaceTaken = true;
       this.kb.set({ boardId: row.board.id, cardId: card.id, col: colIndex, index, fromCol: colIndex, fromIndex: index });
       this.say('todos.drag.lifted', row, card);
       return;
@@ -397,6 +413,7 @@ export class TodoBoardRowsComponent {
       case ' ':
       case 'Enter':
         event.preventDefault();
+        this.spaceTaken = event.key === ' ';
         this.commit(kb, row, card);
         return;
       case 'Escape':

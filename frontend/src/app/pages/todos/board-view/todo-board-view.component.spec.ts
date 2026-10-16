@@ -1,4 +1,5 @@
-import type { CdkDragDrop } from '@angular/cdk/drag-drop';
+import { CdkDrag, type CdkDragDrop } from '@angular/cdk/drag-drop';
+import { By } from '@angular/platform-browser';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import type { TodoBoard } from '@core/api/todos.service';
 import { cardsOf } from '../../../features/todos/todos.util';
@@ -35,6 +36,19 @@ function dropEvent(cardId: string, from: string, to: string, previousIndex: numb
     previousIndex,
     currentIndex,
   } as unknown as CdkDragDrop<string>;
+}
+
+/**
+ * Space on a tile as Firefox does it: the keydown on the focused button, then the keyup,
+ * and the keyup clicks the button unless a handler prevented it.
+ */
+function firefoxSpace(title: string): void {
+  const button = screen.getByRole('button', { name: title });
+  fireEvent.keyDown(button, { key: ' ' });
+  const target = screen.getByRole('button', { name: title });
+  const up = new KeyboardEvent('keyup', { key: ' ', bubbles: true, cancelable: true });
+  target.dispatchEvent(up);
+  if (!up.defaultPrevented) target.click();
 }
 
 describe('TodoBoardViewComponent', () => {
@@ -177,6 +191,31 @@ describe('TodoBoardViewComponent', () => {
     expect(on.moveCard).toHaveBeenCalledWith({ cardId: 'k-1', move: { columnId: 'c-2' } });
     expect(container.querySelector('[aria-live]')).toHaveTextContent('„Raum buchen“ abgelegt in In Arbeit.');
     expect(cmp.kb()).toBeNull();
+  });
+
+  it('lifts and puts down a card with Space without opening it, as Firefox clicks on keyup', async () => {
+    const { cmp, on, fixture } = await setup();
+    firefoxSpace('Raum buchen');
+    fixture.detectChanges();
+    expect(cmp.kb()).toMatchObject({ cardId: 'k-1' });
+    expect(on.openCard).not.toHaveBeenCalled();
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Raum buchen' }), { key: 'ArrowDown' });
+    fixture.detectChanges();
+    firefoxSpace('Raum buchen');
+    fixture.detectChanges();
+    expect(cmp.kb()).toBeNull();
+    expect(on.moveCard).toHaveBeenCalled();
+    expect(on.openCard).not.toHaveBeenCalled();
+    // A Space keyup without a drag still clicks the tile.
+    fireEvent.click(screen.getByRole('button', { name: 'Raum buchen' }));
+    expect(on.openCard).toHaveBeenCalledWith('k-1');
+  });
+
+  it('lifts a card by touch only after a long press, so a swipe over the board scrolls', async () => {
+    const { fixture } = await setup();
+    const drags = fixture.debugElement.queryAll(By.directive(CdkDrag));
+    expect(drags.length).toBeGreaterThan(0);
+    for (const d of drags) expect(d.injector.get(CdkDrag).dragStartDelay).toEqual({ touch: 400, mouse: 0 });
   });
 
   it('lets Tab leave a held card: the drag ends and the focus is not pulled back', async () => {

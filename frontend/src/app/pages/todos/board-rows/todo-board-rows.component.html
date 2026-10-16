@@ -61,10 +61,12 @@
                   role="listitem"
                   cdkDrag
                   cdkDragPreviewClass="br__preview"
+                  [cdkDragStartDelay]="dragDelay"
                   [cdkDragData]="card.id"
                   [cdkDragDisabled]="!canDrag(row)"
                   (cdkDragStarted)="onDragStart(row, col)"
                   (cdkDragEnded)="ptr.set(null)"
+                  (keyup)="onTileKeyUp($event)"
                   (keydown)="onTileKey($event, row, card, ci, i)"
                 >
                   <app-todo-card-tile

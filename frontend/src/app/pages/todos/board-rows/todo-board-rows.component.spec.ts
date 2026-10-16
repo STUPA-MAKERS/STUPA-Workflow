@@ -1,5 +1,6 @@
 import { ScrollDispatcher } from '@angular/cdk/scrolling';
-import type { CdkDragDrop } from '@angular/cdk/drag-drop';
+import { CdkDrag, type CdkDragDrop } from '@angular/cdk/drag-drop';
+import { By } from '@angular/platform-browser';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
@@ -89,6 +90,19 @@ function dropEvent(cardId: string, from: string, to: string, previousIndex: numb
     previousIndex,
     currentIndex,
   } as unknown as CdkDragDrop<string>;
+}
+
+/**
+ * Space on a tile as Firefox does it: the keydown on the focused button, then the keyup,
+ * and the keyup clicks the button unless a handler prevented it.
+ */
+function firefoxSpace(title: string): void {
+  const button = screen.getByRole('button', { name: title });
+  fireEvent.keyDown(button, { key: ' ' });
+  const target = screen.getByRole('button', { name: title });
+  const up = new KeyboardEvent('keyup', { key: ' ', bubbles: true, cancelable: true });
+  target.dispatchEvent(up);
+  if (!up.defaultPrevented) target.click();
 }
 
 describe('boardRows', () => {
@@ -272,6 +286,31 @@ describe('TodoBoardRowsComponent', () => {
     expect(api.moveCard).not.toHaveBeenCalled();
     const phone = await setup({ phone: true });
     expect(phone.cmp.canDrag(phone.cmp.rows()[0])).toBe(false);
+  });
+
+  it('lifts and puts down a card with Space without opening it, as Firefox clicks on keyup', async () => {
+    const { cmp, on, api, settle } = await setup();
+    firefoxSpace('Raum buchen');
+    await settle();
+    expect(cmp.kb()).toMatchObject({ cardId: 'k-1' });
+    expect(on.openCard).not.toHaveBeenCalled();
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Raum buchen' }), { key: 'ArrowRight' });
+    await settle();
+    firefoxSpace('Raum buchen');
+    await settle();
+    expect(cmp.kb()).toBeNull();
+    expect(api.moveCard).toHaveBeenCalledWith('k-1', { columnId: 'c-2' });
+    expect(on.openCard).not.toHaveBeenCalled();
+    // Without a drag, Space still opens the card of a read-only row.
+    firefoxSpace('Ticket prüfen');
+    expect(on.openCard).toHaveBeenCalledWith('k-9');
+  });
+
+  it('lifts a card by touch only after a long press, so a swipe over the rows scrolls', async () => {
+    const { fixture } = await setup();
+    const drags = fixture.debugElement.queryAll(By.directive(CdkDrag));
+    expect(drags.length).toBeGreaterThan(0);
+    for (const d of drags) expect(d.injector.get(CdkDrag).dragStartDelay).toEqual({ touch: 400, mouse: 0 });
   });
 
   it('moves a card with the keyboard inside its row and names each step', async () => {
