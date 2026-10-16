@@ -10,13 +10,17 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, NavigationEnd, type ParamMap, Router, RouterOutlet } from '@angular/router';
-import { filter } from 'rxjs/operators';
+import type { Observable } from 'rxjs';
+import { filter, map } from 'rxjs/operators';
+import { AuthService } from '@core/auth/auth.service';
 import type { PersonRef, Uuid } from '@core/api/models';
 import {
   TICKET_KINDS,
   TicketsApiService,
+  type MyTicketItem,
   type TicketKind,
   type TicketListItem,
+  type TicketPage,
   type TicketQuery,
   type TicketStatus,
 } from '@core/api/tickets.service';
@@ -77,6 +81,10 @@ export interface TicketGroup {
  * the search runs while the user types. All filters live in the query params, and a row
  * keeps them. In the default view the closed tickets stay folded under "Erledigt oder
  * abgelehnt" with their number; "n abgeschlossene Tickets zeigen" loads them.
+ *
+ * Without `ticket.manage` the page lists the own tickets of the reporter
+ * (`/tickets/mine`): the same groups and filters, without the assignee chip and the
+ * assignee of a row.
  */
 @Component({
   selector: 'app-tickets',
@@ -111,6 +119,8 @@ export class TicketsComponent implements OnDestroy {
   private readonly page = inject(TicketsPageService);
   private readonly frame = inject(PageFrameService);
   private readonly rail = inject(RailStatusService);
+  /** The team view; else the own tickets of the reporter. */
+  readonly manager = inject(AuthService).can('ticket.manage');
 
   /** The clock of the row ages; a spec sets it. */
   now: () => Date = () => new Date();
@@ -218,10 +228,12 @@ export class TicketsComponent implements OnDestroy {
   readonly hasMore = computed(() => this.items().length < this.total());
 
   constructor() {
-    this.api.assignees().subscribe({
-      next: (list) => this.assignees.set(list),
-      error: () => this.assignees.set([]),
-    });
+    if (this.manager) {
+      this.api.assignees().subscribe({
+        next: (list) => this.assignees.set(list),
+        error: () => this.assignees.set([]),
+      });
+    }
 
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.readFilters(pm);
@@ -305,6 +317,12 @@ export class TicketsComponent implements OnDestroy {
 
   // --- loading ------------------------------------------------------------
 
+  /** One page: every ticket for the team, the own ones for the reporter. */
+  private fetch(query: TicketQuery): Observable<TicketPage> {
+    if (this.manager) return this.api.list(query);
+    return this.api.mine(query).pipe(map((page) => ({ ...page, items: page.items.map(asListItem) })));
+  }
+
   /** The request of the filters, without the states. */
   private baseQuery(): TicketQuery {
     return {
@@ -329,7 +347,7 @@ export class TicketsComponent implements OnDestroy {
     const seq = ++this.seq;
     const showClosed = keepClosed && this.closedItems() !== null;
     if (!keepClosed) this.closedItems.set(null);
-    this.api.list({ ...this.baseQuery(), status: this.statusQuery(), limit: TICKET_PAGE, offset: 0 }).subscribe({
+    this.fetch({ ...this.baseQuery(), status: this.statusQuery(), limit: TICKET_PAGE, offset: 0 }).subscribe({
       next: (page) => {
         if (seq !== this.seq) return;
         this.items.set(page.items);
@@ -350,8 +368,7 @@ export class TicketsComponent implements OnDestroy {
       this.closedTotal.set(0);
       return;
     }
-    this.api
-      .list({ ...this.baseQuery(), status: ['done', 'rejected'], limit: showClosed ? TICKET_PAGE : 1, offset: 0 })
+    this.fetch({ ...this.baseQuery(), status: ['done', 'rejected'], limit: showClosed ? TICKET_PAGE : 1, offset: 0 })
       .subscribe({
         next: (page) => {
           if (seq !== this.seq) return;
@@ -369,8 +386,7 @@ export class TicketsComponent implements OnDestroy {
     if (this.closedLoading()) return;
     const seq = this.seq;
     this.closedLoading.set(true);
-    this.api
-      .list({ ...this.baseQuery(), status: ['done', 'rejected'], limit: TICKET_PAGE, offset: 0 })
+    this.fetch({ ...this.baseQuery(), status: ['done', 'rejected'], limit: TICKET_PAGE, offset: 0 })
       .subscribe({
         next: (page) => {
           this.closedLoading.set(false);
@@ -387,13 +403,7 @@ export class TicketsComponent implements OnDestroy {
     if (this.loadingMore()) return;
     const seq = this.seq;
     this.loadingMore.set(true);
-    this.api
-      .list({
-        ...this.baseQuery(),
-        status: this.statusQuery(),
-        limit: TICKET_PAGE,
-        offset: this.items().length,
-      })
+    this.fetch({ ...this.baseQuery(), status: this.statusQuery(), limit: TICKET_PAGE, offset: this.items().length })
       .subscribe({
         next: (page) => {
           this.loadingMore.set(false);
@@ -409,12 +419,22 @@ export class TicketsComponent implements OnDestroy {
     const t = (key: TranslationKey, params?: Record<string, string | number>): string =>
       this.i18n.translate(key, params);
     const age = ticketAge(item.createdAt, this.now(), this.i18n.formatLocale(), t);
+    const reporter = this.manager ? reporterRowName(item.reporter, t) : null;
     return {
       item,
       icon: KIND_ICON[item.kind],
       kindLabel: t(KIND_LABEL[item.kind]),
-      sub: [reporterRowName(item.reporter, t), age].filter(Boolean).join(' · '),
+      sub: [reporter, age].filter(Boolean).join(' · '),
       assignee: item.assignee,
     };
   }
+}
+
+/** An own ticket as a list row of the team list: no reporter, no assignee. */
+function asListItem(item: MyTicketItem): TicketListItem {
+  return {
+    ...item,
+    reporter: { principalId: null, displayName: null, email: null, anonymized: false },
+    assignee: null,
+  };
 }

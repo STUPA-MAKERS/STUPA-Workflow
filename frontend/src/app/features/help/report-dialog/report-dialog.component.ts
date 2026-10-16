@@ -320,6 +320,8 @@ export class ReportDialogComponent {
           this.sending.set(false);
           this.drafts.clear();
           this.sentNumber.set(res.number);
+          // With a session the tab "Tickets" shows the own tickets from now on.
+          if (!anonymous) this.auth.markReportedTicket();
           // The send button that had the focus is gone: the focus moves to the
           // confirmation, so a screen reader reads the ticket number.
           afterNextRender(() => this.sentBox()?.nativeElement.focus(), { injector: this.injector });

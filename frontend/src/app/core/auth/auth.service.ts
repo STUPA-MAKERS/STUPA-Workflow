@@ -73,6 +73,17 @@ export class AuthService {
   readonly inSubstitutePool = computed(
     () => this._principal()?.in_substitute_pool === true,
   );
+  /** The principal reported a ticket: the tab "Tickets" shows its own tickets. A report
+   *  of this session sets it at once (`markReportedTicket`). */
+  readonly hasReportedTickets = computed(
+    () => this._principal()?.has_reported_tickets === true,
+  );
+
+  /** A report went out with this session: the tab "Tickets" shows from now on. */
+  markReportedTicket(): void {
+    const p = this._principal();
+    if (p && !p.has_reported_tickets) this._principal.set({ ...p, has_reported_tickets: true });
+  }
 
   /**
    * Loads the principal exactly once and caches the result with `shareReplay`.

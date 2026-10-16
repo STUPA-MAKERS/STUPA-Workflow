@@ -1,6 +1,7 @@
 import type { PersonRef } from '@core/api/models';
 import type {
   TicketEvent,
+  TicketEventPayload,
   TicketKind,
   TicketReporter,
   TicketStatus,
@@ -93,6 +94,16 @@ export function ticketAge(at: string, now: Date, locale: string, t: Translate): 
     month: '2-digit',
     ...(sameYear ? {} : { year: 'numeric' }),
   }).format(then);
+}
+
+/**
+ * The text of a status change in the thread of the reporter, which carries no actor
+ * ("Status Neu → In Arbeit").
+ */
+export function reporterEventText(payload: TicketEventPayload, t: Translate): string {
+  const from = t(STATUS_LABEL[payload.from as TicketStatus] ?? 'tickets.status.new');
+  const to = t(STATUS_LABEL[payload.to as TicketStatus] ?? 'tickets.status.new');
+  return t('tickets.event.statusPlain', { from, to });
 }
 
 /** The text of an event in the thread ("Mara Keller hat das Ticket übernommen"). */

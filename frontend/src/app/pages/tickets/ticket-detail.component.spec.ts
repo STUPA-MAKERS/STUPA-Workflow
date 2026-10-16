@@ -10,6 +10,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { PersonRef } from '@core/api/models';
 import {
   TicketsApiService,
+  type MyTicketDetail,
   type TicketDetail,
   type TicketListItem,
   type TicketNote,
@@ -25,6 +26,36 @@ import { TicketsPageService } from './tickets-page.service';
 
 const MARA: PersonRef = { principalId: 'p1', displayName: 'Mara Keller' };
 const JONAS: PersonRef = { principalId: 'p2', displayName: 'Jonas Albrecht' };
+
+function mine(over: Partial<MyTicketDetail> = {}): MyTicketDetail {
+  return {
+    id: 't40',
+    number: 'T-0040',
+    kind: 'question',
+    title: 'Wo finde ich das Protokoll?',
+    status: 'in_progress',
+    createdAt: '2026-10-14T19:14:00Z',
+    updatedAt: '2026-10-15T06:12:00Z',
+    body: 'Ich finde das Protokoll nicht.',
+    attachments: [{ id: 'a1', filename: 'screen.png', mime: 'image/png', size: 9, scanned: true }],
+    notes: [
+      {
+        id: 'n1',
+        author: MARA,
+        body: 'Unter Sitzungen.',
+        at: '2026-10-15T06:20:00Z',
+        editedAt: null,
+        isOwn: false,
+        attachments: [],
+        visibility: 'public',
+      },
+    ],
+    events: [{ id: 'e1', kind: 'status', at: '2026-10-15T06:12:00Z', payload: { from: 'new', to: 'in_progress' } }],
+    closedAt: null,
+    canReply: true,
+    ...over,
+  };
+}
 
 function detail(over: Partial<TicketDetail> = {}): TicketDetail {
   return {
@@ -92,6 +123,10 @@ interface Opts {
   split?: boolean | null;
   /** The e-mail of the signed-in viewer. */
   me?: string | null;
+  /** The viewer holds `ticket.manage` (default); false: the reporter view. */
+  manager?: boolean;
+  /** The reporter view: the answer of `GET /tickets/mine/{id}`. */
+  mine?: (id: string) => Observable<MyTicketDetail>;
 }
 
 async function start(url = '/tickets/t40', opts: Opts = {}) {
@@ -120,6 +155,32 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
     unblockSender: jest.fn((id: string) => of(detail({ id, senderBlocked: false }))),
     deleteNote: jest.fn(() => of(undefined)),
     list: jest.fn(() => of<TicketPage>({ items: [], total: 0, limit: 8, offset: 0 })),
+    getMine: jest.fn((id: string) => (opts.mine ?? (() => of(mine({ id }))))(id)),
+    addMyNote: jest.fn((_id: string, body: string, _files?: unknown) =>
+      of<TicketNote>({
+        id: 'n9',
+        author: { principalId: 'r1', displayName: 'Lea Hoffmann' },
+        body,
+        at: '2026-10-15T09:00:00Z',
+        editedAt: null,
+        isOwn: true,
+        attachments: [],
+        visibility: 'public',
+        fromReporter: true,
+      }),
+    ),
+    editMyNote: jest.fn((_id: string, noteId: string, body: string) =>
+      of<TicketNote>({
+        id: noteId,
+        author: { principalId: 'r1', displayName: 'Lea Hoffmann' },
+        body,
+        at: '2026-10-15T06:20:00Z',
+        editedAt: '2026-10-15T09:00:00Z',
+        isOwn: true,
+        attachments: [],
+      }),
+    ),
+    deleteMyNote: jest.fn(() => of(undefined)),
     attachmentUrl: (id: string) => `/api/attachments/${id}/download`,
   };
   const todosApi = {
@@ -142,14 +203,15 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
       { provide: TodosApiService, useValue: todosApi },
       { provide: ToastService, useValue: toast },
       ...(page ? [{ provide: TicketsPageService, useValue: page }] : []),
-      ...(opts.me !== undefined
-        ? [
-            {
-              provide: AuthService,
-              useValue: { principal: signal(opts.me === null ? null : { email: opts.me }), isAuthenticated: signal(true) },
-            },
-          ]
-        : []),
+      {
+        provide: AuthService,
+        useValue: {
+          principal: signal(opts.me == null ? null : { email: opts.me }),
+          isAuthenticated: signal(true),
+          displayName: signal('Lea Hoffmann'),
+          can: (p: string) => (opts.manager ?? true) && p === 'ticket.manage',
+        },
+      },
     ],
   });
   const harness = await RouterTestingHarness.create();
@@ -740,7 +802,7 @@ describe('TicketDetailComponent', () => {
   it('sends, edits and deletes notes, and never the report', async () => {
     const { cmp, api, toast } = await start();
     cmp.sendNote({ body: 'Fix ist offen.' });
-    expect(api.addNote).toHaveBeenCalledWith('t40', 'Fix ist offen.', { body: 'Fix ist offen.' });
+    expect(api.addNote).toHaveBeenCalledWith('t40', 'Fix ist offen.', { body: 'Fix ist offen.' }, undefined);
     expect(cmp.notes().map((n) => n.id)).toEqual(['n1', 'n9']);
 
     cmp.editNote({ id: 'n1', body: 'Prüfe ich morgen.' });
@@ -898,7 +960,12 @@ describe('TicketDetailComponent', () => {
     const file = { id: 'd1', filename: 'a.png', mime: 'image/png', size: 3, scanState: 'scanning' as const, url: '/x' };
     api.addNote.mockReturnValueOnce(throwError(() => new Error('offline')));
     cmp.sendNote({ body: '', attachmentIds: ['d1'], draftToken: 'tok', files: [file] });
-    expect(api.addNote).toHaveBeenCalledWith('t40', '', expect.objectContaining({ attachmentIds: ['d1'], draftToken: 'tok' }));
+    expect(api.addNote).toHaveBeenCalledWith(
+      't40',
+      '',
+      expect.objectContaining({ attachmentIds: ['d1'], draftToken: 'tok' }),
+      undefined,
+    );
     const failed = cmp.messages().at(-1)!;
     expect(failed.attachments).toEqual([file]);
     cmp.discardNote({ id: failed.id });
@@ -915,5 +982,80 @@ describe('TicketDetailComponent', () => {
   it('names the tabs without a count', async () => {
     const { cmp } = await start();
     expect(cmp.tabs()[0]).toEqual({ id: 'log', label: 'Verlauf' });
+  });
+
+  describe('as the reporter', () => {
+    it('reads the own ticket without the work of the team', async () => {
+      const { cmp, api, todosApi } = await start('/tickets/t40', { manager: false, split: true });
+      expect(api.getMine).toHaveBeenCalledWith('t40');
+      expect(api.get).not.toHaveBeenCalled();
+      expect(api.assignees).not.toHaveBeenCalled();
+      expect(todosApi.linked).not.toHaveBeenCalled();
+      expect(screen.getByRole('heading', { level: 2, name: /Wo finde ich/ })).toBeInTheDocument();
+      const line = document.querySelector('.td__line')!;
+      expect(line).toHaveTextContent('In Bearbeitung');
+      expect(line).toHaveTextContent('Frage');
+      expect(line).not.toHaveTextContent('Niemand');
+      expect(screen.queryByRole('button', { name: /Erledigt/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Ablehnen' })).not.toBeInTheDocument();
+      expect(cmp.menuSections()).toEqual([]);
+      expect(screen.queryByText('Technische Angaben')).not.toBeInTheDocument();
+      expect(screen.queryByText('Gemeldet von')).not.toBeInTheDocument();
+      expect(cmp.visibilityOptions()).toEqual([]);
+      expect(cmp.placeholder()).toBe('chat.placeholder');
+      const [report, note] = cmp.messages();
+      expect(report.own).toBe(true);
+      expect(report.canEdit).toBe(false);
+      expect(report.authorLabel).toBeNull();
+      expect(note.visibility).toBeNull();
+      expect(cmp.events()[0].text).toBe('Status Neu → In Bearbeitung');
+    });
+
+    it('writes, edits and deletes own messages through the reporter routes', async () => {
+      const { cmp, api } = await start('/tickets/t40', { manager: false });
+      cmp.sendNote({ body: 'Danke!' });
+      expect(api.addMyNote).toHaveBeenCalledWith('t40', 'Danke!', { body: 'Danke!' });
+      expect(api.addNote).not.toHaveBeenCalled();
+      expect(cmp.messages().at(-1)!.body).toBe('Danke!');
+      cmp.editNote({ id: 'n9', body: 'Danke sehr!' });
+      expect(api.editMyNote).toHaveBeenCalledWith('t40', 'n9', 'Danke sehr!');
+      cmp.deleteNote({ id: 'n9' });
+      expect(api.deleteMyNote).toHaveBeenCalledWith('t40', 'n9');
+      expect(cmp.notes().map((n) => n.id)).toEqual(['n1']);
+      cmp.refreshThread();
+      expect(api.getMine).toHaveBeenCalledTimes(2);
+    });
+
+    it('hides the composer while a block holds the reporter back', async () => {
+      const { cmp } = await start('/tickets/t40', { manager: false, mine: (id) => of(mine({ id, canReply: false })) });
+      expect(cmp.canReply()).toBe(false);
+    });
+
+    it('names a ticket of somebody else as not found', async () => {
+      await start('/tickets/t99', { manager: false, mine: () => throwError(() => notFound()) });
+      expect(screen.getByText('Ticket nicht gefunden')).toBeInTheDocument();
+    });
+  });
+
+  describe('the visibility of a team note', () => {
+    it('offers internal first on a ticket of an account and marks every note', async () => {
+      const { cmp, api } = await start();
+      expect(cmp.visibilityOptions()).toEqual(['internal', 'public']);
+      expect(cmp.placeholder()).toBe('chat.placeholder');
+      const [report, note] = cmp.messages();
+      expect(report.visibility).toBe('public');
+      expect(note.visibility).toBe('internal');
+      cmp.sendNote({ body: 'Antwort', visibility: 'public' });
+      expect(api.addNote).toHaveBeenCalledWith('t40', 'Antwort', { body: 'Antwort', visibility: 'public' }, 'public');
+    });
+
+    it('keeps every note internal on a report without an account', async () => {
+      const { cmp } = await start('/tickets/t40', {
+        get: () => of(detail({ reporter: { principalId: null, displayName: null, email: 'x@example.org', anonymized: false } })),
+      });
+      expect(cmp.visibilityOptions()).toEqual([]);
+      expect(cmp.placeholder()).toBe('tickets.detail.notePlaceholder');
+      expect(cmp.messages()[0].visibility).toBeNull();
+    });
   });
 });

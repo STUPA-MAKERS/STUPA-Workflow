@@ -171,6 +171,19 @@ describe('authGuard', () => {
     expect(run(data, noScope)).toBeInstanceOf(UrlTree);
   });
 
+  describe('the tickets', () => {
+    const tickets = routes.flatMap((r) => r.children ?? []).find((c) => c.path === 'tickets')!;
+    const plain: Principal = { ...MEMBER, permissions: [], gremien: [] };
+
+    it('let a reporter in without ticket.manage', () => {
+      expect(run({ ...tickets.data }, { ...plain, has_reported_tickets: true })).toBe(true);
+    });
+
+    it('stay closed to anybody else without ticket.manage', () => {
+      expect(run({ ...tickets.data }, plain)).not.toBe(true);
+    });
+  });
+
   it('lets any authenticated user onto allowAuthenticated routes', () => {
     const anyUser: Principal = { ...MEMBER, permissions: [], gremien: [] };
     const data = { permission: ['budget.view'], allowAuthenticated: true };
