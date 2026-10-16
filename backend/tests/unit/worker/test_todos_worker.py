@@ -86,10 +86,13 @@ async def test_due_reminds_once_and_skips_a_failing_card(monkeypatch: pytest.Mon
         return card is ok
 
     monkeypatch.setattr(wt, "send_todo_due", _send)
+    asked = _members(monkeypatch, {ME, OTHER})
     session = ScriptedSession(
         execute=[[(ok, b), (quiet, b), (broken, b)]], scalars=[[ME, OTHER], [], [ME]]
     )
     assert await wt.process_todo_due(_ctx(session), now=MORNING) == 1
+    # One member read per board, not per card.
+    assert asked == [b.id]
     tomorrow = date(2026, 10, 2)
     assert [c[2] for c in calls] == [tomorrow] * 3
     assert calls[0][1] == [ME, OTHER]
@@ -97,6 +100,39 @@ async def test_due_reminds_once_and_skips_a_failing_card(monkeypatch: pytest.Mon
     assert broken.due_reminded_on is None
     assert session.committed == 1
     assert "IS DISTINCT FROM" in str(session.statements[0])
+
+
+def _members(monkeypatch: pytest.MonkeyPatch, ids: set[Any]) -> list[Any]:
+    asked: list[Any] = []
+
+    class _Access:
+        def __init__(self, _session: object) -> None:
+            pass
+
+        async def member_ids(self, b: Any) -> set[Any]:
+            asked.append(b.id)
+            return ids
+
+    monkeypatch.setattr(wt, "BoardAccess", _Access)
+    return asked
+
+
+async def test_due_skips_an_assignee_who_left_the_board(monkeypatch: pytest.MonkeyPatch) -> None:
+    b = board()
+    col = column(b.id)
+    one, gone = card(b, col), card(b, col)
+    calls: list[list[Any]] = []
+
+    async def _send(_s: Any, *, assignee_ids: list[Any], **_kw: Any) -> bool:
+        calls.append(assignee_ids)
+        return bool(assignee_ids)
+
+    monkeypatch.setattr(wt, "send_todo_due", _send)
+    _members(monkeypatch, {ME})
+    session = ScriptedSession(execute=[[(one, b), (gone, b)]], scalars=[[ME, OTHER], [OTHER]])
+    assert await wt.process_todo_due(_ctx(session), now=MORNING) == 1
+    assert calls == [[ME], []]
+    assert gone.due_reminded_on == date(2026, 10, 2)
 
 
 async def test_due_without_cards(monkeypatch: pytest.MonkeyPatch) -> None:

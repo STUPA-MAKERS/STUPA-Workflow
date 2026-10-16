@@ -9,7 +9,10 @@ system), and the board gets a new ``updated_at``, so its ETag changes.
 ``process_todo_due`` runs inside the deadline cron (``worker/deadlines.py``), so every
 minute. From 07:00 Europe/Berlin on, it reminds the assignees of every open card
 (not archived, not in a done column) that is due tomorrow (Europe/Berlin) with the
-mail ``todo_due``. ``todo_card.due_reminded_on`` keeps the due date of the last
+mail ``todo_due``. An assignee who is no longer a member of the board (an ended
+gremium membership, a lost team permission) gets no reminder, because the mail
+carries the card title and the board name that the person can no longer read; the
+row in ``todo_assignee`` stays. ``todo_card.due_reminded_on`` keeps the due date of the last
 reminder, so a card gets one reminder per due date, also after the arq job id of
 the mail expires. A new due date gets a new reminder.
 """
@@ -27,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.db import get_sessionmaker
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
 from app.modules.notifications.todos import send_todo_due
+from app.modules.todos.access import BoardAccess
 from app.modules.todos.models import (
     TodoAssignee,
     TodoBoard,
@@ -118,6 +122,8 @@ async def process_todo_due(ctx: dict[str, Any], now: datetime | None = None) -> 
     queue = _mail_queue(ctx)
     sent = 0
     async with _sessionmaker(ctx)() as session:
+        access = BoardAccess(session)
+        members: dict[uuid.UUID, set[uuid.UUID]] = {}
         rows = (
             await session.execute(
                 select(TodoCard, TodoBoard)
@@ -135,13 +141,17 @@ async def process_todo_due(ctx: dict[str, Any], now: datetime | None = None) -> 
             )
         ).all()
         for card, board in rows:
-            assignees = list(
-                (
+            if board.id not in members:
+                members[board.id] = await access.member_ids(board)
+            assignees = [
+                pid
+                for pid in (
                     await session.scalars(
                         select(TodoAssignee.principal_id).where(TodoAssignee.card_id == card.id)
                     )
                 ).all()
-            )
+                if pid in members[board.id]
+            ]
             try:
                 if await send_todo_due(
                     session,
