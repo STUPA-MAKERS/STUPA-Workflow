@@ -17,7 +17,7 @@ import {
 } from '@core/api/tickets.service';
 import { TodosApiService, type TodoLinkedCard } from '@core/api/todos.service';
 import { ToastService } from '@stupa-makers/ui-kit';
-import { TicketDetailComponent } from './ticket-detail.component';
+import { TicketDetailComponent, reportScanState } from './ticket-detail.component';
 import { TicketsPageService } from './tickets-page.service';
 
 const MARA: PersonRef = { principalId: 'p1', displayName: 'Mara Keller' };
@@ -305,21 +305,14 @@ describe('TicketDetailComponent', () => {
     expect(harness.fixture.debugElement.query((d) => d.name === 'app-chat').componentInstance.canAttach()).toBe(false);
   });
 
-  it('blocks the sender after the question, and unblocks at once', async () => {
+  it('blocks the sender at once from the menu, without a question, and unblocks at once', async () => {
     const { cmp, api, toast, harness } = await start();
     expect(harness.fixture.debugElement.query((d) => d.name === 'app-chat').componentInstance.canAttach()).toBe(true);
     cmp.onMenu({ id: 'block', label: '' });
     harness.detectChanges();
-    expect(cmp.blockOpen()).toBe(true);
-    expect(screen.getByRole('dialog')).toHaveTextContent(
-      'Weitere Meldungen von Tobias Brandt werden ab jetzt ohne Ticket und ohne Mail verworfen.',
-    );
-    expect(api.blockSender).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole('button', { name: 'Sperren' }));
-    harness.detectChanges();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(api.blockSender).toHaveBeenCalledWith('t40');
     expect(cmp.ticket()!.senderBlocked).toBe(true);
-    expect(cmp.blockOpen()).toBe(false);
     expect(toast.success).toHaveBeenCalledWith('Absender gesperrt.');
 
     cmp.onMenu({ id: 'unblock', label: '' });
@@ -328,20 +321,10 @@ describe('TicketDetailComponent', () => {
     expect(toast.success).toHaveBeenCalledWith('Absender entsperrt.');
   });
 
-  it('closes the block question without a change', async () => {
-    const { cmp, api, harness } = await start();
-    cmp.onMenu({ id: 'block', label: '' });
-    harness.detectChanges();
-    const footer = screen.getAllByRole('button', { name: 'Abbrechen' }).filter((b) => !b.classList.contains('dialog__close'));
-    await userEvent.click(footer[0]);
-    expect(cmp.blockOpen()).toBe(false);
-    expect(api.blockSender).not.toHaveBeenCalled();
-  });
-
   it('names a failed block, runs one at a time and drops the answer for a ticket the user left', async () => {
     const { cmp, api, toast, harness } = await start();
     api.blockSender.mockReturnValueOnce(throwError(() => new Error('x')));
-    cmp.confirmBlock();
+    cmp.onMenu({ id: 'block', label: '' });
     expect(toast.error).toHaveBeenCalledWith('Die Sperre konnte nicht geändert werden.');
     expect(cmp.blocking()).toBe(false);
 
@@ -349,7 +332,7 @@ describe('TicketDetailComponent', () => {
     api.unblockSender.mockReturnValueOnce(late);
     cmp.onMenu({ id: 'unblock', label: '' });
     expect(cmp.blocking()).toBe(true);
-    cmp.confirmBlock();
+    cmp.onMenu({ id: 'block', label: '' });
     expect(api.blockSender).toHaveBeenCalledTimes(1);
     await harness.navigateByUrl('/tickets/t41');
     late.next(detail({ id: 't40', senderBlocked: false, title: 'Alt' }));
@@ -741,7 +724,7 @@ describe('TicketDetailComponent', () => {
 
   it('says why a note failed, and discards it on request', async () => {
     const { cmp, api, toast } = await start();
-    api.addNote.mockReturnValueOnce(throwError(() => ({ status: 422 })));
+    api.addNote.mockReturnValueOnce(throwError(() => ({ status: 422, error: { errors: [{ field: 'body.body', msg: 'String should have at most 10000 characters' }] } })));
     cmp.sendNote({ body: 'Zu lang' });
     expect(toast.error).toHaveBeenCalledWith('Die Nachricht ist zu lang.');
     const failed = cmp.messages().at(-1)!;
@@ -761,6 +744,47 @@ describe('TicketDetailComponent', () => {
     expect(note.attachments).toEqual([
       { id: 'f1', filename: 'log.txt', mime: 'text/plain', size: 10, scanState: 'clean', url: '/api/attachments/f1/download' },
     ]);
+  });
+
+  it('shows a report file with a finding as quarantined, not as a link', () => {
+    const a = { id: 'a', filename: 'a.png', mime: 'image/png', size: 1 };
+    expect(reportScanState({ ...a, scanned: true, scanState: 'quarantined' })).toBe('quarantined');
+    expect(reportScanState({ ...a, scanned: false, scanState: 'scanning' })).toBe('scanning');
+    expect(reportScanState({ ...a, scanned: true })).toBe('clean');
+    expect(reportScanState({ ...a, scanned: false })).toBe('scanning');
+  });
+
+  it('reads the ticket again when the chat asks, for the scan state of its files', async () => {
+    const { cmp, api, setGet, harness } = await start();
+    const note = (scanState: 'scanning' | 'clean') =>
+      detail({
+        notes: [
+          {
+            id: 'n1',
+            author: MARA,
+            body: 'Log',
+            at: '2026-10-15T06:20:00Z',
+            editedAt: null,
+            isOwn: true,
+            attachments: [{ id: 'f9', filename: 'a.png', mime: 'image/png', size: 1, scanState }],
+          },
+        ],
+      });
+    setGet(() => of(note('clean')));
+    harness.fixture.debugElement.query((d) => d.name === 'app-chat').triggerEventHandler('refresh');
+    expect(api.get).toHaveBeenLastCalledWith('t40');
+    expect(cmp.notes()[0].attachments[0].scanState).toBe('clean');
+
+    // A failed read keeps the page; an answer for a ticket the user left is dropped.
+    setGet(() => throwError(() => new Error('offline')));
+    cmp.refreshThread();
+    expect(cmp.error()).toBe(false);
+    const late = new Subject<TicketDetail>();
+    setGet((id) => (id === 't40' ? late : of(detail({ id: 't41' }))));
+    cmp.refreshThread();
+    await harness.navigateByUrl('/tickets/t41');
+    late.next(note('scanning'));
+    expect(cmp.ticket()!.id).toBe('t41');
   });
 
   it('sends a note with files, and deletes the drafts of a discarded one', async () => {

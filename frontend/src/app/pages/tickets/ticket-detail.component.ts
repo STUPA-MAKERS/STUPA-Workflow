@@ -16,10 +16,11 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { API_BASE_URL } from '@core/api/api.config';
-import type { PersonRef, Uuid } from '@core/api/models';
+import type { PersonRef, ScanState, Uuid } from '@core/api/models';
 import {
   TICKET_KINDS,
   TicketsApiService,
+  type TicketAttachment,
   type TicketDetail,
   type TicketKind,
   type TicketListItem,
@@ -77,6 +78,15 @@ import {
 
 type DetailTab = 'log' | 'details';
 
+/**
+ * The scan state of a report file: the three-state `scanState` of the server, so that
+ * a file with a finding shows as quarantined and not as a link. `scanned` alone only
+ * says that the scan ended; it is the fallback of a server without `scanState`.
+ */
+export function reportScanState(a: TicketAttachment): ScanState {
+  return a.scanState ?? (a.scanned ? 'clean' : 'scanning');
+}
+
 /** The id of the ticket body in the thread: it never collides with a note id. */
 const BODY_ID = 'ticket-body';
 
@@ -90,7 +100,8 @@ const BODY_ID = 'ticket-body';
  * Every note is internal, so the composer has no visibility switch. A note takes up to
  * 5 files (not on an anonymized ticket). Closing a ticket with open to-dos asks "Offene
  * To-Dos mit erledigen?" (default yes). The ⋮ menu blocks or unblocks the sender (frame
- * 19); the block asks first, the unblock does not.
+ * 19) at once, with a toast (contract 12.8: no question). While a file of the report or
+ * a note is in the scan, the chat asks for the thread again (`refreshThread`).
  */
 @Component({
   selector: 'app-ticket-detail',
@@ -169,8 +180,6 @@ export class TicketDetailComponent {
     error: () => this.duplicateHits.set([]),
   });
   readonly todoOpen = signal(false);
-  /** "Absender sperren" asks first. */
-  readonly blockOpen = signal(false);
   /** A block or an unblock in flight. */
   readonly blocking = signal(false);
 
@@ -287,7 +296,7 @@ export class TicketDetailComponent {
         mime: a.mime,
         size: a.size,
         url: this.api.attachmentUrl(a.id),
-        scanState: a.scanned ? 'clean' : 'scanning',
+        scanState: reportScanState(a),
       })),
     };
     const notes = this.notes().map<ChatMessage>((n) => ({
@@ -373,6 +382,21 @@ export class TicketDetailComponent {
     this.loadTodos();
   }
 
+  /**
+   * Read the ticket again in the background, for the scan state of its files. A failure
+   * keeps the page as it is; the next read or a reload tries again.
+   */
+  refreshThread(): void {
+    const id = this.id;
+    const seq = this.seq;
+    this.api.get(id).subscribe({
+      next: (t) => {
+        if (id === this.id && seq === this.seq) this.show(t);
+      },
+      error: () => undefined,
+    });
+  }
+
   private show(t: TicketDetail): void {
     this.ticket.set(t);
     this.notes.set(t.notes);
@@ -403,14 +427,8 @@ export class TicketDetailComponent {
       this.duplicateHits.set([]);
       this.duplicateOpen.set(true);
     }
-    if (item.id === 'block') this.blockOpen.set(true);
+    if (item.id === 'block') this.setBlocked(true);
     if (item.id === 'unblock') this.setBlocked(false);
-  }
-
-  /** "Sperren" in the question. */
-  confirmBlock(): void {
-    this.blockOpen.set(false);
-    this.setBlocked(true);
   }
 
   private setBlocked(block: boolean): void {

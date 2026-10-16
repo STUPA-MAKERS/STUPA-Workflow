@@ -10,7 +10,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
-import type { IsoDateTime, MessageAttachment, MessageFiles, PersonRef, Uuid } from '@core/api/models';
+import type { IsoDateTime, MessageAttachment, MessageFiles, PersonRef, ScanState, Uuid } from '@core/api/models';
 import { messageFiles } from '@core/api/mappers';
 import { skipLoading } from '@core/loading/loading.interceptor';
 
@@ -71,12 +71,16 @@ export interface TicketListItem {
   updatedAt: IsoDateTime;
 }
 
+/** A file of the report. Only a `clean` file downloads, streamed through the API. */
 export interface TicketAttachment {
   id: Uuid;
   filename: string;
   mime: string;
   size: number;
+  /** The scan ended; it does not say whether it found anything. */
   scanned: boolean;
+  /** The three-state scan of the server, as on a message file. */
+  scanState?: ScanState;
 }
 
 export type TicketEventKind = 'created' | 'status' | 'assignee' | 'kind' | 'todo_done';
