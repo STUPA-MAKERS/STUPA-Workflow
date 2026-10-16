@@ -567,9 +567,10 @@ describe('TodoCardDetailComponent', () => {
     cmp.onMenu({ id: 'transfer', label: '' });
     detect();
     expect(screen.getByRole('dialog', { name: 'In anderes Board verschieben' })).toBeInTheDocument();
-    // The current board is no target.
+    // Neither the current board nor, for a card of a gremium board, the personal board is a target.
     expect(api.boards).toHaveBeenCalled();
-    expect(api.board).toHaveBeenCalledWith('b-0');
+    expect(api.board).toHaveBeenCalledWith('b-2');
+    expect(api.board).not.toHaveBeenCalledWith('b-0');
     const order: string[] = [];
     const transferred = jest.fn(() => order.push('transferred'));
     cmp.transferred.subscribe(transferred);
@@ -597,6 +598,7 @@ describe('TodoCardDetailComponent', () => {
       [http(409, 'card_archived'), 'Die Karte konnte nicht verschoben werden.'],
       [http(422, 'transfer_same_board'), 'Die Karte konnte nicht verschoben werden.'],
       [http(422, 'column_not_on_board'), 'Die Karte konnte nicht verschoben werden.'],
+      [http(403, 'transfer_to_personal'), 'Karten aus geteilten Boards können nicht ins persönliche Board verschoben werden.'],
       [http(404), 'Die Karte konnte nicht verschoben werden.'],
       [http(500), 'Die Änderung konnte nicht gespeichert werden.'],
     ] as const) {

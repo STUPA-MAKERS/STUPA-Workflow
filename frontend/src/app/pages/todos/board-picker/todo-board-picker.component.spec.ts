@@ -49,7 +49,8 @@ describe('TodoBoardPickerComponent', () => {
     expect(rows[1]).toBe(screen.getByTestId('bp-all'));
     // The open cards of every board: 1 + 2 + 4 + 6.
     expect(rows[1].textContent).toContain('Alle');
-    expect(rows[1].textContent).toContain('13 offen · alle Boards');
+    expect(rows[1].textContent).toContain('13 offen');
+    expect(rows[1].textContent).not.toContain('alle Boards');
     expect(rows[1]).not.toHaveAttribute('aria-current');
     fireEvent.click(rows[1]);
     expect(picked).toHaveBeenCalledWith('alle');

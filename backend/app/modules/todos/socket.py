@@ -7,18 +7,21 @@ cap of ``MAX_CONNECTIONS_PER_PRINCIPAL`` open sockets of one account (per proces
 the server sends ``too_many_connections`` and closes with ``4403``.
 
 Client frames: ``{"type": "subscribe", "boardIds": [...]}`` replaces the set of
-boards (at most ``MAX_BOARDS``). The server keeps the boards that the principal
-reads (``BoardAccess.can_read``, checked again on every subscribe) and drops an
+boards (at most ``MAX_BOARDS``). Every subscribe resolves the principal again from
+the session cookie of the handshake (``resolve_ws_principal``), because a socket
+lives for hours and the roles, the memberships or the session can change in
+between; a session that is gone closes the socket with ``4401``. The server keeps
+the boards that the principal reads now (``BoardAccess.can_read``) and drops an
 unreadable or unknown id without a word; it answers ``{"type": "subscribed",
 "boardIds": [...]}`` with the kept ids. Then it forwards the pings of these boards
 (see ``live``). A ping carries ids only, so a board that the viewer lost since the
 last subscribe says "changed", and the REST read then answers 404.
 
-Errors keep the socket open: ``invalid_message`` (not JSON, or a bad frame),
-``too_many_boards``, ``unknown_type`` and ``rate_limited`` (a token bucket per
-socket, as on the meeting socket). Every subscribe ends its transaction, because
-the socket keeps its request session for its whole life, and an open transaction
-would hold a pool connection.
+Errors keep the socket open: ``invalid_message`` (a binary frame, not JSON, or a
+bad frame), ``too_many_boards``, ``unknown_type`` and ``rate_limited`` (a token
+bucket per socket, as on the meeting socket; every frame counts, a bad one too).
+Every subscribe ends its transaction, because the socket keeps its request session
+for its whole life, and an open transaction would hold a pool connection.
 """
 
 from __future__ import annotations
@@ -28,6 +31,7 @@ import json
 import logging
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
@@ -45,6 +49,9 @@ from app.settings import Settings, get_settings
 from app.shared.ws import WS_FORBIDDEN, WS_UNAUTHENTICATED, resolve_ws_principal
 
 logger = logging.getLogger("app.todos.live")
+
+#: Resolves the principal of the socket again (``None``: the session is gone).
+PrincipalResolver = Callable[[], Awaitable[Principal | None]]
 
 ws_router = APIRouter(tags=["todos"])
 
@@ -94,11 +101,13 @@ class TodoLiveConnection:
         principal: Principal,
         session: AsyncSession,
         broker: PatternBroker,
+        resolve: PrincipalResolver | None = None,
     ) -> None:
         self.ws = websocket
         self.principal = principal
         self.session = session
         self.broker = broker
+        self._resolve = resolve
         self.board_ids: frozenset[str] = frozenset()
         self._tokens = _THROTTLE_BURST
         self._last_refill = time.monotonic()
@@ -117,12 +126,21 @@ class TodoLiveConnection:
     async def _error(self, code: str) -> None:
         await self.ws.send_json({"type": "error", "code": code})
 
-    async def _readable(self, ids: list[uuid.UUID]) -> list[uuid.UUID]:
-        """The ids among ``ids`` whose board the principal reads now, in the given order."""
-        wanted = list(dict.fromkeys(ids))
-        if not wanted:
-            return []
+    async def _readable(self, ids: list[uuid.UUID]) -> list[uuid.UUID] | None:
+        """The ids among ``ids`` whose board the principal reads now, in the given order.
+
+        Returns:
+            ``None`` when the session of the socket is gone.
+        """
         try:
+            if self._resolve is not None:
+                principal = await self._resolve()
+                if principal is None:
+                    return None
+                self.principal = principal
+            wanted = list(dict.fromkeys(ids))
+            if not wanted:
+                return []
             boards = {
                 b.id: b
                 for b in (
@@ -139,33 +157,51 @@ class TodoLiveConnection:
         finally:
             await self.session.rollback()
 
-    async def _subscribe(self, raw: dict[str, object]) -> None:
+    async def _subscribe(self, raw: dict[str, object]) -> bool:
+        """Replace the boards of the socket; False when the session is gone (closed)."""
         try:
             msg = SubscribeMessage.model_validate(raw)
         except ValidationError:
             await self._error("invalid_message")
-            return
+            return True
         if len(msg.board_ids) > MAX_BOARDS:
             await self._error("too_many_boards")
-            return
+            return True
         kept = await self._readable(msg.board_ids)
+        if kept is None:
+            self.board_ids = frozenset()
+            await self.ws.close(code=WS_UNAUTHENTICATED)
+            return False
         self.board_ids = frozenset(str(b) for b in kept)
         await self.ws.send_json({"type": "subscribed", "boardIds": [str(b) for b in kept]})
+        return True
+
+    async def _frame(self) -> object | None:
+        """Read one client frame; ``None`` for a binary frame or text that is not JSON."""
+        message = await self.ws.receive()
+        if message["type"] == "websocket.disconnect":
+            raise WebSocketDisconnect(code=int(message.get("code") or 1000))
+        text = message.get("text")
+        if not isinstance(text, str):
+            return None
+        try:
+            return json.loads(text)
+        except (ValueError, RecursionError):
+            return None
 
     async def _receive(self) -> None:
         while True:
-            try:
-                raw = await self.ws.receive_json()
-            except json.JSONDecodeError:
-                await self._error("invalid_message")
-                continue
+            raw = await self._frame()
+            # Every frame counts against the throttle, a bad one too, so a flood of
+            # garbage costs the same as a flood of subscribes.
             if not self._allow_frame():
                 await self._error("rate_limited")
                 continue
             if not isinstance(raw, dict):
                 await self._error("invalid_message")
             elif raw.get("type") == "subscribe":
-                await self._subscribe(raw)  # pyright: ignore[reportUnknownArgumentType]
+                if not await self._subscribe(raw):  # pyright: ignore[reportUnknownArgumentType]
+                    return
             else:
                 await self._error("unknown_type")
 
@@ -204,6 +240,19 @@ async def get_todo_ws_principal(
     return await resolve_ws_principal(websocket, session, settings)
 
 
+def get_todo_ws_resolver(
+    websocket: WebSocket,
+    session: DbSession,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> PrincipalResolver:
+    """Resolve the session cookie of the handshake again, on every subscribe."""
+
+    async def resolve() -> Principal | None:
+        return await resolve_ws_principal(websocket, session, settings)
+
+    return resolve
+
+
 def get_todo_ws_broker(websocket: WebSocket) -> PatternBroker:
     """The broker of the app; a test overrides it."""
     return todo_broker(websocket.app.state)
@@ -215,6 +264,7 @@ async def todo_socket(
     session: DbSession,
     principal: Annotated[Principal | None, Depends(get_todo_ws_principal)],
     broker: Annotated[PatternBroker, Depends(get_todo_ws_broker)],
+    resolve: Annotated[PrincipalResolver, Depends(get_todo_ws_resolver)],
 ) -> None:
     """The change pings of the subscribed boards (``subscribe``, then ``card…``/``board``)."""
     # The handshake read the session and the principal: end that transaction first.
@@ -230,7 +280,7 @@ async def todo_socket(
     try:
         await websocket.accept()
         await TodoLiveConnection(
-            websocket, principal=principal, session=session, broker=broker
+            websocket, principal=principal, session=session, broker=broker, resolve=resolve
         ).run()
     finally:
         _release_slot(principal.sub)

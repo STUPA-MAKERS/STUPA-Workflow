@@ -205,20 +205,36 @@ async def test_the_scope_caps_the_global_keys(
     token = _p(permissions={"todo.all", "todo.read_all"}, scope_permissions=scope)
     assert await access.can_read(board(gremium_id=G2), token) is reads
     assert await access.can_write(board(gremium_id=G2), token) is writes
-    assert await access.can_read(board(**_TEAM), token) is reads
-    assert await access.can_write(board(**_TEAM), token) is writes
+    # A team board through a global key also needs its own permission in the scope.
+    assert not await access.can_read(board(**_TEAM), token)
+    assert not await access.can_write(board(**_TEAM), token)
+    wide = _p(
+        permissions={"todo.all", "todo.read_all"}, scope_permissions=scope | {"platform.manage"}
+    )
+    assert await access.can_read(board(**_TEAM), wide) is reads
+    assert await access.can_write(board(**_TEAM), wide) is writes
 
 
-async def test_an_admin_read_token_reads_every_shared_board_but_writes_none(
+async def test_an_admin_read_token_reads_every_gremium_board_but_writes_none(
     grants: dict[str, Any],
 ) -> None:
-    access = BoardAccess(ScriptedSession(scalar=[ME]))  # type: ignore[arg-type]
-    token = _p(roles=["admin"], scope_permissions=frozenset({"todo.read_all", "meeting.view_all"}))
+    access = BoardAccess(
+        ScriptedSession(scalar=[ME], scalars=[["ticket.manage", "platform.manage"]])  # type: ignore[arg-type]
+    )
+    token = _p(
+        roles=["admin"],
+        scope_permissions=frozenset({"todo.read_all", "meeting.view_all", "platform.manage"}),
+    )
     assert await access.can_read(board(gremium_id=G2), token)
     assert not await access.can_write(board(gremium_id=G2), token)
     assert not await access.can_read(board(**_PERSONAL_MINE), token)
+    # The team board "Plattform" (``ticket.manage``) stays closed to a ``read`` token.
+    plattform = board(kind="team", gremium_id=None, permission="ticket.manage")
+    assert not await access.can_read(plattform, token)
+    assert await access.can_read(board(**_TEAM), token)
     scope = await access.scope(token)
-    assert scope == ReadScope(all_gremien=True, all_teams=True)
+    assert scope == ReadScope(all_gremien=True, team_permissions={"platform.manage"})
+    assert not scope.allows(plattform) and scope.allows(board(**_TEAM))
 
 
 @pytest.mark.parametrize("key", ["todo.read_all", "todo.all"])

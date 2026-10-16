@@ -436,6 +436,28 @@ describe('TodosComponent', () => {
       expect(cmp.board()?.cards.some((c) => c.columnId === 'c-2')).toBe(false);
     });
 
+    it('drops a tile answer that a change of the board overtook and reads the card again', async () => {
+      const { cmp, api, settle } = await start('/todos/b-1');
+      const reads: Subject<TodoCardTile>[] = [];
+      const cardTile = jest.fn((): Observable<TodoCardTile> => {
+        const s = new Subject<TodoCardTile>();
+        reads.push(s);
+        return s;
+      });
+      (api as unknown as { cardTile: jest.Mock }).cardTile = cardTile;
+      live().emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
+      await wait(settle);
+      expect(cardTile).toHaveBeenCalledTimes(1);
+      // A local change while the read is out: the answer is stale.
+      cmp.onCommentsChanged({ id: 'k-2', commentCount: 5 });
+      reads[0].next(tile({ id: 'k-1', columnId: 'c-3', title: 'Alt' }));
+      expect(cmp.board()?.cards.find((c) => c.id === 'k-1')?.columnId).not.toBe('c-3');
+      await wait(settle);
+      expect(cardTile).toHaveBeenCalledTimes(2);
+      reads[1].next(tile({ id: 'k-1', columnId: 'c-3', title: 'Neu' }));
+      expect(cmp.board()?.cards.find((c) => c.id === 'k-1')).toMatchObject({ columnId: 'c-3', title: 'Neu' });
+    });
+
     it('polls every 120 s while the socket is up, every 30 s without it', async () => {
       const { api } = await start('/todos/b-1');
       live().connected.set(true);
@@ -471,6 +493,11 @@ describe('TodosComponent', () => {
     cmp.moveCard({ cardId: 'k-2', move: { columnId: 'c-3' } });
     expect(toast.error).toHaveBeenCalledWith('Die Karte konnte nicht verschoben werden.');
     expect(api.pollBoard).toHaveBeenCalledTimes(polls + 1);
+    // A card that a transfer took away meanwhile: the transfer text, and the board reads again.
+    api.moveCard.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 409, error: { code: 'card_moved' } })));
+    cmp.moveCard({ cardId: 'k-2', move: { columnId: 'c-3' } });
+    expect(toast.error).toHaveBeenLastCalledWith('Die Karte konnte nicht verschoben werden.');
+    expect(api.pollBoard).toHaveBeenCalledTimes(polls + 2);
     const answer = new Subject<ReturnType<typeof tile>>();
     api.moveCard.mockReturnValueOnce(answer);
     cmp.moveCard({ cardId: 'k-2', move: { columnId: 'c-3' } });
@@ -921,14 +948,25 @@ describe('TodosComponent', () => {
       expect(api.transferCard).toHaveBeenCalledTimes(1);
     });
 
-    it('a card dropped into a row leaves the rows when it is not assigned to me', async () => {
-      const { cmp } = await start('/todos/b-0', { board: personal(), rows: [other()] });
+    it('a card dropped into a row leaves the rows with a toast when it is not assigned to me', async () => {
+      const { cmp, toast } = await start('/todos/b-0', { board: personal(), rows: [other()] });
       expect(cmp.me()).toBe('p-1');
       cmp.members.set([]);
       expect(cmp.me()).toBeNull();
       cmp.members.set(MEMBERS);
       cmp.onDropIntoRow({ boardId: 'b-1', cardId: 'p-1', move: { columnId: 'c-2' } });
       expect(harnessRows(cmp).some((c) => c.id === 'p-1')).toBe(false);
+      expect(toast.success).toHaveBeenCalledWith(expect.stringMatching(/^Karte nach „.+“ verschoben$/));
+    });
+
+    it('names a refused drop of a shared card onto the personal board', async () => {
+      const { cmp, toast } = await start('/todos/b-0', {
+        board: personal(),
+        rows: [other()],
+        transfer: () => throwError(() => new HttpErrorResponse({ status: 403, error: { code: 'transfer_to_personal' } })),
+      });
+      cmp.onDropFromRow({ cardId: 'k-5', move: { columnId: 'c-1' } });
+      expect(toast.error).toHaveBeenCalledWith('Karten aus geteilten Boards können nicht ins persönliche Board verschoben werden.');
     });
 
     it('passes me, the live boards and the hold to the rows', async () => {

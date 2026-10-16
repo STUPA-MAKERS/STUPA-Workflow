@@ -28,8 +28,9 @@ except Exception:  # noqa: BLE001
 # user and never grants vote.cast, because only a human may cast a ballot. The scope also
 # caps the gremium rights: `meetings:write` lets session.manage, protocol.write and
 # protocol.finalize through, `votes:write` lets vote.manage through, `todos:write` lets
-# todo.write, todo.configure and todo.all through, `read` lets todo.read_all through, `tickets:write` lets ticket.manage through. The set
-# mirrors the platform's `oauth.SCOPES`. Narrow it with ANTRAGSPLATTFORM_SCOPE.
+# todo.write, todo.configure and todo.all through, `read` lets todo.read_all through,
+# `tickets:write` lets ticket.manage through. The set mirrors the platform's
+# `oauth.SCOPES`. Narrow it with ANTRAGSPLATTFORM_SCOPE.
 DEFAULT_SCOPE = (
     "read applications:write votes:write budget:write meetings:write "
     "tickets:write todos:write forms:write flows:write admin:write"

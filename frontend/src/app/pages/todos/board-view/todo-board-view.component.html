@@ -82,6 +82,8 @@
           [cdkDropListData]="col.id"
           [cdkDropListDisabled]="!canWrite()"
           [cdkDropListConnectedTo]="canWrite() ? connectTo() : []"
+          [cdkDropListEnterPredicate]="enter()"
+          [attr.data-board-kind]="board().kind"
           (cdkDropListEntered)="onEnter($event)"
           (cdkDropListDropped)="drop($event)"
         >

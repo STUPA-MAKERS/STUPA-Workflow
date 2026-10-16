@@ -18,7 +18,8 @@ async function setup(opts: Opts = {}) {
   };
   const transferred = jest.fn();
   const view = await render(TodoTransferDialogComponent, {
-    inputs: { open: false, boardId: 'b-1', cardTitle: 'Raum buchen', ...opts.inputs },
+    // A card of a personal board: every other writable board is a target.
+    inputs: { open: false, boardId: 'b-1', boardKind: 'personal', ...opts.inputs },
     on: { transferred },
     providers: [{ provide: TodosApiService, useValue: api }],
   });
@@ -40,8 +41,9 @@ describe('TodoTransferDialogComponent', () => {
     expect(api.boards).not.toHaveBeenCalled();
     open();
     expect(screen.getByRole('dialog', { name: 'In anderes Board verschieben' })).toBeInTheDocument();
-    expect(screen.getByText('Raum buchen')).toBeInTheDocument();
-    expect(screen.getByText(/Labels, die es im Ziel-Board nicht gibt/)).toBeInTheDocument();
+    // No helper text and no sub line with the card title.
+    expect(screen.queryByText(/Labels, die es im Ziel-Board nicht gibt/)).toBeNull();
+    expect(screen.queryByText('Raum buchen')).toBeNull();
     expect(cmp.boardOptions().map((o) => o.value)).toEqual(['b-0', 'b-3']);
     expect(cmp.selectedBoard()).toBe('b-0');
     expect(cmp.column()).toBe('c-1');
@@ -50,6 +52,50 @@ describe('TodoTransferDialogComponent', () => {
     cmp.column.set('c-4');
     fireEvent.click(screen.getByRole('button', { name: 'Verschieben' }));
     expect(transferred).toHaveBeenCalledWith({ boardId: 'b-3', columnId: 'c-4', boardName: 'Board b-3' });
+  });
+
+  it('leaves the personal board out for a card of a shared board', async () => {
+    const { cmp, open } = await setup({ inputs: { boardKind: 'gremium' } });
+    open();
+    expect(cmp.boardOptions().map((o) => o.value)).toEqual(['b-2', 'b-3']);
+    expect(cmp.selectedBoard()).toBe('b-2');
+  });
+
+  it('shows the transfer error when the chosen board does not load', async () => {
+    const { cmp, open, fixture } = await setup({
+      board: (id) => (id === 'b-3' ? throwError(() => new Error('x')) : of(board({ id }))),
+    });
+    open();
+    expect(cmp.failed()).toBe(false);
+    cmp.setBoard('b-3');
+    fixture.detectChanges();
+    expect(cmp.failed()).toBe(true);
+    expect(screen.getByRole('alert')).toHaveTextContent('Die Karte konnte nicht verschoben werden.');
+    cmp.setBoard('b-0');
+    fixture.detectChanges();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('drops the board list of an earlier open', async () => {
+    const lists: Subject<TodoBoardSummary[]>[] = [];
+    const { cmp, open, api, fixture } = await setup();
+    api.boards.mockImplementation(() => {
+      const s = new Subject<TodoBoardSummary[]>();
+      lists.push(s);
+      return s;
+    });
+    open();
+    cmp.open.set(false);
+    fixture.detectChanges();
+    open();
+    expect(lists).toHaveLength(2);
+    lists[0].next([BOARDS[3]]);
+    lists[0].error(new Error('late'));
+    expect(cmp.loaded()).toBe(false);
+    expect(cmp.boards()).toEqual([]);
+    lists[1].next(BOARDS);
+    expect(cmp.loaded()).toBe(true);
+    expect(cmp.boardOptions().map((o) => o.value)).toEqual(['b-0', 'b-2', 'b-3']);
   });
 
   it('says so when there is no other board and offers only the cancel button', async () => {

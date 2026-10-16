@@ -55,6 +55,16 @@ describe('TodoLinkPickerComponent', () => {
     expect(document.querySelector('.lp-layer')).toBeNull();
   });
 
+  it('opens on the first render when open is true from the start', async () => {
+    const linkTargets = jest.fn(() => of(HITS));
+    await render(TodoLinkPickerComponent, {
+      inputs: { open: true, excludeCardId: 'k-1', linked: new Set<string>() },
+      providers: [{ provide: TodosApiService, useValue: { linkTargets } }],
+    });
+    expect(screen.getByRole('dialog', { name: 'Verknüpfen' }).closest('.lp-layer')?.parentElement).toBe(document.body);
+    expect(document.querySelectorAll('.lp-layer')).toHaveLength(1);
+  });
+
   it('closes on the scrim and gives the focus back', async () => {
     const { open, fixture } = await setup();
     const before = document.createElement('button');

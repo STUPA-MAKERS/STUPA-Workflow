@@ -324,9 +324,11 @@ async def test_the_token_scope_decides_reads_and_writes(
     api.login(read_token)
     with TestClient(api.app) as client:
         boards = _ok(client.get("/api/todos/boards"))
-        # The personal board needs todo.write in the scope.
-        assert {b["id"] for b in boards} == {w.gboard, w.team}
+        # The personal board needs todo.write in the scope, the team board
+        # "Plattform" its own permission (`ticket.manage` is not in `read`).
+        assert {b["id"] for b in boards} == {w.gboard}
         assert all(b["canWrite"] is False for b in boards)
+        assert client.get(f"/api/todos/boards/{w.team}").status_code == 404
         assert _ok(client.get("/api/todos/mine")) == {"items": [], "dueSoonCount": 0}
         _problem(
             client.post("/api/todos/cards", json={"boardId": w.gboard, "title": "Neu"}),
@@ -349,12 +351,24 @@ async def test_the_token_scope_decides_reads_and_writes(
         Principal(sub=admin.sub, roles=["admin"], scope_permissions=scope_permissions(["read"]))
     )
     with TestClient(api.app) as client:
-        assert {b["id"] for b in _ok(client.get("/api/todos/boards"))} == {w.gboard, w.team}
+        assert {b["id"] for b in _ok(client.get("/api/todos/boards"))} == {w.gboard}
+        assert {b["id"] for b in _ok(client.get("/api/todos/all/boards"))} == {w.gboard}
+        _problem(client.get(f"/api/todos/boards/{w.team}"), 404, "not_found")
         _problem(
             client.post(f"/api/todos/cards/{w.card['id']}/checklist", json={"text": "x"}),
             403,
             "todo_write_required",
         )
+    # With `tickets:write` beside `read`, the admin token reads "Plattform" again.
+    api.login(
+        Principal(
+            sub=admin.sub,
+            roles=["admin"],
+            scope_permissions=scope_permissions(["read", "tickets:write"]),
+        )
+    )
+    with TestClient(api.app) as client:
+        assert {b["id"] for b in _ok(client.get("/api/todos/boards"))} == {w.gboard, w.team}
 
 
 def _admin_grants(engine: Engine) -> list[str]:

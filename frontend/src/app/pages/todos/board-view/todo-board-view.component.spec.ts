@@ -2,7 +2,7 @@ import { CdkDrag, CdkDropList, type CdkDragDrop } from '@angular/cdk/drag-drop';
 import { By } from '@angular/platform-browser';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import type { TodoBoard } from '@core/api/todos.service';
-import { cardsOf } from '../../../features/todos/todos.util';
+import { DROP_ENTER, cardsOf } from '../../../features/todos/todos.util';
 import { TODAY, board, tile } from '../../../../testing/todo-fixtures';
 import { DONE_PREVIEW, TodoBoardViewComponent } from './todo-board-view.component';
 
@@ -175,6 +175,26 @@ describe('TodoBoardViewComponent', () => {
     fixture.detectChanges();
     const ro = fixture.debugElement.queryAll(By.directive(CdkDropList)).map((d) => d.injector.get(CdkDropList));
     expect(ro.every((l) => (l.connectedTo as string[]).length === 0)).toBe(true);
+  });
+
+  it('lets no card of a shared board into a column of the personal board', async () => {
+    const lists = async (b: TodoBoard) => {
+      const { fixture } = await setup(b, { connectTo: ['br-list-x-1'] });
+      return fixture.debugElement.queryAll(By.directive(CdkDropList)).map((d) => d.injector.get(CdkDropList));
+    };
+    const from = (kind: string) => {
+      const el = document.createElement('div');
+      el.dataset['boardKind'] = kind;
+      return { dropContainer: { element: { nativeElement: el } } } as unknown as CdkDrag;
+    };
+    const personal = await lists(board({ kind: 'personal', gremiumId: null }));
+    expect(personal.every((l) => l.element.nativeElement.dataset['boardKind'] === 'personal')).toBe(true);
+    expect(personal[0].enterPredicate(from('gremium'), personal[0])).toBe(false);
+    expect(personal[0].enterPredicate(from('team'), personal[0])).toBe(false);
+    expect(personal[0].enterPredicate(from('personal'), personal[0])).toBe(true);
+    // A gremium board lets a card of the personal board in.
+    const gremium = DROP_ENTER.gremium;
+    expect(gremium(from('personal'))).toBe(true);
   });
 
   it('drags with the keyboard inside and between columns and announces each step', async () => {

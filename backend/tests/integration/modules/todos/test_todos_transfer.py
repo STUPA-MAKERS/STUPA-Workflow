@@ -1,9 +1,11 @@
 """Integration: a card moves to another board (real Postgres).
 
-Covers the transfer from a gremium board to the personal board and back, the labels
-kept by name and dropped without a match, the assignees dropped without membership,
-the entry into the done column with ``todo_done`` on a linked ticket, the ETag of both
-boards, the errors (404, 409, 422) and a parallel transfer that wins the lock.
+Covers the transfer from one gremium board to another and back, the labels kept by
+name and dropped without a match, the assignees dropped without membership, the entry
+into the done column with ``todo_done`` on a linked ticket, the ETag of both boards,
+the block of a shared card into a personal board (403 ``transfer_to_personal``), the
+card of the own personal board that takes the actor as assignee, the errors (404,
+409, 422) and a parallel transfer that wins the lock.
 """
 
 from __future__ import annotations
@@ -48,18 +50,19 @@ def _transfer(client: TestClient, card_id: str, board_id: str, **kw: Any) -> Any
     return client.post(f"/api/todos/cards/{card_id}/transfer", json={"boardId": board_id, **kw})
 
 
-async def test_a_card_moves_to_the_personal_board_and_back(
+async def test_a_card_moves_to_another_gremium_board_and_back(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
     gid, gboard = await add_gremium(maker, "StuPa")
+    aid, aboard = await add_gremium(maker, "AStA")
     me, me_id = await add_person(maker, "Mia")
     _other, other_id = await add_person(maker, "Otto")
     await add_member(maker, gid, me_id, "todo.write", "todo.configure")
+    await add_member(maker, aid, me_id, "todo.write", "todo.configure")
     await add_member(maker, gid, other_id, "todo.write")
     api.login(Principal(sub=me.sub, permissions={"ticket.manage"}))
     with TestClient(api.app) as client:
-        personal = next(b for b in _ok(client.get("/api/todos/boards")) if b["kind"] == "personal")
-        pboard = personal["id"]
+        pboard = str(aboard)
         gid_s = str(gboard)
         urgent = _ok(
             client.post(
@@ -107,7 +110,7 @@ async def test_a_card_moves_to_the_personal_board_and_back(
 
         moved = _ok(_transfer(client, card["id"], pboard, columnId=done["id"]))
         assert (moved["boardId"], moved["columnId"]) == (pboard, done["id"])
-        assert moved["boardName"] == "Meine To-Dos"
+        assert moved["boardName"] == "AStA"
         assert [x["name"] for x in moved["labels"]] == ["eilig"]
         assert moved["labelIds"] == [mine["id"]]
         assert [a["principalId"] for a in moved["assignees"]] == [str(me_id)]
@@ -117,7 +120,7 @@ async def test_a_card_moves_to_the_personal_board_and_back(
         assert api.mails == []
         event = next(e for e in reversed(moved["events"]) if e["kind"] == "moved")
         assert event["payload"]["fromBoardName"] == "StuPa"
-        assert event["payload"]["toBoardName"] == "Meine To-Dos"
+        assert event["payload"]["toBoardName"] == "AStA"
         assert event["payload"]["toColumnName"] == done["name"]
         assert event["payload"]["droppedLabels"] == ["Später"]
         assert event["payload"]["droppedAssignees"] == 1
@@ -133,7 +136,7 @@ async def test_a_card_moves_to_the_personal_board_and_back(
         assert read.status_code == 200
         assert card["id"] in [c["id"] for c in read.json()["cards"]]
 
-        # Back to the first column of the gremium board: open again, the label by name.
+        # Back to the first column of the first board: open again, the label by name.
         back = _ok(_transfer(client, card["id"], gid_s))
         first = _ok(client.get(f"/api/todos/boards/{gid_s}"))["columns"][0]
         assert (back["boardId"], back["columnId"]) == (gid_s, first["id"])
@@ -173,6 +176,51 @@ async def test_a_done_card_stays_done_in_the_target_done_column(
         )
         moved = _ok(_transfer(client, card["id"], str(team), columnId=tdone["id"]))
         assert moved["completedAt"] == card["completedAt"]
+
+
+async def test_a_shared_card_never_moves_into_a_personal_board(
+    api: Api, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    gid, gboard = await add_gremium(maker)
+    team = await add_team_board(maker, "ticket.manage")
+    me, me_id = await add_person(maker, "Mia")
+    await add_member(maker, gid, me_id, "todo.write")
+    api.login(Principal(sub=me.sub, permissions={"ticket.manage"}))
+    with TestClient(api.app) as client:
+        personal = _ok(client.get("/api/todos/boards"))[0]["id"]
+        for board in (str(gboard), str(team)):
+            card = _ok(client.post("/api/todos/cards", json={"boardId": board, "title": "A"}), 201)
+            _problem(_transfer(client, card["id"], personal), 403, "transfer_to_personal")
+            assert _ok(client.get(f"/api/todos/cards/{card['id']}"))["boardId"] == board
+        # Shared to shared stays allowed.
+        _ok(_transfer(client, card["id"], str(gboard)))
+
+
+async def test_a_card_of_my_personal_board_stays_mine(
+    api: Api, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    gid, gboard = await add_gremium(maker)
+    me, me_id = await add_person(maker, "Mia")
+    await add_member(maker, gid, me_id, "todo.write")
+    admin, _admin_id = await add_person(maker, "Admin")
+    api.login(me)
+    with TestClient(api.app) as client:
+        personal = _ok(client.get("/api/todos/boards"))[0]["id"]
+        card = _ok(client.post("/api/todos/cards", json={"boardId": personal, "title": "A"}), 201)
+        assert card["assignees"] == []
+        api.mails.clear()
+        moved = _ok(_transfer(client, card["id"], str(gboard)))
+        assert [a["principalId"] for a in moved["assignees"]] == [str(me_id)]
+        assert {"moved", "assigned"} <= {e["kind"] for e in moved["events"]}
+        assert api.mails == []
+        mine = _ok(client.get("/api/todos/mine/boards"))
+        assert [c["id"] for b in mine for c in b["cards"]] == [card["id"]]
+        # Not a member of the target: the card moves without an assignee.
+        api.login(Principal(sub=admin.sub, roles=["admin"]))
+        own = _ok(client.get("/api/todos/boards"))[0]
+        assert own["kind"] == "personal"
+        other = _ok(client.post("/api/todos/cards", json={"boardId": own["id"], "title": "B"}), 201)
+        assert _ok(_transfer(client, other["id"], str(gboard)))["assignees"] == []
 
 
 async def test_the_transfer_errors(api: Api, maker: async_sessionmaker[AsyncSession]) -> None:

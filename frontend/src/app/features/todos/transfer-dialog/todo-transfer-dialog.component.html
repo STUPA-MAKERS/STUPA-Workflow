@@ -1,7 +1,6 @@
 <app-dialog
   [open]="open()"
   [title]="'todos.transfer.title' | t"
-  [subtitle]="cardTitle()"
   [closeLabel]="'action.cancel' | t"
   (closed)="cancel()"
 >
@@ -23,7 +22,9 @@
         [ngModel]="column()"
         (ngModelChange)="column.set($event)"
       />
-      <app-note icon="info">{{ 'todos.transfer.note' | t }}</app-note>
+      @if (failed()) {
+        <p class="tt__error" role="alert">{{ 'todos.error.transfer' | t }}</p>
+      }
     </form>
   }
   <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>

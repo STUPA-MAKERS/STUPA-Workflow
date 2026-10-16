@@ -46,7 +46,8 @@ describe('TodoLiveService', () => {
     await flush();
     expect(channels).toHaveLength(1);
     const ch = channels[0];
-    expect(ch.sent.at(-1)).toEqual({ type: 'subscribe', boardIds: ['b1', 'b2'] });
+    // The newest subscriber goes first.
+    expect(ch.sent).toEqual([{ type: 'subscribe', boardIds: ['b2', 'b1'] }]);
     ch.frames.next({ type: 'subscribed', boardIds: ['b1', 'b2'] });
     expect(live.connected()).toBe(true);
     ch.frames.next({ type: 'card', boardId: 'b1', cardId: 'c' });
@@ -62,11 +63,48 @@ describe('TodoLiveService', () => {
     expect(live.connected()).toBe(false);
   });
 
-  it('sends at most the cap of boards', async () => {
+  it('sends at most the cap of boards, the boards of the current page first', async () => {
     const ids = Array.from({ length: TODO_LIVE_MAX_BOARDS + 5 }, (_, i) => `b${i}`);
     live.changes$(ids).subscribe();
     await flush();
     expect(channels[0].sent[0].boardIds).toHaveLength(TODO_LIVE_MAX_BOARDS);
+    const page = live.changes$(['p1', 'b104']).subscribe();
+    await flush();
+    const sent = channels[0].sent.at(-1)!.boardIds;
+    expect(sent).toHaveLength(TODO_LIVE_MAX_BOARDS);
+    expect(sent.slice(0, 3)).toEqual(['p1', 'b104', 'b0']);
+    expect(sent).not.toContain('b99');
+    page.unsubscribe();
+    await flush();
+    expect(channels[0].sent.at(-1)!.boardIds).toEqual(ids.slice(0, TODO_LIVE_MAX_BOARDS));
+  });
+
+  it('sends nothing when the set of boards stays the same', async () => {
+    const first = live.changes$(['b1', 'b2']).subscribe();
+    await flush();
+    const ch = channels[0];
+    expect(ch.sent).toHaveLength(1);
+    // A second view of the same boards, then the first one goes: the set never changed.
+    const second = live.changes$(['b2', 'b1']).subscribe();
+    await flush();
+    first.unsubscribe();
+    await flush();
+    expect(ch.sent).toHaveLength(1);
+    second.unsubscribe();
+    await flush();
+    expect(ch.closed).toBe(true);
+  });
+
+  it('a second subscribed on the same socket pings no board', async () => {
+    const seen: TodoPing[] = [];
+    live.changes$(['b1']).subscribe((p) => seen.push(p));
+    await flush();
+    const ch = channels[0];
+    ch.frames.next({ type: 'subscribed', boardIds: ['b1'] });
+    live.changes$(['b2']).subscribe((p) => seen.push(p));
+    await flush();
+    ch.frames.next({ type: 'subscribed', boardIds: ['b2', 'b1'] });
+    expect(seen).toEqual([]);
   });
 
   it('connects again after a drop and pings every board then', async () => {
@@ -82,6 +120,9 @@ describe('TodoLiveService', () => {
     expect(channels[1].sent).toEqual([{ type: 'subscribe', boardIds: ['b1'] }]);
     channels[1].frames.next({ type: 'subscribed', boardIds: ['b1'] });
     expect(seen).toEqual([{ type: 'board', boardId: 'b1' }]);
+    // Only the first subscribed after the reconnect pings; a later one on the same socket not.
+    channels[1].frames.next({ type: 'subscribed', boardIds: ['b1'] });
+    expect(seen).toHaveLength(1);
     // A frame of the old socket is ignored.
     channels[0].frames.next({ type: 'card', boardId: 'b1', cardId: 'c' });
     expect(seen).toHaveLength(1);

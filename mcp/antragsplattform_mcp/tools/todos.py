@@ -150,7 +150,12 @@ async def todo_card_transfer(
     target. Assignees who are not members of the target board are dropped, without a
     mail. Links, comments, the checklist and the history stay with the card. The
     done column of the target marks the card done; another column reopens it.
-    Errors: 404 for a card or target board that the caller cannot read, 422
+    A card of the caller's own personal board without assignees gets the caller as
+    assignee when the caller is a member of the target board. A card of a shared
+    board (gremium or team) never moves into a personal board.
+    Errors: 404 for a card or target board that the caller cannot read, 403
+    `todo_write_required` (a board that the caller reads but cannot write) or
+    `transfer_to_personal` (a shared board into a personal board), 422
     `transfer_same_board` (use `todo_card_move`), `column_not_on_board` or
     `rank_neighbors_invalid` (a neighbor outside the target column), 409
     `card_archived` or `card_moved` (read the card again).

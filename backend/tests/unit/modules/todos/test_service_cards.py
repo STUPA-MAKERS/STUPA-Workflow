@@ -551,6 +551,99 @@ async def test_transfer_keeps_a_done_card_done_and_opens_it_elsewhere() -> None:
     assert _events(session)[-1].payload["fromColumnName"] == ""
 
 
+async def test_a_shared_card_never_moves_into_a_personal_board() -> None:
+    session, b, _col, c, service = _setup()
+    personal, _first, _done = _target(session, kind="personal", gremium_id=None, owner_id=ME)
+    with pytest.raises(ForbiddenError) as exc:
+        await service.transfer(c.id, _transfer(personal), USER)
+    assert exc.value.code == "transfer_to_personal"
+    assert c.board_id == b.id and session.committed == 0
+    # A team board is shared too.
+    b.kind, b.gremium_id, b.permission = "team", None, "ticket.manage"
+    with pytest.raises(ForbiddenError):
+        await service.transfer(c.id, _transfer(personal), USER)
+
+
+async def test_a_card_of_my_personal_board_takes_me_as_assignee() -> None:
+    session, b, _col, c, service = _setup()
+    b.kind, b.gremium_id, b.owner_id = "personal", None, ME
+    t, first, _done = _target(session)
+    session.scalars_q[:] = [[first], [], [], [], []]
+    await service.transfer(c.id, _transfer(t), USER)
+    (mine,) = [o for o in session.added if isinstance(o, TodoAssignee)]
+    assert mine.principal_id == ME and mine.card_id == c.id
+    assert [e.kind for e in _events(session)] == ["moved", "assigned"]
+    assert service.outbox == []
+    # Not a member of the target, or an assignee already: nobody is added.
+    for members, assignees in (({OTHER}, []), ({ME, OTHER}, [OTHER])):
+        back = board(kind="personal", gremium_id=None, owner_id=ME)
+        session.put(back)
+        c.board_id = back.id
+        service.access.member_set = members  # type: ignore[attr-defined]
+        session.added.clear()
+        session.scalars_q[:] = [[first], [], [], assignees, []]
+        await service.transfer(c.id, _transfer(t), USER)
+        assert not [o for o in session.added if isinstance(o, TodoAssignee)]
+
+
+async def test_a_write_after_a_parallel_transfer_answers_card_moved() -> None:
+    session, b, col, c, service = _setup()
+    elsewhere = board()
+
+    async def _transferred(obj: Any) -> None:
+        obj.board_id = elsewhere.id
+
+    session.refresh = _transferred  # type: ignore[method-assign]
+    with pytest.raises(ConflictError) as moved:
+        await service.move(c.id, _move(col), USER)
+    assert moved.value.code == "card_moved"
+    c.board_id = b.id
+    assert await service.complete(c, b, ME) is False
+    assert c.board_id == elsewhere.id and _events(session) == []
+    # The card lock: the card read after the board lock is on another board.
+    c.board_id = b.id
+    gone = card(elsewhere, column(elsewhere.id), id=c.id)
+    session.scalar_q.append(gone)
+    with pytest.raises(ConflictError) as locked:
+        await service.patch(c.id, CardPatch(version=1, title="Neu"), USER)
+    assert locked.value.code == "card_moved"
+    assert session.committed == 0
+
+
+async def test_a_respread_pings_the_whole_board() -> None:
+    session, b, col, c, service = _setup(rank="q")
+    a, d = card(b, col, rank="b"), card(b, col, rank="c")
+    session.scalars_q[:] = [[col], [a, d]]
+    await service.move(c.id, _move(col, afterId=a.id, beforeId=d.id), USER)
+    assert service.pings.drain() == [{"type": "card", "boardId": str(b.id), "cardId": str(c.id)}]
+    a.rank = d.rank = "b"
+    session.scalars_q[:] = [[col], [a, d]]
+    await service.move(c.id, _move(col, afterId=a.id, beforeId=d.id), USER)
+    assert service.pings.drain() == [{"type": "board", "boardId": str(b.id)}]
+    # A transfer that respreads the target column pings the target board.
+    t, first, _done = _target(session)
+    x, y = card(t, first, rank="b"), card(t, first, rank="b")
+    body = CardTransfer.model_validate(
+        {"boardId": str(t.id), "afterId": str(x.id), "beforeId": str(y.id)}
+    )
+    session.scalars_q[:] = [[first], [], [], [], [x, y]]
+    await service.transfer(c.id, body, USER)
+    assert service.pings.drain() == [
+        {"type": "card_removed", "boardId": str(b.id), "cardId": str(c.id)},
+        {"type": "board", "boardId": str(t.id)},
+    ]
+
+
+def test_place_tells_whether_it_respread() -> None:
+    b = board()
+    col = column(b.id)
+    live = [card(b, col, rank="b"), card(b, col, rank="d")]
+    moved = card(b, col, rank="")
+    assert svc_mod._place(live, 1, moved) is False  # pyright: ignore[reportPrivateUsage]
+    live[1].rank = "b"
+    assert svc_mod._place(live, 1, moved) is True  # pyright: ignore[reportPrivateUsage]
+
+
 LONG = "z" * MAX_LENGTH
 
 

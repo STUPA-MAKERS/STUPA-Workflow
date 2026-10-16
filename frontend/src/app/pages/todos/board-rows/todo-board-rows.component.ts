@@ -35,11 +35,13 @@ import type { TodoPing } from '@core/ws/ws-messages';
 import { IconComponent, ToastService } from '@stupa-makers/ui-kit';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
 import {
+  DROP_ENTER,
   applyMove,
   dropMove,
   filterActive,
   insertTile,
   matchesFilter,
+  moveErrorText,
   moveRequest,
   placeTile,
   removeTile,
@@ -174,7 +176,8 @@ function writeCollapsed(ids: ReadonlySet<Uuid>): void {
  * neighbors of the drop place), both at once and back with a toast when the server
  * refuses. A card from `extraDrops` comes out as `dropIn` for the page. The keyboard drag
  * stays in its row: Space lifts, the arrows move, Space or Enter put down, Escape puts
- * back. A row without `canWrite` is read only: no drag source and no drop target. On a
+ * back. A row without `canWrite` is read only: no drag source and no drop target. A card
+ * of a shared board does not enter the row of the personal board (`DROP_ENTER`). On a
  * phone the columns of a row scroll sideways and there is no drag.
  *
  * The page calls `poll()` with its own poll (ETag, 304 keeps the rows), and the
@@ -300,6 +303,8 @@ export class TodoBoardRowsComponent implements OnInit {
   );
   /** Where a drag of a writable row may go: every writable row and `extraDrops`. */
   readonly connected = computed(() => [...this.dropIds(), ...this.extraDrops()]);
+  /** A card of a shared board does not enter the row of the personal board (`canTransfer`). */
+  readonly enter = DROP_ENTER;
   readonly dropId = rowDropId;
 
   constructor() {
@@ -398,14 +403,20 @@ export class TodoBoardRowsComponent implements OnInit {
 
   /**
    * The server answer of a transfer into a row replaces the tile. Under "Meine To-Dos" a
-   * card that is not assigned to me leaves the rows: they show only my cards.
+   * card that is not assigned to me leaves the rows: they show only my cards. Such a card
+   * gets a success toast with its new board, so it does not vanish without a word.
+   *
+   * Returns:
+   *   True when the rows still show the card.
    */
-  accept(card: TodoCardTile): void {
+  accept(card: TodoCardDetail): boolean {
     if (!this.keeps(card)) {
       this.removeCard(card.id);
-      return;
+      this.toast.success(this.i18n.translate('todos.card.transferred', { board: card.boardName }));
+      return false;
     }
     this.update(card.boardId, (b) => replaceTile(b, card));
+    return true;
   }
 
   /** Take a card out of its row (it went onto the personal board); null when no row holds it. */
@@ -441,11 +452,16 @@ export class TodoBoardRowsComponent implements OnInit {
     if (poll) this.poll();
   }
 
-  /** Read the tile of a `card` ping and put it in place; a 404 takes it out of every row. */
+  /**
+   * Read the tile of a `card` ping and put it in place; a 404 takes it out of every row. A
+   * change of the rows while the read was out (a write, another tile) makes the answer
+   * stale, like a poll: it is dropped and the card is read again.
+   */
   private readTile(ping: TodoPing & { type: 'card' }): void {
+    const muts = this.mutations;
     this.api.cardTile(ping.cardId).subscribe({
       next: (tile) => {
-        if (this.busy()) this.liveRetry.next(ping);
+        if (this.busy() || muts !== this.mutations) this.liveRetry.next(ping);
         else this.placeLive(tile);
       },
       error: (err: unknown) => {
@@ -592,8 +608,8 @@ export class TodoBoardRowsComponent implements OnInit {
     this.pending++;
     this.api.moveCard(cardId, move).pipe(finalize(() => this.pending--)).subscribe({
       next: (tile) => this.update(boardId, (b) => replaceTile(b, tile)),
-      error: () => {
-        this.toast.error(this.i18n.translate('todos.error.move'));
+      error: (err: unknown) => {
+        this.toast.error(this.i18n.translate(moveErrorText(err, 'todos.error.move')));
         // Roll back when nothing else changed the row meanwhile, then read the rows again.
         if (this.boards().find((b) => b.id === boardId) === optimistic) this.update(boardId, () => before);
         this.refresh();
@@ -620,8 +636,8 @@ export class TodoBoardRowsComponent implements OnInit {
         this.accept(card);
         this.transferred.emit(card);
       },
-      error: () => {
-        this.toast.error(this.i18n.translate('todos.error.transfer'));
+      error: (err: unknown) => {
+        this.toast.error(this.i18n.translate(moveErrorText(err, 'todos.error.transfer')));
         if (this.boards() === optimistic) {
           this.mutations++;
           this.boards.set(before);

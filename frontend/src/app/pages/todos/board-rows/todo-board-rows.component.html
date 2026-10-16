@@ -55,6 +55,8 @@
               [cdkDropListData]="col.id"
               [cdkDropListDisabled]="!canDrag(row)"
               [cdkDropListConnectedTo]="canDrag(row) ? connected() : []"
+              [cdkDropListEnterPredicate]="enter[row.board.kind]"
+              [attr.data-board-kind]="row.board.kind"
               (cdkDropListEntered)="onEnter($event)"
               (cdkDropListDropped)="drop(row, $event)"
             >

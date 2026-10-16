@@ -467,7 +467,9 @@ async def patch_card(
 
 
 @router.post(
-    "/cards/{card_id}/move", response_model=TodoCardTile, responses=_errors(401, 403, 404, 422)
+    "/cards/{card_id}/move",
+    response_model=TodoCardTile,
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def move_card(
     card_id: UUID, payload: CardMove, service: ServiceDep, principal: Member
@@ -511,7 +513,7 @@ async def restore_card(card_id: UUID, service: ServiceDep, principal: Member) ->
 @router.post(
     "/cards/{card_id}/assignees",
     response_model=TodoCardDetail,
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def add_assignee(
     card_id: UUID,
@@ -542,7 +544,9 @@ async def remove_assignee(
 
 
 @router.post(
-    "/cards/{card_id}/labels", response_model=TodoCardDetail, responses=_errors(401, 403, 404, 422)
+    "/cards/{card_id}/labels",
+    response_model=TodoCardDetail,
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def add_card_label(
     card_id: UUID, payload: CardLabelIn, service: ServiceDep, principal: Member
@@ -632,7 +636,7 @@ async def remove_link(
     "/cards/{card_id}/comments",
     response_model=TodoCommentOut,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def add_comment(
     card_id: UUID,

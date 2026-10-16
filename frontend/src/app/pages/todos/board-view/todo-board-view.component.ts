@@ -22,7 +22,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
 import { ButtonComponent, IconComponent, TabsComponent, type TabItem } from '@stupa-makers/ui-kit';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
-import { dropMove, moveRequest, sortedColumns } from '../../../features/todos/todos.util';
+import { DROP_ENTER, dropMove, moveRequest, sortedColumns } from '../../../features/todos/todos.util';
 
 /** The done column shows this many cards until "n weitere" opens the rest. */
 export const DONE_PREVIEW = 3;
@@ -55,7 +55,8 @@ interface KeyDrag {
  * the same: Space lifts the focused card, the arrows move it inside and between the
  * columns, Space or Enter put it down, Escape puts it back. A pointer drag also reaches
  * the drop lists of `connectTo` (the rows of "Meine To-Dos"); the keyboard stays on the
- * board. A live region names each
+ * board. A card of a shared board does not enter a column of the personal board
+ * (`DROP_ENTER`, the server refuses it). A live region names each
  * step for a screen reader.
  *
  * The done column shows its newest cards and "n weitere · Archiv". Each column ends
@@ -129,6 +130,8 @@ export class TodoBoardViewComponent {
 
   readonly columns = computed(() => sortedColumns(this.board().columns));
   readonly canWrite = computed(() => this.board().canWrite);
+  /** A card of a shared board does not enter the personal board (`canTransfer`). */
+  readonly enter = computed(() => DROP_ENTER[this.board().kind]);
   readonly dropId = boardDropId;
 
   /** Done columns opened past the preview. */

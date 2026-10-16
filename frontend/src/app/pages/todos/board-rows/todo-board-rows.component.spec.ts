@@ -541,6 +541,32 @@ describe('TodoBoardRowsComponent', () => {
     expect(cmp.boards()[2]).toBe(third);
   });
 
+  it('lets no card of a shared row into the row of the personal board', async () => {
+    const personal = row({ id: 'b-0', name: 'Meine To-Dos', kind: 'personal', columns: [{ id: 'p-1', name: 'Offen', position: 0, isDone: false, cardCount: 0 }], cards: [] });
+    const { fixture } = await setup({ boards: [personal, row()], inputs: { source: 'all' } });
+    const lists = fixture.debugElement.queryAll(By.directive(CdkDropList)).map((d) => d.injector.get(CdkDropList));
+    const byId = new Map(lists.map((l) => [l.id, l]));
+    const own = byId.get(rowDropId('p-1'))!;
+    const shared = byId.get(rowDropId('c-1'))!;
+    expect(own.element.nativeElement.dataset['boardKind']).toBe('personal');
+    expect(shared.element.nativeElement.dataset['boardKind']).toBe('gremium');
+    const from = (list: CdkDropList) => ({ dropContainer: list }) as unknown as CdkDrag;
+    expect(own.enterPredicate(from(shared), own)).toBe(false);
+    expect(own.enterPredicate(from(own), own)).toBe(true);
+    expect(shared.enterPredicate(from(own), shared)).toBe(true);
+  });
+
+  it('names a refused transfer into a personal board and a card moved meanwhile', async () => {
+    const refused = (code: string) => () => throwError(() => new HttpErrorResponse({ status: 403, error: { code } }));
+    const t = await setup({ boards: [row(), team({ canWrite: true })], transfer: refused('transfer_to_personal') });
+    t.cmp.drop(t.cmp.rows()[1], dropEvent('k-1', 'c-1', 't-1', 0, 0));
+    expect(t.toast.error).toHaveBeenCalledWith('Karten aus geteilten Boards können nicht ins persönliche Board verschoben werden.');
+    const m = await setup({ move: () => throwError(() => new HttpErrorResponse({ status: 409, error: { code: 'card_moved' } })) });
+    m.cmp.drop(m.cmp.rows()[0], dropEvent('k-2', 'c-1', 'c-2', 1, 0));
+    expect(m.toast.error).toHaveBeenCalledWith('Die Karte konnte nicht verschoben werden.');
+    expect(m.api.pollMineBoards).toHaveBeenLastCalledWith(null);
+  });
+
   it('reports no count before the first read answers', async () => {
     const { on } = await setup({ poll: () => new Subject<TodoAssignedPoll>() });
     expect(on.matches).not.toHaveBeenCalled();
@@ -590,7 +616,7 @@ describe('TodoBoardRowsComponent', () => {
     const visitor = tile({ id: 'p-1', boardId: 'b-0', columnId: 'p-c', title: 'Privat' });
     cmp.receive(visitor, 'b-1', { columnId: 'c-2' });
     expect(cmp.boards()[0].cards.find((c) => c.id === 'p-1')).toMatchObject({ boardId: 'b-1', columnId: 'c-2' });
-    cmp.accept(tile({ id: 'p-1', boardId: 'b-1', columnId: 'c-2', title: 'Privat (neu)' }));
+    expect(cmp.accept(detail({ id: 'p-1', boardId: 'b-1', columnId: 'c-2', title: 'Privat (neu)' }))).toBe(true);
     expect(cmp.boards()[0].cards.find((c) => c.id === 'p-1')?.title).toBe('Privat (neu)');
   });
 
@@ -688,11 +714,35 @@ describe('TodoBoardRowsComponent', () => {
       expect(api.cardTile).toHaveBeenCalledTimes(2);
     });
 
-    it('a transfer answer without me leaves the rows of "Meine To-Dos" (accept)', async () => {
-      const { cmp } = await setup({ inputs: { me: 'me' } });
-      cmp.accept(tile({ id: 'k-1', boardId: 'b-1', columnId: 'c-2', assignees: [] }));
+    it('a transfer answer without me leaves the rows of "Meine To-Dos" with a toast (accept)', async () => {
+      const { cmp, toast } = await setup({ inputs: { me: 'me' } });
+      const kept = cmp.accept(detail({ id: 'k-1', boardId: 'b-1', boardName: 'AStA', columnId: 'c-2', assignees: [] }));
+      expect(kept).toBe(false);
       expect(cards(cmp)).not.toContain('b-1/k-1/c-2');
       expect(cards(cmp).some((c) => c.includes('/k-1/'))).toBe(false);
+      expect(toast.success).toHaveBeenCalledWith('Karte nach „AStA“ verschoben');
+    });
+
+    it('drops a tile answer that a change of the rows overtook and reads the card again', async () => {
+      const answers: Subject<TodoCardTile>[] = [];
+      const { cmp, api, live, settle } = await setup({
+        cardTile: () => {
+          const s = new Subject<TodoCardTile>();
+          answers.push(s);
+          return s;
+        },
+        inputs: { me: 'me' },
+      });
+      live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
+      await wait(settle);
+      expect(api.cardTile).toHaveBeenCalledTimes(1);
+      cmp.commentsChanged({ id: 'k-2', commentCount: 4 });
+      answers[0].next(tile({ id: 'k-1', columnId: 'c-4', title: 'Alt', assignees: [ME] }));
+      expect(cards(cmp)).toContain('b-1/k-1/c-1');
+      await wait(settle);
+      expect(api.cardTile).toHaveBeenCalledTimes(2);
+      answers[1].next(tile({ id: 'k-1', columnId: 'c-4', title: 'Neu', assignees: [ME] }));
+      expect(cards(cmp)).toContain('b-1/k-1/c-4');
     });
   });
 });

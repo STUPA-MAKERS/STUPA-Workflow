@@ -63,6 +63,7 @@ import {
   insertTile,
   isoDay,
   matchesFilter,
+  moveErrorText,
   placeTile,
   removeTile,
   replaceTile,
@@ -614,15 +615,20 @@ export class TodosComponent implements OnDestroy {
     }
   }
 
-  /** Read the tile of a `card` ping and put it in place; a 404 or another board takes it out. */
+  /**
+   * Read the tile of a `card` ping and put it in place; a 404 or another board takes it out.
+   * A change of the board while the read was out (a write, another tile) makes the answer
+   * stale, like a poll: it is dropped and the card is read again.
+   */
   private readTile(ping: TodoPing & { type: 'card' }): void {
     const seq = this.loadSeq;
+    const muts = this.mutations;
     this.api.cardTile(ping.cardId).subscribe({
       next: (tile) => {
         if (seq !== this.loadSeq) return;
         // The same load: the board answered before its first ping, and only a new load clears it.
         const board = this.board() as TodoBoard;
-        if (this.busy()) {
+        if (this.busy() || muts !== this.mutations) {
           this.liveRetry.next(ping);
           return;
         }
@@ -693,7 +699,6 @@ export class TodosComponent implements OnDestroy {
     });
   }
 
-  /** The assignees of a card changed or may have: read "mine" again, now or at the next pick of "Ich". */
   /** Read the board summaries again (the open counts of the picker). */
   private refreshBoards(): void {
     this.api.boards().subscribe({
@@ -702,6 +707,7 @@ export class TodosComponent implements OnDestroy {
     });
   }
 
+  /** The assignees of a card changed or may have: read "mine" again, now or at the next pick of "Ich". */
   private refreshMine(): void {
     this.mineLoaded = false;
     if (this.filter().assignee === 'me') this.loadMine();
@@ -817,8 +823,8 @@ export class TodosComponent implements OnDestroy {
         const now = this.board();
         if (now) this.board.set(replaceTile(now, tile));
       },
-      error: () => {
-        this.toast.error(this.i18n.translate('todos.error.move'));
+      error: (err: unknown) => {
+        this.toast.error(this.i18n.translate(moveErrorText(err, 'todos.error.move')));
         // Roll back when nothing else changed the board meanwhile, then read it again.
         if (this.board() === optimistic) this.board.set(board);
         this.resync(board.id);
@@ -949,11 +955,13 @@ export class TodosComponent implements OnDestroy {
     rows.receive(tile, event.boardId, event.move);
     this.track(this.api.transferCard(tile.id, { boardId: event.boardId, ...event.move })).subscribe({
       next: (card) => {
+        // A card of mine stays in its row (the server makes me its assignee when I am a
+        // member there); one that leaves the rows gets a toast from `accept`.
         this.rowsView()?.accept(card);
         this.refreshBoards();
         this.refreshMine();
       },
-      error: () => this.transferFailed(board, optimistic),
+      error: (err: unknown) => this.transferFailed(board, optimistic, err),
     });
   }
 
@@ -975,13 +983,13 @@ export class TodosComponent implements OnDestroy {
         this.refreshBoards();
         this.refreshMine();
       },
-      error: () => this.transferFailed(board, optimistic),
+      error: (err: unknown) => this.transferFailed(board, optimistic, err),
     });
   }
 
   /** Roll a refused drag between the board and the rows back, then read both again. */
-  private transferFailed(board: TodoBoard, optimistic: TodoBoard): void {
-    this.toast.error(this.i18n.translate('todos.error.transfer'));
+  private transferFailed(board: TodoBoard, optimistic: TodoBoard, err: unknown): void {
+    this.toast.error(this.i18n.translate(moveErrorText(err, 'todos.error.transfer')));
     if (this.board() === optimistic) this.board.set(board);
     this.resync(board.id);
     this.rowsView()?.refresh();

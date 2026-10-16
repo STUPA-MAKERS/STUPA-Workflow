@@ -95,6 +95,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   card_moved: 'todos.error.transfer',
   card_archived: 'todos.error.transfer',
   column_not_on_board: 'todos.error.transfer',
+  transfer_to_personal: 'todos.error.transferToPersonal',
   todo_write_required: 'todos.error.readOnly',
 };
 

@@ -87,7 +87,7 @@ export class TodoBoardPickerComponent {
   /** The sub line of "Alle": the open cards of every board. */
   readonly allSub = computed(() => {
     const n = this.boards().reduce((sum, b) => sum + b.openCount, 0);
-    return `${this.i18n.translate('todos.board.open', { n })} · ${this.i18n.translate('todos.board.allSub')}`;
+    return this.i18n.translate('todos.board.open', { n });
   });
 
   readonly sections = computed<PickerSection[]>(() => {

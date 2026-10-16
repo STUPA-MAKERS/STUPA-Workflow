@@ -61,7 +61,13 @@ done (`completed_at`).
   only reads them. Neither reaches a personal board, neither configures
   (`can_configure` asks the native right only), and neither makes a member:
   `members()`/`member_ids` stay as they are, so a holder is not assignable, not
-  mentionable and gets no `todo_due`. Read = write or `todo.read_all`.
+  mentionable and gets no `todo_due`. Read = write or `todo.read_all`. Through a
+  global key a team board also needs its own permission in the token scope
+  (`global_reach`: `scope_allows(board.permission)`), in `can_read`, `can_write` and
+  `ReadScope` (a token then gets `team_permissions`, not `all_teams`), because the team
+  permission guards the board. A cookie session lets everything through, so only a
+  narrow token changes: an admin `read` token does not see the team board "Plattform"
+  (`ticket.manage`, 404, not listed).
 - An unreadable board, card or sub-resource is 404, never 403. A card write on a board
   that the caller reads but cannot write is 403 `todo_write_required` (`_card(...,
   write=True)` / `_board(..., write=True)`, after the read check): create, patch, move,
@@ -75,7 +81,8 @@ done (`completed_at`).
   token whose scope holds none of `todo.write`, `todo.all`, `todo.read_all`
   (`token_reads`) gets 403 on `GET /boards`, `GET /mine` and `GET /mine/boards`, `[]` on
   the link picker, `linked` and the search, 404 elsewhere. A `read` token of an admin
-  reads every gremium and team board and writes none.
+  reads every gremium board and the team boards whose permission is in its scope,
+  and writes none.
 - Defaults: the migration grants `todo.write` to every gremium role and `todo.configure`
   to `vorstand` and `manager`; the forced `member` role of a new gremium has
   `vote.cast` and `todo.write`.
@@ -109,8 +116,9 @@ the boards, one for the cards, one each for columns and labels, and the tile fac
 /cards/{id}/transfer` (`CardTransfer`: `boardId`, `columnId?` = default the first column,
 `beforeId?`/`afterId?` as in the move = default the end, 422 `rank_neighbors_invalid` for
 a neighbor outside the target column;
-answers `TodoCardDetail`; 404 for a target board that the caller cannot read, 422
-`transfer_same_board` / `column_not_on_board`, 409 `card_moved` / `card_archived`), `DELETE
+answers `TodoCardDetail`; 404 for a target board that the caller cannot read, 403
+`todo_write_required` / `transfer_to_personal`, 422 `transfer_same_board` /
+`column_not_on_board`, 409 `card_moved` / `card_archived`), `DELETE
 /cards/{id}` (archive), `POST /cards/{id}/restore`, assignees, labels, checklist, links
 (422 `link_self`, `link_target_not_found`; 409 `link_exists`), comments (403
 `not_comment_author`). `POST /cards/{id}/comments` takes `CommentCreate` (`body`,
@@ -140,6 +148,18 @@ answers `TodoCardDetail`; 404 for a target board that the caller cannot read, 42
   `droppedLabels` (names) and `droppedAssignees` (count). `version` does not change.
   Links, comments with their files, the checklist and the events stay with the card, so
   the comment files then download under the read rule of the target board.
+- A transfer from a shared board (gremium, team) into a personal board is 403
+  `transfer_to_personal` (`_check_transfer_kinds`, one check), because the comments,
+  files and links of the card would then leave the reach of everyone else on the
+  board. Personal → shared and shared → shared stay.
+- A card of the actor's own personal board without assignees takes the actor as
+  assignee when the actor is a member of the target (`member_ids`; an `assigned` event,
+  no mail), because the card would else leave "Meine To-Dos" at once.
+- A write that waited for the board lock while a transfer moved the card away is 409
+  `card_moved`: `move` and `_card(lock=True)` compare `card.board_id` after the lock
+  (the lock held is the old board's), and `complete` returns False. A move or a
+  transfer whose `_place` respreads the column pings the whole board (`board`),
+  because every card of the column got a new rank.
 - `patch_column` and `delete_column` take the board lock before they read the column
   (`_column` reads with `populate_existing`), so `is_done` is the committed value and a
   parallel done-flag move cannot leave the board without a done column.
@@ -198,14 +218,17 @@ read rule stays in force (a tile is per viewer, `primaryLink` is redacted).
 - Socket `WS /api/ws/todos`: the session cookie only (`app.shared.ws.resolve_ws_principal`,
   Origin check; 4401 without a session, 4403 for a foreign origin). Client frame
   `{"type":"subscribe","boardIds":[…]}` replaces the set (at most `MAX_BOARDS` = 100, more
-  gives the error `too_many_boards`). The server keeps the ids that `BoardAccess.can_read`
-  allows, drops the rest silently, answers `{"type":"subscribed","boardIds":[…]}` and checks
-  the rights again on every subscribe. It rolls back after each subscribe, so the socket
+  gives the error `too_many_boards`). Every subscribe resolves the principal again from
+  the session cookie of the handshake (`get_todo_ws_resolver` → `resolve_ws_principal`),
+  so a lost role or membership counts at once; a session that is gone closes with 4401.
+  The server keeps the ids that `BoardAccess.can_read` allows, drops the rest silently
+  and answers `{"type":"subscribed","boardIds":[…]}`. It rolls back after each subscribe, so the socket
   holds no transaction. One `PSUBSCRIBE todo-board:*` per socket
   (`PatternBroker.subscribe_pattern`), filtered by the subscribed ids. Limits: 5 sockets per
   principal (error `too_many_connections`, close 4403; per process, like the meeting
-  socket), a token bucket of 5 frames/s (burst 10, `rate_limited`). Bad frames get
-  `invalid_message` / `unknown_type` and keep the socket. No heartbeat of its own (uvicorn's
+  socket), a token bucket of 5 frames/s (burst 10, `rate_limited`). Bad frames (binary,
+  not JSON, a bad shape) get `invalid_message` / `unknown_type`, count against the
+  throttle and keep the socket. No heartbeat of its own (uvicorn's
   WebSocket pings, like the meeting socket).
 - Tests: `tests/unit/modules/todos/test_live.py`, `tests/integration/modules/todos/test_todos_live.py`
   (override `get_todo_broker` and `get_todo_ws_broker` with one `InMemoryBroker`).

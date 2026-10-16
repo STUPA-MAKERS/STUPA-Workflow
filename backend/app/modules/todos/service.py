@@ -230,7 +230,9 @@ class TodoService:
         """Load a card and its board; ``lock`` locks the board first, then the card.
 
         An unreadable board is 404; ``write`` also needs the write right of the board
-        (403 ``todo_write_required``).
+        (403 ``todo_write_required``). A card that a parallel transfer moved to
+        another board while ``lock`` waited is 409 ``card_moved``, because the lock
+        held is the lock of the old board.
 
         Every write locks the board before a card, because a move locks the board
         and then updates the card, and the other order deadlocks with it.
@@ -245,13 +247,17 @@ class TodoService:
             known = await self.session.get(TodoCard, card_id)
             if known is None:
                 raise NotFoundError(f"card {card_id} not found")
-            await self._lock_board(known.board_id)
+            # ``populate_existing`` refreshes the same object, so keep the board id now.
+            locked_board = known.board_id
+            await self._lock_board(locked_board)
             card = await self.session.scalar(
                 select(TodoCard)
                 .where(TodoCard.id == card_id)
                 .with_for_update(key_share=True)
                 .execution_options(populate_existing=True)
             )
+            if card is not None and card.board_id != locked_board:
+                raise _card_moved()
         else:
             card = await self.session.get(TodoCard, card_id)
         if card is None:
@@ -1057,6 +1063,8 @@ class TodoService:
 
         Raises:
             NotFoundError: The card is unknown or not readable (HTTP 404).
+            ConflictError: ``card_moved``: a parallel transfer moved the card to
+                another board while the move waited for the board lock (HTTP 409).
             ValidationProblem: ``column_not_on_board``, or ``rank_neighbors_invalid``
                 for a neighbor outside the column or two neighbors that are not
                 adjacent (HTTP 422).
@@ -1067,12 +1075,15 @@ class TodoService:
         # A parallel move of the same card held the lock: read the card again, so the
         # column change below works from the committed column.
         await self.session.refresh(card)
+        if card.board_id != board.id:
+            # A parallel transfer won: the lock held is the lock of the old board.
+            raise _card_moved()
         columns = {c.id: c for c in await self._columns(board.id)}
         target = columns.get(payload.column_id)
         if target is None:
             raise _invalid("The column is not on this board.", "column_not_on_board", "columnId")
         siblings = await self._column_cards(target.id, exclude=card.id)
-        _place(siblings, _slot(siblings, payload.after_id, payload.before_id), card)
+        respread = _place(siblings, _slot(siblings, payload.after_id, payload.before_id), card)
         source = columns.get(card.column_id)
         if target.id != card.column_id:
             self._event(
@@ -1094,6 +1105,9 @@ class TodoService:
                 card.completed_at = None
         card.updated_at = _now()
         self._touch(board, card)
+        if respread:
+            # Every card of the column has a new rank: the board reads again.
+            self._touch(board)
         await self.session.commit()
         return (await self.tiles([card], principal))[0]
 
@@ -1109,7 +1123,14 @@ class TodoService:
         label with the same name (case-insensitive), else it is dropped. The service
         never creates a label on the target, because that needs ``todo.configure``.
         Assignees who are not members of the target board are dropped, without a mail.
-        Links, comments, the checklist and the events stay with the card.
+        Links, comments, the checklist and the events stay with the card. A card
+        without an assignee that leaves the actor's personal board gets the actor as
+        assignee when the actor is a member of the target (no mail), so it stays in
+        "Meine To-Dos".
+
+        A card of a shared board (gremium or team) never moves into a personal board
+        (403 ``transfer_to_personal``), because its comments, files and links would
+        then leave the reach of everyone else on the board.
 
         Both boards are locked in id order, so two transfers between the same two
         boards in opposite directions wait instead of deadlocking.
@@ -1117,6 +1138,9 @@ class TodoService:
         Raises:
             NotFoundError: The card or the target board is unknown or not readable
                 (HTTP 404).
+            ForbiddenError: ``todo_write_required`` for a board that the caller reads
+                but cannot write, ``transfer_to_personal`` from a shared board into a
+                personal board (HTTP 403).
             ConflictError: ``card_moved`` (a parallel transfer moved the card) or
                 ``card_archived`` (HTTP 409).
             ValidationProblem: ``transfer_same_board``, ``column_not_on_board``, or
@@ -1130,11 +1154,12 @@ class TodoService:
                 "The card is on this board already. Use move.", "transfer_same_board", "boardId"
             )
         target = await self._board(payload.board_id, principal, write=True)
+        _check_transfer_kinds(source, target)
         for board_id in sorted((source.id, target.id)):
             await self._lock_board(board_id)
         await self.session.refresh(card)
         if card.board_id != source.id:
-            raise ConflictError("The card was moved in the meantime.", code="card_moved")
+            raise _card_moved()
         if card.archived_at is not None:
             raise ConflictError("An archived card cannot move.", code="card_archived")
         columns = await self._columns(target.id)
@@ -1173,7 +1198,11 @@ class TodoService:
                 )
             ).all()
         )
-        dropped_assignees = assignees - await self.access.member_ids(target)
+        members = await self.access.member_ids(target)
+        dropped_assignees = assignees - members
+        # A card of the own personal board stays the actor's: without an assignee it
+        # would leave "Meine To-Dos" at once, which looks like a lost card.
+        claim = source.kind == "personal" and not assignees and actor in members
         live = await self._column_cards(column.id)
         index = _slot(live, payload.after_id, payload.before_id)
         await self.session.execute(delete(TodoCardLabel).where(TodoCardLabel.card_id == card.id))
@@ -1205,7 +1234,10 @@ class TodoService:
                 "droppedAssignees": len(dropped_assignees),
             },
         )
-        _place(live, index, card)
+        if claim:
+            self.session.add(TodoAssignee(card_id=card.id, principal_id=actor))
+            self._event(card, "assigned", actor, {"principalId": str(actor), "added": True})
+        respread = _place(live, index, card)
         card.board_id = target.id
         card.column_id = column.id
         if not column.is_done:
@@ -1215,6 +1247,8 @@ class TodoService:
             await self._write_ticket_done(card, target, actor)
         self._touch(source, card, removed=True)
         self._touch(target, card)
+        if respread:
+            self._touch(target)
         await self.session.commit()
         return await self._detail(card, target, principal)
 
@@ -1222,12 +1256,16 @@ class TodoService:
         """Move an open card to the end of the done column, without a commit.
 
         Returns:
-            True when the card moved (False: no done column, or done already).
+            True when the card moved (False: no done column, done already, archived,
+            or a parallel transfer moved it to another board).
         """
         # The board lock orders this rank against a parallel move or create, and the
         # card is read again after the lock.
         await self._lock_board(board.id)
         await self.session.refresh(card)
+        if card.board_id != board.id:
+            # A parallel transfer moved the card: the lock held is the old board's.
+            return False
         columns = await self._columns(board.id)
         done = next((c for c in columns if c.is_done), None)
         if done is None or card.column_id == done.id or card.archived_at is not None:
@@ -1945,6 +1983,23 @@ class TodoService:
             self._touch(board, card)
 
 
+def _check_transfer_kinds(source: TodoBoard, target: TodoBoard) -> None:
+    """Refuse a transfer from a shared board into a personal board (403).
+
+    Raises:
+        ForbiddenError: ``transfer_to_personal``.
+    """
+    if source.kind != "personal" and target.kind == "personal":
+        raise ForbiddenError(
+            "A card of a shared board cannot move into a personal board.",
+            code="transfer_to_personal",
+        )
+
+
+def _card_moved() -> ConflictError:
+    return ConflictError("The card was moved in the meantime.", code="card_moved")
+
+
 def _rank(low: str | None, high: str | None) -> str:
     """Return ``between(low, high)``, or raise RankError for a rank above ``MAX_LENGTH``."""
     rank = between(low, high)
@@ -1977,12 +2032,16 @@ def _append(live: Sequence[TodoCard], cards: Sequence[TodoCard]) -> None:
         _respread([*live, *cards])
 
 
-def _place(live: Sequence[TodoCard], index: int, card: TodoCard) -> None:
+def _place(live: Sequence[TodoCard], index: int, card: TodoCard) -> bool:
     """Rank ``card`` at ``index`` among the live cards ``live`` of a column.
 
     Two cards that share a rank, a broken rank or a new rank above ``MAX_LENGTH``
     give the column a fresh order. The
     caller holds the board lock, so no parallel write ranks the column at the same time.
+
+    Returns:
+        True when the column got a fresh order. The caller then pings the whole
+        board, because the other cards of the column changed too.
     """
     low = live[index - 1].rank if index > 0 else None
     high = live[index].rank if index < len(live) else None
@@ -1990,6 +2049,8 @@ def _place(live: Sequence[TodoCard], index: int, card: TodoCard) -> None:
         card.rank = _rank(low, high)
     except RankError:
         _respread([*live[:index], card, *live[index:]])
+        return True
+    return False
 
 
 def _slot(

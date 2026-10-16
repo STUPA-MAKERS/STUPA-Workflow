@@ -9,6 +9,7 @@ in-memory broker; the subscribe reads boards through a scripted session and a fa
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any
@@ -29,6 +30,7 @@ from app.modules.todos.socket import (
     TodoLiveConnection,
     get_todo_ws_broker,
     get_todo_ws_principal,
+    get_todo_ws_resolver,
 )
 from tests.unit.modules.todos.fakes import ScriptedSession
 
@@ -124,23 +126,40 @@ def _session(*boards: uuid.UUID) -> ScriptedSession:
     return session
 
 
+class _Raw(str):
+    """A text frame sent as it is (not JSON-encoded by the fake)."""
+
+
+def _asgi(frame: Any) -> dict[str, Any]:
+    """The ASGI message of a fake frame: bytes are binary, a ``_Raw`` is raw text."""
+    if isinstance(frame, bytes):
+        return {"type": "websocket.receive", "bytes": frame}
+    if isinstance(frame, _Raw):
+        return {"type": "websocket.receive", "text": str(frame)}
+    return {"type": "websocket.receive", "text": json.dumps(frame)}
+
+
 class _Ws:
     def __init__(self, frames: list[Any]) -> None:
         self.frames = list(frames)
         self.sent: list[dict[str, Any]] = []
+        self.closed: list[int] = []
         self.done = asyncio.Event()
 
     async def send_json(self, payload: dict[str, Any]) -> None:
         self.sent.append(payload)
 
-    async def receive_json(self) -> Any:
+    async def close(self, code: int = 1000) -> None:
+        self.closed.append(code)
+
+    async def receive(self) -> dict[str, Any]:
         if not self.frames:
             self.done.set()
             await asyncio.Event().wait()
         frame = self.frames.pop(0)
         if isinstance(frame, Exception):
             raise frame
-        return frame
+        return _asgi(frame)
 
 
 async def _run(frames: list[Any], session: ScriptedSession, publish: list[dict[str, Any]]) -> _Ws:
@@ -208,12 +227,11 @@ async def test_a_new_subscribe_checks_the_rights_again(
 
 
 async def test_bad_frames_get_an_error_and_keep_the_socket(access: type[_Access]) -> None:
-    import json
-
     too_many = {"type": "subscribe", "boardIds": [str(uuid.uuid4()) for _ in range(MAX_BOARDS + 1)]}
     ws = await _run(
         [
-            json.JSONDecodeError("x", "", 0),
+            _Raw("{kein json"),
+            b"\x00\x01",
             ["a"],
             {"type": "nope"},
             {"type": "subscribe", "boardIds": ["not-a-uuid"]},
@@ -226,10 +244,97 @@ async def test_bad_frames_get_an_error_and_keep_the_socket(access: type[_Access]
     assert codes == [
         "invalid_message",
         "invalid_message",
+        "invalid_message",
         "unknown_type",
         "invalid_message",
         "too_many_boards",
     ]
+
+
+async def test_bad_frames_count_against_the_throttle(access: type[_Access]) -> None:
+    ws = await _run([b"\x00"] * 6 + [_Raw("{")] * 6, _session(), [])
+    codes = [m["code"] for m in ws.sent]
+    assert codes == ["invalid_message"] * 10 + ["rate_limited"] * 2
+
+
+async def test_a_disconnect_frame_ends_the_run(access: type[_Access]) -> None:
+    class _Gone(_Ws):
+        async def receive(self) -> dict[str, Any]:
+            return {"type": "websocket.disconnect", "code": 1001}
+
+    conn = TodoLiveConnection(
+        _Gone([]),  # type: ignore[arg-type]
+        principal=USER,
+        session=_session(),  # type: ignore[arg-type]
+        broker=InMemoryBroker(),
+    )
+    await asyncio.wait_for(conn.run(), 2)
+
+
+async def test_every_subscribe_resolves_the_principal_again(
+    access: type[_Access], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = _session(B1)
+    admin = Principal(sub="live-user", roles=["admin"])
+    current: list[Principal | None] = [admin]
+    seen: list[Principal] = []
+
+    async def _resolve() -> Principal | None:
+        return current[0]
+
+    class _Seen(_Access):
+        async def can_read(self, board: TodoBoard, principal: Principal) -> bool:
+            seen.append(principal)
+            return board.id in self.allowed
+
+    monkeypatch.setattr(socket_mod, "BoardAccess", _Seen)
+    ws = _Ws([])
+    conn = TodoLiveConnection(
+        ws,  # type: ignore[arg-type]
+        principal=USER,
+        session=session,  # type: ignore[arg-type]
+        broker=InMemoryBroker(),
+        resolve=_resolve,
+    )
+    frame = {"type": "subscribe", "boardIds": [str(B1)]}
+    assert await conn._subscribe(frame) is True
+    assert seen == [admin] and conn.principal is admin
+    current[0] = None
+    assert await conn._subscribe(frame) is False
+    assert ws.closed == [4401] and conn.board_ids == frozenset()
+    assert ws.sent == [{"type": "subscribed", "boardIds": [str(B1)]}]
+    assert session.rolled_back == 2  # type: ignore[attr-defined]
+
+
+async def test_a_gone_session_closes_the_socket_and_ends_the_run(access: type[_Access]) -> None:
+    async def _gone() -> Principal | None:
+        return None
+
+    ws = _Ws([{"type": "subscribe", "boardIds": [str(B1)]}])
+    conn = TodoLiveConnection(
+        ws,  # type: ignore[arg-type]
+        principal=USER,
+        session=_session(B1),  # type: ignore[arg-type]
+        broker=InMemoryBroker(),
+        resolve=_gone,
+    )
+    await asyncio.wait_for(conn.run(), 2)
+    assert ws.closed == [4401] and ws.sent == []
+
+
+async def test_the_resolver_reads_the_handshake_cookie_again(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[Any, Any, Any]] = []
+
+    async def _fake(websocket: Any, db: Any, settings: Any) -> Principal | None:
+        calls.append((websocket, db, settings))
+        return USER
+
+    monkeypatch.setattr(socket_mod, "resolve_ws_principal", _fake)
+    resolve = get_todo_ws_resolver("ws", "db", "settings")  # type: ignore[arg-type]
+    assert await resolve() is USER
+    assert calls == [("ws", "db", "settings")]
 
 
 def test_the_throttle_drops_a_flood() -> None:
@@ -248,7 +353,7 @@ async def test_a_failing_pump_ends_the_run(access: type[_Access]) -> None:
         async def send_json(self, _payload: Any) -> None:
             raise RuntimeError("socket gone")
 
-        async def receive_json(self) -> Any:
+        async def receive(self) -> Any:
             await asyncio.Event().wait()
 
     broker = InMemoryBroker()
@@ -271,6 +376,11 @@ def _app(principal: Principal | None, broker: InMemoryBroker) -> Any:
 
     app.dependency_overrides[get_session] = _db
     app.dependency_overrides[get_todo_ws_principal] = lambda: principal
+
+    async def _again() -> Principal | None:
+        return principal
+
+    app.dependency_overrides[get_todo_ws_resolver] = lambda: _again
     app.dependency_overrides[get_todo_ws_broker] = lambda: broker
     return app
 

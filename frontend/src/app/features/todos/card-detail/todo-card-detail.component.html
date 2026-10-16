@@ -178,7 +178,7 @@
   <app-todo-transfer-dialog
     [(open)]="transferOpen"
     [boardId]="card.boardId"
-    [cardTitle]="card.title"
+    [boardKind]="card.boardKind"
     [busy]="transferring()"
     (transferred)="transfer($event)"
   />

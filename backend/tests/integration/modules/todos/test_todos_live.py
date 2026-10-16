@@ -2,7 +2,9 @@
 
 Covers the subscribe that keeps only the readable boards, the ping after a create,
 a move, an archive and a board change, the tile read that a ping names (404 when
-archived), the two pings of a transfer, and the socket without a session.
+archived), the two pings of a transfer, the principal that every subscribe resolves
+again (a lost right drops the board, a lost session closes 4401), and the socket
+without a session.
 """
 
 from __future__ import annotations
@@ -18,7 +20,11 @@ from starlette.websockets import WebSocketDisconnect
 from app.modules.auth.principal import Principal
 from app.modules.livevote.broker import InMemoryBroker
 from app.modules.todos.router import get_todo_broker
-from app.modules.todos.socket import get_todo_ws_broker, get_todo_ws_principal
+from app.modules.todos.socket import (
+    get_todo_ws_broker,
+    get_todo_ws_principal,
+    get_todo_ws_resolver,
+)
 from tests.integration.modules.todos.conftest import Api, add_gremium, add_member, add_person
 
 pytestmark = pytest.mark.integration
@@ -29,12 +35,20 @@ def _ok(resp: Any, status: int = 200) -> Any:
     return resp.json() if resp.content else None
 
 
-def _live(api: Api, principal: Principal) -> None:
+def _live(api: Api, principal: Principal) -> list[Principal | None]:
+    """Wire the in-memory broker; the returned list is what the next subscribe resolves."""
     broker = InMemoryBroker()
+    current: list[Principal | None] = [principal]
     api.login(principal)
     api.app.dependency_overrides[get_todo_broker] = lambda: broker
     api.app.dependency_overrides[get_todo_ws_broker] = lambda: broker
     api.app.dependency_overrides[get_todo_ws_principal] = lambda: principal
+
+    async def _again() -> Principal | None:
+        return current[0]
+
+    api.app.dependency_overrides[get_todo_ws_resolver] = lambda: _again
+    return current
 
 
 def _personal(client: TestClient) -> str:
@@ -83,19 +97,41 @@ async def test_a_transfer_pings_both_boards(
     board = str(gboard)
     with TestClient(api.app) as client:
         personal = _personal(client)
-        card = _ok(client.post("/api/todos/cards", json={"boardId": board, "title": "Flyer"}), 201)
+        card = _ok(
+            client.post("/api/todos/cards", json={"boardId": personal, "title": "Flyer"}), 201
+        )
         with client.websocket_connect("/api/ws/todos") as ws:
             ws.send_json({"type": "subscribe", "boardIds": [board, personal]})
             assert ws.receive_json()["boardIds"] == [board, personal]
-            moved = client.post(
-                f"/api/todos/cards/{card['id']}/transfer", json={"boardId": personal}
-            )
+            moved = client.post(f"/api/todos/cards/{card['id']}/transfer", json={"boardId": board})
             _ok(moved)
             pings = [ws.receive_json(), ws.receive_json()]
     assert pings == [
-        {"type": "card_removed", "boardId": board, "cardId": card["id"]},
-        {"type": "card", "boardId": personal, "cardId": card["id"]},
+        {"type": "card_removed", "boardId": personal, "cardId": card["id"]},
+        {"type": "card", "boardId": board, "cardId": card["id"]},
     ]
+
+
+async def test_every_subscribe_resolves_the_session_again(
+    api: Api, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    _gid, gboard = await add_gremium(maker, "StuPa")
+    admin, _admin_id = await add_person(maker, "Ada")
+    current = _live(api, Principal(sub=admin.sub, roles=["admin"]))
+    board = str(gboard)
+    with TestClient(api.app) as client, client.websocket_connect("/api/ws/todos") as ws:
+        ws.send_json({"type": "subscribe", "boardIds": [board]})
+        assert ws.receive_json() == {"type": "subscribed", "boardIds": [board]}
+        # The admin role is gone: the next subscribe no longer keeps the board.
+        current[0] = Principal(sub=admin.sub)
+        ws.send_json({"type": "subscribe", "boardIds": [board]})
+        assert ws.receive_json() == {"type": "subscribed", "boardIds": []}
+        # The session is gone: the socket closes with 4401.
+        current[0] = None
+        ws.send_json({"type": "subscribe", "boardIds": [board]})
+        with pytest.raises(WebSocketDisconnect) as exc:
+            ws.receive_json()
+        assert exc.value.code == 4401
 
 
 async def test_the_socket_without_a_session_closes(api: Api) -> None:

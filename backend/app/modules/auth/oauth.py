@@ -42,7 +42,9 @@ FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset(
 # `gremium.view_all`, the global read key of the tab "Gremien", and `todo.read_all`,
 # the global read key of the to-do boards. `todos:write` holds `todo.all`, the global
 # write key of the to-do cards; the to-dos read with any of `todo.write`, `todo.all`
-# and `todo.read_all` in the scope and write with `todo.write` or `todo.all`.
+# and `todo.read_all` in the scope and write with `todo.write` or `todo.all`. Through
+# `todo.all` or `todo.read_all` a team board also needs its own permission in the
+# scope, so a `read` token never opens the board "Plattform" (`ticket.manage`).
 SCOPES: dict[str, frozenset[str]] = {
     "read": frozenset(
         {

@@ -16,6 +16,11 @@ Every path obeys the OAuth scope cap. The native rights (the gremium ``todo.writ
 the owner, the team permission) need ``todo.write`` in the scope (``todos:write``);
 ``todo.all`` (``todos:write``) and ``todo.read_all`` (``read``) go through
 ``Principal.has``. A token whose scope holds none of the three reads no board.
+Through ``todo.all`` or ``todo.read_all`` a team board also needs its own
+permission in the scope (``scope_allows``), because the team permission guards the
+board: an admin ``read`` token must not open the board "Plattform"
+(``ticket.manage``), which a ``read`` token cannot reach. A cookie session lets
+every permission through, so only a narrow token sees a difference.
 
 Assignees and mentions must be members of the board: the active members of the
 gremium whose role holds ``todo.write``, the owner, or the holders of the team
@@ -55,8 +60,22 @@ def token_reads(principal: Principal) -> bool:
 
 
 def reads_all(principal: Principal) -> bool:
-    """Tell if the principal reads every gremium and team board (global key or bypass)."""
+    """Tell if the principal reads every gremium and team board (global key or bypass).
+
+    A team board also needs ``global_reach`` (its permission in the token scope).
+    """
     return principal.has(TODO_ALL) or principal.has(TODO_READ_ALL)
+
+
+def global_reach(board: TodoBoard, principal: Principal) -> bool:
+    """Tell if a global key (``todo.all``, ``todo.read_all``) may open the board.
+
+    Never a personal board; a team board only when its permission is in the token
+    scope (always for a cookie session).
+    """
+    if board.kind == "personal":
+        return False
+    return board.kind == "gremium" or principal.scope_allows(board.permission or "")
 
 
 @dataclass(slots=True)
@@ -65,8 +84,9 @@ class ReadScope:
 
     ``all_gremien`` is every gremium board (the admin bypass, ``todo.all`` or
     ``todo.read_all``), ``all_teams`` every team board (``todo.all`` or
-    ``todo.read_all``). ``team_permissions`` are the permissions of the team boards
-    that the principal holds.
+    ``todo.read_all`` in a cookie session). ``team_permissions`` are the
+    permissions of the team boards that the principal holds, or, for a token with a
+    global key, that its scope lets through.
     """
 
     all_gremien: bool = False
@@ -129,22 +149,32 @@ class BoardAccess:
         if principal.sub in self._scopes:
             return self._scopes[principal.sub]
         scope = ReadScope()
-        if reads_all(principal):
-            scope.all_gremien = scope.all_teams = True
-        if principal.scope_allows(TODO_WRITE):
+        everything = reads_all(principal)
+        native = principal.scope_allows(TODO_WRITE)
+        if everything:
+            scope.all_gremien = True
+            # A token reaches a team board through the global key only when its
+            # scope lets the team permission through (``global_reach``).
+            scope.all_teams = principal.scope_permissions is None
+        if native:
             scope.all_gremien = scope.all_gremien or admin_bypass(principal, TODO_WRITE)
             if not scope.all_gremien:
                 scope.gremium_ids = await self._gremium_ids(principal, TODO_WRITE)
             scope.owner_id = await self.me(principal)
-            if not scope.all_teams:
-                permissions = (
-                    await self.session.scalars(
-                        select(TodoBoard.permission)
-                        .where(TodoBoard.kind == "team", TodoBoard.permission.is_not(None))
-                        .distinct()
-                    )
-                ).all()
-                scope.team_permissions = {p for p in permissions if p and principal.has(p)}
+        if not scope.all_teams and (native or everything):
+            permissions = (
+                await self.session.scalars(
+                    select(TodoBoard.permission)
+                    .where(TodoBoard.kind == "team", TodoBoard.permission.is_not(None))
+                    .distinct()
+                )
+            ).all()
+            scope.team_permissions = {
+                p
+                for p in permissions
+                if p
+                and ((native and principal.has(p)) or (everything and principal.scope_allows(p)))
+            }
         self._scopes[principal.sub] = scope
         return scope
 
@@ -166,13 +196,13 @@ class BoardAccess:
 
     async def can_write(self, board: TodoBoard, principal: Principal) -> bool:
         """Tell if the principal works on the cards of the board (``todo.all`` included)."""
-        if board.kind != "personal" and principal.has(TODO_ALL):
+        if principal.has(TODO_ALL) and global_reach(board, principal):
             return True
         return await self._native(board, principal)
 
     async def can_read(self, board: TodoBoard, principal: Principal) -> bool:
         """Tell if the principal reads the board: a writer, or ``todo.read_all``."""
-        if board.kind != "personal" and reads_all(principal):
+        if reads_all(principal) and global_reach(board, principal):
             return True
         return await self._native(board, principal)
 

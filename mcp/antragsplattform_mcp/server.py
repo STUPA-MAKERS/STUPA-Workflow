@@ -77,7 +77,8 @@ TYPICAL FLOWS:
   done) → `todo_card_get` → `todo_card_update(card_id, {version, ...})` with the card's
   current `version` (409 `card_version_conflict`: read again), `todo_card_move` into a
   column, `todo_card_transfer` to another board (labels by name, assignees by
-  membership; `before_id`/`after_id` as in the move), `todo_comment`. `todo_my_cards`
+  membership; `before_id`/`after_id` as in the move; never from a shared board into
+  a personal one, 403 `transfer_to_personal`), `todo_comment`. `todo_my_cards`
   lists my cards on the other boards, by board; `todo_all_boards` lists every readable
   board with all its cards. Writes need the scope `todos:write` (the gremium right
   `todo.write` or the global `todo.all`); `read` reads only with the global `todo.read_all`
