@@ -509,13 +509,20 @@ export class TodosComponent implements OnDestroy {
     const items = Array.from(
       root.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'),
     ).filter((el) => el.offsetParent !== null || el === document.activeElement);
-    if (!items.length) return;
+    if (!items.length) {
+      event.preventDefault();
+      return;
+    }
     const first = items[0];
     const last = items[items.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
+    // The drawer itself holds the focus after the open and is not in `items`: a Tab from
+    // there (or from any element outside the list) wraps like one from an edge.
+    const active = document.activeElement as HTMLElement | null;
+    const outside = !active || !items.includes(active);
+    if (event.shiftKey && (outside || active === first)) {
       event.preventDefault();
       last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
+    } else if (!event.shiftKey && (outside || active === last)) {
       event.preventDefault();
       first.focus();
     }

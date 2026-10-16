@@ -450,11 +450,30 @@ describe('TodosComponent', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Raum buchen' }));
   });
 
+  it('wraps a Tab from the drawer itself into the drawer', async () => {
+    const { cmp, settle } = await start('/todos/b-1');
+    cmp.openCard('k-1');
+    await settle();
+    const drawer = screen.getByRole('dialog', { name: 'Raum buchen' });
+    expect(document.activeElement).toBe(drawer);
+    const focusable = Array.from(drawer.querySelectorAll<HTMLElement>('button:not([disabled])'));
+    for (const el of focusable) Object.defineProperty(el, 'offsetParent', { value: drawer, configurable: true });
+    const back = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, cancelable: true, bubbles: true });
+    drawer.dispatchEvent(back);
+    expect(back.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(focusable[focusable.length - 1]);
+    drawer.focus();
+    fireEvent.keyDown(drawer, { key: 'Tab' });
+    expect(document.activeElement).toBe(focusable[0]);
+  });
+
   it('keeps the focus in a drawer without focusable items and closes via the scrim', async () => {
     const { cmp, settle, router } = await start('/todos/b-1?card=k-1');
     const drawer = screen.getByRole('dialog', { name: 'Raum buchen' });
     drawer.querySelectorAll('button, a, input, textarea, [tabindex]').forEach((el) => el.remove());
-    fireEvent.keyDown(drawer, { key: 'Tab' });
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', cancelable: true, bubbles: true });
+    drawer.dispatchEvent(tab);
+    expect(tab.defaultPrevented).toBe(true);
     const prevented = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true, bubbles: true });
     prevented.preventDefault();
     drawer.dispatchEvent(prevented);
