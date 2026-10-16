@@ -219,11 +219,11 @@ export class TicketDetailComponent {
     return t ? reporterName(t.reporter, this.t) : '';
   });
 
-  /** "Ticket · T-0040 · gemeldet 14.10., 21:14". */
+  /** "Ticket · T-0040". The report time is a row in the details. */
   readonly kicker = computed(() => {
     const t = this.ticket();
     if (!t) return '';
-    return this.t('tickets.detail.kicker', { number: t.number, when: this.relativeWhen(t.createdAt) });
+    return this.t('tickets.detail.kicker', { number: t.number });
   });
 
   /** The kicker around the ticket number, which the bar sets in mono. */
@@ -661,20 +661,6 @@ export class TicketDetailComponent {
   // --- formatting ---------------------------------------------------------
 
   /** "14.10., 21:14". */
-  /** "heute, 08:12", "gestern, 21:14", else "14.10., 21:14". */
-  private relativeWhen(at: string): string {
-    const d = new Date(at);
-    const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-    const days = Math.round((day(new Date()) - day(d)) / 86_400_000);
-    if (days !== 0 && days !== 1) return this.when(at);
-    const time = new Intl.DateTimeFormat(this.i18n.formatLocale(), {
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    }).format(d);
-    return `${this.t(days === 0 ? 'tickets.age.today' : 'tickets.age.yesterday')}, ${time}`;
-  }
-
   private when(at: string): string {
     return new Intl.DateTimeFormat(this.i18n.formatLocale(), {
       day: '2-digit',

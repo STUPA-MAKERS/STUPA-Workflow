@@ -19,10 +19,10 @@ import {
   ButtonComponent,
   DialogComponent,
   IconComponent,
-  SelectComponent,
   type SelectOption,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { Subscription } from 'rxjs';
 import { liveSearch } from '@shared/live-search';
 import { AdminApiService } from '../admin-api.service';
@@ -62,7 +62,7 @@ const SEARCH_LIMIT = 8;
     ButtonComponent,
     DialogComponent,
     IconComponent,
-    SelectComponent,
+    SelectFieldComponent,
     SkeletonComponent,
   ],
   templateUrl: './substitute-pool.component.html',

@@ -7,9 +7,9 @@ import {
   ButtonComponent,
   IconComponent,
   InputComponent,
-  SelectComponent,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import type { BudgetTreeNode } from '../../budget/budget-tree.api';
 import {
   ACTION_TYPES,
@@ -39,7 +39,7 @@ import { actionParamOf, recipientNeedsRef, recipientsOf } from './flow-guard.uti
     ButtonComponent,
     IconComponent,
     InputComponent,
-    SelectComponent,
+    SelectFieldComponent,
     GuardEditorComponent,
     CostCentrePickerComponent,
   ],

@@ -329,11 +329,14 @@ export function moveRequest(list: readonly TodoCardTile[], index: number, column
   return below ? { columnId, beforeId: below.id } : { columnId };
 }
 
+/** What the tile helpers below read of a board: a board read or a row of "Meine To-Dos". */
+export type TileBoard = Pick<TodoBoard, 'columns' | 'cards'>;
+
 /**
  * The board after a move, before the server answers: the card leaves its place and sits
  * after `afterId`, before `beforeId`, or at the end of the column.
  */
-export function applyMove(board: TodoBoard, cardId: Uuid, move: TodoCardMove): TodoBoard {
+export function applyMove<B extends TileBoard>(board: B, cardId: Uuid, move: TodoCardMove): B {
   const card = board.cards.find((c) => c.id === cardId);
   if (!card) return board;
   const moved: TodoCardTile = { ...card, columnId: move.columnId };
@@ -355,7 +358,7 @@ export function applyMove(board: TodoBoard, cardId: Uuid, move: TodoCardMove): T
 }
 
 /** Put a server tile into the board (a move answer, a new card). */
-export function replaceTile(board: TodoBoard, tile: TodoCardTile): TodoBoard {
+export function replaceTile<B extends TileBoard>(board: B, tile: TodoCardTile): B {
   const has = board.cards.some((c) => c.id === tile.id);
   const cards = has ? board.cards.map((c) => (c.id === tile.id ? tile : c)) : [...board.cards, tile];
   return { ...board, cards, columns: recount(board, cards) };
@@ -366,7 +369,7 @@ export function replaceTile(board: TodoBoard, tile: TodoCardTile): TodoBoard {
  * the board does not hold yet (a restored card), goes before the first card of its column
  * with a higher rank, else to the end of it; any other tile keeps its place (`replaceTile`).
  */
-export function placeTile(board: TodoBoard, tile: TodoCardTile): TodoBoard {
+export function placeTile<B extends TileBoard>(board: B, tile: TodoCardTile): B {
   const old = board.cards.find((c) => c.id === tile.id);
   if (old && old.columnId === tile.columnId) return replaceTile(board, tile);
   const base = old ? board : { ...board, cards: [...board.cards, tile] };
@@ -376,27 +379,28 @@ export function placeTile(board: TodoBoard, tile: TodoCardTile): TodoBoard {
 }
 
 /** Drop a card from the board (archived). */
-export function removeTile(board: TodoBoard, cardId: Uuid): TodoBoard {
+export function removeTile<B extends TileBoard>(board: B, cardId: Uuid): B {
   const cards = board.cards.filter((c) => c.id !== cardId);
   return { ...board, cards, columns: recount(board, cards) };
 }
 
-function recount(board: TodoBoard, cards: readonly TodoCardTile[]): TodoBoard['columns'] {
+function recount(board: TileBoard, cards: readonly TodoCardTile[]): TodoBoard['columns'] {
   return board.columns.map((col) => ({ ...col, cardCount: cards.filter((c) => c.columnId === col.id).length }));
 }
 
 /**
- * The board `/todos` opens: the board of the caller's first own gremium by name, else the personal
- * board. An admin also lists the boards of gremien they do not belong to, so a gremium board outside
- * `ownGremiumIds` comes only after the personal board.
+ * The board `/todos` opens without a board in the URL: the personal board "Meine To-Dos", else
+ * the board of the caller's first own gremium by name. An admin also lists the boards of gremien
+ * they do not belong to, so a gremium board outside `ownGremiumIds` comes only after the boards
+ * of the own gremien.
  */
 export function defaultBoard(
   boards: readonly TodoBoardSummary[],
   ownGremiumIds: readonly Uuid[] = [],
 ): TodoBoardSummary | null {
   return (
-    boards.find((b) => b.kind === 'gremium' && b.gremiumId !== null && ownGremiumIds.includes(b.gremiumId)) ??
     boards.find((b) => b.kind === 'personal') ??
+    boards.find((b) => b.kind === 'gremium' && b.gremiumId !== null && ownGremiumIds.includes(b.gremiumId)) ??
     boards.find((b) => b.kind === 'gremium') ??
     boards[0] ??
     null

@@ -87,7 +87,9 @@ describe('TodoCardDetailComponent', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Raum buchen' })).toBeInTheDocument();
     expect(screen.getByText('Studierendenparlament · To-Do')).toBeInTheDocument();
     expect(screen.getByText(/^Angelegt von Selin Yıldız · /)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Aktivität' })).toBeInTheDocument();
+    // The thread has no heading of its own; its column carries the name.
+    expect(screen.queryByRole('heading', { name: 'Aktivität' })).toBeNull();
+    expect(screen.getByRole('region', { name: 'Aktivität' })).toBeInTheDocument();
     expect(screen.getByText('Raum ist frei')).toBeInTheDocument();
     expect(screen.getByText('in 7 Tagen')).toBeInTheDocument();
     expect(screen.getByText('Haushalt')).toBeInTheDocument();
@@ -162,6 +164,49 @@ describe('TodoCardDetailComponent', () => {
     late.next(detail({ title: 'Alt' }));
     late.error(new Error('x'));
     expect(cmp.card()?.title).toBe('Raum buchen');
+  });
+
+  it('draws the sheet in its loaded shape while the card loads, with a working close button', async () => {
+    const { cmp, api, detect, closed, fixture } = await setup({ board: board() });
+    api.card.mockReturnValueOnce(new Subject<TodoCardDetail>());
+    fixture.componentRef.setInput('cardId', 'k-2');
+    detect();
+    expect(cmp.loading()).toBe(true);
+    expect(screen.getByRole('status')).toHaveTextContent('Karte wird geladen');
+    // The kicker names the board, which the page already has.
+    expect(cmp.loadingKicker()).toBe('Studierendenparlament · To-Do');
+    expect(document.querySelectorAll('.cd__skelIcon')).toHaveLength(2);
+    expect(document.querySelector('.cd__chat .sk__composer')).not.toBeNull();
+    expect(document.querySelectorAll('.cd__fields dt').length).toBe(4);
+    fireEvent.click(screen.getByRole('button', { name: 'Schließen' }));
+    expect(closed).toHaveBeenCalled();
+  });
+
+  it('draws no composer while it loads for a board the person may not write to, and no kicker without a board', async () => {
+    const { cmp, api, detect, fixture } = await setup({ board: board({ canWrite: false }) });
+    api.card.mockReturnValueOnce(new Subject<TodoCardDetail>());
+    fixture.componentRef.setInput('cardId', 'k-2');
+    detect();
+    expect(document.querySelector('.cd__chat .sk__composer')).toBeNull();
+    fixture.componentRef.setInput('board', null);
+    detect();
+    expect(cmp.loadingKicker()).toBe('');
+  });
+
+  it('names no board while it loads a card of another board, and counts no foreign columns', async () => {
+    const { cmp, api, detect, fixture } = await setup({ board: board({ id: 'b-0', name: 'Meine To-Dos' }) });
+    const late = new Subject<TodoCardDetail>();
+    api.card.mockReturnValueOnce(late);
+    // A tile of a row of another board: the board of the page does not hold it.
+    fixture.componentRef.setInput('cardId', 'k-9');
+    detect();
+    expect(cmp.loading()).toBe(true);
+    expect(cmp.loadingKicker()).toBe('');
+    expect(document.querySelector('.cd__chat .sk__composer')).toBeNull();
+    late.next(detail({ id: 'k-9', boardId: 'b-7', boardName: 'AStA' }));
+    detect();
+    expect(cmp.kicker()).toBe('AStA · To-Do');
+    expect(cmp.moveColumns().every((col) => col.count === null)).toBe(true);
   });
 
   it('reads only the comments again when the chat asks, for the scan state of their files', async () => {
@@ -861,6 +906,18 @@ describe('TodoCardDetailComponent', () => {
 
   describe('phone', () => {
     beforeEach(() => asPhone(MEDIA.phone));
+
+    it('draws the tabs without a count and the details while the card loads, with a working back link', async () => {
+      const { cmp, api, detect, closed, fixture } = await setup();
+      api.card.mockReturnValueOnce(new Subject<TodoCardDetail>());
+      fixture.componentRef.setInput('cardId', 'k-2');
+      detect();
+      expect(cmp.busyTabs().map((t) => t.count)).toEqual([undefined, undefined]);
+      expect(document.querySelector('.cd__skelTitle--second')).not.toBeNull();
+      expect(document.querySelectorAll('.cd__panel .cd__item').length).toBe(3);
+      fireEvent.click(screen.getByRole('button', { name: /Zum Board/ }));
+      expect(closed).toHaveBeenCalled();
+    });
 
     it('has the tabs Details and Aktivität, the back link and the bar', async () => {
       const { cmp, detect, closed, fixture } = await setup();

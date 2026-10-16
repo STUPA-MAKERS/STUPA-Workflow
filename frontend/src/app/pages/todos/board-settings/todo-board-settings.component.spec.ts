@@ -48,10 +48,18 @@ describe('TodoBoardSettingsComponent', () => {
     expect(screen.getByText('2 Karten')).toBeInTheDocument();
     expect(screen.getByText('Erledigt-Spalte')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Label Haushalt bearbeiten' })).toBeInTheDocument();
-    expect(screen.getByText('Erledigte Karten nach 30 Tagen archivieren')).toBeInTheDocument();
+    expect(screen.getByText('Erledigte Karten archivieren')).toBeInTheDocument();
     expect(cmp.days()).toBe(30);
     fireEvent.click(screen.getByRole('button', { name: 'Fertig' }));
     expect(cmp.open()).toBe(false);
+  });
+
+  it('groups the dialog into four sections and says so when there is no label', async () => {
+    await setup(board({ labels: [] }));
+    for (const name of ['Allgemein', 'Spalten', 'Labels', 'Archiv']) {
+      expect(screen.getByRole('heading', { level: 3, name })).toBeInTheDocument();
+    }
+    expect(screen.getByText('Keine Labels')).toBeInTheDocument();
   });
 
   it('saves a new name, keeps the old one for an empty or the same name', async () => {
@@ -98,7 +106,7 @@ describe('TodoBoardSettingsComponent', () => {
     cmp.days.set(999);
     cmp.saveDays();
     expect(cmp.days()).toBe(14);
-    expect(screen.getByRole('spinbutton', { name: 'Tage' })).toBeInTheDocument();
+    expect(screen.getByRole('spinbutton', { name: 'Archivieren nach Tagen' })).toBeInTheDocument();
   });
 
   it('builds the column menu by position and runs it', async () => {

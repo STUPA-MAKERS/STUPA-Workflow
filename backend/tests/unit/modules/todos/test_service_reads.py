@@ -80,6 +80,56 @@ async def test_mine_lists_the_cards_and_counts_the_due_soon_ones() -> None:
     assert out.items[1].labels == []
 
 
+async def test_mine_boards_needs_the_scope_and_an_account() -> None:
+    with pytest.raises(ForbiddenError):
+        await _svc(ScriptedSession()).mine_boards(TOKEN)
+    assert await _svc(ScriptedSession(), me=None).mine_boards(USER) == []
+    session = ScriptedSession(execute=[[]])
+    assert await _svc(session).mine_boards(USER) == []
+    sql = _sql(session.statements[0])
+    assert "todo_assignee.principal_id" in sql and "todo_board.kind !=" in sql
+    assert "todo_card.archived_at IS NULL" in sql and "todo_board.archived_at IS NULL" in sql
+
+
+async def test_mine_boards_groups_the_cards_by_board_with_all_columns() -> None:
+    team = board(name="Plattform", kind="team", gremium_id=None, permission="ticket.manage")
+    stupa = board(name="stupa")
+    asta = board(name="AStA")
+    s_open, s_done = column(stupa.id, "Offen", 0), column(stupa.id, "Erledigt", 1, is_done=True)
+    s_mid = column(stupa.id, "In Arbeit", 2)
+    a_open = column(asta.id, "Offen", 0)
+    t_open = column(team.id, "Neu", 0)
+    lab = label(stupa.id)
+    first = card(stupa, s_done, rank="a", title="Erledigt")
+    second = card(stupa, s_open, rank="b", title="Offen 1")
+    third = card(stupa, s_open, rank="c", title="Offen 2")
+    other = card(asta, a_open, rank="d")
+    tcard = card(team, t_open, rank="e")
+    session = ScriptedSession(
+        execute=[
+            [(first, stupa), (second, stupa), (other, asta), (third, stupa), (tcard, team)],
+            [(second.id, lab.id)],
+            [],
+            [],
+            [],
+        ],
+        scalars=[[s_open, s_done, s_mid, a_open, t_open], [lab], []],
+    )
+    out = await _svc(session).mine_boards(USER)
+    assert [b.name for b in out] == ["AStA", "stupa", "Plattform"]
+    st = out[1]
+    assert st.can_write is True and st.kind == "gremium" and st.gremium_id == stupa.gremium_id
+    assert [c.name for c in st.columns] == ["Offen", "Erledigt", "In Arbeit"]
+    assert [c.card_count for c in st.columns] == [2, 1, 0]
+    assert [c.title for c in st.cards] == ["Offen 1", "Offen 2", "Erledigt"]
+    assert st.cards[0].label_ids == [lab.id]
+    assert [x.name for x in st.labels] == ["Wichtig"]
+    assert out[0].labels == [] and [c.id for c in out[0].cards] == [other.id]
+    assert out[2].kind == "team" and out[2].gremium_id is None
+    assert "todo_column.board_id IN" in _sql(session.statements[1])
+    assert "todo_label.board_id IN" in _sql(session.statements[2])
+
+
 async def test_linked_sorts_open_first_then_by_due_date() -> None:
     assert await _svc(ScriptedSession()).linked("ticket", uuid.uuid4(), TOKEN) == []
     assert await _svc(ScriptedSession(execute=[[]])).linked("ticket", uuid.uuid4(), USER) == []

@@ -1,6 +1,11 @@
 <section class="ht">
   <app-page-header [flush]="true" [title]="'admin.helpTickets.title' | t">
-    @if (loadState() === 'ok' && !loading()) {
+    @if (loading()) {
+      <ng-container ngProjectAs="[actions]">
+        <span class="skel-box ht__skelButton ht__skelButton--text skel-in" aria-hidden="true"></span>
+        <span class="skel-box ht__skelButton skel-in" aria-hidden="true"></span>
+      </ng-container>
+    } @else if (loadState() === 'ok') {
       <ng-container ngProjectAs="[actions]">
         <app-button variant="text" [disabled]="!dirty() || saving()" (click)="discard()">
           {{ 'admin.helpTickets.discard' | t }}
@@ -13,7 +18,29 @@
   </app-page-header>
 
   @if (loading()) {
-    <app-skeleton variant="lines" [count]="4" [label]="'common.loading' | t" />
+    <!-- The loaded form with bars in place of the values: the same sections, the field
+         and the switch rows with their real labels. The bars show after 300ms. -->
+    <div class="ht__form" aria-hidden="true">
+      <section class="ht__sec">
+        <h2 class="sec ht__secTitle">{{ 'admin.helpTickets.wiki' | t }}</h2>
+        <span class="ht__skelField">
+          <span class="ht__skelFieldLabel">{{ 'admin.helpTickets.wikiUrl' | t }}</span>
+          <span class="ht__skelFieldValue skel-in"><span class="skel-text"></span></span>
+        </span>
+      </section>
+      <section class="ht__sec">
+        <h2 class="sec ht__secTitle">{{ 'admin.helpTickets.reports' | t }}</h2>
+        <div class="ht__rows">
+          @for (key of skelSwitches; track key) {
+            <div class="ht__row ht__row--split">
+              <span class="ht__label">{{ key | t }}</span>
+              <span class="skel-box ht__skelSwitch skel-in"></span>
+            </div>
+          }
+        </div>
+      </section>
+    </div>
+    <span class="sr-only" role="status">{{ 'common.loading' | t }}</span>
   } @else if (loadState() === 'forbidden') {
     @if (!canBlock()) {
       <app-note kind="warn" icon="lock" role="alert">{{ 'admin.helpTickets.forbidden' | t }}</app-note>
@@ -109,7 +136,19 @@
           <p class="ht__empty">{{ 'admin.helpTickets.blockedEmpty' | t }}</p>
         }
       } @else {
-        <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
+        <!-- One row of the list: the sender, the quiet line, "Entsperren". -->
+        <ul class="ht__rows ht__skelBlocks skel-in" aria-hidden="true">
+          <li class="ht__row ht__row--split">
+            <span class="ht__block">
+              <span class="ht__label"><span class="skel-text ht__skelName"></span></span>
+              <span class="ht__meta"><span class="skel-text skel-text--muted ht__skelMeta"></span></span>
+            </span>
+            <span class="skel-box ht__skelButton ht__skelButton--sm"></span>
+          </li>
+        </ul>
+        @if (!loading()) {
+          <span class="sr-only" role="status">{{ 'common.loading' | t }}</span>
+        }
       }
     </section>
   }

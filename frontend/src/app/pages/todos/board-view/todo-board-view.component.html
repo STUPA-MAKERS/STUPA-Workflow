@@ -10,30 +10,38 @@
       [active]="phoneCol()?.id ?? null"
       (activeChange)="selectPhoneColumn($event)"
     />
-    @if (phoneCol(); as col) {
-      <div class="bv__phoneCards" role="list" [attr.aria-label]="col.name">
-        @for (card of list(col); track card.id) {
-          <app-todo-card-tile
-            role="listitem"
-            [card]="card"
-            [labels]="labels()"
-            [done]="col.isDone"
-            [today]="today()"
-            (open)="openCard.emit(card.id)"
-          />
-        } @empty {
-          <p class="bv__empty">{{ 'todos.board.columnEmpty' | t }}</p>
-        }
-        @if (more(col) > 0) {
-          <button type="button" class="bv__more" (click)="expand(col)">
-            {{ 'todos.board.more' | t: { n: more(col) } }}
-          </button>
+    @if (columns().length) {
+      <!-- One page per column side by side; a swipe snaps to the next page (CSS scroll
+           snap), and the tab follows the page that the scroll ends on. -->
+      <div #pager class="bv__pager" (scroll)="onPagerScroll()" (scrollend)="syncPage()">
+        @for (col of columns(); track col.id) {
+          <div class="bv__page" [class.bv__page--empty]="!list(col).length">
+            <div class="bv__phoneCards" role="list" [attr.aria-label]="col.name">
+              @for (card of list(col); track card.id) {
+                <app-todo-card-tile
+                  role="listitem"
+                  [card]="card"
+                  [labels]="labels()"
+                  [done]="col.isDone"
+                  [today]="today()"
+                  (open)="openCard.emit(card.id)"
+                />
+              } @empty {
+                <p class="bv__empty">{{ 'todos.board.columnEmpty' | t }}</p>
+              }
+              @if (more(col) > 0) {
+                <button type="button" class="bv__more" (click)="expand(col)">
+                  {{ 'todos.board.more' | t: { n: more(col) } }}
+                </button>
+              }
+            </div>
+          </div>
         }
       </div>
       @if (columns().length > 1) {
         <div class="bv__dots" aria-hidden="true">
-          @for (c of columns(); track c.id; let i = $index) {
-            <span class="bv__dot" [class.bv__dot--on]="c.id === col.id"></span>
+          @for (c of columns(); track c.id) {
+            <span class="bv__dot" [class.bv__dot--on]="c.id === phoneCol()?.id"></span>
           }
         </div>
       }
@@ -82,10 +90,12 @@
               role="listitem"
               cdkDrag
               cdkDragPreviewClass="bv__preview"
+              [cdkDragStartDelay]="dragDelay"
               [cdkDragData]="card.id"
               [cdkDragDisabled]="!canWrite()"
               (cdkDragStarted)="onDragStart(col)"
               (cdkDragEnded)="ptr.set(null)"
+              (keyup)="onTileKeyUp($event)"
               (keydown)="onTileKey($event, card, ci, i)"
             >
               <app-todo-card-tile
@@ -99,7 +109,9 @@
             </div>
           }
         </div>
+        </div>
 
+        <!-- The foot of the column stays at its bottom edge, under the scrolling cards. -->
         @if (col.isDone && (more(col) > 0 || board().archivedCount)) {
           <p class="bv__doneFoot">
             @if (more(col) > 0) {
@@ -145,7 +157,6 @@
             </button>
           }
         }
-        </div>
       </section>
     }
   </div>

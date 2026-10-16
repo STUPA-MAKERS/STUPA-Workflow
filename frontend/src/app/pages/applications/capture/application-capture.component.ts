@@ -33,11 +33,11 @@ import {
   IconComponent,
   InputComponent,
   SegmentedComponent,
-  SelectComponent,
   ToastService,
   type SegmentedOption,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import {
   DRAFT_FILES_STORAGE_KEY,
   DraftAttachmentsService,
@@ -103,7 +103,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     IconComponent,
     InputComponent,
     SegmentedComponent,
-    SelectComponent,
+    SelectFieldComponent,
     ScrollFadeDirective,
     SkeletonComponent,
     DraftFilesComponent,

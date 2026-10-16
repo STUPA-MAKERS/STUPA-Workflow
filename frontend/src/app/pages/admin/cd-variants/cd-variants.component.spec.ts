@@ -5,6 +5,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { CdVariant, CdVariantLogo } from '../admin.models';
 import { AdminCdVariantsComponent } from './cd-variants.component';
+import { pickOption } from '../../../../testing/select';
 
 const TITLE_LOGO: CdVariantLogo = {
   id: 'l-1',
@@ -206,7 +207,7 @@ describe('AdminCdVariantsComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Variante hinzufügen' }));
     await userEvent.type(screen.getByLabelText(/^Name/), 'AStA Vorstand');
     expect(c.form().key).toBe('asta-vorstand');
-    await userEvent.selectOptions(screen.getByLabelText(/Basis-Variante/), 'protocol');
+    await pickOption(screen.getByLabelText(/Basis-Variante/), 'Protokoll');
     await userEvent.click(screen.getByRole('button', { name: 'Hinzufügen' }));
     expect(api.createCdVariant).toHaveBeenCalledWith({
       key: 'asta-vorstand',

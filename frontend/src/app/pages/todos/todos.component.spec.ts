@@ -7,6 +7,8 @@ import { fireEvent, screen } from '@testing-library/angular';
 import { Subject, of, throwError, type Observable } from 'rxjs';
 import {
   TodosApiService,
+  type TodoAssignedBoard,
+  type TodoAssignedPoll,
   type TodoBoard,
   type TodoBoardPoll,
   type TodoBoardSummary,
@@ -23,6 +25,11 @@ interface Opts {
   boardsFail?: boolean;
   board?: TodoBoard;
   gremien?: string[];
+  /** The board read never answers: the page stays in its loading state. */
+  pending?: boolean;
+  rows?: TodoAssignedBoard[];
+  /** The rows read: a subject keeps it in flight. */
+  rowsRead?: Subject<TodoAssignedPoll>;
 }
 
 async function start(url: string, opts: Opts = {}) {
@@ -33,7 +40,10 @@ async function start(url: string, opts: Opts = {}) {
   ] });
   const api = {
     boards: jest.fn(() => (opts.boardsFail ? throwError(() => new Error('x')) : of(opts.boards ?? BOARDS))),
-    pollBoard: jest.fn((): Observable<TodoBoardPoll> => of({ board: b, etag: 'W/"1"' })),
+    pollBoard: jest.fn((): Observable<TodoBoardPoll> =>
+      opts.pending ? new Subject<TodoBoardPoll>() : of({ board: b, etag: 'W/"1"' }),
+    ),
+    pollMineBoards: jest.fn((): Observable<TodoAssignedPoll> => opts.rowsRead ?? of({ boards: opts.rows ?? [], etag: 'W/"r"' })),
     members: jest.fn(() => of(MEMBERS)),
     mine: jest.fn((): Observable<TodoMine> => of({ items: [{ ...tile({ id: 'k-1' }), boardName: '', boardKind: 'gremium', columnName: '', labels: [] }], dueSoonCount: 0 })),
     moveCard: jest.fn(() => of(tile({ id: 'k-1', columnId: 'c-2', title: 'Raum buchen' }))),
@@ -78,22 +88,22 @@ describe('TodosComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => jest.restoreAllMocks());
 
-  it('opens the first gremium board from /todos and keeps the query', async () => {
+  it('opens the personal board from /todos and keeps the query', async () => {
     const { router, api, settle } = await start('/todos?view=list');
     await settle();
-    expect(router.url).toBe('/todos/b-1?view=list');
-    expect(api.pollBoard).toHaveBeenCalledWith('b-1', null);
-    expect(api.members).toHaveBeenCalledWith('b-1');
+    expect(router.url).toBe('/todos/b-0?view=list');
+    expect(api.pollBoard).toHaveBeenCalledWith('b-0', null);
+    expect(api.members).toHaveBeenCalledWith('b-0');
   });
 
-  it('opens the personal board when the caller belongs to none of the listed gremien', async () => {
-    const { router, settle } = await start('/todos', { gremien: ['g-9'] });
+  it('keeps a board in the URL', async () => {
+    const { router, settle } = await start('/todos/b-2');
     await settle();
-    expect(router.url).toBe('/todos/b-0');
+    expect(router.url).toBe('/todos/b-2');
   });
 
-  it('opens the board of an own gremium before a foreign one', async () => {
-    const { router, settle } = await start('/todos', { gremien: ['g-2'] });
+  it('opens the board of an own gremium before a foreign one when there is no personal board', async () => {
+    const { router, settle } = await start('/todos', { boards: BOARDS.filter((b) => b.kind !== 'personal'), gremien: ['g-2'] });
     await settle();
     expect(router.url).toBe('/todos/b-2');
   });
@@ -112,6 +122,35 @@ describe('TodosComponent', () => {
     expect(none.api.pollBoard).not.toHaveBeenCalled();
   });
 
+  it('draws the board in its loaded shape while it loads, with the count of the board list', async () => {
+    const { cmp } = await start('/todos/b-1', { pending: true });
+    expect(cmp.loading()).toBe(true);
+    expect(document.querySelector('app-todo-board-skeleton')).not.toBeNull();
+    expect(document.querySelectorAll('.bv__col')).toHaveLength(4);
+    expect(screen.getByRole('status')).toHaveTextContent('Board wird geladen');
+    // The board list already knows the count and the rights of the board.
+    expect(cmp.openCount()).toBe(2);
+    expect(screen.getByPlaceholderText('2 offene To-Dos durchsuchen')).toBeInTheDocument();
+    expect(document.querySelectorAll('.td__skelIcon')).toHaveLength(1);
+    expect(document.querySelector('.td__skelNew')).not.toBeNull();
+    expect(document.querySelectorAll('.td__chips .td__skelChip')).toHaveLength(3);
+  });
+
+  it('leaves out the place of the settings for a board the person may not configure', async () => {
+    const { cmp } = await start('/todos/b-2', { pending: true });
+    expect(cmp.summary()?.canConfigure).toBe(false);
+    expect(cmp.openCount()).toBe(4);
+    expect(document.querySelector('.td__skelIcon')).toBeNull();
+    expect(document.querySelector('.td__skelNew')).not.toBeNull();
+  });
+
+  it('draws the list in its loaded shape while it loads', async () => {
+    await start('/todos/b-1?view=list', { pending: true });
+    expect(document.querySelector('.lv__row--head')).not.toBeNull();
+    expect(document.querySelectorAll('.lv__group')).toHaveLength(2);
+    expect(document.querySelector('.bv__col')).toBeNull();
+  });
+
   it('shows an error when the boards fail without a board in the route', async () => {
     const failing = await start('/todos', { boardsFail: true });
     expect(failing.cmp.error()).toBe(true);
@@ -126,7 +165,7 @@ describe('TodosComponent', () => {
 
   it('shows the board with header, picker, search and filters in one bar', async () => {
     const { cmp } = await start('/todos/b-1');
-    expect(screen.getByRole('heading', { level: 1, name: 'To-Dos' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Boards' })).toBeInTheDocument();
     expect(screen.queryByText('2 offen')).toBeNull();
     expect(screen.queryByTestId('td-filter-toggle')).toBeNull();
     expect(screen.getByRole('group', { name: 'Filter' })).toBeInTheDocument();
@@ -584,6 +623,122 @@ describe('TodosComponent', () => {
     cmp.onRestored(detail());
   });
 
+  describe('rows of the other boards', () => {
+    const personal = () =>
+      board({
+        id: 'b-0',
+        name: 'Meine To-Dos',
+        kind: 'personal',
+        gremiumId: null,
+        cards: [tile({ id: 'p-1', boardId: 'b-0', columnId: 'c-1', title: 'Privat' })],
+      });
+    const other = (): TodoAssignedBoard => {
+      const { id, name, kind, gremiumId, canWrite, columns, labels } = board();
+      const cards = [tile({ id: 'k-5', columnId: 'c-1', title: 'Plakat drucken', dueDate: '2026-10-01' })];
+      return { id, name, kind, gremiumId, canWrite, columns, labels, cards };
+    };
+
+    it('shows the rows under the personal board and counts their matches', async () => {
+      const { cmp, api, harness, settle } = await start('/todos/b-0', { board: personal(), rows: [other()] });
+      expect(cmp.withRows()).toBe(true);
+      expect(api.pollMineBoards).toHaveBeenCalledWith(null);
+      expect(screen.getByRole('region', { name: /Studierendenparlament/ })).toBeInTheDocument();
+      expect(cmp.rowMatches()).toBe(1);
+      expect(harness.routeNativeElement?.querySelector('.td__body--rows')).not.toBeNull();
+      cmp.setDue('overdue');
+      await settle();
+      expect(cmp.noMatch()).toBe(false);
+      cmp.setDue('none');
+      await settle();
+      expect(cmp.rowMatches()).toBe(0);
+      expect(cmp.noMatch()).toBe(false);
+      cmp.search.set('nichts');
+      cmp.search.flush();
+      await settle();
+      expect(cmp.noMatch()).toBe(true);
+      cmp.poll();
+      expect(api.pollMineBoards).toHaveBeenLastCalledWith('W/"r"');
+    });
+
+    it('loads the personal board in the shape it will have: natural height, no label chip', async () => {
+      const { harness } = await start('/todos/b-0', { pending: true });
+      const root = harness.routeNativeElement!;
+      expect(root.querySelector('app-todo-board-skeleton')).toHaveClass('bv-host--natural');
+      expect(root.querySelector('.td__body--rows')).not.toBeNull();
+      expect(root.querySelectorAll('.td__skelChip')).toHaveLength(2);
+      TestBed.resetTestingModule();
+      const gremium = await start('/todos/b-1', { pending: true });
+      const other = gremium.harness.routeNativeElement!;
+      expect(other.querySelector('app-todo-board-skeleton')).not.toHaveClass('bv-host--natural');
+      expect(other.querySelectorAll('.td__skelChip')).toHaveLength(3);
+    });
+
+    it('keeps the board at natural height while the rows load, and fills once they answer empty', async () => {
+      const rowsRead = new Subject<TodoAssignedPoll>();
+      const { cmp, harness, settle } = await start('/todos/b-0', { board: personal(), rowsRead });
+      expect(cmp.rowMatches()).toBeNull();
+      expect(cmp.rowsBelow()).toBe(true);
+      expect(harness.routeNativeElement?.querySelector('app-todo-board-view')).toHaveClass('bv-host--natural');
+      rowsRead.next({ boards: [], etag: 'W/"r"' });
+      await settle();
+      expect(cmp.rowMatches()).toBe(0);
+      expect(harness.routeNativeElement?.querySelector('app-todo-board-view')).not.toHaveClass('bv-host--natural');
+      // The next load of the board expects no rows and resets the count of the rows.
+      expect(cmp.skeleton().natural).toBe(false);
+    });
+
+    it('draws the skeleton of a board again with the columns it had, and resets the row count', async () => {
+      const three = board({
+        id: 'b-0',
+        name: 'Meine To-Dos',
+        kind: 'personal',
+        gremiumId: null,
+        cards: [],
+        columns: [
+          { id: 'c-1', name: 'Offen', position: 0, isDone: false, cardCount: 0 },
+          { id: 'c-2', name: 'In Arbeit', position: 1, isDone: false, cardCount: 0 },
+          { id: 'c-4', name: 'Erledigt', position: 2, isDone: true, cardCount: 0 },
+        ],
+      });
+      const { cmp, api, harness, router, settle } = await start('/todos/b-0', { board: three, rows: [other()] });
+      expect(cmp.rowMatches()).toBe(1);
+      api.pollBoard.mockReturnValue(new Subject<TodoBoardPoll>());
+      await router.navigateByUrl('/todos/b-1');
+      await settle();
+      expect(cmp.rowMatches()).toBeNull();
+      await router.navigateByUrl('/todos/b-0');
+      await settle();
+      const skel = harness.routeNativeElement!.querySelector('app-todo-board-skeleton')!;
+      expect(skel.querySelectorAll('.bv__col')).toHaveLength(3);
+      expect(skel).toHaveClass('bv-host--natural');
+    });
+
+    it('opens a row card in the drawer and passes the changes of the drawer to the rows', async () => {
+      const { cmp, api, settle, router } = await start('/todos/b-0', { board: personal(), rows: [other()] });
+      fireEvent.click(screen.getByRole('button', { name: 'Plakat drucken' }));
+      await settle();
+      expect(router.url).toBe('/todos/b-0?card=k-5');
+      api.pollMineBoards.mockClear();
+      cmp.onCardChanged(detail({ id: 'k-5', boardId: 'b-1', title: 'Plakat bestellen' }));
+      expect(api.pollMineBoards).toHaveBeenCalledWith(null);
+      cmp.onCommentsChanged({ id: 'k-5', commentCount: 3 });
+      const before = cmp.board()?.archivedCount;
+      cmp.onArchived('k-5');
+      expect(cmp.board()?.archivedCount).toBe(before);
+      expect(cmp.board()?.cards.map((c) => c.id)).toEqual(['p-1']);
+    });
+
+    it('has no rows on a gremium board or in the list view', async () => {
+      const gremium = await start('/todos/b-1', { rows: [other()] });
+      expect(gremium.cmp.withRows()).toBe(false);
+      expect(gremium.api.pollMineBoards).not.toHaveBeenCalled();
+      TestBed.resetTestingModule();
+      const list = await start('/todos/b-0?view=list', { board: personal(), rows: [other()] });
+      expect(list.cmp.withRows()).toBe(false);
+      expect(screen.queryByRole('region', { name: /Studierendenparlament/ })).toBeNull();
+    });
+  });
+
   it('opens the settings and the archive and does nothing without a board id', async () => {
     const { cmp, harness } = await start('/todos/b-1');
     fireEvent.click(screen.getByTestId('td-settings'));
@@ -594,6 +749,15 @@ describe('TodosComponent', () => {
 
   describe('phone', () => {
     beforeEach(() => asPhone(MEDIA.phone));
+
+    it('draws the tabs, one column of tiles and the places of the menu and the filter while it loads', async () => {
+      await start('/todos/b-1', { pending: true });
+      expect(document.querySelector('.bsk__tabs')).not.toBeNull();
+      expect(document.querySelectorAll('.bv__phoneCards .bsk__tile')).toHaveLength(5);
+      expect(document.querySelector('.td__skelIcon')).not.toBeNull();
+      expect(document.querySelector('.td__skelChip--filter')).not.toBeNull();
+      expect(screen.queryByTestId('td-fab')).toBeNull();
+    });
 
     it('has the search button, the menu, the chips row and the FAB', async () => {
       const { cmp, harness } = await start('/todos/b-1');

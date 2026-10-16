@@ -16,8 +16,8 @@ import {
   DatepickerComponent,
   IconComponent,
   InputComponent,
-  SelectComponent,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { CostCentreTreeComponent } from '../../budget/cost-centre-tree.component';
 import type { BudgetTreeNode } from '../../budget/budget-tree.api';
@@ -67,7 +67,7 @@ interface Leg {
     IconComponent,
     InputComponent,
     ScrollFadeDirective,
-    SelectComponent,
+    SelectFieldComponent,
     TranslatePipe,
   ],
   templateUrl: './transfer-form.component.html',

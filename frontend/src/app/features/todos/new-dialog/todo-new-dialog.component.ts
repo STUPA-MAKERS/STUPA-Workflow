@@ -30,10 +30,10 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
-  SelectComponent,
   ToastService,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
 import { LINK_ICON, LINK_KIND_LABEL, sortedColumns } from '../todos.util';
 
@@ -67,7 +67,7 @@ export interface NewTodoLink {
     DialogComponent,
     IconComponent,
     InputComponent,
-    SelectComponent,
+    SelectFieldComponent,
     TodoLinkPickerComponent,
   ],
   templateUrl: './todo-new-dialog.component.html',

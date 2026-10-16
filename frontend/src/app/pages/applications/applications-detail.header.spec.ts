@@ -125,7 +125,10 @@ async function setup(opts: Opts = {}) {
         },
       },
       { provide: RailStatusService, useValue: { refresh: jest.fn() } },
-      { provide: ActivatedRoute, useValue: { paramMap: paramMap$ } },
+      {
+        provide: ActivatedRoute,
+        useValue: { paramMap: paramMap$, fragment: new BehaviorSubject<string | null>(null), snapshot: { fragment: null } },
+      },
       ...(opts.page === false ? [] : [{ provide: ApplicationsPageService, useValue: page }]),
     ],
   });
@@ -406,7 +409,9 @@ describe('ApplicationsDetailComponent — header', () => {
     it('shows the sections in tabs with their counts', async () => {
       const { detectChanges } = await setup({ split: false });
       const tabs = screen.getAllByRole('tab').map((t) => t.getAttribute('aria-label') ?? t.textContent?.trim());
-      expect(tabs).toEqual(['Antrag', 'Verlauf 2', 'Kommentare 0', 'Anhänge 0']);
+      expect(tabs).toEqual(['Antrag', 'Verlauf 2', 'Anhänge 0']);
+      // The comments are a header action that opens a sheet, not a tab.
+      expect(screen.getByRole('button', { name: 'Kommentare, 0' })).toBeInTheDocument();
       expect(screen.getByRole('tabpanel', { name: 'Antrag' })).toBeVisible();
       await userEvent.click(screen.getByRole('tab', { name: 'Verlauf 2' }));
       detectChanges();
@@ -416,9 +421,9 @@ describe('ApplicationsDetailComponent — header', () => {
 
     it('replaces the tabs with the edit form, also from another tab', async () => {
       const { cmp, detectChanges } = await setup({ split: false });
-      await userEvent.click(screen.getByRole('tab', { name: 'Kommentare 0' }));
+      await userEvent.click(screen.getByRole('tab', { name: 'Anhänge 0' }));
       detectChanges();
-      expect(cmp.tab()).toBe('comments');
+      expect(cmp.tab()).toBe('files');
       // The edit form needs structuredClone, which jsdom lacks.
       const g = globalThis as unknown as { structuredClone?: unknown };
       const saved = g.structuredClone;

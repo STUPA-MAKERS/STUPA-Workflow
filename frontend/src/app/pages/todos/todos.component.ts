@@ -1,3 +1,4 @@
+import { CdkScrollable } from '@angular/cdk/scrolling';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -40,7 +41,6 @@ import {
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import {
@@ -70,7 +70,9 @@ import { mediaQuerySignal } from '../../layout/media-query';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { TodoArchiveSheetComponent } from './archive-sheet/todo-archive-sheet.component';
 import { TodoBoardPickerComponent } from './board-picker/todo-board-picker.component';
+import { TodoBoardRowsComponent } from './board-rows/todo-board-rows.component';
 import { TodoBoardSettingsComponent } from './board-settings/todo-board-settings.component';
+import { TodoBoardSkeletonComponent } from './board-skeleton/todo-board-skeleton.component';
 import { TodoBoardViewComponent, type BoardMove } from './board-view/todo-board-view.component';
 import { TodoListViewComponent } from './list-view/todo-list-view.component';
 
@@ -88,9 +90,10 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
 };
 
 /**
- * "To-Dos" (`/todos`, `/todos/:boardId`): one board of the person (frames 0–9, 11–14, 34).
+ * "Boards" (`/todos`, `/todos/:boardId`): one board of the person (frames 0–9, 11–14, 34).
  *
- * `/todos` opens the board of the first own Gremium, else the personal board. The header
+ * `/todos` opens the personal board "Meine To-Dos", else the board of the first own Gremium;
+ * a board in the URL wins. The header
  * holds "Board | Liste", the board settings (`todo.configure`) and "+ To-Do"; the bar
  * below the board picker, the search and the chips Zuständig, Label, Fällig. Filters run
  * in the browser over the cards of the board.
@@ -105,6 +108,7 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    CdkScrollable,
     TranslatePipe,
     ButtonComponent,
     EmptyStateComponent,
@@ -114,18 +118,21 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
     RowMenuComponent,
     SearchPillComponent,
     SegmentedComponent,
-    SkeletonComponent,
     StickyBarComponent,
     ScrollFadeDirective,
     TodoArchiveSheetComponent,
     TodoBoardPickerComponent,
+    TodoBoardRowsComponent,
+    TodoBoardSkeletonComponent,
     TodoBoardSettingsComponent,
     TodoBoardViewComponent,
     TodoCardDetailComponent,
     TodoListViewComponent,
     TodoNewDialogComponent,
   ],
-  host: { '[class.pane-page]': '!phone()', class: 'todos-host' },
+  // On a phone the board fills the free height too, so its column pages scroll inside;
+  // the list scrolls as a page.
+  host: { '[class.pane-page]': "!phone() || view() === 'board'", class: 'todos-host' },
   templateUrl: './todos.component.html',
   styleUrl: './todos.component.scss',
 })
@@ -184,6 +191,36 @@ export class TodosComponent implements OnDestroy {
   readonly today = signal(isoDay(new Date()));
 
   private readonly drawer = viewChild<ElementRef<HTMLElement>>('drawer');
+  /** The rows of the other boards under "Meine To-Dos" (board view only). */
+  private readonly rowsView = viewChild(TodoBoardRowsComponent);
+  /** The cards the rows show after the filters; null until the rows of this board answered. */
+  readonly rowMatches = signal<number | null>(null);
+  readonly withRows = computed(() => this.board()?.kind === 'personal' && this.view() === 'board');
+  /**
+   * The rows held cards at their last answer. Until the rows answer, the board and its
+   * skeleton keep that shape, so the board does not resize when the rows land.
+   */
+  private readonly rowsExpected = signal(true);
+  /** Rows of other boards follow under the board: the board takes its natural height. */
+  readonly rowsBelow = computed(() => {
+    if (!this.withRows()) return false;
+    const n = this.rowMatches();
+    return n === null ? this.rowsExpected() : n > 0;
+  });
+  /** The shape of each board the page has shown: the skeleton draws it on a return. */
+  private readonly shapes = signal<ReadonlyMap<Uuid, { columns: number; labels: boolean }>>(new Map());
+  /** The shape of the loading board: known from an earlier visit, else a new board. */
+  readonly skeleton = computed(() => {
+    const id = this.boardId();
+    const known = id ? this.shapes().get(id) : undefined;
+    const personal = this.summary()?.kind === 'personal';
+    return {
+      columns: known?.columns ?? 4,
+      // A new personal board has no labels, so its chip row has no label chip.
+      labels: known?.labels ?? !personal,
+      natural: personal && this.view() === 'board' && this.rowsExpected(),
+    };
+  });
   private focusedFor: Uuid | null = null;
 
   readonly viewOptions = computed<SegmentedOption[]>(() => [
@@ -199,9 +236,16 @@ export class TodosComponent implements OnDestroy {
     () => new Set((this.board()?.columns ?? []).filter((c) => c.isDone).map((c) => c.id)),
   );
 
+  /** The entry of the shown board in the board list: known before the board loads. */
+  readonly summary = computed(() => this.boards().find((b) => b.id === this.boardId()) ?? null);
+
   readonly openCount = computed(() => {
+    const board = this.board();
+    // While the board loads, the list already knows its count, so the search does not
+    // say "0 offene To-Dos".
+    if (!board) return this.summary()?.openCount ?? 0;
     const done = this.doneColumns();
-    return (this.board()?.cards ?? []).filter((c) => !done.has(c.columnId)).length;
+    return board.cards.filter((c) => !done.has(c.columnId)).length;
   });
 
   /** The cards that pass the filters, by column. */
@@ -221,6 +265,7 @@ export class TodosComponent implements OnDestroy {
   readonly filtered = computed(() => filterActive(this.filter()));
   readonly noMatch = computed(() => {
     if (!this.filtered()) return false;
+    if (this.withRows() && (this.rowMatches() ?? 0) > 0) return false;
     for (const list of this.visible().values()) if (list.length) return false;
     return true;
   });
@@ -293,6 +338,18 @@ export class TodosComponent implements OnDestroy {
       untracked(() => this.loadBoard(id));
     });
 
+    // Remember the shape of each shown board for its skeleton on a return.
+    effect(() => {
+      const b = this.board();
+      if (!b) return;
+      const shape = { columns: b.columns.length, labels: b.labels.length > 0 };
+      untracked(() => {
+        const known = this.shapes().get(b.id);
+        if (known?.columns === shape.columns && known.labels === shape.labels) return;
+        this.shapes.update((m) => new Map(m).set(b.id, shape));
+      });
+    });
+
     // The drawer takes the focus once when it opens for a card.
     effect(() => {
       const id = this.cardId();
@@ -326,6 +383,12 @@ export class TodosComponent implements OnDestroy {
     this.frame.fill.set(false);
   }
 
+  /** The rows answered with the number of cards they show. */
+  onRowMatches(n: number): void {
+    this.rowMatches.set(n);
+    this.rowsExpected.set(n > 0);
+  }
+
   private openDefault(boards: readonly TodoBoardSummary[]): void {
     const pick = defaultBoard(
       boards,
@@ -349,6 +412,7 @@ export class TodosComponent implements OnDestroy {
     this.error.set(false);
     this.board.set(null);
     this.etag = null;
+    this.rowMatches.set(null);
     this.filter.set(NO_FILTER);
     this.search.sync('');
     this.api.pollBoard(id, null).subscribe({
@@ -378,6 +442,7 @@ export class TodosComponent implements OnDestroy {
   poll(): void {
     const board = this.board();
     if (!board) return;
+    this.rowsView()?.poll();
     const seq = this.loadSeq;
     const muts = this.mutations;
     this.today.set(isoDay(new Date()));
@@ -583,6 +648,7 @@ export class TodosComponent implements OnDestroy {
   }
 
   onCardChanged(card: TodoCardDetail): void {
+    this.rowsView()?.cardChanged(card);
     const board = this.board();
     if (!board || card.boardId !== board.id) return;
     this.mutations++;
@@ -599,6 +665,7 @@ export class TodosComponent implements OnDestroy {
 
   /** Merge only the comment count: the drawer's copy of the rest of the card can be stale. */
   onCommentsChanged(event: { id: Uuid; commentCount: number }): void {
+    this.rowsView()?.commentsChanged(event);
     const board = this.board();
     if (!board?.cards.some((c) => c.id === event.id)) return;
     this.mutations++;
@@ -609,9 +676,13 @@ export class TodosComponent implements OnDestroy {
   }
 
   onArchived(id: Uuid): void {
+    this.rowsView()?.cardRemoved(id);
     const board = this.board();
     this.mutations++;
-    if (board) this.board.set({ ...removeTile(board, id), archivedCount: board.archivedCount + 1 });
+    // A card of a row lives on another board: the archive count of this one stays.
+    if (board?.cards.some((c) => c.id === id)) {
+      this.board.set({ ...removeTile(board, id), archivedCount: board.archivedCount + 1 });
+    }
     this.closeCard();
   }
 

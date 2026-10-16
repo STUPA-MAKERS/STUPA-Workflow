@@ -21,10 +21,10 @@ import {
   InputComponent,
   SegmentedComponent,
   type SegmentedOption,
-  SelectComponent,
   type SelectOption,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { AdminApiService } from '../admin-api.service';
 import { formatBytes } from '../admin-health/admin-health.util';
 import {
@@ -134,7 +134,7 @@ function errorCode(err: unknown): string {
     InputComponent,
     NoteComponent,
     SegmentedComponent,
-    SelectComponent,
+    SelectFieldComponent,
     SkeletonComponent,
     PageHeaderComponent,
   ],

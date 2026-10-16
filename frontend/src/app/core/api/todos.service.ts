@@ -198,6 +198,28 @@ export interface TodoMine {
   dueSoonCount: number;
 }
 
+/**
+ * A board of `GET /todos/mine/boards` (the rows under "Meine To-Dos"): all its columns
+ * and labels, but only the live cards assigned to the caller (done ones too).
+ * `cardCount` of a column counts those cards.
+ */
+export interface TodoAssignedBoard {
+  id: Uuid;
+  name: string;
+  kind: TodoBoardKind;
+  gremiumId: Uuid | null;
+  canWrite: boolean;
+  columns: TodoColumn[];
+  labels: TodoLabel[];
+  cards: TodoCardTile[];
+}
+
+/** The answer of a poll of the rows: the boards and their ETag, or `boards: null` for 304. */
+export interface TodoAssignedPoll {
+  boards: TodoAssignedBoard[] | null;
+  etag: string | null;
+}
+
 /** A hit of the link picker. */
 export interface TodoLinkTarget {
   kind: TodoLinkKind;
@@ -472,6 +494,29 @@ export class TodosApiService {
   /** The open cards assigned to the caller, for "Aufgaben" and the rail counter. */
   mine(): Observable<TodoMine> {
     return this.http.get<TodoMine>(`${this.base}/todos/mine`, { context: skipLoading() });
+  }
+
+  /**
+   * The other boards with the cards assigned to the caller, with `If-None-Match`. A 304
+   * gives `boards: null`, so the caller keeps its state.
+   */
+  pollMineBoards(etag: string | null): Observable<TodoAssignedPoll> {
+    let headers = new HttpHeaders();
+    if (etag) headers = headers.set('If-None-Match', etag);
+    return this.http
+      .get<TodoAssignedBoard[]>(`${this.base}/todos/mine/boards`, {
+        headers,
+        observe: 'response',
+        context: skipLoading(),
+      })
+      .pipe(
+        map((res) => ({ boards: res.body, etag: res.headers.get('ETag') })),
+        catchError((err: unknown) =>
+          err instanceof HttpErrorResponse && err.status === 304
+            ? of({ boards: null, etag })
+            : throwError(() => err),
+        ),
+      );
   }
 
   /** The link picker: what the caller may read, at most five per kind. */

@@ -225,6 +225,12 @@
 }
 
 /* The kind icon in front is a narrow box, so the slots of a row sit closer and the title keeps its width. */
-.tk__row {
+.tk__row,
+.tk__skelRows {
   --li-gap: var(--space-3);
+}
+/* One view at a time a row ends with a chevron after the person: the gap and the 17px
+   icon, of which `.tk__chev` pulls 8px into the row padding. */
+.tk:not(.tk--split) .tk__skelRows {
+  --sk-trail-end: 17px;
 }

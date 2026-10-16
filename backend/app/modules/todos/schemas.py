@@ -202,6 +202,25 @@ class TodoMine(_Out):
     due_soon_count: int = Field(default=0, serialization_alias="dueSoonCount")
 
 
+class TodoAssignedBoard(_Out):
+    """A board of ``GET /todos/mine/boards``: its columns and the caller's cards on it.
+
+    ``columns`` are all columns of the board in their order; ``cardCount`` counts the
+    caller's live cards in each. ``cards`` holds only the live cards assigned to the
+    caller, done ones included, in board order. ``labels`` are the labels of the board.
+    ``canWrite`` has the value of the board read: a reader of a board writes on it.
+    """
+
+    id: UUID
+    name: str
+    kind: TodoBoardKind
+    gremium_id: UUID | None = Field(default=None, serialization_alias="gremiumId")
+    can_write: bool = Field(default=True, serialization_alias="canWrite")
+    columns: list[TodoColumnOut] = Field(default_factory=list)
+    labels: list[TodoLabelOut] = Field(default_factory=list)
+    cards: list[TodoCardTile] = Field(default_factory=list)
+
+
 class TodoLinkTarget(_Out):
     kind: TodoLinkKind
     target_id: UUID = Field(serialization_alias="targetId")

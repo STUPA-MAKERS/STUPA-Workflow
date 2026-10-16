@@ -14,9 +14,9 @@ import {
   ButtonComponent,
   IconComponent,
   InputComponent,
-  SelectComponent,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import {
   COMPARE_OPS,
   GUARD_ACTOR_OPERATORS,
@@ -43,7 +43,7 @@ type ValueKind = 'none' | 'role' | 'committee' | 'compare' | 'text';
   imports: [
     FormsModule,
     TranslatePipe,
-    SelectComponent,
+    SelectFieldComponent,
     ButtonComponent,
     IconComponent,
     InputComponent,

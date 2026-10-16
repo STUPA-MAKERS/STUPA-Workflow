@@ -1,0 +1,94 @@
+// The look of the app's option list: the popover of `app-filter-select` and `app-select`
+// on a wide screen, and their rows in the phone bottom sheet. One partial, so both
+// controls show the same menu. Component styles are encapsulated, so each component
+// includes the mixins.
+
+// The popover: fixed to the viewport, in the top layer, with the surface and the shadow
+// of the row menu. In the top layer the UA styles would centre it, so the reset comes
+// first.
+@mixin menu {
+  position: fixed;
+  inset: auto;
+  z-index: var(--z-dropdown);
+  margin: 0;
+  overflow-y: auto;
+  padding: 6px 0;
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  box-shadow: var(--shadow-elevated);
+
+  &:focus {
+    outline: none;
+  }
+}
+
+// The top-layer box of the phone sheet: no box of its own. The scrim and the sheet inside
+// are fixed to the viewport.
+@mixin layer {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+// One row of the list.
+@mixin option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+  text-align: start;
+  cursor: pointer;
+}
+
+// The hover and the active row: surface 4 on the surface-3 menu.
+@mixin option-hover {
+  background: var(--color-surface-4);
+}
+
+// Surface 4 on surface 3 is only about 1.2:1, too weak to show the focus (WCAG 2.4.7).
+// The focused or active row also gets an inset ring in the focus colour.
+@mixin option-focus {
+  outline: none;
+  background: var(--color-surface-4);
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+}
+
+// In the sheet: the rows of a row group (`.rowgroup--bg3`, global) on surface 3, as tall
+// as a list row. The row group sets the surface and the corners.
+@mixin option-sheet {
+  min-height: 52px;
+  background: var(--color-surface-3);
+}
+
+// The check mark after the label of the chosen row.
+@mixin check {
+  flex: none;
+  color: var(--color-accent-text);
+}
+
+// The text when there is no choice.
+@mixin empty {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}

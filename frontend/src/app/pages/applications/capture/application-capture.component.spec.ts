@@ -16,6 +16,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { DraftAttachmentsService, type DraftFile } from '../../../features/apply/draft-attachments.service';
 import { FormlyDraftFilesType } from '../../../features/apply/draft-files/formly-draft-files.type';
 import { runAxe } from '../../../../testing/a11y';
+import { optionLabels } from '../../../../testing/select';
 import {
   APPLICANT_SEARCH_DELAY_MS,
   ApplicationCaptureComponent,
@@ -133,8 +134,9 @@ describe('ApplicationCaptureComponent', () => {
     const s = await setup();
     expect(screen.getByRole('heading', { name: 'Antrag erfassen' })).toBeTruthy();
     expect(screen.getByText('Für eine andere Person · geht direkt in den Ablauf')).toBeTruthy();
-    expect(screen.getByRole('option', { name: 'Förderantrag' })).toBeTruthy();
-    expect(screen.queryByRole('option', { name: 'Alt' })).toBeNull();
+    expect(await optionLabels(screen.getByRole('combobox', { name: 'Antragsart' }))).toEqual([
+      'Förderantrag',
+    ]);
     expect(screen.getByText('Wähle eine Antragsart, dann erscheinen die Felder.')).toBeTruthy();
     expect(s.comp.receivedOn()).toBe(localToday());
     expect((screen.getByTestId('cap-submit').querySelector('button') as HTMLButtonElement).disabled).toBe(true);

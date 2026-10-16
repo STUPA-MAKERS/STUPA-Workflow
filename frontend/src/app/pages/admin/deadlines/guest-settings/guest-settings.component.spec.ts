@@ -1,11 +1,12 @@
 import { of, throwError } from 'rxjs';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, waitFor } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
 import type { GuestSettings } from '../../admin.models';
 import { GuestSettingsComponent } from './guest-settings.component';
+import { pickOption } from '../../../../../testing/select';
 
 function makeApi(initial: GuestSettings = { confirmTtlHours: 12, linkTtlDays: null }) {
   return {
@@ -44,8 +45,8 @@ describe('GuestSettingsComponent', () => {
     expect(api.getGuestSettings).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('heading', { name: 'Anträge ohne Konto' })).toBeInTheDocument();
     expect(hoursField().value).toBe('12');
-    const select = screen.getByLabelText('Gültigkeit des persönlichen Links') as HTMLSelectElement;
-    expect(select.value).toBe('unlimited');
+    const select = screen.getByLabelText('Gültigkeit des persönlichen Links');
+    expect(select).toHaveTextContent('Unbegrenzt');
     expect(screen.queryByLabelText('Gültig für')).not.toBeInTheDocument();
     // Nothing changed yet: the save is off.
     expect(saveButton()).toBeDisabled();
@@ -79,10 +80,10 @@ describe('GuestSettingsComponent', () => {
   it('limits the link to a number of days, and back to "Unbegrenzt"', async () => {
     const { api, c } = await setup();
     const select = screen.getByLabelText('Gültigkeit des persönlichen Links');
-    await userEvent.selectOptions(select, 'days');
+    await pickOption(select, 'Begrenzt');
     const days = screen.getByLabelText('Gültig für') as HTMLInputElement;
     // The field starts with 30 days, so a switch alone is a valid change.
-    expect(days.value).toBe('30');
+    await waitFor(() => expect(days.value).toBe('30'));
     await userEvent.clear(days);
     await userEvent.type(days, '3651');
     expect(screen.getByText('Eine ganze Zahl von 1 bis 3650 Tagen.')).toBeInTheDocument();

@@ -72,14 +72,20 @@
                     @case ('textarea') { <textarea class="fe__pv-control" rows="3" disabled></textarea> }
                     @case ('checkbox') { <input type="checkbox" disabled /> }
                     @case ('select') {
-                      <select class="fe__pv-control" disabled>
-                        @for (o of field.options ?? []; track $index) { <option>{{ resolved(o.label) || o.value }}</option> }
-                      </select>
+                      <app-select
+                        class="fe__pv-select"
+                        [disabled]="true"
+                        [ariaLabel]="resolved(field.label) || ('admin.forms.untitledQuestion' | t)"
+                        [placeholder]="'formly.select.placeholder' | t"
+                      />
                     }
                     @case ('multiselect') {
-                      <select class="fe__pv-control" multiple disabled>
-                        @for (o of field.options ?? []; track $index) { <option>{{ resolved(o.label) || o.value }}</option> }
-                      </select>
+                      <app-select
+                        class="fe__pv-select"
+                        [disabled]="true"
+                        [ariaLabel]="resolved(field.label) || ('admin.forms.untitledQuestion' | t)"
+                        [placeholder]="'formly.select.placeholder' | t"
+                      />
                     }
                     @case ('date') { <input class="fe__pv-control" type="date" disabled /> }
                     @case ('number') { <input class="fe__pv-control" type="number" disabled /> }

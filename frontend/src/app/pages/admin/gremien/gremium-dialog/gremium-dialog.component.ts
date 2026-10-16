@@ -19,10 +19,10 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
-  SelectComponent,
   type SelectOption,
   SwitchComponent,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { AdminApiService } from '../../admin-api.service';
 import {
   type CdVariantOption,
@@ -105,7 +105,7 @@ export function parseRecipients(raw: string): string[] {
     DialogComponent,
     IconComponent,
     InputComponent,
-    SelectComponent,
+    SelectFieldComponent,
     SwitchComponent,
   ],
   templateUrl: './gremium-dialog.component.html',

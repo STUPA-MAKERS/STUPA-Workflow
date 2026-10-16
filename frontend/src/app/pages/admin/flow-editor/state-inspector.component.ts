@@ -6,10 +6,10 @@ import {
   ButtonComponent,
   IconComponent,
   InputComponent,
-  SelectComponent,
   SwitchComponent,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import type { StateDef } from '../admin.models';
 import { FlowColorComponent } from './flow-color.component';
 
@@ -34,7 +34,7 @@ export interface GuardPriorityRow {
     ButtonComponent,
     IconComponent,
     InputComponent,
-    SelectComponent,
+    SelectFieldComponent,
     SwitchComponent,
     FlowColorComponent,
   ],

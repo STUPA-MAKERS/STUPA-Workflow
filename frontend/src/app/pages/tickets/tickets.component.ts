@@ -150,9 +150,12 @@ export class TicketsComponent implements OnDestroy {
 
   readonly assignees = signal<PersonRef[]>([]);
 
-  readonly searchPlaceholder = computed(() =>
-    this.i18n.translate('tickets.list.search', { n: this.total() + this.closedTotal() }),
-  );
+  readonly searchPlaceholder = computed(() => {
+    const n = this.total() + this.closedTotal();
+    // Before the first answer there is no count: "Tickets durchsuchen", not "0 Tickets".
+    if (this.loading() && n === 0) return this.i18n.translate('tickets.list.searchLabel');
+    return this.i18n.translate('tickets.list.search', { n });
+  });
 
   readonly statusOptions = computed<FilterSelectOption[]>(() =>
     STATUS_FILTERS.map((s) => ({ value: s, label: this.i18n.translate(this.statusFilterLabel(s)) })),

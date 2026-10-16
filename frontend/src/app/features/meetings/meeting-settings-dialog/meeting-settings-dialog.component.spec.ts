@@ -6,6 +6,7 @@ import type { Attendance, Meeting } from '@core/api/models';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
 import { MeetingSettingsDialogComponent } from './meeting-settings-dialog.component';
+import { optionLabels, pickOption } from '../../../../testing/select';
 
 const MEETING = {
   id: 'm-1',
@@ -62,21 +63,21 @@ describe('MeetingSettingsDialogComponent', () => {
     const dialog = screen.getByRole('dialog', { name: 'Sitzung bearbeiten' });
     expect(dialog).toHaveAccessibleDescription('Studierendenparlament');
     expect(within(dialog).getByLabelText(/Titel/)).toHaveValue('35. Sitzung');
-    const keeper = within(dialog).getByLabelText('Protokollführung') as HTMLSelectElement;
-    expect(within(keeper).getAllByRole('option').map((o) => o.textContent?.trim())).toEqual([
+    const keeper = within(dialog).getByLabelText('Protokollführung');
+    expect(keeper).toHaveTextContent('Tom Brandt');
+    expect(await optionLabels(keeper)).toEqual([
       '— niemand —',
       'Mara Keller',
       'Tom Brandt',
       'lea@x.de',
       'Ohne Namen',
     ]);
-    expect(keeper.value).toBe('p-2');
   });
 
   it('saves the minute-taker, the date and the times in one PATCH', async () => {
     const { http, fixture, cmp, saved, toasts } = await setup();
     flushRoster(http, fixture);
-    await userEvent.selectOptions(screen.getByLabelText('Protokollführung'), 'p-1');
+    await pickOption(screen.getByLabelText('Protokollführung'), 'Mara Keller');
     cmp.endTime.set('20:00');
     fixture.detectChanges();
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));

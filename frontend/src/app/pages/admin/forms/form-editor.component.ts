@@ -32,10 +32,10 @@ import {
   IconComponent,
   InputComponent,
   MEDIA,
-  SelectComponent,
   type SelectOption,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
@@ -100,7 +100,7 @@ type QPos = QuestionPos;
     TranslatePipe,
     ButtonComponent,
     CheckboxComponent,
-    SelectComponent,
+    SelectFieldComponent,
     IconComponent,
     InputComponent,
     VersionHistoryComponent,

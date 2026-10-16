@@ -18,6 +18,7 @@ import { AGENDA } from '../../../testing/meeting-fixtures';
 import { MeetingAgendaService } from './meeting-agenda.service';
 import { MeetingSessionService } from './meeting-session.service';
 import { MeetingsComponent } from './meetings.component';
+import { pickOption } from '../../../testing/select';
 
 const MEETING: MeetingOutWire = {
   id: 'm-1',
@@ -625,8 +626,7 @@ describe('MeetingsComponent', () => {
     // Match the exact label. The start button carries an aria-label
     // "Protokollant zuweisen …", which makes a /Protokollant/ regex ambiguous.
     const select = await screen.findByLabelText('Protokollführung');
-    await screen.findByRole('option', { name: 'Max P' });
-    await userEvent.selectOptions(select, 'pr-1');
+    await pickOption(select, 'Max P');
     await userEvent.click(screen.getByRole('button', { name: /Speichern/i }));
     const req = http.expectOne('/api/meetings/m-1');
     expect(req.request.method).toBe('PATCH');

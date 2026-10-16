@@ -348,11 +348,12 @@ describe('todos.util', () => {
       expect(added.columns.find((c) => c.id === 'c-2')?.cardCount).toBe(1);
     });
 
-    it('opens the first own gremium board, else the personal one, else any', () => {
+    it('opens the personal board, else the first own gremium board, else any', () => {
       const personal = summary({ id: 'p', kind: 'personal' });
       const team = summary({ id: 't', kind: 'team' });
       const gremium = summary({ id: 'g', kind: 'gremium', gremiumId: 'gr-1' });
-      expect(defaultBoard([personal, team, gremium], ['gr-1'])?.id).toBe('g');
+      expect(defaultBoard([personal, team, gremium], ['gr-1'])?.id).toBe('p');
+      expect(defaultBoard([team, gremium], ['gr-1'])?.id).toBe('g');
       expect(defaultBoard([team, personal])?.id).toBe('p');
       expect(defaultBoard([team, gremium])?.id).toBe('g');
       expect(defaultBoard([team])?.id).toBe('t');
@@ -364,8 +365,8 @@ describe('todos.util', () => {
       const asta = summary({ id: 'a', kind: 'gremium', gremiumId: 'gr-asta' });
       const fs = summary({ id: 'f', kind: 'gremium', gremiumId: 'gr-fs' });
       const stupa = summary({ id: 's', kind: 'gremium', gremiumId: 'gr-stupa' });
-      expect(defaultBoard([personal, asta, fs, stupa], ['gr-stupa'])?.id).toBe('s');
-      expect(defaultBoard([personal, asta, fs, stupa], [])?.id).toBe('p');
+      expect(defaultBoard([asta, fs, stupa], ['gr-stupa'])?.id).toBe('s');
+      expect(defaultBoard([personal, asta, fs, stupa], ['gr-stupa'])?.id).toBe('p');
     });
 
     it('finds the people a comment mentions, each once', () => {

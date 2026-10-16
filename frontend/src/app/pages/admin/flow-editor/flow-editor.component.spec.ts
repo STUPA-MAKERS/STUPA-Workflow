@@ -360,6 +360,27 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.graph().states).toHaveLength(1);
   });
 
+  it('keeps the state when Delete, Backspace or Insert hit a focused inspector app-select', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.addState();
+    c.selection.set({ kind: 'state', key: c.graph().states[0].key });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const host = fixture.nativeElement as HTMLElement;
+    const trigger = host.querySelector<HTMLElement>('app-select [role="combobox"]');
+    expect(trigger).not.toBeNull();
+    trigger!.focus();
+    for (const key of ['Delete', 'Backspace', 'Insert']) {
+      trigger!.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+      fixture.detectChanges();
+    }
+    expect(c.graph().states).toHaveLength(1);
+    expect(c.selection()).toEqual({ kind: 'state', key: c.graph().states[0].key });
+  });
+
   it('saves nothing and warns when the graph is invalid', async () => {
     const { fixture, createGlobalFlowVersion } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -665,6 +686,9 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(c.nodes().find((n: { key: string }) => n.key === a).gremiumFromBudget).toBe(false);
     // The state inspector shows the source select and the hint, not the gremium select.
     c.selection.set({ kind: 'state', key: v });
+    fixture.detectChanges();
+    // ngModel writes the value of the select field after a microtask.
+    await fixture.whenStable();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Gremium aus der Kostenstelle');
     expect(fixture.nativeElement.textContent).toContain('Gremium: aus Kostenstelle');
