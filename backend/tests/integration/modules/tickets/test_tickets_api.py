@@ -384,10 +384,18 @@ async def test_the_detail_holds_notes_events_attachments_and_links(
         )
         session.add(ticket)
         await session.flush()
+        # One transaction gives every server default the same now(); explicit times
+        # keep the order of the two notes from depending on their random ids.
+        noted = datetime.now(UTC)
         session.add_all(
             [
-                TicketNote(ticket_id=ticket.id, author_id=me, body="mine"),
-                TicketNote(ticket_id=ticket.id, author_id=other, body="theirs"),
+                TicketNote(ticket_id=ticket.id, author_id=me, body="mine", created_at=noted),
+                TicketNote(
+                    ticket_id=ticket.id,
+                    author_id=other,
+                    body="theirs",
+                    created_at=noted + timedelta(seconds=1),
+                ),
                 TicketNote(
                     ticket_id=ticket.id,
                     author_id=me,
