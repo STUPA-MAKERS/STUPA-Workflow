@@ -196,6 +196,48 @@ describe('TodoBoardViewComponent', () => {
     elsewhere.remove();
   });
 
+  it('ends a keyboard drag when the focus or a pointer goes elsewhere', async () => {
+    const { cmp, on, key, fixture, container } = await setup();
+    const elsewhere = document.createElement('button');
+    document.body.appendChild(elsewhere);
+    await key('Raum buchen', ' ');
+    await key('Raum buchen', 'ArrowRight');
+    expect(cmp.count(cmp.columns()[1])).toBe(1);
+    // The refocus after the step lands in the held card and keeps the drag.
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Raum buchen' }));
+    expect(cmp.kb()).not.toBeNull();
+    elsewhere.focus();
+    fixture.detectChanges();
+    expect(cmp.kb()).toBeNull();
+    expect(cmp.count(cmp.columns()[0])).toBe(2);
+    expect(cmp.count(cmp.columns()[1])).toBe(0);
+    expect(container.querySelector('[aria-live]')).toHaveTextContent('Verschieben von „Raum buchen“ abgebrochen.');
+
+    await key('Raum buchen', ' ');
+    // A pointer on the held card keeps the drag, one on another card ends it.
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Raum buchen' }));
+    expect(cmp.kb()).not.toBeNull();
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Haushalt Kapitel 3' }));
+    expect(cmp.kb()).toBeNull();
+    // Without a drag a pointer or a focus changes nothing.
+    fireEvent.pointerDown(document.body);
+    expect(on.moveCard).not.toHaveBeenCalled();
+    elsewhere.remove();
+  });
+
+  it('ends a keyboard drag when a pointer drag starts', async () => {
+    const { cmp, key } = await setup();
+    await key('Raum buchen', ' ');
+    await key('Raum buchen', 'ArrowDown');
+    cmp.onDragStart(cmp.columns()[0]);
+    expect(cmp.kb()).toBeNull();
+    expect(cmp.list(cmp.columns()[0]).map((c) => c.id)).toEqual(['k-1', 'k-2']);
+    // A held card that the board no longer holds ends without an announcement.
+    cmp.kb.set({ cardId: 'gone', col: 0, index: 0, fromCol: 0, fromIndex: 0 });
+    cmp.onDragStart(cmp.columns()[0]);
+    expect(cmp.kb()).toBeNull();
+  });
+
   it('marks the board as a scroll container for the drag', async () => {
     const { container } = await setup();
     expect(container.querySelector('.bv')).toHaveAttribute('cdkScrollable');

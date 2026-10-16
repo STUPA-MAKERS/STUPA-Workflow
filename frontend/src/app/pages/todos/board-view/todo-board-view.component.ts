@@ -72,6 +72,10 @@ interface KeyDrag {
     TabsComponent,
     TodoCardTileComponent,
   ],
+  host: {
+    '(document:focusin)': 'leaveDrag($event)',
+    '(document:pointerdown)': 'leaveDrag($event)',
+  },
   templateUrl: './todo-board-view.component.html',
   styleUrl: './todo-board-view.component.scss',
 })
@@ -168,6 +172,8 @@ export class TodoBoardViewComponent {
   }
 
   onDragStart(col: TodoColumn): void {
+    // A pointer drag computes its move from the shown lists, so a held card goes back first.
+    this.cancelKeyDrag();
     this.ptr.set({ from: col.id, over: col.id });
   }
 
@@ -294,6 +300,29 @@ export class TodoBoardViewComponent {
     }
     this.say('todos.drag.moved', card);
     this.refocus(card.id);
+  }
+
+  /**
+   * A keyboard drag ends when the focus or a pointer goes anywhere but the held card,
+   * because only a key on that card ends it. Without that end the board keeps the card at
+   * its provisional place, with shifted counts. The refocus after a step lands inside the
+   * held card and keeps the drag.
+   */
+  leaveDrag(event: Event): void {
+    const kb = this.kb();
+    if (!kb) return;
+    const target = event.target instanceof Element ? event.target : null;
+    const item = target?.closest('.bv__item');
+    if (item?.querySelector(`[data-card-id="${kb.cardId}"]`)) return;
+    this.cancelKeyDrag();
+  }
+
+  private cancelKeyDrag(): void {
+    const kb = this.kb();
+    if (!kb) return;
+    this.kb.set(null);
+    const card = this.board().cards.find((c) => c.id === kb.cardId);
+    if (card) this.say('todos.drag.cancelled', card);
   }
 
   private commit(card: TodoCardTile): void {
