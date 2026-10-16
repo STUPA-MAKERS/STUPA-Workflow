@@ -175,6 +175,10 @@ export class MeetingsComponent {
         this.timeline.loadList();
       }
     });
+    // A link to an agenda item (`?item=`) opens that item, not the first one.
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed())
+      .subscribe((qp) => this.agendaSvc.requestTop(qp.get('item')));
   }
 
   /** Back from the meeting page to the list. */

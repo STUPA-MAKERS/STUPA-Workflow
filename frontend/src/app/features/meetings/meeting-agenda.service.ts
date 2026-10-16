@@ -32,6 +32,11 @@ export class MeetingAgendaService implements OnDestroy {
   /** Autosave state of the current TOP body. */
   readonly saveState = signal<'idle' | 'saving' | 'saved' | 'error'>('idle');
   private bodyTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * The item a link asks for (`?item=` of `/meetings/:id`, from a to-do link). The first
+   * read of the agenda that holds it selects it, ahead of the item the room handles now.
+   */
+  private requestedTopId: Uuid | null = null;
   /** Debounced TOP edit that the server does not hold yet: the item and the text. */
   private pendingBody: { meetingId: Uuid; itemId: Uuid; body: string } | null = null;
   /**
@@ -72,15 +77,20 @@ export class MeetingAgendaService implements OnDestroy {
   /**
    * Load the agenda. Later calls are quiet refreshes after a WS event or a failed drop.
    *
-   * Without a valid selection the item the room handles now (`preferred`) is opened,
-   * else the first item.
+   * An item that a link asks for (`requestTop`) is opened once it is on the agenda.
+   * Without it and without a valid selection the item the room handles now
+   * (`preferred`) is opened, else the first item.
    */
   load(meetingId: Uuid, preferred: Uuid | null = null): void {
     this.api.listAgenda(meetingId, { quiet: true }).subscribe({
       next: (rows) => {
         this.setRows(rows);
         const sel = this.selectedTopId();
-        if (!sel || !rows.some((r) => r.id === sel)) {
+        const wanted = this.requestedTopId;
+        if (wanted && rows.some((r) => r.id === wanted)) {
+          this.requestedTopId = null;
+          this.selectedTopId.set(wanted);
+        } else if (!sel || !rows.some((r) => r.id === sel)) {
           const now = preferred && rows.some((r) => r.id === preferred) ? preferred : null;
           this.selectedTopId.set(now ?? rows[0]?.id ?? null);
         }
@@ -171,6 +181,18 @@ export class MeetingAgendaService implements OnDestroy {
         this.load(meetingId);
       },
     });
+  }
+
+  /**
+   * Open the item that a link names (`?item=`). The item is selected at once when the
+   * agenda holds it, else at the next read of the agenda. The room does not move.
+   */
+  requestTop(id: Uuid | null): void {
+    this.requestedTopId = id;
+    if (id && this.agenda().some((a) => a.id === id)) {
+      this.requestedTopId = null;
+      this.selectedTopId.set(id);
+    }
   }
 
   /**

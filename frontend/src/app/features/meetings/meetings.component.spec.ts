@@ -167,6 +167,8 @@ async function setup(
     userId?: string | null;
     /** Do NOT auto-answer the initial timeline requests. The test flushes them itself. */
     skipTimelineFlush?: boolean;
+    /** The `?item=` of a link to an agenda item. */
+    item?: string;
   } = {},
 ) {
   const perms = opts.perms ?? ['admin', 'protocol.write'];
@@ -186,7 +188,7 @@ async function setup(
         provide: ActivatedRoute,
         useValue: {
           paramMap: of(convertToParamMap(id ? { id } : {})),
-          queryParamMap: of(convertToParamMap({})),
+          queryParamMap: of(convertToParamMap(opts.item ? { item: opts.item } : {})),
         },
       },
     ],
@@ -414,6 +416,20 @@ describe('MeetingsComponent', () => {
     // The locked protocol leaves no row menu.
     expect(within(agendaSheet).queryByRole('button', { name: /Aktionen für/ })).toBeNull();
     void container;
+  });
+
+  it('opens the agenda item that the link names, not the first one', async () => {
+    const { http, fixture } = await setup({ item: 't-2' });
+    http.expectOne('/api/meetings/m-1').flush(MEETING);
+    http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+    http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([
+      { id: 't-1', applicationId: null, title: 'Erster', body: '', position: 0 },
+      { id: 't-2', applicationId: null, title: 'Zweiter', body: '', position: 1 },
+    ]);
+    flushDelegationContext(http);
+    const cmp = fixture.componentInstance as Cmp;
+    expect(cmp.selectedTopId()).toBe('t-2');
   });
 
   it('tags the non-public TOP while the meeting is still live', async () => {
@@ -2205,7 +2221,7 @@ describe('MeetingsComponent — methods', () => {
           { provide: AuthService, useValue: fakeAuth(['admin', 'protocol.write']) },
           { provide: WsService, useValue: ws },
           { provide: Router, useValue: routerStub() },
-          { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: 'm-1' })) } },
+          { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: 'm-1' })), queryParamMap: of(convertToParamMap({})) } },
         ],
       });
       const http = view.fixture.debugElement.injector.get(HttpTestingController);

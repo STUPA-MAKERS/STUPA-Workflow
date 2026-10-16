@@ -101,3 +101,57 @@ describe('MeetingAgendaService — text of the minute-taker', () => {
     expect(saves.length).toBe(0);
   });
 });
+
+describe('MeetingAgendaService — the item a link names', () => {
+  let svc: MeetingAgendaService;
+  let reads: Subject<AgendaItem[]>[];
+  const rows = (...ids: string[]): AgendaItem[] =>
+    ids.map((id, position) => ({ id, applicationId: null, title: id, body: '', position }));
+
+  beforeEach(() => {
+    reads = [];
+    const api = {
+      listAgenda: jest.fn(() => {
+        const s = new Subject<AgendaItem[]>();
+        reads.push(s);
+        return s;
+      }),
+    };
+    TestBed.configureTestingModule({
+      providers: [
+        MeetingAgendaService,
+        { provide: ApiClient, useValue: api },
+        { provide: ToastService, useValue: { error: jest.fn() } },
+      ],
+    });
+    svc = TestBed.inject(MeetingAgendaService);
+  });
+
+  it('selects the named item at the first read, ahead of the item the room handles', () => {
+    svc.requestTop('t-3');
+    svc.load('m-1', 't-2');
+    reads[0].next(rows('t-1', 't-2', 't-3'));
+    expect(svc.selectedTopId()).toBe('t-3');
+    // A later read keeps the selection the user makes after that.
+    svc.selectTop(null, 't-1');
+    svc.load('m-1', 't-2');
+    reads[1].next(rows('t-1', 't-2', 't-3'));
+    expect(svc.selectedTopId()).toBe('t-1');
+  });
+
+  it('falls back to the item the room handles when the named item is not on the agenda', () => {
+    svc.requestTop('t-9');
+    svc.load('m-1', 't-2');
+    reads[0].next(rows('t-1', 't-2'));
+    expect(svc.selectedTopId()).toBe('t-2');
+  });
+
+  it('selects at once when the agenda already holds the item', () => {
+    svc.agenda.set(rows('t-1', 't-2'));
+    svc.selectedTopId.set('t-1');
+    svc.requestTop('t-2');
+    expect(svc.selectedTopId()).toBe('t-2');
+    svc.requestTop(null);
+    expect(svc.selectedTopId()).toBe('t-2');
+  });
+});
