@@ -362,15 +362,16 @@ export function replaceTile(board: TodoBoard, tile: TodoCardTile): TodoBoard {
 }
 
 /**
- * Put a server tile into the board at its place. A tile that changed its column goes
- * before the first card of the new column with a higher rank, else to the end of it;
- * any other tile keeps its place (`replaceTile`).
+ * Put a server tile into the board at its place. A tile that changed its column, or that
+ * the board does not hold yet (a restored card), goes before the first card of its column
+ * with a higher rank, else to the end of it; any other tile keeps its place (`replaceTile`).
  */
 export function placeTile(board: TodoBoard, tile: TodoCardTile): TodoBoard {
   const old = board.cards.find((c) => c.id === tile.id);
-  if (!old || old.columnId === tile.columnId) return replaceTile(board, tile);
-  const next = board.cards.find((c) => c.id !== tile.id && c.columnId === tile.columnId && c.rank > tile.rank);
-  const moved = applyMove(board, tile.id, next ? { columnId: tile.columnId, beforeId: next.id } : { columnId: tile.columnId });
+  if (old && old.columnId === tile.columnId) return replaceTile(board, tile);
+  const base = old ? board : { ...board, cards: [...board.cards, tile] };
+  const next = base.cards.find((c) => c.id !== tile.id && c.columnId === tile.columnId && c.rank > tile.rank);
+  const moved = applyMove(base, tile.id, next ? { columnId: tile.columnId, beforeId: next.id } : { columnId: tile.columnId });
   return replaceTile(moved, tile);
 }
 

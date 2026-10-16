@@ -340,7 +340,12 @@ describe('todos.util', () => {
       const renamed = placeTile(b, tile({ id: 'k-3', columnId: 'c-4', rank: 'd', title: 'Neu' }));
       expect(order(renamed)).toEqual(order(b));
       expect(renamed.cards[2].title).toBe('Neu');
-      expect(order(placeTile(b, tile({ id: 'k-9', columnId: 'c-1' })))).toEqual(['k-1@c-1', 'k-2@c-4', 'k-3@c-4', 'k-9@c-1']);
+      // A tile the board does not hold (a restored card) also goes in by its rank.
+      expect(order(placeTile(b, tile({ id: 'k-9', columnId: 'c-1' })))).toEqual(['k-1@c-1', 'k-9@c-1', 'k-2@c-4', 'k-3@c-4']);
+      expect(order(placeTile(b, tile({ id: 'k-9', columnId: 'c-4', rank: 'c' })))).toEqual(['k-1@c-1', 'k-2@c-4', 'k-9@c-4', 'k-3@c-4']);
+      const added = placeTile(b, tile({ id: 'k-9', columnId: 'c-2' }));
+      expect(order(added)).toEqual(['k-1@c-1', 'k-2@c-4', 'k-3@c-4', 'k-9@c-2']);
+      expect(added.columns.find((c) => c.id === 'c-2')?.cardCount).toBe(1);
     });
 
     it('opens the first own gremium board, else the personal one, else any', () => {

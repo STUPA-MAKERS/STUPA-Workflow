@@ -586,7 +586,14 @@ export class TodosComponent implements OnDestroy {
     const board = this.board();
     if (!board || card.boardId !== board.id) return;
     this.mutations++;
-    this.board.set(card.archivedAt ? removeTile(board, card.id) : placeTile(board, card));
+    if (card.archivedAt) {
+      this.board.set(removeTile(board, card.id));
+    } else if (board.cards.some((c) => c.id === card.id)) {
+      this.board.set(placeTile(board, card));
+    } else {
+      // A card the board does not hold came back from the archive (the drawer's restore).
+      this.board.set({ ...placeTile(board, card), archivedCount: Math.max(0, board.archivedCount - 1) });
+    }
     this.refreshMine();
   }
 
@@ -612,7 +619,7 @@ export class TodosComponent implements OnDestroy {
     const board = this.board();
     if (!board || card.boardId !== board.id) return;
     this.mutations++;
-    this.board.set({ ...replaceTile(board, card), archivedCount: Math.max(0, board.archivedCount - 1) });
+    this.board.set({ ...placeTile(board, card), archivedCount: Math.max(0, board.archivedCount - 1) });
   }
 
   onSettingsChanged(board: TodoBoard): void {

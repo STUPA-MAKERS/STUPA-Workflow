@@ -403,6 +403,23 @@ describe('TodosComponent', () => {
     expect(cmp.visible().get('c-4')?.map((c) => c.id)).toEqual(['k-5', 'k-1', 'k-6']);
   });
 
+  it('puts a card the drawer restored back at its rank and counts the archive down', async () => {
+    const b = board({ archivedCount: 1, cards: [
+      tile({ id: 'k-5', columnId: 'c-4', rank: 'b' }),
+      tile({ id: 'k-6', columnId: 'c-4', rank: 'd' }),
+    ] });
+    const { cmp } = await start('/todos/b-1', { board: b });
+    cmp.onCardChanged(detail({ id: 'k-7', columnId: 'c-4', rank: 'c', archivedAt: null }));
+    expect(cmp.visible().get('c-4')?.map((c) => c.id)).toEqual(['k-5', 'k-7', 'k-6']);
+    expect(cmp.board()?.archivedCount).toBe(0);
+    // A later change of the same card is no restore: the count stays.
+    cmp.onCardChanged(detail({ id: 'k-7', columnId: 'c-4', rank: 'c', title: 'Neu' }));
+    expect(cmp.board()?.archivedCount).toBe(0);
+    cmp.onRestored(detail({ id: 'k-8', columnId: 'c-4', rank: 'a' }));
+    expect(cmp.visible().get('c-4')?.map((c) => c.id)).toEqual(['k-8', 'k-5', 'k-7', 'k-6']);
+    expect(cmp.board()?.archivedCount).toBe(0);
+  });
+
   it('toggles a card done from the list and back', async () => {
     const { cmp, api } = await start('/todos/b-1');
     cmp.toggleDone(cmp.board()!.cards[0]);
