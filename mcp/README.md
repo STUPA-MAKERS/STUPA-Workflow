@@ -37,7 +37,7 @@ Configure it in your MCP client. Set the platform URL with `ANTRAGSPLATTFORM_URL
 - `ANTRAGSPLATTFORM_URL` (required) — the platform base URL.
 - `ANTRAGSPLATTFORM_SCOPE` (optional) — space-separated OAuth scopes. The default is the
   full curated set (`read applications:write votes:write budget:write meetings:write
-  forms:write flows:write admin:write`). Narrow it to limit what the agent can do.
+  tickets:write todos:write forms:write flows:write admin:write`). Narrow it to limit what the agent can do.
 
 The platform must have OIDC configured. It must also register the public client id of
 this server (`antragsplattform-mcp`, set with `OAUTH_MCP_CLIENT_ID`). The platform accepts
@@ -52,6 +52,8 @@ clients.
 | `applications:write` | comment / transition / manage applications, capture an application on behalf of an applicant (`application.create_on_behalf`) |
 | `votes:write` | create / open / close / cancel / manage votes through the gremium right `vote.manage` (NEVER cast a ballot — only a human may do that. `vote.cast` is in `FORBIDDEN_PERMISSIONS` and is never grantable) |
 | `budget:write` | book expenses, manage cost centers & invoices |
+| `todos:write` | read and write the to-do boards through the gremium rights `todo.write` and `todo.configure` (or the personal board, or a team board's permission) |
+| `tickets:write` | read and work on the tickets (`ticket.manage`) |
 | `meetings:write` | the gremium rights `session.manage` (meetings & agendas, and every vote of the gremium: the votes of its meetings and the application votes that no meeting holds), `protocol.write` (minutes) and `protocol.finalize` (finalize & send the minutes) |
 
 The meeting and vote rights are gremium rights. No global permission grants them. The
@@ -90,6 +92,9 @@ Public meeting (#17): `list_meeting_guests`, `admit_meeting_guest`, `admit_all_m
 `get_meeting_join_link`, `rotate_meeting_join_code`. No tool casts a ballot for a guest.
 On behalf (#11): `create_application_on_behalf`, `search_on_behalf_applicants` (needs
 `application.create_on_behalf`).
+To-dos: `todo_boards`, `todo_board`, `todo_card_get`, `todo_card_create`, `todo_card_update`
+(needs the card `version`), `todo_card_move`, `todo_comment`.
+Tickets: `tickets_list`, `tickets_get`, `tickets_note`, `tickets_update` (need `ticket.manage`).
 Audit: `list_audit`, `verify_audit_chain` (live), `get_latest_audit_verification` (stored).
 
 The list above is not complete. The server has about 160 tools in the modules of

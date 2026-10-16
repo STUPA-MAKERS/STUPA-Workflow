@@ -67,6 +67,13 @@ TYPICAL FLOWS:
   `delete_invoice`. To attach an original PDF: `parse_invoice(file_path)` (ZUGFeRD/Factur-X →
   extracted fields + `fileToken`) or `upload_invoice_file(file_path)`, then pass `fileToken`
   to `create_invoice`.
+- To-dos: `todo_boards` → `todo_board(board_id)` (columns, cards; the `isDone` column is
+  done) → `todo_card_get` → `todo_card_update(card_id, {version, ...})` with the card's
+  current `version` (409 `card_version_conflict`: read again), `todo_card_move` into a
+  column, `todo_comment`. The scope `todos:write` must let the gremium right `todo.write`
+  through.
+- Tickets (help menu reports, `ticket.manage` and scope `tickets:write`): `tickets_list` →
+  `tickets_get` → `tickets_note` (internal) or `tickets_update` (status, assignee, kind).
 - Members and roles: the OIDC groups of the IdP are the only source. No tool adds a member
   or assigns a role. There are three separate group mappings: a group to the membership in
   a Gremium (`create_gremium_membership_mapping`, default role `member`), a group to a
