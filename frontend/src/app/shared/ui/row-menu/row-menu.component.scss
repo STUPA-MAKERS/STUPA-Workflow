@@ -159,11 +159,6 @@
 .rm__loading {
   padding: var(--space-3) var(--space-4) 0;
 }
-/* The skeleton blocks are on surface 3 by default, the same as the menu. One step up, so
-   that they show while a lazy menu loads. */
-.rm__loading ::ng-deep .skel {
-  background: var(--color-surface-4);
-}
 .rm__empty {
   margin: 0;
   padding: var(--space-3) var(--space-4);

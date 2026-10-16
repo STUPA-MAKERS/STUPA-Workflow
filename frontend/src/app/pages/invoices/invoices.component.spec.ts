@@ -269,6 +269,23 @@ describe('InvoicesComponent', () => {
     expect(status?.textContent?.trim()).toBe('Bezahlt');
   });
 
+  it('keeps the old rows dimmed and inert while a filter loads, with a bar under the chips', async () => {
+    const { c, http, container, fixture } = await setup({ initial: [inv({ id: 'a' })] });
+    c.setSegment('inbox');
+    fixture.detectChanges();
+    expect(c.reloading()).toBe(true);
+    expect(c.loading()).toBe(false);
+    expect(container.querySelector('.inv__groups')).toHaveClass('skel-stale');
+    expect(container.querySelector('.inv__groups')).toHaveAttribute('inert');
+    expect(container.querySelector('.skel-progress')).not.toBeNull();
+    c.loadMore(); // no second page while page 0 reloads
+    lastInvoicesReq(http).flush(page([inv({ id: 'b' })]));
+    fixture.detectChanges();
+    expect(c.reloading()).toBe(false);
+    expect(container.querySelector('.inv__groups')).not.toHaveClass('skel-stale');
+    expect(container.querySelector('.skel-progress')).toBeNull();
+  });
+
   it('onSearch debounces and reloads with the q param', async () => {
     const { c, http } = await setup();
     jest.useFakeTimers();

@@ -1,10 +1,4 @@
-@use '../../../shared/ui/view-switch' as vs;
-
 :host {
   display: inline-flex;
   flex: none;
-}
-/* The switch keeps one width in both views (`_view-switch.scss`). */
-app-segmented {
-  @include vs.keep-width;
 }

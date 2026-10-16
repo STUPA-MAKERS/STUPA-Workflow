@@ -1,15 +1,18 @@
 import { Injectable, signal } from '@angular/core';
 
-/** Delay before the overlay appears. This stops a flicker on fast requests. */
-const SHOW_DELAY_MS = 150;
-/** Minimum time the overlay stays visible after it appears. This stops a flash. */
+/**
+ * Delay before the loading bar appears. The same 300ms as the skeletons (`.skel-in`), so a
+ * fast answer shows neither, and a slow one shows both at the same moment.
+ */
+const SHOW_DELAY_MS = 300;
+/** Minimum time the bar stays visible after it appears. This stops a flash. */
 const MIN_VISIBLE_MS = 400;
 
 /**
- * Global loading state. It counts the in-flight HTTP requests through the
+ * Global loading state of the loading bar. It counts the in-flight HTTP requests through the
  * {@link loadingInterceptor}. `visible` turns on after {@link SHOW_DELAY_MS} if at
  * least one request still runs. It then stays on for at least {@link MIN_VISIBLE_MS}.
- * This keeps the overlay from a flicker on fast responses.
+ * This keeps the bar from a flicker on fast responses.
  */
 @Injectable({ providedIn: 'root' })
 export class LoadingService {
@@ -19,7 +22,7 @@ export class LoadingService {
   private hideTimer: ReturnType<typeof setTimeout> | null = null;
 
   private readonly _visible = signal(false);
-  /** True when the app must show the loading overlay. */
+  /** True when the app must show the loading bar. */
   readonly visible = this._visible.asReadonly();
 
   // The timer and the clock are overridable hooks. Tests can then run deterministically

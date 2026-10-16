@@ -118,14 +118,9 @@
   --main-pad-bottom: 0px;
 }
 
-/* The global loading overlay (ui-kit `.lo`, fixed, z-index above the rail) dims the page
-   only. The rail and the phone bar stay clear and usable, so a slow request never keeps
-   the user from going somewhere else. */
-.frame--rail ~ app-loading-overlay ::ng-deep .lo {
-  inset-inline-start: var(--rail-width);
-}
-.frame--phone ~ app-loading-overlay ::ng-deep .lo {
-  bottom: calc(var(--bottom-bar-height) + env(safe-area-inset-bottom));
+/* The loading bar runs along the top edge of the page, not over the rail. */
+.frame--rail ~ app-load-bar {
+  --lb-start: var(--rail-width);
 }
 
 /* Toasts sit above the phone bar instead of on it. */

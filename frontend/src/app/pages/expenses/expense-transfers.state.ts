@@ -31,6 +31,9 @@ export class ExpenseTransfersState {
   readonly total = signal(0);
   readonly loading = signal(false);
   readonly loadingMore = signal(false);
+  /** Page 0 loads again after a filter change while the old rows show: they stay, dimmed
+   *  and inert, until the new ones arrive. */
+  readonly reloading = signal(false);
   readonly saving = signal(false);
   readonly hasMore = computed(() => this.items().length < this.total());
   /** True once a load ran. Before that the tab shows nothing, not "empty". */
@@ -85,11 +88,12 @@ export class ExpenseTransfersState {
     this.fetchEpoch++;
     this.nextOffset = 0;
     this.loading.set(this.items().length === 0);
+    this.reloading.set(this.items().length > 0);
     this.fetch(true);
   }
 
   loadMore(): void {
-    if (this.loading() || this.loadingMore() || !this.hasMore()) return;
+    if (this.loading() || this.loadingMore() || this.reloading() || !this.hasMore()) return;
     this.loadingMore.set(true);
     this.fetch(false);
   }
@@ -105,12 +109,14 @@ export class ExpenseTransfersState {
           this.items.update((cur) => (initial ? page.items : [...cur, ...page.items]));
           this.nextOffset = page.offset + page.items.length;
           this.loading.set(false);
+          this.reloading.set(false);
           this.loadingMore.set(false);
           this.loaded.set(true);
         },
         error: (err) => {
           if (epoch !== this.fetchEpoch) return;
           this.loading.set(false);
+          this.reloading.set(false);
           this.loadingMore.set(false);
           this.loaded.set(true);
           this.toast.error(this.failureText(err));

@@ -1,6 +1,8 @@
 import '@testing-library/jest-dom';
 import { toHaveNoViolations } from 'jest-axe';
 import { setupZoneTestEnv } from 'jest-preset-angular/setup-env/zone';
+import { registerCatalog } from './src/app/core/i18n/translations';
+import { en } from './src/app/core/i18n/translations.en';
 
 setupZoneTestEnv();
 
@@ -41,3 +43,8 @@ if (!('ResizeObserver' in globalThis)) {
   });
 }
 
+
+// The EN catalog is a lazy chunk in the app, which the app initializer loads. Specs run
+// without the initializer, so register it here: a spec that switches to EN reads the
+// strings synchronously, as the app does after its first paint.
+registerCatalog('en', en);

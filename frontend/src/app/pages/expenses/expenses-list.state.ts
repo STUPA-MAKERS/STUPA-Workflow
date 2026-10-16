@@ -28,6 +28,9 @@ export class ExpensesListState {
   readonly total = signal(0);
   readonly loading = signal(true);
   readonly loadingMore = signal(false);
+  /** Page 0 loads again after a filter change while the old rows show: they stay, dimmed
+   *  and inert, until the new ones arrive. */
+  readonly reloading = signal(false);
   readonly hasMore = computed(() => this.items().length < this.total());
   /** Shared in-flight flag for every mutating dialog (create/edit/delete/sub/transfer). */
   readonly saving = signal(false);
@@ -164,12 +167,13 @@ export class ExpensesListState {
     this.fetchEpoch++;
     this.nextOffset = 0;
     this.loading.set(this.items().length === 0);
+    this.reloading.set(this.items().length > 0);
     this.loadingMore.set(false);
     this.fetch(true);
   }
 
   loadMore(): void {
-    if (this.loadingMore() || this.loading() || !this.hasMore()) return;
+    if (this.loadingMore() || this.loading() || this.reloading() || !this.hasMore()) return;
     this.loadingMore.set(true);
     this.fetch(false);
   }
@@ -224,11 +228,13 @@ export class ExpensesListState {
           this.items.update((cur) => (initial ? page.items : [...cur, ...page.items]));
           this.nextOffset = page.offset + page.items.length;
           this.loading.set(false);
+          this.reloading.set(false);
           this.loadingMore.set(false);
         },
         error: () => {
           if (epoch !== this.fetchEpoch) return;
           this.loading.set(false);
+          this.reloading.set(false);
           this.loadingMore.set(false);
         },
       });
