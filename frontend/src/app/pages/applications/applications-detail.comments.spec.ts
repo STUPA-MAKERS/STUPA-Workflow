@@ -197,7 +197,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     http.verify();
   });
 
-  it('posts an internal comment when the toggle says so, then goes back to public', async () => {
+  it('posts an internal comment when the toggle says so and keeps the choice', async () => {
     const { http, type, detectChanges } = await loaded();
     const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
     expect(within(group).getByRole('radio', { name: 'Öffentlich' })).toHaveAttribute('aria-checked', 'true');
@@ -207,7 +207,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     expect(post.request.body).toEqual({ body: 'Nur für uns', visibility: 'internal' });
     post.flush({ ...OWN, body: 'Nur für uns' });
     detectChanges();
-    expect(within(group).getByRole('radio', { name: 'Öffentlich' })).toHaveAttribute('aria-checked', 'true');
+    expect(within(group).getByRole('radio', { name: 'Intern' })).toHaveAttribute('aria-checked', 'true');
     // Both kinds exist: the internal comment carries its mark.
     expect(document.querySelector('.chat__mark--internal')).toHaveTextContent('Intern');
     http.verify();
