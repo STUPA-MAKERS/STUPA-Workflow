@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, JsonValue, field_validator
@@ -48,15 +48,21 @@ def platform_page_url(value: str | None) -> str | None:
     """Keep ``value`` only when it names a page of the platform, else ``None``.
 
     A page is an absolute http(s) URL on the origin of ``PUBLIC_BASE_URL``, or a path
-    that starts with one ``/``. The route is public and the ticket detail shows the url
-    as a link, so a url to another host is dropped instead of being stored.
+    that starts with one ``/`` and resolves against ``PUBLIC_BASE_URL`` to that origin.
+    The route is public and the ticket detail shows the url as a link, so a url to
+    another host is dropped instead of being stored. A value with whitespace or a control
+    character is dropped too, because a browser removes tab, CR and LF before it parses,
+    so ``/\\t/evil.example`` would become ``//evil.example`` and name another host.
     """
-    if value is None:
+    if value is None or any(ord(ch) < 0x21 or ord(ch) == 0x7F for ch in value):
         return None
+    base = get_settings().public_base_url
+    platform = _origin(base)
     if value.startswith("/") and not value.startswith("//") and "\\" not in value:
-        return value
+        resolved = urljoin(base, value)
+        return value if platform is not None and _origin(resolved) == platform else None
     origin = _origin(value)
-    if origin is not None and origin == _origin(get_settings().public_base_url):
+    if origin is not None and origin == platform:
         return value
     return None
 
