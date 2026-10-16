@@ -21,7 +21,7 @@
   } @else {
     <form class="ht__form" (submit)="$event.preventDefault(); save()">
       <section class="ht__sec" aria-labelledby="ht-wiki">
-        <h2 id="ht-wiki" class="cap ht__secTitle">{{ 'admin.helpTickets.wiki' | t }}</h2>
+        <h2 id="ht-wiki" class="sec ht__secTitle">{{ 'admin.helpTickets.wiki' | t }}</h2>
         <app-input
           type="url"
           name="wikiUrl"
@@ -34,7 +34,7 @@
       </section>
 
       <section class="ht__sec" aria-labelledby="ht-reports">
-        <h2 id="ht-reports" class="cap ht__secTitle">{{ 'admin.helpTickets.reports' | t }}</h2>
+        <h2 id="ht-reports" class="sec ht__secTitle">{{ 'admin.helpTickets.reports' | t }}</h2>
         <div class="ht__rows">
           <app-switch
             class="ht__row"

@@ -239,13 +239,43 @@
   padding: 0;
   list-style: none;
 }
+/* A file is a tile: a type icon, the name in mono and "PNG · 96 KB" under it. */
 .chat__file {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-3);
+  max-width: 100%;
+  padding: 6px var(--space-3) 6px 6px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
   color: inherit;
+  text-decoration: none;
+}
+.chat__file:hover .chat__fileName {
+  text-decoration: underline;
+}
+.chat__fileIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  color: var(--color-text-muted);
+}
+.chat__fileText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.chat__fileName {
   font-size: var(--fs-small);
   overflow-wrap: anywhere;
+}
+.chat__fileMeta {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
 }
 .chat__meta {
   display: inline-flex;
@@ -282,10 +312,19 @@
 }
 
 /* Edit and delete of an own message: visible on hover or focus. */
+/* The actions float beside the bubble, so the hidden pill takes no width from it. */
+.chat__line {
+  position: relative;
+}
 .chat__acts {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + var(--space-2));
+  z-index: 1;
   display: inline-flex;
   flex: none;
   gap: 2px;
+  transform: translateY(-50%);
   padding: 2px;
   border-radius: var(--radius-pill);
   background: var(--color-surface-3);
@@ -295,7 +334,8 @@
 }
 /* Beside a message of another person (a moderator) the actions follow the bubble. */
 .chat__row:not(.chat__row--own) .chat__acts {
-  order: 1;
+  right: auto;
+  left: calc(100% + var(--space-2));
 }
 .chat__row:hover .chat__acts,
 .chat__acts:focus-within {

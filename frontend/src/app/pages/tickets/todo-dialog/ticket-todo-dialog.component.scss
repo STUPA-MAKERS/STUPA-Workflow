@@ -1,6 +1,10 @@
 :host {
   display: contents;
 }
+/* Wider than the shared `md` dialog, like "Neues To-Do". */
+:host ::ng-deep .dialog {
+  max-width: 39rem;
+}
 
 .ttd {
   display: flex;
@@ -32,6 +36,8 @@
 .ttd__cap {
   flex: 1 0 100%;
   color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
 }
 .ttd__chip {
   display: inline-flex;

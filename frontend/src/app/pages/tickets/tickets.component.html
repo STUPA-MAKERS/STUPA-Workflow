@@ -76,12 +76,12 @@
                       role="listitem"
                       class="tk__row"
                       [title]="row.item.title"
-                      [sub]="row.sub"
                       [link]="['/tickets', row.item.id]"
                       linkQueryParamsHandling="preserve"
                       [selected]="row.item.id === selectedId()"
                     >
-                      <span lead class="tk__kind" [title]="row.kindLabel">
+                      <span sub><span class="mono">{{ row.item.number }}</span>@if (row.sub) { · {{ row.sub }}}</span>
+                      <span lead class="tk__kind" [attr.data-kind]="row.item.kind" [title]="row.kindLabel">
                         <app-icon [name]="row.icon" [size]="20" />
                         <span class="sr-only">{{ row.kindLabel }}</span>
                       </span>

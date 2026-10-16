@@ -25,7 +25,7 @@
           {{ 'altcha.verifying' | t }}
         }
         @case ('solved') {
-          {{ 'altcha.solved' | t }}
+          {{ 'altcha.idle' | t }}
         }
         @case ('error') {
           {{ 'altcha.error' | t }}
@@ -34,7 +34,13 @@
     </span>
     <span class="altcha__brand" aria-hidden="true">ALTCHA</span>
   </button>
-  <p [id]="noteId" class="altcha__note" [class.altcha__note--error]="state() === 'error'" role="status">
+  <p
+    [id]="noteId"
+    class="altcha__note"
+    [class.sr-only]="state() !== 'error'"
+    [class.altcha__note--error]="state() === 'error'"
+    role="status"
+  >
     @switch (state()) {
       @case ('solved') {
         {{ 'altcha.noteSolved' | t }}

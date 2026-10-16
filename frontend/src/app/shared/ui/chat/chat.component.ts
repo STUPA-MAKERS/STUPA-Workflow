@@ -33,7 +33,9 @@ import { PressSelectDirective } from '@shared/press-select.directive';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { AvatarComponent } from '../avatar/avatar.component';
 import { SideSheetComponent } from '../side-sheet/side-sheet.component';
+import { formatSize } from '../../../features/apply/apply.util';
 import type {
+  ChatAttachment,
   ChatEdit,
   ChatEvent,
   ChatMessage,
@@ -243,6 +245,14 @@ export class ChatComponent {
     const opts: Intl.DateTimeFormatOptions = { weekday: 'short', day: '2-digit', month: '2-digit' };
     if (date.getFullYear() !== today.getFullYear()) opts.year = 'numeric';
     return new Intl.DateTimeFormat(this.i18n.formatLocale(), opts).format(date);
+  }
+
+  /** "PNG · 96 KB": the file type from the name, then the size. */
+  protected fileMeta(file: ChatAttachment): string {
+    const dot = file.filename.lastIndexOf('.');
+    const ext = dot > 0 ? file.filename.slice(dot + 1).toUpperCase() : '';
+    const size = formatSize(file.size, this.i18n.formatLocale());
+    return ext ? `${ext} · ${size}` : size;
   }
 
   protected time(at: string): string {

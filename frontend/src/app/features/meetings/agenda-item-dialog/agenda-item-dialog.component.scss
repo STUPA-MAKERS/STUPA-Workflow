@@ -87,6 +87,22 @@
 .aid__row--todo {
   position: relative;
   padding-block: 9px;
+  border-radius: var(--radius-lg);
+  background: transparent;
+}
+.aid__row--todo:hover {
+  background: var(--color-surface-2);
+}
+.aid__row--todo.aid__row--on {
+  background: var(--color-selected);
+}
+.aid__list:has(.aid__row--todo) {
+  max-height: 22rem;
+}
+.aid__cap--todo {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--color-text-muted);
 }
 .aid__radio--hidden {
   position: absolute;

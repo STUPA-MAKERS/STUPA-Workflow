@@ -59,7 +59,7 @@
         (valueChange)="todoQuery.set($event)"
       />
       <div class="aid__group">
-        <span class="aid__cap cap" id="aid-todos">
+        <span class="aid__cap aid__cap--todo" id="aid-todos">
           {{ 'meetings.agenda.openTodos' | t: { n: shownTodos().length } }}
         </span>
         @if (todosLoading()) {

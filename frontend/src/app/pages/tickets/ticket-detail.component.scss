@@ -123,6 +123,24 @@
 .td__tabs {
   margin-top: calc(-1 * var(--space-5));
 }
+/* One column: two tabs of equal width that fill the row, and the two actions share it. */
+.td__tabs ::ng-deep .tabs {
+  gap: 0;
+}
+.td__tabs ::ng-deep .tabs__tab {
+  flex: 1 1 0;
+  justify-content: center;
+}
+.td:not(.td--split) .td__actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+}
+.td:not(.td--split) .td__act {
+  display: flex;
+}
+.td:not(.td--split) .td__act ::ng-deep .btn {
+  width: 100%;
+}
 .td__panel {
   display: flex;
   flex-direction: column;
@@ -156,9 +174,28 @@
   font-size: var(--fs-small);
 }
 
+/* Two fields side by side, each on its own surface like a row of the group. */
 .td__pair {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  background: transparent;
+}
+.td__pair > * {
+  border-radius: 4px;
+  background: var(--color-surface-2);
+}
+.td__pair:first-child > :first-child {
+  border-top-left-radius: var(--radius-lg);
+}
+.td__pair:first-child > :last-child {
+  border-top-right-radius: var(--radius-lg);
+}
+.td__pair:last-child > :first-child {
+  border-bottom-left-radius: var(--radius-lg);
+}
+.td__pair:last-child > :last-child {
+  border-bottom-right-radius: var(--radius-lg);
 }
 .td__pair time {
   white-space: nowrap;
@@ -168,12 +205,31 @@
 .td__url {
   display: inline;
   color: var(--color-accent-text);
+  text-decoration: none;
   overflow-wrap: anywhere;
 }
+.td__mail:hover,
+.td__url:hover {
+  text-decoration: underline;
+}
+/* An inline select: the value at the start, the chevron at the end of the field. */
 .td__select {
   display: block;
-  margin-inline-start: calc(-1 * var(--space-3));
-  max-width: calc(100% + var(--space-3));
+}
+.td__select ::ng-deep .fs__chip {
+  justify-content: flex-start;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-regular);
+}
+.td__select ::ng-deep .fs__text {
+  max-width: none;
 }
 
 /* The linked to-dos: a circle, the title over "Board · Spalte · fällig", the people. */
@@ -250,9 +306,11 @@
 .td__closeLabel {
   font-weight: var(--fw-medium);
 }
+/* The open to-dos: plain lines under the label of the checkbox. */
 .td__closeList {
   margin: 0;
-  padding-inline-start: calc(var(--space-6) + var(--space-2));
+  padding-inline-start: calc(var(--space-6) + var(--space-1));
+  list-style: none;
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }

@@ -33,7 +33,7 @@ import {
 } from '@shared/ui/filter-select/filter-select.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { SheetBarComponent, SheetBarKickerDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import {
@@ -101,6 +101,7 @@ const BODY_ID = 'ticket-body';
     NoteComponent,
     RowMenuComponent,
     SheetBarComponent,
+    SheetBarKickerDirective,
     SkeletonComponent,
     StatusTextComponent,
     TabsComponent,
@@ -167,7 +168,15 @@ export class TicketDetailComponent {
   readonly kicker = computed(() => {
     const t = this.ticket();
     if (!t) return '';
-    return this.t('tickets.detail.kicker', { number: t.number, when: this.when(t.createdAt) });
+    return this.t('tickets.detail.kicker', { number: t.number, when: this.relativeWhen(t.createdAt) });
+  });
+
+  /** The kicker around the ticket number, which the bar sets in mono. */
+  readonly kickerParts = computed(() => {
+    const text = this.kicker();
+    const no = this.ticket()?.number ?? '';
+    const at = no ? text.indexOf(no) : -1;
+    return at < 0 ? { before: text, number: '', after: '' } : { before: text.slice(0, at), number: no, after: text.slice(at + no.length) };
   });
 
   readonly statusKind = computed(() => STATUS_KIND[this.ticket()?.status ?? 'new']);
@@ -481,6 +490,20 @@ export class TicketDetailComponent {
   // --- formatting ---------------------------------------------------------
 
   /** "14.10., 21:14". */
+  /** "heute, 08:12", "gestern, 21:14", else "14.10., 21:14". */
+  private relativeWhen(at: string): string {
+    const d = new Date(at);
+    const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const days = Math.round((day(new Date()) - day(d)) / 86_400_000);
+    if (days !== 0 && days !== 1) return this.when(at);
+    const time = new Intl.DateTimeFormat(this.i18n.formatLocale(), {
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).format(d);
+    return `${this.t(days === 0 ? 'tickets.age.today' : 'tickets.age.yesterday')}, ${time}`;
+  }
+
   private when(at: string): string {
     return new Intl.DateTimeFormat(this.i18n.formatLocale(), {
       day: '2-digit',

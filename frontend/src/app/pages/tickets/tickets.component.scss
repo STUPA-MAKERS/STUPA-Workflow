@@ -119,6 +119,15 @@
   background: var(--color-surface-2);
   color: var(--color-text-muted);
 }
+/* A bug is tinted in the danger colour, an idea in the success colour. */
+.tk__kind[data-kind='bug'] {
+  background: color-mix(in srgb, var(--color-danger) 16%, transparent);
+  color: var(--color-danger);
+}
+.tk__kind[data-kind='idea'] {
+  background: color-mix(in srgb, var(--color-success) 16%, transparent);
+  color: var(--color-success);
+}
 
 .tk__trail {
   display: flex;

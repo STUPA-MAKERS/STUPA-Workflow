@@ -56,6 +56,7 @@ export interface TicketRow {
   item: TicketListItem;
   icon: IconName;
   kindLabel: string;
+  /** The sub line after the number, which the row sets in mono. */
   sub: string;
   assignee: PersonRef | null;
 }
@@ -409,7 +410,7 @@ export class TicketsComponent implements OnDestroy {
       item,
       icon: KIND_ICON[item.kind],
       kindLabel: t(KIND_LABEL[item.kind]),
-      sub: [item.number, reporterRowName(item.reporter, t), age].filter(Boolean).join(' · '),
+      sub: [reporterRowName(item.reporter, t), age].filter(Boolean).join(' · '),
       assignee: item.assignee,
     };
   }

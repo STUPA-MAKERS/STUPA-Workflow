@@ -15,7 +15,8 @@
 } @else if (ticket(); as ticket) {
   <article class="td" [class.td--split]="split()" aria-labelledby="td-title">
     <header class="td__head">
-      <app-sheet-bar [bleed]="split()" [kicker]="kicker()">
+      <app-sheet-bar [bleed]="split()">
+        <span appSheetBarKicker class="ell" [title]="kicker()">{{ kickerParts().before }}<span class="mono">{{ kickerParts().number }}</span>{{ kickerParts().after }}</span>
         <app-button
           variant="text"
           [iconOnly]="true"
@@ -43,6 +44,7 @@
       <div class="td__actions" role="group" [attr.aria-label]="'tickets.detail.actions' | t">
         @if (open()) {
           <app-button
+            class="td__act"
             variant="fill"
             [loading]="saving() === 'status' && closing() === null"
             [disabled]="saving() !== null"
@@ -51,7 +53,7 @@
             <app-icon name="check" [size]="17" />
             {{ 'tickets.detail.done' | t }}
           </app-button>
-          <app-button variant="tonal" [disabled]="saving() !== null" (click)="close('rejected')">
+          <app-button class="td__act" variant="tonal" [disabled]="saving() !== null" (click)="close('rejected')">
             {{ 'tickets.detail.reject' | t }}
           </app-button>
         } @else {

@@ -399,7 +399,15 @@ describe('ReportDialogComponent', () => {
     const { open, c } = await setup();
     c.env = () => ({ ...ENV, href: '', userAgent: '' });
     await open();
+    expect(c.contextRows().map((r) => r.label)).toEqual(['tickets.context.window', 'tickets.context.time']);
+    c.openedAt.set(null);
     expect(c.contextRows().map((r) => r.label)).toEqual(['tickets.context.window']);
+  });
+
+  it('names the file type before the size', async () => {
+    const { c } = await setup();
+    expect(c.fileType('bild.png')).toBe('PNG · ');
+    expect(c.fileType('README')).toBe('');
   });
 
   it('waits for an upload in flight before it sends', async () => {

@@ -183,11 +183,17 @@ describe('ChatComponent', () => {
     await setup({
       messages: [
         msg('a', today(9), {
-          attachments: [{ id: 'f', filename: 'angebot.pdf', mime: 'application/pdf', size: 10, url: '/api/attachments/f/download' }],
+          attachments: [
+            { id: 'f', filename: 'angebot.pdf', mime: 'application/pdf', size: 10, url: '/api/attachments/f/download' },
+            { id: 'g', filename: 'kopf.png', mime: 'image/png', size: 98_304, url: '/api/attachments/g/download' },
+            { id: 'h', filename: 'README', mime: 'text/plain', size: 2048, url: '/api/attachments/h/download' },
+          ],
         }),
       ],
     });
-    expect(screen.getByRole('link', { name: 'angebot.pdf' })).toHaveAttribute('href', '/api/attachments/f/download');
+    expect(screen.getByRole('link', { name: /^angebot\.pdf/ })).toHaveAttribute('href', '/api/attachments/f/download');
+    const metas = [...document.querySelectorAll('.chat__fileMeta')].map((m) => m.textContent?.trim());
+    expect(metas).toEqual(['PDF · 1 KB', 'PNG · 96 KB', '2 KB']);
   });
 
   it('shows pending, failed and edited states', async () => {

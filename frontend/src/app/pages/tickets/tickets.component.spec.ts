@@ -149,6 +149,8 @@ describe('TicketsComponent', () => {
     expect(row.querySelector('.tk__nobody')).not.toBeNull();
     const other = screen.getByRole('link', { name: /Protokoll-PDF/ }).closest('app-list-item')!;
     expect(other.querySelector('.li__sub')).toHaveTextContent(/^T-0040 · gestern$/);
+    expect(other.querySelector('.li__sub .mono')).toHaveTextContent('T-0040');
+    expect(other.querySelector('.tk__kind')).toHaveAttribute('data-kind', 'idea');
     expect(other).not.toHaveTextContent('kassenwart');
     expect(other.querySelector('app-avatar')).not.toBeNull();
     expect(rail.refresh).not.toHaveBeenCalled();

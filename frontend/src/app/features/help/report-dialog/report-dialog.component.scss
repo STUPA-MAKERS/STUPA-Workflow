@@ -64,7 +64,8 @@
   font: inherit;
   font-size: var(--fs-md);
   line-height: 1.375rem;
-  resize: vertical;
+  resize: none;
+  field-sizing: content;
 }
 .rd__fieldError {
   @include f.message;
@@ -80,6 +81,11 @@
 }
 .rd__cap {
   color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+/* Wider than the shared `md` dialog, like the mockup. */
+:host ::ng-deep .dialog {
+  max-width: 40rem;
 }
 .rd__chips {
   display: flex;
@@ -217,6 +223,10 @@
 }
 .rd__ctxRow a {
   color: var(--color-accent-text);
+  text-decoration: none;
+}
+.rd__ctxRow a:hover {
+  text-decoration: underline;
 }
 
 .rd__error {

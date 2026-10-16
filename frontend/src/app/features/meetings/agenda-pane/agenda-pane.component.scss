@@ -189,16 +189,14 @@
 }
 
 /* Drag and drop: the lift and the drop box of the to-do board. The row in the hand is
-   lifted, tilted a little and has the accent edge; the grip shows on it. */
+   lifted onto an opaque surface with a shadow and tilted a little; the grip shows on it. */
 .ap__preview {
   box-sizing: border-box;
   border-radius: var(--radius-lg);
   background: var(--color-surface-2);
   box-shadow: var(--shadow-elevated);
-  outline: 1.5px solid var(--color-accent);
   /* `rotate`, not `transform`: the CDK sets the inline transform of the preview. */
   rotate: 2deg;
-  opacity: 0.97;
 }
 .ap__preview .ap__grip {
   opacity: 1;

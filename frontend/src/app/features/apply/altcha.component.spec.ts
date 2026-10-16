@@ -57,7 +57,9 @@ describe('AltchaComponent', () => {
     await waitFor(() => expect(solved).toHaveBeenCalledWith(expected));
     // `findByText` polls until the verified state re-renders. The DOM update follows the
     // `solved` emit one change-detection cycle later, so a direct check is flaky under load.
-    expect(await screen.findByText(/Bestätigt/)).toBeInTheDocument();
+    // Solved: the box is ticked, the label stays, the note is only for a screen reader.
+    expect(await screen.findByText('Verifizierung abgeschlossen.')).toHaveClass('sr-only');
+    expect(screen.getByText('Ich bin kein Roboter')).toBeInTheDocument();
   });
 
   it('signals unavailable when altcha is disabled (404 → null)', async () => {

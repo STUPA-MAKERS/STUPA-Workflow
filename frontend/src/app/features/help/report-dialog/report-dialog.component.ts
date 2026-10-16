@@ -120,6 +120,8 @@ export class ReportDialogComponent {
   /** The ALTCHA solution, `''` when the server has ALTCHA off, `null` while unsolved. */
   readonly altcha = signal<string | null>(null);
   readonly context = signal<TicketContext>({});
+  /** When the dialog opened: the time the report shows with its context. */
+  readonly openedAt = signal<Date | null>(null);
   readonly sending = signal(false);
   /** The number of the sent ticket: the dialog then shows only the confirmation. */
   readonly sentNumber = signal<string | null>(null);
@@ -160,6 +162,20 @@ export class ReportDialogComponent {
       const lang = c.language === 'en' ? 'English' : 'Deutsch';
       rows.push({ label: 'tickets.context.window', value: `${viewportLabel(c.viewport)} · ${lang}` });
     }
+    const at = this.openedAt();
+    if (at) {
+      const value = new Intl.DateTimeFormat(this.i18n.formatLocale(), {
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23',
+      }).format(at);
+      rows.push({ label: 'tickets.context.time', value });
+    }
     return rows;
   });
 
@@ -195,6 +211,7 @@ export class ReportDialogComponent {
     this.sending.set(false);
     this.error.set(null);
     this.tried.set(false);
+    this.openedAt.set(new Date());
     this.context.set(
       reportContext(this.env(), this.i18n.locale() === 'en' ? 'en' : 'de', this.theme.resolved()),
     );
@@ -220,6 +237,12 @@ export class ReportDialogComponent {
 
   size(bytes: number): string {
     return formatSize(bytes, this.i18n.formatLocale());
+  }
+
+  /** "PNG · " from the file name, or nothing without an extension. */
+  fileType(name: string): string {
+    const dot = name.lastIndexOf('.');
+    return dot > 0 ? `${name.slice(dot + 1).toUpperCase()} · ` : '';
   }
 
   scanKey(file: DraftFile): TranslationKey {

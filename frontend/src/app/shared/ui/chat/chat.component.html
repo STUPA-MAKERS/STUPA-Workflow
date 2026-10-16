@@ -107,8 +107,13 @@
                       @for (f of m.attachments; track f.id) {
                         <li>
                           <a class="chat__file" [href]="f.url" target="_blank" rel="noopener">
-                            <app-icon name="clip" [size]="15" />
-                            <span class="chat__fileName">{{ f.filename }}</span>
+                            <span class="chat__fileIcon" aria-hidden="true">
+                              <app-icon [name]="f.mime.startsWith('image/') ? 'image' : 'file'" [size]="17" />
+                            </span>
+                            <span class="chat__fileText">
+                              <span class="mono chat__fileName">{{ f.filename }}</span>
+                              <span class="chat__fileMeta">{{ fileMeta(f) }}</span>
+                            </span>
                           </a>
                         </li>
                       }
