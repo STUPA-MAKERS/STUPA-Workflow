@@ -277,12 +277,26 @@ describe('HelpTicketsComponent', () => {
       expect(rows()).toHaveLength(3);
     });
 
-    it('unblocks a sender', async () => {
-      const { tickets, toast } = await setup({ perms: ['admin.site', 'ticket.manage'] });
-      await userEvent.click(screen.getAllByRole('button', { name: 'Entsperren' })[0]);
+    it('unblocks a sender, and the focus goes to the row that takes its place', async () => {
+      const { tickets, toast, fixture } = await setup({ perms: ['admin.site', 'ticket.manage'] });
+      await userEvent.click(screen.getByRole('button', { name: 'spam@example.org entsperren' }));
+      await fixture.whenStable();
       expect(tickets.deleteBlockedSender).toHaveBeenCalledWith('b1');
       expect(rows()).toHaveLength(2);
       expect(toast.success).toHaveBeenCalledWith('Absender entsperrt.');
+      expect(screen.getByRole('button', { name: 'Finn Schulze entsperren' })).toHaveFocus();
+    });
+
+    it('gives the focus to the row before after the last unblock, then to the heading', async () => {
+      const { fixture } = await setup({ perms: ['admin.site', 'ticket.manage'] });
+      await userEvent.click(screen.getByRole('button', { name: 'weg@example.org entsperren' }));
+      await fixture.whenStable();
+      expect(screen.getByRole('button', { name: 'Finn Schulze entsperren' })).toHaveFocus();
+      await userEvent.click(screen.getByRole('button', { name: 'Finn Schulze entsperren' }));
+      await fixture.whenStable();
+      await userEvent.click(screen.getByRole('button', { name: 'spam@example.org entsperren' }));
+      await fixture.whenStable();
+      expect(screen.getByRole('heading', { name: 'Gesperrte Absender' })).toHaveFocus();
     });
 
     it('names a failed unblock and keeps the row, one unblock at a time', async () => {

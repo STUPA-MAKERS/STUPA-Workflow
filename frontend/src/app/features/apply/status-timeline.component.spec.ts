@@ -429,16 +429,22 @@ describe('StatusTimelineComponent', () => {
   });
 
   it('reads the comments again when the chat asks, quietly, and keeps them on a failure', async () => {
-    let answer: Observable<ApplicationComment[]> = of([{ ...COMMENTS[0], body: 'Neu' }]);
+    const file = { id: 'f1', filename: 'a.pdf', mime: 'application/pdf', size: 1 };
+    let answer: Observable<ApplicationComment[]> = of([
+      { ...COMMENTS[0], body: 'Neu', attachments: [{ ...file, scanState: 'scanning' }] },
+    ]);
     const comments = jest.fn((): Observable<ApplicationComment[]> => answer);
     const { comp, fixture } = await setup(fakeApi({ comments: comments as ApiClient['comments'] }));
     await screen.findByRole('heading', { level: 1 });
     comp.commentsOpen.set(true);
     fixture.detectChanges();
     await screen.findByRole('log');
+    // Only the scan state comes from the read; the text on screen stays.
+    answer = of([{ ...COMMENTS[0], body: 'Alt', attachments: [{ ...file, scanState: 'clean' }] }]);
     fixture.debugElement.query((d) => d.name === 'app-chat').triggerEventHandler('refresh');
     expect(comments).toHaveBeenLastCalledWith(ID, { quiet: true });
     expect(comp.comments().map((c) => c.body)).toEqual(['Neu']);
+    expect(comp.comments()[0].attachments?.[0].scanState).toBe('clean');
     answer = throwError(() => new Error('x'));
     (comp as unknown as { refreshComments(id: string): void }).refreshComments(ID);
     expect(comp.comments().map((c) => c.body)).toEqual(['Neu']);
@@ -446,6 +452,18 @@ describe('StatusTimelineComponent', () => {
     answer = of([]);
     (comp as unknown as { refreshComments(id: string): void }).refreshComments('other');
     expect(comp.comments()).toHaveLength(1);
+  });
+
+  it('offers no paperclip on an anonymized application', async () => {
+    const { comp, fixture } = await setup(fakeApi());
+    await screen.findByRole('heading', { level: 1 });
+    comp.commentsOpen.set(true);
+    fixture.detectChanges();
+    await screen.findByRole('log');
+    expect(screen.getByRole('button', { name: 'Datei anhängen' })).toBeInTheDocument();
+    comp.application.update((a) => a && { ...a, applicant: { email: null, name: null, anonymized: true } });
+    fixture.detectChanges();
+    expect(screen.queryByRole('button', { name: 'Datei anhängen' })).toBeNull();
   });
 
   it('keeps a failed comment and sends it again', async () => {

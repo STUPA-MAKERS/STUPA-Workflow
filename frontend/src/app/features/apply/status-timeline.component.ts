@@ -46,7 +46,7 @@ import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
 import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import type { ChatEdit, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/chat.models';
-import { toChatAttachments } from '@shared/ui/chat/chat.util';
+import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { mediaQuerySignal } from '../../layout/media-query';
 import { ButtonComponent, DialogComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
@@ -156,7 +156,7 @@ export class StatusTimelineComponent {
   /** Optimistic send: a new comment shows at once, the server answer replaces it. */
   private readonly outbox = new ChatOutbox<ApplicationComment>(
     (req) => this.api.addComment(this.application()?.id ?? '', req.body, 'public', req),
-    (created) => this.comments.update((list) => [...list, created]),
+    (created) => this.comments.update((list) => appendOnce(list, created)),
     (err) => this.toast.error(this.i18n.translate(sendErrorKey(err, 'status.toast.commentFailed'))),
     draftDropper(this.api),
   );
@@ -359,13 +359,15 @@ export class StatusTimelineComponent {
   }
 
   /**
-   * Read the comments again in the background, for the scan state of their files. A
-   * failure keeps the thread as it is; an answer for another application is dropped.
+   * Read the comments again in the background, for the scan state of their files. Only
+   * the scan states change, because the read can be older than a send, an edit or a
+   * delete. A failure keeps the thread as it is; an answer for another application is
+   * dropped.
    */
   protected refreshComments(appId: Uuid): void {
     this.api.comments(appId, { quiet: true }).subscribe({
       next: (comments) => {
-        if (this.application()?.id === appId) this.comments.set(comments);
+        if (this.application()?.id === appId) this.comments.update((list) => withScanStates(list, comments));
       },
       error: () => undefined,
     });

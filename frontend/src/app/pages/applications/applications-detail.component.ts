@@ -45,7 +45,10 @@ import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.component';
 import {
   ChatComponent,
+  ChatDrafts,
   ChatOutbox,
+  appendOnce,
+  withScanStates,
   draftDropper,
   sendErrorKey,
   toChatAttachments,
@@ -167,7 +170,8 @@ type DetailTab = 'app' | 'history' | 'comments' | 'files';
   ],
   // The field types of the form (`provideFormly`) come with the component, so Formly is not
   // part of the initial bundle.
-  providers: [provideFormly()],
+  // The two layouts re-create the chat; the composer files stay with the page.
+  providers: [provideFormly(), ChatDrafts],
   templateUrl: './applications-detail.component.html',
   styleUrl: './applications-detail.component.scss',
 })
@@ -228,7 +232,7 @@ export class ApplicationsDetailComponent {
   /** Optimistic send: a new comment shows at once, the server answer replaces it. */
   private readonly outbox = new ChatOutbox<ApplicationComment>(
     (req) => this.api.addComment(this.id, req.body, req.visibility ?? 'public', req),
-    (created) => this.comments.update((list) => [...list, created]),
+    (created) => this.comments.update((list) => appendOnce(list, created)),
     (err) => this.toast.error(this.i18n.translate(sendErrorKey(err, 'applications.comments.error'))),
     draftDropper(this.api),
   );
@@ -910,14 +914,15 @@ export class ApplicationsDetailComponent {
   }
 
   /**
-   * Read the comments again in the background, for the scan state of their files. A
-   * failure keeps the thread as it is.
+   * Read the comments again in the background, for the scan state of their files. Only
+   * the scan states change: the read can be older than a comment, an edit or a delete
+   * that ended while it was in flight. A failure keeps the thread as it is.
    */
   protected refreshComments(): void {
     const seq = this.loadSeq;
     this.api.comments(this.id, { quiet: true }).subscribe({
       next: (c) => {
-        if (seq === this.loadSeq) this.comments.set(c);
+        if (seq === this.loadSeq) this.comments.update((list) => withScanStates(list, c));
       },
       error: () => {},
     });

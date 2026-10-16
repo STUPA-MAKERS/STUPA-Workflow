@@ -17,6 +17,7 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
 import {
   ButtonComponent,
@@ -44,6 +45,7 @@ import {
   DraftAttachmentsService,
   type DraftFile,
 } from '../../../features/apply/draft-attachments.service';
+import { ChatDrafts } from './chat-drafts';
 import type {
   ChatAttachment,
   ChatEdit,
@@ -80,6 +82,11 @@ export function chatUploadError(reason: TranslationKey): TranslationKey {
   if (reason === 'apply.files.error.type') return 'chat.error.fileType';
   if (reason === 'apply.files.error.tooLarge') return 'chat.error.fileTooLarge';
   return 'chat.error.upload';
+}
+
+/** The page's drafts, when the chat got them; else null. */
+function heldDrafts(page: ChatDrafts | null, drafts: DraftAttachmentsService): ChatDrafts | null {
+  return page?.holds(drafts) ? page : null;
 }
 
 function pad(n: number): string {
@@ -139,10 +146,12 @@ function writeStore(key: string, value: string | null): void {
  *   The chips show the upload and the scan state and can leave before the send; the
  *   send carries the ids and the token and forgets them. On a message only a clean file
  *   is a link (streamed through the API); a file in the scan or in quarantine is not.
- *   While a file of a sent message is in the scan, `refresh` asks the consumer to read
+ *   A page that provides `ChatDrafts` keeps the files when a layout switch re-creates
+ *   the chat. While a file of a sent message is in the scan, `refresh` asks the consumer to read
  *   the thread again (`SCAN_BACKOFF`), so the chip turns into a link without a reload.
- * - A paste with text (Word, a web page) stays text, even when the clipboard also holds
- *   a picture of it; only a paste of files alone becomes files.
+ * - A paste with plain text (Word, a web page) stays text, even when the clipboard also
+ *   holds a picture of it; a paste of files without plain text (a copied image, which
+ *   comes with an HTML `<img>`) becomes files.
  */
 @Component({
   selector: 'app-chat',
@@ -154,13 +163,20 @@ function writeStore(key: string, value: string | null): void {
     ChatBodyPipe,
     DialogComponent,
     IconComponent,
+    NgTemplateOutlet,
     PressSelectDirective,
     SegmentedComponent,
     SideSheetComponent,
     StatusTextComponent,
     TranslatePipe,
   ],
-  providers: [DraftAttachmentsService, { provide: DRAFT_FILES_PERSIST, useValue: false }],
+  providers: [
+    { provide: DRAFT_FILES_PERSIST, useValue: false },
+    {
+      provide: DraftAttachmentsService,
+      useFactory: () => inject(ChatDrafts, { optional: true })?.claim() ?? new DraftAttachmentsService(),
+    },
+  ],
   host: { '[class.chat--phone]': 'phone()' },
   templateUrl: './chat.component.html',
   styleUrl: './chat.component.scss',
@@ -170,6 +186,13 @@ export class ChatComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
   private readonly drafts = inject(DraftAttachmentsService);
+  /**
+   * The page's drafts (`ChatDrafts`) when this chat holds them: a layout switch that
+   * re-creates the chat keeps the files. Null: the files belong to this chat and go with it.
+   */
+  private readonly pageDrafts = heldDrafts(inject(ChatDrafts, { optional: true }), this.drafts);
+  /** The thread whose files the drafts hold. */
+  private readonly thread: { key: string | null } = this.pageDrafts ?? { key: null };
   private readonly toast = inject(ToastService);
   private readonly apiBase = inject(API_BASE_URL);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -288,7 +311,11 @@ export class ChatComponent {
         this.atBottom.set(true);
         this.editingId.set(null);
         // The files of another thread never go into this one, nor do its running uploads.
-        if (this.drafts.files().length || this.drafts.busy()) void this.drafts.discard();
+        // The same thread in a re-created chat keeps them.
+        if (this.thread.key !== key && (this.drafts.files().length || this.drafts.busy())) {
+          void this.drafts.discard();
+        }
+        this.thread.key = key;
         // A new thread starts on the default visibility (public first), never on the last one.
         this.visibility.set(this.visibilityOptions()[0] ?? null);
       });
@@ -317,7 +344,8 @@ export class ChatComponent {
     });
     this.destroyRef.onDestroy(() => {
       this.stopScanWatch();
-      void this.drafts.discard();
+      if (this.pageDrafts) this.pageDrafts.release();
+      else void this.drafts.discard();
     });
     afterNextRender(() => {
       const observer = new ResizeObserver(() => this.follow());
@@ -523,14 +551,14 @@ export class ChatComponent {
 
   /**
    * A pasted image becomes a file of the message; pasted text stays text. Word, Excel and
-   * many pages put a picture of the selection next to its text, so a clipboard with any
-   * text keeps the text and drops the picture.
+   * many pages put a picture of the selection next to its text, so a clipboard with
+   * plain text keeps the text and drops the picture. "Bild kopieren" in a browser, Slack
+   * or Teams puts the image next to an HTML `<img>` and no plain text: that is a file.
    */
   protected onPaste(event: ClipboardEvent): void {
     if (!this.canAttach()) return;
     const data = event.clipboardData;
-    const types = Array.from(data?.types ?? []);
-    if (types.includes('text/plain') || types.includes('text/html')) return;
+    if (data?.getData('text/plain').trim()) return;
     const files = Array.from(data?.files ?? []);
     if (!files.length) return;
     event.preventDefault();

@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { Subject, of, throwError, type Observable } from 'rxjs';
@@ -9,6 +10,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
 import { AltchaService } from '../../../features/apply/altcha.service';
+import { ChatDrafts } from './chat-drafts';
 import { ChatComponent, SCAN_BACKOFF, chatUploadError } from './chat.component';
 import type { ChatEvent, ChatMessage, ChatVisibility } from './chat.models';
 
@@ -908,7 +910,7 @@ describe('ChatComponent', () => {
       jest.spyOn(cmp, 'now').mockReturnValue(new Date(2026, 9, 15, 10, 45, 0));
       const paste = (files: File[]) => {
         const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
-        Object.defineProperty(event, 'clipboardData', { value: { files } });
+        Object.defineProperty(event, 'clipboardData', { value: { files, getData: () => '' } });
         input().dispatchEvent(event);
         return event;
       };
@@ -933,21 +935,41 @@ describe('ChatComponent', () => {
 
     it('keeps the text of a paste that also holds a picture of it (Word, a web page)', async () => {
       const { input, api, settle } = await setup({ canAttach: true });
-      const paste = (types: string[]) => {
+      const paste = (data: Record<string, string>) => {
         const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
         Object.defineProperty(event, 'clipboardData', {
-          value: { types, files: [new File(['x'], 'image.png', { type: 'image/png' })] },
+          value: {
+            types: [...Object.keys(data), 'Files'],
+            files: [new File(['x'], 'image.png', { type: 'image/png' })],
+            getData: (type: string) => data[type] ?? '',
+          },
         });
         input().dispatchEvent(event);
         return event;
       };
-      expect(paste(['text/plain', 'Files']).defaultPrevented).toBe(false);
-      expect(paste(['text/html', 'Files']).defaultPrevented).toBe(false);
+      expect(paste({ 'text/plain': 'Tabelle', 'text/html': '<table></table>' }).defaultPrevented).toBe(false);
       await settle();
       expect(api.uploadDraftAttachment).not.toHaveBeenCalled();
-      expect(paste(['Files']).defaultPrevented).toBe(true);
+      expect(paste({}).defaultPrevented).toBe(true);
       await settle();
       expect(api.uploadDraftAttachment).toHaveBeenCalledTimes(1);
+    });
+
+    it('takes a copied image that comes with HTML and no plain text (a browser, Slack, Teams)', async () => {
+      const { input, api, settle } = await setup({ canAttach: true });
+      const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
+      Object.defineProperty(event, 'clipboardData', {
+        value: {
+          types: ['text/html', 'Files'],
+          files: [new File(['x'], 'image.png', { type: 'image/png' })],
+          getData: (type: string) => (type === 'text/html' ? '<img src="https://x/y.png">' : ' '),
+        },
+      });
+      input().dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+      await settle();
+      expect(api.uploadDraftAttachment).toHaveBeenCalledTimes(1);
+      expect((api.uploadDraftAttachment.mock.calls[0][0] as File).name).toBe('image.png');
     });
 
     it('takes no pasted file where the thread takes none', async () => {
@@ -969,6 +991,83 @@ describe('ChatComponent', () => {
       await pick(pdf('b.pdf'));
       view.fixture.destroy();
       expect(api.deleteDraftAttachment).toHaveBeenCalledWith('d2', 'tok');
+    });
+
+    it('keeps the files of the page (ChatDrafts) when a layout switch re-creates the chat', async () => {
+      @Component({
+        standalone: true,
+        imports: [ChatComponent],
+        providers: [ChatDrafts],
+        template: `
+          @if (wide()) {
+            <app-chat class="one" [draftKey]="key()" [canAttach]="true" />
+          } @else {
+            <app-chat class="one" [draftKey]="key()" [canAttach]="true" />
+          }
+          @if (second()) {
+            <app-chat class="two" draftKey="other" [canAttach]="true" />
+          }
+        `,
+      })
+      class PageHost {
+        readonly wide = signal(true);
+        readonly key = signal('t1');
+        readonly second = signal(false);
+      }
+      mockPhone(false);
+      let n = 0;
+      const api = {
+        uploadDraftAttachment: jest.fn((file: File) => of(draftOf(file, ++n))),
+        deleteDraftAttachment: jest.fn((): Observable<void> => of(undefined)),
+      };
+      const { fixture } = await render(PageHost, {
+        providers: [
+          { provide: ApiClient, useValue: api },
+          { provide: AuthService, useValue: { isAuthenticated: signal(true) } },
+          { provide: AltchaService, useValue: { solve: jest.fn(async () => 'sol') } },
+          { provide: ToastService, useValue: { success: jest.fn(), error: jest.fn() } },
+        ],
+      });
+      const settle = async () => {
+        await new Promise((r) => setTimeout(r));
+        fixture.detectChanges();
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const chat = (cls: string): any => fixture.debugElement.query(By.css(`app-chat.${cls}`)).componentInstance;
+      const pick = async (cls: string, file: File) => {
+        const box = fixture.nativeElement.querySelector(`app-chat.${cls} .chat__fileInput`) as HTMLInputElement;
+        Object.defineProperty(box, 'files', { value: [file], configurable: true });
+        fireEvent.change(box);
+        await settle();
+      };
+      await pick('one', pdf('a.pdf'));
+      const first = chat('one');
+      fixture.componentInstance.wide.set(false);
+      await settle();
+      expect(chat('one')).not.toBe(first);
+      expect(chat('one').files().map((f: { id: string }) => f.id)).toEqual(['d1']);
+      expect(api.deleteDraftAttachment).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'a.pdf entfernen' })).toBeInTheDocument();
+
+      // A second chat beside it gets drafts of its own, and its files go with it.
+      fixture.componentInstance.second.set(true);
+      await settle();
+      expect(chat('two').files()).toEqual([]);
+      await pick('two', pdf('b.pdf'));
+      expect(chat('one').files().map((f: { id: string }) => f.id)).toEqual(['d1']);
+      fixture.componentInstance.second.set(false);
+      await settle();
+      expect(api.deleteDraftAttachment).toHaveBeenCalledWith('d2', 'tok');
+      expect(api.deleteDraftAttachment).toHaveBeenCalledTimes(1);
+
+      // Another thread drops them; so does the page when it goes.
+      fixture.componentInstance.key.set('t2');
+      await settle();
+      expect(api.deleteDraftAttachment).toHaveBeenCalledWith('d1', 'tok');
+      await pick('one', pdf('c.pdf'));
+      fixture.destroy();
+      await new Promise((r) => setTimeout(r));
+      expect(api.deleteDraftAttachment).toHaveBeenCalledWith('d3', 'tok');
     });
 
     it('drops an upload that is still running when the thread changes', async () => {
@@ -1089,6 +1188,27 @@ describe('ChatComponent', () => {
         'gone.pdf PDF · 1 KB · Nicht mehr vorhanden',
         'lost.pdf PDF · 1 KB · Nicht mehr vorhanden',
       ]);
+    });
+
+    it('keeps the files of a message in view, read-only, while it is in edit', async () => {
+      const { view } = await setup({
+        messages: [
+          msg('m', today(9), {
+            own: true,
+            body: 'Alt',
+            attachments: [
+              { id: 'f1', filename: 'plan.pdf', mime: 'application/pdf', size: 10, url: '/api/attachments/f1/download', scanState: 'clean' },
+              { id: 'f2', filename: 'bild.png', mime: 'image/png', size: 10, url: '/x', scanState: 'scanning' },
+            ],
+          }),
+        ],
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
+      const form = view.container.querySelector('.chat__edit') as HTMLElement;
+      expect(form).not.toBeNull();
+      expect(within(form).getByRole('link', { name: /plan\.pdf/ })).toHaveAttribute('href', '/api/attachments/f1/download');
+      expect(within(form).getByText('bild.png')).toBeInTheDocument();
+      expect(form.querySelectorAll('button[aria-label*="entfernen"]')).toHaveLength(0);
     });
 
     it('offers no edit for a failed message with files', async () => {

@@ -31,6 +31,15 @@ export function missingFiles(err: unknown): Set<string> | null {
   return new Set(ids);
 }
 
+/** The problem codes of a message whose thread takes no files any more (anonymized). */
+const FILES_REFUSED: ReadonlySet<unknown> = new Set(['application_anonymized', 'ticket_anonymized']);
+
+/** A 422 that refuses every file of the message: the application or the ticket is anonymized. */
+export function filesRefused(err: unknown): boolean {
+  const e = err as { status?: unknown; error?: { code?: unknown } } | null;
+  return e?.status === 422 && FILES_REFUSED.has(e.error?.code);
+}
+
 /**
  * A body over the limit of the server: a 413, or a 422 whose errors name the field
  * `body` with a length message ("String should have at most 10000 characters").
@@ -52,6 +61,7 @@ function bodyTooLong(err: unknown): boolean {
 export function sendErrorKey(err: unknown, fallback: TranslationKey): TranslationKey {
   const status = (err as { status?: unknown } | null)?.status;
   if (missingFiles(err)) return 'chat.error.filesMissing';
+  if (filesRefused(err)) return 'chat.error.filesRefused';
   if (bodyTooLong(err)) return 'chat.error.tooLong';
   if (status === 403) return 'chat.error.forbidden';
   return fallback;
@@ -69,7 +79,9 @@ export function sendErrorKey(err: unknown, fallback: TranslationKey): Translatio
  * the named files lost, and `retry` sends the others with the same token. A message
  * with no text and no file left is not sent again: it stays failed and `failed` gets
  * the missing-files error again; "Bearbeiten" then offers its way out. `discard`
- * deletes the drafts of the message through `dropDrafts` (best effort).
+ * deletes the drafts of the message through `dropDrafts` (best effort). A 422
+ * `application_anonymized` or `ticket_anonymized` refuses every file: all of them count
+ * as lost, so a retry sends the text alone and "Bearbeiten" comes back.
  */
 export class ChatOutbox<T> {
   private readonly items = signal<ChatMessage[]>([]);
@@ -141,8 +153,11 @@ export class ChatOutbox<T> {
       },
       error: (err: unknown) => {
         if (!this.requests.has(id)) return;
-        const lost = missingFiles(err);
+        const refused = filesRefused(err);
+        const lost = refused ? new Set(req.attachmentIds ?? []) : missingFiles(err);
         if (lost) this.markLost(id, req, lost);
+        // The server keeps refused drafts unbound: they go now, not at the hourly purge.
+        if (refused && lost?.size && req.draftToken) this.dropDrafts([...lost], req.draftToken);
         this.setState(id, 'failed');
         this.failed(err);
       },

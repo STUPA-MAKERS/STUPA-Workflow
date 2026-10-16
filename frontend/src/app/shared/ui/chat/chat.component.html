@@ -78,6 +78,7 @@
                     (keydown)="onEditKey($event)"
                     [attr.aria-label]="'chat.edit' | t"
                   ></textarea>
+                  <ng-container *ngTemplateOutlet="msgFiles; context: { $implicit: m }" />
                   <span class="chat__editActions">
                     <app-button variant="text" size="sm" (click)="cancelEdit()">{{ 'chat.cancel' | t }}</app-button>
                     <app-button type="submit" variant="fill" size="sm" [disabled]="!editDraft().trim()">{{
@@ -104,38 +105,7 @@
                     </span>
                   }
                   <div class="chat__text" [innerHTML]="m.body | chatBody"></div>
-                  @if (m.attachments?.length) {
-                    <ul class="chat__files">
-                      @for (f of m.attachments; track f.id) {
-                        <li>
-                          @if (isLink(f)) {
-                            <a class="chat__file" [href]="f.url" target="_blank" rel="noopener">
-                              <span class="chat__fileIcon" aria-hidden="true">
-                                <app-icon [name]="f.mime.startsWith('image/') ? 'image' : 'file'" [size]="17" />
-                              </span>
-                              <span class="chat__fileText">
-                                <span class="mono chat__fileName">{{ f.filename }}</span>
-                                <span class="chat__fileMeta">{{ fileMeta(f) }}</span>
-                              </span>
-                            </a>
-                          } @else {
-                            @let st = fileState(f);
-                            <span class="chat__file chat__file--off">
-                              <span class="chat__fileIcon" aria-hidden="true">
-                                <app-icon [name]="f.mime.startsWith('image/') ? 'image' : 'file'" [size]="17" />
-                              </span>
-                              <span class="chat__fileText">
-                                <span class="mono chat__fileName">{{ f.filename }}</span>
-                                <span class="chat__fileMeta">
-                                  {{ fileMeta(f) }} · <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
-                                </span>
-                              </span>
-                            </span>
-                          }
-                        </li>
-                      }
-                    </ul>
-                  }
+                  <ng-container *ngTemplateOutlet="msgFiles; context: { $implicit: m }" />
                 </div>
               }
             </div>
@@ -310,3 +280,39 @@
     </div>
   }
 </app-side-sheet>
+
+<!-- The files of a message: under the bubble, and read-only under its edit (files stay as sent). -->
+<ng-template #msgFiles let-m>
+  @if (m.attachments?.length) {
+    <ul class="chat__files">
+      @for (f of m.attachments; track f.id) {
+        <li>
+          @if (isLink(f)) {
+            <a class="chat__file" [href]="f.url" target="_blank" rel="noopener">
+              <span class="chat__fileIcon" aria-hidden="true">
+                <app-icon [name]="f.mime.startsWith('image/') ? 'image' : 'file'" [size]="17" />
+              </span>
+              <span class="chat__fileText">
+                <span class="mono chat__fileName">{{ f.filename }}</span>
+                <span class="chat__fileMeta">{{ fileMeta(f) }}</span>
+              </span>
+            </a>
+          } @else {
+            @let st = fileState(f);
+            <span class="chat__file chat__file--off">
+              <span class="chat__fileIcon" aria-hidden="true">
+                <app-icon [name]="f.mime.startsWith('image/') ? 'image' : 'file'" [size]="17" />
+              </span>
+              <span class="chat__fileText">
+                <span class="mono chat__fileName">{{ f.filename }}</span>
+                <span class="chat__fileMeta">
+                  {{ fileMeta(f) }} · <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+                </span>
+              </span>
+            </span>
+          }
+        </li>
+      }
+    </ul>
+  }
+</ng-template>

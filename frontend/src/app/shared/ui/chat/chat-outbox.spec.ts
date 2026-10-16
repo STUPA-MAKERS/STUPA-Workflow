@@ -1,5 +1,5 @@
 import { Subject, of, throwError } from 'rxjs';
-import { ChatOutbox, draftDropper, missingFiles, sendErrorKey } from './chat-outbox';
+import { ChatOutbox, draftDropper, filesRefused, missingFiles, sendErrorKey } from './chat-outbox';
 import type { ChatAttachment, ChatSend } from './chat.models';
 
 const FILE_A: ChatAttachment = { id: 'a', filename: 'a.png', mime: 'image/png', size: 1, url: '/a', scanState: 'scanning' };
@@ -126,7 +126,7 @@ describe('ChatOutbox', () => {
   it('takes no other 422 for a long body', () => {
     const v = (errors: unknown) => ({ status: 422, error: { code: 'validation_error', errors } });
     expect(sendErrorKey({ status: 422 }, 'chat.failed')).toBe('chat.failed');
-    expect(sendErrorKey({ status: 422, error: { code: 'ticket_anonymized' } }, 'chat.failed')).toBe('chat.failed');
+    expect(sendErrorKey({ status: 422, error: { code: 'ticket_closed' } }, 'chat.failed')).toBe('chat.failed');
     expect(sendErrorKey(v([{ field: 'body', msg: 'Value error, A message needs a text or at least one file.' }]), 'chat.failed')).toBe('chat.failed');
     expect(sendErrorKey(v([{ field: 'body.draftToken', msg: 'Field required' }]), 'chat.failed')).toBe('chat.failed');
     expect(sendErrorKey(v([null, { field: 1, msg: 'at most' }, { field: 'body.body', msg: 3 }]), 'chat.failed')).toBe('chat.failed');
@@ -211,5 +211,49 @@ describe('ChatOutbox', () => {
     draftDropper({ deleteDraftAttachment: del })(['a', 'bad'], 'tok');
     expect(del).toHaveBeenCalledWith('a', 'tok');
     expect(del).toHaveBeenCalledWith('bad', 'tok');
+  });
+
+  it('marks every file lost when an anonymized thread refuses them, and drops their drafts', () => {
+    const drop = jest.fn();
+    const sent: ChatSend[] = [];
+    const answers: Subject<string>[] = [];
+    const errors: unknown[] = [];
+    const box = new ChatOutbox<string>(
+      (req) => {
+        sent.push(req);
+        const a = new Subject<string>();
+        answers.push(a);
+        return a;
+      },
+      () => undefined,
+      (err) => errors.push(err),
+      drop,
+    );
+    const refused = { status: 422, error: { code: 'application_anonymized', errors: [] } };
+    box.send({ body: 'Text', attachmentIds: ['a', 'b'], draftToken: 'tok', files: [FILE_A, FILE_B] });
+    answers[0].error(refused);
+    const msg = box.messages()[0];
+    expect(msg.state).toBe('failed');
+    expect(msg.attachments).toEqual([{ ...FILE_A, lost: true }, { ...FILE_B, lost: true }]);
+    expect(drop).toHaveBeenCalledWith(['a', 'b'], 'tok');
+    expect(sendErrorKey(errors[0], 'chat.failed')).toBe('chat.error.filesRefused');
+    // The retry sends the text alone.
+    box.retry(msg.id);
+    expect(sent[1].attachmentIds).toEqual([]);
+
+    // Nothing to drop: no files, or no token.
+    box.send({ body: 'ohne' });
+    answers[2].error({ status: 422, error: { code: 'ticket_anonymized' } });
+    box.send({ body: '', attachmentIds: ['c'], draftToken: null });
+    answers[3].error({ status: 422, error: { code: 'ticket_anonymized' } });
+    expect(drop).toHaveBeenCalledTimes(1);
+  });
+
+  it('knows the refusals of an anonymized thread', () => {
+    expect(filesRefused({ status: 422, error: { code: 'application_anonymized' } })).toBe(true);
+    expect(filesRefused({ status: 422, error: { code: 'ticket_anonymized' } })).toBe(true);
+    expect(filesRefused({ status: 409, error: { code: 'ticket_anonymized' } })).toBe(false);
+    expect(filesRefused({ status: 422 })).toBe(false);
+    expect(filesRefused(null)).toBe(false);
   });
 });

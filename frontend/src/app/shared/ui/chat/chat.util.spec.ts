@@ -1,5 +1,6 @@
 import type { ChatMessage } from './chat.models';
 import {
+  appendOnce,
   buildItems,
   chatFileUrl,
   dayKey,
@@ -7,6 +8,7 @@ import {
   linkify,
   newCount,
   toChatAttachments,
+  withScanStates,
   type BuildOptions,
   type ChatItem,
 } from './chat.util';
@@ -182,5 +184,40 @@ describe('message files', () => {
     ]);
     expect(toChatAttachments('/api', undefined)).toEqual([]);
     expect(toChatAttachments('/api', null)).toEqual([]);
+  });
+});
+
+describe('withScanStates and appendOnce', () => {
+  const file = (id: string, scanState: 'scanning' | 'clean' | 'quarantined') => ({
+    id,
+    filename: `${id}.pdf`,
+    mime: 'application/pdf',
+    size: 1,
+    scanState,
+  });
+
+  it('takes only the scan states of a read, keeps every message on screen and the same objects without a change', () => {
+    const plain = { id: 'm0', body: 'ohne' };
+    const same = { id: 'm1', body: 'a', attachments: [file('f1', 'clean')] };
+    const scanning = { id: 'm2', body: 'neu', attachments: [file('f2', 'scanning'), file('f3', 'scanning')] };
+    const delivered = { id: 'm3', body: 'nach dem Lesen', attachments: [file('f4', 'scanning')] };
+    const fresh = [
+      { id: 'm1', body: 'alt', attachments: [file('f1', 'clean')] },
+      { id: 'm2', body: 'alt', attachments: [file('f2', 'quarantined')] },
+      { id: 'gone', attachments: null },
+    ];
+    const out = withScanStates([plain, same, scanning, delivered], fresh);
+    expect(out.map((m) => m.id)).toEqual(['m0', 'm1', 'm2', 'm3']);
+    expect(out[0]).toBe(plain);
+    expect(out[1]).toBe(same);
+    expect(out[2].body).toBe('neu');
+    expect(out[2].attachments?.map((f) => f.scanState)).toEqual(['quarantined', 'scanning']);
+    expect(out[3]).toBe(delivered);
+  });
+
+  it('adds a delivered message once and replaces one already there', () => {
+    const list = [{ id: 'a', v: 1 }];
+    expect(appendOnce(list, { id: 'b', v: 1 })).toEqual([{ id: 'a', v: 1 }, { id: 'b', v: 1 }]);
+    expect(appendOnce([...list, { id: 'b', v: 1 }], { id: 'a', v: 2 })).toEqual([{ id: 'a', v: 2 }, { id: 'b', v: 1 }]);
   });
 });

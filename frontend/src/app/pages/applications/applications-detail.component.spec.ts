@@ -9,6 +9,7 @@ import userEvent from '@testing-library/user-event';
 import { BehaviorSubject } from 'rxjs';
 import { ApplicationsDetailComponent } from './applications-detail.component';
 import { ApplicationsPageService } from './applications-page.service';
+import { DraftAttachmentsService } from '../../features/apply/draft-attachments.service';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { TestBed } from '@angular/core/testing';
 import { AuthService } from '@core/auth/auth.service';
@@ -1536,18 +1537,64 @@ describe('ApplicationsDetailComponent', () => {
     flushAll(http);
     detectChanges();
     flushAttachments(http);
+    const file = { id: 'f1', filename: 'plan.pdf', mime: 'application/pdf', size: 20 };
+    cmp.comments.set([{ ...cmp.comments()[0], attachments: [{ ...file, scanState: 'scanning' }] }]);
     cmp['refreshComments']();
-    http.expectOne(url('/comments')).flush([{ ...COMMENTS[0], body: 'Neu' }]);
-    expect(cmp.comments().map((c) => c.body)).toEqual(['Neu']);
+    // Only the scan state comes from the read: the text on screen stays.
+    http.expectOne(url('/comments')).flush([{ ...COMMENTS[0], body: 'Alt', attachments: [{ ...file, scanState: 'clean' }] }]);
+    expect(cmp.comments().map((c) => c.body)).toEqual(['Bitte Kostenplan ergänzen.']);
+    expect(cmp.comments()[0].attachments?.[0].scanState).toBe('clean');
     cmp['refreshComments']();
     http.expectOne(url('/comments')).flush(null, { status: 500, statusText: 'x' });
-    expect(cmp.comments().map((c) => c.body)).toEqual(['Neu']);
+    expect(cmp.comments()[0].attachments?.[0].scanState).toBe('clean');
     // An answer from before another load is dropped.
     cmp['refreshComments']();
     const late = http.expectOne(url('/comments'));
     (cmp as unknown as { loadSeq: number }).loadSeq++;
     late.flush([]);
     expect(cmp.comments()).toHaveLength(1);
+  });
+
+  it('keeps a comment the outbox delivered while a background read was in flight, once', async () => {
+    const { http, detectChanges, cmp } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    cmp['refreshComments']();
+    const stale = http.expectOne(url('/comments'));
+    cmp['sendComment']({ body: 'Neu' });
+    const created = { ...COMMENTS[0], id: 'c2', body: 'Neu' };
+    // The read was served after the send committed: it already holds c2.
+    stale.flush([...COMMENTS, created]);
+    expect(cmp.comments().map((c) => c.id)).toEqual(['c1']);
+    http.expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-1/comments').flush(created);
+    expect(cmp.comments().map((c) => c.id)).toEqual(['c1', 'c2']);
+  });
+
+  it('offers no paperclip on an anonymized application', async () => {
+    const { http, detectChanges, cmp } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    expect(screen.getByRole('button', { name: 'Datei anhängen' })).toBeInTheDocument();
+    cmp.app.update((a) => a && { ...a, applicant: { ...a.applicant!, anonymized: true } });
+    detectChanges();
+    expect(screen.queryByRole('button', { name: 'Datei anhängen' })).toBeNull();
+  });
+
+  it('keeps the composer files with the page when the layout switch re-creates the chat', async () => {
+    const { http, detectChanges, fixture } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    const chat = () => fixture.debugElement.query((d) => d.name === 'app-chat');
+    const before = chat();
+    const drafts = before.injector.get(DraftAttachmentsService);
+    fixture.debugElement.injector.get(ApplicationsPageService).split.set(false);
+    detectChanges();
+    for (const req of http.match(() => true)) req.flush([]);
+    expect(chat().componentInstance).not.toBe(before.componentInstance);
+    expect(chat().injector.get(DraftAttachmentsService)).toBe(drafts);
   });
 
   it.each([

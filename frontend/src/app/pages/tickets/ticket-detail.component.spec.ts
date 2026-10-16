@@ -17,6 +17,7 @@ import {
 } from '@core/api/tickets.service';
 import { TodosApiService, type TodoLinkedCard } from '@core/api/todos.service';
 import { ToastService } from '@stupa-makers/ui-kit';
+import { DraftAttachmentsService } from '../../features/apply/draft-attachments.service';
 import { TicketDetailComponent, reportScanState } from './ticket-detail.component';
 import { TicketsPageService } from './tickets-page.service';
 
@@ -149,6 +150,7 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
   };
   return {
     harness,
+    page,
     cmp,
     api,
     files,
@@ -770,6 +772,7 @@ describe('TicketDetailComponent', () => {
           },
         ],
       });
+    cmp.notes.set(note('scanning').notes);
     setGet(() => of(note('clean')));
     harness.fixture.debugElement.query((d) => d.name === 'app-chat').triggerEventHandler('refresh');
     expect(api.get).toHaveBeenLastCalledWith('t40');
@@ -785,6 +788,57 @@ describe('TicketDetailComponent', () => {
     await harness.navigateByUrl('/tickets/t41');
     late.next(note('scanning'));
     expect(cmp.ticket()!.id).toBe('t41');
+  });
+
+  it('takes only the scan states of a background read, never older notes or an older block', async () => {
+    const { cmp, setGet } = await start();
+    const stale = new Subject<TicketDetail>();
+    setGet(() => stale);
+    cmp.refreshThread();
+    // While the read is in flight: a note goes out, n1 goes away, the sender gets blocked.
+    cmp.sendNote({ body: 'Neu' });
+    cmp.deleteNote({ id: 'n1' });
+    cmp.onMenu({ id: 'block', label: '' });
+    expect(cmp.ticket()!.senderBlocked).toBe(true);
+    stale.next(
+      detail({
+        attachments: [{ id: 'a1', filename: 'protokoll-kopf.png', mime: 'image/png', size: 98304, scanned: true, scanState: 'quarantined' }],
+        senderBlocked: false,
+      }),
+    );
+    expect(cmp.notes().map((n) => n.id)).toEqual(['n9']);
+    expect(cmp.ticket()!.senderBlocked).toBe(true);
+    expect(cmp.messages()[0].attachments![0].scanState).toBe('quarantined');
+
+    // A report file the read does not know keeps its state; a delivered note joins once.
+    setGet(() => of(detail({ attachments: [], notes: [{ ...detail().notes[0], id: 'n9' }] })));
+    cmp.refreshThread();
+    expect(cmp.messages()[0].attachments![0].scanState).toBe('quarantined');
+    cmp.sendNote({ body: 'Neu' });
+    expect(cmp.notes().map((n) => n.id)).toEqual(['n9']);
+  });
+
+  it('takes the note scan states of a read that lands before the ticket', async () => {
+    const first = new Subject<TicketDetail>();
+    const { cmp, setGet } = await start('/tickets/t40', { get: () => first });
+    expect(cmp.ticket()).toBeNull();
+    setGet(() => of(detail()));
+    cmp.refreshThread();
+    expect(cmp.ticket()).toBeNull();
+    expect(cmp.notes()).toEqual([]);
+  });
+
+  it('keeps the composer files with the page when the layout switch re-creates the chat', async () => {
+    const { harness, page } = await start();
+    const drafts = () =>
+      harness.fixture.debugElement.query((d) => d.name === 'app-chat').injector.get(DraftAttachmentsService);
+    const chat = () => harness.fixture.debugElement.query((d) => d.name === 'app-chat').componentInstance;
+    const before = drafts();
+    const old = chat();
+    page!.split.set(true);
+    harness.detectChanges();
+    expect(chat()).not.toBe(old);
+    expect(drafts()).toBe(before);
   });
 
   it('sends a note with files, and deletes the drafts of a discarded one', async () => {

@@ -68,7 +68,7 @@
 
   @if (canBlock()) {
     <section class="ht__sec" aria-labelledby="ht-blocked">
-      <h2 id="ht-blocked" class="sec ht__secTitle">{{ 'admin.helpTickets.blocked' | t }}</h2>
+      <h2 id="ht-blocked" class="sec ht__secTitle" tabindex="-1">{{ 'admin.helpTickets.blocked' | t }}</h2>
       @if (blocked(); as list) {
         @if (blockedError()) {
           <app-note kind="error" icon="alert" role="alert">{{ 'admin.helpTickets.error.blocked' | t }}</app-note>
@@ -95,6 +95,7 @@
                   size="sm"
                   [loading]="unblocking() === b.id"
                   [disabled]="unblocking() !== null"
+                  [ariaLabel]="'admin.helpTickets.unblockNamed' | t: { name: senderName(b) }"
                   (click)="unblock(b)"
                 >
                   {{ 'admin.helpTickets.unblock' | t }}

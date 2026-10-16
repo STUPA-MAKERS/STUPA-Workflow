@@ -1,4 +1,4 @@
-import type { MessageAttachment } from '@core/api/models';
+import type { MessageAttachment, ScanState } from '@core/api/models';
 import type { ChatAttachment, ChatEvent, ChatMessage, ChatVisibility } from './chat.models';
 
 /** The most files one message carries; the server checks it again. */
@@ -22,6 +22,32 @@ export function toChatAttachments(
     scanState: f.scanState,
     url: chatFileUrl(base, f.id),
   }));
+}
+
+/** A message on the wire with files: a comment, a note or a card comment. */
+interface WithFiles {
+  id: string;
+  attachments?: readonly MessageAttachment[] | null;
+}
+
+/**
+ * The scan states of a background read (`refresh`), put into the list on screen. The
+ * read can be older than a send, an edit or a delete that ended while it was in flight,
+ * so the list keeps its own messages and only the scan state of their files changes.
+ */
+export function withScanStates<T extends WithFiles>(current: readonly T[], fresh: readonly WithFiles[]): T[] {
+  const states = new Map<string, ScanState>();
+  for (const m of fresh) for (const f of m.attachments ?? []) states.set(f.id, f.scanState);
+  return current.map((m) => {
+    const files = m.attachments ?? [];
+    if (!files.some((f) => (states.get(f.id) ?? f.scanState) !== f.scanState)) return m;
+    return { ...m, attachments: files.map((f) => ({ ...f, scanState: states.get(f.id) ?? f.scanState })) };
+  });
+}
+
+/** A delivered message joins the list once; a message with its id already there is replaced. */
+export function appendOnce<T extends { id: string }>(list: readonly T[], item: T): T[] {
+  return list.some((x) => x.id === item.id) ? list.map((x) => (x.id === item.id ? item : x)) : [...list, item];
 }
 
 /** Messages of one person within this time form one group: one name, one avatar. */

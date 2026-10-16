@@ -166,13 +166,25 @@ describe('TodoCardDetailComponent', () => {
   it('reads only the comments again when the chat asks, for the scan state of their files', async () => {
     const { cmp, api, fixture, detect, commentsChanged } = await setup();
     const clean = { ...COMMENT, attachments: [{ ...COMMENT.attachments[0], scanState: 'clean' as const }] };
-    api.card.mockReturnValueOnce(of(detail({ title: 'Anders', comments: [clean], commentCount: 1 })));
+    const count = cmp.card()!.commentCount;
+    api.card.mockReturnValueOnce(
+      of(detail({ title: 'Anders', comments: [{ ...clean, body: 'Alt' }], commentCount: count + 5 })),
+    );
     fixture.debugElement.query((d) => d.name === 'app-chat').triggerEventHandler('refresh');
     detect();
     expect(cmp.card()?.comments[0].attachments[0].scanState).toBe('clean');
-    // The other fields stay as they are.
+    // The other fields stay as they are, the text and the count of the comments too.
     expect(cmp.card()?.title).toBe('Raum buchen');
-    expect(commentsChanged).toHaveBeenLastCalledWith({ id: 'k-1', commentCount: 1 });
+    expect(cmp.card()?.comments[0].body).toBe('Raum ist frei');
+    expect(commentsChanged).toHaveBeenLastCalledWith({ id: 'k-1', commentCount: count });
+
+    // A read from before a send keeps the comment the send delivered.
+    const stale = new Subject<TodoCardDetail>();
+    api.card.mockReturnValueOnce(stale);
+    cmp.refreshComments();
+    cmp.sendComment({ body: 'Neu' });
+    stale.next(detail({ comments: [clean] }));
+    expect(cmp.card()?.comments.map((c) => c.id)).toEqual(['cm-1', 'cm-2']);
 
     // A failure changes nothing; an answer for a card the user left is dropped.
     api.card.mockReturnValueOnce(http(500));
@@ -780,7 +792,8 @@ describe('TodoCardDetailComponent', () => {
     expect(toast.error).toHaveBeenLastCalledWith('Der Kommentar konnte nicht gespeichert werden.');
 
     cmp.deleteComment({ id: 'cm-1' });
-    expect(cmp.card()?.comments.map((c) => c.id)).toEqual(['cm-2', 'cm-2']);
+    // The same answer twice (a mocked server) joins the thread once.
+    expect(cmp.card()?.comments.map((c) => c.id)).toEqual(['cm-2']);
     cmp.card.set({ ...cmp.card()!, commentCount: 0 });
     cmp.deleteComment({ id: 'cm-2' });
     expect(cmp.card()?.commentCount).toBe(0);

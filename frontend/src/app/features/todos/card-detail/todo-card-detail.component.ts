@@ -40,7 +40,7 @@ import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
 import type { ChatEdit, ChatEvent, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/chat.models';
-import { toChatAttachments } from '@shared/ui/chat/chat.util';
+import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import {
   FilterSelectComponent,
@@ -193,7 +193,11 @@ export class TodoCardDetailComponent {
   readonly outbox = new ChatOutbox<TodoComment>(
     (req) => this.postComment(req),
     (comment) =>
-      this.patchComments((c) => ({ ...c, comments: [...c.comments, comment], commentCount: c.commentCount + 1 })),
+      this.patchComments((c) => ({
+        ...c,
+        comments: appendOnce(c.comments, comment),
+        commentCount: c.commentCount + (c.comments.some((x) => x.id === comment.id) ? 0 : 1),
+      })),
     (err) => this.toast.error(this.t(sendErrorKey(err, 'todos.error.comment'))),
     draftDropper(this.files),
   );
@@ -357,7 +361,9 @@ export class TodoCardDetailComponent {
 
   /**
    * Read the comments again in the background, for the scan state of their files. Only
-   * the comments change, so a field in edit keeps its text; a failure changes nothing.
+   * their scan states change, so a field in edit keeps its text and a comment sent,
+   * edited or deleted while the read was in flight stays as it is; a failure changes
+   * nothing.
    */
   refreshComments(): void {
     const id = this.cardId();
@@ -365,7 +371,7 @@ export class TodoCardDetailComponent {
     this.api.card(id).subscribe({
       next: (card) => {
         if (id !== this.cardId() || gen !== this.gen) return;
-        this.patchComments((c) => ({ ...c, comments: card.comments, commentCount: card.commentCount }));
+        this.patchComments((c) => ({ ...c, comments: withScanStates(c.comments, card.comments) }));
       },
       error: () => undefined,
     });

@@ -38,7 +38,8 @@ import { AvatarStackComponent } from '@shared/ui/avatar/avatar.component';
 import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
 import type { ChatEdit, ChatEvent, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/chat.models';
-import { toChatAttachments } from '@shared/ui/chat/chat.util';
+import { ChatDrafts } from '@shared/ui/chat/chat-drafts';
+import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { FieldGroupComponent, FieldRowComponent } from '@shared/ui/field-group/field-group.component';
 import {
@@ -101,7 +102,8 @@ const BODY_ID = 'ticket-body';
  * 5 files (not on an anonymized ticket). Closing a ticket with open to-dos asks "Offene
  * To-Dos mit erledigen?" (default yes). The ⋮ menu blocks or unblocks the sender (frame
  * 19) at once, with a toast (contract 12.8: no question). While a file of the report or
- * a note is in the scan, the chat asks for the thread again (`refreshThread`).
+ * a note is in the scan, the chat asks for the thread again (`refreshThread`), and only
+ * the scan states of that read change the page.
  */
 @Component({
   selector: 'app-ticket-detail',
@@ -133,6 +135,8 @@ const BODY_ID = 'ticket-body';
     TabsComponent,
     TicketTodoDialogComponent,
   ],
+  // The two layouts re-create the chat; the composer files stay with the page.
+  providers: [ChatDrafts],
   templateUrl: './ticket-detail.component.html',
   styleUrl: './ticket-detail.component.scss',
 })
@@ -275,7 +279,7 @@ export class TicketDetailComponent {
   /** The report as the first message, then the notes, then the pending ones. */
   private readonly outbox = new ChatOutbox<TicketNote>(
     (req) => this.api.addNote(this.id, req.body, req),
-    (created) => this.notes.update((list) => [...list, created]),
+    (created) => this.notes.update((list) => appendOnce(list, created)),
     (err) => this.toast.error(this.t(sendErrorKey(err, 'tickets.detail.error.note'))),
     draftDropper(this.files),
   );
@@ -383,18 +387,33 @@ export class TicketDetailComponent {
   }
 
   /**
-   * Read the ticket again in the background, for the scan state of its files. A failure
-   * keeps the page as it is; the next read or a reload tries again.
+   * Read the ticket again in the background, for the scan state of its files. Only the
+   * scan states change: the read can be older than a note, an edit, a delete or a block
+   * that ended while it was in flight. A failure keeps the page as it is; the next read
+   * or a reload tries again.
    */
   refreshThread(): void {
     const id = this.id;
     const seq = this.seq;
     this.api.get(id).subscribe({
       next: (t) => {
-        if (id === this.id && seq === this.seq) this.show(t);
+        if (id === this.id && seq === this.seq) this.takeScanStates(t);
       },
       error: () => undefined,
     });
+  }
+
+  private takeScanStates(fresh: TicketDetail): void {
+    const cur = this.ticket();
+    if (cur) {
+      const report = new Map(fresh.attachments.map((a) => [a.id, a]));
+      const attachments = cur.attachments.map((a) => {
+        const f = report.get(a.id);
+        return f ? { ...a, scanned: f.scanned, scanState: f.scanState } : a;
+      });
+      this.ticket.set({ ...cur, attachments });
+    }
+    this.notes.update((list) => withScanStates(list, fresh.notes));
   }
 
   private show(t: TicketDetail): void {

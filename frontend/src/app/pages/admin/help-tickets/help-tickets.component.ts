@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { TicketsApiService, type TicketBlockedSender } from '@core/api/tickets.service';
@@ -74,6 +83,8 @@ export class HelpTicketsComponent {
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly injector = inject(Injector);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   /** The page needs the site right. The server checks it again. */
   protected readonly allowed = computed(() => this.auth.can('admin.site'));
@@ -171,20 +182,33 @@ export class HelpTicketsComponent {
       : this.i18n.translate('admin.helpTickets.blockedHits.other', { count: b.hitCount });
   }
 
+  /**
+   * The row and its focused button leave the DOM, so the focus goes to the unblock
+   * button of the row that takes its place (or the one before), else to the heading.
+   */
   protected unblock(b: TicketBlockedSender): void {
     if (this.unblocking()) return;
     this.unblocking.set(b.id);
     this.tickets.deleteBlockedSender(b.id).subscribe({
       next: () => {
+        const at = (this.blocked() ?? []).findIndex((x) => x.id === b.id);
         this.unblocking.set(null);
         this.blocked.update((list) => (list ?? []).filter((x) => x.id !== b.id));
         this.toast.success(this.i18n.translate('admin.helpTickets.unblocked'));
+        afterNextRender(() => this.focusAfterUnblock(at), { injector: this.injector });
       },
       error: () => {
         this.unblocking.set(null);
         this.toast.error(this.i18n.translate('admin.helpTickets.error.unblock'));
       },
     });
+  }
+
+  private focusAfterUnblock(at: number): void {
+    const root = this.host.nativeElement;
+    const buttons = Array.from(root.querySelectorAll<HTMLElement>('.ht__blocks button'));
+    const next = buttons[Math.min(Math.max(at, 0), buttons.length - 1)];
+    (next ?? root.querySelector<HTMLElement>('#ht-blocked'))?.focus();
   }
 
   protected monthsText(n: number): string {
