@@ -163,6 +163,30 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.card()?.title).toBe('Raum buchen');
   });
 
+  it('reads only the comments again when the chat asks, for the scan state of their files', async () => {
+    const { cmp, api, fixture, detect, commentsChanged } = await setup();
+    const clean = { ...COMMENT, attachments: [{ ...COMMENT.attachments[0], scanState: 'clean' as const }] };
+    api.card.mockReturnValueOnce(of(detail({ title: 'Anders', comments: [clean], commentCount: 1 })));
+    fixture.debugElement.query((d) => d.name === 'app-chat').triggerEventHandler('refresh');
+    detect();
+    expect(cmp.card()?.comments[0].attachments[0].scanState).toBe('clean');
+    // The other fields stay as they are.
+    expect(cmp.card()?.title).toBe('Raum buchen');
+    expect(commentsChanged).toHaveBeenLastCalledWith({ id: 'k-1', commentCount: 1 });
+
+    // A failure changes nothing; an answer for a card the user left is dropped.
+    api.card.mockReturnValueOnce(http(500));
+    cmp.refreshComments();
+    expect(cmp.error()).toBe(false);
+    const late = new Subject<TodoCardDetail>();
+    api.card.mockReturnValueOnce(late);
+    cmp.refreshComments();
+    fixture.componentRef.setInput('cardId', 'k-2');
+    detect();
+    late.next(detail({ comments: [] }));
+    expect(cmp.card()?.comments).toHaveLength(1);
+  });
+
   it('reads the people once per board and again after a failure', async () => {
     const { cmp, api } = await setup();
     cmp.reload();
@@ -738,7 +762,7 @@ describe('TodoCardDetailComponent', () => {
     expect(failed).toBeDefined();
     expect(toast.error).toHaveBeenLastCalledWith('Der Kommentar konnte nicht gespeichert werden.');
     cmp.retryComment({ id: failed!.id });
-    api.addComment.mockReturnValueOnce(throwError(() => ({ status: 422 })));
+    api.addComment.mockReturnValueOnce(throwError(() => ({ status: 422, error: { errors: [{ field: 'body.body', msg: 'String should have at most 10000 characters' }] } })));
     cmp.sendComment({ body: 'Zu lang' });
     expect(toast.error).toHaveBeenLastCalledWith('Die Nachricht ist zu lang.');
     cmp.discardComment({ id: cmp.messages().find((m) => m.state === 'failed')!.id });

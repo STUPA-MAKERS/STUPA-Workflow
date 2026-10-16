@@ -115,11 +115,32 @@ describe('ChatOutbox', () => {
   });
 
   it('names the reason of a failed send', () => {
-    expect(sendErrorKey({ status: 422 }, 'chat.failed')).toBe('chat.error.tooLong');
+    const tooLong = { status: 422, error: { errors: [{ field: 'body.body', msg: 'String should have at most 10000 characters' }] } };
+    expect(sendErrorKey(tooLong, 'chat.failed')).toBe('chat.error.tooLong');
     expect(sendErrorKey({ status: 413 }, 'chat.failed')).toBe('chat.error.tooLong');
     expect(sendErrorKey({ status: 403 }, 'chat.failed')).toBe('chat.error.forbidden');
     expect(sendErrorKey({ status: 500 }, 'chat.failed')).toBe('chat.failed');
     expect(sendErrorKey(null, 'chat.failed')).toBe('chat.failed');
+  });
+
+  it('takes no other 422 for a long body', () => {
+    const v = (errors: unknown) => ({ status: 422, error: { code: 'validation_error', errors } });
+    expect(sendErrorKey({ status: 422 }, 'chat.failed')).toBe('chat.failed');
+    expect(sendErrorKey({ status: 422, error: { code: 'ticket_anonymized' } }, 'chat.failed')).toBe('chat.failed');
+    expect(sendErrorKey(v([{ field: 'body', msg: 'Value error, A message needs a text or at least one file.' }]), 'chat.failed')).toBe('chat.failed');
+    expect(sendErrorKey(v([{ field: 'body.draftToken', msg: 'Field required' }]), 'chat.failed')).toBe('chat.failed');
+    expect(sendErrorKey(v([null, { field: 1, msg: 'at most' }, { field: 'body.body', msg: 3 }]), 'chat.failed')).toBe('chat.failed');
+  });
+
+  it('keeps a message with no text and no file left failed, without a resend', () => {
+    outbox.send({ body: ' ', attachmentIds: ['a'], draftToken: 'tok', files: [FILE_A] });
+    calls[0].answer.error(missing('a'));
+    const msg = outbox.messages()[0];
+    outbox.retry(msg.id);
+    expect(calls).toHaveLength(1);
+    expect(outbox.messages()[0].state).toBe('failed');
+    expect(failures).toHaveLength(2);
+    expect(sendErrorKey(failures[1], 'chat.failed')).toBe('chat.error.filesMissing');
   });
 
   it('names a lost file before a long body', () => {

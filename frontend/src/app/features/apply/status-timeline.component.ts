@@ -358,6 +358,19 @@ export class StatusTimelineComponent {
     }
   }
 
+  /**
+   * Read the comments again in the background, for the scan state of their files. A
+   * failure keeps the thread as it is; an answer for another application is dropped.
+   */
+  protected refreshComments(appId: Uuid): void {
+    this.api.comments(appId, { quiet: true }).subscribe({
+      next: (comments) => {
+        if (this.application()?.id === appId) this.comments.set(comments);
+      },
+      error: () => undefined,
+    });
+  }
+
   private load(appId: Uuid): void {
     if (!appId) {
       this.phase.set('error');

@@ -355,6 +355,22 @@ export class TodoCardDetailComponent {
     this.load(this.cardId(), false);
   }
 
+  /**
+   * Read the comments again in the background, for the scan state of their files. Only
+   * the comments change, so a field in edit keeps its text; a failure changes nothing.
+   */
+  refreshComments(): void {
+    const id = this.cardId();
+    const gen = this.gen;
+    this.api.card(id).subscribe({
+      next: (card) => {
+        if (id !== this.cardId() || gen !== this.gen) return;
+        this.patchComments((c) => ({ ...c, comments: card.comments, commentCount: card.commentCount }));
+      },
+      error: () => undefined,
+    });
+  }
+
   private load(id: Uuid, fresh: boolean): void {
     const seq = ++this.seq;
     if (fresh) {

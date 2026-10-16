@@ -61,6 +61,11 @@ const DRAFT_PREFIX = 'ap.chat.draft.';
 /** The longest body the server takes for a comment, a note or a card comment. */
 export const CHAT_MAX_LENGTH = 10_000;
 const SEEN_PREFIX = 'ap.chat.seen.';
+/**
+ * The waits between two reads of a thread while a file of a message is in the scan, in
+ * ms: about 30 s in all. The ClamAV scan runs in the worker after the send.
+ */
+export const SCAN_BACKOFF: readonly number[] = [2_000, 4_000, 8_000, 16_000];
 
 /** The extension of a pasted image without a name of its own. */
 const PASTE_EXT: Readonly<Record<string, string>> = {
@@ -134,6 +139,10 @@ function writeStore(key: string, value: string | null): void {
  *   The chips show the upload and the scan state and can leave before the send; the
  *   send carries the ids and the token and forgets them. On a message only a clean file
  *   is a link (streamed through the API); a file in the scan or in quarantine is not.
+ *   While a file of a sent message is in the scan, `refresh` asks the consumer to read
+ *   the thread again (`SCAN_BACKOFF`), so the chip turns into a link without a reload.
+ * - A paste with text (Word, a web page) stays text, even when the clipboard also holds
+ *   a picture of it; only a paste of files alone becomes files.
  */
 @Component({
   selector: 'app-chat',
@@ -163,6 +172,7 @@ export class ChatComponent {
   private readonly drafts = inject(DraftAttachmentsService);
   private readonly toast = inject(ToastService);
   private readonly apiBase = inject(API_BASE_URL);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   readonly messages = input<readonly ChatMessage[]>([]);
   readonly events = input<readonly ChatEvent[]>([]);
@@ -181,6 +191,8 @@ export class ChatComponent {
   readonly retry = output<ChatRef>();
   /** A failed message leaves the thread: "Verwerfen", or "Bearbeiten" back into the composer. */
   readonly discard = output<ChatRef>();
+  /** Read the thread again: a file of a sent message is still in the scan. */
+  readonly refresh = output<void>();
 
   protected readonly phone = mediaQuerySignal(MEDIA.phone);
   private readonly coarse = mediaQuerySignal('(pointer: coarse)');
@@ -250,6 +262,20 @@ export class ChatComponent {
     this.atBottom() ? 0 : newCount(this.messages(), this.seenAt()),
   );
 
+  /** The ids of the files of sent messages that are in the scan, sorted and joined. */
+  private readonly scanning = computed(() => {
+    const ids: string[] = [];
+    for (const m of this.messages()) {
+      if (isPending(m)) continue;
+      for (const f of m.attachments ?? []) if (!f.lost && f.scanState === 'scanning') ids.push(f.id);
+    }
+    return ids.sort().join(' ');
+  });
+  /** The scanning files the current back-off waits for. */
+  private scanIds = new Set<string>();
+  private scanStep = 0;
+  private scanTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor() {
     effect(() => {
       const key = this.draftKey();
@@ -261,8 +287,8 @@ export class ChatComponent {
         this.stick = true;
         this.atBottom.set(true);
         this.editingId.set(null);
-        // The files of another thread never go into this one.
-        if (this.drafts.files().length) void this.drafts.discard();
+        // The files of another thread never go into this one, nor do its running uploads.
+        if (this.drafts.files().length || this.drafts.busy()) void this.drafts.discard();
         // A new thread starts on the default visibility (public first), never on the last one.
         this.visibility.set(this.visibilityOptions()[0] ?? null);
       });
@@ -285,12 +311,54 @@ export class ChatComponent {
       const messages = this.messages();
       untracked(() => this.refocusAfterDelete(messages));
     });
-    this.destroyRef.onDestroy(() => void this.drafts.discard());
+    effect(() => {
+      const ids = this.scanning();
+      untracked(() => this.watchScan(ids));
+    });
+    this.destroyRef.onDestroy(() => {
+      this.stopScanWatch();
+      void this.drafts.discard();
+    });
     afterNextRender(() => {
       const observer = new ResizeObserver(() => this.follow());
       observer.observe(this.log().nativeElement);
       this.destroyRef.onDestroy(() => observer.disconnect());
     });
+  }
+
+  /**
+   * A new file in the scan starts the back-off again; the last file out of the scan ends
+   * it. When the back-off runs out, the next send starts it again.
+   */
+  private watchScan(joined: string): void {
+    if (!joined) {
+      this.stopScanWatch();
+      this.scanIds = new Set();
+      return;
+    }
+    const ids = joined.split(' ');
+    const fresh = ids.some((id) => !this.scanIds.has(id));
+    this.scanIds = new Set(ids);
+    if (!fresh) return;
+    this.stopScanWatch();
+    this.scanStep = 0;
+    this.armScanWatch();
+  }
+
+  private armScanWatch(): void {
+    const wait = SCAN_BACKOFF[this.scanStep];
+    if (wait === undefined) return;
+    this.scanTimer = setTimeout(() => {
+      this.scanTimer = null;
+      this.scanStep++;
+      this.refresh.emit();
+      this.armScanWatch();
+    }, wait);
+  }
+
+  private stopScanWatch(): void {
+    if (this.scanTimer !== null) clearTimeout(this.scanTimer);
+    this.scanTimer = null;
   }
 
   /** The time of the newest sent message, or null. */
@@ -453,10 +521,17 @@ export class ChatComponent {
     void this.addFiles(files);
   }
 
-  /** A pasted image becomes a file of the message; pasted text stays text. */
+  /**
+   * A pasted image becomes a file of the message; pasted text stays text. Word, Excel and
+   * many pages put a picture of the selection next to its text, so a clipboard with any
+   * text keeps the text and drops the picture.
+   */
   protected onPaste(event: ClipboardEvent): void {
     if (!this.canAttach()) return;
-    const files = Array.from(event.clipboardData?.files ?? []);
+    const data = event.clipboardData;
+    const types = Array.from(data?.types ?? []);
+    if (types.includes('text/plain') || types.includes('text/html')) return;
+    const files = Array.from(data?.files ?? []);
     if (!files.length) return;
     event.preventDefault();
     void this.addFiles(files.map((f) => this.named(f)));
@@ -498,10 +573,29 @@ export class ChatComponent {
     }
   }
 
+  /**
+   * The remove button leaves the DOM with its chip, so the focus goes to the remove
+   * button of the chip that takes its place (or the one before), else to the text box.
+   */
   protected async removeFile(file: DraftFile): Promise<void> {
+    const at = this.files().findIndex((f) => f.id === file.id);
     if (!(await this.drafts.remove(file.id))) {
       this.toast.error(this.i18n.translate('apply.files.error.delete'));
+      return;
     }
+    afterNextRender(
+      () => {
+        const buttons = Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>('.chat__draftX'));
+        const next = buttons[Math.min(at, buttons.length - 1)];
+        (next ?? this.composerInput()?.nativeElement)?.focus();
+      },
+      { injector: this.injector },
+    );
+  }
+
+  /** "Bearbeiten" on a failed message: only while it has no file the server still holds. */
+  protected canEditFailed(msg: ChatMessage): boolean {
+    return (msg.attachments ?? []).every((f) => f.lost);
   }
 
   // --- failed messages -------------------------------------------------------------

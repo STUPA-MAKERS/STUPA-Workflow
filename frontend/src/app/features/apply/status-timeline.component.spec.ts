@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of, throwError, type Observable } from 'rxjs';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
@@ -426,6 +426,26 @@ describe('StatusTimelineComponent', () => {
     expect(comp.authorName(COMMENTS[1])).toBe('Du');
     comp.comments.set([COMMENTS[0]]);
     expect(comp.commentsSub()).toBe('1 Kommentar');
+  });
+
+  it('reads the comments again when the chat asks, quietly, and keeps them on a failure', async () => {
+    let answer: Observable<ApplicationComment[]> = of([{ ...COMMENTS[0], body: 'Neu' }]);
+    const comments = jest.fn((): Observable<ApplicationComment[]> => answer);
+    const { comp, fixture } = await setup(fakeApi({ comments: comments as ApiClient['comments'] }));
+    await screen.findByRole('heading', { level: 1 });
+    comp.commentsOpen.set(true);
+    fixture.detectChanges();
+    await screen.findByRole('log');
+    fixture.debugElement.query((d) => d.name === 'app-chat').triggerEventHandler('refresh');
+    expect(comments).toHaveBeenLastCalledWith(ID, { quiet: true });
+    expect(comp.comments().map((c) => c.body)).toEqual(['Neu']);
+    answer = throwError(() => new Error('x'));
+    (comp as unknown as { refreshComments(id: string): void }).refreshComments(ID);
+    expect(comp.comments().map((c) => c.body)).toEqual(['Neu']);
+    // An answer for another application is dropped.
+    answer = of([]);
+    (comp as unknown as { refreshComments(id: string): void }).refreshComments('other');
+    expect(comp.comments()).toHaveLength(1);
   });
 
   it('keeps a failed comment and sends it again', async () => {

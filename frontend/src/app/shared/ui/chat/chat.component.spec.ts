@@ -9,7 +9,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
 import { AltchaService } from '../../../features/apply/altcha.service';
-import { ChatComponent, chatUploadError } from './chat.component';
+import { ChatComponent, SCAN_BACKOFF, chatUploadError } from './chat.component';
 import type { ChatEvent, ChatMessage, ChatVisibility } from './chat.models';
 
 /** A time today, so the day separator reads "Heute". */
@@ -84,6 +84,7 @@ async function setup(opts: SetupOpts = {}) {
   const del = jest.fn();
   const retry = jest.fn();
   const discard = jest.fn();
+  const refresh = jest.fn();
   let n = 0;
   const api = {
     uploadDraftAttachment: jest.fn((file: File, o: { token?: string | null }) =>
@@ -101,7 +102,7 @@ async function setup(opts: SetupOpts = {}) {
       draftKey: opts.draftKey ?? 't1',
       canAttach: opts.canAttach ?? false,
     },
-    on: { send, edit, delete: del, retry, discard },
+    on: { send, edit, delete: del, retry, discard, refresh },
     providers: [
       { provide: ApiClient, useValue: api },
       { provide: AuthService, useValue: { isAuthenticated: signal(true) } },
@@ -128,7 +129,7 @@ async function setup(opts: SetupOpts = {}) {
     await new Promise((r) => setTimeout(r));
     view.fixture.detectChanges();
   };
-  return { view, send, edit, del, retry, discard, set, log, input, cmp, api, toast, pick, settle, user: userEvent.setup() };
+  return { view, send, edit, del, retry, discard, refresh, set, log, input, cmp, api, toast, pick, settle, user: userEvent.setup() };
 }
 
 describe('ChatComponent', () => {
@@ -930,6 +931,25 @@ describe('ChatComponent', () => {
       expect(plain.defaultPrevented).toBe(false);
     });
 
+    it('keeps the text of a paste that also holds a picture of it (Word, a web page)', async () => {
+      const { input, api, settle } = await setup({ canAttach: true });
+      const paste = (types: string[]) => {
+        const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
+        Object.defineProperty(event, 'clipboardData', {
+          value: { types, files: [new File(['x'], 'image.png', { type: 'image/png' })] },
+        });
+        input().dispatchEvent(event);
+        return event;
+      };
+      expect(paste(['text/plain', 'Files']).defaultPrevented).toBe(false);
+      expect(paste(['text/html', 'Files']).defaultPrevented).toBe(false);
+      await settle();
+      expect(api.uploadDraftAttachment).not.toHaveBeenCalled();
+      expect(paste(['Files']).defaultPrevented).toBe(true);
+      await settle();
+      expect(api.uploadDraftAttachment).toHaveBeenCalledTimes(1);
+    });
+
     it('takes no pasted file where the thread takes none', async () => {
       const { input, api } = await setup();
       const event = new Event('paste', { bubbles: true, cancelable: true }) as ClipboardEvent;
@@ -949,6 +969,90 @@ describe('ChatComponent', () => {
       await pick(pdf('b.pdf'));
       view.fixture.destroy();
       expect(api.deleteDraftAttachment).toHaveBeenCalledWith('d2', 'tok');
+    });
+
+    it('drops an upload that is still running when the thread changes', async () => {
+      const answer = new Subject<DraftUpload>();
+      const { pick, set, api, cmp, settle, view } = await setup({ canAttach: true, upload: () => answer });
+      await pick(pdf());
+      expect(cmp.uploads()).toHaveLength(1);
+      set('draftKey', 't2');
+      await settle();
+      expect(cmp.uploads()).toEqual([]);
+      answer.next(draftOf(pdf(), 1));
+      answer.complete();
+      await settle();
+      expect(cmp.files()).toEqual([]);
+      expect(view.container.querySelectorAll('.chat__draft')).toHaveLength(0);
+      expect(api.deleteDraftAttachment).toHaveBeenCalledWith('d1', 'tok');
+    });
+
+    it('moves the focus to the next chip, then the one before, then the text box after a remove', async () => {
+      const { pick, settle, input } = await setup({ canAttach: true });
+      await pick(pdf('a.pdf'), pdf('b.pdf'), pdf('c.pdf'));
+      fireEvent.click(screen.getByRole('button', { name: 'b.pdf entfernen' }));
+      await settle();
+      expect(screen.getByRole('button', { name: 'c.pdf entfernen' })).toHaveFocus();
+      fireEvent.click(screen.getByRole('button', { name: 'c.pdf entfernen' }));
+      await settle();
+      expect(screen.getByRole('button', { name: 'a.pdf entfernen' })).toHaveFocus();
+      fireEvent.click(screen.getByRole('button', { name: 'a.pdf entfernen' }));
+      await settle();
+      expect(input()).toHaveFocus();
+    });
+
+    describe('scan refresh', () => {
+      const scanning = (id: string, extra: Partial<ChatMessage> = {}) =>
+        msg(id, today(9), {
+          attachments: [{ id: `f-${id}`, filename: 'a.png', mime: 'image/png', size: 1, url: '/a', scanState: 'scanning' }],
+          ...extra,
+        });
+      beforeEach(() => jest.useFakeTimers());
+      afterEach(() => jest.useRealTimers());
+
+      it('reads the thread again with a back-off while a sent file is in the scan', async () => {
+        const { refresh, set } = await setup({ messages: [scanning('a')] });
+        expect(SCAN_BACKOFF.reduce((a, b) => a + b, 0)).toBe(30_000);
+        jest.advanceTimersByTime(SCAN_BACKOFF[0] - 1);
+        expect(refresh).not.toHaveBeenCalled();
+        jest.advanceTimersByTime(1);
+        expect(refresh).toHaveBeenCalledTimes(1);
+        jest.advanceTimersByTime(SCAN_BACKOFF[1]);
+        expect(refresh).toHaveBeenCalledTimes(2);
+        // The same file still in the scan keeps the back-off where it is.
+        set('messages', [scanning('a', { body: 'neu' })]);
+        jest.advanceTimersByTime(SCAN_BACKOFF[2] + SCAN_BACKOFF[3]);
+        expect(refresh).toHaveBeenCalledTimes(4);
+        // The back-off has run out.
+        jest.advanceTimersByTime(60_000);
+        expect(refresh).toHaveBeenCalledTimes(4);
+        // A new file in the scan starts it again.
+        set('messages', [scanning('a'), scanning('b')]);
+        jest.advanceTimersByTime(SCAN_BACKOFF[0]);
+        expect(refresh).toHaveBeenCalledTimes(5);
+        // One file out of the scan, another still in it: the back-off goes on.
+        set('messages', [scanning('b')]);
+        jest.advanceTimersByTime(SCAN_BACKOFF[1]);
+        expect(refresh).toHaveBeenCalledTimes(6);
+      });
+
+      it('stops once the scan is done, and never runs for pending, lost or clean files', async () => {
+        const { refresh, set, view } = await setup({ messages: [scanning('a')] });
+        set('messages', [msg('a', today(9), { attachments: [{ id: 'f-a', filename: 'a.png', mime: 'image/png', size: 1, url: '/a', scanState: 'clean' }] })]);
+        jest.advanceTimersByTime(60_000);
+        expect(refresh).not.toHaveBeenCalled();
+        set('messages', [
+          scanning('p', { state: 'sending' }),
+          msg('l', today(9), { attachments: [{ id: 'f-l', filename: 'a.png', mime: 'image/png', size: 1, url: '/a', scanState: 'scanning', lost: true }] }),
+          msg('n', today(9)),
+        ]);
+        jest.advanceTimersByTime(60_000);
+        expect(refresh).not.toHaveBeenCalled();
+        set('messages', [scanning('a')]);
+        view.fixture.destroy();
+        jest.advanceTimersByTime(60_000);
+        expect(refresh).not.toHaveBeenCalled();
+      });
     });
 
     it('links only clean files of a message; others show their scan state', async () => {
@@ -999,6 +1103,21 @@ describe('ChatComponent', () => {
       });
       expect(screen.getByRole('button', { name: 'Erneut senden' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Bearbeiten' })).not.toBeInTheDocument();
+    });
+
+    it('offers the edit once every file of a failed message is lost', async () => {
+      const { discard } = await setup({
+        messages: [
+          msg('f', today(10), {
+            own: true,
+            body: '',
+            state: 'failed',
+            attachments: [{ id: 'x', filename: 'x.pdf', mime: 'application/pdf', size: 1, url: '/x', lost: true }],
+          }),
+        ],
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+      expect(discard).toHaveBeenCalledWith({ id: 'f' });
     });
 
     it('marks a lost file in the composer', async () => {

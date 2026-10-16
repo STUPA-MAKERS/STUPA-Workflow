@@ -1511,10 +1511,10 @@ describe('ApplicationsDetailComponent', () => {
   });
 
   it.each([
-    [422, 'Die Nachricht ist zu lang.'],
-    [403, 'Du darfst hier nicht schreiben.'],
-    [500, 'Kommentar konnte nicht gespeichert werden.'],
-  ])('toasts a failed comment %s and discards it on request', async (status, message) => {
+    [422, 'Die Nachricht ist zu lang.', [{ field: 'body.body', msg: 'String should have at most 10000 characters' }]],
+    [403, 'Du darfst hier nicht schreiben.', []],
+    [500, 'Kommentar konnte nicht gespeichert werden.', []],
+  ])('toasts a failed comment %s and discards it on request', async (status, message, errors) => {
     const { http, detectChanges, cmp, toast } = await setup();
     flushAll(http);
     detectChanges();
@@ -1523,12 +1523,31 @@ describe('ApplicationsDetailComponent', () => {
     cmp['sendComment']({ body: 'Hallo', visibility: 'internal' });
     http
       .expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-1/comments')
-      .flush({ title: 'e' }, { status, statusText: 'x' });
+      .flush({ title: 'e', errors }, { status, statusText: 'x' });
     expect(error).toHaveBeenCalledWith(message);
     const failed = cmp.chatMessages().find((m) => m.state === 'failed');
     expect(failed?.body).toBe('Hallo');
     cmp['discardComment']({ id: failed!.id });
     expect(cmp.chatMessages().some((m) => m.state === 'failed')).toBe(false);
+  });
+
+  it('reads the comments again when the chat asks, and keeps them on a failure', async () => {
+    const { http, detectChanges, cmp } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    cmp['refreshComments']();
+    http.expectOne(url('/comments')).flush([{ ...COMMENTS[0], body: 'Neu' }]);
+    expect(cmp.comments().map((c) => c.body)).toEqual(['Neu']);
+    cmp['refreshComments']();
+    http.expectOne(url('/comments')).flush(null, { status: 500, statusText: 'x' });
+    expect(cmp.comments().map((c) => c.body)).toEqual(['Neu']);
+    // An answer from before another load is dropped.
+    cmp['refreshComments']();
+    const late = http.expectOne(url('/comments'));
+    (cmp as unknown as { loadSeq: number }).loadSeq++;
+    late.flush([]);
+    expect(cmp.comments()).toHaveLength(1);
   });
 
   it.each([

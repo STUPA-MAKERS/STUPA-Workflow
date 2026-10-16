@@ -379,6 +379,25 @@ describe('DraftAttachmentsService', () => {
     expect(svc.busy()).toBe(false);
   });
 
+  it('deletes an upload that lands after a discard, and sends no further file of the call', async () => {
+    const answer = new Subject<DraftUpload>();
+    const upload = jest.fn(() => answer);
+    const { svc, remove } = setup({ upload, loggedIn: true });
+    const done = svc.upload([file('a.pdf'), file('b.pdf')]);
+    await Promise.resolve();
+    expect(svc.busy()).toBe(true);
+    await svc.discard();
+    expect(svc.pending()).toEqual([]);
+    answer.next({ attachment: attachment('d1'), draftToken: 'old', draftExpiresAt: '2999-01-01T00:00:00Z' });
+    answer.complete();
+    const res = await done;
+    expect(res.uploaded).toEqual([]);
+    expect(svc.files()).toEqual([]);
+    expect(svc.token()).toBeNull();
+    expect(remove).toHaveBeenCalledWith('d1', 'old');
+    expect(upload).toHaveBeenCalledTimes(1);
+  });
+
   it('maps every refusal to its text', () => {
     expect(uploadErrorKey(new Error('x'))).toBe('apply.files.error.upload');
     expect(uploadErrorKey(httpError(413, { code: 'draft_quota_exceeded' }))).toBe('apply.files.error.quota');

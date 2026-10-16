@@ -84,7 +84,10 @@ let nextKey = 0;
  *   effort), so they are not bound and do not count for the limits. The general files
  *   (`fieldKey` null) stay.
  * - `discard` deletes every draft on the server (best effort) and forgets the token;
- *   `clear` only forgets it, after the submit bound the files.
+ *   `clear` only forgets it, after the submit bound the files. An upload that is still
+ *   running at a `discard` is deleted when it lands and never joins the next draft, and
+ *   the files still waiting in its call do not go up (the chat composer of another
+ *   thread).
  * - The scan state of a file is the state of the upload response. The service does not
  *   read it again; a file that the scan finds infected shows as lost at the submit
  *   (422).
@@ -102,6 +105,8 @@ export class DraftAttachmentsService {
   private expiresAt: string | null = null;
   /** The file fields of the current form; `null` until the wizard sets them. */
   private fieldScope: ReadonlySet<string> | null = null;
+  /** Counts the discards: an upload of an earlier draft does not land in this one. */
+  private generation = 0;
 
   /** The uploaded files, oldest first. */
   readonly files = signal<DraftFile[]>([]);
@@ -149,7 +154,9 @@ export class DraftAttachmentsService {
     const fieldKey = opts.fieldKey ?? null;
     const uploaded: DraftFile[] = [];
     const failed: UploadFailure[] = [];
+    const generation = this.generation;
     for (const file of files) {
+      if (generation !== this.generation) break;
       const limit = this.limitReason(file);
       if (limit) {
         failed.push({ filename: file.name, reason: limit });
@@ -163,7 +170,8 @@ export class DraftAttachmentsService {
       };
       this.pending.update((list) => [...list, pending]);
       try {
-        const draft = await this.send(file, fieldKey, opts.isComparisonOffer === true);
+        const draft = await this.send(file, fieldKey, opts.isComparisonOffer === true, generation);
+        if (!draft) continue;
         if (!this.inScope(draft)) {
           // The type changed during the upload: the new form has no such field.
           void this.deleteQuietly([draft.id]);
@@ -251,6 +259,8 @@ export class DraftAttachmentsService {
   async discard(): Promise<void> {
     const token = this._token();
     const ids = this.attachmentIds();
+    this.generation++;
+    this.pending.set([]);
     this.forget();
     await this.deleteQuietly(ids, token);
   }
@@ -300,26 +310,37 @@ export class DraftAttachmentsService {
    * One upload. Without a token an anonymous applicant needs an ALTCHA solution. When
    * the server no longer knows the token (422), the draft starts again once without it.
    */
-  private async send(file: File, fieldKey: string | null, isComparisonOffer: boolean): Promise<DraftFile> {
+  private async send(
+    file: File,
+    fieldKey: string | null,
+    isComparisonOffer: boolean,
+    generation: number,
+  ): Promise<DraftFile | null> {
     try {
-      return await this.sendOnce(file, fieldKey, isComparisonOffer);
+      return await this.sendOnce(file, fieldKey, isComparisonOffer, generation);
     } catch (err) {
       if (!(err instanceof HttpErrorResponse) || problemCode(err) !== TOKEN_INVALID) throw err;
       this.markFailed({ code: TOKEN_INVALID } as ProblemDetail);
-      return this.sendOnce(file, fieldKey, isComparisonOffer);
+      return this.sendOnce(file, fieldKey, isComparisonOffer, generation);
     }
   }
 
+  /** One upload; null when the draft was discarded meanwhile (the file is deleted again). */
   private async sendOnce(
     file: File,
     fieldKey: string | null,
     isComparisonOffer: boolean,
-  ): Promise<DraftFile> {
+    generation: number,
+  ): Promise<DraftFile | null> {
     const token = this._token();
     const altcha = !token && !this.auth.isAuthenticated() ? await this.altcha.solve() : null;
     const res = await firstValueFrom(
       this.api.uploadDraftAttachment(file, { token, altcha, fieldKey, isComparisonOffer }),
     );
+    if (generation !== this.generation) {
+      void this.deleteQuietly([res.attachment.id], res.draftToken);
+      return null;
+    }
     this._token.set(res.draftToken);
     this.expiresAt = res.draftExpiresAt;
     return { ...res.attachment, fieldKey };

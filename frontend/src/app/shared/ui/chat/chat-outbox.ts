@@ -17,6 +17,8 @@ export function draftDropper(
 }
 
 const FILES_MISSING = 'draft_attachments_missing';
+/** The error of a retry that has nothing left to send. */
+const FILES_GONE = { status: 422, error: { code: FILES_MISSING, errors: [] } };
 
 /** The draft ids a 422 `draft_attachments_missing` names (`attachmentIds.<id>`), else null. */
 export function missingFiles(err: unknown): Set<string> | null {
@@ -30,14 +32,27 @@ export function missingFiles(err: unknown): Set<string> | null {
 }
 
 /**
+ * A body over the limit of the server: a 413, or a 422 whose errors name the field
+ * `body` with a length message ("String should have at most 10000 characters").
+ */
+function bodyTooLong(err: unknown): boolean {
+  const e = err as { status?: unknown; error?: { errors?: unknown } } | null;
+  if (e?.status === 413) return true;
+  if (e?.status !== 422 || !Array.isArray(e.error?.errors)) return false;
+  return (e.error.errors as { field?: unknown; msg?: unknown }[]).some(
+    (x) => typeof x?.field === 'string' && /(^|\.)body$/.test(x.field) && typeof x.msg === 'string' && /at most/i.test(x.msg),
+  );
+}
+
+/**
  * The toast of a failed send: a lost file names itself, a body over the limit of the
- * server (413 or 422) and a missing right (403) name their reason, every other error
- * the `fallback` of the thread.
+ * server and a missing right (403) name their reason, every other error (another 422
+ * too) the `fallback` of the thread.
  */
 export function sendErrorKey(err: unknown, fallback: TranslationKey): TranslationKey {
   const status = (err as { status?: unknown } | null)?.status;
   if (missingFiles(err)) return 'chat.error.filesMissing';
-  if (status === 413 || status === 422) return 'chat.error.tooLong';
+  if (bodyTooLong(err)) return 'chat.error.tooLong';
   if (status === 403) return 'chat.error.forbidden';
   return fallback;
 }
@@ -51,7 +66,9 @@ export function sendErrorKey(err: unknown, fallback: TranslationKey): Translatio
  * The consumer passes `[...serverMessages, ...outbox.messages()]` to `app-chat`.
  *
  * Files: the pending bubble shows `req.files`. A 422 `draft_attachments_missing` marks
- * the named files lost, and `retry` sends the others with the same token. `discard`
+ * the named files lost, and `retry` sends the others with the same token. A message
+ * with no text and no file left is not sent again: it stays failed and `failed` gets
+ * the missing-files error again; "Bearbeiten" then offers its way out. `discard`
  * deletes the drafts of the message through `dropDrafts` (best effort).
  */
 export class ChatOutbox<T> {
@@ -91,6 +108,10 @@ export class ChatOutbox<T> {
   retry(id: string): void {
     const req = this.requests.get(id);
     if (!req) return;
+    if (!req.body.trim() && !req.attachmentIds?.length) {
+      this.failed(FILES_GONE);
+      return;
+    }
     this.setState(id, 'sending');
     this.run(id, req);
   }

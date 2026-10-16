@@ -147,7 +147,7 @@
                 <button type="button" class="chat__retry" (click)="retryFailed(m)">
                   {{ 'chat.retry' | t }}
                 </button>
-                @if (!m.attachments?.length) {
+                @if (canEditFailed(m)) {
                   <button type="button" class="chat__retry" (click)="editFailed(m)">
                     {{ 'chat.editShort' | t }}
                   </button>

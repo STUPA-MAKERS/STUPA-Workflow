@@ -909,6 +909,20 @@ export class ApplicationsDetailComponent {
     this.transitionsLoading.set(false);
   }
 
+  /**
+   * Read the comments again in the background, for the scan state of their files. A
+   * failure keeps the thread as it is.
+   */
+  protected refreshComments(): void {
+    const seq = this.loadSeq;
+    this.api.comments(this.id, { quiet: true }).subscribe({
+      next: (c) => {
+        if (seq === this.loadSeq) this.comments.set(c);
+      },
+      error: () => {},
+    });
+  }
+
   /** Load the versions, the comments and the available transitions.
    *  An error degrades silently to an empty result. The transitions load only with
    *  the needed permission. The server filters them again. */
