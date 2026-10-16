@@ -123,7 +123,7 @@ a background task after the commit and never fail the report.
 **Retention and privacy:** `anonymize_tickets` (arq cron 03:45) anonymizes tickets whose
 `closed_at` is older than `tickets.retentionMonths` (null = off): reporter, context and
 attachments (row + object) go, title, body, notes and events stay, but the `created` event
-loses its actor and the reporter's notes lose their author (both are the reporter), one commit and one `anonymization` audit entry
+loses its actor and the public notes of the reporter lose their author (both are the reporter; an internal note of the same account is team work and keeps it), one commit and one `anonymization` audit entry
 per ticket. `PrincipalService.erase` gives the same anonymization to the tickets of the
 account and to the reports without a session under the account's e-mail; an applicant
 erasure does it for the tickets of the request's e-mail

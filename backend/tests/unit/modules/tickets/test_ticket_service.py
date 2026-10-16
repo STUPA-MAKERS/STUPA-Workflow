@@ -730,12 +730,13 @@ async def test_anonymize_clears_the_reporter_the_context_and_the_files() -> None
     session = ScriptedSession()
     await _svc(session, files=files).anonymize(ticket, actor="sys")
     assert files.deleted == [(ticket.id, "sys")]
-    # The notes of the reporter and the created event name the reporter, so both
-    # lose the account.
+    # The public notes of the reporter and the created event name the reporter, so
+    # both lose the account. An internal note of the same account is team work.
     notes, clear = session.statements
     sql = str(notes.compile(compile_kwargs={"literal_binds": True}))
     assert sql.startswith("UPDATE ticket_note SET author_id")
     assert ME.hex in sql or str(ME) in sql
+    assert "ticket_note.visibility = 'public'" in sql
     sql = str(clear.compile(compile_kwargs={"literal_binds": True}))
     assert sql.startswith("UPDATE ticket_event SET actor_id")
     assert "kind = 'created'" in sql

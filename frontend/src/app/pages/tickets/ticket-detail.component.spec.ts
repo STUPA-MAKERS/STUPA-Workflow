@@ -50,7 +50,14 @@ function mine(over: Partial<MyTicketDetail> = {}): MyTicketDetail {
         visibility: 'public',
       },
     ],
-    events: [{ id: 'e1', kind: 'status', at: '2026-10-15T06:12:00Z', payload: { from: 'new', to: 'in_progress' } }],
+    events: [
+      {
+        id: 'e1',
+        kind: 'status',
+        at: '2026-10-15T06:12:00Z',
+        payload: { from: 'new', to: 'in_progress' },
+      },
+    ],
     closedAt: null,
     canReply: true,
     ...over,
@@ -64,7 +71,12 @@ function detail(over: Partial<TicketDetail> = {}): TicketDetail {
     kind: 'bug',
     title: 'Protokoll-PDF zeigt im Kopf das falsche Datum',
     status: 'in_progress',
-    reporter: { principalId: 'r1', displayName: 'Tobias Brandt', email: 'tobias@example.org', anonymized: false },
+    reporter: {
+      principalId: 'r1',
+      displayName: 'Tobias Brandt',
+      email: 'tobias@example.org',
+      anonymized: false,
+    },
     assignee: MARA,
     createdAt: '2026-10-14T19:14:00Z',
     updatedAt: '2026-10-15T06:12:00Z',
@@ -73,10 +85,13 @@ function detail(over: Partial<TicketDetail> = {}): TicketDetail {
       url: 'https://stupa.example.org/meetings/m1/protocol',
       route: '/meetings/m1/protocol',
       appVersion: 'v2026.10.10',
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/19.0 Safari/605.1.15',
+      userAgent:
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/19.0 Safari/605.1.15',
       viewport: '1512x945',
     },
-    attachments: [{ id: 'a1', filename: 'protokoll-kopf.png', mime: 'image/png', size: 98304, scanned: true }],
+    attachments: [
+      { id: 'a1', filename: 'protokoll-kopf.png', mime: 'image/png', size: 98304, scanned: true },
+    ],
     notes: [
       {
         id: 'n1',
@@ -85,12 +100,26 @@ function detail(over: Partial<TicketDetail> = {}): TicketDetail {
         at: '2026-10-15T06:20:00Z',
         editedAt: null,
         isOwn: true,
-        attachments: [{ id: 'f1', filename: 'log.txt', mime: 'text/plain', size: 10, scanState: 'clean' }],
+        attachments: [
+          { id: 'f1', filename: 'log.txt', mime: 'text/plain', size: 10, scanState: 'clean' },
+        ],
       },
     ],
     events: [
-      { id: 'e1', kind: 'created', actor: null, at: '2026-10-14T19:14:00Z', payload: { confirmationSent: true } },
-      { id: 'e2', kind: 'assignee', actor: MARA, at: '2026-10-15T06:12:00Z', payload: { to: MARA } },
+      {
+        id: 'e1',
+        kind: 'created',
+        actor: null,
+        at: '2026-10-14T19:14:00Z',
+        payload: { confirmationSent: true },
+      },
+      {
+        id: 'e2',
+        kind: 'assignee',
+        actor: MARA,
+        at: '2026-10-15T06:12:00Z',
+        payload: { to: MARA },
+      },
     ],
     duplicateOf: null,
     contextTarget: { kind: 'meeting', id: 'm1', title: '33. Sitzung STUPA' },
@@ -135,10 +164,22 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
   let todos = opts.todos ?? of<TodoLinkedCard[]>([]);
   const api = {
     get: jest.fn((id: string) => get(id)),
-    assignees: jest.fn(() => opts.assignees ?? of([MARA, JONAS, { principalId: null, displayName: 'Weg' }])),
-    patch: jest.fn((id: string, body: TicketPatch) => of(detail({ ...body, id } as Partial<TicketDetail>))),
+    assignees: jest.fn(
+      () => opts.assignees ?? of([MARA, JONAS, { principalId: null, displayName: 'Weg' }]),
+    ),
+    patch: jest.fn((id: string, body: TicketPatch) =>
+      of(detail({ ...body, id } as Partial<TicketDetail>)),
+    ),
     addNote: jest.fn((_id: string, body: string, _files?: unknown) =>
-      of<TicketNote>({ id: 'n9', author: MARA, body, at: '2026-10-15T09:00:00Z', editedAt: null, isOwn: true, attachments: [] }),
+      of<TicketNote>({
+        id: 'n9',
+        author: MARA,
+        body,
+        at: '2026-10-15T09:00:00Z',
+        editedAt: null,
+        isOwn: true,
+        attachments: [],
+      }),
     ),
     editNote: jest.fn((_id: string, noteId: string, body: string) =>
       of<TicketNote>({
@@ -191,7 +232,10 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
     createCard: jest.fn(),
   };
   const toast = { success: jest.fn(), error: jest.fn() };
-  const files = { deleteDraftAttachment: jest.fn(() => of(undefined)), uploadDraftAttachment: jest.fn() };
+  const files = {
+    deleteDraftAttachment: jest.fn(() => of(undefined)),
+    uploadDraftAttachment: jest.fn(),
+  };
   const page = opts.split === null ? null : new TicketsPageService();
   page?.split.set(opts.split ?? false);
   const notify = page ? jest.spyOn(page, 'notify') : null;
@@ -278,19 +322,24 @@ describe('TicketDetailComponent', () => {
   it('shows the details: reporter, mail, the context and the linked object', async () => {
     await start('/tickets/t40', { split: true });
     expect(screen.getByRole('heading', { name: 'Verlauf' })).toHaveClass('sr-only');
-    expect(screen.getByRole('link', { name: 'tobias@example.org' })).toHaveAttribute('href', 'mailto:tobias@example.org');
-    expect(screen.getByRole('link', { name: 'https://stupa.example.org/meetings/m1/protocol' })).toHaveAttribute(
-      'target',
-      '_blank',
+    expect(screen.getByRole('link', { name: 'tobias@example.org' })).toHaveAttribute(
+      'href',
+      'mailto:tobias@example.org',
     );
+    expect(
+      screen.getByRole('link', { name: 'https://stupa.example.org/meetings/m1/protocol' }),
+    ).toHaveAttribute('target', '_blank');
     expect(screen.getByText('v2026.10.10')).toBeInTheDocument();
     expect(screen.getByText('Safari 19 · macOS · 1512 × 945')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '33. Sitzung STUPA' })).toHaveAttribute('href', '/meetings/m1');
+    expect(screen.getByRole('link', { name: '33. Sitzung STUPA' })).toHaveAttribute(
+      'href',
+      '/meetings/m1',
+    );
   });
 
   const fieldLabels = () =>
-    [...document.querySelectorAll('[aria-labelledby="td-details"] app-field-row .fld__label')].map((l) =>
-      l.textContent?.trim(),
+    [...document.querySelectorAll('[aria-labelledby="td-details"] app-field-row .fld__label')].map(
+      (l) => l.textContent?.trim(),
     );
 
   it('pairs the fields side by side', async () => {
@@ -357,13 +406,20 @@ describe('TicketDetailComponent', () => {
   });
 
   it('puts the duplicate in its own section of the menu', async () => {
-    const { cmp } = await start('/tickets/t40', { get: () => of(detail({ status: 'in_progress' })) });
-    expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['reset'], ['duplicate', 'block']]);
+    const { cmp } = await start('/tickets/t40', {
+      get: () => of(detail({ status: 'in_progress' })),
+    });
+    expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([
+      ['reset'],
+      ['duplicate', 'block'],
+    ]);
   });
 
   it('offers only the duplicate for a new ticket', async () => {
     const { cmp } = await start('/tickets/t40', { get: () => of(detail({ status: 'new' })) });
-    expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['duplicate', 'block']]);
+    expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([
+      ['duplicate', 'block'],
+    ]);
   });
 
   it('offers the unblock for a blocked sender, and no block on an anonymized ticket', async () => {
@@ -378,12 +434,20 @@ describe('TicketDetailComponent', () => {
     harness.detectChanges();
     expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['reset']]);
     // An anonymized ticket takes no note files.
-    expect(harness.fixture.debugElement.query((d) => d.name === 'app-chat').componentInstance.canAttach()).toBe(false);
+    expect(
+      harness.fixture.debugElement
+        .query((d) => d.name === 'app-chat')
+        .componentInstance.canAttach(),
+    ).toBe(false);
   });
 
   it('blocks the sender at once from the menu, without a question, and unblocks at once', async () => {
     const { cmp, api, toast, harness } = await start();
-    expect(harness.fixture.debugElement.query((d) => d.name === 'app-chat').componentInstance.canAttach()).toBe(true);
+    expect(
+      harness.fixture.debugElement
+        .query((d) => d.name === 'app-chat')
+        .componentInstance.canAttach(),
+    ).toBe(true);
     cmp.onMenu({ id: 'block', label: '' });
     harness.detectChanges();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -417,12 +481,18 @@ describe('TicketDetailComponent', () => {
   });
 
   it('offers no block on the own report, by the e-mail in any case', async () => {
-    const { cmp } = await start('/tickets/t40', { me: ' Tobias@Example.org', get: () => of(detail({ status: 'new' })) });
+    const { cmp } = await start('/tickets/t40', {
+      me: ' Tobias@Example.org',
+      get: () => of(detail({ status: 'new' })),
+    });
     expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['duplicate']]);
   });
 
   it('offers the block while the viewer is not known', async () => {
-    const { cmp } = await start('/tickets/t40', { me: null, get: () => of(detail({ status: 'new' })) });
+    const { cmp } = await start('/tickets/t40', {
+      me: null,
+      get: () => of(detail({ status: 'new' })),
+    });
     expect(cmp.menuSections()[0].items.map((i) => i.id)).toEqual(['duplicate', 'block']);
   });
 
@@ -430,7 +500,12 @@ describe('TicketDetailComponent', () => {
     const { cmp } = await start('/tickets/t40', {
       me: 'tobias@example.org',
       get: () =>
-        of(detail({ status: 'new', reporter: { principalId: null, displayName: null, email: null, anonymized: false } })),
+        of(
+          detail({
+            status: 'new',
+            reporter: { principalId: null, displayName: null, email: null, anonymized: false },
+          }),
+        ),
     });
     expect(cmp.menuSections()[0].items.map((i) => i.id)).toEqual(['duplicate', 'block']);
   });
@@ -438,7 +513,9 @@ describe('TicketDetailComponent', () => {
   it('says why a block was refused', async () => {
     const { cmp, api, toast } = await start();
     const refuse = (status: number, error: unknown) =>
-      api.blockSender.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status, error })));
+      api.blockSender.mockReturnValueOnce(
+        throwError(() => new HttpErrorResponse({ status, error })),
+      );
     refuse(422, { code: 'sender_is_self' });
     cmp.onMenu({ id: 'block', label: '' });
     expect(toast.error).toHaveBeenLastCalledWith('Das eigene Konto kann nicht gesperrt werden.');
@@ -478,7 +555,10 @@ describe('TicketDetailComponent', () => {
 
   it('asks first when open to-dos are linked, and completes them by default', async () => {
     const { cmp, api, todosApi, harness } = await start('/tickets/t40', {
-      todos: of([card(), card({ id: 'c2', title: 'Zweite', isDone: true, dueDate: null, assignees: [] })]),
+      todos: of([
+        card(),
+        card({ id: 'c2', title: 'Zweite', isDone: true, dueDate: null, assignees: [] }),
+      ]),
     });
     await userEvent.click(screen.getByRole('button', { name: /Erledigt/ }));
     harness.detectChanges();
@@ -497,7 +577,9 @@ describe('TicketDetailComponent', () => {
   });
 
   it('asks before a rejection with to-dos only the server counts', async () => {
-    const { cmp, api, harness } = await start('/tickets/t40', { get: () => of(detail({ openTodoCount: 2 })) });
+    const { cmp, api, harness } = await start('/tickets/t40', {
+      get: () => of(detail({ openTodoCount: 2 })),
+    });
     cmp.close('rejected');
     harness.detectChanges();
     expect(screen.getByRole('dialog', { name: 'Ticket ablehnen?' })).toBeInTheDocument();
@@ -508,7 +590,9 @@ describe('TicketDetailComponent', () => {
   });
 
   it('says "1 offenes To-Do" when only the server counts one', async () => {
-    const { cmp, harness } = await start('/tickets/t40', { get: () => of(detail({ openTodoCount: 1 })) });
+    const { cmp, harness } = await start('/tickets/t40', {
+      get: () => of(detail({ openTodoCount: 1 })),
+    });
     cmp.close('done');
     harness.detectChanges();
     expect(cmp.openTodoN()).toBe(1);
@@ -517,17 +601,19 @@ describe('TicketDetailComponent', () => {
 
   it('lists the linked to-dos and links each to its board', async () => {
     const { cmp } = await start('/tickets/t40', {
-      todos: of([card(), card({ id: 'c2', title: 'Zweite', isDone: true, dueDate: null, assignees: [] })]),
+      todos: of([
+        card(),
+        card({ id: 'c2', title: 'Zweite', isDone: true, dueDate: null, assignees: [] }),
+      ]),
       split: true,
     });
     const link = screen.getByRole('link', { name: 'PDF-Kopf: Beginn statt Ende verwenden' });
     expect(link).toHaveAttribute('href', '/todos/b1?card=c1');
     expect(cmp.todoSub(card())).toBe('Plattform · In Arbeit · fällig 17.10.');
     expect(cmp.todoSub(card({ dueDate: null }))).toBe('Plattform · In Arbeit');
-    expect(cmp.todoNames(card({ assignees: [MARA, { principalId: null, displayName: null }] }))).toEqual([
-      'Mara Keller',
-      'Gelöschte Person',
-    ]);
+    expect(
+      cmp.todoNames(card({ assignees: [MARA, { principalId: null, displayName: null }] })),
+    ).toEqual(['Mara Keller', 'Gelöschte Person']);
     expect(cmp.todoIds(card())).toEqual(['p1']);
     expect(cmp.openTodos().map((c) => c.id)).toEqual(['c1']);
   });
@@ -681,7 +767,9 @@ describe('TicketDetailComponent', () => {
     ['other', 'Die Änderung konnte nicht gespeichert werden.'],
   ])('names a refused change (%s)', async (code, text) => {
     const { cmp, api, toast } = await start();
-    api.patch.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 422, error: { code } })));
+    api.patch.mockReturnValueOnce(
+      throwError(() => new HttpErrorResponse({ status: 422, error: { code } })),
+    );
     cmp.setKind('idea');
     expect(toast.error).toHaveBeenCalledWith(text);
     expect(cmp.saving()).toBeNull();
@@ -710,7 +798,10 @@ describe('TicketDetailComponent', () => {
   });
 
   it('closes as a duplicate of a found ticket', async () => {
-    const hits: TicketListItem[] = [detail(), detail({ id: 't12', number: 'T-0012', title: 'Gleicher Fehler', status: 'done' })];
+    const hits: TicketListItem[] = [
+      detail(),
+      detail({ id: 't12', number: 'T-0012', title: 'Gleicher Fehler', status: 'done' }),
+    ];
     const { cmp, api, harness, settle } = await start();
     api.list.mockReturnValue(of({ items: hits, total: 2, limit: 8, offset: 0 }));
     cmp.onMenu({ id: 'duplicate', label: '' });
@@ -729,7 +820,9 @@ describe('TicketDetailComponent', () => {
   });
 
   it('asks about the open to-dos before it closes as a duplicate', async () => {
-    const { cmp, api, harness } = await start('/tickets/t40', { get: () => of(detail({ status: 'new', openTodoCount: 1 })) });
+    const { cmp, api, harness } = await start('/tickets/t40', {
+      get: () => of(detail({ status: 'new', openTodoCount: 1 })),
+    });
     cmp.onMenu({ id: 'duplicate', label: '' });
     cmp.pickDuplicate(detail({ id: 't12', number: 'T-0012' }));
     harness.detectChanges();
@@ -737,11 +830,17 @@ describe('TicketDetailComponent', () => {
     expect(cmp.duplicateOpen()).toBe(false);
     expect(screen.getByRole('dialog', { name: 'Ticket ablehnen?' })).toBeInTheDocument();
     cmp.confirmClose();
-    expect(api.patch).toHaveBeenCalledWith('t40', { status: 'rejected', duplicateOfId: 't12', completeTodos: true });
+    expect(api.patch).toHaveBeenCalledWith('t40', {
+      status: 'rejected',
+      duplicateOfId: 't12',
+      completeTodos: true,
+    });
   });
 
   it('forgets the duplicate when the question is cancelled', async () => {
-    const { cmp, api } = await start('/tickets/t40', { get: () => of(detail({ status: 'new', openTodoCount: 1 })) });
+    const { cmp, api } = await start('/tickets/t40', {
+      get: () => of(detail({ status: 'new', openTodoCount: 1 })),
+    });
     cmp.pickDuplicate(detail({ id: 't12', number: 'T-0012' }));
     cmp.cancelClose();
     expect(cmp.closing()).toBeNull();
@@ -802,7 +901,12 @@ describe('TicketDetailComponent', () => {
   it('sends, edits and deletes notes, and never the report', async () => {
     const { cmp, api, toast } = await start();
     cmp.sendNote({ body: 'Fix ist offen.' });
-    expect(api.addNote).toHaveBeenCalledWith('t40', 'Fix ist offen.', { body: 'Fix ist offen.' }, undefined);
+    expect(api.addNote).toHaveBeenCalledWith(
+      't40',
+      'Fix ist offen.',
+      { body: 'Fix ist offen.' },
+      undefined,
+    );
     expect(cmp.notes().map((n) => n.id)).toEqual(['n1', 'n9']);
 
     cmp.editNote({ id: 'n1', body: 'Prüfe ich morgen.' });
@@ -840,7 +944,14 @@ describe('TicketDetailComponent', () => {
 
   it('says why a note failed, and discards it on request', async () => {
     const { cmp, api, toast } = await start();
-    api.addNote.mockReturnValueOnce(throwError(() => ({ status: 422, error: { errors: [{ field: 'body.body', msg: 'String should have at most 10000 characters' }] } })));
+    api.addNote.mockReturnValueOnce(
+      throwError(() => ({
+        status: 422,
+        error: {
+          errors: [{ field: 'body.body', msg: 'String should have at most 10000 characters' }],
+        },
+      })),
+    );
     cmp.sendNote({ body: 'Zu lang' });
     expect(toast.error).toHaveBeenCalledWith('Die Nachricht ist zu lang.');
     const failed = cmp.messages().at(-1)!;
@@ -851,14 +962,34 @@ describe('TicketDetailComponent', () => {
   it('shows the files of the notes and of the report with their scan state', async () => {
     const { cmp } = await start('/tickets/t40', {
       get: () =>
-        of(detail({ attachments: [{ id: 'a2', filename: 'neu.png', mime: 'image/png', size: 5, scanned: false }] })),
+        of(
+          detail({
+            attachments: [
+              { id: 'a2', filename: 'neu.png', mime: 'image/png', size: 5, scanned: false },
+            ],
+          }),
+        ),
     });
     const [body, note] = cmp.messages();
     expect(body.attachments).toEqual([
-      { id: 'a2', filename: 'neu.png', mime: 'image/png', size: 5, url: '/api/attachments/a2/download', scanState: 'scanning' },
+      {
+        id: 'a2',
+        filename: 'neu.png',
+        mime: 'image/png',
+        size: 5,
+        url: '/api/attachments/a2/download',
+        scanState: 'scanning',
+      },
     ]);
     expect(note.attachments).toEqual([
-      { id: 'f1', filename: 'log.txt', mime: 'text/plain', size: 10, scanState: 'clean', url: '/api/attachments/f1/download' },
+      {
+        id: 'f1',
+        filename: 'log.txt',
+        mime: 'text/plain',
+        size: 10,
+        scanState: 'clean',
+        url: '/api/attachments/f1/download',
+      },
     ]);
   });
 
@@ -916,7 +1047,16 @@ describe('TicketDetailComponent', () => {
     expect(cmp.ticket()!.senderBlocked).toBe(true);
     stale.next(
       detail({
-        attachments: [{ id: 'a1', filename: 'protokoll-kopf.png', mime: 'image/png', size: 98304, scanned: true, scanState: 'quarantined' }],
+        attachments: [
+          {
+            id: 'a1',
+            filename: 'protokoll-kopf.png',
+            mime: 'image/png',
+            size: 98304,
+            scanned: true,
+            scanState: 'quarantined',
+          },
+        ],
         senderBlocked: false,
       }),
     );
@@ -945,8 +1085,11 @@ describe('TicketDetailComponent', () => {
   it('keeps the composer files with the page when the layout switch re-creates the chat', async () => {
     const { harness, page } = await start();
     const drafts = () =>
-      harness.fixture.debugElement.query((d) => d.name === 'app-chat').injector.get(DraftAttachmentsService);
-    const chat = () => harness.fixture.debugElement.query((d) => d.name === 'app-chat').componentInstance;
+      harness.fixture.debugElement
+        .query((d) => d.name === 'app-chat')
+        .injector.get(DraftAttachmentsService);
+    const chat = () =>
+      harness.fixture.debugElement.query((d) => d.name === 'app-chat').componentInstance;
     const before = drafts();
     const old = chat();
     page!.split.set(true);
@@ -957,7 +1100,14 @@ describe('TicketDetailComponent', () => {
 
   it('sends a note with files, and deletes the drafts of a discarded one', async () => {
     const { cmp, api, files } = await start();
-    const file = { id: 'd1', filename: 'a.png', mime: 'image/png', size: 3, scanState: 'scanning' as const, url: '/x' };
+    const file = {
+      id: 'd1',
+      filename: 'a.png',
+      mime: 'image/png',
+      size: 3,
+      scanState: 'scanning' as const,
+      url: '/x',
+    };
     api.addNote.mockReturnValueOnce(throwError(() => new Error('offline')));
     cmp.sendNote({ body: '', attachmentIds: ['d1'], draftToken: 'tok', files: [file] });
     expect(api.addNote).toHaveBeenCalledWith(
@@ -1027,8 +1177,29 @@ describe('TicketDetailComponent', () => {
     });
 
     it('hides the composer while a block holds the reporter back', async () => {
-      const { cmp } = await start('/tickets/t40', { manager: false, mine: (id) => of(mine({ id, canReply: false })) });
+      const { cmp } = await start('/tickets/t40', {
+        manager: false,
+        mine: (id) => of(mine({ id, canReply: false })),
+      });
       expect(cmp.canReply()).toBe(false);
+    });
+
+    it('closes the composer when a block arrives while the ticket is open', async () => {
+      const { cmp, api, toast } = await start('/tickets/t40', { manager: false });
+      const blocked = new HttpErrorResponse({ status: 403, error: { code: 'sender_blocked' } });
+      api.editMyNote.mockReturnValueOnce(throwError(() => blocked));
+      cmp.editNote({ id: 'n9', body: 'x' });
+      expect(cmp.canReply()).toBe(false);
+      expect(toast.error).toHaveBeenLastCalledWith(
+        'Du kannst auf dieses Ticket nicht mehr antworten.',
+      );
+      cmp.canReply.set(true);
+      api.addMyNote.mockReturnValueOnce(throwError(() => blocked));
+      cmp.sendNote({ body: 'noch was' });
+      expect(cmp.canReply()).toBe(false);
+      api.editMyNote.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 403 })));
+      cmp.editNote({ id: 'n9', body: 'y' });
+      expect(toast.error).toHaveBeenLastCalledWith('Die Notiz konnte nicht gespeichert werden.');
     });
 
     it('names a ticket of somebody else as not found', async () => {
@@ -1046,12 +1217,27 @@ describe('TicketDetailComponent', () => {
       expect(report.visibility).toBe('public');
       expect(note.visibility).toBe('internal');
       cmp.sendNote({ body: 'Antwort', visibility: 'public' });
-      expect(api.addNote).toHaveBeenCalledWith('t40', 'Antwort', { body: 'Antwort', visibility: 'public' }, 'public');
+      expect(api.addNote).toHaveBeenCalledWith(
+        't40',
+        'Antwort',
+        { body: 'Antwort', visibility: 'public' },
+        'public',
+      );
     });
 
     it('keeps every note internal on a report without an account', async () => {
       const { cmp } = await start('/tickets/t40', {
-        get: () => of(detail({ reporter: { principalId: null, displayName: null, email: 'x@example.org', anonymized: false } })),
+        get: () =>
+          of(
+            detail({
+              reporter: {
+                principalId: null,
+                displayName: null,
+                email: 'x@example.org',
+                anonymized: false,
+              },
+            }),
+          ),
       });
       expect(cmp.visibilityOptions()).toEqual([]);
       expect(cmp.placeholder()).toBe('tickets.detail.notePlaceholder');

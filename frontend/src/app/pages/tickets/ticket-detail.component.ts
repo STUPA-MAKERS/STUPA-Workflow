@@ -52,14 +52,24 @@ import type {
 import { ChatDrafts } from '@shared/ui/chat/chat-drafts';
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { FieldGroupComponent, FieldRowComponent } from '@shared/ui/field-group/field-group.component';
+import {
+  FieldGroupComponent,
+  FieldRowComponent,
+} from '@shared/ui/field-group/field-group.component';
 import {
   FilterSelectComponent,
   type FilterSelectOption,
 } from '@shared/ui/filter-select/filter-select.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { SheetBarComponent, SheetBarKickerDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
+import {
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+} from '@shared/ui/row-menu/row-menu.component';
+import {
+  SheetBarComponent,
+  SheetBarKickerDirective,
+} from '@shared/ui/sheet-bar/sheet-bar.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import {
@@ -108,7 +118,8 @@ const BLOCK_ERROR: Readonly<Record<string, TranslationKey>> = {
 
 /** The text of a refused block or unblock. */
 export function blockErrorKey(err: unknown): TranslationKey {
-  const code = err instanceof HttpErrorResponse ? (err.error as { code?: string } | null)?.code : undefined;
+  const code =
+    err instanceof HttpErrorResponse ? (err.error as { code?: string } | null)?.code : undefined;
   return (code && BLOCK_ERROR[code]) || 'tickets.detail.error.block';
 }
 
@@ -283,7 +294,9 @@ export class TicketDetailComponent {
     const text = this.kicker();
     const no = this.ticket()?.number ?? '';
     const at = no ? text.indexOf(no) : -1;
-    return at < 0 ? { before: text, number: '', after: '' } : { before: text.slice(0, at), number: no, after: text.slice(at + no.length) };
+    return at < 0
+      ? { before: text, number: '', after: '' }
+      : { before: text.slice(0, at), number: no, after: text.slice(at + no.length) };
   });
 
   readonly statusKind = computed(() => STATUS_KIND[this.ticket()?.status ?? 'new']);
@@ -305,11 +318,14 @@ export class TicketDetailComponent {
     if (!t || !this.manager) return [];
     const sections: RowMenuSection[] = [];
     if (t.status !== 'new') {
-      sections.push({ items: [{ id: 'reset', label: this.t('tickets.detail.resetNew'), icon: 'history' }] });
+      sections.push({
+        items: [{ id: 'reset', label: this.t('tickets.detail.resetNew'), icon: 'history' }],
+      });
     }
     // The closing action and the block stand apart from the status change, behind a rule.
     const apart: RowMenuItem[] = [];
-    if (isOpen(t.status)) apart.push({ id: 'duplicate', label: this.t('tickets.detail.duplicate'), icon: 'copy' });
+    if (isOpen(t.status))
+      apart.push({ id: 'duplicate', label: this.t('tickets.detail.duplicate'), icon: 'copy' });
     // An anonymized ticket has no sender any more, and nobody blocks themselves.
     if (!t.anonymizedAt && !this.ownReport(t.reporter)) {
       apart.push(
@@ -351,7 +367,9 @@ export class TicketDetailComponent {
   });
 
   readonly placeholder = computed<TranslationKey>(() =>
-    this.visibilityOptions().length || !this.manager ? 'chat.placeholder' : 'tickets.detail.notePlaceholder',
+    this.visibilityOptions().length || !this.manager
+      ? 'chat.placeholder'
+      : 'tickets.detail.notePlaceholder',
   );
 
   /** The report as the first message, then the notes, then the pending ones. */
@@ -361,7 +379,10 @@ export class TicketDetailComponent {
         ? this.api.addNote(this.id, req.body, req, req.visibility)
         : this.api.addMyNote(this.id, req.body, req),
     (created) => this.notes.update((list) => appendOnce(list, created)),
-    (err) => this.toast.error(this.t(sendErrorKey(err, 'tickets.detail.error.note'))),
+    (err) =>
+      this.toast.error(
+        this.t(this.blockedKey(err) ?? sendErrorKey(err, 'tickets.detail.error.note')),
+      ),
     draftDropper(this.files),
   );
 
@@ -370,7 +391,9 @@ export class TicketDetailComponent {
     if (!t) return [];
     const body: ChatMessage = {
       id: BODY_ID,
-      author: t.reporter.principalId ? { principalId: t.reporter.principalId, displayName: t.reporter.displayName } : null,
+      author: t.reporter.principalId
+        ? { principalId: t.reporter.principalId, displayName: t.reporter.displayName }
+        : null,
       authorLabel: this.manager ? this.reporter() : null,
       body: t.body,
       at: t.createdAt,
@@ -406,7 +429,9 @@ export class TicketDetailComponent {
     return t.events.map((e) => ({
       id: e.id,
       at: e.at,
-      text: this.manager ? eventText(e, this.reporter(), this.t) : reporterEventText(e.payload, this.t),
+      text: this.manager
+        ? eventText(e, this.reporter(), this.t)
+        : reporterEventText(e.payload, this.t),
     }));
   });
 
@@ -417,7 +442,10 @@ export class TicketDetailComponent {
     if (c.url) rows.push({ label: 'tickets.context.page', value: c.url, href: c.url });
     if (c.appVersion) rows.push({ label: 'tickets.context.version', value: c.appVersion });
     if (c.userAgent || c.viewport) {
-      const parts = [c.userAgent ? browserLabel(c.userAgent) : null, c.viewport ? viewportLabel(c.viewport) : null];
+      const parts = [
+        c.userAgent ? browserLabel(c.userAgent) : null,
+        c.viewport ? viewportLabel(c.viewport) : null,
+      ];
       rows.push({ label: 'tickets.context.browser', value: parts.filter(Boolean).join(' · ') });
     }
     return rows;
@@ -561,7 +589,9 @@ export class TicketDetailComponent {
         this.blocking.set(false);
         if (id !== this.id) return;
         this.ticket.set(t);
-        this.toast.success(this.t(block ? 'tickets.detail.senderBlocked' : 'tickets.detail.senderUnblocked'));
+        this.toast.success(
+          this.t(block ? 'tickets.detail.senderBlocked' : 'tickets.detail.senderUnblocked'),
+        );
       },
       error: (err: unknown) => {
         this.blocking.set(false);
@@ -674,13 +704,28 @@ export class TicketDetailComponent {
    * the focus to the button that takes its place, so it does not fall back to the page.
    */
   private focusActions(): void {
-    afterNextRender(() => this.actions()?.nativeElement.querySelector<HTMLElement>('button')?.focus(), {
-      injector: this.injector,
-    });
+    afterNextRender(
+      () => this.actions()?.nativeElement.querySelector<HTMLElement>('button')?.focus(),
+      {
+        injector: this.injector,
+      },
+    );
+  }
+
+  /** A block that the team set while the reporter had the ticket open closes the composer. */
+  private blockedKey(err: unknown): TranslationKey | null {
+    const code =
+      err instanceof HttpErrorResponse ? (err.error as { code?: string } | null)?.code : undefined;
+    if (err instanceof HttpErrorResponse && err.status === 403 && code === 'sender_blocked') {
+      this.canReply.set(false);
+      return 'tickets.detail.error.blocked';
+    }
+    return null;
   }
 
   private patchError(err: unknown): TranslationKey {
-    const code = err instanceof HttpErrorResponse ? (err.error as { code?: string } | null)?.code : undefined;
+    const code =
+      err instanceof HttpErrorResponse ? (err.error as { code?: string } | null)?.code : undefined;
     if (code === 'assignee_not_allowed') return 'tickets.detail.error.assignee';
     if (code === 'duplicate_invalid') return 'tickets.detail.error.duplicate';
     return 'tickets.detail.error.save';
@@ -707,16 +752,18 @@ export class TicketDetailComponent {
       : this.api.editMyNote(this.id, change.id, change.body);
     edit.subscribe({
       next: (n) => this.notes.update((list) => list.map((x) => (x.id === n.id ? n : x))),
-      error: () => {
+      error: (err: unknown) => {
         change.restore?.();
-        this.toast.error(this.t('tickets.detail.error.note'));
+        this.toast.error(this.t(this.blockedKey(err) ?? 'tickets.detail.error.note'));
       },
     });
   }
 
   deleteNote(ref: ChatRef): void {
     if (ref.id === BODY_ID) return;
-    const remove = this.manager ? this.api.deleteNote(this.id, ref.id) : this.api.deleteMyNote(this.id, ref.id);
+    const remove = this.manager
+      ? this.api.deleteNote(this.id, ref.id)
+      : this.api.deleteMyNote(this.id, ref.id);
     remove.subscribe({
       next: () => this.notes.update((list) => list.filter((x) => x.id !== ref.id)),
       error: () => this.toast.error(this.t('tickets.detail.error.note')),
@@ -732,7 +779,8 @@ export class TicketDetailComponent {
 
   todoSub(card: TodoLinkedCard): string {
     const parts = [card.boardName, card.columnName];
-    if (card.dueDate) parts.push(this.t('tickets.todos.due', { date: this.shortDate(card.dueDate) }));
+    if (card.dueDate)
+      parts.push(this.t('tickets.todos.due', { date: this.shortDate(card.dueDate) }));
     return parts.join(' · ');
   }
 
@@ -764,9 +812,10 @@ export class TicketDetailComponent {
   /** `YYYY-MM-DD` as "17.10.". */
   private shortDate(date: string): string {
     const [y, m, d] = date.split('-').map(Number);
-    return new Intl.DateTimeFormat(this.i18n.formatLocale(), { day: '2-digit', month: '2-digit' }).format(
-      new Date(y, m - 1, d),
-    );
+    return new Intl.DateTimeFormat(this.i18n.formatLocale(), {
+      day: '2-digit',
+      month: '2-digit',
+    }).format(new Date(y, m - 1, d));
   }
 
   reportedAt(t: TicketDetail): string {

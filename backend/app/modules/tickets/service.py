@@ -1101,6 +1101,9 @@ class TicketService:
     ) -> None:
         """Delete an own message on an own ticket, with its files.
 
+        A sender block does not stop a delete: the reporter keeps the right to remove
+        the own data.
+
         Raises:
             NotFoundError: Not a ticket of the caller, or no live public note (HTTP 404).
             ForbiddenError: The note has another author (HTTP 403, ``not_note_author``).
@@ -1131,7 +1134,9 @@ class TicketService:
 
         The reporter (account and e-mail), the context and the files of the report and
         of every note (rows and objects) go; title, body, the note texts and events
-        stay. The notes of the reporter lose their author. A sender block from this
+        stay. The public notes of the reporter lose their author: a reporter writes only
+        public notes, and an internal note of the same account is the work of a team
+        member, who must keep the right to change it. A sender block from this
         ticket stays. The ``created`` event loses its actor, because that actor is the
         reporter and the detail would show the name.
         ``anonymized_at`` marks it.
@@ -1143,6 +1148,7 @@ class TicketService:
                 .where(
                     TicketNote.ticket_id == ticket.id,
                     TicketNote.author_id == ticket.reporter_principal_id,
+                    TicketNote.visibility == "public",
                 )
                 .values(author_id=None)
             )

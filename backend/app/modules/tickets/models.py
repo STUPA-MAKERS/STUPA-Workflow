@@ -121,7 +121,7 @@ class TicketNote(UUIDPkMixin, Base):
     ticket_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ticket.id", ondelete="CASCADE"))
     author_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("principal.id"), nullable=True)
     body: Mapped[str] = mapped_column(Text)
-    visibility: Mapped[str] = mapped_column(Text, server_default="internal")
+    visibility: Mapped[str] = mapped_column(Text, default="internal", server_default="internal")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

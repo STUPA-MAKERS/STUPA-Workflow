@@ -33,7 +33,7 @@ from app.modules.flow.models import State
 from app.modules.livevote.models import Meeting, MeetingAttendance
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.protocol.erasure import erase_candidate_names
-from app.modules.tickets.models import Ticket
+from app.modules.tickets.models import Ticket, TicketNote
 from app.modules.tickets.service import (
     TicketService,
     erase_sender_blocks,
@@ -249,9 +249,7 @@ async def erase_email(
     )
     applications = ApplicationsService(session)
     for application_id in app_ids:
-        await applications.anonymize(
-            application_id, files=files, actor=actor, commit=False
-        )
+        await applications.anonymize(application_id, files=files, actor=actor, commit=False)
         await audit_record(
             session,
             actor=actor,
@@ -259,13 +257,9 @@ async def erase_email(
             target_type="application",
             target_id=str(application_id),
         )
-    tickets = await anonymize_reported_tickets(
-        session, actor=actor, files=files, email=email
-    )
+    tickets = await anonymize_reported_tickets(session, actor=actor, files=files, email=email)
     await erase_sender_blocks(session, email=email)
-    principal_id = await session.scalar(
-        select(Principal.id).where(Principal.email == email)
-    )
+    principal_id = await session.scalar(select(Principal.id).where(Principal.email == email))
     await audit_record(
         session,
         actor=actor,
@@ -333,9 +327,7 @@ class ErasureRequestService:
             # Capture the applicant email now. Anonymization nulls it, but the
             # confirmation mail still needs it.
             email = await self.session.scalar(
-                select(Applicant.email).where(
-                    Applicant.application_id == application_id
-                )
+                select(Applicant.email).where(Applicant.application_id == application_id)
             )
         request = ErasureRequest(
             subject_type=subject_type,
@@ -470,11 +462,7 @@ class AuskunftService:
             Rows ready for `build_auskunft_workbook`.
         """
         applicants = list(
-            (
-                await self.session.scalars(
-                    select(Applicant).where(Applicant.email == email)
-                )
-            ).all()
+            (await self.session.scalars(select(Applicant).where(Applicant.email == email))).all()
         )
         applicant_by_app = {a.application_id: a for a in applicants}
         app_ids = list(applicant_by_app.keys())
@@ -508,9 +496,7 @@ class AuskunftService:
                     sid: label
                     for sid, label in (
                         await self.session.execute(
-                            select(State.id, State.label_i18n).where(
-                                State.id.in_(state_ids)
-                            )
+                            select(State.id, State.label_i18n).where(State.id.in_(state_ids))
                         )
                     ).all()
                 }
@@ -539,9 +525,7 @@ class AuskunftService:
                     await self.session.scalars(
                         select(SubmissionVersion)
                         .where(SubmissionVersion.application_id.in_(app_ids))
-                        .order_by(
-                            SubmissionVersion.application_id, SubmissionVersion.version
-                        )
+                        .order_by(SubmissionVersion.application_id, SubmissionVersion.version)
                     )
                 ).all()
             )
@@ -662,9 +646,7 @@ class AuskunftService:
         if principal_row is not None:
             reporter.append(Ticket.reporter_principal_id == principal_row.id)
         trows = (
-            await self.session.scalars(
-                select(Ticket).where(or_(*reporter)).order_by(Ticket.number)
-            )
+            await self.session.scalars(select(Ticket).where(or_(*reporter)).order_by(Ticket.number))
         ).all()
         tickets = [
             {
@@ -697,6 +679,40 @@ class AuskunftService:
                 }
                 for at in tarows
             )
+        ticket_notes: list[dict[str, Any]] = []
+        if principal_row is not None:
+            # The own ticket messages of the account, with the names of their files: the
+            # chat of a reporter and the notes of a team member. Deleted messages keep
+            # their text until the anonymization, so they are part of the export.
+            nrows = (
+                await self.session.execute(
+                    select(TicketNote, Ticket.number)
+                    .join(Ticket, Ticket.id == TicketNote.ticket_id)
+                    .where(TicketNote.author_id == principal_row.id)
+                    .order_by(Ticket.number, TicketNote.created_at, TicketNote.id)
+                )
+            ).all()
+            note_files: dict[UUID, list[str]] = {}
+            if nrows:
+                for note_id, filename in (
+                    await self.session.execute(
+                        select(Attachment.ticket_note_id, Attachment.filename)
+                        .where(Attachment.ticket_note_id.in_([n.id for n, _ in nrows]))
+                        .order_by(Attachment.created_at, Attachment.id)
+                    )
+                ).all():
+                    note_files.setdefault(cast(UUID, note_id), []).append(filename)
+            ticket_notes = [
+                {
+                    "ticketNumber": format_number(number),
+                    "visibility": note.visibility,
+                    "createdAt": note.created_at,
+                    "deletedAt": note.deleted_at,
+                    "body": note.body,
+                    "attachments": note_files.get(note.id, []),
+                }
+                for note, number in nrows
+            ]
         todos = await todo_export(
             self.session, [principal_row.id] if principal_row is not None else []
         )
@@ -732,6 +748,7 @@ class AuskunftService:
             "attachments": attachments,
             "attendance": attendance,
             "tickets": tickets,
+            "ticket_notes": ticket_notes,
             "todos": todos["cards"],
             "todo_comments": todos["comments"],
             "sender_blocks": blocks,
@@ -753,6 +770,7 @@ def build_auskunft_workbook(
     attachments: Sequence[Mapping[str, Any]] = (),
     attendance: Sequence[Mapping[str, Any]] = (),
     tickets: Sequence[Mapping[str, Any]] = (),
+    ticket_notes: Sequence[Mapping[str, Any]] = (),
     todos: Sequence[Mapping[str, Any]] = (),
     todo_comments: Sequence[Mapping[str, Any]] = (),
     sender_blocks: Sequence[Mapping[str, Any]] = (),
@@ -760,10 +778,11 @@ def build_auskunft_workbook(
     """Build the GDPR access request (Art. 15) as `.xlsx` bytes.
 
     This function extends the shared `app.shared.xlsx.build_auskunft_workbook`. It adds
-    seven sheets: the comments that the subject can see (with the names of their
+    eight sheets: the comments that the subject can see (with the names of their
     files), the attachment metadata of the applications and the reported tickets, the
     meeting attendance with the reason of an excuse, the reported tickets with their
-    text and technical context, the to-dos that the subject created or is assigned to
+    text and technical context, the own ticket messages (with the names of their
+    files), the to-dos that the subject created or is assigned to
     (with the description of the own cards), the own to-do comments (with the names of
     their files), and the sender blocks of the account or the address.
     """
@@ -866,6 +885,21 @@ def build_auskunft_workbook(
                 else "",
             ]
             for t in tickets
+        ],
+    )
+    _add_sheet(
+        "Ticket-Nachrichten",
+        ["Ticket", "Sichtbarkeit", "Zeitpunkt", "Gelöscht", "Text", "Anhänge"],
+        [
+            [
+                n.get("ticketNumber") or "",
+                n.get("visibility") or "",
+                _fmt_dt(n.get("createdAt")),
+                _fmt_dt(n.get("deletedAt")),
+                n.get("body") or "",
+                "; ".join(n.get("attachments") or []),
+            ]
+            for n in ticket_notes
         ],
     )
     _add_sheet(
