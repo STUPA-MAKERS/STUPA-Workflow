@@ -268,6 +268,18 @@ class TodoService:
             stmt = stmt.where(TodoCard.id != exclude)
         return list((await self.session.scalars(stmt.order_by(TodoCard.rank, TodoCard.id))).all())
 
+    async def _all_column_cards(self, column_id: uuid.UUID) -> list[TodoCard]:
+        """Return every card of a column, the archived ones too, in rank order."""
+        return list(
+            (
+                await self.session.scalars(
+                    select(TodoCard)
+                    .where(TodoCard.column_id == column_id)
+                    .order_by(TodoCard.rank, TodoCard.id)
+                )
+            ).all()
+        )
+
     # -- tiles ------------------------------------------------------------------
 
     async def _facts(self, cards: Sequence[TodoCard], principal: Principal) -> _Facts:
@@ -556,27 +568,33 @@ class TodoService:
         """Rename a column, or make it the done column (``isDone: true`` moves the flag).
 
         The cards of the new done column get ``completed_at``; the cards of the old one
-        lose it.
+        lose it. Both include the archived cards, so a restored card has the state of
+        its column. A card that becomes done writes ``todo_done`` to its linked
+        tickets, as a move into the done column does.
         """
         board = await self._configurable(board_id, principal)
         column = await self._column(board, column_id)
         if payload.name is not None:
             column.name = payload.name.strip() or column.name
         if payload.is_done and not column.is_done:
+            actor = await self._actor(principal)
+            await self._lock_board(board.id)
             now = _now()
             for other in await self._columns(board.id):
                 if other.is_done:
                     other.is_done = False
-                    for card in await self._column_cards(other.id):
+                    for card in await self._all_column_cards(other.id):
                         card.completed_at = None
                         card.updated_at = now
             # The partial unique index allows one done column: clear the old flag
             # before the new one is written.
             await self.session.flush()
             column.is_done = True
-            for card in await self._column_cards(column.id):
-                card.completed_at = card.completed_at or now
+            for card in await self._all_column_cards(column.id):
                 card.updated_at = now
+                if card.completed_at is None:
+                    card.completed_at = now
+                    await self._write_ticket_done(card, board, actor)
         self._touch(board)
         await self.session.commit()
         return await self._board_out(board, principal)
@@ -611,6 +629,9 @@ class TodoService:
     ) -> TodoBoardOut:
         """Delete a column. Its cards (archived ones too) go to ``move_to`` first.
 
+        Each card gets a ``moved`` event; a card that enters the done column this way
+        gets ``completed_at`` and writes ``todo_done`` to its linked tickets.
+
         Raises:
             ConflictError: The done column (``done_column_required``), or cards and no
                 ``move_to`` (``column_not_empty``) (HTTP 409).
@@ -621,31 +642,38 @@ class TodoService:
         if column.is_done:
             raise ConflictError("The done column cannot be deleted.", code="done_column_required")
         await self._lock_board(board.id)
-        cards = list(
-            (
-                await self.session.scalars(
-                    select(TodoCard)
-                    .where(TodoCard.column_id == column.id)
-                    .order_by(TodoCard.rank, TodoCard.id)
-                )
-            ).all()
-        )
+        cards = await self._all_column_cards(column.id)
         if cards:
             if move_to is None:
                 raise ConflictError("The column still has cards.", code="column_not_empty")
             target = await self.session.get(TodoColumn, move_to)
             if target is None or target.board_id != board.id or target.id == column.id:
                 raise _invalid("moveTo names another column of the board.", "invalid", "moveTo")
+            actor = await self._actor(principal)
             live = await self._column_cards(target.id)
             last = live[-1].rank if live else None
             now = _now()
             for card in cards:
                 last = between(last, None)
                 card.rank = last
+                # The same bookkeeping as a move: the event, and on the entry into
+                # the done column ``completed_at`` and ``todo_done``.
+                self._event(
+                    card,
+                    "moved",
+                    actor,
+                    {
+                        "fromColumnId": str(column.id),
+                        "fromColumnName": column.name,
+                        "toColumnId": str(target.id),
+                        "toColumnName": target.name,
+                    },
+                )
                 card.column_id = target.id
                 card.updated_at = now
-                if target.is_done:
-                    card.completed_at = card.completed_at or now
+                if target.is_done and card.completed_at is None:
+                    card.completed_at = now
+                    await self._write_ticket_done(card, board, actor)
             await self.session.flush()
         await self.session.delete(column)
         await self.session.flush()
@@ -946,6 +974,9 @@ class TodoService:
         actor = await self._actor(principal)
         card, board = await self._card(card_id, principal)
         await self._lock_board(board.id)
+        # A parallel move of the same card held the lock: read the card again, so the
+        # column change below works from the committed column.
+        await self.session.refresh(card)
         columns = {c.id: c for c in await self._columns(board.id)}
         target = columns.get(payload.column_id)
         if target is None:
@@ -992,6 +1023,10 @@ class TodoService:
         Returns:
             True when the card moved (False: no done column, or done already).
         """
+        # The board lock orders this rank against a parallel move or create, and the
+        # card is read again after the lock.
+        await self._lock_board(board.id)
+        await self.session.refresh(card)
         columns = await self._columns(board.id)
         done = next((c for c in columns if c.is_done), None)
         if done is None or card.column_id == done.id:
@@ -1055,12 +1090,22 @@ class TodoService:
             await self.session.commit()
 
     async def restore_card(self, card_id: uuid.UUID, principal: Principal) -> TodoCardDetail:
-        """Bring an archived card back into its column."""
+        """Bring an archived card back into its column.
+
+        A card in the done column gets a new ``completed_at``, else the archive cron
+        archives it again at its next run.
+        """
         actor = await self._actor(principal)
         card, board = await self._card(card_id, principal)
         if card.archived_at is not None:
+            # Read the column before the card changes. A read after them autoflushes
+            # the card, so ``completed_at`` goes in a second UPDATE without an explicit
+            # ``updated_at``; its ``onupdate=now()`` then expires the attribute.
+            column = await self.session.get(TodoColumn, card.column_id)
             card.archived_at = None
             card.updated_at = _now()
+            if column is not None and column.is_done:
+                card.completed_at = card.updated_at
             self._event(card, "restored", actor)
             self._touch(board)
             await self.session.commit()

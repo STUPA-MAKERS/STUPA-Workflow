@@ -69,6 +69,7 @@ class ScriptedSession:
         self.statements: list[Any] = []
         self.committed = 0
         self.flushed = 0
+        self.refreshed: list[Any] = []
 
     def put(self, *objs: Any) -> None:
         for obj in objs:
@@ -96,6 +97,9 @@ class ScriptedSession:
 
     async def delete(self, obj: Any) -> None:
         self.deleted.append(obj)
+
+    async def refresh(self, obj: Any) -> None:
+        self.refreshed.append(obj)
 
     async def scalar(self, stmt: Any, *_a: Any) -> Any:
         self.statements.append(stmt)

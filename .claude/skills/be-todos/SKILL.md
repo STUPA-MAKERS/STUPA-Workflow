@@ -71,7 +71,8 @@ included), `GET /link-targets`, `GET /linked?kind&targetId`, `POST /cards`, `GET
 `not_comment_author`).
 
 **Data rules:**
-- Create, move and column delete lock the board row; a move writes one row unless two
+- Create, move, `complete`, the done-flag move and column delete lock the board row; move
+  and `complete` read the card again after the lock (`refresh`); a move writes one row unless two
   ranks collide (`RankError` → `spread` over the column). Every write bumps
   `todo_board.updated_at`, so the ETag changes.
 - A write that changes a card sets `card.updated_at` itself. The column has
@@ -81,7 +82,10 @@ included), `GET /link-targets`, `GET /linked?kind&targetId`, `POST /cards`, `GET
   bump it. A `moved` event is written only on a column change.
 - Entry into the done column sets `completed_at` and writes `todo_done` (payload
   `cardId`, `cardTitle`, `boardId`) into every linked ticket; leaving it clears
-  `completed_at`. The ticket detail shows `cardTitle` only to a reader of the board.
+  `completed_at`. The same holds for the column paths: `PATCH` with `isDone` and
+  `DELETE …?moveTo=<done>` (which also writes a `moved` event per card); both change
+  archived cards too. A restore into the done column sets a new `completed_at`, so the
+  archive cron does not archive the card again at once. The ticket detail shows `cardTitle` only to a reader of the board.
 - A link target that the viewer cannot read has `accessible: false` and no title, url or
   detail (the frontend shows "kein Zugriff"). Event payloads of `linked`/`unlinked` get
   the title the same way.
@@ -94,7 +98,8 @@ links the card to the item.
 
 **Mails:** `todo_assigned` (new assignee except the actor), `todo_mentioned` (new mentions
 except the author, with an excerpt), both after the commit and best effort; `todo_due` from
-the deadline cron to the assignees of an open card due tomorrow (Berlin), from 07:00 Berlin,
+the deadline cron to the assignees of an open card due tomorrow (Berlin) who are still
+members of the board (`BoardAccess.member_ids`), from 07:00 Berlin,
 once per card and due date (`due_reminded_on`, idempotency key `todo_due:<card>:<date>`).
 All three are opt-out kinds.
 

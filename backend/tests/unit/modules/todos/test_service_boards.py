@@ -8,9 +8,10 @@ from typing import Any
 import pytest
 
 from app.modules.auth.principal import Principal
+from app.modules.tickets.models import TicketEvent
 from app.modules.todos import service as svc_mod
 from app.modules.todos.access import ReadScope
-from app.modules.todos.models import TodoColumn, TodoLabel
+from app.modules.todos.models import TodoColumn, TodoEvent, TodoLabel
 from app.modules.todos.schemas import BoardPatch, ColumnPatch, LabelCreate, LabelPatch
 from app.modules.todos.service import TodoService
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
@@ -212,7 +213,10 @@ async def test_patch_column_renames_and_moves_the_done_flag() -> None:
     old_done = card(b, done, completed_at=svc_mod._now())
     new_done = card(b, first)
     kept = card(b, first, completed_at=svc_mod._now())
-    session = ScriptedSession(scalars=[[first, done], [old_done], [new_done, kept]])
+    ticket = uuid.uuid4()
+    # Columns, the old done column, the new one (archived cards too), then the
+    # linked tickets of the one card that becomes done.
+    session = ScriptedSession(scalars=[[first, done], [old_done], [new_done, kept], [ticket]])
     session.put(b, first, done)
     service = _svc(session)
     _stub(service)
@@ -223,6 +227,11 @@ async def test_patch_column_renames_and_moves_the_done_flag() -> None:
     assert old_done.completed_at is None
     assert new_done.completed_at is not None and kept.completed_at == stamp
     assert session.flushed == 1
+    (event,) = [o for o in session.added if isinstance(o, TicketEvent)]
+    assert (event.ticket_id, event.kind, event.actor_id) == (ticket, "todo_done", ME)
+    assert event.payload["cardId"] == str(new_done.id)
+    assert "archived_at" not in str(session.statements[-1])
+    assert "FOR UPDATE" in str(session.statements[0])
     # The done column again: nothing moves.
     await service.patch_column(b.id, first.id, ColumnPatch.model_validate({"isDone": True}), USER)
     await service.patch_column(b.id, first.id, ColumnPatch(name=" "), USER)
@@ -272,9 +281,8 @@ async def test_delete_column_moves_the_cards_and_renumbers() -> None:
     done = column(b.id, "Erledigt", 2, is_done=True)
     moving = [card(b, col, rank="a"), card(b, col, rank="b", completed_at=svc_mod._now())]
     present = card(b, done, rank="m")
-    session = ScriptedSession(
-        execute=[[]], scalars=[moving, [present], [first, done], [], [first, done]]
-    )
+    ticket = uuid.uuid4()
+    session = ScriptedSession(execute=[[]], scalars=[moving, [present], [ticket], [first, done]])
     session.put(b, first, col, done)
     service = _svc(session)
     _stub(service)
@@ -283,6 +291,19 @@ async def test_delete_column_moves_the_cards_and_renumbers() -> None:
     assert all(m.column_id == done.id for m in moving)
     assert present.rank < moving[0].rank < moving[1].rank
     assert moving[0].completed_at is not None and moving[1].completed_at == stamp
+    # Each card gets a moved event; only the card that becomes done tells its ticket.
+    moved = [o for o in session.added if isinstance(o, TodoEvent)]
+    assert [(e.card_id, e.kind, e.actor_id) for e in moved] == [
+        (m.id, "moved", ME) for m in moving
+    ]
+    assert moved[0].payload == {
+        "fromColumnId": str(col.id),
+        "fromColumnName": "Wartet",
+        "toColumnId": str(done.id),
+        "toColumnName": "Erledigt",
+    }
+    (told,) = [o for o in session.added if isinstance(o, TicketEvent)]
+    assert (told.ticket_id, told.payload["cardId"]) == (ticket, str(moving[0].id))
     assert session.deleted == [col]
     assert (first.position, done.position) == (0, 1)
     # An empty column into a column without cards and not done.

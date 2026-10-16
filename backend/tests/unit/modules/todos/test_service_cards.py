@@ -324,6 +324,9 @@ async def test_move_into_done_and_back() -> None:
     session.scalars_q[:] = [[col, done], [], [TICKET]]
     await service.move(c.id, _move(done), USER)
     assert c.column_id == done.id and c.completed_at is not None
+    # The card is read again after the board lock, so a parallel move is seen.
+    assert session.refreshed == [c]
+    assert "FOR UPDATE" in str(session.statements[0])
     (moved,) = _events(session)
     assert (
         moved.payload["fromColumnName"] == "Offen" and moved.payload["toColumnName"] == "Erledigt"
@@ -352,6 +355,10 @@ async def test_complete_moves_an_open_card_into_done() -> None:
     session.scalars_q[:] = [[done], [], []]
     assert await service.complete(c, b, None) is True  # type: ignore[arg-type]
     assert _events(session)[-1].payload["fromColumnName"] == ""
+    # Every call takes the board lock before it reads the done column.
+    locks = [s for s in session.statements if "FOR UPDATE" in str(s)]
+    assert len(locks) == 4
+    assert session.refreshed == [c] * 4
 
 
 # -- archive ------------------------------------------------------------------------
@@ -366,6 +373,22 @@ async def test_archive_and_restore_are_idempotent() -> None:
     assert await service.restore_card(c.id, USER) is OUT
     assert c.archived_at is None and session.committed == 2
     assert [e.kind for e in _events(session)] == ["archived", "restored"]
+    assert c.completed_at is None
+
+
+async def test_restore_in_the_done_column_restarts_the_archive_clock() -> None:
+    b = board()
+    done = column(b.id, "Erledigt", 1, is_done=True)
+    old = svc_mod._now().replace(year=2020)
+    c = card(b, done, completed_at=old, archived_at=old)
+    session = ScriptedSession()
+    session.put(b, done, c)
+    service = _svc(session)
+    _stub(service)
+    await service.restore_card(c.id, USER)
+    assert c.archived_at is None
+    assert c.completed_at is not None and c.completed_at > old
+    assert c.completed_at == c.updated_at
 
 
 # -- assignees and labels -------------------------------------------------------------

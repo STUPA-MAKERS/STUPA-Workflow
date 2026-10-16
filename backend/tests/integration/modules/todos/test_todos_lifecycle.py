@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.admin.principal_merge import PrincipalMergeService
 from app.modules.privacy.service import AuskunftService, PrincipalService
+from app.modules.tickets.models import Ticket, TicketEvent
 from app.modules.todos.boards import ensure_personal_board
 from app.modules.todos.models import (
     TodoAssignee,
@@ -27,11 +28,12 @@ from app.modules.todos.models import (
     TodoColumn,
     TodoComment,
     TodoEvent,
+    TodoLink,
 )
-from app.modules.todos.schemas import CardCreate
+from app.modules.todos.schemas import CardCreate, ColumnPatch
 from app.modules.todos.service import BERLIN, TodoService
 from app.settings import Settings
-from tests.integration.modules.todos.conftest import add_person
+from tests.integration.modules.todos.conftest import add_gremium, add_member, add_person
 from worker.todos import archive_done_todos, process_todo_due
 
 pytestmark = pytest.mark.integration
@@ -137,6 +139,110 @@ async def test_the_due_reminder(
     async with maker() as session:
         card = await session.get(TodoCard, due)
         assert card is not None and card.due_reminded_on == tomorrow
+
+
+async def test_a_restored_card_waits_for_the_archive_days_again(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    me, me_id = await add_person(maker, "Ada")
+    board, columns = await _personal(maker, me_id)
+    done = await _create(maker, me, board.id, columnId=str(columns[-1].id))
+    async with maker() as session:
+        await session.execute(
+            text("UPDATE todo_card SET completed_at = now() - interval '31 days' WHERE id = :c"),
+            {"c": done},
+        )
+        await session.commit()
+    ctx = {"todos_sessionmaker": maker}
+    assert await archive_done_todos(ctx) == 1
+    async with maker() as session:
+        await TodoService(session).restore_card(done, me)
+    assert await archive_done_todos(ctx) == 0
+    async with maker() as session:
+        card = await session.get(TodoCard, done)
+        assert card is not None and card.archived_at is None
+        assert card.completed_at is not None
+        assert card.completed_at > datetime.now(UTC) - timedelta(minutes=5)
+
+
+async def test_a_column_change_into_done_tells_the_linked_ticket(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    me, me_id = await add_person(maker, "Ada")
+    board, columns = await _personal(maker, me_id)
+    waiting, first = columns[2], columns[0]
+    flagged = await _create(maker, me, board.id, columnId=str(waiting.id))
+    moved = await _create(maker, me, board.id, columnId=str(first.id))
+    async with maker() as session:
+        ticket = Ticket(kind="bug", title="t", body="b", status="new", reporter_email="r@x.org")
+        session.add(ticket)
+        await session.flush()
+        session.add_all(
+            [
+                TodoLink(card_id=flagged, ticket_id=ticket.id, created_by=me_id),
+                TodoLink(card_id=moved, ticket_id=ticket.id, created_by=me_id),
+            ]
+        )
+        await session.commit()
+        ticket_id = ticket.id
+    async with maker() as session:
+        await TodoService(session).patch_column(
+            board.id, waiting.id, ColumnPatch.model_validate({"isDone": True}), me
+        )
+    async with maker() as session:
+        await TodoService(session).delete_column(board.id, first.id, me, move_to=waiting.id)
+    async with maker() as session:
+        told = (
+            await session.scalars(
+                select(TicketEvent)
+                .where(TicketEvent.ticket_id == ticket_id, TicketEvent.kind == "todo_done")
+                .order_by(TicketEvent.created_at)
+            )
+        ).all()
+        events = (
+            await session.scalars(select(TodoEvent).where(TodoEvent.kind == "moved"))
+        ).all()
+        cards = {c.id: c for c in (await session.scalars(select(TodoCard))).all()}
+    assert [e.payload["cardId"] for e in told] == [str(flagged), str(moved)]
+    assert all(e.actor_id == me_id for e in told)
+    assert [(e.card_id, e.payload["toColumnId"]) for e in events] == [(moved, str(waiting.id))]
+    assert cards[moved].column_id == waiting.id
+    assert cards[flagged].completed_at is not None and cards[moved].completed_at is not None
+
+
+async def test_the_due_reminder_skips_a_former_member(
+    maker: async_sessionmaker[AsyncSession], settings: Settings
+) -> None:
+    lead, lead_id = await add_person(maker, "Lea")
+    _former, former_id = await add_person(maker, "Otto")
+    gremium_id, board_id = await add_gremium(maker)
+    await add_member(maker, gremium_id, lead_id, "todo.write")
+    await add_member(maker, gremium_id, former_id, "todo.write")
+    now = datetime(2026, 10, 1, 8, tzinfo=BERLIN).astimezone(UTC)
+    tomorrow = (now.astimezone(BERLIN) + timedelta(days=1)).date()
+    lead_card = await _create(
+        maker, lead, board_id, dueDate=str(tomorrow), assigneeIds=[str(lead_id)]
+    )
+    former_card = await _create(
+        maker, lead, board_id, dueDate=str(tomorrow), assigneeIds=[str(former_id)]
+    )
+    async with maker() as session:
+        await session.execute(
+            text(
+                "UPDATE gremium_membership SET valid_until = now() - interval '1 day' "
+                "WHERE principal_id = :p"
+            ),
+            {"p": former_id},
+        )
+        await session.commit()
+    queue = _Queue()
+    ctx = {"todos_sessionmaker": maker, "mail_queue": queue, "settings": settings}
+    assert await process_todo_due(ctx, now) == 1
+    assert len(queue.jobs) == 1
+    async with maker() as session:
+        for card_id in (lead_card, former_card):
+            card = await session.get(TodoCard, card_id)
+            assert card is not None and card.due_reminded_on == tomorrow
 
 
 async def test_erasure_and_auskunft(maker: async_sessionmaker[AsyncSession]) -> None:
