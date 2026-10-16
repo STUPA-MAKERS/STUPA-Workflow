@@ -238,6 +238,25 @@ async def test_patch_column_renames_and_moves_the_done_flag() -> None:
     assert first.name == "Fertig" and session.flushed == 1
 
 
+async def test_patch_column_does_not_tell_tickets_of_archived_cards() -> None:
+    b = board()
+    waiting, done = column(b.id, "Wartet"), column(b.id, "Erledigt", 1, is_done=True)
+    archived = card(b, waiting, archived_at=svc_mod._now())
+    live = card(b, waiting)
+    ticket = uuid.uuid4()
+    # Columns, the old done column, the new one; only the live card reads its tickets.
+    session = ScriptedSession(scalars=[[waiting, done], [], [archived, live], [ticket]])
+    session.put(b, waiting, done)
+    service = _svc(session)
+    _stub(service)
+    await service.patch_column(b.id, waiting.id, ColumnPatch.model_validate({"isDone": True}), USER)
+    # The archived card takes the column state, so a restore matches it.
+    assert archived.completed_at is not None and live.completed_at is not None
+    (event,) = [o for o in session.added if isinstance(o, TicketEvent)]
+    assert event.payload["cardId"] == str(live.id)
+    assert session.scalars_q == []
+
+
 async def test_order_columns() -> None:
     b = board()
     a, c = column(b.id, "A", 0), column(b.id, "C", 1)
@@ -310,6 +329,22 @@ async def test_delete_column_moves_the_cards_and_renumbers() -> None:
     session.scalars_q[:] = [[], [first, done]]
     await service.delete_column(b.id, empty.id, USER)
     assert session.deleted[-1] is empty
+
+
+async def test_delete_column_into_done_does_not_tell_tickets_of_archived_cards() -> None:
+    b = board()
+    col = column(b.id, "Wartet", 0)
+    done = column(b.id, "Erledigt", 1, is_done=True)
+    archived = card(b, col, rank="a", archived_at=svc_mod._now())
+    session = ScriptedSession(scalars=[[archived], [], [done]])
+    session.put(b, col, done)
+    service = _svc(session)
+    _stub(service)
+    await service.delete_column(b.id, col.id, USER, move_to=done.id)
+    assert archived.column_id == done.id and archived.completed_at is not None
+    assert [o.kind for o in session.added if isinstance(o, TodoEvent)] == ["moved"]
+    assert not [o for o in session.added if isinstance(o, TicketEvent)]
+    assert session.scalars_q == []
 
 
 async def test_delete_column_into_an_open_column() -> None:

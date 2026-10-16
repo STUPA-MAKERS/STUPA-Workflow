@@ -595,8 +595,8 @@ class TodoService:
 
         The cards of the new done column get ``completed_at``; the cards of the old one
         lose it. Both include the archived cards, so a restored card has the state of
-        its column. A card that becomes done writes ``todo_done`` to its linked
-        tickets, as a move into the done column does.
+        its column. A live card that becomes done writes ``todo_done`` to its linked
+        tickets, as a move into the done column does; an archived one does not.
         """
         board = await self._configurable(board_id, principal)
         await self._lock_board(board.id)
@@ -620,7 +620,10 @@ class TodoService:
                 card.updated_at = now
                 if card.completed_at is None:
                     card.completed_at = now
-                    await self._write_ticket_done(card, board, actor)
+                    # An archived card was never finished: it keeps the column
+                    # bookkeeping but writes no ``todo_done`` to its tickets.
+                    if card.archived_at is None:
+                        await self._write_ticket_done(card, board, actor)
         self._touch(board)
         await self.session.commit()
         return await self._board_out(board, principal)
@@ -656,7 +659,8 @@ class TodoService:
         """Delete a column. Its cards (archived ones too) go to ``move_to`` first.
 
         Each card gets a ``moved`` event; a card that enters the done column this way
-        gets ``completed_at`` and writes ``todo_done`` to its linked tickets.
+        gets ``completed_at``; a live one also writes ``todo_done`` to its linked
+        tickets, an archived one does not.
 
         Raises:
             ConflictError: The done column (``done_column_required``), or cards and no
@@ -699,7 +703,8 @@ class TodoService:
                 card.updated_at = now
                 if target.is_done and card.completed_at is None:
                     card.completed_at = now
-                    await self._write_ticket_done(card, board, actor)
+                    if card.archived_at is None:
+                        await self._write_ticket_done(card, board, actor)
             await self.session.flush()
         await self.session.delete(column)
         await self.session.flush()

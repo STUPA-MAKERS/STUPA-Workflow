@@ -101,7 +101,8 @@ included), `GET /link-targets`, `GET /linked?kind&targetId`, `POST /cards`, `GET
   `cardId`, `cardTitle`, `boardId`) into every linked ticket; leaving it clears
   `completed_at`. The same holds for the column paths: `PATCH` with `isDone` and
   `DELETE …?moveTo=<done>` (which also writes a `moved` event per card); both change
-  archived cards too. A restore into the done column sets a new `completed_at`, so the
+  archived cards too, but an archived card gets only `completed_at`, never a `todo_done`
+  (it was not finished). A restore into the done column sets a new `completed_at`, so the
   archive cron does not archive the card again at once. The ticket detail shows `cardTitle` only to a reader of the board.
 - A link target that the viewer cannot read has `accessible: false` and no title, url or
   detail (the frontend shows "kein Zugriff"). Event payloads of `linked`/`unlinked` get
