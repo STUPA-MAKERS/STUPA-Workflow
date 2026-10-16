@@ -1,4 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -16,6 +17,7 @@ import {
   type TicketPatch,
 } from '@core/api/tickets.service';
 import { TodosApiService, type TodoLinkedCard } from '@core/api/todos.service';
+import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { DraftAttachmentsService } from '../../features/apply/draft-attachments.service';
 import { TicketDetailComponent, reportScanState } from './ticket-detail.component';
@@ -88,6 +90,8 @@ interface Opts {
   todos?: Observable<TodoLinkedCard[]>;
   assignees?: Observable<PersonRef[]>;
   split?: boolean | null;
+  /** The e-mail of the signed-in viewer. */
+  me?: string | null;
 }
 
 async function start(url = '/tickets/t40', opts: Opts = {}) {
@@ -138,6 +142,14 @@ async function start(url = '/tickets/t40', opts: Opts = {}) {
       { provide: TodosApiService, useValue: todosApi },
       { provide: ToastService, useValue: toast },
       ...(page ? [{ provide: TicketsPageService, useValue: page }] : []),
+      ...(opts.me !== undefined
+        ? [
+            {
+              provide: AuthService,
+              useValue: { principal: signal(opts.me === null ? null : { email: opts.me }), isAuthenticated: signal(true) },
+            },
+          ]
+        : []),
     ],
   });
   const harness = await RouterTestingHarness.create();
@@ -340,6 +352,43 @@ describe('TicketDetailComponent', () => {
     late.next(detail({ id: 't40', senderBlocked: false, title: 'Alt' }));
     expect(cmp.blocking()).toBe(false);
     expect(cmp.ticket()!.title).not.toBe('Alt');
+  });
+
+  it('offers no block on the own report, by the e-mail in any case', async () => {
+    const { cmp } = await start('/tickets/t40', { me: ' Tobias@Example.org', get: () => of(detail({ status: 'new' })) });
+    expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['duplicate']]);
+  });
+
+  it('offers the block while the viewer is not known', async () => {
+    const { cmp } = await start('/tickets/t40', { me: null, get: () => of(detail({ status: 'new' })) });
+    expect(cmp.menuSections()[0].items.map((i) => i.id)).toEqual(['duplicate', 'block']);
+  });
+
+  it('offers the block on a report without an e-mail', async () => {
+    const { cmp } = await start('/tickets/t40', {
+      me: 'tobias@example.org',
+      get: () =>
+        of(detail({ status: 'new', reporter: { principalId: null, displayName: null, email: null, anonymized: false } })),
+    });
+    expect(cmp.menuSections()[0].items.map((i) => i.id)).toEqual(['duplicate', 'block']);
+  });
+
+  it('says why a block was refused', async () => {
+    const { cmp, api, toast } = await start();
+    const refuse = (status: number, error: unknown) =>
+      api.blockSender.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status, error })));
+    refuse(422, { code: 'sender_is_self' });
+    cmp.onMenu({ id: 'block', label: '' });
+    expect(toast.error).toHaveBeenLastCalledWith('Das eigene Konto kann nicht gesperrt werden.');
+    refuse(409, { code: 'ticket_sender_unknown' });
+    cmp.onMenu({ id: 'block', label: '' });
+    expect(toast.error).toHaveBeenLastCalledWith('Der Absender ist nicht mehr bekannt.');
+    refuse(409, { code: 'other' });
+    cmp.onMenu({ id: 'block', label: '' });
+    expect(toast.error).toHaveBeenLastCalledWith('Die Sperre konnte nicht geändert werden.');
+    refuse(500, null);
+    cmp.onMenu({ id: 'block', label: '' });
+    expect(toast.error).toHaveBeenLastCalledWith('Die Sperre konnte nicht geändert werden.');
   });
 
   it('closes a ticket without to-dos at once and tells the list', async () => {

@@ -6,6 +6,7 @@ import { Subject, of, throwError, type Observable } from 'rxjs';
 import { TodosApiService, type TodoBoard, type TodoCardDetail, type TodoComment } from '@core/api/todos.service';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { MEMBERS, asPhone, board, detail, link, tile } from '../../../../testing/todo-fixtures';
+import { DraftAttachmentsService } from '../../apply/draft-attachments.service';
 import { TodoCardDetailComponent } from './todo-card-detail.component';
 
 const COMMENT: TodoComment = {
@@ -824,6 +825,38 @@ describe('TodoCardDetailComponent', () => {
     const { cmp } = await setup({ card: detail({ archivedAt: 'bad', dueDate: null }) });
     expect(cmp.archivedLine()).toBeNull();
     expect(cmp.dueRelative()).toBe('');
+  });
+
+  it('keeps the composer files when a breakpoint change re-creates the chat', async () => {
+    let phone = false;
+    const listeners: ((e: MediaQueryListEvent) => void)[] = [];
+    jest.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          get matches() {
+            return query === MEDIA.phone && phone;
+          },
+          media: query,
+          addEventListener: (_: string, fn: (e: MediaQueryListEvent) => void) => {
+            if (query === MEDIA.phone) listeners.push(fn);
+          },
+          removeEventListener: () => undefined,
+        }) as unknown as MediaQueryList,
+    );
+    const { fixture, files } = await setup();
+    const chat = () => fixture.debugElement.query((d) => d.name === 'app-chat');
+    const drafts = chat().injector.get(DraftAttachmentsService);
+    const old = chat().componentInstance;
+    const file = { id: 'd1', filename: 'a.png', mime: 'image/png', size: 3, scanned: false, isComparisonOffer: false, scanState: 'scanning' as const };
+    drafts.files.set([file]);
+    phone = true;
+    for (const fn of [...listeners]) fn({ matches: true } as MediaQueryListEvent);
+    fixture.detectChanges();
+    expect(fixture.nativeElement).toHaveClass('cd--phone');
+    expect(chat().componentInstance).not.toBe(old);
+    expect(chat().injector.get(DraftAttachmentsService)).toBe(drafts);
+    expect(drafts.files()).toEqual([file]);
+    expect(files.deleteDraftAttachment).not.toHaveBeenCalled();
   });
 
   describe('phone', () => {

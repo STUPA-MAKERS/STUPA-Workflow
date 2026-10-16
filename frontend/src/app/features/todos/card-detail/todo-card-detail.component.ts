@@ -39,6 +39,7 @@ import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component'
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
+import { ChatDrafts } from '@shared/ui/chat/chat-drafts';
 import type { ChatEdit, ChatEvent, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/chat.models';
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
@@ -127,6 +128,9 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     TodoLinkPickerComponent,
     TodoMoveSheetComponent,
   ],
+  // The phone and the wide layout render the chat in two branches: the page owns its
+  // composer files, so a breakpoint change keeps them.
+  providers: [ChatDrafts],
   host: { '[class.cd--phone]': 'phone()', '[class.cd--pane]': "mode() === 'pane'" },
   templateUrl: './todo-card-detail.component.html',
   styleUrl: './todo-card-detail.component.scss',

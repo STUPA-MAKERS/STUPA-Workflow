@@ -107,6 +107,8 @@ export class DraftAttachmentsService {
   private fieldScope: ReadonlySet<string> | null = null;
   /** Counts the discards: an upload of an earlier draft does not land in this one. */
   private generation = 0;
+  /** The end of the last upload call: the next one starts after it. */
+  private queue: Promise<unknown> = Promise.resolve();
 
   /** The uploaded files, oldest first. */
   readonly files = signal<DraftFile[]>([]);
@@ -146,67 +148,97 @@ export class DraftAttachmentsService {
   /**
    * Upload files one after the other. A file over a limit stays here with its reason;
    * the others go on. Resolves the uploaded files and the failures.
+   *
+   * A second call waits until the first is done, because the first upload of a draft
+   * gets the token and every later one has to send it: two uploads without a token get
+   * two drafts, and the submit binds only one. The files of the call join `pending` at
+   * once, so a count against `pending` sees the whole queue.
    */
-  async upload(
+  upload(
     files: readonly File[],
     opts: { fieldKey?: string | null; isComparisonOffer?: boolean } = {},
   ): Promise<{ uploaded: DraftFile[]; failed: UploadFailure[] }> {
     const fieldKey = opts.fieldKey ?? null;
+    const generation = this.generation;
+    const queued = files.map((file) => ({
+      file,
+      pending: { key: nextKey++, filename: file.name, size: file.size, fieldKey } satisfies PendingUpload,
+    }));
+    if (queued.length) this.pending.update((list) => [...list, ...queued.map((q) => q.pending)]);
+    const run = this.queue.then(() => this.runUploads(queued, fieldKey, opts.isComparisonOffer === true, generation));
+    // `runUploads` catches every refusal and never rejects, so the queue never stalls.
+    this.queue = run;
+    return run;
+  }
+
+  private async runUploads(
+    queued: readonly { file: File; pending: PendingUpload }[],
+    fieldKey: string | null,
+    isComparisonOffer: boolean,
+    generation: number,
+  ): Promise<{ uploaded: DraftFile[]; failed: UploadFailure[] }> {
     const uploaded: DraftFile[] = [];
     const failed: UploadFailure[] = [];
-    const generation = this.generation;
-    for (const file of files) {
-      if (generation !== this.generation) break;
-      const limit = this.limitReason(file);
-      if (limit) {
-        failed.push({ filename: file.name, reason: limit });
-        continue;
-      }
-      const pending: PendingUpload = {
-        key: nextKey++,
-        filename: file.name,
-        size: file.size,
-        fieldKey,
-      };
-      this.pending.update((list) => [...list, pending]);
-      try {
-        const draft = await this.send(file, fieldKey, opts.isComparisonOffer === true, generation);
-        if (!draft) continue;
-        if (!this.inScope(draft)) {
-          // The type changed during the upload: the new form has no such field.
-          void this.deleteQuietly([draft.id]);
+    const done = (p: PendingUpload): void => this.pending.update((list) => list.filter((x) => x.key !== p.key));
+    try {
+      for (const { file, pending } of queued) {
+        if (generation !== this.generation) break;
+        const limit = this.limitReason(file);
+        if (limit) {
+          failed.push({ filename: file.name, reason: limit });
+          done(pending);
           continue;
         }
-        uploaded.push(draft);
-        this.files.update((list) => [...list, draft]);
-        this.store();
-      } catch (err) {
-        failed.push({ filename: file.name, reason: uploadErrorKey(err) });
-      } finally {
-        this.pending.update((list) => list.filter((p) => p.key !== pending.key));
+        try {
+          const draft = await this.send(file, fieldKey, isComparisonOffer, generation);
+          if (!draft) continue;
+          if (!this.inScope(draft)) {
+            // The type changed during the upload: the new form has no such field.
+            void this.deleteQuietly([draft.id]);
+            continue;
+          }
+          uploaded.push(draft);
+          this.files.update((list) => [...list, draft]);
+          this.store();
+        } catch (err) {
+          failed.push({ filename: file.name, reason: uploadErrorKey(err) });
+        } finally {
+          done(pending);
+        }
       }
+    } finally {
+      // A discard stops the loop: the files still waiting in this call never go up.
+      const left = new Set(queued.map((q) => q.pending.key));
+      this.pending.update((list) => list.filter((p) => !left.has(p.key)));
     }
     return { uploaded, failed };
   }
 
   /**
-   * Remove a file. A failed file only leaves the list; the server no longer has it. A
-   * 404 means the same, so the file leaves the list as well. Resolves false when the
-   * server refused for another reason.
+   * Remove a file. It leaves the list (and the submit) at once; a refused delete puts it
+   * back where it was. A failed file only leaves the list; the server no longer has it. A
+   * 404 means the same. Resolves false when the server refused for another reason.
    */
   async remove(id: Uuid): Promise<boolean> {
-    const file = this.files().find((f) => f.id === id);
-    if (!file) return true;
+    const at = this.files().findIndex((f) => f.id === id);
+    if (at < 0) return true;
+    const file = this.files()[at];
     const token = this._token();
+    this.files.update((list) => list.filter((f) => f.id !== id));
+    this.store();
     if (!file.failed && token) {
       try {
         await firstValueFrom(this.api.deleteDraftAttachment(id, token));
       } catch (err) {
-        if (!(err instanceof HttpErrorResponse && err.status === 404)) return false;
+        if (err instanceof HttpErrorResponse && err.status === 404) return true;
+        // A send or a discard since then ended the draft: the file does not come back.
+        if (this._token() === token) {
+          this.files.update((list) => [...list.slice(0, at), file, ...list.slice(at)]);
+          this.store();
+        }
+        return false;
       }
     }
-    this.files.update((list) => list.filter((f) => f.id !== id));
-    this.store();
     return true;
   }
 

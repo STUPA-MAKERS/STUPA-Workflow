@@ -185,23 +185,31 @@ export class HelpTicketsComponent {
   /**
    * The row and its focused button leave the DOM, so the focus goes to the unblock
    * button of the row that takes its place (or the one before), else to the heading.
+   * A 404 says the block is gone already (lifted from the ticket or by another manager),
+   * so the row leaves as on a success.
    */
   protected unblock(b: TicketBlockedSender): void {
     if (this.unblocking()) return;
     this.unblocking.set(b.id);
     this.tickets.deleteBlockedSender(b.id).subscribe({
-      next: () => {
-        const at = (this.blocked() ?? []).findIndex((x) => x.id === b.id);
-        this.unblocking.set(null);
-        this.blocked.update((list) => (list ?? []).filter((x) => x.id !== b.id));
-        this.toast.success(this.i18n.translate('admin.helpTickets.unblocked'));
-        afterNextRender(() => this.focusAfterUnblock(at), { injector: this.injector });
-      },
-      error: () => {
+      next: () => this.dropBlock(b),
+      error: (err: { status?: number }) => {
+        if (err.status === 404) {
+          this.dropBlock(b);
+          return;
+        }
         this.unblocking.set(null);
         this.toast.error(this.i18n.translate('admin.helpTickets.error.unblock'));
       },
     });
+  }
+
+  private dropBlock(b: TicketBlockedSender): void {
+    const at = (this.blocked() ?? []).findIndex((x) => x.id === b.id);
+    this.unblocking.set(null);
+    this.blocked.update((list) => (list ?? []).filter((x) => x.id !== b.id));
+    this.toast.success(this.i18n.translate('admin.helpTickets.unblocked'));
+    afterNextRender(() => this.focusAfterUnblock(at), { injector: this.injector });
   }
 
   private focusAfterUnblock(at: number): void {

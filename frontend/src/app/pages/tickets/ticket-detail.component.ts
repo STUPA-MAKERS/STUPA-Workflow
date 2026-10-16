@@ -16,6 +16,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { API_BASE_URL } from '@core/api/api.config';
+import { AuthService } from '@core/auth/auth.service';
 import type { PersonRef, ScanState, Uuid } from '@core/api/models';
 import {
   TICKET_KINDS,
@@ -26,6 +27,7 @@ import {
   type TicketListItem,
   type TicketNote,
   type TicketPatch,
+  type TicketReporter,
   type TicketStatus,
 } from '@core/api/tickets.service';
 import { TodosApiService, type TodoLinkedCard } from '@core/api/todos.service';
@@ -88,6 +90,18 @@ export function reportScanState(a: TicketAttachment): ScanState {
   return a.scanState ?? (a.scanned ? 'clean' : 'scanning');
 }
 
+/** The refusals of a block that say why; any other gets the general text. */
+const BLOCK_ERROR: Readonly<Record<string, TranslationKey>> = {
+  sender_is_self: 'tickets.detail.error.blockSelf',
+  ticket_sender_unknown: 'tickets.detail.error.senderUnknown',
+};
+
+/** The text of a refused block or unblock. */
+export function blockErrorKey(err: unknown): TranslationKey {
+  const code = err instanceof HttpErrorResponse ? (err.error as { code?: string } | null)?.code : undefined;
+  return (code && BLOCK_ERROR[code]) || 'tickets.detail.error.block';
+}
+
 /** The id of the ticket body in the thread: it never collides with a note id. */
 const BODY_ID = 'ticket-body';
 
@@ -101,7 +115,8 @@ const BODY_ID = 'ticket-body';
  * Every note is internal, so the composer has no visibility switch. A note takes up to
  * 5 files (not on an anonymized ticket). Closing a ticket with open to-dos asks "Offene
  * To-Dos mit erledigen?" (default yes). The ⋮ menu blocks or unblocks the sender (frame
- * 19) at once, with a toast (contract 12.8: no question). While a file of the report or
+ * 19) at once, with a toast (contract 12.8: no question); the own report offers no
+ * block. While a file of the report or
  * a note is in the scan, the chat asks for the thread again (`refreshThread`), and only
  * the scan states of that read change the page.
  */
@@ -147,6 +162,7 @@ export class TicketDetailComponent {
   private readonly todosApi = inject(TodosApiService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly page = inject(TicketsPageService, { optional: true });
   private readonly injector = inject(Injector);
@@ -242,8 +258,8 @@ export class TicketDetailComponent {
     // The closing action and the block stand apart from the status change, behind a rule.
     const apart: RowMenuItem[] = [];
     if (isOpen(t.status)) apart.push({ id: 'duplicate', label: this.t('tickets.detail.duplicate'), icon: 'copy' });
-    // An anonymized ticket has no sender any more.
-    if (!t.anonymizedAt) {
+    // An anonymized ticket has no sender any more, and nobody blocks themselves.
+    if (!t.anonymizedAt && !this.ownReport(t.reporter)) {
       apart.push(
         t.senderBlocked
           ? { id: 'unblock', label: this.t('tickets.detail.unblockSender'), icon: 'lock' }
@@ -461,11 +477,17 @@ export class TicketDetailComponent {
         this.ticket.set(t);
         this.toast.success(this.t(block ? 'tickets.detail.senderBlocked' : 'tickets.detail.senderUnblocked'));
       },
-      error: () => {
+      error: (err: unknown) => {
         this.blocking.set(false);
-        this.toast.error(this.t('tickets.detail.error.block'));
+        this.toast.error(this.t(blockErrorKey(err)));
       },
     });
+  }
+
+  /** The viewer filed the report: the e-mail of the report is the own one. */
+  private ownReport(reporter: TicketReporter): boolean {
+    const own = this.auth.principal()?.email?.trim().toLowerCase();
+    return !!own && reporter.email?.trim().toLowerCase() === own;
   }
 
   /** Copy the link of the ticket. */

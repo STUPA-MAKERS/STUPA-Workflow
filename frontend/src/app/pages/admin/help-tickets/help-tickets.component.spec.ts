@@ -1,3 +1,4 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { provideRouter } from '@angular/router';
@@ -314,6 +315,18 @@ describe('HelpTicketsComponent', () => {
       fixture.detectChanges();
       expect(toast.error).toHaveBeenCalledWith('Die Sperre konnte nicht aufgehoben werden.');
       expect(rows()).toHaveLength(2);
+    });
+
+    it('drops the row of a block that is gone already (404), as on a success', async () => {
+      const tickets = makeTickets();
+      tickets.deleteBlockedSender.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 404 })));
+      const { toast, fixture } = await setup({ perms: ['admin.site', 'ticket.manage'], tickets });
+      await userEvent.click(screen.getByRole('button', { name: 'spam@example.org entsperren' }));
+      await fixture.whenStable();
+      expect(rows()).toHaveLength(2);
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(toast.success).toHaveBeenCalledWith('Absender entsperrt.');
+      expect(screen.getByRole('button', { name: 'Finn Schulze entsperren' })).toHaveFocus();
     });
 
     it('says when nobody is blocked', async () => {

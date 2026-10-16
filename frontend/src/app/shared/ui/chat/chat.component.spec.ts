@@ -867,6 +867,45 @@ describe('ChatComponent', () => {
       expect(api.uploadDraftAttachment).toHaveBeenCalledTimes(5);
     });
 
+    it('counts a batch still on its way against the 5 files of a message', async () => {
+      const answers: Subject<DraftUpload>[] = [];
+      const { pick, api, toast, cmp } = await setup({
+        canAttach: true,
+        upload: () => {
+          const a = new Subject<DraftUpload>();
+          answers.push(a);
+          return a;
+        },
+      });
+      await pick(...Array.from({ length: 4 }, (_, i) => pdf(`a${i}.pdf`)));
+      expect(api.uploadDraftAttachment).toHaveBeenCalledTimes(1);
+      expect(cmp.uploads()).toHaveLength(4);
+      await pick(...Array.from({ length: 4 }, (_, i) => pdf(`b${i}.pdf`)));
+      expect(toast.error).toHaveBeenCalledWith('Höchstens 5 Dateien pro Nachricht.');
+      expect(cmp.uploads().map((u: { filename: string }) => u.filename)).toEqual([
+        'a0.pdf',
+        'a1.pdf',
+        'a2.pdf',
+        'a3.pdf',
+        'b0.pdf',
+      ]);
+      expect(screen.getByRole('button', { name: 'Datei anhängen' })).toBeDisabled();
+    });
+
+    it('never sends a file whose remove is still running', async () => {
+      const gone = new Subject<void>();
+      const { pick, api, send, input, view } = await setup({ canAttach: true });
+      await pick(pdf(), pdf('b.pdf'));
+      api.deleteDraftAttachment.mockReturnValueOnce(gone);
+      fireEvent.click(screen.getByRole('button', { name: 'angebot.pdf entfernen' }));
+      view.fixture.detectChanges();
+      expect(view.container.querySelectorAll('.chat__draft')).toHaveLength(1);
+      fireEvent.keyDown(input(), { key: 'Enter' });
+      expect(send.mock.calls[0][0]).toMatchObject({ attachmentIds: ['d2'] });
+      gone.next();
+      gone.complete();
+    });
+
     it('checks the size before the upload', async () => {
       const { pick, api, toast } = await setup({ canAttach: true });
       await pick(pdf('gross.pdf', 11 * 1024 * 1024));

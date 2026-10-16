@@ -2,9 +2,9 @@ import { Injectable, Injector, inject, type OnDestroy } from '@angular/core';
 import { DRAFT_FILES_PERSIST, DraftAttachmentsService } from '../../../features/apply/draft-attachments.service';
 
 /**
- * The composer files of a page whose layout switch re-creates `app-chat` (the ticket and
- * the application detail render the thread in one branch for two panes and in another
- * for tabs). The page provides this service, so the uploaded drafts belong to the page:
+ * The composer files of a page whose layout switch re-creates `app-chat` (the ticket,
+ * the application and the to-do card detail render the thread in one branch for two
+ * panes and in another for tabs). The page provides this service, so the uploaded drafts belong to the page:
  * a new chat takes them over with the text draft, and they go when the page goes.
  *
  * One chat holds the drafts at a time. A second chat on the same page while the first
