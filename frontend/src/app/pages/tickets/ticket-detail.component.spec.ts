@@ -188,7 +188,7 @@ describe('TicketDetailComponent', () => {
     expect(line).toHaveTextContent('In Bearbeitung');
     expect(line).toHaveTextContent('Fehler');
     expect(line).toHaveTextContent('Mara Keller');
-    expect(document.querySelector('app-sheet-bar')).toHaveTextContent(/Ticket · T-0040 · gemeldet/);
+    expect(document.querySelector('app-sheet-bar')).toHaveTextContent(/Ticket · T-0040/);
     expect(document.querySelector('app-sheet-bar .mono')).toHaveTextContent('T-0040');
     expect(screen.getByRole('button', { name: /Erledigt/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ablehnen' })).toBeInTheDocument();
@@ -530,12 +530,10 @@ describe('TicketDetailComponent', () => {
     expect(screen.getByRole('link', { name: 'Zur Liste' })).toHaveAttribute('href', '/tickets');
   });
 
-  it('names the report time relative to today in the kicker', async () => {
-    const { cmp } = await start('/tickets/t40');
-    const rel = (at: Date) => (cmp as unknown as { relativeWhen(at: string): string }).relativeWhen(at.toISOString());
-    expect(rel(new Date())).toMatch(/^heute, \d\d:\d\d$/);
-    expect(rel(new Date(Date.now() - 86_400_000))).toMatch(/^gestern, \d\d:\d\d$/);
-    expect(rel(new Date('2026-01-05T09:00:00Z'))).toMatch(/^05\.01\., \d\d:\d\d$/);
+  it('names only the ticket number in the kicker', async () => {
+    await start('/tickets/t40');
+    const kicker = document.querySelector('app-sheet-bar [appSheetBarKicker]');
+    expect(kicker?.textContent?.trim()).toBe('Ticket · T-0040');
   });
 
   it('names a failed read', async () => {
