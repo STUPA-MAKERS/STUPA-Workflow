@@ -2,25 +2,36 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import type { AssignableApplication, Meeting } from '@core/api/models';
+import type { AgendaItem, AssignableApplication, Meeting } from '@core/api/models';
+import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
+import { BOARDS, board, tile } from '../../../../testing/todo-fixtures';
 import { runAxe } from '../../../../testing/a11y';
 import { AgendaItemDialogComponent } from './agenda-item-dialog.component';
 
-const MEETING = { id: 'm-1', title: '34. Sitzung', status: 'live', votes: [] } as unknown as Meeting;
+const MEETING = { id: 'm-1', title: '34. Sitzung', status: 'live', votes: [], gremiumId: 'g-1' } as unknown as Meeting;
 const APPS: AssignableApplication[] = [
   { applicationId: 'a-1', title: 'Sommerkino auf der Campuswiese', stateLabel: { de: 'Auf Tagesordnung', en: 'On the agenda' } },
   { applicationId: 'a-2', title: 'Erste-Hilfe-Kurs', stateLabel: null },
   { applicationId: 'a-3', title: null },
 ];
 
-async function setup(open = true, kind: 'application' | 'freetext' = 'application') {
+async function setup(
+  open = true,
+  kind: 'application' | 'freetext' = 'application',
+  extra: { canTodo?: boolean; meeting?: Meeting; agenda?: AgendaItem[] } = {},
+) {
   const closed = jest.fn();
   const added = jest.fn();
+  const canInGremium = jest.fn(() => extra.canTodo ?? false);
   const view = await render(AgendaItemDialogComponent, {
-    inputs: { open, meeting: MEETING, nextNumber: 9 },
+    inputs: { open, meeting: extra.meeting ?? MEETING, ...(extra.agenda ? { agenda: extra.agenda } : {}) },
     on: { closed, added },
-    providers: [provideHttpClient(), provideHttpClientTesting()],
+    providers: [
+      provideHttpClient(),
+      provideHttpClientTesting(),
+      { provide: AuthService, useValue: { canInGremium } },
+    ],
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   // The dialog opens on a free-text item. Most specs work on the application list.
@@ -33,7 +44,7 @@ async function setup(open = true, kind: 'application' | 'freetext' = 'applicatio
       .get(ToastService)
       .toasts()
       .map((t) => t.message);
-  return { ...view, http, cmp: view.fixture.componentInstance, closed, added, toasts };
+  return { ...view, http, cmp: view.fixture.componentInstance, closed, added, toasts, canInGremium };
 }
 
 function flushApps(http: HttpTestingController, fixture: { detectChanges(): void }, rows = APPS) {
@@ -51,14 +62,13 @@ describe('AgendaItemDialogComponent', () => {
   it('lists the assignable applications of the Gremium with their state', async () => {
     const { http, fixture } = await setup();
     const dialog = screen.getByRole('dialog', { name: 'TOP hinzufügen' });
-    expect(dialog).toHaveAccessibleDescription('34. Sitzung');
+    expect(dialog).not.toHaveTextContent('34. Sitzung');
     expect(screen.getByRole('status')).toHaveTextContent('Wird geladen');
     flushApps(http, fixture);
     expect(screen.getByText('Zuweisbare Anträge · 3')).toBeInTheDocument();
     const group = screen.getByRole('radiogroup', { name: /Zuweisbare Anträge/ });
     expect(within(group).getAllByRole('radio')).toHaveLength(3);
     expect(within(group).getByText('Auf Tagesordnung')).toBeInTheDocument();
-    expect(screen.getByText('Kommt als TOP 9 ans Ende der Tagesordnung.')).toBeInTheDocument();
     expect(submitButton()).toBeDisabled();
   });
 
@@ -119,14 +129,14 @@ describe('AgendaItemDialogComponent', () => {
     const { http, fixture, cmp } = await setup(true, 'freetext');
     flushApps(http, fixture);
     expect(cmp.kind()).toBe('freetext');
-    expect(screen.getByRole('radio', { name: 'Freitext-TOP' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Freitext' })).toBeChecked();
     expect(screen.getByLabelText(/Titel/)).toBeInTheDocument();
   });
 
   it('adds a free-text item', async () => {
     const { http, fixture, cmp, added } = await setup();
     flushApps(http, fixture);
-    await userEvent.click(screen.getByRole('radio', { name: 'Freitext-TOP' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Freitext' }));
     expect(submitButton()).toBeDisabled();
     await userEvent.type(screen.getByLabelText(/Titel/), '  Verschiedenes ');
     await userEvent.click(submitButton());
@@ -137,12 +147,13 @@ describe('AgendaItemDialogComponent', () => {
     expect(added).toHaveBeenCalledWith([]);
   });
 
-  it('accepts only the two kinds', async () => {
+  it('accepts only the known kinds', async () => {
     const { http, fixture, cmp } = await setup();
     flushApps(http, fixture);
     cmp.setKind('freetext');
     cmp.setKind('other');
     cmp.setKind(null);
+    cmp.setKind('todo'); // only with todo.write in the gremium
     expect(cmp.kind()).toBe('freetext');
     cmp.setKind('application');
     expect(cmp.kind()).toBe('application');
@@ -179,5 +190,145 @@ describe('AgendaItemDialogComponent', () => {
     const [, footerCancel] = screen.getAllByRole('button', { name: 'Abbrechen' });
     await userEvent.click(footerCancel);
     expect(closed).toHaveBeenCalled();
+  });
+  describe('kind To-Do', () => {
+    const AGENDA_TODO = [{ id: 't-1', applicationId: null, todoId: 'k-5', title: 'Schon da', position: 0 }] as AgendaItem[];
+    const BOARD = board({
+      cards: [
+        tile({ id: 'k-1', columnId: 'c-2', title: 'Haushaltsplan 2027: Entwurf Kapitel 3', dueDate: '2026-11-03' }),
+        tile({ id: 'k-2', columnId: 'c-1', title: 'Kassenprüfer anfragen', dueDate: '2027-01-15' }),
+        tile({ id: 'k-3', columnId: 'c-3', title: 'Wahlordnung lesen' }),
+        tile({ id: 'k-4', columnId: 'c-4', title: 'Erledigt schon' }),
+        tile({ id: 'k-5', columnId: 'c-1', title: 'Schon auf der Tagesordnung' }),
+      ],
+    });
+
+    async function todoSetup(extra: { meeting?: Meeting } = {}) {
+      const view = await setup(true, 'freetext', { canTodo: true, agenda: AGENDA_TODO, ...extra });
+      flushApps(view.http, view.fixture);
+      await userEvent.click(screen.getByRole('radio', { name: 'To-Do' }));
+      return view;
+    }
+
+    function flushBoard(http: HttpTestingController, fixture: { detectChanges(): void }) {
+      http.expectOne((r) => r.url === '/api/todos/boards' && r.params.get('gremiumId') === 'g-1').flush(BOARDS);
+      http.expectOne('/api/todos/boards/b-1').flush(BOARD);
+      fixture.detectChanges();
+    }
+
+    it('is offered only with todo.write in the gremium of the meeting', async () => {
+      const { http, fixture, cmp, canInGremium } = await setup(true, 'freetext');
+      flushApps(http, fixture);
+      expect(screen.queryByRole('radio', { name: 'To-Do' })).toBeNull();
+      expect(canInGremium).toHaveBeenCalledWith('g-1', 'todo.write');
+      expect(screen.getAllByRole('radio')).toHaveLength(2);
+      // Nothing loaded yet: no cards.
+      expect(cmp.shownTodos()).toEqual([]);
+    });
+
+    it('is not offered for a meeting without a gremium, and the kind stays', async () => {
+      const { http, fixture, cmp, canInGremium } = await setup(true, 'freetext', {
+        canTodo: true,
+        meeting: { ...MEETING, gremiumId: null } as unknown as Meeting,
+      });
+      flushApps(http, fixture);
+      expect(screen.queryByRole('radio', { name: 'To-Do' })).toBeNull();
+      expect(canInGremium).not.toHaveBeenCalled();
+      cmp.setKind('todo');
+      expect(cmp.kind()).toBe('freetext');
+      http.expectNone('/api/todos/boards');
+    });
+
+    it('lists the open cards of the gremium board by column, without done cards and cards on the agenda', async () => {
+      const { http, fixture } = await todoSetup();
+      expect(screen.getByRole('status')).toHaveTextContent('Wird geladen');
+      flushBoard(http, fixture);
+      expect(screen.getByText('Offene To-Dos · 3')).toBeInTheDocument();
+      const group = screen.getByRole('radiogroup', { name: /Offene To-Dos/ });
+      const radios = within(group).getAllByRole('radio');
+      expect(radios.map((r) => r.closest('label')?.querySelector('.aid__title')?.textContent)).toEqual([
+        'Kassenprüfer anfragen',
+        'Haushaltsplan 2027: Entwurf Kapitel 3',
+        'Wahlordnung lesen',
+      ]);
+      expect(within(group).getByText('Offen · fällig 15.01.2027')).toBeInTheDocument();
+      expect(within(group).getByText('Wartet')).toBeInTheDocument();
+      expect(within(group).getByText(/^In Arbeit · fällig 03\.11\./)).toBeInTheDocument();
+      expect(screen.queryByText('Erledigt schon')).toBeNull();
+      expect(screen.queryByText('Schon auf der Tagesordnung')).toBeNull();
+      expect(screen.getByRole('searchbox', { name: 'To-Do suchen' })).toBeInTheDocument();
+    });
+
+    it('puts the picked card on the agenda, non-public at once', async () => {
+      const { http, fixture, added, cmp } = await todoSetup();
+      flushBoard(http, fixture);
+      expect(submitButton()).toBeDisabled();
+      await userEvent.click(screen.getByRole('radio', { name: /Wahlordnung/ }));
+      expect(screen.getByRole('radio', { name: /Wahlordnung/ }).closest('label')).toHaveClass('aid__row--on');
+      await userEvent.click(screen.getByRole('switch', { name: 'Nicht öffentlich (NÖ)' }));
+      await userEvent.click(submitButton());
+      const req = http.expectOne('/api/meetings/m-1/agenda');
+      expect(req.request.body).toEqual({ todoId: 'k-3', nonPublic: true });
+      req.flush([{ id: 't-9', applicationId: null, todoId: 'k-3', title: 'Wahlordnung lesen', position: 1 }]);
+      expect(added).toHaveBeenCalledWith([expect.objectContaining({ todoId: 'k-3' })]);
+      // Back on "To-Do" the list stays loaded.
+      cmp.setKind('freetext');
+      cmp.setKind('todo');
+      http.expectNone('/api/todos/boards');
+    });
+
+    it('filters by the search text, says when nothing matches, and does not send a hidden pick', async () => {
+      const { http, fixture, cmp } = await todoSetup();
+      flushBoard(http, fixture);
+      await userEvent.click(screen.getByRole('radio', { name: /Kassenprüfer/ }));
+      expect(submitButton()).toBeEnabled();
+      await userEvent.type(screen.getByRole('searchbox', { name: 'To-Do suchen' }), 'haushalt');
+      expect(screen.getByText('Offene To-Dos · 1')).toBeInTheDocument();
+      expect(submitButton()).toBeDisabled();
+      cmp.submit();
+      http.expectNone('/api/meetings/m-1/agenda');
+      cmp.todoQuery.set('zzz');
+      fixture.detectChanges();
+      expect(screen.getByText('Kein To-Do passt zur Suche.')).toBeInTheDocument();
+    });
+
+    it('says there are no open to-dos without a gremium board', async () => {
+      const { http, fixture, cmp } = await todoSetup();
+      http.expectOne((r) => r.url === '/api/todos/boards').flush([BOARDS[0], BOARDS[2]]);
+      fixture.detectChanges();
+      expect(screen.getByText('Keine offenen To-Dos.')).toBeInTheDocument();
+      expect(cmp.todosLoading()).toBe(false);
+    });
+
+    it('says there are no open to-dos after a failed read', async () => {
+      const { http, fixture } = await todoSetup();
+      http.expectOne((r) => r.url === '/api/todos/boards').flush(BOARDS);
+      http.expectOne('/api/todos/boards/b-1').flush(null, { status: 404, statusText: 'x' });
+      fixture.detectChanges();
+      expect(screen.getByText('Keine offenen To-Dos.')).toBeInTheDocument();
+    });
+
+    it('starts again on every opening', async () => {
+      const { http, fixture, cmp } = await todoSetup();
+      flushBoard(http, fixture);
+      cmp.todoPick.set('k-1');
+      cmp.todoQuery.set('x');
+      fixture.componentRef.setInput('open', false);
+      fixture.detectChanges();
+      fixture.componentRef.setInput('open', true);
+      fixture.detectChanges();
+      flushApps(http, fixture);
+      expect(cmp.todos()).toBeNull();
+      expect(cmp.todoPick()).toBeNull();
+      expect(cmp.todoQuery()).toBe('');
+      expect(cmp.kind()).toBe('freetext');
+    });
+
+    it('has no axe violations', async () => {
+      const { http, fixture } = await todoSetup();
+      flushBoard(http, fixture);
+      await userEvent.click(screen.getByRole('radio', { name: /Wahlordnung/ }));
+      expect(await runAxe(document.body)).toHaveNoViolations();
+    });
   });
 });

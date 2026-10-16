@@ -806,6 +806,17 @@ export class ApiClient {
     });
   }
 
+  /**
+   * POST /meetings/{id}/agenda — put a to-do of the gremium board on the agenda. The item
+   * takes the card title, and the server links the card to the item.
+   */
+  addAgendaTodo(meetingId: Uuid, todoId: Uuid, nonPublic = false): Observable<AgendaItem[]> {
+    return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
+      todoId,
+      nonPublic,
+    });
+  }
+
   /** DELETE /meetings/{id}/agenda/{itemId} — remove an item from the agenda. */
   removeAgendaItem(meetingId: Uuid, itemId: Uuid): Observable<AgendaItem[]> {
     return this.http.delete<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda/${itemId}`);

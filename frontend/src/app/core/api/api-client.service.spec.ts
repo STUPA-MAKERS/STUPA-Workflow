@@ -934,6 +934,18 @@ describe('ApiClient', () => {
     req.flush([]);
   });
 
+  it('puts a to-do on the agenda', () => {
+    api.addAgendaTodo('m-1', 'k-1').subscribe();
+    const req = http.expectOne('/api/meetings/m-1/agenda');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ todoId: 'k-1', nonPublic: false });
+    req.flush([]);
+    api.addAgendaTodo('m-1', 'k-1', true).subscribe();
+    const np = http.expectOne('/api/meetings/m-1/agenda');
+    expect(np.request.body).toEqual({ todoId: 'k-1', nonPublic: true });
+    np.flush([]);
+  });
+
   it('removes an agenda item', () => {
     api.removeAgendaItem('m-1', 'ag-1').subscribe();
     const req = http.expectOne('/api/meetings/m-1/agenda/ag-1');

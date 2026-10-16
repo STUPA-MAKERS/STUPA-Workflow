@@ -187,3 +187,38 @@
   color: var(--color-text-muted);
   font-size: var(--fs-sm);
 }
+
+/* Drag and drop: the lift and the drop box of the to-do board. The row in the hand is
+   lifted, tilted a little and has the accent edge; the grip shows on it. */
+.ap__preview {
+  box-sizing: border-box;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+  box-shadow: var(--shadow-elevated);
+  outline: 1.5px solid var(--color-accent);
+  transform: rotate(2deg);
+  opacity: 0.97;
+}
+.ap__preview .ap__grip {
+  opacity: 1;
+}
+/* Where it lands: a dashed box of the height of a row. */
+.ap__placeholder {
+  min-height: 3.375rem;
+  border: 1.5px dashed var(--color-accent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+.ap__list.cdk-drop-list-dragging .ap__row:not(.cdk-drag-placeholder),
+.ap__row.cdk-drag-animating {
+  transition: transform var(--motion-base) cubic-bezier(0, 0, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ap__list.cdk-drop-list-dragging .ap__row,
+  .ap__row.cdk-drag-animating {
+    transition: none;
+  }
+  .ap__preview {
+    transform: none;
+  }
+}

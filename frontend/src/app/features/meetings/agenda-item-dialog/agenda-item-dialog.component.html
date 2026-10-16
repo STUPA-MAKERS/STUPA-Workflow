@@ -1,7 +1,6 @@
 <app-dialog
   [open]="open()"
   [title]="'meetings.agenda.dialogTitle' | t"
-  [subtitle]="meeting().title"
   [closeLabel]="'action.cancel' | t"
   (closed)="cancel()"
 >
@@ -52,6 +51,46 @@
           </p>
         }
       </div>
+    } @else if (kind() === 'todo') {
+      <app-search-pill
+        size="md"
+        [placeholder]="'meetings.agenda.searchTodo' | t"
+        [value]="todoQuery()"
+        (valueChange)="todoQuery.set($event)"
+      />
+      <div class="aid__group">
+        <span class="aid__cap cap" id="aid-todos">
+          {{ 'meetings.agenda.openTodos' | t: { n: shownTodos().length } }}
+        </span>
+        @if (todosLoading()) {
+          <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
+        } @else if (shownTodos().length) {
+          <div class="aid__list" appScrollFade="y" role="radiogroup" aria-labelledby="aid-todos">
+            @for (c of shownTodos(); track c.id) {
+              @let on = todoPick() === c.id;
+              <label class="aid__row aid__row--todo" [class.aid__row--on]="on">
+                <input
+                  class="aid__radio aid__radio--hidden"
+                  type="radio"
+                  name="aid-todo"
+                  [value]="c.id"
+                  [checked]="on"
+                  (change)="todoPick.set(c.id)"
+                />
+                <app-icon class="aid__mark" [name]="on ? 'circleok' : 'circle'" [size]="20" />
+                <span class="aid__text">
+                  <span class="aid__title ell" [title]="c.title">{{ c.title }}</span>
+                  <span class="aid__sub ell">{{ c.sub }}</span>
+                </span>
+              </label>
+            }
+          </div>
+        } @else {
+          <p class="aid__hint">
+            {{ (todoQuery().trim() ? 'meetings.agenda.noTodoMatch' : 'meetings.agenda.noTodos') | t }}
+          </p>
+        }
+      </div>
     } @else {
       <app-input
         name="freetext"
@@ -62,11 +101,8 @@
         (ngModelChange)="freetext.set($event)"
       />
     }
-    <p class="aid__hint">{{ 'meetings.agenda.appendsAs' | t: { n: nextNumber() } }}</p>
-
     <app-switch
       [id]="'aid-np'"
-      [hint]="'meetings.agenda.nonPublicHint' | t"
       [checked]="nonPublic()"
       (checkedChange)="nonPublic.set($event)"
       ><span class="aid__switchLabel">{{ 'meetings.agenda.nonPublicLabel' | t }}</span></app-switch

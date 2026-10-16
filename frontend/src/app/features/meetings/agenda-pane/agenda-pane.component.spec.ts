@@ -1,3 +1,6 @@
+import { CdkDrag, CdkDropList } from '@angular/cdk/drag-drop';
+import type { ComponentFixture } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { of } from 'rxjs';
@@ -10,8 +13,22 @@ import { AgendaPaneComponent } from './agenda-pane.component';
 
 const OUTPUTS = [
   'pick', 'add', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'move',
-  'remove', 'dragStart', 'dragOver', 'dropAt',
+  'remove',
 ] as const;
+
+/** Whether each row may be lifted, in agenda order. */
+function draggable(fixture: ComponentFixture<AgendaPaneComponent>): boolean[] {
+  return fixture.debugElement
+    .queryAll(By.directive(CdkDrag))
+    .map((d) => !d.injector.get(CdkDrag).disabled);
+}
+
+/** Drop the row at `from` at `to`, as the drop list reports it. */
+function drop(fixture: ComponentFixture<AgendaPaneComponent>, from: number, to: number): void {
+  fixture.debugElement
+    .query(By.directive(CdkDropList))
+    .triggerEventHandler('cdkDropListDropped', { previousIndex: from, currentIndex: to });
+}
 
 interface Inputs {
   meeting: Meeting;
@@ -219,10 +236,11 @@ describe('AgendaPaneComponent', () => {
     });
 
     it('keeps only the NÖ switch once the meeting is closed (O22)', async () => {
-      const { container } = await setup({ meeting: meeting({ status: 'closed' }) });
+      const { container, fixture } = await setup({ meeting: meeting({ status: 'closed' }) });
       expect(screen.queryByRole('button', { name: 'TOP hinzufügen' })).toBeNull();
       expect(container.querySelector('.ap__grip')).toBeNull();
-      expect(screen.getAllByRole('listitem')[0].getAttribute('draggable')).toBe('false');
+      expect(draggable(fixture)).toEqual([false, false, false]);
+      expect(fixture.debugElement.query(By.directive(CdkDropList)).injector.get(CdkDropList).disabled).toBe(true);
       const menu = await openMenu(0);
       expect(within(menu).getAllByRole('menuitemcheckbox')).toHaveLength(1);
       expect(within(menu).queryByRole('menuitem')).toBeNull();
@@ -241,7 +259,7 @@ describe('AgendaPaneComponent', () => {
   });
 
   it('renames inline: enter saves, escape cancels, blur saves', async () => {
-    const { on } = await setup({ renamingTopId: 't-1', renameDraft: 'Begrüßung neu' });
+    const { on, fixture } = await setup({ renamingTopId: 't-1', renameDraft: 'Begrüßung neu' });
     const input = screen.getByRole('textbox', { name: 'TOP umbenennen' });
     expect(input).toHaveValue('Begrüßung neu');
     await userEvent.type(input, '!');
@@ -252,19 +270,32 @@ describe('AgendaPaneComponent', () => {
     fireEvent.blur(input);
     expect(on.renameTop).toHaveBeenCalledTimes(2);
     // A row in rename is no drag source.
-    expect(screen.getAllByRole('listitem')[0].getAttribute('draggable')).toBe('false');
+    expect(draggable(fixture)).toEqual([false, true, true]);
   });
 
-  it('reorders by drag and drop', async () => {
-    const { on } = await setup();
-    const rows = screen.getAllByRole('listitem');
-    expect(rows[0].getAttribute('draggable')).toBe('true');
-    rows[0].dispatchEvent(new Event('dragstart'));
-    rows[1].dispatchEvent(new Event('dragover'));
-    rows[1].dispatchEvent(new Event('drop'));
-    expect(on.dragStart).toHaveBeenCalledWith(0);
-    expect(on.dragOver).toHaveBeenCalled();
-    expect(on.dropAt).toHaveBeenCalledWith(1);
+  it('reorders by drag and drop with the lift and the drop box of the board (frame 7)', async () => {
+    const { on, fixture } = await setup();
+    expect(draggable(fixture)).toEqual([true, true, true]);
+    const row = fixture.debugElement.queryAll(By.directive(CdkDrag))[0].injector.get(CdkDrag);
+    expect(row.previewClass).toBe('ap__preview');
+    expect(row.dragStartDelay).toEqual({ touch: 400, mouse: 0 });
+    drop(fixture, 2, 0);
+    expect(on.move).toHaveBeenCalledWith({ from: 2, to: 0 });
+    // A drop at the same place moves nothing.
+    drop(fixture, 1, 1);
+    expect(on.move).toHaveBeenCalledTimes(1);
+  });
+
+  it('lifts no row and drops nothing while the agenda saves', async () => {
+    const { on, fixture } = await setup({ savingAgenda: true });
+    expect(draggable(fixture)).toEqual([false, false, false]);
+    drop(fixture, 0, 1);
+    expect(on.move).not.toHaveBeenCalled();
+  });
+
+  it('names a to-do item in the sub line', async () => {
+    await setup({ agenda: [item({ id: 't-7', title: 'Raum buchen', todoId: 'k-1' })] });
+    expect(screen.getByText('To-Do')).toBeInTheDocument();
   });
 
   describe('To-Do anlegen', () => {

@@ -45,7 +45,6 @@ export class MeetingAgendaService implements OnDestroy {
   private localBody: { itemId: Uuid; body: string } | null = null;
   /** The running body save. It emits once and completes after the response. */
   private runningSave: Observable<void> | null = null;
-  private dragTopIndex: number | null = null;
 
   readonly selectedTop = computed<AgendaItem | null>(
     () => this.agenda().find((a) => a.id === this.selectedTopId()) ?? null,
@@ -153,21 +152,6 @@ export class MeetingAgendaService implements OnDestroy {
         this.failed(err);
       },
     });
-  }
-
-  onTopDragStart(index: number): void {
-    this.dragTopIndex = index;
-  }
-
-  onTopDragOver(event: DragEvent): void {
-    if (this.dragTopIndex !== null) event.preventDefault();
-  }
-
-  onTopDrop(meetingId: Uuid | null, index: number): void {
-    const from = this.dragTopIndex;
-    this.dragTopIndex = null;
-    if (from === null) return;
-    this.moveTop(meetingId, from, index);
   }
 
   /**

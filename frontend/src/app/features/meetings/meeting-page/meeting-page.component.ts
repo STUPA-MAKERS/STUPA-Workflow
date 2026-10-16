@@ -172,10 +172,6 @@ export class MeetingPageComponent {
   readonly renameTop = output<AgendaItem>();
   readonly setNonPublic = output<{ item: AgendaItem; nonPublic: boolean }>();
   readonly moveTop = output<AgendaMove>();
-  readonly dragStart = output<number>();
-  readonly dragOver = output<DragEvent>();
-  /** Drop a dragged agenda item at this index. Not `drop`: see `AgendaPaneComponent.pick`. */
-  readonly dropAt = output<number>();
   /** Name the minute-taker of a planned meeting. */
   readonly setProtokollant = output<Uuid>();
   /** A member was picked in the dock to take the minutes of a live meeting over (Z3). */

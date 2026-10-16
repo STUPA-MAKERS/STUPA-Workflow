@@ -1,3 +1,4 @@
+import { CdkDrag, CdkDragPlaceholder, CdkDropList, type CdkDragDrop } from '@angular/cdk/drag-drop';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -54,7 +55,10 @@ export interface AgendaMove {
  * the sheet.
  *
  * The row menu holds every agenda change (N21): rename (free text only), move up and
- * down, the non-public switch and the remove. Drag and drop also reorders. Only a
+ * down, the non-public switch and the remove. Drag and drop also reorders (frame 7): the
+ * list is a drop list of `@angular/cdk/drag-drop`, with the lifted row and the dashed
+ * drop box of the to-do board. A touch starts the drag only after a long press, so a
+ * swipe still scrolls the agenda; the menu moves without a pointer. Only a
  * planned or live meeting changes its agenda (O25); a closed meeting keeps the
  * non-public switch while the protocol is a draft (O22). An item with an open or
  * closed vote stays on the agenda, so its remove is disabled with the reason.
@@ -68,6 +72,9 @@ export interface AgendaMove {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    CdkDrag,
+    CdkDragPlaceholder,
+    CdkDropList,
     FormsModule,
     TranslatePipe,
     BadgeComponent,
@@ -113,9 +120,9 @@ export class AgendaPaneComponent {
   readonly setNonPublic = output<{ item: AgendaItem; nonPublic: boolean }>();
   readonly move = output<AgendaMove>();
   readonly remove = output<Uuid>();
-  readonly dragStart = output<number>();
-  readonly dragOver = output<DragEvent>();
-  readonly dropAt = output<number>();
+
+  /** A touch lifts a row after this long press; a mouse lifts it at once. */
+  protected readonly dragDelay = { touch: 400, mouse: 0 };
 
   /** "Neues To-Do" from the menu of an item: open, and the links it starts with. */
   protected readonly todoOpen = signal(false);
@@ -160,17 +167,29 @@ export class AgendaPaneComponent {
     this.heading().nativeElement.focus();
   }
 
+  /** A row lifts while the agenda may change, is not saving and the row is not in rename. */
+  protected canDrag(item: AgendaItem): boolean {
+    return this.canChangeAgenda() && !this.savingAgenda() && this.renamingTopId() !== item.id;
+  }
+
+  /** A row dropped at another place of the agenda. */
+  protected dropped(event: Pick<CdkDragDrop<unknown>, 'previousIndex' | 'currentIndex'>): void {
+    if (event.previousIndex === event.currentIndex || this.savingAgenda()) return;
+    this.move.emit({ from: event.previousIndex, to: event.currentIndex });
+  }
+
   protected title(item: AgendaItem): string {
     return item.title || this.i18n.translate('meetings.agenda.untitled');
   }
 
   /**
-   * "Antrag · Abstimmung offen". The number badge already names the TOP, and a free-text
-   * item needs no kind: it gets a sub line only for an open vote, else none.
+   * "Antrag · Abstimmung offen", "To-Do". The number badge already names the TOP, and a
+   * free-text item needs no kind: it gets a sub line only for an open vote, else none.
    */
   protected sub(item: AgendaItem): string | null {
     const parts: string[] = [];
     if (item.applicationId) parts.push(this.i18n.translate('meetings.agenda.kindApplication'));
+    else if (item.todoId) parts.push(this.i18n.translate('meetings.agenda.kindTodo'));
     if (this.votesFor(item.id).some((v) => v.status === 'open')) {
       parts.push(this.i18n.translate('meetings.agenda.voteOpen'));
     }

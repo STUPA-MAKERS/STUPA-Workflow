@@ -383,6 +383,8 @@ export interface AgendaItem {
   id: Uuid;
   /** `null` for a free-text agenda item (no application). */
   applicationId: Uuid | null;
+  /** The to-do card that the item was made from, or `null`. */
+  todoId?: Uuid | null;
   title: string | null;
   /** Markdown text of this agenda item. Each item has its own editor. */
   body?: string | null;

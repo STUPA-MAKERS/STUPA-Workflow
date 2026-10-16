@@ -1058,15 +1058,12 @@ export const de = {
   'meetings.agenda.noAssignable': 'Keine zuweisbaren Anträge.',
   'meetings.agenda.noMatch': 'Kein Antrag passt zur Suche.',
   'meetings.agenda.freetextTitle': 'Titel',
-  'meetings.agenda.appendsAs': 'Kommt als TOP {n} ans Ende der Tagesordnung.',
   'meetings.agenda.nonPublicLabel': 'Nicht öffentlich (NÖ)',
   'meetings.agenda.nonPublicHint': 'TOP erscheint nicht im öffentlichen Protokoll',
   'meetings.agenda.empty': 'Noch keine Anträge auf der Tagesordnung.',
   'meetings.agenda.addFreetext': 'TOP hinzufügen',
   'meetings.agenda.untitled': 'Unbenannter TOP',
   'meetings.agenda.nonPublic': 'NÖ',
-  'meetings.agenda.assignHeading': 'Antrag zuweisen',
-  'meetings.agenda.freetextHeading': 'Freitext-TOP',
   'meetings.agenda.rename': 'TOP umbenennen',
   'meetings.agenda.removeBlocked':
     'Dieser TOP hat eine offene oder abgeschlossene Abstimmung und bleibt auf der Tagesordnung.',
@@ -4370,6 +4367,13 @@ export const de = {
   'todos.archive.restoreOne': '„{title}“ wiederherstellen',
   'todos.archive.more': 'Mehr laden',
   'meetings.agenda.todo': 'To-Do anlegen',
+  'meetings.agenda.kindTodo': 'To-Do',
+  'meetings.agenda.kindFreetext': 'Freitext',
+  'meetings.agenda.searchTodo': 'To-Do suchen',
+  'meetings.agenda.openTodos': 'Offene To-Dos · {n}',
+  'meetings.agenda.noTodos': 'Keine offenen To-Dos.',
+  'meetings.agenda.noTodoMatch': 'Kein To-Do passt zur Suche.',
+  'meetings.agenda.todoDue': 'fällig {date}',
 } as const;
 
 export const en: Partial<Record<TranslationKey, string>> = {
@@ -5401,15 +5405,12 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.agenda.noAssignable': 'No assignable applications.',
   'meetings.agenda.noMatch': 'No application matches the search.',
   'meetings.agenda.freetextTitle': 'Title',
-  'meetings.agenda.appendsAs': 'Goes to the end of the agenda as item {n}.',
   'meetings.agenda.nonPublicLabel': 'Non-public',
   'meetings.agenda.nonPublicHint': 'The item is left out of the public minutes',
   'meetings.agenda.empty': 'No applications on the agenda yet.',
   'meetings.agenda.addFreetext': 'Add item',
   'meetings.agenda.untitled': 'Untitled item',
   'meetings.agenda.nonPublic': 'Non-public',
-  'meetings.agenda.assignHeading': 'Assign application',
-  'meetings.agenda.freetextHeading': 'Free-text item',
   'meetings.agenda.rename': 'Rename item',
   'meetings.agenda.removeBlocked': 'This item has an open or closed vote and stays on the agenda.',
   'meetings.agenda.removeNeedsVoteRight':
@@ -8663,6 +8664,13 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'todos.archive.restoreOne': 'Restore “{title}”',
   'todos.archive.more': 'Load more',
   'meetings.agenda.todo': 'Add a to-do',
+  'meetings.agenda.kindTodo': 'To-do',
+  'meetings.agenda.kindFreetext': 'Free text',
+  'meetings.agenda.searchTodo': 'Search to-dos',
+  'meetings.agenda.openTodos': 'Open to-dos · {n}',
+  'meetings.agenda.noTodos': 'No open to-dos.',
+  'meetings.agenda.noTodoMatch': 'No to-do matches the search.',
+  'meetings.agenda.todoDue': 'due {date}',
 };
 
 export const CATALOG: Record<Locale, Partial<Record<TranslationKey, string>>> = { de, en };
