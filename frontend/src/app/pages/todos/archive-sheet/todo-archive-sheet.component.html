@@ -10,7 +10,9 @@
     />
     @if (failed()) {
       <p class="as__note as__note--error" role="alert">{{ 'todos.archive.error' | t }}</p>
-    } @else if (!loading() && !items().length) {
+    } @else if (loading() && !items().length) {
+      <app-skeleton variant="rows" [count]="4" [label]="'todos.archive.loading' | t" />
+    } @else if (!items().length) {
       <p class="as__note">{{ 'todos.archive.empty' | t }}</p>
     }
     <ul class="as__list">
