@@ -1582,6 +1582,56 @@ describe('ApplicationsDetailComponent', () => {
     expect(screen.queryByRole('button', { name: 'Datei anhängen' })).toBeNull();
   });
 
+  it('hides the paperclip once the server refuses files, for a reader without the applicant block', async () => {
+    // A reader without the PII right gets no applicant block: the refusal is the only sign.
+    const id = 'app-nofiles';
+    const params = new BehaviorSubject(convertToParamMap({ id }));
+    const { http, detectChanges, cmp } = await setup(['application.read'], params);
+    const show = (appId: string) => {
+      http.expectOne(url('', appId)).flush({ ...appWire(), id: appId, applicant: null });
+      http.expectOne(url('/versions', appId)).flush(VERSIONS);
+      http.expectOne(url('/comments', appId)).flush(COMMENTS);
+      flushForm(http, appId);
+      detectChanges();
+      flushAttachments(http);
+      detectChanges();
+    };
+    const post = () => http.expectOne((r) => r.method === 'POST' && r.url === `/api/applications/${id}/comments`);
+    flushTypes(http);
+    show(id);
+    expect(screen.getByRole('button', { name: 'Datei anhängen' })).toBeInTheDocument();
+    cmp['sendComment']({ body: 'Siehe Anhang', attachmentIds: ['d1'], draftToken: 'tok' });
+    post().flush({ code: 'application_anonymized', errors: [] }, { status: 422, statusText: 'x' });
+    detectChanges();
+    expect(screen.queryByRole('button', { name: 'Datei anhängen' })).toBeNull();
+    // Another failure keeps the paperclip as it is.
+    cmp['sendComment']({ body: 'Nochmal' });
+    post().flush(null, { status: 500, statusText: 'x' });
+    detectChanges();
+    expect(screen.queryByRole('button', { name: 'Datei anhängen' })).toBeNull();
+
+    // Another application takes files; the next visit of this one knows it without a refusal.
+    params.next(convertToParamMap({ id: 'app-takes' }));
+    show('app-takes');
+    expect(screen.getByRole('button', { name: 'Datei anhängen' })).toBeInTheDocument();
+    params.next(convertToParamMap({ id }));
+    show(id);
+    expect(screen.queryByRole('button', { name: 'Datei anhängen' })).toBeNull();
+  });
+
+  it('keeps the paperclip of a thread that takes files after another failed send', async () => {
+    const { http, detectChanges, cmp } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    cmp['sendComment']({ body: 'Text' });
+    http
+      .expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-1/comments')
+      .flush({ code: 'validation_error', errors: [] }, { status: 422, statusText: 'x' });
+    detectChanges();
+    expect(screen.getByRole('button', { name: 'Datei anhängen' })).toBeInTheDocument();
+  });
+
   it('keeps the composer files with the page when the layout switch re-creates the chat', async () => {
     const { http, detectChanges, fixture } = await setup();
     flushAll(http);
@@ -1972,6 +2022,45 @@ describe('ApplicationsDetailComponent', () => {
       detectChanges();
 
       expect(screen.getByRole('button', { name: /Aus Archiv holen/ })).toBeInTheDocument();
+    });
+
+    it('keeps the applicant block and the closed paperclip of an anonymized application after the archive', async () => {
+      // The archive answers without the applicant block.
+      const { http, detectChanges, cmp } = await setup(['application.read', 'application.manage', 'application.archive']);
+      flushTypes(http);
+      http.expectOne(url('')).flush({ ...appWire(), applicant: { email: null, name: null, anonymized: true } });
+      http.expectOne(url('/versions')).flush(VERSIONS);
+      http.expectOne(url('/comments')).flush(COMMENTS);
+      for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) req.flush([]);
+      flushForm(http);
+      detectChanges();
+      flushAttachments(http);
+      expect(screen.queryByRole('button', { name: 'Datei anhängen' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: /Archivieren/ }));
+      http
+        .expectOne((r) => r.url.endsWith('/archive') && r.method === 'POST')
+        .flush({ ...appWire(), applicant: null, archivedAt: '2026-09-02T10:00:00Z' });
+      detectChanges();
+      expect(cmp.app()?.archivedAt).not.toBeNull();
+      expect(cmp.app()?.applicant?.anonymized).toBe(true);
+      expect(screen.queryByRole('button', { name: 'Datei anhängen' })).toBeNull();
+    });
+
+    it('takes the archive answer as it is when no applicant block was shown', async () => {
+      const { http, detectChanges, cmp } = await setup(['application.read', 'application.archive']);
+      flushTypes(http);
+      http.expectOne(url('')).flush({ ...appWire(), applicant: null });
+      http.expectOne(url('/versions')).flush(VERSIONS);
+      http.expectOne(url('/comments')).flush(COMMENTS);
+      flushForm(http);
+      detectChanges();
+      await userEvent.click(screen.getByRole('button', { name: /Archivieren/ }));
+      http
+        .expectOne((r) => r.url.endsWith('/archive') && r.method === 'POST')
+        .flush({ ...appWire(), applicant: null, archivedAt: '2026-09-02T10:00:00Z' });
+      detectChanges();
+      expect(cmp.app()?.archivedAt).not.toBeNull();
+      expect(cmp.app()?.applicant).toBeNull();
     });
 
     it('says on the page that an application is archived', async () => {

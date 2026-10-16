@@ -50,6 +50,7 @@ import {
   appendOnce,
   withScanStates,
   draftDropper,
+  filesRefused,
   sendErrorKey,
   toChatAttachments,
   EmptyStateComponent,
@@ -106,6 +107,13 @@ import { provideFormly } from '@shared/formly/formly.providers';
 /** Field types whose old and new value do not fit on one line of the history. The
  *  history opens them as blocks below the change ("Werte anzeigen"). */
 const BLOCK_DIFF: ReadonlySet<string> = new Set(['positions', 'table', 'textarea']);
+
+/**
+ * The applications whose comments refused files in this tab (422 `application_anonymized`).
+ * A reader without the PII right gets no applicant block, so this refusal is the only
+ * sign of an anonymized application, and it stays for the next visit.
+ */
+const NO_FILES = new Set<string>();
 
 /** The tabs of the detail when the list and the detail do not sit side by side. */
 type DetailTab = 'app' | 'history' | 'comments' | 'files';
@@ -233,8 +241,20 @@ export class ApplicationsDetailComponent {
   private readonly outbox = new ChatOutbox<ApplicationComment>(
     (req) => this.api.addComment(this.id, req.body, req.visibility ?? 'public', req),
     (created) => this.comments.update((list) => appendOnce(list, created)),
-    (err) => this.toast.error(this.i18n.translate(sendErrorKey(err, 'applications.comments.error'))),
+    (err) => {
+      if (filesRefused(err)) {
+        NO_FILES.add(this.id);
+        this.filesRefusedHere.set(true);
+      }
+      this.toast.error(this.i18n.translate(sendErrorKey(err, 'applications.comments.error')));
+    },
     draftDropper(this.api),
+  );
+  /** The server refused the files of a comment on this application: it is anonymized. */
+  private readonly filesRefusedHere = signal(false);
+  /** The composer takes files unless the application is anonymized. */
+  readonly canAttach = computed(
+    () => !this.app()?.applicant?.anonymized && !this.filesRefusedHere(),
   );
   /** The comments as chat messages, the pending ones last. */
   readonly chatMessages = computed<ChatMessage[]>(() => [
@@ -376,7 +396,9 @@ export class ApplicationsDetailComponent {
     this.archiving.set(true);
     this.api.setApplicationArchived(current.id, next).subscribe({
       next: (updated) => {
-        this.app.set(updated);
+        // The archive answer carries no applicant block: the one already shown stays.
+        const keep = !updated.applicant && current.applicant;
+        this.app.set(keep ? { ...updated, applicant: current.applicant } : updated);
         this.archiving.set(false);
         this.page?.notify({ id: updated.id, kind: 'updated', source: 'detail' });
         this.toast.success(
@@ -841,6 +863,7 @@ export class ApplicationsDetailComponent {
     this.editing.set(false);
     this.confirmDelete.set(false);
     this.outbox.clear();
+    this.filesRefusedHere.set(NO_FILES.has(id));
     this.agendaOpen.set(false);
     // An application is shown: it stays until the next one arrives (`switching`). With
     // nothing shown, the page resets now and draws its loading shape.

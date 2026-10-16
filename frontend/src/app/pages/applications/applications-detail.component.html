@@ -402,7 +402,7 @@
       [draftKey]="'application.' + (app()?.id ?? '')"
       [messages]="chatMessages()"
       [visibilityOptions]="chatVisibilities()"
-      [canAttach]="!app()?.applicant?.anonymized"
+      [canAttach]="canAttach()"
       placeholder="applications.comments.placeholder"
       (send)="sendComment($event)"
       (retry)="retryComment($event)"
