@@ -81,48 +81,32 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'account.nav.notificationsDesc': 'Turn mails on or off per occasion',
   'account.nav.grantsDesc': 'MCP server and agent access',
   'account.calendar.title': 'Calendar subscription',
-  'account.calendar.intro':
-    'Subscribe to your meeting dates in your calendar (Google, Apple, Outlook …). The URL is personal — do not share it.',
   'account.calendar.urlLabel': 'Feed URL',
   'account.calendar.copy': 'Copy',
   'account.calendar.copied': 'Copied!',
   'account.calendar.none': 'No feed link created yet.',
   'account.calendar.generate': 'Create feed link',
   'account.calendar.rotate': 'Generate new URL',
-  'account.calendar.rotateHint': 'Creates a new URL — the old one stops working.',
   'account.calendar.error': 'Could not load the feed link.',
   'account.calendar.rotateError': 'Could not create the feed link.',
   'pwa.updateReady': 'A new version of the app is available.',
   'pwa.reload': 'Reload',
   'account.notifications.title': 'Notifications',
-  'account.notifications.intro':
-    'Choose which email notifications you want to receive. Login links are always delivered.',
   'account.notifications.error': 'Settings could not be loaded.',
   'account.notifications.saveError': 'Saving failed — please try again.',
   'account.notifications.empty':
     'There are no notifications that you can turn off for your account.',
   'account.notifications.kind.status_update': 'Status updates on applications',
-  'account.notifications.hint.status_update':
-    'When the status of an application that concerns you changes.',
   'account.notifications.kind.comment': 'New comments',
-  'account.notifications.hint.comment': 'When an application that concerns you receives a comment.',
   'account.notifications.kind.task': 'New tasks',
-  'account.notifications.hint.task': 'When an application reaches a step where you can act.',
   'account.notifications.kind.task_reminder': 'Task reminders',
-  'account.notifications.hint.task_reminder': 'Reminders about open tasks.',
   'account.notifications.kind.meeting': 'Meetings',
-  'account.notifications.hint.meeting': 'Invitations and agendas of your committees’ meetings.',
   'account.notifications.kind.delegation': 'Delegations',
-  'account.notifications.hint.delegation': 'When you receive a vote delegation or it is revoked.',
   'account.notifications.kind.protocol': 'Protocols',
-  'account.notifications.hint.protocol': 'When a meeting protocol is finalized.',
   'account.notifications.kind.deadline': 'Deadline reminders',
-  'account.notifications.hint.deadline': 'When a deadline on an application is approaching.',
   'account.notifications.kind.privacy': 'Privacy/erasure requests',
-  'account.notifications.hint.privacy': 'Status updates on GDPR erasure requests.',
   'search.title': 'Search',
   'search.placeholder': 'Application, meeting, cost centre, page …',
-  'search.hint': 'Type to search. Enter opens the result.',
   'search.archived': 'Archived',
   'search.close': 'Close search',
   'search.keys.select': 'Select',
@@ -138,8 +122,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'search.group.gremium': 'Committees',
   'search.group.principal': 'People',
   'account.grants.title': 'API access',
-  'account.grants.intro':
-    'Manage the OAuth grants (agents/MCP) that are allowed to act on your behalf.',
   'account.grants.active': 'Active grants',
   'account.grants.activeCount': 'Active grants · {count}',
   'account.grants.empty': 'No active grants.',
@@ -156,8 +138,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'account.grants.revoke': 'Revoke',
   'account.grants.revokeAll': 'Revoke all',
   'account.mcp.title': 'MCP server',
-  'account.mcp.intro':
-    'Download the MCP server that lets agents use the platform API. The package is pre-configured for this platform.',
   'account.mcp.download': 'Download MCP package',
   'account.mcp.downloadError': 'Could not load the MCP package.',
   'account.mcp.step1': 'Unpack the archive.',
@@ -290,8 +270,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'expenses.bulk.exportConfirm': 'Export',
   'expenses.bulk.reassign': 'Reassign',
   'expenses.bulk.reassignTitle': 'Reassign selection',
-  'expenses.bulk.reassignHint':
-    'Empty fields stay unchanged. The cost centre applies to standalone bookings only.',
   'expenses.bulk.reassignConfirm': 'Apply',
   'expenses.bulk.reassignDone': '{count} booking(s) updated.',
   'expenses.bulk.reassignError': 'Bulk reassignment failed.',
@@ -359,7 +337,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'invoices.rowMenu': 'Actions for invoice {number}',
   'invoices.col.bookings': 'Bookings',
   'invoices.dueLine': 'due {date}',
-  'invoices.dropHint': 'ZUGFeRD/Factur-X is read automatically',
   'invoices.dropButton': 'Choose PDF',
 
   'theme.toggle': 'Toggle appearance',
@@ -371,7 +348,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'home.choice.apply.desc': 'No account needed — submitted in minutes.',
   'home.choice.login.title': 'Sign in as a committee member',
   'home.choice.login.desc': 'Process applications, run meetings, manage the budget.',
-  'home.statusNote': 'Already submitted? Track its status via the link in your confirmation email.',
   'home.choice.go': 'Continue',
 
   'common.yes': 'Yes',
@@ -391,11 +367,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.type.empty': 'No application types are available right now.',
   'apply.form.loading': 'Loading form …',
   'apply.contact.title': 'Contact',
-  'apply.contact.lead': 'We will send the editing link for your application to this email address.',
   'apply.contact.email': 'Email',
   'apply.contact.emailInvalid': 'Please enter a valid email address.',
   'apply.contact.name': 'Name',
-  'apply.contact.nameHint': 'Shown to committees; not public.',
   'apply.review.title': 'Review & submit',
   'apply.positions.add': 'Add position',
   'apply.positions.label': 'Position label',
@@ -465,9 +439,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'apply.submitted.link': 'Open the application',
   'apply.confirm.linkUnlimited': 'The link in the email does not expire.',
   'apply.confirm.linkDays': 'The link in the email works for {days} days.',
-  'apply.lead': 'No account needed. After you submit, we email you a link to follow the status.',
-  'apply.leadSignedIn':
-    'You submit with your account. You then find the application under “Applications”.',
   'apply.stepOf': 'Step {n} of {total}',
   'apply.steps.details': 'Details',
   'apply.steps.reviewHint': 'Summary',
@@ -671,8 +642,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.archived': 'Application archived.',
   'applications.unarchived': 'Application is back in the list.',
   'applications.share.title': 'Public link',
-  'applications.share.lead':
-    'Whoever holds the link sees the application without signing in — no comments and no change history. Personal details stay out.',
   'applications.share.ttl': 'Valid for (days)',
   'applications.share.label': 'Note',
   'applications.share.labelPlaceholder': 'What is this link for?',
@@ -766,8 +735,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.history.captured': 'Entered on behalf of the applicant',
   'applications.history.intake': 'Intake: {intake}',
   'applications.capture.title': 'Enter application',
-  'applications.capture.subtitle': 'For another person · goes straight into the flow',
-  'applications.capture.subtitleFor': 'For {name} · goes straight into the flow',
   'applications.capture.applicant': 'Applicant',
   'applications.capture.mode.account': 'Account',
   'applications.capture.mode.guest': 'New person',
@@ -779,8 +746,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.capture.name': 'Name',
   'applications.capture.email': 'E-mail',
   'applications.capture.emailInvalid': 'Enter a valid e-mail address.',
-  'applications.capture.guestHint':
-    'The person gets an e-mail with a personal link to the application.',
   'applications.capture.application': 'Application',
   'applications.capture.type': 'Application type',
   'applications.capture.typePlaceholder': 'Choose a type',
@@ -802,7 +767,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.capture.note': 'Entered by {name} on {date}',
   'applications.capture.noteReceived': 'received on {date}',
   'applications.edit.title': 'Edit application',
-  'applications.edit.versionHint': 'Saving creates version {version}',
   'applications.edit.saved': 'Saved. Version {version} created.',
   'applications.edit.invalid': 'Check the marked fields.',
   'applications.agenda.title': 'Put on the agenda',
@@ -812,7 +776,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'No planned meeting is visible. The application goes automatically on the next planned meeting of the committee, if there is one.',
   'applications.agenda.meetingInvalid':
     'This meeting no longer takes applications. Choose another planned meeting.',
-  'applications.agenda.appends': 'The application becomes a new item at the end.',
   'applications.agenda.note': 'Note on the transition (optional)',
   'applications.agenda.notePlaceholder': 'Shows in the history of the application',
   'applications.agenda.added': 'Put on the agenda of “{meeting}”.',
@@ -834,7 +797,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'forms.positions.position': 'Position',
   'forms.positions.provider': 'Supplier',
   'forms.positions.amount': 'Amount',
-  'forms.positions.offersLead': 'Offers · the preferred one sets the amount',
   'forms.positions.preferOfferNamed': 'Preferred: {name}',
   'forms.positions.offerN': 'Offer {n}',
   'forms.positions.removePosition': 'Remove position',
@@ -908,7 +870,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.transitions.fallback': 'Transition',
   'applications.transitions.forbidden': 'You are not allowed to perform this transition.',
   'applications.budget.title': 'Cost centre',
-  'applications.budget.lead': 'Assign a cost centre to this application.',
   'applications.budget.field': 'Cost centre',
   'applications.budget.none': 'None',
   'applications.budget.save': 'Assign',
@@ -1051,7 +1012,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.agenda.noMatch': 'No application matches the search.',
   'meetings.agenda.freetextTitle': 'Title',
   'meetings.agenda.nonPublicLabel': 'Non-public',
-  'meetings.agenda.nonPublicHint': 'The item is left out of the public minutes',
   'meetings.agenda.empty': 'No applications on the agenda yet.',
   'meetings.agenda.addFreetext': 'Add item',
   'meetings.agenda.untitled': 'Untitled item',
@@ -1091,9 +1051,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
   'decision.section': 'Decision proposal',
   'decision.switch': 'Approve with deviations',
-  'decision.switchHintVote':
-    'Another funding amount or conditions. Applies only when the vote passes.',
-  'decision.switchHintTransition': 'Another funding amount or conditions for this approval.',
   'decision.amount': 'Funding amount',
   'decision.amountHint': 'Requested: {requested}',
   'decision.amountHintDiff': 'Requested: {requested} · Difference {diff}',
@@ -1106,8 +1063,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'decision.conditionDown': 'Move condition {n} down',
   'decision.conditionCount.one': '1 condition',
   'decision.conditionCount.other': '{n} conditions',
-  'decision.questionHint':
-    'Made from the proposal. It follows the amount and the conditions until you edit it by hand.',
   'decision.error.amountInvalid':
     'The funding amount must be greater than 0 with at most two decimals.',
   'decision.error.amountExceeds': 'The funding amount must not exceed the requested amount.',
@@ -1127,7 +1082,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'decision.applicantNoteConditions': 'Please observe the conditions of the decision.',
   'meetings.vote.option': 'Option',
   'meetings.vote.secret': 'Secret ballot',
-  'meetings.vote.secretHint': 'Votes are counted without names',
   'meetings.vote.majorityRule': 'Majority rule',
   'meetings.vote.rule.simple': 'Simple',
   'meetings.vote.rule.absolute': 'Absolute',
@@ -1175,7 +1129,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'election.dialog.nameTaken': 'This name is already on the list.',
   'election.dialog.nameTwice': 'A free name is on the list twice. Remove one of the two entries.',
   'election.dialog.secret': 'Secret election',
-  'election.dialog.secretHint': 'Votes are counted without names',
   'election.dialog.submit': 'Open election',
   'election.rule.single':
     'Each person has one vote. The candidate with the most votes is elected. A tie goes to the lot.',
@@ -1342,7 +1295,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.prep.change': 'Change',
   'meetings.prep.presentCount': '{n} of {m} present',
   'meetings.prep.recordAttendance': 'Record',
-  'meetings.prep.topsHint': 'Pick an agenda item to prepare its text and its votes.',
   'meetings.prep.back': 'Back to the preparation',
   'meetings.dock.closedAt': 'Closed at {time}',
   'meetings.page.back': 'Back to meetings',
@@ -1382,7 +1334,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.dock.top': 'Item',
   'meetings.dock.none': '–',
   'meetings.dock.voteCast': 'cast',
-  'meetings.protocol.hint': 'Continue writing here … Markdown is formatted as you type.',
   'meetings.follow.now': 'Now',
   'meetings.keeper.from': 'from {start}',
   'meetings.keeper.fromTopAt': 'from {top}, {time}',
@@ -1394,7 +1345,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.keeper.takesOverAt': 'takes over from {top}',
   'meetings.keeper.takesOverNext': 'takes over with the next item',
   'meetings.keeper.keeps': 'keeps the minutes',
-  'meetings.keeper.onlyRight': 'Only members with the right “Write minutes”.',
   'meetings.handoverDialog.before': 'Before',
   'meetings.handoverDialog.after': 'New',
   'meetings.handoverDialog.change': 'Change',
@@ -1432,8 +1382,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.leadSubstitute.title': 'Enter substitute',
   'meetings.leadSubstitute.for': 'for {name}',
   'meetings.leadSubstitute.pool': 'Substitutes from the pool',
-  'meetings.leadSubstitute.poolNote':
-    'Personal substitutes of the member and substitutes for the whole committee.',
   'meetings.leadSubstitute.search': 'Search substitute',
   'meetings.leadSubstitute.loading': 'Loading …',
   'meetings.leadSubstitute.empty': 'Nobody is in the substitute pool for {name}.',
@@ -1574,8 +1522,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.incomeTitle': 'Income {amount}',
   'admin.webhook.edit': 'Edit the webhook',
   'admin.webhook.noEvents': 'No fixed events · triggers from the flow',
-  'admin.webhook.signedNote':
-    'Every delivery carries an HMAC-SHA256 signature. The server keeps the newest delivery attempt of each webhook; it does not store addresses or response bodies.',
   'admin.mailTemplates.template': 'Template',
   'admin.mailTemplates.lang': 'Language of the template',
   'admin.mailTemplates.key.erasure_requested': 'Erasure request received',
@@ -1589,8 +1535,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.cdVariants.unused': 'used by no gremium',
   'admin.cdVariants.pickFile': 'Choose a file',
   'admin.cdVariants.noFile': 'No file chosen',
-  'admin.cdVariants.note':
-    'You set the variant of a committee on the committee. Square logo: PNG, JPEG or WebP, square, at least {min} × {min} px, {mb} MB at most. Title page and footer: also SVG and PDF. Without a square logo the app shows the initials of the committee.',
   'admin.config.history.unknownActor': 'Unknown person',
   'admin.brand.textLang': 'Texts in',
   'admin.brand.replaceLogo': 'Replace the file',
@@ -1603,12 +1547,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.brand.removeLink': 'Remove the link',
   'admin.brand.noColumns': 'No column yet.',
   'admin.brand.noLegal': 'No legal links yet.',
-  'admin.brand.copyrightHint': 'Leave empty for the default text.',
   'admin.brand.preview': 'Preview',
-  'admin.brand.previewHint':
-    'This is how the header, the texts and the footer look with this draft.',
   'budget.tree.col.income': 'Income',
-  'budget.tree.subtitle': 'Allocation per fiscal year, a colour per cost centre, sub cost centres.',
   'budget.tree.createTopShort': 'Budget',
   'budget.tree.moreActions': 'More actions',
   'budget.tree.topLabel': 'Budget',
@@ -1628,26 +1568,20 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.colorHex': 'Colour as a hex value',
   'budget.tree.colorInvalid': 'Format #rrggbb',
   'budget.tree.colorClear': 'Remove the colour',
-  'budget.tree.colorHint': 'Without an own colour, the colour of the parent applies.',
   'budget.tree.active': 'Active',
-  'budget.tree.activeHint': 'An inactive cost centre is not available in the application form.',
   'budget.tree.deleteTitle': 'Delete the cost centre',
   'budget.tree.deleteConfirm': 'Delete “{name}” ({path})?',
   'budget.tree.deleteBlocked':
     'A cost centre with sub cost centres or allocations cannot be deleted.',
   'budget.tree.fyState': 'Status',
   'admin.deadlines.edit': 'Edit deadline',
-  'admin.deadlines.keyHint': 'The flow names the key. It stays fixed after the create.',
   'admin.deadlines.keyLocked': 'The key cannot change.',
   'admin.deadlines.daysValue': '{n} days',
   'admin.deadlines.dateCount': '{n} dates',
   'admin.deadlines.noNextDate': 'No date ahead',
   'admin.guest.title': 'Applications without an account',
-  'admin.guest.subtitle': 'Applies to applications that people submit without signing in.',
   'admin.guest.hours': 'Discard unconfirmed applications after',
   'admin.guest.hoursUnit': 'hours',
-  'admin.guest.hoursHint':
-    'When nobody confirms the e-mail address, the platform deletes the application and its attachments after this time. 1 to {max} hours.',
   'admin.guest.hoursRange': 'A whole number from 1 to {max} hours.',
   'admin.guest.link': 'Lifetime of the personal link',
   'admin.guest.linkUnlimited': 'Unlimited',
@@ -1655,41 +1589,25 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.guest.days': 'Valid for',
   'admin.guest.daysUnit': 'days',
   'admin.guest.daysRange': 'A whole number from 1 to {max} days.',
-  'admin.guest.linkHint':
-    'With the link, the applicant follows and edits the application. When the applicant redeems a new link, the older links expire. A change applies to links requested from now on.',
   'admin.guest.loadError': 'The settings could not be loaded.',
   'admin.meetingWindow.title': 'Opening a session',
-  'admin.meetingWindow.subtitle': 'When a planned session can be opened before its start.',
   'admin.meetingWindow.openLead': 'Open at the earliest',
-  'admin.meetingWindow.openLeadHint':
-    'Before this point the session cannot be opened. 0 to {max} minutes before the planned start.',
   'admin.meetingWindow.confirmLead': 'Open without a question from',
-  'admin.meetingWindow.confirmLeadHint':
-    'Before this point an extra dialog asks whether the session should really start. 0 = always ask before the start; the same value as "Open at the earliest" = never ask.',
   'admin.meetingWindow.unit': 'min before',
   'admin.meetingWindow.range': 'A whole number from 0 to {max} minutes.',
   'admin.meetingWindow.order': 'At most as many minutes as "Open at the earliest".',
   'admin.loginSettings.title': 'Sign-in',
-  'admin.loginSettings.subtitle': 'How long a sign-in stays valid in the browser and in the installed app.',
   'admin.loginSettings.web': 'Sign-in in the browser valid for',
-  'admin.loginSettings.webHint': 'Applies to a sign-in in a browser tab.',
   'admin.loginSettings.pwa': 'Sign-in in the installed app valid for',
-  'admin.loginSettings.pwaHint': 'Applies to the app that is installed on the home screen or the desktop.',
   'admin.loginSettings.daysUnit': 'days',
   'admin.loginSettings.range': 'A whole number from 1 to {max} days.',
-  'admin.loginSettings.note':
-    'A sign-in stays valid for this number of days after its last use. A change applies to each sign-in from its next renewal. About every 12 hours, the platform checks the account at the identity provider: when a group is removed or the account is disabled, the access still ends quickly. Browsers delete a cookie after {max} days at the latest, thus this is the highest value.',
   'admin.loginSettings.updatedAt': 'Last changed on {date}',
   'admin.loginSettings.loadError': 'The settings could not be loaded.',
   'admin.loginSettings.forbidden': 'These settings need the right to manage people.',
   'admin.forms.col.version': 'Version',
   'admin.forms.withBudget': 'With budget',
   'admin.forms.withoutBudget': 'Without budget',
-  'admin.forms.draftNote':
-    'Without an active form version, an application type stays a draft and cannot be picked in the public application.',
   'admin.gremiumRoles.manage': 'Manage roles',
-  'admin.gremien.note':
-    'Memberships come from OIDC groups and are read-only here. You manage the roles and their permissions here.',
   'admin.gremien.collapse': 'Collapse',
   'admin.gremien.expand': 'Expand',
   'admin.gremien.settings': 'Settings',
@@ -1761,8 +1679,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.audit.targetType.notification_settings': 'Notifications',
   'admin.audit.targetType.gremium_membership': 'Membership',
   'admin.audit.targetType.auskunft': 'Access request',
-  'admin.backups.subtitle':
-    'Back up the whole platform: the database and all attachments, age-encrypted.',
   'admin.backups.pinned': 'pinned',
   'admin.privacy.noEmail': 'anonymised',
   'admin.audit.verify.checkedOn': 'Last checked on {when}',
@@ -1788,9 +1704,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.roles.empty': 'No global roles yet.',
   'admin.roles.fixedFoot':
     'Fixed roles cannot be deleted. Administrator always has all rights; the rights of Member can change.',
-  'admin.roles.addSubtitle': 'You set the rights afterwards in the expanded role.',
-  'admin.roles.keyHint':
-    'Starts with a lowercase letter, then lowercase letters, digits and underscores. Cannot change later.',
   'admin.roles.add': 'Add',
   'admin.roles.keyTaken': 'This key exists already.',
   'admin.frame.navLabel': 'Administration areas',
@@ -1893,13 +1806,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.col.actions': 'Actions',
   'budget.overview.button': 'Overview',
   'budget.overview.title': 'Budget overview',
-  'budget.overview.hint':
-    'Rings = levels of the cost-centre tree (outer = deeper). Click a segment to open the cost centre.',
   'budget.pie.emptyLabel': '{name}: no amount',
   'budget.tree.col.color': 'Colour',
   'budget.tree.stateConfig': 'Requested/committed states',
-  'budget.tree.stateConfigHint':
-    'Flow states that count as accepted (committed) or denied (excluded). Everything else is requested.',
   'budget.tree.stateCol': 'Status',
   'budget.tree.accepted': 'Accepted',
   'budget.tree.denied': 'Denied',
@@ -1909,32 +1818,20 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.delete': 'Delete',
   'budget.tree.fyTitle': 'Create fiscal year',
   'budget.tree.fyYear': 'Year',
-  'budget.tree.fyYearHint':
-    'Start and end derive from the budget cutoff date. Display: “YYYY” for a 01 Jan cutoff, otherwise “YYYY/YY”.',
   'budget.tree.fyInactive': 'inactive',
   'budget.tree.stichtagTitle': 'Set cutoff date',
-  'budget.tree.stichtagHint':
-    'Day (1 to 28) and month on which a fiscal year starts. Default: 01.01.',
   'budget.tree.done': 'Done',
   'budget.tree.save': 'Save',
   'budget.tree.editNode': 'Edit cost centre',
-  'budget.tree.editNodeHint':
-    'When the key changes, the platform updates the path of every sub cost centre.',
   'budget.tree.hiddenInBudget': 'Hide in budget tab',
-  'budget.tree.hiddenInBudgetHint':
-    'Display only: the cost centre (incl. its subtree) does not appear in the budget tab; totals, available calculation and export stay unchanged.',
   'budget.tree.decisionGremium': 'Deciding committee',
   'budget.tree.decisionGremiumNone': '— none (from parent) —',
-  'budget.tree.decisionGremiumHint':
-    'This committee decides on applications for this cost centre and its children when the flow takes the committee from the cost centre.',
   'budget.tree.decisionGremiumInherited': 'Inherited from {path} · {name}: {gremium}',
   'budget.tree.unknownGremium': 'unknown committee',
   'budget.tree.decisionGremiumNoneHint':
     'No committee here or above: applications for this cost centre have no deciding committee.',
   'budget.tree.viewGremium': 'Visible to committee',
   'budget.tree.viewGremiumNone': '— no committee —',
-  'budget.tree.viewGremiumHint':
-    'Members of this committee see the cost centre and its subtree as a root in the budget tab — even without global budget permissions.',
   'budget.tree.toast.saved': 'Saved.',
   'budget.tree.toast.keyFailed': 'Save failed (key invalid or already in use?).',
   'budget.tree.pickHint': 'Pick a budget to edit its cost centres.',
@@ -1956,8 +1853,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.fyExisting': 'Existing fiscal years',
   'budget.tree.fyActive': 'Active',
   'budget.tree.fyEdit': 'Edit fiscal year',
-  'budget.tree.fyEditHint':
-    'The server derives the start and the end date again from the budget cutoff. An inactive year is no longer offered for selection.',
   'budget.tree.fyDelete': 'Delete fiscal year',
   'budget.tree.fyDeleteTitle': 'Delete fiscal year?',
   'budget.tree.fyDeleteConfirm': 'The fiscal year {year} is deleted. You cannot undo this.',
@@ -1978,7 +1873,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.common.moveUp': 'Move up',
   'admin.common.moveDown': 'Move down',
   'admin.common.key': 'Key',
-  'admin.common.roleKeyHint': 'Lowercase letters, digits and _. The first character is a letter.',
   'admin.common.roleKeyInvalid':
     'The key must start with a lowercase letter. Use only lowercase letters, digits and _.',
   'admin.common.label': 'Label',
@@ -2030,15 +1924,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.form.type.positions': 'Cost positions',
   'admin.form.type.section': 'Section (new step)',
   'admin.form.metric.amount': 'Amount (budget)',
-  'admin.form.autoPromoted': 'Automatically summed into the budget amount.',
   'admin.form.positions': 'Cost positions',
-  'admin.form.positionsHint':
-    'Applicants list positions, each with several comparison offers. One offer is marked preferred — its value counts; the sum of positions is the amount.',
   'admin.form.minOffers': 'Min. comparison offers',
   'admin.form.minPositions': 'Min. positions',
   'admin.form.allowNoOffers': 'Allow opting out of comparison offers',
-  'admin.form.allowNoOffersHint':
-    'Applicants can declare per position — with a reason — that comparison offers are not possible; a single offer is sufficient then.',
 
   'admin.flow.title': 'Flow editor',
   // Flow validation: what the editor rejects in a graph before it is saved.
@@ -2096,17 +1985,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.cfgGremiumPh': 'Choose committee…',
   'admin.flow.cfgRole': 'Deciding role',
   'admin.flow.cfgRolePh': 'Choose role…',
-  'admin.flow.globalNotice':
-    'This is the global flow for ALL application types. Decision/vote/approval states control which path applies.',
-  'admin.flow.branchHint':
-    'This state has two outgoing edges — mark transitions with branch “pass”/“fail” or “accept”/“reject”.',
   'admin.flow.cfgDeadline': 'Deadline',
   'admin.flow.cfgDeadlinePh': 'No deadline',
-  'admin.flow.cfgDeadlineHint':
-    'Entering this state schedules the chosen deadline. Wire an outgoing edge with the “deadline passed” guard so it fires automatically on expiry.',
   'admin.flow.guardPriority': 'Guard priority',
-  'admin.flow.guardPriorityHint':
-    'One output dot per distinct guard. The order sets evaluation — the first matching guard wins.',
   'admin.flow.guardDefault': 'No guard (catch-all)',
   'admin.flow.moveUp': 'Move up',
   'admin.flow.moveDown': 'Move down',
@@ -2135,13 +2016,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.removeState': 'Delete state',
   'admin.flow.removeTransition': 'Delete transition',
   'admin.flow.automatic': 'Automatic transition',
-  'admin.flow.automaticHint': 'Fires without user action as soon as the guard is satisfied.',
   'admin.flow.requiresAction': 'Requires action',
-  'admin.flow.requiresActionHint':
-    'Counts as an open task in the tasks tab. Disable for purely optional actions.',
   'admin.flow.selectHint': 'Select a state or transition in the diagram to edit it.',
   'admin.flow.guardNone': '— no condition —',
-  'admin.flow.guardHelp': 'The transition fires automatically once this condition is met.',
   'admin.flow.guardAddChild': 'Condition',
   'admin.flow.guardBoolTrue': 'met',
   'admin.flow.guardCombinator.and': 'AND (all)',
@@ -2185,22 +2062,16 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.cfgGremiumSource': 'Who decides',
   'admin.flow.cfgGremiumSourceFixed': 'Fixed committee',
   'admin.flow.cfgGremiumSourceBudget': 'Committee from the cost centre',
-  'admin.flow.cfgGremiumSourceBudgetHint':
-    'On entry the application takes the deciding committee of its cost centre (or of a parent). Without such a committee the transition is blocked.',
   'admin.flow.nodeGremiumFromBudget': 'Committee: from cost centre',
   'admin.flow.actSessionGremiumPh': 'Committee of the vote',
-  'admin.flow.actSessionGremiumHint': 'Empty = committee of the vote.',
   'admin.flow.actSubtree': 'Limit the search to',
   'admin.flow.actSubtreeAll': 'All cost centres',
-  'admin.flow.actApplicantGremiumHint':
-    'Assigns the one cost centre whose own deciding committee is a committee of the applicant. With no match or more than one, the cost centre stays open.',
   'admin.flow.actMapRows': 'Field value → cost centre',
   'admin.flow.actMapValue': 'Field value',
   'admin.flow.actMapBudget': 'Cost centre',
   'admin.flow.actMapAdd': 'Add row',
   'admin.flow.actMapRemove': 'Remove row',
   'admin.flow.actMapEmpty': 'No mapping yet.',
-  'admin.flow.actMapHint': 'Without a matching field value the cost centre stays open.',
   'admin.flow.ccPick': 'Choose cost centre…',
   'admin.flow.ccUnknown': 'Unknown cost centre',
   'admin.flow.ccEmpty': 'No cost centres.',
@@ -2233,10 +2104,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.group.subgroups': 'subgroups',
   'admin.flow.group.rootCrumb': 'Flow',
   'admin.flow.group.dissolve': 'Dissolve group',
-  'admin.flow.group.dissolveHint':
-    'Dissolving only removes the visual bracket — its content moves one level up.',
-  'admin.flow.group.multiHint':
-    'Shift-click selects several steps; “Group” bundles them. A click on a group opens it.',
   'admin.flow.guardHint.budgetIs': 'Cost-centre id (budget tree).',
   'admin.flow.guardHint.hasField': 'Field key, e.g. "iban".',
   'admin.flow.compareField': 'Field',
@@ -2249,13 +2116,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.recipientKind.email': 'Email address',
   'admin.flow.actWebhook': 'Webhook',
   'admin.flow.actWebhookPh': 'Choose webhook …',
-  'admin.flow.actSessionHint': 'Only valid on a transition into a vote state.',
   'admin.flow.actBudget': 'Cost centre',
   'admin.flow.actBudgetPh': 'Cost-centre id',
   'admin.flow.actBudgetField': 'Field holding the cost centre',
   'admin.flow.actBudgetFieldPh': 'Field key (e.g. ziel_kostenstelle)',
-  'admin.flow.actBudgetFieldHint':
-    'Assigns the cost centre chosen in the named form field (gremium_select/budget_select).',
   'admin.flow.actRecipients': 'Recipients',
   'admin.flow.actEmailPh': 'name@example.com',
   'admin.flow.addRecipient': 'Recipient',
@@ -2290,24 +2154,17 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.addActionPh': 'Choose an action …',
 
   'admin.brand.title': 'Branding & texts',
-  'admin.brand.desc':
-    'Logos, footer, legal links and free texts. “Activate draft” makes the changes visible to everybody.',
   'admin.brand.version': 'Version {n}',
   'admin.brand.draftDirty': 'Unactivated draft',
   'admin.brand.appName.group': 'App name',
   'admin.brand.appName.full': 'Full name (browser tab)',
   'admin.brand.appName.short': 'Short name (PWA)',
-  'admin.brand.appName.hint':
-    'Leave empty to use the default names (STUPA Antragsplattform / STUPA).',
   'admin.brand.avatars.group': 'Profile pictures',
   'admin.brand.avatars.gravatar': 'Show Gravatar pictures',
-  'admin.brand.avatars.hint':
-    'Persons with a Gravatar account show their picture instead of the initials. The platform fetches the picture itself; the browser does not connect to Gravatar. Off: initials everywhere.',
   'admin.brand.logos': 'Logos',
   'admin.brand.logo.wordmark': 'Wordmark',
   'admin.brand.logo.imagemark': 'Image mark',
   'admin.brand.logo.favicon': 'Favicon',
-  'admin.brand.logoHint': 'PNG/JPEG/WEBP/ICO, max. {mb} MB.',
   'admin.brand.dropHere': 'Drag a file here or choose one',
   'admin.brand.tooLarge': 'File too large (max. {mb} MB).',
   'admin.brand.badType': 'File type not allowed.',
@@ -2324,8 +2181,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.brand.text.emailFooter': 'Email footer',
   'admin.brand.text.applyInfo': 'Info below the application type selection (Markdown)',
   'admin.brand.submitted.group': 'Texts after the submission',
-  'admin.brand.submitted.hint':
-    'Markdown. The page after the submission shows this text. An empty field shows the default text.',
   'admin.brand.submitted.internal': 'Internal – signed in with an account',
   'admin.brand.submitted.external': 'External – guest with email confirmation',
   'admin.brand.submitted.preview': 'Preview',
@@ -2336,12 +2191,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.brand.badUrl': 'Disallowed link URL — only http(s):// or mailto: are allowed.',
 
   'admin.webhook.title': 'Webhooks',
-  'admin.webhook.desc':
-    'Send events to external systems (e.g. chat bridges). One target URL per hook plus the events that should trigger it.',
   'admin.webhook.name': 'Name',
   'admin.webhook.url': 'Target URL',
   'admin.webhook.events': 'Events',
-  'admin.webhook.eventsHint': 'Optional — triggers usually come from the flow graph.',
   'admin.webhook.active': 'Active',
   'admin.webhook.add': 'Add webhook',
   'admin.webhook.none': 'No webhooks configured.',
@@ -2378,8 +2230,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.webhook.delivery.reason.unknown': 'The reason is unknown.',
 
   'admin.gremiumRoles.title': 'Committee roles',
-  'admin.gremiumRoles.subtitle':
-    'The roles of a committee and their permissions, separate from the global roles.',
   'admin.gremiumRoles.add': 'Add committee role',
   'admin.gremiumRoles.empty': 'No committee roles yet.',
   'admin.gremiumRoles.forced': 'Required role: present in every committee, cannot be deleted',
@@ -2393,7 +2243,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.gremiumPerm.protocol.finalize': 'Approve minutes',
 
   'admin.audit.title': 'Audit log',
-  'admin.audit.desc': 'Tamper-evident, append-only record of all security-relevant actions.',
   'admin.audit.empty': 'No audit entries.',
   'admin.audit.error': 'Could not load the audit log.',
   'admin.audit.loadMore': 'Load more',
@@ -2538,20 +2387,14 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.backups.offHint':
     'This installation has no age recipient. Without one the platform cannot encrypt an archive. See deploy/README.md.',
   'admin.backups.createTitle': 'Create a backup',
-  'admin.backups.createHint':
-    'An archive holds the whole database and every attachment, age-encrypted. It is built in the background and takes a few minutes, depending on how much data there is.',
   'admin.backups.note': 'Note (optional)',
   'admin.backups.notePlaceholder': 'for example: before the budget vote',
   'admin.backups.create': 'Create a backup',
   'admin.backups.importTitle': 'Import an archive',
-  'admin.backups.importHint':
-    'Takes an uploaded .tar.age file into the list. The file is checked, but it is NOT restored.',
   'admin.backups.import': 'Choose a file',
   'admin.backups.noIdentity':
     'No AGE private key is configured. An import verifies the archive by decrypting it, which needs BACKUP_AGE_IDENTITY_FILE. Without the key, import and restore stay off.',
   'admin.backups.listTitle': 'Existing backups',
-  'admin.backups.retentionHint':
-    'The {count} newest backups are kept. A pinned backup, and the automatic copy taken before a restore, are never deleted.',
   'admin.backups.empty': 'No backups yet.',
   'admin.backups.col.created': 'Created',
   'admin.backups.col.status': 'Status',
@@ -2590,7 +2433,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.backups.toast.restoreStarted':
     'Restore started. The platform will be briefly unavailable and you will be logged out.',
   'admin.privacy.title': 'Privacy',
-  'admin.privacy.subtitle': 'GDPR administration: erasure requests, data access, retention.',
   'admin.privacy.queueTitle': 'Erasure requests (Art. 17)',
   'admin.privacy.queueEmpty': 'No erasure requests.',
   'admin.privacy.col.status': 'Status',
@@ -2612,13 +2454,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.privacy.subject.applicant': 'Application',
   'admin.privacy.subject.principal': 'Account',
   'admin.privacy.auskunftTitle': 'Data access (Art. 15)',
-  'admin.privacy.auskunftHint': 'Export all data stored for an email address as XLSX.',
   'admin.privacy.email': 'Email address',
   'admin.privacy.auskunftExport': 'Export',
   'admin.privacy.auskunftDone': 'Data access report exported.',
   'admin.privacy.principalTitle': 'Erase account (Art. 17)',
-  'admin.privacy.principalHint':
-    'Clear the personal data of an account. The identifier stays as a pseudonym.',
   'admin.privacy.personSearch': 'Search a person (name or e-mail)',
   'admin.privacy.personHits': 'Accounts found',
   'admin.privacy.personPlaceholder': 'Name or e-mail …',
@@ -2628,41 +2467,27 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'Permanently erase this account’s personal data? This cannot be undone.',
   'admin.privacy.principalErased': 'Account erased.',
   'admin.privacy.retentionTitle': 'Retention (Art. 5(1)(e))',
-  'admin.privacy.retentionHint':
-    'Global default in months until closed applications are anonymised.',
   'admin.privacy.retentionMonths': 'Retention (months)',
 
   'admin.notifications.title': 'Notifications',
-  'admin.notifications.intro': 'Platform-wide settings for email notifications.',
   'admin.notifications.taskReminder': 'Task reminders',
-  'admin.notifications.taskReminderDesc':
-    'Reminds people who can act when an application sits in a step without action for too long. Individual users can opt out of the “task reminders” kind in their account settings.',
   'admin.notifications.enabled': 'Enabled',
   'admin.notifications.afterDays': 'Remind after (days)',
-  'admin.notifications.afterDaysHint':
-    'Days without a status change until the first reminder is sent (min. 1).',
   'admin.notifications.repeatDays': 'Repeat every (days)',
-  'admin.notifications.repeatDaysHint':
-    '0 = only once per stay in the step; otherwise remind again every N days.',
   'admin.notifications.saved': 'Settings saved.',
   'admin.notifications.error': 'Settings could not be loaded.',
   'admin.notifications.saveError': 'Saving failed — please try again.',
 
   'admin.deadlines.title': 'Deadlines',
-  'admin.deadlines.subtitle':
-    'Deadlines that the flow references. A state sets its deadline on entry; the guard “deadline passed” moves on.',
   'admin.deadlines.add': 'Add deadline',
   'admin.deadlines.empty': 'No deadlines yet.',
   'admin.deadlines.kind': 'Type',
   'admin.deadlines.date': 'Date',
   'admin.deadlines.offsetDays': 'Deadline in days',
   'admin.deadlines.dates': 'Dates',
-  'admin.deadlines.datesHint': 'A list of dates; the next one still ahead is used.',
   'admin.deadlines.addDate': 'Add date',
   'admin.deadlines.removeDate': 'Remove date',
   'admin.deadlines.atTime': 'Time of day',
-  'admin.deadlines.atTimeHint':
-    'Optional: fixed time (local to the timezone). Empty = the moment it fires.',
   'admin.deadlines.timezone': 'Timezone',
   'admin.deadlines.deleteTitle': 'Delete deadline',
   'admin.deadlines.deleteConfirm':
@@ -2677,9 +2502,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
   // Agent tokens (OAuth grants) of every principal — the admin view with a kill switch.
   'admin.oauthGrants.title': 'Agent access',
-  'admin.oauthGrants.subtitle': 'See and revoke the OAuth grants of every person.',
-  'admin.oauthGrants.intro':
-    'An agent grant is a token that lets a program use the platform for a person. Revoke a grant when a token is lost.',
   'admin.oauthGrants.loading': 'Loading grants…',
   'admin.oauthGrants.error': 'The grants did not load.',
   'admin.oauthGrants.empty': 'No live agent grants.',
@@ -2706,7 +2528,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
   // Corporate-design variants: the logo sets of the rendered documents.
   'admin.cdVariants.title': 'Document variants',
-  'admin.cdVariants.subtitle': 'Logo sets a committee renders its documents with.',
   'admin.cdVariants.add': 'Add variant',
   'admin.cdVariants.create': 'Create a document variant',
   'admin.cdVariants.edit': 'Edit the document variant',
@@ -2714,11 +2535,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.cdVariants.error': 'The document variants could not be loaded.',
   'admin.cdVariants.empty': 'No document variants yet.',
   'admin.cdVariants.name': 'Name',
-  'admin.cdVariants.keyHint': 'The name generates it. After the create it cannot change.',
   'admin.cdVariants.keyLocked': 'The key is immutable.',
   'admin.cdVariants.keyExists': 'This key is already in use.',
   'admin.cdVariants.base': 'Base variant',
-  'admin.cdVariants.baseHint': 'The document shape the variant builds on.',
   'admin.cdVariants.base.report': 'Report',
   'admin.cdVariants.base.protocol': 'Protocol',
   'admin.cdVariants.toggleLogos': 'Show the logos',
@@ -2729,8 +2548,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.cdVariants.noSquare': 'No square logo',
   'admin.cdVariants.variantOf': 'Variant {name}',
   'admin.cdVariants.otherFile': 'Other file',
-  'admin.cdVariants.squareFileHint':
-    'PNG, JPEG or WebP, square, at least {min} × {min} px, {mb} MB at most.',
   'admin.cdVariants.squareChecking': 'Checking the image …',
   'admin.cdVariants.square.ok': '{w} × {h} px · square, large enough',
   'admin.cdVariants.square.notSquare': '{w} × {h} px · not square (aspect ratio 1:1)',
@@ -2741,8 +2558,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.cdVariants.serverTooSmall': 'The logo is smaller than {min} × {min} px.',
   'admin.cdVariants.serverTooManyPx': 'The logo is larger than {max} × {max} px.',
   'admin.cdVariants.previewLabel': 'This is how it appears in the committee list',
-  'admin.cdVariants.squareReplaces':
-    'A variant has at most one square logo. A new one replaces the old one.',
   'admin.cdVariants.noLogos': 'No logos yet.',
   'admin.cdVariants.addLogo': 'Add logo',
   'admin.cdVariants.removeLogo': 'Remove logo',
@@ -2751,7 +2566,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.cdVariants.sourceVendored': 'Bundled logo',
   'admin.cdVariants.vendoredHint':
     'The PDF renderer ships this logo. The server turns it into a normal upload at its next start.',
-  'admin.cdVariants.fileHint': 'PNG, JPEG, WebP, SVG or PDF, {mb} MB at most.',
   'admin.cdVariants.logoTooLarge': 'The file is too large.',
   'admin.cdVariants.logoType': 'This file type is not allowed.',
   'admin.cdVariants.download': 'Download the file',
@@ -2760,7 +2574,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.cdVariants.deleted': 'Document variant deleted.',
   'admin.cdVariants.inUse': 'A committee still uses this variant. Change the committee first.',
   'admin.deleg.title': 'Proxy / Delegation',
-  'admin.deleg.subtitle': 'Meeting-bound delegations at a glance.',
   'admin.deleg.loading': 'Loading delegations …',
   'admin.deleg.error': 'Could not load the delegations.',
   'admin.deleg.none': 'No active delegations.',
@@ -2774,8 +2587,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
   // Substitute pool, shown in the Gremium member administration.
   'admin.substitutes.title': 'Substitutes',
-  'admin.substitutes.hint':
-    'A delegation to a substitute needs no lead time and is possible until the meeting starts, also when the substitute is not a member.',
   'admin.substitutes.add': 'Add substitute',
   'admin.substitutes.addAction': 'Add',
   'admin.substitutes.search': 'Search person',
@@ -2791,8 +2602,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
   // Meeting delegation: card on the meeting page plus dialog.
   'delegation.card.title': 'Proxy',
-  'delegation.card.lead':
-    'You can arrange a proxy for this meeting (optionally including your voting right).',
   'delegation.card.deadline': 'Can be set up until {date}.',
   'delegation.card.deadlinePassed':
     'The deadline has passed — only pool substitutes are still possible.',
@@ -2817,10 +2626,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'participant.attendance.title': 'Your attendance',
   'participant.attendance.delegated':
     'You have a proxy for this meeting. Revoke the proxy to report as present.',
-  'participant.attendance.noteHint': 'Visible to you and the chair.',
   'participant.delegation.yourSubstitutes': 'Your substitutes',
-  'participant.delegation.substitutesNote':
-    'Substitutes can represent you without notice until the meeting starts.',
   'participant.delegation.substitutesOnly':
     'The deadline has passed. Until the meeting starts, only a substitute is possible.',
   'participant.delegation.others': 'Other members',
@@ -2901,7 +2707,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'Really delete application type “{name}”? Its form and history are removed too.',
   'admin.forms.deleteFailed': 'Delete failed — applications of this type may still exist.',
   'admin.forms.listTitle': 'Applications & forms',
-  'admin.forms.listSubtitle': 'Create application types and edit their forms.',
   'admin.forms.add': 'New form',
   'admin.forms.create': 'New form',
   'admin.forms.nameDe': 'Title (DE)',
@@ -2912,9 +2717,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.forms.helpDe': 'Help text (DE)',
   'admin.forms.helpEn': 'Help text (EN)',
   'admin.forms.hasBudget': 'With budget',
-  'admin.forms.hasBudgetHint': 'Lets the applicant pick a budget pot.',
   'admin.forms.cmpRequired': 'Comparison offers required',
-  'admin.forms.cmpRequiredHint': 'Applicants must attach comparison offers.',
   'admin.forms.cmpMinCount': 'Minimum count',
   'admin.forms.col.budget': 'Budget',
   'admin.forms.untitled': 'Untitled form',
@@ -2996,15 +2799,12 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.dash.appsNone': 'No applications on this cost centre.',
 
   'admin.gremien.title': 'Committees',
-  'admin.gremien.subtitle': 'Meetings, minutes and votes belong to a committee.',
   'admin.gremien.create': 'Create committee',
   'admin.gremien.edit': 'Edit committee',
   'admin.gremien.name': 'Name',
   'admin.gremien.slug': 'Slug',
   'admin.gremien.cdVariant': 'CD variant',
   'admin.gremien.cdVariantNone': 'PDF renderer default',
-  'admin.gremien.cdVariantHint':
-    'Logos of the rendered minutes. You manage the variants under Document variants.',
   'admin.gremien.defaultLang': 'Default language',
   'admin.gremien.langDe': 'German',
   'admin.gremien.langEn': 'English',
@@ -3016,29 +2816,19 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.gremien.deleteConfirm':
     '“{name}” and all its meetings with their votes and all its role assignments will be permanently deleted. Votes outside a meeting stay.',
   'admin.gremien.delegation': 'Allow vote delegation',
-  'admin.gremien.delegationHint': 'Members may have a substitute for single meetings.',
   'admin.gremien.delegationLead': 'Lead time for delegations (minutes)',
-  'admin.gremien.delegationLeadHint':
-    '0 = until the meeting starts. Substitutes from the pool are exempt.',
   'admin.gremien.delegationExternal': 'Allow delegation to externals',
-  'admin.gremien.delegationExternalHint': 'Also persons outside the committee and the pool.',
   'admin.gremien.quorum': 'Quorum (%)',
-  'admin.gremien.quorumHint': 'Share of the eligible voters that must attend. Empty = no quorum.',
   'admin.gremien.mailRecipients': 'Additional minutes recipients',
   'admin.gremien.mailRecipientsPlaceholder': 'list@example.org\nboard@example.org',
-  'admin.gremien.mailRecipientsHint':
-    'One address per line. Finalized minutes go to the active members and to these addresses.',
   'admin.gremien.memberPicked': 'Selected',
   'admin.gremien.members': 'Members',
   'admin.gremien.membersOf': 'Members',
   'admin.gremien.membersEmpty': 'No members in this committee yet.',
   'admin.gremien.memberSearchPlaceholder': 'Name, email or OIDC subject …',
   'admin.gremien.membersLoadFailed': 'Could not load the members.',
-  'admin.users.subtitle': 'Search users and see their roles and OIDC groups.',
   'admin.users.col.groups': 'SSO groups (last login)',
   'admin.users.noGroups': 'No groups.',
-  'admin.users.rolesFromGroups':
-    'The roles come from the OIDC groups of the person through the group mapping. They change at the next login. Every person gets the role Member at login.',
   'admin.users.manageGroupMappings': 'Group mapping',
   'admin.gremien.loading': 'Loading committees …',
   'admin.gremien.error': 'Committees could not be loaded.',
@@ -3086,8 +2876,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.users.revoke.action': 'Revoke rights …',
   'admin.users.revoke.notSelf': 'You cannot revoke your own rights. Ask another administrator.',
   'admin.users.revoke.title': 'Revoke rights',
-  'admin.users.revoke.subtitle':
-    'For people who no longer log in. Select which committees and roles the person loses.',
   'admin.users.revoke.loading': 'Loading rights …',
   'admin.users.revoke.loadFailed': 'The rights of the person could not be loaded.',
   'admin.users.revoke.retry': 'Try again',
@@ -3136,7 +2924,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.users.revoke.returnsAutomatically':
     'Comes back at the next start or login: the person is a configured bootstrap admin (BOOTSTRAP_ADMIN_SUBJECTS / BOOTSTRAP_ADMIN_EMAILS).',
   'admin.users.revoke.deactivate': 'Also deactivate the account',
-  'admin.users.revoke.deactivateHint': 'The person can then no longer log in.',
   'admin.users.revoke.count.gremium': '1 committee',
   'admin.users.revoke.count.gremien': '{n} committees',
   'admin.users.revoke.count.role': '1 role',
@@ -3158,16 +2945,12 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.users.merge.title': 'Merge into another account',
   'admin.users.merge.subtitle': 'Old account: {name}',
   'admin.users.merge.unnamed': 'Account without a name',
-  'admin.users.merge.pickLead':
-    'Select the account that stays. The old account goes into it and is locked after the merge.',
   'admin.users.merge.pickSearch': 'Search the account that stays',
   'admin.users.merge.pickList': 'Accounts to select',
   'admin.users.merge.loadingPreview': 'Loading the preview …',
   'admin.users.merge.previewFailed': 'Could not load the preview.',
   'admin.users.merge.from': 'Old account',
-  'admin.users.merge.fromNote': 'Is locked and then points to the account that stays.',
   'admin.users.merge.into': 'Stays',
-  'admin.users.merge.intoNote': 'Gets the applications, votes, delegations and history.',
   'admin.users.merge.conflictsTitle': 'Conflicts',
   'admin.users.merge.conflictsLead':
     'These accounts cannot be merged as they are. Resolve these conflicts first.',
@@ -3254,7 +3037,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'This account was merged and is locked. Log in with your current account.',
   'admin.roles.loading': 'Loading roles …',
   'admin.roles.title': 'Roles & permissions',
-  'admin.roles.subtitle': 'Global roles and their rights. Expand a role to see its permissions.',
   'admin.roles.addGlobalRole': 'Add global role',
   'admin.roles.roleKey': 'Key',
   'admin.roles.deleteRole': 'Delete role',
@@ -3265,8 +3047,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.roles.adminLocked':
     'The administrator role always has all permissions and cannot be edited here.',
   'admin.mailTemplates.title': 'Mail templates',
-  'admin.mailTemplates.subtitle':
-    'Edit the subject, the text and the HTML of the notification mails per language (Jinja2 placeholders).',
   'admin.mailTemplates.empty': 'No templates yet.',
   'admin.mailTemplates.selectHint': 'Pick a template on the left to edit.',
   'admin.mailTemplates.key.magic_link': 'Sign-in link',
@@ -3306,10 +3086,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.groupMappings.deleted': 'Mapping deleted.',
   'admin.groupMappings.failed': 'Action failed.',
   'admin.groupMappings.loadFailed': 'Could not load the mappings.',
-  'admin.gremien.membersHint':
-    'Membership comes from the OIDC groups of the person, through the "Committee membership" mapping. The list is read-only. It changes at the next login of the person and when a mapping changes.',
-  'admin.groupMappings.subtitle':
-    'At each login the platform reads the OIDC groups of the person. Global roles, committee membership and committee roles are three separate mappings.',
   'admin.groupMappings.unknown': '(unknown)',
   'admin.groupMappings.reserved': 'The prefix "vote:" is reserved.',
   'admin.groupMappings.gremiumPlaceholder': 'Select committee …',
@@ -3322,16 +3098,12 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.groupMappings.notFound':
     'The committee or the role does not exist anymore. Reload the page.',
   'admin.groupMappings.global.title': 'Global roles',
-  'admin.groupMappings.global.hint':
-    'Each person in the OIDC group gets the global role. A global role applies to the whole platform and is not related to a committee.',
   'admin.groupMappings.global.add': 'Map a global role',
   'admin.groupMappings.global.editTitle': 'Edit global role',
   'admin.groupMappings.global.empty': 'No OIDC group is mapped to a global role yet.',
   'admin.groupMappings.global.deleteBody':
     'Delete this mapping? Persons who have the role only through this group lose it at their next login.',
   'admin.groupMappings.membership.title': 'Committee membership',
-  'admin.groupMappings.membership.hint':
-    'Each person in the OIDC group becomes a member of the committee, with the committee role "Member". Only this mapping makes a person a member.',
   'admin.groupMappings.membership.add': 'Map a membership',
   'admin.groupMappings.membership.editTitle': 'Edit membership',
   'admin.groupMappings.membership.empty':
@@ -3339,11 +3111,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.groupMappings.membership.deleteBody':
     'Delete this mapping? Persons who are members only through this group lose the membership.',
   'admin.groupMappings.role.title': 'Committee roles',
-  'admin.groupMappings.role.hint':
-    'Each person in the OIDC group gets the role in the committee, but only if the person is a member of that committee through "Committee membership". This mapping makes nobody a member.',
-  'admin.groupMappings.role.ruleHint':
-    'If more than one role applies to a person in a committee, the role with the most permissions applies.',
-  'admin.groupMappings.role.gremiumFilterHint': 'The committee only filters the list of roles.',
   'admin.groupMappings.role.add': 'Map a committee role',
   'admin.groupMappings.role.editTitle': 'Edit committee role',
   'admin.groupMappings.role.empty': 'No OIDC group is mapped to a committee role yet.',
@@ -3393,7 +3160,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'expenses.form.fromInvoice':
     'Taken from the invoice: payee/payer, invoice date, reference number.',
   'expenses.form.receipt': 'Receipt',
-  'expenses.form.required': 'Required fields are marked with *.',
   'expenses.form.what': 'What',
   'expenses.form.where': 'Where',
   'expenses.none': 'No booking open',
@@ -3471,21 +3237,13 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'guests.pseudonym': 'Guest {n}',
   'guests.tag': 'Guest',
   'guests.settings.title': 'Public participation (QR)',
-  'guests.settings.hint':
-    'People without an account join with their phone. You admit each person. Admitted guests see the public agenda items like members.',
   'guests.settings.modeCaption': 'Guests in this meeting',
   'guests.settings.needsNoQuorum': 'Only for committees without a quorum.',
   'guests.settings.hasQuorum': 'This committee has a quorum of {n} %.',
   'guests.toast.needsNoQuorum':
     'Public participation is only possible in committees without a quorum.',
-  'guests.settings.linkAfterCreate':
-    'The link and the QR code come after the create: in "Edit meeting", in the header of the meeting page ("QR code") and on the beamer.',
-  'guests.settings.perVote':
-    'You can limit single votes to members when you open them. Votes in non-public agenda items are always for members only.',
   'guests.mode.vote': 'Guests may vote',
   'guests.mode.watch': 'Guests only watch',
-  'guests.mode.voteHint': 'Guests vote like members, then without a quorum.',
-  'guests.mode.watchHint': 'Guests follow the meeting live. Only members vote.',
   'guests.link.caption': 'Join link · code {code}',
   'guests.link.copy': 'Copy',
   'guests.link.copied': 'Copied',
@@ -3501,15 +3259,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'guests.toast.admittedAll': '{n} guests admitted.',
   'guests.toast.guestVoteOpen': 'A vote with guests is open. Close it before guests only watch.',
   'guests.vote.switch': 'Guests vote too',
-  'guests.vote.switchOn':
-    '{n} admitted guests vote too. Without a quorum: only the majority of the votes cast counts.',
-  'guests.vote.switchOff': 'Off: only the members vote. Quorum as before.',
-  'guests.vote.switchNonPublic': 'In a non-public agenda item only members vote.',
   'guests.vote.votersWith': 'Eligible now: {n} ({members} members + {guests} guests present)',
   'guests.vote.votersMembers': 'Eligible: {n} members ({present} present)',
   'guests.vote.composition': '{members} members + {guests} guests present',
-  'guests.vote.lateHint':
-    'Guests that you admit now still vote. The number of voters is fixed at the close.',
   'guests.vote.resultCaption': 'Result without quorum',
   'guests.vote.cast': 'Cast',
   'guests.vote.castN': 'Cast {n}',
@@ -3551,8 +3303,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'guests.list.renameTitle': 'Change the name of the guest',
   'guests.list.remove': 'Remove guest',
   'guests.list.removeTitle': 'Remove {name}?',
-  'guests.list.removeHint':
-    'The person can no longer vote afterwards. Votes in closed votes stay counted.',
   'guests.status.left': 'Left',
   'guests.status.removed': 'Removed',
   'guests.status.watching': 'Watching',
@@ -3597,7 +3347,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'guests.join.introVote': 'Take part in the meeting and vote. You need no account.',
   'guests.join.introWatch': 'Follow the meeting live. You need no account.',
   'guests.join.name': 'Your name',
-  'guests.join.nameHint': 'First and last name. The meeting lead sees it and admits you.',
   'guests.join.submit': 'Join',
   'guests.join.member': 'Member?',
   'guests.join.login': 'Log in with your account',
@@ -3643,8 +3392,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'publicProtocols.lede':
     'Finalized minutes of the public committees in their public version: attendance as numbers only, non-public agenda items without title and content.',
   'publicProtocols.search': 'Search title or text',
-  'publicProtocols.searchHint':
-    'The search covers meeting titles and the text of public agenda items.',
   'publicProtocols.filter.gremium': 'Committee',
   'publicProtocols.filter.gremienN': '{n} committees',
   'publicProtocols.filter.semester': 'Semester',
@@ -3707,8 +3454,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'meetings.finalizeDialog.body':
     'The minutes become final, are made into a PDF and are sent to the mailing list. After that you cannot change them.',
   'meetings.finalizeDialog.withheld': 'Do not publish',
-  'meetings.finalizeDialog.withheldHint':
-    'The minutes do not appear under “Public minutes”. You can publish them later.',
   'meetings.protocolBar.public': 'Public under “Public minutes”.',
   'meetings.protocolBar.withheld': 'Not published.',
   'meetings.protocolBar.publish': 'Publish',
@@ -3718,8 +3463,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.gremien.public': 'Public (show the minutes on the public page)',
   'admin.gremien.publicShort': 'Public',
   'admin.gremien.publicTag': 'Public',
-  'admin.gremien.publicHint':
-    'Finalized minutes of this committee appear without a login under “Public minutes”. The start page links the page.',
   'admin.gremien.publicImplies.title': 'What this means',
   'admin.gremien.publicImplies.final':
     'Only finalized minutes. Drafts and minutes that are rendering never appear.',
@@ -3732,8 +3475,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.gremien.publicImplies.meetings':
     'Meetings themselves never appear in public: no dates, no running meetings. Only title and date as part of final minutes.',
   'admin.gremien.publicView': 'View the public page',
-  'admin.gremien.publicQrNote':
-    'Separately, the meeting lead sets the public participation (QR) per meeting. It makes no meeting visible in public, and this switch allows no guests.',
   'admin.gremien.publicConfirm.title': 'Publish the minutes?',
   'admin.gremien.publicConfirm.loading': 'Counting the minutes …',
   'admin.gremien.publicConfirm.count':
@@ -3742,8 +3483,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'After saving, all finalized minutes of {name} are readable without a login, in their public version.',
   'admin.gremien.publicConfirm.missing':
     '{n} of them have no public version yet. The platform makes it now; until then they do not appear.',
-  'admin.gremien.publicConfirm.nonPublicHint':
-    'To keep an agenda item off the public page, mark it as “Non-public” before the finalization.',
   'admin.gremien.publicConfirm.confirm': 'Publish',
   'admin.audit.action.protocol_publication': 'Protocol publication changed',
   // The tab "Gremien" (/gremien).
@@ -3912,13 +3651,10 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'search.group.ticket': 'Tickets',
   'search.group.todo': 'To-dos',
   'account.notifications.kind.ticket_created': 'New tickets',
-  'account.notifications.hint.ticket_created': 'When someone reports a problem.',
   'admin.mailTemplates.key.ticket_created': 'New ticket (team)',
   'admin.mailTemplates.key.ticket_received': 'Ticket confirmation',
   'account.notifications.kind.ticket_message': 'Messages on tickets',
-  'account.notifications.hint.ticket_message': 'When someone replies on a ticket they reported. On an assigned ticket, only the assignee.',
   'account.notifications.kind.ticket_answer': 'Replies to my tickets',
-  'account.notifications.hint.ticket_answer': 'When the team replies on a ticket that you reported.',
   'admin.mailTemplates.key.ticket_message': 'Message on a ticket (team)',
   'admin.mailTemplates.key.ticket_answer': 'Reply on a ticket (reporter)',
   'account.scope.tickets_write.label': 'Edit tickets',

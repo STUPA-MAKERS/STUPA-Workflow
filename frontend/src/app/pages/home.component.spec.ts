@@ -85,12 +85,7 @@ describe('HomeComponent', () => {
     expect(auth.login).toHaveBeenCalled();
   });
 
-  it('keeps the returning-applicant magic-link note', async () => {
-    await setup();
-    expect(screen.getByText(/Bestätigungs-E-Mail/)).toBeInTheDocument();
-  });
-
-  it('localizes both choices and the note to English', async () => {
+  it('localizes both choices to English', async () => {
     localStorage.setItem('ap.locale', 'en');
     await setup();
     expect(screen.getByRole('heading', { level: 1, name: 'Welcome' })).toBeInTheDocument();
@@ -98,7 +93,6 @@ describe('HomeComponent', () => {
     expect(
       screen.getByRole('button', { name: /Sign in as a committee member/ }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/confirmation email/)).toBeInTheDocument();
   });
 
   describe('refused login', () => {

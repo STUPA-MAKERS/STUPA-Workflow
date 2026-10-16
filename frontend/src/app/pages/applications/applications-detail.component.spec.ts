@@ -1727,7 +1727,6 @@ describe('ApplicationsDetailComponent', () => {
     detectChanges();
     await new Promise((r) => setTimeout(r));
     detectChanges();
-    expect(screen.getByText(/Speichern legt Version 3 an/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /Speichern/ }));
     http

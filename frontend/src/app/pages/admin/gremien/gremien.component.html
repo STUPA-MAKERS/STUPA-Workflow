@@ -2,21 +2,19 @@
   <app-page-header
     [flush]="true"
     [title]="'admin.gremien.title' | t"
-    [subtitle]="'admin.gremien.subtitle' | t"
   >
     <app-button actions variant="fill" (click)="openCreate()">
       <app-icon name="plus" [size]="18" /> {{ 'admin.gremien.create' | t }}
     </app-button>
   </app-page-header>
 
-  <app-note>
-    <span>{{ 'admin.gremien.note' | t }}</span>
-    @if (canMappings()) {
+  @if (canMappings()) {
+    <app-note>
       <a class="grem__noteLink" routerLink="/admin/group-mappings">{{
         'admin.users.manageGroupMappings' | t
       }}</a>
-    }
-  </app-note>
+    </app-note>
+  }
 
   @if (loading()) {
     <app-skeleton variant="rows" [count]="4" [label]="'admin.gremien.loading' | t" />

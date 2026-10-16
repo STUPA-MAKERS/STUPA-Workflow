@@ -72,7 +72,6 @@ describe('DelegationDialogComponent', () => {
     const subs = group('Deine Stellvertretung');
     expect(within(subs).getAllByRole('radio')).toHaveLength(2);
     expect(within(subs).getAllByText('Stellvertretung')).toHaveLength(2);
-    expect(within(dialog()).getByText('Stellvertretungen vertreten dich ohne Vorlauf bis Sitzungsbeginn.')).toBeInTheDocument();
     const others = group('Andere Mitglieder');
     expect(within(others).getAllByRole('radio')).toHaveLength(3);
     expect(within(others).getByText('Mara Keller')).toBeInTheDocument();

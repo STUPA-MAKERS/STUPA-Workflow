@@ -102,7 +102,6 @@ describe('AgendaDialogComponent', () => {
     expect(sub(0)).toMatch(/^\w{2} · 0 TOPs$/);
     expect(sub(3)).toBe('3 TOPs');
     expect(sub(4)).toBe('19:30 · 3 TOPs');
-    expect(screen.getByText('Der Antrag kommt als neuer TOP ans Ende.')).toBeInTheDocument();
     http.verify();
   });
 
@@ -219,7 +218,6 @@ describe('AgendaDialogComponent', () => {
         'Keine geplante Sitzung sichtbar. Der Antrag kommt automatisch auf die nächste geplante Sitzung des Gremiums, falls es eine gibt.',
       ),
     ).toBeInTheDocument();
-    expect(screen.queryByText('Der Antrag kommt als neuer TOP ans Ende.')).not.toBeInTheDocument();
     // "Nicht öffentlich" needs a chosen meeting.
     expect(screen.queryByRole('switch')).not.toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Notiz zum Übergang (optional)'), 'Eilt');

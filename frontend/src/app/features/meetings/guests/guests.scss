@@ -97,10 +97,6 @@
   gap: var(--space-4);
   margin: 0;
 }
-.g__explain {
-  margin: 0;
-  color: var(--color-text);
-}
 @include bp.phone {
   .g__row {
     padding-inline: var(--space-3);

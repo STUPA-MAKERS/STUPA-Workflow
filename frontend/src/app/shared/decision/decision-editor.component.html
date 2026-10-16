@@ -1,7 +1,6 @@
 <div class="dec">
   <app-switch
     [id]="idPrefix() + '-switch'"
-    [hint]="switchHint() | t"
     [checked]="draft().enabled"
     (checkedChange)="setEnabled($event)"
     ><span class="dec__switchLabel">{{ 'decision.switch' | t }}</span></app-switch

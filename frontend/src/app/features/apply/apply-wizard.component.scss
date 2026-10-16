@@ -30,12 +30,6 @@
 .wz__title {
   margin: 0;
 }
-.wz__lead {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-  line-height: 1.25rem;
-}
 .wz__saved {
   display: flex;
   align-items: center;
@@ -141,11 +135,6 @@
 
 .wz__files {
   margin-top: var(--space-2);
-}
-.wz__hint {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
 }
 .wz__contact {
   display: grid;
@@ -255,8 +244,7 @@
   .wz__intro {
     padding: 0;
   }
-  .wz__stepper,
-  .wz__lead {
+  .wz__stepper {
     display: none;
   }
   .wz__saved {

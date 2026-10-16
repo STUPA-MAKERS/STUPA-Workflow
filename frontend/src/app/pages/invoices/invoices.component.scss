@@ -358,9 +358,6 @@
   font-size: var(--fs-xl);
   font-weight: var(--fw-semibold);
 }
-.inv__dropHint {
-  color: var(--color-text-muted);
-}
 
 @include bp.phone {
   /* A phone row gives the sub line more width, so the number and the due date fit: less

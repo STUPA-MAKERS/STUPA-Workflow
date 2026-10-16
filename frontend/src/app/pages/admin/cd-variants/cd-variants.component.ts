@@ -172,7 +172,6 @@ export class AdminCdVariantsComponent {
   readonly logoError = signal<TranslationKey | null>(null);
 
   readonly listOrder = CD_LOGO_LIST_ORDER;
-  readonly maxMb = Math.round(MAX_CD_LOGO_BYTES / (1024 * 1024));
   readonly minPx = SQUARE_LOGO_MIN_PX;
 
   /** Ids of square logos whose image failed to load: they show the placeholder. */

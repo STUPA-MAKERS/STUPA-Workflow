@@ -137,9 +137,7 @@ export class InvoiceFormComponent {
       const i = this.host().editing();
       return i?.number ?? '';
     }
-    return this.host().importNotice() === 'parsed'
-      ? this.i18n.translate('invoices.form.fromFile')
-      : this.i18n.translate('expenses.form.required');
+    return this.host().importNotice() === 'parsed' ? this.i18n.translate('invoices.form.fromFile') : '';
   });
 
   protected readonly statusOptions = computed<SegmentedOption[]>(() =>

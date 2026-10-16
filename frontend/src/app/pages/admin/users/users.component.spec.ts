@@ -171,11 +171,8 @@ describe('UsersComponent', () => {
     expect(inst.roleIds(PRINCIPALS[1])).toEqual([]);
   });
 
-  it('shows the hint with a link to the group mappings when permitted', async () => {
+  it('shows a link to the group mappings when permitted', async () => {
     await setup();
-    expect(
-      screen.getByText(/Die Rollen kommen aus den OIDC-Gruppen/),
-    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Gruppen-Zuordnung' })).toHaveAttribute(
       'href',
       '/admin/group-mappings',

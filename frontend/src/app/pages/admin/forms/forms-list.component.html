@@ -1,6 +1,6 @@
 <section class="fl">
   <!-- Create posts an application type, so the button needs admin.types. -->
-  <app-page-header [flush]="true" [title]="'admin.forms.listTitle' | t" [subtitle]="'admin.forms.listSubtitle' | t">
+  <app-page-header [flush]="true" [title]="'admin.forms.listTitle' | t">
     @if (canCreate()) {
       <app-button actions variant="fill" (click)="openCreate()">
         <app-icon name="plus" [size]="18" /> {{ 'admin.forms.add' | t }}
@@ -71,8 +71,6 @@
         }
       </ng-template>
     </app-data-table>
-
-    <app-note>{{ 'admin.forms.draftNote' | t }}</app-note>
   }
 </section>
 
@@ -102,7 +100,6 @@
     <app-checkbox
       [ngModel]="form().hasBudget"
       (ngModelChange)="patch('hasBudget', $event)"
-      [hint]="'admin.forms.hasBudgetHint' | t"
       name="hasBudget"
     >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
   </form>

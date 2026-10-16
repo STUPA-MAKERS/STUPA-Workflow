@@ -1,5 +1,5 @@
 <section class="bk">
-  <app-page-header [flush]="true" [title]="'admin.backups.title' | t" [subtitle]="'admin.backups.subtitle' | t" />
+  <app-page-header [flush]="true" [title]="'admin.backups.title' | t" />
 
   @if (!enabled()) {
     <app-note kind="warn" icon="alert">
@@ -11,7 +11,6 @@
     <!-- Create -->
     <section class="bk__card" aria-labelledby="bk-create">
       <h2 class="bk__cardTitle" id="bk-create">{{ 'admin.backups.createTitle' | t }}</h2>
-      <p class="bk__hint">{{ 'admin.backups.createHint' | t }}</p>
       <form class="bk__createForm" (submit)="$event.preventDefault(); create()">
         <app-input
           class="bk__note"
@@ -31,7 +30,6 @@
     <!-- Import -->
     <section class="bk__card" aria-labelledby="bk-import">
       <h2 class="bk__cardTitle" id="bk-import">{{ 'admin.backups.importTitle' | t }}</h2>
-      <p class="bk__hint">{{ 'admin.backups.importHint' | t }}</p>
       <!-- A dead control with no reason beside it reads as a broken page. An import has
            to decrypt the archive to verify it, so it needs the private key the API
            does not have here. -->
@@ -64,7 +62,6 @@
   <section class="bk__list" aria-labelledby="bk-list">
     <header class="bk__listHead">
       <h2 class="sec" id="bk-list">{{ 'admin.backups.listTitle' | t }}</h2>
-      <p class="bk__hint">{{ 'admin.backups.retentionHint' | t: { count: retentionCount() } }}</p>
     </header>
     <app-data-table
       surface="rowgroup"

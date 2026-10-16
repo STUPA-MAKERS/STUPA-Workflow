@@ -1,5 +1,5 @@
 <section class="dl">
-  <app-page-header [flush]="true" [title]="'admin.deadlines.title' | t" [subtitle]="'admin.deadlines.subtitle' | t">
+  <app-page-header [flush]="true" [title]="'admin.deadlines.title' | t">
     <app-button actions variant="fill" (click)="openAdd()">
       <app-icon name="plus" [size]="18" /> {{ 'admin.deadlines.add' | t }}
     </app-button>
@@ -77,7 +77,7 @@
         (ngModelChange)="patch('key', $event)"
         name="key"
         [disabled]="editingId() !== null"
-        [hint]="(editingId() === null ? 'admin.deadlines.keyHint' : 'admin.deadlines.keyLocked') | t"
+        [hint]="editingId() === null ? '' : ('admin.deadlines.keyLocked' | t)"
       />
       <app-input
         [label]="'admin.common.labelDe' | t"
@@ -109,7 +109,6 @@
       } @else if (d.kind === 'recurring') {
         <fieldset class="dl__dates">
           <legend class="dl__legend">{{ 'admin.deadlines.dates' | t }}</legend>
-          <p class="dl__hint">{{ 'admin.deadlines.datesHint' | t }}</p>
           @for (dt of d.dates; track $index) {
             <div class="dl__date">
               <app-datepicker
@@ -162,7 +161,6 @@
           name="timezone"
         />
       </div>
-      <p class="dl__hint">{{ 'admin.deadlines.atTimeHint' | t }}</p>
     </form>
   }
   <div dialog-footer class="dl__foot">

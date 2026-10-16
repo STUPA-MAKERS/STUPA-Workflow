@@ -34,12 +34,7 @@
       </div>
       <app-seg-bar size="fat" [segments]="[{ value: v.voted, tone: 'filled' }]" [total]="v.present" [label]="progressLabel()" />
       @if (!showCounts()) {
-        <p class="vc__hint">
-          {{ hiddenKey() | t }}
-          @if (v.guestsVote) {
-            {{ 'guests.vote.lateHint' | t }}
-          }
-        </p>
+        <p class="vc__hint">{{ hiddenKey() | t }}</p>
       }
     </div>
   }

@@ -325,7 +325,7 @@ export class GroupMappingsComponent {
   /** The i18n key of one text of one section, e.g. `admin.groupMappings.role.add`. */
   protected key(
     kind: MappingKind,
-    suffix: 'title' | 'hint' | 'add' | 'empty' | 'editTitle' | 'deleteBody',
+    suffix: 'title' | 'add' | 'empty' | 'editTitle' | 'deleteBody',
   ): TranslationKey {
     return `admin.groupMappings.${kind}.${suffix}` as TranslationKey;
   }

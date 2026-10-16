@@ -121,7 +121,7 @@ describe('CalendarSubscribeComponent', () => {
     await openIt();
     await userEvent.click(screen.getByRole('button', { name: 'Neue URL erzeugen' }));
     fixture.detectChanges();
-    expect(screen.getByText('Erzeugt eine neue URL — die bisherige wird ungültig.')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Neue URL erzeugen' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
     fixture.detectChanges();
     expect(api.rotateCalendar).not.toHaveBeenCalled();

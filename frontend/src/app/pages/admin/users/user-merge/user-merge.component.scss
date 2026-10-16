@@ -10,11 +10,6 @@
   container-type: inline-size;
 }
 
-.um__lead {
-  margin: 0;
-  color: var(--color-text-muted);
-}
-
 .um__search {
   display: block;
   min-width: 0;
@@ -131,11 +126,6 @@
   align-items: flex-start;
   gap: var(--space-3);
   min-width: 0;
-}
-.um__cardNote {
-  margin-top: auto;
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
 }
 .um__arrow {
   align-self: center;

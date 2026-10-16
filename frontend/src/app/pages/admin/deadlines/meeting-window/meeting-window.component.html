@@ -3,7 +3,6 @@
     <header class="gs__head">
       <div class="gs__text">
         <h2 class="gs__title" id="mw-title">{{ 'admin.meetingWindow.title' | t }}</h2>
-        <p class="gs__sub">{{ 'admin.meetingWindow.subtitle' | t }}</p>
       </div>
       @if (loadState() === 'ok' && !loading()) {
         <app-button variant="tonal" [disabled]="!canSave()" [loading]="saving()" (click)="save()">
@@ -24,7 +23,6 @@
               type="number"
               [label]="'admin.meetingWindow.openLead' | t"
               [error]="openError()"
-              [hint]="'admin.meetingWindow.openLeadHint' | t: { max: max }"
               name="openLeadMinutes"
               [ngModel]="draft().open"
               (ngModelChange)="patch({ open: $event })"
@@ -39,7 +37,6 @@
               type="number"
               [label]="'admin.meetingWindow.confirmLead' | t"
               [error]="confirmError()"
-              [hint]="'admin.meetingWindow.confirmLeadHint' | t"
               name="confirmLeadMinutes"
               [ngModel]="draft().confirm"
               (ngModelChange)="patch({ confirm: $event })"

@@ -114,7 +114,6 @@ describe('MeetingDelegationCardComponent', () => {
     const { flush } = await setup();
     flush(ctx({ deadline: '2026-10-13T15:00:00Z' }));
     const section = screen.getByRole('region', { name: 'Vertretung' });
-    expect(within(section).getByText(/Du kannst dich für diese Sitzung vertreten lassen/)).toBeInTheDocument();
     expect(within(section).getByText(/^Einrichtbar bis .*13\.10\.2026/)).toBeInTheDocument();
     expect(within(section).getByRole('button', { name: 'Vertretung einrichten' })).toBeInTheDocument();
   });

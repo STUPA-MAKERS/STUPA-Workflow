@@ -52,7 +52,6 @@
   [closeLabel]="'action.cancel' | t"
   (closed)="removing.set(null)"
 >
-  <p class="g__explain">{{ 'guests.list.removeHint' | t }}</p>
   <app-button dialog-footer variant="text" (click)="removing.set(null)">{{ 'action.cancel' | t }}</app-button>
   <app-button dialog-footer variant="danger" (click)="confirmRemove()">{{ 'guests.list.remove' | t }}</app-button>
 </app-dialog>

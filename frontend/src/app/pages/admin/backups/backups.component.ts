@@ -87,7 +87,6 @@ export class BackupsComponent implements OnDestroy {
   protected readonly enabled = signal(true);
   /** False without the private key: it cannot read one either, so no restore, no import. */
   protected readonly restoreEnabled = signal(true);
-  protected readonly retentionCount = signal(0);
   /** True until the first list response, so the table shows its loading state once. */
   protected readonly loading = signal(true);
   protected readonly busy = signal(false);
@@ -158,7 +157,6 @@ export class BackupsComponent implements OnDestroy {
         this.rows.set(list.items);
         this.enabled.set(list.enabled);
         this.restoreEnabled.set(list.restoreEnabled);
-        this.retentionCount.set(list.retentionCount);
         this.loading.set(false);
         this.syncPolling();
       },

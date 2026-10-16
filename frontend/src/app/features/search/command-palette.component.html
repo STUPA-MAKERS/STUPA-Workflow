@@ -83,9 +83,6 @@
       @if (showEmpty()) {
         <p class="pal__note">{{ 'search.empty' | t }}</p>
       }
-      @if (!query().trim()) {
-        <p class="pal__note">{{ 'search.hint' | t }}</p>
-      }
       <!-- Say so rather than implying that this is everything. -->
       @if (showTruncated()) {
         <p class="pal__note pal__note--foot">{{ 'search.truncated' | t }}</p>

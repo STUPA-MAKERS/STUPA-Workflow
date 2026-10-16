@@ -6,8 +6,6 @@
   [closeLabel]="'applications.detail.cancel' | t"
   (closed)="close()"
 >
-  <p class="sld__lead">{{ 'applications.share.lead' | t }}</p>
-
   @if (freshUrl(); as url) {
     <!-- Shown once. The server keeps a hash, so closing this dialog loses the token. -->
     <div class="sld__fresh">

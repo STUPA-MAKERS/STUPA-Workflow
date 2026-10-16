@@ -440,7 +440,6 @@ describe('ApplicationsDetailComponent — header', () => {
       expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
       const bar = document.querySelector('.ad__editBar') as HTMLElement;
       expect(bar.textContent).toContain('Antrag bearbeiten');
-      expect(bar.textContent).toContain('Speichern legt Version 3 an');
       expect(within(bar).getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
       await userEvent.click(within(bar).getByRole('button', { name: 'Abbrechen' }));
       detectChanges();

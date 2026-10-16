@@ -304,8 +304,6 @@ describe('GremiumDialogComponent', () => {
       await setup(STUPA);
       expect(publicSwitch()).toHaveAttribute('aria-checked', 'false');
       expect(screen.queryByText('Was das bedeutet')).toBeNull();
-      // The note on the QR participation shows always.
-      expect(screen.getByText(/öffentliche Teilnahme \(QR\)/)).toBeInTheDocument();
       await userEvent.click(publicSwitch());
       expect(screen.getByText('Was das bedeutet')).toBeInTheDocument();
       expect(screen.getByText(/Sitzungen selbst erscheinen nie öffentlich/)).toBeInTheDocument();

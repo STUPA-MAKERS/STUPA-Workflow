@@ -217,13 +217,12 @@ describe('GroupMappingsComponent', () => {
     expect(within(dialog).queryByText('Rolle')).toBeNull();
   });
 
-  it('the role dialog has a gremium filter, a gremium role select and the rule hint', async () => {
+  it('the role dialog has a gremium filter, and a gremium role select', async () => {
     await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Gremien-Rolle zuordnen' }));
     const dialog = screen.getByRole('dialog', { name: 'Gremien-Rolle zuordnen' });
     expect(within(dialog).getByText('Gremium')).toBeInTheDocument();
     expect(within(dialog).getByText('Gremien-Rolle')).toBeInTheDocument();
-    expect(within(dialog).getByText(/die Rolle mit den meisten Rechten/)).toBeInTheDocument();
   });
 
   it('openAdd resets the form', async () => {

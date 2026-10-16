@@ -38,9 +38,6 @@
         (ngModelChange)="setQuestion($event)"
       ></textarea>
     </label>
-    @if (forApplication() && draft().enabled) {
-      <p class="vod__hint">{{ 'decision.questionHint' | t }}</p>
-    }
 
     @if (isElection()) {
     <div class="vod__group">
@@ -121,7 +118,6 @@
 
     <app-switch
       [id]="'vod-election-secret'"
-      [hint]="'election.dialog.secretHint' | t"
       [checked]="electionSecret()"
       (checkedChange)="electionSecret.set($event)"
       ><span class="vod__switchLabel">{{ 'election.dialog.secret' | t }}</span></app-switch
@@ -145,7 +141,6 @@
 
     <app-switch
       [id]="'vod-secret'"
-      [hint]="'meetings.vote.secretHint' | t"
       [checked]="secret()"
       (checkedChange)="secret.set($event)"
       ><span class="vod__switchLabel">{{ 'meetings.vote.secret' | t }}</span></app-switch
@@ -155,7 +150,6 @@
     @if (guestsAllowed()) {
       <app-switch
         [id]="'vod-guests'"
-        [hint]="(guestsLocked() ? 'guests.vote.switchNonPublic' : guestsVote() ? 'guests.vote.switchOn' : 'guests.vote.switchOff') | t: { n: meeting().admittedGuests }"
         [disabled]="guestsLocked()"
         [checked]="guestsVote() && !guestsLocked()"
         (checkedChange)="guestsVote.set($event)"

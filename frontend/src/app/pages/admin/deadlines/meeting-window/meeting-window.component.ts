@@ -58,8 +58,6 @@ export class MeetingWindowSettingsComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
-  protected readonly max = MAX_LEAD_MINUTES;
-
   /** The section needs the deadline right. The server checks it again. */
   protected readonly allowed = computed(() => this.auth.can('admin.deadlines'));
 

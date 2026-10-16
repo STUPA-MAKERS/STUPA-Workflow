@@ -64,7 +64,6 @@ describe('FormlyPositionsType — view', () => {
       'Stadthalle',
       'Gemeindezentrum',
     ]);
-    expect(within(card).getByText('Angebote · das bevorzugte bestimmt den Betrag')).toBeInTheDocument();
     // Each radio names its offer.
     const radios = within(card).getAllByRole('radio') as HTMLInputElement[];
     expect(radios.map((r) => r.getAttribute('aria-label'))).toEqual([

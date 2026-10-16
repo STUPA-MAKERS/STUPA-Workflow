@@ -251,11 +251,10 @@ describe('VoteCardComponent', () => {
   });
 
   describe('a vote with guests (#17)', () => {
-    it('shows the room while open and the hint about late guests', async () => {
+    it('shows the room while open', async () => {
       await setup({ vote: vote({ guestsVote: true, majorityRule: 'simple', presentMembers: 19, presentGuests: 7 }) });
       expect(screen.getByText('19 Mitglieder + 7 Gäste anwesend')).toBeInTheDocument();
       expect(screen.getByText(/Einfache Mehrheit der abgegebenen Stimmen/)).toBeInTheDocument();
-      expect(screen.getByText(/Gäste, die du jetzt zulässt, stimmen noch mit/)).toBeInTheDocument();
     });
 
     it('sums the closed result up without a quorum', async () => {

@@ -68,7 +68,6 @@ export class GuestSettingsComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
-  protected readonly maxHours = MAX_CONFIRM_TTL_HOURS;
   protected readonly maxDays = MAX_LINK_TTL_DAYS;
 
   /** The section needs the deadline right. The server checks it again. */

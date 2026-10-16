@@ -52,9 +52,7 @@
     [ngModel]="gremiumSource()"
     (ngModelChange)="gremiumSourceChange.emit($event)"
   />
-  @if (gremiumSource() === 'budget') {
-    <p class="ins__hint">{{ 'admin.flow.cfgGremiumSourceBudgetHint' | t }}</p>
-  } @else {
+  @if (gremiumSource() !== 'budget') {
     <app-select
       [label]="'admin.flow.cfgGremium' | t"
       [placeholder]="'admin.flow.cfgGremiumPh' | t"
@@ -63,7 +61,6 @@
       (ngModelChange)="gremiumChange.emit($event)"
     />
   }
-  <p class="ins__hint">{{ 'admin.flow.branchHint' | t }}</p>
 }
 
 <!-- The server creates the deadline from the named policy when the application
@@ -75,7 +72,6 @@
   [ngModel]="state().config?.deadlinePolicyKey ?? ''"
   (ngModelChange)="deadlinePolicyChange.emit($event)"
 />
-<p class="ins__hint">{{ 'admin.flow.cfgDeadlineHint' | t }}</p>
 
 <!-- The stack order is the evaluation order. The first guard that matches wins. -->
 @if ((state().kind ?? 'normal') === 'normal' && guardGroups().length > 1) {
@@ -91,6 +87,5 @@
         </li>
       }
     </ol>
-    <p class="ins__hint">{{ 'admin.flow.guardPriorityHint' | t }}</p>
   </section>
 }
