@@ -2,6 +2,7 @@ import { Subject, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
+import { AuthService } from '@core/auth/auth.service';
 import type { NotificationPreference } from '@core/api/models';
 import { runAxe } from '../../../testing/a11y';
 import { AccountNotificationsComponent } from './notifications.component';
@@ -14,13 +15,18 @@ const PREFS: NotificationPreference[] = [
 async function setup(
   prefs: NotificationPreference[] = PREFS,
   save: jest.Mock = jest.fn((p: NotificationPreference[]) => of(p)),
+  permissions: string[] = [],
 ) {
   const api = {
     listNotificationPreferences: jest.fn(() => of(prefs)),
     setNotificationPreferences: save,
   };
+  const auth = { can: (p: string) => permissions.includes(p) };
   const view = await render(AccountNotificationsComponent, {
-    providers: [{ provide: ApiClient, useValue: api }],
+    providers: [
+      { provide: ApiClient, useValue: api },
+      { provide: AuthService, useValue: auth },
+    ],
   });
   await view.fixture.whenStable();
   view.fixture.detectChanges();
@@ -151,12 +157,39 @@ describe('AccountNotificationsComponent', () => {
       setNotificationPreferences: jest.fn(),
     };
     await render(AccountNotificationsComponent, {
-      providers: [{ provide: ApiClient, useValue: api }],
+      providers: [
+        { provide: ApiClient, useValue: api },
+        { provide: AuthService, useValue: { can: () => false } },
+      ],
     });
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Einstellungen konnten nicht geladen werden.',
     );
     expect(screen.queryAllByRole('switch')).toHaveLength(0);
+  });
+
+  it('shows the ticket mails of the team only to a holder of ticket.manage', async () => {
+    const prefs: NotificationPreference[] = [
+      { kind: 'ticket_created', enabled: true },
+      { kind: 'ticket_message', enabled: true },
+      { kind: 'ticket_answer', enabled: true },
+    ];
+    await setup(prefs);
+    expect(screen.getAllByRole('switch')).toHaveLength(1);
+    expect(screen.getByText('Antworten auf meine Tickets')).toBeInTheDocument();
+    expect(screen.queryByText('Nachrichten zu Tickets')).toBeNull();
+  });
+
+  it('shows every ticket mail to the team', async () => {
+    const prefs: NotificationPreference[] = [
+      { kind: 'ticket_created', enabled: true },
+      { kind: 'ticket_message', enabled: false },
+      { kind: 'ticket_answer', enabled: true },
+    ];
+    const save = jest.fn((p: NotificationPreference[]) => of(p));
+    await setup(prefs, save, ['ticket.manage']);
+    expect(screen.getAllByRole('switch')).toHaveLength(3);
+    expect(screen.getByText('Nachrichten zu Tickets')).toBeInTheDocument();
   });
 
   it('falls back to the raw kind for a kind without a translation', async () => {

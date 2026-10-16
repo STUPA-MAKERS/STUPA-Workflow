@@ -287,6 +287,20 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         tickets.TICKET_RECEIVED_PLACEHOLDERS,
     ),
     MailTemplateSpec(
+        tickets.TICKET_ANSWER_KEY,
+        tickets.TICKET_ANSWER_KEY,
+        tickets.TICKET_ANSWER_SUBJECT,
+        tickets.TICKET_ANSWER_BODY,
+        tickets.TICKET_ANSWER_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
+        tickets.TICKET_MESSAGE_KEY,
+        tickets.TICKET_MESSAGE_KEY,
+        tickets.TICKET_MESSAGE_SUBJECT,
+        tickets.TICKET_MESSAGE_BODY,
+        tickets.TICKET_MESSAGE_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
         todos.TODO_ASSIGNED_KEY,
         todos.TODO_ASSIGNED_KEY,
         todos.TODO_ASSIGNED_SUBJECT,

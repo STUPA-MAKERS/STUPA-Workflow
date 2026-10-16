@@ -1,6 +1,6 @@
 ---
 name: be-tickets
-description: Tickets from the help menu — problem reports, questions and ideas (ticket/ticket_note/ticket_event, number T-0001 from ticket_number_seq). Covers the public one-way report POST /api/tickets (session, or ALTCHA + rate limit + body cap while tickets.publicEnabled), the ticket.manage work routes (list/counts/assignees/detail/patch/notes), draft attachments bound with ticket_id, note files, the sender block (ticket_sender_block, "Absender sperren"), the mails ticket_created/ticket_received, the "Hilfe & Tickets" settings (help.wikiUrl, tickets.publicEnabled/notifyNew/retentionMonths, GET/PUT /api/admin/help-tickets), the retention cron anonymize_tickets, privacy export/erasure and the search source. Use when working on tickets, the help menu backend, TicketService, ticket mails, ticket retention or ticket attachments in backend/app/modules/tickets.
+description: Tickets from the help menu — problem reports, questions and ideas (ticket/ticket_note/ticket_event, number T-0001 from ticket_number_seq). Covers the public one-way report POST /api/tickets (session, or ALTCHA + rate limit + body cap while tickets.publicEnabled), the ticket.manage work routes (list/counts/assignees/detail/patch/notes), draft attachments bound with ticket_id, note files, the sender block (ticket_sender_block, "Absender sperren"), the mails ticket_created/ticket_received/ticket_message/ticket_answer, the "Hilfe & Tickets" settings (help.wikiUrl, tickets.publicEnabled/notifyNew/retentionMonths, GET/PUT /api/admin/help-tickets), the retention cron anonymize_tickets, privacy export/erasure and the search source. Use when working on tickets, the help menu backend, TicketService, ticket mails, ticket retention or ticket attachments in backend/app/modules/tickets.
 ---
 
 # Tickets — `backend/app/modules/tickets`
@@ -115,7 +115,14 @@ context of the report.
 **Mails:** `ticket_created` to the holders of `ticket.manage` (not the reporter), only while
 `tickets.notifyNew`, opt-out kind, link `/tickets/{id}`. `ticket_received` to the reporter
 (account e-mail or given e-mail) in `context.language`, else `de`, with `wikiUrl`; its kind
-is not in `NOTIFICATION_KINDS`, so nobody can switch it off, and it has no link. For a report
+is not in `NOTIFICATION_KINDS`, so nobody can switch it off; only a report of an account
+links `/tickets/{id}` (the tab), a report without a session stays one-way. A new `public`
+message (`notify_ticket_note`, background task of both note routes, idempotency key per note)
+goes to the other side: from the reporter as `ticket_message` to the assignee while they hold
+`ticket.manage`, else to every holder (never the reporter's own address); from the team as
+`ticket_answer` to the reporter account, with the author's name only. Internal notes, edits,
+anonymized tickets and reports without an account send nothing; a message of files only
+names its files. Both kinds are opt-out. For a report
 without a session the context `title` is empty, because that address is unchecked and the
 platform must not mail the caller's text to it; the builtin texts drop the quoted title. Both run as
 a background task after the commit and never fail the report.

@@ -22,7 +22,9 @@ from app.modules.admin.branding import Branding, TicketSettings
 from app.modules.auth.principal import Principal
 from app.modules.tickets import router as router_mod
 from app.modules.tickets.router import (
+    _deliver_note_mail,
     _deliver_ticket_mails,
+    get_note_mail_sender,
     get_ticket_mail_sender,
     get_ticket_service,
 )
@@ -43,6 +45,7 @@ from app.shared.paging import Page
 from app.shared.people import PersonRef
 
 NOW = datetime(2026, 10, 1, tzinfo=UTC)
+NOTE_ID = uuid.UUID("00000000-0000-0000-0000-0000000000a1")
 TID = uuid.uuid4()
 MANAGER = Principal(sub="mgr", permissions={"ticket.manage"})
 
@@ -121,7 +124,7 @@ class _FakeService:
 
     async def add_note(self, *a: Any, **kw: Any) -> TicketNoteOut:
         self.calls.append(("add_note", (a, kw)))
-        return _note()
+        return _note().model_copy(update={"visibility": a[1].visibility})
 
     async def edit_note(self, *_a: Any) -> TicketNoteOut:
         return _note()
@@ -157,7 +160,7 @@ class _FakeService:
 
     async def reporter_add_note(self, *a: Any, **kw: Any) -> TicketNoteOut:
         self.calls.append(("reporter_add_note", (a, kw)))
-        return _note()
+        return _note().model_copy(update={"visibility": "public", "id": NOTE_ID})
 
     async def reporter_edit_note(self, *a: Any) -> TicketNoteOut:
         self.calls.append(("reporter_edit_note", a))
@@ -180,6 +183,7 @@ class _Env:
         self.app = app
         self.service = service
         self.mails = mails
+        self.note_mails = _Mails()
         self.public = True
         self.account: uuid.UUID | None = uuid.uuid4()
 
@@ -207,6 +211,7 @@ def env(monkeypatch: pytest.MonkeyPatch) -> _Env:
     app.dependency_overrides[get_session] = _session
     app.dependency_overrides[get_ticket_service] = lambda: service
     app.dependency_overrides[get_ticket_mail_sender] = lambda: mails
+    app.dependency_overrides[get_note_mail_sender] = lambda: state.note_mails
     state.login(None)
     return state
 
@@ -370,6 +375,7 @@ def test_the_work_routes_answer(env: _Env) -> None:
 
 def test_the_default_wiring() -> None:
     assert get_ticket_mail_sender() is _deliver_ticket_mails
+    assert get_note_mail_sender() is _deliver_note_mail
     from app.modules.todos.hooks import TicketTodoBridge
 
     storage = object()
@@ -399,6 +405,38 @@ async def test_the_mail_sender_sends_both_mails(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(router_mod, "notify_ticket_created", _created)
     await _deliver_ticket_mails(load_settings(), TID, None)
     assert order == [f"received:{TID}", f"created:{TID}"]
+
+
+async def test_the_note_mail_sender_passes_the_note(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[uuid.UUID] = []
+
+    async def _note_mail(**kw: Any) -> bool:
+        seen.append(kw["note_id"])
+        return True
+
+    monkeypatch.setattr(router_mod, "notify_ticket_note", _note_mail)
+    await _deliver_note_mail(load_settings(), NOTE_ID, None)
+    assert seen == [NOTE_ID]
+
+
+def test_only_a_public_note_of_the_team_mails(env: _Env) -> None:
+    env.login(MANAGER)
+    client = TestClient(env.app)
+    assert client.post(f"/api/tickets/{TID}/notes", json={"body": "n"}).status_code == 201
+    assert env.note_mails.sent == []
+    public = client.post(f"/api/tickets/{TID}/notes", json={"body": "n", "visibility": "public"})
+    assert public.status_code == 201
+    assert env.note_mails.sent == [uuid.UUID(public.json()["id"])]
+
+
+def test_a_message_of_the_reporter_mails_the_team(env: _Env) -> None:
+    env.login(Principal(sub="plain"))
+    client = TestClient(env.app)
+    assert client.post(f"/api/tickets/mine/{TID}/notes", json={"body": "n"}).status_code == 201
+    assert env.note_mails.sent == [NOTE_ID]
+    # An edit sends nothing.
+    client.patch(f"/api/tickets/mine/{TID}/notes/{TID}", json={"body": "m"})
+    assert env.note_mails.sent == [NOTE_ID]
 
 
 def test_validation_problem_is_the_shape_of_the_assignee_error() -> None:
