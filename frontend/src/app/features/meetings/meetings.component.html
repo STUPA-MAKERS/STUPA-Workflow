@@ -124,9 +124,13 @@
                   <app-button variant="ghost" size="sm" [disabled]="vote.applicationId === m.activeApplicationId" (click)="setActive(vote.applicationId)">{{ 'meetings.vote.setActive' | t }}</app-button>
                 }
                 @if (vote.status !== 'open') {
-                  <app-button variant="primary" size="sm" [disabled]="vote.status === 'closed'" (click)="openVote(vote.id)">{{ 'meetings.vote.open' | t }}</app-button>
+                  @if (m.isProtokollant) {
+                    <app-button variant="primary" size="sm" [disabled]="vote.status === 'closed'" (click)="openVote(vote.id)">{{ 'meetings.vote.open' | t }}</app-button>
+                  }
                 } @else {
-                  <app-button variant="danger" size="sm" (click)="closeVote(vote.id)">{{ 'meetings.vote.close' | t }}</app-button>
+                  @if (m.isProtokollant) {
+                    <app-button variant="danger" size="sm" (click)="closeVote(vote.id)">{{ 'meetings.vote.close' | t }}</app-button>
+                  }
                   <app-button variant="ghost" size="sm" (click)="cancelVote(vote.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
                 }
               </div>

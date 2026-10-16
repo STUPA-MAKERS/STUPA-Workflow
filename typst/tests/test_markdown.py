@@ -74,6 +74,7 @@ def test_vote_tally_keeps_the_formatting_of_the_question() -> None:
     (vote,) = conv("> [!abstimmung] **Soll das so?**\n> ja: 12, nein: 3, enthaltung: 2")
     assert vote["t"] == "tally"
     assert (vote["yes"], vote["no"], vote["abstain"]) == (12, 3, 2)
+    assert vote["counts"] is True
     assert vote["lines"] == [[{"t": "strong", "c": [{"t": "text", "v": "Soll das so?"}]}]]
 
 
@@ -81,6 +82,16 @@ def test_vote_tally_ignores_counts_outside_the_tally_line() -> None:
     (vote,) = conv("> [!vote] Antrag ja 7\n> Beschreibung\n> yes: 1, no: 2")
     assert (vote["yes"], vote["no"], vote["abstain"]) == (1, 2, 0)
     assert [texts(line) for line in vote["lines"]] == ["Antrag ja 7", "Beschreibung"]  # pyright: ignore[reportGeneralTypeIssues]
+
+
+def test_election_without_a_tally_line_has_no_counts() -> None:
+    (vote,) = conv(
+        "> [!abstimmung] **DEF**\n> Wahl · 1 Posten\n"
+        "> Jakob Frey: 1 · Frederik Beimgraben: 0 · Enthaltungen: 0\n> Gewählt: Jakob Frey"
+    )
+    assert vote["t"] == "tally"
+    assert vote["counts"] is False
+    assert len(vote["lines"]) == 4  # pyright: ignore[reportArgumentType]
 
 
 def test_signature_callout() -> None:

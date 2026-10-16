@@ -7,7 +7,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
 import { VoteOpenDialogComponent } from './vote-open-dialog.component';
 
-const MEETING = { id: 'm-1', title: '34. Sitzung', status: 'live', votes: [] } as unknown as Meeting;
+const MEETING = { id: 'm-1', title: '34. Sitzung', status: 'live', isProtokollant: true, votes: [] } as unknown as Meeting;
 const APP_TOP: AgendaItem = { id: 't-3', applicationId: 'a-1', title: 'Zuschuss Party', position: 2 };
 const FREE_TOP: AgendaItem = { id: 't-8', applicationId: null, title: 'Verschiedenes', position: 7 };
 

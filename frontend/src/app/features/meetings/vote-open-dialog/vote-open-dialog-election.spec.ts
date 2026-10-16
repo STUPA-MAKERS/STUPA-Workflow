@@ -10,6 +10,7 @@ const MEETING = {
   id: 'm-1',
   title: '34. Sitzung',
   status: 'live',
+  isProtokollant: true,
   votes: [],
   publicJoin: true,
   guestsMode: 'vote',

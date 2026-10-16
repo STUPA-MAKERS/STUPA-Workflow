@@ -209,8 +209,8 @@ async function setup(
 }
 
 /** Load meeting + (auto) protocol + attendance + agenda — answer all requests. */
-function flushLoad(http: HttpTestingController): void {
-  http.expectOne('/api/meetings/m-1').flush(MEETING);
+function flushLoad(http: HttpTestingController, meeting: MeetingOutWire = MEETING): void {
+  http.expectOne('/api/meetings/m-1').flush(meeting);
   http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
   http.expectOne('/api/meetings/m-1/attendance').flush([]);
   http.expectOne('/api/meetings/m-1/agenda').flush([]);
@@ -259,9 +259,19 @@ describe('MeetingsComponent', () => {
     http.verify();
   });
 
-  it('opens a planned vote via the API', async () => {
+  it('offers no open or close to a lead who does not keep the minutes', async () => {
     const { http } = await setup();
     flushLoad(http);
+    expect(await screen.findByText('Antrag A')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Abstimmung öffnen/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Abstimmung schließen/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /Abstimmung abbrechen/i })).toBeInTheDocument();
+  });
+
+  it('opens a planned vote via the API', async () => {
+    const { http } = await setup();
+    // Only the protokollant opens and closes a vote.
+    flushLoad(http, { ...MEETING, isProtokollant: true });
     const openBtn = await screen.findByRole('button', { name: /Abstimmung öffnen/i });
     await userEvent.click(openBtn);
     const req = http.expectOne('/api/meetings/m-1/votes/v-2/open');
@@ -271,7 +281,8 @@ describe('MeetingsComponent', () => {
 
   it('closes an open vote via the API', async () => {
     const { http } = await setup();
-    flushLoad(http);
+    // Only the protokollant opens and closes a vote.
+    flushLoad(http, { ...MEETING, isProtokollant: true });
     const closeBtn = await screen.findByRole('button', { name: /Abstimmung schließen/i });
     await userEvent.click(closeBtn);
     const req = http.expectOne('/api/votes/v-1/close');

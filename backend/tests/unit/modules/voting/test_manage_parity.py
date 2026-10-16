@@ -155,3 +155,41 @@ async def test_vanished_meeting_falls_back_to_the_gremium_rule(
     db = fake_session(result(vote))  # `get` finds no meeting
     with pytest.raises(ForbiddenError, match="manage"):
         await VotingService(db).assert_can_manage_vote(vote.id, Principal(sub="x"))
+
+
+async def test_run_vote_needs_the_protokollant_for_a_meeting_vote(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Open and close of a meeting vote follow the minutes; a loose vote does not."""
+    from uuid import uuid4
+
+    from app.modules.livevote.service import MeetingService
+    from app.modules.voting.service import VotingService
+    from app.shared.errors import ForbiddenError
+
+    meeting_id = uuid4()
+    checked: list[object] = []
+
+    async def _manage(_self: object, _vote_id: object, _principal: object) -> None:
+        return None
+
+    async def _meeting(_self: object, _vote_id: object) -> object:
+        return meeting_id
+
+    async def _refuse(_self: object, mid: object, _principal: object) -> None:
+        checked.append(mid)
+        raise ForbiddenError("only the protokollant may open or close a vote")
+
+    monkeypatch.setattr(VotingService, "assert_can_manage_vote", _manage)
+    monkeypatch.setattr(VotingService, "meeting_id_of", _meeting)
+    monkeypatch.setattr(MeetingService, "assert_can_run_votes", _refuse)
+    svc = VotingService(object())  # type: ignore[arg-type]
+    with pytest.raises(ForbiddenError):
+        await svc.assert_can_run_vote(uuid4(), object())  # type: ignore[arg-type]
+    assert checked == [meeting_id]
+
+    async def _loose(_self: object, _vote_id: object) -> None:
+        return None
+
+    monkeypatch.setattr(VotingService, "meeting_id_of", _loose)
+    await svc.assert_can_run_vote(uuid4(), object())  # type: ignore[arg-type]

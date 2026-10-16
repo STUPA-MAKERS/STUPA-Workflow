@@ -1446,6 +1446,28 @@ class VotingService:
         """Return the meeting of the vote, or None for a vote without a meeting."""
         return await self.session.scalar(select(Vote.meeting_id).where(Vote.id == vote_id))
 
+    async def assert_can_run_vote(self, vote_id: UUID, principal: Principal) -> None:
+        """Guard the open and the close of a vote.
+
+        The manage right (``assert_can_manage_vote``) comes first. A vote that a
+        meeting holds then needs the protokollant of that meeting
+        (``MeetingService.assert_can_run_votes``): the open and the close follow the
+        minutes. A vote without a meeting keeps the manage right only.
+
+        Raises:
+            NotFoundError: No vote has this id.
+            ForbiddenError: The principal cannot manage this vote, or the vote belongs
+                to a meeting and the principal is not its protokollant.
+        """
+        await self.assert_can_manage_vote(vote_id, principal)
+        meeting_id = await self.meeting_id_of(vote_id)
+        if meeting_id is None:
+            return
+        # Local import: `app.modules.livevote.service` imports this module.
+        from app.modules.livevote.service import MeetingService
+
+        await MeetingService(self.session).assert_can_run_votes(meeting_id, principal)
+
     async def assert_can_manage_vote(self, vote_id: UUID, principal: Principal) -> None:
         """Load the vote and run ``assert_can_manage`` on it.
 

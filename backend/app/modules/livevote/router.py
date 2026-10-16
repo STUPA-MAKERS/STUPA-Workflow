@@ -586,8 +586,9 @@ async def open_meeting_vote(
     creates the vote: the question waits as a ``draft`` until
     ``POST /meetings/{id}/votes/{voteId}/open`` opens it. A draft can be prepared in a
     planned or a live meeting, an open vote needs a live meeting (409
-    ``meeting_not_started`` / ``meeting_closed``). The caller must be the manager, the
-    protokollant, or hold the gremium permission ``vote.manage``. An application
+    ``meeting_not_started`` / ``meeting_closed``). A draft needs ``canManageVotes``.
+    An open vote also needs the protokollant of the meeting (403), because the
+    person who keeps the minutes runs the room. An application
     agenda item allows exactly one vote, because that vote fires the pass or fail
     branch on close. A free-text agenda item allows several generic questions.
     ``eligibleGroup`` is the Gremium of the meeting. The server derives the quorum
@@ -597,6 +598,9 @@ async def open_meeting_vote(
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:
         raise ForbiddenError("not allowed to open a vote in this meeting")
+    if not payload.draft:
+        # The lead prepares a draft; only the protokollant opens a vote.
+        await service.assert_can_run_votes(meeting_id, principal)
     # An open vote needs a started meeting. Before ``live`` there is no protocol to
     # record the result in. A prepared draft only waits for the start.
     assert_vote_window(meeting, draft=payload.draft)
@@ -712,18 +716,20 @@ async def open_prepared_meeting_vote(
 ) -> MeetingOut:
     """Open a prepared draft vote of this meeting.
 
-    The caller must hold ``canManageVotes``, as for the create. The meeting must be
-    live. The draft can wait a long time, so the route runs the checks of the create
-    again: the application must still be in a vote state that the Gremium of the
-    meeting decides, and a vote with guests needs a meeting where guests vote and a
-    public agenda item (409 ``guests_vote_unavailable``). The quorum denominator comes
-    from the current roster, not from the roster at the create. The route broadcasts
+    The caller must hold ``canManageVotes`` and be the protokollant of the meeting
+    (403), as for an open create. The meeting must be live. The draft can wait a
+    long time, so the route runs the checks of the create again: the application
+    must still be in a vote state that the Gremium of the meeting decides, and a
+    vote with guests needs a meeting where guests vote and a public agenda item
+    (409 ``guests_vote_unavailable``). The quorum denominator comes from the current
+    roster, not from the roster at the create. The route broadcasts
     ``vote_opened``. 404 when the meeting has no such vote, 409 when the vote is no
     longer a draft.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:
         raise ForbiddenError("not allowed to open a vote in this meeting")
+    await service.assert_can_run_votes(meeting_id, principal)
     eligible = await draft_open_checks(service, agenda, meeting, vote_id)
     opened = await voting.open(
         vote_id, now=datetime.now(UTC), actor=principal.sub, eligible_count=eligible
