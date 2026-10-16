@@ -111,13 +111,6 @@
 // - A dialog or a side sheet of the page is an overlay. Closed, it is empty, but as a
 //   flex item it would still take the gap of the host. `display: contents` gives it no
 //   box of its own.
-/* An icon before the label of a button keeps the gap of the design (8px): the space
-   after the icon plus this margin. One rule for every button, so no page sets its own.
-   An icon button has no label: a margin there would push its glyph off the centre. */
-app-button .btn:not(.btn--icon) .btn__label > app-icon:first-child {
-  margin-inline-end: var(--space-1);
-}
-
 .pane-page {
   flex: 1 1 0;
   min-height: 0;
