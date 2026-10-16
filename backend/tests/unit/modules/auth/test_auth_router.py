@@ -354,6 +354,7 @@ def test_me_returns_principal() -> None:
         "gremium_permissions": {},
         "has_scoped_budget_view": False,
         "in_substitute_pool": False,
+        "has_reported_tickets": False,
     }
 
 

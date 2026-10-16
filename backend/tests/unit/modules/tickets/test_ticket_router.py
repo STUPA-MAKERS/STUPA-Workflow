@@ -27,6 +27,8 @@ from app.modules.tickets.router import (
     get_ticket_service,
 )
 from app.modules.tickets.schemas import (
+    ReporterTicketDetail,
+    ReporterTicketItem,
     TicketBlockedSender,
     TicketCounts,
     TicketDetail,
@@ -126,6 +128,43 @@ class _FakeService:
 
     async def delete_note(self, *_a: Any) -> None:
         self.calls.append(("delete_note", None))
+
+    async def reporter_list(self, me: uuid.UUID, **kw: Any) -> Page[ReporterTicketItem]:
+        self.calls.append(("reporter_list", (me, kw)))
+        item = ReporterTicketItem(
+            id=TID,
+            number="T-0001",
+            kind="bug",
+            title="t",
+            status="new",
+            created_at=NOW,
+            updated_at=NOW,
+        )
+        return Page[ReporterTicketItem](items=[item], total=1, limit=kw["limit"], offset=0)
+
+    async def reporter_detail(self, ticket_id: uuid.UUID, _p: Principal) -> ReporterTicketDetail:
+        self.calls.append(("reporter_detail", ticket_id))
+        return ReporterTicketDetail(
+            id=TID,
+            number="T-0001",
+            kind="bug",
+            title="t",
+            status="new",
+            created_at=NOW,
+            updated_at=NOW,
+            body="b",
+        )
+
+    async def reporter_add_note(self, *a: Any, **kw: Any) -> TicketNoteOut:
+        self.calls.append(("reporter_add_note", (a, kw)))
+        return _note()
+
+    async def reporter_edit_note(self, *a: Any) -> TicketNoteOut:
+        self.calls.append(("reporter_edit_note", a))
+        return _note()
+
+    async def reporter_delete_note(self, *a: Any) -> None:
+        self.calls.append(("reporter_delete_note", a))
 
 
 class _Mails:
@@ -366,3 +405,107 @@ def test_validation_problem_is_the_shape_of_the_assignee_error() -> None:
     with pytest.raises(ValidationProblem):
         router_mod._assignee_filter("x")
     assert router_mod._assignee_filter(None) is None
+
+
+# -- the view of the reporter --------------------------------------------------------
+
+_MINE = [
+    ("get", "/api/tickets/mine"),
+    ("get", f"/api/tickets/mine/{TID}"),
+    ("post", f"/api/tickets/mine/{TID}/notes"),
+    ("patch", f"/api/tickets/mine/{TID}/notes/{TID}"),
+    ("delete", f"/api/tickets/mine/{TID}/notes/{TID}"),
+]
+
+
+@pytest.mark.parametrize(("method", "path"), _MINE)
+def test_the_reporter_routes_need_a_session_and_no_permission(
+    env: _Env, method: str, path: str
+) -> None:
+    client = TestClient(env.app)
+    kwargs: dict[str, Any] = {"json": {"body": "x"}} if method in ("post", "patch") else {}
+    assert getattr(client, method)(path, **kwargs).status_code == 401
+    env.login(Principal(sub="plain"))
+    assert getattr(client, method)(path, **kwargs).status_code in (200, 201, 204)
+
+
+def test_the_reporter_list_passes_the_filters_and_the_account(env: _Env) -> None:
+    env.login(Principal(sub="plain"))
+    client = TestClient(env.app)
+    resp = client.get(
+        "/api/tickets/mine", params=[("status", "done"), ("kind", "idea"), ("q", "x")]
+    )
+    assert resp.status_code == 200
+    assert resp.json()["items"][0]["number"] == "T-0001"
+    assert "reporter" not in resp.json()["items"][0]
+    me, kw = env.service.calls[-1][1]
+    assert me == env.account
+    assert (kw["statuses"], kw["kinds"], kw["q"]) == (["done"], ["idea"], "x")
+    client.get("/api/tickets/mine")
+    _me, kw = env.service.calls[-1][1]
+    assert (kw["statuses"], kw["kinds"]) == ((), ())
+
+
+def test_the_reporter_list_of_a_session_without_an_account_is_empty(env: _Env) -> None:
+    env.account = None
+    env.login(Principal(sub="plain"))
+    body = TestClient(env.app).get("/api/tickets/mine").json()
+    assert (body["items"], body["total"]) == ([], 0)
+    assert env.service.calls == []
+
+
+def test_the_reporter_routes_answer(env: _Env) -> None:
+    env.login(Principal(sub="plain"))
+    client = TestClient(env.app)
+    detail = client.get(f"/api/tickets/mine/{TID}").json()
+    assert detail["canReply"] is True
+    assert "assignee" not in detail
+    assert "context" not in detail
+    note = client.post(f"/api/tickets/mine/{TID}/notes", json={"body": "n"})
+    assert note.status_code == 201
+    (args, kw) = env.service.calls[-1][1]
+    assert args[1].body == "n"
+    assert kw["pepper"]
+    # A reporter has no visibility switch: the field is refused.
+    assert (
+        client.post(
+            f"/api/tickets/mine/{TID}/notes", json={"body": "n", "visibility": "internal"}
+        ).status_code
+        == 422
+    )
+    assert (
+        client.patch(f"/api/tickets/mine/{TID}/notes/{TID}", json={"body": "m"}).status_code == 200
+    )
+    assert client.delete(f"/api/tickets/mine/{TID}/notes/{TID}").status_code == 204
+    assert env.service.calls[-1][0] == "reporter_delete_note"
+
+
+@pytest.mark.parametrize(("method", "path"), _MINE[2:])
+def test_a_token_without_tickets_write_cannot_write_as_reporter(
+    env: _Env, method: str, path: str
+) -> None:
+    env.login(Principal(sub="plain", scope_permissions=frozenset({"application.read"})))
+    client = TestClient(env.app)
+    kwargs: dict[str, Any] = {"json": {"body": "x"}} if method in ("post", "patch") else {}
+    assert getattr(client, method)(path, **kwargs).status_code == 403
+    assert client.get(f"/api/tickets/mine/{TID}").status_code == 200
+    env.login(Principal(sub="plain", scope_permissions=frozenset({"ticket.manage"})))
+    assert getattr(client, method)(path, **kwargs).status_code in (200, 201, 204)
+
+
+def test_a_manager_note_takes_a_visibility(env: _Env) -> None:
+    env.login(MANAGER)
+    client = TestClient(env.app)
+    assert (
+        client.post(
+            f"/api/tickets/{TID}/notes", json={"body": "n", "visibility": "public"}
+        ).status_code
+        == 201
+    )
+    (args, _kw) = env.service.calls[-1][1]
+    assert args[1].visibility == "public"
+    client.post(f"/api/tickets/{TID}/notes", json={"body": "n"})
+    (args, _kw) = env.service.calls[-1][1]
+    assert args[1].visibility == "internal"
+    bad = client.post(f"/api/tickets/{TID}/notes", json={"body": "n", "visibility": "secret"})
+    assert bad.status_code == 422

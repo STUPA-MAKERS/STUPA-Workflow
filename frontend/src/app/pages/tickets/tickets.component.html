@@ -33,17 +33,19 @@
             [icon]="kindFilter() ? 'check' : null"
             [chevron]="!kindFilter()"
           />
-          <app-filter-select
-            class="tk__chip"
-            [label]="'tickets.list.filter.assignee' | t"
-            [options]="assigneeOptions()"
-            [value]="assigneeFilter()"
-            (valueChange)="setAssignee($event)"
-            [text]="assigneeChipLabel()"
-            [active]="assigneeFilter() !== ''"
-            [icon]="assigneeFilter() ? 'check' : null"
-            [chevron]="!assigneeFilter()"
-          />
+          @if (manager) {
+            <app-filter-select
+              class="tk__chip"
+              [label]="'tickets.list.filter.assignee' | t"
+              [options]="assigneeOptions()"
+              [value]="assigneeFilter()"
+              (valueChange)="setAssignee($event)"
+              [text]="assigneeChipLabel()"
+              [active]="assigneeFilter() !== ''"
+              [icon]="assigneeFilter() ? 'check' : null"
+              [chevron]="!assigneeFilter()"
+            />
+          }
           @if (activeFilterCount() > 0) {
             <app-button variant="text" size="sm" (click)="reset()">
               {{ 'tickets.list.filter.reset' | t }}
@@ -98,7 +100,9 @@
                         <span class="sr-only">{{ row.kindLabel }}</span>
                       </span>
                       <span trail class="tk__trail">
-                        @if (row.assignee; as a) {
+                        @if (!manager) {
+                          <!-- The reporter sees no assignee. -->
+                        } @else if (row.assignee; as a) {
                           <app-avatar
                             size="sm"
                             [name]="a.displayName || ('chat.deletedPerson' | t)"

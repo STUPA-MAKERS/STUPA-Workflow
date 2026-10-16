@@ -62,6 +62,11 @@ export const authGuard: CanActivateFn = (route) => {
         if (route.data['allowAuthenticated'] === true) {
           return true;
         }
+        // A reporter reads the own tickets without `ticket.manage`. The server
+        // answers only the own tickets.
+        if (route.data['allowReporter'] === true && auth.hasReportedTickets()) {
+          return true;
+        }
         toast.error(i18n.translate('rbac.forbidden'));
         return router.createUrlTree(['/forbidden']);
       }

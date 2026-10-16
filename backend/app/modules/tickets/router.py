@@ -3,7 +3,14 @@
 ``POST /tickets`` is the report. It is open to a session and, while
 ``tickets.publicEnabled`` is on, to a person without one behind ALTCHA. The body cap,
 the rate limit and ALTCHA run as dependencies in the order of ``POST /applications``.
-The answer is the ticket number only: a reporter never reads the ticket again.
+The answer is the ticket number only.
+
+``/tickets/mine`` is the view of a reporter account on its own tickets: any session
+reads it, without a permission. The reporter reads the report, the ``public`` notes and
+the status changes, and writes, edits and deletes its own messages; a write needs a
+session cookie or a token with the scope ``tickets:write``. A ticket of somebody else
+gives 404. These routes stand before ``/tickets/{ticket_id}``, so ``mine`` never parses
+as an id.
 
 Every other route needs ``ticket.manage`` (401/403 on a collection route). An
 unknown ticket or note gives 404.
@@ -26,6 +33,9 @@ from app.modules.tickets.access import TICKET_MANAGE
 from app.modules.tickets.schemas import (
     NoteBody,
     NoteCreate,
+    ReporterNoteCreate,
+    ReporterTicketDetail,
+    ReporterTicketItem,
     TicketBlockedSender,
     TicketCounts,
     TicketCreate,
@@ -65,6 +75,21 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 
 Manager = Annotated[Principal, Depends(require_principal(TICKET_MANAGE))]
+Reader = Annotated[Principal, Depends(require_principal())]
+
+
+def require_reporter_write(principal: Reader) -> Principal:
+    """Let a reporter write with a session cookie or a token with ``tickets:write``.
+
+    Raises:
+        ForbiddenError: A token without the scope ``tickets:write`` (HTTP 403).
+    """
+    if not principal.scope_allows(TICKET_MANAGE):
+        raise ForbiddenError("The token scope does not allow ticket messages.")
+    return principal
+
+
+ReporterWriter = Annotated[Principal, Depends(require_reporter_write)]
 
 
 def get_ticket_service(session: DbSession, request: Request) -> TicketService:
@@ -164,6 +189,99 @@ async def create_ticket(
         pool = getattr(request.app.state, "arq_pool", None)
         background.add_task(send_mails, settings, ticket.id, pool)
     return TicketCreated(number=format_number(ticket.number))
+
+
+@router.get(
+    "/tickets/mine",
+    response_model=Page[ReporterTicketItem],
+    responses=_errors(401, 422),
+)
+async def list_my_tickets(
+    service: ServiceDep,
+    db: DbSession,
+    principal: Reader,
+    page: Annotated[PageParams, Depends()],
+    statuses: Annotated[list[TicketStatus] | None, Query(alias="status")] = None,
+    kinds: Annotated[list[TicketKind] | None, Query(alias="kind")] = None,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+) -> Page[ReporterTicketItem]:
+    """List the tickets that the caller reported, newest first.
+
+    ``status`` and ``kind`` repeat; ``q`` matches title, body and number. A session
+    without an account row gets an empty page.
+    """
+    me = await principal_id_of(db, principal.sub)
+    if me is None:
+        return Page[ReporterTicketItem](items=[], total=0, limit=page.limit, offset=page.offset)
+    return await service.reporter_list(
+        me,
+        statuses=statuses or (),
+        kinds=kinds or (),
+        q=q,
+        limit=page.limit,
+        offset=page.offset,
+    )
+
+
+@router.get(
+    "/tickets/mine/{ticket_id}",
+    response_model=ReporterTicketDetail,
+    responses=_errors(401, 404),
+)
+async def get_my_ticket(
+    ticket_id: UUID, service: ServiceDep, principal: Reader
+) -> ReporterTicketDetail:
+    """The own ticket: the report, its files, the public notes and the status changes."""
+    return await service.reporter_detail(ticket_id, principal)
+
+
+@router.post(
+    "/tickets/mine/{ticket_id}/notes",
+    response_model=TicketNoteOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=_errors(401, 403, 404, 422),
+)
+async def add_my_ticket_note(
+    ticket_id: UUID,
+    payload: ReporterNoteCreate,
+    service: ServiceDep,
+    principal: ReporterWriter,
+    settings: SettingsDep,
+) -> TicketNoteOut:
+    """Write a message on an own ticket. It is public. A block gives 403 ``sender_blocked``."""
+    return await service.reporter_add_note(
+        ticket_id, payload, principal, pepper=settings.magic_link_secret
+    )
+
+
+@router.patch(
+    "/tickets/mine/{ticket_id}/notes/{note_id}",
+    response_model=TicketNoteOut,
+    responses=_errors(401, 403, 404, 422),
+)
+async def edit_my_ticket_note(
+    ticket_id: UUID,
+    note_id: UUID,
+    payload: NoteBody,
+    service: ServiceDep,
+    principal: ReporterWriter,
+) -> TicketNoteOut:
+    """Change an own message. Another author gives 403 ``not_note_author``."""
+    return await service.reporter_edit_note(ticket_id, note_id, payload.body, principal)
+
+
+@router.delete(
+    "/tickets/mine/{ticket_id}/notes/{note_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+    responses=_errors(401, 403, 404),
+)
+async def delete_my_ticket_note(
+    ticket_id: UUID, note_id: UUID, service: ServiceDep, principal: ReporterWriter
+) -> Response:
+    """Delete an own message and its files. Another author gives 403 ``not_note_author``."""
+    await service.reporter_delete_note(ticket_id, note_id, principal)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def _assignee_filter(raw: str | None) -> AssigneeFilter | None:
@@ -305,7 +423,10 @@ async def add_ticket_note(
     principal: Manager,
     settings: SettingsDep,
 ) -> TicketNoteOut:
-    """Add an internal note. ``attachmentIds`` and ``draftToken`` bind its files.
+    """Add a note. ``attachmentIds`` and ``draftToken`` bind its files.
+
+    ``visibility`` is ``internal`` (the default) or ``public``: the reporter account
+    reads a public note in ``/tickets/mine``.
 
     A draft that is missing, expired, foreign or infected gives 422
     ``draft_attachments_missing``; files on an anonymized ticket 422

@@ -56,6 +56,10 @@ describe('NavService', () => {
     expect(NAV_ITEMS.findIndex((i) => i.key === 'tickets')).toBe(NAV_ITEMS.findIndex((i) => i.key === 'invoices') + 1);
   });
 
+  it('opens the tickets to a reporter without ticket.manage', () => {
+    expect(keysFor({ ...BASE, has_reported_tickets: true })).toEqual(['start', 'applications', 'tasks', 'todos', 'tickets']);
+  });
+
   it('shows the To-Dos to every session, after the tasks', () => {
     const todos = NAV_ITEMS.find((i) => i.key === 'todos');
     expect(todos).toMatchObject({ path: '/todos', labelKey: 'nav.todos', icon: 'circleok', permissions: [] });

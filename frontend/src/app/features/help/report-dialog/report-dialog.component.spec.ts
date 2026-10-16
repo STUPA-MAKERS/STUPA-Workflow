@@ -72,11 +72,12 @@ async function setup(
   const create =
     opts.create ?? jest.fn((_b: TicketCreate) => of<TicketCreated>({ number: 'T-0043' }));
   const toast = { success: jest.fn(), error: jest.fn() };
+  const auth = jest.fn();
   const view = await render(ReportDialogComponent, {
     componentProviders: [{ provide: DraftAttachmentsService, useValue: drafts }],
     providers: [
       { provide: TicketsApiService, useValue: { create } },
-      { provide: AuthService, useValue: { isAuthenticated: signal(opts.signedIn ?? true) } },
+      { provide: AuthService, useValue: { isAuthenticated: signal(opts.signedIn ?? true), markReportedTicket: auth } },
       {
         provide: BrandingService,
         useValue: { wikiUrl: signal('https://wiki.example.org/handbook'), ticketsPublic: signal(true) },
@@ -98,7 +99,7 @@ async function setup(
     await view.fixture.whenStable();
     view.fixture.detectChanges();
   };
-  return { ...view, c, drafts, create, toast, help, open };
+  return { ...view, c, drafts, create, toast, help, open, auth };
 }
 
 const titleField = () => screen.getByLabelText(/Kurz: Was ist das Problem\?/) as HTMLInputElement;
@@ -126,7 +127,7 @@ describe('ReportDialogComponent', () => {
   afterEach(() => localStorage.clear());
 
   it('sends a signed-in report with the context and shows only the number', async () => {
-    const { open, create, drafts, fixture } = await setup();
+    const { open, create, drafts, fixture, auth } = await setup();
     await open();
     expect(screen.getByRole('link', { name: /Handbuch im Wiki/ })).toHaveAttribute(
       'href',
@@ -163,6 +164,8 @@ describe('ReportDialogComponent', () => {
       altcha: null,
     });
     expect(drafts.clear).toHaveBeenCalled();
+    // The tab "Tickets" shows the own report from now on.
+    expect(auth).toHaveBeenCalled();
     expect(screen.getByRole('status')).toHaveTextContent('Deine Meldung hat die Nummer T-0043');
     expect(screen.queryByRole('button', { name: 'Senden' })).not.toBeInTheDocument();
     // The focused send button is gone: the focus moves to the confirmation.
@@ -215,7 +218,7 @@ describe('ReportDialogComponent', () => {
   });
 
   it('asks a visitor for the e-mail and the ALTCHA solution', async () => {
-    const { open, create, fixture, c } = await setup({ signedIn: false });
+    const { open, create, fixture, c, auth } = await setup({ signedIn: false });
     await open();
     await fill();
     const email = screen.getByLabelText(/Deine E-Mail/);
@@ -237,6 +240,8 @@ describe('ReportDialogComponent', () => {
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({ email: 'jana@example.org', altcha: 'solution-1' }),
     );
+    // Without a session there is no tab to show.
+    expect(auth).not.toHaveBeenCalled();
   });
 
   it('sends without a solution when the server has ALTCHA off', async () => {

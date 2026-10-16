@@ -1,9 +1,14 @@
 """Ticket service: report, list, detail, change, notes, anonymization.
 
 The service trusts its caller for the permission: the router lets only a holder of
-``ticket.manage`` reach every method except ``create``. The service still decides
-who may be the assignee (a holder of ``ticket.manage``) and who may edit a note
-(its author).
+``ticket.manage`` reach every method except ``create`` and the ``reporter_*`` methods.
+The service still decides who may be the assignee (a holder of ``ticket.manage``) and
+who may edit a note (its author).
+
+The ``reporter_*`` methods are the view of the reporter account on its own tickets:
+the report, the ``public`` notes and the status changes, plus its own messages. They
+check the reporter themselves and answer 404 for any other ticket, so the routes are
+no existence oracle. An anonymized ticket has no reporter any more.
 
 The to-do coupling (``openTodoCount`` and ``completeTodos``) runs through
 ``TicketTodoHooks``. Without hooks the count is 0 and ``completeTodos`` changes no
@@ -32,6 +37,7 @@ from app.modules.applications.service.service_base import _title_of
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.files.drafts import bind_drafts, check_drafts, check_message_drafts
+from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.files.service import FilesService
 from app.modules.livevote.models import Meeting
 from app.modules.tickets.access import TICKET_MANAGE
@@ -47,6 +53,10 @@ from app.modules.tickets.models import (
 from app.modules.tickets.schemas import (
     ContextTarget,
     NoteCreate,
+    ReporterNoteCreate,
+    ReporterTicketDetail,
+    ReporterTicketEvent,
+    ReporterTicketItem,
     TicketAttachment,
     TicketBlockedSender,
     TicketCounts,
@@ -88,6 +98,8 @@ SENDER_UNKNOWN = "ticket_sender_unknown"
 SENDER_IS_SELF = "sender_is_self"
 #: The problem code of a note with files on an anonymized ticket.
 TICKET_ANONYMIZED = "ticket_anonymized"
+#: The problem code of a message of a reporter that a sender block holds back.
+SENDER_BLOCKED = "sender_blocked"
 
 #: What a block targets: an account id or a normalized e-mail address.
 BlockTarget = tuple[Literal["principal"], uuid.UUID] | tuple[Literal["email"], str]
@@ -627,18 +639,7 @@ class TicketService:
             attachments=[
                 TicketAttachment.of(a) for a in await self.files.list_for_ticket(ticket.id)
             ],
-            notes=[
-                TicketNoteOut(
-                    id=n.id,
-                    author=_person(accounts, n.author_id),
-                    body=n.body,
-                    at=n.created_at,
-                    edited_at=n.edited_at,
-                    is_own=me is not None and n.author_id == me,
-                    attachments=files.get(n.id, []),
-                )
-                for n in notes
-            ],
+            notes=[_note_row(n, ticket, accounts, me, files.get(n.id, [])) for n in notes],
             events=[_event_out(e, accounts, readable) for e in events],
             duplicate_of=(
                 TicketRef(id=duplicate.id, number=format_number(duplicate.number))
@@ -791,7 +792,7 @@ class TicketService:
     async def add_note(
         self, ticket_id: uuid.UUID, payload: NoteCreate, principal: Principal, *, pepper: str
     ) -> TicketNoteOut:
-        """Add an internal note and bind its files.
+        """Add a note (``internal`` or ``public``) and bind its files.
 
         Raises:
             NotFoundError: No ticket has this id, or the caller has no account row
@@ -805,7 +806,30 @@ class TicketService:
         # would not see the file again.
         ticket = await self._get(ticket_id, lock=bool(payload.attachment_ids))
         author = await self._require_account(principal)
-        if payload.attachment_ids and ticket.anonymized_at is not None:
+        return await self._insert_note(
+            ticket,
+            author,
+            body=payload.body,
+            visibility=payload.visibility,
+            attachment_ids=payload.attachment_ids,
+            draft_token=payload.draft_token,
+            pepper=pepper,
+        )
+
+    async def _insert_note(
+        self,
+        ticket: Ticket,
+        author: uuid.UUID,
+        *,
+        body: str,
+        visibility: str,
+        attachment_ids: list[uuid.UUID],
+        draft_token: str | None,
+        pepper: str,
+        for_reporter: bool = False,
+    ) -> TicketNoteOut:
+        """Store a note, bind its files and commit. The caller read the ticket."""
+        if attachment_ids and ticket.anonymized_at is not None:
             raise ValidationProblem(
                 "The ticket is anonymized and takes no files.",
                 code=TICKET_ANONYMIZED,
@@ -813,17 +837,23 @@ class TicketService:
             )
         token = await check_message_drafts(
             self.session,
-            attachment_ids=payload.attachment_ids,
-            token=payload.draft_token,
+            attachment_ids=attachment_ids,
+            token=draft_token,
             pepper=pepper,
         )
-        note = TicketNote(id=uuid.uuid4(), ticket_id=ticket.id, author_id=author, body=payload.body)
+        note = TicketNote(
+            id=uuid.uuid4(),
+            ticket_id=ticket.id,
+            author_id=author,
+            body=body,
+            visibility=visibility,
+        )
         self.session.add(note)
         if token is not None:
             await self.session.flush()
             await bind_drafts(
                 self.session,
-                attachment_ids=payload.attachment_ids,
+                attachment_ids=attachment_ids,
                 token=token,
                 pepper=pepper,
                 ticket_note_id=note.id,
@@ -831,7 +861,7 @@ class TicketService:
         ticket.updated_at = _now()
         await self.session.commit()
         await self.session.refresh(note)
-        return await self._note_out(note, author)
+        return await self._note_out(note, author, ticket, for_reporter=for_reporter)
 
     async def edit_note(
         self, ticket_id: uuid.UUID, note_id: uuid.UUID, body: str, principal: Principal
@@ -846,7 +876,7 @@ class TicketService:
         note.body = body
         note.edited_at = _now()
         await self.session.commit()
-        return await self._note_out(note, me)
+        return await self._note_out(note, me, await self._get(ticket_id))
 
     async def delete_note(
         self, ticket_id: uuid.UUID, note_id: uuid.UUID, principal: Principal
@@ -873,18 +903,229 @@ class TicketService:
             raise ForbiddenError("Only the author edits a note.", code="not_note_author")
         return note, me
 
-    async def _note_out(self, note: TicketNote, me: uuid.UUID) -> TicketNoteOut:
+    async def _note_out(
+        self, note: TicketNote, me: uuid.UUID, ticket: Ticket, *, for_reporter: bool = False
+    ) -> TicketNoteOut:
         accounts = await self._load_accounts({note.author_id})
         files = await self.files.message_attachments("ticket_note", [note.id])
-        return TicketNoteOut(
-            id=note.id,
-            author=_person(accounts, note.author_id),
-            body=note.body,
-            at=note.created_at,
-            edited_at=note.edited_at,
-            is_own=note.author_id == me,
-            attachments=files.get(note.id, []),
+        return _note_row(
+            note, ticket, accounts, me, files.get(note.id, []), for_reporter=for_reporter
         )
+
+    # -- the view of the reporter -----------------------------------------------
+
+    async def _reporter_ticket(
+        self, ticket_id: uuid.UUID, principal: Principal, *, lock: bool = False
+    ) -> tuple[Ticket, uuid.UUID]:
+        """Return the ticket and the account when the caller reported it.
+
+        Raises:
+            NotFoundError: No ticket has this id, the caller has no account row, did
+                not report it, or the ticket is anonymized (HTTP 404).
+        """
+        missing = NotFoundError(f"ticket {ticket_id} not found")
+        me = await principal_id_of(self.session, principal.sub)
+        if me is None:
+            raise missing
+        try:
+            ticket = await self._get(ticket_id, lock=lock)
+        except NotFoundError:
+            raise missing from None
+        if ticket.anonymized_at is not None or ticket.reporter_principal_id != me:
+            raise missing
+        return ticket, me
+
+    async def reporter_list(
+        self,
+        me: uuid.UUID,
+        *,
+        statuses: Sequence[str] = (),
+        kinds: Sequence[str] = (),
+        q: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Page[ReporterTicketItem]:
+        """List the tickets that the account reported, newest first.
+
+        ``q`` matches the title, the body and the number. Anonymized tickets have no
+        reporter any more and never show.
+        """
+        conds: list[ColumnElement[bool]] = [
+            Ticket.reporter_principal_id == me,
+            Ticket.anonymized_at.is_(None),
+        ]
+        if statuses:
+            conds.append(Ticket.status.in_(list(statuses)))
+        if kinds:
+            conds.append(Ticket.kind.in_(list(kinds)))
+        term = (q or "").strip()
+        if term:
+            pattern = f"%{escape_like(term)}%"
+            matches: list[ColumnElement[bool]] = [
+                Ticket.title.ilike(pattern, escape="\\"),
+                Ticket.body.ilike(pattern, escape="\\"),
+            ]
+            number = _NUMBER_RE.match(term)
+            if number is not None:
+                matches.append(Ticket.number == int(number.group(1)))
+            conds.append(or_(*matches))
+        total = await self.session.scalar(select(func.count(Ticket.id)).where(*conds))
+        rows = list(
+            (
+                await self.session.scalars(
+                    select(Ticket)
+                    .where(*conds)
+                    .order_by(Ticket.created_at.desc(), Ticket.number.desc())
+                    .limit(limit)
+                    .offset(offset)
+                )
+            ).all()
+        )
+        return Page[ReporterTicketItem](
+            items=[_reporter_item(t) for t in rows],
+            total=int(total or 0),
+            limit=limit,
+            offset=offset,
+        )
+
+    async def reporter_detail(
+        self, ticket_id: uuid.UUID, principal: Principal
+    ) -> ReporterTicketDetail:
+        """Return the own ticket: the report, its files, the public notes and the status changes.
+
+        Raises:
+            NotFoundError: Not a ticket of the caller (HTTP 404).
+        """
+        ticket, me = await self._reporter_ticket(ticket_id, principal)
+        notes = list(
+            (
+                await self.session.scalars(
+                    select(TicketNote)
+                    .where(
+                        TicketNote.ticket_id == ticket.id,
+                        TicketNote.deleted_at.is_(None),
+                        TicketNote.visibility == "public",
+                    )
+                    .order_by(TicketNote.created_at, TicketNote.id)
+                )
+            ).all()
+        )
+        events = list(
+            (
+                await self.session.scalars(
+                    select(TicketEvent)
+                    .where(TicketEvent.ticket_id == ticket.id, TicketEvent.kind == "status")
+                    .order_by(TicketEvent.created_at, TicketEvent.id)
+                )
+            ).all()
+        )
+        accounts = await self._load_accounts({n.author_id for n in notes})
+        files = await self.files.message_attachments("ticket_note", [n.id for n in notes])
+        return ReporterTicketDetail(
+            **_reporter_item(ticket).model_dump(),
+            body=ticket.body,
+            attachments=[
+                TicketAttachment.of(a) for a in await self.files.list_for_ticket(ticket.id)
+            ],
+            notes=[
+                _note_row(n, ticket, accounts, me, files.get(n.id, []), for_reporter=True)
+                for n in notes
+            ],
+            events=[
+                ReporterTicketEvent(
+                    id=e.id,
+                    kind="status",
+                    at=e.created_at,
+                    payload={k: v for k, v in (e.payload or {}).items() if k in ("from", "to")},
+                )
+                for e in events
+            ],
+            closed_at=ticket.closed_at,
+            can_reply=not await self._sender_blocked(ticket),
+        )
+
+    async def reporter_add_note(
+        self,
+        ticket_id: uuid.UUID,
+        payload: ReporterNoteCreate,
+        principal: Principal,
+        *,
+        pepper: str,
+    ) -> TicketNoteOut:
+        """Add a message of the reporter. It is ``public`` and binds its files.
+
+        Raises:
+            NotFoundError: Not a ticket of the caller (HTTP 404).
+            ForbiddenError: A sender block holds back the reporter (HTTP 403,
+                ``sender_blocked``).
+            ValidationProblem: Files without a draft token, or a draft that is missing,
+                expired, foreign or infected (HTTP 422).
+        """
+        # Always under the row lock: an anonymization that runs between the check and the
+        # commit would miss the new note and leave the reporter on an anonymized ticket.
+        ticket, me = await self._reporter_ticket(ticket_id, principal, lock=True)
+        if await self._sender_blocked(ticket):
+            raise ForbiddenError("The sender is blocked.", code=SENDER_BLOCKED)
+        return await self._insert_note(
+            ticket,
+            me,
+            body=payload.body,
+            visibility="public",
+            attachment_ids=payload.attachment_ids,
+            draft_token=payload.draft_token,
+            pepper=pepper,
+            for_reporter=True,
+        )
+
+    async def reporter_edit_note(
+        self, ticket_id: uuid.UUID, note_id: uuid.UUID, body: str, principal: Principal
+    ) -> TicketNoteOut:
+        """Change the text of an own message on an own ticket.
+
+        Raises:
+            NotFoundError: Not a ticket of the caller, or no live public note (HTTP 404).
+            ForbiddenError: The note has another author (HTTP 403, ``not_note_author``), or
+                a sender block holds back the reporter (HTTP 403, ``sender_blocked``).
+        """
+        ticket, me = await self._reporter_ticket(ticket_id, principal, lock=True)
+        note = await self._reporter_note(ticket, note_id, principal)
+        if await self._sender_blocked(ticket):
+            raise ForbiddenError("The sender is blocked.", code=SENDER_BLOCKED)
+        note.body = body
+        note.edited_at = _now()
+        await self.session.commit()
+        return await self._note_out(note, me, ticket, for_reporter=True)
+
+    async def reporter_delete_note(
+        self, ticket_id: uuid.UUID, note_id: uuid.UUID, principal: Principal
+    ) -> None:
+        """Delete an own message on an own ticket, with its files.
+
+        A sender block does not stop a delete: the reporter keeps the right to remove
+        the own data.
+
+        Raises:
+            NotFoundError: Not a ticket of the caller, or no live public note (HTTP 404).
+            ForbiddenError: The note has another author (HTTP 403, ``not_note_author``).
+        """
+        ticket, _me = await self._reporter_ticket(ticket_id, principal)
+        await self._reporter_note(ticket, note_id, principal)
+        await self.delete_note(ticket.id, note_id, principal)
+
+    async def _reporter_note(
+        self, ticket: Ticket, note_id: uuid.UUID, principal: Principal
+    ) -> TicketNote:
+        """Return an own note of the reporter; an internal note answers like a missing one.
+
+        Raises:
+            NotFoundError: No live public note with this id on the ticket (HTTP 404).
+            ForbiddenError: The note has another author (HTTP 403, ``not_note_author``).
+        """
+        visible = await self.session.get(TicketNote, note_id)
+        if visible is None or visible.visibility != "public":
+            raise NotFoundError(f"note {note_id} not found")
+        note, _me = await self._own_note(ticket.id, note_id, principal)
+        return note
 
     # -- anonymization ----------------------------------------------------------
 
@@ -893,11 +1134,24 @@ class TicketService:
 
         The reporter (account and e-mail), the context and the files of the report and
         of every note (rows and objects) go; title, body, the note texts and events
-        stay. A sender block from this ticket stays. The ``created`` event loses its
-        actor, because that actor is the reporter and the detail would show the name.
+        stay. The public notes of the reporter lose their author: a reporter writes only
+        public notes, and an internal note of the same account is the work of a team
+        member, who must keep the right to change it. A sender block from this
+        ticket stays. The ``created`` event loses its actor, because that actor is the
+        reporter and the detail would show the name.
         ``anonymized_at`` marks it.
         """
         await self.files.delete_for_ticket(ticket.id, actor=actor)
+        if ticket.reporter_principal_id is not None:
+            await self.session.execute(
+                update(TicketNote)
+                .where(
+                    TicketNote.ticket_id == ticket.id,
+                    TicketNote.author_id == ticket.reporter_principal_id,
+                    TicketNote.visibility == "public",
+                )
+                .values(author_id=None)
+            )
         await self.session.execute(
             update(TicketEvent)
             .where(TicketEvent.ticket_id == ticket.id, TicketEvent.kind == "created")
@@ -1023,11 +1277,101 @@ def _ids_of(payload: dict[str, JsonValue]) -> set[uuid.UUID | None]:
     return out
 
 
-def _person(accounts: dict[uuid.UUID, _Account], principal_id: uuid.UUID) -> PersonRef:
-    account = accounts.get(principal_id)
-    if account is None:
+def _person(accounts: dict[uuid.UUID, _Account], principal_id: uuid.UUID | None) -> PersonRef:
+    account = accounts.get(principal_id) if principal_id is not None else None
+    if principal_id is None or account is None:
         return DELETED_PERSON
     return person_of(principal_id, account.display_name, account.email)
+
+
+def _note_row(
+    note: TicketNote,
+    ticket: Ticket,
+    accounts: dict[uuid.UUID, _Account],
+    me: uuid.UUID | None,
+    attachments: list[MessageAttachmentOut],
+    *,
+    for_reporter: bool = False,
+) -> TicketNoteOut:
+    """Build the wire note.
+
+    For the reporter a team author shows by name only: neither the e-mail nor the
+    account id of a holder of ``ticket.manage`` reaches the reporter, because the id
+    opens the avatar of that e-mail.
+    """
+    author = _person(accounts, note.author_id)
+    if for_reporter and note.author_id is not None:
+        account = accounts.get(note.author_id)
+        own = account is not None and note.author_id == me
+        author = PersonRef(
+            principal_id=note.author_id if own else None,
+            display_name=account.display_name if account is not None else None,
+        )
+    return TicketNoteOut(
+        id=note.id,
+        author=author,
+        body=note.body,
+        at=note.created_at,
+        edited_at=note.edited_at,
+        is_own=me is not None and note.author_id == me,
+        attachments=attachments,
+        visibility=note.visibility or "internal",  # pyright: ignore[reportArgumentType]
+        from_reporter=(
+            note.author_id is not None and note.author_id == ticket.reporter_principal_id
+        ),
+    )
+
+
+def _reporter_item(ticket: Ticket) -> ReporterTicketItem:
+    return ReporterTicketItem(
+        id=ticket.id,
+        number=format_number(ticket.number),
+        kind=ticket.kind,  # pyright: ignore[reportArgumentType]
+        title=ticket.title,
+        status=ticket.status,  # pyright: ignore[reportArgumentType]
+        created_at=ticket.created_at,
+        updated_at=ticket.updated_at,
+    )
+
+
+async def reporter_reads_file(
+    session: AsyncSession, principal: Principal, *, kind: str, owner_id: uuid.UUID
+) -> bool:
+    """Tell if the reporter account reads a file of its own ticket.
+
+    ``kind`` ``ticket`` is a file of the report; ``ticket_note`` a file of a live
+    ``public`` note. An anonymized ticket has no reporter.
+    """
+    me = await principal_id_of(session, principal.sub)
+    if me is None:
+        return False
+    stmt = select(Ticket.id).where(
+        Ticket.reporter_principal_id == me, Ticket.anonymized_at.is_(None)
+    )
+    if kind == "ticket":
+        stmt = stmt.where(Ticket.id == owner_id)
+    elif kind == "ticket_note":
+        stmt = stmt.join(TicketNote, TicketNote.ticket_id == Ticket.id).where(
+            TicketNote.id == owner_id,
+            TicketNote.deleted_at.is_(None),
+            TicketNote.visibility == "public",
+        )
+    else:
+        return False
+    return (await session.scalar(stmt.limit(1))) is not None
+
+
+async def has_reported_tickets(session: AsyncSession, sub: str) -> bool:
+    """Tell if the account of ``sub`` reported a ticket that is not anonymized."""
+    me = await principal_id_of(session, sub)
+    if me is None:
+        return False
+    found = await session.scalar(
+        select(Ticket.id)
+        .where(Ticket.reporter_principal_id == me, Ticket.anonymized_at.is_(None))
+        .limit(1)
+    )
+    return found is not None
 
 
 def _reporter(ticket: Ticket, accounts: dict[uuid.UUID, _Account]) -> TicketReporter:
@@ -1120,8 +1464,10 @@ __all__ = [
     "TicketTodoHooks",
     "erase_sender_blocks",
     "format_number",
+    "has_reported_tickets",
     "normalize_email",
     "principal_id_of",
+    "reporter_reads_file",
     "sender_blocks_of",
     "ticket_managers",
 ]

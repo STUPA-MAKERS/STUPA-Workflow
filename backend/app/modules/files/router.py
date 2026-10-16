@@ -45,6 +45,7 @@ from app.modules.files.schemas import AttachmentOut, DraftAttachmentOut, SignedU
 from app.modules.files.service import AttachmentOwner, FilesService, application_id_of
 from app.modules.tickets.access import TICKET_MANAGE
 from app.modules.tickets.models import TicketNote
+from app.modules.tickets.service import reporter_reads_file
 from app.modules.todos.access import BoardAccess
 from app.modules.todos.models import TodoBoard, TodoCard, TodoComment
 from app.shared.altcha import AltchaError, AltchaVerifier, NullAltchaVerifier
@@ -197,7 +198,8 @@ async def _assert_owner_reader(
     The rule is the rule of reading the message itself:
 
     * ``ticket`` (a report file) and ``ticket_note``: a principal with
-      ``ticket.manage``; a note must not be deleted.
+      ``ticket.manage``, or the reporter account of the ticket (a note only when it is
+      ``public``; never on an anonymized ticket); a note must not be deleted.
     * ``todo_comment``: a principal whose token allows ``todo.write`` and who reads
       the board of the card (``BoardAccess``, archived cards too); the comment must
       not be deleted.
@@ -214,7 +216,11 @@ async def _assert_owner_reader(
     """
     missing = NotFoundError(f"attachment {attachment_id} not found")
     if owner.kind in ("ticket", "ticket_note"):
-        if principal is None or not principal.has(TICKET_MANAGE):
+        if principal is None:
+            raise missing
+        if not principal.has(TICKET_MANAGE) and not await reporter_reads_file(
+            db, principal, kind=owner.kind, owner_id=owner.id
+        ):
             raise missing
         if owner.kind == "ticket_note":
             deleted = await db.scalar(

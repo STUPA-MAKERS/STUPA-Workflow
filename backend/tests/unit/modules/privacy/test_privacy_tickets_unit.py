@@ -136,6 +136,77 @@ async def test_the_export_lists_the_tickets_of_the_account() -> None:
     assert [t["number"] for t in data["tickets"]] == ["T-0012"]
 
 
+async def test_the_export_lists_the_own_ticket_messages() -> None:
+    from app.modules.tickets.models import TicketNote
+    from tests._support.privacy_fakes import FakeResult
+
+    principal = Principal(id=uuid.uuid4(), sub="kc", email="x@example.org", active=True)
+    ticket = _ticket(reporter_principal_id=principal.id, number=12)
+    note = TicketNote(
+        id=uuid.uuid4(),
+        ticket_id=ticket.id,
+        author_id=principal.id,
+        body="Danke!",
+        visibility="public",
+        created_at=_AT,
+        deleted_at=None,
+    )
+    db = fake_session(
+        scalars=[result(), result(ticket)],
+        scalar=[principal],
+        # The attendance comes first, then the messages and their files.
+        execute=[
+            FakeResult(),
+            FakeResult([(note, 12)]),
+            FakeResult([(note.id, "antwort.pdf")]),
+        ],
+    )
+    data = await AuskunftService(db).collect("x@example.org")
+    assert data["ticket_notes"] == [
+        {
+            "ticketNumber": "T-0012",
+            "visibility": "public",
+            "createdAt": _AT,
+            "deletedAt": None,
+            "body": "Danke!",
+            "attachments": ["antwort.pdf"],
+        }
+    ]
+
+
+async def test_the_export_without_an_account_has_no_ticket_messages() -> None:
+    db = fake_session(scalars=[result(), result()], scalar=[None])
+    data = await AuskunftService(db).collect("x@example.org")
+    assert data["ticket_notes"] == []
+
+
+def test_the_workbook_has_a_ticket_message_sheet() -> None:
+    raw = build_auskunft_workbook(
+        email="x@example.org",
+        applications=[],
+        versions=[],
+        principal=None,
+        ticket_notes=[
+            {
+                "ticketNumber": "T-0012",
+                "visibility": "public",
+                "createdAt": _AT,
+                "deletedAt": None,
+                "body": "=SUM(1)",
+                "attachments": ["a.pdf", "b.png"],
+            },
+            {"ticketNumber": None, "visibility": None, "createdAt": None},
+        ],
+    )
+    book = load_workbook(BytesIO(raw))
+    rows = [[c.value for c in row] for row in book["Ticket-Nachrichten"].iter_rows()]
+    assert rows[0] == ["Ticket", "Sichtbarkeit", "Zeitpunkt", "Gelöscht", "Text", "Anhänge"]
+    assert rows[1][:3] == ["T-0012", "public", "2026-06-16 12:00"]
+    assert not str(rows[1][4]).startswith("=")
+    assert rows[1][5] == "a.pdf; b.png"
+    assert rows[2] == [None] * 6
+
+
 def test_the_workbook_has_a_ticket_sheet() -> None:
     raw = build_auskunft_workbook(
         email="x@example.org",

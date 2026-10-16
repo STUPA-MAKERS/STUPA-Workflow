@@ -2,9 +2,11 @@
  * API of the tickets (`/api/tickets`): the "Problem melden" dialog sends a ticket, and
  * the page `/tickets` (permission `ticket.manage`) reads and works them.
  *
- * The reporter never reads a ticket again (one-way). Every read and write below the
- * create needs `ticket.manage`; an unknown ticket and a ticket the caller may not read
- * both answer 404. The client only binds the data; the server stays authoritative.
+ * A reporter account reads its own tickets under `/tickets/mine`: the report, the
+ * public notes and the status changes, and it writes, edits and deletes its own
+ * messages. Every other read and write below the create needs `ticket.manage`; an
+ * unknown ticket and a ticket the caller may not read both answer 404. The client only
+ * binds the data; the server stays authoritative.
  */
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
@@ -109,6 +111,9 @@ export interface TicketEvent {
   payload: TicketEventPayload;
 }
 
+/** `internal`: the holders of `ticket.manage` only; `public`: the reporter account too. */
+export type TicketNoteVisibility = 'internal' | 'public';
+
 export interface TicketNote {
   id: Uuid;
   author: PersonRef;
@@ -118,6 +123,10 @@ export interface TicketNote {
   isOwn: boolean;
   /** The files of the note, oldest first. */
   attachments: MessageAttachment[];
+  /** Absent on an older server: internal. */
+  visibility?: TicketNoteVisibility;
+  /** The reporter wrote it. */
+  fromReporter?: boolean;
 }
 
 export interface TicketDetail extends TicketListItem {
@@ -156,6 +165,36 @@ export interface TicketBlockedSender {
   /** Reports held back since the block. */
   hitCount: number;
   lastHitAt: IsoDateTime | null;
+}
+
+/** A ticket in the list of its reporter: no reporter, no assignee. */
+export interface MyTicketItem {
+  id: Uuid;
+  number: string;
+  kind: TicketKind;
+  title: string;
+  status: TicketStatus;
+  createdAt: IsoDateTime;
+  updatedAt: IsoDateTime;
+}
+
+/** The own ticket of a reporter: the report, the public notes and the status changes. */
+export interface MyTicketDetail extends MyTicketItem {
+  body: string;
+  attachments: TicketAttachment[];
+  notes: TicketNote[];
+  /** Status changes only, without an actor. */
+  events: { id: Uuid; kind: 'status'; at: IsoDateTime; payload: TicketEventPayload }[];
+  closedAt: IsoDateTime | null;
+  /** False while a block holds back the reporter. */
+  canReply: boolean;
+}
+
+export interface MyTicketPage {
+  items: MyTicketItem[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 export interface TicketPatch {
@@ -205,15 +244,33 @@ export class TicketsApiService {
   }
 
   list(query: TicketQuery = {}): Observable<TicketPage> {
-    let params = new HttpParams();
-    for (const s of query.status ?? []) params = params.append('status', s);
-    for (const k of query.kind ?? []) params = params.append('kind', k);
-    if (query.assignee) params = params.set('assignee', query.assignee);
-    const q = query.q?.trim();
-    if (q) params = params.set('q', q);
-    if (query.limit !== undefined) params = params.set('limit', query.limit);
-    if (query.offset !== undefined) params = params.set('offset', query.offset);
-    return this.http.get<TicketPage>(`${this.base}/tickets`, { params, context: skipLoading() });
+    return this.http.get<TicketPage>(`${this.base}/tickets`, { params: queryParams(query), context: skipLoading() });
+  }
+
+  /** The own tickets of the caller; `assignee` does not apply. */
+  mine(query: TicketQuery = {}): Observable<MyTicketPage> {
+    const params = queryParams({ ...query, assignee: null });
+    return this.http.get<MyTicketPage>(`${this.base}/tickets/mine`, { params, context: skipLoading() });
+  }
+
+  getMine(id: Uuid): Observable<MyTicketDetail> {
+    return this.http.get<MyTicketDetail>(`${this.base}/tickets/mine/${id}`, { context: skipLoading() });
+  }
+
+  /** A message of the reporter: always public. */
+  addMyNote(id: Uuid, body: string, files: MessageFiles = {}): Observable<TicketNote> {
+    return this.http.post<TicketNote>(`${this.base}/tickets/mine/${id}/notes`, {
+      body,
+      ...messageFiles(files),
+    });
+  }
+
+  editMyNote(id: Uuid, noteId: Uuid, body: string): Observable<TicketNote> {
+    return this.http.patch<TicketNote>(`${this.base}/tickets/mine/${id}/notes/${noteId}`, { body });
+  }
+
+  deleteMyNote(id: Uuid, noteId: Uuid): Observable<void> {
+    return this.http.delete<void>(`${this.base}/tickets/mine/${id}/notes/${noteId}`);
   }
 
   /** The counts per state, for the rail badge. Never covers the page. */
@@ -234,11 +291,20 @@ export class TicketsApiService {
     return this.http.patch<TicketDetail>(`${this.base}/tickets/${id}`, body);
   }
 
-  /** A note; `files` binds draft uploads of `POST /apply/attachments` (at most 5). */
-  addNote(id: Uuid, body: string, files: MessageFiles = {}): Observable<TicketNote> {
+  /**
+   * A note; `files` binds draft uploads of `POST /apply/attachments` (at most 5).
+   * Without `visibility` the server keeps the note internal.
+   */
+  addNote(
+    id: Uuid,
+    body: string,
+    files: MessageFiles = {},
+    visibility?: TicketNoteVisibility,
+  ): Observable<TicketNote> {
     return this.http.post<TicketNote>(`${this.base}/tickets/${id}/notes`, {
       body,
       ...messageFiles(files),
+      ...(visibility ? { visibility } : {}),
     });
   }
 
@@ -275,4 +341,17 @@ export class TicketsApiService {
   attachmentUrl(attachmentId: Uuid): string {
     return `${this.base}/attachments/${attachmentId}/download`;
   }
+}
+
+/** The query params of a ticket list. */
+function queryParams(query: TicketQuery): HttpParams {
+  let params = new HttpParams();
+  for (const s of query.status ?? []) params = params.append('status', s);
+  for (const k of query.kind ?? []) params = params.append('kind', k);
+  if (query.assignee) params = params.set('assignee', query.assignee);
+  const q = query.q?.trim();
+  if (q) params = params.set('q', q);
+  if (query.limit !== undefined) params = params.set('limit', query.limit);
+  if (query.offset !== undefined) params = params.set('offset', query.offset);
+  return params;
 }

@@ -4,7 +4,8 @@ import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { Observable, Subject, of, throwError } from 'rxjs';
+import { Observable, Subject, map, of, throwError } from 'rxjs';
+import { AuthService } from '@core/auth/auth.service';
 import type { PersonRef } from '@core/api/models';
 import {
   TicketsApiService,
@@ -79,6 +80,8 @@ const defaultAnswer: Answer = (q) => {
 interface Opts {
   answer?: Answer;
   assignees?: Observable<PersonRef[]>;
+  /** The viewer holds `ticket.manage` (default); false: the own tickets of a reporter. */
+  manager?: boolean;
 }
 
 async function start(url = '/tickets', opts: Opts = {}) {
@@ -86,6 +89,11 @@ async function start(url = '/tickets', opts: Opts = {}) {
   let answer = opts.answer ?? defaultAnswer;
   const api = {
     list: jest.fn((q: TicketQuery) => answer(q)),
+    mine: jest.fn((q: TicketQuery) =>
+      answer(q).pipe(
+        map((page) => ({ ...page, items: page.items.map(({ reporter: _r, assignee: _a, ...rest }) => rest) })),
+      ),
+    ),
     assignees: jest.fn(() => opts.assignees ?? of([MARA, { principalId: null, displayName: 'Weg' }, { principalId: 'p3', displayName: null }])),
   };
   const rail = { refresh: jest.fn() };
@@ -103,6 +111,7 @@ async function start(url = '/tickets', opts: Opts = {}) {
       ]),
       { provide: TicketsApiService, useValue: api },
       { provide: RailStatusService, useValue: rail },
+      { provide: AuthService, useValue: { can: (p: string) => (opts.manager ?? true) && p === 'ticket.manage' } },
     ],
   });
   const harness = await RouterTestingHarness.create();
@@ -415,4 +424,20 @@ describe('TicketsComponent', () => {
       restore();
     }
   });
+
+  it('lists the own tickets of a reporter without people', async () => {
+    const { cmp, api } = await start('/tickets', { manager: false });
+    expect(api.mine).toHaveBeenCalled();
+    expect(api.list).not.toHaveBeenCalled();
+    expect(api.assignees).not.toHaveBeenCalled();
+    expect(screen.getByRole('link', { name: /Upload bricht/ })).toBeInTheDocument();
+    expect(screen.queryByText(/Lea Hoffmann/)).not.toBeInTheDocument();
+    expect(document.querySelector('.tk__nobody')).toBeNull();
+    expect(document.querySelector('app-avatar')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Zugewiesen/ })).not.toBeInTheDocument();
+    const row = cmp.groups()[0].rows[0];
+    expect(row.sub).not.toContain('Lea');
+    expect(row.assignee).toBeNull();
+  });
 });
+

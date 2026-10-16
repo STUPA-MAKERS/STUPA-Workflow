@@ -291,7 +291,15 @@ async def me(
         gremium_permissions=await _gremium_permissions(db, principal),
         has_scoped_budget_view=await _has_scoped_budget_view(db, principal.sub),
         in_substitute_pool=await _in_substitute_pool(db, principal.sub),
+        has_reported_tickets=await _has_reported_tickets(db, principal.sub),
     )
+
+
+async def _has_reported_tickets(db: DbSession, sub: str) -> bool:
+    """Tell if `sub` reported a ticket that is not anonymized (the tab "Tickets")."""
+    from app.modules.tickets.service import has_reported_tickets
+
+    return await has_reported_tickets(db, sub)
 
 
 async def _in_substitute_pool(db: DbSession, sub: str) -> bool:

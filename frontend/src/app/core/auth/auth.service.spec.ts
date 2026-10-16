@@ -170,6 +170,10 @@ describe('AuthService', () => {
     expect(auth.gremiumPermissions()).toEqual({});
     expect(auth.hasScopedBudgetView()).toBe(false);
     expect(auth.inSubstitutePool()).toBe(false);
+    expect(auth.hasReportedTickets()).toBe(false);
+    // Without a principal a report marks nothing.
+    auth.markReportedTicket();
+    expect(auth.hasReportedTickets()).toBe(false);
 
     auth.ensureLoaded().subscribe();
     // Authenticated, but the optional fields are absent. The fallbacks still apply.
@@ -178,6 +182,13 @@ describe('AuthService', () => {
     expect(auth.sessionManageGremien()).toEqual([]);
     expect(auth.hasScopedBudgetView()).toBe(false);
     expect(auth.inSubstitutePool()).toBe(false);
+    expect(auth.hasReportedTickets()).toBe(false);
+    // A report of this session opens the tab at once; a second report changes nothing.
+    auth.markReportedTicket();
+    expect(auth.hasReportedTickets()).toBe(true);
+    const marked = auth.principal();
+    auth.markReportedTicket();
+    expect(auth.principal()).toBe(marked);
   });
 
   it('falls back to the placeholder display name when name and email are blank', () => {

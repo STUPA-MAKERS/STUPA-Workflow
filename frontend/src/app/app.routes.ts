@@ -343,9 +343,10 @@ export const routes: Routes = [
       },
       {
         path: 'tickets',
-        // The tickets of the help menu: the list beside the detail of the open ticket. Only
-        // `ticket.manage`; the server answers 403/404 to anybody else.
-        data: { title: 'nav.tickets', permission: 'ticket.manage', wide: true },
+        // The tickets of the help menu: the list beside the detail of the open ticket.
+        // `ticket.manage` works every ticket; a reporter reads and answers the own ones.
+        // The server answers 403/404 to anybody else.
+        data: { title: 'nav.tickets', permission: 'ticket.manage', allowReporter: true, wide: true },
         canActivate: [authGuard],
         loadComponent: () => import('./pages/tickets/tickets.component').then((m) => m.TicketsComponent),
         children: [

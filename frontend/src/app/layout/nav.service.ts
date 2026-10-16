@@ -70,6 +70,8 @@ export interface NavItem {
   inAnyCommittee?: boolean;
   /** Also visible with a scoped budget view. */
   scopedBudgetView?: boolean;
+  /** Also visible to a principal who reported a ticket. */
+  reportedTickets?: boolean;
   /** Match the active route exactly. */
   exact?: boolean;
   /** `end` entries sit at the foot of the rail, after the spacer. */
@@ -130,7 +132,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   },
   { key: 'expenses', path: '/expenses', labelKey: 'nav.expenses', icon: 'swap', permissions: BUDGET_PERMISSIONS, place: 'main' },
   { key: 'invoices', path: '/invoices', labelKey: 'nav.invoices', icon: 'receipt', permissions: BUDGET_PERMISSIONS, place: 'main' },
-  { key: 'tickets', path: '/tickets', labelKey: 'nav.tickets', icon: 'ticket', permissions: ['ticket.manage'], place: 'main' },
+  { key: 'tickets', path: '/tickets', labelKey: 'nav.tickets', icon: 'ticket', permissions: ['ticket.manage'], reportedTickets: true, place: 'main' },
   { key: 'admin', path: '/admin', labelKey: 'nav.admin', icon: 'shield', permissions: ADMIN_AREA_PERMISSIONS, place: 'end' },
 ];
 
@@ -154,7 +156,8 @@ export class NavService {
         this.globalAllows(item) ||
         (item.gremiumPermissions ?? []).some((p) => this.auth.canInAnyGremium(p)) ||
         (!!item.inAnyCommittee && inAnyCommittee) ||
-        (!!item.scopedBudgetView && this.auth.hasScopedBudgetView()),
+        (!!item.scopedBudgetView && this.auth.hasScopedBudgetView()) ||
+        (!!item.reportedTickets && this.auth.hasReportedTickets()),
     );
   });
 

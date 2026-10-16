@@ -14,6 +14,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { type Observable, map, tap } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { API_BASE_URL } from '@core/api/api.config';
 import { AuthService } from '@core/auth/auth.service';
@@ -21,6 +22,7 @@ import type { PersonRef, ScanState, Uuid } from '@core/api/models';
 import {
   TICKET_KINDS,
   TicketsApiService,
+  type MyTicketDetail,
   type TicketAttachment,
   type TicketDetail,
   type TicketKind,
@@ -39,18 +41,35 @@ import { liveSearch } from '@shared/live-search';
 import { AvatarStackComponent } from '@shared/ui/avatar/avatar.component';
 import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
-import type { ChatEdit, ChatEvent, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/chat.models';
+import type {
+  ChatEdit,
+  ChatEvent,
+  ChatMessage,
+  ChatRef,
+  ChatSend,
+  ChatVisibility,
+} from '@shared/ui/chat/chat.models';
 import { ChatDrafts } from '@shared/ui/chat/chat-drafts';
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { FieldGroupComponent, FieldRowComponent } from '@shared/ui/field-group/field-group.component';
+import {
+  FieldGroupComponent,
+  FieldRowComponent,
+} from '@shared/ui/field-group/field-group.component';
 import {
   FilterSelectComponent,
   type FilterSelectOption,
 } from '@shared/ui/filter-select/filter-select.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { SheetBarComponent, SheetBarKickerDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
+import {
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+} from '@shared/ui/row-menu/row-menu.component';
+import {
+  SheetBarComponent,
+  SheetBarKickerDirective,
+} from '@shared/ui/sheet-bar/sheet-bar.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import {
@@ -76,6 +95,7 @@ import {
   eventText,
   isOpen,
   personName,
+  reporterEventText,
   reporterName,
 } from './tickets.util';
 
@@ -98,12 +118,45 @@ const BLOCK_ERROR: Readonly<Record<string, TranslationKey>> = {
 
 /** The text of a refused block or unblock. */
 export function blockErrorKey(err: unknown): TranslationKey {
-  const code = err instanceof HttpErrorResponse ? (err.error as { code?: string } | null)?.code : undefined;
+  const code =
+    err instanceof HttpErrorResponse ? (err.error as { code?: string } | null)?.code : undefined;
   return (code && BLOCK_ERROR[code]) || 'tickets.detail.error.block';
 }
 
 /** The id of the ticket body in the thread: it never collides with a note id. */
 const BODY_ID = 'ticket-body';
+
+/** The composer of the team on a ticket of an account: internal first, the safe default. */
+const TEAM_VISIBILITIES: readonly ChatVisibility[] = ['internal', 'public'];
+
+/**
+ * The own ticket of a reporter in the shape of the team detail: no assignee, no
+ * context, no to-dos; the events are the status changes without an actor.
+ */
+export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDetail {
+  return {
+    id: m.id,
+    number: m.number,
+    kind: m.kind,
+    title: m.title,
+    status: m.status,
+    reporter,
+    assignee: null,
+    createdAt: m.createdAt,
+    updatedAt: m.updatedAt,
+    body: m.body,
+    context: {},
+    attachments: m.attachments,
+    notes: m.notes,
+    events: m.events.map((e) => ({ ...e, actor: null })),
+    duplicateOf: null,
+    contextTarget: null,
+    openTodoCount: 0,
+    closedAt: m.closedAt,
+    anonymizedAt: null,
+    senderBlocked: false,
+  };
+}
 
 /**
  * The detail of a ticket (frames 18, 19, 30–32, 35, 36) in the geometry of the
@@ -112,8 +165,14 @@ const BODY_ID = 'ticket-body';
  * the report, the internal notes and the events) and "Details" (reporter, assignee, kind,
  * the linked to-dos, the technical context). One pane at a time the two are tabs.
  *
- * Every note is internal, so the composer has no visibility switch. A note takes up to
- * 5 files (not on an anonymized ticket). Closing a ticket with open to-dos asks "Offene
+ * A note of the team is internal or public; the composer offers the switch (internal
+ * first) when an account reported the ticket, because only an account reads a public
+ * note. A note takes up to 5 files (not on an anonymized ticket).
+ *
+ * Without `ticket.manage` the page is the view of the reporter on an own ticket
+ * (`/tickets/mine`): the report, the public notes and the status changes, the own
+ * messages, the kind and the report time. No actions, no menu, no assignee, no to-dos,
+ * no technical context. A block of the sender hides the composer. Closing a ticket with open to-dos asks "Offene
  * To-Dos mit erledigen?" (default yes). The ⋮ menu blocks or unblocks the sender (frame
  * 19) at once, with a toast (contract 12.8: no question); the own report offers no
  * block. While a file of the report or
@@ -170,6 +229,10 @@ export class TicketDetailComponent {
   private readonly actions = viewChild<ElementRef<HTMLElement>>('actions');
 
   readonly split = computed(() => this.page?.split() ?? false);
+  /** The team view; else the view of the reporter on an own ticket. */
+  readonly manager = this.auth.can('ticket.manage');
+  /** The reporter may write: false while a block holds back the sender. */
+  readonly canReply = signal(true);
   readonly phone = mediaQuerySignal(MEDIA.phone);
 
   private id: Uuid = '';
@@ -231,7 +294,9 @@ export class TicketDetailComponent {
     const text = this.kicker();
     const no = this.ticket()?.number ?? '';
     const at = no ? text.indexOf(no) : -1;
-    return at < 0 ? { before: text, number: '', after: '' } : { before: text.slice(0, at), number: no, after: text.slice(at + no.length) };
+    return at < 0
+      ? { before: text, number: '', after: '' }
+      : { before: text.slice(0, at), number: no, after: text.slice(at + no.length) };
   });
 
   readonly statusKind = computed(() => STATUS_KIND[this.ticket()?.status ?? 'new']);
@@ -250,14 +315,17 @@ export class TicketDetailComponent {
 
   readonly menuSections = computed<RowMenuSection[]>(() => {
     const t = this.ticket();
-    if (!t) return [];
+    if (!t || !this.manager) return [];
     const sections: RowMenuSection[] = [];
     if (t.status !== 'new') {
-      sections.push({ items: [{ id: 'reset', label: this.t('tickets.detail.resetNew'), icon: 'history' }] });
+      sections.push({
+        items: [{ id: 'reset', label: this.t('tickets.detail.resetNew'), icon: 'history' }],
+      });
     }
     // The closing action and the block stand apart from the status change, behind a rule.
     const apart: RowMenuItem[] = [];
-    if (isOpen(t.status)) apart.push({ id: 'duplicate', label: this.t('tickets.detail.duplicate'), icon: 'copy' });
+    if (isOpen(t.status))
+      apart.push({ id: 'duplicate', label: this.t('tickets.detail.duplicate'), icon: 'copy' });
     // An anonymized ticket has no sender any more, and nobody blocks themselves.
     if (!t.anonymizedAt && !this.ownReport(t.reporter)) {
       apart.push(
@@ -292,11 +360,29 @@ export class TicketDetailComponent {
     TICKET_KINDS.map((k) => ({ value: k, label: this.t(KIND_LABEL[k]) })),
   );
 
+  /** The visibility switch of the team composer: only an account reads a public note. */
+  readonly visibilityOptions = computed<readonly ChatVisibility[]>(() => {
+    const t = this.ticket();
+    return this.manager && t && t.reporter.principalId && !t.anonymizedAt ? TEAM_VISIBILITIES : [];
+  });
+
+  readonly placeholder = computed<TranslationKey>(() =>
+    this.visibilityOptions().length || !this.manager
+      ? 'chat.placeholder'
+      : 'tickets.detail.notePlaceholder',
+  );
+
   /** The report as the first message, then the notes, then the pending ones. */
   private readonly outbox = new ChatOutbox<TicketNote>(
-    (req) => this.api.addNote(this.id, req.body, req),
+    (req) =>
+      this.manager
+        ? this.api.addNote(this.id, req.body, req, req.visibility)
+        : this.api.addMyNote(this.id, req.body, req),
     (created) => this.notes.update((list) => appendOnce(list, created)),
-    (err) => this.toast.error(this.t(sendErrorKey(err, 'tickets.detail.error.note'))),
+    (err) =>
+      this.toast.error(
+        this.t(this.blockedKey(err) ?? sendErrorKey(err, 'tickets.detail.error.note')),
+      ),
     draftDropper(this.files),
   );
 
@@ -305,11 +391,16 @@ export class TicketDetailComponent {
     if (!t) return [];
     const body: ChatMessage = {
       id: BODY_ID,
-      author: t.reporter.principalId ? { principalId: t.reporter.principalId, displayName: t.reporter.displayName } : null,
-      authorLabel: this.reporter(),
+      author: t.reporter.principalId
+        ? { principalId: t.reporter.principalId, displayName: t.reporter.displayName }
+        : null,
+      authorLabel: this.manager ? this.reporter() : null,
       body: t.body,
       at: t.createdAt,
-      own: false,
+      // The reporter reads the own report on the right, without an edit.
+      own: !this.manager,
+      canEdit: false,
+      visibility: this.visibilityOptions().length ? 'public' : null,
       attachments: t.attachments.map((a) => ({
         id: a.id,
         filename: a.filename,
@@ -327,6 +418,7 @@ export class TicketDetailComponent {
       editedAt: n.editedAt,
       own: n.isOwn,
       attachments: toChatAttachments(this.apiBase, n.attachments),
+      visibility: this.manager ? (n.visibility ?? 'internal') : null,
     }));
     return [body, ...notes, ...this.outbox.messages()];
   });
@@ -337,7 +429,9 @@ export class TicketDetailComponent {
     return t.events.map((e) => ({
       id: e.id,
       at: e.at,
-      text: eventText(e, this.reporter(), this.t),
+      text: this.manager
+        ? eventText(e, this.reporter(), this.t)
+        : reporterEventText(e.payload, this.t),
     }));
   });
 
@@ -348,7 +442,10 @@ export class TicketDetailComponent {
     if (c.url) rows.push({ label: 'tickets.context.page', value: c.url, href: c.url });
     if (c.appVersion) rows.push({ label: 'tickets.context.version', value: c.appVersion });
     if (c.userAgent || c.viewport) {
-      const parts = [c.userAgent ? browserLabel(c.userAgent) : null, c.viewport ? viewportLabel(c.viewport) : null];
+      const parts = [
+        c.userAgent ? browserLabel(c.userAgent) : null,
+        c.viewport ? viewportLabel(c.viewport) : null,
+      ];
       rows.push({ label: 'tickets.context.browser', value: parts.filter(Boolean).join(' · ') });
     }
     return rows;
@@ -366,6 +463,7 @@ export class TicketDetailComponent {
   constructor() {
     // The route is `tickets/:id`, so the id is always there.
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => this.load(pm.get('id')!));
+    if (!this.manager) return;
     this.api.assignees().subscribe({
       next: (list) => this.assignees.set(list),
       error: () => this.assignees.set([]),
@@ -386,7 +484,7 @@ export class TicketDetailComponent {
     }
     this.notFound.set(false);
     this.error.set(false);
-    this.api.get(id).subscribe({
+    this.read(id).subscribe({
       next: (t) => {
         if (seq !== this.seq) return;
         this.show(t);
@@ -402,6 +500,21 @@ export class TicketDetailComponent {
     this.loadTodos();
   }
 
+  /** The ticket: the team detail, or the own ticket of the reporter in the same shape. */
+  private read(id: Uuid): Observable<TicketDetail> {
+    if (this.manager) return this.api.get(id);
+    const me: TicketReporter = {
+      principalId: null,
+      displayName: this.auth.displayName() || null,
+      email: null,
+      anonymized: false,
+    };
+    return this.api.getMine(id).pipe(
+      tap((m) => this.canReply.set(m.canReply)),
+      map((m) => fromMine(m, me)),
+    );
+  }
+
   /**
    * Read the ticket again in the background, for the scan state of its files. Only the
    * scan states change: the read can be older than a note, an edit, a delete or a block
@@ -411,7 +524,7 @@ export class TicketDetailComponent {
   refreshThread(): void {
     const id = this.id;
     const seq = this.seq;
-    this.api.get(id).subscribe({
+    this.read(id).subscribe({
       next: (t) => {
         if (id === this.id && seq === this.seq) this.takeScanStates(t);
       },
@@ -438,6 +551,7 @@ export class TicketDetailComponent {
   }
 
   loadTodos(): void {
+    if (!this.manager) return;
     const id = this.id;
     this.todosApi.linked('ticket', id).subscribe({
       next: (cards) => {
@@ -475,7 +589,9 @@ export class TicketDetailComponent {
         this.blocking.set(false);
         if (id !== this.id) return;
         this.ticket.set(t);
-        this.toast.success(this.t(block ? 'tickets.detail.senderBlocked' : 'tickets.detail.senderUnblocked'));
+        this.toast.success(
+          this.t(block ? 'tickets.detail.senderBlocked' : 'tickets.detail.senderUnblocked'),
+        );
       },
       error: (err: unknown) => {
         this.blocking.set(false);
@@ -588,13 +704,28 @@ export class TicketDetailComponent {
    * the focus to the button that takes its place, so it does not fall back to the page.
    */
   private focusActions(): void {
-    afterNextRender(() => this.actions()?.nativeElement.querySelector<HTMLElement>('button')?.focus(), {
-      injector: this.injector,
-    });
+    afterNextRender(
+      () => this.actions()?.nativeElement.querySelector<HTMLElement>('button')?.focus(),
+      {
+        injector: this.injector,
+      },
+    );
+  }
+
+  /** A block that the team set while the reporter had the ticket open closes the composer. */
+  private blockedKey(err: unknown): TranslationKey | null {
+    const code =
+      err instanceof HttpErrorResponse ? (err.error as { code?: string } | null)?.code : undefined;
+    if (err instanceof HttpErrorResponse && err.status === 403 && code === 'sender_blocked') {
+      this.canReply.set(false);
+      return 'tickets.detail.error.blocked';
+    }
+    return null;
   }
 
   private patchError(err: unknown): TranslationKey {
-    const code = err instanceof HttpErrorResponse ? (err.error as { code?: string } | null)?.code : undefined;
+    const code =
+      err instanceof HttpErrorResponse ? (err.error as { code?: string } | null)?.code : undefined;
     if (code === 'assignee_not_allowed') return 'tickets.detail.error.assignee';
     if (code === 'duplicate_invalid') return 'tickets.detail.error.duplicate';
     return 'tickets.detail.error.save';
@@ -616,18 +747,24 @@ export class TicketDetailComponent {
 
   editNote(change: ChatEdit): void {
     if (change.id === BODY_ID) return;
-    this.api.editNote(this.id, change.id, change.body).subscribe({
+    const edit = this.manager
+      ? this.api.editNote(this.id, change.id, change.body)
+      : this.api.editMyNote(this.id, change.id, change.body);
+    edit.subscribe({
       next: (n) => this.notes.update((list) => list.map((x) => (x.id === n.id ? n : x))),
-      error: () => {
+      error: (err: unknown) => {
         change.restore?.();
-        this.toast.error(this.t('tickets.detail.error.note'));
+        this.toast.error(this.t(this.blockedKey(err) ?? 'tickets.detail.error.note'));
       },
     });
   }
 
   deleteNote(ref: ChatRef): void {
     if (ref.id === BODY_ID) return;
-    this.api.deleteNote(this.id, ref.id).subscribe({
+    const remove = this.manager
+      ? this.api.deleteNote(this.id, ref.id)
+      : this.api.deleteMyNote(this.id, ref.id);
+    remove.subscribe({
       next: () => this.notes.update((list) => list.filter((x) => x.id !== ref.id)),
       error: () => this.toast.error(this.t('tickets.detail.error.note')),
     });
@@ -642,7 +779,8 @@ export class TicketDetailComponent {
 
   todoSub(card: TodoLinkedCard): string {
     const parts = [card.boardName, card.columnName];
-    if (card.dueDate) parts.push(this.t('tickets.todos.due', { date: this.shortDate(card.dueDate) }));
+    if (card.dueDate)
+      parts.push(this.t('tickets.todos.due', { date: this.shortDate(card.dueDate) }));
     return parts.join(' · ');
   }
 
@@ -674,9 +812,10 @@ export class TicketDetailComponent {
   /** `YYYY-MM-DD` as "17.10.". */
   private shortDate(date: string): string {
     const [y, m, d] = date.split('-').map(Number);
-    return new Intl.DateTimeFormat(this.i18n.formatLocale(), { day: '2-digit', month: '2-digit' }).format(
-      new Date(y, m - 1, d),
-    );
+    return new Intl.DateTimeFormat(this.i18n.formatLocale(), {
+      day: '2-digit',
+      month: '2-digit',
+    }).format(new Date(y, m - 1, d));
   }
 
   reportedAt(t: TicketDetail): string {

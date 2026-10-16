@@ -159,9 +159,11 @@ def test_tickets_list_filters(fake_api: _FakeApi) -> None:
 def test_tickets_get_and_note(fake_api: _FakeApi) -> None:
     asyncio.run(tickets.tickets_get("t1"))
     asyncio.run(tickets.tickets_note("t1", "Reproduziert"))
+    asyncio.run(tickets.tickets_note("t1", "Ist behoben.", public=True))
     assert fake_api.calls == [
         ("GET", "/tickets/t1", None),
         ("POST", "/tickets/t1/notes", {"body": "Reproduziert"}),
+        ("POST", "/tickets/t1/notes", {"body": "Ist behoben.", "visibility": "public"}),
     ]
 
 

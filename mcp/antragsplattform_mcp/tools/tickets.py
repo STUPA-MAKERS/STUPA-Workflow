@@ -57,9 +57,16 @@ async def tickets_get(ticket_id: str) -> dict:
 
 @group.tool
 async def tickets_note(
-    ticket_id: str, body: str = "", file_paths: list[str] | None = None
+    ticket_id: str,
+    body: str = "",
+    file_paths: list[str] | None = None,
+    public: bool = False,
 ) -> dict:
-    """Add an internal note to a ticket, optionally with files. The reporter never sees it.
+    """Add a note to a ticket, optionally with files.
+
+    A note is internal: the reporter never sees it. With `public` the reporter account
+    reads it (and its files) in its own view of the ticket; a report without an account
+    has nobody to read it.
 
     Each file in `file_paths` (a local path on the machine of the MCP server, at most 5
     per note) goes up as a draft through `POST /apply/attachments`; the note then binds
@@ -72,8 +79,12 @@ async def tickets_note(
     Args:
         body: Markdown, up to 10000 characters; empty only with at least one file.
         file_paths: Local files to attach.
+        public: Show the note to the reporter account.
     """
-    return await post_message(f"/tickets/{ticket_id}/notes", {"body": body}, file_paths)
+    payload: dict[str, object] = {"body": body}
+    if public:
+        payload["visibility"] = "public"
+    return await post_message(f"/tickets/{ticket_id}/notes", payload, file_paths)
 
 
 @group.tool

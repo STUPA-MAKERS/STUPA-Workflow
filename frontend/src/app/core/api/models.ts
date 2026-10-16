@@ -139,6 +139,8 @@ export interface Principal {
   has_scoped_budget_view?: boolean;
   /** The principal is in at least one substitute pool. The meeting timeline shows. */
   in_substitute_pool?: boolean;
+  /** The principal reported a ticket that is not anonymized: the tab "Tickets" shows. */
+  has_reported_tickets?: boolean;
 }
 
 /** Response of POST /api/auth/logout. An RP-initiated OIDC logout URL, or null. */
