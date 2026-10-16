@@ -49,6 +49,8 @@ import { buildItems, dayKey, isPending, linkify, newCount } from './chat.util';
 /** The log counts as "at the newest message" this close to its end, in px. */
 const BOTTOM_SLACK = 24;
 const DRAFT_PREFIX = 'ap.chat.draft.';
+/** The longest body the server takes for a comment, a note or a card comment. */
+export const CHAT_MAX_LENGTH = 10_000;
 const SEEN_PREFIX = 'ap.chat.seen.';
 
 /** The body of a message as safe HTML: escaped Markdown, bare URLs as links. */
@@ -94,6 +96,8 @@ function writeStore(key: string, value: string | null): void {
  * - The composer grows to 6 lines. Enter sends on a desktop, Shift+Enter is a new line;
  *   on a phone Enter is a new line and only the button sends. The draft stays per thread.
  * - Optimistic send: the consumer passes pending messages (`state`), see `ChatOutbox`.
+ *   A failed message offers "Erneut senden", "Bearbeiten" (its text back into the
+ *   composer) and "Verwerfen".
  * - Own messages: edit and delete on hover or focus (desktop), a long press opens a
  *   bottom sheet (phone).
  */
@@ -134,6 +138,8 @@ export class ChatComponent {
   readonly edit = output<ChatEdit>();
   readonly delete = output<ChatRef>();
   readonly retry = output<ChatRef>();
+  /** A failed message leaves the thread: "Verwerfen", or "Bearbeiten" back into the composer. */
+  readonly discard = output<ChatRef>();
 
   protected readonly phone = mediaQuerySignal(MEDIA.phone);
   private readonly coarse = mediaQuerySignal('(pointer: coarse)');
@@ -143,7 +149,9 @@ export class ChatComponent {
    */
   protected readonly touchMenu = computed(() => this.phone() && this.coarse());
   private readonly log = viewChild.required<ElementRef<HTMLElement>>('log');
+  private readonly composerInput = viewChild<ElementRef<HTMLTextAreaElement>>('composerInput');
 
+  protected readonly maxLength = CHAT_MAX_LENGTH;
   protected readonly draft = signal('');
   protected readonly visibility = signal<ChatVisibility | null>(null);
   protected readonly editingId = signal<string | null>(null);
@@ -338,6 +346,27 @@ export class ChatComponent {
     // The chosen visibility stays for the next message of the thread.
     this.onDraft('');
     this.scrollToEnd();
+  }
+
+  // --- failed messages -------------------------------------------------------------
+
+  /**
+   * "Bearbeiten" on a failed message: its text goes back into the composer, ahead of a
+   * draft typed since, and the failed message leaves the thread.
+   */
+  protected editFailed(msg: ChatMessage): void {
+    const draft = this.draft().trim();
+    this.onDraft(draft ? `${msg.body}\n\n${draft}` : msg.body);
+    this.discard.emit({ id: msg.id });
+    afterNextRender(
+      () => {
+        const box = this.composerInput();
+        if (!box) return;
+        box.nativeElement.focus();
+        box.nativeElement.setSelectionRange(box.nativeElement.value.length, box.nativeElement.value.length);
+      },
+      { injector: this.injector },
+    );
   }
 
   // --- edit, delete, phone menu ----------------------------------------------------

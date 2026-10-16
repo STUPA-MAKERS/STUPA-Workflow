@@ -56,6 +56,7 @@ async function setup(opts: SetupOpts = {}) {
   const edit = jest.fn();
   const del = jest.fn();
   const retry = jest.fn();
+  const discard = jest.fn();
   const view = await render(ChatComponent, {
     inputs: {
       messages: opts.messages ?? [],
@@ -64,7 +65,7 @@ async function setup(opts: SetupOpts = {}) {
       visibilityOptions: opts.visibilityOptions ?? [],
       draftKey: opts.draftKey ?? 't1',
     },
-    on: { send, edit, delete: del, retry },
+    on: { send, edit, delete: del, retry, discard },
   });
   const set = (name: string, value: unknown) => {
     view.fixture.componentRef.setInput(name, value);
@@ -74,7 +75,7 @@ async function setup(opts: SetupOpts = {}) {
   const input = () => screen.getByRole('textbox', { name: 'Nachricht schreiben …' }) as HTMLTextAreaElement;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cmp = view.fixture.componentInstance as any;
-  return { view, send, edit, del, retry, set, log, input, cmp, user: userEvent.setup() };
+  return { view, send, edit, del, retry, discard, set, log, input, cmp, user: userEvent.setup() };
 }
 
 describe('ChatComponent', () => {
@@ -206,12 +207,46 @@ describe('ChatComponent', () => {
       ],
     });
     const metas = [...view.container.querySelectorAll('.chat__meta')].map((m) => m.textContent?.replace(/\s+/g, ' ').trim());
-    expect(metas).toEqual(['bearbeitet', '09:01·bearbeitet', 'wird gesendet …', 'Nicht gesendet Erneut senden']);
+    expect(metas).toEqual(['bearbeitet', '09:01·bearbeitet', 'wird gesendet …', 'Nicht gesendet Erneut senden Bearbeiten Verwerfen']);
     expect(view.container.querySelector('.chat__bubble--failed')).not.toBeNull();
     // A pending message offers no edit.
     expect(screen.queryAllByRole('button', { name: 'Nachricht bearbeiten' })).toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: 'Erneut senden' }));
     expect(retry).toHaveBeenCalledWith({ id: 'f' });
+  });
+
+  it('discards a failed message, or puts its text back into the composer', async () => {
+    const { discard, input, view } = await setup({
+      messages: [msg('f', today(10), { own: true, state: 'failed', body: 'Zu lang' })],
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Verwerfen' }));
+    expect(discard).toHaveBeenCalledWith({ id: 'f' });
+    discard.mockClear();
+    fireEvent.input(input(), { target: { value: 'Neu' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    expect(discard).toHaveBeenCalledWith({ id: 'f' });
+    view.fixture.detectChanges();
+    await view.fixture.whenStable();
+    expect(input().value).toBe('Zu lang\n\nNeu');
+    expect(localStorage.getItem('ap.chat.draft.t1')).toBe('Zu lang\n\nNeu');
+    expect(document.activeElement).toBe(input());
+  });
+
+  it('puts the text of a failed message into an empty composer as it is', async () => {
+    const { input, view } = await setup({
+      messages: [msg('f', today(10), { own: true, state: 'failed', body: 'Hallo' })],
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Bearbeiten' }));
+    view.fixture.detectChanges();
+    expect(input().value).toBe('Hallo');
+  });
+
+  it('caps the composer and the edit at the length the server takes', async () => {
+    const { input, cmp, view } = await setup({ messages: [msg('o', today(10), { own: true })] });
+    expect(input().getAttribute('maxlength')).toBe('10000');
+    cmp.startEdit(cmp.messages()[0]);
+    view.fixture.detectChanges();
+    expect(view.container.querySelector('.chat__editInput')?.getAttribute('maxlength')).toBe('10000');
   });
 
   describe('composer', () => {

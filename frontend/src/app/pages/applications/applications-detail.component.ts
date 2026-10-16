@@ -45,6 +45,7 @@ import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.compo
 import {
   ChatComponent,
   ChatOutbox,
+  sendErrorKey,
   EmptyStateComponent,
   FieldGroupComponent,
   FieldRowComponent,
@@ -224,6 +225,7 @@ export class ApplicationsDetailComponent {
   private readonly outbox = new ChatOutbox<ApplicationComment>(
     (req) => this.api.addComment(this.id, req.body, req.visibility ?? 'public'),
     (created) => this.comments.update((list) => [...list, created]),
+    (err) => this.toast.error(this.i18n.translate(sendErrorKey(err, 'applications.comments.error'))),
   );
   /** The comments as chat messages, the pending ones last. */
   readonly chatMessages = computed<ChatMessage[]>(() => [
@@ -1160,6 +1162,10 @@ export class ApplicationsDetailComponent {
 
   protected retryComment(ref: ChatRef): void {
     this.outbox.retry(ref.id);
+  }
+
+  protected discardComment(ref: ChatRef): void {
+    this.outbox.discard(ref.id);
   }
 
   /** Translation key for a failed comment change. 403 and 404 read as reasons. */

@@ -1,11 +1,24 @@
 import { signal } from '@angular/core';
 import type { Observable } from 'rxjs';
+import type { TranslationKey } from '@core/i18n/translations';
 import type { ChatMessage, ChatSend } from './chat.models';
+
+/**
+ * The toast of a failed send: a body over the limit of the server (413 or 422) and a
+ * missing right (403) name their reason, every other error the `fallback` of the thread.
+ */
+export function sendErrorKey(err: unknown, fallback: TranslationKey): TranslationKey {
+  const status = (err as { status?: unknown } | null)?.status;
+  if (status === 413 || status === 422) return 'chat.error.tooLong';
+  if (status === 403) return 'chat.error.forbidden';
+  return fallback;
+}
 
 /**
  * The optimistic send of a thread. A sent message shows at once as "wird gesendet …".
  * On success it leaves the outbox and `delivered` gets the server answer, which the
- * consumer puts into its list. On an error it stays as "Nicht gesendet" until `retry`.
+ * consumer puts into its list. On an error it stays as "Nicht gesendet" until `retry` or
+ * `discard`, and `failed` gets the error, so that the consumer can say why (a toast).
  *
  * The consumer passes `[...serverMessages, ...outbox.messages()]` to `app-chat`.
  */
@@ -19,6 +32,7 @@ export class ChatOutbox<T> {
   constructor(
     private readonly post: (req: ChatSend) => Observable<T>,
     private readonly delivered: (result: T) => void,
+    private readonly failed: (err: unknown) => void = () => undefined,
   ) {}
 
   send(req: ChatSend): void {
@@ -47,6 +61,12 @@ export class ChatOutbox<T> {
     this.run(id, req);
   }
 
+  /** Remove a failed message from the thread. An unknown id does nothing. */
+  discard(id: string): void {
+    if (!this.requests.delete(id)) return;
+    this.items.update((list) => list.filter((m) => m.id !== id));
+  }
+
   /** Forget every pending message, for example when the thread changes. */
   clear(): void {
     this.requests.clear();
@@ -61,7 +81,11 @@ export class ChatOutbox<T> {
         this.items.update((list) => list.filter((m) => m.id !== id));
         this.delivered(result);
       },
-      error: () => this.setState(id, 'failed'),
+      error: (err: unknown) => {
+        if (!this.requests.has(id)) return;
+        this.setState(id, 'failed');
+        this.failed(err);
+      },
     });
   }
 

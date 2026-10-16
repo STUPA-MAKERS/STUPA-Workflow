@@ -435,11 +435,21 @@ describe('StatusTimelineComponent', () => {
     await screen.findByRole('heading', { level: 1 });
     comp.sendComment({ body: 'Hallo', visibility: 'internal' });
     expect(comp.chatMessages().at(-1)).toMatchObject({ body: 'Hallo', state: 'failed', visibility: null });
-    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith('Kommentar konnte nicht gespeichert werden.');
     fail = false;
     comp.retryComment({ id: comp.chatMessages().at(-1)!.id });
     expect(addComment).toHaveBeenCalledTimes(2);
     expect(comp.comments().at(-1)?.id).toBe('c4');
+    expect(comp.chatMessages().some((m) => m.state === 'failed')).toBe(false);
+  });
+
+  it('names a refused send and discards the failed comment', async () => {
+    const addComment = jest.fn(() => throwError(() => ({ status: 403 })));
+    const { comp, toast } = await setup(fakeApi({ addComment }));
+    await screen.findByRole('heading', { level: 1 });
+    comp.sendComment({ body: 'Hallo' });
+    expect(toast.error).toHaveBeenCalledWith('Du darfst hier nicht schreiben.');
+    comp.discardComment({ id: comp.chatMessages().at(-1)!.id });
     expect(comp.chatMessages().some((m) => m.state === 'failed')).toBe(false);
   });
 

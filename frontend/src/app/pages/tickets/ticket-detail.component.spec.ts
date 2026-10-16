@@ -633,6 +633,16 @@ describe('TicketDetailComponent', () => {
     expect(cmp.notes().at(-1)!.body).toBe('Später');
   });
 
+  it('says why a note failed, and discards it on request', async () => {
+    const { cmp, api, toast } = await start();
+    api.addNote.mockReturnValueOnce(throwError(() => ({ status: 422 })));
+    cmp.sendNote({ body: 'Zu lang' });
+    expect(toast.error).toHaveBeenCalledWith('Die Nachricht ist zu lang.');
+    const failed = cmp.messages().at(-1)!;
+    cmp.discardNote({ id: failed.id });
+    expect(cmp.messages().some((m) => m.id === failed.id)).toBe(false);
+  });
+
   it('runs without the list page as one pane', async () => {
     const { cmp } = await start('/tickets/t40', { split: null });
     expect(cmp.split()).toBe(false);

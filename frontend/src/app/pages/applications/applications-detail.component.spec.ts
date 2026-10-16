@@ -1485,6 +1485,27 @@ describe('ApplicationsDetailComponent', () => {
   });
 
   it.each([
+    [422, 'Die Nachricht ist zu lang.'],
+    [403, 'Du darfst hier nicht schreiben.'],
+    [500, 'Kommentar konnte nicht gespeichert werden.'],
+  ])('toasts a failed comment %s and discards it on request', async (status, message) => {
+    const { http, detectChanges, cmp, toast } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    const error = jest.spyOn(toast, 'error');
+    cmp['sendComment']({ body: 'Hallo', visibility: 'internal' });
+    http
+      .expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-1/comments')
+      .flush({ title: 'e' }, { status, statusText: 'x' });
+    expect(error).toHaveBeenCalledWith(message);
+    const failed = cmp.chatMessages().find((m) => m.state === 'failed');
+    expect(failed?.body).toBe('Hallo');
+    cmp['discardComment']({ id: failed!.id });
+    expect(cmp.chatMessages().some((m) => m.state === 'failed')).toBe(false);
+  });
+
+  it.each([
     [409, 'In diesem Status nicht bearbeitbar.'],
     [500, 'Speichern fehlgeschlagen.'],
   ])('maps a failed save %s to its toast', async (status, message) => {

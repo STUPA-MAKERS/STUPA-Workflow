@@ -647,7 +647,12 @@ describe('TodoCardDetailComponent', () => {
     cmp.sendComment({ body: 'Fehlt' });
     const failed = cmp.messages().find((m) => m.state === 'failed');
     expect(failed).toBeDefined();
+    expect(toast.error).toHaveBeenLastCalledWith('Der Kommentar konnte nicht gespeichert werden.');
     cmp.retryComment({ id: failed!.id });
+    api.addComment.mockReturnValueOnce(throwError(() => ({ status: 422 })));
+    cmp.sendComment({ body: 'Zu lang' });
+    expect(toast.error).toHaveBeenLastCalledWith('Die Nachricht ist zu lang.');
+    cmp.discardComment({ id: cmp.messages().find((m) => m.state === 'failed')!.id });
     expect(cmp.messages().some((m) => m.state === 'failed')).toBe(false);
 
     cmp.editComment({ id: 'cm-1', body: 'Geändert' });
@@ -664,7 +669,7 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.card()?.commentCount).toBe(0);
     api.deleteComment.mockReturnValueOnce(throwError(() => new Error('x')));
     cmp.deleteComment({ id: 'cm-2' });
-    expect(toast.error).toHaveBeenCalledTimes(2);
+    expect(toast.error).toHaveBeenCalledTimes(4);
   });
 
   it('writes the events with their time', async () => {

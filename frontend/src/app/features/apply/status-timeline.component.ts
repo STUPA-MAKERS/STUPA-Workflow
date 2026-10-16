@@ -43,7 +43,7 @@ import { HistoryComponent, type HistoryEntry } from '@shared/ui/history/history.
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
-import { ChatOutbox } from '@shared/ui/chat/chat-outbox';
+import { ChatOutbox, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import type { ChatEdit, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/chat.models';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { mediaQuerySignal } from '../../layout/media-query';
@@ -154,6 +154,7 @@ export class StatusTimelineComponent {
   private readonly outbox = new ChatOutbox<ApplicationComment>(
     (req) => this.api.addComment(this.application()?.id ?? '', req.body),
     (created) => this.comments.update((list) => [...list, created]),
+    (err) => this.toast.error(this.i18n.translate(sendErrorKey(err, 'status.toast.commentFailed'))),
   );
   /** The comments as chat messages, the pending ones last. */
   readonly chatMessages = computed<ChatMessage[]>(() => [
@@ -570,6 +571,10 @@ export class StatusTimelineComponent {
 
   retryComment(ref: ChatRef): void {
     this.outbox.retry(ref.id);
+  }
+
+  discardComment(ref: ChatRef): void {
+    this.outbox.discard(ref.id);
   }
 
   /** Translation key for a failed comment change. 403 and 404 read as reasons. */

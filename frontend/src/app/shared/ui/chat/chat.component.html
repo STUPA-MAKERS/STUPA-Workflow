@@ -72,6 +72,7 @@
                     class="chat__editInput"
                     rows="1"
                     name="chatEdit"
+                    [attr.maxlength]="maxLength"
                     [value]="editDraft()"
                     (input)="editDraft.set($any($event.target).value)"
                     (keydown)="onEditKey($event)"
@@ -131,6 +132,12 @@
                 <button type="button" class="chat__retry" (click)="retry.emit({ id: m.id })">
                   {{ 'chat.retry' | t }}
                 </button>
+                <button type="button" class="chat__retry" (click)="editFailed(m)">
+                  {{ 'chat.editShort' | t }}
+                </button>
+                <button type="button" class="chat__retry" (click)="discard.emit({ id: m.id })">
+                  {{ 'chat.discard' | t }}
+                </button>
               </span>
             } @else if (item.tail || m.editedAt) {
               <span class="chat__meta">
@@ -174,9 +181,11 @@
     }
     <div class="chat__box">
       <textarea
+        #composerInput
         class="chat__input"
         rows="1"
         name="chatDraft"
+        [attr.maxlength]="maxLength"
         [value]="draft()"
         [placeholder]="placeholder() | t"
         [attr.aria-label]="placeholder() | t"

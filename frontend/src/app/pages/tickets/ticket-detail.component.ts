@@ -22,7 +22,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { liveSearch } from '@shared/live-search';
 import { AvatarStackComponent } from '@shared/ui/avatar/avatar.component';
-import { ChatOutbox } from '@shared/ui/chat/chat-outbox';
+import { ChatOutbox, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
 import type { ChatEdit, ChatEvent, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/chat.models';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
@@ -235,6 +235,7 @@ export class TicketDetailComponent {
   private readonly outbox = new ChatOutbox<TicketNote>(
     (req) => this.api.addNote(this.id, req.body),
     (created) => this.notes.update((list) => [...list, created]),
+    (err) => this.toast.error(this.t(sendErrorKey(err, 'tickets.detail.error.note'))),
   );
 
   readonly messages = computed<ChatMessage[]>(() => {
@@ -475,6 +476,10 @@ export class TicketDetailComponent {
 
   retryNote(ref: ChatRef): void {
     this.outbox.retry(ref.id);
+  }
+
+  discardNote(ref: ChatRef): void {
+    this.outbox.discard(ref.id);
   }
 
   editNote(change: ChatEdit): void {

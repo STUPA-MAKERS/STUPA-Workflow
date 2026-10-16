@@ -32,7 +32,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
-import { ChatOutbox } from '@shared/ui/chat/chat-outbox';
+import { ChatOutbox, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
 import type { ChatEdit, ChatEvent, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/chat.models';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
@@ -178,6 +178,7 @@ export class TodoCardDetailComponent {
   readonly outbox = new ChatOutbox<TodoComment>(
     (req) => this.postComment(req),
     (comment) => this.patchLocal((c) => ({ ...c, comments: [...c.comments, comment], commentCount: c.commentCount + 1 })),
+    (err) => this.toast.error(this.t(sendErrorKey(err, 'todos.error.comment'))),
   );
 
   constructor() {
@@ -699,6 +700,10 @@ export class TodoCardDetailComponent {
 
   retryComment(ref: ChatRef): void {
     this.outbox.retry(ref.id);
+  }
+
+  discardComment(ref: ChatRef): void {
+    this.outbox.discard(ref.id);
   }
 
   editComment(edit: ChatEdit): void {
