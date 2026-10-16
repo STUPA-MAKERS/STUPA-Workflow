@@ -108,6 +108,10 @@
   font-size: var(--fs-small);
   white-space: nowrap;
 }
+/* "0 von 0" is not true before the first answer: the place stays, the text waits. */
+.exp__count--wait {
+  visibility: hidden;
+}
 .exp__selbar {
   gap: var(--space-2);
   padding: 0 var(--space-2) 0 var(--space-4);

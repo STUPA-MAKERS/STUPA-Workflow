@@ -162,7 +162,11 @@
                 (valueChange)="setTab($any($event))"
               />
             }
-            <span class="exp__count" role="status">{{
+            <span
+              class="exp__count"
+              [class.exp__count--wait]="tab() === 'transfers' ? transferLoading() : loading()"
+              role="status"
+            >{{
               tab() === 'transfers'
                 ? ('expenses.count' | t: { count: transferItems().length, total: transferTotal() })
                 : ('expenses.count' | t: { count: items().length, total: total() })

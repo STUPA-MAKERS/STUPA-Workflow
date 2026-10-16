@@ -45,8 +45,9 @@
           [value]="timeline.searchQuery()"
           (valueChange)="timeline.onSearch($event)"
         />
-        @if (showFilter()) {
-          <div class="mtl__chips">
+        @if (showFilter() || timeline.filterPending()) {
+          <!-- Until the filter Gremien arrive the chip shows "Alle Gremien", inert. -->
+          <div class="mtl__chips" [attr.inert]="showFilter() ? null : ''">
             <app-filter-select
               class="mtl__chip"
               icon="building"

@@ -63,7 +63,7 @@
             [to]="grossMax()"
             (applied)="onGrossRange($event)"
           />
-          <span class="inv__count" role="status">{{ 'invoices.count' | t: { count: items().length, total: total() } }}</span>
+          <span class="inv__count" [class.inv__count--wait]="loading()" role="status">{{ 'invoices.count' | t: { count: items().length, total: total() } }}</span>
         </div>
         <app-segmented
           class="inv__seg"

@@ -71,6 +71,17 @@ export class MeetingsTimelineService implements OnDestroy {
   readonly gremiumFilter = signal<string>('');
   /** Gremien with at least one readable meeting. The backend provides the list. */
   readonly filterGremien = signal<{ id: string; name: string }[]>([]);
+  private readonly filterGremienLoaded = signal(false);
+  /**
+   * The filter Gremien have not arrived yet, and the person probably gets the chip (more
+   * than one Gremium, or every meeting). The list then holds the place of the chip row, so
+   * the rows do not move down when the answer comes.
+   */
+  readonly filterPending = computed(
+    () =>
+      !this.filterGremienLoaded() &&
+      (this.auth.isAdmin() || this.auth.can('meeting.view_all') || this.auth.gremien().length > 1),
+  );
   readonly filterGremiumOptions = computed<SelectOption[]>(() => [
     { value: '', label: this.i18n.translate('meetings.list.allCommittees') },
     ...this.filterGremien().map((g) => ({ value: g.id, label: g.name })),
@@ -102,8 +113,14 @@ export class MeetingsTimelineService implements OnDestroy {
       .listMeetingFilterGremien()
       .pipe(takeUntilDestroyed())
       .subscribe({
-        next: (gs) => this.filterGremien.set(gs),
-        error: () => this.filterGremien.set([]),
+        next: (gs) => {
+          this.filterGremien.set(gs);
+          this.filterGremienLoaded.set(true);
+        },
+        error: () => {
+          this.filterGremien.set([]);
+          this.filterGremienLoaded.set(true);
+        },
       });
   }
 

@@ -10,7 +10,9 @@ type Params = { direction: string; cursor?: string | null; limit: number; gremiu
 
 const m = (id: string): Meeting => ({ id, title: id }) as Meeting;
 
-function setup(opts: { reader?: boolean; gremien?: () => ReturnType<ApiClient['listMeetingFilterGremien']> } = {}) {
+function setup(
+  opts: { reader?: boolean; many?: boolean; gremien?: () => ReturnType<ApiClient['listMeetingFilterGremien']> } = {},
+) {
   const calls: Params[] = [];
   const answers: Subject<Page>[] = [];
   const api = {
@@ -26,7 +28,7 @@ function setup(opts: { reader?: boolean; gremien?: () => ReturnType<ApiClient['l
   const auth = {
     isAdmin: () => false,
     can: () => false,
-    gremien: () => (reader ? [{ id: 'g1' }] : []),
+    gremien: () => (reader ? (opts.many ? [{ id: 'g1' }, { id: 'g2' }] : [{ id: 'g1' }]) : []),
     inSubstitutePool: () => false,
   };
   TestBed.configureTestingModule({
@@ -53,6 +55,21 @@ describe('MeetingsTimelineService', () => {
     TestBed.resetTestingModule();
     const { svc } = setup({ gremien: () => throwError(() => new Error('x')) });
     expect(svc.filterGremien()).toEqual([]);
+  });
+
+  it('holds the place of the filter chip while the filter Gremien load, for a member of several', () => {
+    const pending = new Subject<{ id: string; name: string }[]>();
+    const { svc } = setup({ many: true, gremien: () => pending });
+    expect(svc.filterPending()).toBe(true);
+    pending.next([{ id: 'g1', name: 'StuPa' }]);
+    expect(svc.filterPending()).toBe(false);
+    TestBed.resetTestingModule();
+    const failed = new Subject<{ id: string; name: string }[]>();
+    const second = setup({ many: true, gremien: () => failed }).svc;
+    failed.error(new Error('x'));
+    expect(second.filterPending()).toBe(false);
+    TestBed.resetTestingModule();
+    expect(setup({ gremien: () => new Subject() }).svc.filterPending()).toBe(false);
   });
 
   it('does not load the timeline for a user who may not read it', () => {
