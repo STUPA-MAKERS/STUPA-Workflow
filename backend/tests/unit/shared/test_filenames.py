@@ -82,6 +82,23 @@ def test_display_drops_invisible_characters() -> None:
     assert sanitize_display_name("\ufeffa\u200bb\u2060c\u180e.pdf") == "abc.pdf"
 
 
+@pytest.mark.parametrize(
+    "fmt",
+    [
+        "‎",  # LRM
+        "‏",  # RLM
+        "؜",  # ALM
+        "­",  # soft hyphen
+        "⁢",  # invisible times
+        "⁪",  # inhibit symmetric swapping
+        "￹",  # interlinear annotation anchor
+        "\U000e0041\U000e0042",  # tag characters: text a person cannot see
+    ],
+)
+def test_display_drops_every_format_character(fmt: str) -> None:
+    assert sanitize_display_name(f"Bericht{fmt}final.pdf") == "Berichtfinal.pdf"
+
+
 def test_display_keeps_joiners_inside_and_drops_loose_ones() -> None:
     # Inside an emoji sequence or a word the joiner stays.
     assert sanitize_display_name("a\u200db.pdf") == "a\u200db.pdf"
@@ -233,6 +250,18 @@ def test_disposition_round_trips_a_long_name() -> None:
     name = "Ä" * 300 + ".pdf"
     _kind, _plain, ext = _parts(content_disposition("attachment", name))
     assert unquote(ext) == sanitize_display_name(name)
+
+
+def test_disposition_caps_a_fallback_that_the_fold_expands() -> None:
+    # NFKD makes U+FDFA into 18 characters. Without the cap the header passes 5 KB,
+    # and nginx answers 502 above its proxy_buffer_size of 4 KB.
+    name = "ﷺ" * 300 + ".pdf"
+    value = content_disposition("attachment", name)
+    _kind, plain, ext = _parts(value)
+    assert len(plain) == DISPLAY_NAME_MAX
+    assert plain.endswith(".pdf")
+    assert unquote(ext) == sanitize_display_name(name)
+    assert len(value) < 3000
 
 
 def test_disposition_default_for_an_empty_name() -> None:

@@ -7,7 +7,8 @@ An upload has two names, and they have different rules:
   ``Einführung.pdf`` stays ``Einführung.pdf``. ``sanitize_display_name`` normalizes it
   to NFC and removes what can hurt: path components, control characters, the bidi
   override and isolate characters (an ``U+202E`` makes ``gpj.exe`` look like
-  ``exe.jpg``) and invisible zero-width characters.
+  ``exe.jpg``), every other invisible format character (Unicode category Cf) and the
+  zero-width characters.
 * The **storage-key name** is the last segment of the MinIO object key. It stays ASCII
   (``sanitize_storage_name``), because an object key is a path: it must never hold a
   separator, a ``..`` or a byte that a tool along the way encodes differently.
@@ -39,16 +40,6 @@ DEFAULT_NAME = "upload"
 _EXTENSION_MAX = 16
 """An extension longer than this is not kept when the name is cut."""
 
-_BIDI_CONTROLS = frozenset(
-    "‪‫‬‭‮"  # embeddings and overrides
-    "⁦⁧⁨⁩"  # isolates
-)
-"""Bidi controls that reorder the text around them and so can fake an extension."""
-
-_INVISIBLE = frozenset("​⁠﻿᠎")
-"""Zero-width characters that never carry meaning in a name: space, word joiner, BOM,
-Mongolian vowel separator."""
-
 _JOINERS = frozenset("‌‍")
 """ZWNJ and ZWJ. Emoji sequences and several scripts need them between two visible
 characters. At an edge or next to a dot or a space they only hide something."""
@@ -73,11 +64,18 @@ def _drop_char(char: str) -> bool:
     """Tell whether a character never belongs in a display name.
 
     The categories are Cc (control, also CR, LF, TAB and NUL), Cs (a lone surrogate,
-    which Postgres cannot store), Zl and Zp (line and paragraph separators).
+    which Postgres cannot store), Zl and Zp (line and paragraph separators) and Cf
+    (format). Cf is invisible: it holds the bidi embeddings, overrides and isolates
+    (U+202A to U+202E, U+2066 to U+2069), the bidi marks LRM, RLM and ALM, the
+    zero-width space, the word joiner, the BOM, the soft hyphen, the invisible
+    operators and the tag characters. A bidi control reorders the text around it and
+    so can fake an extension, and the tag characters hide text from a person but not
+    from a model that reads the name through MCP. ZWJ and ZWNJ are Cf too, but they
+    stay here, because ``_drop_loose_joiners`` decides about them.
     """
-    if char in _BIDI_CONTROLS or char in _INVISIBLE:
-        return True
-    return unicodedata.category(char) in {"Cc", "Cs", "Zl", "Zp"}
+    if char in _JOINERS:
+        return False
+    return unicodedata.category(char) in {"Cc", "Cs", "Zl", "Zp", "Cf"}
 
 
 def _drop_loose_joiners(name: str) -> str:
@@ -118,9 +116,9 @@ def sanitize_display_name(filename: str | None, *, default: str = DEFAULT_NAME) 
     """Clean a client file name for display and download, and keep its Unicode.
 
     The steps are: NFC normalization, the last path component only, every space
-    character as a plain space, no control, surrogate, line-separator, bidi-control or
-    zero-width character, no space or dot at an edge, at most ``DISPLAY_NAME_MAX``
-    characters with the extension kept.
+    character as a plain space, no control, surrogate, line-separator, format (Cf,
+    which includes the bidi controls) or zero-width character, no space or dot at an
+    edge, at most ``DISPLAY_NAME_MAX`` characters with the extension kept.
 
     Args:
         filename: The name the client sent, or ``None``.
@@ -159,12 +157,18 @@ def sanitize_storage_name(filename: str | None) -> str:
 
 
 def _ascii_fallback(name: str) -> str:
-    """Build the plain ``filename`` value: printable ASCII, no quote, no backslash."""
+    """Build the plain ``filename`` value: printable ASCII, no quote, no backslash.
+
+    The value is capped like the display name, because the NFKD fold can make one
+    character into many (``U+FDFA`` gives 18). Without the cap a name of 200 such
+    characters gives a header of more than 5 KB, and nginx answers 502 when the
+    response headers do not fit its ``proxy_buffer_size`` of 4 KB.
+    """
     folded = _ascii_fold(name)
     fallback = "".join(
         c if " " <= c <= "~" and c not in _FALLBACK_UNSAFE else "_" for c in folded
     )
-    return fallback or "download"
+    return _cap(fallback, DISPLAY_NAME_MAX) or "download"
 
 
 def content_disposition(
